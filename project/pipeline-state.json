@@ -224,6 +224,21 @@
       "consumedAt": "2026-08-16T20:41:30.753Z"
     },
     {
+      "proofSha256": "7f39c96567e52426a3e313f8b6a623af1976a9c9f9c71ac1f384a41536ec62b5",
+      "kind": "feature-package-reconcile",
+      "consumedAt": "2026-08-17T15:12:04.465Z"
+    },
+    {
+      "proofSha256": "a769ac58aac9304d5b6953cf5c2051c6e466e597312c5ea0295b2b77dba08103",
+      "kind": "feature-package-reconcile",
+      "consumedAt": "2026-08-17T18:10:13.731Z"
+    },
+    {
+      "proofSha256": "5f9894e850032110611257347cbe7e540f76673aa612687964892792fbcd7145",
+      "kind": "feature-package-reconcile",
+      "consumedAt": "2026-08-17T20:24:34.449Z"
+    },
+    {
       "proofSha256": "e9a9c5e5e98ca4a59da40ff9a12022481cad539fd8da5f647ea9cc7d4b530be0",
       "kind": "push",
       "consumedAt": "2026-08-19T19:00:55.669Z"
@@ -238,5 +253,202 @@
       "kind": "push",
       "consumedAt": "2026-08-26T05:55:38.318Z"
     }
-  ]
+  ],
+  "phoenixEpicHistory": {
+    "note": "Preserved verbatim from origin/sprint_phoenix @ 25c97b589967bdb27a430f2cb6fda86f9501ca61 during the 2026-08-26 Phoenix merge into this branch. HISTORICAL RECORD ONLY, not active state -- the PO decided sprint-nova-epic (the top-level activeFeature/continuity/planApproval/planSubmission/planInvalidation/pushApproval above) remains authoritative going forward. This block records sprint-phoenix-epic's own continuity/authority/approval history as it stood on that branch, including work that continued past the earlier 2026-08-01 closure already recorded in closedFeatures above (revision 8, a 2026-08-17 re-approval, and feature-package-reconcile approvals) -- preserved rather than dropped per explicit PO instruction that no Phoenix data be lost in this merge. Not wrapped as a closedFeatures[] entry because no result.md/continuityClose evidence exists for this later work (continuity.authority.result was null on the Phoenix side) -- fabricating a closure record would misrepresent what actually happened.",
+    "activeFeature": {
+      "id": "sprint-phoenix-epic",
+      "planPath": "specs/sprint-phoenix-epic/prd_phoenix-epic.md",
+      "phase": "implementation"
+    },
+    "continuity": {
+      "schema": "pipeline.continuity.v0",
+      "featureId": "sprint-phoenix-epic",
+      "revision": 8,
+      "runtime": {
+        "humanFacingLanguage": "en",
+        "activeDuty": "Elephant",
+        "sessionCleanup": null
+      },
+      "authority": {
+        "prd": {
+          "path": "specs/sprint-phoenix-epic/prd_phoenix-epic.md",
+          "sha256": "81d0213b4c3c2f114d49bbebba4423515feef89b086152964eab7e489b1c32eb"
+        },
+        "spec": {
+          "path": "specs/sprint-phoenix-epic/spec.md",
+          "sha256": "5eeef75ccea0a49e512634d8ae8d899bee672e3635d7e9f461fc99b6f034ed5f"
+        },
+        "result": null
+      },
+      "queueHead": {
+        "packageId": "continuity-adoption",
+        "actionId": "review-active-feature",
+        "nextAction": "review",
+        "productRetryCount": 0,
+        "environmentRerouteCount": 0,
+        "dispatch": null
+      },
+      "blocker": null,
+      "acknowledgedFinal": null,
+      "resume": {
+        "mode": "immediate",
+        "sourceRevision": 8,
+        "reasonCode": "active-turn"
+      },
+      "recovery": null,
+      "decisionTxn": null,
+      "capacity": {
+        "concurrencyLimit": 4,
+        "reservedCriticSlots": 1,
+        "reservedRecoverySlots": 1,
+        "fallbackPolicy": "defer"
+      },
+      "closeTransition": null,
+      "nativeContinuation": null
+    },
+    "planRecovery": {
+      "schema": "pipeline.plan-legacy-v2-revocation-recovery.v1",
+      "recoveryClass": "legacy-v2-revocation-implementation-to-design",
+      "recoveredBy": "PO Phoenix design reopen",
+      "recoveredAt": "2026-08-06T05:27:50.475Z",
+      "preimageSha256": "b8e3df1d7729b2059a7129ab006dbb0b629473ea060e2f781ffc508cc5f57b3a"
+    },
+    "continuityAuthorityRevisionReceipts": [
+      {
+        "schema": "pipeline.continuity-authority-revision-receipt.v1",
+        "operation": "design-revision",
+        "outcome": "committed",
+        "oldArtifactDigests": {
+          "prd": "92f38d22405392c860eab918a33d5f4d303170561efaa3df1ae5c3884c9b04e9",
+          "spec": "39912b05660026f5dc82efa5f37aca33b7899d99ff8b29ced1545a9cb389f57f"
+        },
+        "newArtifactDigests": {
+          "prd": "92f38d22405392c860eab918a33d5f4d303170561efaa3df1ae5c3884c9b04e9",
+          "spec": "da2cca3e6e9f742266913df20d82725275ac27b3b0258c445e41917a731e2267"
+        },
+        "decision": {
+          "id": "phoenix-authority-revision-20260806",
+          "sha256": "a3a8086f54b0249bf7b4486eb26a1f913c2729da4f332b1251937febec506e56"
+        },
+        "candidate": {
+          "commit": "faa5e083b1b30cf0c2000646f2f1e87d51412133",
+          "tree": "b69c2dc7f4129f64e73a91a79590fc50db72b04b"
+        },
+        "evidence": {
+          "sha256": "da2cca3e6e9f742266913df20d82725275ac27b3b0258c445e41917a731e2267"
+        },
+        "idempotencyKey": "phoenix-authority-revision-20260806"
+      }
+    ],
+    "planSubmission": {
+      "schema": "pipeline.plan-submission.v1",
+      "featureId": "sprint-phoenix-epic",
+      "planPath": "specs/sprint-phoenix-epic/prd_phoenix-epic.md",
+      "planSha256": "81d0213b4c3c2f114d49bbebba4423515feef89b086152964eab7e489b1c32eb",
+      "specPath": "specs/sprint-phoenix-epic/spec.md",
+      "specSha256": "5eeef75ccea0a49e512634d8ae8d899bee672e3635d7e9f461fc99b6f034ed5f",
+      "profile": "epic",
+      "profileSha256": "26494e6fbe5634bf4b7bbd698f5348b74f766bb3bcb715d926f5def107d50ba0",
+      "submittedBy": "Elephant",
+      "submittedAt": "2026-08-17T14:00:26.483Z"
+    },
+    "planInvalidation": {
+      "schema": "pipeline.plan-invalidation.v1",
+      "featureId": "sprint-phoenix-epic",
+      "invalidatedSubmissionSha256": "7f394f4c028cf7b7b6e840a859443aefe5759cb629313bb0809f3daf3b1dda65",
+      "invalidatedApprovalSha256": "66c6cbdfed6540d444915ab894debb141679479914cfb7674a786e487fe7455a",
+      "invalidatedBy": "PO",
+      "invalidatedAt": "2026-08-17T13:36:37.686Z",
+      "reason": "reopen-design"
+    },
+    "planApproval": {
+      "schema": "pipeline.plan-approval.v4",
+      "approvedBy": "PO",
+      "approvedAt": "2026-08-17T14:05:27.557Z",
+      "submissionSha256": "8f1dddccda4161c095b13124266836cc7692186b36c554c349bd7dc9848da255",
+      "profileSha256": "26494e6fbe5634bf4b7bbd698f5348b74f766bb3bcb715d926f5def107d50ba0",
+      "poGateAuthority": {
+        "schema": "pipeline.po-gate-authority.v2",
+        "humanFacing": "en",
+        "sourceSha256": "ce50d74d16fdbcd0b9f8b3b606297e88af3d2f139b3cd14b692f4ea15599b023",
+        "runtimeSha256": "5fa4492e52d5987142bcd7eb466bba8492a4ba53a7938995783e93c3e43df58f",
+        "receiptSha256": "708c217f156dd2b00fdaca9071494fa0ee4e917ed17e00c1c1379ec583eb60c9",
+        "repositoryFingerprint": "92f4f001424af56c17e443aec9969d0ff5ac0e426b8f388fe06d4b1800aa2d35",
+        "planPath": "specs/sprint-phoenix-epic/prd_phoenix-epic.md",
+        "planSha256": "81d0213b4c3c2f114d49bbebba4423515feef89b086152964eab7e489b1c32eb",
+        "specPath": "specs/sprint-phoenix-epic/spec.md",
+        "specSha256": "5eeef75ccea0a49e512634d8ae8d899bee672e3635d7e9f461fc99b6f034ed5f"
+      },
+      "priorInvalidationSha256": "7ea3bf1823f41e25df7f7a4da8499eb6b5d58eb25d3adfcbf3392ce4fe3ac1f2"
+    },
+    "authorityRevisionReceipts": [
+      {
+        "schema": "pipeline.continuity-authority-revision-receipt.v1",
+        "operation": "continuity-authority-revision",
+        "reasonClass": "design-authority-revision",
+        "featureId": "sprint-phoenix-epic",
+        "oldAuthority": {
+          "prd": {
+            "path": "specs/sprint-phoenix-epic/prd_phoenix-epic.md",
+            "sha256": "fb1447148ca2df667dc24c51279e92bea30a6975d5281b4c487cf0081978f2a2"
+          },
+          "spec": {
+            "path": "specs/sprint-phoenix-epic/spec.md",
+            "sha256": "8041183b39bd1ac2c1248470d7dee3934f9501f2322c87a32a1cb8798f5fa2ec"
+          }
+        },
+        "nextAuthority": {
+          "prd": {
+            "path": "specs/sprint-phoenix-epic/prd_phoenix-epic.md",
+            "sha256": "83051d18451ca64b85e1cc23ec8101eb46baa88513fceb3b5f444c8d96a61723"
+          },
+          "spec": {
+            "path": "specs/sprint-phoenix-epic/spec.md",
+            "sha256": "badebcb8fbc09334642c8c1465647934af9cad567dc71b2709da4dc1276b7287"
+          }
+        },
+        "decision": {
+          "id": "phoenix-authority-revision-20260817-v2",
+          "sha256": "1299f283279a4c5690d35f40229dc5dae0e295a776908cc74f081ab7e6adbae8",
+          "scope": {
+            "featureId": "sprint-phoenix-epic",
+            "phase": "design"
+          }
+        },
+        "candidate": {
+          "commit": "e39f390375eda45eecaa33893e94848b1e7f6e9e",
+          "tree": "03aca7d3e4d4203d2ef40eea8b6ed464bc70fa1a"
+        },
+        "evidence": {
+          "sha256": "badebcb8fbc09334642c8c1465647934af9cad567dc71b2709da4dc1276b7287"
+        },
+        "casOutcome": "applied",
+        "intentSha256": "77521aa99b85bf6f3a26ba8236448390e49f8b1f12472f9cfb6010c475833f95"
+      }
+    ],
+    "featurePackageReconcileApproval": {
+      "lastApproved": {
+        "approvedBy": "André",
+        "approvedAt": "2026-08-17T20:24:34.449Z",
+        "forCommit": "8959cb9961f00c96221d65e5faddf7768e7b5105",
+        "criticalProof": {
+          "proofSha256": "5f9894e850032110611257347cbe7e540f76673aa612687964892792fbcd7145",
+          "intentSha256": "96243dc58674c24cf93ab67bd244a9b63a6bebabc6d28ac1fc3412fe0ce63299",
+          "action": {
+            "kind": "feature-package-reconcile",
+            "subjectSha256": "ef63378348bbe04938d554cf3ff88c959a8fb8f84efb418aea32d60acfc2afb3",
+            "expiresAt": "2026-08-18T21:00:00.000Z"
+          },
+          "proof": {
+            "schema": "pipeline.po-approval-proof.v1",
+            "intentSha256": "96243dc58674c24cf93ab67bd244a9b63a6bebabc6d28ac1fc3412fe0ce63299",
+            "keyReference": "local-po-key",
+            "publicKey": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAb2hgIMasQe7m80aB5C9zD7YTW6mEa0wjUGHRZ9yGv5c=\n-----END PUBLIC KEY-----\n",
+            "signatureBase64": "MxrwjAg1nxMhlhda8yV+olOIUAAh1CDQGuqrSG3mT7OuKPfi6ZK9pngjT5aZIU/ZxphfJ4LIqr7H282LGHVoBA=="
+          }
+        }
+      }
+    }
+  }
 }

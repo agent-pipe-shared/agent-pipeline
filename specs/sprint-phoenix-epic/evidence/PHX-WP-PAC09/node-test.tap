@@ -1,0 +1,490 @@
+TAP version 13
+# Subtest: maps sanitized projections deterministically into all supported interchange profiles
+ok 1 - maps sanitized projections deterministically into all supported interchange profiles
+  ---
+  duration_ms: 1.364198
+  type: 'test'
+  ...
+# Subtest: maps only the already-sanitized projection and rejects profile or payload mismatch
+ok 2 - maps only the already-sanitized projection and rejects profile or payload mismatch
+  ---
+  duration_ms: 1.1533
+  type: 'test'
+  ...
+# Subtest: E-AC-18 excludes destination secrets from every portable export record while keeping typed local bindings
+ok 3 - E-AC-18 excludes destination secrets from every portable export record while keeping typed local bindings
+  ---
+  duration_ms: 1.411324
+  type: 'test'
+  ...
+# Subtest: E-AC-02 declares RFC 5424's actual dropped fields instead of always claiming no loss
+ok 4 - E-AC-02 declares RFC 5424's actual dropped fields instead of always claiming no loss
+  ---
+  duration_ms: 0.27865
+  type: 'test'
+  ...
+# Subtest: profile and acknowledgements are closed, non-authoritative and deduplicated
+ok 5 - profile and acknowledgements are closed, non-authoritative and deduplicated
+  ---
+  duration_ms: 0.22784
+  type: 'test'
+  ...
+# Subtest: E-AC-04 omits free-form rationale/summary by default; an explicit policy admits only a redacted form
+ok 6 - E-AC-04 omits free-form rationale/summary by default; an explicit policy admits only a redacted form
+  ---
+  duration_ms: 0.586929
+  type: 'test'
+  ...
+# Subtest: E-AC-09 the advisory destination classification is a closed boolean, not free text
+ok 7 - E-AC-09 the advisory destination classification is a closed boolean, not free text
+  ---
+  duration_ms: 0.24703
+  type: 'test'
+  ...
+# Subtest: local conformance collector delivers a bounded mapped batch and advances the acknowledged cursor
+ok 8 - local conformance collector delivers a bounded mapped batch and advances the acknowledged cursor
+  ---
+  duration_ms: 2.250677
+  type: 'test'
+  ...
+# Subtest: forged or out-of-batch acknowledgements fail before a local outbox transition
+ok 9 - forged or out-of-batch acknowledgements fail before a local outbox transition
+  ---
+  duration_ms: 0.624949
+  type: 'test'
+  ...
+# Subtest: partial acknowledgement leaves an independent recoverable suffix with explicit receipt state
+ok 10 - partial acknowledgement leaves an independent recoverable suffix with explicit receipt state
+  ---
+  duration_ms: 0.496359
+  type: 'test'
+  ...
+# Subtest: E-AC-06 an unacknowledged attempt leaves the event pending so a retry redelivers the same mapping
+ok 11 - E-AC-06 an unacknowledged attempt leaves the event pending so a retry redelivers the same mapping
+  ---
+  duration_ms: 0.52333
+  type: 'test'
+  ...
+# Subtest: PHX-WP-EAC14 a simulated destination transport failure leaves the outbox untouched for a safe retry
+ok 12 - PHX-WP-EAC14 a simulated destination transport failure leaves the outbox untouched for a safe retry
+  ---
+  duration_ms: 0.967798
+  type: 'test'
+  ...
+# Subtest: E-AC-06 the delivery receipt is structurally unable to ever claim exactly-once delivery
+ok 13 - E-AC-06 the delivery receipt is structurally unable to ever claim exactly-once delivery
+  ---
+  duration_ms: 0.49567
+  type: 'test'
+  ...
+# Subtest: E-AC-09 exposes non-zero lag on the receipt when a destination fails to fully acknowledge
+ok 14 - E-AC-09 exposes non-zero lag on the receipt when a destination fails to fully acknowledge
+  ---
+  duration_ms: 0.880258
+  type: 'test'
+  ...
+# Subtest: E-AC-09 an advisory destination's lag/failure is exposed identically to any other destination, labelled advisory on the delivery result
+ok 15 - E-AC-09 an advisory destination's lag/failure is exposed identically to any other destination, labelled advisory on the delivery result
+  ---
+  duration_ms: 0.45159
+  type: 'test'
+  ...
+# Subtest: E-AC-09 canonical local governance appends, queries and verifies with zero outbox/adapter/receipt/destination-health input while an advisory destination fails
+ok 16 - E-AC-09 canonical local governance appends, queries and verifies with zero outbox/adapter/receipt/destination-health input while an advisory destination fails
+  ---
+  duration_ms: 62.883508
+  type: 'test'
+  ...
+# Subtest: E-AC-11 the delivery receipt is closed and rejects any retention/immutability/review/compliance-implying field
+ok 17 - E-AC-11 the delivery receipt is closed and rejects any retention/immutability/review/compliance-implying field
+  ---
+  duration_ms: 0.724009
+  type: 'test'
+  ...
+# Subtest: E-AC-11 the receipt's projectionDigest is deterministic over batch content and changes when content changes
+ok 18 - E-AC-11 the receipt's projectionDigest is deterministic over batch content and changes when content changes
+  ---
+  duration_ms: 0.511059
+  type: 'test'
+  ...
+# Subtest: E-AC-16 bounds batching and rejects a policy that exceeds the destination profile
+ok 19 - E-AC-16 bounds batching and rejects a policy that exceeds the destination profile
+  ---
+  duration_ms: 0.832579
+  type: 'test'
+  ...
+# Subtest: E-AC-16 applies compression only where the profile enables it, over the same events
+ok 20 - E-AC-16 applies compression only where the profile enables it, over the same events
+  ---
+  duration_ms: 0.832809
+  type: 'test'
+  ...
+# Subtest: E-AC-16 holds a batch inside the destination's declared payload bound
+ok 21 - E-AC-16 holds a batch inside the destination's declared payload bound
+  ---
+  duration_ms: 0.3849
+  type: 'test'
+  ...
+# Subtest: E-AC-16 enforces the rate limit between successful deliveries
+ok 22 - E-AC-16 enforces the rate limit between successful deliveries
+  ---
+  duration_ms: 0.167789
+  type: 'test'
+  ...
+# Subtest: E-AC-16 spends a bounded retry budget with capped exponential backoff
+ok 23 - E-AC-16 spends a bounded retry budget with capped exponential backoff
+  ---
+  duration_ms: 0.28023
+  type: 'test'
+  ...
+# Subtest: E-AC-16 signals backpressure without ever suppressing the drain
+ok 24 - E-AC-16 signals backpressure without ever suppressing the drain
+  ---
+  duration_ms: 0.20963
+  type: 'test'
+  ...
+# Subtest: E-AC-16 lets flush drain a shutdown without waiving the retry budget or cancellation
+ok 25 - E-AC-16 lets flush drain a shutdown without waiving the retry budget or cancellation
+  ---
+  duration_ms: 0.443429
+  type: 'test'
+  ...
+# Subtest: E-AC-16 resumes a restart with its retry budget and outstanding wait intact
+ok 26 - E-AC-16 resumes a restart with its retry budget and outstanding wait intact
+  ---
+  duration_ms: 0.31267
+  type: 'test'
+  ...
+# Subtest: E-AC-16 replays only what the outbox still owes after a failed delivery
+ok 27 - E-AC-16 replays only what the outbox still owes after a failed delivery
+  ---
+  duration_ms: 0.467939
+  type: 'test'
+  ...
+# Subtest: keeps destination queues independent and idempotently enqueues one source event
+ok 28 - keeps destination queues independent and idempotently enqueues one source event
+  ---
+  duration_ms: 1.256409
+  type: 'test'
+  ...
+# Subtest: advances only the safely acknowledged prefix after partial delivery
+ok 29 - advances only the safely acknowledged prefix after partial delivery
+  ---
+  duration_ms: 0.34464
+  type: 'test'
+  ...
+# Subtest: preserves retryable and quarantined entries without source-history mutation
+ok 30 - preserves retryable and quarantined entries without source-history mutation
+  ---
+  duration_ms: 0.23963
+  type: 'test'
+  ...
+# Subtest: E-AC-08 detects an event-gap and a schema-downgrade before either becomes valid outbox state
+ok 31 - E-AC-08 detects an event-gap and a schema-downgrade before either becomes valid outbox state
+  ---
+  duration_ms: 0.298429
+  type: 'test'
+  ...
+# Subtest: E-AC-08 detects a cursor pointing past the end of the entries array
+ok 32 - E-AC-08 detects a cursor pointing past the end of the entries array
+  ---
+  duration_ms: 0.18521
+  type: 'test'
+  ...
+# Subtest: E-AC-08 detects a source fork: two entries tracking the same source event under different destination identities
+ok 33 - E-AC-08 detects a source fork: two entries tracking the same source event under different destination identities
+  ---
+  duration_ms: 0.19298
+  type: 'test'
+  ...
+# Subtest: E-AC-08 detects an invalid hash on an entry's digest field
+ok 34 - E-AC-08 detects an invalid hash on an entry's digest field
+  ---
+  duration_ms: 0.189129
+  type: 'test'
+  ...
+# Subtest: E-AC-10 boundary gate reports not blocked on an empty outbox and on a fully-acknowledged one
+ok 35 - E-AC-10 boundary gate reports not blocked on an empty outbox and on a fully-acknowledged one
+  ---
+  duration_ms: 0.706989
+  type: 'test'
+  ...
+# Subtest: E-AC-10 boundary gate blocks and names the exact unacknowledged range at the tail
+ok 36 - E-AC-10 boundary gate blocks and names the exact unacknowledged range at the tail
+  ---
+  duration_ms: 0.28723
+  type: 'test'
+  ...
+# Subtest: E-AC-10 boundary gate's range starts at the first unacknowledged entry, not from zero
+ok 37 - E-AC-10 boundary gate's range starts at the first unacknowledged entry, not from zero
+  ---
+  duration_ms: 0.277619
+  type: 'test'
+  ...
+# Subtest: E-AC-10 boundary gate counts a quarantined entry as part of the unacknowledged range instead of silently excluding it
+ok 38 - E-AC-10 boundary gate counts a quarantined entry as part of the unacknowledged range instead of silently excluding it
+  ---
+  duration_ms: 0.18886
+  type: 'test'
+  ...
+# Subtest: E-AC-10 boundary gate rejects a malformed boundary identifier
+ok 39 - E-AC-10 boundary gate rejects a malformed boundary identifier
+  ---
+  duration_ms: 0.10664
+  type: 'test'
+  ...
+# Subtest: activates exactly the planned effective policy only after a bound authority readback
+ok 40 - activates exactly the planned effective policy only after a bound authority readback
+  ---
+  duration_ms: 7.87235
+  type: 'test'
+  ...
+# Subtest: rejects an unbound authority response and stale plan preimage
+ok 41 - rejects an unbound authority response and stale plan preimage
+  ---
+  duration_ms: 3.317086
+  type: 'test'
+  ...
+# Subtest: P-AC-03 computes newlyRequiredArtifacts, externalEffects, and backfillRange deterministically from the transition
+ok 42 - P-AC-03 computes newlyRequiredArtifacts, externalEffects, and backfillRange deterministically from the transition
+  ---
+  duration_ms: 8.120449
+  type: 'test'
+  ...
+# Subtest: P-AC-03 rejects a plan whose preview fields were tampered instead of trusting caller-supplied data
+ok 43 - P-AC-03 rejects a plan whose preview fields were tampered instead of trusting caller-supplied data
+  ---
+  duration_ms: 0.559209
+  type: 'test'
+  ...
+# Subtest: P-AC-09 refuses a backfill-implying activation carrying only the ordinary activation authority
+ok 44 - P-AC-09 refuses a backfill-implying activation carrying only the ordinary activation authority
+  ---
+  duration_ms: 2.939586
+  type: 'test'
+  ...
+# Subtest: P-AC-09 requires the backfill consent to be a distinct decision bound to the exact previewed window
+ok 45 - P-AC-09 requires the backfill consent to be a distinct decision bound to the exact previewed window
+  ---
+  duration_ms: 5.115574
+  type: 'test'
+  ...
+# Subtest: P-AC-09 refuses an unasked-for backfill consent and leaves a no-backfill activation's shape untouched
+ok 46 - P-AC-09 refuses an unasked-for backfill consent and leaves a no-backfill activation's shape untouched
+  ---
+  duration_ms: 1.664157
+  type: 'test'
+  ...
+# Subtest: P-AC-09 the consent subject is deterministic, window-bound, and fails closed on malformed input
+ok 47 - P-AC-09 the consent subject is deterministic, window-bound, and fails closed on malformed input
+  ---
+  duration_ms: 0.37089
+  type: 'test'
+  ...
+# Subtest: P-AC-09 selects exactly the half-open consented window
+ok 48 - P-AC-09 selects exactly the half-open consented window
+  ---
+  duration_ms: 0.21802
+  type: 'test'
+  ...
+# Subtest: P-AC-09 exports exactly the consented historical events through the real export and delivery path
+ok 49 - P-AC-09 exports exactly the consented historical events through the real export and delivery path
+  ---
+  duration_ms: 96.113495
+  type: 'test'
+  ...
+# Subtest: P-AC-09 assertBackfillConsent refuses a consent that is absent or not distinct from the activation decision
+ok 50 - P-AC-09 assertBackfillConsent refuses a consent that is absent or not distinct from the activation decision
+  ---
+  duration_ms: 0.34743
+  type: 'test'
+  ...
+# Subtest: accepts a closed compatible policy pack
+ok 51 - accepts a closed compatible policy pack
+  ---
+  duration_ms: 1.024839
+  type: 'test'
+  ...
+# Subtest: rejects floor weakening, duplicate document ownership, unknown fields, and incompatible core
+ok 52 - rejects floor weakening, duplicate document ownership, unknown fields, and incompatible core
+  ---
+  duration_ms: 0.346879
+  type: 'test'
+  ...
+# Subtest: resolves compatible packs without last-write-wins and unions approval requirements
+ok 53 - resolves compatible packs without last-write-wins and unions approval requirements
+  ---
+  duration_ms: 5.180003
+  type: 'test'
+  ...
+# Subtest: P-AC-05 refuses credential, endpoint, coordinate, actor-mapping and signing-key fields at every portable policy level
+ok 54 - P-AC-05 refuses credential, endpoint, coordinate, actor-mapping and signing-key fields at every portable policy level
+  ---
+  duration_ms: 0.27995
+  type: 'test'
+  ...
+# Subtest: rejects duplicate pack bindings and incompatible modes instead of choosing a winner
+ok 55 - rejects duplicate pack bindings and incompatible modes instead of choosing a winner
+  ---
+  duration_ms: 0.313199
+  type: 'test'
+  ...
+# Subtest: P-AC-11 rejects a document class mode outside the closed reference-only/projection/controlled-publication set
+ok 56 - P-AC-11 rejects a document class mode outside the closed reference-only/projection/controlled-publication set
+  ---
+  duration_ms: 0.15172
+  type: 'test'
+  ...
+# Subtest: P-AC-11 unions approval requirements so a later pack cannot downgrade an earlier pack's required approval
+ok 57 - P-AC-11 unions approval requirements so a later pack cannot downgrade an earlier pack's required approval
+  ---
+  duration_ms: 0.21598
+  type: 'test'
+  ...
+# Subtest: P-AC-11 represents a closed provider-neutral targetBinding and rejects a non-closed value
+ok 58 - P-AC-11 represents a closed provider-neutral targetBinding and rejects a non-closed value
+  ---
+  duration_ms: 0.257219
+  type: 'test'
+  ...
+# Subtest: P-AC-11 leaves targetBinding an optional key: a document class without one still validates and resolves with no targetBinding key present
+ok 59 - P-AC-11 leaves targetBinding an optional key: a document class without one still validates and resolves with no targetBinding key present
+  ---
+  duration_ms: 0.26218
+  type: 'test'
+  ...
+# Subtest: P-AC-11 refuses to merge a mismatched targetBinding for the same document class instead of choosing one
+ok 60 - P-AC-11 refuses to merge a mismatched targetBinding for the same document class instead of choosing one
+  ---
+  duration_ms: 0.30538
+  type: 'test'
+  ...
+# Subtest: P-AC-11 refuses to merge a declared targetBinding with an undeclared one for the same document class
+ok 61 - P-AC-11 refuses to merge a declared targetBinding with an undeclared one for the same document class
+  ---
+  duration_ms: 0.172759
+  type: 'test'
+  ...
+# Subtest: P-AC-11 records which pack(s) and revision(s) contributed each effective document class
+ok 62 - P-AC-11 records which pack(s) and revision(s) contributed each effective document class
+  ---
+  duration_ms: 0.19347
+  type: 'test'
+  ...
+# Subtest: P-AC-10 rejects a compliance or regulatory-assessment claim field on a portable policy pack
+ok 63 - P-AC-10 rejects a compliance or regulatory-assessment claim field on a portable policy pack
+  ---
+  duration_ms: 0.13645
+  type: 'test'
+  ...
+# Subtest: P-AC-01 leaves provenance, dependencies, and signaturePolicy optional: a pack omitting all three still validates unchanged
+ok 64 - P-AC-01 leaves provenance, dependencies, and signaturePolicy optional: a pack omitting all three still validates unchanged
+  ---
+  duration_ms: 0.11282
+  type: 'test'
+  ...
+# Subtest: P-AC-01 validates a pack's provenance and rejects a malformed or incomplete record
+ok 65 - P-AC-01 validates a pack's provenance and rejects a malformed or incomplete record
+  ---
+  duration_ms: 0.416399
+  type: 'test'
+  ...
+# Subtest: P-AC-01 validates a pack's dependencies and rejects a self-dependency, duplicate target, or inverted version range
+ok 66 - P-AC-01 validates a pack's dependencies and rejects a self-dependency, duplicate target, or inverted version range
+  ---
+  duration_ms: 0.29054
+  type: 'test'
+  ...
+# Subtest: P-AC-01 validates a pack's signature policy and rejects an unknown algorithm or a required policy declaring no algorithm
+ok 67 - P-AC-01 validates a pack's signature policy and rejects an unknown algorithm or a required policy declaring no algorithm
+  ---
+  duration_ms: 0.227999
+  type: 'test'
+  ...
+# Subtest: P-AC-11 accepts a closed ownedSections declaration and rejects a non-closed one
+ok 68 - P-AC-11 accepts a closed ownedSections declaration and rejects a non-closed one
+  ---
+  duration_ms: 0.27223
+  type: 'test'
+  ...
+# Subtest: P-AC-11 merges ownedSections by safe intersection across disagreeing packs
+ok 69 - P-AC-11 merges ownedSections by safe intersection across disagreeing packs
+  ---
+  duration_ms: 0.19938
+  type: 'test'
+  ...
+# Subtest: P-AC-11 accepts a closed lifecycleEvents declaration and rejects a non-closed one
+ok 70 - P-AC-11 accepts a closed lifecycleEvents declaration and rejects a non-closed one
+  ---
+  duration_ms: 0.274609
+  type: 'test'
+  ...
+# Subtest: F1 admits ownedSections field names outside TARGET_REF's slug shape that external-reference-adapter.mjs's changes[].field domain already accepts
+ok 71 - F1 admits ownedSections field names outside TARGET_REF's slug shape that external-reference-adapter.mjs's changes[].field domain already accepts
+  ---
+  duration_ms: 0.20417
+  type: 'test'
+  ...
+# Subtest: F1 pins ownedSections' value domain equal to external-reference-adapter.mjs's changes[].field domain
+ok 72 - F1 pins ownedSections' value domain equal to external-reference-adapter.mjs's changes[].field domain
+  ---
+  duration_ms: 0.07378
+  type: 'test'
+  ...
+# Subtest: F2 pins lifecycleEvents' overlap and non-overlap with feature-package-topology's FEATURE_STATES
+ok 73 - F2 pins lifecycleEvents' overlap and non-overlap with feature-package-topology's FEATURE_STATES
+  ---
+  duration_ms: 0.08649
+  type: 'test'
+  ...
+# Subtest: P-AC-11 merges lifecycleEvents by safe intersection across disagreeing packs
+ok 74 - P-AC-11 merges lifecycleEvents by safe intersection across disagreeing packs
+  ---
+  duration_ms: 0.134499
+  type: 'test'
+  ...
+# Subtest: P-AC-11 accepts previewRequired, rejects a non-boolean, and unions it so a later pack cannot downgrade an earlier pack's required preview
+ok 75 - P-AC-11 accepts previewRequired, rejects a non-boolean, and unions it so a later pack cannot downgrade an earlier pack's required preview
+  ---
+  duration_ms: 0.21338
+  type: 'test'
+  ...
+# Subtest: P-AC-11 accepts a closed retention declaration and rejects a non-closed one
+ok 76 - P-AC-11 accepts a closed retention declaration and rejects a non-closed one
+  ---
+  duration_ms: 0.12764
+  type: 'test'
+  ...
+# Subtest: P-AC-11 refuses to merge a mismatched retention for the same document class instead of choosing one
+ok 77 - P-AC-11 refuses to merge a mismatched retention for the same document class instead of choosing one
+  ---
+  duration_ms: 0.1706
+  type: 'test'
+  ...
+# Subtest: P-AC-11 accepts a closed conflictPolicy declaration, rejects a non-closed one, and merges it toward the stricter disposition
+ok 78 - P-AC-11 accepts a closed conflictPolicy declaration, rejects a non-closed one, and merges it toward the stricter disposition
+  ---
+  duration_ms: 0.181219
+  type: 'test'
+  ...
+# Subtest: inspects all explicit packs without a repository mutation path
+ok 79 - inspects all explicit packs without a repository mutation path
+  ---
+  duration_ms: 0.901899
+  type: 'test'
+  ...
+# Subtest: plans only a named activation and rejects incomplete command forms
+ok 80 - plans only a named activation and rejects incomplete command forms
+  ---
+  duration_ms: 0.33909
+  type: 'test'
+  ...
+1..80
+# tests 80
+# suites 0
+# pass 80
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 193.00535

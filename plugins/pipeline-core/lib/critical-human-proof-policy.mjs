@@ -381,8 +381,8 @@ export function criticalProofWaiverFor(dir, kind) {
   // Follow-up). The two must not disagree: a policy-file waiver alongside
   // `signature` in the source is an ambiguous configuration, and an ambiguous gate
   // configuration fails closed. Every other kind (`deploy`, `publication`,
-  // `release-preflight`) has no source key and skips this branch entirely, exactly
-  // as before.
+  // `release-preflight`, `governance-fork-disposition`) has no source key and skips
+  // this branch entirely, exactly as before.
   const approvalModeKey = GATE_APPROVAL_MODE_KEYS[kind];
   if (approvalModeKey !== undefined) {
     const configured = readGateApprovalMode(dir, kind);

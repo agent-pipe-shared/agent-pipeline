@@ -1,0 +1,8 @@
+docs(backlog): close the trust-policy shape-disagreement item
+
+Fixed in commit 4c2f04cb, which added a trustPolicy-specific
+ownTrustPolicy() check accepting the 3-key named shape (proposal
+option (a)) with a passing real-crypto test suite. Fills the Triage
+section and marks the item closed with its closure commit.
+
+AI-Assisted: true

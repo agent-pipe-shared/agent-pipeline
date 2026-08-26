@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-pipeline.dev/schemas/pipeline.change-control-profile.v1.json",
+  "title": "Pipeline change-control profile v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "profileId", "policySha256", "changeClass", "candidate", "artifact", "environment", "scopeSha256", "window", "mandatory"],
+  "properties": {
+    "schema": { "const": "pipeline.change-control-profile.v1" },
+    "profileId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "policySha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "changeClass": { "enum": ["standard", "normal", "emergency", "not-required"] },
+    "candidate": { "type": "object", "additionalProperties": false, "required": ["commit", "tree"], "properties": { "commit": { "type": "string", "pattern": "^[a-f0-9]{40,64}$" }, "tree": { "type": "string", "pattern": "^[a-f0-9]{40,64}$" } } },
+    "artifact": { "type": "object", "additionalProperties": false, "required": ["path", "sha256"], "properties": { "path": { "type": "string" }, "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" } } },
+    "environment": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "scopeSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "window": { "type": "object", "additionalProperties": false, "required": ["startsAtEpochMs", "endsAtEpochMs"], "properties": { "startsAtEpochMs": { "type": "integer", "minimum": 0 }, "endsAtEpochMs": { "type": "integer", "minimum": 0 } } },
+    "mandatory": { "type": "boolean" }
+  }
+}

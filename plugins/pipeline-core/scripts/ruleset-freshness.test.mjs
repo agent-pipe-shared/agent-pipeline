@@ -9,9 +9,11 @@ import { spawnSync } from "node:child_process";
 import test from "node:test";
 
 import {
+  createWslHostFailClosedSpawn,
   inspectPipelineUpdateAvailability,
   migrateLegacyRulesetFreshness,
   PIPELINE_UPDATE_AVAILABILITY_SCHEMA,
+  PUBLIC_MARKETPLACE_URL,
   repositoryWritePermitted,
   resolvePipelineUpdateChannelConfig,
   runPipelineUpdateAvailabilityCli,
@@ -88,6 +90,79 @@ function blockingPolicy(build) {
     }],
   };
 }
+
+// ---- PX0-AC-13: honest fail-closed spawn for the CLI's two network-touching
+// git calls (`ls-remote`, disposable-repo `fetch`) under the
+// host-authorized-wsl boundary -- no subprocess is ever attempted for them. ----
+
+/** A local disposable bare repo carrying exactly one valid stable release tag. */
+function tagFixture(name, version) {
+  const root = mkdtempSync(join(tmpdir(), `ruleset-freshness-cli-network-${name}-`));
+  roots.push(root);
+  const remote = join(root, "public.git");
+  const source = join(root, "source");
+  git(root, "init", "--bare", "-q", remote);
+  git(root, "init", "-q", "-b", "main", source);
+  configure(source);
+  commit(source, "base");
+  git(source, "tag", `v${version}`);
+  git(source, "remote", "add", "public", remote);
+  git(source, "push", "-q", "public", "main", "--tags");
+  return remote;
+}
+
+/** Only `.claude/settings.json` shape `resolveMarketplaceUrl` accepts. */
+function writeMarketplaceSettings(repo, url) {
+  const match = String(url).match(/^https:\/\/github\.com\/(.+)\.git$/u);
+  mkdirSync(join(repo, ".claude"), { recursive: true });
+  writeFileSync(join(repo, ".claude", "settings.json"), JSON.stringify({
+    extraKnownMarketplaces: { "agent-pipeline": { source: { source: "github", repo: match[1] } } },
+  }));
+}
+
+/**
+ * Inner spawn for local (non-network-delegated) calls reaching the CLI's
+ * fail-closed `options.spawn` substitute. Genuinely runs `git` for every
+ * call it receives -- it only ever rewrites the one reviewed
+ * public-marketplace URL literal to a real local disposable fixture repo
+ * path first (unused once no network-delegated call ever reaches it, but
+ * kept so a local call, e.g. the loaded HEAD lookup, stays fully real).
+ */
+function localNetworkSubstituteSpawn(localRemoteUrl, calls) {
+  return (command, args, opts) => {
+    calls.push({ command, args: [...args], env: opts?.env });
+    const rewritten = args.map((value) => (value === PUBLIC_MARKETPLACE_URL ? localRemoteUrl : value));
+    return spawnSync(command, rewritten, opts);
+  };
+}
+
+test("PX0-AC-13: under the host-authorized-wsl boundary, the update-availability CLI's network-delegated ls-remote never reaches any spawn substitute, while a local call still genuinely spawns and returns real data", () => {
+  const remote = tagFixture("failclosed", "1.2.3");
+  const repo = mkdtempSync(join(tmpdir(), "ruleset-freshness-cli-network-failclosed-repo-"));
+  roots.push(repo);
+  writeMarketplaceSettings(repo, PUBLIC_MARKETPLACE_URL);
+  const calls = [];
+  const createFailClosedSpawn = () => createWslHostFailClosedSpawn({
+    spawn: localNetworkSubstituteSpawn(remote, calls),
+  });
+  let stdout = "";
+  const execution = runPipelineUpdateAvailabilityCli(["--repo", repo], {
+    env: { WSL_DISTRO_NAME: "Ubuntu" },
+    createFailClosedSpawn,
+    stdout: { write: (chunk) => { stdout += chunk; } },
+  });
+  assert.equal(calls.some((call) => call.args[0] === "ls-remote"), false,
+    "a network-delegated call must never reach the substitute spawn -- no doomed sandbox attempt is made");
+  assert.equal(calls.some((call) => call.args.includes("fetch")), false,
+    "the disposable-repo fetch must likewise never reach the substitute spawn");
+  const local = calls.find((call) => call.args.includes("rev-parse") && call.args.includes("HEAD"));
+  assert.ok(local, "a genuinely local call (loaded HEAD) must still have been observed");
+  assert.equal(local.command, "git", "local calls must pass straight through to the real spawn, unmodified");
+  const result = JSON.parse(stdout);
+  assert.equal(result.status, "unknown");
+  assert.equal(result.reason, "remote-unavailable");
+  assert.equal(execution.exitCode, 0);
+});
 
 test.after(() => {
   for (const root of roots) rmSync(root, { recursive: true, force: true });

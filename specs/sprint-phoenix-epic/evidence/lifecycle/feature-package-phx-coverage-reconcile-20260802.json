@@ -1,0 +1,1 @@
+{"candidate":null,"correlation":"fp-014f6609e059ffde","evidence":null,"featureId":"sprint-phoenix-epic","idempotencyKey":"phx-coverage-reconcile-20260802","operation":"reconcile-mutable-design","outcome":"committed","schema":"pipeline.feature-package-lifecycle-receipt.v1"}

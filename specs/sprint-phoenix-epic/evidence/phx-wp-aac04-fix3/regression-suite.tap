@@ -1,0 +1,162 @@
+# Command: node --test --test-reporter=tap --test-reporter-destination=<path> plugins/pipeline-core/hooks/guard-git-phoenix.test.mjs plugins/pipeline-core/lib/human-governance-ledger.test.mjs
+# Exit code: 0
+TAP version 13
+# Subtest: Phoenix Git override requires and single-consumes checkpoint-bound human authority
+ok 1 - Phoenix Git override requires and single-consumes checkpoint-bound human authority
+  ---
+  duration_ms: 334.053024
+  type: 'test'
+  ...
+# Subtest: validates a closed portable grant and resolves matching authority
+ok 2 - validates a closed portable grant and resolves matching authority
+  ---
+  duration_ms: 1.499961
+  type: 'test'
+  ...
+# Subtest: fails closed for repository/candidate drift, expiry, and consuming disposition
+ok 3 - fails closed for repository/candidate drift, expiry, and consuming disposition
+  ---
+  duration_ms: 0.297528
+  type: 'test'
+  ...
+# Subtest: verifies an external detached proof without upgrading caller-supplied trust to human identity
+ok 4 - verifies an external detached proof without upgrading caller-supplied trust to human identity
+  ---
+  duration_ms: 2.915592
+  type: 'test'
+  ...
+# Subtest: binds an external proof to the ledger grant, its candidate, and both scoped artifacts
+ok 5 - binds an external proof to the ledger grant, its candidate, and both scoped artifacts
+  ---
+  duration_ms: 0.694886
+  type: 'test'
+  ...
+# Subtest: derives an append-only consumption disposition without rewriting the grant
+ok 6 - derives an append-only consumption disposition without rewriting the grant
+  ---
+  duration_ms: 0.372258
+  type: 'test'
+  ...
+# Subtest: consumes a persisted single-use grant exactly once under the canonical stream lock
+ok 7 - consumes a persisted single-use grant exactly once under the canonical stream lock
+  ---
+  duration_ms: 97.978927
+  type: 'test'
+  ...
+# Subtest: rejects open payloads and invalid lifecycle link cardinality
+ok 8 - rejects open payloads and invalid lifecycle link cardinality
+  ---
+  duration_ms: 0.230288
+  type: 'test'
+  ...
+# Subtest: H-AC-11 exposes the full reconstruction surface and admits no attribution or rationale
+ok 9 - H-AC-11 exposes the full reconstruction surface and admits no attribution or rationale
+  ---
+  duration_ms: 0.855155
+  type: 'test'
+  ...
+# Subtest: requires one event-specific link and outcome for every authority lifecycle disposition
+ok 10 - requires one event-specific link and outcome for every authority lifecycle disposition
+  ---
+  duration_ms: 0.263748
+  type: 'test'
+  ...
+# Subtest: H-AC-10 records scope, reason, expiry, constraints and a mandatory follow-up review
+ok 11 - H-AC-10 records scope, reason, expiry, constraints and a mandatory follow-up review
+  ---
+  duration_ms: 0.542667
+  type: 'test'
+  ...
+# Subtest: H-AC-10 refuses an unconstrained, unreviewed or non-expiring exception
+ok 12 - H-AC-10 refuses an unconstrained, unreviewed or non-expiring exception
+  ---
+  duration_ms: 0.353877
+  type: 'test'
+  ...
+# Subtest: H-AC-10 admits no attribution, rationale or provider field, exactly like the plan class
+ok 13 - H-AC-10 admits no attribution, rationale or provider field, exactly like the plan class
+  ---
+  duration_ms: 0.605227
+  type: 'test'
+  ...
+# Subtest: H-AC-10 an exception cannot name another consumer's authority verb
+ok 14 - H-AC-10 an exception cannot name another consumer's authority verb
+  ---
+  duration_ms: 0.195399
+  type: 'test'
+  ...
+# Subtest: H-AC-10 keeps the two decision classes apart in both directions
+ok 15 - H-AC-10 keeps the two decision classes apart in both directions
+  ---
+  duration_ms: 0.121309
+  type: 'test'
+  ...
+# Subtest: H-AC-10 resolves through the shared ledger and carries its bounds with the grant
+ok 16 - H-AC-10 resolves through the shared ledger and carries its bounds with the grant
+  ---
+  duration_ms: 0.517407
+  type: 'test'
+  ...
+# Subtest: H-AC-10 keeps the published schema and the validator in agreement
+ok 17 - H-AC-10 keeps the published schema and the validator in agreement
+  ---
+  duration_ms: 0.808666
+  type: 'test'
+  ...
+# Subtest: H-AC-15 denial: an explicitly denied decision resolves as denied for that specific reason, not scope or expiry
+ok 18 - H-AC-15 denial: an explicitly denied decision resolves as denied for that specific reason, not scope or expiry
+  ---
+  duration_ms: 0.079989
+  type: 'test'
+  ...
+# Subtest: H-AC-15 revocation and correction each dispose a live grant through their own dedicated link, distinct from consumption
+ok 19 - H-AC-15 revocation and correction each dispose a live grant through their own dedicated link, distinct from consumption
+  ---
+  duration_ms: 0.08471
+  type: 'test'
+  ...
+# Subtest: H-AC-15 stale candidate: a grant scoped to one candidate commit does not resolve once the candidate has moved
+ok 20 - H-AC-15 stale candidate: a grant scoped to one candidate commit does not resolve once the candidate has moved
+  ---
+  duration_ms: 0.058169
+  type: 'test'
+  ...
+# Subtest: H-AC-15 cross-repository binding: an intent whose declared repository does not match its own scope is rejected before any store access
+ok 21 - H-AC-15 cross-repository binding: an intent whose declared repository does not match its own scope is rejected before any store access
+  ---
+  duration_ms: 0.131259
+  type: 'test'
+  ...
+# Subtest: H-AC-15 retry: replaying the identical append intent returns the committed event as a replay, never a duplicate
+ok 22 - H-AC-15 retry: replaying the identical append intent returns the committed event as a replay, never a duplicate
+  ---
+  duration_ms: 85.025704
+  type: 'test'
+  ...
+# Subtest: H-AC-15 concurrency: exactly one of two racing consumption attempts on the same single-use grant wins
+ok 23 - H-AC-15 concurrency: exactly one of two racing consumption attempts on the same single-use grant wins
+  ---
+  duration_ms: 79.610618
+  type: 'test'
+  ...
+# Subtest: H-AC-15 interruption: an append recovers from an orphaned temporary file left by an earlier interrupted write
+ok 24 - H-AC-15 interruption: an append recovers from an orphaned temporary file left by an earlier interrupted write
+  ---
+  duration_ms: 54.457694
+  type: 'test'
+  ...
+# Subtest: H-AC-15 tampering: a mutated persisted event is detected and rejected on read, never silently accepted
+ok 25 - H-AC-15 tampering: a mutated persisted event is detected and rejected on read, never silently accepted
+  ---
+  duration_ms: 45.772027
+  type: 'test'
+  ...
+1..25
+# tests 25
+# suites 0
+# pass 25
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 425.56234

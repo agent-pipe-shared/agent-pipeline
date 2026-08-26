@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-pipeline.dev/schemas/pipeline.agent-decision-event.v1.json",
+  "title": "Pipeline agent decision event v1",
+  "type": "object",
+  "oneOf": [
+    {
+      "additionalProperties": false,
+      "required": ["eventId", "kind", "state", "reasonCode", "candidateDigest", "relatedHumanDecisionId", "supersedesEventId"],
+      "properties": {
+        "eventId": { "type": "string" },
+        "kind": { "enum": ["assumption", "selection", "verification-scope", "fallback", "escalation"] },
+        "state": { "enum": ["declared", "verified", "contradicted", "expired", "invalidated", "superseded"] },
+        "assumptionState": { "enum": ["assumed", "inferred", "observed", "verified", "contradicted", "unavailable", "unknown"] },
+        "identity": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 7,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["dimension", "value", "provenance", "assurance"],
+            "properties": {
+              "dimension": { "enum": ["runner", "model", "effort", "profile", "role", "adapter", "capability"] },
+              "value": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+              "provenance": { "enum": ["same-dispatch-observed", "requested-route", "inherited-session", "unknown"] },
+              "assurance": { "enum": ["verified", "reported", "inferred", "unknown"] }
+            }
+          }
+        },
+        "revalidationTrigger": { "type": "string", "pattern": "^[A-Z][A-Z0-9._:-]{0,127}$" },
+        "reasonCode": { "type": "string" },
+        "candidateDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "relatedHumanDecisionId": { "type": ["string", "null"] },
+        "supersedesEventId": { "type": ["string", "null"] }
+      }
+    },
+    {
+      "additionalProperties": false,
+      "required": ["eventId", "kind", "state", "reasonCode", "candidateDigest", "relatedHumanDecisionId", "supersedesEventId", "offerOrigin", "operation", "target", "sideEffectClass", "authorityRequirement", "policyDigest", "redactionPolicyDigest", "executionAssurance", "omissions", "offerEventId", "preEvidenceDigest", "postEvidenceDigest", "recoverability"],
+      "properties": {
+        "eventId": { "type": "string" },
+        "kind": { "const": "command-offer" },
+        "state": { "enum": ["offered", "acknowledged", "authorized", "copied", "attempted", "execution-unobserved", "observed-completed", "readback-verified", "failed", "partial", "cancelled", "unknown", "unavailable", "readback-mismatch", "recovery-proposed", "recovered", "rollback-performed", "cleanup-performed"] },
+        "reasonCode": { "type": "string" },
+        "candidateDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "relatedHumanDecisionId": { "type": ["string", "null"] },
+        "supersedesEventId": { "type": ["string", "null"] },
+        "offerOrigin": { "enum": ["pipeline-initiated", "user-requested-pipeline-supplied"] },
+        "operation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["operationClass", "version", "governedArtifactSha256"],
+          "properties": {
+            "operationClass": { "type": "string" },
+            "version": { "type": ["string", "null"] },
+            "governedArtifactSha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" }
+          }
+        },
+        "target": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["repositoryFingerprint", "scopeDigest"],
+          "properties": {
+            "repositoryFingerprint": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "scopeDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+          }
+        },
+        "sideEffectClass": { "enum": ["non-authoritative", "destructive", "guard-bypass", "authority-changing"] },
+        "authorityRequirement": { "enum": ["not-required", "human-decision-required"] },
+        "policyDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "redactionPolicyDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "executionAssurance": { "enum": ["not-applicable", "attempted", "execution-unobserved", "observed-completed", "readback-verified", "failed", "partial", "cancelled", "unknown", "unavailable", "readback-mismatch"] },
+        "omissions": { "type": "array", "items": { "enum": ["raw-command", "arguments", "private-coordinates", "unrestricted-output", "prompt", "transcript", "credential"] } },
+        "offerEventId": { "type": ["string", "null"] },
+        "preEvidenceDigest": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+        "postEvidenceDigest": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+        "recoverability": { "enum": ["not-applicable", "recoverable", "cleanup-required", "rollback-required"] }
+      }
+    },
+    {
+      "additionalProperties": false,
+      "required": ["eventId", "kind", "state", "reasonCode", "candidateDigest", "relatedHumanDecisionId", "supersedesEventId", "legacySourceClass", "authorityProofStatus", "sourceReferencePath", "sourceReferenceDigest"],
+      "properties": {
+        "eventId": { "type": "string" },
+        "kind": { "const": "legacy-import-observation" },
+        "state": { "enum": ["declared", "verified", "contradicted", "expired", "invalidated", "superseded"] },
+        "reasonCode": { "type": "string" },
+        "candidateDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "relatedHumanDecisionId": { "type": ["string", "null"] },
+        "supersedesEventId": { "type": ["string", "null"] },
+        "legacySourceClass": { "enum": ["mutable-approval-state", "guard-override-jsonl-record", "deployment-approval-log", "override-receipt", "backlog-transition-record", "release-change-evidence"] },
+        "authorityProofStatus": { "enum": ["unprovable", "not-attempted"] },
+        "sourceReferencePath": { "type": ["string", "null"] },
+        "sourceReferenceDigest": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" }
+      }
+    }
+  ]
+}

@@ -18,9 +18,19 @@ export const ITEM_HASH_RESCOPE_AMENDMENT_SCHEMA = "pipeline.backlog-item-hash-re
 export const INDEX_SCHEMA = "pipeline.backlog-index.v1";
 export const SENTINEL_RECOVERY_CATALOG_SCHEMA = "pipeline.sentinel-backlog-recovery.v1";
 export const PROJECT_CLOSURE_READBACK_SCHEMA = "pipeline.project-closure-readback.v1";
-export const BACKLOG_STATUSES = Object.freeze(["open", "in_progress", "closed"]);
-export const BACKLOG_TYPES = Object.freeze(["workflow-improvement", "tooling-radar", "defect", "idea"]);
-const FORWARD_TRANSITIONS = Object.freeze({ open: "in_progress", in_progress: "closed" });
+export const BACKLOG_STATUSES = Object.freeze(["open", "in_progress", "closed", "rejected", "deferred"]);
+export const BACKLOG_TYPES = Object.freeze(["workflow-improvement", "tooling-radar", "defect", "idea", "requirement"]);
+// `open` branches three ways (backlog/README.md Triage rules: accept moves work
+// into `in_progress`; reject/defer are the two other triage outcomes, applied
+// only to `open` items "at a natural session/phase boundary, not mid-execution" —
+// never to an item already `in_progress`). `in_progress`, `closed`, `rejected`,
+// and `deferred` are otherwise terminal: this module records no path back out
+// of a triage disposition, matching what backlog/README.md documents today.
+const FORWARD_TRANSITIONS = Object.freeze({
+  open: Object.freeze(["in_progress", "rejected", "deferred"]),
+  in_progress: Object.freeze(["closed"]),
+});
+const STATUS_ENUM_TEXT = `${BACKLOG_STATUSES.slice(0, -1).join(", ")}, or ${BACKLOG_STATUSES.at(-1)}`;
 
 const ITEM_REQUIRED = Object.freeze(["schema", "id", "type", "owner", "status", "created", "source"]);
 const ITEM_OPTIONAL = Object.freeze(["tracking", "due", "expires", "closed_at", "closure_repository", "closure_commit", "closure_evidence", "closure_readback"]);
@@ -35,6 +45,7 @@ const CANONICAL_REPOSITORY_FILE_PATH = /^(?!\/)(?!.*\\)(?!.*\/\/)(?!.*\/$)(?!\.{
 const HASH = /^[a-f0-9]{64}$/u;
 const EVIDENCE_AMENDMENT_KEYS = new Set(["kind", "commit", "reference", "previousClosureCommit", "resultSha256", "privateLicenseGateSha256", "neutralPublicLicenseGateSha256"]);
 const REACHABILITY_AMENDMENT_KEYS = new Set(["kind", "commit", "reference", "supersedesSequence", "supersedesEntryHash", "referenceBlobOid", "referenceSha256"]);
+const ITEM_HASH_AMENDMENT_KEYS = new Set(["kind", "commit", "reference", "supersedesSequence", "supersedesEntryHash", "itemSha256"]);
 const V2_EVIDENCE_AMENDMENT_KEYS = new Set(["schema", "kind", "targetSequence", "targetEntryHash", "targetCommit", "replacementCommit", "reference", "dispositionSha256", "idempotencyKey"]);
 const V2_ORDINARY_EVIDENCE_KEYS = new Set(["kind", "commit", "reference", "legacyStatus"]);
 const AFK_REPAIR_ID = "pipeline.elephant-direct-implementation-under-afk-authorization";
@@ -53,6 +64,73 @@ const REACHABILITY_REPAIR_TARGETS = Object.freeze({
     entryHash: "2849de19fb7f0d0f34d6f2cbe6ed6d5171445abb09fa02132bc9a1d0d707e2b1",
     status: "closed",
   }),
+});
+// Sibling to REACHABILITY_REPAIR_TARGETS/REACHABILITY_REPAIR_ACTOR above; it
+// never touches them. It repairs a separate, later-discovered episode: the 38
+// pre-public-core-foundation ledger events (sequences 1..38) whose
+// evidence.commit no longer exists after the 2026-07-20 anonymized history
+// re-anchor (e32f34c). Keyed by physical sequence, not id, because several
+// ids (e.g. the licensing item) have more than one affected historical event.
+const PRE_PUBLIC_CORE_REACHABILITY_ACTOR = "hotfix-phx-ledger-reach-repair";
+export const PRE_PUBLIC_CORE_REACHABILITY_KIND = "pre-public-core-reachability-amendment";
+// Sibling to the two reachability registries above; a distinct amendment
+// kind for a distinct problem. Reachability amendments prove a historical
+// evidence.commit is still reachable without changing what it asserts. An
+// item-hash amendment instead supersedes a genesis event's own stale
+// itemSha256 binding after a LATER, legitimate content edit changed the
+// item's real bytes -- the genesis event's bytes and the hash chain are
+// never touched; only a new, appended event carries the corrected binding.
+// Frozen and keyed by physical sequence, exactly like
+// PRE_PUBLIC_CORE_REACHABILITY_TARGETS, so no caller-supplied sequence
+// outside this registry can ever be repaired (PHX-WP-LEDGER-AMENDMENT-KIND).
+const ITEM_HASH_AMENDMENT_ACTOR = "hotfix-phx-ledger-itemsha256-repair";
+export const ITEM_HASH_AMENDMENT_KIND = "item-hash-amendment";
+export const ITEM_HASH_AMENDMENT_TARGETS = Object.freeze({
+  41: Object.freeze({
+    id: MANAGED_ONBOARDING_REPAIR_ID,
+    entryHash: "48d371f383d42919d565cdb3caab6e4f51ba9803d1fbbfd29c0e44339fe32a5e",
+    reference: "backlog/items/2026-07-25-managed-onboarding-success-contract.md",
+  }),
+});
+export const PRE_PUBLIC_CORE_REACHABILITY_TARGETS = Object.freeze({
+  1: Object.freeze({ id: "pipeline.closed-input-channel-review-economics", entryHash: "b1ccddfe9258d12d225776a6a19ce74439c46bfd996c64e3d4d3fe652d3017f6", status: "in_progress" }),
+  2: Object.freeze({ id: "pipeline.critic-context-isolation", entryHash: "bef951e5f3ce086c33f9a52750e2fc454eb37563ae754cdfe1cf04a5a5915beb", status: "in_progress" }),
+  3: Object.freeze({ id: "pipeline.cross-repository-override-ledger-binding", entryHash: "c4167bd937cee10623476bdfd56cc4f648b8290b677d46d7052bd0366b490cae", status: "in_progress" }),
+  4: Object.freeze({ id: "pipeline.dispatch-provenance", entryHash: "0dc1a797814efdfaf2392420da9d5cdd7a457a49dbb37a98e6e92b10b2a30ed3", status: "in_progress" }),
+  5: Object.freeze({ id: "pipeline.evidence-bound-review-retry-economics", entryHash: "0891c5c1fdc76b42a888fdbd9b64aab4487794d455ace8c0413497154f07d99d", status: "in_progress" }),
+  6: Object.freeze({ id: "pipeline.multi-cli-efficiency-pilots", entryHash: "d653a625f1575ebfe3494d4ce432aa04c31f9ce094ef74b0a701872a097f28b0", status: "in_progress" }),
+  7: Object.freeze({ id: "pipeline.observation-intake-document-governance", entryHash: "5ac04be464bb4d56228e282ad631266538ff687147c7808f143bbbf1f62e523b", status: "closed" }),
+  8: Object.freeze({ id: "pipeline.private-overlay-activation-bridge", entryHash: "5d235238033fabdc78c4959f3c2e1338001d498c65f6030768832db8ed954913", status: "closed" }),
+  9: Object.freeze({ id: "pipeline.project-scoped-github-issue-operations", entryHash: "7aeb8bc8bf785f55807058d67bffeeb278460441b1d5d5dcbae6db5bf20bb935", status: "in_progress" }),
+  10: Object.freeze({ id: "pipeline.recovery-preview-callback-attestation", entryHash: "e40efe6c7aa975e3fd09767fe486e0ddea9fd110708b406ad78c934370a36da1", status: "in_progress" }),
+  11: Object.freeze({ id: "pipeline.sentinel-go-live-completion", entryHash: "db3857dba599c743c5ccbd7e93e1db251c0288de90930ded5e7b0d00a8065358", status: "closed" }),
+  12: Object.freeze({ id: "pipeline.spec-retention-on-close", entryHash: "6e9075a5b7f188a54ffdcd5de2ae897f664a01e32c6da64b16d6cf8336b64f18", status: "open" }),
+  13: Object.freeze({ id: "pipeline.source-available-commercial-licensing", entryHash: "72021f06d96cda06fa5a6027a78c217c193ef781d03d181ba8768bd74e8c9f83", status: "closed" }),
+  14: Object.freeze({ id: "pipeline.source-available-commercial-licensing", entryHash: "212d7f444e8de3ddad65c965a74922205b594360df7d3116befbaf248fcd15de", status: "closed" }),
+  15: Object.freeze({ id: "pipeline.source-available-commercial-licensing", entryHash: "48cf4e306cfb8192c1af05b85dce70d42bb844f61f4494e83bd522af6a0614b3", status: "closed" }),
+  16: Object.freeze({ id: "pipeline.close-spec-retention-and-consent", entryHash: "08624bcb18ed9e82f730df0db456578cabfd17984fe8793bca85a3eb0f91b91c", status: "closed" }),
+  17: Object.freeze({ id: "pipeline.afk-assumption-mode", entryHash: "34fe465e1a76823f63e68e455570493b28aef87fdcfbb71a770dca21baacd553", status: "in_progress" }),
+  18: Object.freeze({ id: "pipeline.canonical-worktree-lifecycle", entryHash: "23623c98bd6b6cad2edd4e041449ed4b6f5ec95e5f85d0709edd8f83f3330f1b", status: "in_progress" }),
+  19: Object.freeze({ id: "pipeline.codex-plugin-validator-host-parity", entryHash: "2f549f7cb00a47d32340af073ce55cfb8312aec57e3101ec4690180af20d55f5", status: "in_progress" }),
+  20: Object.freeze({ id: "pipeline.codex-sandbox-critic-longterm", entryHash: "90cc402b1f58bb374f42a274d2db0ca7d69cfad3747f4ca3d2d8496f7ce8a5b3", status: "in_progress" }),
+  21: Object.freeze({ id: "pipeline.documentation-information-architecture", entryHash: "eefd7cfc5e8d24589773aae1196799307aee7b944edb312a7503fe113edb4f20", status: "open" }),
+  22: Object.freeze({ id: "pipeline.dual-channel-publication", entryHash: "cc519e50a3f4766c3c0b22f9ac65478d7da565ca3b6812c89351785326e86ce7", status: "open" }),
+  23: Object.freeze({ id: "pipeline.execution-model-switchback", entryHash: "08c21e340f40c7d40ddcc26534d4ce4ab3f2ef62f2a99e328224bb30a343ecb8", status: "in_progress" }),
+  24: Object.freeze({ id: "pipeline.nonblocking-interaction-continuity", entryHash: "a788d00547ff7bbe7faa4eb69f6738c1b86c57e4310e2626e7b2e0441de6cdab", status: "in_progress" }),
+  25: Object.freeze({ id: "pipeline.po-gate-worktree-authority", entryHash: "0fe732acb7f1fdd5d33f1cdbf5baa80ba767e71d84467893cd38166f6d6d53a2", status: "in_progress" }),
+  26: Object.freeze({ id: "pipeline.push-guard-worktree-target", entryHash: "19605ae7f9e6b8b71f0266ddfdd9cadcbd4a10daee6d3d2a5028496a05e1f66d", status: "closed" }),
+  27: Object.freeze({ id: "pipeline.regulated-document-hooks", entryHash: "759539b128da1aea504af343f37e1ba040f37641be5217d08b145ee164f87242", status: "open" }),
+  28: Object.freeze({ id: "pipeline.session-keep-awake", entryHash: "c2cf01813dad769c5653a73608ddfc96f5d2b4f7e8501fde770a52a5e60e66b5", status: "in_progress" }),
+  29: Object.freeze({ id: "pipeline.stateful-design-contract-template", entryHash: "90a587c8cc0164e9588ab25f1b7acc949751e5a1177e3d8332e886f8aa38558e", status: "open" }),
+  30: Object.freeze({ id: "pipeline.t1-governance-path-preflight", entryHash: "65da0a566b43cc9c812231ae074388540a1e2ddc84684079bd4514f3ddb67c3d", status: "in_progress" }),
+  31: Object.freeze({ id: "pipeline.verify-gate-scoped-registration", entryHash: "fdb7baa3832fc84300e8da293070b30469ba7186dd3814cf6954c01391624f64", status: "in_progress" }),
+  32: Object.freeze({ id: "pipeline.windows-runtime-baseline-containment", entryHash: "c5328053a8255b54a6dfb4c7d9b3b9f0a4e596108eabd3475529dc96397d9b28", status: "closed" }),
+  33: Object.freeze({ id: "pipeline.windows-directory-durability", entryHash: "2935227a1e98815f533c48f22b933a2f4ea0d3357397ad5abe308c0b51e5c16e", status: "closed" }),
+  34: Object.freeze({ id: "pipeline.windows-private-state-assurance", entryHash: "f8cd66a35974a109d63ebdbc2baeac213adb3473e81ac7b42953a90d479ca88f", status: "closed" }),
+  35: Object.freeze({ id: "pipeline.windows-verify-reproducibility", entryHash: "7a8b10d66080d3dccc08f71949ebe7ab114e712bc6ea6aa31b805858e9303e6e", status: "closed" }),
+  36: Object.freeze({ id: "pipeline.windows-trusted-tool-resolution", entryHash: "c3e371eb7e48afa1bc790f8d547a76d95361ee93094df8ffa0de4a44b98fbc67", status: "closed" }),
+  37: Object.freeze({ id: "pipeline.windows-runtime-baseline-containment", entryHash: "f5483d02c1f24f00b9bb108b0a31c69172bc6c437a793d96ee519488bdfb2021", status: "closed" }),
+  38: Object.freeze({ id: "pipeline.windows-runtime-baseline-containment", entryHash: "92e42ed2e83f2820f6aac609bb96996f5e9fdd6e12a2878d9340ebc359c9002f", status: "closed" }),
 });
 const AFK_REPAIR_EVIDENCE_KEYS = new Set(["kind", "commit", "reference", "sourceSha256"]);
 const AFK_REPAIR_DATE = "2026-07-23";
@@ -181,7 +259,7 @@ export function validateBacklogItem(item) {
   if (!ITEM_ID.test(asString(metadata.id))) errors.push(`${path}: id must be a lowercase stable identifier`);
   if (!BACKLOG_TYPES.includes(metadata.type)) errors.push(`${path}: type is not in the canonical item taxonomy`);
   if (!OWNER.test(asString(metadata.owner))) errors.push(`${path}: owner must be pipeline or project:<slug>`);
-  if (!BACKLOG_STATUSES.includes(metadata.status)) errors.push(`${path}: status must be open, in_progress, or closed`);
+  if (!BACKLOG_STATUSES.includes(metadata.status)) errors.push(`${path}: status must be ${STATUS_ENUM_TEXT}`);
   if (!validDate(asString(metadata.created))) errors.push(`${path}: created must be an ISO calendar date`);
   if (asString(metadata.source).trim().length === 0) errors.push(`${path}: source must be non-empty`);
   if (own(metadata, "tracking") && asString(metadata.tracking).trim().length === 0) errors.push(`${path}: tracking must be non-empty when present`);
@@ -264,8 +342,9 @@ export function validateSentinelRecoveryCatalog(catalog) {
     if (!ITEM_ID.test(asString(entry.id))) errors.push(`${label} id must be a lowercase stable identifier`);
     else if (ids.has(entry.id)) errors.push(`${label} duplicates id ${entry.id}`);
     else ids.add(entry.id);
-    if (!BACKLOG_STATUSES.includes(entry.status)) errors.push(`${label} status must be open, in_progress, or closed`);
+    if (!BACKLOG_STATUSES.includes(entry.status)) errors.push(`${label} status must be ${STATUS_ENUM_TEXT}`);
     else if (entry.status === "closed") errors.push(`${label} must not claim closed status during recovery`);
+    else if (entry.status === "rejected" || entry.status === "deferred") errors.push(`${label} must not claim ${entry.status} status during recovery`);
     if (!BACKLOG_TYPES.includes(entry.type)) errors.push(`${label} type is not in the canonical item taxonomy`);
   }
   const expected = new Set(SENTINEL_RECOVERY_IDS);
@@ -535,11 +614,15 @@ export function validateTransitionShape(event, label, { readDispositionBytes = n
   const amendment = event.from === "closed" && event.to === "closed" && event?.evidence?.kind === "evidence-amendment";
   const reachabilityAmendment = event.from === event.to
     && event?.evidence?.kind === "reachability-amendment";
+  const prePublicCoreReachability = event.from === event.to
+    && event?.evidence?.kind === PRE_PUBLIC_CORE_REACHABILITY_KIND;
+  const itemHashAmendment = event.from === event.to
+    && event?.evidence?.kind === ITEM_HASH_AMENDMENT_KIND;
   const v2Amendment = isV2EvidenceAmendment(event);
   const afkRepair = event.id === AFK_REPAIR_ID && event.from === null && event.to === "open" && event?.evidence?.kind === "missing-initial-ledger-repair";
   const managedRepair = event.id === MANAGED_ONBOARDING_REPAIR_ID && event.from === null && event.to === "open" && event?.evidence?.kind === "missing-initial-ledger-repair";
   const hashRescopeAmendment = event.from === event.to && event?.evidence?.kind === "item-hash-rescope-amendment";
-  if (event.from === event.to && !amendment && !reachabilityAmendment && !hashRescopeAmendment) errors.push(`${label}: transition must change status`);
+  if (event.from === event.to && !amendment && !reachabilityAmendment && !prePublicCoreReachability && !itemHashAmendment && !hashRescopeAmendment) errors.push(`${label}: transition must change status`);
   if (!validDate(asString(event.at))) errors.push(`${label}: at must be an ISO calendar date`);
   if (!ITEM_ID.test(asString(event.actor))) errors.push(`${label}: actor must be a lowercase stable identifier`);
   if (asString(event.reason).trim().length === 0) errors.push(`${label}: reason must be non-empty`);
@@ -568,7 +651,11 @@ export function validateTransitionShape(event, label, { readDispositionBytes = n
       ? EVIDENCE_AMENDMENT_KEYS
       : reachabilityAmendment
         ? REACHABILITY_AMENDMENT_KEYS
-        : afkRepair
+        : prePublicCoreReachability
+          ? REACHABILITY_AMENDMENT_KEYS
+          : itemHashAmendment
+            ? ITEM_HASH_AMENDMENT_KEYS
+            : afkRepair
           ? AFK_REPAIR_EVIDENCE_KEYS
           : managedRepair
             ? new Set(["kind", "commit", "reference", "itemSha256"])
@@ -605,6 +692,52 @@ export function validateTransitionShape(event, label, { readDispositionBytes = n
       if (target && (event.evidence.supersedesSequence !== target.sequence
         || event.evidence.supersedesEntryHash !== target.entryHash)) {
         errors.push(`${label}: reachability amendment does not bind the authorized historical event`);
+      }
+    }
+    if (prePublicCoreReachability) {
+      for (const key of ["supersedesSequence", "supersedesEntryHash", "referenceBlobOid", "referenceSha256"]) {
+        if (!own(event.evidence, key)) errors.push(`${label}: reachability-amendment is missing ${key}`);
+      }
+      if (!Number.isSafeInteger(event.evidence.supersedesSequence) || event.evidence.supersedesSequence < 1) {
+        errors.push(`${label}: supersedesSequence must be a positive integer`);
+      }
+      if (!HASH.test(asString(event.evidence.supersedesEntryHash))) errors.push(`${label}: supersedesEntryHash must be a SHA-256 hex digest`);
+      if (!OID.test(asString(event.evidence.referenceBlobOid))) errors.push(`${label}: referenceBlobOid must be a full lowercase Git blob OID`);
+      if (!HASH.test(asString(event.evidence.referenceSha256))) errors.push(`${label}: referenceSha256 must be a SHA-256 hex digest`);
+      const target2 = Number.isSafeInteger(event.evidence.supersedesSequence)
+        ? PRE_PUBLIC_CORE_REACHABILITY_TARGETS[event.evidence.supersedesSequence]
+        : undefined;
+      if (!target2
+        || target2.id !== event.id
+        || event.actor !== PRE_PUBLIC_CORE_REACHABILITY_ACTOR
+        || event.from !== target2.status
+        || event.to !== target2.status) {
+        errors.push(`${label}: reachability amendment is not an authorized PHX-LEDGER-REACH target`);
+      }
+      if (target2 && event.evidence.supersedesEntryHash !== target2.entryHash) {
+        errors.push(`${label}: reachability amendment does not bind the authorized historical event`);
+      }
+    }
+    if (itemHashAmendment) {
+      for (const key of ["supersedesSequence", "supersedesEntryHash", "itemSha256"]) {
+        if (!own(event.evidence, key)) errors.push(`${label}: item-hash-amendment is missing ${key}`);
+      }
+      if (!Number.isSafeInteger(event.evidence.supersedesSequence) || event.evidence.supersedesSequence < 1) {
+        errors.push(`${label}: supersedesSequence must be a positive integer`);
+      }
+      if (!HASH.test(asString(event.evidence.supersedesEntryHash))) errors.push(`${label}: supersedesEntryHash must be a SHA-256 hex digest`);
+      if (!HASH.test(asString(event.evidence.itemSha256))) errors.push(`${label}: itemSha256 must be a SHA-256 hex digest`);
+      const itemHashTarget = Number.isSafeInteger(event.evidence.supersedesSequence)
+        ? ITEM_HASH_AMENDMENT_TARGETS[event.evidence.supersedesSequence]
+        : undefined;
+      if (!itemHashTarget
+        || itemHashTarget.id !== event.id
+        || event.actor !== ITEM_HASH_AMENDMENT_ACTOR
+        || event.evidence.reference !== itemHashTarget.reference) {
+        errors.push(`${label}: item hash amendment is not an authorized target`);
+      }
+      if (itemHashTarget && event.evidence.supersedesEntryHash !== itemHashTarget.entryHash) {
+        errors.push(`${label}: item hash amendment does not bind the authorized historical event`);
       }
     }
     if (afkRepair && !HASH.test(asString(event.evidence.sourceSha256))) errors.push(`${label}: sourceSha256 must be a SHA-256 hex digest`);
@@ -677,6 +810,25 @@ export function validateTransitionLedger(events, items, { commitExists = null, r
       reachabilitySupersessions.add(target.sequence);
     }
   }
+  const prePublicCoreReachabilitySupersessions = new Set();
+  for (const event of events) {
+    if (event?.evidence?.kind !== PRE_PUBLIC_CORE_REACHABILITY_KIND) continue;
+    const target = PRE_PUBLIC_CORE_REACHABILITY_TARGETS[event.evidence.supersedesSequence];
+    const superseded = events[event.evidence.supersedesSequence - 1];
+    if (target
+      && target.id === event.id
+      && event.actor === PRE_PUBLIC_CORE_REACHABILITY_ACTOR
+      && event.from === target.status
+      && event.to === target.status
+      && event.evidence.supersedesEntryHash === target.entryHash
+      && superseded?.id === event.id
+      && superseded?.entryHash === target.entryHash
+      && superseded?.evidence?.reference === event.evidence.reference
+      && OID.test(asString(event.evidence.commit))
+      && (typeof commitExists !== "function" || commitExists(event.evidence.commit))) {
+      prePublicCoreReachabilitySupersessions.add(event.evidence.supersedesSequence);
+    }
+  }
   let previousHash = null;
   let seenV2 = false;
   for (const [index, event] of events.entries()) {
@@ -710,9 +862,10 @@ export function validateTransitionLedger(events, items, { commitExists = null, r
         const closureAmendment = event.from === "closed" && event.to === "closed" && event?.evidence?.kind === "evidence-amendment";
         const reachabilityAmendment = event.from === "closed" && event.to === "closed" && event?.evidence?.kind === "reachability-amendment";
         const hashRescopeAmendmentClosed = event.from === "closed" && event.to === "closed" && event?.evidence?.kind === "item-hash-rescope-amendment";
+        const prePublicCoreReachability = event.from === "closed" && event.to === "closed" && event?.evidence?.kind === PRE_PUBLIC_CORE_REACHABILITY_KIND;
         if (v2Amendment) {
           if (event.to !== "closed") mark(index, `${label}: evidence amendment must preserve closed status`);
-        } else if (!closureAmendment && !reachabilityAmendment && !hashRescopeAmendmentClosed) errors.push(`${label}: closed must never transition to another status`);
+        } else if (!closureAmendment && !reachabilityAmendment && !prePublicCoreReachability && !hashRescopeAmendmentClosed) errors.push(`${label}: closed must never transition to another status`);
         else if (closureAmendment && event.evidence.previousClosureCommit !== closureCommitById.get(event.id)) errors.push(`${label}: previousClosureCommit does not bind the prior closure`);
       } else if (v2Amendment) {
         if (event.to !== prior) mark(index, `${label}: evidence amendment must not mutate status`);
@@ -720,11 +873,15 @@ export function validateTransitionLedger(events, items, { commitExists = null, r
         if (event.to !== prior) errors.push(`${label}: reachability amendment must preserve status`);
       } else if (event?.evidence?.kind === "item-hash-rescope-amendment") {
         if (event.to !== prior) errors.push(`${label}: item hash rescope amendment must preserve status`);
-      } else if (FORWARD_TRANSITIONS[prior] !== event.to) errors.push(`${label}: ${prior} may only move to ${FORWARD_TRANSITIONS[prior]}`);
+      } else if (event?.evidence?.kind === PRE_PUBLIC_CORE_REACHABILITY_KIND) {
+        if (event.to !== prior) errors.push(`${label}: reachability amendment must preserve status`);
+      } else if (event?.evidence?.kind === ITEM_HASH_AMENDMENT_KIND) {
+        if (event.to !== prior) errors.push(`${label}: item hash amendment must preserve status`);
+      } else if (!(FORWARD_TRANSITIONS[prior] ?? []).includes(event.to)) errors.push(`${label}: ${prior} may only move to ${(FORWARD_TRANSITIONS[prior] ?? []).join(" or ") || "no further status"}`);
     }
     if (BACKLOG_STATUSES.includes(event.to)) stateById.set(event.id, event.to);
     const projectedCommit = projectedClosureCommit(event);
-    if (event.to === "closed" && event?.evidence?.kind !== "reachability-amendment" && OID.test(asString(projectedCommit))) closureCommitById.set(event.id, projectedCommit);
+    if (event.to === "closed" && event?.evidence?.kind !== "reachability-amendment" && event?.evidence?.kind !== PRE_PUBLIC_CORE_REACHABILITY_KIND && OID.test(asString(projectedCommit))) closureCommitById.set(event.id, projectedCommit);
     const externalProjectClosure = item?.metadata?.closure_repository?.startsWith("project:") && event.to === "closed";
     if (!externalProjectClosure && OID.test(asString(event?.evidence?.commit))) localEvidenceCommits.push({ index, commit: event.evidence.commit });
     previousHash = typeof event.entryHash === "string" ? event.entryHash : previousHash;
@@ -815,6 +972,7 @@ export function validateTransitionLedger(events, items, { commitExists = null, r
     }
     for (const record of localEvidenceCommits) {
       if (reachabilitySupersessions.has(record.index + 1)) continue;
+      if (prePublicCoreReachabilitySupersessions.has(record.index + 1)) continue;
       if (reachable(record.commit)) continue;
       if (acceptedByTarget.has(record.index + 1)) continue;
       mark(record.index, `ledger event ${record.index + 1}: evidence.commit is not a reachable local Git commit`);
@@ -827,9 +985,13 @@ export function validateTransitionLedger(events, items, { commitExists = null, r
     else if (current !== item.metadata.status) errors.push(`items: ${id} status does not match its final ledger transition`);
     if (item.metadata.status === "closed" && current === "closed") {
       const latest = [...events].reverse().find((event) => event?.id === id);
-      const reachabilitySuperseded = latest?.evidence?.kind === "reachability-amendment"
-        && reachabilitySupersessions.has(latest.evidence.supersedesSequence);
-      const final = [...events].reverse().find((event) => event?.id === id && event?.evidence?.kind !== "reachability-amendment");
+      const reachabilitySuperseded = (latest?.evidence?.kind === "reachability-amendment"
+        && reachabilitySupersessions.has(latest.evidence.supersedesSequence))
+        || (latest?.evidence?.kind === PRE_PUBLIC_CORE_REACHABILITY_KIND
+        && prePublicCoreReachabilitySupersessions.has(latest.evidence.supersedesSequence));
+      const final = [...events].reverse().find((event) => event?.id === id
+        && event?.evidence?.kind !== "reachability-amendment"
+        && event?.evidence?.kind !== PRE_PUBLIC_CORE_REACHABILITY_KIND);
       if (!reachabilitySuperseded && projectedClosureCommit(final) !== item.metadata.closure_commit) {
         const finding = isV2EvidenceAmendment(final)
           ? `items: ${id} closure_commit must equal its final ledger evidence.replacementCommit`
@@ -996,9 +1158,7 @@ export function projectBacklog(items, events) {
     "",
     "## Counts",
     "",
-    `- open: ${counts.open}`,
-    `- in_progress: ${counts.in_progress}`,
-    `- closed: ${counts.closed}`,
+    ...BACKLOG_STATUSES.map((status) => `- ${status}: ${counts[status]}`),
     "",
   ].join("\n");
   return { index, indexText: `${JSON.stringify(index, null, 2)}\n`, statusText: status };
@@ -1015,7 +1175,7 @@ export function planBacklogTransition(items, events, input) {
   if (index === -1) return { ok: false, errors: [`transition: unknown item id ${id}`], items, events, projection: null };
   const original = items[index];
   const from = original.metadata.status;
-  if (FORWARD_TRANSITIONS[from] !== to) errors.push(`transition: ${from} may only move to ${FORWARD_TRANSITIONS[from] ?? "no further status"}`);
+  if (!(FORWARD_TRANSITIONS[from] ?? []).includes(to)) errors.push(`transition: ${from} may only move to ${(FORWARD_TRANSITIONS[from] ?? []).join(" or ") || "no further status"}`);
   if (!validDate(asString(at))) errors.push("transition: at must be an ISO calendar date");
   if (!ITEM_ID.test(asString(actor))) errors.push("transition: actor must be a lowercase stable identifier");
   if (asString(reason).trim().length === 0) errors.push("transition: reason must be non-empty");
@@ -1287,4 +1447,212 @@ export function planBacklogReachabilityRepair(items, events, input) {
 function exactReferenceKeys(value) {
   return Object.keys(value).sort().join("\n")
     === ["id", "reference", "referenceBlobOid", "referenceSha256"].sort().join("\n");
+}
+
+/**
+ * Append reachable evidence for the 38 pre-public-core-foundation ledger
+ * events (physical sequences 1..38), a sibling to planBacklogReachabilityRepair
+ * that never touches REACHABILITY_REPAIR_TARGETS, REACHABILITY_REPAIR_ACTOR,
+ * or that function. It enumerates every event it repairs and refuses if that
+ * enumeration does not exactly match the events currently failing reachability
+ * (when a `commitExists` probe is supplied) — mirroring the same "no broad
+ * repair" principle by construction rather than by trusting the caller. The
+ * historical events remain byte-for-byte intact and item status is unchanged.
+ */
+export function planPrePublicCoreReachabilityRepair(items, events, input, { commitExists = null } = {}) {
+  const errors = [];
+  const expectedKeys = ["at", "actor", "commit", "references"];
+  if (!isPlainObject(input)
+    || Object.keys(input).sort().join("\n") !== expectedKeys.sort().join("\n")) {
+    return { ok: false, errors: ["pre-public-core reachability repair input shape is invalid"], items, events, projection: null };
+  }
+  if (input.actor !== PRE_PUBLIC_CORE_REACHABILITY_ACTOR || !validDate(asString(input.at))) {
+    errors.push("pre-public-core reachability repair authority binding is invalid");
+  }
+  if (!OID.test(asString(input.commit))) errors.push("pre-public-core reachability repair commit is invalid");
+  const expectedSequences = Object.keys(PRE_PUBLIC_CORE_REACHABILITY_TARGETS).map(Number).sort((left, right) => left - right);
+  if (!Array.isArray(input.references)
+    || input.references.length !== expectedSequences.length
+    || input.references.map((entry) => entry?.sequence).join("\n") !== expectedSequences.join("\n")) {
+    errors.push("pre-public-core reachability repair references must equal the authorized ordered target sequence set");
+  }
+  if (events.some((event) => event?.evidence?.kind === PRE_PUBLIC_CORE_REACHABILITY_KIND)) {
+    errors.push("pre-public-core reachability repair was already appended");
+  }
+  if (typeof commitExists === "function") {
+    const currentFindings = validateTransitionLedger(events, items, { commitExists });
+    const expectedFindings = expectedSequences.map((sequence) => `ledger event ${sequence}: evidence.commit is not a reachable local Git commit`);
+    if (currentFindings.join("\n") !== expectedFindings.join("\n")) {
+      errors.push("pre-public-core reachability repair requires exactly its authorized set of currently failing events");
+    }
+  }
+  for (const sequence of expectedSequences) {
+    const target = PRE_PUBLIC_CORE_REACHABILITY_TARGETS[sequence];
+    const historical = events[sequence - 1];
+    const reference = input.references?.find((entry) => entry?.sequence === sequence);
+    const item = items.find((entry) => entry?.metadata?.id === target.id);
+    if (historical?.id !== target.id || historical?.entryHash !== target.entryHash) {
+      errors.push(`pre-public-core reachability repair target ${sequence} does not bind canonical history`);
+    }
+    if (!item || item.metadata.status !== target.status) {
+      errors.push(`pre-public-core reachability repair target ${sequence} must preserve ${target.status}`);
+    }
+    if (!isPlainObject(reference)
+      || !exactPrePublicCoreReferenceKeys(reference)
+      || !SAFE_REPOSITORY_PATH.test(asString(reference.reference))
+      || !OID.test(asString(reference.referenceBlobOid))
+      || !HASH.test(asString(reference.referenceSha256))) {
+      errors.push(`pre-public-core reachability repair reference ${sequence} is invalid`);
+    }
+    if (isPlainObject(reference) && historical?.evidence?.reference !== undefined
+      && reference.reference !== historical.evidence.reference) {
+      errors.push(`pre-public-core reachability repair reference ${sequence} must match the superseded event's reference`);
+    }
+  }
+  if (errors.length) return { ok: false, errors, items, events, projection: null };
+
+  const nextEvents = [...events];
+  let previousHash = nextEvents.at(-1)?.entryHash ?? null;
+  for (const sequence of expectedSequences) {
+    const target = PRE_PUBLIC_CORE_REACHABILITY_TARGETS[sequence];
+    const reference = input.references.find((entry) => entry.sequence === sequence);
+    const event = {
+      schema: TRANSITION_SCHEMA,
+      sequence: nextEvents.length + 1,
+      id: target.id,
+      from: target.status,
+      to: target.status,
+      at: input.at,
+      actor: input.actor,
+      reason: `Append reachable evidence for historical event ${sequence} without rewriting it or changing item status.`,
+      evidence: {
+        kind: PRE_PUBLIC_CORE_REACHABILITY_KIND,
+        commit: input.commit,
+        reference: reference.reference,
+        supersedesSequence: sequence,
+        supersedesEntryHash: target.entryHash,
+        referenceBlobOid: reference.referenceBlobOid,
+        referenceSha256: reference.referenceSha256,
+      },
+      previousHash,
+      entryHash: "",
+    };
+    event.entryHash = transitionHash(event);
+    nextEvents.push(event);
+    previousHash = event.entryHash;
+  }
+  errors.push(...validateTransitionLedger(nextEvents, items, { commitExists }));
+  return {
+    ok: errors.length === 0,
+    errors,
+    items,
+    events: nextEvents,
+    appended: nextEvents.slice(events.length),
+    projection: errors.length ? null : projectBacklog(items, nextEvents),
+  };
+}
+
+function exactPrePublicCoreReferenceKeys(value) {
+  return Object.keys(value).sort().join("\n")
+    === ["sequence", "reference", "referenceBlobOid", "referenceSha256"].sort().join("\n");
+}
+
+/**
+ * Resolve the itemSha256 override recorded by a valid item-hash-amendment
+ * event, keyed by the physical sequence of the genesis event it targets.
+ * Only a structurally sound, registry-authorized amendment whose superseded
+ * event still matches the frozen target (id, entryHash, reference) counts;
+ * a malformed, unauthorized, or mistargeted event contributes no override,
+ * so the caller's normal itemSha256 check against current item bytes still
+ * applies unchanged -- an amendment can never bypass that check, only
+ * supply the corrected hash it is compared against (PHX-WP-LEDGER-AMENDMENT-KIND).
+ */
+export function resolveItemHashAmendmentOverlay(events) {
+  const overlay = new Map();
+  if (!Array.isArray(events)) return overlay;
+  for (const event of events) {
+    if (event?.evidence?.kind !== ITEM_HASH_AMENDMENT_KIND) continue;
+    const evidence = event.evidence;
+    const target = Number.isSafeInteger(evidence.supersedesSequence)
+      ? ITEM_HASH_AMENDMENT_TARGETS[evidence.supersedesSequence]
+      : undefined;
+    const superseded = Number.isSafeInteger(evidence.supersedesSequence)
+      ? events[evidence.supersedesSequence - 1]
+      : undefined;
+    if (!target
+      || target.id !== event.id
+      || event.from !== event.to
+      || event.actor !== ITEM_HASH_AMENDMENT_ACTOR
+      || evidence.reference !== target.reference
+      || evidence.supersedesEntryHash !== target.entryHash
+      || !HASH.test(asString(evidence.itemSha256))
+      || superseded?.id !== event.id
+      || superseded?.entryHash !== target.entryHash
+      || superseded?.evidence?.reference !== evidence.reference) {
+      continue;
+    }
+    overlay.set(evidence.supersedesSequence, evidence.itemSha256);
+  }
+  return overlay;
+}
+
+/**
+ * Plan exactly one authorized item-hash-amendment event that supersedes a
+ * genesis event's stale itemSha256 binding after a later, legitimate item
+ * content edit. Mirrors planPrePublicCoreReachabilityRepair's shape: a
+ * frozen per-sequence target registry (ITEM_HASH_AMENDMENT_TARGETS) is the
+ * only source of authorized targets, so no caller-supplied sequence outside
+ * that registry can ever be repaired. The superseded event's own bytes and
+ * the hash chain are never touched; only a new, appended event carries the
+ * corrected binding.
+ */
+export function planItemHashAmendment(items, events, input) {
+  const errors = [];
+  const expectedKeys = ["at", "actor", "commit", "supersedesSequence", "itemSha256"];
+  if (!isPlainObject(input) || Object.keys(input).sort().join("\n") !== expectedKeys.sort().join("\n")) {
+    return { ok: false, errors: ["item hash amendment input shape is invalid"], items, events, projection: null };
+  }
+  if (input.actor !== ITEM_HASH_AMENDMENT_ACTOR || !validDate(asString(input.at))) {
+    errors.push("item hash amendment authority binding is invalid");
+  }
+  if (!OID.test(asString(input.commit))) errors.push("item hash amendment commit is invalid");
+  if (!HASH.test(asString(input.itemSha256))) errors.push("item hash amendment itemSha256 is invalid");
+  const target = Number.isSafeInteger(input.supersedesSequence) ? ITEM_HASH_AMENDMENT_TARGETS[input.supersedesSequence] : undefined;
+  if (!target) errors.push("item hash amendment target is not authorized");
+  if (events.some((event) => event?.evidence?.kind === ITEM_HASH_AMENDMENT_KIND && event?.evidence?.supersedesSequence === input.supersedesSequence)) {
+    errors.push("item hash amendment was already appended for this target");
+  }
+  const historical = target && Number.isSafeInteger(input.supersedesSequence) ? events[input.supersedesSequence - 1] : undefined;
+  if (target && (historical?.id !== target.id || historical?.entryHash !== target.entryHash || historical?.evidence?.reference !== target.reference)) {
+    errors.push("item hash amendment target does not bind canonical history");
+  }
+  const record = target ? items.find((entry) => entry?.metadata?.id === target.id) : undefined;
+  if (target && !record) errors.push("item hash amendment target item is missing");
+  if (errors.length) return { ok: false, errors, items, events, projection: null };
+
+  const status = record.metadata.status;
+  const event = {
+    schema: TRANSITION_SCHEMA,
+    sequence: events.length + 1,
+    id: target.id,
+    from: status,
+    to: status,
+    at: input.at,
+    actor: input.actor,
+    reason: `Supersede stale itemSha256 recorded by ledger event ${input.supersedesSequence} after a later, legitimate content edit; the earlier event's own bytes and the hash chain remain untouched.`,
+    evidence: {
+      kind: ITEM_HASH_AMENDMENT_KIND,
+      commit: input.commit,
+      reference: target.reference,
+      supersedesSequence: input.supersedesSequence,
+      supersedesEntryHash: target.entryHash,
+      itemSha256: input.itemSha256,
+    },
+    previousHash: events.at(-1)?.entryHash ?? null,
+    entryHash: "",
+  };
+  event.entryHash = transitionHash(event);
+  const nextEvents = [...events, event];
+  errors.push(...validateTransitionLedger(nextEvents, items));
+  return { ok: errors.length === 0, errors, items, events: nextEvents, event, projection: errors.length === 0 ? projectBacklog(items, nextEvents) : null };
 }

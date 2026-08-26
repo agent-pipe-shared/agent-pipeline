@@ -1,0 +1,9 @@
+fix(backlog): repair closure fields, due dates, and ledger drift
+
+Add missing closure fields to the external-reference-adapter item, fix
+two due: null violations, and reconcile the ledger for four items whose
+files asserted a status the ledger never recorded, so check-backlog-state
+and the reconciliation test suite both pass clean.
+
+Dispatch: PHX-VF-BACKLOG (goldfish)
+AI-Assisted: true

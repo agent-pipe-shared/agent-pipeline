@@ -16,4 +16,47 @@ assert.equal(mismatch.observedPublicKeySha256, createHash("sha256").update(publi
 assert.equal(mismatch.expectedPublicKeySha256, "0".repeat(64), "the expected digest must be the trust policy's own publicKeySha256");
 assert.notEqual(mismatch.observedPublicKeySha256, mismatch.expectedPublicKeySha256, "the two disclosed digests must be distinct in the mismatch case");
 assert.ok(!("publicKey" in mismatch) && !JSON.stringify(mismatch).includes(publicKey), "raw key material must never be echoed back, only its sha256 digest");
-console.log("6 PO approval proof checks passed");
+
+// SETUP-1: trust-policy.json shape disagreement fix (backlog
+// 2026-08-17-trust-policy-shape-disagreement-...). `setup --human-name`
+// writes a 3-key named shape {keyReference, publicKeySha256, humanName};
+// verifyPoApprovalProof must accept it, exactly as it accepts the 2-key
+// legacy shape, without loosening the precision of the `own()` check.
+const namedTrustPolicy = { ...trustPolicy, humanName: "Nova the PO" };
+const namedProofResult = verifyPoApprovalProof({ intent, trustPolicy: namedTrustPolicy, proof });
+assert.equal(namedProofResult.verified, true);
+assert.equal(namedProofResult.code, "PO-APPROVAL-PROOF-VERIFIED");
+
+// Regression: the pre-existing 2-key legacy shape (no humanName) still verifies.
+assert.equal(verifyPoApprovalProof({ intent, trustPolicy, proof }).verified, true);
+
+// A required field missing must still fail closed, humanName present or not.
+const missingKeyReference = { publicKeySha256: trustPolicy.publicKeySha256, humanName: "Nova the PO" };
+const missingKeyReferenceResult = verifyPoApprovalProof({ intent, trustPolicy: missingKeyReference, proof });
+assert.equal(missingKeyReferenceResult.verified, false);
+assert.equal(missingKeyReferenceResult.code, "PO-APPROVAL-PROOF-INVALID");
+const missingPublicKeySha256 = { keyReference: trustPolicy.keyReference, humanName: "Nova the PO" };
+const missingPublicKeySha256Result = verifyPoApprovalProof({ intent, trustPolicy: missingPublicKeySha256, proof });
+assert.equal(missingPublicKeySha256Result.verified, false);
+assert.equal(missingPublicKeySha256Result.code, "PO-APPROVAL-PROOF-INVALID");
+const missingBothNoHumanName = { humanName: "Nova the PO" };
+const missingBothNoHumanNameResult = verifyPoApprovalProof({ intent, trustPolicy: missingBothNoHumanName, proof });
+assert.equal(missingBothNoHumanNameResult.verified, false);
+assert.equal(missingBothNoHumanNameResult.code, "PO-APPROVAL-PROOF-INVALID");
+
+// Precision bar: only `humanName` specifically becomes tolerated, not any
+// extra key -- a different extra field must still fail closed.
+const otherExtraKey = { ...trustPolicy, someOtherField: "x" };
+const otherExtraKeyResult = verifyPoApprovalProof({ intent, trustPolicy: otherExtraKey, proof });
+assert.equal(otherExtraKeyResult.verified, false);
+assert.equal(otherExtraKeyResult.code, "PO-APPROVAL-PROOF-INVALID");
+
+// proof's own `own()` check stays exactly as strict as before: an extra key
+// on `proof` (mirroring the trustPolicy precision-bar case above) must still
+// fail closed, proving this fix did not touch proof's check.
+const proofWithExtraKey = { ...proof, someOtherField: "x" };
+const proofWithExtraKeyResult = verifyPoApprovalProof({ intent, trustPolicy, proof: proofWithExtraKey });
+assert.equal(proofWithExtraKeyResult.verified, false);
+assert.equal(proofWithExtraKeyResult.code, "PO-APPROVAL-PROOF-INVALID");
+
+console.log("24 PO approval proof checks passed");

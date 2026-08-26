@@ -1,0 +1,1 @@
+{"candidate":null,"correlation":"fp-4feeaf730866eb0d","evidence":null,"featureId":"sprint-phoenix-epic","idempotencyKey":"phoenix-lifecycle-reconcile-01","operation":"reconcile-draft","outcome":"committed","schema":"pipeline.feature-package-lifecycle-receipt.v1"}

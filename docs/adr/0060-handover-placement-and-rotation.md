@@ -2,11 +2,17 @@
 
 > Agent-Pipeline · Sprint Nova · as of 2026-08-07
 
-**Status:** accepted for the placement rule; the rotation mechanism (Decision
+**Status:** accepted for the placement rule. The rotation mechanism (Decision
 5) is **closed by [ADR-0066](0066-handover-rotation-extraction-archive-hard-size-gate.md)**,
-2026-08-17 — this ADR's own text below is left unrewritten per this
-repository's never-rewrite convention, read Decision 5 as historical context
-for the question ADR-0066 answers, not as the current mechanism.
+2026-08-17, on the Nova line — this ADR's own text below is left unrewritten
+per this repository's never-rewrite convention, read Decision 5 as historical
+context for the question ADR-0066 answers, not as the current mechanism.
+Separately, on the Phoenix line, the rotation-mechanism *shape* (Decision 5)
+is addressed by [ADR-0064](0064-handover-rotation-extraction-archive-hard-size-gate.md),
+2026-08-18, which cross-references ADR-0066 as the shape's origin; ADR-0064
+itself records that the extraction pass is partial and the mechanism
+build/rotation are NOT yet done on that line — Decision 5 is therefore
+shape-closed there, not fully discharged.
 (2026-08-07, PO instruction, chat) — *"state ist ja auch dafür gedacht. weil
 eine neue session immer dumm ist und deine zwischendokumente nicht finden würde.
 eins der agentischen entwicklungsprobleme: auch ein Elephant ist am Anfang ein

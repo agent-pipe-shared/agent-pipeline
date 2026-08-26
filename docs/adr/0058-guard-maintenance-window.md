@@ -11,6 +11,8 @@ aktiviert wurde (kein fail! aber Warnung)"*. **Refines** [ADR-0056](0056-push-ap
 **extends** the "Attended Human guard override" system described in
 `docs/human-guard-override-threat-model.md`.
 
+**Governs:** plugins/pipeline-core/hooks/guard-gate-strength.mjs, plugins/pipeline-core/hooks/guard-testpath.mjs, plugins/pipeline-core/lib/human-guard-override.mjs, plugins/pipeline-core/lib/po-approval-proof.mjs, plugins/pipeline-core/lib/tool-write-target.mjs, plugins/pipeline-core/hooks/guard-command-grammar.mjs, plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs, plugins/pipeline-core/hooks/hooks.json, docs/human-guard-override-threat-model.md, docs/po-approval-proof-contract.md
+
 ## Context
 
 `guard-gate-strength.mjs` Rule GS-6 unconditionally refuses every Edit/Write to
@@ -103,6 +105,36 @@ cannot today for a push in `signature` mode.
    enumeration is listed in `docs/guard-maintenance-window-threat-model.md`'s
    "Protected assets" section rather than duplicated a third time here.
 
+**Correction, 2026-08-10 (found by a round-2 Critic review of a design that proposes growing this
+kernel).** Decision 3 enumerates the kernel by name and has never been amended since — this ADR is
+the decision authority for that list (`plugins/pipeline-core/lib/self-application-attestation-gate.mjs:45-47`
+already treats "whether the kernel list should grow" as "one ADR-0058 decision"), so a design that
+proposes a new member without amending this ADR leaves the authoritative record silently incomplete
+the moment the code change lands. Stated as a standing process, so this does not need rediscovering
+per future module: **a `NEVER_LIFTABLE_KERNEL_PATHS` addition is a decision of this ADR, recorded
+here as a dated correction at the time the addition is proposed** — never merely a code-review
+outcome on the file that hosts the array. The correction names the new module, the capability-
+bearing artifact it computes that makes it kernel-eligible (Decision 3's own test: would a window
+covering this file let the first edit disable the very check that gates it), and the design or
+dispatch that raised it.
+
+**First application of that process.** `specs/sprint-phoenix-epic/design/gmw-hgo-evidence-intake-
+into-the-human-ledger.md` §15.1.6 (iv) proposes `plugins/pipeline-core/lib/guard-authority-ledger-
+intake.mjs` as an eighth kernel entry once that module ships (it does not exist yet): it will host
+`ledgerConfirmsLiveGmwGrant`, whose return value becomes a term of the lift condition — exactly
+Decision 3's own recursive-hole test. Endorsed here as the correct kernel classification, contingent
+on that module actually landing; the array itself is edited by whichever dispatch ships the module,
+not by this correction. This does not resolve the SEPARATE, already-pending question named at
+`self-application-attestation-gate.mjs:45-47` — **which is about two modules, not one, and the first
+version of this paragraph named only one of them.** The source comment reads: "This module is
+deliberately not in `NEVER_LIFTABLE_KERNEL_PATHS`; GS-8's module is not either, and whether the
+kernel list should grow is one ADR-0058 decision about both." "This module" is
+`self-application-attestation-gate.mjs` itself — governed, for the live-enforcing copy, by GS-6 (the
+same window-liftable rule the intake module above sits under), not by GS-8. "GS-8's module" is the
+sibling file it imports and compares against, `./public-core-origin-allowlist.mjs`
+(`self-application-attestation-gate.mjs:22-23`). Both memberships are open, both are outside this
+design's scope, and both are left open below for their own dated correction when addressed.
+
 4. **Bounded TTL, enforced in code, fail-closed on a malformed clock.** The
    verifier clamps effective expiry to `min(signedExpiresAt, openedAt + MAX_TTL)`
    with a fixed, short `MAX_TTL` (hours, not days). Expiry parsing follows the
@@ -193,3 +225,60 @@ its own right (see Follow-up).
 - `deploy`/`publication` are untouched by this ADR; if a maintenance-window
   need is ever raised for them, the shape proven here (closed scope, no
   activation step, bounded TTL) is the template to reuse.
+- `plugins/pipeline-core/lib/guard-authority-ledger-intake.mjs`'s addition to
+  `NEVER_LIFTABLE_KERNEL_PATHS` (2026-08-10 correction above) is endorsed but
+  not yet applied — the array itself is edited when that module ships, not
+  here. Trigger: land alongside that module.
+- Two kernel-membership questions raised at `self-application-attestation-gate.mjs:45-47` remain
+  undecided by this ADR — corrected here from an earlier version of this bullet, which named only
+  one of them and mislabeled it (see the 2026-08-10 correction above). Neither is the intake module
+  above; both are a separate module, a separate decision:
+  - `plugins/pipeline-core/lib/self-application-attestation-gate.mjs` itself (the live-enforcing
+    copy is governed by GS-6, the window-liftable rule).
+  - `plugins/pipeline-core/lib/public-core-origin-allowlist.mjs`, GS-8's actual module.
+
+  Owner `pipeline`. **Trigger:** resolved when a dated correction to this ADR either adds the
+  relevant path(s) to `NEVER_LIFTABLE_KERNEL_PATHS` or records, on the record, that the
+  maintenance-cost tradeoff (permanently uneditable under any window, per Decision 3) is accepted
+  and the exposure stays — the same two-way trigger shape §15.1.6 (v) of the caching design now uses
+  for the analogous `guard-testpath.mjs` question, not a default of leaving the question open
+  indefinitely.
+- `plugins/pipeline-core/hooks/guard-testpath.mjs`'s own membership in
+  `NEVER_LIFTABLE_KERNEL_PATHS` — the question the entry above uses only as an
+  analogy — is itself raised here, not yet decided.
+  `backlog/items/2026-08-10-guard-testpath-not-kernel-protected-like-its-
+  sibling.md` names the same recursive-hole shape Decision 3 already protects
+  `guard-gate-strength.mjs` against: `guard-testpath.mjs` is the enforcement
+  hook for the entire TP-* rule family, so a GS-6 window opened for any
+  legitimate, unrelated purpose would let its first edit weaken or remove a
+  TP-* refusal, and that edit would survive the window's own expiry — this
+  file's own `Governs:` line already lists `guard-testpath.mjs`, so the
+  question sits squarely inside this ADR's authority. `PIPE-WP-GTP-KERNEL`
+  (2026-08-11) attempted the array addition the backlog item proposes and
+  correctly stopped rather than ship it without this recorded decision —
+  the stop is what surfaced that the question had only ever been used as an
+  analogy above, never itself tracked.
+
+  Owner `pipeline`. **Trigger:** the same two-way shape as the entry above —
+  a dated correction that either adds the path to
+  `NEVER_LIFTABLE_KERNEL_PATHS` or records that the maintenance-cost
+  tradeoff is accepted and the exposure stays. The backlog item names the
+  cost precisely: once added, a genuine bug in TP-*'s own enforcement logic
+  would need a different, out-of-session route to fix (the PO editing it
+  directly, or a separate installed-plugin-copy workflow) — the same
+  limitation this repository already accepts for `guard-gate-strength.mjs`
+  today. That tradeoff is the PO's to weigh, not a default either way.
+
+  **Resolved, 2026-08-11 (PO decision).** The exposure stays;
+  `guard-testpath.mjs` is NOT added to `NEVER_LIFTABLE_KERNEL_PATHS`. PO
+  rationale, recorded as given: a GMW window is itself human-authorized to
+  open — it requires the PO's own signature — and this repository's guard
+  system is built to bound what an AGENT can do without a human step, not
+  to bound the PO, who can already change any file directly, guard or no
+  guard, outside a session entirely. Any edit reachable through an active
+  window, including one to `guard-testpath.mjs`, only becomes reachable
+  after the PO has already signed that window into existence. On that
+  reasoning, the marginal exposure this bullet raised is not accepted as a
+  live risk worth the permanent-uneditability cost. This resolves the
+  two-way trigger above by the second branch: the tradeoff was weighed, not
+  defaulted, and the exposure stays.

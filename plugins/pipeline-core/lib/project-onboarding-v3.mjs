@@ -83,6 +83,7 @@ import { derivePlanLifecycle } from "./plan-spec-state-v2.mjs";
 import { discoverRepository } from "./worktree-lifecycle.mjs";
 import { CRITICAL_HUMAN_PROOF_POLICY_PATH, CRITICAL_HUMAN_PROOF_POLICY_V1, CRITICAL_HUMAN_PROOF_POLICY_V3 } from "./critical-human-proof-policy.mjs";
 import { readMachinePlane } from "./machine-plane.mjs";
+import { clearConsentMarker } from "./onboarding-consent-marker.mjs";
 
 // Wave 4 onboarding coordinator, step 6 (design SSa.4/SSe; NVA-W5-COORD-STEP6-1).
 // The three new v4Inspection statuses a genuinely fresh repo now settles into
@@ -4100,9 +4101,29 @@ function v4Inspection(rootDir, fs, intent = "onboarding", runner) {
   });
 }
 
+/**
+ * PHX-WP-ONBOARDING-CONSENT-LOCK: the onboarding-consent marker's one
+ * genuine-completion call site. `intent === "session"` is the exact intent
+ * guard-lifecycle-ready.mjs's `requireProjectOnboardingReady` uses to gate
+ * real Write/Edit and Bash/PowerShell admission, so a `ready` result here,
+ * for that intent, IS this codebase's own existing definition of "onboarding
+ * actually complete" -- regardless of which apply/recovery path produced it.
+ * Clearing is best-effort and never allowed to affect this function's own
+ * return value: a marker that fails to clear simply stays blocking, which is
+ * safe for the marker's purpose (never a bypass), and inspect() itself must
+ * stay a reliable read no matter what the marker's filesystem state is.
+ */
 export function inspectProjectOnboardingV3({ rootDir = process.cwd(), deps: overrides = {}, intent = "onboarding", runner } = {}) {
   requireRunner(runner, "inspectProjectOnboardingV3");
-  return v4Inspection(rootDir, deps(overrides), intent, runner);
+  const result = v4Inspection(rootDir, deps(overrides), intent, runner);
+  if (intent === "session" && result?.status === "ready") {
+    try {
+      clearConsentMarker({ rootDir: result.root ?? rootDir, reason: "onboarding-complete" });
+    } catch {
+      // Never let a marker-clear failure surface through inspect()'s contract.
+    }
+  }
+  return result;
 }
 
 export function planProjectOnboardingV3({ rootDir = process.cwd(), deps: overrides = {}, runner } = {}) {

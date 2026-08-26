@@ -1,0 +1,10 @@
+{
+  "schema": "pipeline.elephant-verified-checks.v1",
+  "note": "Elephant-run (not verify.mjs, not script-written) — same honesty disclosure QG-03 requires: this is a direct, individually-run reproduction, not a substitute claimed as verify.mjs-equivalent. Each command was run directly by the Elephant against the working tree at a point where its code content was confirmed identical to candidate f01f111 (only docs/state.md changed afterward, confirmed via git show --stat on each subsequent commit).",
+  "candidate": { "commit": "f01f111226a4d6327627564c3ce225860455dd6e", "tree": "fe60c323e98de3a889de3b9aedffe9904c61a5d9" },
+  "checks": [
+    { "command": "node plugins/pipeline-core/lib/external-push-ledger.test.mjs", "exitCode": 0, "resultSummary": "24/24 checks passed (EPL01-EPL23, including new EPL20-EPL23 for F4)." },
+    { "command": "node plugins/pipeline-core/hooks/guard-push-external-ledger.test.mjs", "exitCode": 0, "resultSummary": "7/7 passed (PGXL01-PGXL07, including new PGXL07 for F5)." },
+    { "command": "node plugins/pipeline-core/lib/runner-profiles-v3.test.mjs", "exitCode": 0, "resultSummary": "20/20 cases passed, including 'gates.push_external_ledger accepts required/off, absence stays valid, other values are rejected' (F1)." }
+  ]
+}

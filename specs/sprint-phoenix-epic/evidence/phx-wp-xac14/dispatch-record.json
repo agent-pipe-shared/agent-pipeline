@@ -1,0 +1,23 @@
+{
+  "taskId": "PHX-WP-XAC14",
+  "model": "claude-sonnet-5",
+  "rulesetSha": "ce50d74d16fdbcd0b9f8b3b606297e88af3d2f139b3cd14b692f4ea15599b023",
+  "dispatcher": "elephant",
+  "outcome": "passed",
+  "log": [
+    {"phase": "start", "toolUses": 2, "note": "dispatch record created before any other work"},
+    {"phase": "implementation", "toolUses": 8, "note": "wrapped both inspect() call sites in try/catch, returning reason: external-unreachable on catch"},
+    {"phase": "verification", "toolUses": 18, "note": "24/24 GREEN; break-proof RED captured (2 tests failed with uncaught Error: transport down) then fix restored and re-verified GREEN; node --check clean"},
+    {"phase": "backlog-closure", "toolUses": 20, "note": "backlog item triage fields filled, status set to closed"}
+  ],
+  "dodResults": {
+    "X-AC-14 fix (try/catch both call sites, external-unreachable reason)": "passed",
+    "new tests (break-proof + regression)": "passed",
+    "break-proof discipline (RED captured, restored)": "passed",
+    "verify command exit 0": "passed",
+    "node --check clean": "passed",
+    "backlog closure (triage fields + status)": "passed"
+  },
+  "commit": "0d01845",
+  "report": "DoD: all checks passed. Evidence: specs/sprint-phoenix-epic/evidence/phx-wp-xac14/green-final.log (node --test, 24/24 pass, exit 0) and red-break-proof.log (2/24 fail, exit 1, uncaught Error: transport down, confirming the pre-fix defect). Changed files: external-reference-adapter.mjs (try/catch around both inspect() call sites, reason: external-unreachable on catch), external-reference-adapter.test.mjs (5 new X-AC-14 tests: 2 break-proof + 2 regression-equivalent + 1 invalid-inspection regression), backlog item triage fields + status:closed. Not changed: validateTarget, validateExternalReference, applyExternalReferenceWrite, bindCanonicalArtifactIdentity, all pre-existing test assertions, backlog item's Description/Triggering situation/Affected artifact/Proposal sections. No deviations from briefing. No stop conditions triggered."
+}

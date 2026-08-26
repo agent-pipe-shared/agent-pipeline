@@ -3,9 +3,14 @@ schema: pipeline.backlog-item.v1
 id: pipeline.maintenance-window-selectivity-is-untested-at-both-levels
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-07
 source: "Observation from a parallel Phoenix session on the marketplace snapshot that each guard hook carries only one maintenance-window test, sharpened and empirically checked against the live TP-2/TP-6/TP-7 window during the 2026-08-07 Nova session."
+due: 2026-09-06
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "2c227a3d6f90855c7a8eed09bd4e932142925589"
+closure_evidence: "backlog/items/2026-08-07-maintenance-window-selectivity-is-untested-at-both-levels.md"
 ---
 
 # A maintenance window's selectivity holds, and nothing tests it
@@ -89,7 +94,9 @@ whether a lift applies at all: an expired window, and a closed one. If the
 library suite already covers those, say so rather than duplicating them at hook
 level — the point is the invariant, not the case count.
 
-## Triage (filled in by the Elephant of the next Pipeline session)
+## Triage — 2026-08-18
+
+### Nova line
 
 - **Decision:** deferred — owned by Sprint Alfred. Re-verified
   the item's own framing: this is explicitly "not a live defect but an
@@ -138,3 +145,16 @@ level — the point is the invariant, not the case count.
   ceremony this item's own "Affected artifact" section already anticipated
   ("Both hook suites are themselves protected test paths ... this work needs
   a maintenance window of its own").
+
+### Phoenix line (independent parallel investigation and closure, converging on the same final fix commit)
+
+- **Decision:** still_open_dispatch_ready — partially fixed, not closed. Library-level selectivity is now covered: `plugins/pipeline-core/lib/guard-maintenance-window.test.mjs:178-181` (GMW03) asserts `windowCoversRule({ruleId:"TP-2"}).covered === false` against a window scoped to `["GS-6","TP-1"]` — a liftable rule outside scope (confirmed identical in Nova at the same file, lines 206-207). GST20's hook-level negative was already present and is unchanged. Hook-level selectivity for `guard-testpath.test.mjs` is still NOT covered: TP09 (lines 197-213) remains the sole maintenance-window case in that file and is still a pure happy path with no negative for a different in-scope-file/out-of-scope-rule combination; Nova has not added one either. The "expired/closed window" adjacent-states suggestion is already satisfied by GMW04 and the existing "already-expired" fixture.
+- **Rationale:** The remaining gap (a `guard-testpath.test.mjs` negative mirroring GST20's pattern) is a bounded, ordinary test-authoring task with a ready-made model already in the same repo — no PO judgment call needed.
+- **Assignment (if accepted):** Goldfish, scoped to adding one negative case to `guard-testpath.test.mjs` (itself a protected test path, TP-2 — needs its own GMW window to land).
+- **Date:** 2026-08-18
+
+## Triage — closed 2026-08-18
+
+- **Decision:** closed — resolved.
+- **Rationale:** The one remaining gap this item's 2026-08-18 Triage narrowed to — a `guard-testpath.test.mjs` negative mirroring GST20's pattern — is closed: new case `TP14` proves a window scoped to one liftable TP rule does not lift a different TP rule. Landed commit `2c227a3d`.
+- **Date:** 2026-08-18

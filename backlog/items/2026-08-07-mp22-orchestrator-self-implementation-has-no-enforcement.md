@@ -3,10 +3,14 @@ schema: pipeline.backlog-item.v1
 id: pipeline.mp22-orchestrator-self-implementation-has-no-enforcement
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-07
 due: 2026-08-21
 source: "Critic rounds 1 and 2 of the 0.5.3 candidate, 2026-08-07 — both independently found the same class of violation, round 2 with the sharper spec-ref."
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "339f08bd848bec332ba78f602109b83f1ea70360"
+closure_evidence: "backlog/items/2026-08-07-mp22-orchestrator-self-implementation-has-no-enforcement.md"
 ---
 
 # MP-22 / EL-01 forbid orchestrator self-implementation and nothing technically prevents it
@@ -226,7 +230,45 @@ conscious PO call, not just this triage pass's default.
 Confirmed: stays at Alfred, not pulled forward. Accepted as a conscious
 restricted risk until then.
 
-### Sweep re-check, 2026-08-25 (AGY-SWEEP-mp22-orchestrator-enforcement)
+## Triage re-examination, 2026-08-18 (Phoenix branch)
+
+- **Decision:** Not decided — this entry records re-examination, not a
+  choice among the item's four named designs. No technical enforcement of
+  MP-22/EL-01/EL-16 self-implementation exists in code today (re-verified:
+  no orchestrator-completion trailer/dispatch-record cross-check anywhere in
+  `plugins/`; Nova's `dispatch-authorship-verify.mjs` verifies source-marker
+  authorship, a different, narrower check per Nova's own sibling backlog item
+  `2026-08-10-verify-authorship-defaults-to-source-markers-not-behavior.md`
+  — it does not cover this gap either, so there is no cross-repo fix to
+  adopt here).
+- **Rationale:** The item's own Proposal explicitly frames all four
+  candidates as "not designed here, deliberately" — a genuine PO-owned
+  enforcement-design choice among mutually exclusive mechanisms, not a
+  backlog-sweep judgment call.
+- **Assignment (if accepted):** Not assigned; needs the PO decision the item
+  itself asks for before any candidate is designed further.
+- **Date:** 2026-08-18
+
+## Triage — closed 2026-08-18 (PO decision)
+
+**Merge note (2026-08-26, moved from frontmatter):** Merged from two diverged branch histories (Nova vs. Phoenix, 2026-08-26). Phoenix closed this item 2026-08-18 (commit 339f08bd848bec332ba78f602109b83f1ea70360, verified present) per an explicit PO decision; Nova's independent 2026-08-25 sweep re-check did not yet know of that closure and reported the item still open. Closure evidence checked and holds; status: closed taken from Phoenix. Both branches' Triage passes are preserved below in chronological order.
+
+- **PO decision (verbatim intent):** "ist so gewollt: close. Falls es mal
+  nötig ist soll es gehen aber per se nicht gewünscht sein" — the current
+  state (MP-22/EL-01/EL-16 as a prose-only rule, no technical enforcement
+  mechanism) is the desired end state, not an interim gap. Self-implementation
+  by the orchestrator must remain technically possible for the rare case it
+  is genuinely necessary, but is deliberately not encouraged or made
+  frictionless by tooling. None of the four proposed enforcement candidates
+  is being built.
+- **Consequence:** Detection stays exactly as it is today — a Critic review
+  reading both a commit and its dispatch record can still catch a violation
+  after the fact (as it already did, twice, for `503fe0d`/`584a598`); there
+  is and will be no in-session technical block. This is accepted, not a
+  residual risk to track further.
+- **Closed, no code change.**
+
+### Sweep re-check, 2026-08-25 (AGY-SWEEP-mp22-orchestrator-enforcement, Nova branch)
 
 Re-verified live rather than trusting the inherited "still open" label:
 EL-13a/EL-13b/EL-25a in `roles/elephant.md` give partial technical coverage
@@ -236,3 +278,11 @@ later artifact treats it as closed. This item also names a genuine
 cross-item dependency — the same root gap must close a second entry point
 owned by `2026-08-08-no-design-to-implementation-handover-exists.md`, a
 separate still-in-flight item. Status unchanged; no code touched this pass.
+
+**Merge-time note (2026-08-26):** this sweep ran on a branch that had not
+yet merged the Phoenix branch's 2026-08-18 closure above (commit
+`339f08bd848bec332ba78f602109b83f1ea70360`, verified present at merge time).
+The sweep's "no later artifact treats it as closed" finding was accurate for
+the branch it ran on; it is superseded by the closure once both histories
+are combined. Left verbatim as an accurate record of what that sweep found
+on its own branch at the time.

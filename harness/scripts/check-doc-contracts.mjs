@@ -18,6 +18,12 @@ import { checkObservationGovernance } from "./check-observation-governance.mjs";
 
 const decoder = new TextDecoder("utf-8", { fatal: true });
 const EXCLUDED_PATH = "AGENTS.md";
+// Archived-history directories (ADR-0064): a verbatim, never-re-edited copy of
+// a prior handover section whose internal relative links resolved correctly
+// only at its original location. Excluded the same way AGENTS.md is: never
+// scanned as a link source, and any link INTO it resolves without checking
+// against trackedPaths. Directory-prefix match, not a second exact constant.
+const EXCLUDED_PREFIXES = ["docs/state-archive"];
 const STATEFUL_DESIGN_SURFACES = ["templates/spec.md", "roles/elephant.md"];
 const STATEFUL_DESIGN_OPERATIVE_HEADINGS = [
   "### 2a. Stateful guard/control pre-readiness checklist (conditional, mandatory)",
@@ -66,7 +72,9 @@ function posixPath(value) {
 }
 
 export function isExcludedRepoPath(value) {
-  return posixPath(value).replace(/^\.\//, "") === EXCLUDED_PATH;
+  const normalized = posixPath(value).replace(/^\.\//, "");
+  if (normalized === EXCLUDED_PATH) return true;
+  return EXCLUDED_PREFIXES.some((prefix) => normalized === prefix || normalized.startsWith(`${prefix}/`));
 }
 
 // --- GF-110: per-link exclusions for the byte-identical vendored canon copies
@@ -250,8 +258,28 @@ export function stripFencedCode(markdown) {
 // positives on inline code containing bracket-adjacent regex syntax, e.g.
 // `` `[a-z][a-z0-9-]{0,63}` `` -- strip backtick-delimited spans first so
 // character-class notation inside code never looks like a markdown link.
-function stripInlineCode(line) {
-  return line.replace(/(`+)(?:(?!\1)[\s\S])*?\1/g, "");
+//
+/**
+ * Blank inline code spans (single or multiple backticks, e.g. `text` or
+ * ``text``) so link-syntax regexes never read markdown-shaped characters
+ * that only exist as prose inside a code span. Mirrors stripFencedCode's
+ * contract: same line count preserved, only span *content* replaced with
+ * spaces (never removed), so line numbers stay accurate for callers.
+ *
+ * Deliberately line-scoped, not document-scoped: every regex this feeds
+ * (reference-definition, inline-destination, reference-link) already
+ * operates per line, and a document-wide scan risks pairing two unrelated
+ * stray backticks across paragraphs and blanking everything between them —
+ * a false negative far worse than the false positive this fixes. A code
+ * span that legitimately spans a soft line break is not handled; that is
+ * a known, accepted narrowing given the line-oriented design of the rest
+ * of this scanner.
+ */
+export function stripInlineCode(markdown) {
+  return markdown
+    .split("\n")
+    .map((line) => line.replace(/(`+)(.*?)\1/g, (match) => match.replace(/./g, " ")))
+    .join("\n");
 }
 
 function cleanHeading(value) {
@@ -270,9 +298,22 @@ function baseSlug(value) {
     .replace(/\s/g, "-");
 }
 
+/**
+ * Bilingual-doc convention (CLAUDE.md, Language): a file that carries a
+ * DE-REFERENCE-BELOW marker line has an authoritative English half above it
+ * and a redundant full German reference translation below it that agents
+ * must not read. Anchor collection honors that same boundary: an anchor
+ * that only exists below the marker must not let a link resolve as if it
+ * pointed at the (never-consulted) English content.
+ */
+function englishHalfLines(lines) {
+  const markerIndex = lines.findIndex((line) => line.includes("DE-REFERENCE-BELOW"));
+  return markerIndex === -1 ? lines : lines.slice(0, markerIndex);
+}
+
 export function collectAnchors(markdown) {
   const text = stripFencedCode(markdown);
-  const lines = text.split("\n");
+  const lines = englishHalfLines(text.split("\n"));
   const anchors = new Set();
   const headingSlugs = new Set();
   const nextSuffix = new Map();
@@ -390,7 +431,7 @@ function inlineDestinations(line) {
 }
 
 export function extractMarkdownLinks(markdown) {
-  const text = stripFencedCode(markdown);
+  const text = stripInlineCode(stripFencedCode(markdown));
   const lines = text.split("\n");
   const definitions = new Map();
   const links = [];

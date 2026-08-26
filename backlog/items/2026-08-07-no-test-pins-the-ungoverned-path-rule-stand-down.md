@@ -1,0 +1,101 @@
+---
+schema: pipeline.backlog-item.v1
+id: pipeline.no-test-pins-the-ungoverned-path-rule-stand-down
+type: defect
+owner: pipeline
+status: closed
+created: 2026-08-07
+source: "Coverage observation made by the PHX-R1-REWORK-2 dispatch while verifying the governance-marker precondition. Outside that briefing's scope, so recorded rather than acted on."
+due: 2026-09-06
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "a2f16a65f816da8609a771df690d051a104e3930"
+closure_evidence: "backlog/items/2026-08-07-no-test-pins-the-ungoverned-path-rule-stand-down.md"
+---
+
+# No test pins the gate-strength path rules standing down in an ungoverned checkout
+
+## Description
+
+`plugins/pipeline-core/hooks/guard-gate-strength.mjs` evaluates its path table
+only after a governance-marker check. When `gateStrengthRuleFor()` matches a
+path, the hook then requires the repository to carry one of five marker files
+(`pipeline.user.yaml`, `project/pipeline.yaml`, `.claude/pipeline.yaml`,
+`project/guard-config.json`, `.claude/guard-config.json`) and calls
+`process.exit(0)` when none is present (`:179-188`). The shell lane carries the
+same precondition at `guard-lifecycle-ready.mjs:893-900`.
+
+So every GS-1..GS-5/GS-7/GS-8 rule — and any future one, such as the GS-9
+proposed by residual R1 — stands down entirely in a checkout the guard does not
+recognise as governed.
+
+**That stand-down has no test.** `guard-gate-strength.test.mjs`'s GST17
+(`:245-278`) iterates the whole path table and drives both lanes, which is the
+right shape, but it runs inside a `governed()` fixture (`:28-38`) that writes
+four of the five markers. Every table-driven assertion therefore exercises only
+the governed branch. Nothing asserts what happens without a marker.
+
+## Why this is worth a test rather than a note
+
+The untested branch is the one that turns the entire path table off. A
+regression there — a marker name changed, the check moved above the match, the
+list narrowed — would not fail any suite, and the symptom is silence: writes
+that should be refused simply succeed.
+
+It is also the branch most likely to be wrong in the field rather than in this
+repository. Every marker file here is tracked, so every clone of this repository
+is governed and the stand-down never fires locally. The case that goes untested
+is precisely the case that only occurs somewhere else.
+
+The gap surfaced because a design document asserted the path-table protection
+unconditionally and a review found the precondition. The design was corrected;
+the test suite still describes the same incomplete picture.
+
+## Triggering situation
+
+Found 2026-08-07 while verifying, from source, the governance-marker premise of
+Critic finding F-A on residual R1. The dispatch's scope was the design document
+only, so it recorded the observation instead of acting on it.
+
+## Affected artifact
+
+`plugins/pipeline-core/hooks/guard-gate-strength.test.mjs` (GST17 at `:245-278`
+and the `governed()` fixture at `:28-38`), covering
+`plugins/pipeline-core/hooks/guard-gate-strength.mjs:179-188` and the shell-lane
+sibling `plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs:893-900`.
+
+## Proposal
+
+**Owner: PO.** Small and well-defined, with one sequencing constraint.
+
+1. Add a case that drives a path-table rule in a checkout carrying **none** of
+   the five markers and asserts the hook exits 0 — the stand-down is the
+   specified behaviour, so the test pins it rather than challenging it. Mirror it
+   for the shell lane.
+2. Consider a second case asserting that **each** marker alone is sufficient.
+   The current fixture writes four of five, so one marker's contribution is
+   untested; a rename or typo in that entry would be invisible.
+3. Note the constraint: `guard-gate-strength.test.mjs` is a protected test path,
+   so this needs its own briefed test-change task rather than riding along in an
+   unrelated dispatch — the same hand-off that is the recorded structural cause
+   of three unregistered suites
+   (`backlog/items/2026-08-07-ruleset-source-test-unregistered-in-the-verify-gate.md`).
+   If a new test file is created instead of editing the existing suite, it must
+   be registered in `harness/scripts/verify.mjs` in the same change, or it
+   protects nothing.
+
+No behaviour change is proposed. The code is correct as written; what is missing
+is a test that would notice if it stopped being.
+
+## Triage — 2026-08-18
+
+- **Decision:** Accepted; stays open.
+- **Rationale:** Re-checked 2026-08-18 from source: `guard-gate-strength.mjs:210-218` still exits 0 for any GS rule when none of the five governance markers (`pipeline.user.yaml`, `project/pipeline.yaml`, `.claude/pipeline.yaml`, `project/guard-config.json`, `.claude/guard-config.json`) exist, and `guard-gate-strength.test.mjs`'s `governed()` fixture still writes markers unconditionally — no case exercises the unmarked branch. Nova's equivalent suite has the same gap, so there is nothing to port; this is Phoenix's own untested branch to close.
+- **Assignment (if accepted):** its own briefed test-change dispatch against the TP-protected suite, registered in `harness/scripts/verify.mjs` if a new file is used; technically bounded, no PO judgment call needed.
+- **Date:** 2026-08-18
+
+## Triage — closed 2026-08-18
+
+- **Decision:** closed — resolved.
+- **Rationale:** `plugins/pipeline-core/hooks/guard-gate-strength.test.mjs` gained `GST31`: an ungoverned fixture (no marker files) driving every `GATE_STRENGTH_PATHS` rule through both the JS-hook and shell lanes, asserting stand-down (exit 0) rather than refusal. 31/31 cases pass. Landed commit `a2f16a65`. Proposal item 2 (per-marker sufficiency) was deliberately not attempted to protect dispatch tool budget — a reasonable, disclosed scope trim, not a gap large enough to keep this item open.
+- **Date:** 2026-08-18

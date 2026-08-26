@@ -85,6 +85,8 @@ denials — only for `guard-testpath.mjs`/Codex-adapter denials).
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
+**Merge note (2026-08-26, moved from frontmatter):** Two branches independently closed this item on the same date (2026-08-18) citing the same underlying resolution (ADR-0058 Guard Maintenance Window), with different closure commits. The origin/sprint_phoenix side recorded closure_commit 88dc3ba6952f226ed4f9caa57bad982cb660a425, closure_evidence pointing at this backlog item file itself rather than the test file. Kept here as this note rather than a second closure field; both branches' closing Triage narratives are preserved below.
+
 - **Decision:** accept-open.
 - **Rationale:** the item's own proposal already draws the correct
   distinction (guard-reading code stays override-free; inert metadata gets a
@@ -160,3 +162,15 @@ amount of friction for a two-line version bump" design question, but it
 is a GMW-ergonomics question, not this item's own defect — left open
 only if a future session wants to raise it as its own, narrower item.
 - **Date:** 2026-08-18
+
+**Update 2026-08-18 (Elephant, Phoenix backlog-clearing pass):** the accepted
+fix has since landed via a different, already-shipped mechanism than the
+`goldfish-deep`+T1-Critic path this Triage assigned: `guard-gate-strength.mjs`
+(lines 220-240) now gates whether a GS-6 hit can be lifted on
+`isNeverLiftableKernelPath` (`guard-maintenance-window.mjs:120-128`,
+`NEVER_LIFTABLE_KERNEL_PATHS`), which does NOT include
+`.claude-plugin/plugin.json` — exactly the split this item's own Proposal
+asked for (guard-reading code stays override-free; inert metadata gets a
+routed, signed Guard Maintenance Window path instead of a bare refusal).
+Confirmed identical in Nova, i.e. this was reviewed shared architecture, not
+a drive-by patch. Closing.

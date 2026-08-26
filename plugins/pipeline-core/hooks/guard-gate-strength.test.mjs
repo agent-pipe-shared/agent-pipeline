@@ -360,12 +360,13 @@ try {
       rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 300, reason: "GST20",
       featureId: "gst20", planSha256: createHash("sha256").update("plan\n").digest("hex"),
       specSha256: createHash("sha256").update("spec\n").digest("hex"), policyRevision: "gst20-v1", livePluginRoot,
+      authorshipMode: "goldfish-dispatch",
     });
     const proof = {
       schema: PO_APPROVAL_PROOF_SCHEMA, intentSha256: intent.sha256, keyReference: "gst-e2e", publicKey,
       signatureBase64: sign(null, Buffer.from(intent.sha256, "utf8"), pair.privateKey).toString("base64"),
     };
-    installGuardMaintenanceWindow({ rootDir: root, request, trustPolicy: { keyReference: "gst-e2e", publicKeySha256 }, proof, livePluginRoot });
+    installGuardMaintenanceWindow({ rootDir: root, request, anchors: [{ keyReference: "gst-e2e", publicKeySha256 }], proof, livePluginRoot });
 
     const ordinary = ask(root, join(PLUGIN_ROOT, "hooks", "guard-git.mjs"));
     assert.equal(ordinary.blocked, false, "ordinary plugin file should be lifted under the active window");
@@ -799,6 +800,35 @@ try {
     const { blocked, stderr } = shell(root, command);
     assert.equal(blocked, true, "a write smuggled alongside a mention of the exempt script must still be refused");
     assert.match(stderr, /GUARD-GATE-STRENGTH-SHELL/u);
+  });
+
+  check("GST37 every path-table rule stands down, in both lanes, when no governance marker is present", () => {
+    // Mirrors GST17's shape but on the opposite fixture: none of the five governance
+    // markers (pipeline.user.yaml, project/pipeline.yaml, .claude/pipeline.yaml,
+    // project/guard-config.json, .claude/guard-config.json) exist here, so the
+    // governed-check inside guard-gate-strength.mjs's PreToolUse block (and its
+    // shell-lane sibling in guard-lifecycle-ready.mjs) must exit 0 for every rule
+    // currently in the table (GS-1..GS-5/GS-7..GS-15) -- the stand-down is the
+    // specified behaviour
+    // (backlog/items/2026-08-07-no-test-pins-the-ungoverned-path-rule-stand-down.md),
+    // so this pins it rather than challenging it. GS-6 is not in GATE_STRENGTH_PATHS
+    // (it is checked before, and independently of, the marker gate) and is out of
+    // scope here. Renumbered from GST31 during the Nova/Phoenix merge (PHX-GATESTRENGTHTEST)
+    // to avoid colliding with the unrelated Nova-side GST31 (hand-edit-pattern regression).
+    const base = mkdtempSync(join(tmpdir(), "gate-strength-ungoverned-"));
+    roots.push(base);
+    writeFileSync(join(base, "README.md"), "# unrelated project\n");
+    for (const rule of GATE_STRENGTH_PATHS) {
+      const write = spawnSync(process.execPath, [GUARD], {
+        input: JSON.stringify({ tool_name: "Edit", tool_input: { file_path: rule.path }, cwd: base }),
+        encoding: "utf8",
+        cwd: base,
+        env: { ...process.env, CLAUDE_PROJECT_DIR: base },
+      });
+      assert.equal(write.status, 0, `write lane refuses ${rule.path} without any governance marker present`);
+      assert.doesNotMatch(shell(base, `touch ${rule.path}`).stderr, /GUARD-GATE-STRENGTH-SHELL/u,
+        `shell lane refuses ${rule.path} without any governance marker present`);
+    }
   });
 
   console.log(`\nguard-gate-strength: ${passed} passed, ${failed} failed`);

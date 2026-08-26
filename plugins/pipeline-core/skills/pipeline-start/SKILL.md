@@ -30,9 +30,7 @@ Print only after a ready result:
 
 `Agent Pipeline start: version {{MANIFEST_VERSION}} · plugin root {{ABSOLUTE_PLUGIN_ROOT}}`
 
-For local development also print:
-
-`Agent Pipeline source: local-development · registered local marketplace`
+For local development also print the source line → `references/freshness.md`.
 
 A canon pointer here (`roles/`, `guardrails/`, `templates/prompts/`,
 `docs/push-release-flow.md`) means repo-root if present, else the vendored
@@ -97,13 +95,8 @@ via `git config user.name "<name>"` / `git config user.email "<email>"` in
 THIS repository's local config only, immediately before the first commit,
 never sooner — never `--global`, never an untyped value.
 
-After a required restart, an already seeded repository shows this consent
-was exercised; resume ordinary bootstrap without re-asking. Stop for new
-human input only when no usable goal or material design input exists, a
-configured plan/acceptance gate is reached, an action is external or
-irreversible, or a typed hard block has no supplied safe recovery. Never
-treat this consent as approval for unrelated adoption, remote operations,
-deployment, publication, destructive work, or scope change.
+Restart bounds and what this consent does NOT grant →
+`references/onboarding-recovery.md`.
 
 **Before this consent exists:** never create a deliverable file — reading,
 explaining, answering are fine, artifacts are not, even in the turn you say
@@ -111,7 +104,8 @@ you will wait for a yes. Never volunteer whether the Pipeline fits the task;
 that call is the human's — if asked, state cost/benefit neutrally, not a
 recommendation.
 
-1. **Step 0 / V4 onboarding:** execute the exact read-only
+1. **Step 0 / V4 onboarding:** `nextAction.kind: "advisory"` runs nothing --
+   go to Step 2, surfaced. Otherwise execute the exact read-only
    `project-onboarding-v3.mjs inspect --root "$PWD" --intent bootstrap` action
    returned by preflight. Accept only ready `pipeline.project-onboarding.v4`
    native-local or receipt-bound plugin-managed forms, including CAS-READY
@@ -148,26 +142,26 @@ recommendation.
    prior turn, even for the identical restart action seen before: a
    correctly relayed rendering on one occasion does not carry over to the
    next if the command is retyped instead of re-read.
-4. **Confirmation:** after all checks, print the auditable confirmation line
-   with version, root, V3/runtime, profile, model/effort, role, calibration,
-   handover and Verify evidence. Print no confirmation on non-ready,
-   unavailable, stale, malformed or drifted state. The four required facts
-   are `runtime.status`, `profile/model and role`, `calibration/handover`,
-   and `Verify availability`; each is digest-bound to the machine readback
-   and printed before continuation. If this project has `gates.push_approval`
-   configured, note here that any push will need a signed or chat-cleared
-   approval before it can land — `references/push-approval.md` explains the
-   full ceremony when a push is actually being constructed or discussed.
+4. **Confirmation:** after all checks print exactly this line, five concrete
+   fields, no placeholder (additions, role variants → typed references):
+
+   > Bootstrap check passed: ruleset {{VERSION_OR_SHA}} loaded · Project {{PROJECT}} · Calibration {{CALIBRATION_FILE}} · State {{HANDOVER_DATE}} · Role {{Elephant|Goldfish|Critic}}
+
+   Never print it without Steps 1–5. "Non-ready" excludes
+   `plugin-refresh-required` (soft-refresh; carried forward, not withheld). No
+   confirmation on non-ready, unavailable, stale, malformed or drifted state.
+   The four required confirmation facts are: `runtime.status`, `profile/model`
+   and `role`, `calibration/handover`, and `Verify availability`; each is
+   digest-bound to the machine readback and printed before continuation. If
+   this project has `gates.push_approval` configured, note here that any push
+   will need a signed or chat-cleared approval before it can land —
+   `references/push-approval.md` explains the full ceremony when a push is
+   actually being constructed or discussed.
 5. **Observation governance:** run
    `node "${PIPELINE_PLUGIN_ROOT}/scripts/observation-governance-bootstrap.mjs" --root "$PWD"`
-   before confirmation. `not-applicable` is the successful Consumer-project
-   result: never look for, copy, or repair
-   `harness/scripts/check-observation-governance.mjs` there. Only a checkout
-   carrying the Pipeline source manifest is `required`; it runs
-   `node harness/scripts/check-observation-governance.mjs`. A `failed`
-   source-checkout result is case **F6**: fail closed, diagnose read-only, and
-   correct the governed artifact through its reviewed recovery path before
-   restarting bootstrap.
+   before confirmation. `not-applicable` is the successful Consumer result; a
+   source checkout runs `node harness/scripts/check-observation-governance.mjs`,
+   and a `failed` one is case **F6** → `references/failure-cases.md`.
 
 6. **Restart hint for material session input:** before a first kickoff **and
    before proposing, displaying, or performing any restart, session cut or
@@ -198,18 +192,8 @@ recommendation.
    a new readiness precondition, so it never blocks or gates the session.
    The card is never a gate and capture failure must be surfaced honestly rather
    than claimed as persisted context.
-   Its exact keys are `intent`, `constraints`, `scope`, and `questions`, and
-   their shapes differ: `intent` is one string; the other three are **arrays** of
-   short strings, at most 4, 4 and 3 entries. Every entry is a distilled
-   statement, never a transcript. Interpret user intent
-   rather than keywords: an intended restart/session cut captures it; changed
-   scope or constraints refresh it; canonised or revoked information is
-   discarded. At bootstrap, `resume-hint.mjs inspect` is passive context only:
-   `absent`, `challenged-stale`, or `ignored-invalid` never changes readiness,
-   actions, authority, approval, close state, or exit status. Do not capture
-   raw transcripts, commands, approvals, lifecycle instructions, host paths,
-   URLs, credentials, secrets, or private identifiers. The validator rejects
-   those forms rather than persisting them.
+   Card keys, capture-trigger interpretation, bootstrap passivity and the
+   sanitisation prohibitions → `references/onboarding-recovery.md`.
 
 7. **Normal restart is handover-only:** a same-topic restart, context cut, or
    request to save progress is not a block close. Update only the calibrated
@@ -220,7 +204,17 @@ recommendation.
    `runtime-transfer` (PC/CLI/runtime changes); its coordinator rejects any
    other start intent before it can write private lifecycle state.
 
-### Kickoff intake and the durable design package
+**Role prohibitions (Elephant, embedded — read no file for this):** EL-01 no
+production code (sole exception: the stage-0 fast path per `roles/elephant.md`
+— EL-01) · EL-02 delegate once, via the 6-field briefing, never step by step ·
+EL-03 judgment stays at its level · EL-04 no silent fundamental decision
+(register + ADR) · EL-16 delegate-first: EVERY implementation is a briefed
+Goldfish dispatch · EL-18 one repo, one Elephant · EL-19 PO gate: present the
+PRD readably, wait for "approved". Print verbatim under the Model/Effort line:
+
+> Role prohibitions loaded: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19 — implementation only via Goldfish dispatch (Tier-0 per roles/elephant.md — EL-01; further exceptions only by the PO); PRD gate: present readably + wait for 'approved'
+
+### Kickoff intake, durable design package, and document quality
 
 A pristine project, a first `kickoff plan`, material design input, or a design
 package about to be created or promoted — in any of those states load

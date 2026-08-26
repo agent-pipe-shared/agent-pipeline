@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-pipeline.dev/schemas/pipeline.governance-delivery-receipt.v1.json",
+  "title": "Pipeline governance delivery receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "destinationProfile", "policyRevision", "batchId", "eventCount", "attempt", "acknowledgementClass", "terminalDisposition", "cursor", "lag"],
+  "properties": { "schema": { "const": "pipeline.governance-delivery-receipt.v1" }, "destinationProfile": { "type": "string" }, "policyRevision": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "batchId": { "type": "string" }, "eventCount": { "type": "integer", "minimum": 0 }, "attempt": { "type": "integer", "minimum": 1 }, "acknowledgementClass": { "enum": ["none", "partial", "accepted"] }, "terminalDisposition": { "enum": ["pending", "delivered", "retryable-failure", "quarantined"] }, "cursor": { "type": "integer", "minimum": 0 }, "lag": { "type": "integer", "minimum": 0 } } }
+}

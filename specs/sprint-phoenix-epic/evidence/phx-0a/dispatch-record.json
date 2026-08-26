@@ -1,0 +1,13 @@
+{
+  "schema": "pipeline.phx-dispatch-record.v1",
+  "taskId": "PHX-0A-R2",
+  "model": "Goldfish-deep/xhigh",
+  "rulesetSha": "0728884a3898d1df4bc9a3278118b323b72c6a49",
+  "dispatcher": "pipeline-goldfish-dispatch",
+  "outcome": "validated-pending-commit",
+  "runningEvidence": [
+    { "id": "feature-package-topology-suite", "outcome": "passed" },
+    { "id": "pipeline-state-suite", "outcome": "passed" },
+    { "id": "phx-0a-public-safe-receipts", "outcome": "passed" }
+  ]
+}

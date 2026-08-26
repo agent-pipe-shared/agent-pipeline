@@ -50,6 +50,11 @@
  *     prepare).
  *   - `gates.dev-plan.exemptPaths` (array of path-prefix strings) from the manifest,
  *     if present — project-specific additional exemptions.
+ *   - The sanctioned close-artifact writer: exactly `HISTORY.md` (exact match, root
+ *     file) and `telemetry/` (directory prefix) — the mandatory root-level close
+ *     records, unconditionally exempt regardless of lifecycle phase, never a general
+ *     product-file exemption (see CLOSE_ARTIFACT_EXACT_PATHS/CLOSE_ARTIFACT_PREFIXES
+ *     below; backlog/items/2026-07-26-readonly-command-guard-classification.md).
  *
  * ABSOLUTE PATHS AND THE PROJECT ROOT (C1 fix, from a critic review):
  * Claude Code's write PreToolUse contract typically delivers the target path (read via
@@ -129,24 +134,207 @@
  *
  * VERIFY: node plugins/pipeline-core/hooks/guard-devplan.test.mjs
  */
-import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { join, relative, isAbsolute, posix, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
-import { devPlanGateVerdict } from "../lib/guard-devplan-policy.mjs";
+import { loadManifest, gateConfig } from "../lib/manifest.mjs";
+import {
+  LEGACY_STATE,
+  NEUTRAL_STATE,
+  resolveProjectAuthorityPaths,
+  validatePortablePipelineState,
+} from "../lib/project-authority.mjs";
+import { derivePlanLifecycle } from "../lib/plan-spec-state-v2.mjs";
 import { writeTargetPath } from "../lib/tool-write-target.mjs";
+import { dualEvaluateDecisionReference } from "../lib/decision-reference-dual-evaluation.mjs";
 
-// The exempt prefixes, the full decision logic and the full reasoning for each step now
-// live in `lib/guard-devplan-policy.mjs` (`devPlanGateVerdict()`) so both this hook and the
-// shipped obligations reference can be GENERATED from / call the same one owner. It has to
-// be a separate module rather than logic inlined here: this file is a hook SCRIPT that
-// calls process.exit(), so a reader that merely wants to know or reuse the policy (e.g.
-// guard-lifecycle-ready.mjs's GUARD-DEVPLAN-SHELL, the Bash|PowerShell lane of this same
-// gate) cannot import a script that dies on import -- it imports the pure function instead.
-// One owner, two readers (three counting the obligations generator), no hand-copied second
-// copy of the decision.
+// ---- PHX-LEDGERAUTH: restored read-time ledger resolution -----------------------------
+// Restored from 998a609:plugins/pipeline-core/hooks/guard-devplan.mjs (lines 138-145 and
+// 147-212), verbatim. The 0.5.2 integration merge (75b8361) took the second parent's side
+// for this file wholesale and the symbol was lost with it. Nothing on the merged base
+// replaced it: `derivePlanLifecycle` is a pure function of the state object plus caller-
+// supplied file digests (it takes no projectDir and its module performs no I/O), and its
+// v3 compatibility branch accepts a `pipeline.plan-approval.v3` approval on SHAPE ALONE.
+// The `priorInvalidationSha256` seal is a digest over data already in the same mutable
+// file, so it closes replay-after-revocation, not forgery. Anyone able to write the state
+// file could therefore mint plan-approval authority. Re-bound additively at the permit
+// below; no existing binding is renamed, shadowed or weakened.
+const GOVERNANCE_AUTHORITY_CLI = fileURLToPath(new URL("../scripts/governance-authority.mjs", import.meta.url));
+const SHA256 = /^[a-f0-9]{64}$/u;
+const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
+
+function exact(value, keys) {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
+}
+
+/**
+ * The Cyborg governance-authority CLI request/readback exchange, shared by
+ * every ledger-backed resolution path below (v3's own `humanDecision` AND the
+ * generalized H-AC-12 dual-evaluation path for legacy/v2/v4 approvals). Kept
+ * as ONE spawnSync + readback-validation body rather than duplicated per
+ * caller. `authority`/`packageId` bind the readback to the exact plan/spec
+ * bytes and feature the reference is being asked to cover.
+ */
+function resolveHumanDecisionReadback(reference, projectDir, { packageId, planPath, planSha256, specPath, specSha256 }) {
+  const request = {
+    schema: "pipeline.governance-authority-request.v1",
+    repositoryFingerprint: reference.checkpoint.repositoryFingerprint,
+    decisionId: reference.decisionId,
+    candidate: reference.candidate,
+    checkpoint: reference.checkpoint,
+    nowEpochMs: Date.now(),
+  };
+  const invoked = spawnSync(process.execPath, [
+    GOVERNANCE_AUTHORITY_CLI,
+    "--repo", projectDir,
+    "--request-json", JSON.stringify(request),
+  ], { encoding: "utf8", timeout: 5000, shell: false });
+  if (invoked.status !== 0) return false;
+  let readback;
+  try { readback = JSON.parse(invoked.stdout); } catch { return false; }
+  if (!exact(readback, ["schema", "granted", "decisionId", "decisionDigest", "scope", "singleUse"])
+    || readback.schema !== "pipeline.governance-authority-readback.v1"
+    || readback.granted !== true
+    || readback.decisionId !== reference.decisionId
+    || readback.decisionDigest !== reference.decisionDigest
+    || readback.singleUse !== true
+    || !exact(readback.scope, ["repositoryFingerprint", "candidate", "packageId", "action", "environment", "artifacts"])
+    || readback.scope.repositoryFingerprint !== reference.checkpoint.repositoryFingerprint
+    || JSON.stringify(readback.scope.candidate) !== JSON.stringify(reference.candidate)
+    || readback.scope.packageId !== packageId
+    || readback.scope.action !== "APPROVE_PLAN"
+    || readback.scope.environment !== "local"
+    || !Array.isArray(readback.scope.artifacts)) return false;
+  const expected = [
+    { path: planPath, sha256: planSha256 },
+    { path: specPath, sha256: specSha256 },
+  ];
+  return expected.every((artifact) => readback.scope.artifacts.some((entry) => exact(entry, ["path", "sha256"])
+    && entry.path === artifact.path && entry.sha256 === artifact.sha256));
+}
+
+/**
+ * H-AC-12 migration boundary. A mutable `planApproved` projection is never
+ * authority by itself: the exact v3 reference must still resolve from the
+ * canonical human ledger at the current read. Cyborg's PO-proof verification
+ * is deliberately owned by that authority CLI rather than this hook.
+ */
+function hasLedgerBackedPlanApproval(state, projectDir) {
+  const approval = state?.planApproval;
+  const feature = state?.activeFeature;
+  if (state?.planApproved !== true
+    || !exact(approval, ["schema", "approvedBy", "approvedAt", "specBoundBy", "specBoundAt", "poGateAuthority", "humanDecision"])
+    || approval.schema !== "pipeline.plan-approval.v3"
+    || !exact(feature, ["id", "planPath", "phase"])
+    || !exact(approval.poGateAuthority, ["schema", "humanFacing", "sourceSha256", "runtimeSha256", "receiptSha256", "repositoryFingerprint", "planPath", "planSha256", "specPath", "specSha256"])
+    || approval.poGateAuthority.planPath !== feature.planPath
+    || !SHA256.test(approval.poGateAuthority.planSha256 ?? "")
+    || !SHA256.test(approval.poGateAuthority.specSha256 ?? "")) return false;
+  const reference = approval.humanDecision;
+  if (!exact(reference, ["schema", "decisionId", "decisionDigest", "candidate", "checkpoint"])
+    || reference.schema !== "pipeline.human-decision-reference.v1"
+    || typeof reference.decisionId !== "string"
+    || !SHA256.test(reference.decisionDigest ?? "")
+    || !exact(reference.candidate, ["commit", "tree"])
+    || !OID.test(reference.candidate.commit ?? "")
+    || !OID.test(reference.candidate.tree ?? "")
+    || !exact(reference.checkpoint, ["repositoryFingerprint", "streamId", "sequence", "eventDigest", "candidateCommit", "candidateTree"])
+    || !SHA256.test(reference.checkpoint.repositoryFingerprint ?? "")
+    || reference.checkpoint.candidateCommit !== reference.candidate.commit
+    || reference.checkpoint.candidateTree !== reference.candidate.tree
+    || reference.checkpoint.repositoryFingerprint !== approval.poGateAuthority.repositoryFingerprint) return false;
+  return resolveHumanDecisionReadback(reference, projectDir, {
+    packageId: feature.id,
+    planPath: approval.poGateAuthority.planPath,
+    planSha256: approval.poGateAuthority.planSha256,
+    specPath: approval.poGateAuthority.specPath,
+    specSha256: approval.poGateAuthority.specSha256,
+  });
+}
+
+/**
+ * H-AC-12, generalized to every legacy/v2/v4 plan approval that is NOT
+ * `pipeline.plan-approval.v3` (the schema `hasLedgerBackedPlanApproval` above
+ * already covers). Before this dispatch, this branch was a bare skip: any
+ * schema other than v3 exited allow with NO second evaluation at all. Now it
+ * dual-evaluates: the "old mechanism" verdict is the already-true
+ * `lifecycle.ok` structural verdict this function is only called under, and
+ * the "new" reader is an OPTIONAL, top-level `state.planApprovalDecisionReference`
+ * (schema `pipeline.human-decision-reference.v1`, reused verbatim -- same
+ * shape v3's own `humanDecision` field already carries) -- independent of
+ * `planApproval` itself, so it does not require touching the exact-key
+ * schema validators in `lib/plan-spec-state-v2.mjs` (out of this dispatch's
+ * scope) to let a non-v3 approval carry one. No writer populates this field
+ * yet (`harness/scripts/pipeline-state.mjs` is out of scope for this
+ * dispatch); it is deliberately additive and forward-compatible: a reader
+ * ready to dual-evaluate the moment a reference appears, ahead of any writer
+ * change. A BARE legacy approval (`approvedBy`/`approvedAt` only, no
+ * `poGateAuthority` at all -- the sole pre-v2 compatibility shape) carries no
+ * planPath/specSha256 pair to bind a reference to; there is nothing to
+ * dual-evaluate against, so it keeps exactly its current single-evaluation
+ * standing, unchanged.
+ */
+function hasGeneralizedLedgerBackedPlanApproval(state, projectDir) {
+  const approval = state?.planApproval;
+  const feature = state?.activeFeature;
+  const authority = approval?.poGateAuthority;
+  const hasAuthority = authority !== null && typeof authority === "object" && !Array.isArray(authority)
+    && typeof authority.planPath === "string" && SHA256.test(authority.planSha256 ?? "")
+    && typeof authority.specPath === "string" && SHA256.test(authority.specSha256 ?? "")
+    && SHA256.test(authority.repositoryFingerprint ?? "");
+  const reference = state?.planApprovalDecisionReference;
+  const evaluation = dualEvaluateDecisionReference({
+    legacyOk: true, // this function is only reached once lifecycle.ok/status==="implementing" already hold
+    reference: hasAuthority ? reference : undefined,
+    resolveReference: (ref) => ref.checkpoint.repositoryFingerprint === authority.repositoryFingerprint
+      && resolveHumanDecisionReadback(ref, projectDir, {
+        packageId: feature.id,
+        planPath: authority.planPath,
+        planSha256: authority.planSha256,
+        specPath: authority.specPath,
+        specSha256: authority.specSha256,
+      }),
+  });
+  return evaluation.ok;
+}
+
+/** The one schema whose approval carries a ledger reference that must still resolve. */
+const LEDGER_FIRST_APPROVAL_SCHEMA = "pipeline.plan-approval.v3";
+
+const DEFAULT_EXEMPT_PREFIXES = ["docs/", "specs/", ".claude/", "backlog/"];
+
+// ---- sanctioned close-artifact writer (root-level History/telemetry close records) -----
+// The mandatory root-level History (`HISTORY.md`) and telemetry (`telemetry/`) close
+// records must be writable before plan approval without exempting any actual product
+// file (backlog/items/2026-07-26-readonly-command-guard-classification.md;
+// specs/sprint-phoenix-epic/RECOVERY.md R-02: this gate previously classified these
+// mandatory closeout writes as "implementation" while the plan correctly stayed
+// unapproved -- a false-positive deadlock, not a security gap). This is a closed,
+// non-implementation classification -- exactly these two artifacts, kept deliberately
+// separate from DEFAULT_EXEMPT_PREFIXES's directory-prefix semantics because HISTORY.md
+// is a single root FILE: an exact match only, never a prefix match, so an unrelated file
+// merely sharing the "history.md" string prefix (e.g. a hypothetical "HISTORY.md.bak")
+// is NOT exempted. `telemetry/` is a directory prefix, matched the same way the
+// DEFAULT_EXEMPT_PREFIXES entries are.
+const CLOSE_ARTIFACT_EXACT_PATHS = ["history.md"];
+const CLOSE_ARTIFACT_PREFIXES = ["telemetry/"];
+
+function isSanctionedCloseArtifact(normalizedCandidatePath) {
+  return CLOSE_ARTIFACT_EXACT_PATHS.includes(normalizedCandidatePath)
+    || CLOSE_ARTIFACT_PREFIXES.some((prefix) => normalizedCandidatePath.startsWith(prefix));
+}
 
 function emit(code, lines) {
   process.stderr.write(lines.filter(Boolean).join("\n") + "\n");
   process.exit(code);
+}
+
+function normalize(p) {
+  return String(p ?? "").replace(/\\/g, "/").toLowerCase();
 }
 
 // ---- read tool input (fail-open) --------------------------------------------------
@@ -161,8 +349,166 @@ if (!filePath) process.exit(0);
 
 const projectDir = process.env.CLAUDE_PROJECT_DIR || process.cwd();
 
-// ---- decide (pure), then translate the verdict into this hook's exit protocol -----
-const result = devPlanGateVerdict({ filePath, projectDir });
-if (result.verdict === "allow") process.exit(0);
-if (result.verdict === "warn") emit(1, [result.reason]);
-emit(2, [result.reason]); // verdict "block"
+// ---- resolve absolute file_path against the project root (C1 fix) ----------------
+// See header "ABSOLUTE PATHS AND THE PROJECT ROOT" for the full rationale.
+let relPath = filePath;
+if (isAbsolute(filePath)) {
+  const rel = relative(projectDir, filePath);
+  const relSlashes = rel.replace(/\\/g, "/");
+  const outsideRoot = rel === ".." || relSlashes.startsWith("../") || isAbsolute(rel);
+  if (outsideRoot) process.exit(0); // not this project's file -- allow unconditionally
+  relPath = rel;
+}
+// Collapse ".."/"." traversal segments BEFORE the prefix match (see header "TRAVERSAL
+// HARDENING"). No-op for a path already free of traversal segments. Slashify backslashes
+// FIRST, then collapse with POSIX semantics explicitly -- platform-native `path.normalize`
+// only treats "\" as a separator on win32; on POSIX hosts (e.g. Linux CI) a literal "\"
+// in the input is just an ordinary filename character to it, so a backslash-form traversal
+// like "docs\\..\\src\\foo.ts" would pass through UNCOLLAPSED and then wrongly match the
+// "docs/" exempt prefix once the later case-insensitive slash normalization runs. Using
+// `posix.normalize()` on an already-slashified string collapses "docs/../src/foo.ts" the
+// same way on every host OS.
+relPath = posix.normalize(relPath.replace(/\\/g, "/"));
+const normalizedPath = normalize(relPath);
+
+// ---- manifest: gate config (fail-open on absent, WARN on genuine YAML failure) -----
+const manifestResult = loadManifest(projectDir);
+if (manifestResult.status === "absent") process.exit(0);
+if (manifestResult.status === "invalid" && manifestResult.manifest === undefined) {
+  // Genuine YAML syntax failure -- the manifest could not even be parsed into a
+  // structure, so there is nothing to read a gate config off. See file header WARN.
+  const reason = manifestResult.errors?.[0]?.reason ?? "YAML error";
+  emit(1, [
+    `[guard-devplan] WARN: .claude/pipeline.yaml is not readable (${reason}).`,
+    `Dev-Plan gate is being skipped (fail-open) -- please repair the manifest file.`,
+  ]);
+}
+// status "ok", OR "invalid" with a structurally parsed manifest (schema/semantic
+// errors elsewhere -- e.g. an as-yet-unschematized exemptPaths field, see DEVIATION
+// NOTE above): still usable for this hook's own gate slice.
+const manifest = manifestResult.manifest;
+const gate = gateConfig(manifest, "dev-plan");
+if (!gate || gate.mode === "off") process.exit(0);
+
+// ---- state: activeFeature / planApproved (fail-open on absent, WARN on malformed) --
+const projectAuthority = resolveProjectAuthorityPaths({ rootDir: projectDir });
+const statePath = join(
+  projectDir,
+  projectAuthority.status === "ready"
+    ? projectAuthority.state
+    : (existsSync(join(projectDir, NEUTRAL_STATE)) ? NEUTRAL_STATE : LEGACY_STATE),
+);
+let stateRaw;
+try {
+  stateRaw = readFileSync(statePath, "utf8");
+} catch {
+  process.exit(0); // no state file at all -- fail-open
+}
+let state;
+try {
+  state = JSON.parse(stateRaw);
+} catch (e) {
+  emit(1, [
+    `[guard-devplan] WARN: ${statePath} contains invalid JSON (${e.message}).`,
+    `Dev-Plan gate is being skipped (fail-open) -- please repair the state file (rewrite only via ` +
+      `harness/scripts/pipeline-state.mjs, never by hand).`,
+  ]);
+}
+
+const activeFeature = state && typeof state === "object" ? state.activeFeature : undefined;
+if (!activeFeature || typeof activeFeature !== "object" || typeof activeFeature.id !== "string" || activeFeature.id === "") {
+  process.exit(0); // no active feature -- nothing to enforce
+}
+
+if (statePath === join(projectDir, NEUTRAL_STATE)) {
+  const portability = validatePortablePipelineState(state);
+  if (!portability.ok) {
+    emit(gate.mode === "warn" ? 1 : 2, [
+      `[guard-devplan] ${gate.mode === "warn" ? "WARN" : "BLOCKED"}: neutral State contains private cleanup identity (${portability.code}).`,
+      "Repair through the sanctioned cleanup recovery transaction; direct State edits are not authority.",
+    ]);
+  }
+}
+
+function fileSha256(path) {
+  try { return createHash("sha256").update(readFileSync(resolve(projectDir, path))).digest("hex"); }
+  catch { return null; }
+}
+
+const submitted = state.planSubmission;
+const approvalAuthority = state.planApproval?.poGateAuthority;
+const planPath = typeof submitted?.planPath === "string"
+  ? submitted.planPath
+  : approvalAuthority?.planPath;
+const specPath = typeof submitted?.specPath === "string"
+  ? submitted.specPath
+  : approvalAuthority?.specPath;
+const lifecycle = derivePlanLifecycle(state, {
+  ...(typeof planPath === "string" ? { planSha256: fileSha256(planPath) } : {}),
+  ...(typeof specPath === "string" ? { specSha256: fileSha256(specPath) } : {}),
+});
+// PHX-LEDGERAUTH: AND-ed onto the existing permit, never a second permit path. A v3
+// approval is ledger-first by construction, so the stored human-decision reference must
+// still resolve from the canonical ledger at THIS read before the lifecycle verdict is
+// honoured. H-AC-12 (narrowed scope, see hasGeneralizedLedgerBackedPlanApproval's own
+// docstring above): every other schema now ALSO runs through the shared dual-evaluation
+// primitive -- trusting the old structural verdict when no ledger reference is present
+// (unchanged standing), but failing closed on disagreement the moment one is.
+let ledgerAuthorityUnresolved = false;
+if (lifecycle.status === "implementing" && lifecycle.ok && lifecycle.nextAction === null) {
+  const resolved = state.planApproval?.schema === LEDGER_FIRST_APPROVAL_SCHEMA
+    ? hasLedgerBackedPlanApproval(state, projectDir)
+    : hasGeneralizedLedgerBackedPlanApproval(state, projectDir);
+  if (resolved) {
+    process.exit(0);
+  }
+  ledgerAuthorityUnresolved = true;
+}
+
+// ---- exempt paths -------------------------------------------------------------------
+const exemptPrefixes = [...DEFAULT_EXEMPT_PREFIXES];
+if (lifecycle.status === "draft"
+  && typeof activeFeature.planPath === "string"
+  && activeFeature.planPath !== "") {
+  exemptPrefixes.push(activeFeature.planPath);
+}
+if (Array.isArray(gate.exemptPaths)) {
+  for (const p of gate.exemptPaths) if (typeof p === "string" && p !== "") exemptPrefixes.push(p);
+}
+
+const authoritativePaths = [planPath, specPath]
+  .filter((path) => typeof path === "string")
+  .map(normalize);
+const touchesAuthority = authoritativePaths.some((path) => normalizedPath === path);
+const isDraftAuthority = lifecycle.status === "draft" && touchesAuthority;
+const isExempt = isDraftAuthority
+  || (!touchesAuthority
+    && (exemptPrefixes.some((prefix) => normalizedPath.startsWith(normalize(prefix)))
+      || isSanctionedCloseArtifact(normalizedPath)));
+if (isExempt) process.exit(0);
+
+// ---- verdict --------------------------------------------------------------------------
+const lifecycleReason = ledgerAuthorityUnresolved
+  ? "The recorded plan approval has an associated human-decision reference (H-AC-12 "
+    + "migration boundary -- either the v3 approval's own ledger-first binding, or a "
+    + "top-level planApprovalDecisionReference dual-evaluated alongside a legacy/v2/v4 "
+    + "approval) that must still resolve from the canonical human ledger at THIS read, and "
+    + "it did not. A mutable planApproved projection is never authority by itself. "
+    + "Re-record it: node harness/scripts/pipeline-state.mjs approve-plan --by <name> "
+    + "--human-decision-file <repo-relative-reference>."
+  : lifecycle.nextAction === "reopen-design"
+  ? "Current Plan/Spec authority is stale or closed; run `reopen-design --by <name>` before editing."
+  : lifecycle.status === "awaiting-approval"
+    ? "The submitted Plan/Spec is immutable until approval or a sanctioned `reopen-design --by <name>`."
+    : lifecycle.status === "approved"
+      ? "The approved design must enter implementation through `set-phase --phase implementation`, or be reopened before design edits."
+      : "The feature is still in draft design and has no implementation authority.";
+const message = [
+  `BLOCKED (guard-devplan, plugin pipeline-core): Feature "${activeFeature.id}" lifecycle is "${lifecycle.status ?? "invalid"}".`,
+  `Plan: ${typeof activeFeature.planPath === "string" ? activeFeature.planPath : "(no planPath recorded in state)"}`,
+  `File: ${filePath}`,
+  `Why: ${lifecycleReason}`,
+];
+
+if (gate.mode === "warn") emit(1, message);
+emit(2, message); // mode "blocking" (or any unrecognized non-"off" value -- errs safe)

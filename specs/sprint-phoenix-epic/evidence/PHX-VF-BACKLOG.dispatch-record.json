@@ -1,0 +1,21 @@
+{
+  "taskId": "PHX-VF-BACKLOG",
+  "model": "claude-sonnet-5",
+  "rulesetSha": "ce50d74d16fdbcd0b9f8b3b606297e88af3d2f139b3cd14b692f4ea15599b023",
+  "dispatcher": "goldfish",
+  "outcome": "passed",
+  "log": [
+    { "phase": "start", "toolUses": 1, "note": "dispatch record created before work begins" },
+    { "phase": "fix-due-dates", "toolUses": 5, "note": "set due dates on the two open items with due: null" },
+    { "phase": "investigate-closure-fields", "toolUses": 4, "note": "read backlog-state.mjs and check-backlog-state.mjs; grepped closure_evidence conventions across items; confirmed pointing closure_evidence at the item file itself is a precedented pattern (2026-08-07-adr-0047-numbering-collision.md, 2026-07-25-security-scan-cross-branch-gitleaks-findings.md)" },
+    { "phase": "fix-closure-fields", "toolUses": 2, "note": "added closed_at/closure_repository/closure_commit/closure_evidence to the external-reference-adapter item, verified against the real closing commit 0d018453700bc7b5e08eac99d6b37ee428f31f60" },
+    { "phase": "reconcile-ledger", "toolUses": 3, "note": "ran reconcile-backlog-ledger.mjs plan then --activate; recorded 5 transitions across 4 items including the two-step open->in_progress->closed catch-up for the external-reference-adapter item" },
+    { "phase": "verify", "toolUses": 3, "note": "check-backlog-state.mjs: 0 findings, success message, exit 0; reconcile-backlog-ledger.test.mjs: 12/12 passed including RBL01" }
+  ],
+  "dodResults": {
+    "reconcile-backlog-ledger.test.mjs": "passed (12/12, exit 0)",
+    "check-backlog-state.mjs": "passed (0 findings, exit 0)"
+  },
+  "commit": "89570dfc",
+  "report": "See final assistant message of session for the full completion report."
+}

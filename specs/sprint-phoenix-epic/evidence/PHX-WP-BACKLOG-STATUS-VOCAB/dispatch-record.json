@@ -1,0 +1,18 @@
+{
+  "taskId": "PHX-WP-BACKLOG-STATUS-VOCAB",
+  "model": "claude-sonnet-5",
+  "rulesetSha": "5fa52282cd58e6be5c04dceada78dda8c9dd072b7f2d4b4d833b5d2ab8a54af2",
+  "dispatcher": "elephant",
+  "outcome": "done",
+  "commit": "ed26b50a",
+  "log": [
+    { "phase": "opening", "toolUseCount": 2, "note": "Dispatch record created as opening act." },
+    { "phase": "design", "note": "BACKLOG_STATUSES extended to open/in_progress/closed/rejected/deferred; FORWARD_TRANSITIONS made branching (open -> in_progress|rejected|deferred; in_progress -> closed). rejected/deferred reachable only from open, matching README Triage rules (triage applies to open items only, never mid-execution)." },
+    { "phase": "verify-library", "note": "node --test plugins/pipeline-core/lib/backlog-state.test.mjs: 38/38 pass (35 pre-existing + BS02d/BS02e/BS02f new; BS02's stale 'deferred'-as-invalid counterexample swapped to 'cancelled')." },
+    { "phase": "verify-reconcile", "note": "node --test plugins/pipeline-core/scripts/reconcile-backlog-ledger.test.mjs: 15/15 pass (12 pre-existing + RBL13/14/15 new)." },
+    { "phase": "activate", "note": "node plugins/pipeline-core/scripts/reconcile-backlog-ledger.mjs --activate against real repo root: exit 0, 3 transitions recorded (R-AC-06 item + two other pre-existing legitimately-drifted open items swept in by the tool's all-or-nothing design). backlog/transitions.ndjson gained exactly 3 new appended lines, no existing line changed." },
+    { "phase": "residual-findings", "note": "check-backlog-state.mjs still exits 2: ~19 findings, all from a separate pre-existing, out-of-scope bug (unquoted comma in several 2026-08-17 items' source: frontmatter, including R-AC-06's own; plus one item with invalid type: follow-up). None are 'unknown status'/status-vocabulary findings -- those are gone. Reported as open item, not fixed (out of scope)." },
+    { "phase": "commit", "note": "Committed ed26b50a: backlog/README.md, backlog-state.mjs+test, reconcile-backlog-ledger.mjs+test, backlog/{transitions.ndjson,STATUS.md,index.json}." }
+  ],
+  "report": "See final chat message (6-point DoD/evidence/changed-files/deviations/open-items report) delivered as this dispatch's completion report."
+}

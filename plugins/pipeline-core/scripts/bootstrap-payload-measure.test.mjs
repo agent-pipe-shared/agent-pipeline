@@ -25,6 +25,31 @@ assert.equal(normalReceipt.segments.length, 2);
 assert.equal(normalReceipt.originalMeasurement.upperBoundUnits,
   normalReceipt.segments.reduce((sum, segment) => sum + segment.utf8Bytes, 0));
 
+// Deterministic, hermetic default for the origin/content attestation
+// dependency (design: bootstrap-origin-allowlist-and-codex-wsl-freshness.md
+// §A.2/§A.3; fix per Critic finding F5, WP2-WP3-partA-rework-1) -- this
+// sibling suite ran without any `observe` override, so it performed a real
+// observation (subprocess + full recursive tree hash) against the real
+// plugin tree on every Verify run instead of the fixture-only measurement it
+// is meant to be. Mirrors the same shape `pipeline-start-preflight.test.mjs`
+// already injects.
+const readyObservation = () => ({
+  schema: "pipeline.public-core-observation.v1",
+  status: "ready",
+  candidate: {
+    repository: "https://github.com/agent-pipe-shared/agent-pipeline.git",
+    branch: "main",
+    commit: "a".repeat(40),
+    tree: "b".repeat(40),
+  },
+  plugin: {
+    name: "pipeline-core",
+    version: "0.4.5+test",
+    manifestSha256: "c".repeat(64),
+    contentSha256: "d".repeat(64),
+  },
+});
+
 const normalPreflight = observePipelineStartPreflight({
   env: {},
   cwd: "/tmp/normal-bootstrap-fixture",
@@ -41,6 +66,7 @@ const normalPreflight = observePipelineStartPreflight({
       marketplaceSource: { sourceType: "git", source: "https://example.invalid/agent-pipeline.git" },
     }],
   }),
+  observe: readyObservation,
 });
 assert.equal(normalPreflight.bootstrapPayload.schema, "pipeline.bootstrap-payload-receipt.v1");
 assert.equal(normalPreflight.bootstrapPayload.mode, "normal");

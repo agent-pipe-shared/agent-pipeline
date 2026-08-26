@@ -1,0 +1,15 @@
+{
+  "taskId": "PHX-WP-PX0-CASOUTCOME",
+  "model": "claude-sonnet-5",
+  "rulesetSha": "ce50d74d16fdbcd0b9f8b3b606297e88af3d2f139b3cd14b692f4ea15599b023",
+  "dispatcher": "goldfish-deep",
+  "outcome": "landed",
+  "report": "AR06g added to harness/scripts/pipeline-state.test.mjs, proving runAuthorityRevisionRecoverCommand's recovered-preimage branch echoes receipt.casOutcome as \"stale\" (not the frozen journal's own \"applied\", fixed under the F4/courseDecisionReceipts convention comment), alongside the pre-existing status:\"recovered-preimage\"/mutated:false invariant AR06e already asserts. Follows AR06e's exact fixture pattern (an expiresAt that has passed by the time recovery runs). Full suite: 473/473 passed (468 baseline + 5 new AR06g-prefixed cases), 0 regressed. Committed as 433e73db.",
+  "log": [
+    {
+      "phase": "landed",
+      "toolUseCount": "~45 (shared research phase covered (a)/(b)/(c) together under the PHX-GMW-TP5-TESTS dispatch)",
+      "note": "Read runAuthorityRevisionRecoverCommand's recovered-preimage branch (plugins/pipeline-core/scripts/pipeline-state.mjs ~3680-3711) and the AR06e/AR06f fixture pattern already in the test file (seedAuthorityRevisionRoot/reviseProposal/planCmd/arApplyCmd/arRecoverCmd). Confirmed buildAuthorityRevisionPlan freezes receipt.casOutcome:\"applied\" unconditionally at apply-build time (pipeline-state.mjs line 3377), independent of which path later completes the write -- so AR06g's setup1 assertion (plan.receipt.casOutcome === \"applied\") proves the frozen value the fix must NOT echo. Added AR06g right after AR06f, before the PX0-AC-07 section. node --test harness/scripts/pipeline-state.test.mjs -> 473/473 passed, 0 failed (tail output captured before commit). Committed harness/scripts/pipeline-state.test.mjs alone (git add -- harness/scripts/pipeline-state.test.mjs; git commit -F <msgfile> -- harness/scripts/pipeline-state.test.mjs, msgfile written under .git/ and removed immediately after since the session's scratchpad directory is outside the physical project root and is refused by GUARD-CROSS-REPO-MUTATION) as 433e73db. No other file touched."
+    }
+  ]
+}

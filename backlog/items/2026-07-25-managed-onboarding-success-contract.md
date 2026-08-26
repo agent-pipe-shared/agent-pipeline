@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.managed-onboarding-success-contract
 type: workflow-improvement
 owner: pipeline
-status: open
+status: deferred
 created: 2026-07-25
 source: "close-block self-retro, 0.4.4 managed-workspace onboarding hotfix"
 ---
@@ -48,3 +48,13 @@ see backlog/items/2026-08-17-managed-onboarding-repair-item-sha256-pin-blocks-it
 for that mechanism and its fix.
 **Assignment:** Sprint Alfred, unassigned within it.
 **Date:** 2026-08-18
+
+- **Cross-branch triage (Phoenix line, 2026-08-18):** independently reached
+  the same defer decision. **Rationale:** a process/review-discipline item
+  (workflow-improvement) asking future host-layout onboarding additions to
+  include a disposable-root success-contract test. Phoenix's own spec
+  explicitly excludes onboarding/front-door work as a non-goal
+  (specs/sprint-phoenix-epic/spec.md section 3, line 76). Condition to
+  revisit: the next session doing onboarding/front-door work.
+  **Assignment (if accepted):** Nova / general pipeline backlog — out of
+  Phoenix's own epic scope. **Date:** 2026-08-18

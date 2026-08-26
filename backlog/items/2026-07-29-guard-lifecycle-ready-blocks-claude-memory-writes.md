@@ -187,3 +187,10 @@ A `goldfish-deep` dispatch, sequenced after the runner-aware restart work
 releases `plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs`. It carries the
 platform check above as a DoD item and the prefix prohibition as a hard scope
 boundary.
+
+## Triage — closed 2026-08-18 (Phoenix line, independent confirmation)
+
+- **Decision:** Close as fixed-in-Nova-only, not ported; the citation gap above is also resolved.
+- **Rationale:** Nova's `guard-lifecycle-ready.mjs` now carries `claudeSessionMemoryDirectory()`/`isClaudeSessionMemoryWritePath()` (`:906-978`), wired into the write-admission path (`:2424-2443`) so a write strictly inside the session's own derived `.../memory/` directory is admitted outright (symlink-safe, via the same realpath walk `isProjectWritePath()` uses), while every other cross-repository write is still refused exactly as before. Nova's own inline comment cites "PO decision, 2026-08-08 — Option A" and names this exact backlog item by filename — so the decision this item's 2026-08-06 Triage searched for and couldn't find was made one day later (2026-08-08) and one repo away (Nova), as Option A, not Option B as originally cited. Phoenix's own `guard-lifecycle-ready.mjs` remains unchanged and still has no memory carve-out.
+- **Assignment (if the PO wants parity in Phoenix):** port Nova's `claudeSessionMemoryDirectory`/`isClaudeSessionMemoryWritePath` mechanism verbatim via a briefed dispatch against Phoenix's TP-protected `guard-lifecycle-ready.mjs` — not done automatically here, since Phoenix's own memory-write needs may differ.
+- **Date:** 2026-08-18

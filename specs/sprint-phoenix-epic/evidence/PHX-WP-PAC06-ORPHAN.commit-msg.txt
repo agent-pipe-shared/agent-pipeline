@@ -1,0 +1,11 @@
+fix(phoenix): reject orphaned artifacts in feature package validation
+
+validateFeaturePackage now flags any file physically present under
+specs/{id}/ that is not referenced by a manifest artifact entry
+(excluding the manifest itself), closing the "orphaned" clause of
+P-AC-06. Adds a regression test mirroring the existing missing/
+misplaced/stale/truncated/illegally-mutable P-AC-06 sibling tests in
+audit-bundle.test.mjs.
+
+Dispatch: PHX-WP-PAC06-ORPHAN (goldfish)
+AI-Assisted: true

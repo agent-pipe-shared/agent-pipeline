@@ -6,15 +6,18 @@
  * `prepare` writes only public candidate-bound requests and is agent work.
  * `setup` and `approve` are intentionally for a terminal operated by the
  * approving human. `authorize-critical` is the single human-terminal command
- * for a critical action: it prepares the request and signs that exact request
- * in one invocation, so a request left on disk by an earlier, possibly failed
- * preparation can never be the thing that gets signed. It changes nothing
- * about where key material lives or who is prompted for the passphrase.
- * The encrypted private key stays outside the checkout and
- * OpenSSL reads its passphrase from that terminal. No password, passphrase,
- * recovery code or private key is accepted as an argument, environment value,
- * stdin payload, repository file, or pipeline state. `verify` is public
- * readback and is agent work again.
+ * for a critical action (push/deploy/publication/feature-package-reconcile/
+ * release-preflight, ADR-0061 port PHX-WP-PORT-ADR0061-AUTHORIZE-CRITICAL):
+ * it prepares the request and signs that exact request in one invocation, so
+ * a request left on disk by an earlier, possibly failed preparation can never
+ * be the thing that gets signed. It changes nothing about where key material
+ * lives or who is prompted for the passphrase; `prepare-critical`/
+ * `approve-critical` stay available as the two-step form. The encrypted
+ * private key stays outside the checkout and OpenSSL reads its passphrase
+ * from that terminal. No password, passphrase, recovery code or private key
+ * is accepted as an argument, environment value, stdin payload, repository
+ * file, or pipeline state. `verify` is public readback and is agent work
+ * again.
  */
 import { createHash, createPublicKey } from "node:crypto";
 import { spawnSync } from "node:child_process";
@@ -24,9 +27,11 @@ import { fileURLToPath } from "node:url";
 
 import { approvalRequestFromExternalJson, observeCleanCandidate, run as runApprovalRequest } from "./po-approval-request.mjs";
 import { readPublicRepositoryFile, verifyThreatModelApprovalRequest } from "../lib/threat-model-approval-request.mjs";
-import { CRITICAL_ACTION_KINDS, criticalActionSubjectSha256, createCriticalActionApprovalRequest, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
+import { criticalActionSubjectSha256, createCriticalActionApprovalRequest, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
 import { describeGuardMaintenanceWindowRequest } from "../lib/guard-maintenance-window.mjs";
 import { describeHumanGuardOverrideSelection } from "../lib/human-guard-override.mjs";
+import { GOVERNANCE_FORK_DISPOSITION_APPROVAL, governanceForkDispositionApprovalSubject, inspectForkedGovernanceStream } from "../lib/governance-event-store.mjs";
+import { readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { MACHINE_PLANE_SCHEMA, readMachinePlane, writeMachinePlane } from "../lib/machine-plane.mjs";
 import { boundedOpaqueCopyCommand, renderProjectOnboardingAction } from "../lib/project-onboarding-v3.mjs";
@@ -41,7 +46,7 @@ import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
 const SCRIPT = fileURLToPath(import.meta.url);
 const PLUGIN_ROOT = resolve(dirname(SCRIPT), "..");
 
-const USAGE = "Usage: po-human-approval.mjs setup --repo-root <repo> --directory <external-dir> [--key-reference <id>] | prepare --repo-root <repo> --directory <external-dir> [--feature-id <id> --plan <repo-path> --spec <repo-path> --model <repo-path>] | prepare-all --repo-root <repo> --directory <external-dir> | approve --repo-root <repo> --directory <external-dir> [--feature-id <id>] | approve-all --repo-root <repo> --directory <external-dir> | verify --repo-root <repo> --directory <external-dir> [--feature-id <id>] | verify-all --repo-root <repo> --directory <external-dir> | prepare-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication|release-preflight> --subject-sha256 <sha256> [--subject <repo-path>] --expires-at <ISO-8601> | approve-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication|release-preflight> | verify-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication|release-preflight> | sign-intent --repo-root <repo> --directory <external-dir> (--intent-sha256 <sha256> | --request <repo-scratch-relative-path>) | authorize-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication|release-preflight> --subject-sha256 <sha256> [--subject <repo-path>] --expires-at <ISO-8601>";
+const USAGE = "Usage: po-human-approval.mjs setup --repo-root <repo> --directory <external-dir> [--key-reference <id>] | prepare --repo-root <repo> --directory <external-dir> [--feature-id <id> --plan <repo-path> --spec <repo-path> --model <repo-path>] | prepare-all --repo-root <repo> --directory <external-dir> | approve --repo-root <repo> --directory <external-dir> [--feature-id <id>] | approve-all --repo-root <repo> --directory <external-dir> | verify --repo-root <repo> --directory <external-dir> [--feature-id <id>] | verify-all --repo-root <repo> --directory <external-dir> | prepare-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication|release-preflight|feature-package-reconcile> --subject-sha256 <sha256> [--subject <repo-path>] --expires-at <ISO-8601> | approve-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication|release-preflight|feature-package-reconcile> | verify-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication|release-preflight|feature-package-reconcile> | sign-intent --repo-root <repo> --directory <external-dir> (--intent-sha256 <sha256> | --request <repo-scratch-relative-path>) | authorize-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication|release-preflight|feature-package-reconcile> --subject-sha256 <sha256> [--subject <repo-path>] --expires-at <ISO-8601> | prepare-fork-disposition --repo-root <repo> --directory <external-dir> --repository-fingerprint <sha256> --stream-id <id> --sequence <n> --expires-at <ISO-8601> | approve-fork-disposition --repo-root <repo> --directory <external-dir> --repository-fingerprint <sha256> --stream-id <id> --sequence <n> | verify-fork-disposition --repo-root <repo> --directory <external-dir> --repository-fingerprint <sha256> --stream-id <id> --sequence <n>";
 // This repo's own environment inputs are all named PIPELINE_<PURPOSE> (see
 // PIPELINE_GUARD_OVERRIDE, PIPELINE_LIVE_CERTIFICATION_AUTHORITY,
 // PIPELINE_SECURITY_REVIEWER_ID elsewhere in this plugin); PO_APPROVAL_DIRECTORY
@@ -216,6 +221,15 @@ function persistExplicitDirectoryIntoRepoScope(args, directory, gitCommonDir, de
 // file's own code (args.directorySource) without joining the object's public shape.
 function setDirectorySource(values, source) { Object.defineProperty(values, "directorySource", { value: source, enumerable: false, configurable: true }); }
 const own = (value, keys) => value !== null && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
+/**
+ * `trustPolicy`/`authority` specifically may also carry `humanName` — the
+ * SETUP-1 human-readable label some operators' external `trust-policy.json`
+ * already carries (mirrors `po-approval-proof.mjs`'s `ownTrustPolicy`). It is
+ * never part of what is cryptographically checked here, so its presence must
+ * not fail-close a genuinely valid trust policy; any OTHER unrecognised extra
+ * key still must.
+ */
+const ownTrustPolicy = (value) => own(value, ["keyReference", "publicKeySha256"]) || own(value, ["keyReference", "publicKeySha256", "humanName"]);
 const SHA = /^[a-f0-9]{64}$/u;
 const text = (value) => typeof value === "string" && value.trim() !== "";
 
@@ -349,12 +363,21 @@ function artifactPath(directory, name) {
   return path;
 }
 
+/**
+ * The three fork-disposition commands (ADR-0063). They are a sibling of the
+ * `-critical` trio, not a fourth `--kind` for it: a fork disposition's subject
+ * is DERIVED from the fork that actually exists, so the parameters that locate
+ * that fork replace the ones `prepare-critical` accepts verbatim.
+ */
+const FORK_DISPOSITION_COMMANDS = new Set(["prepare-fork-disposition", "approve-fork-disposition", "verify-fork-disposition"]);
+
 // NVA-CLI-FEEDBACK-1 (backlog/items/2026-08-09-critical-push-signing-
 // ceremony-gives-no-path-feedback.md): the fixed set of recognised
 // subcommands, named once and reused both for validation (below) and for the
 // "did you mean" suggestion on an unrecognised one -- a single list, never
-// two that could drift apart.
-const KNOWN_COMMANDS = ["setup", "prepare", "prepare-all", "approve", "approve-all", "verify", "verify-all", "prepare-critical", "approve-critical", "verify-critical", "authorize-critical", "sign-intent"];
+// two that could drift apart. Includes the fork-disposition trio (ADR-0063)
+// so an unrecognised fork-disposition subcommand also gets a suggestion.
+const KNOWN_COMMANDS = ["setup", "prepare", "prepare-all", "approve", "approve-all", "verify", "verify-all", "prepare-critical", "approve-critical", "verify-critical", "authorize-critical", "sign-intent", ...FORK_DISPOSITION_COMMANDS];
 
 // NVA-CLI-FEEDBACK-1: standard O(len(a)*len(b)) Levenshtein edit distance
 // (insert/delete/substitute, each cost 1) between two subcommand strings.
@@ -400,13 +423,48 @@ function suggestSubcommand(input, candidates) {
   return best !== null && bestDistance <= SUBCOMMAND_SUGGESTION_MAX_DISTANCE ? best : null;
 }
 
+/**
+ * The `--kind` values `prepare-critical`/`approve-critical`/`verify-critical`
+ * accept — deliberately a fixed literal list, spelled out here rather than
+ * taken from `CRITICAL_ACTION_KINDS`.
+ *
+ * That import is what admitted `governance-fork-disposition` the moment the
+ * family grew a fourth member (ADR-0063), and every branch behind it is wrong
+ * for that kind: `prepare-critical` binds the git candidate and real repository
+ * plan/spec bytes, none of which the disposition's verifier accepts, and it
+ * writes the request to `request-critical-governance-fork-disposition.json` --
+ * the very file `prepare-fork-disposition` owns, so the broken request silently
+ * replaced a valid one. Refusing the kind at the parser closes that route, the
+ * artifact-name collision and the direct `approve-critical` signing bypass with
+ * a single check, at the exact point every other invalid `--kind` is refused.
+ *
+ * A literal, not a filter over the shared family: a fifth kind must be an
+ * explicit decision here too, not an automatic membership.
+ *
+ * `"feature-package-reconcile"` was added 2026-08-18 (PHX-WP-POHUMAN-SIGNING-ERGO):
+ * it is a first-class `CRITICAL_ACTION_KINDS` member with no security concern
+ * analogous to `governance-fork-disposition`'s — it binds a real git candidate
+ * and repository plan/spec bytes exactly like `push`/`deploy`/`publication` do,
+ * so admitting it here closes the manual-copy workaround without reopening the
+ * hole this comment describes.
+ *
+ * `"release-preflight"` (GF-105/ADR-0064 Decision 4) is the same: it binds a
+ * real git candidate and repository plan/spec bytes, with its own additional
+ * `--subject`-derived digest (see `resolveSubjectPreimage`) and its own
+ * disclosure lines (see `releasePreflightConfirmationLines`) -- no
+ * governance-fork-disposition-style verification bypass concern either.
+ */
+const CRITICAL_COMMAND_KINDS = Object.freeze(["push", "deploy", "publication", "feature-package-reconcile", "release-preflight"]);
+const SEQUENCE = /^[1-9][0-9]{0,14}$/u;
+const isoTimestamp = (value) => text(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value;
+
 export function parseHumanArgs(argv, dependencies = {}) {
   const [command, ...tokens] = argv; const values = { command, keyReference: "local-po-key" }; const supplied = new Set();
   for (let index = 0; index < tokens.length; index += 1) {
     const key = tokens[index]; const value = tokens[index + 1];
     if (!key?.startsWith("--") || typeof value !== "string" || value.startsWith("--")) return { error: USAGE };
     const normalized = key.slice(2).replace(/-([a-z])/gu, (_, letter) => letter.toUpperCase());
-    if (!new Set(["directory", "repoRoot", "keyReference", "humanName", "featureId", "plan", "spec", "model", "kind", "subject", "subjectSha256", "expiresAt", "intentSha256", "request"]).has(normalized) || supplied.has(normalized)) return { error: USAGE };
+    if (!new Set(["directory", "repoRoot", "keyReference", "humanName", "featureId", "plan", "spec", "model", "kind", "subject", "subjectSha256", "expiresAt", "intentSha256", "request", "repositoryFingerprint", "streamId", "sequence"]).has(normalized) || supplied.has(normalized)) return { error: USAGE };
     supplied.add(normalized); values[normalized] = value; index += 1;
   }
   // GF-104: keyReference always carries a default ("local-po-key") even when the
@@ -475,12 +533,24 @@ export function parseHumanArgs(argv, dependencies = {}) {
   if (!text(values.repoRoot) || !isAbsolute(values.repoRoot)) {
     return { error: `${USAGE}\nrepository root is required and must be an absolute path: pass --repo-root <path> naming the repository this ceremony operates on (a relative path such as "." is not accepted).` };
   }
+  // The fork-locating parameters exist only for the new commands; every
+  // pre-existing command rejects them exactly as it rejected any unknown flag
+  // before, so widening the accepted-key set above changes nothing for them.
+  if (!FORK_DISPOSITION_COMMANDS.has(command) && (values.repositoryFingerprint || values.streamId || values.sequence)) return { error: USAGE };
+  if (FORK_DISPOSITION_COMMANDS.has(command)) {
+    // No `--subject-sha256` here, ever: accepting a bare digest is precisely
+    // the self-minting route ADR-0063 closes. Nor plan/spec/feature paths --
+    // GOVERNANCE_FORK_DISPOSITION_APPROVAL fixes all three.
+    if (values.kind || values.subjectSha256 || values.featureId || values.plan || values.spec || values.model) return { error: USAGE };
+    if (!SHA.test(values.repositoryFingerprint ?? "") || !text(values.streamId) || !SEQUENCE.test(values.sequence ?? "")) return { error: USAGE };
+    if (command === "prepare-fork-disposition" ? !isoTimestamp(values.expiresAt) : values.expiresAt !== undefined) return { error: USAGE };
+  }
   // FIXTURE-2: --human-name is validated where the authority directory's state is known
   // (inside the "setup" branch of runHumanApproval), never here. The parser cannot see
   // whether an authority record already exists on disk, and a `setup` that recovers or
   // re-reads an existing record must not be forced to repeat a name it already has.
   if (command.endsWith("-all") && (values.featureId || values.plan || values.spec || values.model)) return { error: USAGE };
-  if (command.endsWith("-critical") && !CRITICAL_ACTION_KINDS.includes(values.kind)) return { error: USAGE };
+  if (command.endsWith("-critical") && !CRITICAL_COMMAND_KINDS.includes(values.kind)) return { error: USAGE };
   // NVA-SWEEP-F2 (backlog/items/2026-08-16-gmw-reconcile-still-needs-a-manual-copy-after-
   // the-po-signs.md, Triage confirmation 2026-08-18, direction b): `--request` is an
   // ALTERNATIVE source for the digest, never a second one accepted alongside
@@ -845,6 +915,27 @@ function signIntentIntoProof({ intentSha256, keys, artifacts, io, dependencies }
 
 export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}) {
   const args = parseHumanArgs(argv, dependencies); if (args.error) fail(args.error);
+  // Fail closed rather than fall through: the fork-disposition commands need an
+  // async fork inspection this synchronous entry point cannot perform, and they
+  // were rejected here (as unknown commands) before they existed.
+  if (FORK_DISPOSITION_COMMANDS.has(args.command)) fail("fork-disposition commands run through runForkDispositionApproval");
+  return executeHumanApproval(args, dependencies);
+}
+
+/**
+ * Everything the command above does once its argv is parsed and accepted.
+ *
+ * Split out, and deliberately NOT exported, for exactly one reason:
+ * `runForkDispositionApproval` must still reach the single existing signing
+ * branch, and it can no longer do so by synthesizing the argv `approve-critical
+ * --kind governance-fork-disposition` — `parseHumanArgs` now refuses that, and
+ * must keep refusing it for every argv an operator can type. The alternatives
+ * were a second OpenSSL/confirmation path (two definitions of the ceremony) or
+ * an exported opt-out on the parser (the escape route again, one argument
+ * away). This split adds neither: every caller outside this module still enters
+ * through `runHumanApproval` and its parser.
+ */
+function executeHumanApproval(args, dependencies = {}) {
   if (args.command.endsWith("-all")) {
     const action = args.command.slice(0, -4);
     const results = ["cyb-4", "cyb-5"].map((featureId) => runHumanApproval([
@@ -971,6 +1062,15 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
     command("openssl", ["genpkey", "-algorithm", "ED25519", "-aes-256-cbc", "-out", paths.privateKey], dependencies);
     command("openssl", ["pkey", "-in", paths.privateKey, "-pubout", "-out", paths.publicKey], dependencies);
     const authority = localAuthority(read(paths.publicKey, "utf8"), args.keyReference, args.humanName); write(paths.authority, `${JSON.stringify(authority, null, 2)}\n`, { mode: 0o600 }); chmodSync(paths.privateKey, 0o600);
+    // Privacy-hygiene nudge (H-AC-11 O-4): fires only on this fresh-key-creation
+    // branch and only when the operator chose a non-default --key-reference; the
+    // GMW/human-ledger design cannot fully decouple this key reference from the
+    // portable record, so a value that uniquely identifies the operator as a
+    // natural person is a real, proven privacy concern here. Advisory only; it
+    // never blocks, fails, or alters the returned result object.
+    if (args.keyReference !== "local-po-key") {
+      process.stdout.write(`NOTE: --key-reference "${args.keyReference}" may uniquely identify you as a natural person; consider a less individually-attributable value (H-AC-11 O-4).\n`);
+    }
     persistExplicitDirectoryIntoRepoScope(args, directory, gitCommonDir, dependencies);
     return { ok: true, code: "PO-HUMAN-AUTHORITY-READY", authority, paths: { privateKey: paths.privateKey, publicKey: paths.publicKey, authority: paths.authority } };
   }
@@ -1129,7 +1229,7 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
   if (args.command === "approve" || args.command === "approve-critical") {
     if (!exists(paths.privateKey)) fail("private key is unavailable");
     const kind = critical ? request?.action?.kind : request?.approvalIntent?.value?.kind;
-    const summary = [`kind: ${kind}`, `candidate commit: ${request?.candidate?.commit}`];
+    const summary = [`kind: ${kind}`, `intent sha256: ${intentSha256}`, `candidate commit: ${request?.candidate?.commit}`];
     if (critical) {
       summary.push(`action subject sha256: ${request?.action?.subjectSha256}`);
       summary.push(`action expires at: ${request?.action?.expiresAt}`);
@@ -1156,6 +1256,151 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
   return { ok: true, value: verified };
 }
 
+/**
+ * The subject of a fork disposition, rebuilt from the fork that ACTUALLY
+ * exists right now — never from anything the operator typed. The only caller
+ * inputs are the three coordinates that locate the fork; the conflicting
+ * entries' content digests, the derived candidate and the signed digest all
+ * come from `inspectForkedGovernanceStream` and
+ * `governanceForkDispositionApprovalSubject`, i.e. from the exact two exports
+ * the store itself uses at verification time. Recomputing either here would be
+ * a second definition of the binding, which is the duplication class this
+ * neighbourhood has already paid for once.
+ */
+async function forkDispositionSubject(args, repository, sequence) {
+  const inspection = await inspectForkedGovernanceStream({
+    repositoryRoot: repository,
+    repositoryFingerprint: args.repositoryFingerprint,
+    streamId: args.streamId,
+  });
+  const fork = inspection.forks.find((entry) => entry.sequence === sequence);
+  if (!fork) fail(`stream ${args.streamId} has no forked position at sequence ${sequence}`);
+  const subject = governanceForkDispositionApprovalSubject({
+    repositoryFingerprint: inspection.repositoryFingerprint,
+    streamId: args.streamId,
+    sequence,
+    forkedEventDigests: fork.entries.map((entry) => entry.eventDigest),
+  });
+  return { ...subject, acknowledgedEventIds: fork.entries.map((entry) => entry.eventId) };
+}
+
+/**
+ * The fork-disposition half of the ceremony (ADR-0063), split from
+ * `runHumanApproval` because inspecting the fork is asynchronous and because
+ * nothing about the `push`/`deploy`/`publication` branches may change to
+ * accommodate it.
+ *
+ * `prepare-fork-disposition` is agent work and writes only public bytes;
+ * `approve-fork-disposition` re-checks the prepared request against the fork
+ * as it stands NOW and then hands the signing itself to the untouched
+ * `approve-critical` branch, so there is exactly one OpenSSL/confirmation path
+ * in this file; `verify-fork-disposition` is public readback that predicts the
+ * store's own decision by rebuilding the subject the same way and verifying
+ * against the SAME anchor the store will use — the repository's declared
+ * `project/critical-human-proof.json` trustAnchor, never the external
+ * directory's `trust-policy.json`, which is the signer's own claim about its
+ * own key.
+ */
+export async function runForkDispositionApproval(argv = process.argv.slice(2), dependencies = {}) {
+  const args = parseHumanArgs(argv, dependencies); if (args.error) fail(args.error);
+  if (!FORK_DISPOSITION_COMMANDS.has(args.command)) fail(USAGE);
+  const repository = resolve(args.repoRoot);
+  const directory = externalDirectory(repository, resolve(args.directory), { create: args.command === "prepare-fork-disposition" });
+  const suffix = `-critical-${GOVERNANCE_FORK_DISPOSITION_APPROVAL.kind}`;
+  const paths = {
+    request: artifactPath(directory, `request${suffix}.json`),
+    authority: artifactPath(directory, "trust-policy.json"),
+    proof: artifactPath(directory, `proof${suffix}.json`),
+  };
+  const write = dependencies.writeFile ?? writeFileSync; const exists = dependencies.exists ?? existsSync;
+  const sequence = Number(args.sequence);
+  const subject = await forkDispositionSubject(args, repository, sequence);
+  if (args.command === "prepare-fork-disposition") {
+    const request = createCriticalActionApprovalRequest({
+      candidate: subject.candidate,
+      featureId: GOVERNANCE_FORK_DISPOSITION_APPROVAL.featureId,
+      // The fixed LABEL bytes, never a repository file: a disposition is a
+      // store-level governance act with no sprint plan/spec of its own, and the
+      // signer must be able to rebuild these offline with no repository I/O.
+      planBytes: Buffer.from(GOVERNANCE_FORK_DISPOSITION_APPROVAL.planLabel, "utf8"),
+      specBytes: Buffer.from(GOVERNANCE_FORK_DISPOSITION_APPROVAL.specLabel, "utf8"),
+      action: { kind: GOVERNANCE_FORK_DISPOSITION_APPROVAL.kind, subjectSha256: subject.subjectSha256, expiresAt: args.expiresAt },
+    });
+    write(paths.request, `${JSON.stringify(request, null, 2)}\n`, { mode: 0o600 });
+    return {
+      ok: true,
+      code: "PO-HUMAN-FORK-DISPOSITION-REQUEST-READY",
+      candidate: request.candidate,
+      subjectSha256: subject.subjectSha256,
+      intentSha256: request.approvalIntent.sha256,
+      action: request.action,
+      forkedEventDigests: [...subject.subject.forkedEventDigests],
+      acknowledgedEventIds: [...subject.acknowledgedEventIds],
+    };
+  }
+  if (!exists(paths.request)) fail("run prepare-fork-disposition first");
+  const request = json(paths.request);
+  if (request?.action?.kind !== GOVERNANCE_FORK_DISPOSITION_APPROVAL.kind || request?.action?.subjectSha256 !== subject.subjectSha256) {
+    fail("the prepared request does not bind the conflicting entries that exist at this sequence now; prepare it again");
+  }
+  // F2 fix (Critic round 3): pin the same three authority fields
+  // `verify-fork-disposition` checks further below, but HERE, before
+  // `approve-fork-disposition` delegates into a real OpenSSL signing
+  // operation. Without this, a prepared request with correct
+  // `action.kind`/`action.subjectSha256` but a tampered `approvalIntent.value`
+  // field would still reach signing -- wasting a real signature on a request
+  // that the store's own write-time check (`authorizeForkDisposition`) would
+  // later refuse to persist anyway, since it pins these same fields.
+  {
+    const pinnedIntent = request?.approvalIntent?.value;
+    if (pinnedIntent?.featureId !== GOVERNANCE_FORK_DISPOSITION_APPROVAL.featureId
+      || pinnedIntent?.planSha256 !== GOVERNANCE_FORK_DISPOSITION_APPROVAL.planSha256
+      || pinnedIntent?.specSha256 !== GOVERNANCE_FORK_DISPOSITION_APPROVAL.specSha256) {
+      fail("the prepared request was not issued for the fork-disposition authority");
+    }
+  }
+  if (args.command === "approve-fork-disposition") {
+    // Deliberately the EXISTING critical signing branch, unchanged: same
+    // confirmation gate, same OpenSSL invocation, same artifact names, same
+    // proof shape. Entered with the parsed form of the `approve-critical`
+    // invocation this used to spell as argv, because that argv is now correctly
+    // refused: `--kind governance-fork-disposition` on the `-critical` trio was
+    // itself an escape route (an unverifiable request written over this
+    // command's own artifact). The values below are the ones that argv produced.
+    return executeHumanApproval({
+      command: "approve-critical",
+      keyReference: args.keyReference,
+      repoRoot: args.repoRoot,
+      directory: args.directory,
+      kind: GOVERNANCE_FORK_DISPOSITION_APPROVAL.kind,
+    }, dependencies);
+  }
+  if (!exists(paths.authority) || !exists(paths.proof)) fail("run approve-fork-disposition before verifying");
+  const policy = readCriticalHumanProofPolicy(repository);
+  if (!policy.ok || policy.trustAnchor === null) fail("project/critical-human-proof.json declares no usable trustAnchor, so the store can verify no external approval");
+  const intent = request?.approvalIntent?.value;
+  if (intent?.featureId !== GOVERNANCE_FORK_DISPOSITION_APPROVAL.featureId
+    || intent?.planSha256 !== GOVERNANCE_FORK_DISPOSITION_APPROVAL.planSha256
+    || intent?.specSha256 !== GOVERNANCE_FORK_DISPOSITION_APPROVAL.specSha256) {
+    fail("the prepared request was not issued for the fork-disposition authority");
+  }
+  const proof = json(paths.proof);
+  const verified = verifyCriticalActionApprovalRequest({ request, trustPolicy: policy.trustAnchor, proof, expectedCandidate: subject.candidate, expectedAction: request.action });
+  if (!verified.verified) fail(`the fork disposition approval does not verify (${verified.code}${verified.cause ? `; ${verified.cause}` : ""})`);
+  return {
+    ok: true,
+    code: "PO-HUMAN-FORK-DISPOSITION-VERIFIED",
+    value: verified,
+    subjectSha256: subject.subjectSha256,
+    acknowledgedEventIds: [...subject.acknowledgedEventIds],
+    approval: { mode: "signature", request, proof },
+  };
+}
+
 if (isDirectInvocation(import.meta.url)) {
-  try { process.stdout.write(`${JSON.stringify(runHumanApproval(), null, 2)}\n`); } catch (error) { process.stderr.write(`PO-HUMAN-APPROVAL-FAILED: ${error.message}\n`); process.exitCode = 2; }
+  const argv = process.argv.slice(2);
+  try {
+    const result = FORK_DISPOSITION_COMMANDS.has(argv[0]) ? await runForkDispositionApproval(argv) : runHumanApproval(argv);
+    process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+  } catch (error) { process.stderr.write(`PO-HUMAN-APPROVAL-FAILED: ${error.message}\n`); process.exitCode = 2; }
 }

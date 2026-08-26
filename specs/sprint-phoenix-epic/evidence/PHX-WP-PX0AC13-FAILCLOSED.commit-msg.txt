@@ -1,0 +1,16 @@
+fix(phoenix): replace fake WSL host attestation with honest fail-closed spawn
+
+createWslHostAttestedSpawn claimed to route the two network-delegated git
+calls (ls-remote, disposable-repo fetch) through a host-attested boundary,
+but only checked a local Codex App-Server health observation and then
+spawned /usr/bin/git in the same sandboxed process -- it never crossed the
+sandbox boundary. Two independent investigation dispatches confirmed this
+is fake. Under host-authorized-wsl, the two network-delegated calls now
+always return a synthetic non-zero result without ever attempting to spawn
+a subprocess; local-only calls pass straight through to the real spawn,
+unmodified. This satisfies PX0-AC-13's second clause only ("without
+consuming a known-failing sandbox attempt"); a real cross-sandbox transport
+for the first clause does not exist in this codebase and is out of scope.
+
+Dispatch: PHX-WP-PX0AC13-FAILCLOSED (goldfish)
+AI-Assisted: true

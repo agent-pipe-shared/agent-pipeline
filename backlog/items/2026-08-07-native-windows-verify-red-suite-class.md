@@ -65,6 +65,8 @@ here rather than as isolated one-off items.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
+**Merge note (2026-08-26, moved from frontmatter):** Merged from two diverged branch histories (Nova vs. Phoenix, 2026-08-26). Nova closed this item 2026-08-12 (commit 344b49620f2353749b8bb44fc0dc2889dbdc339c, verified present) per an explicit PO decision; Phoenix's independent 2026-08-18 backlog-clearing pass had not yet merged that closure and instead flipped the frontmatter to `deferred`. Closure evidence checked and holds; status: closed taken from Nova. The 2026-08-18 update is preserved below, repositioned after the 2026-08-12 closure it predates in merged history (git's line-wise auto-merge had spliced it into the middle of the 2026-08-07 Triage bullet list, ahead of the Assignment/Date bullets and the 2026-08-12 closure section — restored to chronological order here, content unchanged).
+
 - **Decision:** accept-deferred.
 - **Rationale:** re-verified 2026-08-07: the item's own Description already
   correctly lists the individually-filed Windows defects it knows of as
@@ -91,3 +93,16 @@ here rather than as isolated one-off items.
   access shows everything passing now.
 - **Rationale:** PO, 2026-08-12: "close setzen akuell geht alles."
 - **Date:** 2026-08-12
+
+### Note, 2026-08-18 (Elephant, Phoenix backlog-clearing pass — superseded by the 2026-08-12 closure above)
+
+Re-verified again; no native-Windows access available from this checkout
+either. The Decision above already read "accept-deferred" — flipping the
+frontmatter `status` field to match (it had been left at `open` despite the
+Triage decision). Condition to revisit unchanged: a session with native
+Windows access re-measures the class-level count.
+
+This pass ran on a branch that had not yet merged the 2026-08-12 closure
+above; its `status: deferred` flip was accurate for the branch it ran on at
+the time, and is superseded by the closure once both histories are combined
+(2026-08-26 merge note).

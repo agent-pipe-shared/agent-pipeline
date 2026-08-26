@@ -39,6 +39,7 @@ import {
   parseWorktreePorcelain,
   rawSha256,
   registerTemporaryIntent,
+  runGit,
   loadSessionDescriptor,
   retireSessionDescriptor,
   sealTemporaryResource,
@@ -909,6 +910,49 @@ check("WT-LOCAL-WINDOWS-ASSURANCE still hardens every newly-created component ou
   });
   assert.deepEqual(assessed, [existing]);
   assert.deepEqual(hardened, [resolve(existing, "active"), parent]);
+});
+
+// ---- PHX-2: runGit/discoverRepository timeout forwarding (WP5-phx2-implementation §2) ----
+// worktree-lifecycle.mjs previously forwarded only cwd/env/encoding/maxBuffer/shell to
+// spawnSync; no caller anywhere passed a timeout and none would have been honored. This is
+// the disclosed small extension the design doc's §2 calls for, so `discoverRepository(...,
+// { timeout: 5000 })` (guard-push.mjs's read side, pipeline-state.mjs's approve-push write
+// side) actually bounds its git spawns.
+
+check("D0-TO01 runGit forwards an explicit timeout to the underlying spawn call", () => {
+  const { primary } = repoFixture();
+  let seenOptions = null;
+  const spy = (_cmd, _args, options) => {
+    seenOptions = options;
+    return spawnSync("git", _args, options);
+  };
+  runGit(primary, ["rev-parse", "HEAD"], { spawn: spy, timeout: 12345 });
+  assert.equal(seenOptions.timeout, 12345);
+});
+
+check("D0-TO02 runGit omits timeout entirely (stays undefined, not 0/null) when the caller passes none", () => {
+  const { primary } = repoFixture();
+  let seenOptions = null;
+  const spy = (_cmd, _args, options) => {
+    seenOptions = options;
+    return spawnSync("git", _args, options);
+  };
+  runGit(primary, ["rev-parse", "HEAD"], { spawn: spy });
+  assert.equal(seenOptions.timeout, undefined);
+  assert.equal(Object.hasOwn(seenOptions, "timeout"), false);
+});
+
+check("D0-TO03 discoverRepository forwards its options.timeout down to every git spawn it makes", () => {
+  const { primary } = repoFixture();
+  const seenTimeouts = [];
+  const spy = (_cmd, _args, options) => {
+    seenTimeouts.push(options.timeout);
+    return spawnSync("git", _args, options);
+  };
+  const repo = discoverRepository(primary, { spawn: spy, timeout: 5000 });
+  assert.equal(repo.primaryRoot, resolve(primary));
+  assert.ok(seenTimeouts.length > 0);
+  assert.ok(seenTimeouts.every((t) => t === 5000));
 });
 
 function readdirJson(path) {

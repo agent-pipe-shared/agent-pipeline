@@ -1,0 +1,88 @@
+PHX-WP-HAC12 verification log (written by verify-run.mjs itself)
+startedAt: 2026-08-17T09:08:20.844Z
+node: v24.19.0
+
+============================================================================================
+command : node --check plugins/pipeline-core/hooks/guard-push.mjs
+exitCode: 0
+duration: 0.0s
+tally   : (no tally line emitted)
+
+============================================================================================
+command : node --check plugins/pipeline-core/scripts/pipeline-state.mjs
+exitCode: 0
+duration: 0.0s
+tally   : (no tally line emitted)
+
+============================================================================================
+command : node --check plugins/pipeline-core/hooks/guard-push-decision-reference.test.mjs
+exitCode: 0
+duration: 0.0s
+tally   : (no tally line emitted)
+
+============================================================================================
+command : node --check harness/scripts/pipeline-state-decision-reference.test.mjs
+exitCode: 0
+duration: 0.0s
+tally   : (no tally line emitted)
+
+============================================================================================
+command : node plugins/pipeline-core/hooks/guard-push-decision-reference.test.mjs
+exitCode: 0
+duration: 0.6s
+tally   : 
+          6 passed, 0 failed
+
+============================================================================================
+command : node harness/scripts/pipeline-state-decision-reference.test.mjs
+exitCode: 0
+duration: 0.3s
+tally   : 
+          11 passed, 0 failed
+
+============================================================================================
+command : node plugins/pipeline-core/lib/decision-reference-dual-evaluation.test.mjs
+exitCode: 0
+duration: 0.0s
+tally   : (no tally line emitted)
+
+============================================================================================
+command : node harness/scripts/pipeline-state.test.mjs
+exitCode: 1
+duration: 1.8s
+tally   : 
+          PASS  AR06e PX0-AC-06: recover reports recovered-preimage (not recovered-postimage) once the frozen decision's expiresAt has passed
+          PASS  AR06f PX0-AC-06: recover still rolls forward to recovered-postimage when the frozen expiresAt has NOT yet passed
+          PASS  RGq a proof already consumed by an earlier reconcile is refused with the accurate CRITICAL-PROOF-REPLAY message (F3: not the generic FTP-RECONCILE-APPROVAL-REJECTED text, which would falsely claim the candidate/plan digest binding failed when the proof actually verified and was already consumed), zero mutation on the new package's manifest
+          504/506 cases passed.
+          Error: serialized state write failed before commit (PLAN-IMPLEMENTATION-STATE-INVALID); zero mutation.
+          Error: serialized state write failed before commit (PS-CONTINUITY-LOCKED); zero mutation.
+failing cases (2):
+          FAIL  PS54af status reports the live Phoenix package's real current state
+          FAIL  PS54ag plan previews the live Phoenix transition from its real current state
+
+============================================================================================
+command : node plugins/pipeline-core/hooks/guard-push.test.mjs
+exitCode: 0
+duration: 9.6s
+tally   : 
+          146/146 cases passed.
+
+============================================================================================
+command : node plugins/pipeline-core/hooks/guard-push-external-ledger.test.mjs
+exitCode: 0
+duration: 0.7s
+tally   : 
+          7/7 passed.
+
+============================================================================================
+command : node harness/scripts/pipeline-state-external-push-ledger.test.mjs
+exitCode: 0
+duration: 0.2s
+tally   : 
+          PASS PSXL04 approve-push refuses with WRITE-FAILED on a genuine filesystem condition, and the success line is not reached
+          5/5 checks passed.
+
+============================================================================================
+overall : FAILED
+finishedAt: 2026-08-17T09:08:34.214Z

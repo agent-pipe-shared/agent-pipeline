@@ -218,6 +218,8 @@ function verifySignedAction({ state, kind, prefix, candidate, subject, recorded,
   // `signer` — the recorded `keyReference`/`publicKeySha256` (SETUP-1) — is present in
   // every accepting case, independent of posture: `verifyAgainstTrustAnchors` derives it
   // from the proof itself in the absent-set posture and from the matched anchor otherwise.
+  // It is the only remaining source for the caller's reported `keyReference`, because an
+  // empty v3 set has no anchor object to read one off.
   return { ok: true, signer: verified.signer };
 }
 

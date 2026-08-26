@@ -116,6 +116,22 @@ the current tip (`project-onboarding-v3` 107/0, `guard-lifecycle-ready` 51/0,
 assignment, `2026-08-07-onboarding-ready-path-unconditional-restart-barrier-read.md`,
 is not closed by this and keeps its own status.
 
+**Update 2026-08-18 (Elephant, Phoenix backlog-clearing pass):** at the time
+of this pass, the item still read unfixed on the Phoenix line —
+`guard-lifecycle-ready.mjs`'s `LAUNCH_SCRIPT` names only
+`codex-onboarding-launch.mjs`, and `project-onboarding-v3.mjs` still builds
+the Codex launcher argv and Codex-worded diagnostic unconditionally there.
+Nova has since built exactly the runner-aware fix this item's open questions
+were blocking: `restartAction()` (Nova `project-onboarding-v3.mjs` ~line 1983)
+branches `if (runner !== "codex") return externalOperatorRestartAction(runner)`,
+with a code comment explicitly cross-referencing this backlog item's name —
+i.e. Nova already answered both open questions by building the runner-aware
+path rather than investigating the old one further (see the `864c7f1f`
+closure above, which independently reaches the same conclusion with line
+numbers and suite evidence). Per PO direction (2026-08-18): items already
+resolved in Nova's current code are closed here rather than reimplemented.
+Confirms the closure above.
+
 ## Update, 2026-08-07 (second live session)
 
 A second onboarding test (`rune_test1_claude` line of work, same day) reached

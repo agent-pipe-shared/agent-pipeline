@@ -1,0 +1,64 @@
+{
+  "schema": "pipeline.dispatch-record.v1",
+  "taskId": "PHX-WP-RAC09",
+  "model": "claude-opus-5[1m] (effort xhigh)",
+  "rulesetSha": "2d25aa24c69d7585d321bf9ab4d12ad53d87ae83e2d85ff6dcb4753bcb0c0cba",
+  "dispatcher": "elephant",
+  "outcome": "landed-fix",
+  "commit": "5c05a117",
+  "log": [
+    {
+      "phase": "investigation: store-layer idempotency traced",
+      "toolUses": 11,
+      "finding": "governance-event-store.mjs scanStream():459-489 refuses duplicates on READ (GES-DUPLICATE :478 / GES-IDEMPOTENCY-CONFLICT :477); appendPortableGovernanceEvent():702-708 refuses a second write under the stream lock (idempotent-replay receipt for an identical intent, GES-IDEMPOTENCY-CONFLICT for a divergent one). Both replay entry points (verifyPortableGovernanceStream:734, queryPortableGovernanceStream:747) go through scanStream, so a duplicate makes the whole projection throw, never return successful."
+    },
+    {
+      "phase": "investigation: delegation claim traced",
+      "toolUses": 20,
+      "finding": "No production consumer of recordCommandOffer/recordCommandOutcome exists anywhere in plugins/pipeline-core (only the module's own test); the append callback is an unbound seam, so external-command-offer.test.mjs:175's delegation claim is a design statement, not a traced production path. governance-event.mjs:165-166 keeps eventId and idempotencyKey as two independent ID-pattern tokens with no derivation rule; scanStream indexes bySequence and byIdempotency only (:467-480) and never eventId; GES-EVENT-COLLISION (:720) fires only on an identical sequence+eventId path. Conclusion: the store mechanism covers ITS identity, not the lifecycle identity R-AC-09's links resolve through."
+    },
+    {
+      "phase": "implementation + verification",
+      "toolUses": 27,
+      "finding": "Added projectCommandOfferReplay + an optional caller-supplied `journaled` append precondition at the shared appendValidated seam in external-command-offer.mjs; two new R-AC-09 tests. node --test: 41 tests, 41 pass, 0 fail (artifact node-test-external-command-offer.tap lines 249-253); pre-existing R-AC-13 duplicate/retry test at :175 passes unmodified because it supplies no `journaled`."
+    }
+  ],
+  "report": {
+    "result": "Landed a real fix. The 'duplicated' trigger word was NOT already satisfied for the offer lifecycle's own identity; the store's idempotencyKey mechanism is genuinely fail-closed but answers a different question.",
+    "dodChecks": [
+      { "check": "real, tested enforcement closing the duplicated gap in external-command-offer.mjs", "status": "passed" },
+      { "check": "node --test on every touched file, 0 failures", "status": "passed", "evidence": "41 tests / 41 pass / 0 fail" },
+      { "check": "pre-existing R-AC-09/R-AC-10/R-AC-13 cases still pass unmodified", "status": "passed", "evidence": "ok 13-17 (R-AC-09), ok 22 (R-AC-13 duplicate/retry), no test body edited" }
+    ],
+    "evidence": {
+      "commit": "5c05a117",
+      "artifact": "specs/sprint-phoenix-epic/evidence/PHX-WP-RAC09/node-test-external-command-offer.tap",
+      "command": "node --test --test-reporter=tap --test-reporter-destination=<artifact> plugins/pipeline-core/lib/external-command-offer.test.mjs",
+      "exitCode": 0,
+      "note": "TAP written by the node test runner itself; no shell redirect (guard grammar forbids one)."
+    },
+    "reasoning": "Store layer: a duplicate idempotencyKey is refused outright, not detected-and-logged. On write, appendPortableGovernanceEvent:704-708 either returns an idempotent-replay receipt naming the already-committed event (identical intent) or throws GES-IDEMPOTENCY-CONFLICT (divergent intent) -- no second record is ever created. On read, scanStream:475-479 throws GES-DUPLICATE/GES-IDEMPOTENCY-CONFLICT, and every replay entry point routes through it, so an out-of-band duplicate makes the whole projection fail rather than return successful. That satisfies R-AC-09's consequent for the STORE's identity. But R-AC-09 governs offer/authority-link/candidate-policy-binding/outcome-evidence replay, and every correlation in that family resolves through the lifecycle eventId (offerEventId, supersedesEventId; agent-decision-journal.mjs:156,166). The envelope keeps eventId and idempotencyKey as two independent free tokens (governance-event.mjs:165-166) with no derivation rule, and no scan indexes eventId. So two records carrying one lifecycle eventId under different idempotency keys both land and both replay as integrity 'valid', leaving a dependent outcome's offerEventId resolving to more than one record. Read in the company of its sibling triggers (missing/stale/substituted/cross-repository/contradictory -- all about an untrustworthy reference), 'duplicated' means the reference resolves to more than one record; reading it as the store's identical-bytes retry case would leave the criterion's own word doing no work at this layer, and identical duplicates are exactly the case the already-enforced 'contradictory' trigger cannot catch.",
+    "changedFiles": [
+      { "path": "plugins/pipeline-core/lib/external-command-offer.mjs", "why": "added duplicateInJournal + exported projectCommandOfferReplay (typed replay verdict: integrity invalid/valid, reasonCode DUPLICATE_LIFECYCLE_EVENT_ID or DUPLICATE_OFFER_EVIDENCE) and an optional `journaled` append precondition threaded through the single shared appendValidated seam, so all four recording paths refuse a duplicate before append" },
+      { "path": "plugins/pipeline-core/lib/external-command-offer.test.mjs", "why": "two new R-AC-09 tests (duplicate eventId rendered invalid on replay and refused before append with zero append calls; two unlinked same-state evidences for one offer duplicated, while an explicitly superseding re-record and a distinct later state stay valid); import extended. No existing test body changed." },
+      { "path": "specs/sprint-phoenix-epic/evidence/PHX-WP-RAC09/node-test-external-command-offer.tap", "why": "machine-written verification artifact" }
+    ],
+    "notChanged": [
+      "governance-event-store.mjs -- read-only per the briefing; the fix needed nothing from it (the assertAppend seam at :709-715 already exists for exactly this class of precondition, and the new helper is pure).",
+      "external-command-offer.test.mjs:175 (R-AC-13 duplicate/retry) -- left verbatim; it stays true because it supplies no `journaled`, so its delegation statement remains accurate for the unbound-seam case.",
+      "acceptance.md, acceptance-evidence-map.mjs, closure-plan.md -- forbidden for this dispatch.",
+      "The absence of any production wiring from recordCommandOffer's append to appendPortableGovernanceEvent -- noted, not built; that is a separate integration scope."
+    ],
+    "deviations": [
+      "`journaled` is OPTIONAL, not mandatory. Making it mandatory would have broken every existing caller and the DoD's 'pre-existing cases pass unmodified' requirement. Consequence, stated plainly: when a caller omits `journaled`, duplicate refusal at the recording seam does not fire and remains delegated to the store's idempotencyKey (its own identity only). The replay projector is unconditional.",
+      "The second rule (two evidences for one offerEventId) is restricted to an identical `state` and admits an explicit supersedesEventId link. A pair disagreeing in `state` is contradiction, a different trigger word, and is deliberately not reinterpreted as duplication -- forbidding two differing outcomes would have been unbriefed policy invention.",
+      "Evidence artifact written via node's --test-reporter-destination rather than a shell redirect; the lifecycle guard rejects redirects (GUARD-PARSE-UNSUPPORTED).",
+      "The commit-message file lives in the evidence dir, not the scratchpad: the guard blocks writes outside the physical project root (GUARD-CROSS-REPO-MUTATION). It is left uncommitted."
+    ],
+    "openItems": [
+      "dispatch-record.json and commit-msg.txt are intentionally left UNCOMMITTED: the record's report field is written after the commit, so committing it earlier would have persisted a knowingly stale record. The Elephant should land (or discard) both.",
+      "Elephant to re-verify independently and decide the R-AC-09 verdict wording in the evidence map; the criterion now has enforcement for the 'duplicated' word at this layer, but the store-layer paragraph in the current pointer text should be corrected -- it credits a mechanism that covers a different identity.",
+      "Genuine architecture question for the Elephant, deliberately not acted on: nothing anywhere binds a governance envelope's idempotencyKey to the payload's lifecycle eventId, and no stream scan enforces eventId uniqueness. Any future production wiring of `append` should derive idempotencyKey from eventId, otherwise the store cannot help at all. A defence in governance-event-store.mjs was out of scope by briefing."
+    ]
+  }
+}

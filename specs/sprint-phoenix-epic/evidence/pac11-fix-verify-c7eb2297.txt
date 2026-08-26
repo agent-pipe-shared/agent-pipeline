@@ -1,0 +1,96 @@
+$ node --test plugins/pipeline-core/lib/organization-policy.test.mjs plugins/pipeline-core/scripts/organization-policy.test.mjs plugins/pipeline-core/lib/external-reference-adapter.test.mjs
+(run at candidate c7eb2297b40410d316f48ed8f6203d33abfca21d, synced worktree .git/phx-verify)
+
+✔ requires inspection, exact preview, authority, idempotent apply and matching readback (1.97029ms)
+✔ does not report success for revision, capability, authority, or readback conflicts (0.442044ms)
+✔ rejects unclosed references and blocks non-pipeline-owned writes (0.443115ms)
+✔ X-AC-07 keeps credentials and private coordinates out of every portable adapter record (1.00099ms)
+✔ X-AC-10 resolves the artifact's sole canonical identity through the feature package, not the path (1.608836ms)
+✖ X-AC-10 resolves a live repository path through the feature package topology (4.623237ms)
+✔ preserves the closed normative relation taxonomy and rejects unknown relation semantics (0.184012ms)
+✔ X-AC-06 preserves a deterministic typed state for every abnormal external observation (0.331283ms)
+✔ X-AC-08 keeps provider names and fields out of the normative core schemas (0.313113ms)
+✔ X-AC-09 treats external content as untrusted data and prevents execution or authority injection (0.460325ms)
+✔ X-AC-13 defaults to reference-only or projection and never resolves by last write (0.328693ms)
+✔ reconciles external observations without importing them as authority (0.172022ms)
+✔ X-AC-12 proves one provider-neutral core contract across issue-tracker, knowledge-base, document-store, and secondary-forge profiles (1.079091ms)
+✔ X-AC-11 rejects a governed reference when no organization policy is supplied (0.103311ms)
+✔ X-AC-11 rejects a governed reference when the effective policy has no covering class entry (0.153391ms)
+✔ X-AC-11 rejects a governed reference when the effective policy's mode disagrees with the adapter's declared mode (0.135992ms)
+✔ X-AC-11 rejects a governed reference when the effective policy requires approval (0.093831ms)
+✔ X-AC-11 permits a governed reference to proceed when the effective policy's mode matches and approval is not required (0.202852ms)
+✔ WP-PAC11 rejects a governed write whose desired change targets a field the effective policy does not own (0.172372ms)
+✔ WP-PAC11 admits a governed write whose desired changes stay within the effective policy's declared ownedSections (0.196152ms)
+✔ WP-PAC11 leaves an undeclared ownedSections neutral, unlike a declared-but-empty one which blocks every change (0.174202ms)
+✔ F4 does not degrade ownedSections into a substring test when a hand-built policy declares it as a bare string (0.098921ms)
+✔ F4 does not throw a raw TypeError when a hand-built policy declares ownedSections as null (0.086921ms)
+✔ X-AC-11 never consults organization policy for an ungoverned reference, even when one is supplied (0.452754ms)
+✔ X-AC-14 planExternalReferenceWrite types a synchronously throwing inspect as external-unreachable (0.114871ms)
+✔ X-AC-14 planExternalReferenceWrite types a rejecting inspect as external-unreachable (0.102401ms)
+✔ X-AC-14 reconcileExternalReference types a synchronously throwing inspect as external-unreachable (0.080451ms)
+✔ X-AC-14 reconcileExternalReference types a rejecting inspect as external-unreachable (0.083961ms)
+✔ X-AC-14 an invalid (but non-throwing) inspection still reports invalid-inspection, not external-unreachable (0.111721ms)
+✔ accepts a closed compatible policy pack (0.961609ms)
+✔ rejects floor weakening, duplicate document ownership, unknown fields, and incompatible core (0.335393ms)
+✔ resolves compatible packs without last-write-wins and unions approval requirements (4.82101ms)
+✔ P-AC-05 refuses credential, endpoint, coordinate, actor-mapping and signing-key fields at every portable policy level (0.268533ms)
+✔ rejects duplicate pack bindings and incompatible modes instead of choosing a winner (0.316004ms)
+✔ P-AC-11 rejects a document class mode outside the closed reference-only/projection/controlled-publication set (0.148481ms)
+✔ P-AC-11 unions approval requirements so a later pack cannot downgrade an earlier pack's required approval (0.204632ms)
+✔ P-AC-11 represents a closed provider-neutral targetBinding and rejects a non-closed value (0.248173ms)
+✔ P-AC-11 leaves targetBinding an optional key: a document class without one still validates and resolves with no targetBinding key present (0.253663ms)
+✔ P-AC-11 refuses to merge a mismatched targetBinding for the same document class instead of choosing one (0.258253ms)
+✔ P-AC-11 refuses to merge a declared targetBinding with an undeclared one for the same document class (0.168382ms)
+✔ P-AC-11 records which pack(s) and revision(s) contributed each effective document class (0.187982ms)
+✔ P-AC-10 rejects a compliance or regulatory-assessment claim field on a portable policy pack (0.129242ms)
+✔ P-AC-01 leaves provenance, dependencies, and signaturePolicy optional: a pack omitting all three still validates unchanged (0.107871ms)
+✔ P-AC-01 validates a pack's provenance and rejects a malformed or incomplete record (0.371774ms)
+✔ P-AC-01 validates a pack's dependencies and rejects a self-dependency, duplicate target, or inverted version range (0.267043ms)
+✔ P-AC-01 validates a pack's signature policy and rejects an unknown algorithm or a required policy declaring no algorithm (0.218162ms)
+✔ P-AC-11 accepts a closed ownedSections declaration and rejects a non-closed one (0.260943ms)
+✔ P-AC-11 merges ownedSections by safe intersection across disagreeing packs (0.194882ms)
+✔ P-AC-11 accepts a closed lifecycleEvents declaration and rejects a non-closed one (0.271843ms)
+✔ F1 admits ownedSections field names outside TARGET_REF's slug shape that external-reference-adapter.mjs's changes[].field domain already accepts (0.180192ms)
+✔ F1 pins ownedSections' value domain equal to external-reference-adapter.mjs's changes[].field domain (0.073991ms)
+✔ F2 pins lifecycleEvents' overlap and non-overlap with feature-package-topology's FEATURE_STATES (0.116721ms)
+✔ P-AC-11 merges lifecycleEvents by safe intersection across disagreeing packs (0.130672ms)
+✔ P-AC-11 accepts previewRequired, rejects a non-boolean, and unions it so a later pack cannot downgrade an earlier pack's required preview (0.208422ms)
+✔ P-AC-11 accepts a closed retention declaration and rejects a non-closed one (0.119192ms)
+✔ P-AC-11 refuses to merge a mismatched retention for the same document class instead of choosing one (0.152191ms)
+✔ P-AC-11 accepts a closed conflictPolicy declaration, rejects a non-closed one, and merges it toward the stricter disposition (0.161852ms)
+✔ inspects all explicit packs without a repository mutation path (0.878109ms)
+✔ plans only a named activation and rejects incomplete command forms (0.405764ms)
+ℹ tests 59
+ℹ suites 0
+ℹ pass 58
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 70.550993
+
+✖ failing tests:
+
+test at .git/phx-verify/plugins/pipeline-core/lib/external-reference-adapter.test.mjs:102:1
+✖ X-AC-10 resolves a live repository path through the feature package topology (4.623237ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+
+  + 'unresolved'
+  - 'resolved'
+
+      at TestContext.<anonymous> (file://<repo-root>/.git/phx-verify/plugins/pipeline-core/lib/external-reference-adapter.test.mjs:104:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)
+      at Test.postRun (node:internal/test_runner/test:1522:19)
+      at Test.run (node:internal/test_runner/test:1447:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'unresolved',
+    expected: 'resolved',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+exit code: 1

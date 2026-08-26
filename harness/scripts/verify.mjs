@@ -51,6 +51,7 @@ import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { duplicateSuiteIds } from "./check-verify-suite-registration.mjs";
 import {
   NOVA_APPROVAL_PENDING_BINDING,
   NOVA_APPROVAL_PENDING_STATUS,
@@ -73,13 +74,7 @@ const hooksDir = join(repoRoot, "plugins", "pipeline-core", "hooks");
 const libDir = join(repoRoot, "plugins", "pipeline-core", "lib");
 const pluginScriptsDir = join(repoRoot, "plugins", "pipeline-core", "scripts");
 
-/**
- * Capture one exact clean Git candidate; an unavailable Git fixture stays explicit.
- * The single non-clean status that is not `dirty` is `approval-pending` (ADR-0061 Change 3):
- * a tree whose only modification is the push approval `approve-push` just recorded FOR THIS
- * commit. The freeze library owns that judgment -- see nova-candidate-freeze.mjs -- and every
- * tree it cannot fully read stays `dirty`, so this reader is never the place that widens it.
- */
+/** Capture one exact clean Git candidate; an unavailable Git fixture stays explicit. */
 function candidateIdentity() {
   try {
     const commit = spawnSync("git", ["rev-parse", "HEAD"], { encoding: "utf8", cwd: repoRoot });
@@ -109,7 +104,21 @@ function gitCommonDirectory() {
 }
 const startedCandidate = candidateIdentity();
 const command = "node harness/scripts/verify.mjs";
-const evidenceDir = join(repoRoot, "evidence");
+// Evidence must always land at the PRIMARY worktree root (the parent of Git's
+// common directory), never at the invoking worktree's own root: the push gate
+// (guard-push.mjs's resolveEvidenceProject) only ever reads evidence from the
+// primary checkout, but the prescribed clean-candidate route runs THIS script
+// from the detached `.git/phx-verify` worktree -- backlog
+// 2026-08-09-push-gate-reads-evidence-from-a-location-the-prescribed-verify-run-never-writes-to.md
+// (PO Decision, Option B, 2026-08-18). This is deliberately narrower than
+// redirecting `repoRoot` itself: `repoRoot` -- and every one of its other
+// consumers, including candidateIdentity()'s dirty-check above and
+// hooksDir/libDir/pluginScriptsDir below -- keeps resolving against the
+// INVOKING worktree. A full `repoRoot` redirect would make the candidate
+// preflight inspect the PRIMARY worktree instead, which is permanently dirty
+// by this repo's own convention, and would fail the prescribed route forever.
+const primaryRoot = dirname(gitCommonDirectory());
+const evidenceDir = join(primaryRoot, "evidence");
 const evidencePath = join(evidenceDir, "verify-latest.json");
 const verifyStartedAt = new Date().toISOString();
 function writeEvidence(evidence) {
@@ -218,9 +227,9 @@ const TEST_SUITES = [
   { name: "session-power-cli-tests", file: join(pluginScriptsDir, "session-power.test.mjs") },
   { name: "session-cleanup-power-tests", file: join(pluginScriptsDir, "session-cleanup-power.test.mjs") },
   { name: "session-cleanup-binding-tests", file: join(pluginScriptsDir, "session-cleanup-binding.test.mjs") },
-  { name: "session-cleanup-owner-nonce-tests", file: join(pluginScriptsDir, "session-cleanup-owner-nonce.test.mjs") },
   { name: "human-guard-override-tests", file: join(libDir, "human-guard-override.test.mjs") },
   { name: "guard-maintenance-window-tests", file: join(libDir, "guard-maintenance-window.test.mjs") },
+  { name: "guard-maintenance-window-cli-tests", file: join(pluginScriptsDir, "guard-maintenance-window.test.mjs") },
   { name: "review-economy-tests", file: join(libDir, "review-economy.test.mjs") },
   { name: "guard-git-tests", file: join(hooksDir, "guard-git.test.mjs") },
   { name: "guard-apply-patch-tests", file: join(hooksDir, "guard-apply-patch.test.mjs") },
@@ -231,7 +240,6 @@ const TEST_SUITES = [
   { name: "pipeline-state-revocation-tests", file: join(pluginScriptsDir, "pipeline-state-revocation.test.mjs") },
   { name: "pipeline-state-rebind-runner-tests", file: join(pluginScriptsDir, "pipeline-state-rebind-runner.test.mjs") },
   { name: "codex-pretool-guard-tests", file: join(hooksDir, "codex-pretool-guard.test.mjs") },
-  { name: "antigravity-pretool-guard-tests", file: join(hooksDir, "antigravity-pretool-guard.test.mjs") },
   { name: "codex-session-start-hint-tests", file: join(hooksDir, "codex-session-start-hint.test.mjs") },
   { name: "guard-push-tests", file: join(hooksDir, "guard-push.test.mjs") },
   { name: "guard-push-v2-tests", file: join(hooksDir, "guard-push-v2.test.mjs") },
@@ -267,6 +275,7 @@ const TEST_SUITES = [
   { name: "advisory-receipt-tests", file: join(libDir, "advisory-receipt.test.mjs") },
   { name: "advisory-lifecycle-v2-tests", file: join(libDir, "advisory-lifecycle-v2.test.mjs") },
   { name: "advisory-coordinator-tests", file: join(libDir, "advisory-coordinator.test.mjs") },
+  { name: "advisory-decision-event-tests", file: join(libDir, "advisory-decision-event.test.mjs") },
   { name: "critic-export-policy-tests", file: join(libDir, "critic-export-policy.test.mjs") },
   { name: "advisory-host-bridge-tests", file: join(pluginScriptsDir, "advisory-host-bridge.test.mjs") },
   { name: "codex-sandbox-preflight-tests", file: join(scriptDir, "codex-sandbox-preflight.test.mjs") },
@@ -283,7 +292,6 @@ const TEST_SUITES = [
   { name: "host-advisor-workspace-tests", file: join(pluginScriptsDir, "host-advisor-workspace.test.mjs") },
   { name: "codex-plugin-validator-parity-tests", file: join(pluginScriptsDir, "codex-plugin-validator-parity.test.mjs") },
   { name: "worktree-lifecycle-tests", file: join(libDir, "worktree-lifecycle.test.mjs") },
-  { name: "worktree-create-tests", file: join(pluginScriptsDir, "worktree-create.test.mjs") },
   { name: "lifecycle-ready-enforcement-tests", file: join(pluginScriptsDir, "lifecycle-ready-enforcement.test.mjs") },
   // Walks the gate: mandatory AND satisfiable, for both runners. Unit suites were
   // green while the gate was unwired on Claude and its own remediation was refused.
@@ -353,6 +361,15 @@ const TEST_SUITES = [
   { name: "sbom-release-binding-tests", file: join(libDir, "sbom-release-binding.test.mjs") },
   { name: "po-gate-authority-fixture-tests", file: join(libDir, "po-gate-authority.test.mjs") },
   { name: "public-core-observation-tests", file: join(libDir, "public-core-observation.test.mjs") },
+  { name: "public-core-origin-allowlist-tests", file: join(libDir, "public-core-origin-allowlist.test.mjs") },
+  { name: "bootstrap-source-attestation-acceptance-tests", file: join(libDir, "bootstrap-source-attestation-acceptance.test.mjs") },
+  { name: "external-push-ledger-tests", file: join(libDir, "external-push-ledger.test.mjs") },
+  { name: "guard-push-external-ledger-tests", file: join(hooksDir, "guard-push-external-ledger.test.mjs") },
+  { name: "guard-gate-strength-gmw-tests", file: join(hooksDir, "guard-gate-strength-gmw.test.mjs") },
+  { name: "guard-gate-strength-ledger-tests", file: join(hooksDir, "guard-gate-strength-ledger.test.mjs") },
+  { name: "guard-gate-strength-origin-attestation-tests", file: join(hooksDir, "guard-gate-strength-origin-attestation.test.mjs") },
+  { name: "guard-handover-size-tests", file: join(hooksDir, "guard-handover-size.test.mjs") },
+  { name: "guard-testpath-gmw-tests", file: join(hooksDir, "guard-testpath-gmw.test.mjs") },
   { name: "private-overlay-activation-tests", file: join(libDir, "private-overlay-activation.test.mjs") },
   { name: "private-overlay-runtime-projection-tests", file: join(libDir, "private-overlay-runtime-projection.test.mjs") },
   { name: "po-gate-profile-publisher-tests", file: join(libDir, "po-gate-profile-publisher.test.mjs") },
@@ -388,8 +405,17 @@ const TEST_SUITES = [
   { name: "release-version-plan-tests", file: join(pluginScriptsDir, "release-version-plan.test.mjs") },
   { name: "product-capability-inventory-tests", file: join(scriptDir, "check-product-capability-inventory.test.mjs") },
   { name: "pipeline-state-tests", file: join(scriptDir, "pipeline-state.test.mjs") },
+  { name: "dispatch-provenance-tests", file: join(scriptDir, "check-dispatch-provenance.test.mjs") },
+  { name: "guard-git-phoenix-authority-grant-tests", file: join(hooksDir, "guard-git-phoenix-authority-grant.test.mjs") },
+  { name: "decision-reference-dual-evaluation-tests", file: join(libDir, "decision-reference-dual-evaluation.test.mjs") },
+  { name: "human-authority-grant-tests", file: join(pluginScriptsDir, "human-authority-grant.test.mjs") },
+  { name: "po-approval-gate-tests", file: join(pluginScriptsDir, "po-approval-gate.test.mjs") },
   { name: "doc-contract-tests", file: join(scriptDir, "check-doc-contracts.test.mjs") },
   { name: "doc-contract-check", file: join(scriptDir, "check-doc-contracts.mjs") },
+  { name: "auth-gate-inventory-drift-tests", file: join(scriptDir, "check-auth-gate-inventory-drift.test.mjs") },
+  { name: "auth-gate-inventory-drift-check", file: join(scriptDir, "check-auth-gate-inventory-drift.mjs") },
+  { name: "section-citation-tests", file: join(scriptDir, "check-section-citations.test.mjs") },
+  { name: "section-citation-check", file: join(scriptDir, "check-section-citations.mjs") },
   { name: "authority-tier-agreement-tests", file: join(scriptDir, "check-authority-tier-agreement.test.mjs") },
   { name: "authority-tier-agreement-check", file: join(scriptDir, "check-authority-tier-agreement.mjs") },
   { name: "language-canon-tests", file: join(scriptDir, "check-language-canon.test.mjs") },
@@ -413,18 +439,17 @@ const TEST_SUITES = [
   // The ledger drifted for weeks because nothing gated it. Remedy when this goes red:
   // node plugins/pipeline-core/scripts/reconcile-backlog-ledger.mjs --activate
   { name: "backlog-state-check", file: join(pluginScriptsDir, "check-backlog-state.mjs") },
-  { name: "state-numeric-claims-tests", file: join(pluginScriptsDir, "check-state-numeric-claims.test.mjs") },
-  { name: "state-numeric-claims-check", file: join(pluginScriptsDir, "check-state-numeric-claims.mjs") },
-  { name: "afk-activation-tests", file: join(pluginScriptsDir, "afk-activation.test.mjs") },
-  { name: "codex-sandbox-preflight-plugin-tests", file: join(pluginScriptsDir, "codex-sandbox-preflight.test.mjs") },
   { name: "parallel-dispatch-planner-tests", file: join(libDir, "parallel-dispatch-planner.test.mjs") },
   { name: "parallel-sprint-integration-tests", file: join(libDir, "parallel-sprint-integration.test.mjs") },
+  { name: "epic-ac02-publication-check-tests", file: join(pluginScriptsDir, "check-epic-ac02-publication.test.mjs") },
+  { name: "epic-ac02-publication-check", file: join(pluginScriptsDir, "check-epic-ac02-publication.mjs") },
   { name: "continuity-status-tests", file: join(libDir, "continuity-status.test.mjs") },
   { name: "continuity-status-cli-tests", file: join(pluginScriptsDir, "continuity-status.test.mjs") },
   { name: "delivery-course-tests", file: join(libDir, "delivery-course.test.mjs") },
   { name: "critic-packet-governance-tests", file: join(libDir, "critic-packet-governance.test.mjs") },
   { name: "critic-dispatch-preflight-tests", file: join(pluginScriptsDir, "critic-dispatch-preflight.test.mjs") },
   { name: "windows-private-state-tests", file: join(libDir, "windows-private-state.test.mjs") },
+  { name: "windows-assurance-verify-registration-tests", file: join(libDir, "windows-assurance-verify-registration.test.mjs") },
   { name: "symlink-capability-tests", file: join(libDir, "symlink-capability.test.mjs") },
   { name: "runner-native-continuation-tests", file: join(libDir, "runner-native-continuation.test.mjs") },
   { name: "bootstrap-payload-budget-tests", file: join(libDir, "bootstrap-payload-budget.test.mjs") },
@@ -439,11 +464,9 @@ const TEST_SUITES = [
   { name: "nova-backlog-reconciler-cli-tests", file: join(pluginScriptsDir, "reconcile-backlog-delivery.test.mjs") },
   { name: "nova-runner-capability-tests", file: join(libDir, "runner-capability-report.test.mjs") },
   { name: "nova-sandbox-disposition-tests", file: join(libDir, "selected-sandbox-disposition.test.mjs") },
-  { name: "nova-sandbox-launch-tests", file: join(pluginScriptsDir, "selected-sandbox-launch.test.mjs") },
   { name: "nova-invocation-reliability-tests", file: join(libDir, "invocation-reliability.test.mjs") },
   { name: "nova-invocation-preflight-tests", file: join(pluginScriptsDir, "invocation-preflight.test.mjs") },
   { name: "nova-execution-plane-tests", file: join(libDir, "execution-plane-contract.test.mjs") },
-  { name: "nova-execution-plane-real-tests", file: join(libDir, "execution-plane-contract-real.test.mjs") },
   { name: "nova-scheduling-lifecycle-tests", file: join(libDir, "scheduling-lifecycle.test.mjs") },
   { name: "nova-critic-lineage-tests", file: join(libDir, "critic-review-lineage.test.mjs") },
   { name: "nova-critic-packet-tests", file: join(pluginScriptsDir, "critic-packet-preflight.test.mjs") },
@@ -459,127 +482,198 @@ const TEST_SUITES = [
   { name: "nova-candidate-freeze-tests", file: join(libDir, "nova-candidate-freeze.test.mjs") },
   { name: "nova-verify-resume-tests", file: join(libDir, "verify-resume.test.mjs") },
   { name: "nova-verify-journal-tests", file: join(pluginScriptsDir, "verify-journal.test.mjs") },
+  { name: "afk-assumption-mode-tests", file: join(libDir, "afk-assumption-mode.test.mjs") },
+  { name: "afk-capability-worker-tests", file: join(libDir, "afk-capability-worker.test.mjs") },
+  { name: "afk-git-adapter-tests", file: join(libDir, "afk-git-adapter.test.mjs") },
+  { name: "afk-review-tests", file: join(libDir, "afk-review.test.mjs") },
+  { name: "afk-transaction-host-tests", file: join(libDir, "afk-transaction-host.test.mjs") },
+  { name: "afk-claude-host-tests", file: join(pluginScriptsDir, "afk-claude-host.test.mjs") },
+  { name: "codex-sandbox-preflight-host-control-tests", file: join(scriptDir, "codex-sandbox-preflight-host-control.test.mjs") },
+  { name: "codex-isolation-control-decomposition-tests", file: join(pluginScriptsDir, "codex-isolation-control-decomposition.test.mjs") },
+  { name: "codex-critic-packet-host-tests", file: join(pluginScriptsDir, "codex-critic-packet-host.test.mjs") },
+  { name: "codex-critic-probe-split-tests", file: join(pluginScriptsDir, "codex-critic-probe-split.test.mjs") },
+  { name: "codex-critic-shadow-tests", file: join(pluginScriptsDir, "codex-critic-shadow.test.mjs") },
+  { name: "codex-isolated-critic-claims-tests", file: join(pluginScriptsDir, "codex-isolated-critic-claims.test.mjs") },
+  { name: "run-codex-critic-isolation-tests", file: join(pluginScriptsDir, "run-codex-critic-isolation.test.mjs") },
+  { name: "run-codex-critic-probe-split-tests", file: join(pluginScriptsDir, "run-codex-critic-probe-split.test.mjs") },
+  { name: "evidence-view-model-tests", file: join(libDir, "evidence-view-model.test.mjs") },
+  { name: "evidence-view-renderer-tests", file: join(libDir, "evidence-view-renderer.test.mjs") },
+  { name: "evidence-viewer-tests", file: join(pluginScriptsDir, "evidence-viewer.test.mjs") },
+  { name: "governance-authority-resolver-tests", file: join(libDir, "governance-authority-resolver.test.mjs") },
+  { name: "governance-event-projection-tests", file: join(libDir, "governance-event-projection.test.mjs") },
+  { name: "governance-event-store-tests", file: join(libDir, "governance-event-store.test.mjs") },
+  { name: "governance-event-core-tests", file: join(libDir, "governance-event.test.mjs") },
+  { name: "governance-export-adapter-tests", file: join(libDir, "governance-export-adapter.test.mjs") },
+  { name: "governance-export-delivery-tests", file: join(libDir, "governance-export-delivery.test.mjs") },
+  { name: "governance-export-outbox-store-tests", file: join(libDir, "governance-export-outbox-store.test.mjs") },
+  { name: "governance-export-outbox-tests", file: join(libDir, "governance-export-outbox.test.mjs") },
+  { name: "governance-replay-view-tests", file: join(libDir, "governance-replay-view.test.mjs") },
+  { name: "governance-replay-core-tests", file: join(libDir, "governance-replay.test.mjs") },
+  { name: "human-governance-ledger-tests", file: join(libDir, "human-governance-ledger.test.mjs") },
+  { name: "lifecycle-governance-events-tests", file: join(libDir, "lifecycle-governance-events.test.mjs") },
+  { name: "governance-authority-tests", file: join(pluginScriptsDir, "governance-authority.test.mjs") },
+  { name: "governance-event-cli-tests", file: join(pluginScriptsDir, "governance-event.test.mjs") },
+  { name: "governance-export-tests", file: join(pluginScriptsDir, "governance-export.test.mjs") },
+  { name: "governance-replay-viewer-tests", file: join(pluginScriptsDir, "governance-replay-viewer.test.mjs") },
+  { name: "governance-replay-cli-tests", file: join(pluginScriptsDir, "governance-replay.test.mjs") },
+  { name: "phoenix-governance-threat-model-tests", file: join(pluginScriptsDir, "phoenix-governance-threat-model.test.mjs") },
+  { name: "phoenix-authority-approval-tests", file: join(pluginScriptsDir, "phoenix-authority-approval.test.mjs") },
+  { name: "critical-human-proof-gate-tests", file: join(pluginScriptsDir, "critical-human-proof-gate.test.mjs") },
+  { name: "guard-human-override-tests", file: join(pluginScriptsDir, "guard-human-override.test.mjs") },
+  { name: "po-human-approval-tests", file: join(pluginScriptsDir, "po-human-approval.test.mjs") },
+  { name: "network-lockdown-tests", file: join(scriptDir, "network-lockdown.test.mjs") },
+  { name: "pipeline-state-external-push-ledger-tests", file: join(scriptDir, "pipeline-state-external-push-ledger.test.mjs") },
+  { name: "agent-decision-journal-tests", file: join(libDir, "agent-decision-journal.test.mjs") },
+  { name: "async-execution-tests", file: join(libDir, "async-execution.test.mjs") },
+  { name: "authority-revision-proof-tests", file: join(libDir, "authority-revision-proof.test.mjs") },
+  { name: "credential-lease-tests", file: join(libDir, "credential-lease.test.mjs") },
+  { name: "critical-action-approval-request-tests", file: join(libDir, "critical-action-approval-request.test.mjs") },
+  { name: "external-command-offer-tests", file: join(libDir, "external-command-offer.test.mjs") },
+  { name: "forge-capability-tests", file: join(libDir, "forge-capability.test.mjs") },
+  { name: "gate-estimate-tests", file: join(libDir, "gate-estimate.test.mjs") },
+  { name: "local-worker-pool-tests", file: join(libDir, "local-worker-pool.test.mjs") },
+  { name: "plan-spec-state-v2-tests", file: join(libDir, "plan-spec-state-v2.test.mjs") },
+  { name: "remote-provisional-receipt-tests", file: join(libDir, "remote-provisional-receipt.test.mjs") },
+  { name: "ruleset-source-tests", file: join(libDir, "ruleset-source.test.mjs") },
+  { name: "security-capability-plan-builder-tests", file: join(libDir, "security-capability-plan-builder.test.mjs") },
+  { name: "security-completeness-gate-tests", file: join(libDir, "security-completeness-gate.test.mjs") },
+  { name: "security-evidence-v1-migration-fixture-tests", file: join(libDir, "security-evidence-v1-migration-fixture.test.mjs") },
+  { name: "source-observation-tests", file: join(libDir, "source-observation.test.mjs") },
+  { name: "stack-capability-plan-tests", file: join(libDir, "stack-capability-plan.test.mjs") },
+  { name: "ai-assisted-hardening-gate-tests", file: join(pluginScriptsDir, "ai-assisted-hardening-gate.test.mjs") },
+  { name: "antigravity-alpha-adapter-tests", file: join(pluginScriptsDir, "antigravity-alpha-adapter.test.mjs") },
+  { name: "check-close-security-completeness-tests", file: join(pluginScriptsDir, "check-close-security-completeness.test.mjs") },
+  { name: "check-completeness-vocabulary-doclint-tests", file: join(pluginScriptsDir, "check-completeness-vocabulary-doclint.test.mjs") },
+  { name: "check-release-state-consistency-tests", file: join(pluginScriptsDir, "check-release-state-consistency.test.mjs") },
+  { name: "critic-route-activation-tests", file: join(pluginScriptsDir, "critic-route-activation.test.mjs") },
+  { name: "critic-t1-po-override-tests", file: join(pluginScriptsDir, "critic-t1-po-override.test.mjs") },
+  { name: "live-runner-certification-tests", file: join(pluginScriptsDir, "live-runner-certification.test.mjs") },
+  { name: "native-plugin-readback-tests", file: join(pluginScriptsDir, "native-plugin-readback.test.mjs") },
+  { name: "neutral-range-plan-tests", file: join(pluginScriptsDir, "neutral-range-plan.test.mjs") },
+  { name: "pipeline-state-reopen-design-tests", file: join(pluginScriptsDir, "pipeline-state-reopen-design.test.mjs") },
+  { name: "po-guarded-push-tests", file: join(pluginScriptsDir, "po-guarded-push.test.mjs") },
+  { name: "public-baseline-diagnose-tests", file: join(pluginScriptsDir, "public-baseline-diagnose.test.mjs") },
+  { name: "ruleset-update-policy-tests", file: join(pluginScriptsDir, "ruleset-update-policy.test.mjs") },
+  { name: "run-codex-isolation-control-decomposition-tests", file: join(pluginScriptsDir, "run-codex-isolation-control-decomposition.test.mjs") },
+  { name: "runner-contracts.schema-tests", file: join(pluginScriptsDir, "runner-contracts.schema.test.mjs") },
+  { name: "verify-topology-preflight-tests", file: join(pluginScriptsDir, "verify-topology-preflight.test.mjs") },
+  { name: "worktree-target-binding-tests", file: join(pluginScriptsDir, "worktree-target-binding.test.mjs") },
+  { name: "critic-review-scope-tests", file: join(repoRoot, "plugins", "pipeline-core", "skills", "critic-review", "critic-review-scope.test.mjs") },
+  { name: "audit-bundle-core-tests", file: join(libDir, "audit-bundle.test.mjs") },
+  { name: "change-control-core-tests", file: join(libDir, "change-control.test.mjs") },
+  { name: "control-catalog-migration-tests", file: join(libDir, "control-catalog-migration.test.mjs") },
+  { name: "organization-policy-activation-tests", file: join(libDir, "organization-policy-activation.test.mjs") },
+  { name: "organization-policy-core-tests", file: join(libDir, "organization-policy.test.mjs") },
+  { name: "audit-bundle-cli-tests", file: join(pluginScriptsDir, "audit-bundle.test.mjs") },
+  { name: "change-control-cli-tests", file: join(pluginScriptsDir, "change-control.test.mjs") },
+  { name: "organization-policy-cli-tests", file: join(pluginScriptsDir, "organization-policy.test.mjs") },
+  { name: "publication-state-authority-tests", file: join(scriptDir, "publication-state-authority.test.mjs") },
+  { name: "provenance-release-binding-tests", file: join(libDir, "provenance-release-binding.test.mjs") },
+  { name: "publication-authority-tests", file: join(libDir, "publication-authority.test.mjs") },
+  { name: "publication-bundle-v2-tests", file: join(libDir, "publication-bundle-v2.test.mjs") },
+  { name: "publication-bundle-tests", file: join(libDir, "publication-bundle.test.mjs") },
+  { name: "publication-capability-preflight-tests", file: join(libDir, "publication-capability-preflight.test.mjs") },
+  { name: "publication-close-journal-tests", file: join(pluginScriptsDir, "publication-close-journal.test.mjs") },
+  { name: "publication-executor-v2-tests", file: join(pluginScriptsDir, "publication-executor-v2.test.mjs") },
+  { name: "external-reference-adapter-tests", file: join(libDir, "external-reference-adapter.test.mjs") },
+  { name: "reference-catalog-views-tests", file: join(libDir, "reference-catalog-views.test.mjs") },
+  { name: "reference-catalog-tests", file: join(libDir, "reference-catalog.test.mjs") },
+  { name: "external-reference-tests", file: join(pluginScriptsDir, "external-reference.test.mjs") },
+  { name: "gitleaks-tests", file: join(pluginScriptsDir, "security-adapters", "gitleaks.test.mjs") },
+  { name: "license-check-tests", file: join(pluginScriptsDir, "security-adapters", "license-check.test.mjs") },
+  { name: "osv-scanner-tests", file: join(pluginScriptsDir, "security-adapters", "osv-scanner.test.mjs") },
+  { name: "semgrep-tests", file: join(pluginScriptsDir, "security-adapters", "semgrep.test.mjs") },
+  { name: "security-readiness-harness-tests", file: join(scriptDir, "security-readiness", "security-readiness.test.mjs") },
+  { name: "security-scan-v2-integration-tests", file: join(pluginScriptsDir, "security-scan-v2-integration.test.mjs") },
+  { name: "verify-suite-registration-tests", file: join(scriptDir, "check-verify-suite-registration.test.mjs") },
+  { name: "verify-suite-registration-check", file: join(scriptDir, "check-verify-suite-registration.mjs") },
+  { name: "self-application-attestation-gate-tests", file: join(libDir, "self-application-attestation-gate.test.mjs") },
+  { name: "pipeline-state-decision-reference-tests", file: join(scriptDir, "pipeline-state-decision-reference.test.mjs") },
+  { name: "guard-push-decision-reference-tests", file: join(hooksDir, "guard-push-decision-reference.test.mjs") },
+  { name: "control-execution-lifecycle-event-tests", file: join(libDir, "control-execution-lifecycle-event.test.mjs") },
+  { name: "governance-export-view-status-tests", file: join(libDir, "governance-export-view-status.test.mjs") },
+  { name: "guard-authority-ledger-intake-tests", file: join(libDir, "guard-authority-ledger-intake.test.mjs") },
+  { name: "guard-handoff-offer-tests", file: join(libDir, "guard-handoff-offer.test.mjs") },
+  { name: "pipeline-state-lifecycle-event-tests", file: join(pluginScriptsDir, "pipeline-state-lifecycle-event.test.mjs") },
+  { name: "epic-file-contract-tests", file: join(scriptDir, "check-epic-file-contract.test.mjs") },
+  { name: "plan-spec-state-v2-legacy-tests", file: join(repoRoot, "harness", "lib", "plan-spec-state-v2.test.mjs") },
+  { name: "recovery-bridge-approval-tests", file: join(scriptDir, "recovery-bridge-approval.test.mjs") },
+  { name: "guard-git-phoenix-tests", file: join(hooksDir, "guard-git-phoenix.test.mjs") },
+  { name: "afk-activation-tests", file: join(pluginScriptsDir, "afk-activation.test.mjs") },
+  { name: "codex-isolated-critic-protected-preimage-tests", file: join(pluginScriptsDir, "codex-isolated-critic-protected-preimage.test.mjs") },
+  { name: "resume-hint-tests", file: join(libDir, "resume-hint.test.mjs") },
+  { name: "guard-el01-tripwire-tests", file: join(hooksDir, "guard-el01-tripwire.test.mjs") },
+  { name: "guard-onboarding-consent-lock-tests", file: join(hooksDir, "guard-onboarding-consent-lock.test.mjs") },
+  { name: "onboarding-consent-marker-tests", file: join(libDir, "onboarding-consent-marker.test.mjs") },
+  { name: "clean-candidate-run-tests", file: join(pluginScriptsDir, "clean-candidate-run.test.mjs") },
+  { name: "verify-evidence-root-tests", file: join(scriptDir, "verify-evidence-root.test.mjs") },
+  { name: "human-decision-attribution-tests", file: join(libDir, "human-decision-attribution.test.mjs") },
+  { name: "handover-rotate-tests", file: join(pluginScriptsDir, "handover-rotate.test.mjs") },
+  { name: "pipeline-state-rebind-mutable-tests", file: join(pluginScriptsDir, "pipeline-state-rebind-mutable.test.mjs") },
+  // --- merged from Nova (feat/sprint-nova-codex-v046) during the Phoenix/Nova
+  // integration merge, PHX-VERIFY: present on the Nova side, absent from Phoenix's list. ---
+  { name: "session-cleanup-owner-nonce-tests", file: join(pluginScriptsDir, "session-cleanup-owner-nonce.test.mjs") },
+  { name: "antigravity-pretool-guard-tests", file: join(hooksDir, "antigravity-pretool-guard.test.mjs") },
+  { name: "worktree-create-tests", file: join(pluginScriptsDir, "worktree-create.test.mjs") },
+  { name: "state-numeric-claims-tests", file: join(pluginScriptsDir, "check-state-numeric-claims.test.mjs") },
+  { name: "state-numeric-claims-check", file: join(pluginScriptsDir, "check-state-numeric-claims.mjs") },
+  { name: "codex-sandbox-preflight-plugin-tests", file: join(pluginScriptsDir, "codex-sandbox-preflight.test.mjs") },
+  { name: "nova-sandbox-launch-tests", file: join(pluginScriptsDir, "selected-sandbox-launch.test.mjs") },
+  { name: "nova-execution-plane-real-tests", file: join(libDir, "execution-plane-contract-real.test.mjs") },
   { name: "machine-plane-tests", file: join(libDir, "machine-plane.test.mjs") },
   { name: "consumer-safe-paths-tests", file: join(repoRoot, "harness", "scripts", "check-consumer-safe-paths.test.mjs") },
   { name: "verify-evidence-producer-tests", file: join(pluginScriptsDir, "verify-evidence-producer.test.mjs") },
   { name: "lifecycle-recovery-contract-tests", file: join(hooksDir, "guard-lifecycle-recovery-contract.test.mjs") },
   { name: "pipeline-state-inspection-contract-tests", file: join(pluginScriptsDir, "pipeline-state-inspection-contract.test.mjs") },
   { name: "project-reset-tests", file: join(pluginScriptsDir, "project-reset.test.mjs") },
-  { name: "po-human-approval-tests", file: join(pluginScriptsDir, "po-human-approval.test.mjs") },
   { name: "reference-path-tests", file: join(scriptDir, "check-reference-paths.test.mjs") },
   { name: "reference-path-check", file: join(scriptDir, "check-reference-paths.mjs") },
   { name: "repair-map-tests", file: join(pluginScriptsDir, "repair-map.test.mjs") },
   { name: "obligations-contract-tests", file: join(scriptDir, "generate-agent-obligations.test.mjs") },
-  { name: "resume-hint-tests", file: join(libDir, "resume-hint.test.mjs") },
   { name: "harness-lib-plan-spec-state-v2-tests", file: join(repoRoot, "harness", "lib", "plan-spec-state-v2.test.mjs") },
   { name: "check-directory-contract-tests", file: join(scriptDir, "check-directory-contract.test.mjs") },
   { name: "check-gitignore-anchoring-tests", file: join(scriptDir, "check-gitignore-anchoring.test.mjs") },
   { name: "check-review-retry-plan-tests", file: join(scriptDir, "check-review-retry-plan.test.mjs") },
   { name: "review-retry-plan-check", file: join(scriptDir, "check-review-retry-plan.mjs"), args: reviewRetryInput ? ["--review-retry-input", reviewRetryInput] : [] },
   { name: "check-session-bootstrap-directory-contract-tests", file: join(scriptDir, "check-session-bootstrap-directory-contract.test.mjs") },
-  { name: "codex-sandbox-preflight-host-control-tests", file: join(scriptDir, "codex-sandbox-preflight-host-control.test.mjs") },
   { name: "generate-vendored-canon-tests", file: join(scriptDir, "generate-vendored-canon.test.mjs") },
-  { name: "network-lockdown-tests", file: join(scriptDir, "network-lockdown.test.mjs") },
-  { name: "publication-state-authority-tests", file: join(scriptDir, "publication-state-authority.test.mjs") },
-  { name: "guard-handover-size-tests", file: join(hooksDir, "guard-handover-size.test.mjs") },
-  { name: "afk-assumption-mode-tests", file: join(libDir, "afk-assumption-mode.test.mjs") },
-  { name: "afk-capability-worker-tests", file: join(libDir, "afk-capability-worker.test.mjs") },
-  { name: "afk-git-adapter-tests", file: join(libDir, "afk-git-adapter.test.mjs") },
-  { name: "afk-review-tests", file: join(libDir, "afk-review.test.mjs") },
-  { name: "afk-transaction-host-tests", file: join(libDir, "afk-transaction-host.test.mjs") },
   { name: "agent-model-registry-tests", file: join(libDir, "agent-model-registry.test.mjs") },
-  { name: "async-execution-tests", file: join(libDir, "async-execution.test.mjs") },
   { name: "backlog-dispatch-reference-tests", file: join(libDir, "backlog-dispatch-reference.test.mjs") },
-  { name: "control-catalog-migration-tests", file: join(libDir, "control-catalog-migration.test.mjs") },
-  { name: "credential-lease-tests", file: join(libDir, "credential-lease.test.mjs") },
-  { name: "critical-action-approval-request-tests", file: join(libDir, "critical-action-approval-request.test.mjs") },
-  { name: "forge-capability-tests", file: join(libDir, "forge-capability.test.mjs") },
-  { name: "gate-estimate-tests", file: join(libDir, "gate-estimate.test.mjs") },
   { name: "guard-maintenance-window-kernel-closure-tests", file: join(libDir, "guard-maintenance-window-kernel-closure.test.mjs") },
   { name: "handover-rotation-tests", file: join(libDir, "handover-rotation.test.mjs") },
-  { name: "local-worker-pool-tests", file: join(libDir, "local-worker-pool.test.mjs") },
   { name: "observation-governance-bootstrap-tests", file: join(libDir, "observation-governance-bootstrap.test.mjs") },
   { name: "lib-plan-spec-state-v2-tests", file: join(libDir, "plan-spec-state-v2.test.mjs") },
-  { name: "provenance-release-binding-tests", file: join(libDir, "provenance-release-binding.test.mjs") },
-  { name: "publication-authority-tests", file: join(libDir, "publication-authority.test.mjs") },
-  { name: "publication-bundle-v2-tests", file: join(libDir, "publication-bundle-v2.test.mjs") },
-  { name: "publication-bundle-tests", file: join(libDir, "publication-bundle.test.mjs") },
-  { name: "publication-capability-preflight-tests", file: join(libDir, "publication-capability-preflight.test.mjs") },
-  { name: "reference-catalog-views-tests", file: join(libDir, "reference-catalog-views.test.mjs") },
-  { name: "reference-catalog-tests", file: join(libDir, "reference-catalog.test.mjs") },
-  { name: "remote-provisional-receipt-tests", file: join(libDir, "remote-provisional-receipt.test.mjs") },
   { name: "review-retry-planner-tests", file: join(libDir, "review-retry-planner.test.mjs") },
-  { name: "security-capability-plan-builder-tests", file: join(libDir, "security-capability-plan-builder.test.mjs") },
-  { name: "security-completeness-gate-tests", file: join(libDir, "security-completeness-gate.test.mjs") },
-  { name: "security-evidence-v1-migration-fixture-tests", file: join(libDir, "security-evidence-v1-migration-fixture.test.mjs") },
   { name: "session-cleanup-recovery-tests", file: join(libDir, "session-cleanup-recovery.test.mjs") },
-  { name: "source-observation-tests", file: join(libDir, "source-observation.test.mjs") },
-  { name: "stack-capability-plan-tests", file: join(libDir, "stack-capability-plan.test.mjs") },
   { name: "test-tmpdir-budget-tests", file: join(libDir, "test-tmpdir-budget.test.mjs") },
   { name: "test-tmpdir-tests", file: join(libDir, "test-tmpdir.test.mjs") },
   { name: "transfer-classification-tests", file: join(libDir, "transfer-classification.test.mjs") },
-  { name: "afk-claude-host-tests", file: join(pluginScriptsDir, "afk-claude-host.test.mjs") },
-  { name: "ai-assisted-hardening-gate-tests", file: join(pluginScriptsDir, "ai-assisted-hardening-gate.test.mjs") },
-  { name: "antigravity-alpha-adapter-tests", file: join(pluginScriptsDir, "antigravity-alpha-adapter.test.mjs") },
   { name: "antigravity-execution-host-tests", file: join(libDir, "antigravity-execution-host.test.mjs") },
   { name: "backlog-item-strip-for-dispatch-tests", file: join(pluginScriptsDir, "backlog-item-strip-for-dispatch.test.mjs") },
   { name: "check-backlog-state-tests", file: join(pluginScriptsDir, "check-backlog-state.test.mjs") },
-  { name: "check-close-security-completeness-tests", file: join(pluginScriptsDir, "check-close-security-completeness.test.mjs") },
-  { name: "check-completeness-vocabulary-doclint-tests", file: join(pluginScriptsDir, "check-completeness-vocabulary-doclint.test.mjs") },
-  { name: "check-release-state-consistency-tests", file: join(pluginScriptsDir, "check-release-state-consistency.test.mjs") },
   { name: "check-suite-registration-tests", file: join(pluginScriptsDir, "check-suite-registration.test.mjs") },
   { name: "check-vendored-template-sync-tests", file: join(pluginScriptsDir, "check-vendored-template-sync.test.mjs") },
-  { name: "codex-critic-packet-host-tests", file: join(pluginScriptsDir, "codex-critic-packet-host.test.mjs") },
-  { name: "codex-critic-probe-split-tests", file: join(pluginScriptsDir, "codex-critic-probe-split.test.mjs") },
-  { name: "codex-critic-shadow-tests", file: join(pluginScriptsDir, "codex-critic-shadow.test.mjs") },
-  { name: "codex-isolated-critic-claims-tests", file: join(pluginScriptsDir, "codex-isolated-critic-claims.test.mjs") },
-  { name: "codex-isolated-critic-protected-preimage-tests", file: join(pluginScriptsDir, "codex-isolated-critic-protected-preimage.test.mjs") },
-  { name: "codex-isolation-control-decomposition-tests", file: join(pluginScriptsDir, "codex-isolation-control-decomposition.test.mjs") },
-  { name: "critic-route-activation-tests", file: join(pluginScriptsDir, "critic-route-activation.test.mjs") },
-  { name: "critic-t1-po-override-tests", file: join(pluginScriptsDir, "critic-t1-po-override.test.mjs") },
-  { name: "critical-human-proof-gate-tests", file: join(pluginScriptsDir, "critical-human-proof-gate.test.mjs") },
   { name: "dispatch-authorship-verify-tests", file: join(pluginScriptsDir, "dispatch-authorship-verify.test.mjs") },
   { name: "execution-plane-launch-tests", file: join(pluginScriptsDir, "execution-plane-launch.test.mjs") },
-  { name: "guard-human-override-tests", file: join(pluginScriptsDir, "guard-human-override.test.mjs") },
-  { name: "handover-rotate-tests", file: join(pluginScriptsDir, "handover-rotate.test.mjs") },
-  { name: "live-runner-certification-tests", file: join(pluginScriptsDir, "live-runner-certification.test.mjs") },
-  { name: "native-plugin-readback-tests", file: join(pluginScriptsDir, "native-plugin-readback.test.mjs") },
-  { name: "neutral-range-plan-tests", file: join(pluginScriptsDir, "neutral-range-plan.test.mjs") },
   { name: "nova-a8-benchmark-runner-tests", file: join(pluginScriptsDir, "nova-a8-benchmark-runner.test.mjs") },
   { name: "pipeline-start-scratch-lifecycle-tests", file: join(pluginScriptsDir, "pipeline-start-scratch-lifecycle.test.mjs") },
   { name: "pipeline-state-approve-announce-tests", file: join(pluginScriptsDir, "pipeline-state-approve-announce.test.mjs") },
   { name: "pipeline-state-approve-push-argv-closure-tests", file: join(pluginScriptsDir, "pipeline-state-approve-push-argv-closure.test.mjs") },
   { name: "pipeline-state-discard-feature-tests", file: join(pluginScriptsDir, "pipeline-state-discard-feature.test.mjs") },
   { name: "pipeline-state-inspect-tests", file: join(pluginScriptsDir, "pipeline-state-inspect.test.mjs") },
-  { name: "pipeline-state-reopen-design-tests", file: join(pluginScriptsDir, "pipeline-state-reopen-design.test.mjs") },
   { name: "scripts-pipeline-state-tests", file: join(pluginScriptsDir, "pipeline-state.test.mjs") },
-  { name: "po-guarded-push-tests", file: join(pluginScriptsDir, "po-guarded-push.test.mjs") },
   { name: "project-onboarding-v3-argv-closure-tests", file: join(pluginScriptsDir, "project-onboarding-v3-argv-closure.test.mjs") },
-  { name: "public-baseline-diagnose-tests", file: join(pluginScriptsDir, "public-baseline-diagnose.test.mjs") },
-  { name: "publication-close-journal-tests", file: join(pluginScriptsDir, "publication-close-journal.test.mjs") },
   { name: "publication-executor-productive-flow-tests", file: join(pluginScriptsDir, "publication-executor-productive-flow.test.mjs") },
-  { name: "publication-executor-v2-tests", file: join(pluginScriptsDir, "publication-executor-v2.test.mjs") },
   { name: "push-prepare-tests", file: join(pluginScriptsDir, "push-prepare.test.mjs") },
   { name: "push-release-flow-docs-contract-tests", file: join(pluginScriptsDir, "push-release-flow-docs-contract.test.mjs") },
   { name: "rotate-handover-sections-tests", file: join(pluginScriptsDir, "rotate-handover-sections.test.mjs") },
-  { name: "ruleset-update-policy-tests", file: join(pluginScriptsDir, "ruleset-update-policy.test.mjs") },
-  { name: "run-codex-critic-isolation-tests", file: join(pluginScriptsDir, "run-codex-critic-isolation.test.mjs") },
-  { name: "run-codex-critic-probe-split-tests", file: join(pluginScriptsDir, "run-codex-critic-probe-split.test.mjs") },
-  { name: "run-codex-isolation-control-decomposition-tests", file: join(pluginScriptsDir, "run-codex-isolation-control-decomposition.test.mjs") },
-  { name: "runner-contracts.schema-tests", file: join(pluginScriptsDir, "runner-contracts.schema.test.mjs") },
-  { name: "gitleaks-tests", file: join(pluginScriptsDir, "security-adapters", "gitleaks.test.mjs") },
-  { name: "license-check-tests", file: join(pluginScriptsDir, "security-adapters", "license-check.test.mjs") },
-  { name: "osv-scanner-tests", file: join(pluginScriptsDir, "security-adapters", "osv-scanner.test.mjs") },
-  { name: "semgrep-tests", file: join(pluginScriptsDir, "security-adapters", "semgrep.test.mjs") },
-  { name: "security-scan-v2-integration-tests", file: join(pluginScriptsDir, "security-scan-v2-integration.test.mjs") },
   { name: "settings-allowlist-merge-tests", file: join(pluginScriptsDir, "settings-allowlist-merge.test.mjs") },
   { name: "signing-ceremony-tests", file: join(pluginScriptsDir, "signing-ceremony.test.mjs") },
   { name: "tmp-leak-enumerate-tests", file: join(pluginScriptsDir, "tmp-leak-enumerate.test.mjs") },
   { name: "tmp-leak-guard-tests", file: join(pluginScriptsDir, "tmp-leak-guard.test.mjs") },
   { name: "usage-ledger-tests", file: join(pluginScriptsDir, "usage-ledger.test.mjs") },
-  { name: "verify-topology-preflight-tests", file: join(pluginScriptsDir, "verify-topology-preflight.test.mjs") },
-  { name: "worktree-target-binding-tests", file: join(pluginScriptsDir, "worktree-target-binding.test.mjs") },
-  { name: "critic-review-scope-tests", file: join(repoRoot, "plugins", "pipeline-core", "skills", "critic-review", "critic-review-scope.test.mjs") },
+  // Landed after both merge sides diverged (commit ab347a74); registered here per PHX-VERIFY 1b.
+  { name: "pipeline-start-preflight-antigravity-hard-enforcement-tests", file: join(pluginScriptsDir, "pipeline-start-preflight-antigravity-hard-enforcement.test.mjs") },
 ];
 
 // Manifest-gated phase steps: see header — only projects that carry a manifest at
@@ -629,36 +723,48 @@ if (startedCandidate.status === "dirty") {
       const windowsAssuranceTests = WINDOWS_ASSURANCE_VERIFY_SUITES.map((suite) => ({ name: suite.name, file: join(repoRoot, suite.file) }));
       const phaseSteps = PHASE_STEPS.map((suite, index) => ({ ...suite, dependsOn: index === 0 ? [] : [PHASE_STEPS[index - 1].name] }));
       const registeredSuites = [...TEST_SUITES, ...scopedTests, ...windowsAssuranceTests, ...phaseSteps];
-      try {
-        verifyRun = await runVerifyJournal({
-          gitCommonDir: gitCommonDirectory(),
-          repoRoot,
-          candidate: { commit: startedCandidate.commit, tree: startedCandidate.tree },
-          suites: registeredSuites,
-          policyInputs: {
-            command,
-            harnessSha256: createHash("sha256").update(readFileSync(fileURLToPath(import.meta.url))).digest("hex"),
-            phase26Result,
-            phase3Result,
-          },
-        });
-        steps.push(...verifyRun.steps.map(({ name, exitCode, durationMs, reused }) => ({ name, exitCode, durationMs, reused })));
-        verifyRunEvidence = createPublicVerifyRunEvidence({
-          runId: verifyRun.runId,
-          policySha256: verifyRun.policySha256,
-          resumePlanSha256: verifyRun.plan.planSha256,
-          terminalSha256: verifyRun.terminal.terminalSha256,
-          registeredSuiteCount: registeredSuites.length,
-          terminalReceiptCount: verifyRun.terminal.receipts.length,
-          terminalStatus: verifyRun.terminal.status,
-        });
-        if (verifyRunEvidence.status !== "passed" && steps.every((step) => step.exitCode === 0)) {
-          steps.push({ name: "verify-terminal-coverage", exitCode: 1 });
+      // AC-P3/R1.4: report a duplicate registration as a step rather than letting
+      // planVerifyResume throw before any suite runs. Without this the registration check
+      // below never executes for the defect class it was written to catch, because the
+      // throw aborts the whole journal.
+      const registrationDuplicates = duplicateSuiteIds(registeredSuites);
+      if (registrationDuplicates.length > 0) {
+        for (const duplicate of registrationDuplicates) {
+          console.error(`VERIFY-REGISTRATION-DUPLICATE: suite id ${JSON.stringify(duplicate.id)} is registered ${duplicate.count} times`);
         }
-      } catch (error) {
-        const diagnostic = error instanceof Error ? error.message.slice(0, 256) : "VERIFY-JOURNAL-UNAVAILABLE";
-        console.error(`VERIFY-JOURNAL-FAILED: ${diagnostic}`);
-        steps.push({ name: "verify-journal", exitCode: 1 });
+        steps.push({ name: "verify-suite-registration-duplicates", exitCode: 1 });
+      } else {
+        try {
+          verifyRun = await runVerifyJournal({
+            gitCommonDir: gitCommonDirectory(),
+            repoRoot,
+            candidate: { commit: startedCandidate.commit, tree: startedCandidate.tree },
+            suites: registeredSuites,
+            policyInputs: {
+              command,
+              harnessSha256: createHash("sha256").update(readFileSync(fileURLToPath(import.meta.url))).digest("hex"),
+              phase26Result,
+              phase3Result,
+            },
+          });
+          steps.push(...verifyRun.steps.map(({ name, exitCode, durationMs, reused }) => ({ name, exitCode, durationMs, reused })));
+          verifyRunEvidence = createPublicVerifyRunEvidence({
+            runId: verifyRun.runId,
+            policySha256: verifyRun.policySha256,
+            resumePlanSha256: verifyRun.plan.planSha256,
+            terminalSha256: verifyRun.terminal.terminalSha256,
+            registeredSuiteCount: registeredSuites.length,
+            terminalReceiptCount: verifyRun.terminal.receipts.length,
+            terminalStatus: verifyRun.terminal.status,
+          });
+          if (verifyRunEvidence.status !== "passed" && steps.every((step) => step.exitCode === 0)) {
+            steps.push({ name: "verify-terminal-coverage", exitCode: 1 });
+          }
+        } catch (error) {
+          const diagnostic = error instanceof Error ? error.message.slice(0, 256) : "VERIFY-JOURNAL-UNAVAILABLE";
+          console.error(`VERIFY-JOURNAL-FAILED: ${diagnostic}`);
+          steps.push({ name: "verify-journal", exitCode: 1 });
+        }
       }
     }
   }

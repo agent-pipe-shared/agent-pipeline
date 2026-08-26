@@ -1,0 +1,226 @@
+TAP version 13
+# Subtest: preflight reports exact identity and no-handoff without secret fields
+ok 1 - preflight reports exact identity and no-handoff without secret fields
+  ---
+  duration_ms: 6.634589
+  type: 'test'
+  ...
+# Subtest: preflight declares the Claude runner when CLAUDECODE marks the session
+ok 2 - preflight declares the Claude runner when CLAUDECODE marks the session
+  ---
+  duration_ms: 0.88255
+  type: 'test'
+  ...
+# Subtest: preflight keeps the Codex runner default for any non-Claude-Code session
+ok 3 - preflight keeps the Codex runner default for any non-Claude-Code session
+  ---
+  duration_ms: 1.5549
+  type: 'test'
+  ...
+# Subtest: normal bootstrap receipt retains exact envelope measurement and over-budget state
+ok 4 - normal bootstrap receipt retains exact envelope measurement and over-budget state
+  ---
+  duration_ms: 0.401334
+  type: 'test'
+  ...
+# Subtest: preflight selects one host-authorized capability boundary for WSL under Codex, including an explicit CLAUDECODE=0
+ok 5 - preflight selects one host-authorized capability boundary for WSL under Codex, including an explicit CLAUDECODE=0
+  ---
+  duration_ms: 1.5235
+  type: 'test'
+  ...
+# Subtest: PX0-AC-13: a Claude Code session under WSL never receives the Codex-only host-authorized boundary
+ok 6 - PX0-AC-13: a Claude Code session under WSL never receives the Codex-only host-authorized boundary
+  ---
+  duration_ms: 1.304312
+  type: 'test'
+  ...
+# Subtest: preflight distinguishes complete and malformed handoff by presence only
+ok 7 - preflight distinguishes complete and malformed handoff by presence only
+  ---
+  duration_ms: 2.289447
+  type: 'test'
+  ...
+# Subtest: preflight turns a loaded/installed mismatch into a typed refresh handoff
+ok 8 - preflight turns a loaded/installed mismatch into a typed refresh handoff
+  ---
+  duration_ms: 0.547092
+  type: 'test'
+  ...
+# Subtest: an exact registered local marketplace is a visible development source
+ok 9 - an exact registered local marketplace is a visible development source
+  ---
+  duration_ms: 1.031293
+  type: 'test'
+  ...
+# Subtest: simultaneous local-development and official installations fail closed
+ok 10 - simultaneous local-development and official installations fail closed
+  ---
+  duration_ms: 1.293072
+  type: 'test'
+  ...
+# Subtest: the isolated development id is accepted only from its exact local marketplace root
+ok 11 - the isolated development id is accepted only from its exact local marketplace root
+  ---
+  duration_ms: 0.484562
+  type: 'test'
+  ...
+# Subtest: unavailable registry remains non-blocking when the loaded identity is coherent
+ok 12 - unavailable registry remains non-blocking when the loaded identity is coherent
+  ---
+  duration_ms: 2.374399
+  type: 'test'
+  ...
+# Subtest: installed version accepts only one exact enabled Agent-Pipeline entry
+ok 13 - installed version accepts only one exact enabled Agent-Pipeline entry
+  ---
+  duration_ms: 0.554666
+  type: 'test'
+  ...
+# Subtest: missing or malformed manifest fails identity closed
+ok 14 - missing or malformed manifest fails identity closed
+  ---
+  duration_ms: 0.699932
+  type: 'test'
+  ...
+# Subtest: a Claude session reads the Claude source manifest, never the Codex one
+ok 15 - a Claude session reads the Claude source manifest, never the Codex one
+  ---
+  duration_ms: 0.503469
+  type: 'test'
+  ...
+# Subtest: a non-Claude-Code session still reads the Codex source manifest, never the Claude one
+ok 16 - a non-Claude-Code session still reads the Codex source manifest, never the Claude one
+  ---
+  duration_ms: 0.379642
+  type: 'test'
+  ...
+# Subtest: a Claude bare-array registry resolves an attested local-development installation
+ok 17 - a Claude bare-array registry resolves an attested local-development installation
+  ---
+  duration_ms: 0.854036
+  type: 'test'
+  ...
+# Subtest: a Claude registry with two eligible entries fails closed as ambiguous
+ok 18 - a Claude registry with two eligible entries fails closed as ambiguous
+  ---
+  duration_ms: 0.538876
+  type: 'test'
+  ...
+# Subtest: a malformed, non-array, or empty Claude registry yields no identity without crashing
+ok 19 - a malformed, non-array, or empty Claude registry yields no identity without crashing
+  ---
+  duration_ms: 1.10355
+  type: 'test'
+  ...
+# Subtest: a Claude version mismatch between loaded and installed identity requires refresh
+ok 20 - a Claude version mismatch between loaded and installed identity requires refresh
+  ---
+  duration_ms: 0.422093
+  type: 'test'
+  ...
+# Subtest: the Claude local-development id is accepted only from an attested directory-source marketplace
+ok 21 - the Claude local-development id is accepted only from an attested directory-source marketplace
+  ---
+  duration_ms: 0.669774
+  type: 'test'
+  ...
+# Subtest: a non-local Claude installation id reports unknown source without touching the host marketplace registry
+ok 22 - a non-local Claude installation id reports unknown source without touching the host marketplace registry
+  ---
+  duration_ms: 0.245006
+  type: 'test'
+  ...
+# Subtest: preflight calls observe self-referentially with the loaded plugin root on both sides
+ok 23 - preflight calls observe self-referentially with the loaded plugin root on both sides
+  ---
+  duration_ms: 0.531041
+  type: 'test'
+  ...
+# Subtest: an unattested origin folds into the soft plugin-refresh-required advisory, never a new hard status
+ok 24 - an unattested origin folds into the soft plugin-refresh-required advisory, never a new hard status
+  ---
+  duration_ms: 0.631933
+  type: 'test'
+  ...
+# Subtest: the second reviewed origin (SSH form) also attests as ready
+ok 25 - the second reviewed origin (SSH form) also attests as ready
+  ---
+  duration_ms: 0.422966
+  type: 'test'
+  ...
+# Subtest: a rejected observation (dirty tree, missing git, any SNT-A2-* code) folds into the same soft advisory
+ok 26 - a rejected observation (dirty tree, missing git, any SNT-A2-* code) folds into the same soft advisory
+  ---
+  duration_ms: 0.680014
+  type: 'test'
+  ...
+# Subtest: a missing manifest still hard-fails to plugin-identity-unavailable without invoking the attestation
+ok 27 - a missing manifest still hard-fails to plugin-identity-unavailable without invoking the attestation
+  ---
+  duration_ms: 0.349385
+  type: 'test'
+  ...
+# Subtest: plugin-identity-unavailable keeps nextAction null even under a failing attestation
+ok 28 - plugin-identity-unavailable keeps nextAction null even under a failing attestation
+  ---
+  duration_ms: 0.321662
+  type: 'test'
+  ...
+# Subtest: F2: attestation still runs, unmodified, when the loaded plugin root sits inside a real git checkout
+ok 29 - F2: attestation still runs, unmodified, when the loaded plugin root sits inside a real git checkout
+  ---
+  duration_ms: 0.418647
+  type: 'test'
+  ...
+# Subtest: F2: attestation is skipped entirely (not attempted, not failed) for a real installed-plugin-cache-style layout with no .git at all
+ok 30 - F2: attestation is skipped entirely (not attempted, not failed) for a real installed-plugin-cache-style layout with no .git at all
+  ---
+  duration_ms: 1.212347
+  type: 'test'
+  ...
+# Subtest: F4(c): the .git-presence gate skips real attestation for a no-.git fixture without injecting any observe stub
+ok 31 - F4(c): the .git-presence gate skips real attestation for a no-.git fixture without injecting any observe stub
+  ---
+  duration_ms: 0.813379
+  type: 'test'
+  ...
+# Subtest: F4(a): runner claude reaches the real observePublicCoreIdentity default path, without any observe stub
+ok 32 - F4(a): runner claude reaches the real observePublicCoreIdentity default path, without any observe stub
+  ---
+  duration_ms: 81.149878
+  type: 'test'
+  ...
+# Subtest: F4(b): runner codex reaches the real observeCodexPublicCoreIdentity default path, without any observe stub
+ok 33 - F4(b): runner codex reaches the real observeCodexPublicCoreIdentity default path, without any observe stub
+  ---
+  duration_ms: 162.853221
+  type: 'test'
+  ...
+# Subtest: PX0-AC-08(a): a self-application/dev-checkout run emits a closed rulesetSource classed self-application with an available content-hash identity
+ok 34 - PX0-AC-08(a): a self-application/dev-checkout run emits a closed rulesetSource classed self-application with an available content-hash identity
+  ---
+  duration_ms: 0.736011
+  type: 'test'
+  ...
+# Subtest: PX0-AC-08(b): an ordinary no-.git installed-copy run emits a closed rulesetSource classed marketplace-public with honestly-unavailable identities that still validate
+ok 35 - PX0-AC-08(b): an ordinary no-.git installed-copy run emits a closed rulesetSource classed marketplace-public with honestly-unavailable identities that still validate
+  ---
+  duration_ms: 1.052143
+  type: 'test'
+  ...
+# Subtest: PX0-AC-08(c): the previously-dangling freshnessHostActionForPreflight read of preflight.rulesetSource now observably binds a real value
+ok 36 - PX0-AC-08(c): the previously-dangling freshnessHostActionForPreflight read of preflight.rulesetSource now observably binds a real value
+  ---
+  duration_ms: 1.02956
+  type: 'test'
+  ...
+1..36
+# tests 36
+# suites 0
+# pass 36
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 450.450467

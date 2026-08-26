@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-pipeline.dev/schemas/pipeline.external-reference.v1.json",
+  "title": "Pipeline external reference v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "systemClass", "adapterProfile", "objectId", "relation", "authorityDirection", "pipelineArtifact", "externalRevision", "mode", "freshness", "ownership"],
+  "properties": {
+    "schema": { "const": "pipeline.external-reference.v1" },
+    "systemClass": { "enum": ["issue-tracker", "knowledge-base", "document-store", "forge"] },
+    "adapterProfile": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "objectId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$" },
+    "relation": { "enum": ["relates-to", "implements", "evidence-for", "published-from"] },
+    "authorityDirection": { "enum": ["pipeline-to-external", "external-observation-only", "independent"] },
+    "pipelineArtifact": { "type": "object", "additionalProperties": false, "required": ["path", "sha256"], "properties": { "path": { "type": "string" }, "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" } } },
+    "externalRevision": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$" },
+    "mode": { "enum": ["reference-only", "projection", "controlled-publication"] },
+    "freshness": { "type": "object", "additionalProperties": false, "required": ["state", "observedAtEpochMs"], "properties": { "state": { "enum": ["fresh", "stale", "deleted", "moved", "merged", "duplicated", "inaccessible", "out-of-order"] }, "observedAtEpochMs": { "type": "integer", "minimum": 0 } } },
+    "ownership": { "enum": ["pipeline-owned", "external-owned", "projection-only", "independently-maintained", "unsupported"] }
+  }
+}

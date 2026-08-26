@@ -8,7 +8,8 @@ tools: Read, Edit, Write, Grep, Glob, Bash
 # NO `memory` field — deliberate: memory would auto-activate persistent write surfaces; the
 #   pipeline learns via the versioned operating model, not via agent memory.
 # Worktree isolation is deliberately NOT hardcoded here: the Elephant enables it per dispatch
-#   according to the project calibration (.claude/pipeline.json, field `worktree`). Caution: a
+#   according to the project calibration at its resolved authority tier (project/pipeline.json,
+#   else .claude/pipeline.json; field `worktree`). Caution: a
 #   project's compile/type-check gate can be fail-open inside a worktree - verify this per project
 #   when enabling worktree isolation.
 # model: sonnet = implement-tier shipped default (MP-02; configured in pipeline.user.yaml ->
@@ -28,7 +29,7 @@ tools: Read, Edit, Write, Grep, Glob, Bash
 #   weaker (weakest-tier) model for implementation remains FORBIDDEN regardless of tier (MP-03). NOTE:
 #   `effort` as an agent-frontmatter key (MP-02/MP-27); if the harness does not honor it, the dispatch
 #   invocation parameter carries the effort.
-# maxTurns: 50 = hard leash (operating-model §4.3, stage 1); start value, calibrate via telemetry.
+# maxTurns: 50 = hard leash (docs/operating-model.md, Rigor, risk and gates, stage 1); start value, calibrate via telemetry.
 # Out-of-project paths (plugin cache, other repos): Glob searches only its `path` argument and
 #   defaults to the project cwd - pass the absolute out-of-project path explicitly, or fall back
 #   to shell listing via Bash.

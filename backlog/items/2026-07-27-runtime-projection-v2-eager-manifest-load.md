@@ -93,3 +93,15 @@ renamed; confirmed no external consumers of the removed constants.
 Independently re-verified: `node --test
 plugins/pipeline-core/lib/runtime-projection-v2.test.mjs
 plugins/pipeline-core/lib/runtime-projection-v3.test.mjs` both green.
+
+- **Cross-branch note (Phoenix line, 2026-08-18):** independently decided
+  "Close — superseded by Nova, not ported into Phoenix," per PO direction:
+  Phoenix's own `runtime-projection-v2.mjs:72-73` still read/froze the
+  manifest eagerly at module scope, unguarded, while Nova had already
+  replaced it with the lazy, memoized `frozenOwnedKeys()` accessor above.
+  Flagged for awareness that Phoenix's own fail-closed hooks
+  (`guard-lifecycle-ready.mjs`, `codex-pretool-guard.mjs`) still depended
+  on the unguarded module in the meantime. The frontmatter above (commit
+  `456b7beb`, 2026-08-17) is kept as the closure record of truth because
+  it is the actual code fix with load-safety test evidence; Phoenix's own
+  closure was a disposition ("not ported"), not an independent fix.

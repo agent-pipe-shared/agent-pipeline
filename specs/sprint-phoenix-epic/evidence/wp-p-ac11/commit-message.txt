@@ -1,0 +1,22 @@
+feat(pipeline-core): narrow P-AC-11's gap with target-binding and revision readback
+
+organization-policy.mjs's documentClasses entries gain two of P-AC-11's seven
+missing sub-concepts: an optional, closed, provider-neutral targetBinding
+(targetClass enum + bounded targetRef, never a literal path/credential) and
+an additive revisions readback ({packId, revision} per contributing pack) on
+resolveEffectiveOrganizationPolicy's merged output. targetBinding is optional
+rather than mandatory because a mandatory-field draft broke
+organization-policy-activation.test.mjs's own out-of-scope fixtures; optional
+keeps every pre-existing pack valid while staying fully closed and
+rejection-tested when declared. It is never merged across packs (same
+OPP-RESOLVE-CONFLICT rule as mode, including declared-vs-undeclared
+mismatches); revisions is always safely appended. Owned fields/sections,
+lifecycle event, preview, retention and conflict policy remain out of scope;
+P-AC-11 stays `partial` in the evidence map, narrowed not closed.
+
+13/13 organization-policy-tests pass (8 pre-existing unmodified behaviorally,
+1 mechanical key-count assertion update, 5 new); 2/2
+organization-policy-activation-tests pass unmodified.
+
+Dispatch: WP-P-AC11 (goldfish)
+AI-Assisted: true

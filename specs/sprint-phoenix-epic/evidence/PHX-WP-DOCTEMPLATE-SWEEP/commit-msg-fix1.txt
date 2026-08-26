@@ -1,0 +1,15 @@
+docs(phoenix): repoint stale .claude/pipeline.json refs to resolved-tier phrasing
+
+5 files across 9 call sites still hardcoded .claude/pipeline.json as THE
+calibration path, contradicting the runner-neutral project/ migration. Mirror
+the already-correct roles/goldfish.md:52 pattern ("the project calibration at
+its resolved authority tier -- project/pipeline.json, else
+.claude/pipeline.json") at each site, including the German half of
+PIPELINE_FLOW.md's bilingual doc. SETUP.md:333's shell example is left as a
+worked example with a short added note for runner-neutral projects, since
+rewriting the literal command would be more disruptive than helpful. Closes
+the remaining 5-file slice of the claude-dir-leftovers backlog item.
+
+Dispatch: PHX-WP-DOCTEMPLATE-SWEEP (goldfish)
+AI-Assisted: true
+Commit-Act: goldfish

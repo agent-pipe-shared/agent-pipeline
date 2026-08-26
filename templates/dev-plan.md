@@ -2,7 +2,7 @@
 PROMPT/DOC TEMPLATE: Dev-Plan — implementation contract for the PO's Plan-Mode approval
 (Dev-Plan-Gate) — Agent-Pipeline, AP1-P3 "DURIN".
 Language: ENGLISH (share default; the PO is the primary reader in the hosted project).
-Source of truth: docs/operating-model.md §3.2 Step 3b (booking statement).
+Source of truth: docs/operating-model.md, *The lifecycle* (Step 3b, booking statement).
 Purpose: Plan-Mode substitute for Spec/PRD ceremony in sessions that use the PO's Session
 Rule 1 ("Plan Mode + explicit plan approval") instead of the full Spec process — this
 artifact is then the implementation contract against which the Dev-Plan-Gate
@@ -19,7 +19,7 @@ the feature is set: `node harness/scripts/pipeline-state.mjs set-feature --id <i
 > here, with date/time) — this artifact is the session's implementation contract.
 >
 > **Approval booking:** After the PO's literal "approved", the approval is additionally
-> recorded deterministically (docs/operating-model.md §3.2 Step 3b):
+> recorded deterministically (docs/operating-model.md, *The lifecycle*, Step 3b):
 > ```
 > node harness/scripts/pipeline-state.mjs set-feature --id <feature-id> --plan-path .claude/plans/<date>-<feature>.md
 > node harness/scripts/pipeline-state.mjs approve-plan --by po-test

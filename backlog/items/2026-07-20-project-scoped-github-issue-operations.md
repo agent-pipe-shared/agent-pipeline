@@ -101,3 +101,17 @@ evidence before implementation or prioritization.
   closing, rather than closed on the strength of "mostly implemented."
 - **Assignment:** closed, no further work.
 - **Date:** 2026-08-18
+- **Cross-branch note:** a separate, independently run PO-requested audit
+  of `in_progress` backlog items on another line of development reached
+  the same "closed — implemented" conclusion on 2026-08-19 by reading
+  `skills/github-issue-operations/SKILL.md` and
+  `scripts/github-issue-operations.mjs` against the acceptance criteria
+  (target resolution with `owner/repo` display, local `gh` auth with no
+  token exposure, typed setup/permission failures, narrow create/edit,
+  preview + confirmation, mandatory readback with `publish-unverified` on
+  mismatch, `docs/github-issue-operations.md` setup docs, and
+  `github-issue-operations-tests` registered in `verify.mjs`). That audit
+  did not have visibility into the `GHO-READBACK-URL` stable-URL gap
+  found and fixed above; the frontmatter above (commit `5d5153e5`)
+  reflects the more complete, Critic-re-verified closure and is kept as
+  the record of truth for `closure_commit`/`closure_evidence`.

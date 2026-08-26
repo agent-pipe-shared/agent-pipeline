@@ -1,0 +1,18 @@
+fix(harness): ignore inline code spans in doc-contract link scan
+
+The markdown-reference-link scanner read adjacent bracket groups inside
+a backtick-wrapped inline code span (e.g. `[a-z][a-z0-9-]{0,63}`) as a
+reference-style link with no matching definition, flagging false
+positives in ordinary prose that quotes a regex character class.
+
+Add stripInlineCode(), mirroring stripFencedCode's line-count-preserving
+contract, and wire it into extractMarkdownLinks() ahead of the
+reference-link, reference-definition, and inline-destination regexes.
+Fixes the 3 backtick-wrapped occurrences in docs/state.md exactly as
+described. A separate, differently-shaped false positive remains open
+in ~17 acceptance-evidence-map files (bare parenthesized prose, not a
+code span) -- out of this fix's scope; reported as a briefing-vs-repo
+contradiction rather than resolved unilaterally.
+
+Dispatch: PHX-WP-DOCCONTRACT-CODESPAN (goldfish)
+AI-Assisted: true

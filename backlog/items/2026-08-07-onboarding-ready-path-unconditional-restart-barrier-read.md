@@ -61,6 +61,8 @@ before proposing a fix — the two may share a root cause or a fix.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
+**Merge note (2026-08-26, moved from frontmatter):** Phoenix (origin/sprint_phoenix) independently closed its own tracking copy of this item on 2026-08-18 (closure_commit 88dc3ba6952f226ed4f9caa57bad982cb660a425, closure_evidence self-referential to this item file's own Update note), citing the same underlying fix already confirmed here on 2026-08-11 (commit 864c7f1f, the requiresNativeRuntimeReadback gating). Both closures agree on outcome and root cause -- not a contradiction. Nova's earlier code-fix commit (864c7f1f) is kept as the primary closure_commit above since it is the actual fix landing in this repository; Phoenix's closure fields are preserved here rather than discarded. Merged 2026-08-26 (PHX-ITEMX-5) resolving the frontmatter conflict between the two branches' independent closures.
+
 - **Decision:** Closed (2026-08-11) — fixed. Supersedes the 2026-08-07
   "accept-open" note below, which was correct as of its own date.
 - **Rationale:** the unconditional `readRestartBarrier` call is now gated
@@ -89,3 +91,18 @@ before proposing a fix — the two may share a root cause or a fix.
   `readRestartBarrier` is meaningfully Codex-specific or only its naming is.
   No PO scope call needed to start that investigation.
 - **Date:** 2026-08-07
+
+**Update 2026-08-18 (Elephant, Phoenix backlog-clearing pass):** still
+unfixed in Phoenix — `project-onboarding-v3.mjs:3060` still calls
+`readRestartBarrier()` unconditionally in the ready-path branch. Nova has
+since built `requiresNativeRuntimeReadback(runner)`
+(`codex-onboarding-runtime.mjs:175`,
+`RUNNERS_WITHOUT_NATIVE_RUNTIME_READBACK = new Set(["claude"])`), threaded
+through all 3 restart-barrier call sites, so a Claude-only session never
+reads the barrier at all — the shared root cause this item's own Assignment
+suspected with its paired item
+(`2026-08-06-restart-launch-is-codex-only-for-every-runner.md`, also closed
+today on the same basis) turned out to be real: both are solved by the same
+runner-neutrality guard function in Nova. Per PO direction (2026-08-18):
+items already resolved in Nova's current code are closed here rather than
+reimplemented. Closing.

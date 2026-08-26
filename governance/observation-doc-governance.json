@@ -68,15 +68,23 @@
         "lifecycle": "maintained",
         "paths": [
           "docs/README.md",
+          "docs/agent-decision-journal.md",
+          "docs/audit-bundles.md",
+          "docs/change-control.md",
           "docs/deploy/README.md",
           "docs/design/README.md",
           "docs/design/design-facilitator-prompt.md",
           "docs/design/export-template.md",
+          "docs/evidence-viewer.md",
+          "docs/external-traceability.md",
           "docs/github-issue-operations.md",
+          "docs/governance-event-export.md",
+          "docs/governance-replay.md",
           "docs/licensing.md",
           "docs/macos-support.md",
           "docs/observation-intake.md",
           "docs/operating-model.md",
+          "docs/organization-policy-packs.md",
           "docs/runner-support.md",
           "docs/runtime-boundary.md",
           "docs/v3-consumer-onboarding.md",
@@ -110,16 +118,18 @@
           "docs/codex-onboarding-threat-model.md",
           "docs/contributor-gate-security.md",
           "docs/critic-isolation-threat-model.md",
+          "docs/doc-reconciliation.md",
           "docs/github-actions-token-permissions.md",
           "docs/gitlab-ci-pilot-threat-model.md",
+          "docs/governance-events.md",
           "docs/guard-maintenance-window-threat-model.md",
-          "docs/human-authorization-inventory.md",
           "docs/human-guard-override-threat-model.md",
           "docs/local-supervisor-state-threat-model.md",
           "docs/marketplace-supply-chain-threat-model.md",
           "docs/next-session-setup-prompt.md",
           "docs/nova-execution-plane-threat-model.md",
           "docs/pending-verify-registrations.md",
+          "docs/phoenix-governance-threat-model.md",
           "docs/po-approval-proof-contract.md",
           "docs/po-human-approval.md",
           "docs/push-release-flow.md",
@@ -140,6 +150,7 @@
           "docs/sprint-cyborg-tp-waiver.md",
           "docs/state-archive/2026-08-18--nova-055-afk-block-through-sentinel-cyborg-reconciliation.md",
           "docs/state-archive/2026-08-18--oldest-nova-047-history.md",
+          "docs/state-archive/2026-08-19--checkpoints-1-through-60.md",
           "docs/state-archive/2026-08-19--critic-round2-orphan-through-tp3-gmw-ceremony.md",
           "docs/state-archive/2026-08-19--observation-publication-queue.md",
           "docs/state-archive/2026-08-19--open-items-and-next-block.md",
@@ -214,12 +225,18 @@
           "docs/adr/0058-guard-maintenance-window.md",
           "docs/adr/0059-signed-human-guard-override.md",
           "docs/adr/0060-handover-placement-and-rotation.md",
+          "docs/adr/0061-local-supervisor-state-authority.md",
           "docs/adr/0061-uniform-human-approval-ceremony.md",
+          "docs/adr/0062-governance-event-kernel.md",
           "docs/adr/0062-production-execution-and-selected-sandbox-launch.md",
+          "docs/adr/0063-fork-disposition-approval-proof.md",
           "docs/adr/0063-repository-directory-contract.md",
+          "docs/adr/0064-handover-rotation-extraction-archive-hard-size-gate.md",
           "docs/adr/0064-release-preflight-consent-reuses-the-uniform-approval-ceremony.md",
           "docs/adr/0065-a-voided-gate-is-re-earned-from-declared-inputs.md",
+          "docs/adr/0065-port-authorize-critical-ceremony.md",
           "docs/adr/0066-handover-rotation-extraction-archive-hard-size-gate.md",
+          "docs/adr/0066-publication-approval-time-signature-accepted-tradeoff.md",
           "docs/adr/0067-tri-runner-antigravity-integration.md",
           "docs/adr/README.md"
         ]
@@ -244,6 +261,8 @@
         "lifecycle": "review-candidate",
         "paths": [
           "docs/codex-isolated-critic-foundation.md",
+          "docs/handover-0.5.2-findings.md",
+          "docs/human-authorization-inventory.md",
           "docs/known-issues.md"
         ]
       },
@@ -254,6 +273,13 @@
           "docs/product-capability-inventory.json",
           "docs/release-state.json",
           "docs/spec-archive/2026-07-20-sentinel-recovery/manifest.json"
+        ]
+      },
+      {
+        "audience": "maintainer",
+        "lifecycle": "normative-record",
+        "paths": [
+          "docs/state-archive/2026-08-19--pre-restart-and-nova-inherited-history.md"
         ]
       }
     ]

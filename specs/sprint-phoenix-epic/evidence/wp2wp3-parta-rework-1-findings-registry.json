@@ -1,0 +1,14 @@
+{
+  "schema": "pipeline.neutral-findings-registry.v1",
+  "priorReview": "specs/sprint-phoenix-epic/evidence/wp2wp3-parta-implementation-critic-review-1-77a7d79.md",
+  "priorReviewVerdict": "FAIL",
+  "baseCommit": "77a7d79",
+  "findings": [
+    { "id": "F1", "severity": "blocker", "gap": "the SKILL.md edit pushes the mandatory bootstrap payload over its own 15,000-byte budget, breaking a registered Verify suite", "claimedStatus": "fixed", "claimedResolvingCommit": "d63b858" },
+    { "id": "F2", "severity": "blocker", "gap": "the new attestation can never succeed against the real installed plugin layout, permanently disabling bootstrap Step 0", "claimedStatus": "fixed", "claimedResolvingCommit": "e5db7df" },
+    { "id": "F3", "severity": "major", "gap": "the new test suite is not registered in the Verify gate", "claimedStatus": "blocked", "claimedResolvingCommit": null },
+    { "id": "F4", "severity": "major", "gap": "the per-runner default observer selection has zero test coverage", "claimedStatus": "fixed", "claimedResolvingCommit": "e5db7df" },
+    { "id": "F5", "severity": "minor", "gap": "a sibling Verify suite became non-hermetic (spawns a subprocess, hashes the whole plugin tree)", "claimedStatus": "fixed", "claimedResolvingCommit": "7aa84f0" },
+    { "id": "F6", "severity": "minor", "gap": "GS-8 protects the constant but not the test that pins it", "claimedStatus": "blocked", "claimedResolvingCommit": null }
+  ]
+}

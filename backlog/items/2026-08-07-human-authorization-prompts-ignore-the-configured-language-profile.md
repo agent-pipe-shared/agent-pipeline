@@ -6,11 +6,11 @@ owner: pipeline
 status: closed
 created: 2026-08-07
 due: 2026-09-06
-closed_at: 2026-08-17
-closure_repository: self
-closure_commit: 598a8388a819086a10a649ff696b2a5b925b6fec
-closure_evidence: backlog/items/2026-08-07-human-authorization-prompts-ignore-the-configured-language-profile.md
 source: "PO request in the 2026-08-07 Nova session for a deliberate confirmation before PIN entry, explicitly qualified as language-profile dependent; partially delivered by NOVA-PO-CONFIRM-1 in commits 5efb0f1 and 584a598."
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "badde56d93ef9f792e31820d111238d4ff64d594"
+closure_evidence: "backlog/items/2026-08-07-human-authorization-prompts-ignore-the-configured-language-profile.md"
 ---
 
 # The pre-signature confirmation prompt is English-only and ignores `runtime.humanFacingLanguage`
@@ -83,6 +83,8 @@ runs and before any artifact exists.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
+### Nova line
+
 - **Decision:** Elephant's recommendation accepted — translate the
   human-facing PROMPT TEXT to `runtime.humanFacingLanguage` (English hard
   fallback on any lookup failure, so the gate never fails open into "no
@@ -107,3 +109,10 @@ value; the language is resolved from
 constant, exactly the recommended decision. Landed in commit
 `598a8388a819086a10a649ff696b2a5b925b6fec` (2026-08-12), independent of this
 triage pass. Closing.
+
+### Phoenix line (independent parallel disposition)
+
+- **Decision:** Close — superseded by Nova, not ported into Phoenix.
+- **Rationale:** Phoenix's CONFIRMATION_TOKEN and prompt text remain hardcoded English-only. Nova resolved this: the token stays the untranslated English literal for stability, while surrounding prompt text is resolved per continuity.runtime.humanFacingLanguage with English fallback (resolveHumanFacingLanguage(), wired into requireExplicitConfirmation() call sites). Per PO direction (2026-08-18), closed here rather than ported.
+- **Assignment (if accepted):** n/a — disposed without further work
+- **Date:** 2026-08-18

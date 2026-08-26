@@ -1,7 +1,7 @@
 # ADR-0038: Runner-neutral advisory duty v3
 
-**Status:** accepted route registry; session-trigger semantics superseded by
-ADR-0047 · **Date:** 2026-07-19
+**Status:** accepted route registry; session-trigger and mandatory-receipt
+semantics superseded by ADR-0047 · **Date:** 2026-07-19
 
 ## Context
 

@@ -1,0 +1,52 @@
+Break-proof RED transcript for the N1 regression test
+Command: node --test plugins/pipeline-core/scripts/human-authority-grant.test.mjs
+Fault injected: `readCriticalHumanProofPolicy(repo.primaryRoot)` at
+plugins/pipeline-core/scripts/human-authority-grant.mjs (runInstall) temporarily
+reverted to `readCriticalHumanProofPolicy(rootDir)` (the raw `resolve(args.repoRoot)`
+value) -- i.e. the pre-fix N1/F1-residual defect, reproduced on purpose to confirm
+the new test fails for the right reason before restoring the fix.
+Exit code observed: 1
+
+✔ a genuine matching proof installs exactly one granted decision, and the request digest is a real sha256 (77.843821ms)
+✔ a tampered proof is rejected and appends nothing (51.350622ms)
+✔ a proof signed by the wrong key is rejected and appends nothing (47.472254ms)
+✔ a missing committed trust anchor (no project/critical-human-proof.json at all) is rejected and appends nothing (46.61288ms)
+✔ F1: --trust-anchor-file is not a recognized flag at all -- install refuses it as an unknown argument, not merely as ignored, and appends nothing (47.951615ms)
+✔ prepare refuses to run without its required flags (0.244607ms)
+✔ install refuses a proof file supplied from inside the repository (34.970722ms)
+✔ F2: a proof file at the repo root whose name literally begins with '..' is correctly refused as in-repo, not accepted as external (34.75216ms)
+✔ F2: pointing --repo-root at a subdirectory of the real repository still correctly treats an actually-in-repo proof file as in-repo (48.477985ms)
+✖ N1: pointing --repo-root at an agent-writable subdirectory that itself contains a forged project/critical-human-proof.json does not cause install to verify against that forged anchor -- it still resolves and verifies against the real repository's committed anchor (49.963892ms)
+✔ a request whose payload has been tampered with after prepare is rejected before append (48.539655ms)
+✔ F4: a request whose envelope-level eventId was hand-edited after prepare installs with the reconstructed eventId, never the tampered one (66.714643ms)
+✔ F4: a request whose envelope-level candidate was hand-edited after prepare installs with the reconstructed (decision-derived) candidate, never the tampered one (67.67972ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 12
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 681.45343
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/human-authority-grant.test.mjs:262:1
+✖ N1: pointing --repo-root at an agent-writable subdirectory that itself contains a forged project/critical-human-proof.json does not cause install to verify against that forged anchor -- it still resolves and verifies against the real repository's committed anchor (49.963892ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at async TestContext.<anonymous> (file:///home/skar667/src/agent-pipeline-share_phoenix/plugins/pipeline-core/scripts/human-authority-grant.test.mjs:281:3)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+Interpretation: with the raw --repo-root string governing the trust-anchor read,
+`install` did NOT reject the forged-anchor proof (no thrown HAG-PROOF-INVALID) --
+it accepted the attacker's own key as if it were the repository's committed
+trust anchor, exactly the N1/F1-residual self-confirmation defect the fix closes.
+All 12 other assertions were unaffected by this single reverted line, isolating
+the fault to the trust-anchor root selection exclusively.

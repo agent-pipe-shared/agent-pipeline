@@ -1,0 +1,18 @@
+fix(human-authority-grant): resolve trust anchor via discovered repo root, not raw --repo-root
+
+Round-2 Critic review found F1 only partially closed: install still read
+the committed trust-anchor policy from the raw --repo-root string rather
+than repo.primaryRoot, the authoritative root discoverRepository already
+computes and that the F2 containment check already uses. Pointing
+--repo-root at an agent-writable subdirectory carrying a forged policy
+file let a caller select their own anchor while the fingerprint check
+still bound to the real repository (N1, same shape as F1). Route the
+trust-anchor read, the capture-policy digest read, and the ledger append
+all through repo.primaryRoot instead, add a named regression test
+break-proofed via a persisted RED transcript, correct the now-true
+docstring claim (F3), and remove --event-id/--idempotency-key from
+prepare's grammar since install always overwrites both from
+decision.decisionId and neither was ever honored (N2).
+
+Dispatch: PHX-WP-AAC04-FIX2 (goldfish)
+AI-Assisted: true

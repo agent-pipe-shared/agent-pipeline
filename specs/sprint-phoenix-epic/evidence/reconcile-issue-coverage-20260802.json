@@ -1,0 +1,5 @@
+{
+  "operation": "reconcile-mutable-design",
+  "targetState": "draft",
+  "artifactPath": "specs/sprint-phoenix-epic/design/issue-coverage.md"
+}

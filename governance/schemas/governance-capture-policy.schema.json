@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-pipeline.dev/schemas/pipeline.governance-capture-policy.v1.json",
+  "title": "Pipeline governance capture policy v1",
+  "description": "Closed default-deny materiality and privacy policy. It contains no identity mapping, endpoint, secret, or free-form rationale field.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "policyId", "revision", "defaultAction", "streams", "sanitizedReceipt"],
+  "properties": {
+    "schema": { "const": "pipeline.governance-capture-policy.v1" },
+    "policyId": { "$ref": "#/$defs/id" },
+    "revision": { "$ref": "#/$defs/sha256" },
+    "defaultAction": { "const": "deny" },
+    "streams": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": { "$ref": "#/$defs/streamPolicy" }
+    },
+    "sanitizedReceipt": { "$ref": "#/$defs/receiptPolicy" }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "streamPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["origin", "purpose", "materiality", "personalIdentifiability", "contextualIdentifiability", "storageProfile", "retention", "disclosure", "encryptionGeneration"],
+      "properties": {
+        "origin": { "enum": ["human", "agent", "lifecycle"] },
+        "purpose": { "enum": ["authority-history", "declared-assumption", "deterministic-lifecycle"] },
+        "materiality": { "enum": ["required", "policy-selected", "not-applicable"] },
+        "personalIdentifiability": { "enum": ["prohibited", "restricted-only"] },
+        "contextualIdentifiability": { "enum": ["prohibited", "restricted-only"] },
+        "storageProfile": { "enum": ["repository-public-safe", "restricted-machine-local", "deny"] },
+        "retention": { "enum": ["repository-retained", "machine-local-expiring", "deny"] },
+        "disclosure": { "enum": ["repository-visible", "machine-local-only", "redacted", "omit", "deny"] },
+        "encryptionGeneration": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/id" }] }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "storageProfile": { "const": "repository-public-safe" } }, "required": ["storageProfile"] },
+          "then": {
+            "properties": {
+              "personalIdentifiability": { "const": "prohibited" },
+              "contextualIdentifiability": { "const": "prohibited" },
+              "retention": { "const": "repository-retained" },
+              "encryptionGeneration": { "type": "null" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "storageProfile": { "const": "restricted-machine-local" } }, "required": ["storageProfile"] },
+          "then": {
+            "properties": {
+              "retention": { "const": "machine-local-expiring" },
+              "disclosure": { "enum": ["machine-local-only", "redacted", "omit"] },
+              "encryptionGeneration": { "$ref": "#/$defs/id" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "storageProfile": { "const": "deny" } }, "required": ["storageProfile"] },
+          "then": {
+            "properties": {
+              "retention": { "const": "deny" },
+              "disclosure": { "const": "deny" },
+              "encryptionGeneration": { "type": "null" }
+            }
+          }
+        }
+      ]
+    },
+    "receiptPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allowEventId", "allowEventDigest", "allowCheckpoint", "allowReasonText"],
+      "properties": {
+        "allowEventId": { "type": "boolean" },
+        "allowEventDigest": { "type": "boolean" },
+        "allowCheckpoint": { "type": "boolean" },
+        "allowReasonText": { "const": false }
+      }
+    }
+  }
+}

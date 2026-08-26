@@ -27,8 +27,12 @@
  *         "remote": "<safe-remote>", "destination": "<full-ref>", "criticalProof": <verified-proof> }
  *     } | absent,
  *     "criticalProofConsumption": [
- *       { "proofSha256": "<sha256>", "kind": "push", "consumedAt": "<ISO-8601>" }
+ *       { "proofSha256": "<sha256>", "kind": "push" | "feature-package-reconcile", "consumedAt": "<ISO-8601>" }
  *     ] | absent,
+ *     "featurePackageReconcileApproval": {
+ *       "lastApproved": { "approvedBy": "<string>", "approvedAt": "<ISO-8601>", "forCommit": "<sha>",
+ *         "criticalProof": <verified-proof>|null, "criticalProofWaiver": <waiver>? }
+ *     } | absent,
  *     "closedFeatures": [
  *       { "id": "<string>", "planPath": "<string>", "phaseAtClose": "<string>|null",
  *         "closedAt": "<ISO-8601>", "closedBy": "<string>", "forCommit": "<sha>|null" }
@@ -52,6 +56,20 @@
  *   agent immediately after the triggering push succeeds. Additive within
  *   `pipeline.state.v0` -- no schema-id bump, same additive-optional discipline as
  *   every other field here.
+ *
+ *   `featurePackageReconcileApproval` (PHX-WP-PAC08-APPROVAL-LEDGER, closing Critic
+ *   finding F-B): the durable, attributed record of a PO-bound `feature-package-reconcile`
+ *   approval, written by `defaultFeaturePackageReconcileApproval` into the GOVERNING
+ *   session's own state (never `--root`'s) at the moment `verifyCriticalHumanProof`
+ *   returns `ok:true` -- before the reconcile journal is published or any manifest byte
+ *   is touched, so a verified proof is burned even if a later, unrelated step fails.
+ *   `criticalProof` is `null` in chat mode (ADR-0056), but `approvedBy`/`approvedAt`/
+ *   `forCommit` are always recorded, which is what binds a chat-cleared reconcile to an
+ *   exact commit. `criticalProofConsumption` is SHARED with `push` (not kind-restricted --
+ *   entries are told apart only by their `kind` field); a `proofSha256` already present
+ *   there, of any `kind`, refuses a repeat `feature-package-reconcile` presentation of
+ *   that same proof with `CRITICAL-PROOF-REPLAY`, mirroring `approve-push`'s own
+ *   consumption-ledger shape (~6554-6576 as of this writing).
  *
  *   DEVIATION NOTE (declared during the F1 fix, commit 1c0a181 -- see the `set-feature`/
  *   `set-phase` entries below for that fix itself, which moved `phase` INSIDE
@@ -274,6 +292,7 @@ import {
   readdirSync,
   realpathSync,
   renameSync,
+  statSync,
   unlinkSync,
   writeSync,
 } from "node:fs";
@@ -296,6 +315,8 @@ import {
   recordCourseDecisionBrief,
   validateContinuityState,
 } from "../lib/continuity-state.mjs";
+import { createControlExecutionExchange } from "../lib/control-execution-exchange.mjs";
+import { buildLifecycleDispatchEvent, buildLifecycleStatusEvent } from "../lib/control-execution-lifecycle-event.mjs";
 import {
   canonicalJson as canonicalDecisionJson,
   sha256Canonical,
@@ -306,14 +327,21 @@ import {
 import {
   PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER,
   PRD_ACKNOWLEDGEMENT_MARKER,
+  derivePoGateRepositoryFingerprint,
   validatePoGateAuthorityForRepository,
   validatePoGateProfileForRepository,
 } from "../lib/po-gate-authority.mjs";
+import {
+  appendExternalPushLedgerConsumption,
+  externalPushLedgerGate,
+} from "../lib/external-push-ledger.mjs";
+import { dualEvaluateDecisionReference } from "../lib/decision-reference-dual-evaluation.mjs";
 import { inspectProjectOnboardingV3 } from "../lib/project-onboarding-v3.mjs";
 import {
   applyLegacyV2RevocationRecovery,
   approveSubmittedPlan,
   bindPlanSpecApproval,
+  canonicalJson as canonicalPhxJson,
   derivePlanLifecycle,
   enterPlanImplementation,
   LEGACY_V2_REVOCATION_RECOVERY_CLASS,
@@ -326,7 +354,13 @@ import {
   validCurrentPlanApproval,
   validPlanSubmission,
 } from "../lib/plan-spec-state-v2.mjs";
-import { validateFeaturePackage } from "../lib/feature-package-topology.mjs";
+import {
+  inventoryFeaturePackages,
+  planFeaturePackageBootstrap,
+  planFeaturePackageReconcile,
+  planFeaturePackageTransition,
+  validateFeaturePackage,
+} from "../lib/feature-package-topology.mjs";
 import {
   clearGateEstimateForMutation,
   prepareGateEstimateMutation,
@@ -339,7 +373,8 @@ import {
   validatePortablePipelineState,
 } from "../lib/project-authority.mjs";
 import { observeGitSource } from "../lib/source-observation.mjs";
-import { inspectSessionClosure } from "../lib/worktree-lifecycle.mjs";
+import { createAuthorityRevisionIntent } from "../lib/authority-revision-proof.mjs";
+import { discoverRepository, inspectSessionClosure } from "../lib/worktree-lifecycle.mjs";
 import {
   PUBLICATION_AUTHORITY_REFERENCE_SCHEMA,
   approvePublicationAuthority,
@@ -371,6 +406,106 @@ import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
 export const SCHEMA_ID = "pipeline.state.v0";
 export const CONTINUITY_LOCK_SCHEMA_ID = "pipeline.continuity-lock.v0";
 export const CONTINUITY_LOCK_STALE_MS = 30_000;
+
+// Restored verbatim from 5f8bf1d:harness/scripts/pipeline-state.mjs (the pre-merge
+// home of this module), dropped by merge 75b8361 when the second-parent side of
+// the file won. Only the closure the decision contract itself needs is restored;
+// the Phoenix transaction adapter referenced by the block comment below is not
+// part of this restoration.
+/**
+ * Closed Recovery Bridge decision contract. The sole executable consumer is
+ * the Phoenix-only adapter below. Every new issuance is bound to the existing
+ * repository-scoped PO gate; a local caller can never create PO authority by
+ * choosing an attribution string. Legacy terminal records remain inspectable
+ * solely for recovery/readback compatibility.
+ */
+export const RECOVERY_BRIDGE_DECISION_SCHEMA = "pipeline.recovery-bridge-decision.v1";
+export const RECOVERY_BRIDGE_ISSUANCE_CUTOFF = "2026-10-31T00:00:00.000Z";
+const RECOVERY_BRIDGE_FEATURE_ID = "sprint-phoenix-epic";
+const RECOVERY_BRIDGE_OPERATION = "reconcile-mutable-design";
+const RECOVERY_BRIDGE_MANIFEST = "specs/sprint-phoenix-epic/lifecycle.json";
+const RECOVERY_BRIDGE_ARTIFACT_PATH = "specs/sprint-phoenix-epic/RECOVERY.md";
+const RECOVERY_BRIDGE_ASSURANCE = "po-gate-bound";
+const RECOVERY_BRIDGE_ID_RE = /^rb-[a-f0-9]{16,64}$/u;
+const RECOVERY_BRIDGE_BINDING_KEYS = [
+  "decisionId", "featureId", "operation", "manifest", "artifactPath", "assurance",
+  "manifestPreimageSha256", "recoveryPostimageSha256", "prdSha256", "specSha256", "poApproval", "approvedBy", "approvedAt", "expiresAt",
+];
+const RECOVERY_BRIDGE_APPROVAL_KEYS = ["what", "why", "scope", "notAuthorized"];
+const RECOVERY_BRIDGE_DECISION_KEYS = [
+  "schema", "decisionId", "decisionSha256", "featureId", "operation", "manifest", "artifactPath", "assurance",
+  "manifestPreimageSha256", "recoveryPostimageSha256", "prdSha256", "specSha256", "approvedBy", "approvedAt", "expiresAt", "status",
+];
+
+function recoveryBridgeBindingKeys(value) {
+  const legacy = !Object.hasOwn(value ?? {}, "poApproval");
+  return [
+    ...RECOVERY_BRIDGE_BINDING_KEYS.filter((key) => key !== "poApproval" || !legacy),
+    ...(Object.hasOwn(value ?? {}, "approval") ? ["approval"] : []),
+  ];
+}
+function validRecoveryBridgeApproval(value) {
+  return exactObjectKeys(value, RECOVERY_BRIDGE_APPROVAL_KEYS)
+    && RECOVERY_BRIDGE_APPROVAL_KEYS.every((key) => typeof value[key] === "string"
+      && value[key].trim().length >= 12 && value[key].length <= 1_000);
+}
+function recoveryBridgeBinding(value) {
+  return Object.fromEntries(recoveryBridgeBindingKeys(value).map((key) => [key, value?.[key]]));
+}
+function safeIso(value) { return typeof value === "string" && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/u.test(value) && !Number.isNaN(Date.parse(value)); }
+function exactPoDecision(value) {
+  return exactObjectKeys(value, ["planPath", "planSha256", "specPath", "specSha256", "approvalSha256"])
+    && typeof value.planPath === "string" && typeof value.specPath === "string"
+    && SHA256_RE.test(value.planSha256) && SHA256_RE.test(value.specSha256) && SHA256_RE.test(value.approvalSha256);
+}
+
+/** Canonical digest for the immutable, exact Recovery Bridge decision binding. */
+export function recoveryBridgeDecisionDigest(value) {
+  return sha256Bytes(canonicalPhxJson({ schema: RECOVERY_BRIDGE_DECISION_SCHEMA, ...recoveryBridgeBinding(value) }));
+}
+
+function recoveryBridgeNow(now) {
+  return safeIso(now) ? Date.parse(now) : null;
+}
+
+/**
+ * Validates a public-safe Recovery Bridge decision. `now` is optional for
+ * structural inspection; when supplied it also enforces expiry, and for an
+ * uncommitted issuance it enforces the non-extendable issuance cutoff.
+ */
+export function validateRecoveryBridgeDecision(value, { now } = {}) {
+  const hasApproval = Object.hasOwn(value ?? {}, "approval");
+  const hasPoApproval = Object.hasOwn(value ?? {}, "poApproval");
+  if (!exactObjectKeys(value, [...RECOVERY_BRIDGE_DECISION_KEYS, ...(hasPoApproval ? ["poApproval"] : []), ...(hasApproval ? ["approval"] : [])])
+    || value.schema !== RECOVERY_BRIDGE_DECISION_SCHEMA || (hasApproval && !validRecoveryBridgeApproval(value.approval))) {
+    return { ok: false, code: "RB-DECISION-SCHEMA" };
+  }
+  if (!RECOVERY_BRIDGE_ID_RE.test(value.decisionId) || !SHA256_RE.test(value.decisionSha256)
+    || !SHA256_RE.test(value.manifestPreimageSha256) || !SHA256_RE.test(value.recoveryPostimageSha256)
+    || !SHA256_RE.test(value.prdSha256) || !SHA256_RE.test(value.specSha256) || !safeIso(value.expiresAt)) {
+    return { ok: false, code: "RB-DECISION-FIELDS" };
+  }
+  if (value.featureId !== RECOVERY_BRIDGE_FEATURE_ID || value.operation !== RECOVERY_BRIDGE_OPERATION
+    || value.manifest !== RECOVERY_BRIDGE_MANIFEST || value.artifactPath !== RECOVERY_BRIDGE_ARTIFACT_PATH
+    || value.assurance !== RECOVERY_BRIDGE_ASSURANCE) return { ok: false, code: "RB-DECISION-TARGET" };
+  if (value.decisionSha256 !== recoveryBridgeDecisionDigest(value)) return { ok: false, code: "RB-DECISION-DIGEST" };
+  if (hasPoApproval && (!exactPoDecision(value.poApproval)
+    || value.poApproval.planPath !== "specs/sprint-phoenix-epic/prd_phoenix-epic.md"
+    || value.poApproval.specPath !== "specs/sprint-phoenix-epic/spec.md"
+    || value.poApproval.planSha256 !== value.prdSha256 || value.poApproval.specSha256 !== value.specSha256)) return { ok: false, code: "RB-DECISION-PO-AUTHORITY" };
+  if (value.status === "issued" && !hasPoApproval) return { ok: false, code: "RB-DECISION-PO-AUTHORITY" };
+  if (value.approvedBy !== "PO" || !safeIso(value.approvedAt)) return { ok: false, code: "RB-DECISION-ATTRIBUTION" };
+  if (Date.parse(value.approvedAt) > Date.parse(value.expiresAt)) return { ok: false, code: "RB-DECISION-CHRONOLOGY" };
+  if (!["issued", "public-committed", "consumed"].includes(value.status)) return { ok: false, code: "RB-DECISION-STATUS" };
+  if (Date.parse(value.expiresAt) > Date.parse(RECOVERY_BRIDGE_ISSUANCE_CUTOFF)) return { ok: false, code: "RB-DECISION-CUTOFF" };
+  if (now !== undefined) {
+    const nowMs = recoveryBridgeNow(now);
+    if (nowMs === null) return { ok: false, code: "RB-DECISION-NOW" };
+    if (value.status === "issued" && nowMs >= Date.parse(RECOVERY_BRIDGE_ISSUANCE_CUTOFF)) return { ok: false, code: "RB-ISSUANCE-CUTOFF" };
+    if (nowMs >= Date.parse(value.expiresAt)) return { ok: false, code: "RB-DECISION-EXPIRED" };
+  }
+  return { ok: true, value };
+}
 const CONTINUITY_REQUEST_MAX_BYTES = 32_768;
 // `approve-push` binds a threat-model document into the signed subject (M-2,
 // evidence/cb-1a-measurement.md). Until here that binding was a single path
@@ -447,9 +582,13 @@ const PIPELINE_STATE_COMMANDS = Object.freeze([
   "continuity-clear-decision", "continuity-result-bootstrap-plan", "continuity-result-bootstrap-apply",
   "continuity-result-rebind-plan", "continuity-result-rebind-apply",
   "continuity-result-case-migration-plan", "continuity-result-case-migration-apply",
-  "continuity-result-close-plan", "continuity-result-close-apply", "publication-prepare",
+  "continuity-result-close-plan", "continuity-result-close-apply",
+  "continuity-authority-revision-plan", "continuity-authority-revision-apply", "continuity-authority-revision-recover",
+  "publication-prepare",
   "publication-approve", "publication-authorize", "publication-reconcile", "publication-observe",
   "publication-start-readback", "publication-close", "publication-rearm", "publication-block",
+  "feature-package-inspect", "feature-package-status", "feature-package-plan", "feature-package-apply",
+  "feature-package-reconcile", "feature-package-recover", "feature-package-rebind-mutable",
 ]);
 const PUSH_THREAT_MODEL_DEFAULT_PATH = "project/push-threat-model.md";
 const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -580,7 +719,13 @@ export function readState(dir = projectDir()) {
 }
 
 function writeState(dir, state, expectedState, options = {}) {
-  const lock = acquireContinuityLock(dir, LEGACY_WRITER_LOCK_TOKEN);
+  // `options.reuseLock`, when supplied, is an already-acquired, still-held lock on this
+  // exact `dir` (PHX-WP-PAC08-LOCK-REENTRANCY): the caller verified the resolved paths
+  // match before handing it in (see `defaultFeaturePackageReconcileApproval`). Reusing it
+  // instead of acquiring a second lock avoids a self-collision on the same lock path; this
+  // call then does not own the lock's lifecycle and must not release it.
+  const reusedLock = options.reuseLock;
+  const lock = reusedLock ?? acquireContinuityLock(dir, LEGACY_WRITER_LOCK_TOKEN);
   if (!lock.ok) return { ok: false, committed: false, code: lock.code };
   try {
     const observed = readState(dir);
@@ -631,7 +776,7 @@ function writeState(dir, state, expectedState, options = {}) {
     });
     return transition === undefined ? written : { ...written, transition };
   } finally {
-    releaseContinuityLock(lock);
+    if (!reusedLock) releaseContinuityLock(lock);
   }
 }
 
@@ -927,6 +1072,69 @@ function readContinuityRequest(dir, requestFile) {
   } catch {
     return { ok: false, code: "PS-CONTINUITY-REQUEST" };
   }
+}
+
+/**
+ * H-AC-12's dual-evaluation for the two commands that GRANT human authority from this CLI
+ * (`approve-push`, `approve-deploy`). ONE body rather than duplicated per command, mirroring
+ * how `hooks/guard-devplan.mjs` keeps a single `resolveHumanDecisionReadback` for its own two
+ * callers, and shaped exactly like `lib/change-control.mjs`'s optional `decisionReference`:
+ * strictly opt-in, so an invocation that passes no `--decision-reference` never reaches this
+ * function and both commands behave byte-for-byte as they did before.
+ *
+ * `legacyOk` is `true` because every caller invokes this only AFTER all of its pre-existing
+ * checks have passed (policy, flags, candidate, proof verification, replay) and BEFORE its
+ * first mutation -- the same "this point is only reached once the legacy verdict already
+ * holds" contract guard-devplan.mjs's generalized path documents.
+ *
+ * The second, decision-anchored reader binds the canonical reference to what this process can
+ * independently observe about the action actually being recorded: the candidate commit AND
+ * tree, plus the repository fingerprint derived from the real Git topology. An unresolvable
+ * topology returns `false` (disagreement -> fail closed), never a pass-through.
+ */
+function evaluateOptInDecisionReference(dir, requestFile, candidate) {
+  const path = safeRequestFile(dir, requestFile);
+  if (path === null) return { ok: false, code: "DECISION-REFERENCE-FILE" };
+  let reference;
+  try { reference = JSON.parse(readFileSync(path, "utf8")); } catch { return { ok: false, code: "DECISION-REFERENCE-UNREADABLE" }; }
+  // A reference that cannot be read must NEVER degrade into "no reference was supplied": the
+  // shared primitive treats null/undefined as "no second reader consulted" and returns the
+  // legacy verdict unchanged, so an unreadable or non-object file is refused HERE -- otherwise
+  // a broken file would silently buy back the exact single-evaluation path this criterion closes.
+  if (reference === null || typeof reference !== "object" || Array.isArray(reference)) {
+    return { ok: false, code: "DECISION-REFERENCE-UNREADABLE" };
+  }
+  const evaluation = dualEvaluateDecisionReference({
+    legacyOk: true,
+    reference,
+    resolveReference: (ref) => {
+      let fingerprint;
+      try {
+        const repository = discoverRepository(dir, { timeout: 5000 });
+        fingerprint = derivePoGateRepositoryFingerprint({
+          gitCommonDir: repository.commonDir,
+          primaryRoot: repository.primaryRoot,
+        });
+      } catch {
+        return false; // topology unresolved -> the second reader cannot confirm -> disagreement
+      }
+      return ref.candidate.commit === candidate.commit
+        && ref.candidate.tree === candidate.tree
+        && ref.checkpoint.repositoryFingerprint === fingerprint;
+    },
+  });
+  if (!evaluation.ok) {
+    return {
+      ok: false,
+      code: "DECISION-REFERENCE-DISAGREEMENT",
+      // H-AC-12's second sentence: the shared compatibility owner and expiry are carried on
+      // the evaluation result and surfaced to the operator, never left implicit in a comment.
+      detail: `legacy=${evaluation.legacyOk}, decision-reference=${evaluation.ledgerOk}, `
+        + `compatibility owner "${evaluation.compat.owner}", expiry `
+        + `${new Date(evaluation.compat.expiresAtEpochMs).toISOString()}`,
+    };
+  }
+  return { ok: true, reference };
 }
 
 function hashBoundRepoFile(dir, binding, maxBytes = 1_048_576) {
@@ -2110,6 +2318,168 @@ function continuityTransition(sub, base, expectedRevision, request) {
   return clearDecisionSelection(base.continuity, { expectedRevision, receipt: request.receipt }, featureId);
 }
 
+const LIFECYCLE_EVENT_FLAGS = ["lifecycle-event-out", "parent-orchestration-id", "worker-id", "correlation-id"];
+
+/* PHX L-AC-01. A dispatch admission is a material lifecycle event, and this CAS
+ * is the only transaction that installs a `queueHead.dispatch`. So the event is
+ * produced HERE, from the exact continuity state about to be committed, rather
+ * than reconstructed later from a log that would have to guess which revision
+ * admitted which dispatch.
+ *
+ * It is opt-in for one honest reason: worker and correlation identity do not
+ * exist in the continuity state at all -- they live in the coordinator that
+ * dispatched the worker -- and the lifecycle schema requires both. Without them
+ * no truthful event can be built, so an operator that cannot supply them keeps
+ * this command's previous behaviour byte for byte. Asking for the event on a
+ * transition that admits no dispatch is a refusal, not a silent no-op.
+ *
+ * Planning happens BEFORE the state write (a refusal here costs zero mutation);
+ * only the file write happens after, once the admission it describes is durable.
+ */
+function planDispatchLifecycleEvent(sub, dir, previous, next, flags, deps) {
+  const requested = LIFECYCLE_EVENT_FLAGS.filter((flag) => !isBlank(flags[flag]));
+  if (requested.length === 0) return { ok: true, planned: null };
+  if (sub !== "continuity-cas") return { ok: false, code: "PS-LIFECYCLE-EVENT-SCOPE" };
+  if (requested.length !== LIFECYCLE_EVENT_FLAGS.length) return { ok: false, code: "PS-LIFECYCLE-EVENT-ARGUMENTS" };
+  const before = previous?.queueHead?.dispatch ?? null;
+  const dispatch = next?.queueHead?.dispatch ?? null;
+  if (dispatch === null || before !== null) return { ok: false, code: "PS-LIFECYCLE-EVENT-NO-ADMISSION" };
+  const target = boundLifecycleEventTarget(dir, flags["lifecycle-event-out"]);
+  if (!target.ok) return target;
+  const candidate = (deps.gitCandidate ?? defaultGitCandidate)(dir);
+  if (!candidate.ok) return { ok: false, code: "PS-LIFECYCLE-EVENT-CANDIDATE" };
+  try {
+    const exchange = createControlExecutionExchange({
+      continuityState: next,
+      // At admission the worker has produced nothing yet: base and candidate are
+      // the same observed tree. Claiming a distinct candidate here would assert a
+      // commit that does not exist.
+      gitBinding: { baseCommit: candidate.commit, candidateCommit: candidate.commit, candidateTree: candidate.tree },
+      orchestrationAssignment: {
+        parentOrchestrationId: flags["parent-orchestration-id"],
+        workerId: flags["worker-id"],
+        correlationId: flags["correlation-id"],
+      },
+      invalidation: { state: "valid", reasonCode: null, supersededByQueueRevision: null },
+      event: {
+        class: "admission",
+        status: "admitted",
+        observedAt: (deps.now ?? (() => new Date().toISOString()))(),
+        // The evidence is the committed state itself, digested canonically.
+        evidenceSha256: sha256Bytes(canonicalDecisionJson(next)),
+      },
+      extensions: {},
+    });
+    return { ok: true, planned: { path: target.path, event: buildLifecycleDispatchEvent({ exchange }) } };
+  } catch {
+    return { ok: false, code: "PS-LIFECYCLE-EVENT-PROJECTION" };
+  }
+}
+
+/* The continuity acknowledgement vocabulary (`FINAL_OUTCOMES` in
+ * `continuity-host-adapter.mjs`) has exactly two members, and both name a
+ * status of the exchange's `terminal` class. The class's other three
+ * (`cancelled`, `unknown`, `unavailable`) are deliberately unreachable from
+ * here: no continuity transition can observe them today, and mapping something
+ * onto them would fabricate an outcome the state machine never saw. */
+const LIFECYCLE_TERMINAL_STATUS = Object.freeze({ succeeded: "succeeded", failed: "failed" });
+
+/* PHX L-AC-01 (status kind). The mirror of the admission above: this transaction
+ * is the only one that acknowledges a delivered final for the dispatch currently
+ * at the queue head, so the terminal event is produced HERE, from the exact
+ * dispatch identity that is about to stop being current.
+ *
+ * The exchange is built from the state BEFORE the transition, deliberately. The
+ * post-transition state either carries no dispatch at all (the exchange shape
+ * refuses that) or already carries the next one, so projecting from it would
+ * attribute one worker's outcome to another. The identity is not taken on trust
+ * either: it must be the exact identity the observation reports, which is the
+ * same equality `continuity-host-adapter.mjs` enforces downstream before any
+ * integration is admitted.
+ *
+ * Opt-in for the same honest reason as the admission event: worker and
+ * correlation identity live in the coordinator, not in the continuity state.
+ *
+ * Planning happens BEFORE the Result and State writes; the event file is written
+ * only after the transaction reports the terminal state itself as committed. A
+ * replay, a duplicate final or a Result-only repair therefore emits nothing --
+ * and, because a lifecycle event is append-only evidence whose target is refused
+ * if it already exists, asking for the event again on such a retry is refused by
+ * name rather than silently skipped. Retries that only repair the Result are run
+ * without these flags. */
+function planStatusLifecycleEvent(sub, dir, previous, request, flags, deps) {
+  const requested = LIFECYCLE_EVENT_FLAGS.filter((flag) => !isBlank(flags[flag]));
+  if (requested.length === 0) return { ok: true, planned: null };
+  if (sub !== "continuity-integrate-final") return { ok: false, code: "PS-LIFECYCLE-EVENT-SCOPE" };
+  if (requested.length !== LIFECYCLE_EVENT_FLAGS.length) return { ok: false, code: "PS-LIFECYCLE-EVENT-ARGUMENTS" };
+  const dispatch = previous?.queueHead?.dispatch ?? null;
+  const identity = request?.observation?.identity ?? null;
+  const status = LIFECYCLE_TERMINAL_STATUS[request?.observation?.final?.outcome];
+  if (dispatch === null || identity === null || status === undefined
+    || canonicalJson(identity) !== canonicalJson(dispatch)) {
+    return { ok: false, code: "PS-LIFECYCLE-EVENT-NO-TERMINAL" };
+  }
+  const target = boundLifecycleEventTarget(dir, flags["lifecycle-event-out"]);
+  if (!target.ok) return target;
+  const candidate = (deps.gitCandidate ?? defaultGitCandidate)(dir);
+  if (!candidate.ok) return { ok: false, code: "PS-LIFECYCLE-EVENT-CANDIDATE" };
+  try {
+    const exchange = createControlExecutionExchange({
+      continuityState: previous,
+      // The State writer observes exactly one tree -- its own repository at
+      // integration time. It has no separate knowledge of the worker's output
+      // commit, so both bindings name the tree that was actually observed rather
+      // than asserting a candidate commit nobody here has seen.
+      gitBinding: { baseCommit: candidate.commit, candidateCommit: candidate.commit, candidateTree: candidate.tree },
+      orchestrationAssignment: {
+        parentOrchestrationId: flags["parent-orchestration-id"],
+        workerId: flags["worker-id"],
+        correlationId: flags["correlation-id"],
+      },
+      invalidation: { state: "valid", reasonCode: null, supersededByQueueRevision: null },
+      event: {
+        class: "terminal",
+        status,
+        observedAt: (deps.now ?? (() => new Date().toISOString()))(),
+        // The evidence is the delivered final's own canonical digest, the same
+        // digest the acknowledgement is about to bind into the state.
+        evidenceSha256: request.observation.final.resultDigest,
+      },
+      extensions: {},
+    });
+    return { ok: true, planned: { path: target.path, event: buildLifecycleStatusEvent({ exchange }) } };
+  } catch {
+    return { ok: false, code: "PS-LIFECYCLE-EVENT-PROJECTION" };
+  }
+}
+
+/* A lifecycle event is append-only evidence: an existing path is refused, never
+ * overwritten, and the target may not leave the repository root. */
+function boundLifecycleEventTarget(dir, relativePath) {
+  if (isAbsolute(relativePath)) return { ok: false, code: "PS-LIFECYCLE-EVENT-PATH" };
+  let root;
+  try { root = realpathSync(resolve(dir)); } catch { return { ok: false, code: "PS-LIFECYCLE-EVENT-PATH" }; }
+  const path = resolve(root, relativePath);
+  if (!path.startsWith(`${root}${sep}`) || relative(root, path).startsWith(`..${sep}`)) return { ok: false, code: "PS-LIFECYCLE-EVENT-PATH" };
+  try { lstatSync(path); return { ok: false, code: "PS-LIFECYCLE-EVENT-EXISTS" }; } catch { /* absent is the only admissible state */ }
+  return { ok: true, path };
+}
+
+function writeLifecycleEventFile(planned) {
+  let fd;
+  try {
+    mkdirSync(dirname(planned.path), { recursive: true });
+    fd = openSync(planned.path, "wx", 0o600);
+    writeSync(fd, `${JSON.stringify(planned.event, null, 2)}\n`);
+    fsyncSync(fd);
+    return { ok: true };
+  } catch {
+    return { ok: false, code: "PS-LIFECYCLE-EVENT-WRITE" };
+  } finally {
+    if (fd !== undefined) { try { closeSync(fd); } catch { /* the write result already decided the outcome */ } }
+  }
+}
+
 function runContinuityCommand(sub, flags, deps) {
   const dir = deps.dir ?? projectDir();
   const expected = parseExpectedRevision(flags["expected-revision"], sub === "continuity-init");
@@ -2134,6 +2504,11 @@ function runContinuityCommand(sub, flags, deps) {
       return 2;
     }
     if (sub === "continuity-integrate-final") {
+      const lifecycle = planStatusLifecycleEvent(sub, dir, existing.state.continuity ?? null, request.value, flags, deps);
+      if (!lifecycle.ok) {
+        console.error(`Error: dispatch status lifecycle event refused (${lifecycle.code}); zero mutation.`);
+        return 2;
+      }
       const transaction = runFinalIntegrationTransaction(dir, existing, expected.value, request.value, lock, deps);
       if (!transaction.ok) {
         const disposition = transaction.committed === null
@@ -2143,6 +2518,16 @@ function runContinuityCommand(sub, flags, deps) {
             : "zero State and Result mutation";
         console.error(`Error: continuity final transaction refused (${transaction.code}); ${disposition}.`);
         return 2;
+      }
+      // Only the transaction that committed the terminal state itself produces the
+      // event; a duplicate final or a Result-only repair changed no dispatch state.
+      if (lifecycle.planned !== null && transaction.code === "PS-CONTINUITY-FINAL-COMMITTED") {
+        const emitted = writeLifecycleEventFile(lifecycle.planned);
+        if (!emitted.ok) {
+          console.error(`Error: continuity state committed at revision ${transaction.revision}, but the dispatch status lifecycle event could not be persisted (${emitted.code}); mutation is NOT reported as zero.`);
+          return 2;
+        }
+        console.log(`PS-LIFECYCLE-EVENT-WRITTEN: status event ${lifecycle.planned.event.eventId} persisted.`);
       }
       console.log(`${transaction.code}: continuity revision ${transaction.revision}; ${transaction.mutated ? "transaction persisted" : "accepted with zero mutation"}.`);
       return 0;
@@ -2188,6 +2573,11 @@ function runContinuityCommand(sub, flags, deps) {
       console.error(`Error: continuity transition refused (${transition.code}); zero mutation.`);
       return 2;
     }
+    const lifecycle = planDispatchLifecycleEvent(sub, dir, existing.state.continuity ?? null, transition.state, flags, deps);
+    if (!lifecycle.ok) {
+      console.error(`Error: dispatch lifecycle event refused (${lifecycle.code}); zero mutation.`);
+      return 2;
+    }
     if (!transition.mutated) {
       console.log(`${transition.code}: accepted with zero mutation.`);
       return 0;
@@ -2203,6 +2593,14 @@ function runContinuityCommand(sub, flags, deps) {
         console.error(`Error: continuity write refused before commit (${written.code}); zero mutation.`);
       }
       return 2;
+    }
+    if (lifecycle.planned !== null) {
+      const emitted = writeLifecycleEventFile(lifecycle.planned);
+      if (!emitted.ok) {
+        console.error(`Error: continuity state committed at revision ${transition.state.revision}, but the dispatch lifecycle event could not be persisted (${emitted.code}); mutation is NOT reported as zero.`);
+        return 2;
+      }
+      console.log(`PS-LIFECYCLE-EVENT-WRITTEN: dispatch event ${lifecycle.planned.event.eventId} persisted.`);
     }
     console.log(`${transition.code}: continuity revision ${transition.state.revision} written.`);
     return 0;
@@ -2751,6 +3149,22 @@ function externalPublicJson(dir, value) {
   } catch { return { ok: false, code: "CRITICAL-PROOF-EXTERNAL-FILE" }; }
 }
 
+/**
+ * Kinds whose gate is always active, regardless of what `project/critical-human-proof.json`'s
+ * `requiredKinds` list happens to say (PHX-WP-PAC08-RECONCILE-APPROVAL; ADR-0056's
+ * 2026-08-11 Follow-up). `feature-package-reconcile` is never routed through the shared
+ * `prepare-critical`/`approve-critical`/`verify-critical` command family that
+ * `requiredKinds` governs -- it has its own always-on dependency injection point
+ * (`deps.featurePackageReconcileApproval`) -- and the policy file is out of scope to edit
+ * for this kind, so without this bypass the kind would either brick permanently
+ * (`required: true` with the kind absent from `requiredKinds`) or verify nothing at all
+ * (`required: false`). Bypassing the `requiredKinds` membership test here, for this one
+ * kind only, is how the proof stays genuinely demanded either way. `push`/`deploy`/
+ * `publication`/`governance-fork-disposition` are deliberately NOT in this set, so their
+ * behaviour is byte-identical to before this addition.
+ */
+const ALWAYS_REQUIRED_KINDS = new Set(["feature-package-reconcile"]);
+
 function verifyCriticalHumanProof({ dir, state, kind, candidate, subject, flags, now, required = false }) {
   const policy = criticalHumanProofPolicy(dir);
   if (!policy.ok) return policy;
@@ -2775,7 +3189,7 @@ function verifyCriticalHumanProof({ dir, state, kind, candidate, subject, flags,
   const configured = criticalProofWaiverFor(dir, kind);
   if (configured.code !== null && configured.code !== undefined) return { ok: false, code: configured.code };
   if (configured.waived) return { ok: true, proof: null, waived: configured.waiver };
-  if (!policy.requiredKinds.has(kind)) {
+  if (!policy.requiredKinds.has(kind) && !ALWAYS_REQUIRED_KINDS.has(kind)) {
     return required ? { ok: false, code: "CRITICAL-PROOF-POLICY-KIND-REQUIRED" } : { ok: true, proof: null };
   }
   const request = externalPublicJson(dir, flags["proof-request"]);
@@ -3292,6 +3706,565 @@ function runResultCaseMigrationCommand(sub, rest, deps) {
   try { const current = readStateRaw(deps.dir); if (isCaseMigrationPostimage(deps.dir, current, apply)) { console.log(JSON.stringify({ schema: RESULT_CASE_MIGRATION_APPLY_SCHEMA, status: "replayed", featureId: apply.featureId, revision: current.state.continuity.revision, stateSha256: apply.expectedPostStateSha256, result: current.state.continuity.authority.result, archive: apply.archivePath, mutated: false })); return 0; } const freshPlan = buildResultCaseMigrationPlan(deps.dir, current, apply.resultPath, apply.archivePath, apply.updatedAt); const journal = loadCaseMigrationJournal(deps.dir, deps); if (!journal.ok) { console.error(`Error: Result case migration journal refused (${journal.code}); zero mutation.`); return 2; } let plan = null; if (journal.journal === null) { plan = freshPlan; if (!plan.ok || sha256Bytes(current.raw) !== apply.expectedStateSha256 || plan.planSha256 !== apply.planSha256 || plan.payload.featureId !== apply.featureId || plan.payload.preimage.revision !== apply.expectedRevision || plan.payload.postimage.stateSha256 !== apply.expectedPostStateSha256) { console.error("Error: Result case migration apply inputs are stale or conflicting; zero mutation."); return 2; } if (!publishCaseMigrationJournal(deps.dir, plan, deps)) { console.error("Error: Result case migration journal prepare failed; zero mutation."); return 2; } } else if (journal.journal.planSha256 !== apply.planSha256 || journal.journal.stateSha256 !== apply.expectedStateSha256 || journal.journal.postStateSha256 !== apply.expectedPostStateSha256 || journal.journal.target.path !== apply.resultPath || journal.journal.archive !== apply.archivePath) { console.error("Error: Result case migration journal conflicts; zero new mutation."); return 2; }
     const active = journal.journal ?? loadCaseMigrationJournal(deps.dir, deps).journal; const recovered = recoverCaseMigration(deps.dir, active, lock, deps); if (!recovered.ok) { console.error(`Error: Result case migration recovery unresolved (${recovered.code}); mutation disposition is not success.`); return 2; } if (!retireCaseMigrationJournal(journal.paths)) { console.error("Error: Result case migration committed but journal retirement is unresolved."); return 2; } const state = readStateRaw(deps.dir); console.log(JSON.stringify({ schema: RESULT_CASE_MIGRATION_APPLY_SCHEMA, status: plan === null ? "replayed" : "applied", featureId: apply.featureId, revision: state.state.continuity.revision, stateSha256: apply.expectedPostStateSha256, result: state.state.continuity.authority.result, archive: apply.archivePath, mutated: plan !== null })); return 0;
   } finally { releaseContinuityLock(lock); }
+}
+
+// ---- PHX-0B: continuity-authority PRD/Spec revision writer (Phoenix §7) ----
+/**
+ * `continuity-authority-revision-plan` / `-apply` / `-recover`.
+ *
+ * A scoped human design-revision decision replaces the active feature's PRD/Spec
+ * authority bytes recorded at `continuity.authority.{prd,spec}` -- the same pair every
+ * other continuity writer treats as immutable once initialized. `-plan` derives ONE
+ * closed read-only request via `createAuthorityRevisionIntent` (../lib/authority-
+ * revision-proof.mjs) and writes no State. `-apply` re-derives the identical request
+ * fresh from CURRENT reality (closing the TOCTOU gap a planner leaves open), consumes
+ * the caller-injected `authorityRevisionApproval` proof result rather than verifying a
+ * signature itself, and commits the postimage as a transaction: a private, HMAC-
+ * authenticated recovery journal (mirroring `feature-package-apply`'s git-common-dir
+ * journal) is published BEFORE the State bytes are touched and retained -- never
+ * deleted -- on every failure path; only a confirmed post-write readback retires it.
+ * `-recover` never re-derives the plan and never re-reads a git candidate -- it replays
+ * only the exact frozen postimage bytes the journal already carries, or confirms the
+ * exact retained preimage, after a fresh byte-identical reread of the CURRENT State
+ * file (never a temporary file).
+ *
+ * The plan's own stdout document IS the `--request-file` `-apply` consumes: it embeds
+ * the fixed `postimage.updatedAt` the plan used, so apply never calls the clock again
+ * for the postimage it writes -- only for the (separately, freshly re-checked) expiry.
+ */
+const AUTHORITY_REVISION_SUBCOMMANDS = new Set([
+  "continuity-authority-revision-plan",
+  "continuity-authority-revision-apply",
+  "continuity-authority-revision-recover",
+]);
+const AUTHORITY_REVISION_REQUEST_INPUT_SCHEMA = "pipeline.continuity-authority-revision-request.v1";
+const AUTHORITY_REVISION_PLAN_SCHEMA = "pipeline.continuity-authority-revision-plan.v1";
+const AUTHORITY_REVISION_APPLY_SCHEMA = "pipeline.continuity-authority-revision-apply.v1";
+const AUTHORITY_REVISION_RECOVER_SCHEMA = "pipeline.continuity-authority-revision-recover.v1";
+const AUTHORITY_REVISION_RECEIPT_SCHEMA = "pipeline.continuity-authority-revision-receipt.v1";
+// F2: `.v1` predates `expiresAt` (added for PX0-AC-06); a journal a prior build left
+// pending across the upgrade must still load, not fail closed with AR-JOURNAL. Current
+// code only ever WRITES `.v2` -- there is no path that writes a `.v1` journal anymore.
+const AUTHORITY_REVISION_JOURNAL_SCHEMA_V1 = "pipeline.continuity-authority-revision-journal.v1";
+const AUTHORITY_REVISION_JOURNAL_SCHEMA_V2 = "pipeline.continuity-authority-revision-journal.v2";
+const AUTHORITY_REVISION_JOURNAL_SCHEMA = AUTHORITY_REVISION_JOURNAL_SCHEMA_V2;
+const AUTHORITY_REVISION_JOURNAL_KEYS_V1 = ["schema", "intentSha256", "planSha256", "preStateSha256", "postStateSha256", "postStateBase64", "receipt", "mac"];
+const AUTHORITY_REVISION_JOURNAL_KEYS_V2 = ["schema", "intentSha256", "planSha256", "preStateSha256", "postStateSha256", "postStateBase64", "expiresAt", "receipt", "mac"];
+// Must match phoenix-authority-approval.mjs's `approval` object schema and key order
+// EXACTLY: `deps.authorityRevisionApproval` performs a strict JSON.stringify comparison.
+const AUTHORITY_REVISION_APPROVAL_SCHEMA = "pipeline.continuity-authority-revision-approval.v1";
+const AUTHORITY_REVISION_PRD_PATH_RE = /^specs\/[A-Za-z0-9._:-]+\/prd_[A-Za-z0-9._:-]+\.md$/u;
+
+function readAuthorityRevisionFile(dir, relativePath) {
+  const path = safeRequestFile(dir, relativePath);
+  if (path === null) return { ok: false, code: "AR-REQUEST-FILE" };
+  let raw;
+  try { raw = readFileSync(path); } catch { return { ok: false, code: "AR-REQUEST-FILE" }; }
+  let value;
+  try { value = JSON.parse(raw.toString("utf8")); } catch { return { ok: false, code: "AR-REQUEST-JSON" }; }
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return { ok: false, code: "AR-REQUEST-JSON" };
+  return { ok: true, raw, value };
+}
+
+/**
+ * F5: dedup keyed on `intentSha256` alone would silently merge a hash COLLISION --
+ * two DIFFERENT receipts that happen to share an `intentSha256` string -- into a
+ * single retained entry, discarding one of them without a trace. A genuine duplicate
+ * re-splice of the SAME closed intent is deterministic (every `durableReceipt` field
+ * is derived from the same frozen intent value inside `buildAuthorityRevisionPlan`),
+ * so it always produces a byte-for-byte identical receipt; anything that shares the
+ * digest but not the content is therefore never a legitimate replay and must fail
+ * closed rather than silently merge OR silently append a second entry under an
+ * ambiguous, already-claimed correlation key. Exported (not inlined at the call site)
+ * so this decision is directly unit-testable: a genuine SHA-256 collision cannot be
+ * constructed in a test, but two hand-built receipt objects sharing an `intentSha256`
+ * with different content can.
+ */
+export function mergeAuthorityRevisionReceipt(priorReceipts, durableReceipt) {
+  const list = Array.isArray(priorReceipts) ? priorReceipts : [];
+  const priorByIntent = list.find((entry) => entry?.intentSha256 === durableReceipt.intentSha256);
+  if (priorByIntent === undefined) return { ok: true, receipts: [...list, durableReceipt] };
+  if (!sameJson(priorByIntent, durableReceipt)) return { ok: false, code: "AR-RECEIPT-COLLISION" };
+  return { ok: true, receipts: list };
+}
+
+/**
+ * Re-derivable from either a `--proposal-file` (plan) or the intent embedded in a
+ * previously-planned `--request-file` (apply): both are the same closed shape
+ * `createAuthorityRevisionIntent` accepts, and every check below re-reads reality
+ * fresh -- nothing here trusts a cached observation.
+ */
+function buildAuthorityRevisionPlan(dir, existing, proposal, updatedAt, deps = {}) {
+  if (existing.status !== "ok") return { ok: false, code: "AR-STATE-UNAVAILABLE" };
+  if (!canonicalIso(updatedAt)) return { ok: false, code: "AR-UPDATED-AT" };
+  const state = existing.state;
+  if (!state?.activeFeature || !state?.continuity || state.schema !== SCHEMA_ID || state.gateEstimate !== undefined) {
+    return { ok: false, code: "AR-NO-ACTIVE-FEATURE" };
+  }
+  let intent;
+  try { intent = createAuthorityRevisionIntent(proposal); } catch { return { ok: false, code: "AR-INTENT-INVALID" }; }
+  const value = intent.value;
+  const stateFile = physicalRebindFile(dir, stateRelativePath(dir));
+  if (stateFile === null || stateFile.sha256 !== sha256Bytes(existing.raw)) return { ok: false, code: "AR-STATE-IDENTITY" };
+  const continuity = state.continuity;
+  if (!validateContinuityState(continuity, state.activeFeature.id).ok || continuity.featureId !== state.activeFeature.id) {
+    return { ok: false, code: "AR-CONTINUITY-INVALID" };
+  }
+  if (continuity.queueHead?.dispatch !== null || continuity.blocker !== null || continuity.decisionTxn !== null
+    || continuity.closeTransition != null || continuity.recovery !== null || continuity.acknowledgedFinal !== null) {
+    return { ok: false, code: "AR-CONTINUITY-BUSY" };
+  }
+  if (state.activeFeature.id !== value.featureId) return { ok: false, code: "AR-FEATURE-MISMATCH" };
+  if (state.activeFeature.phase !== "design" || value.decision.scope.phase !== "design"
+    || value.decision.scope.featureId !== state.activeFeature.id) return { ok: false, code: "AR-DECISION-SCOPE" };
+  if (continuity.revision !== value.expectedRevision || continuity.revision >= Number.MAX_SAFE_INTEGER) {
+    return { ok: false, code: "AR-REVISION-STALE" };
+  }
+  if (sha256Bytes(existing.raw) !== value.preStateSha256) return { ok: false, code: "AR-PRESTATE-STALE" };
+  const nowIso = (deps.now ?? (() => new Date().toISOString()))();
+  if (!(Date.parse(value.expiresAt) > Date.parse(nowIso))) return { ok: false, code: "AR-EXPIRED" };
+  const observedCandidate = (deps.gitCandidate ?? defaultGitCandidate)(dir);
+  if (!observedCandidate.ok || observedCandidate.commit !== value.candidate.commit || observedCandidate.tree !== value.candidate.tree) {
+    return { ok: false, code: "AR-CANDIDATE-STALE" };
+  }
+  if (continuity.authority.prd.path !== value.oldAuthority.prd.path || continuity.authority.prd.sha256 !== value.oldAuthority.prd.sha256
+    || continuity.authority.spec.path !== value.oldAuthority.spec.path || continuity.authority.spec.sha256 !== value.oldAuthority.spec.sha256) {
+    return { ok: false, code: "AR-OLD-AUTHORITY-STALE" };
+  }
+  if (!AUTHORITY_REVISION_PRD_PATH_RE.test(value.nextAuthority.prd.path)) return { ok: false, code: "AR-NEXT-PRD-PATH" };
+  if (value.nextAuthority.spec.path !== `${dirname(value.nextAuthority.prd.path).split(sep).join("/")}/spec.md`) {
+    return { ok: false, code: "AR-NEXT-SPEC-PATH" };
+  }
+  if (value.nextAuthority.prd.path === value.oldAuthority.prd.path && value.nextAuthority.prd.sha256 === value.oldAuthority.prd.sha256
+    && value.nextAuthority.spec.path === value.oldAuthority.spec.path && value.nextAuthority.spec.sha256 === value.oldAuthority.spec.sha256) {
+    return { ok: false, code: "AR-NO-CHANGE" };
+  }
+  const newPrd = physicalRebindFile(dir, value.nextAuthority.prd.path);
+  const newSpec = physicalRebindFile(dir, value.nextAuthority.spec.path);
+  if (newPrd === null || newSpec === null || newPrd.sha256 !== value.nextAuthority.prd.sha256 || newSpec.sha256 !== value.nextAuthority.spec.sha256) {
+    return { ok: false, code: "AR-NEXT-AUTHORITY-STALE" };
+  }
+  let newPrdText;
+  try { newPrdText = new TextDecoder("utf-8", { fatal: true }).decode(newPrd.bytes); } catch { return { ok: false, code: "AR-NEXT-PRD-TEXT" }; }
+  const marker = rebindMarker(newPrdText);
+  if (marker === null || marker.digest !== newSpec.sha256) return { ok: false, code: "AR-NEXT-PRD-MARKER" };
+
+  // PX0-AC-05: a public-safe correlated receipt -- stable operation/reason classes,
+  // public path+digest references, decision/candidate/evidence references, a typed
+  // outcome. Deliberately excludes `dir`/`root`/any absolute path, any raw command,
+  // any prompt text, and any user/account or machine identifier.
+  //
+  // F4/courseDecisionReceipts convention: `casOutcome`. This function runs exactly once
+  // per revision -- only from `-apply`, always BEFORE it is known whether that same
+  // invocation will finish the write itself or crash and leave it for a later
+  // `-recover` roll-forward to complete. `-recover` never re-derives this object; it
+  // replays the exact frozen bytes this call produces (PX0-AC-06's own "must not infer
+  // success from a temporary file" / exact-byte-replay contract, which this file's own
+  // AR05f test asserts by design: the SAME receipt is retained whichever path commits
+  // it). So `casOutcome` records the one fact that's true and stable at build time
+  // either way -- the revision is applied to State once this postimage is durably
+  // written -- not which invocation physically performed that write; "applied fresh"
+  // vs. "recovered via completing forward" remains visible instead in each command's
+  // own (non-durable) response `status` (`applied` vs. `recovered-postimage`), unchanged
+  // by this fix.
+  const receipt = {
+    schema: AUTHORITY_REVISION_RECEIPT_SCHEMA,
+    operation: "continuity-authority-revision",
+    reasonClass: "design-authority-revision",
+    featureId: state.activeFeature.id,
+    oldAuthority: { prd: value.oldAuthority.prd, spec: value.oldAuthority.spec },
+    nextAuthority: { prd: value.nextAuthority.prd, spec: value.nextAuthority.spec },
+    decision: value.decision,
+    candidate: value.candidate,
+    evidence: value.evidence,
+    casOutcome: "applied",
+  };
+
+  const nextState = structuredClone(state);
+  nextState.continuity.revision += 1;
+  nextState.continuity.authority = {
+    ...nextState.continuity.authority,
+    prd: { path: value.nextAuthority.prd.path, sha256: value.nextAuthority.prd.sha256 },
+    spec: { path: value.nextAuthority.spec.path, sha256: value.nextAuthority.spec.sha256 },
+  };
+  nextState.continuity.resume = { ...nextState.continuity.resume, sourceRevision: nextState.continuity.revision };
+  nextState.updatedAt = updatedAt;
+  if (!validateContinuityState(nextState.continuity, state.activeFeature.id).ok) return { ok: false, code: "AR-POSTIMAGE-INVALID" };
+
+  // PX0-AC-05 (durable retention): a receipt correlated by `intentSha256` is spliced
+  // into the SAME nextState object BEFORE it is written once -- no second write pass --
+  // so it survives independently of the private recovery journal (retired on success)
+  // and of stdout. Lives as a top-level sibling of `continuity` (not inside it): the
+  // continuity record's own closed shape is validated by lib/continuity-state.mjs's
+  // ROOT_KEYS, out of this change's scope. Append-only and idempotent by correlation
+  // key so a receipt is never duplicated if this ever re-splices onto a State that
+  // already carries it -- F5: `mergeAuthorityRevisionReceipt` re-derives/compares the
+  // underlying content, not just the `intentSha256` string, before treating two
+  // entries as the same duplicate (see its own doc comment).
+  const priorReceipts = Array.isArray(state.authorityRevisionReceipts) ? state.authorityRevisionReceipts : [];
+  const durableReceipt = { ...receipt, intentSha256: intent.sha256 };
+  const merged = mergeAuthorityRevisionReceipt(priorReceipts, durableReceipt);
+  if (!merged.ok) return { ok: false, code: merged.code };
+  nextState.authorityRevisionReceipts = merged.receipts;
+
+  const nextStateBytes = Buffer.from(`${JSON.stringify(nextState, null, 2)}\n`, "utf8");
+
+  const payload = {
+    schema: AUTHORITY_REVISION_PLAN_SCHEMA,
+    intent: value,
+    intentSha256: intent.sha256,
+    preimage: { revision: continuity.revision, stateSha256: sha256Bytes(existing.raw), authority: { prd: continuity.authority.prd, spec: continuity.authority.spec } },
+    postimage: {
+      revision: nextState.continuity.revision,
+      stateSha256: sha256Bytes(nextStateBytes),
+      authority: { prd: nextState.continuity.authority.prd, spec: nextState.continuity.authority.spec },
+      updatedAt,
+    },
+    receipt,
+  };
+  return { ok: true, payload, planSha256: sha256CanonicalJson(payload), intentSha256: intent.sha256, nextState, nextStateBytes, receipt };
+}
+
+function authorityRevisionPrivatePaths(dir, deps = {}) {
+  const common = (deps.gitCommonDir ?? defaultGitCommonDir)(dir);
+  if (!common?.ok || typeof common.path !== "string") return null;
+  try {
+    const root = realpathSync(common.path);
+    if (root !== resolve(common.path) || !lstatSync(root).isDirectory() || lstatSync(root).isSymbolicLink()) return null;
+    const namespace = join(root, "agent-pipeline");
+    const base = join(namespace, "continuity-authority-revision");
+    return { root, namespace, base, key: join(base, "key"), journal: join(base, "journal") };
+  } catch { return null; }
+}
+
+function loadAuthorityRevisionJournal(dir, deps = {}) {
+  const paths = authorityRevisionPrivatePaths(dir, deps);
+  if (paths === null || !observeBootstrapPrivateDirectory(paths)) return { ok: false, code: "AR-JOURNAL-GIT-COMMON-DIR" };
+  const key = readPrivateBootstrap(paths.key);
+  const raw = readPrivateBootstrap(paths.journal);
+  if (raw === null) return { ok: true, journal: null, paths, key };
+  if (key === null || key.byteLength !== 32) return { ok: false, code: "AR-JOURNAL" };
+  try {
+    const value = JSON.parse(raw.toString("utf8"));
+    const isV2 = value?.schema === AUTHORITY_REVISION_JOURNAL_SCHEMA_V2;
+    const isV1 = !isV2 && value?.schema === AUTHORITY_REVISION_JOURNAL_SCHEMA_V1;
+    const keys = isV2 ? AUTHORITY_REVISION_JOURNAL_KEYS_V2 : AUTHORITY_REVISION_JOURNAL_KEYS_V1;
+    if (!(isV1 || isV2)
+      || !exactObjectKeys(value, keys)
+      || !SHA256_RE.test(value.intentSha256)
+      || !SHA256_RE.test(value.planSha256)
+      || !SHA256_RE.test(value.preStateSha256)
+      || !SHA256_RE.test(value.postStateSha256)
+      || typeof value.postStateBase64 !== "string"
+      || (isV2 && (typeof value.expiresAt !== "string" || !Number.isFinite(Date.parse(value.expiresAt))))
+      || value.receipt === null || typeof value.receipt !== "object" || Array.isArray(value.receipt)
+      || !SHA256_RE.test(value.mac)) return { ok: false, code: "AR-JOURNAL" };
+    const { mac, ...core } = value;
+    if (bootstrapJournalMac(key, core) !== mac) return { ok: false, code: "AR-JOURNAL" };
+    // F2: a `.v1` journal never had a frozen `expiresAt` to check against -- `expiresAt:
+    // null` here is the in-memory sentinel `runAuthorityRevisionRecoverCommand` reads to
+    // preserve the OLD unconditional-roll-forward behavior for this ONE legacy case only,
+    // never written back to disk.
+    const journal = isV1 ? { ...value, expiresAt: null } : value;
+    return { ok: true, journal, paths, key };
+  } catch { return { ok: false, code: "AR-JOURNAL" }; }
+}
+
+/** Publishes the journal BEFORE any State byte is touched. `wx`-only: never overwrites a pending one. */
+function publishAuthorityRevisionJournal(dir, record, deps = {}) {
+  const paths = authorityRevisionPrivatePaths(dir, deps);
+  if (!ensureBootstrapPrivateDirectory(paths)) return false;
+  let key = readPrivateBootstrap(paths.key);
+  if (key === null) { key = randomBytes(32); if (!writePrivateBootstrap(paths.key, key)) return false; }
+  if (key.byteLength !== 32) return false;
+  const core = {
+    schema: AUTHORITY_REVISION_JOURNAL_SCHEMA,
+    intentSha256: record.intentSha256,
+    planSha256: record.planSha256,
+    preStateSha256: record.preStateSha256,
+    postStateSha256: record.postStateSha256,
+    postStateBase64: record.postStateBytes.toString("base64"),
+    // PX0-AC-06: the frozen intent's own expiry, carried through so `-recover` can run
+    // its one fresh binding check (expiry against `deps.now`) without re-deriving the
+    // plan or re-reading a git candidate. Inside `core` -> MAC-protected exactly like
+    // every other journal field.
+    expiresAt: record.expiresAt,
+    receipt: record.receipt,
+  };
+  const bytes = Buffer.from(`${JSON.stringify({ ...core, mac: bootstrapJournalMac(key, core) })}\n`, "utf8");
+  return writePrivateBootstrap(paths.journal, bytes, false);
+}
+
+/** Retires the journal. Only ever called after a confirmed, matching postimage readback. */
+function retireAuthorityRevisionJournal(paths) {
+  try { return ensureBootstrapPrivateDirectory(paths) && (unlinkSync(paths.journal), syncDirectory(paths.base).ok); } catch { return false; }
+}
+
+function parseAuthorityRevisionApplyFlags(rest) {
+  const parsed = parseExactFlags(rest, new Set(["request-file", "request-sha256", "lock-token"]));
+  if (!parsed.ok || !SHA256_RE.test(parsed.value["request-sha256"])) return null;
+  return { requestFile: parsed.value["request-file"], requestSha256: parsed.value["request-sha256"], lockToken: parsed.value["lock-token"] };
+}
+
+function runAuthorityRevisionPlanCommand(dir, rest, deps) {
+  const parsed = parseExactFlags(rest, new Set(["proposal-file"]));
+  if (!parsed.ok) { console.error("Error: continuity-authority-revision-plan requires exactly --proposal-file <repo-relative-json>."); return 2; }
+  const read = readAuthorityRevisionFile(dir, parsed.value["proposal-file"]);
+  if (!read.ok) { console.error(`Error: continuity-authority-revision-plan refused (${read.code}); zero mutation.`); return 2; }
+  const updatedAt = deps.now();
+  const built = buildAuthorityRevisionPlan(dir, readStateRaw(dir), read.value, updatedAt, deps);
+  if (!built.ok) { console.error(`Error: continuity-authority-revision-plan refused (${built.code}); zero mutation.`); return 2; }
+  console.log(JSON.stringify({ ...built.payload, planSha256: built.planSha256 }, null, 2));
+  return 0;
+}
+
+function authorityRevisionRequestDocValid(requestDoc) {
+  return requestDoc?.schema === AUTHORITY_REVISION_PLAN_SCHEMA
+    && requestDoc.intent && typeof requestDoc.intent === "object" && !Array.isArray(requestDoc.intent)
+    && typeof requestDoc.intentSha256 === "string" && SHA256_RE.test(requestDoc.intentSha256)
+    && typeof requestDoc.planSha256 === "string" && SHA256_RE.test(requestDoc.planSha256)
+    && requestDoc.postimage && typeof requestDoc.postimage.updatedAt === "string"
+    && requestDoc.receipt && typeof requestDoc.receipt === "object" && !Array.isArray(requestDoc.receipt);
+}
+
+function runAuthorityRevisionApplyCommand(dir, rest, deps) {
+  const parsed = parseAuthorityRevisionApplyFlags(rest);
+  if (parsed === null) {
+    console.error("Error: continuity-authority-revision-apply requires exactly --request-file <repo-relative-json> --request-sha256 <sha256> --lock-token <token>.");
+    return 2;
+  }
+  const readRaw = readAuthorityRevisionFile(dir, parsed.requestFile);
+  if (!readRaw.ok) { console.error(`Error: continuity-authority-revision-apply refused (${readRaw.code}); zero mutation.`); return 2; }
+  if (sha256Bytes(readRaw.raw) !== parsed.requestSha256) { console.error("Error: continuity-authority-revision-apply refused (AR-REQUEST-DIGEST-MISMATCH); zero mutation."); return 2; }
+  const requestDoc = readRaw.value;
+  if (!authorityRevisionRequestDocValid(requestDoc)) { console.error("Error: continuity-authority-revision-apply refused (AR-REQUEST-SHAPE); zero mutation."); return 2; }
+  const intentValue = requestDoc.intent;
+
+  if (typeof deps.authorityRevisionApproval !== "function") {
+    console.error("Error: continuity-authority-revision-apply refused (AR-APPROVAL-UNAVAILABLE); zero mutation.");
+    return 2;
+  }
+  const approvalCheck = deps.authorityRevisionApproval({
+    repoRoot: dir,
+    schema: AUTHORITY_REVISION_APPROVAL_SCHEMA,
+    featureId: intentValue.featureId,
+    phase: intentValue.decision?.scope?.phase,
+    oldAuthority: intentValue.oldAuthority,
+    nextAuthority: intentValue.nextAuthority,
+    decision: intentValue.decision,
+    candidate: intentValue.candidate,
+    evidence: intentValue.evidence,
+    expiresAt: intentValue.expiresAt,
+  });
+  if (!approvalCheck?.ok) { console.error("Error: continuity-authority-revision-apply refused (AR-PROOF-REJECTED); zero mutation."); return 2; }
+
+  const lock = acquireContinuityLock(dir, parsed.lockToken, deps);
+  if (!lock.ok) { console.error(`Error: continuity-authority-revision-apply refused (${lock.code}); zero mutation.`); return 2; }
+  try {
+    const current = readStateRaw(dir);
+    if (current.status !== "ok") { console.error("Error: continuity-authority-revision-apply refused (AR-STATE-UNAVAILABLE); zero mutation."); return 2; }
+
+    // PX0-AC-07: the exact same completed request, replayed -- verified zero-write.
+    if (sha256Bytes(current.raw) === requestDoc.postimage.stateSha256) {
+      if (current.state?.activeFeature?.id !== intentValue.featureId
+        || current.state?.continuity?.revision !== requestDoc.postimage.revision
+        || !sameJson(current.state?.continuity?.authority?.prd, requestDoc.postimage.authority?.prd)
+        || !sameJson(current.state?.continuity?.authority?.spec, requestDoc.postimage.authority?.spec)) {
+        console.error("Error: continuity-authority-revision-apply refused (AR-REPLAY-POSTIMAGE-INVALID); zero mutation.");
+        return 2;
+      }
+      console.log(JSON.stringify({ schema: AUTHORITY_REVISION_APPLY_SCHEMA, status: "replayed", mutated: false, featureId: intentValue.featureId, revision: current.state.continuity.revision, receipt: requestDoc.receipt }, null, 2));
+      return 0;
+    }
+
+    const pending = loadAuthorityRevisionJournal(dir, deps);
+    if (!pending.ok) { console.error(`Error: continuity-authority-revision-apply refused (${pending.code}); run continuity-authority-revision-recover.`); return 2; }
+    if (pending.journal !== null) {
+      console.error(pending.journal.intentSha256 === requestDoc.intentSha256
+        ? "Error: continuity-authority-revision-apply refused (AR-JOURNAL-PENDING); a recovery journal is already retained for this exact revision; run continuity-authority-revision-recover before retrying. Zero new mutation; recovery journal retained."
+        : "Error: continuity-authority-revision-apply refused (AR-JOURNAL-CONFLICT); a different revision is already pending; run continuity-authority-revision-recover before retrying. Zero new mutation; recovery journal retained.");
+      return 2;
+    }
+
+    // Fresh -- closes the TOCTOU window a planner leaves open: re-derive against
+    // CURRENT reality using the SAME `updatedAt` the plan fixed, never a fresh clock.
+    const proposal = { ...intentValue, schema: AUTHORITY_REVISION_REQUEST_INPUT_SCHEMA };
+    const rebuilt = buildAuthorityRevisionPlan(dir, current, proposal, requestDoc.postimage.updatedAt, deps);
+    if (!rebuilt.ok || rebuilt.planSha256 !== requestDoc.planSha256 || rebuilt.intentSha256 !== requestDoc.intentSha256) {
+      console.error(`Error: continuity-authority-revision-apply refused (${rebuilt.ok ? "AR-REQUEST-STALE" : rebuilt.code}); zero mutation.`);
+      return 2;
+    }
+
+    const published = publishAuthorityRevisionJournal(dir, {
+      intentSha256: rebuilt.intentSha256, planSha256: rebuilt.planSha256,
+      preStateSha256: sha256Bytes(current.raw), postStateSha256: sha256Bytes(rebuilt.nextStateBytes),
+      postStateBytes: rebuilt.nextStateBytes, expiresAt: intentValue.expiresAt, receipt: rebuilt.receipt,
+    }, deps);
+    if (!published) { console.error("Error: continuity-authority-revision-apply refused (AR-JOURNAL-PREPARE-FAILED); zero mutation."); return 2; }
+    if (deps.afterAuthorityRevisionJournal?.() === false) {
+      console.error("Error: continuity-authority-revision-apply interrupted after journal preparation; recovery journal retained.");
+      return 2;
+    }
+
+    const written = atomicWriteContinuityState(dir, rebuilt.nextState, lock, deps);
+    if (!written.ok) { console.error(`Error: continuity-authority-revision-apply refused (${written.code}); recovery journal retained.`); return 2; }
+    if (deps.afterAuthorityRevisionWrite?.() === false) {
+      console.error("Error: continuity-authority-revision-apply interrupted after State write; recovery journal retained.");
+      return 2;
+    }
+
+    const persisted = readStateRaw(dir);
+    if (persisted.status !== "ok" || sha256Bytes(persisted.raw) !== sha256Bytes(rebuilt.nextStateBytes) || !sameJson(persisted.state, rebuilt.nextState)) {
+      console.error("Error: continuity-authority-revision-apply refused (AR-POSTIMAGE-READBACK); recovery journal retained.");
+      return 2;
+    }
+    const paths = authorityRevisionPrivatePaths(dir, deps);
+    if (!retireAuthorityRevisionJournal(paths)) {
+      console.error("Error: continuity-authority-revision-apply committed but journal retirement is unresolved; recovery journal retained.");
+      return 2;
+    }
+    console.log(JSON.stringify({ schema: AUTHORITY_REVISION_APPLY_SCHEMA, status: "applied", mutated: true, featureId: intentValue.featureId, revision: persisted.state.continuity.revision, receipt: rebuilt.receipt }, null, 2));
+    return 0;
+  } finally { releaseContinuityLock(lock); }
+}
+
+/**
+ * Never re-derives the plan and never re-reads a git candidate -- "must not select a
+ * new candidate". Never infers success from the presence/absence of a `.tmp.*` file --
+ * "must not infer success from a temporary file" -- it re-reads the CURRENT State file
+ * itself and compares its exact bytes to the two values the journal already froze.
+ */
+function runAuthorityRevisionRecoverCommand(dir, rest, deps) {
+  const parsed = parseExactFlags(rest, new Set(["lock-token"]));
+  if (!parsed.ok) { console.error("Error: continuity-authority-revision-recover requires exactly --lock-token <token>."); return 2; }
+  const lockToken = parsed.value["lock-token"];
+  const loaded = loadAuthorityRevisionJournal(dir, deps);
+  if (!loaded.ok) { console.error(`Error: continuity-authority-revision-recover refused (${loaded.code}); manual repository inspection is required.`); return 2; }
+  if (loaded.journal === null) {
+    console.log(JSON.stringify({ schema: AUTHORITY_REVISION_RECOVER_SCHEMA, status: "clean", retained: false }, null, 2));
+    return 0;
+  }
+  const journal = loaded.journal;
+  const observedBefore = readStateRaw(dir);
+  if (observedBefore.status !== "ok") { console.error("Error: continuity-authority-revision-recover refused (AR-STATE-UNAVAILABLE); recovery journal retained."); return 2; }
+  const observedSha256 = sha256Bytes(observedBefore.raw);
+
+  if (observedSha256 === journal.postStateSha256) {
+    // Durable stage already reached; only the journal retirement is outstanding.
+    const paths = authorityRevisionPrivatePaths(dir, deps);
+    if (!retireAuthorityRevisionJournal(paths)) {
+      console.error("Error: continuity-authority-revision-recover refused (AR-JOURNAL-RETIREMENT-UNRESOLVED); recovery journal retained.");
+      return 2;
+    }
+    console.log(JSON.stringify({ schema: AUTHORITY_REVISION_RECOVER_SCHEMA, status: "recovered-postimage", retained: false, mutated: false, receipt: journal.receipt }, null, 2));
+    return 0;
+  }
+
+  if (observedSha256 !== journal.preStateSha256) {
+    console.log(JSON.stringify({ schema: AUTHORITY_REVISION_RECOVER_SCHEMA, status: "diverged", retained: true }, null, 2));
+    return 2;
+  }
+
+  // F3: the expiry decision below (and the journal deletion it can trigger) must not run
+  // unlocked -- `-apply` holds this SAME lock across its entire publish-journal -> write-
+  // State -> retire-journal sequence, so acquiring it here first is what actually closes
+  // the race: a concurrent in-flight `-apply` either still holds the lock (this call fails
+  // closed with a lock-contention code, journal retained, no delete) or has already fully
+  // finished-or-failed-and-released it (in which case the fresh recheck below observes
+  // reality as it now stands). Either way the expiry decision never acts on a stale,
+  // unlocked read.
+  const lock = acquireContinuityLock(dir, lockToken, deps);
+  if (!lock.ok) { console.error(`Error: continuity-authority-revision-recover refused (${lock.code}); recovery journal retained.`); return 2; }
+  try {
+    const recheck = readStateRaw(dir);
+    if (recheck.status !== "ok" || sha256Bytes(recheck.raw) !== journal.preStateSha256) {
+      console.error("Error: continuity-authority-revision-recover refused (AR-RECOVERY-PREIMAGE-DRIFT); recovery journal retained.");
+      return 2;
+    }
+
+    // PX0-AC-06: the ONE fresh binding check recovery performs before completing forward --
+    // the frozen intent's own expiry against the injected clock. No candidate re-derivation,
+    // no re-check of AR-DECISION-SCOPE or any other buildAuthorityRevisionPlan check. If the
+    // decision's approval window has since lapsed, do not complete the write; retire the
+    // journal and report a genuine preimage-recovery outcome instead. `expiresAt === null`
+    // is F2's legacy-`.v1`-journal sentinel (no expiry was ever frozen for it to check
+    // against) -- treated as always still valid, never taking this branch.
+    const nowIso = (deps.now ?? (() => new Date().toISOString()))();
+    if (journal.expiresAt !== null && !(Date.parse(journal.expiresAt) > Date.parse(nowIso))) {
+      const expiredPaths = authorityRevisionPrivatePaths(dir, deps);
+      if (!retireAuthorityRevisionJournal(expiredPaths)) {
+        console.error("Error: continuity-authority-revision-recover refused (AR-JOURNAL-RETIREMENT-UNRESOLVED); recovery journal retained.");
+        return 2;
+      }
+      // F4/courseDecisionReceipts convention (see buildAuthorityRevisionPlan above):
+      // `casOutcome` is the typed, closed enum {applied, stale, conflict, io-error} --
+      // "applied" means the CAS write landed (postRevision advanced from preRevision).
+      // On THIS branch it never did: State stays exactly at the preimage (no
+      // atomicWriteContinuityState call happens here), so echoing the frozen
+      // `journal.receipt` unmodified -- whose `casOutcome` was fixed to "applied" at
+      // apply-build time under the opposite assumption -- would contradict this same
+      // response's own `status: "recovered-preimage"` / `mutated: false`. The frozen
+      // journal object itself (and the durable receipt an eventual successful apply/
+      // recover would splice into State) is left untouched -- only this one echoed,
+      // non-durable CLI response gets a shallow-copied receipt with the outcome
+      // corrected to "stale": the decision's approval window aged out before the CAS
+      // could complete, which is exactly the courseDecisionReceipts sense of "stale"
+      // (an expired precondition, not a concurrent-state "conflict" or an "io-error").
+      const staleReceipt = { ...journal.receipt, casOutcome: "stale" };
+      console.log(JSON.stringify({ schema: AUTHORITY_REVISION_RECOVER_SCHEMA, status: "recovered-preimage", retained: false, mutated: false, receipt: staleReceipt }, null, 2));
+      return 0;
+    }
+
+    // Preimage confirmed byte-identical to the frozen journal's own preimage, and the
+    // decision's approval window is still valid -- then replays the frozen postimage bytes
+    // exactly as journaled. No plan re-derivation, no new candidate.
+    let postState;
+    try { postState = JSON.parse(Buffer.from(journal.postStateBase64, "base64").toString("utf8")); }
+    catch { console.error("Error: continuity-authority-revision-recover refused (AR-JOURNAL); recovery journal retained."); return 2; }
+
+    // F6: the journal's MAC privately seals `postStateBase64`'s own bytes, but the PRD/
+    // Spec artifact FILES it references are never sealed by that MAC -- only their frozen
+    // digest is, inside `postState.continuity.authority`. Between the interrupted apply
+    // that froze this journal and this recovery run completing it forward, those files
+    // could have been mutated out-of-band (a stray edit, a checkout, a bug) without
+    // touching State at all. Blindly replaying `postState` would then certify a State
+    // authority binding that no longer matches what is actually on disk. Same
+    // `physicalRebindFile`-based re-validation `buildAuthorityRevisionPlan` performs at
+    // build time (AR-NEXT-AUTHORITY-STALE), re-run here fresh, immediately before the
+    // write completes -- never trusting the frozen digest alone.
+    const postPrd = physicalRebindFile(dir, postState?.continuity?.authority?.prd?.path);
+    const postSpec = physicalRebindFile(dir, postState?.continuity?.authority?.spec?.path);
+    if (postPrd === null || postSpec === null
+      || postPrd.sha256 !== postState?.continuity?.authority?.prd?.sha256
+      || postSpec.sha256 !== postState?.continuity?.authority?.spec?.sha256) {
+      console.error("Error: continuity-authority-revision-recover refused (AR-RECOVER-ARTIFACT-STALE); recovery journal retained.");
+      return 2;
+    }
+
+    const written = atomicWriteContinuityState(dir, postState, lock, deps);
+    if (!written.ok) { console.error(`Error: continuity-authority-revision-recover refused (${written.code}); recovery journal retained.`); return 2; }
+    const persisted = readStateRaw(dir);
+    if (persisted.status !== "ok" || sha256Bytes(persisted.raw) !== journal.postStateSha256) {
+      console.error("Error: continuity-authority-revision-recover refused (AR-POSTIMAGE-READBACK); recovery journal retained.");
+      return 2;
+    }
+    const paths = authorityRevisionPrivatePaths(dir, deps);
+    if (!retireAuthorityRevisionJournal(paths)) {
+      console.error("Error: continuity-authority-revision-recover committed but journal retirement is unresolved; recovery journal retained.");
+      return 2;
+    }
+    console.log(JSON.stringify({ schema: AUTHORITY_REVISION_RECOVER_SCHEMA, status: "recovered-postimage", retained: false, mutated: true, receipt: journal.receipt }, null, 2));
+    return 0;
+  } finally { releaseContinuityLock(lock); }
+}
+
+function runAuthorityRevisionCommand(sub, rest, deps) {
+  const dir = deps.dir;
+  const now = deps.now ?? (() => new Date().toISOString());
+  const boundDeps = { ...deps, now };
+  if (sub === "continuity-authority-revision-plan") return runAuthorityRevisionPlanCommand(dir, rest, boundDeps);
+  if (sub === "continuity-authority-revision-recover") return runAuthorityRevisionRecoverCommand(dir, rest, boundDeps);
+  return runAuthorityRevisionApplyCommand(dir, rest, boundDeps);
 }
 
 // ---- Elephant-owned first Result-authority bootstrap (AC-047-143--148) ----
@@ -3965,10 +4938,7 @@ function validRebindApproval(state, prd, spec, profile) {
   const authority = approval?.poGateAuthority;
   const approvalKeys = ["schema", "approvedBy", "approvedAt", "specBoundBy", "specBoundAt", "poGateAuthority"];
   const authorityKeys = ["schema", "humanFacing", "sourceSha256", "runtimeSha256", "receiptSha256", "repositoryFingerprint", "planPath", "planSha256", "specPath", "specSha256"];
-  if (!exactObjectKeys(approval, approvalKeys) || !exactObjectKeys(authority, authorityKeys)
-    || approval.schema !== "pipeline.plan-approval.v2"
-    || isBlank(approval.approvedBy) || isBlank(approval.specBoundBy)
-    || !canonicalIso(approval.approvedAt) || !canonicalIso(approval.specBoundAt)
+  if (!exactObjectKeys(authority, authorityKeys)
     || authority.schema !== "pipeline.po-gate-authority.v2" || authority.planPath !== state.activeFeature?.planPath
     || authority.planSha256 !== prd.sha256 || authority.specPath !== spec.path
     || !SHA256_RE.test(authority.specSha256) || !profile?.ok) return null;
@@ -3976,6 +4946,19 @@ function validRebindApproval(state, prd, spec, profile) {
   if (!profileValue || authority.humanFacing !== profileValue.humanFacing
     || authority.sourceSha256 !== profileValue.sourceSha256 || authority.runtimeSha256 !== profileValue.runtimeSha256
     || authority.receiptSha256 !== profileValue.receiptSha256 || authority.repositoryFingerprint !== profileValue.repositoryFingerprint) return null;
+  if (exactObjectKeys(approval, approvalKeys) && approval.schema === "pipeline.plan-approval.v2"
+    && !isBlank(approval.approvedBy) && !isBlank(approval.specBoundBy)
+    && canonicalIso(approval.approvedAt) && canonicalIso(approval.specBoundAt)) return authority;
+  // v4-schema fallback (mirrors validPriorAuthority's dual-handling, ~line 4786):
+  // the v4 planApproval carries no specBoundBy/specBoundAt of its own -- its
+  // authority binding is validated via the submission it was approved against.
+  const submission = state?.planSubmission;
+  if (!validCurrentPlanApproval(approval) || !validPlanSubmission(submission)
+    || approval.submissionSha256 !== sha256CanonicalJson(submission)
+    || approval.profileSha256 !== submission.profileSha256
+    || submission.featureId !== state.activeFeature?.id
+    || submission.planPath !== authority.planPath || submission.planSha256 !== authority.planSha256
+    || submission.specPath !== authority.specPath || submission.specSha256 !== authority.specSha256) return null;
   return authority;
 }
 
@@ -5071,6 +6054,1071 @@ function runPoAuthorityRebindApply(apply, deps, lock, io, stateIo, {
   } catch { console.error("Error: PO authority rebind transaction failed; recovery journal retained."); return 2; }
 }
 
+// ---- PHX-0 slice A: the READ-ONLY half of the #22 lifecycle writer family -----------------
+/**
+ * `feature-package-inspect|status|plan` (P-AC-08).
+ *
+ * These three open no file for writing, take no lock, touch neither the state file nor
+ * any manifest, and are routed BEFORE `readState()` on purpose: a read-only report must
+ * not depend on -- or be refused by -- the operator's local state file.
+ *
+ * Every verdict below comes from the accepted topology validator/transition planner in
+ * `../lib/feature-package-topology.mjs`. This layer parses arguments, refuses fail-closed
+ * naming the argument at fault, and serialises what that planner returned; it re-derives
+ * no package rule of its own, and `feature-package-plan` prints the planner's preview
+ * object verbatim as its whole document rather than a rewrite of it.
+ *
+ * The transactional half (`feature-package-apply` / `feature-package-recover`) is
+ * deliberately ABSENT rather than stubbed -- a stub is precisely the thing a caller
+ * mistakes for a gate.
+ */
+const FEATURE_PACKAGE_READ_SUBCOMMANDS = new Set([
+  "feature-package-inspect",
+  "feature-package-status",
+  "feature-package-plan",
+]);
+const FEATURE_PACKAGE_INSPECT_SCHEMA = "pipeline.feature-package-inspect.v1";
+const FEATURE_PACKAGE_STATUS_SCHEMA = "pipeline.feature-package-status.v1";
+const FEATURE_PACKAGE_READ_FLAGS = new Map([
+  ["feature-package-inspect", new Set(["root"])],
+  ["feature-package-status", new Set(["root", "manifest"])],
+  ["feature-package-plan", new Set(["root", "manifest", "next-state", "proposal"])],
+]);
+
+function refuseFeaturePackageRead(sub, message) {
+  console.error(`Error: ${sub} refused: ${message}.`);
+  return 2;
+}
+
+/**
+ * Closed parser: an unknown, repeated or value-less flag is a refusal that NAMES the
+ * offending argument, not a silently ignored token.
+ */
+function parseFeaturePackageReadFlags(argv, allowed) {
+  const out = {};
+  for (let i = 0; i < argv.length; i++) {
+    const raw = argv[i];
+    if (typeof raw !== "string" || !raw.startsWith("--")) {
+      return { ok: false, error: `unexpected argument "${typeof raw === "string" ? raw : String(raw)}"` };
+    }
+    const name = raw.slice(2);
+    if (!allowed.has(name)) return { ok: false, error: `unknown argument "--${name}"` };
+    if (Object.prototype.hasOwnProperty.call(out, name)) return { ok: false, error: `duplicate argument "--${name}"` };
+    const value = argv[i + 1];
+    if (typeof value !== "string" || value.length === 0 || value.startsWith("--")) {
+      return { ok: false, error: `argument "--${name}" requires a value` };
+    }
+    out[name] = value;
+    i++;
+  }
+  return { ok: true, value: out };
+}
+
+/**
+ * Minimal containment check for the paths THIS layer opens itself. It is not a second
+ * copy of the topology's path contract -- the planner re-checks every package path it
+ * uses -- it exists so a refusal can name the bad argument before any read happens.
+ */
+function featurePackageReadRelative(root, value) {
+  if (typeof value !== "string" || value.length === 0 || isAbsolute(value) || value.includes("\\")) return null;
+  if (value.split("/").some((part) => part === "" || part === "." || part === "..")) return null;
+  const rel = relative(root, resolve(root, value));
+  return rel === "" || rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel) ? null : value;
+}
+
+function featurePackageReadArtifactView(artifact) {
+  if (artifact === null || typeof artifact !== "object" || Array.isArray(artifact)) {
+    return { class: null, path: null, sha256: null, authority: null, mutability: null, retention: null };
+  }
+  return {
+    class: artifact.class ?? null,
+    path: artifact.path ?? null,
+    sha256: artifact.sha256 ?? null,
+    authority: artifact.authority ?? null,
+    mutability: artifact.mutability ?? null,
+    retention: artifact.retention ?? null,
+  };
+}
+
+function runFeaturePackageReadCommand(sub, argv) {
+  const parsed = parseFeaturePackageReadFlags(argv, FEATURE_PACKAGE_READ_FLAGS.get(sub));
+  if (!parsed.ok) return refuseFeaturePackageRead(sub, parsed.error);
+  const flags = parsed.value;
+  if (flags.root === undefined) return refuseFeaturePackageRead(sub, 'argument "--root <dir>" is required');
+  const root = resolve(flags.root);
+  let rootStat = null;
+  try { rootStat = statSync(root); } catch { rootStat = null; }
+  if (rootStat === null || !rootStat.isDirectory()) {
+    return refuseFeaturePackageRead(sub, `argument "--root" does not name a readable directory: ${flags.root}`);
+  }
+
+  if (sub === "feature-package-inspect") {
+    const inventory = inventoryFeaturePackages(root);
+    const packages = inventory.packages.map((manifest) => {
+      const checked = validateFeaturePackage(root, manifest);
+      return {
+        manifest,
+        ok: checked.ok,
+        featureId: checked.receipt?.featureId ?? null,
+        state: checked.receipt?.state ?? null,
+        candidate: checked.receipt?.candidate ?? null,
+        manifestSha256: checked.receipt?.manifestSha256 ?? null,
+        artifactCount: checked.receipt?.artifactCount ?? 0,
+        findings: checked.findings,
+      };
+    });
+    const invalidCount = packages.filter((entry) => !entry.ok).length;
+    console.log(JSON.stringify({
+      schema: FEATURE_PACKAGE_INSPECT_SCHEMA,
+      ok: invalidCount === 0,
+      packageCount: packages.length,
+      invalidCount,
+      packages,
+      legacy: inventory.legacy,
+      unknown: inventory.unknown,
+    }, null, 2));
+    return invalidCount === 0 ? 0 : 2;
+  }
+
+  if (flags.manifest === undefined) {
+    return refuseFeaturePackageRead(sub, 'argument "--manifest <repo-relative-path>" is required');
+  }
+  const manifest = featurePackageReadRelative(root, flags.manifest);
+  if (manifest === null) {
+    return refuseFeaturePackageRead(sub, `argument "--manifest" must be a canonical path inside --root: ${flags.manifest}`);
+  }
+
+  if (sub === "feature-package-status") {
+    const checked = validateFeaturePackage(root, manifest);
+    if (checked.receipt === null) {
+      return refuseFeaturePackageRead(sub, `argument "--manifest" names an unreadable or malformed manifest: ${manifest} (${checked.findings.join("; ")})`);
+    }
+    let value = null;
+    try { value = JSON.parse(readFileSync(join(root, checked.receipt.manifest), "utf8")); }
+    catch { return refuseFeaturePackageRead(sub, `argument "--manifest" names an unreadable or malformed manifest: ${manifest}`); }
+    console.log(JSON.stringify({
+      schema: FEATURE_PACKAGE_STATUS_SCHEMA,
+      ok: checked.ok,
+      manifest: checked.receipt.manifest,
+      featureId: checked.receipt.featureId,
+      state: checked.receipt.state,
+      candidate: checked.receipt.candidate,
+      manifestSha256: checked.receipt.manifestSha256,
+      artifactCount: checked.receipt.artifactCount,
+      artifacts: (Array.isArray(value?.artifacts) ? value.artifacts : []).map(featurePackageReadArtifactView),
+      receipt: checked.receipt,
+      findings: checked.findings,
+    }, null, 2));
+    return checked.ok ? 0 : 2;
+  }
+
+  const nextState = flags["next-state"];
+  if (existsSync(join(root, manifest))) {
+    if (nextState === undefined) {
+      return refuseFeaturePackageRead(sub, 'argument "--next-state <state>" is required for an existing manifest');
+    }
+    if (flags.proposal !== undefined) {
+      return refuseFeaturePackageRead(sub, `argument "--proposal" applies only to an absent manifest, and ${manifest} exists`);
+    }
+    const plan = planFeaturePackageTransition(root, manifest, nextState);
+    console.log(JSON.stringify(plan, null, 2));
+    return plan.status === "preview" || plan.status === "noop" ? 0 : 2;
+  }
+  if (flags.proposal === undefined) {
+    return refuseFeaturePackageRead(sub, `argument "--proposal <repo-relative-path>" is required because ${manifest} is absent; the bootstrap preview validates the proposed manifest bytes in memory and creates nothing`);
+  }
+  const proposalPath = featurePackageReadRelative(root, flags.proposal);
+  if (proposalPath === null) {
+    return refuseFeaturePackageRead(sub, `argument "--proposal" must be a canonical path inside --root: ${flags.proposal}`);
+  }
+  try {
+    const stat = lstatSync(join(root, proposalPath));
+    if (!stat.isFile() || stat.isSymbolicLink()) {
+      return refuseFeaturePackageRead(sub, `argument "--proposal" must name a regular non-symlink file: ${proposalPath}`);
+    }
+  } catch { return refuseFeaturePackageRead(sub, `argument "--proposal" names an unreadable file: ${proposalPath}`); }
+  let manifestBytes = null;
+  try { manifestBytes = readFileSync(join(root, proposalPath), "utf8"); }
+  catch { return refuseFeaturePackageRead(sub, `argument "--proposal" names an unreadable file: ${proposalPath}`); }
+  const plan = planFeaturePackageBootstrap(root, manifest, { manifestBytes, targetState: nextState ?? "draft" });
+  console.log(JSON.stringify(plan, null, 2));
+  return plan.status === "bootstrap-preview" ? 0 : 2;
+}
+
+// ---- PHX-WP-MUTABLE-REBIND-EXPLICIT-CLI: the deliberate, out-of-band rebind trigger --------
+/**
+ * `feature-package-rebind-mutable` (PHX-WP-MUTABLE-ARTIFACT-AUTOREBIND's own remaining design
+ * question, per backlog/items/2026-08-17-acceptance-md-edits-repeatedly-drift-lifecycle-json-
+ * bound-digest.md: "a dedicated CLI verb an operator or Elephant invokes explicitly").
+ *
+ * This is the ONLY place in this script that ever passes `autoRebindMutable: true` to
+ * `validateFeaturePackage`. It is a deliberate, standalone, operator/Elephant-INITIATED
+ * command -- never a silent side effect of `feature-package-apply` / `-reconcile` / `-plan` /
+ * `-inspect` / `-status`, which stay exactly as unwired as PHX-WP-AUTOREBIND-WRITEPATH-
+ * INVESTIGATE-FINISH left them (see the comment on `runFeaturePackageApplyCommand` above for
+ * why: an internal recompute inside a write path that also consumes an approval-bound preview
+ * digest cannot distinguish a routine edit from deliberate tampering). Called here, with no
+ * preview digest to defeat and no approval gate to bypass, that risk does not apply: the
+ * caller sees exactly what was rebound (or that nothing was) in the printed result, same as
+ * running the command IS the audit signal.
+ *
+ * Routed ahead of `readState()`, like the read-only three: this verb's authority is the
+ * `--root` repository's own topology, never the operator's local state file. It takes no
+ * writer lock and keeps no recovery journal -- `validateFeaturePackage`'s own rebind write is
+ * a single atomic `writeFileSync`, not a multi-step transaction, and `immutable`/`append-only`
+ * artifacts are never touched by it (the mutability class test lives once, in
+ * `autoRebindMutableArtifact`, and is never made configurable from here or anywhere else).
+ */
+const FEATURE_PACKAGE_REBIND_MUTABLE_SUBCOMMAND = "feature-package-rebind-mutable";
+const FEATURE_PACKAGE_REBIND_MUTABLE_SCHEMA = "pipeline.feature-package-rebind-mutable.v1";
+const FEATURE_PACKAGE_REBIND_MUTABLE_FLAGS = new Set(["root", "manifest"]);
+
+function runFeaturePackageRebindMutableCommand(argv) {
+  const sub = FEATURE_PACKAGE_REBIND_MUTABLE_SUBCOMMAND;
+  const parsed = parseFeaturePackageReadFlags(argv, FEATURE_PACKAGE_REBIND_MUTABLE_FLAGS);
+  if (!parsed.ok) return refuseFeaturePackageRead(sub, parsed.error);
+  const flags = parsed.value;
+  if (flags.root === undefined) return refuseFeaturePackageRead(sub, 'argument "--root <dir>" is required');
+  const root = resolve(flags.root);
+  let rootStat = null;
+  try { rootStat = statSync(root); } catch { rootStat = null; }
+  if (rootStat === null || !rootStat.isDirectory()) {
+    return refuseFeaturePackageRead(sub, `argument "--root" does not name a readable directory: ${flags.root}`);
+  }
+  if (flags.manifest === undefined) {
+    return refuseFeaturePackageRead(sub, 'argument "--manifest <repo-relative-path>" is required');
+  }
+  const manifest = featurePackageReadRelative(root, flags.manifest);
+  if (manifest === null) {
+    return refuseFeaturePackageRead(sub, `argument "--manifest" must be a canonical path inside --root: ${flags.manifest}`);
+  }
+
+  const checked = validateFeaturePackage(root, manifest, null, { autoRebindMutable: true });
+  if (checked.receipt === null) {
+    return refuseFeaturePackageRead(sub, `argument "--manifest" names an unreadable or malformed manifest: ${manifest} (${checked.findings.join("; ")})`);
+  }
+  const rebinds = Array.isArray(checked.rebinds) ? checked.rebinds : [];
+  for (const rebind of rebinds) {
+    console.log(`Rebound ${rebind.path} (${rebind.class}): ${rebind.from} -> ${rebind.to}`);
+  }
+  if (rebinds.length === 0) console.log(`No mutable-class artifact needed rebinding in ${manifest}.`);
+  console.log(JSON.stringify({
+    schema: FEATURE_PACKAGE_REBIND_MUTABLE_SCHEMA,
+    ok: checked.ok,
+    manifest: checked.receipt.manifest,
+    featureId: checked.receipt.featureId,
+    manifestSha256: checked.receipt.manifestSha256,
+    rebindCount: rebinds.length,
+    rebinds,
+    findings: checked.findings,
+  }, null, 2));
+  return checked.ok ? 0 : 2;
+}
+
+// ---- PHX-0A-WRITE: the transactional half of the #22 lifecycle writer family (P-AC-08) ----
+/**
+ * `feature-package-apply` / `feature-package-recover`.
+ *
+ * Neither subcommand re-derives a package rule: every verdict below still comes from
+ * `planFeaturePackageTransition` / `planFeaturePackageBootstrap` / `validateFeaturePackage`
+ * in `../lib/feature-package-topology.mjs`. This layer only (a) refuses fail-closed unless
+ * the caller's `--plan-sha256` matches a FRESH recompute of that exact preview object, (b)
+ * mechanically turns the planner's non-mutating verdict into the one deterministic byte
+ * sequence it implies (either the exact bootstrap proposal bytes, or the current manifest
+ * with only its `state` field replaced), and (c) commits that write as a transaction: a
+ * private, HMAC-authenticated recovery journal (mirroring `continuity-result-bootstrap-*`'s
+ * git-common-dir journal, never inside the working tree) is published BEFORE the manifest
+ * bytes are touched and is retained -- never deleted -- on every failure path; only a
+ * confirmed post-write readback (byte-for-byte plus a fresh `validateFeaturePackage` pass)
+ * retires it. `feature-package-recover` only ever reads that journal back; it never writes.
+ *
+ * Routed ahead of `readState()`, like the read-only three: this family's authority is the
+ * `--root` repository's own topology and its own private journal, never the operator's
+ * local state file.
+ *
+ * `feature-package-reconcile` (PHX-WP-GATE, P-AC-08) is a THIRD, separate write
+ * subcommand added alongside these two: it shares this exact journal (a `kind: "reconcile"`
+ * record, retained/retired/recovered by the SAME helpers below and by the unmodified
+ * `feature-package-recover`), the same writer lock, and the same digest-bound-preview /
+ * write / readback shape -- but it is additionally PO-bound (a caller-injected approval
+ * check, bound to the exact candidate and the plan digest) because a reconcile changes
+ * authority-bearing artifact digests, which the other two kinds never do. It is the one
+ * write kind that reads Continuity State (never the operator's local file in general --
+ * only the `--root` repository's OWN `authority.result` binding, and only to satisfy the
+ * Result fence precondition on the plan itself).
+ */
+const FEATURE_PACKAGE_WRITE_SUBCOMMANDS = new Set(["feature-package-apply", "feature-package-reconcile", "feature-package-recover"]);
+const FEATURE_PACKAGE_APPLY_SCHEMA = "pipeline.feature-package-apply.v1";
+const FEATURE_PACKAGE_RECONCILE_SCHEMA = "pipeline.feature-package-reconcile.v1";
+const FEATURE_PACKAGE_RECONCILE_APPROVAL_SCHEMA = "pipeline.feature-package-reconcile-approval.v1";
+const FEATURE_PACKAGE_RECOVER_SCHEMA = "pipeline.feature-package-recover.v1";
+const FEATURE_PACKAGE_APPLY_JOURNAL_SCHEMA = "pipeline.feature-package-apply-journal.v1";
+const FEATURE_PACKAGE_APPLY_LOCK_TOKEN = "pipeline-feature-package-apply-v1";
+const FEATURE_PACKAGE_APPLY_FLAGS = new Set(["root", "manifest", "next-state", "proposal", "plan-sha256"]);
+// PHX-WP-PAC08-RECONCILE-APPROVAL: widened to admit the PO-bound approval transport
+// (--by/--proof-request/--proof-authority/--proof) as OPTIONAL flags at this parse
+// stage. Whether a given flag is actually REQUIRED depends on the resolved approval
+// mode (chat vs. signature, ADR-0056's 2026-08-11 Follow-up) and is enforced inside
+// `defaultFeaturePackageReconcileApproval`, not here -- refusing an unknown flag here
+// would make the approval flags unreachable before the check that needs them ever runs.
+const FEATURE_PACKAGE_RECONCILE_FLAGS = new Set(["root", "manifest", "plan-sha256", "by", "proof-request", "proof-authority", "proof"]);
+
+function featurePackageApplyPrivatePaths(dir, deps = {}) {
+  const common = (deps.gitCommonDir ?? defaultGitCommonDir)(dir);
+  if (!common?.ok || typeof common.path !== "string") return null;
+  try {
+    const root = realpathSync(common.path);
+    if (root !== resolve(common.path) || !lstatSync(root).isDirectory() || lstatSync(root).isSymbolicLink()) return null;
+    const namespace = join(root, "agent-pipeline");
+    const base = join(namespace, "feature-package-apply");
+    return { root, namespace, base, key: join(base, "key"), journal: join(base, "journal") };
+  } catch { return null; }
+}
+
+/** Reads and MAC-verifies the retained journal, if any. Never mutates. */
+function loadFeaturePackageApplyJournal(dir, deps = {}) {
+  const paths = featurePackageApplyPrivatePaths(dir, deps);
+  if (paths === null || !observeBootstrapPrivateDirectory(paths)) return { ok: false, code: "FTP-APPLY-JOURNAL-GIT-COMMON-DIR" };
+  const key = readPrivateBootstrap(paths.key);
+  const raw = readPrivateBootstrap(paths.journal);
+  if (raw === null) return { ok: true, journal: null, paths, key };
+  if (key === null || key.byteLength !== 32) return { ok: false, code: "FTP-APPLY-JOURNAL" };
+  try {
+    const value = JSON.parse(raw.toString("utf8"));
+    const keys = ["schema", "planSha256", "manifestPath", "kind", "preSha256", "postSha256", "postBytesBase64", "mode", "mac"];
+    if (!exactObjectKeys(value, keys)
+      || value.schema !== FEATURE_PACKAGE_APPLY_JOURNAL_SCHEMA
+      || !SHA256_RE.test(value.planSha256)
+      || typeof value.manifestPath !== "string"
+      || !["transition", "bootstrap", "reconcile"].includes(value.kind)
+      || !(value.preSha256 === null || SHA256_RE.test(value.preSha256))
+      || !SHA256_RE.test(value.postSha256)
+      || typeof value.postBytesBase64 !== "string"
+      || !Number.isSafeInteger(value.mode) || value.mode < 0 || value.mode > 0o777
+      || !SHA256_RE.test(value.mac)) return { ok: false, code: "FTP-APPLY-JOURNAL" };
+    const { mac, ...core } = value;
+    if (bootstrapJournalMac(key, core) !== mac) return { ok: false, code: "FTP-APPLY-JOURNAL" };
+    return { ok: true, journal: value, paths, key };
+  } catch { return { ok: false, code: "FTP-APPLY-JOURNAL" }; }
+}
+
+/** Publishes the journal BEFORE any manifest byte is touched. `wx`-only: never overwrites a pending one. */
+function publishFeaturePackageApplyJournal(dir, record, deps = {}) {
+  const paths = featurePackageApplyPrivatePaths(dir, deps);
+  if (!ensureBootstrapPrivateDirectory(paths)) return false;
+  let key = readPrivateBootstrap(paths.key);
+  if (key === null) { key = randomBytes(32); if (!writePrivateBootstrap(paths.key, key)) return false; }
+  if (key.byteLength !== 32) return false;
+  const core = {
+    schema: FEATURE_PACKAGE_APPLY_JOURNAL_SCHEMA,
+    planSha256: record.planSha256,
+    manifestPath: record.manifestPath,
+    kind: record.kind,
+    preSha256: record.preSha256,
+    postSha256: record.postSha256,
+    postBytesBase64: record.postBytes.toString("base64"),
+    mode: record.mode,
+  };
+  const bytes = Buffer.from(`${JSON.stringify({ ...core, mac: bootstrapJournalMac(key, core) })}\n`, "utf8");
+  return writePrivateBootstrap(paths.journal, bytes, false);
+}
+
+/** Retires the journal. Only ever called after a confirmed, matching postimage readback. */
+function retireFeaturePackageApplyJournal(paths) {
+  try { return ensureBootstrapPrivateDirectory(paths) && (unlinkSync(paths.journal), syncDirectory(paths.base).ok); } catch { return false; }
+}
+
+/**
+ * Parses the shared root/manifest/next-state/proposal contract (identical to the read
+ * half) plus `--plan-sha256`, then recomputes the exact preview from the SAME accepted
+ * planner `feature-package-plan` uses, and refuses fail-closed on any drift: a stale
+ * manifest, a stale proposal, or a changed `--next-state` all change the recomputed plan
+ * object and therefore its digest. Returns a refusal message (never printed here) or the
+ * resolved, digest-bound request.
+ */
+function buildFeaturePackageApplyPreview(flags) {
+  if (flags.root === undefined) return { ok: false, error: 'argument "--root <dir>" is required' };
+  const root = resolve(flags.root);
+  let rootStat = null;
+  try { rootStat = statSync(root); } catch { rootStat = null; }
+  if (rootStat === null || !rootStat.isDirectory()) {
+    return { ok: false, error: `argument "--root" does not name a readable directory: ${flags.root}` };
+  }
+  if (flags.manifest === undefined) return { ok: false, error: 'argument "--manifest <repo-relative-path>" is required' };
+  const manifest = featurePackageReadRelative(root, flags.manifest);
+  if (manifest === null) return { ok: false, error: `argument "--manifest" must be a canonical path inside --root: ${flags.manifest}` };
+  if (!SHA256_RE.test(flags["plan-sha256"] ?? "")) {
+    return { ok: false, error: 'argument "--plan-sha256 <sha256>" is required and must be a sha256 hex digest' };
+  }
+  const suppliedPlanSha256 = flags["plan-sha256"];
+  const nextState = flags["next-state"];
+  const manifestExists = existsSync(join(root, manifest));
+  let plan; let kind; let manifestBytes = null;
+  if (manifestExists) {
+    if (nextState === undefined) return { ok: false, error: 'argument "--next-state <state>" is required for an existing manifest' };
+    if (flags.proposal !== undefined) return { ok: false, error: `argument "--proposal" applies only to an absent manifest, and ${manifest} exists` };
+    plan = planFeaturePackageTransition(root, manifest, nextState);
+    kind = "transition";
+  } else {
+    if (flags.proposal === undefined) return { ok: false, error: `argument "--proposal <repo-relative-path>" is required because ${manifest} is absent; the bootstrap preview validates the proposed manifest bytes in memory and creates nothing` };
+    const proposalPath = featurePackageReadRelative(root, flags.proposal);
+    if (proposalPath === null) return { ok: false, error: `argument "--proposal" must be a canonical path inside --root: ${flags.proposal}` };
+    try {
+      const stat = lstatSync(join(root, proposalPath));
+      if (!stat.isFile() || stat.isSymbolicLink()) return { ok: false, error: `argument "--proposal" must name a regular non-symlink file: ${proposalPath}` };
+    } catch { return { ok: false, error: `argument "--proposal" names an unreadable file: ${proposalPath}` }; }
+    try { manifestBytes = readFileSync(join(root, proposalPath), "utf8"); }
+    catch { return { ok: false, error: `argument "--proposal" names an unreadable file: ${proposalPath}` }; }
+    plan = planFeaturePackageBootstrap(root, manifest, { manifestBytes, targetState: nextState ?? "draft" });
+    kind = "bootstrap";
+  }
+  const recomputedPlanSha256 = sha256CanonicalJson(plan);
+  if (recomputedPlanSha256 !== suppliedPlanSha256) {
+    return { ok: false, error: `argument "--plan-sha256" does not match the freshly recomputed preview digest for ${manifest}; the manifest, proposal, or --next-state drifted since the preview was taken` };
+  }
+  const actionable = kind === "transition" ? plan.status === "preview" : plan.status === "bootstrap-preview";
+  if (!actionable) {
+    return { ok: false, error: `the recomputed preview for ${manifest} is not an applicable transition (status: ${plan.status}${plan.reason ? `, reason: ${plan.reason}` : ""}); zero mutation` };
+  }
+  return { ok: true, root, manifest, kind, plan, planSha256: suppliedPlanSha256, manifestBytes };
+}
+
+/**
+ * Turns the planner's non-mutating verdict into the one deterministic postimage it
+ * implies. For a bootstrap, that is the exact proposal bytes (already digest-bound to
+ * `plan.receipt.manifestSha256`). For a transition, that is the CURRENT manifest object
+ * re-read fresh (closing the TOCTOU window against the earlier preview) with only its
+ * `state` field replaced -- no other key is ever touched, and a fresh
+ * `validateFeaturePackage` call must still agree the preimage is exactly what `plan.from`
+ * assumed before any byte is written.
+ */
+function computeFeaturePackagePostimage(root, manifest, kind, plan, manifestBytes) {
+  if (kind === "bootstrap") {
+    if (existsSync(join(root, manifest))) return { ok: false, code: "FTP-APPLY-BOOTSTRAP-RACE" };
+    const postBytes = Buffer.from(manifestBytes, "utf8");
+    const postSha256 = sha256Bytes(postBytes);
+    if (postSha256 !== plan.receipt?.manifestSha256) return { ok: false, code: "FTP-APPLY-BOOTSTRAP-DIGEST" };
+    return { ok: true, preSha256: null, postBytes, postSha256, mode: 0o644 };
+  }
+  const preFile = physicalRebindFile(root, manifest);
+  if (preFile === null) return { ok: false, code: "FTP-APPLY-TRANSITION-IDENTITY" };
+  const revalidated = validateFeaturePackage(root, manifest);
+  if (!revalidated.ok || revalidated.receipt.manifestSha256 !== preFile.sha256 || revalidated.receipt.state !== plan.from) {
+    return { ok: false, code: "FTP-APPLY-TRANSITION-DRIFT" };
+  }
+  let value;
+  try { value = JSON.parse(preFile.bytes.toString("utf8")); } catch { return { ok: false, code: "FTP-APPLY-TRANSITION-JSON" }; }
+  const nextValue = { ...value, state: plan.to };
+  const postBytes = Buffer.from(`${JSON.stringify(nextValue, null, 2)}\n`, "utf8");
+  const postSha256 = sha256Bytes(postBytes);
+  const mode = Number(preFile.identity.mode) & 0o777;
+  return { ok: true, preSha256: preFile.sha256, postBytes, postSha256, mode };
+}
+
+function runFeaturePackageApplyCommand(argv, deps) {
+  const sub = "feature-package-apply";
+  const parsed = parseFeaturePackageReadFlags(argv, FEATURE_PACKAGE_APPLY_FLAGS);
+  if (!parsed.ok) return refuseFeaturePackageRead(sub, parsed.error);
+  if (parsed.value.root === undefined) return refuseFeaturePackageRead(sub, 'argument "--root <dir>" is required');
+  const root = resolve(parsed.value.root);
+  let rootStat = null;
+  try { rootStat = statSync(root); } catch { rootStat = null; }
+  if (rootStat === null || !rootStat.isDirectory()) {
+    return refuseFeaturePackageRead(sub, `argument "--root" does not name a readable directory: ${parsed.value.root}`);
+  }
+  const lock = acquireContinuityLock(root, FEATURE_PACKAGE_APPLY_LOCK_TOKEN, deps);
+  if (!lock.ok) return refuseFeaturePackageRead(sub, `writer lock unavailable (${lock.code})`);
+  try {
+    // Deliberately unwired for autoRebindMutable (PHX-WP-AUTOREBIND-WRITEPATH-INVESTIGATE-
+    // FINISH): wiring it here was tried and reverted after testing showed it defeats the
+    // --plan-sha256 freshness/anti-tamper contract for ANY manifest with a mutable+authority
+    // artifact (routinely the PRD/acceptance -- see feature-package-topology.mjs's own
+    // PHX-WP-MUTABLE-ARTIFACT-AUTOREBIND note). An internal recompute that silently self-heals
+    // a mutable digest cannot distinguish a routine edit from deliberate tampering, and the
+    // caller's own preview digest (from feature-package-plan, which stays unwired) never
+    // reflects the healed state either way -- so WRc (a routine drift between plan and apply
+    // must still be refused) and WRg (a manually tampered digest must be refused, not silently
+    // "corrected") both regressed when this was wired. autoRebindMutable remains a safe,
+    // tested LIBRARY capability (planFeaturePackageTransition/planFeaturePackageReconcile,
+    // feature-package-topology.mjs) for a deliberate, out-of-band invocation -- never
+    // hardwired into a CLI write path that also consumes an approval-bound preview digest.
+    const preview = buildFeaturePackageApplyPreview(parsed.value);
+    if (!preview.ok) return refuseFeaturePackageRead(sub, preview.error);
+    const { manifest, kind, plan, planSha256, manifestBytes } = preview;
+    const nextState = kind === "transition" ? plan.to : (parsed.value["next-state"] ?? "draft");
+
+    const pending = loadFeaturePackageApplyJournal(root, deps);
+    if (!pending.ok) return refuseFeaturePackageRead(sub, `a prior recovery journal is unreadable or tampered (${pending.code}); run feature-package-recover`);
+    if (pending.journal !== null) {
+      return refuseFeaturePackageRead(sub, `a recovery journal is already pending for ${pending.journal.manifestPath}; run feature-package-recover before retrying. Zero new mutation; recovery journal retained`);
+    }
+
+    const postimage = computeFeaturePackagePostimage(root, manifest, kind, plan, manifestBytes);
+    if (!postimage.ok) return refuseFeaturePackageRead(sub, `the preimage drifted since the preview was recomputed (${postimage.code}); zero mutation`);
+
+    const published = publishFeaturePackageApplyJournal(root, {
+      planSha256, manifestPath: manifest, kind,
+      preSha256: postimage.preSha256, postSha256: postimage.postSha256,
+      postBytes: postimage.postBytes, mode: postimage.mode,
+    }, deps);
+    if (!published) return refuseFeaturePackageRead(sub, "journal prepare failed; zero mutation");
+    if (deps.afterFeaturePackageApplyJournal?.() === false) {
+      return refuseFeaturePackageRead(sub, "interrupted after journal preparation; recovery journal retained");
+    }
+
+    const target = join(root, manifest);
+    const replace = deps.replaceFeaturePackageApplyFdContents ?? ((fd, bytes) => { ftruncateSync(fd, 0); let offset = 0; while (offset < bytes.length) offset += writeSync(fd, bytes, offset, bytes.length - offset, offset); fsyncSync(fd); });
+    const rename = deps.renameFeaturePackageApply ?? renameSync;
+    const sync = deps.syncFeaturePackageApplyDirectory ?? syncDirectory;
+    const written = writeRebindFile(target, postimage.postBytes, postimage.mode, lock.ownerNonce, replace, rename, sync);
+    if (!written.ok) return refuseFeaturePackageRead(sub, `manifest write failed (${written.code}); recovery journal retained`);
+    if (deps.afterFeaturePackageApplyWrite?.() === false) {
+      return refuseFeaturePackageRead(sub, "interrupted after manifest write; recovery journal retained");
+    }
+
+    const observed = physicalRebindFile(root, manifest);
+    if (observed === null || observed.sha256 !== postimage.postSha256 || !observed.bytes.equals(postimage.postBytes)) {
+      return refuseFeaturePackageRead(sub, "postimage readback did not match the predicted digest; recovery journal retained");
+    }
+    const revalidated = validateFeaturePackage(root, manifest);
+    if (!revalidated.ok) {
+      return refuseFeaturePackageRead(sub, `postimage failed package validation (${revalidated.findings.join("; ")}); recovery journal retained`);
+    }
+
+    const paths = featurePackageApplyPrivatePaths(root, deps);
+    if (!retireFeaturePackageApplyJournal(paths)) {
+      return refuseFeaturePackageRead(sub, "journal retirement is unresolved; recovery journal retained");
+    }
+
+    console.log(JSON.stringify({
+      schema: FEATURE_PACKAGE_APPLY_SCHEMA,
+      status: "applied",
+      kind,
+      manifest,
+      from: kind === "transition" ? plan.from : "absent",
+      to: nextState,
+      planSha256,
+      manifestSha256: postimage.postSha256,
+    }, null, 2));
+    return 0;
+  } finally { releaseContinuityLock(lock); }
+}
+
+/**
+ * Re-derives the reconcile plan FRESH against current on-disk reality AND the CURRENT
+ * Continuity State binding (closing the TOCTOU window the earlier preview leaves open --
+ * exactly what DoD 3 requires: "recomputes the preview fresh and refuses on drift"), and
+ * turns it into a postimage IFF the re-derived plan still matches the digest the caller's
+ * preview bound. Deliberately a SEPARATE function from `computeFeaturePackagePostimage`
+ * rather than a third branch inside it: `feature-package-apply`'s transition/bootstrap
+ * paths are left byte-for-byte untouched.
+ */
+function computeFeaturePackageReconcilePostimage(root, manifest, planSha256, resultAuthority) {
+  const rebuilt = planFeaturePackageReconcile(root, manifest, resultAuthority);
+  if (rebuilt.status !== "reconcile-preview" || sha256CanonicalJson(rebuilt) !== planSha256) {
+    return { ok: false, code: "FTP-RECONCILE-DRIFT" };
+  }
+  const preFile = physicalRebindFile(root, manifest);
+  if (preFile === null) return { ok: false, code: "FTP-RECONCILE-IDENTITY" };
+  const postBytes = Buffer.from(`${JSON.stringify(rebuilt.postimage, null, 2)}\n`, "utf8");
+  const postSha256 = sha256Bytes(postBytes);
+  const mode = Number(preFile.identity.mode) & 0o777;
+  return { ok: true, preSha256: preFile.sha256, postBytes, postSha256, mode, changes: rebuilt.changes };
+}
+
+/**
+ * `feature-package-reconcile` -- the third plan kind's transactional half (PHX-WP-GATE,
+ * P-AC-08). Consumes `planFeaturePackageReconcile` under the identical `--plan-sha256`
+ * preview-digest binding `feature-package-apply` uses, is additionally PO-bound (a
+ * caller-injected `deps.featurePackageReconcileApproval` proof check, bound to the exact
+ * observed candidate and the plan digest -- the same shape `continuity-authority-
+ * revision-apply` uses for `deps.authorityRevisionApproval`), and reuses the SAME private
+ * journal, writer lock, and readback-before-retirement machinery `feature-package-apply`
+ * already uses (a `kind: "reconcile"` record; `feature-package-recover` reads it back
+ * unmodified). A reconcile without a valid bound decision fails closed and writes nothing.
+ */
+function runFeaturePackageReconcileCommand(argv, deps) {
+  const sub = "feature-package-reconcile";
+  const parsed = parseFeaturePackageReadFlags(argv, FEATURE_PACKAGE_RECONCILE_FLAGS);
+  if (!parsed.ok) return refuseFeaturePackageRead(sub, parsed.error);
+  const flags = parsed.value;
+  if (flags.root === undefined) return refuseFeaturePackageRead(sub, 'argument "--root <dir>" is required');
+  const root = resolve(flags.root);
+  let rootStat = null;
+  try { rootStat = statSync(root); } catch { rootStat = null; }
+  if (rootStat === null || !rootStat.isDirectory()) {
+    return refuseFeaturePackageRead(sub, `argument "--root" does not name a readable directory: ${flags.root}`);
+  }
+  if (flags.manifest === undefined) return refuseFeaturePackageRead(sub, 'argument "--manifest <repo-relative-path>" is required');
+  const manifest = featurePackageReadRelative(root, flags.manifest);
+  if (manifest === null) return refuseFeaturePackageRead(sub, `argument "--manifest" must be a canonical path inside --root: ${flags.manifest}`);
+  if (!SHA256_RE.test(flags["plan-sha256"] ?? "")) {
+    return refuseFeaturePackageRead(sub, 'argument "--plan-sha256 <sha256>" is required and must be a sha256 hex digest');
+  }
+  const planSha256 = flags["plan-sha256"];
+
+  const lock = acquireContinuityLock(root, FEATURE_PACKAGE_APPLY_LOCK_TOKEN, deps);
+  if (!lock.ok) return refuseFeaturePackageRead(sub, `writer lock unavailable (${lock.code})`);
+  try {
+    const stateNow = (deps.readStateRaw ?? readStateRaw)(root);
+    const resultAuthority = stateNow.status === "ok" ? (stateNow.state?.continuity?.authority?.result ?? null) : null;
+    const plan = planFeaturePackageReconcile(root, manifest, resultAuthority);
+    if (plan.status !== "reconcile-preview" || sha256CanonicalJson(plan) !== planSha256) {
+      return refuseFeaturePackageRead(sub, `argument "--plan-sha256" does not match the freshly recomputed reconcile preview digest for ${manifest}; the manifest, an artifact, or the Continuity State Result binding drifted since the preview was taken`);
+    }
+
+    if (typeof deps.featurePackageReconcileApproval !== "function") {
+      return refuseFeaturePackageRead(sub, "PO-bound approval is unavailable (FTP-RECONCILE-APPROVAL-UNAVAILABLE); zero mutation");
+    }
+    const observedCandidate = (deps.gitCandidate ?? defaultGitCandidate)(root);
+    if (!observedCandidate.ok) {
+      return refuseFeaturePackageRead(sub, "the current candidate identity is unavailable (FTP-RECONCILE-CANDIDATE-UNAVAILABLE); zero mutation");
+    }
+    // `holderLock`/`holderRoot` let the approval closure recognize and reuse the
+    // exclusive lock THIS call already holds on `root`, rather than acquiring a second,
+    // colliding one on the same resolved path when the approving governing session's own
+    // `dir` happens to coincide with `root` (PHX-WP-PAC08-LOCK-REENTRANCY, closing Critic
+    // finding F1). It is inert for every other caller/topology: an injected test double
+    // that destructures only `{ manifest, planSha256, candidate }` never sees it, and
+    // `defaultFeaturePackageReconcileApproval` only acts on it when the resolved lock
+    // paths actually match.
+    const approvalCheck = deps.featurePackageReconcileApproval({
+      repoRoot: root,
+      schema: FEATURE_PACKAGE_RECONCILE_APPROVAL_SCHEMA,
+      manifest,
+      planSha256,
+      candidate: { commit: observedCandidate.commit, tree: observedCandidate.tree },
+      holderLock: lock,
+      holderRoot: root,
+    });
+    if (!approvalCheck?.ok) {
+      // F3 (Critic pac08-fb-critic-review-5420c5e7.md): a replayed proof already verified
+      // and was already consumed -- the generic "not confirmed for this exact candidate and
+      // plan digest" text is false for this one cause. Every other refusal code keeps the
+      // existing generic message unchanged (RGk/RGl/RGm depend on it).
+      const message = approvalCheck?.code === "CRITICAL-PROOF-REPLAY"
+        ? "external proof was already consumed (CRITICAL-PROOF-REPLAY); zero mutation"
+        : "PO-bound approval was not confirmed for this exact candidate and plan digest (FTP-RECONCILE-APPROVAL-REJECTED); zero mutation";
+      return refuseFeaturePackageRead(sub, message);
+    }
+
+    const pending = loadFeaturePackageApplyJournal(root, deps);
+    if (!pending.ok) return refuseFeaturePackageRead(sub, `a prior recovery journal is unreadable or tampered (${pending.code}); run feature-package-recover`);
+    if (pending.journal !== null) {
+      return refuseFeaturePackageRead(sub, `a recovery journal is already pending for ${pending.journal.manifestPath}; run feature-package-recover before retrying. Zero new mutation; recovery journal retained`);
+    }
+
+    const postimage = computeFeaturePackageReconcilePostimage(root, manifest, planSha256, resultAuthority);
+    if (!postimage.ok) return refuseFeaturePackageRead(sub, `the preimage drifted since the preview was recomputed (${postimage.code}); zero mutation`);
+
+    const published = publishFeaturePackageApplyJournal(root, {
+      planSha256, manifestPath: manifest, kind: "reconcile",
+      preSha256: postimage.preSha256, postSha256: postimage.postSha256,
+      postBytes: postimage.postBytes, mode: postimage.mode,
+    }, deps);
+    if (!published) return refuseFeaturePackageRead(sub, "journal prepare failed; zero mutation");
+    if (deps.afterFeaturePackageReconcileJournal?.() === false) {
+      return refuseFeaturePackageRead(sub, "interrupted after journal preparation; recovery journal retained");
+    }
+
+    const target = join(root, manifest);
+    const replace = deps.replaceFeaturePackageApplyFdContents ?? ((fd, bytes) => { ftruncateSync(fd, 0); let offset = 0; while (offset < bytes.length) offset += writeSync(fd, bytes, offset, bytes.length - offset, offset); fsyncSync(fd); });
+    const rename = deps.renameFeaturePackageApply ?? renameSync;
+    const sync = deps.syncFeaturePackageApplyDirectory ?? syncDirectory;
+    const written = writeRebindFile(target, postimage.postBytes, postimage.mode, lock.ownerNonce, replace, rename, sync);
+    if (!written.ok) return refuseFeaturePackageRead(sub, `manifest write failed (${written.code}); recovery journal retained`);
+    if (deps.afterFeaturePackageReconcileWrite?.() === false) {
+      return refuseFeaturePackageRead(sub, "interrupted after manifest write; recovery journal retained");
+    }
+
+    const observed = physicalRebindFile(root, manifest);
+    if (observed === null || observed.sha256 !== postimage.postSha256 || !observed.bytes.equals(postimage.postBytes)) {
+      return refuseFeaturePackageRead(sub, "postimage readback did not match the predicted digest; recovery journal retained");
+    }
+    const revalidated = validateFeaturePackage(root, manifest);
+    if (!revalidated.ok) {
+      return refuseFeaturePackageRead(sub, `postimage failed package validation (${revalidated.findings.join("; ")}); recovery journal retained`);
+    }
+
+    const paths = featurePackageApplyPrivatePaths(root, deps);
+    if (!retireFeaturePackageApplyJournal(paths)) {
+      return refuseFeaturePackageRead(sub, "journal retirement is unresolved; recovery journal retained");
+    }
+
+    console.log(JSON.stringify({
+      schema: FEATURE_PACKAGE_RECONCILE_SCHEMA,
+      status: "applied",
+      kind: "reconcile",
+      manifest,
+      changes: postimage.changes,
+      planSha256,
+      manifestSha256: postimage.postSha256,
+    }, null, 2));
+    return 0;
+  } finally { releaseContinuityLock(lock); }
+}
+
+/** Read-only diagnosis of any retained journal. Never writes; never retires. */
+function runFeaturePackageRecoverCommand(argv, deps) {
+  const sub = "feature-package-recover";
+  const parsed = parseFeaturePackageReadFlags(argv, new Set(["root"]));
+  if (!parsed.ok) return refuseFeaturePackageRead(sub, parsed.error);
+  if (parsed.value.root === undefined) return refuseFeaturePackageRead(sub, 'argument "--root <dir>" is required');
+  const root = resolve(parsed.value.root);
+  let rootStat = null;
+  try { rootStat = statSync(root); } catch { rootStat = null; }
+  if (rootStat === null || !rootStat.isDirectory()) {
+    return refuseFeaturePackageRead(sub, `argument "--root" does not name a readable directory: ${parsed.value.root}`);
+  }
+  const loaded = loadFeaturePackageApplyJournal(root, deps);
+  if (!loaded.ok) return refuseFeaturePackageRead(sub, `a retained journal is unreadable or tampered (${loaded.code}); manual repository inspection is required`);
+  if (loaded.journal === null) {
+    console.log(JSON.stringify({ schema: FEATURE_PACKAGE_RECOVER_SCHEMA, status: "clean", retained: false }, null, 2));
+    return 0;
+  }
+  const journal = loaded.journal;
+  const observed = physicalRebindFile(root, journal.manifestPath);
+  const observedSha256 = observed === null ? null : observed.sha256;
+  const diagnosis = observedSha256 === journal.postSha256
+    ? "applied-pending-retirement"
+    : observedSha256 === journal.preSha256
+      ? "not-yet-applied"
+      : "diverged";
+  console.log(JSON.stringify({
+    schema: FEATURE_PACKAGE_RECOVER_SCHEMA,
+    status: "retained",
+    transaction: {
+      planSha256: journal.planSha256,
+      manifest: journal.manifestPath,
+      kind: journal.kind,
+      expectedPreSha256: journal.preSha256,
+      expectedPostSha256: journal.postSha256,
+    },
+    observed: { present: observed !== null, sha256: observedSha256 },
+    diagnosis,
+  }, null, 2));
+  return 2;
+}
+
+/**
+ * Default `deps.featurePackageReconcileApproval` for a real operator invocation -- no
+ * test-injected override present (PHX-WP-PAC08-RECONCILE-APPROVAL). Mirrors
+ * `approve-push`'s PO-bound proof-check shape (ADR-0056's 2026-08-11 Follow-up:
+ * `gates.reconcile_approval`, identical fail-closed rules), but reads from the
+ * GOVERNING SESSION's own local pipeline-state.json (`dir = deps.dir ?? projectDir()`)
+ * -- never from `--root`, which names the repository being reconciled, not the approving
+ * operator's own session (ADR-0056: "read from the governing session, not from the
+ * pushed repository").
+ *
+ * `argv` is re-parsed here (idempotent/pure, safe to call twice -- the reconcile command
+ * already parsed it once to reach this point) only to recover the `--by`/`--proof-*`
+ * flags; the fixed `{repoRoot, schema, manifest, planSha256, candidate}` call shape
+ * `runFeaturePackageReconcileCommand` already uses to invoke this closure is untouched,
+ * so an existing or future test injection of `deps.featurePackageReconcileApproval` keeps
+ * working unmodified.
+ *
+ * PHX-WP-PAC08-APPROVAL-LEDGER (closing Critic finding F-B): once `verifyCriticalHumanProof`
+ * returns `ok:true`, this closure ALSO persists a durable attribution record --
+ * `featurePackageReconcileApproval.lastApproved` -- into the governing `dir`'s own state, and
+ * refuses (`CRITICAL-PROOF-REPLAY`, zero mutation) a `proofSha256` already present in the
+ * SAME `criticalProofConsumption` ledger `approve-push` writes (shared, not kind-restricted).
+ * The proof is consumed HERE, at verification time -- before the caller publishes the journal
+ * or touches the manifest -- a deliberate fail-closed choice: a proof that verifies but is
+ * followed by an unrelated later failure is still burned, and a retry needs a fresh proof.
+ *
+ * PHX-WP-PAC08-LOCK-REENTRANCY (closing Critic finding F1): `dir` (this closure's own
+ * governing-session directory, `deps.dir ?? projectDir()`) can resolve to the exact same
+ * directory as `holderRoot` -- the mandated Phoenix self-governance topology, where this
+ * repository reconciles its own manifest from within its own governing session. In that
+ * case the write below (via `writeState`) would try to acquire a SECOND exclusive
+ * continuity lock on the identical resolved path `runFeaturePackageReconcileCommand`
+ * already holds via `holderLock` across its whole body, colliding with itself
+ * (PS-CONTINUITY-LOCKED) every time. Reusing the caller's already-held lock instead of
+ * acquiring a new one is safe precisely because it is the SAME writer, still inside the
+ * SAME critical section that already excluded every other writer (in-process or
+ * cross-process) from this exact path -- not a new contender admitted past the lock. This
+ * is a narrow, explicit hand-off (only from this one call site, only when the resolved
+ * paths genuinely match) rather than a generic "same process already holds this path"
+ * rule: a genuinely separate contender (e.g. a different token, not handed the lock
+ * explicitly) still goes through the normal file-based `acquireContinuityLock` and is
+ * still correctly refused -- see PS44Vc, which this design deliberately leaves intact.
+ */
+function defaultFeaturePackageReconcileApproval(argv, deps) {
+  return ({ manifest, planSha256, candidate, holderLock, holderRoot }) => {
+    const dir = deps.dir ?? projectDir();
+    const kind = "feature-package-reconcile";
+    const parsedArgv = parseFeaturePackageReadFlags(argv, FEATURE_PACKAGE_RECONCILE_FLAGS);
+    const flags = parsedArgv.ok ? parsedArgv.value : {};
+    const configured = criticalProofWaiverFor(dir, kind);
+    if (configured.code !== null && configured.code !== undefined) return { ok: false, code: configured.code };
+    const waived = configured.waived === true;
+    // Mode-appropriate flag presence, the same shape `approve-push` enforces via
+    // `parseExactFlags` there (chat needs only the attribution flag; signature needs the
+    // full detached-proof transport too). Enforced here instead of at the earlier parse
+    // stage because that parse is deliberately permissive across both modes (BLOCKER 1).
+    if (isBlank(flags.by)) return { ok: false, code: "CRITICAL-PROOF-FLAGS-BY-REQUIRED" };
+    if (!waived && (isBlank(flags["proof-request"]) || isBlank(flags["proof-authority"]) || isBlank(flags.proof))) {
+      return { ok: false, code: "CRITICAL-PROOF-FLAGS-PROOF-REQUIRED" };
+    }
+    const stateResult = readState(dir);
+    const state = stateResult.status === "ok" ? stateResult.state : { schema: SCHEMA_ID };
+    const now = (deps.now ?? (() => new Date().toISOString()))();
+    const verified = verifyCriticalHumanProof({
+      dir, state, kind, candidate,
+      subject: { manifest, planSha256, candidate },
+      flags, now, required: true,
+    });
+    if (!verified.ok) return { ok: false, code: verified.code };
+    // Consume-at-verify, mirroring `approve-push`'s own consumption-ledger/attribution
+    // shape (~6554-6576 as of this writing): a malformed consumption array fails closed,
+    // and a `proofSha256` already present in `criticalProofConsumption` (any `kind` -- the
+    // array is not kind-restricted) is refused as a replay. Both checks run BEFORE the
+    // write below, so a replayed proof causes zero mutation here and the caller never
+    // reaches the journal/manifest write.
+    const priorConsumption = state.criticalProofConsumption;
+    if (priorConsumption !== undefined && (!Array.isArray(priorConsumption)
+      || priorConsumption.some((entry) => !entry || typeof entry !== "object" || typeof entry.proofSha256 !== "string"))) {
+      return { ok: false, code: "CRITICAL-PROOF-CONSUMPTION-INVALID" };
+    }
+    const consumed = Array.isArray(priorConsumption) ? priorConsumption : [];
+    if (verified.proof !== null && consumed.some((entry) => entry.proofSha256 === verified.proof.proofSha256)) {
+      return { ok: false, code: "CRITICAL-PROOF-REPLAY" };
+    }
+    // The record states on its face what backed it, mirroring `approve-push`'s own
+    // `approvalRecord` -- chat mode still binds `approvedBy`/`approvedAt`/`forCommit` even
+    // though `criticalProof` is null, which is what closes F-B's "chat mode nothing is
+    // commit-bound" half.
+    const approvalRecord = { approvedBy: flags.by, approvedAt: now, forCommit: candidate.commit, criticalProof: verified.proof };
+    if (verified.waived !== undefined) approvalRecord.criticalProofWaiver = verified.waived;
+    const next = {
+      ...state,
+      schema: SCHEMA_ID,
+      featurePackageReconcileApproval: { lastApproved: approvalRecord },
+      criticalProofConsumption: verified.proof === null
+        ? consumed
+        : [...consumed, { proofSha256: verified.proof.proofSha256, kind, consumedAt: now }],
+      updatedAt: now,
+    };
+    // Reuse the caller's already-held lock only when it is genuinely for THIS same
+    // path on disk -- comparing REAL (symlink-resolved) paths via `realpathSync`, not
+    // lexical `resolve()`, so a `--root` reached through a symlink still counts as the
+    // same path as the caller's already-held lock. The caller's held-lock path comes
+    // from `holderLock.path` (the field `acquireContinuityLock` already returns on
+    // success) rather than being recomputed via `continuityLockPath(holderRoot)`, since
+    // that recomputation depends on `statePath()`'s existence-dependent branching and
+    // can in principle diverge from the path actually locked. Both `realpathSync` calls
+    // are wrapped so a resolution failure (e.g. a dangling symlink) is treated as "not
+    // the same path" rather than thrown -- `reuseLock` stays `undefined` and `writeState`
+    // falls back to acquiring its own lock exactly as before (untouched, fail-closed
+    // behavior). In the ordinary `dir !== root` topology `reuseLock` likewise stays
+    // undefined and `writeState` acquires its own lock exactly as before.
+    const reuseLock = (() => {
+      if (holderLock?.ok !== true || holderRoot === undefined || typeof holderLock.path !== "string") return undefined;
+      try {
+        const heldReal = realpathSync(holderLock.path);
+        const candidateReal = realpathSync(continuityLockPath(dir));
+        return heldReal === candidateReal ? holderLock : undefined;
+      } catch {
+        return undefined;
+      }
+    })();
+    const writeResult = writeState(dir, next, state, reuseLock ? { reuseLock } : {});
+    if (!stateWriteSucceeded(writeResult)) return { ok: false, code: writeResult.code };
+    return { ok: true };
+  };
+}
+
+function runFeaturePackageWriteCommand(sub, argv, deps) {
+  if (sub === "feature-package-apply") return runFeaturePackageApplyCommand(argv, deps);
+  if (sub === "feature-package-reconcile") {
+    // `Object.hasOwn` rather than `??`: a test that explicitly injects
+    // `featurePackageReconcileApproval: undefined` means "no approval function is
+    // available" (RGe's FTP-RECONCILE-APPROVAL-UNAVAILABLE case) and must NOT receive
+    // the default in its place. Only an absent key -- the real, no-injection operator
+    // invocation -- gets the default closure.
+    return runFeaturePackageReconcileCommand(argv, {
+      ...deps,
+      featurePackageReconcileApproval: Object.hasOwn(deps, "featurePackageReconcileApproval")
+        ? deps.featurePackageReconcileApproval
+        : defaultFeaturePackageReconcileApproval(argv, deps),
+    });
+  }
+  return runFeaturePackageRecoverCommand(argv, deps);
+}
+
+/**
+ * PHX-WP-HUMANLEGIBLE-APPROVAL: a closed, bounded vocabulary for the
+ * human-legible briefing presented and persisted at the plan-approval gate
+ * (backlog/items/2026-08-06-human-legible-approval-record.md, PO decision
+ * 2026-08-18: structured/bounded, kept portable -- not free prose, not
+ * confined to the restricted profile). Every field is a repository-relative
+ * path, a sha256 digest, or a value drawn from one of the small fixed enums
+ * below -- never free text -- so the record stays safe under H-AC-13's
+ * portable-ledger prohibition on free-form rationale while still answering,
+ * in words, the three things H-AC-11's gap named: the scope being released,
+ * what changed since the last approved binding, and what this approval does
+ * and does not authorize.
+ *
+ * Persisted as `state.planApprovalBriefing`, a sibling of `planSubmission`/
+ * `planApproval` (not nested inside either): `plan-spec-state-v2.mjs` owns
+ * the closed key sets of those two records and is out of this task's scope,
+ * so the briefing travels alongside them in the same State envelope instead
+ * of inside them. `derivePlanLifecycle`'s structural checks only ever look
+ * at the specific keys they name, so an additional top-level sibling field
+ * changes nothing about its own validation, and `validatePortablePipelineState`
+ * (project-authority.mjs) accepts any top-level field that is not the
+ * machine-local `sessionCleanup` binding.
+ */
+const PLAN_APPROVAL_BRIEFING_SCHEMA = "pipeline.plan-approval-briefing.v1";
+const PLAN_APPROVAL_BRIEFING_KEYS = ["schema", "scope", "change", "authorizes", "excludes"];
+const PLAN_APPROVAL_BRIEFING_SCOPE_KEYS = ["featureId", "planPath", "planSha256", "specPath", "specSha256", "profile"];
+const PLAN_APPROVAL_BRIEFING_CHANGE_KEYS = ["kind", "previousApprovalSha256"];
+const PLAN_APPROVAL_BRIEFING_CHANGE_KINDS = new Set([
+  "initial-submission",
+  "identical-binding",
+  "plan-changed",
+  "spec-changed",
+  "profile-changed",
+  "plan-and-spec-changed",
+  "plan-and-profile-changed",
+  "spec-and-profile-changed",
+  "plan-spec-and-profile-changed",
+]);
+// Fixed, closed content: what a Plan approval ever authorizes and never
+// authorizes in this system does not vary per submission, so these two lists
+// are constants rather than being derived per-record.
+const PLAN_APPROVAL_BRIEFING_AUTHORIZES = Object.freeze(["design-to-implementation-transition"]);
+const PLAN_APPROVAL_BRIEFING_EXCLUDES = Object.freeze([
+  "push", "deploy", "publication", "scope-beyond-bound-plan-and-spec",
+]);
+const PROFILES_ENUM = new Set(["epic", "feature", "mini"]);
+
+function isPlainRecord(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function hasExactBriefingKeys(value, keys) {
+  return isPlainRecord(value)
+    && Object.keys(value).length === keys.length
+    && keys.every((key) => Object.prototype.hasOwnProperty.call(value, key));
+}
+
+function validPlanApprovalBriefing(value) {
+  return hasExactBriefingKeys(value, PLAN_APPROVAL_BRIEFING_KEYS)
+    && value.schema === PLAN_APPROVAL_BRIEFING_SCHEMA
+    && hasExactBriefingKeys(value.scope, PLAN_APPROVAL_BRIEFING_SCOPE_KEYS)
+    && typeof value.scope.featureId === "string" && value.scope.featureId.length > 0
+    && typeof value.scope.planPath === "string" && value.scope.planPath.length > 0
+    && SHA256_RE.test(value.scope.planSha256)
+    && typeof value.scope.specPath === "string" && value.scope.specPath.length > 0
+    && SHA256_RE.test(value.scope.specSha256)
+    && PROFILES_ENUM.has(value.scope.profile)
+    && hasExactBriefingKeys(value.change, PLAN_APPROVAL_BRIEFING_CHANGE_KEYS)
+    && PLAN_APPROVAL_BRIEFING_CHANGE_KINDS.has(value.change.kind)
+    && (value.change.previousApprovalSha256 === null || SHA256_RE.test(value.change.previousApprovalSha256))
+    && Array.isArray(value.authorizes) && value.authorizes.length > 0
+    && value.authorizes.every((entry) => PLAN_APPROVAL_BRIEFING_AUTHORIZES.includes(entry))
+    && Array.isArray(value.excludes) && value.excludes.length > 0
+    && value.excludes.every((entry) => PLAN_APPROVAL_BRIEFING_EXCLUDES.includes(entry));
+}
+
+/**
+ * The prior approved binding this submission's briefing diffs against, read
+ * from whatever valid current (v4) approval the state still carries at
+ * submit time -- the last binding a PO actually approved, not merely the
+ * last thing submitted. An approval in an older schema shape (no
+ * `profileSha256`) or no approval at all reads as "no prior binding": the
+ * change is then always reported as `initial-submission`, a deliberately
+ * conservative simplification rather than guessing at an unrecorded profile.
+ */
+function priorApprovedBriefingBinding(state) {
+  const approval = state?.planApproval;
+  if (!validCurrentPlanApproval(approval)) return null;
+  return {
+    planSha256: approval.poGateAuthority.planSha256,
+    specSha256: approval.poGateAuthority.specSha256,
+    profileSha256: approval.profileSha256,
+    approvalSha256: sha256CanonicalJson(approval),
+  };
+}
+
+function classifyPlanApprovalBriefingChange(prior, { planSha256, specSha256, profileSha256 }) {
+  if (prior === null) return "initial-submission";
+  const planChanged = prior.planSha256 !== planSha256;
+  const specChanged = prior.specSha256 !== specSha256;
+  const profileChanged = prior.profileSha256 !== profileSha256;
+  if (!planChanged && !specChanged && !profileChanged) return "identical-binding";
+  if (planChanged && specChanged && profileChanged) return "plan-spec-and-profile-changed";
+  if (planChanged && specChanged) return "plan-and-spec-changed";
+  if (planChanged && profileChanged) return "plan-and-profile-changed";
+  if (specChanged && profileChanged) return "spec-and-profile-changed";
+  if (planChanged) return "plan-changed";
+  if (specChanged) return "spec-changed";
+  return "profile-changed";
+}
+
+/** Pure derivation from bound artifacts only -- never from caller/approver-typed text. */
+function derivePlanApprovalBriefing({ state, featureId, planPath, planSha256, specPath, specSha256, profile, profileSha256 }) {
+  const prior = priorApprovedBriefingBinding(state);
+  return {
+    schema: PLAN_APPROVAL_BRIEFING_SCHEMA,
+    scope: { featureId, planPath, planSha256, specPath, specSha256, profile },
+    change: {
+      kind: classifyPlanApprovalBriefingChange(prior, { planSha256, specSha256, profileSha256 }),
+      previousApprovalSha256: prior === null ? null : prior.approvalSha256,
+    },
+    authorizes: [...PLAN_APPROVAL_BRIEFING_AUTHORIZES],
+    excludes: [...PLAN_APPROVAL_BRIEFING_EXCLUDES],
+  };
+}
+
+function summarizePlanApprovalBriefing(briefing) {
+  return `scope=${briefing.scope.planPath}(${briefing.scope.planSha256.slice(0, 12)}...)+${briefing.scope.specPath}(${briefing.scope.specSha256.slice(0, 12)}...) profile=${briefing.scope.profile} change=${briefing.change.kind} authorizes=${briefing.authorizes.join(",")} excludes=${briefing.excludes.join(",")}`;
+}
+
+/**
+ * H-AC-11 reviewer reconstruction: exposes the persisted briefing alongside
+ * the existing digests it must match. Recomputes the closed `scope` (plus
+ * the fixed `authorizes`/`excludes`) from the current bound artifacts
+ * (`planApproval.poGateAuthority` + the matching `planSubmission.profile`)
+ * and fails, rather than trusting the stored bytes, when a persisted
+ * briefing does not match what the bound artifacts actually say. The
+ * point-in-time `change` comparison is not independently recomputable after
+ * the fact (its "prior" state no longer exists once superseded) and is
+ * exposed as recorded, not re-verified here.
+ */
+export function reconstructPlanApprovalBriefing(state) {
+  const approval = state?.planApproval;
+  const submission = state?.planSubmission;
+  const briefing = state?.planApprovalBriefing;
+  if (!validCurrentPlanApproval(approval)) return { ok: false, code: "PLAN-APPROVAL-BRIEFING-NO-APPROVAL" };
+  if (!validPlanSubmission(submission) || approval.submissionSha256 !== sha256CanonicalJson(submission)) {
+    return { ok: false, code: "PLAN-APPROVAL-BRIEFING-SUBMISSION-STALE" };
+  }
+  if (!validPlanApprovalBriefing(briefing)) return { ok: false, code: "PLAN-APPROVAL-BRIEFING-INVALID" };
+  const expectedScope = {
+    featureId: submission.featureId,
+    planPath: approval.poGateAuthority.planPath,
+    planSha256: approval.poGateAuthority.planSha256,
+    specPath: approval.poGateAuthority.specPath,
+    specSha256: approval.poGateAuthority.specSha256,
+    profile: submission.profile,
+  };
+  if (JSON.stringify(briefing.scope) !== JSON.stringify(expectedScope)
+    || JSON.stringify(briefing.authorizes) !== JSON.stringify(PLAN_APPROVAL_BRIEFING_AUTHORIZES)
+    || JSON.stringify(briefing.excludes) !== JSON.stringify(PLAN_APPROVAL_BRIEFING_EXCLUDES)) {
+    return { ok: false, code: "PLAN-APPROVAL-BRIEFING-MISMATCH" };
+  }
+  return {
+    ok: true,
+    briefing,
+    submissionSha256: approval.submissionSha256,
+    approvalSha256: sha256CanonicalJson(approval),
+    planSha256: approval.poGateAuthority.planSha256,
+    specSha256: approval.poGateAuthority.specSha256,
+  };
+}
+
 /**
  * Runs the CLI logic. Never calls process.exit itself (testable); returns the exit
  * code. `deps` allows tests to inject `dir`, `now`, `gitHead`, and `env` without
@@ -5128,8 +7176,21 @@ export function run(argv = process.argv.slice(2), deps = {}) {
   if (sub === "continuity-result-case-migration-plan" || sub === "continuity-result-case-migration-apply") {
     return runResultCaseMigrationCommand(sub, rest, { ...deps, dir, now });
   }
+  if (AUTHORITY_REVISION_SUBCOMMANDS.has(sub)) {
+    return runAuthorityRevisionCommand(sub, rest, { ...deps, dir, now, gitCandidate });
+  }
   if (CONTINUITY_SUBCOMMANDS.has(sub)) return runContinuityCommand(sub, flags, { ...deps, dir, now });
   if (PUBLICATION_SUBCOMMANDS.has(sub)) return runPublicationCommand(sub, flags, { ...deps, dir, now });
+  // Routed ahead of readState(): these three are read-only reports over a repository
+  // topology and must not be gated by the operator's local state file.
+  if (FEATURE_PACKAGE_READ_SUBCOMMANDS.has(sub)) return runFeaturePackageReadCommand(sub, rest);
+  // Routed ahead of readState() too: a deliberate, standalone, non-PO-gated rebind trigger
+  // (PHX-WP-MUTABLE-REBIND-EXPLICIT-CLI) -- never a silent side effect of any other verb.
+  if (sub === FEATURE_PACKAGE_REBIND_MUTABLE_SUBCOMMAND) return runFeaturePackageRebindMutableCommand(rest);
+  // Routed ahead of readState() too: this transaction's authority is the --root
+  // repository's own topology and its own private journal, never the operator's
+  // local state file (PHX-0A-WRITE, P-AC-08).
+  if (FEATURE_PACKAGE_WRITE_SUBCOMMANDS.has(sub)) return runFeaturePackageWriteCommand(sub, rest, deps);
 
   const existing = readState(dir);
   if (existing.status === "malformed") {
@@ -5231,6 +7292,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       const expectedPlanSha256 = authority.value.planSha256;
       const expectedSpecSha256 = authority.value.specSha256;
       let submittedAt;
+      let submittedBriefing;
       const written = writeState(dir, undefined, base, {
         transition: (observed) => {
           submittedAt = now();
@@ -5243,9 +7305,21 @@ export function run(argv = process.argv.slice(2), deps = {}) {
             by,
             at: submittedAt,
           });
-          return transition.ok
-            ? { ...transition, state: { ...transition.state, updatedAt: submittedAt } }
-            : transition;
+          if (!transition.ok) return transition;
+          // H-AC-11 human-legible briefing (PHX-WP-HUMANLEGIBLE-APPROVAL): derived
+          // here from the just-bound submission plus the prior approved binding,
+          // never from caller-supplied text -- see the closed vocabulary above.
+          submittedBriefing = derivePlanApprovalBriefing({
+            state: observed,
+            featureId: transition.submission.featureId,
+            planPath: transition.submission.planPath,
+            planSha256: transition.submission.planSha256,
+            specPath: transition.submission.specPath,
+            specSha256: transition.submission.specSha256,
+            profile: transition.submission.profile,
+            profileSha256: transition.submission.profileSha256,
+          });
+          return { ...transition, state: { ...transition.state, updatedAt: submittedAt, planApprovalBriefing: submittedBriefing } };
         },
         beforeCommit: () => {
           const nextAuthority = poGateAuthority({ repoRoot: dir, expectedPlanSha256, expectedSpecSha256 });
@@ -5265,6 +7339,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       }
       syncNextActionDocs(dir, written.transition.state);
       console.log(`Plan submitted by "${by}" on ${submittedAt}; lifecycle="awaiting-approval".`);
+      console.log(`Briefing: ${summarizePlanApprovalBriefing(submittedBriefing)}`);
       return 0;
     }
 
@@ -5457,6 +7532,14 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       syncNextActionDocs(dir, written.transition.state);
       console.log(`Plan approved by "${by}" on ${approvedAt}; lifecycle="approved".`);
       console.log('Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.');
+      // H-AC-11 human-legible briefing (PHX-WP-HUMANLEGIBLE-APPROVAL): the
+      // gate presentation shows the same closed-vocabulary briefing derived
+      // and persisted at submit-plan time -- never raw digests/paths alone --
+      // so the approver sees, in words, exactly what this approval binds.
+      const approvedBriefing = written.transition?.state?.planApprovalBriefing;
+      console.log(validPlanApprovalBriefing(approvedBriefing)
+        ? `Briefing: ${summarizePlanApprovalBriefing(approvedBriefing)}`
+        : "Briefing: not available (submission predates the human-legible approval briefing).");
       return 0;
     }
 
@@ -5656,9 +7739,16 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         return 2;
       }
       const pushWaived = pushMode.waived === true;
-      const expectedFlags = pushWaived
-        ? new Set(["by", "remote", "destination"])
-        : new Set(["by", "remote", "destination", "proof-request", "proof-authority", "proof"]);
+      // H-AC-12: `--decision-reference` is an OPTIONAL flag, admitted into the exact-flag set
+      // ONLY when the caller actually passed it. `parseExactFlags` requires every named flag to
+      // be PRESENT (`Object.keys(out).length === names.size`), so admitting it unconditionally
+      // would break every existing invocation -- presence detection keeps the absent case's
+      // flag set, parse result, approval record and state write byte-for-byte unchanged.
+      const decisionReferenceRequested = rest.includes("--decision-reference");
+      const pushBaseFlags = pushWaived
+        ? ["by", "remote", "destination"]
+        : ["by", "remote", "destination", "proof-request", "proof-authority", "proof"];
+      const expectedFlags = new Set(decisionReferenceRequested ? [...pushBaseFlags, "decision-reference"] : pushBaseFlags);
       const parsed = parseExactFlags(rest, expectedFlags);
       const by = parsed.value?.by;
       if (!parsed.ok || isBlank(by)) {
@@ -5781,10 +7871,26 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         console.error("Error: approve-push refused (CRITICAL-PROOF-REPLAY); external proof was already consumed.");
         return 2;
       }
+      // H-AC-12: the canonical decision ID is referenced and validated HERE -- after every
+      // pre-existing check has passed and before the first mutation, since the grant becomes
+      // effective only at `writeState` below. Refusing at this point leaves zero mutation.
+      let decisionReference;
+      if (decisionReferenceRequested) {
+        const decision = evaluateOptInDecisionReference(dir, parsed.value["decision-reference"], observed);
+        if (!decision.ok) {
+          console.error(`Error: approve-push refused (${decision.code})${decision.detail === undefined ? "" : `; ${decision.detail}`}; human authority was NOT recorded.`);
+          return 2;
+        }
+        decisionReference = decision.reference;
+      }
       // The record states on its face what backed it: a consumed proof, or the waiver
       // and its reason. There is no third, unlabelled state.
       const approvalRecord = { approvedBy: by, approvedAt, forCommit: head.commit, criticalProof: verified.proof, remote, destination, threatModel: threatModelBinding };
       if (verified.waived !== undefined) approvalRecord.criticalProofWaiver = verified.waived;
+      // Written only when one was supplied and validated, so `hooks/guard-push.mjs`'s own
+      // opt-in dual-evaluation (its check (c)) has the reference to re-validate at read time.
+      // Absent, the record is byte-identical to what this command wrote before.
+      if (decisionReference !== undefined) approvalRecord.decisionReference = decisionReference;
       const next = {
         ...base,
         schema: SCHEMA_ID,
@@ -5797,6 +7903,38 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       delete next.pendingPushChallenge;
       if (!stateWriteSucceeded(writeState(dir, next, base))) {
         return 2;
+      }
+      // PHX-2 additive external ledger (opt-in, see design doc §2/§5). Placed immediately
+      // after the local write succeeds, and only when there is a real proof to bind (a
+      // `chat`-mode waiver has no `criticalProof`, so `verified.proof` is null and there is
+      // nothing to externally consume -- see the design's coverage-boundary note). `dir` is
+      // passed to `externalPushLedgerGate`/`discoverRepository` for the same reason as the
+      // read side: worktree-invariant roots, not the CLI's worktree-local cwd.
+      if (verified.proof !== null && externalPushLedgerGate(dir) !== "off") {
+        let repository;
+        try {
+          repository = discoverRepository(dir, { timeout: 5000 });
+        } catch {
+          // Same >=7-path throw surface as the read side. This can only fire AFTER the local
+          // write above has already succeeded, so `pushApproval.lastApproved` and
+          // `criticalProofConsumption` for this `proofSha256` are already persisted -- a naive
+          // retry with the same proof hits the pre-existing CRITICAL-PROOF-REPLAY guard above.
+          // Recovery is a fresh signing ceremony, not a retry (design §4).
+          console.error("Error: approve-push refused (PUSH-EXTERNAL-LEDGER-TOPOLOGY-UNRESOLVED).");
+          return 2;
+        }
+        const appended = appendExternalPushLedgerConsumption({
+          repositoryFingerprint: derivePoGateRepositoryFingerprint({
+            gitCommonDir: repository.commonDir,
+            primaryRoot: repository.primaryRoot,
+          }),
+          proofSha256: verified.proof.proofSha256,
+          consumedAt: approvedAt,
+        });
+        if (!appended.ok) {
+          console.error(`Error: approve-push refused (${appended.code}).`);
+          return 2;
+        }
       }
       console.log(`Push approved by "${by}" for commit ${head.commit} (${approvedAt}).`);
       return 0;
@@ -6135,9 +8273,14 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       // question — "is the proof still demanded" is. Keying off requiredKinds alone
       // would force the operator to pass three proof paths that are never read.
       const deployProofDemanded = policy.requiredKinds.has("deploy") && !policy.waivers?.has("deploy");
-      const expectedFlags = new Set(deployProofDemanded
+      // H-AC-12: optional `--decision-reference`, admitted only when actually passed -- see
+      // approve-push's identical note on why `parseExactFlags` makes unconditional admission a
+      // breaking change, and `evaluateOptInDecisionReference` for the dual-evaluation itself.
+      const decisionReferenceRequested = rest.includes("--decision-reference");
+      const deployBaseFlags = deployProofDemanded
         ? ["env", "artifact", "by", "proof-request", "proof-authority", "proof"]
-        : ["env", "artifact", "by"]);
+        : ["env", "artifact", "by"];
+      const expectedFlags = new Set(decisionReferenceRequested ? [...deployBaseFlags, "decision-reference"] : deployBaseFlags);
       const parsed = parseExactFlags(rest, expectedFlags);
       const env = parsed.value?.env;
       const artifact = parsed.value?.artifact;
@@ -6166,6 +8309,22 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         proof = verified.proof;
         waiver = verified.waived ?? null;
       }
+      // H-AC-12: same consumption point as approve-push -- after every pre-existing check,
+      // before the first mutation (`writeState` below is where the grant becomes effective).
+      let decisionReference;
+      if (decisionReferenceRequested) {
+        const deployCandidate = gitCandidate(dir);
+        if (!deployCandidate.ok) {
+          console.error("Error: approve-deploy refused (DECISION-REFERENCE-CANDIDATE-UNRESOLVED); human authority was NOT recorded.");
+          return 2;
+        }
+        const decision = evaluateOptInDecisionReference(dir, parsed.value["decision-reference"], deployCandidate);
+        if (!decision.ok) {
+          console.error(`Error: approve-deploy refused (${decision.code})${decision.detail === undefined ? "" : `; ${decision.detail}`}; human authority was NOT recorded.`);
+          return 2;
+        }
+        decisionReference = decision.reference;
+      }
       const priorApprovals = Array.isArray(base.deployApprovals) ? base.deployApprovals : [];
       // Labelled, exactly as the push record is: a consumed proof, or the waiver that
       // stood it down. A waived approval must never be byte-identical to one recorded
@@ -6174,6 +8333,8 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         forArtifact: artifact, forEnvironment: env, approvedBy: by, approvedAt,
         ...(proof === null ? {} : { criticalProof: proof }),
         ...(waiver === null ? {} : { criticalProofWaiver: waiver }),
+        // Absent unless one was supplied and validated -- the entry stays byte-identical then.
+        ...(decisionReference === undefined ? {} : { decisionReference }),
       };
       const next = {
         ...base,

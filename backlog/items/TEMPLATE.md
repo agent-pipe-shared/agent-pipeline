@@ -1,7 +1,7 @@
 ---
 schema: pipeline.backlog-item.v1
 id: pipeline.{{short-english-slug}}
-type: {{workflow-improvement|tooling-radar|defect|idea}}
+type: {{workflow-improvement|tooling-radar|defect|idea|requirement}}
 owner: pipeline
 status: open
 created: {{YYYY-MM-DD}}

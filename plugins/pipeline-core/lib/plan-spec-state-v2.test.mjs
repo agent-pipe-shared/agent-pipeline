@@ -272,6 +272,64 @@ test("submission fails closed for malformed, busy, overflow, path, and State-CAS
   assert.equal(stale.code, "PLAN-LIFECYCLE-STATE-STALE");
 });
 
+test("submission fails closed when a signed authority revision's binding conflicts with the gate's derived pair, and succeeds unconditionally on the ordinary matching-path case", () => {
+  // A signed continuity-authority revision (recorded via the dedicated
+  // revision path, never via submitPlan) rebound the PRD side of the binding
+  // to a document other than the one this ordinary, unsigned submission's own
+  // PO-gate view derives. That is not this submission's decision to overwrite.
+  const prdRevised = draft();
+  prdRevised.continuity = continuity({
+    authority: {
+      prd: { path: "specs/feature/prd-v2.md", sha256: "8".repeat(64) },
+      spec: { path: AUTHORITY.specPath, sha256: "9".repeat(64) },
+      result: null,
+    },
+  });
+  const prdConflict = submitPlan({
+    state: prdRevised,
+    expectedStateSha256: sha256CanonicalJson(prdRevised),
+    poGateAuthority: AUTHORITY,
+    profile: "feature",
+    profileSha256: PROFILE,
+    by: "Coordinator",
+    at: NOW,
+  });
+  assert.equal(prdConflict.ok, false);
+  assert.equal(prdConflict.code, "PLAN-SUBMIT-AUTHORITY-PRD-CONFLICT");
+
+  // Same shape, but the signed revision moved the Spec side of the binding.
+  const specRevised = draft();
+  specRevised.continuity = continuity({
+    authority: {
+      prd: { path: AUTHORITY.planPath, sha256: "8".repeat(64) },
+      spec: { path: "specs/feature/spec-v2.md", sha256: "9".repeat(64) },
+      result: null,
+    },
+  });
+  const specConflict = submitPlan({
+    state: specRevised,
+    expectedStateSha256: sha256CanonicalJson(specRevised),
+    poGateAuthority: AUTHORITY,
+    profile: "feature",
+    profileSha256: PROFILE,
+    by: "Coordinator",
+    at: NOW,
+  });
+  assert.equal(specConflict.ok, false);
+  assert.equal(specConflict.code, "PLAN-SUBMIT-AUTHORITY-SPEC-CONFLICT");
+
+  // The ordinary, routine case: the recorded binding's paths already match
+  // the gate's derived pair (`continuity()`'s default fixture pairs each
+  // path with a *different* sha256, i.e. content-digest drift on the same
+  // document) -- this must succeed unconditionally, never gated.
+  const ordinary = submitted(draft());
+  assert.deepEqual(ordinary.continuity.authority, {
+    prd: { path: AUTHORITY.planPath, sha256: AUTHORITY.planSha256 },
+    spec: { path: AUTHORITY.specPath, sha256: AUTHORITY.specSha256 },
+    result: null,
+  });
+});
+
 test("V2 revocation atomically returns the feature to design and the exact legacy mixed postimage recovers", () => {
   const approval = {
     schema: "pipeline.plan-approval.v2",

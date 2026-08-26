@@ -29,7 +29,7 @@ USAGE
    The project's CLAUDE.md "Stand" section shrinks to a 3–5 line pointer
    that references this file — it does not duplicate its content.
 5. Update this file at the close of every block/session (bootstrap protocol,
-   operating-model §5.1/§6) — persist immediately, never rely on chat
+   docs/operating-model.md, *Evidence, review and recovery*) — persist immediately, never rely on chat
    history: a session is a cache on the persisted artifact, not the record
    of truth.
 

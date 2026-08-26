@@ -1,0 +1,14 @@
+{
+  "taskId": "PHX-WP-RPACK-STABLE-READ",
+  "model": "claude-sonnet-5",
+  "rulesetSha": "5fa52282cd58e6be5c04dceada78dda8c9dd072b7f2d4b4d833b5d2ab8a54af2",
+  "dispatcher": "goldfish",
+  "outcome": "done",
+  "log": [
+    { "phase": "start", "toolUseCount": 2 },
+    { "phase": "implementation", "toolUseCount": 6, "note": "read attestRecoveryPreviewDelivery, replaced three acknowledgementId reads with one local const" },
+    { "phase": "tests", "toolUseCount": 8, "note": "added regression test with non-idempotent getter; node --test full suite: 14/14 pass, exit 0" },
+    { "phase": "commit", "toolUseCount": 12, "note": "commit 97ba6598" }
+  ],
+  "report": "DoD: (1) three reads collapsed to one local const acknowledgementId used at safeId check, RP-ACK-REPLAY check, and usedAcknowledgementIds postimage -- passed. (2) node --test plugins/pipeline-core/lib/recovery-preview-attestation.test.mjs exit 0, 14/14 pass (13 pre-existing + 1 new regression test) -- passed. (3) all pre-existing tests unmodified, only additive test appended -- passed. Evidence: specs/sprint-phoenix-epic/evidence/PHX-WP-RPACK-STABLE-READ/verify-output.log (gitignored; manually captured from the tool's own stdout since the shell guard blocks redirect operators for this command grammar). Changed files: recovery-preview-attestation.mjs (the fix), recovery-preview-attestation.test.mjs (added regression test with non-idempotent getter asserting single read + stable postimage). Deliberately not changed: exactKeys/Object.hasOwn key enumeration (does not read getter values), the Set-dedup and includes() semantics downstream, all other functions in the file. Deviation: none from spec. Commit 97ba6598 on sprint_phoenix."
+}

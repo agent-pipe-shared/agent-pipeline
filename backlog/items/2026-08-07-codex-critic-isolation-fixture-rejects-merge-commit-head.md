@@ -125,3 +125,20 @@ batch 1) checked only whether `buildExactFixture`'s requirement had changed
 (it had not) and missed that the TEST FILE's own derivation had been fixed
 separately — a real miss, not a hypothetical one; caught only because the
 dispatched fix attempt read the code before writing anything.
+
+### Phoenix checkout's own triage, 2026-08-18 (superseded — Nova's fix above had already landed by 2026-08-11/12)
+
+Not yet triaged in Phoenix at the time. Not fixed in that session:
+`buildExactFixture` and its test suite are guardrail/security-isolation-tier
+code (Codex sandbox critic isolation), which per this repository's own
+dispatch discipline needs a properly briefed Goldfish-deep + Critic round,
+not a same-session Elephant patch. `harness/scripts/verify.mjs`'s overall
+exit code for candidate `8bc5ceb` was `1` because of this gap alone (plus the
+separately-reconciled backlog-ledger drift, now fixed) -- every GMW-relevant
+suite in that same run passed cleanly; this finding was unrelated to
+NOVA-GMW-1's own correctness.
+
+- **Decision:** Defer — real and open at the time, but out of Phoenix's own epic scope
+- **Rationale:** Confirmed unfixed identically in Phoenix and (at that point, per this checkout's own stale re-verification above) apparently still in Nova (codex-critic-isolation.mjs:1816, single-parent requirement). Guardrail/security-isolation-tier infrastructure code unrelated to any Phoenix-epic acceptance criterion (neither spec.md nor acceptance.md references it) — general pipeline hardening. Condition to revisit: a dedicated Goldfish-deep + Critic round, per the item's own triage note.
+- **Assignment (if accepted):** Nova / general pipeline backlog — out of Phoenix's own epic scope
+- **Date:** 2026-08-18

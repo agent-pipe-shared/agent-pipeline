@@ -147,6 +147,47 @@ normative shape is:
    2026-08-25 addendum; [ADR-0061](adr/0061-uniform-human-approval-ceremony.md)
    Decision 2) — an agent's own tool call cannot complete it, no signature/
    chat mode branch exists for it, and it applies unconditionally.
+   **Post-approval continuation.** Once that required plan gate is recorded,
+   internal implementation slices and packages within its approved scope
+   continue autonomously. Dispatch, required evidence gates, Critic review and
+   finding disposition are delivery work, not repeated PO pauses. Do not ask
+   for a new PO gate merely because a slice completes. A PO gate is required
+   only for a typed blocker, a material scope or authority change, a push or
+   other remote action not already admitted by the PHX-2 Human Governance
+   Decision Ledger and Authority Resolver contract below, or final feature/epic
+   acceptance. This preserves
+   the initial plan gate; it does not weaken any required evidence gate.
+   **PHX-2 Human Governance Decision Ledger and Authority Resolver transition
+   (policy and rollback plan).** The sole possible exception for a remote
+   action is a secure Ledger/Resolver proof of one valid, unconsumed,
+   unrevoked, unexpired and integrity-bound PO decision. The Resolver must bind
+   that decision exactly to one action, remote, ref, candidate and named work
+   package; it authorizes no action variant, other remote action, remote, ref,
+   candidate or work package. The decision record must not originate from an
+   agent, Git history, state, cache, agent journal, lifecycle event, readback,
+   runner or AGY. Until this PHX-2 path exists, or whenever its Resolver or
+   proof is unavailable, missing or ambiguous, this Pipeline has no executable
+   remote-action exception: every remote action remains an explicit PO gate,
+   while a PO decision is only proposed Ledger input, never executable
+   authority. It must not be promoted, copied or inferred from mutable
+   `pushApproval` or other state, CLI input, Git history or metadata, cache,
+   journal, lifecycle/readback record, agent record, runner or AGY value.
+   Before execution, also stop if the decision is expired,
+   revoked, consumed or changed. Its sole lifetime ends at successful exact
+   remote readback, or at an explicit revocation or authority change. This
+   semantics is platform- and runner-neutral: it applies equally on macOS,
+   Windows and Linux and to Claude, Codex and AGY, without making AGY a
+   prerequisite. After the action, compare the exact remote ref with the bound
+   candidate and update the local public evidence/audit path with the binding
+   and observed ref; never include private data or claim success without that
+   readback.
+   **Authorization/trust-boundary threat-model assessment.** An unbound,
+   stale, ambiguous or changed remote action is denied: only the PHX-2
+   Ledger/Resolver proof is authority. Remote readback is observation, never
+   authority; the audit trail is public-safe and contains no private data.
+   **Rollback.** Before the readback, abort the action. After publication,
+   never force-push or automatically reverse it: a compensating remote action
+   needs new explicit PO authority that names that action, remote and ref.
 5. **Dispatch.** Give a Goldfish one outcome, exact context paths, DoD checks,
    prohibitions, stop conditions and route metadata. Independent tasks may run
    in parallel when their files and state do not conflict.
@@ -470,6 +511,52 @@ Die normative Form lautet:
    Die Freigabe wird vor dem ersten Implementierungs-Dispatch aufgezeichnet;
    sie wird nie aus Chat, einem alten Plan oder Zuversicht der implementierenden
    Person abgeleitet.
+   **Fortsetzung nach Freigabe.** Sobald dieses nötige Plan-Gate aufgezeichnet
+   ist, laufen interne Implementierungs-Slices und -Pakete innerhalb seines
+   freigegebenen Scopes autonom weiter. Dispatch, nötige Evidenz-Gates,
+   Critic-Review und Befund-Disposition sind Auslieferungsarbeit, keine
+   wiederholten PO-Pausen. Nicht allein wegen des Abschlusses eines Slices ein
+   neues PO-Gate einholen. Ein PO-Gate ist nur bei einem typisierten Blocker,
+   einer materiellen Scope- oder Autoritätsänderung, einem Push oder einer
+   anderen Remote-Aktion, die nicht bereits durch den unten stehenden PHX-2
+   Human Governance Decision Ledger und Authority Resolver zugelassen ist,
+   oder der finalen Feature-/Epic-Abnahme erforderlich. Das erhält das anfängliche Plan-Gate
+   und schwächt kein nötiges Evidenz-Gate.
+   **PHX-2 Human Governance Decision Ledger und Authority-Resolver-Übergang
+   (Policy und Rollback-Plan).** Die einzige mögliche Ausnahme für eine
+   Remote-Aktion ist ein sicherer Ledger-/Resolver-Nachweis einer gültigen,
+   unverbrauchten, nicht widerrufenen, nicht abgelaufenen und
+   integritätsgebundenen PO-Decision. Der Resolver muss diese Decision genau
+   an eine Aktion, ein Remote, einen Ref, einen Kandidaten und ein benanntes
+   Arbeitspaket binden; sie autorisiert keine Aktionsvariante, andere
+   Remote-Aktion, kein anderes Remote, keinen anderen Ref, Kandidaten oder
+   kein anderes Arbeitspaket. Der Decision-Record darf nicht aus einem Agent,
+   Git-History, State, Cache, Agent-Journal, Lifecycle-Event, Readback, Runner
+   oder AGY stammen. Solange dieser PHX-2-Pfad nicht existiert oder sein
+   Resolver bzw. Nachweis nicht verfügbar, fehlend oder mehrdeutig ist,
+   existiert für diese Pipeline keine ausführbare Remote-Aktionsausnahme:
+   Jede Remote-Aktion bleibt ein ausdrückliches PO-Gate, während eine
+   PO-Decision nur vorgeschlagener Ledger-Eingang und nie ausführbare
+   Authority ist. Sie darf nicht aus mutablem `pushApproval` oder anderem
+   State, CLI-Input, Git-History oder -Metadaten, Cache, Journal,
+   Lifecycle-/Readback-Record, Agent-Record, Runner oder AGY heraufgestuft,
+   kopiert oder abgeleitet werden. Vor der Ausführung auch bei
+   abgelaufener, widerrufener, verbrauchter oder geänderter Decision stoppen.
+   Ihre einzige Laufzeit endet mit erfolgreichem exaktem Remote-Readback oder
+   einem ausdrücklichen Widerruf bzw. einer Authority-Änderung. Diese Semantik
+   ist plattform- und runnerneutral: Sie gilt gleich für macOS, Windows und
+   Linux sowie Claude, Codex und AGY, ohne AGY vorauszusetzen. Nach der Aktion
+   den exakten Remote-Ref mit dem gebundenen Kandidaten vergleichen und den
+   lokalen, öffentlichen Evidenz-/Auditpfad mit Bindung und beobachtetem Ref
+   aktualisieren; niemals private Daten aufnehmen oder ohne diesen Readback
+   Erfolg behaupten. **Authorization-/Trust-Boundary-Threat-Model-Bewertung.**
+   Eine ungebundene, veraltete, mehrdeutige oder geänderte Remote-Aktion wird
+   verweigert: Nur der PHX-2-Ledger-/Resolver-Nachweis ist Authority.
+   Remote-Readback ist Beobachtung, nie Authority; der Auditpfad ist public-safe und enthält
+   keine privaten Daten. **Rollback.** Vor dem Readback die Aktion abbrechen. Nach
+   der Veröffentlichung niemals force-pushen oder automatisch zurückbauen:
+   Eine gegensteuernde Remote-Aktion benötigt neue ausdrückliche PO-Autorität,
+   die Aktion, Remote und Ref benennt.
 5. **Dispatch.** Einem Goldfish genau ein Outcome, Kontextpfade, DoD-Checks,
    Verbote, Stop-Bedingungen und Route-Metadaten geben. Unabhängige Aufgaben
    dürfen parallel laufen, wenn Dateien und Zustand nicht kollidieren.
@@ -553,8 +640,6 @@ ist kein menschliches Gate: zuerst ihre exakte typisierte Read-only- oder
 Lifecycle-Recovery ausführen. So bleibt menschliches Urteil sichtbar, ohne den
 PO zum Implementierungs-Relay zu machen.
 
-<a id="7-feedback-loop"></a>
-
 ## 6. Evidenz, Review und Recovery
 
 Evidenz bindet ein Ergebnis an seinen Kandidaten und hält fest, was wirklich
@@ -572,8 +657,6 @@ die betroffene Arbeit gestoppt. Recovery erfolgt aus dem benannten Artefakt
 oder über einen neu gebrief­ten Task, nicht aus erinnerter Chat-Historie.
 Destruktive Git-Operationen bleiben geschützt, auch wenn ein Modell oder Prompt
 sie verlangt.
-
-<a id="8-projekt-kalibrierungsschicht"></a>
 
 ## 7. Projektkalibrierung und Erweiterungen
 

@@ -12,11 +12,16 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { sha256CanonicalJson } from "../lib/plan-spec-state-v2.mjs";
+import { canonicalSha256, canonicalizeJson } from "../lib/governance-event.mjs";
+import { appendHumanGovernanceDecision } from "../lib/human-governance-ledger.mjs";
+import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
+import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
 
 const GUARD = fileURLToPath(new URL("./guard-devplan.mjs", import.meta.url));
 
@@ -516,6 +521,258 @@ const NO_FEATURE_STATE = { schema: "pipeline.state.v0" };
   check("DP26b block  awaiting-approval exact Spec authority", "Edit", AUTHORITY_SPEC_PATH, BLOCK, {
     projectDir: dir,
     stderrIncludes: ["awaiting-approval", "immutable"],
+  });
+}
+
+// ---- DP27/DP28 H-AC-12 generalized dual-evaluation (legacy/v2/v4 approval path) ---------
+// Before this dispatch, a non-v3-schema approval reaching lifecycle "implementing" exited
+// allow unconditionally -- no second evaluation, no fail-on-disagreement. These fixtures
+// build a real "pipeline.plan-approval.v2" approval (submission-free compatibility branch)
+// carrying an OPTIONAL top-level `state.planApprovalDecisionReference`
+// (`pipeline.human-decision-reference.v1`) and prove the dual-evaluation primitive now
+// governs it: unresolved/mismatched -> BLOCK (fail closed), genuinely ledger-granted -> ALLOW.
+const V2_CANDIDATE = { commit: "b".repeat(40), tree: "c".repeat(40) };
+const UNAVAILABLE = { state: "not-applicable" };
+
+function governanceRegistry(fingerprint) {
+  return {
+    schema: "pipeline.governance-stream-registry.v1",
+    repositoryFingerprint: fingerprint,
+    canonicalization: "RFC8785",
+    digestAlgorithm: "sha-256",
+    eventDigestDomain: "pipeline.governance-event.v1\0",
+    storageRoot: "governance/events",
+    streams: [
+      { streamId: "human", origin: "human", authorityClass: "human-authority", relativeRoot: "human", storageProfile: "repository-public-safe", genesis: { sequence: 0, eventDigest: null } },
+      { streamId: "agent", origin: "agent", authorityClass: "non-authoritative", relativeRoot: "agent", storageProfile: "repository-public-safe", genesis: { sequence: 0, eventDigest: null } },
+      { streamId: "lifecycle", origin: "lifecycle", authorityClass: "non-authoritative", relativeRoot: "lifecycle", storageProfile: "repository-public-safe", genesis: { sequence: 0, eventDigest: null } },
+    ],
+  };
+}
+function governanceCapturePolicy() {
+  return {
+    schema: "pipeline.governance-capture-policy.v1",
+    policyId: "fixture",
+    revision: "d".repeat(64),
+    defaultAction: "deny",
+    streams: [
+      { origin: "human", purpose: "authority-history", materiality: "required", personalIdentifiability: "prohibited", contextualIdentifiability: "prohibited", storageProfile: "repository-public-safe", retention: "repository-retained", disclosure: "repository-visible", encryptionGeneration: null },
+      { origin: "agent", purpose: "declared-assumption", materiality: "policy-selected", personalIdentifiability: "prohibited", contextualIdentifiability: "prohibited", storageProfile: "repository-public-safe", retention: "repository-retained", disclosure: "repository-visible", encryptionGeneration: null },
+      { origin: "lifecycle", purpose: "deterministic-lifecycle", materiality: "required", personalIdentifiability: "prohibited", contextualIdentifiability: "prohibited", storageProfile: "repository-public-safe", retention: "repository-retained", disclosure: "repository-visible", encryptionGeneration: null },
+    ],
+    sanitizedReceipt: { allowEventId: true, allowEventDigest: true, allowCheckpoint: true, allowReasonText: false },
+    mandatoryEventClasses: [],
+  };
+}
+function governanceGrantDecision({ fingerprint, decisionId, packageId, artifacts }) {
+  return {
+    decisionId,
+    event: "granted",
+    outcome: "granted",
+    authorityClass: "product-owner",
+    identityAssurance: "locally-attributed",
+    timeAssurance: "locally-observed",
+    scope: { repositoryFingerprint: fingerprint, candidate: V2_CANDIDATE, packageId, action: "APPROVE_PLAN", environment: "local", artifacts },
+    reasonCode: "APPROVED",
+    policyDigest: "a".repeat(64),
+    ruleDigest: "f".repeat(64),
+    validity: { notBeforeEpochMs: 1, expiresAtEpochMs: 4_102_444_800_000, singleUse: true },
+    links: { requestDecisionId: "request-1", consumesDecisionId: null, revokesDecisionId: null, expiresDecisionId: null, supersedesDecisionId: null, correctsDecisionId: null },
+  };
+}
+function governanceGrantIntent({ fingerprint, capturePolicyDigest, decision }) {
+  return {
+    schema: "pipeline.governance-event-envelope.v1",
+    payloadSchema: "pipeline.human-governance-decision.v1",
+    canonicalization: "RFC8785",
+    digestAlgorithm: "sha-256",
+    eventId: "human-event-1",
+    idempotencyKey: "human-idempotency-1",
+    origin: "human",
+    authorityClass: "human-authority",
+    eventType: "human.granted",
+    occurredAtEpochMs: 2,
+    observedAtEpochMs: 2,
+    timeAssurance: "locally-observed",
+    repositoryFingerprint: fingerprint,
+    sourceUri: `urn:pipeline:repository:${fingerprint}`,
+    streamId: "human",
+    correlation: { featureId: UNAVAILABLE, packageId: UNAVAILABLE, requestId: UNAVAILABLE, sessionId: UNAVAILABLE, dispatchId: UNAVAILABLE, traceId: UNAVAILABLE },
+    candidate: V2_CANDIDATE,
+    artifacts: [UNAVAILABLE],
+    policy: { policyDigest: UNAVAILABLE, configurationDigest: UNAVAILABLE, capturePolicyDigest, redactionPolicyDigest: UNAVAILABLE },
+    classification: "repository-public-safe",
+    storageProfile: "repository-public-safe",
+    retentionCompatibility: "repository-retained",
+    disclosureClass: "repository-visible",
+    payload: decision,
+  };
+}
+/** Real git-init + governance-ledger fixture backing a genuinely resolvable grant. */
+async function writeGovernanceLedgerGrant(dir, { decisionId, packageId, artifacts }) {
+  spawnSync("git", ["init", "-q", dir]);
+  const repository = discoverRepository(dir);
+  const fingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: repository.commonDir, primaryRoot: repository.primaryRoot });
+  const policy = governanceCapturePolicy();
+  await mkdir(join(dir, "governance", "events"), { recursive: true });
+  await writeFile(join(dir, "governance", "events", "registry.json"), `${canonicalizeJson(governanceRegistry(fingerprint))}\n`);
+  await writeFile(join(dir, "governance", "events", "capture-policy.json"), `${canonicalizeJson(policy)}\n`);
+  const decision = governanceGrantDecision({ fingerprint, decisionId, packageId, artifacts });
+  const receipt = await appendHumanGovernanceDecision({
+    repositoryRoot: dir,
+    repositoryFingerprint: fingerprint,
+    intent: governanceGrantIntent({ fingerprint, capturePolicyDigest: canonicalSha256(policy), decision }),
+  });
+  return { fingerprint, checkpoint: receipt.checkpoint, decisionDigest: canonicalSha256(decision) };
+}
+function v2AuthorityState({ repositoryFingerprint }) {
+  return {
+    schema: "pipeline.state.v0",
+    activeFeature: { id: "authority-feature", planPath: AUTHORITY_PLAN_PATH, phase: "implementation" },
+    planApproved: true,
+    planApproval: {
+      schema: "pipeline.plan-approval.v2",
+      approvedBy: "PO",
+      approvedAt: "2026-07-30T20:00:00.000Z",
+      specBoundBy: "PO",
+      specBoundAt: "2026-07-30T20:05:00.000Z",
+      poGateAuthority: {
+        schema: "pipeline.po-gate-authority.v2",
+        humanFacing: "en",
+        sourceSha256: "1".repeat(64),
+        runtimeSha256: "2".repeat(64),
+        receiptSha256: "3".repeat(64),
+        repositoryFingerprint,
+        planPath: AUTHORITY_PLAN_PATH,
+        planSha256: sha256(AUTHORITY_PLAN_BYTES),
+        specPath: AUTHORITY_SPEC_PATH,
+        specSha256: sha256(AUTHORITY_SPEC_BYTES),
+      },
+    },
+  };
+}
+function decisionReference({ fingerprint, decisionId, decisionDigest, checkpoint }) {
+  return {
+    schema: "pipeline.human-decision-reference.v1",
+    decisionId,
+    decisionDigest,
+    candidate: V2_CANDIDATE,
+    checkpoint: checkpoint ?? {
+      repositoryFingerprint: fingerprint,
+      streamId: "human",
+      sequence: 1,
+      eventDigest: "9".repeat(64),
+      candidateCommit: V2_CANDIDATE.commit,
+      candidateTree: V2_CANDIDATE.tree,
+    },
+  };
+}
+
+// ---- DP27 no ledger backing the reference at all -> BLOCK (fail closed, disagreement) ----
+{
+  const dir = freshDir("v2-reference-unresolved");
+  writeManifest(dir, MANIFEST_BLOCKING);
+  writeAuthorityDocs(dir);
+  const fingerprint = "7".repeat(64);
+  const state = {
+    ...v2AuthorityState({ repositoryFingerprint: fingerprint }),
+    planApprovalDecisionReference: decisionReference({ fingerprint, decisionId: "grant-1", decisionDigest: "8".repeat(64) }),
+  };
+  writeState(dir, state);
+  check("DP27 block  legacy/v2 approval + present-but-unresolvable decision reference fails closed", "Edit", "src/foo.ts", BLOCK, {
+    projectDir: dir,
+    stderrIncludes: ["authority-feature", "human ledger"],
+  });
+}
+
+// ---- DP28 a genuinely resolvable, ledger-granted reference -> ALLOW (agreement) ----------
+{
+  const dir = freshDir("v2-reference-resolved");
+  writeManifest(dir, MANIFEST_BLOCKING);
+  writeAuthorityDocs(dir);
+  const grant = await writeGovernanceLedgerGrant(dir, {
+    decisionId: "grant-1",
+    packageId: "authority-feature",
+    artifacts: [
+      { path: AUTHORITY_PLAN_PATH, sha256: sha256(AUTHORITY_PLAN_BYTES) },
+      { path: AUTHORITY_SPEC_PATH, sha256: sha256(AUTHORITY_SPEC_BYTES) },
+    ],
+  });
+  const state = {
+    ...v2AuthorityState({ repositoryFingerprint: grant.fingerprint }),
+    planApprovalDecisionReference: decisionReference({
+      fingerprint: grant.fingerprint,
+      decisionId: "grant-1",
+      decisionDigest: grant.decisionDigest,
+      checkpoint: grant.checkpoint,
+    }),
+  };
+  writeState(dir, state);
+  check("DP28 allow  legacy/v2 approval + genuinely ledger-granted decision reference agrees", "Edit", "src/foo.ts", ALLOW, {
+    projectDir: dir,
+    stderrEmpty: true,
+  });
+}
+
+// ---- DP29 sanctioned close-artifact writer: HISTORY.md and telemetry/ -> allow ----------
+// backlog/items/2026-07-26-readonly-command-guard-classification.md;
+// specs/sprint-phoenix-epic/RECOVERY.md R-02: mandatory root-level History/telemetry close
+// records must be writable before plan approval without exempting any actual product file.
+{
+  const dir = freshDir("close-artifact-history");
+  writeManifest(dir, MANIFEST_BLOCKING);
+  writeState(dir, UNAPPROVED_STATE);
+  check("DP29 allow  root-level HISTORY.md is a sanctioned close artifact", "Edit", "HISTORY.md", ALLOW, {
+    projectDir: dir,
+    stderrEmpty: true,
+  });
+  check("DP29b allow  telemetry/costs.md is a sanctioned close artifact", "Edit", "telemetry/costs.md", ALLOW, {
+    projectDir: dir,
+    stderrEmpty: true,
+  });
+  check("DP29c allow  root-level HISTORY.md matched case-insensitively", "Edit", "history.md", ALLOW, {
+    projectDir: dir,
+    stderrEmpty: true,
+  });
+}
+
+// ---- DP30 close-artifact classification stays exact, not a loose prefix ----------------
+// A file merely sharing the "history.md" string prefix, or living outside telemetry/, is
+// NOT a close record and must still be gated like any other product file.
+{
+  const dir = freshDir("close-artifact-not-loose");
+  writeManifest(dir, MANIFEST_BLOCKING);
+  writeState(dir, UNAPPROVED_STATE);
+  check("DP30 block  HISTORY.md.bak is NOT exempted by the close-artifact exact match", "Edit", "HISTORY.md.bak", BLOCK, {
+    projectDir: dir,
+    stderrIncludes: ["ap1-pipeline-tuning"],
+  });
+  check("DP30b block  nested docs/HISTORY.md (not root) is NOT the sanctioned close artifact", "Edit", "src/HISTORY.md", BLOCK, {
+    projectDir: dir,
+    stderrIncludes: ["ap1-pipeline-tuning"],
+  });
+  check("DP30c block  telemetry-extra/costs.md is NOT the telemetry/ close-record prefix", "Edit", "telemetry-extra/costs.md", BLOCK, {
+    projectDir: dir,
+    stderrIncludes: ["ap1-pipeline-tuning"],
+  });
+  check("DP30d block  ordinary product file src/foo.ts remains gated as before", "Edit", "src/foo.ts", BLOCK, {
+    projectDir: dir,
+    stderrIncludes: ["ap1-pipeline-tuning"],
+  });
+}
+
+// ---- DP31 sanctioned close artifacts are exempt regardless of lifecycle phase ----------
+{
+  const dir = freshDir("close-artifact-approved");
+  writeManifest(dir, MANIFEST_BLOCKING);
+  writeState(dir, APPROVED_STATE); // approved design, not yet "implementation" -- still gated normally
+  check("DP31 allow  HISTORY.md stays exempt even under an approved-but-not-implementation state", "Edit", "HISTORY.md", ALLOW, {
+    projectDir: dir,
+    stderrEmpty: true,
+  });
+  check("DP31b block  sanity: src/foo.ts is still gated in the same fixture", "Edit", "src/foo.ts", BLOCK, {
+    projectDir: dir,
+    stderrIncludes: ["approved", "set-phase"],
   });
 }
 

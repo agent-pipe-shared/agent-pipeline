@@ -1,0 +1,62 @@
+{
+  "taskId": "PHX-WP-HAC08",
+  "model": "claude-opus-5[1m]",
+  "rulesetSha": "5125f494dd5a0f5315b8ea7f5f19e03ab4e0057e15c7198d5565d7b3d67ca937",
+  "dispatcher": "elephant",
+  "outcome": "self-stopped-negative-finding",
+  "log": [
+    {
+      "phase": "bootstrap",
+      "toolUses": 2,
+      "note": "dispatch record created before substantive work. Route pre-check: requested claude-opus-5/xhigh, observed claude-opus-5[1m] from the runtime prompt, no contradiction."
+    },
+    {
+      "phase": "investigation-shape",
+      "toolUses": 9,
+      "note": "LEGACY_SOURCE_CLASSES is a six-member closed vocabulary (mutable-approval-state, guard-override-jsonl-record, deployment-approval-log, override-receipt, backlog-transition-record, release-change-evidence), documented at agent-decision-journal.mjs:14 as 'the six legacy record classes issue #30's Migration section names, one-to-one'. Provenance is an issue's migration narrative, not an inventory of artifacts this repo holds."
+    },
+    {
+      "phase": "investigation-producers",
+      "toolUses": 13,
+      "note": "rg for buildLegacyImportObservation|legacyImport|legacySourceClass|authorityProofStatus across plugins/ harness/ scripts/ returns exactly 2 files: agent-decision-journal.mjs (the validator) and agent-decision-journal.test.mjs. Zero producers. Briefing's CONFIRMED ABSENT independently reproduced."
+    },
+    {
+      "phase": "investigation-sources",
+      "toolUses": 21,
+      "note": "REAL ARTIFACT FOUND for class guard-override-jsonl-record: project/guard-override.log.jsonl and .claude/guard-override.log.jsonl, both git-tracked. project/ copy holds 5 real records (2026-07-23..2026-08-07), shape {ts,rule,token,reason,command,targetSha256?}, authority carried only as free-text reason ('PO-approved ...'), no signature/HMAC. Would map cleanly to authorityProofStatus:'unprovable'. BUT guard-git.mjs:66 documents it as the LIVE one-time-token consumption ledger the guard writes today, not a dormant historical record awaiting migration."
+    },
+    {
+      "phase": "investigation-activity",
+      "toolUses": 27,
+      "note": "The decisive question is whether an IMPORT ACTIVITY exists, not whether a source artifact exists. One real legacy-import path found: scripts/migrate-backlog-state.mjs (readLegacyItems/baselineEvents), class backlog-transition-record. It is (a) permanently closed off -- applyBacklogMigration:99 refuses when backlog/transitions.ndjson exists, and that file exists (199415 bytes), so the path can never run again; (b) semantically the opposite of an H-AC-08 import -- line 47 REFUSES records carrying closure authority rather than importing them as observations; (c) already discharging H-AC-08's requirement by its own mechanism -- baselineEvents emits from:null, actor:'backlog-migration', reason 'no implementation or closure is claimed'."
+    },
+    {
+      "phase": "governing-design",
+      "toolUses": 25,
+      "note": "specs/sprint-phoenix-epic/design/agent-decision-journal-production-producer.md sec.5 rules on this exact criterion: legacy-import-observation source 'none identified', confidence 'low'; 'Building a producer for an activity the product does not perform would be building a caller to satisfy a criterion, which is the exact anti-pattern this epic has caught and reverted before (cc43a182, the reverted orphan check).' sec.6 item 3: put H-AC-08 to the PO as an amendment question 'rather than as its own build'. Explicitly 'a PO decision and is deliberately not taken here.' Building here would contradict a standing governing decision -> stop condition 2."
+    },
+    {
+      "phase": "self-stop",
+      "toolUses": 28,
+      "note": "No code changed, no commit. Qualified NO CARRIER reported."
+    }
+  ],
+  "report": {
+    "result": "clean self-stop, qualified NO CARRIER -- no producer built",
+    "evidenceCommit": null,
+    "sourceArtifactFound": "project/guard-override.log.jsonl (git-tracked, 5 real pre-Phoenix override records, no reprovable authority tuple) -- a genuine artifact of class guard-override-jsonl-record",
+    "whyNotBuilt": [
+      "A source artifact existing is not the same as an import activity existing. H-AC-08 is conditional ('WHEN a legacy record ... THE SYSTEM SHALL import it only as ...'); the system performs no such import, so the criterion is vacuous at the caller level and its shape obligation is already met and drift-tested.",
+      "The guard-override JSONL is the guard's LIVE consumption ledger (guard-git.mjs:66), not a dormant record awaiting migration. Nothing in the repo needs those 5 entries in the governance journal.",
+      "The one real legacy-import path (migrate-backlog-state.mjs) is one-time and already executed -- backlog/transitions.ndjson exists, so applyBacklogMigration:99 refuses forever. Wiring a producer into a dead path is a test-only path with extra steps.",
+      "That path also refuses authority-bearing legacy records (line 47) instead of importing them as observations, and already disclaims closure via its own transition schema -- a legacy-import-observation there would be a duplicate record of the same fact.",
+      "The governing design doc sec.5/sec.6 already ruled this a PO amendment decision, deliberately untaken, and named building it as the reverted cc43a182 anti-pattern."
+    ],
+    "newFactForThePO": "The amendment question changes shape: it is no longer 'no legacy source exists anywhere' but 'a real source artifact of one of the six classes exists (project/guard-override.log.jsonl) while no import need or live import activity does'. The honest options in design sec.5 (acceptance.md amendment, or leave open with reason recorded) are unchanged, but the reason recorded should now be the accurate one.",
+    "openItems": [
+      "H-AC-08 remains partial: shape representable and drift-tested, zero production callers, by deliberate design decision rather than by omission.",
+      "Not investigated to exhaustion for want of budget: classes deployment-approval-log, override-receipt, release-change-evidence, mutable-approval-state were reasoned about from the vocabulary and adjacent code but not each given a dedicated repo-wide artifact hunt.",
+      "Case-collision hazard: an older lowercase evidence dir specs/sprint-phoenix-epic/evidence/phx-wp-hac08/ already exists alongside the briefed uppercase PHX-WP-HAC08/. Distinct on this case-sensitive FS, would collide on a case-insensitive one."
+    ]
+  }
+}

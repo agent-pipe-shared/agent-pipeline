@@ -1,0 +1,27 @@
+TAP version 13
+# Subtest: H-AC-08 rejects an unrecognized legacySourceClass with ADJ-LEGACY-SHAPE
+not ok 1 - H-AC-08 rejects an unrecognized legacySourceClass with ADJ-LEGACY-SHAPE
+  ---
+  duration_ms: 1.208213
+  type: 'test'
+  location: '/home/skar667/src/agent-pipeline-share_phoenix/plugins/pipeline-core/lib/agent-decision-journal.test.mjs:397:1'
+  failureType: 'testCodeFailure'
+  error: 'Missing expected exception: an unrecognized legacySourceClass was admitted'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  stack: |-
+    TestContext.<anonymous> (file:///home/skar667/src/agent-pipeline-share_phoenix/plugins/pipeline-core/lib/agent-decision-journal.test.mjs:398:10)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1382:25)
+    Test.start (node:internal/test_runner/test:1242:17)
+    startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17)
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 0
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 50.033457

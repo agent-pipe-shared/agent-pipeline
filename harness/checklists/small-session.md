@@ -1,7 +1,7 @@
 # Checklist — Small Session ("retest/correction ≤45 min" playbook)
 
 > Agent-Pipeline v0.1.0-draft · Compact operative reference for the Elephant; why + verification live in
-> `docs/operating-model.md` §3.3 (rigor/light-dispatch profile) and §4.2 (Critic trigger matrix).
+> `docs/operating-model.md` — *Rigor, risk and gates* (rigor/light-dispatch profile) and `harness/review-protocol.md` §2.1 (Critic trigger matrix).
 > Companion: `plugins/pipeline-core/skills/close-block/SKILL.md` close-light variant (the closing half
 > of this playbook). This file names the PLAYBOOK for the whole small block, close-light names the
 > CLOSE mechanics only — read both, they cross-reference rather than duplicate. Second companion: the
@@ -30,18 +30,17 @@ out to need real interview/decomposition work — that is a normal session from 
    defaults). A machine change or a new calendar day always forces the FULL bootstrap check
    (`harness/session-bootstrap.md` §6.4 short-bootstrap exclusions) — never skip on that basis.
 2. **ONE bundled dispatch.** Either:
-   - a single **light-profile** Goldfish dispatch (`docs/operating-model.md` §3.3) — briefed
+   - a single **light-profile** Goldfish dispatch (`docs/operating-model.md` — *Rigor, risk and gates*) — briefed
      stage-0/mechanic-shaped correction, compact 3-field report, referenced rule sets inlined, no
      baseline verify, effort per the MP-27 3-tier matrix (`goldfish-mechanic` `low` for
      mechanical/uniform tasks, `goldfish-implementor` `medium` for clearly-briefed
      implementation) — or
-   - the **stage-0 fast path** (`docs/operating-model.md` §3.3 stage-0-smallfix-definition) when the
-     fix qualifies outright (≤2 files, ≤~25 diff lines, no architecture/schema/API/test/guardrail
-     touch, trivially `git revert`-able, no risk flag).
+   - the **stage-0 fast path** (`roles/elephant.md` EL-01 — the sole stage-0 fast-path definition) when
+     the fix qualifies outright per that definition.
    Do NOT fan out multiple small dispatches for a task this size — one bundled dispatch is the whole
    point of the playbook; splitting it defeats the wall-clock target.
 3. **The Critic-trigger matrix decides Critic need — do not default to a full Critic.** Apply
-   `docs/operating-model.md` §4.2 as-is: a mechanical/deterministic diff is **auto-pass** (no Critic);
+   `harness/review-protocol.md` §2.1 as-is: a mechanical/deterministic diff is **auto-pass** (no Critic);
    otherwise the matrix's own cascade rule decides between no-Critic, a non-blocking parallel Critic, or
    a blocking review-tier Critic escalating to a higher-capability model only on the matrix's own trigger conditions (major
    finding / architecture-guardrail-security touch / contested verdict). This playbook adds NO new
@@ -62,7 +61,7 @@ out to need real interview/decomposition work — that is a normal session from 
 - No formal drift-check bundle (CLAUDE.md length re-measure, memory-mirror pass, stale-worktree
   enumeration) beyond a spot-check — close-light's own skip list applies.
 - No separate HISTORY entry and no full retro backlog item — folded into close-light's
-  one-paragraph handover update (rigor-0 bundling, `docs/operating-model.md` §3.3).
+  one-paragraph handover update (rigor-0 bundling, `docs/operating-model.md` — *Rigor, risk and gates*).
 - No `/context`/session-cut recommendation — a ≤45 min session is not near a cut boundary by
   construction.
 

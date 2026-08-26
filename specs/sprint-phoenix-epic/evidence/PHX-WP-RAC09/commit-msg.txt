@@ -1,0 +1,20 @@
+feat(pipeline-core): render a duplicated offer-lifecycle record invalid on replay
+
+R-AC-09's "duplicated" trigger was credited to the store's idempotencyKey
+mechanism, but that answers a different question: it makes an identical retry
+safe on the STORE's identity (no second write, divergent retry refused, two
+same-key records make every projection throw). The offer lifecycle correlates
+on eventId, which no stream scan indexes and which the envelope keeps as a
+token independent of idempotencyKey, so two records carrying one lifecycle
+eventId under different idempotency keys both land and both replay as a valid
+stream -- leaving a dependent outcome's offerEventId resolving to more than one
+record, which is the ambiguity this criterion forbids.
+
+projectCommandOfferReplay renders such a journal integrity "invalid" with a
+typed reasonCode, and an optional caller-supplied `journaled` refuses the
+duplicate before append at the single shared append seam. Additive: omitting
+`journaled` leaves every existing path byte-for-byte unchanged, so the
+pre-existing R-AC-13 delegation test still passes unmodified.
+
+Dispatch: PHX-WP-RAC09 (goldfish)
+AI-Assisted: true

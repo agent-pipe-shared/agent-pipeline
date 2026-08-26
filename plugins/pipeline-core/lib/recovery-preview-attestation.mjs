@@ -96,20 +96,24 @@ export function attestRecoveryPreviewDelivery({
       return invalid("RP-ACK-MALFORMED");
     }
     if (acknowledgement.schema !== RECOVERY_PREVIEW_ACK_SCHEMA
-      || acknowledgement.delivery !== "delivered"
-      || !safeId(acknowledgement.acknowledgementId)) {
+      || acknowledgement.delivery !== "delivered") {
       return invalid("RP-ACK-MALFORMED");
     }
+    // Read acknowledgementId exactly once: a caller-supplied object could
+    // expose a non-idempotent getter, and reading it repeatedly could let
+    // validation and the returned postimage observe different values.
+    const acknowledgementId = acknowledgement.acknowledgementId;
+    if (!safeId(acknowledgementId)) return invalid("RP-ACK-MALFORMED");
     if (acknowledgement.invocationId !== invocation.invocationId) return invalid("RP-INVOCATION-MISMATCH");
     if (acknowledgement.previewDigest !== invocation.previewDigest) return invalid("RP-DIGEST-MISMATCH");
-    if (usedAcknowledgementIds.includes(acknowledgement.acknowledgementId)) return invalid("RP-ACK-REPLAY");
+    if (usedAcknowledgementIds.includes(acknowledgementId)) return invalid("RP-ACK-REPLAY");
 
     return {
       ok: true,
       code: "RP-DELIVERY-ATTESTED",
       delivered: true,
       acknowledgement,
-      usedAcknowledgementIds: [...usedAcknowledgementIds, acknowledgement.acknowledgementId],
+      usedAcknowledgementIds: [...usedAcknowledgementIds, acknowledgementId],
     };
   } catch {
     return invalid("RP-ACK-MALFORMED");

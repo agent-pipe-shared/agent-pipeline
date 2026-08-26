@@ -1,0 +1,18 @@
+{
+  "capturedBy": "elephant",
+  "capturedAtNote": "guard-maintenance-window.mjs status output, captured before closing the window, to make its prior existence checkable (Critic PX0-AC-05 re-review, 2026-08-12, flagged this as 'not verifiable' since window.json lives outside the tracked tree and is TTL-bounded)",
+  "command": "node plugins/pipeline-core/scripts/guard-maintenance-window.mjs status",
+  "output": {
+    "ok": true,
+    "value": {
+      "status": "active",
+      "scopeRuleIds": [
+        "TP-5"
+      ],
+      "reason": "Land the deferred PX0-AC-05 AR05g end-to-end regression test (reviseProposal with decision.id set to an absolute path, asserting exit 2, /AR-INTENT-INVALID/, unchanged stateBytes) into harness/scripts/pipeline-state.test.mjs. PO-authorized 2026-08-12.",
+      "openingTreeSha256": "dbad5382d9998670da08a7c0571ee8ddf9194e730cf7a9fdfb2d5332c4cc17f3",
+      "expiresAtMs": 1786501143903,
+      "remainingMs": 10122869
+    }
+  }
+}

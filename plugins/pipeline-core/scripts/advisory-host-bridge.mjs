@@ -15,6 +15,7 @@ import { basename, resolve } from "node:path";
 import { createInterface } from "node:readline";
 
 import { coordinateAdvisory } from "../lib/advisory-coordinator.mjs";
+import { buildAdvisoryDecisionEvent } from "../lib/advisory-decision-event.mjs";
 import {
   advisoryEvidenceBundleSha256,
   advisoryConsultationDisposition,
@@ -26,6 +27,11 @@ import {
 import { validateAdvisoryReceipt } from "../lib/advisory-receipt.mjs";
 import { AdvisoryReceiptAssuranceError, persistAdvisoryReceipt } from "../lib/advisory-receipt-assurance.mjs";
 import { canonicalJson } from "../lib/codex-sandbox-compatibility.mjs";
+import { canonicalSha256, parseStrictJson } from "../lib/governance-event.mjs";
+import { appendPortableGovernanceEvent } from "../lib/governance-event-store.mjs";
+import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
+import { readPublicRepositoryFile } from "../lib/threat-model-approval-request.mjs";
+import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
 import { ROUTES, selectHostAdvisorRoute } from "./codex-host-advisor-route.mjs";
 import { invokeCodexAdvisoryAppServer } from "./codex-advisory-app-server.mjs";
 import { createCodexSandboxRuntimeTransport } from "./codex-sandbox-runtime.mjs";
@@ -427,6 +433,79 @@ function writeJsonAtomic(path, value) {
   return persistAdvisoryReceipt({ target, bytes: jsonBytes(value), temporaryName });
 }
 
+/** No key on this envelope has anything to report at this call site; the same typed-state marker names that honestly, once, for every one of them. */
+const AGENT_DECISION_UNAVAILABLE = Object.freeze({ state: "unavailable" });
+
+/** Mirrors human-authority-grant.mjs's capturePolicyDigestFor: the exact digest governance-event-store.mjs's own agent-origin binding check requires. */
+function capturePolicyDigestFor(primaryRoot) {
+  return canonicalSha256(parseStrictJson(readPublicRepositoryFile(primaryRoot, "governance/events/capture-policy.json")));
+}
+
+/**
+ * A-AC-05: translate an answered advisory receipt into a validated
+ * agent-decision event and durably append it to the portable "agent"
+ * governance stream (governance-event-store.mjs). Deliberately fail-open:
+ * this event's represented classes are exactly `candidate`/`privacy`
+ * (agent-decision-journal.mjs's `representedEventClasses`, for a `selection`/
+ * `fallback` kind), both `fail-open` in `JOURNALING_UNAVAILABLE_DISPOSITIONS`
+ * (A-AC-10). A translation or append failure is therefore reported back as a
+ * typed gap marker -- never thrown past this function, and never allowed to
+ * withhold the advisory answer itself, which is the caller's actual duty.
+ */
+async function recordAdvisoryDecisionEvent(receipt, { repoRoot }) {
+  try {
+    const event = buildAdvisoryDecisionEvent({ receipt });
+    const repo = discoverRepository(repoRoot);
+    const fingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: repo.commonDir, primaryRoot: repo.primaryRoot });
+    const intent = {
+      schema: "pipeline.governance-event-envelope.v1",
+      payloadSchema: "pipeline.agent-decision-event.v1",
+      canonicalization: "RFC8785",
+      digestAlgorithm: "sha-256",
+      eventId: event.eventId,
+      idempotencyKey: event.eventId,
+      origin: "agent",
+      authorityClass: "non-authoritative",
+      eventType: `agent.${event.kind}`,
+      occurredAtEpochMs: receipt.emittedAtMs,
+      observedAtEpochMs: Date.now(),
+      timeAssurance: "locally-observed",
+      repositoryFingerprint: fingerprint,
+      sourceUri: `urn:pipeline:repository:${fingerprint}`,
+      streamId: "agent",
+      correlation: {
+        featureId: AGENT_DECISION_UNAVAILABLE,
+        packageId: AGENT_DECISION_UNAVAILABLE,
+        requestId: AGENT_DECISION_UNAVAILABLE,
+        sessionId: AGENT_DECISION_UNAVAILABLE,
+        dispatchId: receipt.dispatch.dispatchId,
+        traceId: AGENT_DECISION_UNAVAILABLE,
+      },
+      candidate: { commit: receipt.dispatch.candidateCommit, tree: receipt.dispatch.candidateTree },
+      // No artifact is bound to an advisory decision: the module header states
+      // raw question/answer content never reaches disk, so there is nothing
+      // here for an artifact reference to point at -- an honest empty list,
+      // not an omitted/unavailable placeholder for something that could exist.
+      artifacts: [],
+      policy: {
+        policyDigest: AGENT_DECISION_UNAVAILABLE,
+        configurationDigest: AGENT_DECISION_UNAVAILABLE,
+        capturePolicyDigest: capturePolicyDigestFor(repo.primaryRoot),
+        redactionPolicyDigest: AGENT_DECISION_UNAVAILABLE,
+      },
+      classification: "repository-public-safe",
+      storageProfile: "repository-public-safe",
+      retentionCompatibility: "repository-retained",
+      disclosureClass: "repository-visible",
+      payload: event,
+    };
+    const receipted = await appendPortableGovernanceEvent({ repositoryRoot: repo.primaryRoot, repositoryFingerprint: fingerprint, intent });
+    return { appended: true, eventId: event.eventId, eventPath: receipted.eventPath, outcome: receipted.outcome };
+  } catch (error) {
+    return { appended: false, code: error?.code ?? "AGENT_DECISION_EVENT_UNAVAILABLE" };
+  }
+}
+
 export async function runAdvisoryHostBridge(argv = process.argv.slice(2), dependencies = {}) {
   const args = parseArgs(argv);
   const inputPath = resolve(args.input);
@@ -448,6 +527,7 @@ export async function runAdvisoryHostBridge(argv = process.argv.slice(2), depend
   try {
     let result;
     let execution = null;
+    let agentDecisionEvent = null;
     const advisorExport = input?.advisorExport;
     if (input.runner === "codex") {
       const outcome = await runCodexAdvisoryWithHostFallback(input, null, { repoRoot: process.cwd() });
@@ -457,6 +537,15 @@ export async function runAdvisoryHostBridge(argv = process.argv.slice(2), depend
     } else {
       const adapter = dependencies.makeHostAdapter?.(iterator, args.timeoutMs) ?? makeHostAdapter(iterator, args.timeoutMs);
       result = await coordinateAdvisory(input, { invokeNative: adapter, invokeConsult: adapter, advisorExport });
+      // A-AC-05: only a coordinateAdvisory outcome that actually observed an
+      // identity is translatable (buildAdvisoryDecisionEvent's own
+      // ADE-RECEIPT-UNANSWERED refusal); every other outcome (disabled,
+      // reuse-no-repeat, exhausted route) leaves agentDecisionEvent at its
+      // honest default of null rather than reporting a gap for a decision
+      // that was never actually made.
+      if (result.ok === true && result.receipt?.observed?.status === "answered") {
+        agentDecisionEvent = await recordAdvisoryDecisionEvent(result.receipt, { repoRoot: dependencies.repoRoot ?? process.cwd() });
+      }
     }
     let reported = result;
     let receiptPath = null;
@@ -501,6 +590,7 @@ export async function runAdvisoryHostBridge(argv = process.argv.slice(2), depend
       consultationRecord: reported.consultationRecord ?? null,
       consultationRecordPath: persistedConsultationRecordPath,
       sandboxBinding: sandboxBinding ?? null,
+      agentDecisionEvent,
     });
     return reported.ok ? 0 : 2;
   } finally {

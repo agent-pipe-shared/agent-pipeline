@@ -1,16 +1,28 @@
 # ADR-0045 — Canonical artifact topology
 
-**Status:** accepted · **Date:** 2026-07-24
+**Status:** accepted · **Date:** 2026-07-24 · **Amended:** 2026-08-18
+
+**Governs:** specs/**
 
 ## Decision
 
 Durable rigor-1/2 feature authority is expressed by a stable package rooted at
-`specs/<safe-feature-id>/`: `prd.md`, `spec.md`, `acceptance.md`, `result.md`,
-`lifecycle.json`, `plans/`, `design/`, and `evidence/`. Paths make package
-membership discoverable; the closed lifecycle manifest records authority,
-state, candidate and retention bindings. A phase change moves an artifact only
-when its retention class requires it; Result and candidate evidence retain a
-stable path to avoid reference and digest churn.
+`specs/<safe-feature-id>/`: `prd_<topic>.md`, `spec.md`, `acceptance.md`,
+`result.md`, `lifecycle.json`, `plans/`, `design/`, and `evidence/`. The PRD
+filename carries a topic suffix (matching the bootstrap skill's shipped
+`prd_short-topic.md` convention) rather than the bare `prd.md` this decision
+originally named — amended 2026-08-18 to match the convention every package
+actually uses, in both this repository and its sibling Nova checkout. This
+enumeration is the required core, not an exhaustive closed set — amended
+2026-08-18 to state explicitly what practice already does in both checkouts:
+a package root MAY carry further session- or feature-appropriate artifacts
+beyond it (e.g. a recovery note, a phase plan, a point-in-time spec revision
+snapshot), and their presence is not a topology violation. Paths make the
+CORE package membership discoverable; they do not bound the full root
+contents. The closed lifecycle manifest records authority, state, candidate
+and retention bindings. A phase change moves an artifact only when its
+retention class requires it; Result and candidate evidence retain a stable
+path to avoid reference and digest churn.
 
 The lifecycle states are `draft`, `awaiting-approval`, `approved`,
 `implementing`, `verifying`, `completed`, `superseded`, `abandoned`, and

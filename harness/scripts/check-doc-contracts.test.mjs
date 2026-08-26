@@ -15,6 +15,7 @@ import {
   isExcludedRepoPath,
   stripFencedCode,
   stripHtmlComments,
+  stripInlineCode,
 } from "./check-doc-contracts.mjs";
 
 const SCRIPT = fileURLToPath(new URL("./check-doc-contracts.mjs", import.meta.url));
@@ -141,6 +142,30 @@ test("anchors implement unicode, explicit ids, setext, and duplicate suffixes", 
   assert(!independent.has("foo-2"));
 });
 
+test("collectAnchors scopes to the half above a DE-REFERENCE-BELOW marker", () => {
+  const bilingual =
+    "# English Heading\n\n<a id=\"planted-alias\"></a>\n\n<!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a German reader copy. -->\n\n# Deutsche Überschrift\n\n<a id=\"other-alias\"></a>\n";
+  const anchors = collectAnchors(bilingual);
+  assert(anchors.has("english-heading"));
+  assert(anchors.has("planted-alias"));
+  assert(!anchors.has("deutsche-überschrift"));
+  assert(!anchors.has("other-alias"));
+  const monolingual = collectAnchors("# English Heading\n\n# Deutsche Überschrift\n");
+  assert(monolingual.has("english-heading"));
+  assert(monolingual.has("deutsche-überschrift"));
+});
+
+test("a link into the German half of a bilingual doc fails the anchor check", () => {
+  const { root } = fixture({
+    "docs/state.md":
+      "# State\n\n[Calibration](../.claude/pipeline.json)\n\n<a id=\"english-alias\"></a>\n\n<!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a German reader copy. -->\n\n<a id=\"german-alias\"></a>\n",
+    "README.md": "# Home\n\n[Reachable](docs/state.md#english-alias) [Unreachable](docs/state.md#german-alias)\n",
+  });
+  const reasons = runFixture(root).findings.join("\n");
+  assert.match(reasons, /README\.md:3 -> docs\/state\.md#german-alias: anchor not found/);
+  assert.doesNotMatch(reasons, /english-alias/);
+});
+
 test("inline and reference links are extracted while fenced fakes are ignored", () => {
   const links = extractMarkdownLinks(
     '[ref]: docs/state.md#state\n[A](README.md)\n[B][ref]\n[C](missing_(v1).md)\n[D](missing.md "Title")\n[E](<angle.md> \'Title\')\n```\n[X](missing.md)\n```\n',
@@ -153,6 +178,38 @@ test("inline and reference links are extracted while fenced fakes are ignored", 
     "missing.md",
     "angle.md",
   ]);
+});
+
+test("inline code spans are blanked without losing line structure", () => {
+  const spanA = "`[a-z][a-z0-9-]{0,63}`";
+  const spanB = "``two``";
+  const value = `before ${spanA} middle ${spanB} end`;
+  const expected = value.replace(spanA, " ".repeat(spanA.length)).replace(spanB, " ".repeat(spanB.length));
+  assert.equal(stripInlineCode(value), expected);
+  assert.equal(stripInlineCode(value).length, value.length);
+});
+
+test("a regex character class in a single-backtick code span is not read as a reference-style link", () => {
+  const links = extractMarkdownLinks(
+    "the pattern `[a-z][a-z0-9-]{0,63}` matches bounded ID slugs.\n",
+  );
+  assert.deepEqual(
+    links.filter((link) => link.kind === "missing-reference"),
+    [],
+  );
+  assert.deepEqual(links, []);
+});
+
+test("a genuine broken reference-style link outside any code span is still reported missing-reference", () => {
+  const links = extractMarkdownLinks("see [Missing][undefined-ref] for details.\n");
+  assert.deepEqual(links, [{ destination: null, referenceId: "undefined-ref", line: 1, kind: "missing-reference" }]);
+});
+
+test("a code-span look-alike does not suppress a genuine broken reference-style link on the same line", () => {
+  const links = extractMarkdownLinks(
+    "the pattern `[a-z][a-z0-9-]{0,63}` is unrelated to [Missing][undefined-ref] here.\n",
+  );
+  assert.deepEqual(links, [{ destination: null, referenceId: "undefined-ref", line: 1, kind: "missing-reference" }]);
 });
 
 test("minimal repository passes", () => {
@@ -230,6 +287,49 @@ test("internal symlink aliases cannot bypass the excluded instruction path", () 
   });
   assert.deepEqual(result.findings, []);
   assert(!reads.includes("alias/AGENTS.md"));
+});
+
+test("isExcludedRepoPath: docs/state-archive is a directory-prefix exclusion, AGENTS.md stays exact-match only", () => {
+  assert.equal(isExcludedRepoPath("docs/state-archive"), true);
+  assert.equal(isExcludedRepoPath("docs/state-archive/anything.md"), true);
+  assert.equal(isExcludedRepoPath("docs/state-archive/nested/deep.md"), true);
+  assert.equal(isExcludedRepoPath("docs/state-archive-not-really/foo.md"), false);
+  assert.equal(isExcludedRepoPath("AGENTS.md"), true);
+  assert.equal(isExcludedRepoPath("AGENTS.mdx"), false);
+});
+
+test("a Markdown source under docs/state-archive/ is never scanned, even when its internal links would otherwise fail", () => {
+  const { root } = fixture({
+    "docs/state-archive/2026-08-19--rotation.md": "# Archived\n\n[Stale](../../old/path/that/no/longer/exists.md)\n",
+  });
+  const reads = [];
+  const readText = (file) => {
+    const rel = relative(root, file).split("\\").join("/");
+    reads.push(rel);
+    return execFileSync(process.execPath, ["-e", "process.stdout.write(require('fs').readFileSync(process.argv[1]))", file], { encoding: "utf8" });
+  };
+  const result = runFixture(root, {
+    trackedPaths: [".claude/pipeline.json", "CLAUDE.md", "docs/state.md", "README.md", "docs/state-archive/2026-08-19--rotation.md"],
+    markdownPaths: ["CLAUDE.md", "docs/state.md", "README.md", "docs/state-archive/2026-08-19--rotation.md"],
+    readText,
+  });
+  assert.deepEqual(result.findings, []);
+  assert(!reads.includes("docs/state-archive/2026-08-19--rotation.md"));
+});
+
+test("a link into a specific docs/state-archive/ file resolves via the exclusion, not the pre-existing trackedDescendant fallback", () => {
+  const { root } = fixture({
+    "README.md": "# Home\n\n[Archived](docs/state-archive/2026-08-19--rotation.md)\n",
+  });
+  // Deliberately absent from trackedPaths (and no descendant entry with this
+  // exact prefix + "/" exists either), so the pre-existing trackedDescendant
+  // fallback at the target check cannot be what makes this pass — only the
+  // isExcludedRepoPath directory-prefix exclusion can.
+  const result = runFixture(root, {
+    trackedPaths: [".claude/pipeline.json", "CLAUDE.md", "docs/state.md", "README.md"],
+  });
+  assert.deepEqual(result.findings, []);
+  assert.equal(result.stats.excludedLinks, 1);
 });
 
 test("untracked targets fail even when present in the worktree", () => {

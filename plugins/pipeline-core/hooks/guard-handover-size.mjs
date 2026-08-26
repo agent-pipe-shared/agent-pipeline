@@ -3,8 +3,19 @@
 /**
  * guard-handover-size.mjs -- ADR-0066 Decision 3(b)/4: a PreToolUse hard
  * size gate on the project's configured handover file (default
- * `docs/state.md`, `12,000` utf8-byte-upper-bound units), independent of
- * any close event. NVA-HANDOVER-ROT-1 Piece C.
+ * `docs/state.md`, a calibrated utf8-byte-upper-bound cap -- see
+ * `lib/handover-rotation.mjs`'s `HANDOVER_MAX_BYTES`, overridable
+ * per-project via a `handover.maxBytes` calibration key), independent of
+ * any close event. NVA-HANDOVER-ROT-1 Piece C. Also fulfills the parallel
+ * requirement from ADR-0064 Decision 1(b) ("an independent hard size
+ * gate") -- both ADRs converge on the same guard; this implementation is
+ * the one both merge sides settled on, per PHX-MERGE-1A-HANDOVERSIZE's own
+ * conflict-resolution finding (Nova's proposed-post-write-size simulation
+ * is the only one of the two independently-authored implementations that
+ * actually satisfies Decision 3(b)'s "a proposed write that is NOT a
+ * decrease and would leave the file at or over the cap is refused" --
+ * the Phoenix-line alternative checked only the pre-write on-disk size,
+ * so it never caught the crossing edit itself).
  *
  * NOT wired into `hooks.json` by this dispatch (that file is TP-4 protected,
  * `.claude/guard-config.json` -- no ad-hoc edit is possible, and there is no

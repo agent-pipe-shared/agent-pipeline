@@ -1,0 +1,35 @@
+{
+  "taskId": "PHX-WP-STATE-EXTRACT-CHUNK-1",
+  "model": "claude-sonnet-5",
+  "rulesetSha": "5fa52282cd58e6be5c04dceada78dda8c9dd072b7f2d4b4d833b5d2ab8a54af2",
+  "dispatcher": "elephant",
+  "outcome": "completed",
+  "docsStateModified": false,
+  "log": [
+    { "phase": "read the 3 destination files (guardrails/security.md, roles/elephant.md, guardrails/quality-gates.md) + ADR-0060 Decision 3", "toolUses": 4 },
+    { "phase": "genuine sequential line-by-line read of docs/state.md lines 1-4000, 16 Read calls, offsets chained end-to-end with no gaps: 1-150, 151-350, 351-570, 571-790, 791-1010, 1011-1250, 1251-1500, 1501-1780, 1781-2060, 2061-2340, 2341-2620, 2621-2900, 2901-3180, 3181-3460, 3461-3740, 3741-4000", "toolUses": 16 },
+    { "phase": "extraction: 2 durable additions found and written as addenda to already-existing rules (EL-09 in roles/elephant.md, QG-09 in guardrails/quality-gates.md); no SEC-xx addition found in this range", "toolUses": 2 },
+    { "phase": "commit", "toolUses": 1 }
+  ],
+  "coverage": {
+    "rangeRequested": "docs/state.md lines 1-4000",
+    "rangeCovered": "lines 1-4000, fully, sequentially, no gaps",
+    "readCallCount": 16
+  },
+  "extracted": [
+    {
+      "destination": "roles/elephant.md EL-09",
+      "addition": "Report persistence before acting on the verdict",
+      "sourceCitation": "docs/state.md, 2026-08-11 checkpoint history (\"Two things caught while assembling the above, recorded so they don't bite later\" section, ~line 3144-3160)",
+      "rationale": "explicit forward-looking rule (\"Rule for every Critic dispatch from here on: the report lands at ... before the Elephant acts on its verdict\"), not covered by the existing EL-09 bullets (which govern dispatch INPUT framing, not report OUTPUT persistence) or by EL-21's dispatch ledger duty (which is about the ledger, not the Critic report file itself)."
+    },
+    {
+      "destination": "guardrails/quality-gates.md QG-09",
+      "addition": "Check for a parallel/sibling session before preparing a candidate-bound ceremony request",
+      "sourceCitation": "docs/state.md, 2026-08-17 checkpoint history (\"Both signatures then obtained, in three real attempts...\" section, point 3, ~line 2590-2613: a reconcile ceremony's second refusal was traced to a sibling dispatch's commit landing mid-troubleshooting; the checkpoint's own closing line: \"Lesson for next time: lock the candidate — confirm no dispatch is still in flight — BEFORE building ANY candidate-bound request, not just before the window's\"; corroborated by an earlier instance at checkpoint 5, ~line 1382-1386, where a `SendMessage` liveness check to a peer session was used specifically for this reason before a signed-ceremony request)",
+      "rationale": "QG-09 as written covers not landing a commit BETWEEN prepare and consume within the same session's own control; it does not yet say to check for an already-active PARALLEL session before starting, which is the cheaper prevention the checkpoint history names explicitly as a repeatable lesson."
+    }
+  ],
+  "notFound": "The remaining ~40+ instances of a checkpoint-local \"Lesson\"/\"Rule for future X\" phrasing in this range were checked against the 3 destination files and found to already be captured verbatim or in substance: dispatch-record-per-task naming (landed directly in templates/prompts/goldfish-task.md and roles/goldfish.md per the checkpoint's own text, not a guardrail-file gap); verify.mjs-suite-registration-implies-product-capability-inventory-sync (QG-08); widened blast-radius / literal-source-text grep before declaring a shared lib file's test surface covered (QG-08 addendum); no-commit-between-ceremony-prepare-and-consume (QG-09 base rule); EL-01 stage-0 fast-path criterion clarification vs. goldfish-mechanic dispatch-tier criterion (roles/elephant.md EL-01 Clarification, already present); dispatch-record outcome field must be checked before trusting \"done\" (roles/elephant.md EL-20 \"Report != done\"); fork-scope-creep audit duty, decide-dont-ask, check-state-before-reasking-PO, model-routing discipline, German-for-AskUserQuestion (all pre-existing MEMORY.md entries, session-level not repo-guardrail-level); current-code-beats-Spec-beats-issue grounding precedence (roles/elephant.md EL-29); threat-model scope / guards-bind-agents-not-humans (guardrails/security.md SEC-10); dispatch from the template never freehand (CLAUDE.md, already repo-level).",
+  "report": "Genuine, sequential, line-by-line read of docs/state.md lines 1-4000 completed in 16 Read calls chained end-to-end (1-150, 151-350, ..., 3741-4000), confirmed no gaps. This range is almost entirely checkpoint 1 through checkpoint 48's dense session-by-session historical narrative (dates, commit SHAs, PO decisions, dispatch outcomes) -- per ADR-0060 Decision 3 this is exactly the 'true right now' handover content that is NOT durable and correctly does not migrate anywhere. Cross-checked every place the text used forward-looking rule language ('Lesson for future X', 'Rule for every Y from here on', 'going forward') against guardrails/security.md, roles/elephant.md, and guardrails/quality-gates.md as they exist today. The overwhelming majority of such passages were already captured (see notFound above), which matches the briefing's own framing that two prior extraction passes already covered most of the file via grep-sweep. Found exactly 2 durable rules in this specific 1-4000 range that were not yet in any of the 3 destination files, both narrow additions to already-existing rule IDs (no new rule ID needed, matching this repo's own established extraction convention of adding cited addenda rather than minting new IDs for a close variant of an existing rule): EL-09 (Critic report persistence, roles/elephant.md) and QG-09 (parallel-session check before a candidate-bound ceremony, guardrails/quality-gates.md). docs/state.md itself was read only, never written, edited, or appended to at any point."
+}

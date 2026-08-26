@@ -10,8 +10,6 @@ closure_repository: "self"
 closure_commit: "98b173f03b294e48914467d76803234c9677891e"
 closure_evidence: "plugins/pipeline-core/lib/transfer-classification.test.mjs"
 source: "Sentinel recovery audit after Public close/transfer"
-due: "2026-07-27"
-expires: "2026-08-03"
 ---
 
 # Preserve normative PRD and Spec artifacts across Close and transfer
@@ -130,5 +128,14 @@ matrix. A parallel wave-1 dispatch built the identical mechanism
 independently and did not find the already-landed one; its diff was not
 merged.
 - **Date:** 2026-08-18
+- **Cross-branch note:** a separate, independently run PO-triage closure on
+  another line of development marked this item closed on 2026-08-23 citing
+  only `governance/spec-retention.json`/`check-spec-retention.mjs` (commit
+  `00fcc336`) and Full Verify's `spec-retention-tests`/
+  `spec-retention-check`, without addressing criterion 2 (transfer-time
+  typed-blocked classification) or being aware of `classifyTransfer()`'s
+  landing in `98b173f0`. The frontmatter above (commit `98b173f0`) is kept
+  as the record of truth because it is the closure that actually covers
+  criterion 2; the 2026-08-23 evidence is a strict subset of it.
 
 AI-Assisted: true

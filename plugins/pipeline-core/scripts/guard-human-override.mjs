@@ -13,11 +13,18 @@ import {
   HumanGuardOverrideError,
   planHumanGuardOverride,
   prepareHumanGuardOverrideAuthorization,
+  prepareHumanGuardOverrideForSignature,
+  refreezeHumanGuardOverridePlan,
   verifyHumanGuardOverrideAudit,
 } from "../lib/human-guard-override.mjs";
 
 const SCRIPT = fileURLToPath(import.meta.url);
 const PLUGIN_ROOT = resolve(dirname(SCRIPT), "..");
+// Sibling script, resolved the same PLUGIN_ROOT/SCRIPT way as every other
+// self-referencing path in this file -- design doc §3.3's own instruction: the
+// `po-human-approval.mjs` path IS knowable to this CLI (only the PO's own
+// external material directory and proof file are not).
+const PO_HUMAN_APPROVAL_SCRIPT = resolve(dirname(SCRIPT), "po-human-approval.mjs");
 const SHA256 = /^[a-f0-9]{64}$/u;
 
 function usage() {
@@ -26,6 +33,8 @@ function usage() {
     "  guard-human-override.mjs plan --repo <absolute-root> --request-sha256 <64hex> [--author-source-root <absolute-root>]",
     "  guard-human-override.mjs prepare-authorization --repo <absolute-root> --request-sha256 <64hex> --plan-sha256 <64hex> --reason <text> [--author-source-root <absolute-root>]",
     "  guard-human-override.mjs emit-signature-digest --repo <absolute-root> --request-sha256 <64hex> --plan-sha256 <64hex> [--author-source-root <absolute-root>]",
+    "  guard-human-override.mjs prepare-for-signature --repo <absolute-root> --request-sha256 <64hex> [--author-source-root <absolute-root>]",
+    "  guard-human-override.mjs refreeze-plan --repo <absolute-root> --request-sha256 <64hex> [--author-source-root <absolute-root>]",
     "  guard-human-override.mjs authorize --repo <absolute-root> --request-sha256 <64hex> --plan-sha256 <64hex> --selection-sha256 <64hex> --reason <text> --reason-sha256 <64hex> [--author-source-root <absolute-root>] --activate",
     "  guard-human-override.mjs authorize-by-signature --repo <absolute-root> --request-sha256 <64hex> --plan-sha256 <64hex> --proof <external-public-json> [--author-source-root <absolute-root>]",
     "  guard-human-override.mjs verify-audit --repo <absolute-root>",
@@ -183,6 +192,47 @@ export function main(argv = process.argv.slice(2), io = {}, options = {}) {
         selectionSha256: prepared.selectionSha256,
         intentSha256: intent.sha256,
       }, null, 2)}\n`);
+      return 0;
+    }
+    // PHX merge: the Phoenix line's own two-step alternative to `emit-signature-digest`
+    // above -- `prepare-for-signature` collapses plan+prepare-authorization+digest into one
+    // call and additionally hands back ready-to-run next-step commands (sign-intent,
+    // authorize-by-signature); `refreeze-plan` re-derives a signable candidate bound to the
+    // current HEAD after an `HGO-CANDIDATE-DRIFT` refusal (see
+    // authorizeHumanGuardOverrideBySignature()'s own error text in the library, which
+    // already names both these commands as its documented recovery path). Kept alongside
+    // `emit-signature-digest`, not in place of it: the library already exposes both
+    // `prepareHumanGuardOverrideForSignature()` and `refreezeHumanGuardOverridePlan()`
+    // unconditionally, and `authorizeHumanGuardOverrideBySignature()`'s drift-recovery
+    // message already depends on `refreeze-plan` existing as a CLI command.
+    if (command === "prepare-for-signature") {
+      const parsed = flags(rest);
+      if (!exactFlagSet(parsed, ["repo", "request-sha256"], ["author-source-root"])
+        || typeof parsed.repo !== "string"
+        || !SHA256.test(parsed["request-sha256"] ?? "")) throw new Error(usage());
+      if (Object.hasOwn(parsed, "author-source-root") && typeof parsed["author-source-root"] !== "string") throw new Error(usage());
+      write(`${JSON.stringify(prepareHumanGuardOverrideForSignature({
+        rootDir: parsed.repo,
+        pluginRoot: PLUGIN_ROOT,
+        requestSha256: parsed["request-sha256"],
+        scriptPath: SCRIPT,
+        humanApprovalScriptPath: PO_HUMAN_APPROVAL_SCRIPT,
+        authorSourceRoot: parsed["author-source-root"] ?? null,
+      }), null, 2)}\n`);
+      return 0;
+    }
+    if (command === "refreeze-plan") {
+      const parsed = flags(rest);
+      if (!exactFlagSet(parsed, ["repo", "request-sha256"], ["author-source-root"])
+        || typeof parsed.repo !== "string"
+        || !SHA256.test(parsed["request-sha256"] ?? "")) throw new Error(usage());
+      if (Object.hasOwn(parsed, "author-source-root") && typeof parsed["author-source-root"] !== "string") throw new Error(usage());
+      write(`${JSON.stringify(refreezeHumanGuardOverridePlan({
+        rootDir: parsed.repo,
+        pluginRoot: PLUGIN_ROOT,
+        requestSha256: parsed["request-sha256"],
+        authorSourceRoot: parsed["author-source-root"] ?? null,
+      }), null, 2)}\n`);
       return 0;
     }
     if (command === "authorize") {

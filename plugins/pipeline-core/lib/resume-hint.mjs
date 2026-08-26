@@ -147,11 +147,16 @@ function validContext(value) {
  * rejected for a reason the caller cannot see: `intent` is a string while the
  * other three are arrays, and a card built with four strings -- the shape a
  * reader of the bootstrap skill produced on 2026-08-09 -- fails with no clue
- * which of the four keys was wrong. The verdict does not become permissive; it
- * becomes answerable.
+ * which of the four keys was wrong. That same class of opacity also covers a
+ * false-positive `opaqueToken()` match on an ordinary hyphenated English
+ * compound word (e.g. `documentation-reconciliation`, `checked-and-divergence-
+ * filed`; both 28 characters, no digit, no case mixing, yet long-and-hyphenated
+ * is enough to match the detector) -- the detector itself is untouched by this
+ * function, only the diagnosis is improved. The verdict does not become
+ * permissive; it becomes answerable.
  *
  * Deliberately shape-only. It never echoes a value: a field can be rejected for
- * carrying a secret or a credential-shaped token, and repeating it in a
+ * carrying a secret or an opaque/credential-shaped token, and repeating it in a
  * diagnostic would print the exact thing the validator refused to persist.
  */
 export function resumeHintContextDetail(value) {
@@ -181,9 +186,15 @@ export function resumeHintContextDetail(value) {
 
 export function validateResumeHint(value) {
   if (!exact(value, ["schema", "nonAuthoritative", "context", "createdAt", "basis", "contentSha256"])
-    || value.schema !== RESUME_HINT_SCHEMA || value.nonAuthoritative !== true
-    || !validContext(value.context) || Buffer.byteLength(canonical(value.context), "utf8") > RESUME_HINT_MAX_BYTES
-    || !validTimestamp(value.createdAt) || !validBasis(value.basis) || !SHA256.test(value.contentSha256)) return { ok: false, code: "RH-SCHEMA" };
+    || value.schema !== RESUME_HINT_SCHEMA || value.nonAuthoritative !== true) {
+    return { ok: false, code: "RH-SCHEMA", cause: "shape" };
+  }
+  if (!validContext(value.context) || Buffer.byteLength(canonical(value.context), "utf8") > RESUME_HINT_MAX_BYTES) {
+    return { ok: false, code: "RH-SCHEMA", cause: "context" };
+  }
+  if (!validTimestamp(value.createdAt)) return { ok: false, code: "RH-SCHEMA", cause: "createdAt" };
+  if (!validBasis(value.basis)) return { ok: false, code: "RH-SCHEMA", cause: "basis" };
+  if (!SHA256.test(value.contentSha256)) return { ok: false, code: "RH-SCHEMA", cause: "contentSha256" };
   const { contentSha256, ...unsigned } = value;
   return digest(unsigned) === contentSha256 ? { ok: true, code: "RH-VALID" } : { ok: false, code: "RH-DIGEST" };
 }
@@ -193,11 +204,14 @@ export function buildResumeHint({ context, basis = null, createdAt = new Date().
   const candidate = { ...unsigned, contentSha256: digest(unsigned) };
   const checked = validateResumeHint(candidate);
   // The code stays the contract; the clause after it is what makes a rejection
-  // actionable. A caller that built the card from the bootstrap skill's own
-  // description used to receive the four bare characters `RH-SCHEMA` and had no
-  // way to learn that three of the four keys are arrays.
+  // actionable -- see resumeHintContextDetail() above. Only a genuinely
+  // context-caused RH-SCHEMA gets the context-specific detail clause; every
+  // other cause (createdAt, basis, top-level shape, contentSha256 shape) falls
+  // back to the bare code rather than a false "context is not accepted" claim.
   if (!checked.ok) {
-    throw new Error(checked.code === "RH-SCHEMA" ? `${checked.code}: ${resumeHintContextDetail(context)}` : checked.code);
+    throw new Error(checked.code === "RH-SCHEMA" && checked.cause === "context"
+      ? `${checked.code}: ${resumeHintContextDetail(context)}`
+      : checked.code);
   }
   return candidate;
 }

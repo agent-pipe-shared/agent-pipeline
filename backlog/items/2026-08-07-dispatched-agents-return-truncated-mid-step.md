@@ -138,3 +138,10 @@ thread: `backlog/items/2026-08-08-long-dispatches-truncate-before-emitting-their
 (`pipeline.long-dispatches-truncate-before-emitting-their-report`). This
 item's own historical data (WSL hypothesis, the 57-68-vs-21 tool-use
 correlation table) remains as filed, for the record.
+
+### Phoenix checkout's independent confirmation, 2026-08-18
+
+- **Decision:** Close — already resolved.
+- **Rationale:** The runtime cause remains genuinely unknown and out of this repo's control (as the item itself says), but all proposed repository-side mitigations are implemented: commit-first-then-report and report-early running-log duty (roles/goldfish.md:99-100, templates/prompts/goldfish-task.md:133-159), truncated-report detection and same-context resume in roles/elephant.md (EL-20/EL-24/EL-25a region, lines 156,194,215-217). Re-verified 2026-08-18.
+- **Assignment (if accepted):** n/a — disposed without further work.
+- **Date:** 2026-08-18

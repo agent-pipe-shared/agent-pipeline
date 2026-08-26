@@ -140,7 +140,12 @@ function validRepository(value) {
       && url.hash === ""
       && url.hostname.length > 0;
   } catch {
-    return false;
+    // Git's scp-like SSH form has no URL parser representation.  Admit only
+    // the credential-free `git@host:path` subset: no arbitrary user, port,
+    // query, fragment, whitespace, or control characters can cross this
+    // observer boundary.  The Codex self-application adapter separately
+    // restricts its public authority to its reviewed origin identities.
+    return /^git@[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?:[A-Za-z0-9][A-Za-z0-9._-]*(?:\/[A-Za-z0-9][A-Za-z0-9._-]*)*$/u.test(value);
   }
 }
 

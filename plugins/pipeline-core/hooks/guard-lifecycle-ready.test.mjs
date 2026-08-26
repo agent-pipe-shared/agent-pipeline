@@ -25,8 +25,10 @@ import {
   ProjectOnboardingReadyError,
 } from "../lib/project-onboarding-ready-gate.mjs";
 import {
+  BASE_GOVERNANCE_MARKERS,
   claudeSessionMemoryDirectory,
   evaluateLifecycleReadyGuard,
+  governanceMarkers,
   isClaudeSessionMemoryWritePath,
   isForbiddenCrossRepositoryMutation,
   isMachinePlaneWritePath,
@@ -38,6 +40,7 @@ import {
   isSanctionedLifecycleCommand,
   machinePlaneFilePath,
   main,
+  MANIFEST_FAILURE_WARNING,
   retryActionsForDeniedCommand,
 } from "./guard-lifecycle-ready.mjs";
 // AC-10: imported straight from the library module the guard now defers to, never
@@ -254,6 +257,76 @@ test("source, calibration, lock, and runtime-only markers activate exact session
       assert.equal(calls, 1, marker);
     } finally { rmSync(path, { recursive: true, force: true }); }
   }
+});
+
+// NOVA-GOVMARKERS-WIRING: governanceMarkers() itself -- the direct unit-level fail-open
+// contract, independent of whichever call site consumes it. Regression pin for the wiring
+// bug where evaluateLifecycleReadyGuard's sole runtime call site read the pre-rename
+// `GOVERNANCE_MARKERS` identifier, which governanceMarkers()'s introduction had removed --
+// a ReferenceError on every invocation, silently caught by the surrounding try/catch and
+// turned into blocked() (GUARD-LIFECYCLE-NOT-READY): the OPPOSITE of the fail-open contract
+// asserted here (backlog/items/2026-08-07-module-scope-manifest-read-rearms-the-disarm-by-
+// config-fault.md).
+test("governanceMarkers() fails open to the fixed base markers, with an explicit warning, when the runtime-projection loader throws", () => {
+  const result = governanceMarkers({
+    loadRuntimeProjectionV3OwnedKeysFn() {
+      throw new Error("config/runtime-projection-v3-owned-keys.json unreadable");
+    },
+  });
+  assert.deepEqual(result, { markers: BASE_GOVERNANCE_MARKERS, warning: MANIFEST_FAILURE_WARNING });
+});
+
+test("governanceMarkers() returns the real runtime-projection-derived markers, with no warning, when the loader succeeds", () => {
+  const result = governanceMarkers({
+    loadRuntimeProjectionV3OwnedKeysFn() {
+      return { targets: [{ path: ".codex/config.toml" }, { path: "pipeline.user.yaml" }] };
+    },
+  });
+  assert.equal(result.warning, null);
+  // Fixed base markers are always present, deduplicated against any runtime-projection overlap.
+  for (const marker of BASE_GOVERNANCE_MARKERS) assert.ok(result.markers.includes(marker), marker);
+  assert.ok(result.markers.includes(".codex/config.toml"));
+  assert.equal(result.markers.filter((marker) => marker === "pipeline.user.yaml").length, 1);
+});
+
+test("evaluateLifecycleReadyGuard threads its own dependencies into governanceMarkers() and stays fail-open, not fail-closed, on a throwing loader", () => {
+  const path = root();
+  let calls = 0;
+  try {
+    // A BASE_GOVERNANCE_MARKERS marker is present, so `governed` must resolve true purely
+    // from the fixed base list even though the injected runtime-projection loader throws.
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const result = evaluateLifecycleReadyGuard(edit(), {
+      projectDir: path,
+      loadRuntimeProjectionV3OwnedKeysFn() {
+        throw new Error("config/runtime-projection-v3-owned-keys.json unreadable");
+      },
+      requireProjectOnboardingReadyFn() {
+        calls += 1;
+        deny();
+      },
+    });
+    // The pre-fix bug never reached this call: the stale `GOVERNANCE_MARKERS` identifier
+    // threw a ReferenceError caught by the outer try/catch, returning blocked() immediately.
+    assert.equal(calls, 1);
+    assert.equal(result.exitCode, 2);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("evaluateLifecycleReadyGuard stays admit-open on a throwing loader when no governance marker at all is present", () => {
+  const path = root();
+  let calls = 0;
+  try {
+    const result = evaluateLifecycleReadyGuard(edit(), {
+      projectDir: path,
+      loadRuntimeProjectionV3OwnedKeysFn() {
+        throw new Error("config/runtime-projection-v3-owned-keys.json unreadable");
+      },
+      requireProjectOnboardingReadyFn() { calls += 1; },
+    });
+    assert.deepEqual(result, { exitCode: 0, stderr: "" });
+    assert.equal(calls, 0);
+  } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
 test("exact session readiness allows the governed project write and threads the caller-supplied runner explicitly", () => {
@@ -1105,6 +1178,129 @@ test("bounded rg-to-head pipeline accepts both head -n N and combined head -N", 
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
+// backlog/items/2026-08-19-closed-shell-grammar-still-rejects-common-readonly-composition.md
+test("the small named &&-chain allowlist and trailing 2>/dev/null admit exactly the backlog's triggering shapes and nothing more", () => {
+  const path = root();
+  const outside = mkdtempSync(join(tmpdir(), "guard-lifecycle-and-chain-outside-"));
+  try {
+    for (const command of [
+      'git rev-parse HEAD && git log --oneline -5 && echo "---status---" && git status --porcelain',
+      "mkdir -p scratch/probe && ls -la scratch/probe",
+      'grep -rl "pattern" backlog/items/ 2>/dev/null',
+      "git status && git log -n 10 --oneline",
+      "git rev-parse HEAD && git log --max-count=3",
+      'git rev-parse HEAD && grep -rl "pattern" backlog/items/ | head -n 5',
+      'git status && grep -n "pattern" plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs | grep -v "test"',
+    ]) {
+      assert.equal(isReadOnlyDiagnosticCommand(command, path), true, command);
+      assert.equal(isForbiddenCrossRepositoryMutation(command, path), false, command);
+    }
+    assert.deepEqual(evaluateLifecycleReadyGuard(
+      bash('git rev-parse HEAD && git log --oneline -5 && echo "---status---" && git status --porcelain'),
+      { projectDir: path, requireProjectOnboardingReadyFn() { deny("repository-control-path-invalid"); } },
+    ), { exitCode: 0, stderr: "" });
+
+    for (const command of [
+      // (a) an allowlisted command name chained with a mutating/cross-reaching one.
+      "git log && rm -rf /tmp/x",
+      "git status && git push",
+      // (b) mkdir -p targeting a path outside the permitted-write predicate.
+      `mkdir -p ${outside} && ls -la ${outside}`,
+      // (c) a trailing 2>/dev/null on a command that is not independently read-only.
+      "rm -rf /tmp/x 2>/dev/null",
+      // (d) a chain longer than the chosen bound, or an operator this design never admits.
+      "echo 1 && echo 2 && echo 3 && echo 4 && echo 5 && echo 6 && echo 7",
+      "git status ; git log",
+      "git status || git log",
+      // Trailing pipe where source is not grep (git log | head -n 5) fails closed
+      "git rev-parse HEAD && git log --oneline -5 | head -n 5",
+      // Non-trailing pipe fails closed
+      'grep -rl "pattern" backlog/items/ | head -n 5 && git status',
+      // Trailing pipe where sink is neither grep nor head fails closed
+      'git rev-parse HEAD && grep -rl "pattern" backlog/items/ | cat',
+      // Disclosed exclusions: an unrecognized git log flag, and a git global -c flag
+      // (never a subcommand match), both fail closed by construction.
+      "git log --all && git status",
+      "git -c core.pager=evil log && git status",
+    ]) {
+      assert.equal(isReadOnlyDiagnosticCommand(command, path), false, command);
+    }
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+// backlog/items/2026-08-19-closed-shell-grammar-still-rejects-common-readonly-composition.md
+// Critic finding F2 (rework round against commit b3153385): the test above uses an
+// UNGOVERNED root (root() writes no BASE_GOVERNANCE_MARKERS file), so
+// evaluateLifecycleReadyGuard's own `if (!governed) return verdict(0);` short-circuits
+// before ever reaching the mkdir-chain admission logic the test above claims to prove --
+// the requireProjectOnboardingReadyFn mock it injects at line ~699 is dead code, and F1's
+// bug (isChainEligibleSegment admitting ANY in-repo mkdir -p target) shipped underneath a
+// passing suite. This test uses a genuinely GOVERNED root (a real marker file on disk) with
+// requireProjectOnboardingReadyFn mocked not-ready, and proves both directions of the
+// narrowed mkdir predicate (F1): the scratch/ target stays admitted; an arbitrary in-repo
+// path outside scratch/ or .claude/worktrees/ (guardrails/, the Critic's own live-proved
+// bypass target) is now refused.
+//
+// Neither direction ever calls requireProjectOnboardingReadyFn, and both assert that
+// explicitly rather than leaving it unobserved: the admitted scratch/ chain is classified
+// read-only-diagnostic and short-circuits to verdict(0) BEFORE evaluateAfterGrammarAdmission
+// (the onboarding-readiness check) is reached -- the same early-exit shape the "non-ready
+// governed roots retain a narrow simple-command read-only diagnostic lane" test above
+// already establishes for other read-only shapes. The refused guardrails/ chain is refused
+// at the closed-grammar layer itself: guard-command-grammar.mjs's tokenizer unconditionally
+// rejects any top-level `&&` as a CONTROL operator (parseStatus "denied"), so a chain that
+// isReadOnlyDiagnosticCommand no longer admits is refused as GUARD-PARSE-UNSUPPORTED before
+// onboarding-readiness is ever consulted either -- refused unconditionally, which is at
+// least as strong a guarantee as "refused only while not yet onboarding-ready" would have
+// been. Documented here rather than assumed: this is a stronger, not weaker, proof than a
+// literal onboarding-readiness-mock-invocation would have given.
+test("the narrowed mkdir chain predicate (F1) still admits scratch/ and refuses an arbitrary in-repo path on a genuinely governed, not-yet-ready root", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+
+    const admitted = "mkdir -p scratch/probe && ls -la scratch/probe";
+    assert.equal(isReadOnlyDiagnosticCommand(admitted, path), true, admitted);
+    let admittedCalls = 0;
+    assert.deepEqual(evaluateLifecycleReadyGuard(bash(admitted), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { admittedCalls += 1; deny("partial"); },
+    }), { exitCode: 0, stderr: "" });
+    assert.equal(admittedCalls, 0,
+      "scratch/ chain must short-circuit before onboarding-readiness is ever consulted");
+
+    const worktree = "mkdir -p .claude/worktrees/probe && ls -la .claude/worktrees/probe";
+    assert.equal(isReadOnlyDiagnosticCommand(worktree, path), true, worktree);
+
+    const refused = "mkdir -p guardrails/critic-probe && ls -la guardrails/critic-probe";
+    assert.equal(isReadOnlyDiagnosticCommand(refused, path), false, refused);
+    let refusedCalls = 0;
+    const result = evaluateLifecycleReadyGuard(bash(refused), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { refusedCalls += 1; deny("partial"); },
+    });
+    assert.equal(result.exitCode, 2, refused);
+    assert.match(result.stderr, /GUARD-PARSE-UNSUPPORTED/u, refused);
+    assert.equal(refusedCalls, 0,
+      "the arbitrary in-repo path must be refused at the closed-grammar layer, "
+        + "never reaching onboarding-readiness");
+
+    // The Critic's own live reproduction shape, DoD check 1: refused end to end.
+    const reproduction = "git rev-parse HEAD && mkdir -p guardrails/critic-probe";
+    assert.equal(isReadOnlyDiagnosticCommand(reproduction, path), false, reproduction);
+    const reproductionResult = evaluateLifecycleReadyGuard(bash(reproduction), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { deny("partial"); },
+    });
+    assert.equal(reproductionResult.exitCode, 2, reproduction);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+  }
+});
+
 test("redirect-looking quoted data stays argv while hostile composition is typed and denied", () => {
   const path = root();
   try {
@@ -1130,7 +1326,11 @@ test("redirect-looking quoted data stays argv while hostile composition is typed
       assert.match(result.stderr, /separate parallel tool calls/u, command);
       assert.match(result.stderr, /Do not construct a new composed command/u, command);
       assert.match(result.stderr, /If typed retryActions are present/u, command);
-      assert.match(result.stderr, /Only bounded rg-to-rg and rg-to-head diagnostic pipelines are admitted as exceptions/u, command);
+      assert.match(
+        result.stderr,
+        /Only bounded rg-to-rg, rg-to-head, grep-to-grep, and grep-to-head diagnostic pipelines are admitted as exceptions/u,
+        command,
+      );
     }
   } finally { rmSync(path, { recursive: true, force: true }); }
 });

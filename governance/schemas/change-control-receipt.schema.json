@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-pipeline.dev/schemas/pipeline.change-control-receipt.v1.json",
+  "title": "Pipeline change-control receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "profileId", "candidate", "artifact", "environment", "scopeSha256", "window", "state", "authenticated"],
+  "properties": { "schema": { "const": "pipeline.change-control-receipt.v1" }, "profileId": { "type": "string" }, "candidate": { "type": "object" }, "artifact": { "type": "object" }, "environment": { "type": "string" }, "scopeSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "window": { "type": "object" }, "state": { "enum": ["draft", "approved", "rejected", "expired", "conflicting", "unknown", "unavailable"] }, "authenticated": { "type": "boolean" } }
+}

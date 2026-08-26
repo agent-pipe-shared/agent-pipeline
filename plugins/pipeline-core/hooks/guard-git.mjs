@@ -4,7 +4,7 @@
  * git-guard — central PreToolUse deny-guard for Bash|PowerShell tool calls.
  *
  * Plugin: pipeline-core (Agent-Pipeline). Canon: docs/adr/0013-git-guard-union.md,
- * docs/operating-model.md §4.1 (gate honesty) + §8 (calibration).
+ * docs/operating-model.md, What the model protects (gate honesty) + Project calibration and extensions (calibration).
  *
  * WHY THIS FILE EXISTS
  *   The three project guards (<PROJECT_A>, <PROJECT_B>, <PROJECT_C>) are divergent copies — none is a
@@ -58,6 +58,10 @@
  *   are present the inline prefix wins and the ignored env arming is noted on stderr.
  *   Value = exactly 3 segments split on the first two "|" (reason may itself contain
  *   "|"); token is a fresh one-time value, reason is mandatory and non-empty.
+ *   In a PHOENIX-GOVERNED repository (governance/events/registry.json present) the
+ *   reason segment must itself open with an authority-reference path — effectively
+ *   "<RULE-ID>|<token>|<authority-reference.json>|<reason>". A local token alone is
+ *   never authority there; see the Phoenix block below.
  *
  *   One-time semantics, BOUND rather than counted: a consumption ledger
  *   `.claude/guard-override.log.jsonl` bound to the physical command target records one
@@ -75,7 +79,12 @@
  *   another target, and every entry written before this change (no `commandSha256`) all stay
  *   consumed forever. Lifetime: `overrideArmingTtlSeconds` from the loaded guard-config,
  *   else 3600s from the first admission — an arming that outlives the session that
- *   requested it is not a retry window.
+ *   requested it is not a retry window. In a Phoenix-governed repository (governance/events
+ *   /registry.json present), this local ledger is not the sole authority — see "override
+ *   mechanism: Phoenix canonical human authority" below: a checkpoint-bound canonical human
+ *   decision is additionally required, its own append-only stream is what is actually
+ *   consumed for that admission, and the local ledger is never reached for that path (no
+ *   command or reason content is persisted locally there).
  *
  * SIGNED-PUSH ADMISSION (GG-03 only) — ADR-0061 Decision 0, design R1
  *   When GG-03 is the ONLY matching rule, no `PIPELINE_GUARD_OVERRIDE` is in play, and the
@@ -114,7 +123,7 @@
  *   audit record would violate the override audit contract; ordinary (unarmed) guard operation
  *   stays fail-open, unchanged.
  *
- *   HONESTY NOTE (gate honesty, operating-model §4.1/M20): the mechanism cannot
+ *   HONESTY NOTE (gate honesty, docs/operating-model.md, What the model protects, M20): the mechanism cannot
  *   technically distinguish who typed the arming prefix — an agent could arm it
  *   without the PO. The defense is procedural + forensic, not technical: GIT-04
  *   forbids agents to self-arm, the arming is visible in the permission prompt, every
@@ -164,7 +173,7 @@
  *   → Projects re-add these via the per-project guard-config (example below).
  *
  * PER-PROJECT EXTRA DENIES — config instead of fork (denies live here or in the
- * committed settings.json, NOT in .claude/pipeline.json — operating-model §8):
+ * committed settings.json, NOT in .claude/pipeline.json — docs/operating-model.md, Project calibration and extensions):
  *   File:   <project>/.claude/guard-config.json   (committed in the project repo)
  *   Schema: { "extraDenyPatterns": [ { "pattern": "<JS regex body>",
  *                                      "reason": "<agent-facing explanation>",
@@ -185,7 +194,7 @@
  *   Config is looked up under $CLAUDE_PROJECT_DIR (set by Claude Code for hooks),
  *   falling back to the process cwd. The override ledger uses the same lookup.
  *
- * WHAT THIS GUARD DOES NOT BLOCK (gate honesty, operating-model §4.1 / M20)
+ * WHAT THIS GUARD DOES NOT BLOCK (gate honesty, docs/operating-model.md, What the model protects, M20)
  *   - The everyday workflow: git push (incl. `push origin main` = <PROJECT_A> deploy path),
  *     push -u, tag creation, merge/pull/fetch/commit, deleting FEATURE branches
  *     (part of the branch-archival convention).
@@ -290,6 +299,9 @@ function pipelineStateScriptRef() {
     ? script
     : "pipeline-state.mjs (locate it under your installed pipeline-core plugin's scripts directory)";
 }
+
+const GOVERNANCE_AUTHORITY_CLI = fileURLToPath(new URL("../scripts/governance-authority.mjs", import.meta.url));
+const PHOENIX_OVERRIDE_REFERENCE_SCHEMA = "pipeline.git-override-authority-reference.v1";
 
 // ---- read tool input (fail-open) --------------------------------------------------
 let cmd = "";
@@ -911,6 +923,83 @@ async function admitSignedPush() {
   return { admitted: true, keyReference: verdict.keyReference, forCommit: commit, destination: binding.destination };
 }
 
+// ---- override mechanism: Phoenix canonical human authority ----------------------------
+// Restored from 998a609 (dropped wholesale by the 0.5.2 integration merge 75b8361). In a
+// Phoenix-governed repository an agent-invented one-time token is NOT authority: the
+// override additionally requires a checkpoint-bound canonical human-governance decision,
+// scoped to this exact repository, candidate, rule and guard artifact digest, and it is
+// consumed in the append-only human stream. This ADDS a requirement on top of the target
+// binding below — it never creates a second way to permit anything.
+function exactKeys(value, keys) { return value !== null && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key)); }
+function phoenixGovernedProject() { return existsSync(join(projectDir, "governance", "events", "registry.json")); }
+function currentCandidate() {
+  const invoked = spawnSync("git", ["-C", projectDir, "rev-parse", "HEAD", "HEAD^{tree}"], { encoding: "utf8", timeout: 5000 });
+  const lines = invoked.status === 0 ? invoked.stdout.trim().split("\n") : [];
+  return lines.length === 2 && /^[a-f0-9]{40,64}$/u.test(lines[0]) && /^[a-f0-9]{40,64}$/u.test(lines[1]) ? { commit: lines[0], tree: lines[1] } : null;
+}
+function readPhoenixOverrideReference(reference) {
+  if (typeof reference !== "string" || reference === "" || reference.length > 512) return null;
+  let value;
+  try { value = JSON.parse(readFileSync(reference, "utf8")); } catch { return null; }
+  if (!exactKeys(value, ["schema", "authorityRequest", "consumption"]) || value.schema !== PHOENIX_OVERRIDE_REFERENCE_SCHEMA
+    || !exactKeys(value.authorityRequest, ["schema", "repositoryFingerprint", "decisionId", "candidate", "checkpoint", "nowEpochMs"])
+    || value.authorityRequest.schema !== "pipeline.governance-authority-request.v1"
+    || !exactKeys(value.consumption, ["decisionId", "eventId", "idempotencyKey", "observedAtEpochMs"])) return null;
+  return value;
+}
+function invokeGovernanceAuthority(flag, request) {
+  const invoked = spawnSync(process.execPath, [GOVERNANCE_AUTHORITY_CLI, "--repo", projectDir, flag, JSON.stringify(request)], { encoding: "utf8", timeout: 5000 });
+  if (invoked.status !== 0) return null;
+  try { return JSON.parse(invoked.stdout); } catch { return null; }
+}
+function consumePhoenixOverrideAuthority(reference, rule) {
+  const expectedCandidate = currentCandidate();
+  if (!expectedCandidate) return "the current repository candidate could not be read";
+  const authority = invokeGovernanceAuthority("--request-json", reference.authorityRequest);
+  const scope = authority?.scope;
+  let guardDigest;
+  try { guardDigest = createHash("sha256").update(readFileSync(fileURLToPath(import.meta.url))).digest("hex"); } catch { return "the guarded artifact digest could not be read"; }
+  if (authority?.granted !== true || authority.decisionId !== reference.authorityRequest.decisionId
+    || !exactKeys(scope, ["repositoryFingerprint", "candidate", "packageId", "action", "environment", "artifacts"])
+    || !exactKeys(scope.candidate, ["commit", "tree"])
+    || scope.candidate.commit !== expectedCandidate.commit || scope.candidate.tree !== expectedCandidate.tree
+    || scope.action !== `OVERRIDE.${rule}` || scope.environment !== "local"
+    || !Array.isArray(scope.artifacts) || !scope.artifacts.some((artifact) => exactKeys(artifact, ["path", "sha256"]) && artifact.path === "plugins/pipeline-core/hooks/guard-git.mjs" && artifact.sha256 === guardDigest)) {
+    return "the canonical human-governance decision does not authorize this exact override tuple";
+  }
+  const consume = {
+    schema: "pipeline.governance-authority-consume-request.v1",
+    repositoryFingerprint: reference.authorityRequest.repositoryFingerprint,
+    decisionId: authority.decisionId,
+    decisionDigest: authority.decisionDigest,
+    candidate: expectedCandidate,
+    checkpoint: reference.authorityRequest.checkpoint,
+    observedAtEpochMs: reference.consumption.observedAtEpochMs,
+    consumption: {
+      decisionId: reference.consumption.decisionId,
+      eventId: reference.consumption.eventId,
+      idempotencyKey: reference.consumption.idempotencyKey,
+    },
+  };
+  const consumed = invokeGovernanceAuthority("--consume-request-json", consume);
+  if (consumed?.consumed !== true || consumed.outcome !== "appended" || consumed.decisionId !== authority.decisionId) return "the canonical human-governance decision could not be consumed";
+  return null;
+}
+// Adapted, NOT verbatim: at 998a609 the authority reference was a fourth segment produced
+// by splitOverrideValue. That parser is a merge-introduced binding whose three-segment
+// contract (guardrails/git.md GIT-04, "the reason may itself contain |") the protected
+// suite relies on, so it stays untouched; the same split is performed one level later and
+// only on the Phoenix path. Semantics are identical to 998a609:531-543: everything before
+// the third "|" is the reference, everything after it is the reason. Both halves must be
+// non-empty, otherwise there is no reference and the fail-closed block below fires.
+function phoenixAuthorityArming(reasonSegment) {
+  const thirdPipe = reasonSegment.indexOf("|");
+  if (thirdPipe === -1) return { reference: null, reason: reasonSegment };
+  const reference = reasonSegment.slice(0, thirdPipe);
+  const reason = reasonSegment.slice(thirdPipe + 1);
+  return reference === "" || reason === "" ? { reference: null, reason } : { reference, reason };
+}
+
 // ---- verdict -------------------------------------------------------------------------
 function formatBlockHeader(rule) {
   return (
@@ -921,12 +1010,15 @@ function formatBlockHeader(rule) {
   );
 }
 function overrideProcedureText(rule) {
+  const phoenixReference = phoenixGovernedProject()
+    ? `\n  Phoenix:    PIPELINE_GUARD_OVERRIDE="${rule.id}|<token>|<authority-reference.json>|<reason>" <command>\n  The reference must resolve and consume a canonical decision scoped to OVERRIDE.${rule.id}.`
+    : "";
   return (
     `Override: if this is genuinely intended, run the double-confirmation procedure (guardrails/git.md GIT-04) — ` +
     `explain the command and the reason, get the PO's confirmation, then their explicit "OVERRIDE ${rule.id}", ` +
     `then arm and re-run:\n` +
     `  Bash:       PIPELINE_GUARD_OVERRIDE="${rule.id}|<token>|<reason>" <command>\n` +
-    `  PowerShell: $env:PIPELINE_GUARD_OVERRIDE='${rule.id}|<token>|<reason>'; <command>\n` +
+    `  PowerShell: $env:PIPELINE_GUARD_OVERRIDE='${rule.id}|<token>|<reason>'; <command>` + phoenixReference + `\n` +
     `Fallback (mechanism unavailable): the PO runs the command manually in their own terminal — the guard binds agents, not humans.`
   );
 }
@@ -982,6 +1074,22 @@ function allowWithOverride(status, expiresAt) {
     ...notices,
   ];
   emit(1, lines);
+}
+// Restored from 998a609:722-724 (verbatim) — the Phoenix authority refusal.
+function blockHumanAuthorityFailure(rule, reason) {
+  emit(2, [formatBlockHeader(rule), `Override NOT applied: ${reason}.`, overrideProcedureText(rule), ...notices]);
+}
+// Adapted from 998a609:725-735: at 998a609 this was the canonicalAuthority=true branch of
+// allowWithOverride. allowWithOverride is a merge-introduced binding, so the canonical
+// branch is restored additively under its own name; the emitted lines are those of
+// 998a609:727-732, with the reason taken from the Phoenix split.
+function allowWithPhoenixAuthority(reason) {
+  emit(1, [
+    `[git-guard] OVERRIDE APPLIED (one-time): rule ${arming.rule}, token ${arming.token}.`,
+    `Reason: ${reason}`,
+    "Ledger: canonical human-governance decision consumed (no local command or reason persisted).",
+    ...notices,
+  ]);
 }
 
 // All deny rules are always evaluated; consumption is decided on the FINAL verdict
@@ -1168,6 +1276,18 @@ if (matched.length > 0) {
   if (overrideCoversAll) {
     const target = overrideTarget();
     if (!target.ok) blockTargetBindingFailure(matched[0]);
+    // Phoenix-governed repository: the target binding above is necessary but NOT
+    // sufficient. Restored from 998a609:748-753 — CONJOINED with the target check rather
+    // than placed beside it, so this can only refuse where the guard already permitted;
+    // it can never permit anything the guard refuses. Every exit below is emit()'d.
+    if (phoenixGovernedProject()) {
+      const phoenix = phoenixAuthorityArming(arming.reason);
+      const authorityReference = readPhoenixOverrideReference(phoenix.reference);
+      if (!authorityReference) blockHumanAuthorityFailure(matched[0], "a closed Phoenix authority reference is required");
+      const authorityFailure = consumePhoenixOverrideAuthority(authorityReference, arming.rule);
+      if (authorityFailure) blockHumanAuthorityFailure(matched[0], authorityFailure);
+      allowWithPhoenixAuthority(phoenix.reason);
+    }
     const prior = findConsumption(arming.rule, arming.token, target);
     const armedAt = new Date();
     const commandSha256 = sha256(cmd);

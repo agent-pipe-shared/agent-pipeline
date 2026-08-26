@@ -1,0 +1,50 @@
+{
+  "taskId": "PHX-WP-LAC08",
+  "model": "claude-opus-5[1m]",
+  "rulesetSha": "5125f494dd5a0f5315b8ea7f5f19e03ab4e0057e15c7198d5565d7b3d67ca937",
+  "dispatcher": "elephant",
+  "outcome": "landed",
+  "log": [
+    { "phase": "route-pre-check", "toolUses": 0, "note": "Field 6 requested claude-opus-5/xhigh; direct same-dispatch evidence names claude-opus-5[1m]. Consistent, no contradiction. Effort not directly observable." },
+    { "phase": "context-read", "toolUses": 23, "note": "governance-replay-view.mjs has zero import statements -> the KINDS Set is genuinely hand-duplicated, no shared source. Field-5 stop condition does not apply. lifecycle-governance-events.test.mjs exists and contains no 'cancellation' occurrence. No kind/status pairing rule references cancellation (only candidate-invalidation is cross-validated, lines 87-88)." },
+    { "phase": "edit", "toolUses": 29, "note": "Removed cancellation from both KINDS sets, from KIND_RECORD_CLASS (and corrected that line's doc comment 9 -> 8 kinds), folded the L-AC-07 fixture event to kind:status/status:cancelled, reduced the runner-observed test to dispatch+status (count 3 -> 2), deleted the governance-replay.md honesty-note bullet." },
+    { "phase": "verify", "toolUses": 31, "note": "node --test over the three affected test files: 20 pass, 0 fail. Junit artifact written by node itself to node-test-junit.xml. Re-grep of all six touched code/test files plus docs/governance-replay.md leaves exactly one 'cancellation' occurrence: the L-AC-07 test TITLE, which names a fixture scenario category (explicitly in-vocabulary per briefing field 4), not a kind." },
+    { "phase": "commit", "toolUses": 34, "note": "Commit 20014aab: code, tests, docs/governance-replay.md." },
+    { "phase": "commit", "toolUses": 36, "note": "acceptance.md amendment verified append-only via git diff --numstat: 12 insertions, 0 deletions." },
+    { "phase": "residue", "toolUses": 36, "note": "OUT OF BRIEFED SCOPE, NOT FIXED, needs a follow-up dispatch: governance/schemas/lifecycle-governance-event.schema.json:11 is a THIRD copy of the same kind enum and still lists \"cancellation\". Field 4 bounds scope to the named files ('Nothing else') and does not list this file either as in scope or as a different vocabulary. No test or code path reads that schema (only specs/sprint-phoenix-epic/spec.md:434 references it), so nothing breaks today, but the published contract now permits a kind the validator rejects." },
+    { "phase": "commit", "toolUses": 39, "note": "Commit b4f059f9: acceptance.md amendment + PHX-WP-LAC08 evidence directory." }
+  ],
+  "report": {
+    "result": "Landed as drafted, with one disclosed in-line consistency edit (KIND_RECORD_CLASS doc comment 9 -> 8 kinds) and one out-of-scope residue reported, not fixed (the JSON schema's third copy of the kind enum).",
+    "commits": ["20014aab", "b4f059f9"],
+    "verification": {
+      "command": "node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=specs/sprint-phoenix-epic/evidence/PHX-WP-LAC08/node-test-junit.xml plugins/pipeline-core/lib/governance-replay.test.mjs plugins/pipeline-core/lib/governance-replay-view.test.mjs plugins/pipeline-core/lib/lifecycle-governance-events.test.mjs",
+      "exitCode": 0,
+      "tests": 20,
+      "pass": 20,
+      "fail": 0,
+      "artifact": "specs/sprint-phoenix-epic/evidence/PHX-WP-LAC08/node-test-junit.xml",
+      "note": "node --test runs each listed file in its own child process, so this is standalone-equivalent per file; a separate per-file invocation was not run (tool budget)."
+    },
+    "dodResults": {
+      "no-cancellation-kind-in-the-three-modules": "passed (grep returns zero matches in all three)",
+      "touched-test-files-pass": "passed (20/20 in the single isolated-per-file invocation)",
+      "three-named-test-files-pass": "passed (lifecycle-governance-events.test.mjs exists and is included)",
+      "acceptance-md-append-only": "passed (git diff --numstat: 12 insertions, 0 deletions)",
+      "re-grep-context-files": "passed (only the L-AC-07 test title remains, a scenario category, not a kind)"
+    },
+    "amendmentQuoted": "**Amendment (PO, 2026-08-17).** The `cancellation` item in this enumeration is satisfied by a `kind: \"status\"` event carrying `status: \"cancelled\"` — no dedicated `cancellation` kind exists or is required. The closed schema defined no field, pairing rule or validation that distinguished a `cancellation`-kind event from that representation, so the code was corrected the same day (commit `20014aab`) to stop emitting an undistinguishable duplicate kind; `cancelled` remains a valid `status` and the cancellation scenario still replays. This amendment changes the encoding of one enumerated trigger, not the criterion. L-AC-01 stays `partial` regardless: only 1 of the 9 named triggers has a real producer today (see this criterion's evidence-map pointer), and nothing here changes that.",
+    "deviations": [
+      "governance-replay-view-renderer.mjs:10 — the doc comment on the line being edited asserted 'each of the 9 verified lifecycle kinds'. Removing the map entry would have left that count false, so it now reads 8. Same line, factual correction, not a design change; disclosed rather than silent.",
+      "Commit-message files were written into the evidence directory instead of a scratchpad: the guard blocks writes outside the project root (GUARD-CROSS-REPO-MUTATION), and the briefing mandates git commit -F for multi-line messages. They are committed as dispatch artifacts.",
+      "Two commits instead of one, because the amendment has to cite the code commit's SHA."
+    ],
+    "openItems": [
+      "L-AC-01 stays partial (1 of 9 named triggers has a real producer). The amendment states this explicitly and claims nothing further.",
+      "governance/schemas/lifecycle-governance-event.schema.json:11 still enumerates \"cancellation\" in its kind enum — a third, hand-duplicated copy of the same vocabulary, outside field 4's scope and not listed among the different-vocabulary exclusions. Not touched. Needs a follow-up dispatch; nothing reads it today (only specs/sprint-phoenix-epic/spec.md:434 references it), so no test regressed.",
+      "plugins/pipeline-core/lib/governance-replay.test.mjs:27 test title still contains the word 'cancellation' — a fixture SCENARIO category, kept deliberately per field 4 (same reasoning that keeps L-AC-07's acceptance text unchanged).",
+      "All other repo files containing 'cancellation' are the excluded, genuinely different vocabularies (control-execution-exchange class, gitlab-ci broker record field, export delivery policy, credential-lease revocation reason, execution-plane request field, local-worker supervisor/pool variables) or historical evidence/spec documents that record past state and must not be rewritten.",
+      "Elephant still owns: acceptance-evidence-map.mjs and closure-plan.md updates after independently re-verifying this diff."
+    ]
+  }
+}

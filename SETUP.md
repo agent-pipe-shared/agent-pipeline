@@ -363,6 +363,10 @@ cp <pipeline-source>/templates/pipeline.json.example project/pipeline.json
 cp <pipeline-source>/templates/CLAUDE.project.md CLAUDE.md
 ```
 
+(A runner-neutral project — one without a `.claude/` directory — targets
+`project/pipeline.json` instead; the calibration is read at its resolved
+authority tier, `project/pipeline.json` else `.claude/pipeline.json`.)
+
 `pipeline.json` names the project, its **one** `verify` command, worktree and
 branch model, autonomy, stakes, constraints, handover, and rollback procedure.
 Make `verify` the one deterministic command every actor and CI job means by

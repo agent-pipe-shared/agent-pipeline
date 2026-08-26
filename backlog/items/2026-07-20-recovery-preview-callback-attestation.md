@@ -95,3 +95,21 @@ before further implementation or prioritization.
   `docs/known-issues.md` kept citing it as open).
 - **Assignment:** closed, no further work.
 - **Date:** 2026-08-18
+- **Cross-branch note:** a separate, independently run PO-requested audit
+  of `in_progress` backlog items on another line of development reached
+  the same "closed — implemented, stale record" conclusion on 2026-08-19,
+  confirming `attestRecoveryPreviewDelivery()` binds one acknowledgement
+  to one invocation (digest + invocation-id match required) and that
+  every missing/malformed/replayed/mismatched/timed-out/throwing callback
+  returns a typed non-success code (`RP-CALLBACK-ABSENT`,
+  `RP-ACK-MALFORMED`, `RP-ACK-REPLAY`, `RP-DIGEST-MISMATCH`,
+  `RP-INVOCATION-MISMATCH`, `RP-CALLBACK-TIMEOUT`, `RP-CALLBACK-THREW`)
+  without advancing recovery state, and that suite
+  `recovery-preview-attestation-tests` is registered in `verify.mjs`.
+  That audit did not have visibility into the two hardening fixes
+  (`safeId()`/`safeDigest()` type-coercion bypass; the cross-invocation
+  cached-acknowledgement replay vulnerability in
+  `runner-profile-migration-v3.mjs`) landed and independently Critic-
+  re-reviewed in `6b5157c1`; the frontmatter above reflects that more
+  complete closure and is kept as the record of truth for
+  `closure_commit`/`closure_evidence`.

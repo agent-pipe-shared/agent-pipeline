@@ -418,11 +418,113 @@ function validScope(scopeRuleIds) {
   return Array.isArray(scopeRuleIds) && scopeRuleIds.length > 0 && scopeRuleIds.every(isLiftableRuleId);
 }
 
+// ---------------------------------------------------------------------------------
+// Mandatory stage-0 self-check (PHX-WP-STAGE0-SELFCHECK;
+// backlog/items/2026-08-09-elephant-authored-production-diff-closed-its-own-gating-criterion.md).
+//
+// A signed GMW record only ever authorizes LIFTING FILE PROTECTION (GS-6/TP-*); it
+// has never authorized -- and still does not authorize -- an Elephant session to
+// author the commit itself instead of dispatching a Goldfish (EL-01/EL-16). The
+// backlog item's root cause was exactly this conflation, made as an implicit
+// judgment call under TTL time pressure. This block closes that gap by making the
+// declaration EXPLICIT, STATED and STRUCTURALLY MANDATORY on every prepare()/
+// install() call -- not part of the PO-signed `subject` (the PO's signature
+// authorizes a file-protection lift, never an authorship judgment, which stays the
+// Elephant's own gate per EL-03(c)), but a caller precondition that fails closed,
+// exactly like the F3 scope re-check above, independently in BOTH prepare() and
+// install() so a hand-built request cannot bypass prepare()'s own check either.
+// ---------------------------------------------------------------------------------
+
+export const AUTHORSHIP_MODES = Object.freeze(["goldfish-dispatch", "elephant-direct"]);
+
+/** Shape/membership only: one of the two closed authorship-mode strings, never omitted or defaulted. */
+function validAuthorshipMode(value) {
+  return typeof value === "string" && AUTHORSHIP_MODES.includes(value);
+}
+
+/** Shape only -- EL-01's stage-0 fast-path definition (roles/elephant.md EL-01): file count, diff-line count, explicit no-test-file confirmation. */
+function validStage0Selfcheck(value) {
+  return object(value)
+    && Number.isInteger(value.filesChanged) && value.filesChanged >= 0
+    && Number.isInteger(value.diffLines) && value.diffLines >= 0
+    && typeof value.touchesTestFile === "boolean";
+}
+
+/** EL-01's own stage-0 fast-path arithmetic: <=2 files, <=~25 diff lines, no test-file changes. Presumes `validStage0Selfcheck(value)` already passed. */
+function stage0Qualifies(value) {
+  return value.filesChanged <= 2 && value.diffLines <= 25 && value.touchesTestFile === false;
+}
+
+/** Non-throwing counterpart of assertStage0Declaration, for the read path (currentGuardMaintenanceWindow), which reports "absent" rather than throwing. */
+function validStage0Declaration(authorshipMode, stage0Selfcheck) {
+  if (!validAuthorshipMode(authorshipMode)) return false;
+  if (authorshipMode !== "elephant-direct") return true;
+  return validStage0Selfcheck(stage0Selfcheck) && stage0Qualifies(stage0Selfcheck);
+}
+
+/**
+ * Backward-compat variant of validStage0Declaration, used ONLY on the stored-record
+ * read path (currentGuardMaintenanceWindow) -- never in assertStage0Declaration,
+ * which governs prepare()/install() and must keep demanding an explicit declaration
+ * for every window created from here on (PHX-WP-STAGE0-SELFCHECK-BACKCOMPAT).
+ *
+ * A window record written before this field existed has no `authorshipMode` key at
+ * all (JSON.parse yields `undefined`, not `null` or ""): such a record predates the
+ * stage-0 declaration requirement and is treated as implicitly valid, exactly as it
+ * was before this field was introduced -- re-validating it against a requirement it
+ * was never asked to satisfy would silently invalidate an already-active, PO-signed
+ * window. Any record that DOES carry an authorshipMode key -- even a malformed or
+ * unrecognised one -- is a record written under this requirement (or a tampered
+ * one) and gets the full, strict check; only a genuinely absent field is legacy.
+ */
+function validStoredStage0Declaration(authorshipMode, stage0Selfcheck) {
+  if (authorshipMode === undefined) return true;
+  return validStage0Declaration(authorshipMode, stage0Selfcheck);
+}
+
+/**
+ * Mandatory, fail-closed re-check: every call into prepare()/install() must state
+ * EXPLICITLY who authors the commit under this window. An "elephant-direct"
+ * declaration must also state, and actually satisfy, EL-01's own stage-0 fast-path
+ * definition -- a declaration that does not qualify is refused outright, it is
+ * never merely flagged. Called independently by both prepare() and install() (the
+ * same F3 defense-in-depth pattern already used for scope above).
+ */
+function assertStage0Declaration(authorshipMode, stage0Selfcheck) {
+  if (!validAuthorshipMode(authorshipMode)) {
+    fail(
+      "GMW-AUTHORSHIP-MODE-INVALID",
+      'authorshipMode is required and must be "goldfish-dispatch" or "elephant-direct" -- an explicit, stated declaration of who authors the commit under this window (no implicit default; roles/elephant.md EL-01, backlog/items/2026-08-09-elephant-authored-production-diff-closed-its-own-gating-criterion.md)',
+    );
+  }
+  if (authorshipMode === "elephant-direct") {
+    if (!validStage0Selfcheck(stage0Selfcheck)) {
+      fail(
+        "GMW-STAGE0-SELFCHECK-INVALID",
+        'stage0Selfcheck is required for authorshipMode "elephant-direct" and must state { filesChanged, diffLines, touchesTestFile } -- the explicit stage-0 qualification confirmation EL-01 requires before an Elephant session may author the commit itself',
+      );
+    }
+    if (!stage0Qualifies(stage0Selfcheck)) {
+      fail(
+        "GMW-STAGE0-NOT-QUALIFIED",
+        "the declared diff does not meet EL-01's stage-0 fast-path definition (<=2 files, <=~25 diff lines, no test-file changes) -- an Elephant-authored commit to a protected path requires a Goldfish dispatch instead of direct authorship under this window",
+      );
+    }
+  }
+}
+
 function validIntentEnvelope(value) {
   return object(value) && object(value.value) && SHA256.test(value.sha256 ?? "");
 }
 
 function validRequest(value) {
+  // authorshipMode/stage0Selfcheck are deliberately NOT part of this shape check --
+  // exactly like validSubject above only checking scopeRuleIds is an array of strings
+  // and leaving closed-set membership to the separate validScope() re-check, the
+  // stage-0 declaration's full validation (including its closed-set membership and
+  // its business-logic "does it actually qualify" question) is owned exclusively by
+  // assertStage0Declaration(), called separately and explicitly in both prepare() and
+  // install() (F3 defense in depth) so the two paths report the same specific codes.
   return object(value) && value.schema === GMW_REQUEST_SCHEMA && validSubject(value.subject) && validIntentEnvelope(value.intent);
 }
 
@@ -509,6 +611,8 @@ export function prepareGuardMaintenanceWindowRequest({
   specSha256,
   policyRevision,
   livePluginRoot,
+  authorshipMode,
+  stage0Selfcheck = null,
   nowMs = Date.now(),
   spawn = spawnSync,
 } = {}) {
@@ -520,6 +624,11 @@ export function prepareGuardMaintenanceWindowRequest({
   if (typeof livePluginRoot !== "string" || livePluginRoot === "") {
     fail("GMW-PLUGIN-SOURCE", "no currently-enforcing live plugin root was supplied (see guard-gate-strength.mjs's livePluginRoots())");
   }
+  // Mandatory stage-0 self-check (PHX-WP-STAGE0-SELFCHECK): fails closed before any
+  // repo/tree work happens if the caller has not explicitly stated who authors the
+  // commit under this window, and (for "elephant-direct") whether that diff actually
+  // meets EL-01's own stage-0 fast-path definition.
+  assertStage0Declaration(authorshipMode, stage0Selfcheck);
 
   const repo = topology(rootDir, spawn);
   const repoFingerprintSha256 = repoFingerprint(repo);
@@ -565,8 +674,21 @@ export function prepareGuardMaintenanceWindowRequest({
   // uses ONLY this frozen snapshot for TP-* pattern matching, never a fresh read of the
   // live file, and fails the whole tolerance path closed if the live file has drifted
   // from it by the time install() runs.
+  // `authorshipMode`/`stage0Selfcheck` (PHX-WP-STAGE0-SELFCHECK) ride ALONGSIDE `subject`,
+  // deliberately unsigned: the PO's signature covers the file-protection lift, never the
+  // authorship declaration. `stage0Selfcheck` is recorded only for "elephant-direct" --
+  // carrying it for "goldfish-dispatch" would misleadingly imply EL-01 relevance where
+  // none applies.
   const protectedTestPatterns = captureProtectedTestPatternsSnapshot(rootDir);
-  const request = { schema: GMW_REQUEST_SCHEMA, subject, intent, preparation: { ttlSeconds, preparedAtMs: nowMs }, protectedTestPatterns };
+  const request = {
+    schema: GMW_REQUEST_SCHEMA,
+    subject,
+    intent,
+    preparation: { ttlSeconds, preparedAtMs: nowMs },
+    protectedTestPatterns,
+    authorshipMode,
+    stage0Selfcheck: authorshipMode === "elephant-direct" ? stage0Selfcheck : null,
+  };
   writeAtomic(paths.request, Buffer.from(`${JSON.stringify(request)}\n`, "utf8"));
   return { intent, subject, request, reused: false };
 }
@@ -759,11 +881,32 @@ function intervenedCommitsStayWithinScope({ root, spawn, candidateCommit, curren
 }
 
 /** Agent-safe: verify-and-place only. Cannot succeed without a genuine proof. */
-export function installGuardMaintenanceWindow({ rootDir, request, trustPolicy, proof, livePluginRoot, nowMs = Date.now(), spawn = spawnSync } = {}) {
+export function installGuardMaintenanceWindow({ rootDir, request, trustPolicy, anchors, proof, livePluginRoot, nowMs = Date.now(), spawn = spawnSync } = {}) {
+  // Fail closed on a missing/malformed anchor set. verifyAgainstTrustAnchors() coerces any
+  // non-array `anchors` to [] -- which is its MOST permissive posture (an empty set derives
+  // the anchor from the proof itself, so any well-formed Ed25519 key verifies). GMW never
+  // inherits that posture (NVA-GMWFIX-2): a caller that supplies neither `trustPolicy` nor
+  // `anchors` is refused loudly here, before verification is ever attempted.
+  //
+  // `trustPolicy` is the primary parameter: either a single anchor object -- the shape
+  // every pre-existing single-anchor caller supplies -- or a v3 anchor SET (an array).
+  // `anchors` is accepted as an equivalent, already-array-shaped alias (e.g. this plugin's
+  // own CLI, which already resolves its own set). Whichever is supplied is normalized
+  // below into a one-element set when it is a lone object, keeping every existing
+  // single-anchor caller's behavior byte-for-byte identical.
+  const suppliedTrustPolicy = trustPolicy !== undefined ? trustPolicy : anchors;
+  if (suppliedTrustPolicy === undefined || suppliedTrustPolicy === null) {
+    fail("GMW-ANCHORS-INVALID", "trustPolicy (or anchors) is required; a missing value is refused rather than treated as an empty set");
+  }
   if (!validRequest(request)) fail("GMW-REQUEST-INVALID", "window request is malformed");
   // F3 defense in depth: install() re-validates the closed scope set independently of
   // prepare() -- a hand-built request naming a non-liftable id must never install.
   if (!validScope(request.subject.scopeRuleIds)) fail("GMW-SCOPE-INVALID", "scope must name only GS-6 or a TP-* rule id");
+  // F3 defense in depth (PHX-WP-STAGE0-SELFCHECK): re-verify the stage-0 authorship
+  // declaration independently of prepare() too -- a hand-built request must never
+  // install with a missing/invalid declaration, or an "elephant-direct" declaration
+  // that does not actually qualify under EL-01's stage-0 fast-path definition.
+  assertStage0Declaration(request.authorshipMode, request.stage0Selfcheck);
   if (typeof livePluginRoot !== "string" || livePluginRoot === "") {
     fail("GMW-PLUGIN-SOURCE", "no currently-enforcing live plugin root was supplied (see guard-gate-strength.mjs's livePluginRoots())");
   }
@@ -853,19 +996,23 @@ export function installGuardMaintenanceWindow({ rootDir, request, trustPolicy, p
   // "absent/empty trustAnchors accepts any well-formed key" -- GMW is the ceremony that
   // LIFTS GS-6/TP-* protection in the first place, so that posture here would make the
   // whole ceremony self-serviceable by an agent, with no human involved
-  // (docs/adr/0058-guard-maintenance-window.md). `trustPolicy` is either a single anchor
-  // object -- the shape every pre-existing caller and the CLI's `--authority` branch
-  // supply -- or a v3 anchor SET (an array) -- the shape the CLI's default-authority
-  // branch supplies when the committed policy carries a non-empty one. Normalizing a
-  // lone object into a one-element set before calling verifyAgainstTrustAnchors keeps
-  // every existing single-anchor caller's behavior byte-for-byte identical
-  // (verifyAgainstTrustAnchors on a one-element, non-empty set is exactly
-  // verifyPoApprovalProof against that one anchor). F3-style defense in depth (see "never
-  // trust a stored record's scope claim" a few lines above `currentGuardMaintenanceWindow`'s
-  // anchor resolution, same pattern): an EMPTY resolved set is refused HERE, before
-  // verification is ever attempted, regardless of what shape or source `trustPolicy` came
-  // from -- never trust a caller's anchor shape either.
-  const anchors = Array.isArray(trustPolicy) ? trustPolicy : [trustPolicy];
+  // (docs/adr/0058-guard-maintenance-window.md). `suppliedTrustPolicy` (resolved above) is
+  // either a single anchor object -- the shape every pre-existing caller and the CLI's
+  // `--authority` branch supply -- or a v3 anchor SET (an array) -- the shape the CLI's
+  // default-authority branch supplies when the committed policy carries a non-empty one,
+  // or the shape a caller passing `anchors` directly already supplies. Normalizing a lone
+  // object into a one-element set before calling verifyAgainstTrustAnchors keeps every
+  // existing single-anchor caller's behavior byte-for-byte identical (verifyAgainstTrustAnchors
+  // on a one-element, non-empty set is exactly verifyPoApprovalProof against that one
+  // anchor). F3-style defense in depth (see "never trust a stored record's scope claim" a
+  // few lines above `currentGuardMaintenanceWindow`'s anchor resolution, same pattern): an
+  // EMPTY resolved set is refused HERE, before verification is ever attempted, regardless
+  // of what shape or source `trustPolicy`/`anchors` came from -- never trust a caller's
+  // anchor shape either. Reassigns the `anchors` PARAMETER binding directly (never a
+  // `const`/`let` re-declaration -- `anchors` is already a destructured parameter, per the
+  // `trustPolicy`/`anchors` alias above) so a caller supplying `anchors` directly is
+  // honored identically to one supplying `trustPolicy`.
+  anchors = Array.isArray(suppliedTrustPolicy) ? suppliedTrustPolicy : [suppliedTrustPolicy];
   if (anchors.length === 0) {
     fail("GMW-TRUST-ANCHOR-MISSING", "resolved trust anchor set is empty; the Guard Maintenance Window never treats an empty/absent trustAnchors set as \"any well-formed key\"");
   }
@@ -921,6 +1068,11 @@ export function installGuardMaintenanceWindow({ rootDir, request, trustPolicy, p
     // when the window was armed.
     preparedTreeSha256: request.subject.openingTreeSha256,
     observedTreeSha256,
+    // Carried through for audit visibility (PHX-WP-STAGE0-SELFCHECK) -- unsigned, same
+    // as on the request; the window record is the durable trace that the mandatory
+    // self-check was actually stated, not skipped, at install time.
+    authorshipMode: request.authorshipMode,
+    stage0Selfcheck: request.stage0Selfcheck,
   };
   const paths = storagePaths(repo.common);
   writeAtomic(paths.window, Buffer.from(`${JSON.stringify(record)}\n`, "utf8"));
@@ -938,6 +1090,9 @@ function validTreeObservation(value) {
 }
 
 function validWindowRecord(value) {
+  // authorshipMode/stage0Selfcheck shape/membership is re-checked separately via
+  // validStage0Declaration() below (PHX-WP-STAGE0-SELFCHECK), the same split already
+  // applied to validRequest() above and to scope elsewhere in this file.
   return object(value) && value.schema === GMW_WINDOW_SCHEMA && typeof value.root === "string"
     && SHA256.test(value.repoFingerprintSha256 ?? "") && validSubject(value.subject)
     && object(value.intent) && object(value.intent.value) && SHA256.test(value.intent.sha256 ?? "")
@@ -968,6 +1123,14 @@ export function currentGuardMaintenanceWindow({ rootDir, nowMs = Date.now(), spa
   // other check below would otherwise pass -- a record naming a non-liftable id is
   // treated as wholly invalid, not partially honored.
   if (!validScope(record.subject.scopeRuleIds)) return { status: "absent" };
+  // PHX-WP-STAGE0-SELFCHECK: same posture as the scope re-check immediately above --
+  // never partially honor a stored record whose stage-0 authorship declaration is
+  // present but malformed, or (for "elephant-direct") does not actually qualify.
+  // PHX-WP-STAGE0-SELFCHECK-BACKCOMPAT: uses the legacy-tolerant variant here (read
+  // path only) so a window record written before this field existed -- genuinely
+  // missing authorshipMode -- is not retroactively invalidated; see
+  // validStoredStage0Declaration()'s own doc comment for why this split is safe.
+  if (!validStoredStage0Declaration(record.authorshipMode, record.stage0Selfcheck)) return { status: "absent" };
 
   const repoFingerprintSha256 = repoFingerprint(repo);
   if (record.repoFingerprintSha256 !== repoFingerprintSha256 || record.root !== repo.root) return { status: "absent" };
@@ -984,7 +1147,10 @@ export function currentGuardMaintenanceWindow({ rootDir, nowMs = Date.now(), spa
   // whenever the document carries one; an absent OR EMPTY v3 set falls through to the
   // legacy singular field (the fallback for a document that predates v3, or that
   // explicitly carries an empty v3 set), and finally to "absent" -- the SAME posture GMW
-  // had before NVA-GMWFIX-1 for the no-anchor-available case.
+  // had before NVA-GMWFIX-1 for the no-anchor-available case. (Merge note, PHX-T-GMW: the
+  // sprint_phoenix branch instead treated an explicit empty v3 set as "any well-formed key
+  // may sign" -- superseded by NVA-GMWFIX-2 and pinned wrong-then-corrected by GMW28 below;
+  // kept out of this merge on that basis.)
   let anchors;
   try {
     const policy = readCriticalHumanProofPolicy(repo.root);
@@ -1031,6 +1197,17 @@ export function currentGuardMaintenanceWindow({ rootDir, nowMs = Date.now(), spa
     // Audit-only: what the live plugin tree actually hashed to when this window was
     // armed. `null` when the record predates CEREMONY-1 or the tree was unhashable.
     observedTreeSha256: record.observedTreeSha256 ?? null,
+    // PHX-WP-STAGE0-SELFCHECK: surfaced for audit -- `status`/CLI callers can see the
+    // stated authorship declaration without reading window.json directly.
+    authorshipMode: record.authorshipMode,
+    stage0Selfcheck: record.stage0Selfcheck,
+    // PHX-WP-GMW-LEDGER-EMISSION: surfaced so a `close`-time caller can identify which
+    // ledger request/grant this window's own portable decision trail belongs to
+    // (`guard-authority-ledger-intake.mjs`'s `requestDecisionId`/`grantDecisionId` are
+    // both derived from this digest) WITHOUT re-reading window.json directly or
+    // duplicating this function's own validation. Read-only, additive: no change to
+    // what is stored, verified, or how install/close narrow or arm capability.
+    intentSha256: record.intent.sha256,
   };
   if (!active) {
     return { status: "expired", ...shared, expiresAtMs: Number.isFinite(effectiveExpiresAtMs) ? effectiveExpiresAtMs : null };
@@ -1180,4 +1357,9 @@ export const guardMaintenanceWindowInternals = {
   physicalRoot,
   storagePaths,
   pluginTreeSha256,
+  validAuthorshipMode,
+  validStage0Selfcheck,
+  stage0Qualifies,
+  validStage0Declaration,
+  validStoredStage0Declaration,
 };

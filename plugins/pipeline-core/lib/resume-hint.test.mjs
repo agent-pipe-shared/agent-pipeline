@@ -349,3 +349,57 @@ test("NVA-BL-72 the CLI accepts a five-key card carrying progress, unmodified fo
     rmSync(root, { recursive: true, force: true });
   }
 });
+/**
+ * The four tests below are ported from origin/sprint_phoenix's diagnostic-half fix for
+ * backlog item `pipeline.resume-hint-opaque-token-rejects-hyphenated-english`
+ * (2026-08-18): that branch's own resume-hint.test.mjs did not exist before this merge
+ * and used a standalone check()/process.exit() harness instead of node:test: only the
+ * genuinely new coverage is ported here, converted to this file's node:test idiom, and
+ * de-duplicated against the equivalent assertions already present above (RH-DIAG-1
+ * already covers the missing/unexpected-key distinction, so that Phoenix test is not
+ * repeated). `opaqueToken()`'s detection heuristic itself is unchanged by any of this
+ * -- both fixtures below are still, correctly, rejected; only the diagnostic improves.
+ */
+
+// RH-SCHEMA-DIAG-1. The two confirmed opaqueToken() false-positive strings from that
+// backlog item (ordinary hyphenated English compounds, 28 characters, no digit, no
+// case mixing) must still be rejected -- but the rejection must name the offending
+// field rather than surface the bare four-character code.
+test("RH-SCHEMA-DIAG-1a 'documentation-reconciliation' in intent names the field, not a bare RH-SCHEMA", () => {
+  const context = withIntent("documentation-reconciliation is the current focus");
+  assert.throws(() => buildResumeHint({ context }), (error) => {
+    assert.notEqual(error.message, "RH-SCHEMA", "must not regress to the bare undifferentiated code");
+    assert.match(error.message, /^RH-SCHEMA: /u, "the code stays the contract, followed by a detail clause");
+    assert.match(error.message, /\bintent\b/u, "the message must name the offending field");
+    return true;
+  });
+});
+
+test("RH-SCHEMA-DIAG-1b 'checked-and-divergence-filed' in scope names the field, not a bare RH-SCHEMA", () => {
+  const context = withScope("checked-and-divergence-filed");
+  assert.throws(() => buildResumeHint({ context }), (error) => {
+    assert.notEqual(error.message, "RH-SCHEMA");
+    assert.match(error.message, /^RH-SCHEMA: /u);
+    assert.match(error.message, /\bscope\b/u, "the message must name the offending field");
+    return true;
+  });
+});
+
+test("resumeHintContextDetail never echoes the rejected value itself", () => {
+  const detail = resumeHintContextDetail(withIntent("documentation-reconciliation is the current focus"));
+  assert.match(detail, /\bintent\b/u);
+  assert.doesNotMatch(detail, /documentation-reconciliation/u, "a diagnostic must not repeat a value flagged as secret-shaped");
+});
+
+// RH-SCHEMA-DIAG-2. A fully-valid `context` with an invalid `createdAt` must NOT be
+// blamed on context: resumeHintContextDetail() would find nothing wrong and fall
+// through to its generic "context is not accepted in this shape", which is false --
+// context WAS accepted; createdAt was the actual problem. Regression cover for
+// validateResumeHint's per-field `cause` and buildResumeHint's cause-gated throw.
+test("RH-SCHEMA-DIAG-2 an invalid createdAt with a fully-valid context does not blame context", () => {
+  assert.throws(() => buildResumeHint({ context: BASE, createdAt: "not-a-date" }), (error) => {
+    assert.doesNotMatch(error.message, /context is not accepted in this shape/u, "must not falsely blame a valid context");
+    assert.equal(error.message, "RH-SCHEMA", "falls back to the bare code since the cause is createdAt, not context");
+    return true;
+  });
+});

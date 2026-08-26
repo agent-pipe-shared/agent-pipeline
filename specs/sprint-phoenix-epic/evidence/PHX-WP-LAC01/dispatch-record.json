@@ -1,0 +1,9 @@
+{
+  "taskId": "PHX-WP-LAC01",
+  "model": "claude-opus-5 / xhigh",
+  "rulesetSha": "410f898332ad048bb0cd76087aeef91806f036df937c78109e220d3707436b48",
+  "dispatcher": "elephant",
+  "outcome": "in-progress",
+  "log": [],
+  "report": null
+}

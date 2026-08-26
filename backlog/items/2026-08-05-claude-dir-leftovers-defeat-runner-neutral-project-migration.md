@@ -5,10 +5,10 @@ type: defect
 owner: pipeline
 status: closed
 created: 2026-08-05
-closed_at: 2026-08-18
-closure_repository: self
-closure_commit: 3263567469b09cb1983f8763e417760cbd35574c
-closure_evidence: PIPELINE_FLOW.md
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "c12cbdf7058204863fd9f96df84699e20e51347b"
+closure_evidence: "backlog/items/2026-08-05-claude-dir-leftovers-defeat-runner-neutral-project-migration.md"
 source: "PO observation, Sprint Nova session 2026-08-05, plus a concrete misdiagnosis it caused in that same session (Elephant read .claude/pipeline.yaml as authority and drew the wrong conclusion about the push gate); independently confirmed and extended by the T1 Critic of candidate 8d9b3df as finding F-E (major), which withdrew its own earlier, too-generous disposition of the same drift"
 due: 2026-09-05
 ---
@@ -149,6 +149,8 @@ angle rather than the migration-completeness angle).
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
+**Merge note (2026-08-26, moved from frontmatter):** Two independent branches each closed this item on 2026-08-18 with their own repointing pass: this branch's own NVA-MICRO-4 commit 3263567469b09cb1983f8763e417760cbd35574c (4 files, 8 sites) and the origin/sprint_phoenix PHX-WP-DOCTEMPLATE-SWEEP commit c12cbdf7058204863fd9f96df84699e20e51347b (6 files, kept here as the frontmatter closure_commit since it supersedes/covers a superset of sites). Both narratives are kept in the Triage below; see them for the exact site lists.
+
 - **Decision:** Partially addressed; the item stays open, narrowed further.
   **Option 1 (retire the legacy `.claude/*` tier) is proven impossible as
   written** and is withdrawn from the Proposal's option set. Only Option 2
@@ -218,3 +220,20 @@ reference patterns (`guardrails/git.md:81` prose-reference,
 `templates/CLAUDE.project.md`'s canonical named-listing per `896a7a0`) and
 the `NEUTRAL_CALIBRATION` constant confirmed live in
 `plugins/pipeline-core/lib/project-authority.mjs:35`.
+
+  **Update 2026-08-18 (accept and fix, closing):** the remaining 5-file list
+  repointed under PHX-WP-DOCTEMPLATE-SWEEP/FIX 1 - close-block/SKILL.md:83,98,179,
+  goldfish-{implementor,mechanic,deep}.md:11, SETUP.md:275,333, and
+  PIPELINE_FLOW.md:9,243 (including its German half) - now carry the same
+  "resolved authority tier: project/pipeline.json, else
+  .claude/pipeline.json" phrasing as roles/goldfish.md:52.
+  SETUP.md:333's literal cp ... .claude/pipeline.json shell example was
+  kept as-is (a runner-neutral rewrite of a worked example would be
+  disruptive) with a short added note pointing a runner-neutral project at
+  project/pipeline.json instead. All remaining rg hits for
+  .claude/pipeline.json in the 6 checked files are now either part of the
+  corrected resolved-tier phrasing itself or that one deliberate example
+  line plus its note.
+- **Assignment:** this dispatch (PHX-WP-DOCTEMPLATE-SWEEP).
+- **Date:** 2026-08-18
+- **Closure commit:** this commit (fix and closure land together; see this dispatch's commit repointing the 6-file resolved-tier list).

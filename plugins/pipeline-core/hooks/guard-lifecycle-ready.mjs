@@ -104,15 +104,60 @@ const BOUNDED_PIPELINE_ADDITIONAL_ROOTS = (() => {
   try { return [realpathSync(PLUGIN_ROOT)]; } catch { return [PLUGIN_ROOT]; }
 })();
 
-const GOVERNANCE_MARKERS = [
+export const BASE_GOVERNANCE_MARKERS = [
   ".agent-pipeline/core.lock.json",
   "pipeline.user.yaml",
   "project/pipeline.json",
   "project/pipeline.yaml",
   ".claude/pipeline.json",
   ".claude/pipeline.yaml",
-  ...loadRuntimeProjectionV3OwnedKeys().targets.map((target) => target.path),
-].filter((value, index, values) => values.indexOf(value) === index);
+];
+export const MANIFEST_FAILURE_WARNING =
+  "[pipeline-config-warning] guard-lifecycle-ready: config/runtime-projection-v3-owned-keys.json "
+  + "is missing or unreadable; governance-marker detection continues using only the fixed base "
+  + "markers. Deliberate fail-open (PO decision 2026-08-18, backlog/items/"
+  + "2026-08-07-module-scope-manifest-read-rearms-the-disarm-by-config-fault.md) -- an unreadable "
+  + "manifest must not refuse an otherwise-permitted write.\n";
+
+/**
+ * Resolve the full governance-marker list LAZILY, at the point of use, never
+ * as a module-scope side effect.
+ *
+ * Reading `config/runtime-projection-v3-owned-keys.json` at module scope
+ * (via the unguarded `loadRuntimeProjectionV3OwnedKeys()`, one identifier
+ * away from `runtime-projection-v3.mjs`'s own memoized, lazily-guarded
+ * `frozenOwnedKeys()`) meant a missing, unreadable, or malformed manifest
+ * threw during this module's own ES-module evaluation -- merely IMPORTING
+ * this hook crashed, before `main()` existed, which `hooks/hooks.json`
+ * defines as exit 1, "allow + config warning": a config fault silently
+ * DISARMED this fail-closed gate for every write in the process
+ * (backlog/items/2026-08-07-module-scope-manifest-read-rearms-the-disarm-by-config-fault.md).
+ *
+ * PO decision 2026-08-18 (same item): keep admitting on an unreadable
+ * manifest -- do NOT turn it into a refusal -- but stop letting the failure
+ * escape as an uncontrolled crash. Catching it right here, at the one call
+ * site that consumes it, narrows the blast radius from "the entire hook
+ * process crashes and every write for its lifetime is silently admitted" to
+ * "the runtime-projection-derived markers are treated as absent for this one
+ * call; the fixed BASE_GOVERNANCE_MARKERS above are still enforced
+ * normally." The admit-don't-refuse outcome the PO ratified is unchanged;
+ * only its blast radius and its visibility (an explicit warning instead of a
+ * bare uncaught-exception stack trace) are narrower and deliberate now.
+ */
+export function governanceMarkers(dependencies = {}) {
+  const loadFn = dependencies.loadRuntimeProjectionV3OwnedKeysFn ?? loadRuntimeProjectionV3OwnedKeys;
+  try {
+    return {
+      markers: [
+        ...BASE_GOVERNANCE_MARKERS,
+        ...loadFn().targets.map((target) => target.path),
+      ].filter((value, index, values) => values.indexOf(value) === index),
+      warning: null,
+    };
+  } catch {
+    return { markers: BASE_GOVERNANCE_MARKERS, warning: MANIFEST_FAILURE_WARNING };
+  }
+}
 const READY_RECEIPT_KEYS = ["intent", "schema", "status"];
 const ONBOARDING_SCRIPT = fileURLToPath(new URL("../scripts/project-onboarding-v3.mjs", import.meta.url));
 const ONBOARDING_CONSENT_MARK_SCRIPT = fileURLToPath(new URL("../scripts/onboarding-consent-mark.mjs", import.meta.url));
@@ -240,7 +285,7 @@ const GRAMMAR_DENIAL_REMEDY = [
   "Use one simple shell command per tool call; issue independent read-only commands as separate parallel tool calls.",
   "Do not construct a new composed command with &&, ;, pipelines, redirects, or line continuation.",
   "If typed retryActions are present, run only those exact read-only actions as separate tool calls.",
-  "Only bounded rg-to-rg and rg-to-head diagnostic pipelines are admitted as exceptions.",
+  "Only bounded rg-to-rg, rg-to-head, grep-to-grep, and grep-to-head diagnostic pipelines are admitted as exceptions.",
 ];
 // Every line here is executable advice that actually clears THIS refusal -- the item's
 // second requirement ("make the remedy true or omit it"), and the reason the old text was a
@@ -655,17 +700,19 @@ function crossRepositoryMutationBlocked(overrideGuidance = "") {
  * SHAPE. Substring, not token, matching: the path that matters can sit INSIDE a quoted
  * script argument (`node -e '...writeFileSync("pipeline.user.yaml", ...)'`), where token
  * matching sees one opaque word. That deliberately over-refuses -- a `git commit -m`
- * message merely naming one of these files is refused too. Over-refusal costs a `-F`
- * flag; under-refusal costs the gate. Read-only diagnostics are exempt via the existing
- * classifier, so `cat`, `rg`, `sha256sum` and `git diff` on these paths keep working --
- * except for one measured, real, prescribed shape that classifier does not cover:
- * `node <script> --guardrail <gate-strength-path> ...`, the exact command
- * `skills/critic-review/SKILL.md`'s mandatory dispatch-admission step instructs an
- * operator to run (it tells them to pass "every declared guardrail", a gate-strength
- * path among them for a governance project). That shape is closed instead by the exact,
- * closed exemption below (GATE_STRENGTH_SHELL_READ_ONLY_SCRIPTS): not "any read-only
- * command", but one specific, provably write-free plugin-local script, matched on exact
- * identity rather than shape.
+ * message merely naming one of these files is refused too, and the same over-refusal
+ * applies to the product-source entries (GS-8, GS-9), not only the configuration ones --
+ * a shell command or commit message that merely names one of those source files is
+ * refused too. Over-refusal costs a `-F` flag; under-refusal costs the gate. Read-only
+ * diagnostics are exempt via the existing classifier, so `cat`, `rg`, `sha256sum` and
+ * `git diff` on these paths keep working -- except for one measured, real, prescribed
+ * shape that classifier does not cover: `node <script> --guardrail <gate-strength-path>
+ * ...`, the exact command `skills/critic-review/SKILL.md`'s mandatory dispatch-admission
+ * step instructs an operator to run (it tells them to pass "every declared guardrail", a
+ * gate-strength path among them for a governance project). That shape is closed instead
+ * by the exact, closed exemption below (GATE_STRENGTH_SHELL_READ_ONLY_SCRIPTS): not "any
+ * read-only command", but one specific, provably write-free plugin-local script, matched
+ * on exact identity rather than shape.
  */
 /**
  * GSSHELL-STAGE-1. Git verbs that cannot write the file, and are therefore not this
@@ -729,7 +776,12 @@ function gateStrengthShellRefusal(command, root, dependencies = {}) {
   if (isReadOnlyDiagnosticCommand(command, root)) return null;
   if (isGateStrengthSafeGitCommand(command, root)) return null;
   if (gateStrengthShellReadOnlyScriptExemption(command, root, dependencies)) return null;
-  // Scoped to the five configuration paths (GS-1..GS-5) deliberately. The live plugin
+  // Needles are every entry of GATE_STRENGTH_PATHS (imported above), by basename -- not
+  // restated here as a count or a fixed category, because that is what went stale last
+  // time: this sentence used to say "the five configuration paths (GS-1..GS-5)" and the
+  // table has since grown past that count and past that category (GS-7's legacy-tier
+  // config, then GS-8 and GS-9, which protect product source rather than configuration --
+  // see their own entries in guard-gate-strength.mjs for why). The live plugin
   // root (GS-6) is NOT a needle here: executing a plugin script by absolute path is the
   // normal bootstrap and recovery shape, so matching the root would refuse
   // `node <pluginRoot>/scripts/project-onboarding-v3.mjs inspect` -- the very command the
@@ -1310,15 +1362,295 @@ export function isRestartResumeHintCapture(command, root, options = {}) {
 }
 
 /**
+ * Extends the bounded read-only pipeline family (guard-command-grammar.mjs's
+ * isBoundedReadOnlyPipeline, rg-to-rg/rg-to-head only) with the "grep-to-grep"
+ * and "grep-to-head" shapes: the same closed, bounded two-segment structure
+ * already admitted for rg, applied to grep, because a bare `grep ... | head`
+ * pipeline is the most frequent read-only diagnostic shape actually rejected
+ * in practice (backlog/items/2026-07-26-readonly-command-guard-classification.md;
+ * specs/sprint-phoenix-epic/RECOVERY.md R-02). Deliberately kept LOCAL to this
+ * file rather than added to guard-command-grammar.mjs: this dispatch's briefed
+ * scope is exactly guard-lifecycle-ready.mjs, the Dev-Plan gate file, and their
+ * test files -- guard-command-grammar.mjs is a separate, unbriefed file, so this
+ * duplicates only the bounded head-count/redirect shape already proven safe for
+ * rg (never a general shell composer). The grep source/sink argv predicate
+ * itself is identical to the already-accepted single-command grep rule below
+ * (`--files-with-matches` excluded) -- this recognizes the SAME already-safe
+ * command now composed via one bounded pipe, nothing more permissive.
+ */
+function isBoundedGrepPipeline(parsed, root) {
+  if (!parsed || parsed.parseStatus !== "accepted"
+    || parsed.segments.length !== 2
+    || parsed.operators.length !== 1
+    || parsed.operators[0].operator !== "|"
+    || parsed.redirects.length > 1) return false;
+  const windows = parsed.dialect === "windows-readonly-pipeline";
+  const expectedGrep = windows ? "grep.exe" : "grep";
+  const sourceName = basename(parsed.segments[0].executable).toLowerCase();
+  if (sourceName !== expectedGrep) return false;
+  const validGrepArgs = (argv) => !argv.some((arg) => arg === "--files-with-matches");
+  if (!validGrepArgs(parsed.segments[0].argv)) return false;
+  const sinkName = basename(parsed.segments[1].executable).toLowerCase();
+  if (sinkName === expectedGrep) {
+    return parsed.redirects.length === 0 && validGrepArgs(parsed.segments[1].argv);
+  }
+  if (sinkName !== (windows ? "head.exe" : "head")) return false;
+  if (parsed.redirects.length === 1) {
+    const redirect = parsed.redirects[0];
+    if (redirect.segment !== 0 || redirect.fd !== 2 || redirect.direction !== ">"
+      || (windows ? redirect.target.toLowerCase() !== "nul" : redirect.target !== "/dev/null")) return false;
+  }
+  const headArgs = parsed.segments[1].argv;
+  if (headArgs.length !== 2 || headArgs[0] !== "-n"
+    || !/^(?:[1-9]|[1-9][0-9]|[1-4][0-9]{2}|500)$/u.test(headArgs[1])) return false;
+  return true;
+}
+
+// backlog/items/2026-08-19-closed-shell-grammar-still-rejects-common-readonly-composition.md
+// Proposal point 1: a SMALL, explicit allowlist of read-only commands admitted when
+// chained with `&&`. Deliberately bounded and small -- 6 segments comfortably covers the
+// 4-segment triggering example with headroom, without becoming an unbounded chain.
+const MAX_AND_CHAIN_SEGMENTS = 6;
+
+/**
+ * Splits a command string on top-level `&&` occurrences only, mirroring
+ * retryActionsForDeniedCommand's own quote- and escape-aware local scanner below (same
+ * file) but for `&&` instead of `;`/newline. Deliberately NOT delegated to
+ * guard-command-grammar.mjs's shared tokenizer: that tokenizer treats `&&` -- together
+ * with `;`, `||`, bare `&`, `(`, `)` -- as an unconditional CONTROL rejection
+ * (parseGuardCommand returns parseStatus "denied", segments/operators empty) for every
+ * OTHER caller across the Pipeline, and this dispatch's briefed scope is
+ * guard-lifecycle-ready.mjs only -- widening the SHARED tokenizer would touch every
+ * consumer of parseGuardCommand, far outside it. So this file grows its own narrow
+ * `&&`-only splitter, the same local-scanner shape already established here.
+ *
+ * ANY other control character (|, ;, bare &, <, >, (, )) at the top level aborts the
+ * split entirely (returns null): admitting an `&&`-chain must never become a side door
+ * for a DIFFERENT, still-unapproved operator riding along inside it -- in particular, a
+ * chain ending in a pipe (e.g. `git log | head`) is deliberately NOT admitted by this
+ * function. This is NOT an unbriefed shape: backlog/items/2026-08-19-closed-shell-
+ * grammar-still-rejects-common-readonly-composition.md Proposal point 1 explicitly names
+ * "the existing grep-to-grep/grep-to-head pipeline shape as a trailing stage" as accepted
+ * scope, and the PO accepted it -- it is simply NOT YET implemented here, deliberately
+ * deferred to a dedicated follow-up tracked separately from this dispatch. Each returned
+ * part is re-validated independently through parseGuardCommand by the caller -- this
+ * function only locates boundaries, it grants no authority on its own.
+ */
+function splitTopLevelAndChain(command) {
+  if (typeof command !== "string" || command.trim() === "" || /[\0`]/u.test(command)) return null;
+  const parts = [];
+  let quote = null;
+  let escaped = false;
+  let start = 0;
+  for (let index = 0; index < command.length; index += 1) {
+    const char = command[index];
+    if (escaped) {
+      if (char === "\r" || char === "\n") return null;
+      escaped = false;
+      continue;
+    }
+    if (quote !== "'" && char === "\\") {
+      escaped = true;
+      continue;
+    }
+    if (quote !== null) {
+      if (char === quote) quote = null;
+      continue;
+    }
+    if (char === "'" || char === "\"") {
+      quote = char;
+      continue;
+    }
+    if (char === "\r" || char === "\n") return null;
+    if (char === "&" && command[index + 1] === "&") {
+      parts.push(command.slice(start, index).trim());
+      start = index + 2;
+      index += 1;
+      continue;
+    }
+    if (";&<>()".includes(char)) return null;
+  }
+  if (quote !== null || escaped) return null;
+  parts.push(command.slice(start).trim());
+  if (parts.length < 2 || parts.length > MAX_AND_CHAIN_SEGMENTS) return null;
+  if (parts.some((part) => part === "")) return null;
+  return parts;
+}
+
+// Narrow, explicit allowlist of safe `git log` display flags for the `&&`-chain family.
+// A WHITELIST, not a denylist of known-bad flags -- so an unrecognized flag fails closed
+// by construction ("if genuinely unsure whether a specific flag is safe, exclude it and
+// disclose the exclusion rather than guessing it's fine"). `--all` is deliberately
+// EXCLUDED (it reaches refs beyond the working branch); nothing resembling `-c`,
+// `--exec`, a pager-invoking flag, or a credential-touching flag is in this set, and
+// nothing outside this set is admitted regardless of how safe it looks.
+const GIT_LOG_CHAIN_ALLOWED_FLAGS = new Set([
+  "--oneline", "--stat", "--name-only", "--name-status", "--graph",
+  "--no-merges", "--merges", "--reverse", "--abbrev-commit",
+]);
+
+function isChainEligibleGitLogArgs(argv) {
+  let maxCountSeen = false;
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (GIT_LOG_CHAIN_ALLOWED_FLAGS.has(arg)) continue;
+    if (/^-[1-9][0-9]{0,2}$/u.test(arg)) {
+      if (maxCountSeen) return false;
+      maxCountSeen = true;
+      continue;
+    }
+    if (arg === "-n") {
+      const value = argv[index + 1];
+      if (maxCountSeen || typeof value !== "string" || !/^[1-9][0-9]{0,2}$/u.test(value)) return false;
+      maxCountSeen = true;
+      index += 1;
+      continue;
+    }
+    if (/^--max-count=[1-9][0-9]{0,2}$/u.test(arg)) {
+      if (maxCountSeen) return false;
+      maxCountSeen = true;
+      continue;
+    }
+    return false;
+  }
+  return true;
+}
+
+// The backlog item's exact "restricted to paths already permitted for agent writes --
+// scratch/, scratchpad, `.claude/worktrees/**`" scope, minus `scratchpad`: `scratchpad`
+// names an OS-external path (this session's own scratchpad directory, outside the repo),
+// never reachable from this in-repo-only classifier -- a path outside `root` can never
+// pass the `isProjectWritePath` containment check below, so admitting it here would be a
+// silent no-op at best. Deliberately NOT the general `isProjectWritePath` predicate (that
+// admits ANY in-repo path, which is exactly the bug this narrowing fixes): a governed but
+// not-yet-onboarding-ready session must not be able to create a directory anywhere in the
+// repo merely by riding the `&&`-chain family, bypassing the onboarding-readiness gate
+// evaluateAfterGrammarAdmission() enforces below. `.claude/worktrees` is repo-relative
+// from `root`, matching this file's own path-join convention (`join`, not a raw string).
+const CHAIN_ELIGIBLE_MKDIR_PREFIXES = [
+  "scratch",
+  join(".claude", "worktrees"),
+];
+
+/**
+ * `mkdir -p` chain eligibility: `isProjectWritePath` is still required (containment / no
+ * symlink-escape through an existing ancestor), but it is now an ADDITIONAL check, never
+ * the only gate -- the actual restriction is the prefix allowlist above. A target must
+ * resolve, relative to `root`, to exactly `scratch/...` or `.claude/worktrees/...`.
+ */
+function isChainEligibleMkdirTarget(target, root) {
+  if (!isProjectWritePath(target, root)) return false;
+  const rel = relative(root, resolve(root, target));
+  return CHAIN_ELIGIBLE_MKDIR_PREFIXES.some(
+    (prefix) => rel === prefix || rel.startsWith(`${prefix}${sep}`),
+  );
+}
+
+/**
+ * The exact small set the backlog item names: git rev-parse, git log (restricted
+ * flags), git status, echo, ls, mkdir -p (restricted to scratch/ or .claude/worktrees/,
+ * see isChainEligibleMkdirTarget above). `git rev-parse`/`git status`/`ls` are admitted
+ * with any argv here because isReadOnlySimpleWords below already admits them
+ * unconditionally as single commands -- chaining grants no new authority over what each
+ * already does alone. `echo` is admitted with any argv: it has no side effects (no
+ * redirect can ride along, since every chain segment below is independently required to
+ * parse with zero redirects of its own). Deliberately no `-C`/`-c` support here (unlike
+ * the single-command git rule's `-C` handling): keeping the chain family free of the
+ * cross-repository-reaching `-C` shape is a deliberate narrowing, not an oversight -- an
+ * argv beginning with `-C` or `-c` simply fails every subcommand match below and is
+ * refused.
+ */
+function isChainEligibleSegment(segment, root) {
+  const executable = basename(segment.executable).toLowerCase();
+  const argv = segment.argv;
+  if (executable === "echo") return true;
+  if (executable === "ls") return true;
+  if (executable === "mkdir") {
+    return argv.length === 2 && argv[0] === "-p" && isChainEligibleMkdirTarget(argv[1], root);
+  }
+  if (executable !== "git") return false;
+  const subcommand = argv[0];
+  if (subcommand === "rev-parse" || subcommand === "status") return true;
+  if (subcommand === "log") return isChainEligibleGitLogArgs(argv.slice(1));
+  return false;
+}
+
+/**
+ * Extends the bounded-composition exception family (the same shape isBoundedGrepPipeline
+ * above already established) to `&&`-chained read-only commands, per backlog/items/
+ * 2026-08-19-closed-shell-grammar-still-rejects-common-readonly-composition.md Proposal
+ * point 1 and 2026-08-19-readonly-and-chain-grep-pipe-trailing-stage-not-implemented.md.
+ * Every non-trailing segment must independently parse as a single, simple, accepted command
+ * (no nested operators/redirects of its own) AND be one of the small set
+ * isChainEligibleSegment admits. The trailing segment may either be an isChainEligibleSegment
+ * or an isBoundedGrepPipeline. Fails closed on anything else.
+ */
+function isBoundedReadOnlyAndChain(command, root) {
+  const parts = splitTopLevelAndChain(command);
+  if (!parts) return false;
+  for (let index = 0; index < parts.length; index += 1) {
+    const part = parts[index];
+    const isLast = index === parts.length - 1;
+    const parsedPart = parseGuardCommand(part, root);
+    if (isLast && isBoundedGrepPipeline(parsedPart, root)) {
+      continue;
+    }
+    if (parsedPart.parseStatus !== "accepted"
+      || parsedPart.segments.length !== 1
+      || parsedPart.operators.length !== 0
+      || parsedPart.redirects.length !== 0) return false;
+    if (!isChainEligibleSegment(parsedPart.segments[0], root)) return false;
+  }
+  return true;
+}
+
+/**
+ * Admits a bare trailing `2>/dev/null` (POSIX) or `2>nul` (Windows) stderr redirect on a
+ * command that is ALREADY independently classified read-only on its own, per backlog
+ * Proposal point 2. Reuses parseGuardCommand's own redirect parsing (which already
+ * respects quoting) rather than a raw-string scan, so a quoted argument that merely LOOKS
+ * like a redirect can never be misread as one.
+ *
+ * `2>&1` is deliberately NOT admitted here: the shared tokenizer treats the `&` inside a
+ * redirect target as a segment/operator terminator, so a bare `2>&1` never produces an
+ * empty-vs-populated target it can accept -- parseGuardCommand returns parseStatus
+ * "denied" for it today, exactly as it does for `&&`. Making `2>&1` parseable would mean
+ * widening guard-command-grammar.mjs's tokenizer, out of this dispatch's briefed scope
+ * (guard-lifecycle-ready.mjs and its test file only). Disclosed as a drawn boundary, not
+ * implemented.
+ */
+function simpleWordsAllowingTrailingStderrDevNullRedirect(command, root) {
+  const parsed = parseGuardCommand(command, root);
+  if (parsed.parseStatus !== "accepted"
+    || parsed.segments.length !== 1
+    || parsed.operators.length !== 0
+    || parsed.redirects.length !== 1) return null;
+  const redirect = parsed.redirects[0];
+  const windows = parsed.dialect === "windows-direct";
+  const isAdmittedRedirect = redirect.fd === 2 && redirect.direction === ">"
+    && (windows ? redirect.target.toLowerCase() === "nul" : redirect.target === "/dev/null");
+  if (!isAdmittedRedirect) return null;
+  return [parsed.segments[0].executable, ...parsed.segments[0].argv];
+}
+
+function isReadOnlyDiagnosticCommandWithTrailingStderrRedirect(command, root) {
+  const words = simpleWordsAllowingTrailingStderrDevNullRedirect(command, root);
+  return words !== null && isReadOnlySimpleWords(words, root);
+}
+
+/**
  * Keep fail-closed lifecycle states diagnosable without turning arbitrary
  * shell syntax into a write bypass.  Only one simple command is accepted; the
  * parser already rejects control operators, redirections and command
- * substitution.
+ * substitution. The bounded rg and grep pipeline families (above) are the
+ * only two-segment exceptions.
+ *
+ * Shared tail logic, factored out of isReadOnlyDiagnosticCommand so the trailing-redirect
+ * exception above can validate an already-tokenized `[executable, ...argv]` shape without
+ * re-parsing (and without duplicating this whole classifier). Behavior for every existing
+ * caller of isReadOnlyDiagnosticCommand is unchanged -- this is a pure extraction.
  */
-export function isReadOnlyDiagnosticCommand(command, root) {
-  const parsed = parseGuardCommand(command, root, { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM });
-  if (isBoundedReadOnlyPipeline(parsed, root, BOUNDED_PIPELINE_ADDITIONAL_ROOTS)) return true;
-  const words = simpleWords(command, root);
+function isReadOnlySimpleWords(words, root) {
   if (!words || words.length === 0) return false;
   const executable = basename(words[0]).toLowerCase();
   const args = words.slice(1);
@@ -1385,6 +1717,15 @@ export function isReadOnlyDiagnosticCommand(command, root) {
   return subcommand === "config"
     && subargs.length >= 2
     && ["--get", "--get-all", "--get-regexp"].includes(subargs[0]);
+}
+
+export function isReadOnlyDiagnosticCommand(command, root) {
+  const parsed = parseGuardCommand(command, root, { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM });
+  if (isBoundedReadOnlyPipeline(parsed, root, BOUNDED_PIPELINE_ADDITIONAL_ROOTS)) return true;
+  if (isBoundedGrepPipeline(parsed, root)) return true;
+  if (isBoundedReadOnlyAndChain(command, root)) return true;
+  if (isReadOnlyDiagnosticCommandWithTrailingStderrRedirect(command, root)) return true;
+  return isReadOnlySimpleWords(simpleWords(command, root), root);
 }
 
 /**
@@ -1698,6 +2039,9 @@ export function isForbiddenCrossRepositoryMutation(command, root, dependencies =
     return true;
   }
   if (isBoundedReadOnlyPipeline(parsed, root, BOUNDED_PIPELINE_ADDITIONAL_ROOTS)) return false;
+  if (isBoundedGrepPipeline(parsed, root)) return false;
+  if (isBoundedReadOnlyAndChain(command, root)) return false;
+  if (isReadOnlyDiagnosticCommandWithTrailingStderrRedirect(command, root)) return false;
   if (parsed.parseStatus !== "accepted" && hasExternalOutputRedirect(command, root)) return true;
   if (parsed.parseStatus === "accepted" && parsed.redirects.length > 0) {
     return parsed.redirects.some((redirect) => {
@@ -2687,7 +3031,7 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
   let governed;
   try {
     const exists = dependencies.existsSyncFn ?? existsSync;
-    governed = GOVERNANCE_MARKERS.some((marker) => exists(join(root, marker)));
+    governed = governanceMarkers(dependencies).markers.some((marker) => exists(join(root, marker)));
   } catch {
     return blocked();
   }

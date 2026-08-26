@@ -1,0 +1,640 @@
+TAP version 13
+# Subtest: A-AC-05 translates a first-attempt success into a validated selection event
+ok 1 - A-AC-05 translates a first-attempt success into a validated selection event
+  ---
+  duration_ms: 2.002868
+  type: 'test'
+  ...
+# Subtest: A-AC-05 distinguishes a route that succeeded only after an earlier failure
+ok 2 - A-AC-05 distinguishes a route that succeeded only after an earlier failure
+  ---
+  duration_ms: 5.354753
+  type: 'test'
+  ...
+# Subtest: A-AC-05 records all five identity dimensions with an explicit provenance and assurance
+ok 3 - A-AC-05 records all five identity dimensions with an explicit provenance and assurance
+  ---
+  duration_ms: 0.36351
+  type: 'test'
+  ...
+# Subtest: A-AC-05 refuses an unanswered receipt with a named code instead of guessing an identity
+ok 4 - A-AC-05 refuses an unanswered receipt with a named code instead of guessing an identity
+  ---
+  duration_ms: 0.431289
+  type: 'test'
+  ...
+# Subtest: A-AC-05 refuses a receipt whose observed provider contradicts the configured runner
+ok 5 - A-AC-05 refuses a receipt whose observed provider contradicts the configured runner
+  ---
+  duration_ms: 0.31325
+  type: 'test'
+  ...
+# Subtest: A-AC-05's provider re-derivation is independent, not a restatement of the receipt validator
+ok 6 - A-AC-05's provider re-derivation is independent, not a restatement of the receipt validator
+  ---
+  duration_ms: 0.358099
+  type: 'test'
+  ...
+# Subtest: A-AC-05 lets the journal itself refuse a modelId the receipt pattern admits and the journal does not
+ok 7 - A-AC-05 lets the journal itself refuse a modelId the receipt pattern admits and the journal does not
+  ---
+  duration_ms: 0.27728
+  type: 'test'
+  ...
+# Subtest: A-AC-05 translation is deterministic and reaches for no clock or randomness of its own
+ok 8 - A-AC-05 translation is deterministic and reaches for no clock or randomness of its own
+  ---
+  duration_ms: 0.494809
+  type: 'test'
+  ...
+# Subtest: A-AC-05 refuses a non-receipt outright rather than translating whatever it was handed
+ok 9 - A-AC-05 refuses a non-receipt outright rather than translating whatever it was handed
+  ---
+  duration_ms: 0.44349
+  type: 'test'
+  ...
+# Subtest: accepts a bounded observational agent assumption
+ok 10 - accepts a bounded observational agent assumption
+  ---
+  duration_ms: 1.186558
+  type: 'test'
+  ...
+# Subtest: rejects free text, authority-shaped fields, and unbound supersession
+ok 11 - rejects free text, authority-shaped fields, and unbound supersession
+  ---
+  duration_ms: 0.397309
+  type: 'test'
+  ...
+# Subtest: accepts a closed command-offer journal event while preserving raw command omissions
+ok 12 - accepts a closed command-offer journal event while preserving raw command omissions
+  ---
+  duration_ms: 0.33166
+  type: 'test'
+  ...
+# Subtest: rejects command text, omitted privacy omissions, and authority-required offers without a decision
+ok 13 - rejects command text, omitted privacy omissions, and authority-required offers without a decision
+  ---
+  duration_ms: 0.246149
+  type: 'test'
+  ...
+# Subtest: A-AC-07 recognizes every named event class through an existing field or kind, never a new kind
+ok 14 - A-AC-07 recognizes every named event class through an existing field or kind, never a new kind
+  ---
+  duration_ms: 0.698509
+  type: 'test'
+  ...
+# Subtest: A-AC-10 declares an explicit fail-open/fail-closed disposition for every event class, with no implicit default
+ok 15 - A-AC-10 declares an explicit fail-open/fail-closed disposition for every event class, with no implicit default
+  ---
+  duration_ms: 0.30569
+  type: 'test'
+  ...
+# Subtest: A-AC-10 exposes the journaling gap as a typed record naming which policy fired
+ok 16 - A-AC-10 exposes the journaling gap as a typed record naming which policy fired
+  ---
+  duration_ms: 0.408859
+  type: 'test'
+  ...
+# Subtest: R-AC-04 records a distinct required-cleanup/readback field, optional, scoped to a recoverability other than not-applicable
+ok 17 - R-AC-04 records a distinct required-cleanup/readback field, optional, scoped to a recoverability other than not-applicable
+  ---
+  duration_ms: 0.38515
+  type: 'test'
+  ...
+# Subtest: R-AC-09 records a stale-evaluable occurrence timestamp, optional, format-validated, unscoped by state
+ok 18 - R-AC-09 records a stale-evaluable occurrence timestamp, optional, format-validated, unscoped by state
+  ---
+  duration_ms: 0.418319
+  type: 'test'
+  ...
+# Subtest: R-AC-09 rejects a malformed occurrence timestamp with ADJ-COMMAND-OFFER
+ok 19 - R-AC-09 rejects a malformed occurrence timestamp with ADJ-COMMAND-OFFER
+  ---
+  duration_ms: 0.788779
+  type: 'test'
+  ...
+# Subtest: R-AC-11 records a public-safe commitment digest paired with a receipt id, optional, both-or-neither
+ok 20 - R-AC-11 records a public-safe commitment digest paired with a receipt id, optional, both-or-neither
+  ---
+  duration_ms: 0.15242
+  type: 'test'
+  ...
+# Subtest: R-AC-11 rejects a malformed commitment digest or receipt id with ADJ-COMMAND-OFFER
+ok 21 - R-AC-11 rejects a malformed commitment digest or receipt id with ADJ-COMMAND-OFFER
+  ---
+  duration_ms: 0.13449
+  type: 'test'
+  ...
+# Subtest: R-AC-11 rejects one of the pair present without the other with ADJ-COMMAND-COMMITMENT-PAIRING
+ok 22 - R-AC-11 rejects one of the pair present without the other with ADJ-COMMAND-COMMITMENT-PAIRING
+  ---
+  duration_ms: 0.123789
+  type: 'test'
+  ...
+# Subtest: R-AC-05 refuses every enumerated private field and every untyped digest at both journal boundaries
+ok 23 - R-AC-05 refuses every enumerated private field and every untyped digest at both journal boundaries
+  ---
+  duration_ms: 1.538148
+  type: 'test'
+  ...
+# Subtest: A-AC-11 preserves each enumerated assumption state as a distinct typed value
+ok 24 - A-AC-11 preserves each enumerated assumption state as a distinct typed value
+  ---
+  duration_ms: 0.18742
+  type: 'test'
+  ...
+# Subtest: A-AC-11 rejects unknown assumption states and keeps the two vocabularies unmerged
+ok 25 - A-AC-11 rejects unknown assumption states and keeps the two vocabularies unmerged
+  ---
+  duration_ms: 0.40915
+  type: 'test'
+  ...
+# Subtest: A-AC-11 leaves the assumption state optional and independent of the claim lifecycle
+ok 26 - A-AC-11 leaves the assumption state optional and independent of the claim lifecycle
+  ---
+  duration_ms: 0.306789
+  type: 'test'
+  ...
+# Subtest: A-AC-11 keeps the published schema closed and in step with the validator
+ok 27 - A-AC-11 keeps the published schema closed and in step with the validator
+  ---
+  duration_ms: 0.23697
+  type: 'test'
+  ...
+# Subtest: A-AC-01 preserves a well-formed revalidation trigger as a bounded stable identifier
+ok 28 - A-AC-01 preserves a well-formed revalidation trigger as a bounded stable identifier
+  ---
+  duration_ms: 0.13929
+  type: 'test'
+  ...
+# Subtest: A-AC-01 rejects free text and every non-string revalidation trigger with ADJ-SHAPE
+ok 29 - A-AC-01 rejects free text and every non-string revalidation trigger with ADJ-SHAPE
+  ---
+  duration_ms: 0.378679
+  type: 'test'
+  ...
+# Subtest: A-AC-01 leaves the revalidation trigger optional, unscoped by kind, and independent of the claim lifecycle
+ok 30 - A-AC-01 leaves the revalidation trigger optional, unscoped by kind, and independent of the claim lifecycle
+  ---
+  duration_ms: 0.27549
+  type: 'test'
+  ...
+# Subtest: A-AC-05 accepts a well-formed identity record on each identity-material kind
+ok 31 - A-AC-05 accepts a well-formed identity record on each identity-material kind
+  ---
+  duration_ms: 0.241089
+  type: 'test'
+  ...
+# Subtest: A-AC-05 rejects identity present on assumption with ADJ-IDENTITY-SCOPE
+ok 32 - A-AC-05 rejects identity present on assumption with ADJ-IDENTITY-SCOPE
+  ---
+  duration_ms: 0.10122
+  type: 'test'
+  ...
+# Subtest: A-AC-05 rejects identity present on verification-scope with ADJ-IDENTITY-SCOPE
+ok 33 - A-AC-05 rejects identity present on verification-scope with ADJ-IDENTITY-SCOPE
+  ---
+  duration_ms: 0.08203
+  type: 'test'
+  ...
+# Subtest: A-AC-05 rejects two identity entries sharing the same dimension
+ok 34 - A-AC-05 rejects two identity entries sharing the same dimension
+  ---
+  duration_ms: 0.12263
+  type: 'test'
+  ...
+# Subtest: A-AC-05 rejects an empty identity array
+ok 35 - A-AC-05 rejects an empty identity array
+  ---
+  duration_ms: 0.084
+  type: 'test'
+  ...
+# Subtest: A-AC-05 rejects an identity array exceeding the seven-dimension bound
+ok 36 - A-AC-05 rejects an identity array exceeding the seven-dimension bound
+  ---
+  duration_ms: 0.09602
+  type: 'test'
+  ...
+# Subtest: A-AC-05 rejects an unrecognized dimension, provenance, or assurance value
+ok 37 - A-AC-05 rejects an unrecognized dimension, provenance, or assurance value
+  ---
+  duration_ms: 0.153849
+  type: 'test'
+  ...
+# Subtest: A-AC-05 leaves every observational kind accepted with no identity key at all, unchanged
+ok 38 - A-AC-05 leaves every observational kind accepted with no identity key at all, unchanged
+  ---
+  duration_ms: 0.14716
+  type: 'test'
+  ...
+# Subtest: A-AC-05 keeps the published identity schema closed and in step with the validator
+ok 39 - A-AC-05 keeps the published identity schema closed and in step with the validator
+  ---
+  duration_ms: 0.228229
+  type: 'test'
+  ...
+# Subtest: A-AC-02 accepts a linked follow-up event for every assumption lifecycle transition, and end-to-end preserves the original event unchanged when one is appended
+ok 40 - A-AC-02 accepts a linked follow-up event for every assumption lifecycle transition, and end-to-end preserves the original event unchanged when one is appended
+  ---
+  duration_ms: 79.194178
+  type: 'test'
+  ...
+# Subtest: A-AC-13 rejects a duplicate journal submission deterministically and preserves canonical history exactly once, while an exact idempotent replay is a typed no-write outcome
+ok 41 - A-AC-13 rejects a duplicate journal submission deterministically and preserves canonical history exactly once, while an exact idempotent replay is a typed no-write outcome
+  ---
+  duration_ms: 69.914678
+  type: 'test'
+  ...
+# Subtest: A-AC-12 keeps downstream export/projection policy independently configurable and structurally unable to weaken what capture already admitted
+ok 42 - A-AC-12 keeps downstream export/projection policy independently configurable and structurally unable to weaken what capture already admitted
+  ---
+  duration_ms: 0.940649
+  type: 'test'
+  ...
+# Subtest: A-AC-12 fails closed before persistence for a narrower-than-portable boundary, and the restricted profile stays separate, owner-authenticated, and outside the repository
+ok 43 - A-AC-12 fails closed before persistence for a narrower-than-portable boundary, and the restricted profile stays separate, owner-authenticated, and outside the repository
+  ---
+  duration_ms: 73.305734
+  type: 'test'
+  ...
+# Subtest: A-AC-13 gives agent-kind submissions the same deterministic interrupted, concurrent, and out-of-order outcomes as the generic store
+ok 44 - A-AC-13 gives agent-kind submissions the same deterministic interrupted, concurrent, and out-of-order outcomes as the generic store
+  ---
+  duration_ms: 127.710112
+  type: 'test'
+  ...
+# Subtest: A-AC-14 verification-scope-change is a representable, distinctly named scenario
+ok 45 - A-AC-14 verification-scope-change is a representable, distinctly named scenario
+  ---
+  duration_ms: 0.23173
+  type: 'test'
+  ...
+# Subtest: A-AC-14 escalation is a representable, distinctly named scenario
+ok 46 - A-AC-14 escalation is a representable, distinctly named scenario
+  ---
+  duration_ms: 0.08315
+  type: 'test'
+  ...
+# Subtest: A-AC-14 fallback is a representable, distinctly named scenario
+ok 47 - A-AC-14 fallback is a representable, distinctly named scenario
+  ---
+  duration_ms: 0.0625
+  type: 'test'
+  ...
+# Subtest: A-AC-14 redaction is a representable, distinctly named scenario
+ok 48 - A-AC-14 redaction is a representable, distinctly named scenario
+  ---
+  duration_ms: 0.06237
+  type: 'test'
+  ...
+# Subtest: A-AC-14 retry is a representable, distinctly named scenario
+ok 49 - A-AC-14 retry is a representable, distinctly named scenario
+  ---
+  duration_ms: 0.07587
+  type: 'test'
+  ...
+# Subtest: A-AC-14 missing-journal-availability is a representable, distinctly named scenario
+ok 50 - A-AC-14 missing-journal-availability is a representable, distinctly named scenario
+  ---
+  duration_ms: 0.05511
+  type: 'test'
+  ...
+# Subtest: A-AC-14 tampering is a representable, distinctly named scenario
+ok 51 - A-AC-14 tampering is a representable, distinctly named scenario
+  ---
+  duration_ms: 46.607709
+  type: 'test'
+  ...
+# Subtest: H-AC-08 accepts a well-formed legacy-import-observation via the dispatched kind and the direct validator, across representative legacySourceClass/authorityProofStatus/sourceReference combinations
+ok 52 - H-AC-08 accepts a well-formed legacy-import-observation via the dispatched kind and the direct validator, across representative legacySourceClass/authorityProofStatus/sourceReference combinations
+  ---
+  duration_ms: 0.454359
+  type: 'test'
+  ...
+# Subtest: H-AC-08 rejects an unrecognized legacySourceClass with ADJ-LEGACY-SHAPE
+ok 53 - H-AC-08 rejects an unrecognized legacySourceClass with ADJ-LEGACY-SHAPE
+  ---
+  duration_ms: 0.16736
+  type: 'test'
+  ...
+# Subtest: H-AC-08 rejects an unrecognized authorityProofStatus
+ok 54 - H-AC-08 rejects an unrecognized authorityProofStatus
+  ---
+  duration_ms: 0.11551
+  type: 'test'
+  ...
+# Subtest: H-AC-08 rejects a superseded legacy-import-observation with no supersedesEventId, with ADJ-SUPERSESSION
+ok 55 - H-AC-08 rejects a superseded legacy-import-observation with no supersedesEventId, with ADJ-SUPERSESSION
+  ---
+  duration_ms: 0.23285
+  type: 'test'
+  ...
+# Subtest: H-AC-08 rejects an extra/unknown key on a legacy-import-observation
+ok 56 - H-AC-08 rejects an extra/unknown key on a legacy-import-observation
+  ---
+  duration_ms: 0.091669
+  type: 'test'
+  ...
+# Subtest: H-AC-08 rejects a sourceReferencePath escaping the repository or shaped as an absolute path
+ok 57 - H-AC-08 rejects a sourceReferencePath escaping the repository or shaped as an absolute path
+  ---
+  duration_ms: 0.13342
+  type: 'test'
+  ...
+# Subtest: H-AC-08 keeps the published legacy-import-observation schema closed and in step with the validator
+ok 58 - H-AC-08 keeps the published legacy-import-observation schema closed and in step with the validator
+  ---
+  duration_ms: 0.18602
+  type: 'test'
+  ...
+# Subtest: records a public-safe offer before presentation and requires verified append readback
+ok 59 - records a public-safe offer before presentation and requires verified append readback
+  ---
+  duration_ms: 1.427788
+  type: 'test'
+  ...
+# Subtest: requires a bound human decision for destructive pipeline attempts and appends before execution
+ok 60 - requires a bound human decision for destructive pipeline attempts and appends before execution
+  ---
+  duration_ms: 0.308709
+  type: 'test'
+  ...
+# Subtest: keeps user execution unobserved and admits completion only with bounded evidence
+ok 61 - keeps user execution unobserved and admits completion only with bounded evidence
+  ---
+  duration_ms: 0.38448
+  type: 'test'
+  ...
+# Subtest: retains failed, partial, cancelled, mismatch and unknown outcomes distinctly
+ok 62 - retains failed, partial, cancelled, mismatch and unknown outcomes distinctly
+  ---
+  duration_ms: 0.439079
+  type: 'test'
+  ...
+# Subtest: rejects offer substitution across candidate, repository, and scope
+ok 63 - rejects offer substitution across candidate, repository, and scope
+  ---
+  duration_ms: 0.14979
+  type: 'test'
+  ...
+# Subtest: R-AC-02: a considered recovery (recovery-proposed/recovered) has no correlation path — both states remain unreachable through the outcome recorder
+ok 64 - R-AC-02: a considered recovery (recovery-proposed/recovered) has no correlation path — both states remain unreachable through the outcome recorder
+  ---
+  duration_ms: 0.23701
+  type: 'test'
+  ...
+# Subtest: R-AC-02: recordCommandRecoveryDisposition correlates a considered recovery-proposed alternative to the existing offer, carrying its typed rejection reason
+ok 65 - R-AC-02: recordCommandRecoveryDisposition correlates a considered recovery-proposed alternative to the existing offer, carrying its typed rejection reason
+  ---
+  duration_ms: 0.232429
+  type: 'test'
+  ...
+# Subtest: R-AC-02: recordCommandRecoveryDisposition correlates a recovered selection, chained via supersedesEventId to the chosen recovery-proposed alternative, to the existing offer
+ok 66 - R-AC-02: recordCommandRecoveryDisposition correlates a recovered selection, chained via supersedesEventId to the chosen recovery-proposed alternative, to the existing offer
+  ---
+  duration_ms: 0.20102
+  type: 'test'
+  ...
+# Subtest: R-AC-02: recordCommandRecoveryDisposition fails closed on an undocumented evidence gap, cross-scope substitution, and a mismatched anchor state
+ok 67 - R-AC-02: recordCommandRecoveryDisposition fails closed on an undocumented evidence gap, cross-scope substitution, and a mismatched anchor state
+  ---
+  duration_ms: 0.27508
+  type: 'test'
+  ...
+# Subtest: R-AC-04: binds operation class, target, exact pre/post evidence digests, and recoverability together on a state-mutating outcome; rejects malformed digests or an unrecognized recoverability value
+ok 68 - R-AC-04: binds operation class, target, exact pre/post evidence digests, and recoverability together on a state-mutating outcome; rejects malformed digests or an unrecognized recoverability value
+  ---
+  duration_ms: 0.364199
+  type: 'test'
+  ...
+# Subtest: R-AC-04: requiredCleanup records what cleanup/readback is required, distinct from recoverability's own category, through recordCommandOutcome
+ok 69 - R-AC-04: requiredCleanup records what cleanup/readback is required, distinct from recoverability's own category, through recordCommandOutcome
+  ---
+  duration_ms: 0.29423
+  type: 'test'
+  ...
+# Subtest: R-AC-08: a readback lifecycle event appends exactly once and never re-appends or mutates the original offer
+ok 70 - R-AC-08: a readback lifecycle event appends exactly once and never re-appends or mutates the original offer
+  ---
+  duration_ms: 0.648049
+  type: 'test'
+  ...
+# Subtest: R-AC-09: a missing required offer link is never rendered successful
+ok 71 - R-AC-09: a missing required offer link is never rendered successful
+  ---
+  duration_ms: 0.173859
+  type: 'test'
+  ...
+# Subtest: R-AC-09: contradictory independent outcome evidence is never rendered successful
+ok 72 - R-AC-09: contradictory independent outcome evidence is never rendered successful
+  ---
+  duration_ms: 0.11791
+  type: 'test'
+  ...
+# Subtest: R-AC-09: cross-repository and cross-scope substitution are rejected, not only candidate-digest substitution
+ok 73 - R-AC-09: cross-repository and cross-scope substitution are rejected, not only candidate-digest substitution
+  ---
+  duration_ms: 0.1694
+  type: 'test'
+  ...
+# Subtest: R-AC-09: a well-formed occurrence timestamp flows through recordCommandOffer end-to-end, and a malformed one is rejected before append
+ok 74 - R-AC-09: a well-formed occurrence timestamp flows through recordCommandOffer end-to-end, and a malformed one is rejected before append
+  ---
+  duration_ms: 0.21651
+  type: 'test'
+  ...
+# Subtest: R-AC-09: an outcome's occurrence timestamp is never compared against the offer's -- a later, different value on the outcome is not treated as substitution
+ok 75 - R-AC-09: an outcome's occurrence timestamp is never compared against the offer's -- a later, different value on the outcome is not treated as substitution
+  ---
+  duration_ms: 0.09461
+  type: 'test'
+  ...
+# Subtest: R-AC-11: a public-safe typed omission is mandatory — dropping one of the four required labels is rejected; an extra sanctioned label (e.g. credential) is admitted
+ok 76 - R-AC-11: a public-safe typed omission is mandatory — dropping one of the four required labels is rejected; an extra sanctioned label (e.g. credential) is admitted
+  ---
+  duration_ms: 0.1418
+  type: 'test'
+  ...
+# Subtest: R-AC-13: an offer carrying any raw command, argument, or secret-bearing field — benign or malicious content alike — is structurally rejected, never admitted
+ok 77 - R-AC-13: an offer carrying any raw command, argument, or secret-bearing field — benign or malicious content alike — is structurally rejected, never admitted
+  ---
+  duration_ms: 0.17279
+  type: 'test'
+  ...
+# Subtest: R-AC-13: an independently public-safe governed script identity round-trips as a digest and is rejected when malformed, never as script content
+ok 78 - R-AC-13: an independently public-safe governed script identity round-trips as a digest and is rejected when malformed, never as script content
+  ---
+  duration_ms: 0.18082
+  type: 'test'
+  ...
+# Subtest: R-AC-13: approval-without-run states (acknowledged, authorized, copied) remain unreachable through the outcome recorder
+ok 79 - R-AC-13: approval-without-run states (acknowledged, authorized, copied) remain unreachable through the outcome recorder
+  ---
+  duration_ms: 0.332639
+  type: 'test'
+  ...
+# Subtest: R-AC-13: duplicate/retry — recording the same outcome eventId twice is not detected or prevented at this layer (idempotency is delegated entirely to the append() callback)
+ok 80 - R-AC-13: duplicate/retry — recording the same outcome eventId twice is not detected or prevented at this layer (idempotency is delegated entirely to the append() callback)
+  ---
+  duration_ms: 0.30304
+  type: 'test'
+  ...
+# Subtest: R-AC-12: the motivating Phoenix bootstrap trajectory fixture — rejected guard path, attended local repair, unchanged public-privacy boundary, successful readback, no remote write and no machine-specific value
+ok 81 - R-AC-12: the motivating Phoenix bootstrap trajectory fixture — rejected guard path, attended local repair, unchanged public-privacy boundary, successful readback, no remote write and no machine-specific value
+  ---
+  duration_ms: 0.427919
+  type: 'test'
+  ...
+# Subtest: R-AC-10: journaling unavailable still fails closed by default for recordCommandOffer/recordPipelineAttempt, unaffected by the new non-material exception path
+ok 82 - R-AC-10: journaling unavailable still fails closed by default for recordCommandOffer/recordPipelineAttempt, unaffected by the new non-material exception path
+  ---
+  duration_ms: 0.38337
+  type: 'test'
+  ...
+# Subtest: R-AC-10: a typed non-material exception is admitted for a non-authoritative, not-required offer when journaling is unavailable, and never claims execution
+ok 83 - R-AC-10: a typed non-material exception is admitted for a non-authoritative, not-required offer when journaling is unavailable, and never claims execution
+  ---
+  duration_ms: 0.20808
+  type: 'test'
+  ...
+# Subtest: R-AC-10: the non-material exception is rejected for destructive, guard-bypass, and authority-changing offers -- it never becomes a general journaling bypass
+ok 84 - R-AC-10: the non-material exception is rejected for destructive, guard-bypass, and authority-changing offers -- it never becomes a general journaling bypass
+  ---
+  duration_ms: 0.29219
+  type: 'test'
+  ...
+# Subtest: R-AC-10: the non-material exception is rejected when authorityRequirement is human-decision-required, even for an otherwise non-authoritative offer
+ok 85 - R-AC-10: the non-material exception is rejected when authorityRequirement is human-decision-required, even for an otherwise non-authoritative offer
+  ---
+  duration_ms: 0.09374
+  type: 'test'
+  ...
+# Subtest: R-AC-10: the non-material exception refuses to run when an append function is actually supplied -- it is not a shortcut around working journaling
+ok 86 - R-AC-10: the non-material exception refuses to run when an append function is actually supplied -- it is not a shortcut around working journaling
+  ---
+  duration_ms: 0.127519
+  type: 'test'
+  ...
+# Subtest: R-AC-10: the non-material exception is scoped to the offered state, not attempted or any outcome state
+ok 87 - R-AC-10: the non-material exception is scoped to the offered state, not attempted or any outcome state
+  ---
+  duration_ms: 0.07981
+  type: 'test'
+  ...
+# Subtest: R-AC-11: recordPrivateHandoffCommitment stores a private-only handoff detail via a caller-supplied restricted-store put and returns a public-safe commitment digest, never the detail itself
+ok 88 - R-AC-11: recordPrivateHandoffCommitment stores a private-only handoff detail via a caller-supplied restricted-store put and returns a public-safe commitment digest, never the detail itself
+  ---
+  duration_ms: 0.36646
+  type: 'test'
+  ...
+# Subtest: R-AC-11: recordPrivateHandoffCommitment rejects a readback that reports a different commitment than what was computed
+ok 89 - R-AC-11: recordPrivateHandoffCommitment rejects a readback that reports a different commitment than what was computed
+  ---
+  duration_ms: 0.10679
+  type: 'test'
+  ...
+# Subtest: R-AC-11: recordPrivateHandoffCommitment rejects a malformed put readback shape
+ok 90 - R-AC-11: recordPrivateHandoffCommitment rejects a malformed put readback shape
+  ---
+  duration_ms: 0.165649
+  type: 'test'
+  ...
+# Subtest: R-AC-11: recordPrivateHandoffCommitment fails closed when the private detail or the put callback is missing
+ok 91 - R-AC-11: recordPrivateHandoffCommitment fails closed when the private detail or the put callback is missing
+  ---
+  duration_ms: 0.12866
+  type: 'test'
+  ...
+# Subtest: R-AC-11: end-to-end -- a stored private handoff detail's commitment flows into a public command-offer event and appends
+ok 92 - R-AC-11: end-to-end -- a stored private handoff detail's commitment flows into a public command-offer event and appends
+  ---
+  duration_ms: 0.20328
+  type: 'test'
+  ...
+# Subtest: R-AC-11: a command-offer event carrying only one half of the commitment pair is rejected before append
+ok 93 - R-AC-11: a command-offer event carrying only one half of the commitment pair is rejected before append
+  ---
+  duration_ms: 0.371269
+  type: 'test'
+  ...
+# Subtest: R-AC-10: the exception receipt is structurally distinct from every journaled command state/appendValidated() receipt status, and cannot be reused as an offer/outcome event to claim completion
+ok 94 - R-AC-10: the exception receipt is structurally distinct from every journaled command state/appendValidated() receipt status, and cannot be reused as an offer/outcome event to claim completion
+  ---
+  duration_ms: 0.29326
+  type: 'test'
+  ...
+# Subtest: A-AC-10: journaling unavailable applies the represented event class's declared policy and exposes the gap in both directions
+ok 95 - A-AC-10: journaling unavailable applies the represented event class's declared policy and exposes the gap in both directions
+  ---
+  duration_ms: 0.43719
+  type: 'test'
+  ...
+# Subtest: A-AC-10: the general policy path is strictly stricter than R-AC-10's non-material exception, never looser
+ok 96 - A-AC-10: the general policy path is strictly stricter than R-AC-10's non-material exception, never looser
+  ---
+  duration_ms: 1.068618
+  type: 'test'
+  ...
+# Subtest: A-AC-10: the journaling-gap path is scoped to a genuinely unavailable journal and the offered state, and its record is never a journal receipt
+ok 97 - A-AC-10: the journaling-gap path is scoped to a genuinely unavailable journal and the offered state, and its record is never a journal receipt
+  ---
+  duration_ms: 0.20742
+  type: 'test'
+  ...
+# Subtest: R-AC-08: every external-operator hand-off journals a validated offered command-offer
+ok 98 - R-AC-08: every external-operator hand-off journals a validated offered command-offer
+  ---
+  duration_ms: 94.501757
+  type: 'test'
+  ...
+# Subtest: R-AC-08: the offer append happens before the route is returned
+ok 99 - R-AC-08: the offer append happens before the route is returned
+  ---
+  duration_ms: 26.524635
+  type: 'test'
+  ...
+# Subtest: R-AC-10: an append that throws suppresses nextAction and returns the typed refusal
+ok 100 - R-AC-10: an append that throws suppresses nextAction and returns the typed refusal
+  ---
+  duration_ms: 49.955334
+  type: 'test'
+  ...
+# Subtest: R-AC-10: an unverified append readback suppresses nextAction the same way
+ok 101 - R-AC-10: an unverified append readback suppresses nextAction the same way
+  ---
+  duration_ms: 79.943697
+  type: 'test'
+  ...
+# Subtest: R-AC-05/R-AC-06: the journaled offer omits the four mandatory classes and carries no command, path, or tool input
+ok 102 - R-AC-05/R-AC-06: the journaled offer omits the four mandatory classes and carries no command, path, or tool input
+  ---
+  duration_ms: 52.54929
+  type: 'test'
+  ...
+# Subtest: the three non-external route statuses keep their exact current shape and journal nothing
+ok 103 - the three non-external route statuses keep their exact current shape and journal nothing
+  ---
+  duration_ms: 55.422758
+  type: 'test'
+  ...
+# Subtest: R-AC-08: the production writer appends to its own journal file without rewriting earlier offers
+ok 104 - R-AC-08: the production writer appends to its own journal file without rewriting earlier offers
+  ---
+  duration_ms: 39.909368
+  type: 'test'
+  ...
+# Subtest: the producer refuses anything but an external-operator route and any unverified append
+ok 105 - the producer refuses anything but an external-operator route and any unverified append
+  ---
+  duration_ms: 0.597069
+  type: 'test'
+  ...
+1..105
+# tests 105
+# suites 0
+# pass 105
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 471.950654

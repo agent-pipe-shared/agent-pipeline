@@ -1,0 +1,14 @@
+fix(pipeline-core): guard reasonCode against RegExp#test's array coercion
+
+RegExp.prototype.test coerces its argument with String(...) before
+matching, so a bare `CODE.test(value.reasonCode)` admitted a
+single-element array whose sole entry matched the pattern
+(String(["SOME_CODE"]) === "SOME_CODE") even though the published
+schema types reasonCode as a plain string. All three reasonCode call
+sites in agent-decision-journal.mjs (validateAgentDecisionEvent,
+validateCommandOfferEvent, validateLegacyImportObservationEvent) now
+carry the same `typeof value.reasonCode !== "string"` guard the
+pre-existing revalidationTrigger check already used. Adds one
+parametrized regression test covering all three validators.
+
+AI-Assisted: true

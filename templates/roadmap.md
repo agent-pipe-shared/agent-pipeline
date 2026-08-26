@@ -2,7 +2,7 @@
 ═══════════════════════════════════════════════════════════════════════════
 TEMPLATE: Project roadmap — Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 3 · 2026-07-03
 Source of truth: templates/CLAUDE.project.md block 6/7 (roadmap prose is FORBIDDEN
-in CLAUDE.md — this file is its dedicated home), operating-model §6 (handover owns
+in CLAUDE.md — this file is its dedicated home), docs/operating-model.md, *The lifecycle* (step 8, Close — handover owns
 state).
 Language note (ADR-0011): template structure/instructions English; filled content
 in the project's human-facing language, default English (primary reader: the PO —

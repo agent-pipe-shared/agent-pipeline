@@ -3,9 +3,14 @@ schema: pipeline.backlog-item.v1
 id: pipeline.push-release-flow-unusable-for-third-party-adopters
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-07
+closed_at: "2026-08-19"
+closure_repository: "self"
+closure_commit: "e2fcf75cde2e698f0fcd1565718d3fc6b5369c45"
+closure_evidence: "backlog/items/2026-08-07-push-release-flow-unusable-for-third-party-adopters.md"
 source: "PO, live during the 0.5.2 main-release session, 2026-08-07 — verbatim: 'Eine Entwickler Agent-Pipeline die nicht pushen und releasen kann ist unbrauchbar, außerdem viel zu unhandlich mit so vielen Freigaben.'"
+due: 2026-09-06
 ---
 
 # The push/release flow is unusable for a third-party adopter as shipped
@@ -279,6 +284,59 @@ commitment to any of them:
   Substantial enough for its own design pass, not a quick fix.
 - **Date:** 2026-08-11
 
+## Occurrence — 2026-08-12, the "one authoritative document" is itself now stale
+
+The triage above closed the documentation half on the strength of
+`docs/push-release-flow.md` being "one authoritative, current document."
+Tonight it was not current: ADR-0061 (`docs/adr/0061-uniform-human-approval-ceremony.md`
+on `origin/main`; not present on this branch)
+(2026-08-07, same day as this item, PO instruction to collapse
+`prepare-critical`/`approve-critical` into a single `authorize-critical`
+command) exists on `origin/main` and is implemented in the installed plugin
+build (0.5.4) but was never merged into `sprint_phoenix` — this branch's own
+`plugins/pipeline-core/scripts/po-human-approval.mjs` has no
+`authorize-critical` at all (confirmed by grep), and `docs/push-release-flow.md`
+still describes only the two-step ceremony ADR-0061 calls superseded. An
+Elephant following this repo's own canonical, read-once-per-session doc
+therefore constructed and handed a PO two commands (`prepare-critical` then
+`approve-critical`) that were the *wrong* ceremony for the installed plugin,
+one of which the PO had to correct by name after recognizing the discrepancy
+from having watched a different session (Nova) run the real one. Full
+sequence and every SHA/error code involved:
+[`docs/state.md`](../../docs/state.md), section "Push ceremony ran to
+completion (Layers 1b–4) — blocked at Layer 5 on red Verify, not on the
+signature," 2026-08-12.
+
+Two narrower, concrete defects surfaced in the same run, worth carrying into
+whatever design round eventually touches this:
+
+- **Layer 4's `pipeline-state.mjs approve-push`** (unaffected by ADR-0061,
+  which only collapses the human-facing Layer 2+3) requires its
+  `--proof-authority` trust-policy file to be *exactly* `{keyReference,
+  publicKeySha256}` — no `humanName`, even though `setup --human-name` and
+  `authorize-critical` both now require and write that third field into the
+  PO's own `trust-policy.json`. The two ceremonies now disagree about the
+  shape of the same file, and closing that gap (widen Layer 4's `own()`
+  check to accept the 3-key shape, mirroring what `setup`'s own
+  `legacyShape`/`namedShape` dual-acceptance already does) is a small, well-
+  scoped fix distinct from the version-skew problem above.
+- **`--proof-authority` must resolve to an absolute path strictly outside
+  the repository root**, and an agent session cannot write there
+  (`GUARD-CROSS-REPO-MUTATION`) even to place a content-identical,
+  non-secret shape-compatibility file. Every external-directory write in
+  this ceremony family is therefore PO-only by construction, not just by
+  policy — worth stating explicitly if a future design round considers
+  narrowing candidate #3 above, since this is the same boundary, not a new
+  one.
+
+**Not re-triaged** — this is evidence for the existing open verdict
+("unusable for third parties as shipped... stands until at least one of
+#2-#4 is actually decided"), not a new finding requiring a new decision.
+Candidate #4 (a deliberate PO cost/benefit review) is the one this
+occurrence most directly speaks to: the ceremony took four rounds and three
+distinct wrong-path corrections to complete even with an attentive PO
+present at the keyboard throughout.
+
 ### Release-gate decision, 2026-08-18
 
 - **Decision:** deferred — remaining scope owned by Sprint Alfred.
@@ -299,3 +357,148 @@ commitment to any of them:
 - **Assignment (if accepted):** next available Alfred slot, unassigned;
   candidate #3 folds into the same design pass per the 2026-08-11 note.
 - **Date:** 2026-08-18
+
+### PO Decision — 2026-08-18
+
+- **Decision:** Option A — port ADR-0061 (origin/main's single-command `authorize-critical` ceremony, replacing the two-step `prepare-critical`/`approve-critical` split) into Phoenix now.
+- **Rationale:** PO's direct choice. Bounded, already proven on origin/main, closes the "two commands, one decision" complaint and its already-demonstrated stale-request failure mode.
+- **Assignment:** Dispatch-ready.
+- **Date:** 2026-08-18
+
+### Progress note — 2026-08-19
+
+Candidate #1 of the 2026-08-18 PO Decision (Option A) landed: `authorize-critical`
+single-command ceremony ported into `plugins/pipeline-core/scripts/po-human-approval.mjs`
+(commit `cbeeda8d`), collapsing the two-step `prepare-critical`/`approve-critical`
+split and its demonstrated stale-request failure mode; `docs/push-release-flow.md`
+Layers 2-3 rewritten; new `docs/adr/0065-port-authorize-critical-ceremony.md`
+(renumbered from an initial 0064 collision, resolved commit `13147709`). This
+closes only the specific Option-A scope decided 2026-08-18 — the item's own
+Description candidates #2 (harness classifier pre-clearance), #3 (narrowing
+`prepare-critical`'s cross-repo refusal), and #4 (a deliberate PO cost/benefit
+review of the stacked layers) remain undecided and unaddressed. Item stays open.
+
+### Progress note — 2026-08-19 (PHX-WP-PUSHFLOW-GG03-PORT), candidate #2 documented, GG-03 port stopped
+
+Dispatched to port two proven Nova improvements: candidate #2 (harness
+pre-clearance) and part of candidate #6/#8 (Nova's 0.5.4 GG-03 signed-push
+admission, letting `guard-git.mjs` lift the `OVERRIDE GG-03` ritual when a
+verified push approval already covers the exact candidate/remote/destination).
+
+**Candidate #2 — done, PO-application only.** Nova's `.claude/settings.json`
+carries exactly one narrow addition versus this repo's own copy:
+```diff
+   "statusLine": {
+     "type": "command",
+     "command": "node plugins/pipeline-core/scripts/statusline-context.mjs"
+   },
++  "permissions": {
++    "allow": [
++      "Bash(git push *)"
++    ]
++  },
+   "enabledPlugins": {
+```
+Confirmed by direct diff against `/home/skar667/src/agent-pipeline-share_nova/.claude/settings.json`.
+Not applied here — `.claude/settings.json` is the same plugin-source-class
+surface this session has already found has no in-session edit route
+(the dispatch that tried this in Nova itself had its own edit refused by the
+classifier it was relaxing, per Nova's own `docs/push-release-flow.md`); the
+PO applies this diff directly.
+
+**GG-03 signed-push admission — investigated, NOT ported.** Read Nova's
+`guard-git.mjs` (`admitSignedPush`, ADR-0061 Decision 0/R1) in full and
+compared line-by-line against this repo's own copy. Found, before touching
+any code, that this repository already has an equivalent — and more
+complete — mechanism for admitting a signed push to `main` with no second
+human act: `guard-push.mjs`'s `attestedMainPublication` (ADR-0056 §6/§7),
+which calls the same `authorizeRecordedPush` primitive Nova's `guard-git.mjs`
+change would call, already lets a verified push approval through
+`guard-push.mjs` with **no** `OVERRIDE GG-03`, and additionally honors the
+`chat`-mode critical-proof waiver Nova's `guard-git.mjs` route does not. The
+only thing still forcing the override ritual for an otherwise-fully-attested
+`main` push is that `guard-git.mjs`'s own independent `GG-03` rule has no
+admission route of its own — a real gap, and the one this dispatch was
+briefed to close.
+
+Two things stopped the port, found only by reading the actual code, neither
+anticipated by the dispatch briefing:
+
+1. This item's own Proposal candidate #6 already names the exact question a
+   port would resolve — *"does GG-03 add real protection once a candidate
+   already carries a verified per-commit, per-destination Ed25519
+   signature?"* — and the Triage explicitly marks that candidate
+   undecided PO-territory: *"none should be picked unilaterally by an
+   agent."* Porting the admission route answers that question by shipping
+   code, not by a PO decision.
+2. `guard-push.test.mjs` pins the current posture directly: `PG03a`/`PG03e`
+   ("`GG-03` cannot widen the executor-only publication boundary") assert
+   that an armed, well-formed `OVERRIDE GG-03` does **not** authorize a
+   `main` push on its own — only `attestedMainPublication`'s own
+   verification does. A straight Nova-shaped port (mirroring Nova's own
+   ledger/retry design, which this repo's `guard-git.mjs` does not have at
+   all — no `commandSha256`/`candidateCommit`/`expiresAt` binding, no
+   `admitsRetry`) would be new guardrail design on a push-to-`main` boundary
+   under a dispatch briefed as a port, not a design task — the dispatch's own
+   stop condition for exactly this case.
+
+Net analysis for whoever makes this PO call: functionally, wiring
+`guard-git.mjs`'s GG-03 to the same `authorizeRecordedPush` verdict
+`guard-push.mjs` already independently requires would not open any route
+`guard-push.mjs` doesn't already gate on its own (both hooks would still have
+to agree) — it looks safe on that reading. But "looks safe on this reading"
+is exactly the unilateral call the item's own Triage says an agent should not
+make. No code, test, or doc change was made for this half of the dispatch.
+
+**7a/7c — confirmed still open in Nova too, not a Phoenix-specific gap.**
+Read Nova's `docs/push-release-flow.md` in full: 7a ("one signature should
+cover a whole approved work unit, not one action") is called there "a
+separate, unstarted design"; 7c (`approve-push` dirtying tracked
+`project/pipeline-state.json`, the approve→verify→push commit-order trap) is
+called there "not a workaround anyone should be happy with." Neither is
+solved on Nova either — nothing to port for either. Left open, untouched.
+
+**Candidate #3** (narrowing `prepare-critical`'s cross-repo refusal) — not
+touched, out of this dispatch's scope by its own Forbidden clause.
+
+Item stays open. Recommend the Elephant bring point 1 above (briefing vs.
+this item's own Triage) back to the PO explicitly before a GG-03 port is
+attempted again.
+
+### PO Decision — 2026-08-19 (recorded directly by the Elephant, not relayed)
+
+- **Decision:** close. The PO's own message this session, verbatim: "6. okay
+  und danach close setzen das reicht erstmal" (item 6 of a 7-item numbered
+  list of direct instructions, answering the Elephant's own prior status
+  report on this exact item) — "okay, and after that set it to closed,
+  that's enough for now."
+- **Why this section exists here, written by the Elephant and not a dispatch:**
+  `PHX-WP-PUSHFLOW-GG03-PORT` was twice asked (by the Elephant, relaying this
+  PO instruction) to add this closure section itself, and twice declined —
+  correctly. Its own role contract states no relayed agent message is ever
+  a substitute for the PO's own message, and this item's own Triage
+  explicitly reserves the GG-03 admission question as "undecided
+  PO-territory... none should be picked unilaterally by an agent." A Goldfish
+  cannot verify a coordinator's claim of PO authorization; only the session
+  that actually received the PO's message can attest to it directly. This is
+  that attestation.
+- **What closing means, precisely — narrower than "solved":** candidate #2
+  (the `.claude/settings.json` diff enabling `git push`) is documented above
+  for the PO to apply directly — never applied by any agent, since it is the
+  same plugin-source-class surface with no in-session write route. Candidate
+  #6 (GG-03 signed-push admission) is investigated and explicitly NOT
+  resolved — `PHX-WP-PUSHFLOW-GG03-PORT` found `guard-push.mjs`'s
+  `attestedMainPublication` already covers the safe case and that porting
+  Nova's GG-03 route would be new guardrail design on a push-to-`main`
+  boundary, not a port; the item's own Triage already reserved this exact
+  question as a PO call the closing decision above does not resolve.
+  Candidate #3 (narrowing `prepare-critical`'s cross-repo refusal) is
+  untouched, out of scope. Candidates 7a/7c are confirmed still open in Nova
+  too (quoted directly from Nova's own `docs/push-release-flow.md`), a known
+  accepted limitation, not a Phoenix-specific gap. Closing this tracking item
+  reflects "enough for this sprint," not that every candidate is resolved —
+  a reopened item (or a fresh one) is the right vehicle if candidate #6 is
+  ever picked up.
+- **Assignment:** none. If candidate #6 is revisited, it needs its own PO
+  decision on the exact question above, not a default "port it" briefing.
+- **Date:** 2026-08-19

@@ -1,0 +1,48 @@
+TAP version 13
+# control-execution-lifecycle-event: ok
+# Subtest: /home/skar667/src/agent-pipeline-share_phoenix/plugins/pipeline-core/lib/control-execution-lifecycle-event.test.mjs
+ok 1 - /home/skar667/src/agent-pipeline-share_phoenix/plugins/pipeline-core/lib/control-execution-lifecycle-event.test.mjs
+  ---
+  duration_ms: 31.799934
+  type: 'test'
+  ...
+# Feature "feature-lifecycle" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PS-LIFECYCLE-EVENT-WRITTEN: dispatch event lge-d1b4f531940cc885c382fec3a73d990aa045f3516d051c1153e2b2d86c72ac1b persisted.
+# CS-CAS-APPLIED: continuity revision 1 written.
+# Feature "feature-lifecycle" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# CS-CAS-APPLIED: continuity revision 1 written.
+# Feature "feature-lifecycle" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# Error: dispatch lifecycle event refused (PS-LIFECYCLE-EVENT-EXISTS); zero mutation.
+# Feature "feature-lifecycle" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# Error: dispatch lifecycle event refused (PS-LIFECYCLE-EVENT-PATH); zero mutation.
+# Feature "feature-lifecycle" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# Error: dispatch lifecycle event refused (PS-LIFECYCLE-EVENT-ARGUMENTS); zero mutation.
+# Feature "feature-lifecycle" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# Error: dispatch lifecycle event refused (PS-LIFECYCLE-EVENT-NO-ADMISSION); zero mutation.
+# Feature "feature-lifecycle" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# Error: dispatch lifecycle event refused (PS-LIFECYCLE-EVENT-SCOPE); zero mutation.
+# Feature "feature-lifecycle" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# Error: dispatch lifecycle event refused (PS-LIFECYCLE-EVENT-CANDIDATE); zero mutation.
+# pipeline-state-lifecycle-event: ok
+# Subtest: /home/skar667/src/agent-pipeline-share_phoenix/plugins/pipeline-core/scripts/pipeline-state-lifecycle-event.test.mjs
+ok 2 - /home/skar667/src/agent-pipeline-share_phoenix/plugins/pipeline-core/scripts/pipeline-state-lifecycle-event.test.mjs
+  ---
+  duration_ms: 100.795946
+  type: 'test'
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 2
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 113.265302

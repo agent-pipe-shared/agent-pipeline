@@ -1,0 +1,30 @@
+{
+  "schema": "pipeline.verify-evidence.v0",
+  "project": "agent-pipeline",
+  "command": "node harness/scripts/verify.mjs",
+  "commit": "77a7d7999a998e455f26ad0952d4a4105e2edd47",
+  "tree": "8cf29ccbbc59a9579e13e0ca89c822c33f77a78e",
+  "candidate": {
+    "start": {
+      "status": "clean",
+      "commit": "77a7d7999a998e455f26ad0952d4a4105e2edd47",
+      "tree": "8cf29ccbbc59a9579e13e0ca89c822c33f77a78e"
+    },
+    "finish": {
+      "status": "clean",
+      "commit": "77a7d7999a998e455f26ad0952d4a4105e2edd47",
+      "tree": "8cf29ccbbc59a9579e13e0ca89c822c33f77a78e"
+    },
+    "binding": "exact"
+  },
+  "startedAt": "2026-08-07T15:13:24.978Z",
+  "finishedAt": "2026-08-07T15:13:25.140Z",
+  "steps": [
+    {
+      "name": "verify-journal",
+      "exitCode": 1
+    }
+  ],
+  "verifyRun": null,
+  "exitCode": 1
+}

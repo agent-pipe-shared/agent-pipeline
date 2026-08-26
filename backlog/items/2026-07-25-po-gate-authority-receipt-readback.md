@@ -74,3 +74,13 @@ observation for the Windows/sandbox-assurance slice scope decision in
   from this checkout, matching this item's own "not chased further" scoping.
 - **Assignment:** N/A — resolved outside this repository's own code.
 - **Date:** 2026-08-11.
+- **Cross-branch note:** an independent triage on another line of
+  development (2026-08-18, one week after the closure above) argued for
+  keeping this item deferred/open — "do not close without a real repro" —
+  reasoning from this item's own Description/Proposal alone, without
+  visibility into the 2026-08-11 direct PO statement that this repo's
+  own frontmatter and closure evidence
+  (`backlog/evidence/2026-08-11-po-gate-authority-receipt-readback-po-confirmed-resolved.md`)
+  already record. `status: closed` above is kept as the record of truth
+  because it carries that PO-confirmed closure evidence, which the
+  deferral argument did not have.

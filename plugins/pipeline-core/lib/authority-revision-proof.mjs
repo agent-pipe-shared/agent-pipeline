@@ -1,0 +1,41 @@
+// SPDX-License-Identifier: SUL-1.0
+/** Public-key proof boundary for a Phoenix continuity authority revision. */
+import { createHash, verify } from "node:crypto";
+
+const SHA = /^[a-f0-9]{64}$/u;
+const OID = /^[a-f0-9]{40,64}$/u;
+const ID = /^[a-z][a-z0-9-]{0,63}$/u;
+const own = (value, keys) => value !== null && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
+const canonical = (value) => Array.isArray(value) ? `[${value.map(canonical).join(",")}]` : value !== null && typeof value === "object" ? `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`).join(",")}}` : JSON.stringify(value);
+const authority = (value) => own(value, ["prd", "spec"]) && [value.prd, value.spec].every((entry) => own(entry, ["path", "sha256"]) && typeof entry.path === "string" && SHA.test(entry.sha256));
+const decisionScope = (value, featureId) => own(value, ["featureId", "phase"]) && value.featureId === featureId && value.phase === "design";
+/**
+ * `trustPolicy` specifically (never `proof`) may also carry `humanName` —
+ * the SETUP-1 human-readable label recorded once at key-setup time
+ * (`po-human-approval.mjs`'s `setup --human-name`). It is never part of what
+ * is cryptographically verified here, so its presence must not fail-close a
+ * genuinely valid trust policy; any OTHER unrecognised extra key still must.
+ */
+const ownTrustPolicy = (value) => own(value, ["keyReference", "publicKeySha256"]) || own(value, ["keyReference", "publicKeySha256", "humanName"]);
+
+export const AUTHORITY_REVISION_INTENT_SCHEMA = "pipeline.continuity-authority-revision-intent.v1";
+export const AUTHORITY_REVISION_PROOF_SCHEMA = "pipeline.continuity-authority-revision-proof.v1";
+
+export function createAuthorityRevisionIntent({ schema, featureId, expectedRevision, preStateSha256, oldAuthority, nextAuthority, decision, candidate, evidence, idempotencyKey, expiresAt } = {}) {
+  if (schema !== "pipeline.continuity-authority-revision-request.v1" || typeof featureId !== "string" || !ID.test(featureId)
+    || !Number.isSafeInteger(expectedRevision) || expectedRevision < 0 || !SHA.test(preStateSha256 ?? "") || !authority(oldAuthority) || !authority(nextAuthority)
+    || !own(decision, ["id", "sha256", "scope"]) || typeof decision.id !== "string" || !ID.test(decision.id) || !SHA.test(decision.sha256) || !decisionScope(decision.scope, featureId)
+    || !own(candidate, ["commit", "tree"]) || !OID.test(candidate.commit) || !OID.test(candidate.tree)
+    || !own(evidence, ["sha256"]) || !SHA.test(evidence.sha256) || typeof idempotencyKey !== "string" || !ID.test(idempotencyKey)
+    || typeof expiresAt !== "string" || !Number.isFinite(Date.parse(expiresAt))) throw new TypeError("authority revision intent is invalid");
+  const value = { schema: AUTHORITY_REVISION_INTENT_SCHEMA, featureId, expectedRevision, preStateSha256, oldAuthority, nextAuthority, decision, candidate, evidence, idempotencyKey, expiresAt };
+  return Object.freeze({ value: Object.freeze(value), sha256: createHash("sha256").update(canonical(value)).digest("hex") });
+}
+
+export function verifyAuthorityRevisionProof({ intent, trustPolicy, proof } = {}) {
+  if (!intent || !SHA.test(intent.sha256 ?? "") || !trustPolicy || !proof || !ownTrustPolicy(trustPolicy)
+    || !own(proof, ["schema", "intentSha256", "keyReference", "publicKey", "signatureBase64"])
+    || proof.schema !== AUTHORITY_REVISION_PROOF_SCHEMA || proof.intentSha256 !== intent.sha256 || proof.keyReference !== trustPolicy.keyReference
+    || createHash("sha256").update(proof.publicKey ?? "").digest("hex") !== trustPolicy.publicKeySha256) return Object.freeze({ verified: false, code: "AR-PROOF-INVALID" });
+  try { return verify(null, Buffer.from(intent.sha256, "utf8"), proof.publicKey, Buffer.from(proof.signatureBase64, "base64")) ? Object.freeze({ verified: true, proofSha256: createHash("sha256").update(canonical(proof)).digest("hex") }) : Object.freeze({ verified: false, code: "AR-PROOF-MISMATCH" }); } catch { return Object.freeze({ verified: false, code: "AR-PROOF-INVALID" }); }
+}

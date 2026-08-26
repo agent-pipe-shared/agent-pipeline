@@ -6,6 +6,7 @@ import { createHash } from "node:crypto";
 
 import {
   bindPlanSpecApproval,
+  bindPlanSpecApprovalWithHumanDecision,
   revokePlanV2,
   sha256CanonicalJson,
 } from "./plan-spec-state-v2.mjs";
@@ -81,6 +82,17 @@ function approvedState() {
   return migrated.state;
 }
 
+function humanDecision(overrides = {}) {
+  return {
+    schema: "pipeline.human-decision-reference.v1",
+    decisionId: "human-plan-approval-1",
+    decisionDigest: "7".repeat(64),
+    candidate: { commit: "a".repeat(40), tree: "b".repeat(40) },
+    checkpoint: { repositoryFingerprint: "4".repeat(64), streamId: "human", sequence: 1, eventDigest: "8".repeat(64), candidateCommit: "a".repeat(40), candidateTree: "b".repeat(40) },
+    ...overrides,
+  };
+}
+
 function revoke(input = {}) {
   const state = input.state ?? approvedState();
   return revokePlanV2({
@@ -117,6 +129,21 @@ check("bind-plan-spec exact replay returns the existing v2 object with no state 
   assert.equal(replay.replay, true);
   assert.deepEqual(replay.state, migrated.state);
   assert.deepEqual(replay.approval, migrated.state.planApproval);
+});
+
+check("ledger-first bind writes a closed v3 reference and rejects missing or cross-repository evidence", () => {
+  const state = legacyState();
+  const input = { state, expectedStateSha256: sha256CanonicalJson(state), poGateAuthority: authority(), expectedPlanSha256: authority().planSha256, expectedSpecSha256: authority().specSha256, humanDecision: humanDecision(), by: "Binding PO", at: BIND_AT };
+  const result = bindPlanSpecApprovalWithHumanDecision(input);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(result.approval.schema, "pipeline.plan-approval.v3");
+  assert.deepEqual(result.approval.humanDecision, humanDecision());
+  const replay = bindPlanSpecApprovalWithHumanDecision({ ...input, state: result.state, expectedStateSha256: sha256CanonicalJson(result.state) });
+  assert.equal(replay.replay, true, JSON.stringify(replay));
+  for (const reference of [humanDecision({ decisionId: "" }), humanDecision({ checkpoint: { ...humanDecision().checkpoint, repositoryFingerprint: "9".repeat(64) } })]) {
+    const denied = bindPlanSpecApprovalWithHumanDecision({ ...input, humanDecision: reference });
+    assert.equal(denied.ok, false, JSON.stringify(denied));
+  }
 });
 
 check("bind-plan-spec rejects every non-exact legacy approval before mutation", () => {

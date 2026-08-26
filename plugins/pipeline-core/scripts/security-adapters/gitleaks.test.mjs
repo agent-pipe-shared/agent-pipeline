@@ -173,6 +173,73 @@ const reproSkip = !gitleaksProbe.ok
     ? "git is not spawnable on host; real cross-branch reproduction needs a working git"
     : false;
 
+// Rule-config regression needs only a real gitleaks binary (no git worktree involved).
+const gitleaksOnlySkip = !gitleaksProbe.ok
+  ? `no trusted gitleaks binary resolvable on host (status=${gitleaksProbe.status}); rule-config regression needs one`
+  : false;
+
+// ===============================================================================================
+// Path-scoped rule-config regression (PHX-WP-GITLEAKS-RULE-SCOPE) -- proves run()'s new fixed
+// `--config <repo-root>/.gitleaks.toml` wiring actually narrows sentry-access-token/generic-api-key
+// to backlog/transitions.ndjson ONLY, using the real gitleaks binary and the real, delivered
+// .gitleaks.toml (never a synthetic/fixture config -- this exercises exactly what production runs).
+// ===============================================================================================
+
+test(
+  "run() wires the repo's .gitleaks.toml: a ledger-shaped amendment line at backlog/transitions.ndjson produces no sentry-access-token finding, while the identical secret-shaped string elsewhere still does (real gitleaks binary)",
+  { skip: gitleaksOnlySkip },
+  async () => {
+    // A real reachability-amendment-shaped line (four bare 64-hex-character SHA-256 digests),
+    // the exact shape documented in backlog/2026-08-08-the-hash-chained-ledger-collides-
+    // permanently-with-the-secret-scanner.md. `supersedesEntryHash`'s value is the literal that
+    // trips gitleaks' `sentry-access-token` rule (empirically confirmed while designing this fix).
+    const amendmentLine = `${JSON.stringify({
+      actor: "hotfix-047-reachability-repair",
+      at: "2026-07-30",
+      entryHash: "7b7a0fe4ec4551933201bb4bc356fbb23e744ac23af8deda061a794400386ac7",
+      evidence: {
+        commit: "83640cec22d494d227eebc82929370277ce926b9",
+        kind: "reachability-amendment",
+        reference: "backlog/items/2026-07-23-elephant-direct-implementation-under-afk-authorization.md",
+        referenceBlobOid: "708c5c05b1868b616e0d56974da4316bf6fc43d5",
+        referenceSha256: "90ba0093cf0494ce44c3f1c7cdb207cff0813c55c3a11eac5f2cebc46e701024",
+        supersedesEntryHash: "84d2128467224ca61aa980c088e92473b9dda27959ecd29600cf8d4a72b83d3b",
+        supersedesSequence: 39,
+      },
+      from: "open",
+      id: "pipeline.elephant-direct-implementation-under-afk-authorization",
+      previousHash: "48d371f383d42919d565cdb3caab6e4f51ba9803d1fbbfd29c0e44339fe32a5e",
+      reason: "Append reachable evidence for historical event 39 without rewriting it or changing item status.",
+      schema: "pipeline.backlog-transition.v1",
+      sequence: 42,
+      to: "open",
+    })}\n`;
+
+    const rootDir = mkdtempSync(join(tmpdir(), "gitleaks-rule-scope-"));
+    try {
+      mkdirSync(join(rootDir, "backlog"), { recursive: true });
+      mkdirSync(join(rootDir, "other"), { recursive: true });
+      // Ledger path: must produce zero sentry-access-token findings once .gitleaks.toml is wired in.
+      writeFileSync(join(rootDir, "backlog", "transitions.ndjson"), amendmentLine);
+      // Control: the IDENTICAL secret-shaped content, at a DIFFERENT path -- the load-bearing proof
+      // that the allowlist stayed scoped to backlog/transitions.ndjson and did not weaken the rule
+      // anywhere else.
+      writeFileSync(join(rootDir, "other", "copy.ndjson"), amendmentLine);
+
+      const result = await run({ rootDir, config: { binaryPath: gitleaksProbe.path }, timeoutMs: 20000 });
+      assert.equal(result.status, "FINDINGS", `expected the control file to still trip a finding, got ${result.status} (${result.reason ?? ""})`);
+
+      const ledgerFindings = result.findings.filter((f) => f.path === "backlog/transitions.ndjson" && f.rule === "sentry-access-token");
+      assert.equal(ledgerFindings.length, 0, `backlog/transitions.ndjson must produce zero sentry-access-token findings once .gitleaks.toml is wired in, got: ${JSON.stringify(ledgerFindings)}`);
+
+      const controlFindings = result.findings.filter((f) => f.path === "other/copy.ndjson" && f.rule === "sentry-access-token");
+      assert.equal(controlFindings.length, 1, `other/copy.ndjson (identical secret-shaped content, different path) must still trip sentry-access-token -- proof the allowlist did not weaken the rule elsewhere, got: ${JSON.stringify(controlFindings)}`);
+    } finally {
+      rmSync(rootDir, { recursive: true, force: true });
+    }
+  },
+);
+
 test(
   "reproduction: bare `detect` leaks a sibling branch's secret from a detached worktree; --no-git closes it (real gitleaks + git, env-gated)",
   { skip: reproSkip },

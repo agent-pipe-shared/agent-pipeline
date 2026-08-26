@@ -1,0 +1,17 @@
+fix(phoenix): accept the 3-key trustPolicy shape in authority-revision-proof verification
+
+verifyAuthorityRevisionProof required exactly the 2-key legacy trustPolicy
+shape {keyReference, publicKeySha256}, rejecting the 3-key named shape
+{keyReference, publicKeySha256, humanName} that po-human-approval.mjs's
+setup --human-name can legitimately write to the same shared
+trust-policy.json file format. Mirrors the already-fixed and tested
+pattern in po-approval-proof.mjs's verifyPoApprovalProof: a new
+trustPolicy-specific ownTrustPolicy() helper accepts either shape,
+leaving proof's own strict own() check untouched.
+
+Adds real-crypto regression coverage in authority-revision-proof.test.mjs
+and closes backlog item
+2026-08-18-authority-revision-proof-has-the-same-trustpolicy-shape-gap-po-approval-proof-had.md.
+
+Dispatch: PHX-WP-ARPROOF-HUMANNAME (goldfish)
+AI-Assisted: true

@@ -18,11 +18,7 @@ import {
   sha256Canonical,
 } from "../lib/afk-assumption-mode.mjs";
 import { executeAfkActivationHostTransaction } from "../lib/afk-transaction-host.mjs";
-import {
-  LEGACY_STATE,
-  NEUTRAL_STATE,
-  resolveProjectAuthorityPaths,
-} from "../lib/project-authority.mjs";
+import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 export const EXIT = Object.freeze({ OK: 0, BLOCKED: 2 });
@@ -130,10 +126,13 @@ export async function activateFromBytes(rawInstruction, dependencies = {}) {
   let activatedAt;
   try {
     root = dependencies.root ? resolve(dependencies.root) : trustedRoot(dependencies.cwd ?? process.cwd());
-    const projectAuthority = (dependencies.resolveProjectAuthorityPaths ?? resolveProjectAuthorityPaths)({ rootDir: root });
-    const statePath = projectAuthority.status === "ready"
-      ? projectAuthority.state
-      : (projectAuthority.source === "legacy" ? LEGACY_STATE : NEUTRAL_STATE);
+    // One shared authority resolver (ADR-0054 step 1), never a per-reader
+    // fallback.  The hand-rolled variant this replaces asked for the neutral
+    // State whenever the authority was not `ready` — its legacy arm keyed on a
+    // `source` field that an unreadable authority does not carry at all — so a
+    // checkout whose only lifecycle State is the legacy one was read as missing.
+    // A reader must never become stricter than the hardcoded path it replaces.
+    const statePath = resolveAuthorityArtifactPath("state", { rootDir: root }).relPath;
     statePreimage = await readFile(inside(root, statePath));
     authority = Object.fromEntries(await Promise.all(["prd", "spec", "courseBrief"].map(async (key) => {
       const path = instruction.authority[key].path;

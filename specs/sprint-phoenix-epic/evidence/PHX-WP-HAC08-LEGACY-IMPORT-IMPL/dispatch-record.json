@@ -1,0 +1,24 @@
+{
+  "taskId": "PHX-WP-HAC08",
+  "model": "claude-sonnet-5",
+  "rulesetSha": "ce50d74d16fdbcd0b9f8b3b606297e88af3d2f139b3cd14b692f4ea15599b023",
+  "dispatcher": "elephant",
+  "outcome": "success",
+  "commitSha": "a657e14",
+  "log": [
+    {"phase": "start", "toolUses": 2, "note": "dispatch record created as opening act"},
+    {"phase": "context-read", "toolUses": 10, "note": "read acceptance.md, agent-decision-journal.mjs/test.mjs, schema, doc, governance-event.mjs, ARTIFACT_PATH"},
+    {"phase": "discovery", "toolUses": 14, "note": "repo-wide search: CONFIRMED ABSENT no existing production code path imports/migrates a legacy approval/override/deploy record as a governance observation"},
+    {"phase": "implement", "toolUses": 18, "note": "validator function + dispatch line added to agent-decision-journal.mjs; third oneOf branch added to schema"},
+    {"phase": "tests-authored", "toolUses": 20, "note": "7 new named tests + drift test added to agent-decision-journal.test.mjs"},
+    {"phase": "verify-green-1", "toolUses": 24, "note": "node --test agent-decision-journal.test.mjs: 36/36 pass, exit 0 -- evidence/verify-green.tap (pre-break-proof run)"},
+    {"phase": "regression", "toolUses": 25, "note": "node --test governance-event-store.test.mjs: 13/13 pass, exit 0 -- evidence/regression-governance-event-store.tap"},
+    {"phase": "break-proof-1", "toolUses": 27, "note": "ADJ-LEGACY-SHAPE (unrecognized legacySourceClass): fault injected, RED confirmed for stated reason -- evidence/break-proof-legacy-shape-RED.tap, then restored"},
+    {"phase": "break-proof-2", "toolUses": 29, "note": "ADJ-SUPERSESSION (legacy-import kind): fault injected, RED confirmed for stated reason -- evidence/break-proof-supersession-RED.tap, then restored"},
+    {"phase": "verify-green-2", "toolUses": 30, "note": "post-restore reconfirmation: node --test agent-decision-journal.test.mjs: 36/36 pass, exit 0 -- evidence/verify-green.tap (final)"},
+    {"phase": "doc-citation-sweep", "toolUses": 55, "note": "every agent-decision-journal.mjs:N citation across docs/agent-decision-journal.md re-derived and corrected for the +4/+5 line shift caused by the new consts/dispatch line; verified against actual file content line-by-line"},
+    {"phase": "commit", "toolUses": 59, "note": "git commit a657e14, 4 files (mjs, test.mjs, schema.json, doc), Dispatch/AI-Assisted trailers present"},
+    {"phase": "report", "toolUses": 60, "note": "final report written to this record's report field, then returned as text"}
+  ],
+  "report": "See completion report returned as final assistant message: all DoD checks passed (36/36 tests green, 13/13 regression green, both BREAK-PROOF tests RED-then-restored-then-GREEN with transcripts under this evidence dir), discovery search CONFIRMED ABSENT, commit a657e14."
+}

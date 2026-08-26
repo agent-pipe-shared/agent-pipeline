@@ -1,0 +1,41 @@
+fix(pipeline-core): close 5 Critic findings on human-authority-grant CLI
+
+F1 (blocker): remove --trust-anchor-file entirely from install; the
+repository's own committed project/critical-human-proof.json is now the
+only trust anchor, unconditionally -- no flag, argument, or code path
+lets a caller substitute a different one.
+
+F2 (major): fix externalJson's containment check to mirror
+guard-maintenance-window.mjs's already-correct
+`source === root || source.startsWith(...)` pattern instead of a
+relative()+startsWith("..") heuristic that misclassified an in-repo file
+named "..anchor.json" as external, and check it against the authoritative
+repo.primaryRoot (discoverRepository) instead of the raw --repo-root
+string, so pointing --repo-root at a subdirectory can no longer launder
+an in-repo file past the check.
+
+F3 (minor): rewrite the module docstring to state the actual post-fix
+trust model (single, non-overridable, repository-committed anchor).
+
+F4 (minor): install no longer appends the stored request's envelope
+(request.intent) verbatim. Non-signed-subject fields (eventId,
+idempotencyKey, occurredAtEpochMs, observedAtEpochMs, correlation,
+candidate, artifacts, policy.capturePolicyDigest) are reconstructed at
+install time from the verified decision payload (signed) and fresh live
+repository observation, never trusted from the stored file's copies.
+
+F5: falls out of F1 automatically -- every test now exercises the single
+production trust-anchor path via its own fixture
+project/critical-human-proof.json; --trust-anchor-file no longer exists
+anywhere to bypass it.
+
+Rework of 78006b4 per an independent Critic review (FAIL: 1 blocker, 1
+major, 3 minor). All 9 prior assertions carried forward with
+equivalent-or-stronger coverage; 5 new named tests added (F1 flag
+removal, F2 leading-dot filename, F2 subdirectory --repo-root, F4 eventId
+tamper, F4 candidate tamper). Every changed/added assertion was
+break-proofed with a persisted RED transcript before being restored to
+green.
+
+Dispatch: PHX-WP-AAC04-FIX (goldfish)
+AI-Assisted: true

@@ -1,0 +1,48 @@
+TAP version 13
+# Subtest: plugins/pipeline-core/lib/parallel-sprint-integration.mjs
+ok 1 - plugins/pipeline-core/lib/parallel-sprint-integration.mjs
+  ---
+  duration_ms: 24.181244
+  type: 'test'
+  ...
+# PASS PSI01 keeps an exact SHA-1 baseline current without claiming repository freshness
+# PASS PSI02 accepts exact SHA-256 Git identities but rejects intermediate-length pseudo-OIDs
+# PASS PSI03 defers a disjoint advance without freshness or merge-readiness claims
+# PASS PSI04 requires a confirmed digest-bound review for protected and overlapping surfaces
+# PASS PSI05 accepts the exact confirmed impact receipt and detects receipt drift
+# PASS PSI06 requires explicit PO selection, ready evidence and exact target main before promotion
+# PASS PSI07 binds promotion rebase to only the selected first merge-ready candidate and exact main
+# PASS PSI08 rejects target-main drift after a candidate was selected
+# PASS PSI09 rejects mixed repository object formats and unexpected review receipts
+# PASS PSI10 makes every fail-closed family repairable and confirmed
+# PASS PSI11 idempotently resumes only the same pending digest-bound action
+# PASS PSI12 fails closed on interrupted drift, replay and conflicting action identity
+# PASS PSI13 requires a selected candidate after confirmed material incompatibility
+# PASS PSI14 does not promote across a confirmed defer decision
+# PASS PSI15 permits a package that binds no candidate commit at all
+# PASS PSI16 permits a Nova commit proven reachable from Nova's published tip
+# PASS PSI17 fails verification when the consumed Nova commit is unpublished
+# PASS PSI18 fails verification when sibling-Epic provenance was never observed
+# PASS PSI19 fails verification when the Cyborg tip is itself unpublished
+# PASS PSI20 fails verification when Nightwing reachability was never probed
+# PASS PSI21 refuses a consumption claim that no bound candidate commit could carry
+# PASS PSI22 refuses an unattributed Epic, a drifted tip probe, and an unusable input
+# PASS PSI23 seals every gate receipt against its own body
+# PASS PSI24 admits every feature package this repository holds today
+# PASS PSI25 decides both directions from real git merge-base exit codes
+# 25/25 checks passed.
+# Subtest: plugins/pipeline-core/lib/parallel-sprint-integration.test.mjs
+ok 2 - plugins/pipeline-core/lib/parallel-sprint-integration.test.mjs
+  ---
+  duration_ms: 58.982916
+  type: 'test'
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 2
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 68.000776

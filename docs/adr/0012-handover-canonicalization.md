@@ -6,6 +6,8 @@
 
 **Status:** accepted (2026-07-03, Checkpoint 1) · **Basis:** Register E10 + condition A9
 
+**Governs:** docs/state.md
+
 ## Context
 
 The codebase maintained the handover baton three times by hand (HISTORY log, CLAUDE.md status section, memory) — and it provably lied: one project's CLAUDE.md contradicted HEAD, another project's status existed threefold, a third referenced memory files that didn't exist; the chain broke on a fresh clone. Critic finding L2-03: the relationship between the handover file and the HISTORY "open items" block was undefined — the baton risked existing twice again → condition A9.

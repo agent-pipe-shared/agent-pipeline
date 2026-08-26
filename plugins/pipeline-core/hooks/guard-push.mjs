@@ -142,6 +142,10 @@ import { criticalProofWaiverFor, readCriticalHumanProofPolicy } from "../lib/cri
 // exercises (via `humanGuardOverrideInternals.localPluginInstallSourceObservation`), rather
 // than a second, independently written comparison -- see checkMarketplaceAttestation() below.
 import { HumanGuardOverrideError, humanGuardOverrideInternals } from "../lib/human-guard-override.mjs";
+import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
+import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
+import { checkExternalPushLedgerConsumption, externalPushLedgerGate } from "../lib/external-push-ledger.mjs";
+import { dualEvaluateDecisionReference } from "../lib/decision-reference-dual-evaluation.mjs";
 import { stripQuotedSegments, normalizeGlobalGitOptions, tokenizeArgv, refMatchesPattern, commandIsGitPush } from "../lib/git-cmd.mjs";
 import {
   LEGACY_CALIBRATION,
@@ -324,8 +328,11 @@ const detectionTokens = (() => {
 /**
  * Bind one push invocation to one repository and one source commit.  This is
  * intentionally a small accepted grammar: a guard cannot prove evidence freshness
- * for a shell bundle, an implicit/default refspec, a bulk push, or repository
- * overrides with different git-dir/work-tree semantics.
+ * for a shell bundle, a bulk push, or repository overrides with different
+ * git-dir/work-tree semantics. A colon-less (implicit-destination) refspec IS
+ * accepted, and its destination is resolved below to `refs/heads/<branch>` for
+ * the ordinary/default case only (PHX-WP-GUARDPUSH-REFSPEC-RESOLVE) -- see
+ * `resolveImplicitPushDestination`.
  */
 function parsePushBinding(rawCmd) {
   let singleQuoted = false;
@@ -385,7 +392,7 @@ function parsePushBinding(rawCmd) {
   const [remote, refspec] = positionals;
   const colon = refspec.indexOf(":");
   const source = colon === -1 ? refspec : refspec.slice(0, colon);
-  const destination = colon === -1 ? null : refspec.slice(colon + 1);
+  let destination = colon === -1 ? null : refspec.slice(colon + 1);
   if (!remote || !source || (colon !== -1 && !destination) || source.startsWith("+")) {
     return { ok: false, reason: "push refspec is deleting, forced, or otherwise source-ambiguous" };
   }
@@ -399,7 +406,42 @@ function parsePushBinding(rawCmd) {
   if (rootResult.status !== 0 || !rootResult.stdout?.trim()) {
     return { ok: false, reason: "push repository cannot be resolved to a non-bare worktree" };
   }
-  return { ok: true, projectDir: rootResult.stdout.trim(), source, destination, remote, refspec };
+  const projectDir = rootResult.stdout.trim();
+  if (destination === null) {
+    destination = resolveImplicitPushDestination(projectDir, remote, source);
+  }
+  return { ok: true, projectDir, source, destination, remote, refspec };
+}
+
+/**
+ * PHX-WP-GUARDPUSH-REFSPEC-RESOLVE. Mirrors git's own default push-refspec
+ * resolution, but ONLY for the ordinary/unconfigured case: a bare (colon-less)
+ * branch name pushed to a remote that has no `remote.<name>.push` override
+ * resolves, on an ordinary unconfigured remote, to `refs/heads/<branch>` on
+ * both sides -- so `git push origin <branch>` and
+ * `git push origin <branch>:refs/heads/<branch>` are the same push. This
+ * function does NOT attempt to reproduce git's full remote-refspec-config
+ * resolution: if the remote HAS a configured push refspec (any
+ * `remote.<name>.push` value), or the source is not an ordinary bare branch
+ * name (already a full `refs/...` ref, which resolves to itself with no
+ * guessing needed, or the symbolic ref `HEAD`, whose target depends on the
+ * checkout this guard must not assume), this returns `null` unchanged --
+ * exactly today's behavior -- rather than guess.
+ */
+function resolveImplicitPushDestination(projectDir, remote, source) {
+  if (source.startsWith("refs/")) return source;
+  if (source === "HEAD") return null;
+  const configuredPush = spawnSync(
+    "git", ["-C", projectDir, "config", "--get-all", `remote.${remote}.push`],
+    { encoding: "utf8", timeout: 5000 },
+  );
+  // git config exit codes: 0 = at least one value found (a non-default push refspec IS
+  // configured -- do not guess), 1 = the key is simply absent (the ordinary/default
+  // case this function resolves). Any other status means the lookup itself failed
+  // (e.g. an unreadable config) -- fail closed to "unresolved", same as today.
+  if (configuredPush.status === 0 && configuredPush.stdout?.trim()) return null;
+  if (configuredPush.status !== 1) return null;
+  return `refs/heads/${source}`;
 }
 
 function splitShellSegments(rawCmd) {
@@ -1797,6 +1839,65 @@ try {
           "approve-push --by <name> --remote <remote> --destination <full-ref>.",
         );
       }
+      // H-AC-12 dual-evaluation, wired in `lib/change-control.mjs`'s exact opt-in shape: this
+      // block is reached ONLY when the recorded approval carries a `decisionReference` key at
+      // all (`Object.hasOwn`, same test `evaluateChangeControlGate` uses for its optional
+      // `pipelineAuthority.decisionReference`). Absent -- which is every approval any writer
+      // produces today -- nothing here runs and check (c) stays byte-for-byte what it was.
+      //   `legacyOk` is the pre-existing commit-bound record verdict computed immediately
+      // above (`forCommit === sourceCommit`), NOT a hardcoded true: it can be false, so the
+      // two readers can genuinely disagree in EITHER direction and both directions fail closed.
+      //   The second reader resolves the canonical decision reference against what this guard
+      // can independently observe about the push actually being attempted: its candidate commit
+      // AND tree (the legacy record binds the commit only), and the repository fingerprint of
+      // the governed session root. `fallbackProjectDir()`, never `projectDir` -- reading the
+      // fingerprint from the PUSHED repository would let a nested target repository mint its own
+      // anchor, the same T6-F1 root cause the ADR-0055 waiver below and the external-ledger
+      // check already read from the session root for.
+      //   Shape validation lives inside the shared primitive (`isDecisionReference`), which
+      // resolves a malformed reference as "the second reader disagrees" instead of throwing:
+      // an uncaught throw in this hook exits 1, which this hook's harness treats as ALLOW,
+      // silently discarding every other accumulated failure (same reasoning as the
+      // `discoverRepository` catch below). The compatibility owner and expiry are read off the
+      // evaluation result and named in the operator-visible failure, per H-AC-12's second
+      // sentence -- carried, not silently enforced as a cutover (see the primitive's header).
+      if (approval !== null && typeof approval === "object" && Object.hasOwn(approval, "decisionReference")) {
+        const evaluation = dualEvaluateDecisionReference({
+          legacyOk: Boolean(forCommit) && forCommit === sourceCommit,
+          reference: approval.decisionReference,
+          resolveReference: (reference) => {
+            const referenceTree = resolveSourceTree();
+            if (referenceTree === null) return false; // candidate unresolvable -> cannot confirm
+            let fingerprint;
+            try {
+              const repository = discoverRepository(fallbackProjectDir(), { timeout: 5000 });
+              fingerprint = derivePoGateRepositoryFingerprint({
+                gitCommonDir: repository.commonDir,
+                primaryRoot: repository.primaryRoot,
+              });
+            } catch {
+              return false; // topology unresolved -> the second reader cannot confirm -> disagreement
+            }
+            return reference.candidate.commit === sourceCommit
+              && reference.candidate.tree === referenceTree
+              && reference.checkpoint.repositoryFingerprint === fingerprint;
+          },
+        });
+        if (!evaluation.ok) {
+          // Operand text is deliberately NOT interpolated (SEC-01, same as the attestation
+          // failure below): only booleans and the compatibility metadata travel into the
+          // transcript.
+          failures.push(
+            "Push approval decision reference disagrees with the recorded approval "
+            + `(H-AC-12 dual-evaluation: legacy=${evaluation.legacyOk}, decision-reference=${evaluation.ledgerOk}; `
+            + `compatibility owner "${evaluation.compat.owner}", expiry `
+            + `${new Date(evaluation.compat.expiresAtEpochMs).toISOString()}). The canonical decision ID must `
+            + "reference and validate THIS candidate commit, tree and repository before the push becomes "
+            + `effective. Re-record it: node ${pipelineStateScriptRef()} approve-push ... `
+            + "--decision-reference <repo-relative-json>.",
+          );
+        }
+      }
       // ADR-0055: the project may stand the private-key proof down for `push` with an
       // explicit, reasoned waiver. The human gate itself still applies — the approval
       // above must still be recorded and bound to THIS commit — but a waived project
@@ -1846,6 +1947,57 @@ try {
                 + "--proof-request <path> --proof-authority <path> --proof <path>."
               : `Push approval critical proof is unavailable: project/critical-human-proof.json is ${pushWaiver.code}.`,
           );
+        } else if (externalPushLedgerGate(fallbackProjectDir()) !== "off") {
+          // PHX-2 additive external ledger (opt-in, see design doc §2/§5). AND-ed onto the
+          // base signature attestation above -- evaluated only once `attested.authorized` is
+          // already true, since there is nothing to consume-check if the base proof did not
+          // verify. `fallbackProjectDir()` (not `manifest`, and NOT `projectDir` -- WP5-phx2-
+          // rework-1, F5) is passed deliberately: `manifest` here is project/pipeline.yaml's
+          // already-loaded content (nested `gates.push.approval` shape), a different file from
+          // `pipeline.user.yaml`'s flat `gates.push_external_ledger` this gate actually lives
+          // in -- passing `manifest` would silently never find the key. `projectDir` is the
+          // PUSHED repository, not the governed session root -- exactly the same distinction
+          // the ADR-0056 waiver check above (`pushWaiver`) already reads from
+          // `fallbackProjectDir()`, not `projectDir`, for: reading it from the pushed
+          // repository would let a pushed repository's own committed
+          // `gates.push_external_ledger: "off"` stand this gate down for a session whose own
+          // root has it required. Same root cause as the anchor (T6 F1) and the waiver above;
+          // the fix belongs in both places or in neither.
+          let repository = null;
+          try {
+            repository = discoverRepository(fallbackProjectDir(), { timeout: 5000 });
+          } catch {
+            // discoverRepository throws on >=7 paths (missing/symlinked start path, git spawn
+            // failure/non-zero exit incl. WT-GIT-SPAWN, submodule/`--separate-git-dir` common-dir
+            // shape, missing primary root -- worktree-lifecycle.mjs). This file has no ambient
+            // try/catch around this integration point, and per hooks.json's own exit-code
+            // contract (0 allow, 2 block, 1 allow+warn), an UNCAUGHT throw here exits the
+            // process at 1 -- which this hook's own harness treats as ALLOW, silently
+            // discarding every other already-accumulated failure in `failures`. This catch is
+            // the fail-closed disposition that replaces that uncaught-throw path.
+            failures.push(
+              "External push ledger repository topology could not be resolved "
+              + "(PUSH-EXTERNAL-LEDGER-TOPOLOGY-UNRESOLVED). Push refused -- this is a fail-closed "
+              + "disposition, never a silent pass-through and never an uncaught throw.",
+            );
+          }
+          if (repository !== null) {
+            const ledgerCheck = checkExternalPushLedgerConsumption({
+              repositoryFingerprint: derivePoGateRepositoryFingerprint({
+                gitCommonDir: repository.commonDir,
+                primaryRoot: repository.primaryRoot,
+              }),
+              proofSha256: state.pushApproval.lastApproved.criticalProof.proofSha256,
+              candidate: { commit: sourceCommit, tree: sourceTree },
+            });
+            if (!ledgerCheck.ok) {
+              failures.push(
+                `External push ledger consumption is ${ledgerCheck.code}. Record it with: `
+                + `node ${pipelineStateScriptRef()} approve-push ... `
+                + "(the same command that already records pushApproval now also writes this).",
+              );
+            }
+          }
         }
       } else if (pushGate.approval === "required" && approval?.criticalProofWaiver?.kind !== "push") {
         // Waived by policy, but the recorded approval does not say so: it was recorded

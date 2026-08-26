@@ -1,0 +1,17 @@
+{
+  "taskId": "WP-P-AC11",
+  "model": "claude-sonnet-5",
+  "rulesetSha": "ce50d74d16fdbcd0b9f8b3b606297e88af3d2f139b3cd14b692f4ea15599b023",
+  "dispatcher": "elephant",
+  "outcome": "success",
+  "log": [
+    {"phase": "bootstrap", "toolUses": 4, "note": "dispatch record relocated from /tmp scratchpad (blocked by guard-lifecycle-ready GUARD-CROSS-REPO-MUTATION) to in-repo untracked evidence dir, matching precedent of other phx-wp-* evidence dirs (untracked)"},
+    {"phase": "context-read", "toolUses": 12, "note": "read acceptance.md P-AC-11, organization-policy.mjs, organization-policy.test.mjs, organization-policy-activation.mjs (confirmed it does not re-shape documentClasses -- opaque passthrough), acceptance-evidence-map.mjs structure (VERDICTS/DELTA/POINTERS/CLOSURE)"},
+    {"phase": "implement", "toolUses": 20, "note": "added optional closed targetBinding (targetClass enum + bounded targetRef) and additive revisions readback to organization-policy.mjs; targetBinding never-merged (same OPP-RESOLVE-CONFLICT as mode), revisions always-appended"},
+    {"phase": "discovery", "toolUses": 24, "note": "first design (mandatory targetBinding) broke organization-policy-activation.test.mjs's own 3-key fixtures (2/2 fail, OPP-DOCUMENT) -- that file is out of scope to edit; redesigned targetBinding as OPTIONAL to avoid the collision, re-verified 2/2 activation tests now pass unmodified"},
+    {"phase": "test", "toolUses": 34, "note": "13/13 organization-policy-tests pass (8 pre-existing unmodified behaviorally + 1 mechanical key-count assertion update + 5 new); 2/2 organization-policy-activation-tests pass unmodified, exit 0 both, TAP artifacts in this dir"},
+    {"phase": "delta-and-verify", "toolUses": 40, "note": "added P-AC-11 DELTA entry (tag WP-P-AC11, verdict partial); ran acceptance-evidence-map.mjs --out, confirmed row renders 'partial | WP-P-AC11'; POINTERS['P-AC-11'] left untouched per explicit Forbidden instruction, so the rendered evidence-text column stays the prior WP-P wording -- disclosed as a deviation"},
+    {"phase": "commit", "toolUses": 46, "note": "staged the 3 permitted files (acceptance-evidence-map.mjs required git add -f, already-tracked file under a gitignored parent dir); committed 6de4f44 with Dispatch/AI-Assisted trailer; git status clean except the 3 permanently-dirty state files"}
+  ],
+  "report": "See final assistant message delivered to dispatcher: 6-section report (DoD results / evidence / changed files / deliberately not changed / deviations / open items) for WP-P-AC11, commit 6de4f44."
+}

@@ -2,8 +2,10 @@
 ═══════════════════════════════════════════════════════════════════════════
 PROMPT TEMPLATE: Critic review (two-phase) — Agent-Pipeline v0.1.0-draft ·
 Sprint 0 Phase 3 · 2026-07-03
-Source of truth: docs/operating-model.md §2.4 (Critic contract + report format),
-§4.2 (trigger matrix; canonical German trigger wording — authoritative),
+Source of truth: docs/operating-model.md — Roles and boundaries (Critic contract)
+and Evidence, review and recovery; report format: harness/review-protocol.md §2.4
+Findings format; trigger decision table: harness/review-protocol.md §2.1
+Trigger decision table,
 ADR-0014, ADR-0003 (isolation levels), harness/session-bootstrap.md §6.3,
 the PO-Feedback on Critic isolation + negative-thesis priming (the PO's
 wording, translated to canonical English below), Rensin §5 (anti-sycophancy
@@ -19,7 +21,7 @@ USAGE (Elephant)
    that does not know the grammar spends its budget being refused instead of
    reading code. Do not retype the rules here — a hand-copied second list
    drifts from the guard that owns it.
-1. Model per MP-07 / §4.2 matrix, TIERED (review-protocol.md §2.1 T0/T3/T4):
+1. Model per MP-07, TIERED (harness/review-protocol.md §2.1 T0/T3/T4):
    mechanical/deterministic diffs (lockfiles, generated artifacts, pure
    formatting, zero semantic delta) auto-pass — no critic dispatch. Class-mittel
    diffs dispatch the review-tier model FIRST, escalating to a higher-capability
@@ -181,7 +183,7 @@ review, or issue a substantive pass/fail judgment.
   finding IDs `F1..Fn`), NEVER the implementor's justification prose for
   why/how it was fixed (CR-02/EL-09).
 
-Dispatch metadata (operating-model §2.3 field 6, critic variant):
+Dispatch metadata (`roles/goldfish.md` GF-01 field 6, critic variant):
 - Bootstrap role: critic (closed; use `pipeline-core:pipeline-start critic`;
   validate preflight identity but never execute onboarding or default to
   Elephant) — `CRITIC-BOOTSTRAP-ROLE-CLOSED`
@@ -314,13 +316,22 @@ Hunt systematically, in this order:
    (standard check):** do the production diffs originate from dispatched
    fresh-context sessions (commit/session trailers, dispatch records in the
    briefing/evidence), or from the orchestrator session itself?
-   Orchestrator-authored production diffs outside the OM §3.3 stage-0 fast
-   path = a lifecycle-violation finding (EL-01/EL-16), severity at least
+   Orchestrator-authored production diffs outside the stage-0 fast
+   path (`roles/elephant.md` — EL-01) = a
+   lifecycle-violation finding (EL-01/EL-16), severity at least
    major. The grounded `Dispatch: <TASK_ID> (goldfish)` commit trailer is
-   primary trailer evidence; `AI-Assisted: true` records anonymous assistance
-   only. Provider/model co-author data, session URLs/IDs, account identifiers,
-   and other private correlation metadata are prohibited and a finding when
-   present.
+   primary trailer evidence for exactly ONE fact — WHICH work package the diff
+   belongs to (diff authorship) — it does NOT by itself evidence who performed
+   the commit act. A `Commit-Act: orchestrator` trailer line, when present, is
+   the separate signal that the orchestrating (Elephant) session ran the
+   commit itself rather than the dispatched Goldfish (e.g. finishing a
+   truncated dispatch's last step); its ABSENCE alongside a well-formed
+   `Dispatch:` line is consistent with, but not conclusive proof of, the
+   dispatch having performed its own commit act — cross-check against the
+   dispatch record's logged phases where available. `AI-Assisted: true`
+   records anonymous assistance only. Provider/model co-author data, session
+   URLs/IDs, account identifiers, and other private correlation metadata are
+   prohibited and a finding when present.
 4. **Test integrity:** Were tests/checks of the implementation weakened,
    deleted, skipped, or newly tolerant? (Tests are the contract.)
 5. **Edge cases & failure paths:** boundaries, empty/huge inputs, concurrency,

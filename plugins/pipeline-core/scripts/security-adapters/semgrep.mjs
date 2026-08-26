@@ -101,7 +101,16 @@ export async function run({ rootDir, config = {}, spawnFn = nodeSpawnSync, timeo
   }
 
   const configArg = config.rulesDir || "auto";
-  const args = ["scan", "--json", "--timeout", "60", "--config", configArg, rootDir];
+  // `--timeout` bounds semgrep's own PER-RULE-PER-FILE budget (semgrep's default is a
+  // few seconds), distinct from `timeoutMs` above, which bounds the WHOLE subprocess.
+  // Left unset, a single large file (e.g. a generated or long-lived test suite) can
+  // trip a per-rule timeout and turn the entire scan into a fatal `scanner_error`
+  // even though semgrep's own `results` are empty -- a scale artifact, not a finding.
+  // 45s leaves headroom under the 60s outer `timeoutMs` default for process
+  // startup/shutdown; `--timeout-threshold 0` disables semgrep's own "skip this file
+  // after N per-rule timeouts" behavior so a slow file is retried at full budget on
+  // every rule rather than silently skipped partway through.
+  const args = ["scan", "--json", "--timeout", "45", "--timeout-threshold", "0", "--config", configArg, rootDir];
 
   let scratch;
   try {

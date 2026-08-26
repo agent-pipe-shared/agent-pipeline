@@ -1,0 +1,33 @@
+{
+  "schema": "pipeline.wp2wp3-parta-implementation-evidence.v1",
+  "candidate": { "commit": "77a7d7999a998e455f26ad0952d4a4105e2edd47", "tree": "8cf29ccbbc59a9579e13e0ca89c822c33f77a78e" },
+  "base": "ed22bcca49cf5bf4372cdaff73dbf829013aaae0",
+  "commits": ["99396a7", "57636b2", "cc11803", "77a7d79"],
+  "checks": [
+    {
+      "command": "node plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs",
+      "exitCode": 0,
+      "resultSummary": "27 tests passed, 0 failed."
+    },
+    {
+      "command": "node plugins/pipeline-core/hooks/guard-gate-strength.test.mjs",
+      "exitCode": 0,
+      "resultSummary": "19 passed, 0 failed (existing, unmodified suite; GS-8 exercised generically by GST01/GST17)."
+    },
+    {
+      "command": "node plugins/pipeline-core/hooks/guard-gate-strength-gmw.test.mjs",
+      "exitCode": 0,
+      "resultSummary": "1 passed, 0 failed (existing, unmodified GMW suite)."
+    },
+    {
+      "command": "node plugins/pipeline-core/lib/public-core-origin-allowlist.test.mjs",
+      "exitCode": 0,
+      "resultSummary": "3 tests passed, 0 failed (new file)."
+    },
+    {
+      "command": "node harness/scripts/check-doc-contracts.mjs",
+      "exitCode": 0,
+      "resultSummary": "Documentation contracts valid: 472 Markdown file(s), 776 link(s), 13 anchor check(s)."
+    }
+  ]
+}

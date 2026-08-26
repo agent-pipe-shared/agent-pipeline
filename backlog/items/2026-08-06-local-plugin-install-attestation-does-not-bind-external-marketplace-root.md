@@ -120,6 +120,8 @@ Owner: PO. Due: 2026-09-06.
 
 ## Closure (2026-08-17)
 
+**Merge note (2026-08-26, moved from frontmatter):** Nova (feat/sprint-nova-codex-v046) closed this item 2026-08-17 by implementing the fix (see Closure section). Phoenix (origin/sprint_phoenix) independently closed the same item 2026-08-18 via commit 88dc3ba6952f226ed4f9caa57bad982cb660a425, per PO direction not to reimplement work Nova had already delivered (see the 2026-08-18 update below). Nova's earlier closure_commit is kept as primary.
+
 Implemented exactly per the Proposal: `externalLocalMarketplaceObservation()`
 (NVA-BL-20, extended by `NVA-MKTHASH-1`/`NVA-MKTHASH-2` this session) locates
 the external `agent-pipeline-local` root via the real Codex marketplace
@@ -129,3 +131,16 @@ result into `statusSha256`. Live-environment confirmation, not just unit
 tests: the "F1 (dispatch CRITIC-REMEDY-09)" test, which exercises this
 host's actual registered marketplace root, now passes. Full closure evidence:
 `specs/sprint-nova-epic/evidence/backlog/2026-08-17-local-plugin-install-attestation-closure.md`.
+
+**Update 2026-08-18 (Elephant, Phoenix backlog-clearing pass):** still
+unfixed in Phoenix's own `human-guard-override.mjs` — confirmed unchanged.
+Nova has since built the `goldfish-deep`+design work this Triage called for:
+a dedicated `externalLocalMarketplaceObservation` function (Nova
+`human-guard-override.mjs:344,546-610,1191`) that resolves the host
+marketplace registry's external root, hashes its own `marketplace.json`, and
+verifies the `plugins/pipeline-core` entry (symlink/junction OR
+content-hash-equal real copy) resolves back to the exact checkout — folded
+into the observation's `externalMarketplace` field, with updated preview
+text. Per PO direction (2026-08-18): items already resolved in Nova's
+current code are closed here rather than reimplemented, since Phoenix does
+not need to duplicate Nova's own hardening. Closing.

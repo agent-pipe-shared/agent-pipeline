@@ -13,7 +13,7 @@ behavior observations use a GitHub Issue as their single source from capture
 through triage; only accepted implementation work is linked into this backlog,
 as defined by the [observation intake governance](../docs/observation-intake.md).
 The backlog remains the concrete implementation of the feedback loop from
-[`docs/operating-model.md` §7](../docs/operating-model.md#7-feedback-loop).
+[`docs/operating-model.md` §4](../docs/operating-model.md#4-the-lifecycle) (step 8 retro).
 
 ## Item types
 
@@ -25,8 +25,9 @@ Every item carries exactly one type in the frontmatter field `type`:
 | `tooling-radar` | Result of a radar run or an ADR follow-up from the tooling-radar contract | monthly radar run ([`policies/tooling-policy.md` §4](../policies/tooling-policy.md)) |
 | `defect` | Gap, contradiction, or drift in an existing pipeline artifact (docs contradict the ruleset, guardrail has a hole) | Critic finding, drift check, self-observation |
 | `idea` | Immature proposal without a worked-out case — prioritization and elaboration still pending | spontaneous observation, discussion with the PO |
+| `requirement` | An obligation stated by the Product Owner that the repository must satisfy — not a defect an agent found and not an improvement an agent proposes | PO ruling, PO-stated obligation raised in or outside a session |
 
-`workflow-improvement` and `tooling-radar` are the only types operating-model.md and tooling-policy.md already name explicitly ([`docs/operating-model.md` §7](../docs/operating-model.md), [`policies/tooling-policy.md` §4 R1](../policies/tooling-policy.md)); `defect` and `idea` extend the taxonomy with the two cases "something is broken" and "not yet a mature position" — neither was anchored anywhere before.
+`workflow-improvement` and `tooling-radar` are the only types operating-model.md and tooling-policy.md already name explicitly ([`docs/operating-model.md` §7](../docs/operating-model.md), [`policies/tooling-policy.md` §4 R1](../policies/tooling-policy.md)); `defect` and `idea` extend the taxonomy with the two cases "something is broken" and "not yet a mature position" — neither was anchored anywhere before. `requirement` closes a further gap (PO decision, 2026-08-08): two authors, in different sessions, independently reached for `requirement` and `improvement` to name a PO-stated obligation, and neither was canonical. Use `requirement` only when the obligation itself comes from the PO — a bug an agent finds stays `defect`, and an improvement an agent proposes stays `workflow-improvement`, even when a PO observation triggered the discovery.
 
 ## Storage & format
 
@@ -36,13 +37,23 @@ Every item carries exactly one type in the frontmatter field `type`:
 
 ### Status lifecycle
 
-`open` → `in_progress` → `closed`
+`open` → `in_progress` → `closed`, with two additional triage-only outcomes
+reachable directly from `open`: `open` → `rejected` and `open` → `deferred`.
 
 - **open** — created or triaged but not currently being implemented.
 - **in_progress** — accepted and assigned to active work; the reason and
   evidence remain in the append-only transition ledger.
 - **closed** — implemented with closure evidence and the sanctioned ledger
   transition; a baseline migration never creates this state.
+- **rejected** — triaged and declined, with rationale recorded in the item
+  (see Triage rules below); reachable only from `open`, never mid-execution.
+- **deferred** — triaged and postponed, with the condition for revisiting it
+  recorded in the item (see Triage rules below); reachable only from `open`,
+  never mid-execution.
+
+`rejected` and `deferred` are terminal in the transition ledger, matching
+today's documented process: neither this section nor the Triage rules below
+describe a path back out of a triage disposition.
 
 The 2026-07-20 migration mapped legacy `new`/`open` to `open` and
 `accepted`/`in-progress` to `in_progress`. It preserved bodies and scheduling
@@ -51,7 +62,7 @@ implementation, or closure.
 
 ## Triage rules
 
-Per [`docs/operating-model.md` §7](../docs/operating-model.md#7-feedback-loop): triage is owned by the **Elephant of the next pipeline session** (not the Goldfish who created the item — separation of proposal and decision).
+Per [`docs/operating-model.md` §4](../docs/operating-model.md#4-the-lifecycle) (step 8 retro): triage is owned by the **Elephant of the next pipeline session** (not the Goldfish who created the item — separation of proposal and decision).
 
 1. Review all items with `status: open` (at a natural session/phase boundary, not mid-execution).
 2. Decide per item: **accept** (note phase/release in the item) / **reject**
@@ -120,7 +131,7 @@ As long as the pipeline is versioned in the SHA phase ([ADR-0002](../docs/adr/00
 
 ## Close-retro
 
-Every completed project session ends (part of the `/close` ritual) with a **retro written by the session Elephant itself** on the question "What should the pipeline do better next time?". The answer is either a concrete backlog item (usually `type: workflow-improvement`) or a transfer item to the pipeline Elephant, or a deliberate, explicitly noted "nothing" — silence is not a valid answer ([`docs/operating-model.md` §7](../docs/operating-model.md#7-feedback-loop)). **The PO is no longer asked via a ritual question**; he submits his own observations separately through his own channel.
+Every completed project session ends (part of the `/close` ritual) with a **retro written by the session Elephant itself** on the question "What should the pipeline do better next time?". The answer is either a concrete backlog item (usually `type: workflow-improvement`) or a transfer item to the pipeline Elephant, or a deliberate, explicitly noted "nothing" — silence is not a valid answer ([`docs/operating-model.md` §4](../docs/operating-model.md#4-the-lifecycle), step 8 retro). **The PO is no longer asked via a ritual question**; he submits his own observations separately through his own channel.
 
 ## Tooling radar (special case)
 
@@ -129,7 +140,7 @@ The tooling radar has its own, already fully specified contract in [`policies/to
 ## OPEN
 
 - OPEN (Phase 4): the `/close` skill (close-block) does not yet automate the triage reminder. The radar catch-up rule is anchored as a check step "tooling radar due?" in the close-block skill (step 7) and in `harness/checklists/session-close.md`; a standalone `/radar` skill remains open.
-- Schema format for **calibration files** is decided (shipped with the plugin): JSON (`.claude/pipeline.json`, [`docs/operating-model.md` §8](../docs/operating-model.md#8-projekt-kalibrierungsschicht)). Backlog items deliberately stay Markdown+frontmatter — they are human-readable process artifacts, not skill calibration.
+- Schema format for **calibration files** is decided (shipped with the plugin): JSON (`.claude/pipeline.json`, [`docs/operating-model.md` §7](../docs/operating-model.md#7-project-calibration-and-extensions)). Backlog items deliberately stay Markdown+frontmatter — they are human-readable process artifacts, not skill calibration.
 
 ## References
 

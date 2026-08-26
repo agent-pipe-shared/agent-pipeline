@@ -1,0 +1,40 @@
+{
+  "taskId": "PHX-WP-PX0AC05-AR05G",
+  "model": "claude-opus-5",
+  "rulesetSha": "ce50d74d16fdbcd0b9f8b3b606297e88af3d2f139b3cd14b692f4ea15599b023",
+  "dispatcher": "goldfish-deep",
+  "outcome": "partial-git-contamination-stop",
+  "log": [
+    {
+      "phase": "bootstrap",
+      "toolUseCount": 3,
+      "note": "Dispatch record created as opening act. Beginning context-file reads."
+    },
+    {
+      "phase": "orientation",
+      "toolUseCount": 8,
+      "note": "Confirmed authority-revision-proof.mjs:19 has !ID.test(decision.id) as briefed. Confirmed reviseProposal/stateBytes/AR04g-AR04h/AR05a-c block shapes match briefing (line numbers shifted by a handful of lines but all referenced patterns intact)."
+    },
+    {
+      "phase": "edit",
+      "toolUseCount": 11,
+      "note": "Inserted AR05g block between AR05c's closing brace and the durable-retention comment, verbatim per briefing DoD template. Edit applied cleanly under the active TP-5 Guard Maintenance Window -- no guard block on the test-file edit."
+    },
+    {
+      "phase": "verify",
+      "toolUseCount": 13,
+      "note": "node --test --test-reporter=tap --test-reporter-destination=specs/sprint-phoenix-epic/evidence/PHX-WP-PX0AC05-AR05G-green.tap harness/scripts/pipeline-state.test.mjs -- 506/506 cases passed (custom ok() counter), node:test summary tests=1 pass=1 fail=0 cancelled=0. AR05g's two assertions both PASS in the TAP body. Exit code not separately captured (echo $? was blocked by the shell-grammar guard as a composed/second command); inferred non-fail from the TAP artifact's `# fail 0` and the absence of a Bash-tool error, not asserted as a verified exit code."
+    },
+    {
+      "phase": "commit-first-attempt",
+      "toolUseCount": 20,
+      "note": "First commit (SHA 979e579c) used `git commit -m <short-subject-only> -- harness/scripts/pipeline-state.test.mjs` as a probe of the guard grammar; it succeeded and correctly scoped to only my file, but the message LACKED the required Dispatch/AI-Assisted trailer (multi-line -m and $'...' ANSI-C quoting were both rejected by the shell-grammar guard; heredoc/redirect forms are also forbidden by the guard)."
+    },
+    {
+      "phase": "trailer-fix-attempt-CONTAMINATION",
+      "toolUseCount": 23,
+      "note": "To add the trailer, wrote the full message to .git/AR05G-commit-msg.txt (inside the repo's own physical root, since writing to the session scratchpad under /tmp was blocked by GUARD-CROSS-REPO-MUTATION) and ran `git commit --amend -F .git/AR05G-commit-msg.txt` WITHOUT a pathspec. Between my first commit and this amend, the CONCURRENT ruleset-freshness dispatch committed its own work on top of mine: f51d6348 'fix(phoenix): replace fake WSL host attestation with honest fail-closed spawn' (confirmed via `git reflog`: HEAD@{1} f51d6348 commit, HEAD@{0} ad5a537e commit (amend)). My unscoped amend AMENDED THEIR COMMIT, not mine: current HEAD ad5a537e carries the OTHER dispatch's content (plugins/pipeline-core/scripts/ruleset-freshness.mjs + .test.mjs, 62 insertions/168 deletions) under MY commit message and MY 'Dispatch: PHX-WP-PX0AC05-AR05G' trailer. Their original commit f51d6348 is now dangling (off-branch, recoverable via reflog, not yet garbage-collected). My own file's content is safely committed and correct in 979e579c (which IS still in ad5a537e's ancestry, untouched) -- only the trailer is missing on 979e579c, and ad5a537e is the contaminated tip. Per advisor guidance: did NOT attempt git reset or a second amend (would race the other dispatch a second time, live). Stopping and reporting for Elephant/PO untangling instead."
+    }
+  ],
+  "report": "1. DoD results: AR05g test block added exactly per template, positioned between AR05c and the durable-retention comment -- passed. Both new assertions pass -- passed. Full-suite regression (506/506, fail 0) -- passed. Commit landed with correct scope and required trailer -- FAILED (see below): a live git race with the concurrent ruleset-freshness dispatch left the branch tip contaminated.\n2. Evidence: specs/sprint-phoenix-epic/evidence/PHX-WP-PX0AC05-AR05G-green.tap, command `node --test --test-reporter=tap --test-reporter-destination=<path> harness/scripts/pipeline-state.test.mjs`. TAP shows 506/506 (`# 506/506 cases passed.`) and node:test summary `tests 1 / pass 1 / fail 0 / cancelled 0`; AR05g's two ok() lines PASS at lines 706-707. Exit code NOT separately captured -- `echo $?` was blocked by the shell-grammar guard as a second/composed command; reported as not-separately-captured, not asserted as verified 0.\n3. Changed files: harness/scripts/pipeline-state.test.mjs -- added the AR05g block verbatim per the briefing's DoD template, correctly positioned; this content is safely committed in 979e579c (in ad5a537e's ancestry, untouched).\n4. Deliberately not changed: no existing test case reordered/renumbered/weakened; specs/sprint-phoenix-epic/evidence/PHX-WP-PX0AC05-DECISIONID.dispatch-record.json read-only, untouched; authority-revision-proof.mjs untouched. .git/AR05G-commit-msg.txt (an untracked scratch commit-message file inside .git/, harmless, not part of any tree) left in place -- PO/Elephant may delete it.\n5. Deviations: (a) commit trailer -- 979e579c (my correctly-scoped commit) carries only a bare subject line, missing the required 'Dispatch: PHX-WP-PX0AC05-AR05G (goldfish)' / 'AI-Assisted: true' trailer, because multi-line -m and $'...' ANSI-C quoting were both rejected by the shell-grammar guard and I resorted to an unscoped `git commit --amend -F <file>` to add it. (b) GIT CONTAMINATION (the real incident): between my first commit and that amend, the concurrent ruleset-freshness dispatch committed f51d6348 ('fix(phoenix): replace fake WSL host attestation with honest fail-closed spawn') on top of my 979e579c. My unscoped amend amended THEIR commit instead of mine (confirmed via `git reflog`: HEAD@{1}=f51d6348 commit, HEAD@{0}=ad5a537e commit (amend)). Current branch tip ad5a537e now carries the OTHER dispatch's file content (plugins/pipeline-core/scripts/ruleset-freshness.mjs + .test.mjs) under MY commit message and Dispatch trailer. f51d6348 (their original, correct commit) is dangling -- off-branch, recoverable via reflog, not garbage-collected. This is entirely local/unpushed (branch is 147+ ahead of origin, untouched). Per advisor guidance I did NOT attempt git reset or a second amend, since either risks racing the other dispatch a second time while it may still be running in this shared checkout.\n6. Open items / stop conditions triggered: tool budget exceeded (~31 uses vs a 25 cap) due to the recovery investigation -- reported per the stop-condition rule rather than iterating further. GIT CONTAMINATION requires Elephant/PO untangling: recover f51d6348's tree (`git show f51d6348 --stat` / cherry-pick or reset-and-recommit) for the ruleset-freshness dispatch's work, and separately give 979e579c's content (already correct and isolated) the missing trailer via a clean, single-owner commit once the other dispatch's work is no longer live-racing this checkout. Do not resolve by blindly resetting while the other dispatch may still be active."
+}

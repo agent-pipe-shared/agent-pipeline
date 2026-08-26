@@ -66,7 +66,15 @@ const STATUS_PATH = "backlog/STATUS.md";
 const INDEX_PATH = "backlog/index.json";
 const JOURNAL_PATH = "backlog/.reconcile-transaction.json";
 const ACTOR = "backlog-reconciliation";
+// The single linear backbone this tool fills gaps along, one step at a time.
+// `rejected` and `deferred` are deliberately excluded: per backlog/README.md's
+// Triage rules they are reachable only directly from `open` (triage applies to
+// open items only, "at a natural session/phase boundary, not mid-execution"),
+// never an intermediate step of open -> in_progress -> closed, and never a
+// status a ledger entry moves on from once reached (see backlog-state.mjs's
+// FORWARD_TRANSITIONS for the same rule enforced at validation time).
 const ORDER = Object.freeze(["open", "in_progress", "closed"]);
+const TRIAGE_BRANCH_STATUSES = Object.freeze(["rejected", "deferred"]);
 const REASON =
   "Record in the ledger the status this backlog item file already asserts. " +
   "The item file is the pre-existing record; this entry claims no implementation, " +
@@ -213,10 +221,56 @@ export function planBacklogReconciliation(root = DEFAULT_ROOT, { at = null, comm
   const chain = [...events];
   const blocked = [...findings];
 
+  // A closing entry's evidence commit is the item's OWN recorded closure
+  // commit — the checker binds the two, and a reconciliation must not
+  // substitute the reconciling HEAD for the commit that did the work.
+  const appendStep = (item, from, to) => {
+    const step = {
+      schema: TRANSITION_SCHEMA,
+      sequence: chain.length + 1,
+      id: item.metadata.id,
+      from,
+      to,
+      at: date,
+      actor: ACTOR,
+      reason: to === "closed" ? CLOSED_REASON : REASON,
+      evidence: {
+        kind: "item-file-reconciliation",
+        commit: to === "closed" ? item.metadata.closure_commit : baseline,
+        reference: item.path,
+      },
+      previousHash: chain.length === 0 ? null : chain.at(-1).entryHash,
+      entryHash: "",
+    };
+    step.entryHash = transitionHash(step);
+    chain.push(step);
+    planned.push(step);
+  };
+
   for (const item of items) {
     const target = item.metadata.status;
     const current = ledgerFinal.get(item.metadata.id) ?? null;
     if (current === target) continue;
+
+    if (TRIAGE_BRANCH_STATUSES.includes(current)) {
+      blocked.push(`${item.path}: file status ${target} cannot follow the ledger's ${current} status; a ledger entry is never rewound`);
+      continue;
+    }
+
+    if (TRIAGE_BRANCH_STATUSES.includes(target)) {
+      // backlog/README.md Triage rules apply only to open items, "not
+      // mid-execution" — so this branch is reachable only from open (or from
+      // no ledger entry at all, in which case the item is admitted as open
+      // first, exactly like every other item, before the triage step lands).
+      if (current !== null && current !== "open") {
+        blocked.push(`${item.path}: file status ${target} is reachable only from open (backlog/README.md Triage rules apply to open items only); the ledger's current status is ${current}`);
+        continue;
+      }
+      if (current === null) appendStep(item, null, "open");
+      appendStep(item, "open", target);
+      continue;
+    }
+
     const from = current === null ? -1 : ORDER.indexOf(current);
     const to = ORDER.indexOf(target);
     if (to === -1) {

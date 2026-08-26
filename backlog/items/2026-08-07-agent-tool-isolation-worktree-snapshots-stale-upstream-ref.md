@@ -97,15 +97,25 @@ pre-existing item). Two additions from this occurrence:
 Still not a repository-code defect to fix here (harness-level). Decision
 unchanged: accept-open.
 
+**Update 2026-08-18 (Elephant, Phoenix backlog-clearing pass):** re-verified
+— still no `isolation: "worktree"` implementation exists under
+`plugins/pipeline-core` or `harness/` in this checkout to inspect or patch;
+this is genuinely harness/tool-level, not a repository-code defect, and has
+no bearing on Phoenix's own delivered epic surface. Phoenix's own copy of
+this item flipped frontmatter `status` to `deferred` to match the Decision's
+substance (harness-level, nothing repository-side to fix); superseded by the
+PO's final closure below, one day later.
+
 ## Closure, 2026-08-19
 
 PO decision: close, final. Confirmed harness/tool-level limitation
 (`Agent`/`Workflow` tool's `isolation: "worktree"` snapshot source), not
 fixable from this repository's own code — matches this item's own existing
-Triage conclusion, reconfirmed independently on 2026-08-11. The documented
-workaround (self-heal via `git checkout --detach <sha>`, proactive
-`git rev-parse HEAD` verification before trusting a fresh worktree) is now
-itself a standing CLAUDE.md Hard Rule
+Triage conclusion, reconfirmed independently on 2026-08-11 and again on
+2026-08-18. The documented workaround (self-heal via
+`git checkout --detach <sha>`, proactive `git rev-parse HEAD` verification
+before trusting a fresh worktree) is now itself a standing CLAUDE.md Hard
+Rule
 (`plugins/pipeline-core/skills/pipeline-start/references/workflow-dispatch.md`),
 so the operational knowledge this item exists to preserve already has a
 durable home outside the backlog.

@@ -1,0 +1,17 @@
+fix(security): scope gitleaks bare-hex rules away from the ledger, per-path
+
+sentry-access-token (100% of amendment-kind ledger appends) and generic-api-key
+(~1.6% of ordinary appends) permanently collide with backlog/transitions.ndjson's
+bare 64-hex SHA-256 digests, forcing a manually-reviewed .gitleaksignore entry per
+occurrence forever. Add .gitleaks.toml (extends gitleaks' full default ruleset,
+useDefault = true) with a path-scoped allowlist disabling only those two rules for
+that one file; both rules stay fully armed everywhere else. gitleaks.mjs now always
+passes --config, resolved from the adapter module's own on-disk location so it
+never depends on rootDir (a detached, untrusted candidate-tree snapshot). Proven
+empirically with the real gitleaks binary: a ledger-shaped fixture at
+backlog/transitions.ndjson produces no finding, the identical secret-shaped string
+at a different path still does.
+
+Dispatch: PHX-WP-GITLEAKS-RULE-SCOPE (goldfish)
+
+AI-Assisted: true

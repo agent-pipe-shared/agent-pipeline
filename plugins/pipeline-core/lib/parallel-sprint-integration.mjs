@@ -13,6 +13,8 @@ export const PARALLEL_SPRINT_INTEGRATION_INPUT_SCHEMA = "pipeline.parallel-sprin
 export const PARALLEL_SPRINT_INTEGRATION_RECEIPT_SCHEMA = "pipeline.parallel-sprint-integration-receipt.v1";
 export const PARALLEL_SPRINT_IMPACT_REVIEW_SCHEMA = "pipeline.parallel-sprint-impact-review.v1";
 export const PARALLEL_SPRINT_SELECTION_SCHEMA = "pipeline.parallel-sprint-selection.v1";
+export const PARALLEL_SPRINT_PUBLICATION_GATE_INPUT_SCHEMA = "pipeline.parallel-sprint-publication-gate-input.v1";
+export const PARALLEL_SPRINT_PUBLICATION_GATE_RECEIPT_SCHEMA = "pipeline.parallel-sprint-publication-gate-receipt.v1";
 
 export const PARALLEL_SPRINT_DISPOSITIONS = Object.freeze({
   BASELINE_CURRENT: "baseline-current",
@@ -49,6 +51,28 @@ const IMPACT_SURFACES = new Set([
   "write-set",
 ]);
 const IMPACT_DECISIONS = new Set(["compatible", "defer", "material-incompatibility"]);
+// The parallel Sprint Epics Phoenix must stay independent of. A feature package
+// (specs/<id>/lifecycle.json, pipeline.feature-package.v1) binds exactly one
+// commit identity: candidate.commit. "Consuming" one of these Epics therefore
+// means that bound commit, or its ancestry, carries a commit that belongs to a
+// sibling Epic; "unpublished" means that commit is not reachable from that
+// Epic's own published tip (publicationStatus vocabulary of
+// pipeline.public-release-state.v1).
+export const SIBLING_SPRINT_EPICS = Object.freeze(["cyborg", "nightwing", "nova"]);
+const SIBLING_EPIC_SET = new Set(SIBLING_SPRINT_EPICS);
+const FEATURE_PACKAGE_SCHEMA = "pipeline.feature-package.v1";
+const CONSUMPTION_SOURCES = new Set(["candidate-commit", "candidate-commit-ancestry"]);
+const PUBLICATION_STATUSES = new Set(["published", "unpublished"]);
+// Headline order: the material criterion surfaces before closure diagnostics.
+const PUBLICATION_FINDING_ORDER = Object.freeze([
+  "PSI-PUB-CONSUMES-UNPUBLISHED-COMMIT",
+  "PSI-PUB-SIBLING-TIP-UNPUBLISHED",
+  "PSI-PUB-REACHABILITY-UNOBSERVED",
+  "PSI-PUB-REACHABILITY-TIP-DRIFT",
+  "PSI-PUB-OBJECT-FORMAT-MISMATCH",
+  "PSI-PUB-CONSUMPTION-UNATTRIBUTED",
+  "PSI-PUB-CONSUMPTION-MISSING-FOR-OBSERVED-EPIC",
+]);
 const PROMOTION_REASONS = new Set(["merge-ready-candidate", "protected-surface", "material-incompatibility"]);
 const INTERRUPTED_KINDS = new Set(Object.values(PARALLEL_SPRINT_RECOVERY_ACTIONS));
 
@@ -473,4 +497,192 @@ export function planParallelSprintIntegration(input) {
     );
   }
   return reconcileInterrupted(input.interrupted, requestSha256, planned);
+}
+
+function gateDigest(input) {
+  try {
+    return digestParallelSprintValue(input);
+  } catch {
+    return digestParallelSprintValue({ invalidPortableInput: true });
+  }
+}
+
+function gateReceipt(body) {
+  return sealReceipt({ schema: PARALLEL_SPRINT_PUBLICATION_GATE_RECEIPT_SCHEMA, ...body });
+}
+
+function gateRefusal(code, requestSha256, details = {}) {
+  return gateReceipt({
+    status: "verification-failed",
+    code,
+    requestSha256,
+    packageId: null,
+    boundCommit: null,
+    publishedConsumptions: [],
+    findings: [{ code, epic: null, commit: null }],
+    ...details,
+  });
+}
+
+/** `git for-each-ref --contains <commit>` reduced to the sibling Epics it named. */
+function normalizedProvenance(value) {
+  if (value === "unobserved") return "unobserved";
+  if (!hasExactKeys(value, ["probe", "epics"]) || value.probe !== "branch-contains") return null;
+  const epics = canonicalList(value.epics, (epic) => SIBLING_EPIC_SET.has(epic));
+  return epics === null ? null : { probe: "branch-contains", epics };
+}
+
+function normalizedConsumption(value) {
+  if (!hasExactKeys(value, ["epic", "commit", "source", "publishedTip", "reachability"])) return null;
+  if (typeof value.epic !== "string" || !SIBLING_EPIC_SET.has(value.epic)) return null;
+  if (!GIT_OID.test(value.commit ?? "") || !CONSUMPTION_SOURCES.has(value.source)) return null;
+  const tip = value.publishedTip;
+  if (!(tip === null || (hasExactKeys(tip, ["ref", "commit", "publicationStatus"])
+    && typeof tip.ref === "string" && SAFE_TAG.test(tip.ref) && GIT_OID.test(tip.commit ?? "")
+    && PUBLICATION_STATUSES.has(tip.publicationStatus)))) return null;
+  // Reachability is the raw exit status of `git merge-base --is-ancestor
+  // <commit> <publishedTip>`; the gate, never the caller, draws the verdict.
+  const reach = value.reachability;
+  if (!(reach === "unobserved" || (hasExactKeys(reach, ["probe", "tipCommit", "exitCode"])
+    && reach.probe === "merge-base--is-ancestor" && GIT_OID.test(reach.tipCommit ?? "")
+    && Number.isInteger(reach.exitCode) && reach.exitCode >= 0 && reach.exitCode <= 255))) return null;
+  return {
+    epic: value.epic,
+    commit: value.commit,
+    source: value.source,
+    publishedTip: tip === null ? null : { ...tip },
+    reachability: reach === "unobserved" ? "unobserved" : { ...reach },
+  };
+}
+
+function consumptionKey(record) {
+  return `${record.epic} ${record.commit} ${record.source}`;
+}
+
+function normalizedConsumptions(value) {
+  if (!Array.isArray(value)) return null;
+  const records = value.map(normalizedConsumption);
+  if (records.some((record) => record === null)) return null;
+  const keys = records.map(consumptionKey);
+  if (new Set(keys).size !== keys.length) return null;
+  return records.sort((left, right) => (consumptionKey(left) < consumptionKey(right) ? -1 : 1));
+}
+
+function headlineFinding(findings) {
+  for (const code of PUBLICATION_FINDING_ORDER) {
+    if (findings.some((finding) => finding.code === code)) return code;
+  }
+  return findings[0].code;
+}
+
+/**
+ * EPIC-AC-02. Decides whether one feature package may pass verification given
+ * what the caller observed about the sibling Sprint Epics (Nova, Cyborg,
+ * Nightwing) its bound candidate commit consumes.
+ *
+ * Fail-closed: a bound candidate commit whose sibling-Epic provenance was never
+ * observed, whose sibling tip is itself unpublished, or whose reachability from
+ * that published tip is unobserved or negative, yields
+ * `status: "verification-failed"`. Only a published tip plus an exit-code-0
+ * ancestry probe against exactly that tip commit is a published consumption.
+ *
+ * Like the rest of this module it never invokes Git: the caller supplies the
+ * observations and persists the sealed receipt.
+ */
+export function checkUnpublishedSiblingSprintConsumption(input) {
+  const requestSha256 = gateDigest(input);
+  if (!isObject(input) || input.schema !== PARALLEL_SPRINT_PUBLICATION_GATE_INPUT_SCHEMA) {
+    return gateRefusal("PSI-PUB-INPUT-SCHEMA", requestSha256);
+  }
+  if (!hasExactKeys(input, ["schema", "package", "siblingProvenance", "consumptions"])) {
+    return gateRefusal("PSI-PUB-INPUT-SHAPE", requestSha256);
+  }
+
+  const manifest = input.package;
+  if (!hasExactKeys(manifest, ["schema", "feature", "state", "artifacts", "candidate", "supersedes"])
+    || manifest.schema !== FEATURE_PACKAGE_SCHEMA || !isObject(manifest.feature)
+    || !SAFE_ID.test(manifest.feature.id ?? "") || !Array.isArray(manifest.artifacts)) {
+    return gateRefusal("PSI-PUB-PACKAGE-MANIFEST-INVALID", requestSha256);
+  }
+  const packageId = manifest.feature.id;
+  let boundCommit = null;
+  if (manifest.candidate !== null) {
+    if (!hasExactKeys(manifest.candidate, ["commit", "tree"]) || !GIT_OID.test(manifest.candidate.commit ?? "")
+      || !GIT_OID.test(manifest.candidate.tree ?? "")
+      || manifest.candidate.commit.length !== manifest.candidate.tree.length) {
+      return gateRefusal("PSI-PUB-PACKAGE-CANDIDATE-INVALID", requestSha256, { packageId });
+    }
+    boundCommit = manifest.candidate.commit;
+  }
+
+  const provenance = normalizedProvenance(input.siblingProvenance);
+  if (provenance === null) return gateRefusal("PSI-PUB-PROVENANCE-INVALID", requestSha256, { packageId, boundCommit });
+  const consumptions = normalizedConsumptions(input.consumptions);
+  if (consumptions === null) return gateRefusal("PSI-PUB-CONSUMPTION-INVALID", requestSha256, { packageId, boundCommit });
+
+  if (boundCommit === null) {
+    return consumptions.length === 0
+      ? gateReceipt({
+        status: "verification-permitted",
+        code: "PSI-PUB-NO-BOUND-COMMIT",
+        requestSha256,
+        packageId,
+        boundCommit: null,
+        publishedConsumptions: [],
+        findings: [],
+      })
+      : gateRefusal("PSI-PUB-CONSUMPTION-WITHOUT-BOUND-COMMIT", requestSha256, { packageId, boundCommit: null });
+  }
+  if (provenance === "unobserved") {
+    return gateRefusal("PSI-PUB-PROVENANCE-UNOBSERVED", requestSha256, { packageId, boundCommit });
+  }
+
+  const findings = [];
+  const publishedConsumptions = [];
+  for (const epic of provenance.epics) {
+    if (!consumptions.some((record) => record.epic === epic)) {
+      findings.push({ code: "PSI-PUB-CONSUMPTION-MISSING-FOR-OBSERVED-EPIC", epic, commit: null });
+    }
+  }
+  for (const record of consumptions) {
+    const at = { epic: record.epic, commit: record.commit };
+    if (!provenance.epics.includes(record.epic)) {
+      findings.push({ code: "PSI-PUB-CONSUMPTION-UNATTRIBUTED", ...at });
+    } else if (record.commit.length !== boundCommit.length) {
+      findings.push({ code: "PSI-PUB-OBJECT-FORMAT-MISMATCH", ...at });
+    } else if (record.publishedTip === null || record.publishedTip.publicationStatus !== "published") {
+      findings.push({ code: "PSI-PUB-SIBLING-TIP-UNPUBLISHED", ...at });
+    } else if (record.publishedTip.commit.length !== boundCommit.length) {
+      findings.push({ code: "PSI-PUB-OBJECT-FORMAT-MISMATCH", ...at });
+    } else if (record.reachability === "unobserved") {
+      findings.push({ code: "PSI-PUB-REACHABILITY-UNOBSERVED", ...at });
+    } else if (record.reachability.tipCommit !== record.publishedTip.commit) {
+      findings.push({ code: "PSI-PUB-REACHABILITY-TIP-DRIFT", ...at });
+    } else if (record.reachability.exitCode !== 0) {
+      findings.push({ code: "PSI-PUB-CONSUMES-UNPUBLISHED-COMMIT", ...at });
+    } else {
+      publishedConsumptions.push(at);
+    }
+  }
+
+  if (findings.length > 0) {
+    return gateReceipt({
+      status: "verification-failed",
+      code: headlineFinding(findings),
+      requestSha256,
+      packageId,
+      boundCommit,
+      publishedConsumptions,
+      findings,
+    });
+  }
+  return gateReceipt({
+    status: "verification-permitted",
+    code: consumptions.length === 0 ? "PSI-PUB-NO-SIBLING-CONSUMPTION" : "PSI-PUB-SIBLING-CONSUMPTION-PUBLISHED",
+    requestSha256,
+    packageId,
+    boundCommit,
+    publishedConsumptions,
+    findings: [],
+  });
 }

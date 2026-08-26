@@ -37,6 +37,41 @@ function iso(value) { if (typeof value !== "string") return false; const time = 
 function sortedUnique(values) { return Array.isArray(values) && values.length <= 256 && values.every((value, index) => ID.test(value) && (index === 0 || values[index - 1] < value)); }
 function validSuite(suite) { return exact(suite, ["id", "implementationSha256", "inputs", "environmentContractSha256", "dependsOn"]) && ID.test(suite.id) && SHA256.test(suite.implementationSha256) && inputSet(suite.inputs) && SHA256.test(suite.environmentContractSha256) && sortedUnique(suite.dependsOn); }
 
+// Registration diagnostics. A rejected registration reaches the operator only
+// as verify.mjs's `VERIFY-JOURNAL-FAILED: ${message}`, cut at 256 characters,
+// so every message below stays one line and keeps its finding inside that cut:
+// the id that IS the finding is quoted whole (ID bounds it at 128 characters),
+// while untrusted text -- and any id sharing a message with a second one -- is
+// elided at 64, so even a maximal pair still fits.
+const ID_QUOTE_MAX = 128;
+const TEXT_QUOTE_MAX = 64;
+const SUITE_FIELDS = ["id", "implementationSha256", "inputs", "environmentContractSha256", "dependsOn"];
+function asText(value) {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "bigint" || typeof value === "boolean") return String(value);
+  return `<${value === null ? "null" : typeof value}>`;
+}
+function quoted(value, budget) { const printable = asText(value).replace(/[^ -~]/gu, "?"); return `"${printable.length > budget ? `${printable.slice(0, budget)}...` : printable}"`; }
+// Diagnostic mirror of validSuite(): it gates nothing -- validSuite() alone
+// decides what is accepted -- it only names which part of an already-rejected
+// entry is at fault, so a gap here costs message precision, never admission.
+// "has an invalid shape" is the fallback if it ever drifts behind validSuite().
+function suiteDefect(suite) {
+  if (!object(suite)) return "is not a registration object";
+  const keys = Object.keys(suite);
+  const missing = SUITE_FIELDS.find((field) => !keys.includes(field));
+  if (missing !== undefined) return `is missing the ${missing} field`;
+  const unexpected = keys.find((field) => !SUITE_FIELDS.includes(field));
+  if (unexpected !== undefined) return `carries the unregistered field ${quoted(unexpected, TEXT_QUOTE_MAX)}`;
+  if (!ID.test(suite.id)) return "has an invalid id field";
+  if (!SHA256.test(suite.implementationSha256)) return "has an invalid implementationSha256 field";
+  if (!inputSet(suite.inputs)) return "has an invalid inputs field";
+  if (!SHA256.test(suite.environmentContractSha256)) return "has an invalid environmentContractSha256 field";
+  if (!sortedUnique(suite.dependsOn)) return "has an invalid dependsOn field";
+  return "has an invalid shape";
+}
+function suiteLocation(suite, index) { return object(suite) && typeof suite.id === "string" && ID.test(suite.id) ? `suite ${quoted(suite.id, TEXT_QUOTE_MAX)} at index ${index}` : `suite at index ${index}`; }
+
 export function verifySuiteReceiptSha256(receipt) { const { receiptSha256: omitted, ...body } = receipt ?? {}; return digestJson(body); }
 
 export function validateVerifySuiteReceipt(receipt) {
@@ -121,7 +156,7 @@ function assertAcyclic(suites) {
   const visiting = new Set();
   const visited = new Set();
   function visit(id) {
-    if (visiting.has(id)) throw new TypeError("Verify dependency cycle is invalid");
+    if (visiting.has(id)) throw new TypeError(`Verify dependency cycle is invalid: suite ${quoted(id, ID_QUOTE_MAX)} is part of a dependency cycle`);
     if (visited.has(id)) return;
     visiting.add(id);
     for (const dependency of byId.get(id).dependsOn) visit(dependency);
@@ -152,8 +187,15 @@ export function createPublicVerifyRunEvidence({ runId, policySha256, resumePlanS
 export function planVerifyResume({ runId, candidate: currentCandidate, suites, receipts = {}, logs = {}, policySha256, allowCrossCandidateReuse = false }) {
   if (!ID.test(runId) || !candidate(currentCandidate) || !Array.isArray(suites) || suites.length === 0 || !SHA256.test(policySha256)) throw new TypeError("Verify registration is invalid");
   const ids = new Set();
-  for (const suite of suites) { if (!validSuite(suite) || ids.has(suite.id)) throw new TypeError("Verify suite registration is invalid"); ids.add(suite.id); }
-  for (const suite of suites) if (suite.dependsOn.some((id) => !ids.has(id) || id === suite.id)) throw new TypeError("Verify dependency registration is invalid");
+  for (const [index, suite] of suites.entries()) {
+    if (!validSuite(suite)) throw new TypeError(`Verify suite registration is invalid: ${suiteLocation(suite, index)} ${suiteDefect(suite)}`);
+    if (ids.has(suite.id)) throw new TypeError(`Verify suite registration is invalid: duplicate suite id ${quoted(suite.id, ID_QUOTE_MAX)}, registered again at index ${index}`);
+    ids.add(suite.id);
+  }
+  for (const suite of suites) {
+    const offender = suite.dependsOn.findIndex((id) => !ids.has(id) || id === suite.id);
+    if (offender >= 0) throw new TypeError(`Verify dependency registration is invalid: suite ${quoted(suite.id, TEXT_QUOTE_MAX)} depends on ${suite.dependsOn[offender] === suite.id ? "itself" : `unregistered suite id ${quoted(suite.dependsOn[offender], TEXT_QUOTE_MAX)}`}`);
+  }
   assertAcyclic(suites);
 
   const reasons = new Map();

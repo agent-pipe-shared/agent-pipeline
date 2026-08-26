@@ -1,0 +1,38 @@
+{
+  "schema": "phx-wp-lac01.e2e-readback.v1",
+  "exitCodes": {
+    "setFeature": 0,
+    "continuityInit": 0,
+    "continuityCas": 0
+  },
+  "casStdout": [
+    "PS-LIFECYCLE-EVENT-WRITTEN: dispatch event lge-d7ffdefbf8ad24233cd453794a5882555c9f04fac14a35f1dc698b67fda68acf persisted.",
+    "CS-CAS-APPLIED: continuity revision 1 written."
+  ],
+  "persistedEventPath": "artifacts/lifecycle/dispatch-e2e.json",
+  "persistedEventBytes": 562,
+  "readbackValidatesThroughClosedSchema": true,
+  "event": {
+    "eventId": "lge-d7ffdefbf8ad24233cd453794a5882555c9f04fac14a35f1dc698b67fda68acf",
+    "kind": "dispatch",
+    "status": "active",
+    "reasonCode": "DISPATCH_ADMITTED",
+    "correlation": {
+      "packageId": "P1",
+      "dispatchId": "dispatch-e2e",
+      "attemptId": "attempt-e2e",
+      "workerId": "worker-e2e",
+      "correlationId": "corr-e2e",
+      "queueRevision": 1
+    },
+    "candidate": {
+      "commit": "1725dc778e5d7418f49da5783d8f668be8b60f3c",
+      "tree": "97a4fa3be9a14fd11e32f298bbedd7d4408eefc0"
+    },
+    "invalidatesEventId": null,
+    "supersedesEventId": null
+  },
+  "candidateMatchesRealGitHead": true,
+  "persistedStateRevision": 1,
+  "outcome": "confirmed"
+}

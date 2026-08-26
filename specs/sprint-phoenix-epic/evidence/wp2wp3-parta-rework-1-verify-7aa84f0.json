@@ -1,0 +1,14 @@
+{
+  "schema": "pipeline.elephant-verified-checks.v1",
+  "note": "Elephant-run (not verify.mjs, not script-written) — same honesty disclosure QG-03 requires: this is a direct, individually-run reproduction, not a substitute claimed as verify.mjs-equivalent. Each command was run directly by the Elephant against the working tree at HEAD (cedd58a3a8a011299b1aa908f1906f721682d720), after confirming via `git diff --stat 7aa84f0..HEAD -- <the four touched files>` (empty output) that their content is byte-identical to candidate 7aa84f0; only docs/state.md changed afterward.",
+  "candidate": { "commit": "7aa84f099c5ca0d95b7a2a782a6136ad034bbaf1", "tree": "9b81034deb5224fa7bed7f31c83885cd863a0f8a" },
+  "verifiedAtTree": { "commit": "cedd58a3a8a011299b1aa908f1906f721682d720", "tree": "d246e9b6c0ded08db46af03e420e8189712e57c5" },
+  "checks": [
+    { "command": "node plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs", "exitCode": 0, "resultSummary": "32/32 passed, including the 3 new F2/F4 unstubbed-observer cases and the 2 new F2 .git-presence-gate cases." },
+    { "command": "node plugins/pipeline-core/scripts/bootstrap-payload-measure.test.mjs", "exitCode": 0, "resultSummary": "silent, no assertion errors (F5 hermeticity fix confirmed: no subprocess/tree-hash side effects observed)." },
+    { "command": "node plugins/pipeline-core/lib/public-core-origin-allowlist.test.mjs", "exitCode": 0, "resultSummary": "3/3 passed (unchanged, out of scope for this rework — carried for binding only)." },
+    { "command": "node plugins/pipeline-core/hooks/guard-gate-strength.test.mjs", "exitCode": 0, "resultSummary": "19/19 passed (unchanged, protected — carried for binding only)." },
+    { "command": "node harness/scripts/check-doc-contracts.mjs", "exitCode": 0, "resultSummary": "Documentation contracts valid: 474 Markdown file(s), 776 link(s), 13 anchor check(s)." }
+  ],
+  "notCovered": "harness/scripts/verify.mjs was not run directly (the same pre-existing VERIFY-CLEANUP-REGISTRATION-REQUIRED infra gap disclosed for every prior candidate this session in a plain checkout); F3/F6 remain unregistered/unprotected by design (structurally blocked, not a verification gap)."
+}

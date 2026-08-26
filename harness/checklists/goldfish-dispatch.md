@@ -1,6 +1,6 @@
 # Checklist — Goldfish Dispatch
 
-> Agent-Pipeline v0.1.0-draft · Phase 3 · Compact operative reference for the Elephant; why + verification live in `docs/operating-model.md` §2.3/§3.3/§5.3, `policies/model-policy.md`, `harness/definition-of-done.md`. Briefing template: `templates/` (authored in parallel).
+> Agent-Pipeline v0.1.0-draft · Phase 3 · Compact operative reference for the Elephant; why + verification live in `docs/operating-model.md` — *Roles and boundaries* / *Rigor, risk and gates*, `policies/model-policy.md`, `harness/definition-of-done.md`. Briefing template: `templates/` (authored in parallel).
 
 ## Ready to dispatch?
 
@@ -15,7 +15,7 @@
 - [ ] Background run without intermediate output → automatic watchdog wired IN THE SAME MOVE (monitor/timeout/auto-kill); promised checks are mechanized or withdrawn — the PO is never the watchdog (tooling-policy G3)
 - [ ] New transport path (headless/background/stdin/cwd/auth) → ~30-second smoke test through the FULL path BEFORE the expensive run (tooling-policy G4)
 
-## Briefing — 6 mandatory fields (OM §2.3)
+## Briefing — 6 mandatory fields (docs/operating-model.md, Roles and boundaries)
 
 - [ ] 1 Goal: outcome + observable end-state criterion — no step-by-step dictation
 - [ ] 2 Context files: explicit list, spec/delta-spec first — never chat history
@@ -28,7 +28,7 @@
 
 ## After delivery (Elephant)
 
-- [ ] Completion report complete (OM §2.3): per-check results three-valued (pass / fail / not verifiable) · evidence artifact · changed files + one-line reasons · "Deliberately NOT changed" · spec deviations · open items / remaining handwork
+- [ ] Completion report complete (`docs/operating-model.md` — *Roles and boundaries*): per-check results three-valued (pass / fail / not verifiable) · evidence artifact · changed files + one-line reasons · "Deliberately NOT changed" · spec deviations · open items / remaining handwork
 - [ ] Evidence artifact is script-written and names command + commit state + exit code — model prose does not count
 - [ ] Stop conditions respected; deviations reported, none silently built in
 - [ ] DoD status assigned: done / 🟡 not-human-verified / blocked (`harness/definition-of-done.md` §3)

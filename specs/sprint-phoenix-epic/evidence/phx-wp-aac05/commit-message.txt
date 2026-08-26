@@ -1,0 +1,16 @@
+feat(agent-decision-journal): carry identity provenance/assurance (A-AC-05)
+
+Add an optional identity array to the observational agent-decision-event
+shape, admissible only on selection/escalation/fallback where an identity
+choice (runner/model/effort/profile/role/adapter/capability) is material
+to the decision; presence on assumption/verification-scope fails closed
+with a new ADJ-IDENTITY-SCOPE code. Each entry pairs a closed dimension
+with a bounded value, provenance and assurance enum, no two entries may
+share a dimension, and the published JSON Schema is kept byte-equivalent
+and drift-tested against the runtime constants the same way
+assumptionState already is. Repo-wide discovery confirmed no production
+call site currently emits a selection/escalation/fallback event, so no
+fifth file was wired.
+
+Dispatch: PHX-WP-AAC05 (goldfish)
+AI-Assisted: true

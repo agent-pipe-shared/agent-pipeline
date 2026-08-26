@@ -1,0 +1,25 @@
+{
+  "taskId": "PHX-WP-LAC01B",
+  "model": "claude-opus-5[1m]",
+  "rulesetSha": "5125f494dd5a0f5315b8ea7f5f19e03ab4e0057e15c7198d5565d7b3d67ca937",
+  "dispatcher": "elephant",
+  "outcome": "succeeded",
+  "log": [
+    { "phase": "opening-record", "toolUses": 2, "note": "dispatch record created before substantive work" },
+    { "phase": "investigation", "note": "status kind: real caller found at pipeline-state.mjs:2318 (continuity-integrate-final / runFinalIntegrationTransaction), guarded by continuity-state.mjs:799 (CS-NO-DISPATCH). candidate-invalidation: no real caller -- pipeline-state.mjs:2172 always constructs invalidation as { state: \"valid\" }, zero non-test producers of state:\"invalidated\" or invalidatesEventId anywhere in lib/scripts/harness/scripts." },
+    { "phase": "implement", "note": "buildLifecycleStatusEvent added as a sibling of buildLifecycleDispatchEvent, sharing one projectLifecycleEvent body; planStatusLifecycleEvent wired into continuity-integrate-final, event written only after PS-CONTINUITY-FINAL-COMMITTED." },
+    { "phase": "verify", "note": "node --test on 4 touched/dependent files: pass. Gated harness/scripts/pipeline-state.test.mjs: 504/506 -- PS54af/PS54ag fail, same pre-existing FTP-ARTIFACT-2 cause (acceptance.md digest staleness, PO-signature-gated reconcile) already documented in docs/state.md before this dispatch ran; independently confirmed by the Elephant as pre-existing, not a regression from this change." },
+    { "phase": "commit", "note": "commit 8e4be420, 4 tracked files." },
+    { "phase": "budget-exhausted", "note": "45/45 tool uses reached before the closing dispatch-record write; report delivered via the mandatory final-report channel instead. Elephant completed this record post-hoc from that report." }
+  ],
+  "report": {
+    "result": "status kind wired at a real caller; candidate-invalidation has no real caller (negative finding, correctly not wired)",
+    "triggerCount": "1 of 9, not 2 as the briefing hypothesized -- cancellation is not reachable through this producer (zero hits for cancel-related state anywhere in continuity-state.mjs/continuity-host-adapter.mjs/pipeline-state.mjs), so the dispatch refused to claim it despite the LIFECYCLE_STATUS_PROJECTION covering it for source-vocabulary completeness",
+    "evidenceCommit": "8e4be420635e63fb7ed01dacf31c1bd8183e5be0",
+    "gatedRegression": "504/506, 2 pre-existing FTP-ARTIFACT-2 failures (PS54af/PS54ag), independently confirmed pre-existing by the Elephant",
+    "openItems": [
+      "L-AC-01 stands at 2 of 9 wired triggers (dispatch, status); cancellation and candidate-invalidation still need a real source before a producer can exist",
+      "continuity-record-course-brief / continuity-select-course still silently ignore the lifecycle flags (pre-existing, out of scope)"
+    ]
+  }
+}

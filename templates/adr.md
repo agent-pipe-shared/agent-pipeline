@@ -2,7 +2,7 @@
 ═══════════════════════════════════════════════════════════════════════════
 TEMPLATE: ADR — Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 3 · 2026-07-03
 Source of truth: docs/adr/README.md (conventions), existing ADRs 0001–0015 (format),
-operating-model §2.2 ("no silently made fundamental decisions").
+docs/operating-model.md, *Authority precedence* ("no silently made fundamental decisions").
 Language note: this template's INSTRUCTIONS are English (agent-facing); fill the
 ADR content in the project's human-facing language (default English) — ADRs are
 explicitly human-facing documents ("everything the PO reads, reviews, and signs

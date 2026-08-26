@@ -1,0 +1,14 @@
+{
+  "taskId": "PHX-WP-EVIDENCE-PATH-CHECK",
+  "model": "claude-sonnet-5",
+  "rulesetSha": "5fa52282cd58e6be5c04dceada78dda8c9dd072b7f2d4b4d833b5d2ab8a54af2",
+  "dispatcher": "goldfish",
+  "outcome": "done",
+  "log": [
+    { "phase": "start", "toolUseCount": 1 },
+    { "phase": "implementation", "note": "added the evidence-path existence-check sentence to templates/prompts/goldfish-task.md's Final report section" },
+    { "phase": "verify", "note": "node harness/scripts/check-doc-contracts.mjs -- exit 0, 664 files, 964 links, 13 anchors" },
+    { "phase": "commit", "note": "commit de7cf0d4" }
+  ],
+  "report": "Added one sentence to templates/prompts/goldfish-task.md's Final report section per backlog/items/2026-08-09-a-second-dispatch-claimed-an-evidence-artifact-it-never-wrote.md's Recommended fix: 'Before writing the final report, confirm every evidence-artifact path you are about to cite actually resolves on disk (e.g. ls/stat/Read) -- a claimed path that does not resolve is a stop condition (field 5), not a detail to fix in prose.' check-doc-contracts.mjs exits 0. Commit de7cf0d4 on sprint_phoenix. Independently re-verified by the Elephant before backlog closure (commit 2eb52dd2)."
+}

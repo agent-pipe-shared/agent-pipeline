@@ -455,6 +455,37 @@ try {
     assert.equal(accepted.deferred, false);
   });
 
+  check("RBL13 an open -> rejected transition reconciles cleanly, admitting open first", () => {
+    const { base } = fixture({ items: [ITEM("xi", "rejected")] });
+    const plan = planBacklogReconciliation(base, { at: "2026-08-17" });
+    assert.equal(plan.ok, true, plan.findings.join("; "));
+    assert.deepEqual(plan.planned.map((event) => [event.from, event.to]), [[null, "open"], ["open", "rejected"]]);
+    const applied = applyBacklogReconciliation(base, { at: "2026-08-17" });
+    assert.equal(applied.ok, true, applied.findings.join("; "));
+    assert.equal(checkBacklogState(base).ok, true);
+  });
+
+  check("RBL14 an open -> deferred transition reconciles cleanly from an already-open ledger entry", () => {
+    const { base } = fixture({
+      items: [ITEM("omicron", "deferred")],
+      events: [{ id: "pipeline.omicron", from: null, to: "open", reference: "2026-07-01-omicron.md" }],
+    });
+    const plan = planBacklogReconciliation(base, { at: "2026-08-17" });
+    assert.equal(plan.ok, true, plan.findings.join("; "));
+    assert.deepEqual(plan.planned.map((event) => [event.from, event.to]), [["open", "deferred"]]);
+  });
+
+  check("RBL15 a rejected/deferred target is refused when the ledger's current status is in_progress, not open", () => {
+    const { base } = fixture({
+      items: [ITEM("pi", "rejected")],
+      events: [{ id: "pipeline.pi", from: null, to: "open", reference: "2026-07-01-pi.md" },
+        { id: "pipeline.pi", from: "open", to: "in_progress", reference: "2026-07-01-pi.md" }],
+    });
+    const result = planBacklogReconciliation(base, { at: "2026-08-17" });
+    assert.equal(result.ok, false);
+    assert.match(result.findings.join("\n"), /reachable only from open/u);
+  });
+
   console.log(`\n${passed} passed, ${failed} failed`);
 } finally {
   for (const entry of roots) rmSync(entry, { recursive: true, force: true });

@@ -3,6 +3,7 @@
 
 /** Report loaded distribution identity and restart-handoff presence without secrets. */
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, resolve } from "node:path";
@@ -10,7 +11,18 @@ import { fileURLToPath } from "node:url";
 
 import { measureBootstrapPayload } from "../lib/bootstrap-payload-budget.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { observeCodexPublicCoreIdentity, observePublicCoreIdentity } from "../lib/public-core-observation.mjs";
+import { RULESET_SOURCE_SCHEMA } from "../lib/ruleset-source.mjs";
+import {
+  evaluateSelfApplicationAttestation,
+  pluginRootHasSelfApplicationGit,
+} from "../lib/self-application-attestation-gate.mjs";
 import { bindScratchDescriptor, retireOrphanScratchDescriptors } from "../lib/session-cleanup-recovery.mjs";
+import {
+  inspectSessionOwnerRuntime,
+  listActiveSessionDescriptors,
+} from "../lib/worktree-lifecycle.mjs";
+import { WSL_FRESHNESS_BOUNDARY_ID } from "./ruleset-freshness.mjs";
 
 export const SCHEMA = "pipeline.start-preflight.v1";
 /**
@@ -22,6 +34,7 @@ export const SCHEMA = "pipeline.start-preflight.v1";
  * by construction; `setup-check.mjs`'s `reconcileSetupObservation` refuses an undeclared one.
  */
 export const STATUS_SCOPE = "plugin-distribution-identity";
+export const CONCURRENT_SESSION_WARNING_SCHEMA = "pipeline.concurrent-session-warning.v1";
 const PLUGIN_ID = "pipeline-core@agent-pipeline";
 const LOCAL_PLUGIN_ID = "pipeline-core@agent-pipeline-local";
 const NORMAL_BOOTSTRAP_CHECKS = Object.freeze([
@@ -355,6 +368,105 @@ export function observeAntigravityHardEnforcement({
   };
 }
 
+/**
+ * Return only the selected host route after a WSL preflight. Control identity
+ * selection occurs in the authorized host helper immediately before it starts
+ * the fixed Git child; a sandbox preflight must not claim host availability.
+ *
+ * Restored from 75b8361^1.  The projection below is the pre-merge allowlist,
+ * extended by PHX-WP-PX0AC08 to admit `rulesetSource` now that
+ * `observePipelineStartPreflight` actually populates it: previously the field
+ * was always `undefined` here (never built at all), so it was a no-op inside
+ * `JSON.stringify` regardless of whether it was listed; it is now a real
+ * closed `pipeline.ruleset-source.v1` observation (or `null` when no loaded
+ * distribution was resolved) and is bound like every other field on this
+ * allowlist. The merged-base `bootstrapPayload` remains excluded from the
+ * binding, unchanged.
+ */
+export function freshnessHostActionForPreflight(preflight) {
+  if (!preflight || typeof preflight !== "object"
+    || preflight.schema !== SCHEMA
+    || preflight.status !== "ready"
+    || preflight.executionBoundary !== "host-authorized-wsl") return null;
+  // Bind the host freshness adapter to this exact preflight projection.  The
+  // digest is opaque to callers, so it does not disclose the physical plugin
+  // root or the normalized source observation carried by the preflight.
+  const bound = {
+    schema: preflight.schema,
+    status: preflight.status,
+    version: preflight.version,
+    installedVersion: preflight.installedVersion,
+    installedSource: preflight.installedSource,
+    rulesetSource: preflight.rulesetSource,
+    executionBoundary: preflight.executionBoundary,
+    pluginRoot: preflight.pluginRoot,
+    nextAction: preflight.nextAction,
+  };
+  return Object.freeze({
+    executionBoundary: "host-authorized-wsl",
+    boundaryId: WSL_FRESHNESS_BOUNDARY_ID,
+    preflightSha256: createHash("sha256").update(JSON.stringify(bound)).digest("hex"),
+  });
+}
+
+/**
+ * Best-effort, read-only scan for another LIVE session already registered
+ * under the SAME physical repository root as `startPath` -- the cheap,
+ * PO-requested mitigation for A-AC-01's ordering-ambiguity risk, which only
+ * matters when two agent sessions genuinely operate concurrently in the same
+ * local checkout (a different branch/worktree/clone resolves to a different
+ * physical repository root and is out of scope here, already handled
+ * elsewhere). This never fails/blocks bootstrap: every uncertain outcome --
+ * no repository at `startPath`, no descriptors registered, a malformed
+ * descriptor, any read error -- degrades to `null`, never a thrown error and
+ * never a false positive.
+ *
+ * Only a REAL, currently-running owner process (`inspectSessionOwnerRuntime`
+ * status "live") on a session other than `currentSessionId` counts. A
+ * stale/orphaned descriptor ("not-live"/"reused") or an inconclusive read
+ * ("unavailable"/"unobserved") is never treated as a positive warning --
+ * exactly the false-positive class the PO explicitly does not want (a stale
+ * descriptor or a human reading in a second terminal must never warn).
+ *
+ * The returned object exposes nothing beyond what `inspectSessionOwnerRuntime`
+ * already exposes for that other session (sessionId, descriptorSha256,
+ * status) -- no nonce, no PID, no process-start identity, no conversation
+ * data (see that function's own docstring for the same guarantee).
+ */
+export function observeConcurrentSessionWarning({
+  startPath,
+  currentSessionId = null,
+  listDescriptors = listActiveSessionDescriptors,
+  inspectOwner = inspectSessionOwnerRuntime,
+} = {}) {
+  let descriptors;
+  try {
+    descriptors = listDescriptors(startPath);
+  } catch {
+    return null;
+  }
+  for (const descriptor of descriptors) {
+    if (descriptor.sessionId === currentSessionId) continue;
+    let owner;
+    try {
+      owner = inspectOwner(startPath, descriptor.sessionId, {
+        expectedDescriptorSha256: descriptor.descriptorSha256,
+      });
+    } catch {
+      continue;
+    }
+    if (owner.status === "live") {
+      return {
+        schema: CONCURRENT_SESSION_WARNING_SCHEMA,
+        sessionId: owner.sessionId,
+        descriptorSha256: owner.descriptorSha256,
+        status: owner.status,
+      };
+    }
+  }
+  return null;
+}
+
 export function observePipelineStartPreflight({
   env = process.env,
   pluginList,
@@ -363,6 +475,14 @@ export function observePipelineStartPreflight({
   cwd = process.cwd(),
   knownMarketplaces = readClaudeKnownMarketplaces,
   observeAntigravityHardEnforcementFn = observeAntigravityHardEnforcement,
+  observe,
+  // PHX-WP-AAC01-MULTISESSION: identifies which already-registered session
+  // descriptor (if any) is "this" call's own, so it is excluded from the
+  // concurrent-session scan below. Undefined/null for every production
+  // caller today (ordinary bootstrap does not yet register a descriptor of
+  // its own -- see the module-level open-follow-up note at the bottom of
+  // this file); callers that DO register one may pass its sessionId here.
+  currentSessionId = null,
 } = {}) {
   const pluginRoot = resolve(dirname(fileURLToPath(scriptUrl)), "..");
   // CLAUDECODE is set by every Claude Code session (main and subagent); its
@@ -394,12 +514,106 @@ export function observePipelineStartPreflight({
     && String(env.PIPELINE_CODEX_ONBOARDING_TOKEN) !== "";
   const wsl = [env.WSL_DISTRO_NAME, env.WSL_INTEROP]
     .some((value) => typeof value === "string" && value.trim() !== "");
-  const executionBoundary = wsl ? "host-authorized-wsl" : "default";
+  // PX0-AC-13 / design §B.2(a): "host-authorized-wsl" is a Codex-specific,
+  // App-Server-attested control-channel boundary. Claude Code under WSL has
+  // no such mechanism (`hostControlBinding`/`observeCodexAppServer` are
+  // Codex-only), so this must also gate on `runner`, not WSL presence alone.
+  const executionBoundary = wsl && runner === "codex" ? "host-authorized-wsl" : "default";
+  // Captures the exact origin/content observation `evaluateSelfApplicationAttestation`
+  // (unmodified, imported read-only) resolves and calls internally, without a
+  // second, independent invocation of the real observer: `observe` (below) is
+  // an already-existing extension point of that function -- production code
+  // never supplies one and always falls through to its own runner-based
+  // default, so this wrapper reproduces that exact default-selection
+  // (`observe ?? (runner === "codex" ? observeCodexPublicCoreIdentity :
+  // observePublicCoreIdentity)`) itself, then forwards unmodified to it and
+  // records the return value as a side effect. `evaluateSelfApplicationAttestation`
+  // therefore receives a non-nullish `observe` on every call and always takes
+  // that branch of its own `observe ?? (...)` selection -- functionally
+  // identical to what it would have selected itself, so its pass/fail
+  // semantics (`attestationFailed`) are unchanged; only the discarded
+  // internal `normalized`/`observation` data is now additionally retained
+  // here for `rulesetSource`. `capturedObservation` stays `null` exactly when
+  // the function's own gate (`version && pluginRootHasSelfApplicationGit`)
+  // never attempted an observation at all.
+  let capturedObservation = null;
+  const resolvedObserveForAttestation = observe
+    ?? (runner === "codex" ? observeCodexPublicCoreIdentity : observePublicCoreIdentity);
+  const captureObserve = (...args) => {
+    capturedObservation = resolvedObserveForAttestation(...args);
+    return capturedObservation;
+  };
+  const attestationFailed = evaluateSelfApplicationAttestation({
+    pluginRoot, runner, version, observe: captureObserve,
+  }).failed;
   const status = !version
     ? "plugin-identity-unavailable"
-    : installedIdentity?.ambiguous === true || installedVersion !== null && installedVersion !== version
+    : installedIdentity?.ambiguous === true || installedVersion !== null && installedVersion !== version || attestationFailed
       ? "plugin-refresh-required"
       : "ready";
+  // PX0-AC-08: one closed runner-neutral source observation per bootstrap
+  // resolution. Only built when a loaded distribution was actually resolved
+  // (`version` truthy) -- the acceptance clause itself is conditioned on
+  // that ("WHEN bootstrap resolves a loaded Pipeline distribution"), and the
+  // schema has no "unavailable" variant for `selectedPlugin` the way it does
+  // for the identity fields, so a valid observation cannot be constructed
+  // without a real version string in the first place.
+  let rulesetSource = null;
+  if (version) {
+    // Fixed mapping (briefing PHX-WP-PX0AC08, not a design choice made here):
+    // self-application git checkout present -> "self-application"; else an
+    // attested local-development registry match -> "local-development"; else
+    // an ordinary remote/marketplace registry match -> "marketplace-public";
+    // else (no attested installed identity at all) -> "unavailable". This
+    // repo has no private-marketplace distinction today, so that class is
+    // never selected here.
+    const selfApplicationGit = pluginRootHasSelfApplicationGit(pluginRoot);
+    const sourceClass = selfApplicationGit
+      ? "self-application"
+      : installedIdentity?.source === "local-development"
+        ? "local-development"
+        : installedIdentity?.source === "remote"
+          ? "marketplace-public"
+          : "unavailable";
+    // The strongest available identity: the real content hash the
+    // self-application attestation already derived above, when it derived
+    // one; honestly `unavailable` for every other topology (no fabricated
+    // git/content hash is invented for a marketplace-installed or
+    // local-development copy -- see the linked backlog item for the
+    // out-of-scope question of whether those topologies should eventually
+    // get a stronger mechanism).
+    const identityAvailable = selfApplicationGit && capturedObservation?.status === "ready";
+    const loadedIdentity = identityAvailable
+      ? { status: "available", algorithm: "content-sha256", value: capturedObservation.plugin.contentSha256 }
+      : { status: "unavailable" };
+    const installedIdentityForSource = identityAvailable
+      ? { status: "available", algorithm: "content-sha256", value: capturedObservation.plugin.contentSha256 }
+      : { status: "unavailable" };
+    // selectedPlugin.id: reuses the self-application observation's own
+    // resolved plugin name when one was actually derived (the same value
+    // that internal computation itself uses for this field); otherwise
+    // falls back to whichever of the two matching constants this module
+    // already uses internally for installed-registry eligibility, chosen by
+    // the same `local-development` vs. everything-else split as `source.class`.
+    const selectedPluginId = identityAvailable
+      ? capturedObservation.plugin.name
+      : installedIdentity?.source === "local-development"
+        ? LOCAL_PLUGIN_ID
+        : PLUGIN_ID;
+    rulesetSource = {
+      schema: RULESET_SOURCE_SCHEMA,
+      runner,
+      selectedPlugin: { id: selectedPluginId, version },
+      source: { class: sourceClass },
+      loadedIdentity,
+      installedIdentity: installedIdentityForSource,
+    };
+  }
+  // PHX-WP-AAC01-MULTISESSION: informational only. Computed unconditionally
+  // (observeConcurrentSessionWarning never throws) and never influences
+  // `status`/`nextAction`/any other field above -- see that function's own
+  // docstring for the exact false-positive-avoidance contract.
+  const concurrentSessionWarning = observeConcurrentSessionWarning({ startPath: cwd, currentSessionId });
   const result = {
     schema: SCHEMA,
     status,
@@ -409,7 +623,9 @@ export function observePipelineStartPreflight({
     installedSource: installedIdentity?.source ?? "unknown",
     executionBoundary,
     pluginRoot,
+    rulesetSource,
     handoff: ticket && token ? "ready" : ticket || token ? "malformed" : "none",
+    concurrentSessionWarning,
     nextAction: status === "ready"
       ? {
           kind: "command",
@@ -431,7 +647,23 @@ export function observePipelineStartPreflight({
             schema: "pipeline.project-onboarding.v4",
           },
         }
-      : null,
+      // "plugin-refresh-required" is a soft/advisory status, not a hard block
+      // (design §A.5, correcting the prior nextAction: null defect -- that left
+      // this branch with nothing to execute and no printable confirmation).
+      // Nothing executes; the advisory is carried forward through bootstrap.
+      : status === "plugin-refresh-required"
+        ? {
+            kind: "advisory",
+            executable: null,
+            argv: [],
+            mutation: false,
+            requiresConfirmation: false,
+            executionBoundary,
+            expected: {
+              schema: "pipeline.plugin-refresh-advisory.v1",
+            },
+          }
+        : null,
     // Antigravity-only, and gated at the CALL itself (not merely at the field):
     // for Claude/Codex, observeAntigravityHardEnforcementFn is never invoked and
     // this key is absent from the envelope entirely, keeping their output
@@ -448,6 +680,25 @@ export function observePipelineStartPreflight({
     bootstrapPayload: normalBootstrapPayloadReceipt(result),
   };
 }
+
+// PHX-WP-AAC01-MULTISESSION -- OPEN FOLLOW-UP, documented honestly rather
+// than silently left unaddressed: this file only reads already-registered
+// session descriptors (`observeConcurrentSessionWarning`, above); it does
+// NOT register one of its own for an ordinary Elephant/Claude/Codex
+// bootstrap. `startSessionDescriptor` today has exactly one caller in the
+// whole codebase (`codex-onboarding-capabilities.mjs`'s narrow onboarding
+// capability probe, which registers and immediately retires within the same
+// call -- it never leaves a lasting descriptor). Registering one here would
+// require a real end-of-session retirement hook to avoid leaking an orphan
+// descriptor per bootstrap; this preflight library file, invoked once at
+// the START of bootstrap, has no such hook reachable from itself alone, and
+// none was invented under time pressure (see this task's dispatch report).
+// Net effect today: the warning field is real, wired, and exercised
+// end-to-end by this task's own tests (which register descriptors directly
+// via `startSessionDescriptor`), but stays structurally dormant in ordinary
+// production use until a follow-up task adds (a) descriptor registration at
+// a real bootstrap entry point and (b) its matching retirement at a real
+// session-end hook.
 
 export function pipelineStartPreflightExitCode(result) {
   return result?.status === "ready" || result?.status === "plugin-refresh-required" ? 0 : 2;

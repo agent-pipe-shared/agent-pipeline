@@ -1,0 +1,207 @@
+{
+  "schema": "pipeline.parked-continuity-snapshot.v1",
+  "note": "Nova continuity (sprint-nova-epic, revision 24) as it stood in project/pipeline-state.json on the sprint_phoenix branch immediately before Phoenix authority was restored (2026-08-07). This is a courtesy snapshot, not a closure: Nova/nova-b0 is confirmed NOT done (PO/APS, 2026-08-07) -- it is parked, not closed, and carries no completion claim. sprint_phoenix's own pipeline-state.json now points at Phoenix again; this file exists so nothing about Nova's in-flight runtime state (queueHead, revision, capacity, decisionTxn) is silently lost from this branch's history. Nova's authoritative continuity of record is presumed to live on origin/main's own checkout, unaffected by this local branch change.",
+  "parkedAt": "2026-08-07T09:10:47.924Z",
+  "parkedBy": "Elephant, PO (APS) direction 2026-08-07",
+  "parkedFrom": {
+    "branch": "sprint_phoenix",
+    "path": "project/pipeline-state.json"
+  },
+  "parkedState": {
+    "schema": "pipeline.state.v0",
+    "planApproved": true,
+    "updatedAt": "2026-08-06T20:53:27.982Z",
+    "closedFeatures": [
+      {
+        "id": "sprint-sentinel-epic",
+        "planPath": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
+        "phaseAtClose": "implementation",
+        "closedAt": "2026-07-24T20:49:16.791Z",
+        "closedBy": "Nova Elephant (PO-directed)",
+        "forCommit": null
+      },
+      {
+        "id": "codex-onboarding-0.4.5",
+        "planPath": "specs/2026-07-25-codex-onboarding-0.4.5/prd_codex-onboarding-0.4.5.md",
+        "phaseAtClose": "implementation",
+        "closedAt": "2026-07-28T22:23:25.677Z",
+        "closedBy": "PO",
+        "forCommit": "8de32190fb1e394001a04480bbf6bdb76afdfcb4",
+        "continuityClose": {
+          "schema": "pipeline.continuity-close.v0",
+          "featureId": "codex-onboarding-0.4.5",
+          "expectedRevision": 5,
+          "result": {
+            "path": "specs/2026-07-25-codex-onboarding-0.4.5/result.md",
+            "sha256": "ceed30ddce48d921f2afbbb44d02a3fe5301302ad07fab3f41dfbc149f657b73"
+          },
+          "closeEvidence": {
+            "path": "specs/2026-07-25-codex-onboarding-0.4.5/legacy-continuity-close-evidence.md",
+            "sha256": "8fe8c79f464e2a3f93f2e300fb6e74cccf6791f5920f4a857597f516d97917a1"
+          }
+        }
+      },
+      {
+        "id": "agent-pipeline-0.4.7-hotfix",
+        "planPath": "specs/2026-07-27-agent-pipeline-0.4.7-hotfix/prd_agent-pipeline-0.4.7-hotfix.md",
+        "phaseAtClose": "implementation",
+        "closedAt": "2026-07-31T12:06:05.965Z",
+        "closedBy": "PO",
+        "forCommit": "afdfcb0a019f96ee4831f23f80e7d50413136ef3",
+        "continuityClose": {
+          "schema": "pipeline.continuity-close.v0",
+          "featureId": "agent-pipeline-0.4.7-hotfix",
+          "expectedRevision": 21,
+          "result": {
+            "path": "specs/2026-07-27-agent-pipeline-0.4.7-hotfix/result.md",
+            "sha256": "d2367448d8b72d1466ff995dd7c8dfa54a470334643afd290aa12cb19ddd9cf2"
+          },
+          "closeEvidence": {
+            "path": "specs/2026-07-27-agent-pipeline-0.4.7-hotfix/close-evidence.md",
+            "sha256": "ba896d8d08f16b70270267899717c9a758e7782fa73de4219ce2d115b089bd6b"
+          }
+        },
+        "coordinatorClose": {
+          "schema": "pipeline.close-coordinator-reference.v1",
+          "lifecycleId": "agent-pipeline-0.4.7-hotfix-20260731",
+          "stateSha256": "bc3b25e9423236e3f880b642374c93521000cb8be970396c4588ff9df7f5b079",
+          "revision": 2,
+          "phase": "feature-close-prepared"
+        }
+      }
+    ],
+    "activeFeature": {
+      "id": "sprint-nova-epic",
+      "planPath": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
+      "phase": "implementation"
+    },
+    "planApproval": {
+      "schema": "pipeline.plan-approval.v4",
+      "approvedBy": "Human",
+      "approvedAt": "2026-08-02T20:26:09.754Z",
+      "submissionSha256": "a8af54c63c281179ff4c3258d17b31e44630412fde41c8e383c04b2b7df5e731",
+      "profileSha256": "c9867b5662e7db7d8c9f5ca77503076fb0e80d61d4ef055c58bff69571ee226f",
+      "poGateAuthority": {
+        "schema": "pipeline.po-gate-authority.v2",
+        "humanFacing": "en",
+        "sourceSha256": "833fee99985d3f1799e7ffbf211659b1a7f527b3267ba01b5483792adef5e11e",
+        "runtimeSha256": "071b0236f6054bbeea2140830320a88d1c6a9e733d7294ad0bb976fd2e28c897",
+        "receiptSha256": "6282b90d5db17a2abb98870eeea42f08d1c69a5706998ebae987796602c76240",
+        "repositoryFingerprint": "5172c023ad31e8e1c82402e4d0a657cc6db16c0ba5538a432d48e8d477f2b16d",
+        "planPath": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
+        "planSha256": "164cadc6d175b6d7105404d1e7d84d197864d8be84a6dd20bd7a97d02dadf110",
+        "specPath": "specs/sprint-nova-epic/spec.md",
+        "specSha256": "e9f020f746c7fd880cfbdac355316a0d0d12ee0fd12edd3474c38328371bd4a5"
+      },
+      "priorInvalidationSha256": "93b5cd99b6f76b24018de48ca472fb4357badb9b7e20c96383f85fdcba614a3d"
+    },
+    "continuity": {
+      "schema": "pipeline.continuity.v0",
+      "featureId": "sprint-nova-epic",
+      "revision": 24,
+      "runtime": {
+        "humanFacingLanguage": "en",
+        "activeDuty": "Elephant",
+        "sessionCleanup": null
+      },
+      "authority": {
+        "prd": {
+          "path": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
+          "sha256": "164cadc6d175b6d7105404d1e7d84d197864d8be84a6dd20bd7a97d02dadf110"
+        },
+        "spec": {
+          "path": "specs/sprint-nova-epic/spec.md",
+          "sha256": "e9f020f746c7fd880cfbdac355316a0d0d12ee0fd12edd3474c38328371bd4a5"
+        },
+        "result": null
+      },
+      "queueHead": {
+        "packageId": "nova-b0",
+        "actionId": "runner-native-continuation",
+        "nextAction": "dispatch",
+        "productRetryCount": 0,
+        "environmentRerouteCount": 0,
+        "dispatch": null
+      },
+      "blocker": null,
+      "acknowledgedFinal": null,
+      "resume": {
+        "mode": "immediate",
+        "sourceRevision": 24,
+        "reasonCode": "active-turn"
+      },
+      "recovery": null,
+      "decisionTxn": null,
+      "capacity": {
+        "concurrencyLimit": 2,
+        "reservedCriticSlots": 1,
+        "reservedRecoverySlots": 1,
+        "fallbackPolicy": "defer"
+      },
+      "closeTransition": null,
+      "nativeContinuation": null
+    },
+    "planSubmission": {
+      "schema": "pipeline.plan-submission.v1",
+      "featureId": "sprint-nova-epic",
+      "planPath": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
+      "planSha256": "164cadc6d175b6d7105404d1e7d84d197864d8be84a6dd20bd7a97d02dadf110",
+      "specPath": "specs/sprint-nova-epic/spec.md",
+      "specSha256": "e9f020f746c7fd880cfbdac355316a0d0d12ee0fd12edd3474c38328371bd4a5",
+      "profile": "epic",
+      "profileSha256": "c9867b5662e7db7d8c9f5ca77503076fb0e80d61d4ef055c58bff69571ee226f",
+      "submittedBy": "coordinator",
+      "submittedAt": "2026-08-02T20:26:01.939Z"
+    },
+    "planInvalidation": {
+      "schema": "pipeline.plan-invalidation.v1",
+      "featureId": "sprint-nova-epic",
+      "invalidatedSubmissionSha256": "f2e7c3d9f02546c45cd57aca4e9765e925b7b14ca6adc75d86ead4a85f245364",
+      "invalidatedApprovalSha256": "490430ddc6abb0aa8f1986a6d3fe3d31765338acc0293e1be55651e3d77b8436",
+      "invalidatedBy": "coordinator",
+      "invalidatedAt": "2026-08-02T20:25:08.223Z",
+      "reason": "reopen-design"
+    },
+    "pushApproval": {
+      "lastApproved": {
+        "approvedBy": "roaspeci",
+        "approvedAt": "2026-08-06T20:53:27.982Z",
+        "forCommit": "5ba7ee0f222b356e9e00009e8f188dc4dffe22c7",
+        "criticalProof": {
+          "proofSha256": "0230f5aee3ad9b2518f482e4e0d428fe6228873f0eba9b2ae500ef4926283a36",
+          "intentSha256": "819ee4997a7873d56188198bb33595c849dd15a9e56cc4a4188e2523db7e7b8f",
+          "action": {
+            "kind": "push",
+            "subjectSha256": "988d3378390c4cb3b7bc9bc783abbf8d81af428094139ef6e539ac9bf7d1ef0b",
+            "expiresAt": "2026-08-07T08:00:00.000Z"
+          },
+          "proof": {
+            "schema": "pipeline.po-approval-proof.v1",
+            "intentSha256": "819ee4997a7873d56188198bb33595c849dd15a9e56cc4a4188e2523db7e7b8f",
+            "keyReference": "local-po-key",
+            "publicKey": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAb2hgIMasQe7m80aB5C9zD7YTW6mEa0wjUGHRZ9yGv5c=\n-----END PUBLIC KEY-----\n",
+            "signatureBase64": "T2Q8yyha/6QO5/NzpsX632XZuAclECh5Dq4kdU0oIjT1GhI6p2YL0Zny1wrMibNYoMAzhnsMmiX84OX2822QBA=="
+          }
+        },
+        "remote": "origin",
+        "destination": "refs/heads/feat/sprint-nova-codex-v046",
+        "threatModel": {
+          "path": "specs/sprint-nova-epic/implementation/critical-action-authorization-threat-model.md",
+          "sha256": "6a13ff03dfd15f93f15fe845c86edca35445a49a8979275ad35e42a93252a1ae"
+        }
+      }
+    },
+    "criticalProofConsumption": [
+      {
+        "proofSha256": "0f38b42586f51c6c3900a22e18bd580611d98be2b79f454995a11719945fbc40",
+        "kind": "push",
+        "consumedAt": "2026-08-06T18:31:29.192Z"
+      },
+      {
+        "proofSha256": "0230f5aee3ad9b2518f482e4e0d428fe6228873f0eba9b2ae500ef4926283a36",
+        "kind": "push",
+        "consumedAt": "2026-08-06T20:53:27.982Z"
+      }
+    ]
+  }
+}

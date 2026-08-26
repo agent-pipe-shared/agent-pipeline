@@ -1,0 +1,91 @@
+TAP version 13
+# Subtest: proof binds the complete authority revision intent
+ok 1 - proof binds the complete authority revision intent
+  ---
+  duration_ms: 8.191904
+  type: 'test'
+  ...
+# Subtest: external proof becomes the authority revision approval shape
+ok 2 - external proof becomes the authority revision approval shape
+  ---
+  duration_ms: 7.98273
+  type: 'test'
+  ...
+# Subtest: decision.id rejects a plausible private absolute path
+not ok 3 - decision.id rejects a plausible private absolute path
+  ---
+  duration_ms: 1.16632
+  type: 'test'
+  location: '/home/skar667/src/agent-pipeline-shared_phoenix/plugins/pipeline-core/lib/authority-revision-proof.test.mjs:35:1'
+  failureType: 'testCodeFailure'
+  error: 'Missing expected exception.'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  operator: 'throws'
+  stack: |-
+    TestContext.<anonymous> (file:///home/skar667/src/agent-pipeline-shared_phoenix/plugins/pipeline-core/lib/authority-revision-proof.test.mjs:36:10)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1382:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:960:18)
+    Test.postRun (node:internal/test_runner/test:1522:19)
+    Test.run (node:internal/test_runner/test:1447:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)
+  ...
+# Subtest: decision.id rejects embedded whitespace/newline (a pasted prompt/command fragment)
+not ok 4 - decision.id rejects embedded whitespace/newline (a pasted prompt/command fragment)
+  ---
+  duration_ms: 0.613638
+  type: 'test'
+  location: '/home/skar667/src/agent-pipeline-shared_phoenix/plugins/pipeline-core/lib/authority-revision-proof.test.mjs:42:1'
+  failureType: 'testCodeFailure'
+  error: 'Missing expected exception.'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  operator: 'throws'
+  stack: |-
+    TestContext.<anonymous> (file:///home/skar667/src/agent-pipeline-shared_phoenix/plugins/pipeline-core/lib/authority-revision-proof.test.mjs:43:10)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1382:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:960:18)
+    Test.postRun (node:internal/test_runner/test:1522:19)
+    Test.run (node:internal/test_runner/test:1447:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)
+  ...
+# Subtest: decision.id enforces a bounded length -- accepted at the bound, refused one past it
+not ok 5 - decision.id enforces a bounded length -- accepted at the bound, refused one past it
+  ---
+  duration_ms: 0.626062
+  type: 'test'
+  location: '/home/skar667/src/agent-pipeline-shared_phoenix/plugins/pipeline-core/lib/authority-revision-proof.test.mjs:53:1'
+  failureType: 'testCodeFailure'
+  error: 'Missing expected exception.'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  operator: 'throws'
+  stack: |-
+    TestContext.<anonymous> (file:///home/skar667/src/agent-pipeline-shared_phoenix/plugins/pipeline-core/lib/authority-revision-proof.test.mjs:58:10)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1382:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:960:18)
+    Test.postRun (node:internal/test_runner/test:1522:19)
+    Test.run (node:internal/test_runner/test:1447:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)
+  ...
+# Subtest: decision.id still accepts the existing legitimate slug shape unchanged (regression protection)
+ok 6 - decision.id still accepts the existing legitimate slug shape unchanged (regression protection)
+  ---
+  duration_ms: 0.393358
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 3
+# fail 3
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 150.096382

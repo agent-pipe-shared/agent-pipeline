@@ -1,5 +1,19 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
+//
+// PHX-MERGE-1A-HANDOVERSIZE: this test file exercises the surviving implementation
+// (`evaluateHandoverSizeGuard`/`proposedHandoverBytes`/`DENIAL_CODE`, the proposed-
+// post-write-size-simulation design) chosen when resolving the guard-handover-size.mjs
+// merge conflict between the Nova and Phoenix lines -- see that file's header comment
+// for the supersession rationale. The Phoenix line's own parallel test suite (covering
+// `decide`/`resolveCalibratedHandoverRelPath`/`checkHandoverSize`, a current-size-only
+// design) encoded assertions that directly contradict this suite's for the same input
+// shapes (e.g. an Edit with no content-describing fields against an over-budget file:
+// this suite requires fail-open/allow -- unreadable edit shape; Phoenix's required
+// deny -- current file already over budget) and could not be reconciled without either
+// implementing two live, contradictory admission entry points or weakening one side's
+// assertions, both out of scope for this dispatch. Reported to the dispatcher rather
+// than resolved silently.
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";

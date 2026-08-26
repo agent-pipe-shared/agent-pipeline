@@ -1,0 +1,11 @@
+docs(phoenix): bring change-control.md current against change-control.mjs
+
+Documents resolveChangeControlProfile (C-AC-09), detectChangeClassShopping
+(C-AC-02), the reviewPolicy advisory/mandatory split (C-AC-12), the optional
+decisionReference dual-evaluation wiring (H-AC-12), and the emergency
+retrospective-evidence requirement (C-AC-07) -- all real, tested behavior
+that existed in the module but was invisible in the doc. Every
+change-control.mjs:N citation is re-verified against the module's current
+line numbers.
+
+AI-Assisted: true

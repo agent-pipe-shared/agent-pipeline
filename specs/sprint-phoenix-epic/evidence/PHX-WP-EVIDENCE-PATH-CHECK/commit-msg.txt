@@ -1,0 +1,10 @@
+docs(templates): require evidence-path existence check before goldfish final report
+
+Twice a dispatch cited an evidence-artifact path in its final report/
+dispatch-record that did not actually resolve on disk. Add an explicit
+instruction to the goldfish-task template: confirm every cited path
+resolves (ls/stat/Read) before writing the final report; a claim that
+doesn't resolve is a stop condition, not a prose detail.
+
+Dispatch: PHX-WP-EVIDENCE-PATH-CHECK (goldfish)
+AI-Assisted: true

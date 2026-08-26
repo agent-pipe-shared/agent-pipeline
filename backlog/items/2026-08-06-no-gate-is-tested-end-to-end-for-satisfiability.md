@@ -135,6 +135,8 @@ PO-decided — not deferred.
 
 ## Closure, 2026-08-18
 
+**Merge note (2026-08-26, moved from frontmatter):** Phoenix branch recorded closure_commit 18e5516cf14a9a02fca8cd9bdb6c6ddb1fcf4d78 (closure_evidence pointing at this backlog file itself) for its own, separately-PO-decided closure (Option C, marking the item closed outright rather than deferring steps 2/3); kept the Nova-side commit/evidence here because it names the actual QG-11 code fix. Both closures are preserved below, chronologically.
+
 Step 4 (the only currently-decided, currently-in-scope task) is implemented:
 `guardrails/quality-gates.md` gained a new **QG-11 — Test what the change
 altered, not only what it was meant to fix** entry, citing this item's own
@@ -154,3 +156,10 @@ preimage-baseline and shared-evidence-slot items filed in the same period.
 Closing this item now that its one decided, in-scope task is done; the
 deferred remainder is tracked as new follow-on scope under Sprint Alfred
 rather than left open against this closed item.
+
+### PO Decision — 2026-08-18 (Phoenix branch)
+
+- **Decision:** Option C — prioritize the highest-risk 2-3 gates (push/release path, plan-gate) over a full systemic build or leaving the item fully unbounded. The PO additionally directs this item be marked CLOSED now rather than kept open pending that future build.
+- **Rationale:** PO's direct choice; the scoping decision itself is treated as resolving this item — any actual gate-walk-test construction for the named highest-risk gates is a separate future initiative if pursued, not tracked under this ticket. (Independent of, and consistent with, the Nova-branch closure above: both close the item and leave the broader systemic build untracked here.)
+- **Assignment:** Closed.
+- **Date:** 2026-08-18

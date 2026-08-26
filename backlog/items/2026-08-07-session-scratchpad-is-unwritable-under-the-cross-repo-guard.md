@@ -5,6 +5,7 @@ type: defect
 owner: pipeline
 status: closed
 created: 2026-08-07
+due: 2026-09-06
 closed_at: 2026-08-19
 closure_repository: self
 closure_commit: f12c335034c524c325e960d3c508df1d0530fed5
@@ -71,6 +72,55 @@ its `mkdir` inside the assigned scratchpad was refused by
 review without a scratchpad". Independently, the orchestrator's own attempt to
 park held material in the same directory was refused identically, which is what
 prompted the PO's remark.
+
+**A third instance, and a different casualty (2026-08-08).** The same refusal
+also blocks the agent's own **cross-session memory store**, which lives outside
+the project root by design. The PO asked, with visible irritation and fairly,
+that a machine-local path be remembered rather than re-established every session;
+the write was refused as `GUARD-CROSS-REPO-MUTATION`, so it could not be.
+
+This is worse than the scratchpad case in one specific way. A missing scratchpad
+degrades a single dispatch and the dispatch says so. A missing memory store
+degrades **every future session silently** — nothing reports that a fact was
+supposed to be retained and was not, and the cost lands on the human as a
+repeated question. It also cannot be worked around the way the scratchpad can:
+dispatches now park working files under `.git/`, but a memory store deliberately
+sits outside the repository so that it survives the repository, and relocating it
+inside would defeat its purpose.
+
+Two further observations from that instance, both relevant to whichever option is
+chosen: the refusal has no carve-out for a path the runtime itself designates as
+the session's own store, and it does not distinguish a *write to another
+repository* (the risk the rule exists for) from a *write to agent-private state
+that belongs to no repository at all*.
+
+**Half of this item is already being solved elsewhere, and the split matters
+(PO, 2026-08-08).** Nova is building a **repository-internal, gitignored
+scratchpad** that becomes the standard location for anything transitional —
+inside the repository's own directory structure, so nothing can mutate outward.
+That is the right answer to the scratchpad case and supersedes the `.git/`
+convention dispatches have been improvising; when it lands, the Critic-contract
+clause this item opens with is satisfiable again.
+
+**It does not address the memory case, and cannot.** A repo-internal store is
+by construction scoped to the repository, while a cross-session memory store
+exists precisely to outlive it: it holds facts about the *human and the machine*
+— which key directory this repository's anchor pins, how the PO prefers commands
+delivered — that are not properties of the checkout and would be lost with it.
+Relocating memory inside the repository would also publish machine-local paths
+into tracked content, which this repository's own language and secrets rules
+forbid.
+
+So the two halves need different answers, and closing this item on the
+scratchpad fix alone would silently drop the one whose cost is invisible.
+
+**Explicitly out of scope, so it cannot be misread later (PO, 2026-08-08): the
+signing key stays outside the repository, unconditionally.** Two different things
+live outside the project root here — the PO's Ed25519 key material and the
+agent's memory store — and only the second is under discussion. Nothing in this
+item proposes moving key material inward, and no repair of it may have that
+effect: the private key living outside the repository is the property the whole
+signature gate rests on ([ADR-0056](../../docs/adr/0056-push-approval-mode.md)).
 
 ## Affected artifact
 
@@ -287,3 +337,10 @@ informally satisfied: every Critic dispatch this session has used
 `GUARD-CROSS-REPO-MUTATION` refusals against the in-repo scratch path.
 Per PO instruction, if this friction resurfaces in a future session, it
 gets a new backlog item rather than reopening this one.
+
+### Triage — Phoenix side, 2026-08-18
+
+- **Decision:** Close — superseded by Nova, not ported into Phoenix.
+- **Rationale:** Unfixed in Phoenix's own guard-lifecycle-ready.mjs (isProjectWritePath() has no scratch carve-out). Nova has since built and wired a repo-internal, gitignored scratch/ carve-out (PARTIAL_LIFECYCLE_SCRATCH_DIR, guard-lifecycle-ready.mjs:131 and surrounding machinery) implementing exactly the item's own recommended Option 2. Per PO direction (2026-08-18), items already resolved in Nova's current code are closed here rather than reimplemented — Phoenix does not need to duplicate Nova's own hardening. The memory-store half of the item (which the item itself says needs a different, undesigned answer) is not resolved by this and is not reopened as a separate item.
+- **Assignment (if accepted):** n/a — disposed without further work
+- **Date:** 2026-08-18

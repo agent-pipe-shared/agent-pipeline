@@ -1,0 +1,16 @@
+feat(pipeline-core): warn on a live same-repo concurrent session at bootstrap
+
+A-AC-01's ordering-ambiguity risk only matters when two agent sessions
+genuinely operate concurrently in the SAME physical repository root
+(a different branch/worktree/clone is already handled elsewhere). Add
+observeConcurrentSessionWarning(), a read-only, never-throwing scan over
+already-registered session descriptors (listActiveSessionDescriptors +
+inspectSessionOwnerRuntime) that surfaces a typed concurrentSessionWarning
+field on observePipelineStartPreflight's result only when another session
+(not this one) has a real "live" owner process registered for the same
+repo -- never for a stale/reused/unavailable/unobserved descriptor, and
+never affecting status/nextAction. Cheapest PO-requested mitigation: a
+warning, never a hard block.
+
+Dispatch: PHX-WP-AAC01-MULTISESSION (goldfish)
+AI-Assisted: true

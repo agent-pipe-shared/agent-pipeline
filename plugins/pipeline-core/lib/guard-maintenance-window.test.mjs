@@ -136,9 +136,15 @@ function planSpecShas(root) {
  * checks/clamp entirely. `candidate` defaults to the same fabricated, never-real
  * {commit, tree} every pre-existing caller of this helper already relied on -- passing
  * one explicitly is how CANDBIND-1's checks construct a candidate that is deliberately
- * true about one half (commit or tree) and false about the other.
+ * true about one half (commit or tree) and false about the other. `authorshipMode`/
+ * `stage0Selfcheck` default to a valid "goldfish-dispatch" declaration so a caller that
+ * does not care about PHX-WP-STAGE0-SELFCHECK still builds an admissible request.
  */
-function handBuiltRequest({ root, plugin, scopeRuleIds, expiresAtMs, reason = "hand-built", candidate = { commit: "c".repeat(40), tree: "d".repeat(40) } }) {
+function handBuiltRequest({
+  root, plugin, scopeRuleIds, expiresAtMs, reason = "hand-built",
+  candidate = { commit: "c".repeat(40), tree: "d".repeat(40) },
+  authorshipMode = "goldfish-dispatch", stage0Selfcheck = null,
+}) {
   const repo = guardMaintenanceWindowInternals.topology(root);
   const subject = {
     scopeRuleIds,
@@ -154,7 +160,11 @@ function handBuiltRequest({ root, plugin, scopeRuleIds, expiresAtMs, reason = "h
     candidate, policyRevision: "gmw-test-v1",
     subjectSha256, decision: "lift",
   });
-  return { subject, intent, request: { schema: "pipeline.guard-maintenance-window-request.v1", subject, intent } };
+  return {
+    subject,
+    intent,
+    request: { schema: "pipeline.guard-maintenance-window-request.v1", subject, intent, authorshipMode, stage0Selfcheck },
+  };
 }
 
 try {
@@ -176,7 +186,7 @@ try {
       assert.throws(
         () => prepareGuardMaintenanceWindowRequest({
           rootDir: root, scopeRuleIds: scope, ttlSeconds: 60, reason: "r", featureId: "f",
-          planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
+          planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin, authorshipMode: "goldfish-dispatch",
         }),
         GuardMaintenanceWindowError,
         `scope ${JSON.stringify(scope)} must be rejected`,
@@ -193,10 +203,10 @@ try {
 
     const { intent, request } = prepareGuardMaintenanceWindowRequest({
       rootDir: root, scopeRuleIds: ["GS-6", "TP-1"], ttlSeconds: 120, reason: "smoke",
-      featureId: "f", planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
+      featureId: "f", planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin, authorshipMode: "goldfish-dispatch",
     });
     const installed = installGuardMaintenanceWindow({
-      rootDir: root, request, trustPolicy, proof: proofFor(intent), livePluginRoot: plugin,
+      rootDir: root, request, anchors: [trustPolicy], proof: proofFor(intent), livePluginRoot: plugin,
     });
     assert.equal(installed.status, "active");
     assert.deepEqual([...installed.scopeRuleIds].sort(), ["GS-6", "TP-1"]);
@@ -218,9 +228,9 @@ try {
     const { planSha256, specSha256 } = planSpecShas(root);
     const { intent, request } = prepareGuardMaintenanceWindowRequest({
       rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 60, reason: "expiry", featureId: "f",
-      planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
+      planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin, authorshipMode: "goldfish-dispatch",
     });
-    installGuardMaintenanceWindow({ rootDir: root, request, trustPolicy, proof: proofFor(intent), livePluginRoot: plugin });
+    installGuardMaintenanceWindow({ rootDir: root, request, anchors: [trustPolicy], proof: proofFor(intent), livePluginRoot: plugin });
     assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "active");
 
     const repo = guardMaintenanceWindowInternals.topology(root);
@@ -244,9 +254,9 @@ try {
     const { planSha256, specSha256 } = planSpecShas(root);
     const { intent, request } = prepareGuardMaintenanceWindowRequest({
       rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 30, reason: "short-lived", featureId: "f",
-      planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
+      planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin, authorshipMode: "goldfish-dispatch",
     });
-    installGuardMaintenanceWindow({ rootDir: root, request, trustPolicy, proof: proofFor(intent), livePluginRoot: plugin });
+    installGuardMaintenanceWindow({ rootDir: root, request, anchors: [trustPolicy], proof: proofFor(intent), livePluginRoot: plugin });
     const repo = guardMaintenanceWindowInternals.topology(root);
     const paths = guardMaintenanceWindowInternals.storagePaths(repo.common);
     const record = JSON.parse(readFileSync(paths.window, "utf8"));
@@ -266,17 +276,17 @@ try {
     const { planSha256, specSha256 } = planSpecShas(root);
     const { intent, request } = prepareGuardMaintenanceWindowRequest({
       rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 120, reason: "reinstall", featureId: "f",
-      planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
+      planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin, authorshipMode: "goldfish-dispatch",
     });
     const proof = proofFor(intent);
-    const first = installGuardMaintenanceWindow({ rootDir: root, request, trustPolicy, proof, livePluginRoot: plugin });
+    const first = installGuardMaintenanceWindow({ rootDir: root, request, anchors: [trustPolicy], proof, livePluginRoot: plugin });
     assert.equal(first.status, "active");
     const firstExpiresAtMs = first.expiresAtMs;
 
     // Re-run install with the SAME request/proof after real wall-clock time has passed.
     // A vulnerable implementation would recompute a fresh expiry from "now" here.
     const later = installGuardMaintenanceWindow({
-      rootDir: root, request, trustPolicy, proof, livePluginRoot: plugin, nowMs: Date.now() + 60_000,
+      rootDir: root, request, anchors: [trustPolicy], proof, livePluginRoot: plugin, nowMs: Date.now() + 60_000,
     });
     assert.equal(later.status, "active");
     assert.equal(later.expiresAtMs, firstExpiresAtMs, "a repeated install must reinstall the identical signed bound, never extend it");
@@ -289,7 +299,7 @@ try {
       root, plugin, scopeRuleIds: ["GS-6"], expiresAtMs: Date.now() - 60_000,
     });
     assert.throws(
-      () => installGuardMaintenanceWindow({ rootDir: root, request: builtRequest, trustPolicy, proof: proofFor(intent), livePluginRoot: plugin }),
+      () => installGuardMaintenanceWindow({ rootDir: root, request: builtRequest, anchors: [trustPolicy], proof: proofFor(intent), livePluginRoot: plugin }),
       GuardMaintenanceWindowError,
     );
     assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "absent");
@@ -314,7 +324,7 @@ try {
       root, plugin, scopeRuleIds: ["GS-6"], expiresAtMs: before + MAX_WINDOW_TTL_MS * 100, reason: "excessive claim",
     });
     assert.throws(
-      () => installGuardMaintenanceWindow({ rootDir: root, request, trustPolicy, proof: proofFor(intent), livePluginRoot: plugin }),
+      () => installGuardMaintenanceWindow({ rootDir: root, request, anchors: [trustPolicy], proof: proofFor(intent), livePluginRoot: plugin }),
       GuardMaintenanceWindowError,
       "the first install attempt of a grossly oversized signed expiresAtMs must itself refuse, not silently clamp",
     );
@@ -335,7 +345,7 @@ try {
     const proof = proofFor(intent);
     for (const nowMs of [before, before + 60_000, before + 2 * 60 * 60 * 1000]) {
       assert.throws(
-        () => installGuardMaintenanceWindow({ rootDir: root, request, trustPolicy, proof, livePluginRoot: plugin, nowMs }),
+        () => installGuardMaintenanceWindow({ rootDir: root, request, anchors: [trustPolicy], proof, livePluginRoot: plugin, nowMs }),
         GuardMaintenanceWindowError,
         `install must still refuse at nowMs=${nowMs}`,
       );
@@ -351,10 +361,10 @@ try {
     const { planSha256, specSha256 } = planSpecShas(rootA);
     const { intent, request } = prepareGuardMaintenanceWindowRequest({
       rootDir: rootA, scopeRuleIds: ["GS-6"], ttlSeconds: 60, reason: "cross-repo", featureId: "f",
-      planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
+      planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin, authorshipMode: "goldfish-dispatch",
     });
     assert.throws(
-      () => installGuardMaintenanceWindow({ rootDir: rootB, request, trustPolicy, proof: proofFor(intent), livePluginRoot: plugin }),
+      () => installGuardMaintenanceWindow({ rootDir: rootB, request, anchors: [trustPolicy], proof: proofFor(intent), livePluginRoot: plugin }),
       GuardMaintenanceWindowError,
     );
     assert.equal(currentGuardMaintenanceWindow({ rootDir: rootB }).status, "absent");
@@ -367,9 +377,9 @@ try {
     const { planSha256, specSha256 } = planSpecShas(root);
     const { intent, request } = prepareGuardMaintenanceWindowRequest({
       rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 300, reason: "tamper", featureId: "f",
-      planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
+      planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin, authorshipMode: "goldfish-dispatch",
     });
-    installGuardMaintenanceWindow({ rootDir: root, request, trustPolicy, proof: proofFor(intent), livePluginRoot: plugin });
+    installGuardMaintenanceWindow({ rootDir: root, request, anchors: [trustPolicy], proof: proofFor(intent), livePluginRoot: plugin });
     assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "active");
 
     const repo = guardMaintenanceWindowInternals.topology(root);
@@ -387,7 +397,7 @@ try {
     for (const scope of [["GS-2"], ["GS-1"], ["unknown-id"]]) {
       const { request, intent } = handBuiltRequest({ root, plugin, scopeRuleIds: scope, expiresAtMs: Date.now() + 60_000 });
       assert.throws(
-        () => installGuardMaintenanceWindow({ rootDir: root, request, trustPolicy, proof: proofFor(intent), livePluginRoot: plugin }),
+        () => installGuardMaintenanceWindow({ rootDir: root, request, anchors: [trustPolicy], proof: proofFor(intent), livePluginRoot: plugin }),
         GuardMaintenanceWindowError,
         `scope ${JSON.stringify(scope)} must be rejected at install`,
       );
@@ -405,9 +415,9 @@ try {
     const { planSha256, specSha256 } = planSpecShas(root);
     const { intent, request } = prepareGuardMaintenanceWindowRequest({
       rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 300, reason: "scope-read-check", featureId: "f",
-      planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
+      planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin, authorshipMode: "goldfish-dispatch",
     });
-    installGuardMaintenanceWindow({ rootDir: root, request, trustPolicy, proof: proofFor(intent), livePluginRoot: plugin });
+    installGuardMaintenanceWindow({ rootDir: root, request, anchors: [trustPolicy], proof: proofFor(intent), livePluginRoot: plugin });
     assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "active");
     assert.equal(windowCoversRule({ rootDir: root, ruleId: "GS-2" }).covered, false);
   });
@@ -651,6 +661,26 @@ try {
         () => installGuardMaintenanceWindow({ rootDir: root, request: changed.request, trustPolicy, proof: proofFor(first.intent), livePluginRoot: plugin }),
         GuardMaintenanceWindowError,
         `a proof for the old digest must not install a changed ${label}`,
+      );
+    }
+  });
+
+  // ---- PHX-WP-STAGE0-SELFCHECK: mandatory stage-0 self-check on the prepare/install flow
+  // (backlog/items/2026-08-09-elephant-authored-production-diff-closed-its-own-gating-criterion.md,
+  // roles/elephant.md EL-01's own stage-0 fast-path definition: <=2 files, <=~25 diff
+  // lines, no test-file changes).
+  check("GMW14 prepare rejects a missing/invalid authorshipMode -- mandatory, not skippable", () => {
+    const root = repoFixture("gmw-authorship-missing-");
+    const plugin = pluginRootFixture();
+    const { planSha256, specSha256 } = planSpecShas(root);
+    for (const authorshipMode of [undefined, null, "", "bogus-mode", "Elephant-Direct"]) {
+      assert.throws(
+        () => prepareGuardMaintenanceWindowRequest({
+          rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 60, reason: "r", featureId: "f",
+          planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin, authorshipMode,
+        }),
+        (error) => error instanceof GuardMaintenanceWindowError && error.code === "GMW-AUTHORSHIP-MODE-INVALID",
+        `authorshipMode=${JSON.stringify(authorshipMode)} must be rejected`,
       );
     }
   });
@@ -1364,6 +1394,180 @@ try {
     assert.match(described.lines[disclosureIndex], /commit/iu, "the disclosure line must name the commit as the cause");
     assert.match(described.lines[disclosureIndex], /install/iu, "the disclosure line must name the install step as the deadline");
     assert.ok(described.lines.length <= gmw.GMW_SUMMARY_MAX_LINES, "the new line must stay within the stated bound");
+  });
+
+  check("GMW15 prepare rejects authorshipMode \"elephant-direct\" with a missing/malformed stage0Selfcheck", () => {
+    const root = repoFixture("gmw-stage0-shape-");
+    const plugin = pluginRootFixture();
+    const { planSha256, specSha256 } = planSpecShas(root);
+    for (const stage0Selfcheck of [
+      undefined, null, {},
+      { filesChanged: 1, diffLines: 10 }, // touchesTestFile missing
+      { filesChanged: "1", diffLines: 10, touchesTestFile: false }, // wrong type
+      { filesChanged: 1, diffLines: -1, touchesTestFile: false }, // negative
+    ]) {
+      assert.throws(
+        () => prepareGuardMaintenanceWindowRequest({
+          rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 60, reason: "r", featureId: "f",
+          planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
+          authorshipMode: "elephant-direct", stage0Selfcheck,
+        }),
+        (error) => error instanceof GuardMaintenanceWindowError && error.code === "GMW-STAGE0-SELFCHECK-INVALID",
+        `stage0Selfcheck=${JSON.stringify(stage0Selfcheck)} must be rejected`,
+      );
+    }
+  });
+
+  check("GMW16 prepare rejects authorshipMode \"elephant-direct\" whose declared diff does not qualify for EL-01 stage-0 (the actual gate DoD demonstration)", () => {
+    const root = repoFixture("gmw-stage0-not-qualified-");
+    const plugin = pluginRootFixture();
+    const { planSha256, specSha256 } = planSpecShas(root);
+    for (const stage0Selfcheck of [
+      { filesChanged: 3, diffLines: 10, touchesTestFile: false }, // too many files
+      { filesChanged: 1, diffLines: 40, touchesTestFile: false }, // too many diff lines
+      { filesChanged: 1, diffLines: 10, touchesTestFile: true }, // test-file change (EL-01 excludes these categorically)
+    ]) {
+      assert.throws(
+        () => prepareGuardMaintenanceWindowRequest({
+          rootDir: root, scopeRuleIds: ["TP-1"], ttlSeconds: 60, reason: "r", featureId: "f",
+          planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
+          authorshipMode: "elephant-direct", stage0Selfcheck,
+        }),
+        (error) => error instanceof GuardMaintenanceWindowError && error.code === "GMW-STAGE0-NOT-QUALIFIED",
+        `stage0Selfcheck=${JSON.stringify(stage0Selfcheck)} must be blocked -- it does not qualify for stage-0`,
+      );
+    }
+    assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "absent", "a refused prepare() must leave no request/window trace of an unqualified elephant-direct claim");
+  });
+
+  check("GMW17 prepare+install accept authorshipMode \"elephant-direct\" whose declared diff DOES qualify for EL-01 stage-0, and the declaration survives into the active window's status", () => {
+    const root = repoFixture("gmw-stage0-qualified-");
+    const plugin = pluginRootFixture();
+    const { planSha256, specSha256 } = planSpecShas(root);
+    const stage0Selfcheck = { filesChanged: 1, diffLines: 12, touchesTestFile: false };
+    const { intent, request } = prepareGuardMaintenanceWindowRequest({
+      rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 60, reason: "qualifying stage-0 fix", featureId: "f",
+      planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
+      authorshipMode: "elephant-direct", stage0Selfcheck,
+    });
+    assert.equal(request.authorshipMode, "elephant-direct");
+    assert.deepEqual(request.stage0Selfcheck, stage0Selfcheck);
+    const installed = installGuardMaintenanceWindow({ rootDir: root, request, anchors: [trustPolicy], proof: proofFor(intent), livePluginRoot: plugin });
+    assert.equal(installed.status, "active");
+    assert.equal(installed.authorshipMode, "elephant-direct");
+    assert.deepEqual(installed.stage0Selfcheck, stage0Selfcheck);
+  });
+
+  check("GMW18 install independently re-verifies the stage-0 declaration (F3 defense in depth): a hand-built request cannot bypass prepare()'s check", () => {
+    const root = repoFixture("gmw-install-stage0-");
+    const plugin = pluginRootFixture();
+
+    // (a) a hand-built request naming "elephant-direct" with a non-qualifying stage0Selfcheck.
+    const nonQualifying = handBuiltRequest({
+      root, plugin, scopeRuleIds: ["GS-6"], expiresAtMs: Date.now() + 60_000,
+      authorshipMode: "elephant-direct", stage0Selfcheck: { filesChanged: 5, diffLines: 200, touchesTestFile: true },
+    });
+    assert.throws(
+      () => installGuardMaintenanceWindow({ rootDir: root, request: nonQualifying.request, anchors: [trustPolicy], proof: proofFor(nonQualifying.intent), livePluginRoot: plugin }),
+      (error) => error instanceof GuardMaintenanceWindowError && error.code === "GMW-STAGE0-NOT-QUALIFIED",
+      "install must independently refuse a hand-built non-qualifying elephant-direct declaration",
+    );
+
+    // (b) a hand-built request with no authorshipMode at all (deleted post-construction --
+    // handBuiltRequest's own default parameter would otherwise re-supply "goldfish-dispatch"
+    // for an explicitly-undefined argument too, same as any JS default parameter).
+    const missingMode = handBuiltRequest({ root, plugin, scopeRuleIds: ["GS-6"], expiresAtMs: Date.now() + 60_000 });
+    delete missingMode.request.authorshipMode;
+    assert.throws(
+      () => installGuardMaintenanceWindow({ rootDir: root, request: missingMode.request, anchors: [trustPolicy], proof: proofFor(missingMode.intent), livePluginRoot: plugin }),
+      (error) => error instanceof GuardMaintenanceWindowError && error.code === "GMW-AUTHORSHIP-MODE-INVALID",
+      "install must independently refuse a hand-built request missing authorshipMode entirely",
+    );
+
+    assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "absent", "neither refused install must leave a window record behind");
+  });
+
+  check("GMW19 authorshipMode \"goldfish-dispatch\" never requires (or carries) a stage0Selfcheck", () => {
+    const root = repoFixture("gmw-goldfish-mode-");
+    const plugin = pluginRootFixture();
+    const { planSha256, specSha256 } = planSpecShas(root);
+    const { intent, request } = prepareGuardMaintenanceWindowRequest({
+      rootDir: root, scopeRuleIds: ["TP-2"], ttlSeconds: 60, reason: "goldfish dispatch as normal", featureId: "f",
+      planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
+      authorshipMode: "goldfish-dispatch", // stage0Selfcheck intentionally omitted -- not required off this path
+    });
+    assert.equal(request.stage0Selfcheck, null);
+    const installed = installGuardMaintenanceWindow({ rootDir: root, request, anchors: [trustPolicy], proof: proofFor(intent), livePluginRoot: plugin });
+    assert.equal(installed.status, "active");
+    assert.equal(installed.authorshipMode, "goldfish-dispatch");
+    assert.equal(installed.stage0Selfcheck, null);
+  });
+
+  // ---- PHX-WP-STAGE0-SELFCHECK-BACKCOMPAT: a window record written before the
+  // authorshipMode/stage0Selfcheck fields existed (genuinely missing key, not merely
+  // an empty/invalid value) must still read as active -- only NEWLY created windows
+  // (via prepare()/install()) get full mandatory validation; see
+  // validStoredStage0Declaration()'s doc comment for the rationale.
+  check("GMW20 a legacy stored window record with authorshipMode entirely absent (pre-existing field) still reads as active, not absent", () => {
+    const root = repoFixture("gmw-legacy-record-");
+    const plugin = pluginRootFixture();
+    const { planSha256, specSha256 } = planSpecShas(root);
+    const { intent, request } = prepareGuardMaintenanceWindowRequest({
+      rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 120, reason: "legacy backcompat", featureId: "f",
+      planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin, authorshipMode: "goldfish-dispatch",
+    });
+    installGuardMaintenanceWindow({ rootDir: root, request, anchors: [trustPolicy], proof: proofFor(intent), livePluginRoot: plugin });
+    assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "active");
+
+    // Simulate a record written before this feature existed: strip the keys entirely
+    // (not set to null/""/bogus -- an actually-missing key, as JSON.parse would yield
+    // for a pre-existing file that never had them).
+    const repo = guardMaintenanceWindowInternals.topology(root);
+    const paths = guardMaintenanceWindowInternals.storagePaths(repo.common);
+    const record = JSON.parse(readFileSync(paths.window, "utf8"));
+    delete record.authorshipMode;
+    delete record.stage0Selfcheck;
+    writeFileSync(paths.window, `${JSON.stringify(record)}\n`, { mode: 0o600 });
+
+    const status = currentGuardMaintenanceWindow({ rootDir: root });
+    assert.equal(status.status, "active", "a legacy record missing authorshipMode entirely must still be honored as active");
+  });
+
+  check("GMW21 a stored window record that DOES carry an authorshipMode key, but an invalid/unrecognised one, is still rejected as absent (backcompat is for absence only, not for tampering)", () => {
+    const root = repoFixture("gmw-tampered-mode-");
+    const plugin = pluginRootFixture();
+    const { planSha256, specSha256 } = planSpecShas(root);
+    const { intent, request } = prepareGuardMaintenanceWindowRequest({
+      rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 120, reason: "tamper check", featureId: "f",
+      planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin, authorshipMode: "goldfish-dispatch",
+    });
+    installGuardMaintenanceWindow({ rootDir: root, request, anchors: [trustPolicy], proof: proofFor(intent), livePluginRoot: plugin });
+    assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "active");
+
+    const repo = guardMaintenanceWindowInternals.topology(root);
+    const paths = guardMaintenanceWindowInternals.storagePaths(repo.common);
+    for (const mutate of [
+      (record) => { record.authorshipMode = "bogus-mode"; return record; },
+      (record) => { record.authorshipMode = null; return record; },
+      (record) => { record.authorshipMode = ""; return record; },
+      (record) => { record.authorshipMode = "elephant-direct"; record.stage0Selfcheck = null; return record; },
+    ]) {
+      const record = mutate(JSON.parse(readFileSync(paths.window, "utf8")));
+      writeFileSync(paths.window, `${JSON.stringify(record)}\n`, { mode: 0o600 });
+      const status = currentGuardMaintenanceWindow({ rootDir: root }).status;
+      assert.equal(status, "absent", `authorshipMode=${JSON.stringify(record.authorshipMode)} must not be honored as active`);
+    }
+  });
+
+  check("GMW22 validStoredStage0Declaration: unit-level split between a genuinely absent field (legacy, valid) and a present-but-invalid one (rejected)", () => {
+    const { validStoredStage0Declaration } = guardMaintenanceWindowInternals;
+    assert.equal(validStoredStage0Declaration(undefined, undefined), true, "absent authorshipMode is legacy-valid");
+    assert.equal(validStoredStage0Declaration(undefined, { filesChanged: 1, diffLines: 1, touchesTestFile: false }), true, "absent authorshipMode is legacy-valid regardless of any stray stage0Selfcheck");
+    assert.equal(validStoredStage0Declaration(null, undefined), false, "explicit null is not the same as absent -- rejected");
+    assert.equal(validStoredStage0Declaration("bogus", undefined), false, "an unrecognised mode is rejected, not treated as legacy");
+    assert.equal(validStoredStage0Declaration("goldfish-dispatch", null), true, "a valid explicit declaration passes as normal");
+    assert.equal(validStoredStage0Declaration("elephant-direct", { filesChanged: 1, diffLines: 1, touchesTestFile: false }), true, "a qualifying elephant-direct declaration passes as normal");
+    assert.equal(validStoredStage0Declaration("elephant-direct", { filesChanged: 9, diffLines: 1, touchesTestFile: false }), false, "a non-qualifying elephant-direct declaration is still rejected");
   });
 
   console.log(`\nguard-maintenance-window: ${passed} passed, ${failed} failed`);

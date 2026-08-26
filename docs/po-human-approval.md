@@ -1,5 +1,9 @@
 # PO approval: one human action
 
+For the full list of every human intent/gate this repository implements and
+which ones sit on this shared contract versus a different mechanism, see
+[`docs/human-authorization-inventory.md`](human-authorization-inventory.md).
+
 The agent owns every public preparation step: it creates the candidate-bound
 request, refreshes it after a candidate change, and verifies the public proof.
 The person owns only key setup (once) and approval. The encrypted private key
@@ -40,13 +44,22 @@ directory and rejects a directory that reaches the repository.
 
 ## Before any signature: one explicit confirmation
 
-Every signing command — `approve`, `approve-critical`, `sign-intent`, and each
-signature `approve-all` performs on your behalf — first prints a plain-language
-summary of what is about to be authorized and waits for you to type the exact
-word `approve`. Anything else, including an empty line, cancels: OpenSSL is
-never invoked and no proof artifact is written. The summary names the approval
-kind and the exact candidate commit (plus the action subject digest and expiry
-for a critical action), or the intent digest for `sign-intent`.
+Every signing command — `approve`, `approve-critical`, `approve-fork-disposition`,
+`sign-intent`, and each signature `approve-all` performs on your behalf — first
+prints a plain-language summary of what is about to be authorized and waits for
+you to type the exact word `approve`. Anything else, including an empty line,
+cancels: OpenSSL is never invoked and no proof artifact is written. The summary
+names the approval kind and the candidate (plus the action subject digest and
+expiry for a critical action), or the intent digest for `sign-intent`.
+
+One exception to read carefully, because the line looks like a commit and is
+not: for the `governance-fork-disposition` kind the `candidate commit` field is
+a DERIVED binding value, not a Git commit that exists in this repository. A
+governance-stream fork is not commit-scoped (ADR-0063), so the disposition binds
+the repository fingerprint, stream, sequence and the content digests of the
+conflicting entries instead. Check the `action subject sha256` line against the
+digest the agent showed you; that is the value that identifies what you are
+authorizing for this kind.
 
 The confirmation is deliberately placed *before* the passphrase prompt, so the
 question "should this be authorized, with this consequence?" is answered while
@@ -85,7 +98,12 @@ OpenSSL runs and before any artifact exists.
 ## Which commands are yours
 
 Every command in this document that reads the private key is yours and only
-yours: `setup`, `approve`, `approve-all`, `approve-critical`, `sign-intent`.
+yours: `setup`, `approve`, `approve-all`, `approve-critical`,
+`approve-fork-disposition`, `sign-intent`. `approve-fork-disposition` is on that
+list for a reason that is easy to miss from its name: it re-checks the fork and
+then hands the signing itself to the same `approve-critical` branch, so it opens
+your private key exactly like the others.
+
 Everything else — `prepare*`, `verify*`, and the guard-side consumers such as
 `guard-maintenance-window.mjs install` and `guard-human-override.mjs` — reads
 only public artifacts and is executed by the agent. If an agent asks you to run
@@ -165,6 +183,15 @@ node "$REPO/plugins/pipeline-core/scripts/po-approval-gate.mjs" prepare-all --re
 node "$REPO/plugins/pipeline-core/scripts/po-approval-gate.mjs" verify-all --repo-root "$REPO" --directory "$PO_DIR"
 ```
 
+The same script also carries the public half of the fork-disposition ceremony —
+`prepare-fork-disposition` and `verify-fork-disposition`. `approve-fork-disposition`
+is absent from it on purpose, exactly like `approve-critical`: it reads the
+private key. Note the narrower separate limit inside this repository: the
+lifecycle guard's agent allowlist admits only `prepare`, `prepare-all`, `verify`
+and `verify-all` through this script, so the `-critical` and `-fork-disposition`
+commands, though public, are run from an operator's terminal here until that
+allowlist is widened.
+
 ## Critical external effects
 
 For a remote push, a human-gated deployment or a publication, the control
@@ -174,11 +201,25 @@ digest of the exact writer-owned action subject. The human signs it on the
 hardened terminal with `approve-critical`; the agent can prepare and verify,
 but cannot sign.
 
-The repository policy enables this check only for `push`, `deploy` and
-`publication`. Planning, implementation, normal review and other chat-approved
-decisions do not require the external signer. A proof is single-purpose: a
-push proof cannot approve a deploy or publication, and candidate, subject or
-expiry drift requires a new request.
+The policy field behind this is `requiredKinds` in
+`project/critical-human-proof.json`. It is kind-scoped, it governs the State
+writer and the push guard, and this repository lists exactly `push`, `deploy`
+and `publication` in it. Removing a kind from that list does not stand the gate
+down — the writer action rejects instead (ADR-0055); standing the proof down
+takes an explicit, reasoned waiver.
+
+A fourth kind exists and is deliberately outside that field's reach:
+`governance-fork-disposition` (ADR-0063). The governance-event store never
+consults `requiredKinds` for it — it demands a verified approval
+unconditionally, reading only the `trustAnchor` from that same file, plus
+`gates.push_approval` to decide whether a `chat` clearance is admissible at all.
+So "add it to `requiredKinds`" is neither necessary nor sufficient for that
+kind; the trust anchor is what makes it verifiable.
+
+Planning, implementation, normal review and other chat-approved decisions do not
+require the external signer. A proof is single-purpose: a push proof cannot
+approve a deploy or publication, and candidate, subject or expiry drift requires
+a new request.
 
 ```sh
 # Agent/control plane: creates public external files only.
@@ -199,10 +240,102 @@ attribution string is not a substitute at these three boundaries.
 ## Adapter boundary
 
 This helper is the first adapter for one shared Human-Authorization contract,
-not a CYB-4-only mechanism. The shipped 0.5.0 adapter is the external
-encrypted Ed25519/SSH-style key path above. Passkey/WebAuthn, IAM,
-hardware-key, and password-manager adapters may later produce the same
-detached public proof; they are not bundled in 0.5.0.
+not a CYB-4-only mechanism, and not the only one this contract will ever have.
+The shipped adapter is the external encrypted Ed25519/SSH-style key path
+documented above; it exists to prove the contract, not to close it.
+Passkey/WebAuthn is the next expected **native** adapter — for a desktop
+consumer, built where that consumer lives, not in this repository, which has
+no desktop-app code. IAM, hardware-key, and password-manager adapters may
+follow the same shape. This section is what a conforming adapter — Passkey/
+WebAuthn or otherwise — is written against; it deliberately stops short of
+prescribing a UI, a platform API, or a credential format, because none of
+those are this repository's to decide.
+
+**What a conforming adapter must implement.** Every adapter, regardless of
+its key material or platform, produces a detached `proof` object with exactly
+this shape (the shipped adapter's own output, unchanged):
+
+```json
+{
+  "schema": "pipeline.po-approval-proof.v1",
+  "intentSha256": "<sha256 hex of the approval-intent digest being signed>",
+  "keyReference": "<the label the adapter's own trust-policy entry uses>",
+  "publicKey": "<the adapter's public key, in whatever serialization its own trust policy hashes>",
+  "signatureBase64": "<the signature over the intentSha256 bytes, base64-encoded>"
+}
+```
+
+Three properties are non-negotiable, because the shared contract's callers —
+the critical-action gate, the fork-disposition ceremony, the threat-model
+gate — rely on all three without adapter-specific code of their own:
+
+- **Candidate binding.** The `intentSha256` the adapter signs is not a bare
+  message; it is the digest of an approval-intent object that already
+  embeds the current candidate commit and tree, the action kind, and (for a
+  critical action) the exact subject digest and expiry. An adapter never
+  invents or shortens this digest — it signs exactly the digest the
+  control plane already computed and showed to the human, unmodified. This
+  is what makes a proof for one commit reject silently against any other.
+- **Replay resistance.** Because the signed digest is candidate-bound, a
+  proof captured for one candidate does not verify against a later one — a
+  changed tree or commit forces a new digest, which forces a new signature.
+  An adapter must not cache or reuse a prior signature across a candidate
+  change, and must not accept a pre-computed signature offered by anything
+  other than its own signing step for the exact digest under review.
+- **The no-secret-agent boundary.** No private key material, passphrase,
+  biometric template, hardware-token session, or platform credential
+  handle may cross into agent context, chat transcript, repository content,
+  CI environment, or Pipeline state at any point. The shipped adapter keeps
+  the encrypted private key and its passphrase in an external directory the
+  agent never reads and OpenSSL prompts for locally; a Passkey/WebAuthn
+  adapter keeps the analogous boundary by never exporting the authenticator's
+  private key material out of the platform's own secure enclave/OS
+  credential store — the browser/OS `navigator.credentials` (or platform
+  equivalent) ceremony runs on the human's device and only the resulting
+  assertion, translated into the proof shape above, ever reaches the agent.
+  An adapter that cannot state where its private key material lives and how
+  it stays out of these four surfaces does not conform, independent of
+  cryptographic correctness.
+
+**What the verification surface actually checks — so a conforming adapter's
+proof is accepted without touching the contract.** The consumer-side check
+(`verifyPoApprovalProof` in `plugins/pipeline-core/lib/po-approval-proof.mjs`,
+called from every kind-specific verifier: threat-model, critical-action,
+fork-disposition) is adapter-agnostic on the fields above: it checks the
+proof's `schema` tag, that `proof.intentSha256` equals the digest of the
+rebuilt approval intent (so the proof cannot be replayed against a different
+candidate/action/subject), that `sha256(proof.publicKey)` equals the
+`publicKeySha256` pinned in the repository's own trust policy (so the proof
+cannot substitute a different key than the one this repository was told to
+trust), and finally that `proof.signatureBase64` is a valid signature over the
+`intentSha256` bytes under `proof.publicKey`. None of those four checks name
+Ed25519, OpenSSL, or any other adapter-specific detail — a Passkey/WebAuthn
+adapter that emits the proof shape above, with a public key whose hash
+matches its trust-policy entry and a signature that verifies over the same
+digest bytes, is accepted exactly like the shipped adapter's proof, with no
+change to `verifyPoApprovalProof` or its callers.
+
+**One documented, narrower coupling, not a blocking one.** The signature
+check itself currently calls Node's `crypto.verify(null, ...)` — the `null`
+algorithm form that only Node's crypto library resolves without an explicit
+digest algorithm for EdDSA-family keys (Ed25519/Ed448), which is exactly what
+the shipped adapter's key is. Most WebAuthn/Passkey authenticators issue
+ECDSA (P-256) credentials rather than Ed25519 ones; a future adapter whose
+`publicKey` is such an ECDSA key would need `verifyPoApprovalProof` to pass
+an explicit digest algorithm (or detect one from the key) rather than rely on
+the `null` default, which is a small, well-scoped addition to that one
+function, not a redesign of the contract. An Ed25519-issuing Passkey
+authenticator (WebAuthn permits this credential type) would verify today
+without any change. This document records the boundary precisely so a future
+adapter implementer knows which side of it a code change is required on.
+
+**What every human command below is not.** The setup/approve/authorize
+commands documented above are one adapter's *implementation* of this
+contract, not the contract itself; a Passkey/WebAuthn adapter has its own
+one-time enrollment and its own per-approval user ceremony (a platform
+prompt, not an OpenSSL passphrase entry), and is free to differ from every
+CLI detail above as long as its output satisfies the proof shape and the
+three non-negotiable properties stated here.
 
 ## Remote work and provisional codes
 

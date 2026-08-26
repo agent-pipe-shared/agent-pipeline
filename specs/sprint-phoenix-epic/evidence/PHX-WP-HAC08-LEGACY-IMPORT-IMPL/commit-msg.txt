@@ -1,0 +1,12 @@
+feat(agent-decision-journal): add H-AC-08 legacy-import-observation kind
+
+Give the journal a third, independent event kind for a pre-Phoenix or
+external approval/override/deploy record whose original authority tuple
+cannot be reproven, importable only as a closed, explicitly unverified
+observation. Dispatched exactly like command-offer (a third oneOf branch,
+not a sixth observational kind), and rides the existing, unmodified
+origin === "agent" -> authorityClass: "non-authoritative" binding in
+governance-event.mjs, so it structurally cannot satisfy a gate.
+
+Dispatch: PHX-WP-HAC08 (goldfish)
+AI-Assisted: true

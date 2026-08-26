@@ -1,0 +1,35 @@
+{
+  "taskId": "PHX-WP-EPICAC02-VERIFYCHECK",
+  "model": "claude-sonnet-5",
+  "rulesetSha": "5fa52282cd58e6be5c04dceada78dda8c9dd072b7f2d4b4d833b5d2ab8a54af2",
+  "dispatcher": "elephant",
+  "outcome": "done",
+  "log": [
+    {
+      "phase": "bootstrap",
+      "toolUses": 8,
+      "note": "Read prior PHX-WP-EPICAC02 evidence (dispatch-record.json, commit-message.txt): the decision function checkUnpublishedSiblingSprintConsumption was landed at 77d2d8d5, no-git pure policy, already registered in verify.mjs test suite. This dispatch builds the missing observation-gathering check script."
+    },
+    {
+      "phase": "investigate-contract-and-manifests",
+      "toolUses": 22,
+      "note": "Read the full decision function, its schema helpers, its existing test fixtures, and all 3 real specs/*/lifecycle.json manifests: all three have candidate: null today, so the check will short-circuit to verification-permitted (PSI-PUB-NO-BOUND-COMMIT) for all of them right now. Read public-release-state.mjs: it is a pure validator/digest module with no fs access; the real, already-populated source of truth is docs/release-state.json (single, repo-wide, currently 'consistent' per check-release-state-consistency.mjs). ADR-0043 confirms all follow-up Sprint Epics (Nightwing/Phoenix/Nova; Cyborg the same way) are feat/sprint-<slug>-<runner> branches cut from one accepted go-live OID and published through the SAME shared release train -- one publication boundary in this repo, not one per Epic -- so docs/release-state.json legitimately serves as the published-tip record for whichever sibling Epic gets attributed. git for-each-ref/branch -a confirmed real refs today: feat/sprint-nightwing, feat/sprint-nova-codex-v046; no cyborg ref exists yet (zero attribution for cyborg is therefore correct, not a bug)."
+    },
+    {
+      "phase": "design-direction-check",
+      "toolUses": 4,
+      "note": "Empirically verified git for-each-ref --contains <commit> direction (git for-each-ref --contains v0.4.0 lists refs for which v0.4.0 IS AN ANCESTOR of their tip). A literal for-each-ref --contains <boundCommit> reduced to sibling names would therefore detect 'sibling has since absorbed Phoenix', the reverse of EPIC-AC-02. Implemented the correct direction instead: git merge-base --is-ancestor <siblingTip> <boundCommit>, matching parallel-sprint-integration.mjs's own words ('that bound commit, or its ancestry, carries a commit that belongs to a sibling Epic'). Documented as an explicit deviation in the script's own doc comment and in the final report."
+    },
+    {
+      "phase": "implement",
+      "toolUses": 6,
+      "note": "Wrote plugins/pipeline-core/scripts/check-epic-ac02-publication.mjs (discoverFeaturePackageManifests, gatherPublicationGateInput, checkEpicAc02Publication, direct-invocation CLI) following check-artifact-topology.mjs's shape exactly (exported functions + isDirectInvocation gate, DEFAULT_ROOT via import.meta.url, exit 0/2). Every git-observation failure path returns siblingProvenance: 'unobserved' (fail-closed)."
+    },
+    {
+      "phase": "verify",
+      "toolUses": 6,
+      "note": "check-epic-ac02-publication.mjs run standalone against this real repo: 'epic-ac02-publication: 3 package(s) checked, 0 failed', exit 0 (matches DoD: none of the 3 real manifests consume anything today since all have candidate: null). check-epic-ac02-publication.test.mjs (plain assert-based script, no node:test, mirrors check-artifact-topology.test.mjs's shape): 6 checks against a real throwaway Git repo (Nova branch merged into a synthetic Phoenix candidate) plus the real repo's own 3 manifests -- 'epic-ac02-publication-check: 6 passed, 0 failed', exit 0. Artifact: specs/sprint-phoenix-epic/evidence/PHX-WP-EPICAC02-VERIFYCHECK/check-run.txt."
+    }
+  ],
+  "report": null
+}

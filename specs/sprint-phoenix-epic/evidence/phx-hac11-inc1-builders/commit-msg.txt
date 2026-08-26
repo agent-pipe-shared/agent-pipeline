@@ -1,0 +1,18 @@
+feat(pipeline-core): add the pure GMW/HGO ledger-intake builders
+
+Increment 1 of the GMW/HGO evidence intake (design
+specs/sprint-phoenix-epic/design/gmw-hgo-evidence-intake-into-the-human-ledger.md):
+a pure, I/O-free, clock-free, randomness-free module turning producer facts
+into validated PHX-2 human governance decisions and 24-key append intents.
+
+- deterministic identifiers derived from the request digest and the stream
+  state, never from a clock (§7.3) — the property U-4 pins as a regression
+  guard against the replaced clock-suffixed scheme
+- the closed policyDigest preimage of §5.5, verified constructively in U-7:
+  no trust-anchor value and no derivative of one enters it at any depth
+- HGO representability decided in §7.5's order, candidate before artifacts,
+  yielding an explicit not-representable outcome and no decision object
+  rather than a fabricated candidate or artifact (AC-12, AC-13)
+- unit tests U-1..U-10 of §12, each traceable to its U-number
+
+AI-Assisted: true

@@ -16,7 +16,7 @@ Rule IDs: `GL-xx`. Every rule = MUST / MUST NOT + Why + Verification.
 - **MUST NOT** claim "done", "passing", "verified", or "fixed" without machine-generated evidence: for code work the verify-script evidence artifact (`guardrails/quality-gates.md`, QG-03); for review findings a `file:line` citation; for research claims a source plus retrieval date.
 - **MUST** state the executed command and its exit code whenever a check result is reported.
 - **Why:** The documented #1 failure mode of agentic work is "reported complete but not tested". A fluent success claim without evidence is indistinguishable from a hallucination.
-- **Verification:** Completion reports carry the evidence artifact as a mandatory field (`docs/operating-model.md` §2.3, report field 2). The Critic runs a trajectory check — claimed checks vs. evidence. The Elephant rejects submissions without an artifact; there is no "too small to verify" exemption (verify + evidence are invariant on ALL rigor levels, §3.3).
+- **Verification:** Completion reports carry the evidence artifact as a mandatory field (`docs/operating-model.md`, *The lifecycle* — step 5, Dispatch; the six-field list itself is `roles/goldfish.md` GF-01 — report field 2). The Critic runs a trajectory check — claimed checks vs. evidence. The Elephant rejects submissions without an artifact; there is no "too small to verify" exemption (verify + evidence are invariant on ALL rigor levels, `docs/operating-model.md`, *Rigor, risk and gates*).
 
 ## GL-02 — Docs are a snapshot; code and runtime are the truth (drift check)
 
@@ -42,26 +42,26 @@ Rule IDs: `GL-xx`. Every rule = MUST / MUST NOT + Why + Verification.
   - **costly** (purchases, paid APIs or services beyond an agreed budget).
 - **MUST NOT** carry consent across contexts: an approval given in one session/task authorizes exactly that instance. A new session, a new task, or a changed scope re-requests consent.
 - **Why:** The PO is liable for every agent action; blanket or inherited approvals erode the human gate exactly where stakes are highest.
-- **Verification:** Human-gate step in the SDLC (`docs/operating-model.md` §3.2 step 9) and escalation ladder level 4 (§4.3); the completion report references the concrete approval (who/when/what). Autonomy levels are read from the committed project calibration at its resolved authority tier (`project/pipeline.json`, else `.claude/pipeline.json`), never self-granted.
+- **Verification:** Human-gate step in the SDLC (`docs/operating-model.md`, *The lifecycle* — step 4, Human plan gate) and escalation ladder level 4 (`harness/review-protocol.md` §4, *Escalation ladder (complete)*); the completion report references the concrete approval (who/when/what). Autonomy levels are read from the committed project calibration at its resolved authority tier (`project/pipeline.json`, else `.claude/pipeline.json`), never self-granted.
 
 ## GL-05 — Judgment stays with the PO
 
 - **MUST NOT** decide architecture trade-offs, resolve spec ambiguity by guessing, take final gates, or make any fundamental decision silently.
 - **MUST** escalate ambiguity and conflicts (spec vs. reality, guardrail vs. task) via the defined stop conditions instead of resolving them locally. A new fundamental decision requires a register entry + ADR BEFORE it is acted on.
 - **Why:** Models simulate judgment; silently made decisions are not reconstructable — and the PO answers for all outcomes.
-- **Verification:** Every new fundamental decision has a register entry + ADR (drift check in `/close` flags unlogged ones). Briefings contain stop conditions that route ambiguity to the Elephant/PO (`docs/operating-model.md` §2.3, field 5).
+- **Verification:** Every new fundamental decision has a register entry + ADR (drift check in `/close` flags unlogged ones). Briefings contain stop conditions that route ambiguity to the Elephant/PO (`docs/operating-model.md`, *The lifecycle* — step 5, Dispatch; field 5 of `roles/goldfish.md` GF-01).
 
 ## GL-06 — Show the file, don't argue (anti-hallucination)
 
 - When a hallucination or false claim is detected (your own or another agent's), **MUST** point to the correcting file (spec, code, doc) and load it as context.
 - **MUST NOT** try to argue a hallucination away in chat.
-- **Why:** Discussion anchors the hallucination deeper; the file is the authority, not the counter-argument (`docs/operating-model.md` §2.2).
+- **Why:** Discussion anchors the hallucination deeper; the file is the authority, not the counter-argument (`docs/operating-model.md`, *Authority precedence*).
 - **Verification:** Correction turns reference a concrete file (path + relevant lines) instead of argument chains; the prompt library (Phase 3) ships ready-made correction snippets.
 
 ## GL-07 — What exists only in the chat does not exist
 
 - **MUST** persist decisions, insights, state changes, and lessons to versioned files immediately (handover/state file, spec, register/ADR) — never rely on chat history, memory, or auto-compaction to retain them.
-- **Why:** The session is a volatile cache over the persisted artifact; a crash, machine switch, or planned session cut must lose nothing (`docs/operating-model.md` §5.1).
+- **Why:** The session is a volatile cache over the persisted artifact; a crash, machine switch, or planned session cut must lose nothing (`docs/operating-model.md`, *Evidence, review and recovery*).
 - **Verification:** Handover file is updated at every phase/block end (merge-completion gate — see `guardrails/git.md` GIT-06). Spot check: "Could a fresh session take over right now from files alone?"
 
 ## GL-08 — Error diagnoses are hypotheses until verified

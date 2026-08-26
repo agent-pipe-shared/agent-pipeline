@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-pipeline.dev/schemas/pipeline.governance-stream-registry.v1.json",
+  "title": "Pipeline governance stream registry v1",
+  "description": "Closed repository-bound genesis registry. It declares streams and algorithms; it is not a replaceable head or index.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "repositoryFingerprint", "canonicalization", "digestAlgorithm", "eventDigestDomain", "storageRoot", "streams"],
+  "properties": {
+    "schema": { "const": "pipeline.governance-stream-registry.v1" },
+    "repositoryFingerprint": { "$ref": "#/$defs/sha256" },
+    "canonicalization": { "const": "RFC8785" },
+    "digestAlgorithm": { "const": "sha-256" },
+    "eventDigestDomain": { "const": "pipeline.governance-event.v1\\u0000" },
+    "storageRoot": { "const": "governance/events" },
+    "streams": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": { "$ref": "#/$defs/stream" }
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "stream": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["streamId", "origin", "authorityClass", "relativeRoot", "storageProfile", "genesis"],
+      "properties": {
+        "streamId": { "enum": ["human", "agent", "lifecycle"] },
+        "origin": { "enum": ["human", "agent", "lifecycle"] },
+        "authorityClass": { "enum": ["human-authority", "non-authoritative"] },
+        "relativeRoot": { "enum": ["human", "agent", "lifecycle"] },
+        "storageProfile": { "const": "repository-public-safe" },
+        "genesis": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["sequence", "eventDigest"],
+          "properties": {
+            "sequence": { "const": 0 },
+            "eventDigest": { "type": "null" }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "origin": { "const": "human" } }, "required": ["origin"] },
+          "then": { "properties": { "streamId": { "const": "human" }, "relativeRoot": { "const": "human" }, "authorityClass": { "const": "human-authority" } } }
+        },
+        {
+          "if": { "properties": { "origin": { "enum": ["agent", "lifecycle"] } }, "required": ["origin"] },
+          "then": { "properties": { "authorityClass": { "const": "non-authoritative" } } }
+        }
+      ]
+    }
+  }
+}

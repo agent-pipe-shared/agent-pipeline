@@ -1,0 +1,6 @@
+docs(phoenix): finalize the PHX-WP-HAC11-NUDGE dispatch record
+
+Records the commit SHA and the full-verify preflight open item.
+
+Dispatch: PHX-WP-HAC11-NUDGE (goldfish)
+AI-Assisted: true

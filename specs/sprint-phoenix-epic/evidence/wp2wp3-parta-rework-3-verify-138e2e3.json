@@ -1,0 +1,11 @@
+{
+  "schema": "pipeline.elephant-verified-checks.v1",
+  "note": "Elephant-run (not verify.mjs, not script-written) — same honesty disclosure QG-03 requires: this is a direct, individually-run reproduction, not a substitute claimed as verify.mjs-equivalent, run directly against HEAD after the WP2-WP3-partA-rework-3 dispatch landed all 4 commits.",
+  "candidate": { "commit": "138e2e3cc3bab283869209ee22a985319e4ad83e", "tree": "908053401ce7628495c3a71d125ca85a69830c5f" },
+  "base": { "commit": "5c12a8d7692df1044b160c6df039a479ba22687f", "note": "computed as <first-enumerated-SHA>^ = 2e48cbd^, not carried over from the prior candidate — closing the base-computation defect the two preceding Critic reviews both flagged." },
+  "checks": [
+    { "command": "node harness/scripts/check-doc-contracts.mjs", "exitCode": 0, "resultSummary": "Documentation contracts valid: 478 Markdown file(s), 776 link(s), 13 anchor check(s)." },
+    { "command": "node plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs", "exitCode": 0, "resultSummary": "32/32 passed — regression guard only; this dispatch was design-document + backlog only and touched no code." }
+  ],
+  "notCovered": "harness/scripts/verify.mjs was not run directly (the same pre-existing VERIFY-CLEANUP-REGISTRATION-REQUIRED infra gap disclosed for every prior candidate this session in a plain checkout). F1's central claim — that each repointed citation's target genuinely carries the claimed content — is NOT mechanically verifiable by check-doc-contracts.mjs, which is a link-existence check only; the Elephant spot-verified it by reading the new backlog item and confirming via rg that all three citation sites now point at it."
+}

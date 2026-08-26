@@ -145,6 +145,26 @@ test("a duplicated used-acknowledgement id is rejected before the callback runs"
   assert.equal(invoked, false, "duplicate used-acknowledgement state never reaches the callback");
 });
 
+test("acknowledgementId is read exactly once, even from a non-idempotent getter", () => {
+  const values = ["ack-first", "ack-second", "ack-third", "ack-fourth"];
+  let reads = 0;
+  const acknowledgement = {
+    schema: RECOVERY_PREVIEW_ACK_SCHEMA,
+    invocationId: "preview-01",
+    previewDigest: DIGEST,
+    delivery: "delivered",
+    get acknowledgementId() {
+      const value = values[reads] ?? values.at(-1);
+      reads += 1;
+      return value;
+    },
+  };
+  const result = attestRecoveryPreviewDelivery({ invocation: INVOCATION, callback: () => acknowledgement });
+  assert.equal(result.code, "RP-DELIVERY-ATTESTED");
+  assert.equal(reads, 1, "acknowledgementId must be read exactly once per call");
+  assert.deepEqual(result.usedAcknowledgementIds, ["ack-first"]);
+});
+
 test("non-string ids and digests are rejected instead of being coerced by the regex", () => {
   assert.equal(createRecoveryPreviewInvocation({ invocationId: 12345, previewDigest: DIGEST }), null);
   assert.equal(createRecoveryPreviewInvocation({ invocationId: "preview-01", previewDigest: { toString: () => DIGEST } }), null);

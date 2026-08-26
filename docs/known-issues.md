@@ -59,3 +59,59 @@ history rewrite.
 TP-3 and TP-5 were temporarily removed under explicit PO authorization solely
 for these briefed edits and restored exactly before the final gates. This narrow
 course authorization is not a Critic PASS, review verdict, or release approval.
+
+For the PHX-0A lifecycle-writer implementation session, the PO explicitly
+authorized temporary removal of TP-1, TP-3, and TP-5 only. The authorization
+is limited to the briefed Goldfish scope and must be restored before its
+independent Critic review and final gates; it does not authorize any other
+guard-config change, a bypass of Verify, or a remote action.
+
+The temporary PHX-0A exception was restored without an implementation change
+when the accepted #22 planner rejected the required absent-manifest draft
+bootstrap. The next attempt requires a PO-approved resolution of that planner
+contract before another writer dispatch.
+
+After that PO-approved contract revision received its renewed Plan/Spec gate,
+the same session authorization reactivated only TP-1, TP-3, and TP-5 for the
+single renewed PHX-0A dispatch. The rules remain subject to the same immediate
+restoration requirement before independent review and final gates.
+
+That renewed dispatch restored the rules without a code commit after the
+repository topology validator exposed stale authority digests in the existing
+Phoenix draft lifecycle manifest. The pending worktree remains subject to a
+separate exact PO disposition for that manifest reconciliation.
+
+The PO subsequently authorized PHX-0A to include that manifest and reconcile
+only its stale PRD, Spec, acceptance, and architecture digests through the new
+writer's preview → exact PO-bound apply → readback path. After the revised
+Plan/Spec gate was renewed, this same session exception reactivated only
+TP-1, TP-3, and TP-5 for the single Goldfish completion dispatch. It remains
+limited to the listed writer/topology/test work and must again be restored
+before any independent review, aggregate final gate, or remote action.
+
+That Goldfish dispatch completed its exact writer preview → PO-bound apply →
+readback transaction and committed the corresponding public-safe receipt. The
+TP-1, TP-3, and TP-5 rules are restored before aggregate verification and any
+independent review; the exception grants no further implementation or remote
+authority.
+
+The aggregate Security gate then identified two `generic-api-key` false
+positives in the PHX-0A receipt and its negative fixture. The PO's existing
+session exception reactivates only TP-5 for one bounded Goldfish sanitation
+patch to the writer receipt and `pipeline-state` suite; it does not authorize a
+Gitleaks allowlist expansion, unrelated scanner suppression, or a lifecycle
+manifest change. TP-5 must be restored before the rerun of Security, Verify,
+and independent review.
+
+The bounded writer sanitation patch committed a replay-generated public receipt
+with a compact correlation fingerprint, retained the exact internal authority
+checks, and left the lifecycle manifest unchanged. TP-5 is restored before
+Security and Verify are rerun; no scanner suppression was added.
+
+The subsequent Security scan proved that the remaining false positives are
+immutable local-history findings from the earlier R3 receipt and fixture
+commits. The current receipt and fixture are minimized, but a historical scan
+cannot remove prior commit contents without prohibited history rewriting. TP-5
+is restored while the PO decides whether to authorize exact, immutable-history
+fingerprints in `.gitleaksignore`; no broad allowlist or scanner bypass is
+permitted.

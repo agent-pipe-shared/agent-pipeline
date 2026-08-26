@@ -1,0 +1,30 @@
+{
+  "taskId": "PHX-WP-EPICAC02",
+  "model": "claude-opus-5",
+  "rulesetSha": "2d25aa24c69d7585d321bf9ab4d12ad53d87ae83e2d85ff6dcb4753bcb0c0cba",
+  "dispatcher": "elephant",
+  "outcome": "in-progress",
+  "log": [
+    {
+      "phase": "investigate-carrier",
+      "toolUses": 20,
+      "note": "The only commit identity a feature package manifest (pipeline.feature-package.v1, specs/<id>/lifecycle.json) can bind is candidate.commit/candidate.tree; feature-package-topology.mjs has no cross-epic or dependency field at all (grep for dependencies|externalEpic|crossEpic|sprintId|epic: zero hits). Real packages today: specs/sprint-nova-epic, specs/sprint-phoenix-epic, specs/cyb-4 (Cyborg) - all with candidate: null. 'unpublished' is already real repo vocabulary: public-release-state.mjs types publicationStatus as published|unpublished bound to a commit/tree/tag. Conclusion: 'consumes an unpublished Nova/Cyborg/Nightwing commit' = the package's bound candidate commit, or its ancestry, carries a sibling-Epic commit that is not reachable from that Epic's published tip."
+    },
+    {
+      "phase": "investigate-registration",
+      "toolUses": 22,
+      "note": "harness/scripts/verify.mjs registers suites by explicit file entry; parallel-sprint-integration.test.mjs is already registered (verify.mjs:405) as a blocking suite, so new tests in it run inside Full Verify without a TP-3 edit. Wiring the gate over the REAL manifests plus live git probes inside verify would need a new registration line in verify.mjs - not attempted (TP-3)."
+    },
+    {
+      "phase": "implement",
+      "toolUses": 29,
+      "note": "Added checkUnpublishedSiblingSprintConsumption to parallel-sprint-integration.mjs (pure policy, no git invocation, sealed receipt) plus 11 checks (PSI15-PSI25) to its registered test file."
+    },
+    {
+      "phase": "verify",
+      "toolUses": 33,
+      "note": "node --test on both touched files: tests 2, pass 2, fail 0, exit 0; the suite itself prints 25/25 checks passed. Artifact: specs/sprint-phoenix-epic/evidence/PHX-WP-EPICAC02/node-test-epicac02.tap (written by the node test reporter, repo-relative paths only)."
+    }
+  ],
+  "report": null
+}

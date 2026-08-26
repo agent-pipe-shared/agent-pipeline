@@ -1,0 +1,100 @@
+TAP version 13
+# Subtest: PX0-AC-13: under the host-authorized-wsl boundary, the update-availability CLI's network-delegated ls-remote never reaches any spawn substitute, while a local call still genuinely spawns and returns real data
+ok 1 - PX0-AC-13: under the host-authorized-wsl boundary, the update-availability CLI's network-delegated ls-remote never reaches any spawn substitute, while a local call still genuinely spawns and returns real data
+  ---
+  duration_ms: 107.353093
+  type: 'test'
+  ...
+# Subtest: loaded Pipeline equal/ahead results are metadata and never mutate the source
+ok 2 - loaded Pipeline equal/ahead results are metadata and never mutate the source
+  ---
+  duration_ms: 330.227984
+  type: 'test'
+  ...
+# Subtest: closed update-channel configuration defaults by distribution topology
+ok 3 - closed update-channel configuration defaults by distribution topology
+  ---
+  duration_ms: 0.497527
+  type: 'test'
+  ...
+# Subtest: self-application topology keeps alpha when the loaded cache is outside its source checkout
+ok 4 - self-application topology keeps alpha when the loaded cache is outside its source checkout
+  ---
+  duration_ms: 174.491161
+  type: 'test'
+  ...
+# Subtest: persisted project channel config is closed, read-only, and takes precedence
+ok 5 - persisted project channel config is closed, read-only, and takes precedence
+  ---
+  duration_ms: 175.263402
+  type: 'test'
+  ...
+# Subtest: alpha observes only remote main
+ok 6 - alpha observes only remote main
+  ---
+  duration_ms: 319.408916
+  type: 'test'
+  ...
+# Subtest: beta selects the highest valid beta or stable tag, including annotated tags
+ok 7 - beta selects the highest valid beta or stable tag, including annotated tags
+  ---
+  duration_ms: 459.847786
+  type: 'test'
+  ...
+# Subtest: stable selects only the highest final release tag and invalid or absent tags fail typed
+ok 8 - stable selects only the highest final release tag and invalid or absent tags fail typed
+  ---
+  duration_ms: 441.728491
+  type: 'test'
+  ...
+# Subtest: older loaded Pipeline is update-available but ordinary repository writes stay permitted
+ok 9 - older loaded Pipeline is update-available but ordinary repository writes stay permitted
+  ---
+  duration_ms: 253.474366
+  type: 'test'
+  ...
+# Subtest: loaded identity is independent from a Phoenix-shaped project checkout
+ok 10 - loaded identity is independent from a Phoenix-shaped project checkout
+  ---
+  duration_ms: 340.83821
+  type: 'test'
+  ...
+# Subtest: offline and divergent loaded builds are typed unknown and nonblocking
+ok 11 - offline and divergent loaded builds are typed unknown and nonblocking
+  ---
+  duration_ms: 302.985442
+  type: 'test'
+  ...
+# Subtest: only an exact plugin-shipped security policy match blocks
+ok 12 - only an exact plugin-shipped security policy match blocks
+  ---
+  duration_ms: 139.36401
+  type: 'test'
+  ...
+# Subtest: legacy writePermitted is update metadata and cannot override repository freshness
+ok 13 - legacy writePermitted is update metadata and cannot override repository freshness
+  ---
+  duration_ms: 0.438294
+  type: 'test'
+  ...
+# Subtest: availability CLI rejects the removed direct channel bypass
+ok 14 - availability CLI rejects the removed direct channel bypass
+  ---
+  duration_ms: 0.658153
+  type: 'test'
+  ...
+# Subtest: availability CLI reads only neutral channel authority and otherwise defaults stable
+ok 15 - availability CLI reads only neutral channel authority and otherwise defaults stable
+  ---
+  duration_ms: 2.982297
+  type: 'test'
+  ...
+1..15
+# tests 15
+# suites 0
+# pass 15
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3263.154011

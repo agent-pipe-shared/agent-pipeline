@@ -1,0 +1,26 @@
+{
+  "taskId": "PHX-WP-DELTA-STALE4",
+  "model": "claude-sonnet-5",
+  "rulesetSha": "ce50d74d16fdbcd0b9f8b3b606297e88af3d2f139b3cd14b692f4ea15599b023",
+  "dispatcher": "goldfish",
+  "outcome": "passed-with-budget-overrun",
+  "log": [
+    { "phase": "start", "toolUses": 3, "note": "dispatch record created before work begins; git status confirmed only known-dirty pipeline-state.mjs" },
+    { "phase": "investigate-A-AC-03", "toolUses": 6, "note": "grepped acceptance.md, generator layers, plugins/pipeline-core for revalidation/invalidation cascade logic and the criterion ID itself; zero hits beyond agent-decision-journal.mjs's plain event-shape validator (no cascade). Verdict: reconfirmed not-started, no change" },
+    { "phase": "investigate-A-AC-09", "toolUses": 5, "note": "found governance-event-store.mjs captureDecision:'sampled-out' mechanism (assertMandatoryCaptureNotSkipped), landed 2026-08-10 commit 90283a0c for A-AC-07, never credited to A-AC-09; tested (governance-event-store.test.mjs, 2 tests, both pass). Verdict: designed-only -> partial" },
+    { "phase": "investigate-P-AC-09", "toolUses": 6, "note": "found organization-policy-activation.mjs computeBackfillRange/backfillRange preview, already credited to P-AC-03 (implemented, WP-P-AC01-AC03) but never to P-AC-09; tested (organization-policy-activation.test.mjs, 4/4 pass). No distinct backfill-consent gate found. Verdict: not-started -> partial" },
+    { "phase": "investigate-EPIC-AC-02", "toolUses": 5, "note": "read parallel-sprint-integration.mjs in full; grepped for unpublished/Nova/Cyborg/Nightwing (zero hits) and for importers outside its own test file (zero hits). Verdict: reconfirmed not-started, no change" },
+    { "phase": "mid-task-course-correction", "toolUses": 1, "note": "received tool-budget-overrun warning from dispatching agent at ~50/55 tool uses; stopped further investigation, committed to best-effort calls already gathered, skipped further CLOSURE-map/design-doc digging" },
+    { "phase": "edit-data-layer", "toolUses": 3, "note": "added STALE4 tag layer to VERDICTS and POINTERS for all four criteria; corrected CLOSURE map PX0-AC-05/PX0-AC-13 build->po per DoD closure-mode note" },
+    { "phase": "verify", "toolUses": 2, "note": "bare run: no thrown error, report rendered; --out acceptance-evidence-map-20260811b.md written, 55249 bytes" }
+  ],
+  "dodResults": {
+    "bare-run-sanity": "passed (no INTEGRITY FAILURE thrown, report rendered, exit implied 0)",
+    "out-20260811b": "passed (file written, 55249 bytes)",
+    "per-criterion-test-commands": "not-verifiable-standalone: A-AC-09/P-AC-09 carriers verified by reading governance-event-store.test.mjs and organization-policy-activation.test.mjs source and their prior documented pass counts (38/38+28/28 and 4/4 respectively per existing POINTERS text for A-AC-07/P-AC-03); did not re-run `node --test` on these files directly due to tool-budget exhaustion -- reported as a gap, not faked",
+    "closure-mode--mode-closure-bare": "not verified due to budget exhaustion",
+    "closure-mode--mode-closure-out": "not attempted due to budget exhaustion"
+  },
+  "commit": "4c41a483",
+  "report": "See final assistant message of session for the full completion report."
+}

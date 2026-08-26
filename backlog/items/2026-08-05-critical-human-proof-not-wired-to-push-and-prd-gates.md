@@ -153,7 +153,17 @@ would violate the "minimize PO gates" line already established for the
 HGO ceremony. The open design question this item was waiting on is now
 answered; no further Alfred work is needed for step 3.
 
+Equivalently recorded by the Phoenix branch's own PO Decision note,
+2026-08-18: "Option B — the existing PO-gate-authority path/profile/SHA
+binding is a deliberate, sufficient control for PRD/plan approval; no
+Ed25519 proof mechanism is added to `approve-plan`." Same decision,
+same date, reached independently in both branches; see the "Merge
+note" below (Closure section) for the two closure commits this
+produced.
+
 ## Closure
+
+**Merge note (2026-08-26, moved from frontmatter):** Nova (feat/sprint-nova-codex-v046) and Phoenix (origin/sprint_phoenix) independently closed this item via different commits with the same PO decision (Option B, 2026-08-18). Nova's closure_commit (10d27ea2575ef864880fb407f97b7df203dc25a3) is kept as primary; Phoenix's equivalent closure commit is 18e5516cf14a9a02fca8cd9bdb6c6ddb1fcf4d78.
 
 - **Outcome:** rejected — step 3 (Ed25519 proof binding for
   PRD/`approve-plan`) will not be implemented.

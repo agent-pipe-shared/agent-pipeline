@@ -1,0 +1,121 @@
+{
+  "schema": "pipeline.feature-package.v1",
+  "feature": {
+    "id": "sprint-phoenix-epic",
+    "rigor": 2
+  },
+  "state": "draft",
+  "artifacts": [
+    {
+      "class": "prd",
+      "path": "specs/sprint-phoenix-epic/prd_phoenix-epic.md",
+      "sha256": "81d0213b4c3c2f114d49bbebba4423515feef89b086152964eab7e489b1c32eb",
+      "authority": true,
+      "mutability": "immutable",
+      "retention": "active"
+    },
+    {
+      "class": "spec",
+      "path": "specs/sprint-phoenix-epic/spec.md",
+      "sha256": "5eeef75ccea0a49e512634d8ae8d899bee672e3635d7e9f461fc99b6f034ed5f",
+      "authority": true,
+      "mutability": "immutable",
+      "retention": "active"
+    },
+    {
+      "class": "acceptance",
+      "path": "specs/sprint-phoenix-epic/acceptance.md",
+      "sha256": "f59128d00837f5a14b5310740913896d0a745b14bb25c77b645e3c41ce6415cb",
+      "authority": true,
+      "mutability": "mutable",
+      "retention": "active",
+      "amendment": {
+        "at": "2026-08-18T21:32:46.019Z",
+        "reason": "auto-rebind: mutable-class artifact digest resynced to current file bytes (non-PO-gated)",
+        "previousSha256": "8597b8236ef936f90d16fad4b9983a38b039b05bfe52a6c2d14273ea97e05640"
+      }
+    },
+    {
+      "class": "design",
+      "path": "specs/sprint-phoenix-epic/RECOVERY.md",
+      "sha256": "2f5780d70a526bcc92ff153ee16712f6030323f84517b8b125b346e1187e9946",
+      "authority": false,
+      "mutability": "mutable",
+      "retention": "retain"
+    },
+    {
+      "class": "result",
+      "path": "specs/sprint-phoenix-epic/result.md",
+      "sha256": "708d9293ad8ec13bb58e39ffd857c0a624d93e17b35cde380f242d26de6d9198",
+      "authority": true,
+      "mutability": "append-only",
+      "retention": "active"
+    },
+    {
+      "class": "design",
+      "path": "specs/sprint-phoenix-epic/design/advisor-review.md",
+      "sha256": "13311eb077e9d0ec60f059c69f72924d018ca5058acb741b2f673551652cd7be",
+      "authority": false,
+      "mutability": "mutable",
+      "retention": "retain"
+    },
+    {
+      "class": "design",
+      "path": "specs/sprint-phoenix-epic/design/architecture.md",
+      "sha256": "68cd01be379d8266caf4ea90b3a6135c848664e5b7729ac137e0365845713481",
+      "authority": false,
+      "mutability": "mutable",
+      "retention": "retain"
+    },
+    {
+      "class": "design",
+      "path": "specs/sprint-phoenix-epic/design/critic-review.md",
+      "sha256": "50d3958a280ef3f481db78d19be2795e0d4441021526ecbed2ad89bea25bc08d",
+      "authority": false,
+      "mutability": "mutable",
+      "retention": "retain"
+    },
+    {
+      "class": "design",
+      "path": "specs/sprint-phoenix-epic/design/governance-conformance.md",
+      "sha256": "a5ee4c1666aea37b77677caf2f6aab584d8963f9ad39e74bf2f34aee56f07853",
+      "authority": false,
+      "mutability": "mutable",
+      "retention": "retain"
+    },
+    {
+      "class": "design",
+      "path": "specs/sprint-phoenix-epic/design/issue-coverage.md",
+      "sha256": "8a9de8604a656ec5a2e0a19dce2103179045711c36023db6c98dc733ede1bb2b",
+      "authority": false,
+      "mutability": "mutable",
+      "retention": "retain"
+    },
+    {
+      "class": "design",
+      "path": "specs/sprint-phoenix-epic/design/privacy-review.md",
+      "sha256": "2ef622477001bc0a46a25893a8ecfbeb15737395caa319f9f13b3e28157521e4",
+      "authority": false,
+      "mutability": "mutable",
+      "retention": "retain"
+    },
+    {
+      "class": "design",
+      "path": "specs/sprint-phoenix-epic/design/readiness-audit.md",
+      "sha256": "a422d8f583ad8e62aa190571df306bd9f3ea6309d98f1c8ce3b43f47b334eff1",
+      "authority": false,
+      "mutability": "mutable",
+      "retention": "retain"
+    },
+    {
+      "class": "design",
+      "path": "specs/sprint-phoenix-epic/design/scope-validation.md",
+      "sha256": "9eaecae2a241e68170a91c038ef1e8bb6f95b2ca6d99935b5a1369185d08158f",
+      "authority": false,
+      "mutability": "mutable",
+      "retention": "retain"
+    }
+  ],
+  "candidate": null,
+  "supersedes": null
+}

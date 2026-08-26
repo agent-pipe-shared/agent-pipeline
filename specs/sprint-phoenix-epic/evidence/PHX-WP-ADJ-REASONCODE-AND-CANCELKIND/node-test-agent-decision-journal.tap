@@ -1,0 +1,322 @@
+TAP version 13
+# Subtest: accepts a bounded observational agent assumption
+ok 1 - accepts a bounded observational agent assumption
+  ---
+  duration_ms: 1.165712
+  type: 'test'
+  ...
+# Subtest: rejects free text, authority-shaped fields, and unbound supersession
+ok 2 - rejects free text, authority-shaped fields, and unbound supersession
+  ---
+  duration_ms: 0.375513
+  type: 'test'
+  ...
+# Subtest: accepts a closed command-offer journal event while preserving raw command omissions
+ok 3 - accepts a closed command-offer journal event while preserving raw command omissions
+  ---
+  duration_ms: 0.224422
+  type: 'test'
+  ...
+# Subtest: rejects command text, omitted privacy omissions, and authority-required offers without a decision
+ok 4 - rejects command text, omitted privacy omissions, and authority-required offers without a decision
+  ---
+  duration_ms: 0.155841
+  type: 'test'
+  ...
+# Subtest: A-AC-07 recognizes every named event class through an existing field or kind, never a new kind
+ok 5 - A-AC-07 recognizes every named event class through an existing field or kind, never a new kind
+  ---
+  duration_ms: 0.643608
+  type: 'test'
+  ...
+# Subtest: A-AC-10 declares an explicit fail-open/fail-closed disposition for every event class, with no implicit default
+ok 6 - A-AC-10 declares an explicit fail-open/fail-closed disposition for every event class, with no implicit default
+  ---
+  duration_ms: 0.255738
+  type: 'test'
+  ...
+# Subtest: A-AC-10 exposes the journaling gap as a typed record naming which policy fired
+ok 7 - A-AC-10 exposes the journaling gap as a typed record naming which policy fired
+  ---
+  duration_ms: 0.360895
+  type: 'test'
+  ...
+# Subtest: R-AC-04 records a distinct required-cleanup/readback field, optional, scoped to a recoverability other than not-applicable
+ok 8 - R-AC-04 records a distinct required-cleanup/readback field, optional, scoped to a recoverability other than not-applicable
+  ---
+  duration_ms: 0.362203
+  type: 'test'
+  ...
+# Subtest: R-AC-09 records a stale-evaluable occurrence timestamp, optional, format-validated, unscoped by state
+ok 9 - R-AC-09 records a stale-evaluable occurrence timestamp, optional, format-validated, unscoped by state
+  ---
+  duration_ms: 0.917533
+  type: 'test'
+  ...
+# Subtest: R-AC-09 rejects a malformed occurrence timestamp with ADJ-COMMAND-OFFER
+ok 10 - R-AC-09 rejects a malformed occurrence timestamp with ADJ-COMMAND-OFFER
+  ---
+  duration_ms: 0.269425
+  type: 'test'
+  ...
+# Subtest: R-AC-11 records a public-safe commitment digest paired with a receipt id, optional, both-or-neither
+ok 11 - R-AC-11 records a public-safe commitment digest paired with a receipt id, optional, both-or-neither
+  ---
+  duration_ms: 0.147281
+  type: 'test'
+  ...
+# Subtest: R-AC-11 rejects a malformed commitment digest or receipt id with ADJ-COMMAND-OFFER
+ok 12 - R-AC-11 rejects a malformed commitment digest or receipt id with ADJ-COMMAND-OFFER
+  ---
+  duration_ms: 0.134702
+  type: 'test'
+  ...
+# Subtest: R-AC-11 rejects one of the pair present without the other with ADJ-COMMAND-COMMITMENT-PAIRING
+ok 13 - R-AC-11 rejects one of the pair present without the other with ADJ-COMMAND-COMMITMENT-PAIRING
+  ---
+  duration_ms: 0.139843
+  type: 'test'
+  ...
+# Subtest: R-AC-05 refuses every enumerated private field and every untyped digest at both journal boundaries
+ok 14 - R-AC-05 refuses every enumerated private field and every untyped digest at both journal boundaries
+  ---
+  duration_ms: 1.239693
+  type: 'test'
+  ...
+# Subtest: A-AC-11 preserves each enumerated assumption state as a distinct typed value
+ok 15 - A-AC-11 preserves each enumerated assumption state as a distinct typed value
+  ---
+  duration_ms: 0.15744
+  type: 'test'
+  ...
+# Subtest: A-AC-11 rejects unknown assumption states and keeps the two vocabularies unmerged
+ok 16 - A-AC-11 rejects unknown assumption states and keeps the two vocabularies unmerged
+  ---
+  duration_ms: 0.339877
+  type: 'test'
+  ...
+# Subtest: A-AC-11 leaves the assumption state optional and independent of the claim lifecycle
+ok 17 - A-AC-11 leaves the assumption state optional and independent of the claim lifecycle
+  ---
+  duration_ms: 0.243839
+  type: 'test'
+  ...
+# Subtest: A-AC-11 keeps the published schema closed and in step with the validator
+ok 18 - A-AC-11 keeps the published schema closed and in step with the validator
+  ---
+  duration_ms: 0.225032
+  type: 'test'
+  ...
+# Subtest: A-AC-01 preserves a well-formed revalidation trigger as a bounded stable identifier
+ok 19 - A-AC-01 preserves a well-formed revalidation trigger as a bounded stable identifier
+  ---
+  duration_ms: 0.099917
+  type: 'test'
+  ...
+# Subtest: A-AC-01 rejects free text and every non-string revalidation trigger with ADJ-SHAPE
+ok 20 - A-AC-01 rejects free text and every non-string revalidation trigger with ADJ-SHAPE
+  ---
+  duration_ms: 0.429406
+  type: 'test'
+  ...
+# Subtest: A-AC-01 leaves the revalidation trigger optional, unscoped by kind, and independent of the claim lifecycle
+ok 21 - A-AC-01 leaves the revalidation trigger optional, unscoped by kind, and independent of the claim lifecycle
+  ---
+  duration_ms: 0.199775
+  type: 'test'
+  ...
+# Subtest: A-AC-05 accepts a well-formed identity record on each identity-material kind
+ok 22 - A-AC-05 accepts a well-formed identity record on each identity-material kind
+  ---
+  duration_ms: 0.130983
+  type: 'test'
+  ...
+# Subtest: A-AC-05 rejects identity present on assumption with ADJ-IDENTITY-SCOPE
+ok 23 - A-AC-05 rejects identity present on assumption with ADJ-IDENTITY-SCOPE
+  ---
+  duration_ms: 0.086728
+  type: 'test'
+  ...
+# Subtest: A-AC-05 rejects identity present on verification-scope with ADJ-IDENTITY-SCOPE
+ok 24 - A-AC-05 rejects identity present on verification-scope with ADJ-IDENTITY-SCOPE
+  ---
+  duration_ms: 0.077521
+  type: 'test'
+  ...
+# Subtest: A-AC-05 rejects two identity entries sharing the same dimension
+ok 25 - A-AC-05 rejects two identity entries sharing the same dimension
+  ---
+  duration_ms: 0.07643
+  type: 'test'
+  ...
+# Subtest: A-AC-05 rejects an empty identity array
+ok 26 - A-AC-05 rejects an empty identity array
+  ---
+  duration_ms: 0.094328
+  type: 'test'
+  ...
+# Subtest: A-AC-05 rejects an identity array exceeding the seven-dimension bound
+ok 27 - A-AC-05 rejects an identity array exceeding the seven-dimension bound
+  ---
+  duration_ms: 0.091228
+  type: 'test'
+  ...
+# Subtest: A-AC-05 rejects an unrecognized dimension, provenance, or assurance value
+ok 28 - A-AC-05 rejects an unrecognized dimension, provenance, or assurance value
+  ---
+  duration_ms: 0.181687
+  type: 'test'
+  ...
+# Subtest: A-AC-05 leaves every observational kind accepted with no identity key at all, unchanged
+ok 29 - A-AC-05 leaves every observational kind accepted with no identity key at all, unchanged
+  ---
+  duration_ms: 0.087779
+  type: 'test'
+  ...
+# Subtest: A-AC-05 keeps the published identity schema closed and in step with the validator
+ok 30 - A-AC-05 keeps the published identity schema closed and in step with the validator
+  ---
+  duration_ms: 0.204274
+  type: 'test'
+  ...
+# Subtest: A-AC-02 accepts a linked follow-up event for every assumption lifecycle transition, and end-to-end preserves the original event unchanged when one is appended
+ok 31 - A-AC-02 accepts a linked follow-up event for every assumption lifecycle transition, and end-to-end preserves the original event unchanged when one is appended
+  ---
+  duration_ms: 71.349314
+  type: 'test'
+  ...
+# Subtest: A-AC-13 rejects a duplicate journal submission deterministically and preserves canonical history exactly once, while an exact idempotent replay is a typed no-write outcome
+ok 32 - A-AC-13 rejects a duplicate journal submission deterministically and preserves canonical history exactly once, while an exact idempotent replay is a typed no-write outcome
+  ---
+  duration_ms: 65.820047
+  type: 'test'
+  ...
+# Subtest: A-AC-12 keeps downstream export/projection policy independently configurable and structurally unable to weaken what capture already admitted
+ok 33 - A-AC-12 keeps downstream export/projection policy independently configurable and structurally unable to weaken what capture already admitted
+  ---
+  duration_ms: 0.963837
+  type: 'test'
+  ...
+# Subtest: A-AC-12 fails closed before persistence for a narrower-than-portable boundary, and the restricted profile stays separate, owner-authenticated, and outside the repository
+ok 34 - A-AC-12 fails closed before persistence for a narrower-than-portable boundary, and the restricted profile stays separate, owner-authenticated, and outside the repository
+  ---
+  duration_ms: 66.080975
+  type: 'test'
+  ...
+# Subtest: A-AC-13 gives agent-kind submissions the same deterministic interrupted, concurrent, and out-of-order outcomes as the generic store
+ok 35 - A-AC-13 gives agent-kind submissions the same deterministic interrupted, concurrent, and out-of-order outcomes as the generic store
+  ---
+  duration_ms: 115.682175
+  type: 'test'
+  ...
+# Subtest: A-AC-14 verification-scope-change is a representable, distinctly named scenario
+ok 36 - A-AC-14 verification-scope-change is a representable, distinctly named scenario
+  ---
+  duration_ms: 0.213503
+  type: 'test'
+  ...
+# Subtest: A-AC-14 escalation is a representable, distinctly named scenario
+ok 37 - A-AC-14 escalation is a representable, distinctly named scenario
+  ---
+  duration_ms: 0.07925
+  type: 'test'
+  ...
+# Subtest: A-AC-14 fallback is a representable, distinctly named scenario
+ok 38 - A-AC-14 fallback is a representable, distinctly named scenario
+  ---
+  duration_ms: 0.062572
+  type: 'test'
+  ...
+# Subtest: A-AC-14 redaction is a representable, distinctly named scenario
+ok 39 - A-AC-14 redaction is a representable, distinctly named scenario
+  ---
+  duration_ms: 0.07345
+  type: 'test'
+  ...
+# Subtest: A-AC-14 retry is a representable, distinctly named scenario
+ok 40 - A-AC-14 retry is a representable, distinctly named scenario
+  ---
+  duration_ms: 0.081529
+  type: 'test'
+  ...
+# Subtest: A-AC-14 missing-journal-availability is a representable, distinctly named scenario
+ok 41 - A-AC-14 missing-journal-availability is a representable, distinctly named scenario
+  ---
+  duration_ms: 0.055703
+  type: 'test'
+  ...
+# Subtest: A-AC-14 tampering is a representable, distinctly named scenario
+ok 42 - A-AC-14 tampering is a representable, distinctly named scenario
+  ---
+  duration_ms: 41.787115
+  type: 'test'
+  ...
+# Subtest: H-AC-08 accepts a well-formed legacy-import-observation via the dispatched kind and the direct validator, across representative legacySourceClass/authorityProofStatus/sourceReference combinations
+ok 43 - H-AC-08 accepts a well-formed legacy-import-observation via the dispatched kind and the direct validator, across representative legacySourceClass/authorityProofStatus/sourceReference combinations
+  ---
+  duration_ms: 0.635389
+  type: 'test'
+  ...
+# Subtest: H-AC-08 rejects an unrecognized legacySourceClass with ADJ-LEGACY-SHAPE
+ok 44 - H-AC-08 rejects an unrecognized legacySourceClass with ADJ-LEGACY-SHAPE
+  ---
+  duration_ms: 0.15662
+  type: 'test'
+  ...
+# Subtest: H-AC-08 rejects an unrecognized authorityProofStatus
+ok 45 - H-AC-08 rejects an unrecognized authorityProofStatus
+  ---
+  duration_ms: 0.126844
+  type: 'test'
+  ...
+# Subtest: H-AC-08 rejects a superseded legacy-import-observation with no supersedesEventId, with ADJ-SUPERSESSION
+ok 46 - H-AC-08 rejects a superseded legacy-import-observation with no supersedesEventId, with ADJ-SUPERSESSION
+  ---
+  duration_ms: 0.095198
+  type: 'test'
+  ...
+# Subtest: H-AC-08 rejects an extra/unknown key on a legacy-import-observation
+ok 47 - H-AC-08 rejects an extra/unknown key on a legacy-import-observation
+  ---
+  duration_ms: 0.064212
+  type: 'test'
+  ...
+# Subtest: H-AC-08 rejects a sourceReferencePath escaping the repository or shaped as an absolute path
+ok 48 - H-AC-08 rejects a sourceReferencePath escaping the repository or shaped as an absolute path
+  ---
+  duration_ms: 0.098858
+  type: 'test'
+  ...
+# Subtest: H-AC-08 keeps the published legacy-import-observation schema closed and in step with the validator
+ok 49 - H-AC-08 keeps the published legacy-import-observation schema closed and in step with the validator
+  ---
+  duration_ms: 0.162289
+  type: 'test'
+  ...
+# Subtest: R-AC-08 admits an occurred rollback/cleanup state only when it discharges the matching prospective requirement
+ok 50 - R-AC-08 admits an occurred rollback/cleanup state only when it discharges the matching prospective requirement
+  ---
+  duration_ms: 0.39931
+  type: 'test'
+  ...
+# Subtest: R-AC-08 keeps the published command-offer state enum in step with the validator for both occurred recovery states
+ok 51 - R-AC-08 keeps the published command-offer state enum in step with the validator for both occurred recovery states
+  ---
+  duration_ms: 0.188826
+  type: 'test'
+  ...
+# Subtest: rejects an array-coerced reasonCode at all three reasonCode call sites, while a normal string reasonCode still passes
+ok 52 - rejects an array-coerced reasonCode at all three reasonCode call sites, while a normal string reasonCode still passes
+  ---
+  duration_ms: 0.137593
+  type: 'test'
+  ...
+1..52
+# tests 52
+# suites 0
+# pass 52
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 429.23547

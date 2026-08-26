@@ -11,6 +11,7 @@ import {
   linkSync,
   mkdtempSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
   realpathSync,
   rmSync,
@@ -36,7 +37,9 @@ import {
   humanGuardRouteUnavailableReason,
   planHumanGuardOverride,
   prepareHumanGuardOverrideAuthorization,
+  prepareHumanGuardOverrideForSignature,
   recordHumanGuardDenial,
+  refreezeHumanGuardOverridePlan,
   verifyHumanGuardOverrideAudit,
 } from "./human-guard-override.mjs";
 import { createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA } from "./po-approval-proof.mjs";
@@ -70,6 +73,21 @@ function fixture() {
 
 function reasonDigest(reason) {
   return createHash("sha256").update(Buffer.from(reason, "utf8")).digest("hex");
+}
+
+/**
+ * Tamper one of pluginIdentity()'s six hashed files by changing its bytes. `.codex-plugin/
+ * plugin.json` is the one file `pluginIdentity()` runs through `JSON.parse()`, so a raw `//`
+ * comment append (fine for the other five, which are only ever read as raw bytes) breaks
+ * parsing outright and throws HGO-PLUGIN ("malformed") instead of exercising the intended
+ * *-DRIFT comparison the tests below assert. Trailing whitespace changes the file's bytes/
+ * sha256 exactly the same way while JSON.parse still tolerates it, so it stays a faithful,
+ * minimal tamper for plugin.json specifically.
+ */
+function tamperPluginFile(plugin, relative, label) {
+  const path = join(plugin, ...relative);
+  const original = readFileSync(path, "utf8");
+  writeFileSync(path, relative[1] === "plugin.json" ? `${original}\n` : `${original}\n// ${label}\n`);
 }
 
 const denial = [{ guard: "guard-lifecycle-ready.mjs", reason: "GUARD-LIFECYCLE-NOT-READY" }];
@@ -446,6 +464,43 @@ test("ADR-0059 Decision 1: the global-plugin-install denial class is refused for
     rmSync(root, { recursive: true, force: true });
   }
   });
+});
+
+test("Part C: prepareHumanGuardOverrideForSignature() fails closed on the global-plugin-install denial class with HGO-SIGNATURE-INTENT-INVALID (not a silent pass-through)", () => {
+  // Regression for a documented-but-untested claim (Critic finding, PHX-WP-HGO-FAILCLOSED-IMPL-C
+  // round 1): the function's own docstring asserts createPoApprovalIntent()'s candidate
+  // validation already throws for this mode because its repository observation carries no
+  // head/tree -- this test is that discriminating check, not just the reasoning.
+  const root = fixtureSignature();
+  try {
+    mkdirSync(join(root, "harness", "scripts"), { recursive: true });
+    mkdirSync(join(root, "plugins", "pipeline-core", ".codex-plugin"), { recursive: true });
+    mkdirSync(join(root, ".claude-plugin"), { recursive: true });
+    writeFileSync(join(root, "harness", "scripts", "verify.mjs"), "// verify\n");
+    writeFileSync(join(root, "plugins", "pipeline-core", ".codex-plugin", "plugin.json"), JSON.stringify({
+      name: "pipeline-core",
+      version: "0.0.0-test",
+    }));
+    writeFileSync(join(root, ".claude-plugin", "marketplace.json"), JSON.stringify({
+      name: "agent-pipeline",
+      plugins: [{ name: "pipeline-core", source: "./plugins/pipeline-core" }],
+    }));
+    const toolInput = { command: "codex plugin add pipeline-core@agent-pipeline-local" };
+    const noGit = () => ({ status: null, error: { code: "EPERM" }, stdout: "" });
+    const scriptPath = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+    const request = recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Bash", toolInput, denials: denial, nowMs: 1_000, spawn: noGit,
+    });
+    assert.equal(request.status, "planned");
+    assert.throws(
+      () => prepareHumanGuardOverrideForSignature({
+        rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, nowMs: 2_000, scriptPath,
+      }),
+      (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-SIGNATURE-INTENT-INVALID",
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("ADR-0059 Decision 1: an absent trustAnchor (no trustPolicy given, no committed anchor) is refused with HGO-TRUST-ANCHOR-MISSING", () => {
@@ -1473,6 +1528,8 @@ test("an armed capability is unusable when its authorization audit disappeared",
 
 test("policy-library and override-CLI drift invalidate the loaded plugin identity", () => {
   for (const changed of [
+    [".codex-plugin", "plugin.json"],
+    ["hooks", "codex-pretool-guard.mjs"],
     ["hooks", "guard-command-grammar.mjs"],
     ["lib", "human-guard-override.mjs"],
     ["lib", "windows-private-state.mjs"],
@@ -1500,7 +1557,7 @@ test("policy-library and override-CLI drift invalidate the loaded plugin identit
         denials: denial,
         nowMs: 1000,
       });
-      writeFileSync(join(plugin, ...changed), `${readFileSync(join(plugin, ...changed), "utf8")}\n// identity drift\n`);
+      tamperPluginFile(plugin, changed, "identity drift");
       assert.throws(
         () => planHumanGuardOverride({
           rootDir: root,
@@ -2970,6 +3027,54 @@ test("NVA-HGOHEAD-1: a fresh repository with no commits (unborn HEAD) does not c
   }
 });
 
+// Part A regression coverage (design doc §1.7): planHumanGuardOverride() is now
+// get-or-create, the arm-time freshness re-check is narrowed to exactly three
+// things (3a/3b/3c), the signature path additionally binds signedCandidate/
+// HGO-CANDIDATE-DRIFT, and refreezeHumanGuardOverridePlan() is the sole
+// non-restart recovery path from that refusal.
+// ---------------------------------------------------------------------------------
+
+test("Part A (a): a benign statusSha256/head/tree-only repository change between plan and arm does not block (proves the narrowing)", () => {
+  const root = fixture();
+  try {
+    const toolInput = { file_path: "notes.md", content: "narrowing a\n" };
+    const scriptPath = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+    const request = recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: denial, nowMs: 1000,
+    });
+    const plan = planHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, nowMs: 2000, scriptPath,
+    });
+    // A benign, unrelated commit changes head/tree/statusSha256 but not
+    // fingerprintSha256/policyIdentity -- exactly the class of change design doc
+    // §1.1 identifies as the actual HGO-DRIFT cause (e.g. an append-before-arm
+    // ledger write).
+    writeFileSync(join(root, "unrelated.md"), "benign change\n");
+    git(root, "add", "unrelated.md");
+    git(root, "commit", "-q", "-m", "benign unrelated commit");
+    // A second plan() call for the same (requestSha256, authorSourceRoot) reads
+    // the cached plan back unchanged -- no new observation, no throw.
+    const rePlan = planHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, nowMs: 2500, scriptPath,
+    });
+    assert.equal(rePlan.planSha256, plan.planSha256);
+    assert.deepEqual(rePlan.repository, plan.repository);
+    const reason = "Narrowing proof (a)";
+    const prepared = prepareHumanGuardOverrideAuthorization({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, planSha256: plan.planSha256,
+      reason, nowMs: 3000, scriptPath,
+    });
+    const armed = authorizeHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, planSha256: plan.planSha256,
+      selectionSha256: prepared.selectionSha256, reason, reasonSha256: reasonDigest(reason), activate: true,
+      nowMs: 3500, scriptPath,
+    });
+    assert.equal(armed.status, "armed");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("NVA-HGOHEAD-1: two unborn-HEAD observations of the same otherwise-unchanged repository compare equal (no spurious HGO-DRIFT)", () => {
   const root = fixtureUnborn();
   try {
@@ -3019,6 +3124,39 @@ test("NVA-HGOHEAD-1: a repository that gains its first commit between record and
   }
 });
 
+test("Part A (b): a policyIdentity change between plan and arm still blocks with HGO-DRIFT (narrowing did not become no-check)", () => {
+  const root = fixture();
+  try {
+    const toolInput = { file_path: "notes.md", content: "narrowing b\n" };
+    const scriptPath = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+    const request = recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: denial, nowMs: 1000,
+    });
+    const plan = planHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, nowMs: 2000, scriptPath,
+    });
+    const reason = "Narrowing proof (b)";
+    const prepared = prepareHumanGuardOverrideAuthorization({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, planSha256: plan.planSha256,
+      reason, nowMs: 2500, scriptPath,
+    });
+    // policyIdentity()'s "project" hashes include project/guard-config.json
+    // (absent at plan time); creating it between plan and arm must still block.
+    mkdirSync(join(root, "project"), { recursive: true });
+    writeFileSync(join(root, "project", "guard-config.json"), '{"changed": true}\n');
+    assert.throws(
+      () => authorizeHumanGuardOverride({
+        rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, planSha256: plan.planSha256,
+        selectionSha256: prepared.selectionSha256, reason, reasonSha256: reasonDigest(reason), activate: true,
+        nowMs: 3000, scriptPath,
+      }),
+      (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-DRIFT",
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("NVA-HGOHEAD-1: a rev-parse HEAD failure that is NOT the unborn-branch shape still throws HGO-GIT unchanged (the special case stays narrowly scoped)", () => {
   const root = fixture();
   try {
@@ -3048,6 +3186,248 @@ test("NVA-HGOHEAD-1: a rev-parse HEAD failure that is NOT the unborn-branch shap
         && error.code === "HGO-GIT"
         && error.message.includes("operation=rev-parse-HEAD")
         && error.message.includes("outcome=EPERM"),
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("Part A (c): a hand-tampered byte in a pluginIdentity()-hashed file between plan and arm trips HGO-PLUGIN-DRIFT", () => {
+  for (const changed of [
+    [".codex-plugin", "plugin.json"],
+    ["hooks", "codex-pretool-guard.mjs"],
+    ["hooks", "guard-command-grammar.mjs"],
+    ["lib", "human-guard-override.mjs"],
+    ["lib", "windows-private-state.mjs"],
+    ["scripts", "guard-human-override.mjs"],
+  ]) {
+    const root = fixture();
+    const plugin = mkdtempSync(join(tmpdir(), "human-guard-plugin-armdrift-"));
+    try {
+      for (const relative of [
+        [".codex-plugin", "plugin.json"],
+        ["hooks", "codex-pretool-guard.mjs"],
+        ["hooks", "guard-command-grammar.mjs"],
+        ["lib", "human-guard-override.mjs"],
+        ["lib", "windows-private-state.mjs"],
+        ["scripts", "guard-human-override.mjs"],
+      ]) {
+        mkdirSync(join(plugin, relative[0]), { recursive: true });
+        copyFileSync(join(PLUGIN_ROOT, ...relative), join(plugin, ...relative));
+      }
+      const toolInput = { file_path: "notes.md", content: `plugin-arm-drift ${changed.join("/")}\n` };
+      const scriptPath = join(plugin, "scripts", "guard-human-override.mjs");
+      const request = recordHumanGuardDenial({
+        rootDir: root, pluginRoot: plugin, toolName: "Write", toolInput, denials: denial, nowMs: 1000,
+      });
+      const plan = planHumanGuardOverride({
+        rootDir: root, pluginRoot: plugin, requestSha256: request.requestSha256, nowMs: 2000, scriptPath,
+      });
+      const reason = "Plugin drift proof (c)";
+      const prepared = prepareHumanGuardOverrideAuthorization({
+        rootDir: root, pluginRoot: plugin, requestSha256: request.requestSha256, planSha256: plan.planSha256,
+        reason, nowMs: 2500, scriptPath,
+      });
+      // Tamper AFTER plan, BEFORE arm -- exactly the window step 3c (re-)closes.
+      tamperPluginFile(plugin, changed, "arm-time identity drift");
+      assert.throws(
+        () => authorizeHumanGuardOverride({
+          rootDir: root, pluginRoot: plugin, requestSha256: request.requestSha256, planSha256: plan.planSha256,
+          selectionSha256: prepared.selectionSha256, reason, reasonSha256: reasonDigest(reason), activate: true,
+          nowMs: 3000, scriptPath,
+        }),
+        (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-PLUGIN-DRIFT",
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+      rmSync(plugin, { recursive: true, force: true });
+    }
+  }
+});
+
+test("Part A (d): a benign repository-only change between plan and arm does not trip HGO-PLUGIN-DRIFT (3c stayed narrow)", () => {
+  const root = fixture();
+  try {
+    const toolInput = { file_path: "notes.md", content: "narrowing d\n" };
+    const scriptPath = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+    const request = recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: denial, nowMs: 1000,
+    });
+    const plan = planHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, nowMs: 2000, scriptPath,
+    });
+    const reason = "Narrowing proof (d)";
+    const prepared = prepareHumanGuardOverrideAuthorization({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, planSha256: plan.planSha256,
+      reason, nowMs: 2500, scriptPath,
+    });
+    writeFileSync(join(root, "unrelated-d.md"), "benign change\n");
+    git(root, "add", "unrelated-d.md");
+    git(root, "commit", "-q", "-m", "benign unrelated commit before arm");
+    const armed = authorizeHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, planSha256: plan.planSha256,
+      selectionSha256: prepared.selectionSha256, reason, reasonSha256: reasonDigest(reason), activate: true,
+      nowMs: 3000, scriptPath,
+    });
+    assert.equal(armed.status, "armed");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("Part A (e): a commit landing on HEAD between signing and arming trips HGO-CANDIDATE-DRIFT on the signature path only", () => {
+  const root = fixtureSignature();
+  try {
+    const toolInput = { file_path: "notes.md", content: "candidate drift\n" };
+    const { scriptPath, recorded, plan, proof } = prepareSignedArming(root, { toolName: "Write", toolInput, denials: denial });
+    // A commit lands AFTER the PO's signature was computed (over plan.repository's
+    // frozen head/tree) but BEFORE this arm call.
+    writeFileSync(join(root, "post-sign.md"), "landed after signing\n");
+    git(root, "add", "post-sign.md");
+    git(root, "commit", "-q", "-m", "post-signature commit");
+    assert.throws(
+      () => authorizeHumanGuardOverrideBySignature({
+        rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, planSha256: plan.planSha256,
+        proof, nowMs: 3000, scriptPath,
+      }),
+      (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-CANDIDATE-DRIFT",
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("Part A (e): the chat path has no signedCandidate concept and cannot trip HGO-CANDIDATE-DRIFT even when HEAD moves before arming", () => {
+  const root = fixture();
+  try {
+    const toolInput = { file_path: "notes.md", content: "chat candidate drift\n" };
+    const scriptPath = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+    const request = recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: denial, nowMs: 1000,
+    });
+    const plan = planHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, nowMs: 2000, scriptPath,
+    });
+    const reason = "Chat path candidate drift proof";
+    const prepared = prepareHumanGuardOverrideAuthorization({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, planSha256: plan.planSha256,
+      reason, nowMs: 2500, scriptPath,
+    });
+    writeFileSync(join(root, "post-prepare.md"), "landed before arm\n");
+    git(root, "add", "post-prepare.md");
+    git(root, "commit", "-q", "-m", "commit before chat-path arm");
+    const armed = authorizeHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, planSha256: plan.planSha256,
+      selectionSha256: prepared.selectionSha256, reason, reasonSha256: reasonDigest(reason), activate: true,
+      nowMs: 3000, scriptPath,
+    });
+    assert.equal(armed.status, "armed");
+    const common = git(root, "rev-parse", "--path-format=absolute", "--git-common-dir");
+    const stored = JSON.parse(readFileSync(
+      join(common, "agent-pipeline", "human-guard-overrides", "capabilities", `${plan.planSha256}.json`),
+      "utf8",
+    ));
+    assert.equal(stored.signedCandidate, null);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("Part A (f): refreeze-plan succeeds on a benign drift, produces a new planSha256, and never arms or writes to the capabilities store", () => {
+  const root = fixture();
+  try {
+    const toolInput = { file_path: "notes.md", content: "refreeze benign\n" };
+    const scriptPath = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+    const request = recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: denial, nowMs: 1000, ttlMs: 60_000,
+    });
+    const plan = planHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, nowMs: 2000, scriptPath,
+    });
+    writeFileSync(join(root, "refreeze-benign.md"), "benign\n");
+    git(root, "add", "refreeze-benign.md");
+    git(root, "commit", "-q", "-m", "benign commit before refreeze");
+    const refrozen = refreezeHumanGuardOverridePlan({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, nowMs: 3000,
+    });
+    assert.equal(refrozen.status, "refrozen");
+    assert.equal(refrozen.requestSha256, request.requestSha256);
+    assert.equal(refrozen.priorPlanSha256, plan.planSha256);
+    assert.notEqual(refrozen.planSha256, plan.planSha256);
+    // The next plan() call now reads the REFROZEN plan back, bound to the new HEAD.
+    const rePlan = planHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, nowMs: 3500, scriptPath,
+    });
+    assert.equal(rePlan.planSha256, refrozen.planSha256);
+    assert.equal(rePlan.repository.head, git(root, "rev-parse", "HEAD"));
+    const common = git(root, "rev-parse", "--path-format=absolute", "--git-common-dir");
+    const base = join(common, "agent-pipeline", "human-guard-overrides");
+    assert.deepEqual(readdirSync(join(base, "capabilities")), []);
+    const auditEvents = readFileSync(join(base, "audit.jsonl"), "utf8").trim().split("\n").map((line) => JSON.parse(line).event);
+    assert.deepEqual(auditEvents.map(({ type }) => type), ["denied", "replanned"]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("Part A (f): refreeze-plan still blocks with HGO-DRIFT when the project's guard/policy configuration changed (the gate is not relaxed for recovery)", () => {
+  const root = fixture();
+  try {
+    const toolInput = { file_path: "notes.md", content: "refreeze policy drift\n" };
+    const scriptPath = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+    const request = recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: denial, nowMs: 1000, ttlMs: 60_000,
+    });
+    planHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, nowMs: 2000, scriptPath,
+    });
+    mkdirSync(join(root, "project"), { recursive: true });
+    writeFileSync(join(root, "project", "guard-config.json"), '{"changed": true}\n');
+    assert.throws(
+      () => refreezeHumanGuardOverridePlan({
+        rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, nowMs: 3000,
+      }),
+      (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-DRIFT",
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("Part A (f): refreeze-plan fails HGO-EXPIRED once the underlying request has expired", () => {
+  const root = fixture();
+  try {
+    const toolInput = { file_path: "notes.md", content: "refreeze expired\n" };
+    const scriptPath = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+    const request = recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: denial, nowMs: 1000, ttlMs: 1000,
+    });
+    planHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, nowMs: 1500, scriptPath,
+    });
+    assert.throws(
+      () => refreezeHumanGuardOverridePlan({
+        rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, nowMs: 5000,
+      }),
+      (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-EXPIRED",
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("Part A (f): refreeze-plan fails HGO-PLAN-ABSENT when no persisted plan exists yet for the pair", () => {
+  const root = fixture();
+  try {
+    const toolInput = { file_path: "notes.md", content: "refreeze absent\n" };
+    const request = recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: denial, nowMs: 1000,
+    });
+    assert.throws(
+      () => refreezeHumanGuardOverridePlan({
+        rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, nowMs: 1500,
+      }),
+      (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-PLAN-ABSENT",
     );
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -3085,6 +3465,206 @@ test("NVA-CROSSREPOLEDGER-1a: an ordinary in-root command still binds its ledger
       rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: denial, nowMs: 4000,
     });
     assert.equal(consumed.status, "absent");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("Part A step 6: after HGO-CANDIDATE-DRIFT, refreeze-plan plus a fresh signature recovers without a full ceremony restart", () => {
+  const root = fixtureSignature();
+  try {
+    const toolInput = { file_path: "notes.md", content: "candidate drift recovery\n" };
+    const { scriptPath, recorded, plan, proof } = prepareSignedArming(root, { toolName: "Write", toolInput, denials: denial });
+    writeFileSync(join(root, "post-sign.md"), "landed after signing\n");
+    git(root, "add", "post-sign.md");
+    git(root, "commit", "-q", "-m", "post-signature commit");
+    assert.throws(
+      () => authorizeHumanGuardOverrideBySignature({
+        rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, planSha256: plan.planSha256,
+        proof, nowMs: 3000, scriptPath,
+      }),
+      (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-CANDIDATE-DRIFT",
+    );
+    const refrozen = refreezeHumanGuardOverridePlan({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, nowMs: 3500,
+    });
+    // requestSha256 never changes -- the original denial is reused, never a restart.
+    assert.equal(refrozen.requestSha256, recorded.requestSha256);
+    assert.notEqual(refrozen.planSha256, plan.planSha256);
+    const rePlanned = planHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, nowMs: 4000, scriptPath,
+    });
+    assert.equal(rePlanned.planSha256, refrozen.planSha256);
+    const prepared2 = prepareHumanGuardOverrideAuthorization({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, planSha256: refrozen.planSha256,
+      reason: HGO_SIGNATURE_REASON, nowMs: 4000, scriptPath,
+    });
+    const intent2 = createPoApprovalIntent({
+      kind: "guard-override",
+      featureId: "human-guard-override",
+      planSha256: HGO_SIGNATURE_INTENT_PLAN_SHA256,
+      specSha256: HGO_SIGNATURE_INTENT_SPEC_SHA256,
+      candidate: { commit: rePlanned.repository.head, tree: rePlanned.repository.tree },
+      policyRevision: "human-guard-override-signature-v1",
+      subjectSha256: prepared2.selectionSha256,
+      decision: "authorize",
+    });
+    const proof2 = {
+      schema: PO_APPROVAL_PROOF_SCHEMA,
+      intentSha256: intent2.sha256,
+      keyReference: SIG_KEY_REFERENCE,
+      publicKey: sigPair.publicKey.export({ type: "spki", format: "pem" }),
+      signatureBase64: sign(null, Buffer.from(intent2.sha256, "utf8"), sigPair.privateKey).toString("base64"),
+    };
+    const armed = authorizeHumanGuardOverrideBySignature({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, planSha256: refrozen.planSha256,
+      proof: proof2, nowMs: 5000, scriptPath,
+    });
+    assert.equal(armed.status, "armed");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------------
+// Critic finding 1 (major, commit 7473f6c9; design doc §1.4 step 6 Revision 4 /
+// §1.11): refreezeHumanGuardOverridePlan() must verify a fresh pluginIdentity()
+// against request.plugin BEFORE accepting it into the refrozen baseline, mirroring
+// planHumanGuardOverride's own first-call check exactly.
+// ---------------------------------------------------------------------------------
+test("Finding 1: a plugin-code tamper between plan and refreeze fails HGO-DRIFT and never poisons the persisted plan", () => {
+  for (const changed of [
+    [".codex-plugin", "plugin.json"],
+    ["hooks", "codex-pretool-guard.mjs"],
+    ["hooks", "guard-command-grammar.mjs"],
+    ["lib", "human-guard-override.mjs"],
+    ["lib", "windows-private-state.mjs"],
+    ["scripts", "guard-human-override.mjs"],
+  ]) {
+    const root = fixture();
+    const plugin = mkdtempSync(join(tmpdir(), "human-guard-plugin-refreezedrift-"));
+    try {
+      for (const relative of [
+        [".codex-plugin", "plugin.json"],
+        ["hooks", "codex-pretool-guard.mjs"],
+        ["hooks", "guard-command-grammar.mjs"],
+        ["lib", "human-guard-override.mjs"],
+        ["lib", "windows-private-state.mjs"],
+        ["scripts", "guard-human-override.mjs"],
+      ]) {
+        mkdirSync(join(plugin, relative[0]), { recursive: true });
+        copyFileSync(join(PLUGIN_ROOT, ...relative), join(plugin, ...relative));
+      }
+      const toolInput = { file_path: "notes.md", content: `refreeze-plugin-drift ${changed.join("/")}\n` };
+      const scriptPath = join(plugin, "scripts", "guard-human-override.mjs");
+      const request = recordHumanGuardDenial({
+        rootDir: root, pluginRoot: plugin, toolName: "Write", toolInput, denials: denial, nowMs: 1000, ttlMs: 60_000,
+      });
+      const plan = planHumanGuardOverride({
+        rootDir: root, pluginRoot: plugin, requestSha256: request.requestSha256, nowMs: 2000, scriptPath,
+      });
+      writeFileSync(join(root, "refreeze-plugin-drift.md"), "benign\n");
+      git(root, "add", "refreeze-plugin-drift.md");
+      git(root, "commit", "-q", "-m", "benign commit before refreeze");
+      // Tamper the plugin's own code AFTER plan, BEFORE refreeze -- the exact window
+      // Finding 1 closes: a second write path into the persisted-plan baseline.
+      tamperPluginFile(plugin, changed, "refreeze-time plugin drift");
+      assert.throws(
+        () => refreezeHumanGuardOverridePlan({
+          rootDir: root, pluginRoot: plugin, requestSha256: request.requestSha256, nowMs: 3000,
+        }),
+        (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-DRIFT",
+      );
+      // The persisted plan must NOT have been overwritten with the tampered plugin
+      // identity -- a later plan() cache read (no re-observation, no re-comparison)
+      // must still return the exact pre-tamper baseline, proving the poisoning this
+      // finding describes genuinely cannot happen.
+      const rePlan = planHumanGuardOverride({
+        rootDir: root, pluginRoot: plugin, requestSha256: request.requestSha256, nowMs: 3500, scriptPath,
+      });
+      assert.equal(rePlan.planSha256, plan.planSha256);
+      assert.deepEqual(rePlan.plugin, plan.plugin);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+      rmSync(plugin, { recursive: true, force: true });
+    }
+  }
+});
+
+// ---------------------------------------------------------------------------------
+// Critic finding 3 (minor; design doc §1.7's own already-flagged open item): the
+// persisted plans store is keyed by (requestSha256, authorSourceRoot) -- prove two
+// different authorSourceRoot values for the SAME requestSha256 persist as two
+// independent files that never collide or overwrite one another.
+// ---------------------------------------------------------------------------------
+test("Finding 3: two different non-null authorSourceRoot values for the same requestSha256 persist as independent, non-colliding plans", () => {
+  const root = fixture();
+  try {
+    const toolInput = { file_path: "notes.md", content: "authorSourceRoot collision probe\n" };
+    const scriptPath = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+    const request = recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: denial, nowMs: 1000,
+    });
+    const common = git(root, "rev-parse", "--path-format=absolute", "--git-common-dir");
+    const plansDir = join(common, "agent-pipeline", "human-guard-overrides", "plans");
+    // The plans store never deep-validates plugin/repository/policy/preview content
+    // (validatedPlan() only checks the outer key set, schema, status and digest
+    // self-consistency) -- so a directly-fabricated, self-consistent record is a
+    // faithful, minimal probe of the storage keying itself, independent of the
+    // author-repair eligibility gate (which forces exactly one resolved source root
+    // per repository, and so cannot itself exercise two distinct persisted values).
+    function fabricatedRecord(authorSourceRoot, tag) {
+      const payload = {
+        schema: "pipeline.human-guard-override-plan.v2",
+        status: "planned",
+        root,
+        requestSha256: request.requestSha256,
+        plugin: { tag },
+        repository: { tag },
+        toolName: "Write",
+        toolInputSha256: humanGuardOverrideInternals.sha(`toolInput-${tag}`),
+        commandClass: "exact-project-action",
+        denials: [],
+        policy: { tag },
+        preview: { tag },
+        eligiblePaths: [`plugins/pipeline-core/${tag}.mjs`],
+        mode: "pipeline-author-repair",
+        authorSourceRoot,
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      };
+      const planSha256 = humanGuardOverrideInternals.sha(payload);
+      return { ...payload, planSha256 };
+    }
+    const authorSourceRootA = join(root, "plugins", "pipeline-core-a");
+    const authorSourceRootB = join(root, "plugins", "pipeline-core-b");
+    const recordA = fabricatedRecord(authorSourceRootA, "a");
+    const recordB = fabricatedRecord(authorSourceRootB, "b");
+    assert.notEqual(recordA.planSha256, recordB.planSha256);
+    const pathA = join(plansDir, `${humanGuardOverrideInternals.sha({ requestSha256: request.requestSha256, authorSourceRoot: authorSourceRootA })}.json`);
+    const pathB = join(plansDir, `${humanGuardOverrideInternals.sha({ requestSha256: request.requestSha256, authorSourceRoot: authorSourceRootB })}.json`);
+    assert.notEqual(pathA, pathB);
+    writeFileSync(pathA, `${JSON.stringify(recordA)}\n`, { mode: 0o600 });
+    writeFileSync(pathB, `${JSON.stringify(recordB)}\n`, { mode: 0o600 });
+    const planA = planHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256,
+      authorSourceRoot: authorSourceRootA, nowMs: 2000, scriptPath,
+    });
+    const planB = planHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256,
+      authorSourceRoot: authorSourceRootB, nowMs: 2000, scriptPath,
+    });
+    assert.equal(planA.planSha256, recordA.planSha256);
+    assert.equal(planB.planSha256, recordB.planSha256);
+    assert.notEqual(planA.planSha256, planB.planSha256);
+    assert.equal(planA.authorSourceRoot, authorSourceRootA);
+    assert.equal(planB.authorSourceRoot, authorSourceRootB);
+    // Re-reading A after B exists on disk must still return A's own, unmodified
+    // record -- no overwrite/collision between the two independent keys.
+    const rereadA = planHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256,
+      authorSourceRoot: authorSourceRootA, nowMs: 2500, scriptPath,
+    });
+    assert.equal(rereadA.planSha256, recordA.planSha256);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -3520,4 +4100,22 @@ test("NVA-CROSSREPOGUIDANCE-1b: a cross-repository denial returns the TARGET roo
     rmSync(root, { recursive: true, force: true });
     rmSync(target, { recursive: true, force: true });
   }
+});
+
+test("governance/events/ status lines are excluded from statusSha256 drift check", () => {
+  const { filterGovernanceEventsStatus } = humanGuardOverrideInternals;
+  const rawStatus = [
+    " M plugins/pipeline-core/lib/human-guard-override.mjs",
+    "?? governance/events/human/1-evt-test.jsonl",
+    "?? governance/events/machine/2-evt-test.jsonl",
+    "?? scratch/probe.txt",
+  ].join("\n");
+  const filtered = filterGovernanceEventsStatus(rawStatus);
+  assert.equal(
+    filtered,
+    [
+      " M plugins/pipeline-core/lib/human-guard-override.mjs",
+      "?? scratch/probe.txt",
+    ].join("\n"),
+  );
 });

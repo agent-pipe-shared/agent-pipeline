@@ -1,0 +1,15 @@
+{
+  "taskId": "PHX-WP-HAC11-WINACL",
+  "model": "claude-sonnet-5",
+  "rulesetSha": "5fa52282cd58e6be5c04dceada78dda8c9dd072b7f2d4b4d833b5d2ab8a54af2",
+  "dispatcher": "elephant",
+  "outcome": "done",
+  "log": [
+    { "phase": "opening", "toolUseCount": 2, "note": "dispatch record created, about to read context files" },
+    { "phase": "implementation", "toolUseCount": 12, "note": "assertRestrictedRoot gained an injectable-io win32 branch (harden-on-create/assess-on-existing); stale docstring fixed" },
+    { "phase": "tests-added", "toolUseCount": 16, "note": "4 new PHX-WP-HAC11-WINACL tests added to governance-event-store.test.mjs; assertRestrictedRoot exported for direct testability" },
+    { "phase": "verify", "toolUseCount": 20, "note": "node --test plugins/pipeline-core/lib/governance-event-store.test.mjs: 41/41 pass, 0 fail; node --test plugins/pipeline-core/lib/afk-ledger.test.mjs (sanity, unchanged): 14/14 pass, 0 fail; private-boundary.mjs has no .test.mjs so that sanity check was skipped" }
+  ],
+  "commit": "9a20da73",
+  "report": "DoD: Fix1 passed (win32 branch added, injectable io, additive after POSIX checks). Fix2 passed (docstring corrected). New tests: passed (4 tests added, all pass). Verify: node --test plugins/pipeline-core/lib/governance-event-store.test.mjs = 41/41 pass 0 fail. Sanity: afk-ledger.test.mjs 14/14 pass 0 fail; private-boundary.mjs has no .test.mjs (not verifiable / N-A). Changed files: governance-event-store.mjs (win32 branch + docstring fix + assertRestrictedRoot exported), governance-event-store.test.mjs (4 new tests + import). Deviation: exported assertRestrictedRoot (previously internal) to make it directly unit-testable per DoD requirement, since threading an io param through 6 exported call sites would have violated the no-other-signature-changes rule; chose io={platform,harden,assess} shape mirroring afk-ledger.mjs resolveIo. No stop conditions triggered."
+}

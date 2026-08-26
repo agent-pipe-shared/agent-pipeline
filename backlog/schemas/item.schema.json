@@ -6,9 +6,9 @@
   "properties": {
     "schema": { "const": "pipeline.backlog-item.v1" },
     "id": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$" },
-    "type": { "enum": ["workflow-improvement", "tooling-radar", "defect", "idea"] },
+    "type": { "enum": ["workflow-improvement", "tooling-radar", "defect", "idea", "requirement"] },
     "owner": { "type": "string" },
-    "status": { "enum": ["open", "in_progress", "closed"] },
+    "status": { "enum": ["open", "in_progress", "rejected", "deferred", "closed"] },
     "created": { "type": "string", "format": "date" },
     "source": { "type": "string", "minLength": 1 },
     "tracking": { "type": "string" },

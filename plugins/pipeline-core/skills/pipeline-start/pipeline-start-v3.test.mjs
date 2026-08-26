@@ -4,7 +4,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { BOOTSTRAP_PAYLOAD_MAX_BYTES } from "../../lib/bootstrap-payload-budget.mjs";
+import { measureBootstrapBytes } from "../../lib/bootstrap-payload-budget.mjs";
+import { DEFAULT_ENVELOPE } from "../../scripts/bootstrap-payload-measure.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const core = readFileSync(join(here, "SKILL.md"), "utf8");
@@ -29,24 +30,25 @@ for (const name of new Set(namedReferences)) {
   assert.ok(readFileSync(join(here, "references", name), "utf8").length > 0, `SKILL.md names references/${name}, which is missing or empty`);
 }
 const all = `${core}\n${refs}`;
-// Context-economy budget for the bootstrap skill: it is read at the start of every
-// session, so every byte here is paid on every session, and the cap exists to stop it
-// drifting into a manual. It is a budget, not a correctness property -- the assertions
-// below are the correctness ones.
-//
-// Raised 15,000 -> 18,000 on 2026-08-08 (GF-057), on the PO's explicit authorization to
-// raise it rather than trim the content. Two things needed the room, both of them things
-// a fresh session was measured to be missing: the corrected scratch-space paragraph
-// (which now names both guards instead of one, and states what onboarding does NOT do to
-// a project's .gitignore), and the SETUP-3 bootstrap questions still to land. Recorded
-// here rather than silently bumped, because a cap that moves whenever it is inconvenient
-// is not a budget.
-//
-// The number itself now lives in exactly one place, lib/bootstrap-payload-budget.mjs.
-// It did not before: that raise landed here and nowhere else, so this assertion and the
-// payload budget disagreed by 3,000 bytes and the disagreement was invisible until a
-// suite went red. This comment stays the record of WHY; the constant is the value.
-assert.ok(Buffer.byteLength(core, "utf8") <= BOOTSTRAP_PAYLOAD_MAX_BYTES, `pipeline-start SKILL.md is ${Buffer.byteLength(core, "utf8")} bytes, over the ${BOOTSTRAP_PAYLOAD_MAX_BYTES}-byte session-bootstrap budget`);
+// The budget is the emitted bootstrap payload, not the file alone: it is
+// BOOTSTRAP_PAYLOAD_MAX_BYTES over the SUMMED segments (core skill + machine-
+// readback envelope; lib/bootstrap-payload-budget.mjs, scripts/bootstrap-
+// payload-measure.mjs). Asserting on `core` alone granted an author bytes that
+// do not exist -- it stayed green at 14992 B while the payload measurement was
+// already red. Measured against the production DEFAULT_ENVELOPE, so passing
+// here implies passing bootstrap-payload-measure.test.mjs, never the reverse.
+// (Supersedes an earlier core-alone byte check that lived here: raised
+// 15,000 -> 18,000 on 2026-08-08, GF-057, PO-authorized; the number itself now
+// lives in exactly one place, lib/bootstrap-payload-budget.mjs's
+// BOOTSTRAP_PAYLOAD_MAX_BYTES, which this combined measurement also uses.)
+const coreBudget = measureBootstrapBytes(
+  Buffer.byteLength(core, "utf8") + Buffer.byteLength(JSON.stringify(DEFAULT_ENVELOPE), "utf8"),
+  { mode: "normal" },
+);
+assert.ok(
+  coreBudget.withinBudget,
+  `core+envelope ${coreBudget.upperBoundUnits} B exceeds ${coreBudget.maxUpperBoundUnits} B`,
+);
 assert.match(core, /full Elephant bootstrap is session-bound/u);
 assert.match(core, /never for an ordinary task, message, tool result, commit, test,/u);
 assert.match(core, /does not trigger a second full Elephant bootstrap unless a real SessionStart or\n+typed recovery follows/u);
@@ -142,7 +144,6 @@ assert.match(closeBlock, /Hard entry gate — never close a normal restart/u);
 assert.match(closeBlock, /CLOSE-INTENT-REQUIRED/u);
 assert.match(closeBlock, /`durable-stop` or `runtime-transfer`/u);
 assert.match(closeBlock, /Do \*\*not\*\* invoke `close-block`, `close-feature`, `close-coordinator`, Verify/u);
-
 // SETUP-3: bootstrap questions (language, profile) come before any artifact
 // is written, and are shaped problem/options/cost/recommendation -- never a
 // bare setting name. BOOTMOD-1 moved their full wording into the reference; the
@@ -241,4 +242,25 @@ assert.match(core, /No artifact of a pristine project is written before\nits boo
 assert.match(core, /never inferred, defaulted, or claimed after the fact/u);
 assert.match(core, /`specs\/kickoff-\*` files a bootstrap transaction creates are provisional anchors\nonly/u);
 
+// PHX-SKILL — obligations of harness/session-bootstrap.md that the skill must
+// carry. Steps 1d and 6 are pinned against `core`: the spec requires them
+// embedded, without a runtime file read. Steps 3, 4 and 5b are pinned against
+// `all`, because lazy relocation into a typed reference is legitimate there.
+assert.match(core, /Bootstrap check passed: ruleset \{\{VERSION_OR_SHA\}\} loaded/u);
+assert.match(core, /Never print it without Steps 1–5/u);
+assert.match(core, /Role prohibitions loaded: EL-01\/EL-02\/EL-03\/EL-04\/EL-16\/EL-18\/EL-19/u);
+assert.match(core, /read no file for this/u);
+for (const el of ["EL-01", "EL-02", "EL-03", "EL-04", "EL-16", "EL-18", "EL-19"]) {
+  assert.ok(core.includes(el), `${el} must stay embedded in SKILL.md`);
+}
+assert.match(all, /`project\/pipeline\.json`, else the legacy/u);
+assert.match(all, /denies do not live in that file/u);
+assert.match(all, /sole authoritative state source/u);
+assert.match(all, /\$driftThreshold/u);
+assert.match(all, /briefing replaces the handover/u);
+assert.match(all, /`\/reload-plugins`/u);
+assert.match(all, /Staleness unchecked \(offline, cache state\)/u);
+assert.match(all, /MISSING \(F4\)/u);
+assert.match(all, /State briefing \{\{TASK_ID_OR_DATE\}\}/u);
+assert.match(all, /State n\/a \(Critic sees no history\)/u);
 process.stdout.write("pipeline-start V3: core budget and lazy-reference checks passed\n");

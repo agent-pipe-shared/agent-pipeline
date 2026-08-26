@@ -49,7 +49,7 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required 
 | [0035](0035-codex-native-normal-critic.md) | Codex normal Critic through a native host boundary | accepted | 2026-07-15 |
 | [0036](0036-runner-honest-profiles-v2.md) | Runner-honest profiles and usage contracts v2 | accepted | 2026-07-17 |
 | [0037](0037-batman-bounded-assurance.md) | Batman bounded assurance, static Verify extension and typed delivery | accepted | 2026-07-18 |
-| [0038](0038-runner-neutral-advisory-v3.md) | Runner-neutral advisory duty v3 | accepted route registry; session trigger superseded by 0047 | 2026-07-19 |
+| [0038](0038-runner-neutral-advisory-v3.md) | Runner-neutral advisory duty v3 | accepted route registry; session-trigger and mandatory-receipt semantics superseded by 0047 | 2026-07-19 |
 | [0039](0039-hawkeye-lifecycle-boundaries.md) | Hawkeye lifecycle boundaries for session power and regulated documents | proposed | 2026-07-19 |
 | [0040](0040-advisor-consent-and-readonly-bash.md) | Explicit advisor export consent and sandbox-bound Bash | accepted; partially superseded by 0041 and 0047 | 2026-07-19 |
 | [0041](0041-po-authorized-codex-functional-equivalent.md) | PO-authorized Codex functional-equivalent gate pass | accepted transport; trigger governed by 0047 | 2026-07-20 |
@@ -59,7 +59,6 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required 
 | [0045](0045-canonical-artifact-topology.md) | Canonical artifact topology | accepted | 2026-07-24 |
 | [0046](0046-project-authority-layering.md) | Project authority layering | accepted | 2026-07-24 |
 | [0047](0047-model-free-advisor-preflight-v2.md) | Model-free Advisor preflight and on-demand consultation v2 | accepted | 2026-07-29 |
-| [0047-N](0047-local-supervisor-state-authority.md) | Local supervisor state authority (repository-local numbering collision retained) | accepted | 2026-07-26 |
 | [0048](0048-local-goldfish-supervisor.md) | Local Goldfish supervisor | accepted | 2026-07-26 |
 | [0049](0049-gitlab-ci-constrained-remote-executor-pilot.md) | GitLab CI constrained remote-executor pilot | accepted | 2026-07-27 |
 | [0050](0050-candidate-bound-verify-run-journal.md) | Candidate-bound private Verify run journal | accepted | 2026-08-01 |
@@ -74,11 +73,17 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required 
 | [0059](0059-signed-human-guard-override.md) | Human Guard Override gains a signed admission path, usable in `signature` mode for everything else it already classifies | accepted | 2026-08-07 |
 | [0060](0060-handover-placement-and-rotation.md) | Mid-task findings go into the handover because a fresh context is a Goldfish; durable rules go into ADRs; the handover gains a retention obligation whose mechanism is still open | accepted (placement) / open (rotation) | 2026-08-07 |
 | [0061](0061-uniform-human-approval-ceremony.md) | The adversary is the agent, not the human: every human gate is the same three acts — copy one command, type approve, enter the PIN — whatever it authorizes, with the gate and the signature untouched | accepted (requirement) / open (mechanism) | 2026-08-07 |
+| [0061](0061-local-supervisor-state-authority.md) | Local supervisor state authority (renumbered from the 0047 numbering collision) | accepted | 2026-07-25 |
 | [0062](0062-production-execution-and-selected-sandbox-launch.md) | Production execution and selected-sandbox launch extend ADR-0044's frozen boundary, within its own constraints | accepted | 2026-08-11 |
+| [0062](0062-governance-event-kernel.md) | Governance event kernel uses separate immutable stream records (Phoenix PHX-1; renumbered from the 0047 numbering collision) | accepted | 2026-08-02 |
 | [0063](0063-repository-directory-contract.md) | Repository directory contract — kinds, one home per kind, ignore anchoring, agent-facing surface, future check, consumer inheritance (lean, Nightwing-pending) | accepted (lean scope, deliberately incomplete) | 2026-08-12 |
+| [0063](0063-fork-disposition-approval-proof.md) | Fork disposition requires a PO approval proof, reusing push's signature/chat mode and `po-approval-proof.mjs` rather than a disposition-specific mechanism | accepted | 2026-08-10 |
 | [0064](0064-release-preflight-consent-reuses-the-uniform-approval-ceremony.md) | Release-preflight consent is a fourth critical-action kind, not a fourth ceremony — reuses `po-human-approval.mjs authorize-critical` under ADR-0061 instead of inventing a new mechanism | accepted | 2026-08-17 |
+| [0064](0064-handover-rotation-extraction-archive-hard-size-gate.md) | Handover rotation: extraction, archive, hard size gate | accepted | 2026-08-18 |
 | [0065](0065-a-voided-gate-is-re-earned-from-declared-inputs.md) | A voided Verify gate is cheaply re-earned from per-suite declared inputs (finishing the existing `verify-resume.mjs` mechanism), not preserved by a coarser commit-diff envelope — Security and push approval stay whole-tree/whole-commit by design | accepted | 2026-08-17 |
+| [0065](0065-port-authorize-critical-ceremony.md) | Port origin/main's `authorize-critical` single-command ceremony (ADR-0061) into Phoenix | accepted | 2026-08-18 |
 | [0066](0066-handover-rotation-extraction-archive-hard-size-gate.md) | The handover rotates via extraction-then-archive (`docs/state-archive/`), gated by two independent triggers — block/feature-boundary rotation AND a hard size cap that fires even mid-sprint, closing ADR-0060 Decision 5 | accepted | 2026-08-17 |
+| [0066](0066-publication-approval-time-signature-accepted-tradeoff.md) | Publication's approval-time-only Ed25519 signature check is an accepted, bounded tradeoff (no execution-time re-verification) | accepted | 2026-08-19 |
 | [0067](0067-tri-runner-antigravity-integration.md) | Elevate Google Antigravity CLI (`agy`) with Gemini models to a full 3rd runner with hard hook enforcement, headless dispatch and honest profile mapping, extending ADR-0051/0057 | accepted | 2026-08-22 |
 
 ### Resubmissions
@@ -107,6 +112,7 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required 
 | [0064](0064-release-preflight-consent-reuses-the-uniform-approval-ceremony.md) | Accepted 2026-08-17 — dispatch the enum widening, `authorize-critical --subject` addition, and `release-preflight-cli.mjs` wiring, each with its negative corpus, before `#56`/`#98`'s matrix rows can move |
 | [0065](0065-a-voided-gate-is-re-earned-from-declared-inputs.md) | Accepted 2026-08-17 (Decision 8's conservative default, `--no-reuse` for push/release-bound runs, stands absent a more specific PO answer) — three ordered candidates (break the three coupling sites, add Tier-B enforcement + one promoted suite, then narrow further suites by measured `durationMs`), none needing a Guard Maintenance Window |
 | [0066](0066-handover-rotation-extraction-archive-hard-size-gate.md) | Build the rotation script + hard-cap guard hook (Follow-up); the one-time extraction pass over this repository's own `docs/state.md` (Decision 7) is separate, large, judgment-heavy work — the live file cannot be rotated for real until it lands |
+| [0066](0066-publication-approval-time-signature-accepted-tradeoff.md) | Trigger-based, not calendar-based: destination scope widens beyond a narrow release-channel set, the fixed executor's argument-closed boundary loosens, or a concrete CAS/lock incident surfaces on the publication path (see ADR-0066 Follow-up) |
 
 ### Conventions
 
@@ -169,7 +175,7 @@ Architecture Decision Records der Agent-Pipeline. Die ADRs formalisieren das kan
 | [0045](0045-canonical-artifact-topology.md) | Kanonische Artefakt-Topologie | akzeptiert | 2026-07-24 |
 | [0046](0046-project-authority-layering.md) | Projekt-Authority-Layering | akzeptiert | 2026-07-24 |
 | [0047](0047-model-free-advisor-preflight-v2.md) | Modellfreier Advisor-Preflight und On-demand-Consultation v2 | akzeptiert | 2026-07-29 |
-| [0047-N](0047-local-supervisor-state-authority.md) | Lokale Supervisor-State-Authority (repo-lokale Nummernkollision beibehalten) | akzeptiert | 2026-07-26 |
+| [0061](0061-local-supervisor-state-authority.md) | Lokale Supervisor-State-Authority (repo-lokale Nummernkollision beibehalten) | akzeptiert | 2026-07-26 |
 | [0048](0048-local-goldfish-supervisor.md) | Lokaler Goldfish-Supervisor | akzeptiert | 2026-07-26 |
 | [0049](0049-gitlab-ci-constrained-remote-executor-pilot.md) | GitLab-CI-Pilot für eingeschränkte Remote-Ausführung | akzeptiert | 2026-07-27 |
 | [0050](0050-candidate-bound-verify-run-journal.md) | Kandidatengebundenes privates Verify-Run-Journal | akzeptiert | 2026-08-01 |

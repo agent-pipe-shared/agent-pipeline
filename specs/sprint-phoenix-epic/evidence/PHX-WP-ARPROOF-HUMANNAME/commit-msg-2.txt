@@ -1,0 +1,8 @@
+docs(phoenix): record the closure commit SHA in the PHX-WP-ARPROOF-HUMANNAME backlog item
+
+The closure commit was created first (a3d3f345), so its own SHA could
+only be recorded in the backlog item afterwards, in a small follow-up
+commit rather than an amend.
+
+Dispatch: PHX-WP-ARPROOF-HUMANNAME (goldfish)
+AI-Assisted: true

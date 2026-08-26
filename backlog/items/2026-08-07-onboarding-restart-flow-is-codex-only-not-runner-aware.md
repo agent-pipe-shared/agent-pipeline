@@ -8,10 +8,10 @@ created: 2026-08-07
 source: "PO handover from a separate session (rune_test1_claude), submitted through the PO's own channel, 2026-08-07."
 due: 2026-09-06
 expires: 2026-09-06
-closed_at: 2026-08-08
-closure_repository: self
-closure_commit: 864c7f1f84b5e0a874e360bf26e168fa92f14aaf
-closure_evidence: backlog/evidence/2026-08-08-restart-barrier-runner-exemption-verification.md
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "badde56d93ef9f792e31820d111238d4ff64d594"
+closure_evidence: "backlog/items/2026-08-07-onboarding-restart-flow-is-codex-only-not-runner-aware.md"
 ---
 
 # Onboarding restart flow always launches Codex, regardless of the active runner
@@ -253,3 +253,8 @@ core-logic change -- belongs in a full Goldfish-deep + Critic dispatch, not a
 same-session hotfix). The second repro above (2026-08-07) does not change
 this assessment; it strengthens the evidence without closing the sizing
 question.
+
+- **Decision:** Close — already resolved
+- **Rationale:** restartAction() (plugins/pipeline-core/lib/project-onboarding-v3.mjs:1482) now takes a runner parameter and branches to externalOperatorRestartAction(runner) when runner !== 'codex', with the resolved runner threaded through at the call site (:3098). Re-verified 2026-08-18.
+- **Assignment (if accepted):** n/a — disposed without further work
+- **Date:** 2026-08-18

@@ -1,0 +1,23 @@
+fix(po-approval-proof): accept the 3-key named trust-policy shape
+
+verifyPoApprovalProof's own() check on trustPolicy required exactly
+the 2-key legacy shape {keyReference, publicKeySha256}, so a valid
+3-key file written by po-human-approval.mjs's setup --human-name
+{keyReference, publicKeySha256, humanName} failed closed with
+PO-APPROVAL-PROOF-INVALID even though the key and signature were
+genuinely valid. humanName is a human-readable label recorded at
+key-setup time, never part of what is cryptographically verified
+here, so its presence must not fail-close an otherwise-valid trust
+policy.
+
+Adds a trustPolicy-specific ownTrustPolicy() check that accepts
+either the 2-key or the 3-key shape by reusing the existing own()
+helper twice, so own()'s general exact-match contract (still used
+unchanged for proof) is untouched. Any OTHER unrecognised extra key
+on trustPolicy still fails closed -- only humanName is tolerated.
+
+Closes the root cause named in
+backlog/items/2026-08-17-trust-policy-shape-disagreement-between-sign-intent-and-verify-po-approval-proof.md
+per its proposal option (a).
+
+AI-Assisted: true

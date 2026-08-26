@@ -1,0 +1,8 @@
+{
+  "taskId": "PHX-WP-LAC01-SCOPE",
+  "model": "claude-sonnet-5",
+  "rulesetSha": "ce50d74d16fdbcd0b9f8b3b606297e88af3d2f139b3cd14b692f4ea15599b023",
+  "dispatcher": "elephant",
+  "outcome": "in-progress",
+  "log": []
+}

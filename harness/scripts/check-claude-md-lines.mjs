@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 /**
- * check-claude-md-lines.mjs — CLAUDE.md length gate (context economy, E10 / operating-model §6).
+ * check-claude-md-lines.mjs — CLAUDE.md length gate (context economy, E10 / docs/operating-model.md, What the model protects).
  *
  * Wired as a REAL A12 ritual extension: .claude/pipeline.json → ritualExtensions.close.pre
  * of this repo (self-application E13). close-block step 1 executes it as a shell entry;
@@ -14,7 +14,7 @@
  *   - Counts the lines of <projectRoot>/CLAUDE.md.
  *   - Exit 0: within the limit (prints the count as evidence).
  *   - Exit 2: over the limit, with a plain-text reason (consolidate, move to
- *     skills/hooks, or delete — growing means consolidating, operating-model §7).
+ *     skills/hooks, or delete — growing means consolidating, docs/operating-model.md, What the model protects).
  *   - Exit 2: CLAUDE.md missing (a project under the pipeline must have one).
  *
  * Project root resolution: CLAUDE_PROJECT_DIR (set by Claude Code for hooks/skills),
@@ -56,7 +56,7 @@ if (lineCount > maxLines) {
   console.error(
     `LENGTH GATE RED: CLAUDE.md has ${lineCount} lines, limit is ${maxLines} (${limitSource}).\n` +
       `CLAUDE.md is loaded into EVERY session — growth taxes every session start (anti-pattern AP2: <PROJECT_B> reached 578 lines).\n` +
-      `Fix: consolidate rules, move procedures to skills/hooks, or delete — do not raise the limit to get green (operating-model §7).`,
+      `Fix: consolidate rules, move procedures to skills/hooks, or delete — do not raise the limit to get green. See docs/operating-model.md, What the model protects.`,
   );
   process.exit(2);
 }

@@ -1,0 +1,29 @@
+{
+  "schema": "pipeline.critical-action-approval-request.v1",
+  "candidate": {
+    "commit": "8718a798f0705618eab81a64e6c2e3f38bb15c7e",
+    "tree": "51be4881cc8b26ae3b65b34d09bd4a20697939c5"
+  },
+  "action": {
+    "kind": "feature-package-reconcile",
+    "subjectSha256": "cd0d08c9fe0e5e5914a10b312897e78df6418cb45c6b96642f513135f20cce0d",
+    "expiresAt": "2026-08-18T18:00:36.198Z"
+  },
+  "approvalIntent": {
+    "value": {
+      "schema": "pipeline.po-approval-intent.v1",
+      "kind": "critical-action",
+      "featureId": "sprint-phoenix-epic",
+      "planSha256": "83051d18451ca64b85e1cc23ec8101eb46baa88513fceb3b5f444c8d96a61723",
+      "specSha256": "badebcb8fbc09334642c8c1465647934af9cad567dc71b2709da4dc1276b7287",
+      "candidate": {
+        "commit": "8718a798f0705618eab81a64e6c2e3f38bb15c7e",
+        "tree": "51be4881cc8b26ae3b65b34d09bd4a20697939c5"
+      },
+      "policyRevision": "critical-human-proof-v1",
+      "subjectSha256": "b557d439d83145c41ce17577fc94421b25e7768454c13b844b6e0b39c7c730fe",
+      "decision": "approved"
+    },
+    "sha256": "64b976e2959a8ab3b222eed812dc2fa61c0fcabb947084f1ed2a1e502f7c98f2"
+  }
+}

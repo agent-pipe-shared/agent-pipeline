@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-pipeline.dev/schemas/pipeline.human-decision-attribution.v1.json",
+  "title": "Pipeline human decision attribution v1",
+  "description": "The restricted machine-local attribution record (GMW/HGO design D-1, increment 2). Never admitted portably -- the governance schema and store additionally require storageProfile 'restricted-machine-local' for this payload. Carries exactly the two values the portable human-governance-decision payload structurally excludes: the free-text rationale and the trust anchor's {keyReference, publicKeySha256} pair. No decisionId, link, candidate, artifact, ruleDigest, policyDigest or validity field exists here, and timeBucketEpochMs is bucketed rather than exact, because §5.2 R-2 of the design forbids any record-level correlator crossing between this zone and the portable one.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "packageId", "authorityClass", "identityAssurance", "reasonCode", "rationale", "keyReference", "publicKeySha256", "timeBucketEpochMs"],
+  "properties": {
+    "schema": { "const": "pipeline.human-decision-attribution.v1" },
+    "packageId": { "enum": ["guard-maintenance-window", "human-guard-override"] },
+    "authorityClass": { "enum": ["product-owner", "delegated-reviewer", "security-reviewer", "privacy-reviewer"] },
+    "identityAssurance": { "enum": ["locally-attributed", "externally-attested", "unknown"] },
+    "reasonCode": { "type": "string", "pattern": "^[A-Z][A-Z0-9._:-]{0,127}$" },
+    "rationale": { "type": "string", "minLength": 1, "maxLength": 4096 },
+    "keyReference": { "type": "string", "pattern": "^[A-Za-z0-9._:@/-]{1,200}$" },
+    "publicKeySha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "timeBucketEpochMs": { "type": "integer", "minimum": 0, "multipleOf": 86400000 }
+  }
+}

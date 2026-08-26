@@ -128,4 +128,19 @@ item's own disposition changed, only its tracking location. It is not part
 of the current Nova A (`feat/sprint-nova-codex-v046`) Wave 5 batch and
 should not be picked up before Nova B's own planning starts, per the
 original Triage's own Assignment text.
+
+**merge_note (2026-08-26, PHX-ITEMX-5):** the Phoenix checkout's own copy of
+this item independently recorded its own supersession on 2026-08-19 —
+Decision "deferred (2026-08-17), superseded 2026-08-19 — rejected here as
+duplicate tracking", with an added `- **Superseded (2026-08-19, PO):**`
+bullet stating that this item is now tracked in Nova's own backlog (commit
+`cacb9fb5` on the Nova checkout), `status: rejected` there per
+`backlog/README.md`'s Merge-duplicates convention, with this Nova copy named
+as the sole tracked instance going forward. This is consistent with, not
+contradicting, this document's own Migration note above — both branches
+agree this Nova copy is authoritative. Resolved during the
+`origin/sprint_phoenix` merge by keeping this document's `status: open` /
+`Decision: deferred` (the live, forward copy) and folding the Phoenix side's
+traceability detail (commit `cacb9fb5`, the Merge-duplicates convention) in
+here rather than discarding it.
 - **Date:** 2026-08-19

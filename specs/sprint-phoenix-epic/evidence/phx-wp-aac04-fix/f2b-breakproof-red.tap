@@ -1,0 +1,96 @@
+TAP version 13
+# Subtest: a genuine matching proof installs exactly one granted decision, and the request digest is a real sha256
+ok 1 - a genuine matching proof installs exactly one granted decision, and the request digest is a real sha256
+  ---
+  duration_ms: 84.367381
+  type: 'test'
+  ...
+# Subtest: a tampered proof is rejected and appends nothing
+ok 2 - a tampered proof is rejected and appends nothing
+  ---
+  duration_ms: 47.792185
+  type: 'test'
+  ...
+# Subtest: a proof signed by the wrong key is rejected and appends nothing
+ok 3 - a proof signed by the wrong key is rejected and appends nothing
+  ---
+  duration_ms: 48.37761
+  type: 'test'
+  ...
+# Subtest: a missing committed trust anchor (no project/critical-human-proof.json at all) is rejected and appends nothing
+ok 4 - a missing committed trust anchor (no project/critical-human-proof.json at all) is rejected and appends nothing
+  ---
+  duration_ms: 46.977135
+  type: 'test'
+  ...
+# Subtest: F1: --trust-anchor-file is not a recognized flag at all -- install refuses it as an unknown argument, not merely as ignored, and appends nothing
+ok 5 - F1: --trust-anchor-file is not a recognized flag at all -- install refuses it as an unknown argument, not merely as ignored, and appends nothing
+  ---
+  duration_ms: 43.608548
+  type: 'test'
+  ...
+# Subtest: prepare refuses to run without its required flags
+ok 6 - prepare refuses to run without its required flags
+  ---
+  duration_ms: 0.247873
+  type: 'test'
+  ...
+# Subtest: install refuses a proof file supplied from inside the repository
+ok 7 - install refuses a proof file supplied from inside the repository
+  ---
+  duration_ms: 33.126949
+  type: 'test'
+  ...
+# Subtest: F2: a proof file at the repo root whose name literally begins with '..' is correctly refused as in-repo, not accepted as external
+ok 8 - F2: a proof file at the repo root whose name literally begins with '..' is correctly refused as in-repo, not accepted as external
+  ---
+  duration_ms: 33.786792
+  type: 'test'
+  ...
+# Subtest: F2: pointing --repo-root at a subdirectory of the real repository still correctly treats an actually-in-repo proof file as in-repo
+not ok 9 - F2: pointing --repo-root at a subdirectory of the real repository still correctly treats an actually-in-repo proof file as in-repo
+  ---
+  duration_ms: 34.417555
+  type: 'test'
+  location: '/home/skar667/src/agent-pipeline-share_phoenix/plugins/pipeline-core/scripts/human-authority-grant.test.mjs:239:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The validation function is expected to return "true". Received false
+    
+    Caught error:
+    
+    Error: HAG-TRUST-ANCHOR-MISSING: project/critical-human-proof.json carries no trustAnchor
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  stack: |-
+    async TestContext.<anonymous> (file:///home/skar667/src/agent-pipeline-share_phoenix/plugins/pipeline-core/scripts/human-authority-grant.test.mjs:254:3)
+    async Test.run (node:internal/test_runner/test:1389:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:960:7)
+  ...
+# Subtest: a request whose payload has been tampered with after prepare is rejected before append
+ok 10 - a request whose payload has been tampered with after prepare is rejected before append
+  ---
+  duration_ms: 49.133349
+  type: 'test'
+  ...
+# Subtest: F4: a request whose envelope-level eventId was hand-edited after prepare installs with the reconstructed eventId, never the tampered one
+ok 11 - F4: a request whose envelope-level eventId was hand-edited after prepare installs with the reconstructed eventId, never the tampered one
+  ---
+  duration_ms: 62.99431
+  type: 'test'
+  ...
+# Subtest: F4: a request whose envelope-level candidate was hand-edited after prepare installs with the reconstructed (decision-derived) candidate, never the tampered one
+ok 12 - F4: a request whose envelope-level candidate was hand-edited after prepare installs with the reconstructed (decision-derived) candidate, never the tampered one
+  ---
+  duration_ms: 66.030369
+  type: 'test'
+  ...
+1..12
+# tests 12
+# suites 0
+# pass 11
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 605.270026

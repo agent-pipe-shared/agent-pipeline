@@ -47,6 +47,8 @@ Owner: PO. Due: 2026-09-05.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
+**Merge note (2026-08-26, moved from frontmatter):** Merge conflict 2026-08-26, resolved conservatively (kept open, not closed): the Nova-line branch carries an explicit 2026-08-12 PO decision ('Option B - a full V4-onboarding-parity flow ... not a hint-text-only stopgap', scheduled into Sprint Nightwing). The Phoenix-line branch closed this item on 2026-08-18 (closure_commit 88dc3ba6952f226ed4f9caa57bad982cb660a425) on the basis of exactly a hint-only implementation, which the PO decision explicitly rejected as insufficient. These two are genuinely contradictory, not merely different notes, and this Goldfish dispatch is not positioned to resolve a PO-decision conflict by itself. Left open pending an Elephant/PO re-check of whether the 2026-08-12 'not a hint-text-only stopgap' decision still stands against the shipped hint-only hook, or whether the PO now accepts the hint as sufficient.
+
 - **Decision:** deferred — owned by Sprint Nightwing.
 - **Rationale:** re-verified 2026-08-07: `plugins/pipeline-core/hooks/` has a
   Codex-only session-start hint (`codex-session-start-hint.mjs`) with no
@@ -69,3 +71,22 @@ Owner: PO. Due: 2026-09-05.
 - **Assignment:** kickoff/PRD/Spec cycle deferred to Nightwing planning; not
   actioned in this sprint.
 - **Date:** 2026-08-12
+
+**Update 2026-08-18 (Elephant, Phoenix backlog-clearing pass):** the
+in-repo-hint-only version this Triage flagged as needing a PO scope decision
+has since landed without a separate PRD/Spec cycle: `hooks.json`'s
+`SessionStart` block (matcher `startup|resume|clear`) now registers
+`codex-session-start-hint.mjs` for Claude too (previously Codex-only via
+`codex-hooks.json`), and its `sessionStartDecision()` (lines 19-56) branches
+on an ungoverned repo to return exactly the proposed opt-in flow: state Agent
+Pipeline is available, ask whether to install it, end the turn and wait for
+consent before invoking `pipeline-core:pipeline-start`. This satisfies the
+item's core ask (a bootstrap adoption/opt-in hint for Claude sessions,
+matching what Codex's onboarding already offered). Closing.
+
+**Merge note, 2026-08-26:** this 2026-08-18 closure directly contradicts the
+2026-08-12 PO scope decision immediately above it, which explicitly chose
+"a full V4-onboarding-parity flow ... not a hint-text-only stopgap." The
+implementation this update describes is exactly a hint-only stopgap. Status
+kept `open` pending an Elephant/PO re-check of which of these two stands;
+do not treat this item as closed on the strength of this update alone.

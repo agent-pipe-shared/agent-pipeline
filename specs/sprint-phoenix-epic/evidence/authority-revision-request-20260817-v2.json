@@ -1,0 +1,119 @@
+{
+  "schema": "pipeline.continuity-authority-revision-plan.v1",
+  "intent": {
+    "schema": "pipeline.continuity-authority-revision-intent.v1",
+    "featureId": "sprint-phoenix-epic",
+    "expectedRevision": 6,
+    "preStateSha256": "4fffb4eb22fe117e8bf14e6b283864a81451857fac01389cbf4aa9b5fcbb9544",
+    "oldAuthority": {
+      "prd": {
+        "path": "specs/sprint-phoenix-epic/prd_phoenix-epic.md",
+        "sha256": "fb1447148ca2df667dc24c51279e92bea30a6975d5281b4c487cf0081978f2a2"
+      },
+      "spec": {
+        "path": "specs/sprint-phoenix-epic/spec.md",
+        "sha256": "8041183b39bd1ac2c1248470d7dee3934f9501f2322c87a32a1cb8798f5fa2ec"
+      }
+    },
+    "nextAuthority": {
+      "prd": {
+        "path": "specs/sprint-phoenix-epic/prd_phoenix-epic.md",
+        "sha256": "83051d18451ca64b85e1cc23ec8101eb46baa88513fceb3b5f444c8d96a61723"
+      },
+      "spec": {
+        "path": "specs/sprint-phoenix-epic/spec.md",
+        "sha256": "badebcb8fbc09334642c8c1465647934af9cad567dc71b2709da4dc1276b7287"
+      }
+    },
+    "decision": {
+      "id": "phoenix-authority-revision-20260817-v2",
+      "sha256": "1299f283279a4c5690d35f40229dc5dae0e295a776908cc74f081ab7e6adbae8",
+      "scope": {
+        "featureId": "sprint-phoenix-epic",
+        "phase": "design"
+      }
+    },
+    "candidate": {
+      "commit": "e39f390375eda45eecaa33893e94848b1e7f6e9e",
+      "tree": "03aca7d3e4d4203d2ef40eea8b6ed464bc70fa1a"
+    },
+    "evidence": {
+      "sha256": "badebcb8fbc09334642c8c1465647934af9cad567dc71b2709da4dc1276b7287"
+    },
+    "idempotencyKey": "phoenix-authority-revision-20260817-v2",
+    "expiresAt": "2026-08-18T13:54:10.241Z"
+  },
+  "intentSha256": "77521aa99b85bf6f3a26ba8236448390e49f8b1f12472f9cfb6010c475833f95",
+  "preimage": {
+    "revision": 6,
+    "stateSha256": "4fffb4eb22fe117e8bf14e6b283864a81451857fac01389cbf4aa9b5fcbb9544",
+    "authority": {
+      "prd": {
+        "path": "specs/sprint-phoenix-epic/prd_phoenix-epic.md",
+        "sha256": "fb1447148ca2df667dc24c51279e92bea30a6975d5281b4c487cf0081978f2a2"
+      },
+      "spec": {
+        "path": "specs/sprint-phoenix-epic/spec.md",
+        "sha256": "8041183b39bd1ac2c1248470d7dee3934f9501f2322c87a32a1cb8798f5fa2ec"
+      }
+    }
+  },
+  "postimage": {
+    "revision": 7,
+    "stateSha256": "d9e8f8c90dfb799351dc62637c139fee43e0d61c71ea22fd584aa248c2547d87",
+    "authority": {
+      "prd": {
+        "path": "specs/sprint-phoenix-epic/prd_phoenix-epic.md",
+        "sha256": "83051d18451ca64b85e1cc23ec8101eb46baa88513fceb3b5f444c8d96a61723"
+      },
+      "spec": {
+        "path": "specs/sprint-phoenix-epic/spec.md",
+        "sha256": "badebcb8fbc09334642c8c1465647934af9cad567dc71b2709da4dc1276b7287"
+      }
+    },
+    "updatedAt": "2026-08-17T13:54:15.122Z"
+  },
+  "receipt": {
+    "schema": "pipeline.continuity-authority-revision-receipt.v1",
+    "operation": "continuity-authority-revision",
+    "reasonClass": "design-authority-revision",
+    "featureId": "sprint-phoenix-epic",
+    "oldAuthority": {
+      "prd": {
+        "path": "specs/sprint-phoenix-epic/prd_phoenix-epic.md",
+        "sha256": "fb1447148ca2df667dc24c51279e92bea30a6975d5281b4c487cf0081978f2a2"
+      },
+      "spec": {
+        "path": "specs/sprint-phoenix-epic/spec.md",
+        "sha256": "8041183b39bd1ac2c1248470d7dee3934f9501f2322c87a32a1cb8798f5fa2ec"
+      }
+    },
+    "nextAuthority": {
+      "prd": {
+        "path": "specs/sprint-phoenix-epic/prd_phoenix-epic.md",
+        "sha256": "83051d18451ca64b85e1cc23ec8101eb46baa88513fceb3b5f444c8d96a61723"
+      },
+      "spec": {
+        "path": "specs/sprint-phoenix-epic/spec.md",
+        "sha256": "badebcb8fbc09334642c8c1465647934af9cad567dc71b2709da4dc1276b7287"
+      }
+    },
+    "decision": {
+      "id": "phoenix-authority-revision-20260817-v2",
+      "sha256": "1299f283279a4c5690d35f40229dc5dae0e295a776908cc74f081ab7e6adbae8",
+      "scope": {
+        "featureId": "sprint-phoenix-epic",
+        "phase": "design"
+      }
+    },
+    "candidate": {
+      "commit": "e39f390375eda45eecaa33893e94848b1e7f6e9e",
+      "tree": "03aca7d3e4d4203d2ef40eea8b6ed464bc70fa1a"
+    },
+    "evidence": {
+      "sha256": "badebcb8fbc09334642c8c1465647934af9cad567dc71b2709da4dc1276b7287"
+    },
+    "casOutcome": "applied"
+  },
+  "planSha256": "78b277e8176cd2c7d9951afb2282894473da9ba7ce358bc3c908e0905f4fac07"
+}

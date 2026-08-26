@@ -1,0 +1,30 @@
+{
+  "taskId": "PIPE-WP-GTP-KERNEL",
+  "model": "claude-sonnet-5",
+  "rulesetSha": "ce50d74d16fdbcd0b9f8b3b606297e88af3d2f139b3cd14b692f4ea15599b023",
+  "dispatcher": "elephant",
+  "outcome": "stopped-contradiction",
+  "log": [
+    {
+      "phase": "start",
+      "toolUseCount": 2,
+      "note": "Opening act: dispatch record created before substantive work."
+    },
+    {
+      "phase": "context-read",
+      "toolUseCount": 5,
+      "note": "Read backlog item, NEVER_LIFTABLE_KERNEL_PATHS array region, GMW08 test region."
+    },
+    {
+      "phase": "adr-review",
+      "toolUseCount": 12,
+      "note": "Read docs/adr/0058-guard-maintenance-window.md. Found a 2026-08-10 'Correction' paragraph establishing a standing process: any NEVER_LIFTABLE_KERNEL_PATHS addition must be recorded as a dated correction in ADR-0058 itself, at proposal time, 'never merely a code-review outcome on the file that hosts the array.' Verified via grep that guard-testpath.mjs has NO such dated correction in the ADR (only an analogy reference at line 232, for a DIFFERENT, still-open backlog decision). Contrast: the sibling guard-authority-ledger-intake.mjs addition IS already recorded as a dated correction (lines 216-219), with the array edit itself deferred to 'when that module ships' -- i.e. the ADR correction is meant to precede the code edit, not follow it."
+    },
+    {
+      "phase": "stop",
+      "toolUseCount": 13,
+      "note": "Stop Condition 2 triggered: briefing (2-file scope, silent on ADR-0058) contradicts ADR-0058's own standing governance process for this exact class of change. Did not edit any file. No commit made."
+    }
+  ],
+  "report": "See final response text returned to dispatcher."
+}

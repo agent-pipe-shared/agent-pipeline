@@ -4,14 +4,14 @@ id: pipeline.guard-lifecycle-ready-rejects-plan-runtime-intent-argv
 type: defect
 owner: pipeline
 status: closed
-closed_at: 2026-08-11
-closure_repository: self
-closure_commit: 4d19def0ac9e5c2c6112b72e923bb95b6400be28
-closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md
 created: 2026-08-07
 source: "Live onboarding test (rune_test1_claude line of work) hitting a self-inflicted guard rejection at the plan-runtime step, 2026-08-07 (Nova GMW session); root cause independently re-verified by reading the cited source directly, not taken from the report alone."
 due: 2026-09-06
 expires: 2026-09-06
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "badde56d93ef9f792e31820d111238d4ff64d594"
+closure_evidence: "backlog/items/2026-08-07-guard-lifecycle-ready-rejects-plan-runtime-intent-argv.md"
 ---
 
 # `guard-lifecycle-ready.mjs` rejects the Pipeline's own `plan-runtime`/`plan-repair`/etc. `nextAction` whenever `intent` is not `"onboarding"`
@@ -140,7 +140,12 @@ for a future cleanup pass.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:** Closed (2026-08-11) — fixed.
-- **Rationale:** `withoutRunnerFlag` was generalized to a scan-and-remove strip of the first `--runner <claude|codex>` pair anywhere in the argv (not only trailing), and the `plan*` branch was given the `inspect` branch's optional-`--intent` pattern, per the item's corrected Proposal (`closure_commit` `4d19def0ac9e5c2c6112b72e923bb95b6400be28`).
+- **Decision (2026-08-11):** Closed (2026-08-11) — fixed.
+- **Rationale:** `withoutRunnerFlag` was generalized to a scan-and-remove strip of the first `--runner <claude|codex>` pair anywhere in the argv (not only trailing), and the `plan*` branch was given the `inspect` branch's optional-`--intent` pattern, per the item's corrected Proposal (`closure_commit` `4d19def0ac9e5c2c6112b72e923bb95b6400be28`, evidence: `specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md`).
 - **Assignment:** N/A — already closed.
 - **Date:** 2026-08-11.
+
+- **Decision (2026-08-18 re-verification):** Close — already resolved
+- **Rationale:** The proposed fix is present verbatim: withoutRunnerFlag() (guard-lifecycle-ready.mjs:703-710) now scans the whole argv array for --runner <claude|codex> instead of only a trailing pair; sanctionedOnboardingArgs() (:721-725) accepts the plan* branch's optional 5-token --intent form mirroring the inspect branch. Re-verified 2026-08-18.
+- **Assignment (if accepted):** n/a — disposed without further work
+- **Date:** 2026-08-18

@@ -112,6 +112,8 @@ resolver serves is the tier the compiler writes.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
+**Merge note (2026-08-26, moved from frontmatter):** Phoenix branch recorded closure_commit 88dc3ba6952f226ed4f9caa57bad982cb660a425 (closure_evidence pointing at this backlog file itself) for the same closure event described below; kept the Nova-side commit/evidence here because it names the actual code fix rather than this record.
+
 - **Decision:** partially accepted and delivered; stays open, narrowed to
   step 3 only.
 - **Rationale:** steps 1, 2, and 4 of "Proposed fix" above were delivered
@@ -190,4 +192,18 @@ already-landed generalized one — the two conflicted textually on cherry-
 pick. Discarded in favor of the existing, more general, already-tested
 implementation; nothing from the wave-1 diff was merged.
 - **Date:** 2026-08-18
+
+### Update, 2026-08-18 (Elephant, Phoenix backlog-clearing pass)
+
+Step 3 (the remaining, narrowed scope of this item) is still unfixed in
+Phoenix's own `runtime-projection-v3-owned-keys.json` (only
+`.claude/*`/`.codex/*` targets). Nova has since closed exactly this step
+architecturally: its V3 compiler config declares a `neutralAuthorityMirrors`
+array (lines 72-84) making `project/pipeline.yaml`/`project/pipeline.json`
+compiler-write targets that mirror the `.claude/*` tier. Per PO direction
+(2026-08-18): items already resolved in Nova's current code are closed here
+rather than reimplemented. Closing (the item's title claim is now moot in the
+sense that matters — Nova's compiler does update the neutral tier; Phoenix's
+own compiler still doesn't, but the step-4 drift check already catches it, so
+nothing silently regresses).
 - **Date:** 2026-08-18

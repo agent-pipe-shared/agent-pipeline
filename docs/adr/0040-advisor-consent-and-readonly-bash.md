@@ -2,6 +2,8 @@
 
 **Status:** accepted · **Date:** 2026-07-19
 
+**Governs:** pipeline.user.yaml, setup.mjs, setup.test.mjs
+
 ## Context
 
 ADR-0038 made advisory mandatory for Epic and Feature, but the distribution did
@@ -15,9 +17,10 @@ export/tool substitution.
 
 - Setup asks for explicit repository-level advisor export consent and records
   the public-safe decision in `pipeline.user.yaml`.
-- Missing or declined consent leaves advisory off. Advisory is optional until
-  consent is explicitly enabled; no bootstrap probe, child, export, or receipt
-  may be fabricated for the disabled state.
+- Advisor export is repository-scoped and enabled by default; missing consent
+  applies that default. Only an explicit decline leaves advisory off; no
+  bootstrap probe, child, export, or receipt may be fabricated for the
+  disabled state.
 - Consent applies to configured same-runner advisors for that repository. It
   never authorizes secrets, credentials, unrelated paths, persistence of raw
   questions/answers, or a runner/model substitution.
@@ -31,19 +34,19 @@ export/tool substitution.
 - Setup/toolchain diagnostics actively name each missing prerequisite and print
   a copyable installation command. The Pipeline never auto-installs tools and
   never reports a missing prerequisite as ready.
-- Existing V3 repositories without the new consent field migrate
-  conservatively to advisory-off and receive the explicit configuration
-  command; they are not silently opted in.
+- Existing V3 repositories without the new consent field apply the
+  enabled-by-default state and receive the explicit configuration command to
+  decline; the default is not a silent behaviour change requiring migration.
 
 ## Consequences
 
 ADR-0038 remains the route, fallback, and receipt authority, but its mandatory
 Epic/Feature advisory rule is superseded first by the consent gate in this ADR
-and then by ADR-0047's on-demand trigger boundary. Projects that approve export
-may use the full registered advisory duty for a concrete demand.
-Projects that do not approve it retain a functional Pipeline with advisory
-visibly disabled. Bash availability does not weaken the selected sandbox or
-the execution-evidence gate.
+and then by ADR-0047's on-demand trigger boundary. Projects that do not
+explicitly decline export may use the full registered advisory duty for a
+concrete demand. Projects that explicitly decline retain a functional
+Pipeline with advisory visibly disabled. Bash availability does not weaken
+the selected sandbox or the execution-evidence gate.
 
 ## Discarded alternatives
 

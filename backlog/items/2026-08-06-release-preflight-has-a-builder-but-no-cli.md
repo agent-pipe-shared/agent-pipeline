@@ -5,12 +5,12 @@ type: defect
 owner: pipeline
 status: closed
 created: 2026-08-06
-source: "sprint_phoenix handover finding 1, 2026-08-06. The gate-evidence half was closed by publication-gate-evidence.mjs; the release-preflight half was not, and is recorded separately so the remainder is not lost inside a partly-fixed finding."
-due: 2026-09-06
 closed_at: "2026-08-18"
 closure_repository: "self"
 closure_commit: "f57375ff77263a2df70bbb3201feb361912f07f6"
 closure_evidence: "plugins/pipeline-core/scripts/release-preflight-cli.mjs"
+source: "sprint_phoenix handover finding 1, 2026-08-06. The gate-evidence half was closed by publication-gate-evidence.mjs; the release-preflight half was not, and is recorded separately so the remainder is not lost inside a partly-fixed finding."
+due: 2026-09-06
 ---
 
 # `release-preflight` has a builder and a validator but no CLI, so the publication executor's fifth gate still has no producer
@@ -102,3 +102,11 @@ All five publication gates now have producers.
   itself was stale.
 - **Assignment:** closed, no further work.
 - **Date:** 2026-08-18
+
+## Triage — closed 2026-08-19
+
+**Merge note (2026-08-26, moved from frontmatter):** Two branches independently transitioned this item to closed for the same reason (release-preflight-cli.mjs already resolves the gap), one commit apart in history and one day apart in Triage date. The origin/sprint_phoenix side recorded closed_at 2026-08-19, closure_commit 5e20b854afc1f499d1376c43558565389e375c59, same closure_evidence file. Kept here as this note rather than a second closure field; both Triage entries below are preserved.
+
+- **Decision:** closed — stale `in_progress` record, resolution already documented in this item's own "Resolved 2026-08-06" section but never transitioned.
+- **Rationale:** Found during a PO-requested audit of in_progress backlog items for completed-but-untracked entries. `release-preflight-cli.mjs` exists and is wired into the publication executor exactly as this item's own resolution note describes; no further work needed.
+- **Date:** 2026-08-19

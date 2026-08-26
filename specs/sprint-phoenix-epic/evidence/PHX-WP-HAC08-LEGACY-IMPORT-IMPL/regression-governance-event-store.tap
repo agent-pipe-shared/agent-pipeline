@@ -1,0 +1,88 @@
+TAP version 13
+# Subtest: portable append publishes canonical bytes, readback checkpoint, and source-last head
+ok 1 - portable append publishes canonical bytes, readback checkpoint, and source-last head
+  ---
+  duration_ms: 45.004407
+  type: 'test'
+  ...
+# Subtest: exact idempotency is a zero-write replay while a conflicting key fails closed
+ok 2 - exact idempotency is a zero-write replay while a conflicting key fails closed
+  ---
+  duration_ms: 60.499852
+  type: 'test'
+  ...
+# Subtest: agent journal payloads persist only as candidate-bound, closed observational events
+ok 3 - agent journal payloads persist only as candidate-bound, closed observational events
+  ---
+  duration_ms: 32.690641
+  type: 'test'
+  ...
+# Subtest: portable admission requires the exact effective policy and closed safe payload
+ok 4 - portable admission requires the exact effective policy and closed safe payload
+  ---
+  duration_ms: 24.687411
+  type: 'test'
+  ...
+# Subtest: verification is checkpoint-aware and queries return only validated chain records
+ok 5 - verification is checkpoint-aware and queries return only validated chain records
+  ---
+  duration_ms: 72.810248
+  type: 'test'
+  ...
+# Subtest: tampering, non-canonical bytes, and forks fail before projection or query
+ok 6 - tampering, non-canonical bytes, and forks fail before projection or query
+  ---
+  duration_ms: 66.11894
+  type: 'test'
+  ...
+# Subtest: K-AC-05 a forked stream also fails closed for append and recovery attempts, not only verify/query
+ok 7 - K-AC-05 a forked stream also fails closed for append and recovery attempts, not only verify/query
+  ---
+  duration_ms: 46.993393
+  type: 'test'
+  ...
+# Subtest: K-AC-08 rejects a head/index checkpoint asserting an absent or invalid canonical record instead of trusting the projection
+ok 8 - K-AC-08 rejects a head/index checkpoint asserting an absent or invalid canonical record instead of trusting the projection
+  ---
+  duration_ms: 53.996565
+  type: 'test'
+  ...
+# Subtest: symlink, cross-repository, and writer-owned intent fields are rejected
+ok 9 - symlink, cross-repository, and writer-owned intent fields are rejected
+  ---
+  duration_ms: 30.772244
+  type: 'test'
+  ...
+# Subtest: projection recovery requires a retained checkpoint and rebuilds a stale head without touching canonical events
+ok 10 - projection recovery requires a retained checkpoint and rebuilds a stale head without touching canonical events
+  ---
+  duration_ms: 74.597966
+  type: 'test'
+  ...
+# Subtest: writer-owned orphan temps are invisible to reads and a dead owner lock is recovered only for a later writer
+ok 11 - writer-owned orphan temps are invisible to reads and a dead owner lock is recovered only for a later writer
+  ---
+  duration_ms: 68.022107
+  type: 'test'
+  ...
+# Subtest: competing dead-lock recovery cannot delete a newly acquired writer lock
+ok 12 - competing dead-lock recovery cannot delete a newly acquired writer lock
+  ---
+  duration_ms: 62.823578
+  type: 'test'
+  ...
+# Subtest: restricted storage stays outside the repository, is owner-only encrypted, and supports exact active-store erasure
+ok 13 - restricted storage stays outside the repository, is owner-only encrypted, and supports exact active-store erasure
+  ---
+  duration_ms: 101.592699
+  type: 'test'
+  ...
+1..13
+# tests 13
+# suites 0
+# pass 13
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 790.564866

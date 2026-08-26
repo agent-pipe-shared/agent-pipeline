@@ -4,11 +4,11 @@ id: pipeline.technical-lock-for-pipeline-consent-before-onboarding-complete
 type: workflow-improvement
 owner: pipeline
 status: closed
-closed_at: "2026-08-19"
-closure_repository: self
-closure_commit: 1b6e6a606ffcd6f32c3993b73be1110d3eb299af
-closure_evidence: backlog/items/2026-08-07-technical-lock-for-pipeline-consent-before-onboarding-complete.md
 created: 2026-08-07
+closed_at: "2026-08-19"
+closure_repository: "self"
+closure_commit: "8fcd369c91ad97f11ccf47d0e18290768e8e24cf"
+closure_evidence: "plugins/pipeline-core/hooks/hooks.json"
 source: "PO handover from a separate session (agent-pipeline-share_phoenix), submitted through the PO's own channel, 2026-08-07."
 due: 2026-09-06
 expires: 2026-09-06
@@ -64,7 +64,7 @@ falling back to unguarded implementation, rather than relying on the agent
 correctly re-deriving that Pipeline was still wanted from an unrelated
 instruction.
 
-## Triage (filled in by the Elephant of the next Pipeline session)
+## Triage — 2026-08-18
 
 - **Decision:** Elephant's recommendation accepted — do the cheap read-only
   investigation first (does `guard-lifecycle-ready.mjs`'s existing
@@ -157,3 +157,22 @@ technical barrier today) — deferred to Sprint Alfred on 2026-08-17 as "not
 urgent, one historical incident, no repeat observed." PO, 2026-08-19: close
 as not acute; if it recurs, file a fresh item with the new incident's
 evidence rather than reopening this one.
+
+### Triage — Phoenix side, 2026-08-18
+
+- **Decision:** Accepted as open; dispatch-ready when capacity allows. No PO design judgment blocks starting it.
+- **Rationale:** Re-checked 2026-08-18: no marker-file + `PreToolUse` write-lock mechanism exists in Phoenix's `hooks/hooks.json`. Nova only documents the single-consent bootstrap flow in prose (`plugins/pipeline-core/skills/pipeline-start/SKILL.md:80-83`), with no technical lock either — nothing to port. The item's own Proposal already names a concrete, bounded mechanism (a local marker written at consent, cleared only by real `project-onboarding-v3.mjs` completion or an explicit PO override, gating `Write`/`Edit`), so this can go to an ordinary dispatch without further PO design input.
+- **Assignment (if accepted):** unassigned; PO previously flagged this as "not relevant right now, but interesting hardening for the backlog" — still true, priority decision only, not a design decision.
+- **Date:** 2026-08-18
+
+## Triage — updated 2026-08-19
+
+- **Decision:** stays open — partial progress landed, real blocker remains.
+- **Rationale:** The onboarding-consent marker + PreToolUse lock guard file landed (commit `286673e2`), matching this item's own Proposal. Its `hooks.json` registration step is explicitly blocked by TP-4 per the commit's own message — needs a TP-4-scoped HGO ceremony (the PO's Ed25519 key, outside this session) to complete wiring. Not closeable until that ceremony runs.
+- **Date:** 2026-08-19
+
+## Triage — closed 2026-08-19
+
+- **Decision:** closed — resolved.
+- **Rationale:** `hooks.json` registration turned out not to need the HGO signature ceremony at all: the guard's own override planner refuses even the `plan` step for any edit under `plugins/pipeline-core/**` (`HGO-EXTERNAL-ADAPTER-BOUNDARY`, "must be carried out by an attended operator outside this session") — confirmed live. The PO applied the exact, pre-drafted, anchor-verified registration diff directly outside the guarded session (commit `8fcd369c`), wiring `guard-onboarding-consent-lock.mjs` into `hooks.json`'s `PreToolUse`/`Edit|Write|NotebookEdit` family. `node --test plugins/pipeline-core/hooks/guard-onboarding-consent-lock.test.mjs` passes 10/10 with the live hooks.json in place.
+- **Date:** 2026-08-19

@@ -1,0 +1,6 @@
+fix(external-reference-adapter): type the unreachable-external-system response for X-AC-14
+
+Wrap both inspect(...) call sites in planExternalReferenceWrite and reconcileExternalReference in try/catch so a thrown or rejected inspect (an offline/unreachable external system) returns the module's existing typed reconciliation-required shape with reason: "external-unreachable", distinct from the existing "invalid-inspection" case, instead of propagating as an uncaught rejection. Closes the filed defect.
+
+Dispatch: PHX-WP-XAC14 (goldfish)
+AI-Assisted: true

@@ -1,0 +1,210 @@
+# Organization policy packs
+
+Organization policy packs impose governance floors and document-publication
+rules without creating a second authority system. Multiple packs resolve only
+when their shared document classes have the same mode; conflicting modes fail
+rather than following last-write-wins. Approval requirements combine
+conservatively, so an additional pack can only require more review.
+
+Inspect packs or create a named activation plan:
+
+```bash
+node plugins/pipeline-core/scripts/organization-policy.mjs inspect \
+  --core-version <core-version> --pack-file <pack.json>
+```
+
+`plan` additionally needs `--repo` and `--activation-id`. Applying such a plan
+uses the separate transaction service and must receive a matching human
+authority readback; a policy file, plan, local record, or Git commit is never
+human proof.
+
+## Threat model
+
+**Assets:** the resolved effective policy (governance floors, document-class
+modes/approval requirements) and the single active-policy record at
+`governance/organization-policy-active.json`
+(`organization-policy-activation.mjs:9`).
+
+**Threats considered and their mitigation:**
+- A pack silently weakening governance floors — `requireHumanDecisionLedger`
+  and `allowExternalAuthority` are hard-pinned constants, not pack-supplied
+  values (`requireHumanDecisionLedger !== true || allowExternalAuthority !==
+  false` fails validation), and `resolveEffectiveOrganizationPolicy` always
+  emits the same fixed floors regardless of pack input
+  (`organization-policy.mjs:13,40`).
+- Two packs disagreeing on a document class's publication mode being
+  silently resolved by last-write-wins — explicitly rejected:
+  `if (existing && existing.mode !== entry.mode) fail("OPP-RESOLVE-CONFLICT")`
+  (`organization-policy.mjs:33`).
+- An activation applying against a stale or concurrently-modified active
+  record — `activateOrganizationPolicy` compares the current file's SHA-256
+  digest to the plan's `expectedActiveSha256` twice (once before writing,
+  once again immediately before the atomic rename) and fails `OPA-PREIMAGE`
+  on any mismatch (`organization-policy-activation.mjs:43,47`).
+- A local record, plan file, or Git commit being read as human authorization
+  — `activateOrganizationPolicy` requires a caller-supplied `authorize`
+  function to return a `granted: true` decision bound to the exact
+  `activationId`/`effectivePolicySha256`, and the code comment is explicit
+  that this "never treats this local record or a Git commit as human proof"
+  (`organization-policy-activation.mjs:23-28,44`).
+- Symlink/path substitution on the active-policy file — `readActive` rejects
+  a non-regular or symlinked target (`organization-policy-activation.mjs:17`).
+
+**Out of scope:** the identity/authenticity of whoever calls `authorize` is
+the Cyborg human-attestation integration seam referenced in the code comment
+(`organization-policy-activation.mjs:25-27`) and is not implemented by this
+module; today `authorize` is an injected caller function, and this module
+cannot itself distinguish a genuine human decision from a caller that fakes
+one.
+
+## Pack, schema, and activation policy
+
+A pack is validated against a closed shape —
+`schema, packId, revision, compatibility, governanceFloors, documentClasses`
+exactly, no extra keys (`organization-policy.mjs:9-10`). `packId` is a
+lowercase identifier and `revision` is a SHA-256 content digest, not a
+semantic version (`organization-policy.mjs:3`). Multiple packs are resolved
+by `resolveEffectiveOrganizationPolicy`: each is independently re-validated
+against `coreVersion`, duplicate `packId`s or duplicate `revision`s across
+the input set are rejected (`OPP-RESOLVE-DUPLICATE`,
+`organization-policy.mjs:29`), each document class's `mode` must agree across
+every pack that declares it, and `approvalRequired` combines as a logical OR
+so an additional pack can only add review, never remove it
+(`organization-policy.mjs:18-23,34`).
+
+That closed shape has since grown optional keys at both levels, and this section
+was stale on both counts before 2026-08-16. A pack may additionally carry
+`provenance`, `dependencies` and `signaturePolicy`; a `documentClasses` entry may
+additionally carry `targetBinding`, `ownedSections`, `lifecycleEvents`,
+`previewRequired` and `conflictPolicy`. Every one of them is optional
+in the strict sense: an entry declaring none of them validates and resolves exactly
+as it did before they existed, and the closed-key check simply grows by the keys the
+entry itself declares.
+
+Each optional entry key carries its own merge rule, and two of them can fail
+resolution outright — which matters operationally, because an operator combining two
+packs meets the failure at activation, where a wrong diagnosis is expensive:
+
+| key | merge rule across packs declaring the same class |
+|---|---|
+| `targetBinding` | never merged — a mismatch, **including declared against undeclared**, fails `OPP-RESOLVE-CONFLICT` |
+| `ownedSections` | set intersection; an undeclared side is neutral and yields the declared list |
+| `lifecycleEvents` | set intersection; an undeclared side is neutral |
+| `previewRequired` | logical OR — a later pack can add a required preview, never remove one |
+| `conflictPolicy` | ranked maximum toward the stricter `reject` |
+
+Intersection never widens permission and OR never downgrades it, so no combination of
+packs can resolve to something more permissive than its strictest contributor.
+
+**None of these five is declared but unconsumed anymore.** `mode`,
+`approvalRequired`, `targetBinding` and `ownedSections` scope a real
+permission decision, plus `previewRequired` as of the PO's 2026-08-17
+amendment below, `lifecycleEvents` as of the PO's 2026-08-17 amendment
+further below, and `conflictPolicy` as of the PO's 2026-08-17 amendment at
+the end of this list — the last of the five to close.
+
+**`previewRequired` (PO amendment, 2026-08-17):** satisfied by construction, not by
+enforcement — `external-reference-adapter.mjs`'s `preview()` runs unconditionally on
+every governed write regardless of this field's value, so "scope permission by ...
+preview" is already met structurally. The field stays declared for
+forward-compatibility; see `specs/sprint-phoenix-epic/acceptance.md`'s P-AC-11
+amendment for the full reasoning.
+
+**`retention` (PO amendment, 2026-08-17): dropped, not just left inert.** No natural
+bridge exists between `identity.retention`'s `[active,retain,archive]` values (a
+different field, in `external-reference-adapter.mjs`) and this schema's three
+categorical commitments (`retain-indefinitely`, `retain-until-superseded`,
+`retain-per-external-schedule`), so the dimension is removed from `documentClasses`
+entirely rather than left declared-but-inert like `conflictPolicy`. A pack that still
+declares `retention` on a `documentClasses` entry
+now fails the closed-key check the same way any other unknown key does. See
+`specs/sprint-phoenix-epic/acceptance.md`'s P-AC-11 amendment for the full reasoning.
+
+**`lifecycleEvents` (PO amendment, 2026-08-17): built, not left inert.**
+`external-reference-adapter.mjs` now carries a total, closed
+`FEATURE_STATE_TO_LIFECYCLE_EVENT` mapping and enforces `lifecycleEvents`
+against the artifact's `binding.identity.lifecycleState` inside
+`planExternalReferenceWrite`, the same way `ownedSections` is enforced there —
+sitting after binding resolves, since only binding carries the lifecycle
+state this dimension needs. Four of `LIFECYCLE_EVENTS`' six values map 1:1
+onto an identically-named `FEATURE_STATES` value (`completed`, `superseded`,
+`abandoned`, `retained`); the remaining two (`proposed`, `active`) have no
+identically-named counterpart, so the five build-phase `FEATURE_STATES`
+values that are not part of that overlap (`draft`, `awaiting-approval`,
+`approved`, `implementing`, `verifying`) are split onto them by a
+PO-granted, disclosed mapping decision: `proposed` covers the states before
+a build is committed to (`draft`, `awaiting-approval`); `active` covers the
+states of a build actually underway toward publication (`approved`,
+`implementing`, `verifying`). A declared `lifecycleEvents` list, even one
+that maps to zero live states, is a real restriction; an undeclared key
+stays neutral — the same declared-vs-undeclared precedent `ownedSections`
+already established. See `specs/sprint-phoenix-epic/acceptance.md`'s P-AC-11
+amendment for the full reasoning.
+
+**`conflictPolicy` (PO amendment, 2026-08-17): built, not left inert.**
+`planExternalReferenceWrite` now consults the effective policy's
+document-class entry `conflictPolicy` at the site of its existing
+unconditional revision/ownership conflict check. A declared
+`require-reconciliation` returns `status: "reconciliation-required", reason:
+"policy-conflict-reconciliation"` — the adapter's existing status value,
+already used for `external-unreachable`/`invalid-inspection`/
+`invalid-preview`, with a new `reason` value following the same `policy-...`
+convention as `policy-owned-sections`/`policy-lifecycle-event`/
+`policy-mode-mismatch`/`policy-approval-required`. A declared `reject`, or an
+undeclared `conflictPolicy` key, both keep today's exact unconditional
+behavior (`status: "conflict", reason: "revision-or-ownership"`) — the same
+declared-vs-undeclared precedent every other dimension follows, except here
+undeclared and `reject` collapse to the SAME branch (matching
+`CONFLICT_POLICY_RANK`, where `reject` is strictly stricter than
+`require-reconciliation`): there are only two effective branches, not three.
+See `specs/sprint-phoenix-epic/acceptance.md`'s P-AC-11 amendment for the
+full reasoning.
+
+Activation is a separate, transactional step from resolution
+(`organization-policy-activation.mjs`). `planOrganizationPolicyActivation`
+is a pure, non-mutating function: it resolves the effective policy, reads the
+current active record's digest (or `null` if none exists) to serve as the
+plan's `expectedActiveSha256`, and returns a preview plan bound to a fresh
+`activationId`
+(`organization-policy-activation.mjs:31-35`). Nothing is written or
+authorized at this step — the CLI's `plan` mode
+(`node plugins/pipeline-core/scripts/organization-policy.mjs plan --repo
+<repo> --core-version <core-version> --activation-id <id> --pack-file
+<pack.json>`) only ever produces this preview. `activateOrganizationPolicy`
+is the sole function that writes `governance/organization-policy-active.json`,
+and it requires: the plan to match its own recomputed digest (`assertPlan`,
+`organization-policy-activation.mjs:20-22`), a granted authority decision
+bound to that exact plan (`assertAuthority`,
+`organization-policy-activation.mjs:23-24`), a preimage match against the
+current file (twice, guarding the write race), and a post-write readback
+that confirms the persisted record matches the plan before returning
+`status: "activated"` (`organization-policy-activation.mjs:41-50`).
+
+## Compatibility, migration, and versioning policy
+
+Compatibility is expressed as a Pipeline **core-version range** per pack,
+not a pack-schema version: `compatibility.minimumCoreVersion` /
+`maximumCoreVersion` are semantic-version strings, checked both at
+individual pack validation (`compare(coreVersion,
+pack.compatibility.minimumCoreVersion) < 0` /
+`> pack.compatibility.maximumCoreVersion` fails `OPP-CORE-VERSION`,
+`organization-policy.mjs:12`) and are re-checked for every pack again inside
+`resolveEffectiveOrganizationPolicy` (`organization-policy.mjs:28`). Only one
+pack schema is currently accepted — `pack.schema !==
+"pipeline.organization-policy-pack.v1"` fails `OPP-SHAPE`
+(`organization-policy.mjs:10`) — there is no code path in this module that
+recognizes, migrates, or transforms an older or newer pack schema version;
+a `v2` schema, if introduced later, would need its own validator and an
+explicit migration decision, neither of which exists today.
+
+There is likewise no incremental/partial migration between two revisions of
+the same `packId`: `revision` is a content-addressed SHA-256 digest of the
+pack's own bytes, not an ordered version number, so there is no "upgrade
+path" the code computes between an old and a new revision. Changing a pack's
+content is an entirely new pack input (a new `revision`) supplied to a fresh
+`planOrganizationPolicyActivation`/`activateOrganizationPolicy` call; the
+CAS-guarded preimage check is what prevents that new activation from
+silently clobbering a concurrently-changed active record, but it does not
+diff, reconcile, or migrate the two revisions' content on the module's
+behalf — that comparison, if needed, is an operator/reviewer responsibility
+before authorizing the new activation.
