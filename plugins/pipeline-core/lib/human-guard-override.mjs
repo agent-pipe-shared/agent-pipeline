@@ -473,14 +473,28 @@ function stateObservation(root) {
   return { status: "present", path: stateRelPath, sha256: sha(bytes), continuityRevision: revision };
 }
 
+function filterGovernanceEventsStatus(statusOutput) {
+  if (typeof statusOutput !== "string") return "";
+  return statusOutput
+    .split("\n")
+    .filter((line) => {
+      if (line.length < 4) return false;
+      const rawPath = line.slice(3).trim();
+      const normalizedPath = rawPath.split("\\").join("/");
+      return !normalizedPath.startsWith("governance/events/") && normalizedPath !== "governance/events";
+    })
+    .join("\n");
+}
+
 function repositoryObservation(root, spawn = spawnSync) {
   const common = git(root, ["rev-parse", "--path-format=absolute", "--git-common-dir"], spawn);
   const physicalCommon = realpathSync(isAbsolute(common) ? common : resolve(root, common));
+  const rawStatus = git(root, ["status", "--porcelain=v1", "--untracked-files=all"], spawn);
   return {
     fingerprintSha256: sha({ physicalRoot: realpathSync(root), physicalCommon }),
     head: git(root, ["rev-parse", "HEAD"], spawn),
     tree: git(root, ["rev-parse", "HEAD^{tree}"], spawn),
-    statusSha256: sha(git(root, ["status", "--porcelain=v1", "--untracked-files=all"], spawn)),
+    statusSha256: sha(filterGovernanceEventsStatus(rawStatus)),
     state: stateObservation(root),
   };
 }
@@ -2471,6 +2485,8 @@ export const humanGuardOverrideInternals = {
   eligibility,
   secureDirectory,
   safePrivateFile,
+  filterGovernanceEventsStatus,
+  repositoryObservation,
   // Exposed only so Full Verify can directly exercise the local-plugin-install
   // attestation against THIS repository's own, real .claude-plugin/marketplace.json
   // and plugins/pipeline-core tree (Critic finding F1, dispatch CRITIC-REMEDY-09) --

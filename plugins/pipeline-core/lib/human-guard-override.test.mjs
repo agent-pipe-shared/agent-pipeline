@@ -1898,3 +1898,21 @@ test("Finding 3: two different non-null authorSourceRoot values for the same req
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("governance/events/ status lines are excluded from statusSha256 drift check", () => {
+  const { filterGovernanceEventsStatus } = humanGuardOverrideInternals;
+  const rawStatus = [
+    " M plugins/pipeline-core/lib/human-guard-override.mjs",
+    "?? governance/events/human/1-evt-test.jsonl",
+    "?? governance/events/machine/2-evt-test.jsonl",
+    "?? scratch/probe.txt",
+  ].join("\n");
+  const filtered = filterGovernanceEventsStatus(rawStatus);
+  assert.equal(
+    filtered,
+    [
+      " M plugins/pipeline-core/lib/human-guard-override.mjs",
+      "?? scratch/probe.txt",
+    ].join("\n"),
+  );
+});
