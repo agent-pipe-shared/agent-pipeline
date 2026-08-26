@@ -1,7 +1,7 @@
 {
   "schema": "pipeline.state.v0",
   "planApproved": true,
-  "updatedAt": "2026-08-19T19:00:55.669Z",
+  "updatedAt": "2026-08-26T05:42:18.525Z",
   "closedFeatures": [
     {
       "id": "sprint-sentinel-epic",
@@ -155,27 +155,27 @@
   },
   "pushApproval": {
     "lastApproved": {
-      "approvedBy": "André",
-      "approvedAt": "2026-08-19T19:00:55.669Z",
-      "forCommit": "0c3e4524a00659acb199224c1a67e4203e00b10b",
+      "approvedBy": "APS",
+      "approvedAt": "2026-08-26T05:42:18.525Z",
+      "forCommit": "1a2dbb0aae0b416658f56a8ab6514579370cdbb6",
       "criticalProof": {
-        "proofSha256": "e9a9c5e5e98ca4a59da40ff9a12022481cad539fd8da5f647ea9cc7d4b530be0",
-        "intentSha256": "bbb2035561af4a661bf80affbb7f934db2a222ca2f3d70f5a72b264a044b6847",
+        "proofSha256": "ae89626f039cbc61b93ca7a9da9d6c2481b3cca9aeb87ec85ab979afcac598e3",
+        "intentSha256": "242d5bc735061d2ebf31fd1408f6a1e2cd8ef7bf7fd67327f916c50ae295441d",
         "action": {
           "kind": "push",
-          "subjectSha256": "7d18d3ae26105c9eade4ea5e92688d4ac09747122ce68d7cc1a2b432697198d1",
-          "expiresAt": "2026-08-19T19:28:50.832Z"
+          "subjectSha256": "5637c8a14d59d4706321fe0d56384ce062ac316cb03c5def3ff56ba99cab085a",
+          "expiresAt": "2026-08-26T06:38:36.589Z"
         },
         "proof": {
           "schema": "pipeline.po-approval-proof.v1",
-          "intentSha256": "bbb2035561af4a661bf80affbb7f934db2a222ca2f3d70f5a72b264a044b6847",
+          "intentSha256": "242d5bc735061d2ebf31fd1408f6a1e2cd8ef7bf7fd67327f916c50ae295441d",
           "keyReference": "local-po-key",
-          "publicKey": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAb2hgIMasQe7m80aB5C9zD7YTW6mEa0wjUGHRZ9yGv5c=\n-----END PUBLIC KEY-----\n",
-          "signatureBase64": "FAJm2OG0LrVNMpcdfnuAyun6FAS2mQZX+ruz/XGEFWZ+eb7ru6VbVqa0Ad617csoFuRr3ks1Wf8Z2GxASoh4Aw=="
+          "publicKey": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAULJPLmcfrK+fF6yLn8YPL2Bj0ohgMIKiB/N84KCUHHQ=\n-----END PUBLIC KEY-----\n",
+          "signatureBase64": "87Pp45vViTuENo5GbfoOknTNWg1/yfTX821UzC06Uc6k27ZdRRX1LzWkj2ygFW8lkmKtEwQ+T9Ghb6hvwf0ZAg=="
         }
       },
       "remote": "origin",
-      "destination": "refs/heads/feat/sprint-nova-codex-v046",
+      "destination": "refs/heads/sprint_agy",
       "threatModel": {
         "path": "project/push-threat-model.md",
         "sha256": "6a13ff03dfd15f93f15fe845c86edca35445a49a8979275ad35e42a93252a1ae"
@@ -227,6 +227,11 @@
       "proofSha256": "e9a9c5e5e98ca4a59da40ff9a12022481cad539fd8da5f647ea9cc7d4b530be0",
       "kind": "push",
       "consumedAt": "2026-08-19T19:00:55.669Z"
+    },
+    {
+      "proofSha256": "ae89626f039cbc61b93ca7a9da9d6c2481b3cca9aeb87ec85ab979afcac598e3",
+      "kind": "push",
+      "consumedAt": "2026-08-26T05:42:18.525Z"
     }
   ]
 }
