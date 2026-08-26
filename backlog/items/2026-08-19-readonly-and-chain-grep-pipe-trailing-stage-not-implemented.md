@@ -3,10 +3,22 @@ schema: pipeline.backlog-item.v1
 id: pipeline.readonly-and-chain-grep-pipe-trailing-stage-not-implemented
 type: requirement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-19
+closed_at: "2026-08-23"
+closure_repository: "self"
+closure_evidence: "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs"
 source: "Critic round-1 review (Finding 3) of commit b3153385, PHX-WP-READONLY-GRAMMAR-WIDEN. Split out as follow-up work rather than crammed into the same rework that fixed Finding 1 (blocker, security regression) and Finding 2 (vacuous test)."
 ---
+
+## Closed — 2026-08-23
+
+Implemented in `plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs`:
+`splitTopLevelAndChain` now permits `|` to be evaluated per-segment by
+`isBoundedReadOnlyAndChain`, which checks non-trailing segments against
+`isChainEligibleSegment` and admits a trailing segment that matches
+`isBoundedGrepPipeline`. Verified with unit test fixtures in
+`plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs`.
 
 # `&&`-chain grammar does not admit a trailing bounded grep-pipe stage, though the PO accepted this as in-scope
 
@@ -43,7 +55,7 @@ closed.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Accepted and implemented per Proposal.
+- **Rationale:** Completes the trailing grep-to-grep/grep-to-head pipeline admission in `&&`-chains while preserving fail-closed rejection of non-trailing pipes and arbitrary commands.
+- **Assignment (if accepted):** `plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs` and `plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs`.
+- **Date:** 2026-08-23

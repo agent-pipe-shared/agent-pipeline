@@ -555,7 +555,7 @@ function splitTopLevelAndChain(command) {
       index += 1;
       continue;
     }
-    if ("|;&<>()".includes(char)) return null;
+    if (";&<>()".includes(char)) return null;
   }
   if (quote !== null || escaped) return null;
   parts.push(command.slice(start).trim());
@@ -666,16 +666,22 @@ function isChainEligibleSegment(segment, root) {
  * Extends the bounded-composition exception family (the same shape isBoundedGrepPipeline
  * above already established) to `&&`-chained read-only commands, per backlog/items/
  * 2026-08-19-closed-shell-grammar-still-rejects-common-readonly-composition.md Proposal
- * point 1. Every segment must independently parse as a single, simple, accepted command
+ * point 1 and 2026-08-19-readonly-and-chain-grep-pipe-trailing-stage-not-implemented.md.
+ * Every non-trailing segment must independently parse as a single, simple, accepted command
  * (no nested operators/redirects of its own) AND be one of the small set
- * isChainEligibleSegment admits. Fails closed on anything else, exactly like every other
- * exception in this family.
+ * isChainEligibleSegment admits. The trailing segment may either be an isChainEligibleSegment
+ * or an isBoundedGrepPipeline. Fails closed on anything else.
  */
 function isBoundedReadOnlyAndChain(command, root) {
   const parts = splitTopLevelAndChain(command);
   if (!parts) return false;
-  for (const part of parts) {
+  for (let index = 0; index < parts.length; index += 1) {
+    const part = parts[index];
+    const isLast = index === parts.length - 1;
     const parsedPart = parseGuardCommand(part, root);
+    if (isLast && isBoundedGrepPipeline(parsedPart, root)) {
+      continue;
+    }
     if (parsedPart.parseStatus !== "accepted"
       || parsedPart.segments.length !== 1
       || parsedPart.operators.length !== 0

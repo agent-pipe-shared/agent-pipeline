@@ -690,6 +690,8 @@ test("the small named &&-chain allowlist and trailing 2>/dev/null admit exactly 
       'grep -rl "pattern" backlog/items/ 2>/dev/null',
       "git status && git log -n 10 --oneline",
       "git rev-parse HEAD && git log --max-count=3",
+      'git rev-parse HEAD && grep -rl "pattern" backlog/items/ | head -n 5',
+      'git status && grep -n "pattern" plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs | grep -v "test"',
     ]) {
       assert.equal(isReadOnlyDiagnosticCommand(command, path), true, command);
       assert.equal(isForbiddenCrossRepositoryMutation(command, path), false, command);
@@ -711,7 +713,12 @@ test("the small named &&-chain allowlist and trailing 2>/dev/null admit exactly 
       "echo 1 && echo 2 && echo 3 && echo 4 && echo 5 && echo 6 && echo 7",
       "git status ; git log",
       "git status || git log",
+      // Trailing pipe where source is not grep (git log | head -n 5) fails closed
       "git rev-parse HEAD && git log --oneline -5 | head -n 5",
+      // Non-trailing pipe fails closed
+      'grep -rl "pattern" backlog/items/ | head -n 5 && git status',
+      // Trailing pipe where sink is neither grep nor head fails closed
+      'git rev-parse HEAD && grep -rl "pattern" backlog/items/ | cat',
       // Disclosed exclusions: an unrecognized git log flag, and a git global -c flag
       // (never a subcommand match), both fail closed by construction.
       "git log --all && git status",
