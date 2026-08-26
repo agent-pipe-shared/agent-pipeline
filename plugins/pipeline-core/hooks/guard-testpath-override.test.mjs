@@ -120,6 +120,7 @@ function arm(root, toolInput, denialReason, { toolName = "Edit" } = {}) {
     reason,
     reasonSha256: prepared.reasonSha256,
     activate: true,
+    dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}` },
   });
   assert.equal(armed.status, "armed");
   return { planSha256: planned.planSha256, requestSha256 };
