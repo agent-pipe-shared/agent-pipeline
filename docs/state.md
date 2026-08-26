@@ -3,7 +3,7 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-08-19 (checkpoint 69)
+**Last updated:** 2026-08-23 (checkpoint 71)
 
 **Project calibration:** [`project/pipeline.json`](../project/pipeline.json) — the resolved authority tier (ADR-0046/ADR-0054).
 
@@ -17,6 +17,32 @@
 |---|---|---|
 | 2026-08-11 to 2026-08-19 | Checkpoints 1-60 (2026-08-11 through 2026-08-19 checkpoint 60): superseded session narrative; durable decisions already live in ADRs/backlog/guardrails per this repo's own standing convention, not uniquely in this prose. | [docs/state-archive/2026-08-19--checkpoints-1-through-60.md](state-archive/2026-08-19--checkpoints-1-through-60.md) |
 | through 2026-08-19 | First real rotation: everything from the 2026-08-08 restart checkpoint through the inherited Nova/Cyborg-release history and every older era down to the open-items tail — extraction pass completed first (original pre-rotation line range 4977–19155; see the archive file's own provenance section and the ADR-0064 addendum dated 2026-08-19) | [state-archive/2026-08-19--pre-restart-and-nova-inherited-history.md](state-archive/2026-08-19--pre-restart-and-nova-inherited-history.md) |
+
+## CHECKPOINT — 2026-08-23 (71): checkpoint 70's work committed and pushed; local plugin/pipeline.user.yaml version-skew fixed on the way (READ THIS FIRST)
+
+Checkpoint 70's work was still uncommitted at session start (PC switch). Committed atomically this session (`sprint_phoenix`, oldest first): `ed428603`/`8fb869e0`/`bd2806cb` (trailing grep-pipe `&&`-chain fix + ledger reconciliation), `a0e2424a` (PO triage: 2 closures + 4 Sentinel deferrals), `40fe7258`/`1b60318d` (hgo-cli-side-granted closure), `887ac164` (HGO governance/events drift-preimage fix), `36edb0e8` (pipeline.user.yaml: adopted antigravity runner + google critic-export rule from sibling `agy` checkout, PO-approved), `c8d97515` (tracked `specs/sprint-phoenix-epic/evidence/`), plus this checkpoint.
+
+**Bootstrap blocker found+fixed:** locally-installed marketplace plugin (`0.6.0+claude.20260820200609.40d3b47`) requires an `antigravity` runner this repo's `pipeline.user.yaml` didn't declare → `source_invalid`/`unrepairable`, no in-session fix possible (file is GS-protected). Fixed by adopting the newer schema from the `agy` sibling checkout. **Still open:** no repo-side fix for the version-skew itself; may recur if the marketplace plugin advances again.
+
+**Gotcha for next session:** `reconcile-backlog-ledger.mjs --activate` output must be committed in its own commit (GG-22 checks the full staged index, not the commit's pathspec) and needs `closure_commit` filled in on each closed item first.
+
+**Next:** `harness/scripts/security-scan.mjs` (not under `plugins/pipeline-core/scripts/`) against this clean tree, then `docs/push-release-flow.md`'s signature ceremony.
+
+## CHECKPOINT — 2026-08-23 (70): Phoenix backlog sweep complete — all open items resolved (READ THIS FIRST)
+
+**Backlog items resolved and closed:**
+1. `hgo-ceremony-should-reduce-po-involvement-to-only-the-external-signing-step`: **Closed** (`eabc96b6` + unit test verification in `guard-human-override.test.mjs`).
+2. `hgo-author-repair-digest-withholding-is-bypassable-by-reading-the-request-store`: **Closed** (PO re-scoping confirmed, comment correction landed in `7473f6c9`).
+3. `readonly-and-chain-grep-pipe-trailing-stage-not-implemented`: **Implemented and Closed** (`isBoundedReadOnlyAndChain` in `plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs` now evaluates per-segment and admits a trailing `isBoundedGrepPipeline`; unit test fixtures added in `guard-lifecycle-ready.test.mjs`).
+4. `hgo-cli-side-granted-wiring-conflicts-with-arm-time-drift-check`: **PO Decision (Option 1) implemented** — `filterGovernanceEventsStatus` in `plugins/pipeline-core/lib/human-guard-override.mjs` excludes `governance/events/**` from the `statusSha256` drift check preimage, enabling fail-closed ledger appends before arming without triggering `HGO-DRIFT`. Unit test coverage added in `human-guard-override.test.mjs`.
+5. `spec-retention-on-close`: **Closed** (`00fcc336` + `governance/spec-retention.json` + `check-spec-retention.mjs` fail-closed Verify gates).
+
+**Sentinel-era baseline triage (4 deferred):**
+All 4 Sentinel recovery placeholder items (`documentation-information-architecture`, `dual-channel-publication`, `regulated-document-hooks`, `stateful-design-contract-template`) triaged and set to `status: deferred`.
+
+**Open backlog items remaining: 0** (full backlog sweep complete).
+
+---
 
 ## CHECKPOINT — 2026-08-19 (68): full Verify GREEN (406/406) and security-scan CLEAN; moving to the push-approval ceremony (READ THIS FIRST)
 
