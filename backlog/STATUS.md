@@ -191,6 +191,7 @@
 | pipeline.guard-testpath-override-ot09-stale-literal-pattern | closed | defect | pipeline | 2026-08-19 | — |
 | pipeline.gwm-kernel-doc-enumeration-diverges-from-the-code-array | closed | defect | pipeline | 2026-08-25 | — |
 | pipeline.h-ac-11-restricted-profile-intake-record-is-design-increment-2 | closed | requirement | pipeline | 2026-08-18 | — |
+| pipeline.handover-file-exceeds-its-own-size-cap-after-the-phoenix-merge | open | defect | pipeline | 2026-08-27 | — |
 | pipeline.handover-file-has-no-rotation-obligation | closed | workflow-improvement | pipeline | 2026-08-07 | — |
 | pipeline.handover-rotation-extraction-acknowledgment-is-repo-wide-not-section-scoped | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.happy-path-local-telemetry | closed | workflow-improvement | pipeline | 2026-08-18 | — |
@@ -385,6 +386,7 @@
 | pipeline.the-ledger-reconciler-writes-before-the-items-are-validated | deferred | defect | pipeline | 2026-08-08 | — |
 | pipeline.this-hosts-local-marketplace-copy-is-not-symlinked-to-source | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.three-smaller-greenfield-defects | closed | defect | pipeline | 2026-08-08 | — |
+| pipeline.tp-guard-rules-lifted-on-the-merging-machine-must-be-restored | open | defect | pipeline | 2026-08-27 | — |
 | pipeline.transactional-readbacks-not-status-cascades | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.triage-verdict-text-can-contaminate-a-backlog-item-as-a-later-spec-reference | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.trust-mismatch-names-neither-key-nor-directory | closed | defect | pipeline | 2026-08-08 | — |
@@ -427,7 +429,7 @@
 
 ## Counts
 
-- open: 35
+- open: 37
 - in_progress: 5
 - closed: 367
 - rejected: 1

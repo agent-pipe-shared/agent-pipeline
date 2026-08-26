@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "fe41bbca8eee6e3eaad88114688d01adf9abc93bc5dcf0aceb9f0b7ed4cc52fa"
+    "transitionHead": "20cca1bac03a9799f82f83c894e771afa4d73f48556b2e1c4e3289716cf389c3"
   },
   "counts": {
-    "open": 35,
+    "open": 37,
     "in_progress": 5,
     "closed": 367,
     "rejected": 1,
@@ -831,7 +831,7 @@
       "deferred": false,
       "closedAt": "2026-08-18",
       "closureRepository": "self",
-      "closureCommit": "c12cbdf7058204863fd9f96df84699e20e51347b",
+      "closureCommit": "3263567469b09cb1983f8763e417760cbd35574c",
       "closureEvidence": "backlog/items/2026-08-05-claude-dir-leftovers-defeat-runner-neutral-project-migration.md"
     },
     {
@@ -2202,7 +2202,7 @@
       "deferred": false,
       "closedAt": "2026-08-18",
       "closureRepository": "self",
-      "closureCommit": "badde56d93ef9f792e31820d111238d4ff64d594",
+      "closureCommit": "4d19def0ac9e5c2c6112b72e923bb95b6400be28",
       "closureEvidence": "backlog/items/2026-08-07-guard-lifecycle-ready-rejects-plan-runtime-intent-argv.md"
     },
     {
@@ -2334,6 +2334,15 @@
       "closureRepository": "self",
       "closureCommit": "a910ed069f0df9d4d49bd4dfdd8d1be17b7f4366",
       "closureEvidence": "backlog/items/2026-08-18-h-ac-11-restricted-profile-intake-record-is-design-increment-2.md"
+    },
+    {
+      "id": "pipeline.handover-file-exceeds-its-own-size-cap-after-the-phoenix-merge",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-27",
+      "source": "Observed directly while trying to record merge open points in the canonical handover, 2026-08-27",
+      "deferred": false
     },
     {
       "id": "pipeline.handover-file-has-no-rotation-obligation",
@@ -2536,7 +2545,7 @@
       "deferred": false,
       "closedAt": "2026-08-18",
       "closureRepository": "self",
-      "closureCommit": "badde56d93ef9f792e31820d111238d4ff64d594",
+      "closureCommit": "598a8388a819086a10a649ff696b2a5b925b6fec",
       "closureEvidence": "backlog/items/2026-08-07-human-authorization-prompts-ignore-the-configured-language-profile.md"
     },
     {
@@ -3302,7 +3311,7 @@
       "deferred": false,
       "closedAt": "2026-08-18",
       "closureRepository": "self",
-      "closureCommit": "badde56d93ef9f792e31820d111238d4ff64d594",
+      "closureCommit": "864c7f1f84b5e0a874e360bf26e168fa92f14aaf",
       "closureEvidence": "backlog/items/2026-08-07-onboarding-restart-flow-is-codex-only-not-runner-aware.md"
     },
     {
@@ -3367,7 +3376,7 @@
       "deferred": false,
       "closedAt": "2026-08-18",
       "closureRepository": "self",
-      "closureCommit": "55912293385c595109abffad3442661bb1166956",
+      "closureCommit": "f57375ff77263a2df70bbb3201feb361912f07f6",
       "closureEvidence": "backlog/items/2026-08-07-parallel-goldfish-dispatches-race-on-shared-checkout.md"
     },
     {
@@ -4707,7 +4716,7 @@
       "deferred": false,
       "closedAt": "2026-08-19",
       "closureRepository": "self",
-      "closureCommit": "8fcd369c91ad97f11ccf47d0e18290768e8e24cf",
+      "closureCommit": "1b6e6a606ffcd6f32c3993b73be1110d3eb299af",
       "closureEvidence": "plugins/pipeline-core/hooks/hooks.json"
     },
     {
@@ -4779,6 +4788,15 @@
       "closureRepository": "self",
       "closureCommit": "4a3534ce970962eda367f6eeb523e69ceb84da94",
       "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
+    },
+    {
+      "id": "pipeline.tp-guard-rules-lifted-on-the-merging-machine-must-be-restored",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-27",
+      "source": "Critic round 1 over the Phoenix merge (areas CR1-GUARDS and CR1-VERIFY, independently), 2026-08-27",
+      "deferred": false
     },
     {
       "id": "pipeline.transactional-readbacks-not-status-cascades",
