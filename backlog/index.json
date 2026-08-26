@@ -3,14 +3,14 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "7c729cad6e21cd25ca8838c112f0197ab901e51ada1c68f7f70252162644a6e5"
+    "transitionHead": "1e7538e0e94ed183ef9402169f9cdfd6b4555fa5e92502dae51427cc2ee4f942"
   },
   "counts": {
-    "open": 9,
+    "open": 1,
     "in_progress": 20,
-    "closed": 133,
+    "closed": 137,
     "rejected": 2,
-    "deferred": 11
+    "deferred": 15
   },
   "items": [
     {
@@ -564,21 +564,21 @@
     },
     {
       "id": "pipeline.documentation-information-architecture",
-      "status": "open",
+      "status": "deferred",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-07-19",
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
-      "tracking": "Sentinel recovery baseline; no completion claim."
+      "tracking": "Sentinel recovery baseline; deferred per PO triage 2026-08-23."
     },
     {
       "id": "pipeline.dual-channel-publication",
-      "status": "open",
+      "status": "deferred",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-07-19",
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
-      "tracking": "Sentinel recovery baseline; no completion claim."
+      "tracking": "Sentinel recovery baseline; deferred per PO triage 2026-08-23."
     },
     {
       "id": "pipeline.el-01-has-no-in-session-tripwire",
@@ -855,19 +855,27 @@
     },
     {
       "id": "pipeline.hgo-author-repair-digest-withholding-is-bypassable-by-reading-the-request-store",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-19",
-      "source": "PO instruction, 2026-08-19: 'und danach auch härten, dass goldfische solche guards nicht umgehen können' — after live discovery during the hooks.json wiring ceremony that a dispatched subagent recovered a deliberately-withheld request digest by reading .git/agent-pipeline/human-guard-overrides/requests/ directly."
+      "source": "PO instruction, 2026-08-19: 'und danach auch härten, dass goldfische solche guards nicht umgehen können' — after live discovery during the hooks.json wiring ceremony that a dispatched subagent recovered a deliberately-withheld request digest by reading .git/agent-pipeline/human-guard-overrides/requests/ directly.",
+      "closedAt": "2026-08-23",
+      "closureRepository": "self",
+      "closureCommit": "7473f6c9611ec2aaf05f784b04f1b35da108e9f3",
+      "closureEvidence": "plugins/pipeline-core/lib/human-guard-override.mjs"
     },
     {
       "id": "pipeline.hgo-ceremony-should-reduce-po-involvement-to-only-the-external-signing-step",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-19",
-      "source": "PO instruction, 2026-08-19, live during the hooks.json author-repair HGO ceremony: 'kannst du das hgo bitte so umbauen, dass der agent das selbstständig alles macht bis zum eigentlichen signieren und dann einem auch direkt nur den signier befehl gibt?' and the follow-up 'so bauen das der PO definitiv nur das eine signier gate macht.'"
+      "source": "PO instruction, 2026-08-19, live during the hooks.json author-repair HGO ceremony: 'kannst du das hgo bitte so umbauen, dass der agent das selbstständig alles macht bis zum eigentlichen signieren und dann einem auch direkt nur den signier befehl gibt?' and the follow-up 'so bauen das der PO definitiv nur das eine signier gate macht.'",
+      "closedAt": "2026-08-23",
+      "closureRepository": "self",
+      "closureCommit": "eabc96b6fefe39ee8f6859817f4ffee2fd454f7b",
+      "closureEvidence": "plugins/pipeline-core/scripts/guard-human-override.test.mjs"
     },
     {
       "id": "pipeline.hgo-cli-side-granted-wiring-conflicts-with-arm-time-drift-check",
@@ -1442,11 +1450,15 @@
     },
     {
       "id": "pipeline.readonly-and-chain-grep-pipe-trailing-stage-not-implemented",
-      "status": "open",
+      "status": "closed",
       "type": "requirement",
       "owner": "pipeline",
       "created": "2026-08-19",
-      "source": "Critic round-1 review (Finding 3) of commit b3153385, PHX-WP-READONLY-GRAMMAR-WIDEN. Split out as follow-up work rather than crammed into the same rework that fixed Finding 1 (blocker, security regression) and Finding 2 (vacuous test)."
+      "source": "Critic round-1 review (Finding 3) of commit b3153385, PHX-WP-READONLY-GRAMMAR-WIDEN. Split out as follow-up work rather than crammed into the same rework that fixed Finding 1 (blocker, security regression) and Finding 2 (vacuous test).",
+      "closedAt": "2026-08-23",
+      "closureRepository": "self",
+      "closureCommit": "ed428603ae0bd65eb79c7309c586bd1300b64bda",
+      "closureEvidence": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs"
     },
     {
       "id": "pipeline.readonly-command-guard-classification",
@@ -1522,12 +1534,12 @@
     },
     {
       "id": "pipeline.regulated-document-hooks",
-      "status": "open",
+      "status": "deferred",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-07-19",
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
-      "tracking": "Sentinel recovery baseline; no completion claim."
+      "tracking": "Sentinel recovery baseline; deferred per PO triage 2026-08-23."
     },
     {
       "id": "pipeline.release-preflight-cli-base-commit-not-peeled",
@@ -1752,20 +1764,24 @@
     },
     {
       "id": "pipeline.spec-retention-on-close",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-07-20",
-      "source": "Sentinel recovery audit after Public close/transfer"
+      "source": "Sentinel recovery audit after Public close/transfer",
+      "closedAt": "2026-08-23",
+      "closureRepository": "self",
+      "closureCommit": "00fcc336cfd163d85fed20aa0a7ec2dbcfb6c31a",
+      "closureEvidence": "governance/spec-retention.json"
     },
     {
       "id": "pipeline.stateful-design-contract-template",
-      "status": "open",
+      "status": "deferred",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-07-19",
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
-      "tracking": "Sentinel recovery baseline; no completion claim."
+      "tracking": "Sentinel recovery baseline; deferred per PO triage 2026-08-23."
     },
     {
       "id": "pipeline.t1-governance-path-preflight",
