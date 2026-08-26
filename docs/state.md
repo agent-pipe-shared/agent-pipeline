@@ -3,7 +3,75 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-## Current handover — Antigravity CLI 3rd Runner Integration & Hardening (2026-08-25)
+## Current handover — sprint_agy fetch, fast-forward, and clean local candidate (2026-08-26)
+
+**READ THIS FIRST — 2026-08-26 session.** PO instruction: fetch the newest
+Nova state from `origin` branch `sprint_agy` (same remote,
+`agent-pipe-shared/agent-pipeline` — already registered as both `origin`
+and `upstream`; not a separate/third-party remote) into this checkout and
+build a clean local candidate. `git merge-base feat/sprint-nova-codex-v046
+origin/sprint_agy` equaled this branch's exact prior tip (`0d5a6e6b`), so
+`origin/sprint_agy` was a strict fast-forward descendant, not a divergent
+branch — no merge conflicts, nothing to reconcile by hand. Fast-forwarded
+cleanly (`git merge --ff-only`), 271 commits, bringing in the full
+tri-runner Antigravity/Agy integration (ADR-0067, `specs/sprint-agy-runner/`,
+`plugins/pipeline-core/hooks/antigravity-*`, `install-agy.mjs`,
+`pipeline.user.yaml` schema bump) plus the 2026-08-19→2026-08-26 backlog
+history already summarized in the prior handover section below.
+
+**Local plugin refresh was required before bootstrap would go ready again**
+(`docs/claude-local-plugin-development.md`'s documented, deliberately
+operator-only step): the fetch bumped `plugins/pipeline-core`'s schema/
+manifest past what the session's enforcing local-marketplace copy
+(`~/agent-pipeline-local-marketplace`, stale since the 2026-08-19 stamp)
+recognized (`pipeline.user.yaml is not a valid V3 source`,
+`project-onboarding-v3.mjs plan-source-recovery` returned `unrepairable`
+with no agent-executable `nextAction`). The PO ran the prescribed
+`cp -a .../plugins/pipeline-core ~/agent-pipeline-local-marketplace/plugins/`
++ `claude plugin update pipeline-core@agent-pipeline-local --scope user`
++ `/reload-plugins` themselves (this is intentionally not agent-executable —
+GUARD-CROSS-REPO-MUTATION refuses a session writing into its own enforcing
+plugin root); bootstrap was green again immediately after.
+
+**First full Verify on the fetched tip found one genuine, pre-existing gap
+— not a merge artifact, not a new regression.** `origin/sprint_agy`'s own
+tip carried two 2026-08-26 `docs(backlog): record ...` filing commits
+(`2b68ec79`, `1ebec15f`, for
+`existing-repos-drift-on-agy-pipeline-user-yaml-update-no-migration` and
+`push-approval-record-always-trails-the-signed-commit`) with no
+`chore(backlog): reconcile ledger` follow-up — the pattern every other
+filing commit in that branch's own history paired one-for-one. Confirmed
+via `reconcile-backlog-ledger.mjs` (plan mode: "Would record 2
+transition(s)"), fixed via the sanctioned writer (`--activate`), committed
+separately (`75de5950`, `chore(backlog): reconcile ledger for the two
+2026-08-26 filing commits`). Note for whoever next fetches from
+`sprint_agy`: if this branch continues, watch for the same
+filing-without-reconciliation gap at its new tip.
+
+**Candidate stamped and independently reverified clean twice.** Both
+runner manifests bumped to `0.6.0+{claude,codex}.20260826182242.75de595`
+(commit `3268fcd8`) — the Antigravity manifest
+(`plugins/pipeline-core/plugin.json`, `0.6.0+20260825.bbee2df4`) was left
+as-is: the documented local-candidate stamp convention
+(`docs/claude-local-plugin-development.md`) only names the Claude/Codex
+manifests, and Verify already passed clean without touching it. **Full
+Verify: 385/385 suites, exit 0, twice** (once directly after the ledger
+fix, once again after the manifest stamp) — no known/accepted exceptions
+outstanding this time (the prior `human-guard-override-tests`
+marketplace-mirror exception from the 2026-08-19 handover did not recur).
+Confirmed genuinely parallel: the bounded async worker pool
+(`AGY-VERIFYTUNER-1/2`, default concurrency 8) ran the 385-suite set in
+~2m17s, with multiple suites' `startedAt` timestamps within ~500ms of each
+other before any had completed.
+
+**Not yet done:** this candidate has not been pushed, and no push-approval
+ceremony has started. No Critic review has been dispatched against the
+`0d5a6e6b..3268fcd8` range (271 fetched commits + the ledger-reconciliation
+and manifest-stamp commits made in this session). Whether/when to push,
+and whether this range needs its own Critic gate given it was authored in
+another session/branch, is a PO decision not yet asked.
+
+## Prior handover — Antigravity CLI 3rd Runner Integration & Hardening (2026-08-25)
 
 **READ THIS FIRST — 2026-08-25 session, updated after PO check-in.** F1
 fixed and independently reverified (clean full Verify run, `binding:
