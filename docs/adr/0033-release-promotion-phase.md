@@ -4,7 +4,7 @@
 
 > Agent-Pipeline v0.1.0-draft · SDLC Release/Deploy extension · as of 2026-07-11
 
-**Status:** accepted (2026-07-11, sub-spec `specs/2026-07-11-sdlc-release-deploy/spec_s1-canon.md`, umbrella `specs/2026-07-11-sdlc-release-deploy/spec.md` §2.1/§2.5) · **Basis:** `docs/operating-model.md` §3.1/§3.5, PO decisions (2026-07-11)
+**Status:** accepted (2026-07-11, sub-spec `specs/2026-07-11-sdlc-release-deploy/spec_s1-canon.md`, umbrella `specs/2026-07-11-sdlc-release-deploy/spec.md` §2.1/§2.5) · **Basis:** `docs/operating-model.md` §3.1/§7, PO decisions (2026-07-11)
 
 ## Context
 
@@ -12,7 +12,7 @@ The SDLC flow (`docs/operating-model.md` §3.1) today ends at "merge + docs sync
 
 ## Decision
 
-An OPTIONAL tail phase **Release/Promotion**, activated by a `release` section in the project manifest (`.claude/pipeline.yaml`). Flow (detail: `docs/operating-model.md` §3.1/§3.5):
+An OPTIONAL tail phase **Release/Promotion**, activated by a `release` section in the project manifest (`.claude/pipeline.yaml`). Flow (detail: `docs/operating-model.md` §3.1/§7):
 
 Merge → `deploy:test` (adapter) → test gate (health/smoke evidence, machine-checked) → `promote:prod` (human gate) → `deploy:prod` (build-once-promote, the same artifact) → operate check → evidence + a standardized deploy-log entry.
 
@@ -46,7 +46,7 @@ First live probe of an adapter — neither v1 worked example exercises the `loca
 
 > Agent-Pipeline v0.1.0-draft · SDLC-Release/Deploy-Erweiterung · Stand 2026-07-11
 
-**Status:** akzeptiert (2026-07-11, Sub-Spec `specs/2026-07-11-sdlc-release-deploy/spec_s1-canon.md`, Umbrella `specs/2026-07-11-sdlc-release-deploy/spec.md` §2.1/§2.5) · **Grundlage:** `docs/operating-model.md` §3.1/§3.5, PO-Entscheidungen (2026-07-11)
+**Status:** akzeptiert (2026-07-11, Sub-Spec `specs/2026-07-11-sdlc-release-deploy/spec_s1-canon.md`, Umbrella `specs/2026-07-11-sdlc-release-deploy/spec.md` §2.1/§2.5) · **Grundlage:** `docs/operating-model.md` §3.1/§7, PO-Entscheidungen (2026-07-11)
 
 ## Kontext
 
@@ -54,7 +54,7 @@ Der SDLC-Fluss (`docs/operating-model.md` §3.1) endet heute bei „Merge + Doku
 
 ## Entscheidung
 
-Eine OPTIONALE Tail-Phase **Release/Promotion**, aktiviert durch eine `release`-Sektion im Projekt-Manifest (`.claude/pipeline.yaml`). Fluss (Detail: `docs/operating-model.md` §3.1/§3.5):
+Eine OPTIONALE Tail-Phase **Release/Promotion**, aktiviert durch eine `release`-Sektion im Projekt-Manifest (`.claude/pipeline.yaml`). Fluss (Detail: `docs/operating-model.md` §3.1/§7):
 
 Merge → `deploy:test` (Adapter) → Test-Gate (Health-/Smoke-Evidenz, maschinell) → `promote:prod` (Human-Gate) → `deploy:prod` (build-once-promote, dasselbe Artefakt) → Operate-Check → Evidenz + standardisierter Deploy-Log-Eintrag.
 

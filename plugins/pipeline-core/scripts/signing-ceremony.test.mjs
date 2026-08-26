@@ -31,7 +31,10 @@ import test from "node:test";
 
 import { run as realRunGuardMaintenanceWindow } from "./guard-maintenance-window.mjs";
 import { parseSigningCeremonyArgs, runSigningCeremony } from "./signing-ceremony.mjs";
+import { canonicalizeJson } from "../lib/governance-event.mjs";
 import { verifyPoApprovalProof } from "../lib/po-approval-proof.mjs";
+import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
+import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
 
 function openssl(args) {
   const result = spawnSync("openssl", args, { stdio: "pipe" });
@@ -74,6 +77,42 @@ function repoFixture(prefix, trustAnchor) {
   );
   execFileSync("git", ["add", "-A"], { cwd: root });
   execFileSync("git", ["commit", "-q", "-m", "init"], { cwd: root });
+  // PHX-WP-GMW-LEDGER-EMISSION: `install` now reads/writes the portable governance
+  // ledger, which requires both governance/events/registry.json AND
+  // governance/events/capture-policy.json to exist (loadRegistry ->
+  // GovernanceEventStoreError GES-MISSING; capturePolicyDigestFor ->
+  // GMW-CAPTURE-POLICY-MISSING). Mirrors guard-maintenance-window.test.mjs's own
+  // `fixture()`/`registry()`/`capturePolicy()` helpers exactly (same schema/shape),
+  // the established fixture pattern a peer suite already relies on.
+  mkdirSync(join(root, "governance", "events"), { recursive: true });
+  const repository = discoverRepository(root);
+  const fingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: repository.commonDir, primaryRoot: repository.primaryRoot });
+  writeFileSync(
+    join(root, "governance", "events", "registry.json"),
+    `${canonicalizeJson({
+      schema: "pipeline.governance-stream-registry.v1", repositoryFingerprint: fingerprint,
+      canonicalization: "RFC8785", digestAlgorithm: "sha-256", eventDigestDomain: "pipeline.governance-event.v1\0",
+      storageRoot: "governance/events",
+      streams: [
+        { streamId: "human", origin: "human", authorityClass: "human-authority", relativeRoot: "human", storageProfile: "repository-public-safe", genesis: { sequence: 0, eventDigest: null } },
+        { streamId: "agent", origin: "agent", authorityClass: "non-authoritative", relativeRoot: "agent", storageProfile: "repository-public-safe", genesis: { sequence: 0, eventDigest: null } },
+        { streamId: "lifecycle", origin: "lifecycle", authorityClass: "non-authoritative", relativeRoot: "lifecycle", storageProfile: "repository-public-safe", genesis: { sequence: 0, eventDigest: null } },
+      ],
+    })}\n`,
+  );
+  writeFileSync(
+    join(root, "governance", "events", "capture-policy.json"),
+    `${canonicalizeJson({
+      schema: "pipeline.governance-capture-policy.v1", policyId: "fixture", revision: "d".repeat(64), defaultAction: "deny",
+      streams: [
+        { origin: "human", purpose: "authority-history", materiality: "required", personalIdentifiability: "prohibited", contextualIdentifiability: "prohibited", storageProfile: "repository-public-safe", retention: "repository-retained", disclosure: "repository-visible", encryptionGeneration: null },
+        { origin: "agent", purpose: "declared-assumption", materiality: "policy-selected", personalIdentifiability: "prohibited", contextualIdentifiability: "prohibited", storageProfile: "repository-public-safe", retention: "repository-retained", disclosure: "repository-visible", encryptionGeneration: null },
+        { origin: "lifecycle", purpose: "deterministic-lifecycle", materiality: "required", personalIdentifiability: "prohibited", contextualIdentifiability: "prohibited", storageProfile: "repository-public-safe", retention: "repository-retained", disclosure: "repository-visible", encryptionGeneration: null },
+      ],
+      sanitizedReceipt: { allowEventId: true, allowEventDigest: true, allowCheckpoint: true, allowReasonText: false },
+      mandatoryEventClasses: [],
+    })}\n`,
+  );
   return root;
 }
 
@@ -87,14 +126,14 @@ test.after(() => {
   for (const root of roots) rmSync(root, { recursive: true, force: true });
 });
 
-test("maintenance-window ceremony runs prepare, present+sign, install, verify end to end with exactly one confirmation, and the installed window reads back active", () => {
+test("maintenance-window ceremony runs prepare, present+sign, install, verify end to end with exactly one confirmation, and the installed window reads back active", async () => {
   const directory = externalDirFixture("signing-ceremony-external-");
   const { publicKeyPem, authority } = keyFixture(directory);
   const repoRoot = repoFixture("signing-ceremony-repo-", authority);
 
   const prompts = [];
   const narration = [];
-  const result = runSigningCeremony(
+  const result = await runSigningCeremony(
     [
       "maintenance-window",
       "--repo-root", repoRoot,
@@ -144,13 +183,13 @@ test("maintenance-window ceremony runs prepare, present+sign, install, verify en
   assert.equal(verified.verified, true);
 });
 
-test("maintenance-window ceremony aborts before install when the human declines the confirmation: no window is installed", () => {
+test("maintenance-window ceremony aborts before install when the human declines the confirmation: no window is installed", async () => {
   const directory = externalDirFixture("signing-ceremony-external-decline-");
   const { authority } = keyFixture(directory);
   const repoRoot = repoFixture("signing-ceremony-repo-decline-", authority);
 
   const prompts = [];
-  assert.throws(
+  await assert.rejects(
     () => runSigningCeremony(
       [
         "maintenance-window",
@@ -180,7 +219,7 @@ test("maintenance-window ceremony aborts before install when the human declines 
   assert.equal(JSON.parse(status.stdout).value.status, "absent", "a declined confirmation must never result in an installed window");
 });
 
-test("maintenance-window ceremony surfaces GMW-CANDIDATE-COMMIT-MISMATCH plainly when an unrelated commit lands between prepare and install", () => {
+test("maintenance-window ceremony surfaces GMW-CANDIDATE-COMMIT-MISMATCH plainly when an unrelated commit lands between prepare and install", async () => {
   const directory = externalDirFixture("signing-ceremony-external-drift-");
   const { authority } = keyFixture(directory);
   const repoRoot = repoFixture("signing-ceremony-repo-drift-", authority);
@@ -200,7 +239,7 @@ test("maintenance-window ceremony surfaces GMW-CANDIDATE-COMMIT-MISMATCH plainly
     return outcome;
   };
 
-  assert.throws(
+  await assert.rejects(
     () => runSigningCeremony(
       [
         "maintenance-window",
@@ -240,7 +279,7 @@ test("parseSigningCeremonyArgs rejects a missing required flag, an unknown flag 
   );
 });
 
-test("runSigningCeremony rejects an unknown command and an incomplete argument set with the usage message", () => {
-  assert.throws(() => runSigningCeremony(["bogus-command"], {}), /Usage:/);
-  assert.throws(() => runSigningCeremony(["maintenance-window", "--repo-root", "/r"], {}), /Usage:/);
+test("runSigningCeremony rejects an unknown command and an incomplete argument set with the usage message", async () => {
+  await assert.rejects(() => runSigningCeremony(["bogus-command"], {}), /Usage:/);
+  await assert.rejects(() => runSigningCeremony(["maintenance-window", "--repo-root", "/r"], {}), /Usage:/);
 });

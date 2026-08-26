@@ -30,7 +30,10 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { canonicalizeJson } from "./governance-event.mjs";
+import { derivePoGateRepositoryFingerprint } from "./po-gate-authority.mjs";
 import { createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA } from "./po-approval-proof.mjs";
+import { discoverRepository } from "./worktree-lifecycle.mjs";
 import { run as runGuardMaintenanceWindowCli } from "../scripts/guard-maintenance-window.mjs";
 // Namespace import ON PURPOSE for the CEREMONY-1 additions below: a missing named
 // export fails ESM linking for the WHOLE file, which would turn a red-before run into
@@ -85,6 +88,27 @@ function proofFor(intent) {
  * (plural, array) document instead, mirroring the v3 fixture convention already used in
  * critical-action-authorization.test.mjs's own `fixture()` helper.
  */
+// PHX-WP-GMW-LEDGER-EMISSION: `install`'s CLI path now writes to the portable
+// human-governance ledger (requested/granted decisions), which requires the
+// fixture repository to carry its own governance/events/registry.json and
+// capture-policy.json -- mirrors human-authority-grant.test.mjs's own
+// registry()/capturePolicy() fixture shapes exactly (same ledger, same schema).
+function registry(fingerprint) {
+  return { schema: "pipeline.governance-stream-registry.v1", repositoryFingerprint: fingerprint, canonicalization: "RFC8785", digestAlgorithm: "sha-256", eventDigestDomain: "pipeline.governance-event.v1\0", storageRoot: "governance/events", streams: [
+    { streamId: "human", origin: "human", authorityClass: "human-authority", relativeRoot: "human", storageProfile: "repository-public-safe", genesis: { sequence: 0, eventDigest: null } },
+    { streamId: "agent", origin: "agent", authorityClass: "non-authoritative", relativeRoot: "agent", storageProfile: "repository-public-safe", genesis: { sequence: 0, eventDigest: null } },
+    { streamId: "lifecycle", origin: "lifecycle", authorityClass: "non-authoritative", relativeRoot: "lifecycle", storageProfile: "repository-public-safe", genesis: { sequence: 0, eventDigest: null } },
+  ] };
+}
+
+function capturePolicy() {
+  return { schema: "pipeline.governance-capture-policy.v1", policyId: "fixture", revision: "d".repeat(64), defaultAction: "deny", streams: [
+    { origin: "human", purpose: "authority-history", materiality: "required", personalIdentifiability: "prohibited", contextualIdentifiability: "prohibited", storageProfile: "repository-public-safe", retention: "repository-retained", disclosure: "repository-visible", encryptionGeneration: null },
+    { origin: "agent", purpose: "declared-assumption", materiality: "policy-selected", personalIdentifiability: "prohibited", contextualIdentifiability: "prohibited", storageProfile: "repository-public-safe", retention: "repository-retained", disclosure: "repository-visible", encryptionGeneration: null },
+    { origin: "lifecycle", purpose: "deterministic-lifecycle", materiality: "required", personalIdentifiability: "prohibited", contextualIdentifiability: "prohibited", storageProfile: "repository-public-safe", retention: "repository-retained", disclosure: "repository-visible", encryptionGeneration: null },
+  ], sanitizedReceipt: { allowEventId: true, allowEventDigest: true, allowCheckpoint: true, allowReasonText: false }, mandatoryEventClasses: [] };
+}
+
 function repoFixture(prefix = "gmw-", { policy } = {}) {
   const root = mkdtempSync(join(tmpdir(), prefix));
   roots.push(root);
@@ -103,6 +127,11 @@ function repoFixture(prefix = "gmw-", { policy } = {}) {
       trustAnchor: { keyReference: "gmw-test-key", publicKeySha256 },
     }),
   );
+  const repository = discoverRepository(root);
+  const fingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: repository.commonDir, primaryRoot: repository.primaryRoot });
+  mkdirSync(join(root, "governance", "events"), { recursive: true });
+  writeFileSync(join(root, "governance", "events", "registry.json"), `${canonicalizeJson(registry(fingerprint))}\n`);
+  writeFileSync(join(root, "governance", "events", "capture-policy.json"), `${canonicalizeJson(capturePolicy())}\n`);
   execFileSync("git", ["add", "-A"], { cwd: root });
   execFileSync("git", ["commit", "-q", "-m", "init"], { cwd: root });
   return root;
@@ -894,7 +923,7 @@ try {
 
     const installed = await runGuardMaintenanceWindowCli([
       "install", "--repo-root", root, "--request", requestPath,
-      "--proof", proofPath, "--authority", authorityPath,
+      "--proof", proofPath, "--authority", authorityPath, "--plan", "plan.md", "--spec", "spec.md",
     ]);
     assert.equal(installed.ok, true);
     assert.equal(installed.value.status, "active");
@@ -1026,7 +1055,7 @@ try {
     // NO --authority: exercises the CLI's default-authority branch reading the
     // v3-shaped project/critical-human-proof.json this repository fixture committed.
     const installed = await runGuardMaintenanceWindowCli([
-      "install", "--repo-root", root, "--request", requestPath, "--proof", proofPath,
+      "install", "--repo-root", root, "--request", requestPath, "--proof", proofPath, "--plan", "plan.md", "--spec", "spec.md",
     ]);
     assert.equal(installed.ok, true);
     assert.equal(installed.value.status, "active", "install's own return value must read back active, not absent, under a v3-only committed policy");

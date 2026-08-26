@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: SUL-1.0
 /**
  * Signing Ceremony CLI -- the single entry point Direction step 1 of
- * backlog/items/2026-08-08-the-signing-ceremony-is-designed-for-the-verifier-not-the-signer.md
- * asks for: the PO's own words, after walking the maintenance-window ceremony by
- * hand and needing three attempts, were "ein verlässliches Skript ..., was man
- * immer aufruft und was dann alles sauber managed" (a reliable script you always
- * call, which then manages everything cleanly).
+ * backlog/items/2026-08-08-the-signing-ceremony-is-designed-for-the-verifier-not-
+ * the-signer.md asks for: the PO's own words, after walking the maintenance-window
+ * ceremony by hand and needing three attempts, were "ein verlässliches Skript ...,
+ * was man immer aufruft und was dann alles sauber managed" (a reliable script you
+ * always call, which then manages everything cleanly).
  *
  * This orchestrates the `guard-maintenance-window.mjs` ceremony -- prepare,
  * present, sign, install, verify -- as ONE command, calling the existing,
@@ -29,10 +29,26 @@
  *     mismatched confirmation aborts the whole ceremony before install is ever
  *     attempted -- no maintenance window is opened.
  *
+ * VFX4-SIGNING: `guard-maintenance-window.mjs`'s `prepare` now requires
+ * `--authorship-mode <goldfish-dispatch|elephant-direct>` (PHX-WP-GMW-PREPARE-
+ * AUTHORSHIP) and `install` now requires `--plan`/`--spec` unconditionally
+ * (PHX-WP-GMW-LEDGER-EMISSION). This orchestrator has no stage-0 self-check
+ * inputs of its own to offer, so it defaults `--authorship-mode` to
+ * `"goldfish-dispatch"` (the mode that needs no stage-0 numbers) unless a caller
+ * explicitly overrides it; `--plan`/`--spec` are now REQUIRED on this CLI too, so
+ * the exact same paths are used for both the `prepare` digest and the `install`
+ * ledger entry. Separately, `guard-maintenance-window.mjs`'s `run()` became
+ * `async` in the same merge (the ledger append it now performs on `install`/
+ * `close` is async) -- every call into it below is now awaited; calling an async
+ * function without awaiting it returns a pending Promise with no `.value`
+ * property, which is what previously surfaced as an opaque
+ * `TypeError: Cannot destructure property 'request' of 'prepared.value'`.
+ *
  * Usage:
  *   signing-ceremony.mjs maintenance-window --repo-root <path> --directory <external-dir> \
- *     --scope <ids> --ttl-seconds <n> --reason <text> \
- *     [--feature-id <id>] [--plan <repo-path>] [--spec <repo-path>] \
+ *     --scope <ids> --ttl-seconds <n> --reason <text> --plan <repo-path> --spec <repo-path> \
+ *     [--feature-id <id>] [--authorship-mode <goldfish-dispatch|elephant-direct>] \
+ *     [--files-changed <n> --diff-lines <n> --touches-test-file <true|false>] \
  *     [--authority <external-public-json>]
  */
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -43,12 +59,14 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { run as runGuardMaintenanceWindowCli } from "./guard-maintenance-window.mjs";
 import { runHumanApproval } from "./po-human-approval.mjs";
 
-const USAGE = "Usage: signing-ceremony.mjs maintenance-window --repo-root <path> --directory <external-dir> --scope <ids> --ttl-seconds <n> --reason <text> [--feature-id <id>] [--plan <repo-path>] [--spec <repo-path>] [--authority <external-public-json>]";
+const USAGE = "Usage: signing-ceremony.mjs maintenance-window --repo-root <path> --directory <external-dir> --scope <ids> --ttl-seconds <n> --reason <text> --plan <repo-path> --spec <repo-path> [--feature-id <id>] [--authorship-mode <goldfish-dispatch|elephant-direct>] [--files-changed <n> --diff-lines <n> --touches-test-file <true|false>] [--authority <external-public-json>]";
 
 const KNOWN_FLAGS = new Set([
   "repoRoot", "directory", "scope", "ttlSeconds", "reason", "featureId", "plan", "spec", "authority",
+  "authorshipMode", "filesChanged", "diffLines", "touchesTestFile",
 ]);
-const REQUIRED_FLAGS = ["repoRoot", "directory", "scope", "ttlSeconds", "reason"];
+const REQUIRED_FLAGS = ["repoRoot", "directory", "scope", "ttlSeconds", "reason", "plan", "spec"];
+const DEFAULT_AUTHORSHIP_MODE = "goldfish-dispatch";
 
 /** Same shape/conventions as guard-maintenance-window.mjs's own parseArgs: `--flag value`
  * pairs only, unknown or duplicate flags fail closed to `null` (never a partial parse). */
@@ -82,8 +100,12 @@ export function parseSigningCeremonyArgs(argv) {
  * choose who answers the prompt, never remove it: `sign-intent`'s own
  * `requireExplicitConfirmation()` still runs unconditionally in every case.
  * `dependencies.write` overrides the narration sink (default: real stdout).
+ *
+ * Async because `guard-maintenance-window.mjs`'s own `run()` is async (its
+ * `install`/`close` branches append to the portable governance ledger); every
+ * `runGmw(...)` call below is awaited.
  */
-export function runSigningCeremony(argv = process.argv.slice(2), dependencies = {}) {
+export async function runSigningCeremony(argv = process.argv.slice(2), dependencies = {}) {
   const write = dependencies.write ?? ((line) => { process.stdout.write(`${line}\n`); });
   const [command, ...rest] = argv;
   if (command !== "maintenance-window") throw new Error(USAGE);
@@ -94,14 +116,23 @@ export function runSigningCeremony(argv = process.argv.slice(2), dependencies = 
   const runSign = dependencies.runHumanApproval ?? runHumanApproval;
 
   write("STEP 1/4 -- prepare: recording the maintenance-window request (unsigned).");
+  const authorshipMode = parsed.authorshipMode ?? DEFAULT_AUTHORSHIP_MODE;
   const prepareArgv = [
     "prepare", "--repo-root", parsed.repoRoot, "--scope", parsed.scope,
     "--ttl-seconds", parsed.ttlSeconds, "--reason", parsed.reason,
+    "--plan", parsed.plan, "--spec", parsed.spec,
+    "--authorship-mode", authorshipMode,
   ];
   if (parsed.featureId) prepareArgv.push("--feature-id", parsed.featureId);
-  if (parsed.plan) prepareArgv.push("--plan", parsed.plan);
-  if (parsed.spec) prepareArgv.push("--spec", parsed.spec);
-  const prepared = runGmw(prepareArgv);
+  if (authorshipMode === "elephant-direct") {
+    if (parsed.filesChanged) prepareArgv.push("--files-changed", parsed.filesChanged);
+    if (parsed.diffLines) prepareArgv.push("--diff-lines", parsed.diffLines);
+    if (parsed.touchesTestFile) prepareArgv.push("--touches-test-file", parsed.touchesTestFile);
+  }
+  const prepared = await runGmw(prepareArgv);
+  if (!prepared?.ok || !prepared.value) {
+    throw new Error(`SIGNING-CEREMONY-PREPARE-FAILED: ${prepared?.error ?? "prepare did not return a usable result"}`);
+  }
   const { request, intent } = prepared.value;
   write(`  prepared: candidate commit ${intent.value.candidate.commit}, window would expire (signed, absolute) at ${new Date(request.subject.expiresAtMs).toISOString()} -- nothing is signed yet.`);
 
@@ -123,12 +154,15 @@ export function runSigningCeremony(argv = process.argv.slice(2), dependencies = 
     const requestPath = join(scratchDir, "gmw-request.json");
     writeFileSync(requestPath, JSON.stringify(request), { mode: 0o600 });
     const proofPath = join(resolve(parsed.directory), "proof-manual.json");
-    const installArgv = ["install", "--repo-root", parsed.repoRoot, "--request", requestPath, "--proof", proofPath];
+    const installArgv = [
+      "install", "--repo-root", parsed.repoRoot, "--request", requestPath, "--proof", proofPath,
+      "--plan", parsed.plan, "--spec", parsed.spec,
+    ];
     if (parsed.authority) installArgv.push("--authority", parsed.authority);
-    const installed = runGmw(installArgv);
+    const installed = await runGmw(installArgv);
 
     write("STEP 4/4 -- verify: reading the installed window back independently.");
-    const status = runGmw(["status", "--repo-root", parsed.repoRoot]);
+    const status = await runGmw(["status", "--repo-root", parsed.repoRoot]);
     if (status.value?.status !== "active") {
       throw new Error(`SIGNING-CEREMONY-VERIFY-FAILED: install reported "${installed.value?.status ?? "unknown"}" but the independent status readback reports "${status.value?.status ?? "unknown"}"`);
     }
@@ -147,11 +181,11 @@ export function runSigningCeremony(argv = process.argv.slice(2), dependencies = 
 }
 
 if (isDirectInvocation(import.meta.url)) {
-  try {
-    const result = runSigningCeremony();
-    process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-  } catch (error) {
-    process.stderr.write(`SIGNING-CEREMONY-FAILED: ${error.message}\n`);
-    process.exitCode = 2;
-  }
+  runSigningCeremony().then(
+    (result) => { process.stdout.write(`${JSON.stringify(result, null, 2)}\n`); },
+    (error) => {
+      process.stderr.write(`SIGNING-CEREMONY-FAILED: ${error.message}\n`);
+      process.exitCode = 2;
+    },
+  );
 }
