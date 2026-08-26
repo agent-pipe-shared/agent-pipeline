@@ -1916,10 +1916,30 @@ function assertRequestNotExpired(request, repo, nowMs) {
  * only -- never `statusSha256`/`head`/`tree`/`state`, and never `pluginIdentity`
  * (which is not compared here at all; see armTimeFreshnessCheck() for why the
  * override machinery's own code identity is instead re-verified only at arm time).
+ *
+ * Two narrow amendments (VFX3-HGO merge reconciliation, NVA-HGOHEAD-1 /
+ * NVA-BL-20 F5): the narrowing above exists to let ORDINARY, benign repository
+ * churn (an unrelated commit landing, a ledger append) pass without spurious
+ * drift -- it was never meant to erase the two cases below, which are not
+ * ordinary churn but a change in the very thing this gate exists to bind:
+ * (1) `head === null` (unborn HEAD) is a sentinel for "no history to compare
+ * against yet", not an ordinary value among others -- a repository gaining its
+ * first commit between record and plan/refreeze is a genuine identity
+ * transition, always compared regardless of mode (for `global-plugin-install`
+ * requests `head` is always `null` on both sides, so this stays a no-op there).
+ * (2) for `global-plugin-install` requests, `repository.statusSha256` IS the
+ * Codex-marketplace-registration observation this mode exists to attest --
+ * unlike ordinary `statusSha256` (git status, deliberately ignored above), it
+ * carries no benign-churn case, so it is compared in full, never narrowed.
  */
-function assertNoRequestDrift(repository, policy, request) {
+function assertNoRequestDrift(repository, policy, request, { isLocalPluginInstall = false } = {}) {
+  const unbornTransitioned = (repository.head === null) !== (request.repository.head === null);
+  const marketplaceDrifted = isLocalPluginInstall
+    && repository.statusSha256 !== request.repository.statusSha256;
   if (repository.fingerprintSha256 !== request.repository.fingerprintSha256
-    || canonical(policy) !== canonical(request.policy)) {
+    || canonical(policy) !== canonical(request.policy)
+    || unbornTransitioned
+    || marketplaceDrifted) {
     fail("HGO-DRIFT", "override request preimage drifted");
   }
 }
@@ -2537,7 +2557,7 @@ export function planHumanGuardOverride({
     ? localPluginInstallSourceObservation(repo, { spawn: codexSpawn })
     : repositoryObservation(repo.root, spawn);
   const policy = policyIdentity(repo.root, pluginRoot, request.denials);
-  assertNoRequestDrift(repository, policy, request);
+  assertNoRequestDrift(repository, policy, request, { isLocalPluginInstall });
   if (canonical(plugin) !== canonical(request.plugin)) {
     fail("HGO-DRIFT", "override plugin identity drifted before first plan");
   }

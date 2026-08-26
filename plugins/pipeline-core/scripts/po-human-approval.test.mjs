@@ -1108,7 +1108,7 @@ test("approve-critical accepts a 3-key trust policy carrying humanName and the c
     assert.equal(result.ok, true);
     assert.equal(confirmations.length, 1);
     assert.match(confirmations[0], new RegExp(`intent sha256: ${prepared.intentSha256}`, "u"), "the confirmation must name the intent digest actually signed");
-    const proof = JSON.parse(readFileSync(join(dirs.directory, "proof-critical-push.json"), "utf8"));
+    const proof = JSON.parse(readFileSync(criticalArtifacts(dirs).proof, "utf8"));
     assert.equal(proof.keyReference, authority.keyReference);
   } finally {
     cleanup(dirs);
@@ -2923,8 +2923,9 @@ test("authorize-critical prepares and signs in ONE invocation, and the resulting
     assert.match(confirmations[0], new RegExp(subjectSha256, "u"), "the confirmation must state the exact subject being authorized");
     assert.match(confirmations[0], /does NOT cover/u, "the confirmation must state the approval's bounds (ADR-0061 Decision 4)");
 
-    const request = JSON.parse(readFileSync(join(dirs.directory, "request-critical-push.json"), "utf8"));
-    const proof = JSON.parse(readFileSync(join(dirs.directory, "proof-critical-push.json"), "utf8"));
+    const artifacts = criticalArtifacts(dirs);
+    const request = JSON.parse(readFileSync(artifacts.request, "utf8"));
+    const proof = JSON.parse(readFileSync(artifacts.proof, "utf8"));
     assert.equal(proof.keyReference, authority.keyReference);
     const verified = verifyCriticalActionApprovalRequest({
       request, trustPolicy: authority, proof, expectedCandidate: observed, expectedAction: request.action,
@@ -2932,8 +2933,8 @@ test("authorize-critical prepares and signs in ONE invocation, and the resulting
     assert.equal(verified.verified, true, "the proof produced by authorize-critical must verify against the request it built in the same call");
 
     // Temp signing artifacts are cleaned up; only the durable request/proof remain.
-    assert.equal(existsSync(join(dirs.directory, "intent-critical-push.txt")), false);
-    assert.equal(existsSync(join(dirs.directory, "signature-critical-push.bin")), false);
+    assert.equal(existsSync(artifacts.intent), false);
+    assert.equal(existsSync(artifacts.signature), false);
   } finally {
     cleanup(dirs);
   }
@@ -2976,8 +2977,9 @@ test("authorize-critical round-trips kind publication exactly like push: one inv
     assert.match(confirmations[0], new RegExp(subjectSha256, "u"), "the confirmation must state the exact subject being authorized");
     assert.match(confirmations[0], /does NOT cover/u, "the confirmation must state the approval's bounds (ADR-0061 Decision 4)");
 
-    const request = JSON.parse(readFileSync(join(dirs.directory, "request-critical-publication.json"), "utf8"));
-    const proof = JSON.parse(readFileSync(join(dirs.directory, "proof-critical-publication.json"), "utf8"));
+    const artifacts = criticalArtifacts(dirs, "publication");
+    const request = JSON.parse(readFileSync(artifacts.request, "utf8"));
+    const proof = JSON.parse(readFileSync(artifacts.proof, "utf8"));
     assert.equal(proof.schema, "pipeline.po-approval-proof.v1", "publication's proof uses the exact same shared schema as push/deploy");
     assert.equal(proof.keyReference, authority.keyReference);
     const verified = verifyCriticalActionApprovalRequest({
@@ -2986,8 +2988,8 @@ test("authorize-critical round-trips kind publication exactly like push: one inv
     assert.equal(verified.verified, true, "the proof produced by authorize-critical for kind publication must verify against the request it built in the same call");
 
     // Temp signing artifacts are cleaned up; only the durable request/proof remain.
-    assert.equal(existsSync(join(dirs.directory, "intent-critical-publication.txt")), false);
-    assert.equal(existsSync(join(dirs.directory, "signature-critical-publication.bin")), false);
+    assert.equal(existsSync(artifacts.intent), false);
+    assert.equal(existsSync(artifacts.signature), false);
   } finally {
     cleanup(dirs);
   }
@@ -3008,7 +3010,7 @@ test("authorize-critical never signs a stale request left in the external direct
     const staleRequest = runHumanApproval([
       "prepare-critical", ...criticalRequestArgs(dirs, { subjectSha256: staleSubjectSha256, expiresAt: "2030-01-01T00:00:00.000Z" }),
     ], { observeCandidate: () => observed });
-    assert.equal(readFileSync(join(dirs.directory, "request-critical-push.json"), "utf8").includes(staleSubjectSha256), true, "the stale request must actually be on disk before authorize-critical runs");
+    assert.equal(readFileSync(criticalArtifacts(dirs).request, "utf8").includes(staleSubjectSha256), true, "the stale request must actually be on disk before authorize-critical runs");
 
     // Now authorize-critical runs for the REAL, current subject. It must bind
     // to and sign ONLY the request it builds in this call -- never the stale
@@ -3025,11 +3027,11 @@ test("authorize-critical never signs a stale request left in the external direct
     assert.match(confirmations[0], new RegExp(currentSubjectSha256, "u"), "the human must be shown the CURRENT subject, not the stale one");
     assert.doesNotMatch(confirmations[0], new RegExp(staleSubjectSha256, "u"), "the stale subject must never appear in what the human is asked to confirm");
 
-    const request = JSON.parse(readFileSync(join(dirs.directory, "request-critical-push.json"), "utf8"));
+    const request = JSON.parse(readFileSync(criticalArtifacts(dirs).request, "utf8"));
     assert.equal(request.action.subjectSha256, currentSubjectSha256, "the request file on disk must have been overwritten with the current call's request");
     assert.notEqual(request.approvalIntent.sha256, staleRequest.intentSha256, "the signed intent digest must differ from the stale request's own digest");
 
-    const proof = JSON.parse(readFileSync(join(dirs.directory, "proof-critical-push.json"), "utf8"));
+    const proof = JSON.parse(readFileSync(criticalArtifacts(dirs).proof, "utf8"));
     const verifiedCurrent = verifyCriticalActionApprovalRequest({
       request, trustPolicy: authority, proof, expectedCandidate: observed, expectedAction: request.action,
     });
@@ -3065,11 +3067,12 @@ test("authorize-critical still requires the literal word approve: anything else 
       /approval cancelled: explicit confirmation was not given/,
     );
     assert.equal(spawnCalled, false, "OpenSSL must never be invoked once confirmation is cancelled");
-    assert.equal(existsSync(join(dirs.directory, "proof-critical-push.json")), false);
-    assert.equal(existsSync(join(dirs.directory, "intent-critical-push.txt")), false);
+    const artifacts = criticalArtifacts(dirs);
+    assert.equal(existsSync(artifacts.proof), false);
+    assert.equal(existsSync(artifacts.intent), false);
     // The request itself IS written before the prompt (it must exist for the
     // confirmation to describe it), but no signature/proof follows a refusal.
-    assert.equal(existsSync(join(dirs.directory, "request-critical-push.json")), true);
+    assert.equal(existsSync(artifacts.request), true);
   } finally {
     cleanup(dirs);
   }

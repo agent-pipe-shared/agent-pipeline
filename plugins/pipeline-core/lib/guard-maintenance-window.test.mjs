@@ -54,8 +54,8 @@ import {
 const roots = [];
 let passed = 0;
 let failed = 0;
-function check(name, callback) {
-  try { callback(); console.log(`PASS ${name}`); passed += 1; }
+async function check(name, callback) {
+  try { await callback(); console.log(`PASS ${name}`); passed += 1; }
   catch (error) { console.error(`FAIL ${name}: ${error.stack ?? error.message}`); failed += 1; }
 }
 
@@ -169,7 +169,7 @@ function handBuiltRequest({
 
 try {
   // ---- isLiftableRuleId / scope validation ------------------------------------------
-  check("GMW01 GS-6 and TP-* are liftable; GS-1..GS-5/GS-7 and arbitrary ids are not", () => {
+  await check("GMW01 GS-6 and TP-* are liftable; GS-1..GS-5/GS-7 and arbitrary ids are not", () => {
     assert.equal(isLiftableRuleId("GS-6"), true);
     assert.equal(isLiftableRuleId("TP-1"), true);
     assert.equal(isLiftableRuleId("TP-custom"), true);
@@ -178,7 +178,7 @@ try {
     }
   });
 
-  check("GMW02 prepare rejects a scope naming a non-liftable rule id", () => {
+  await check("GMW02 prepare rejects a scope naming a non-liftable rule id", () => {
     const root = repoFixture();
     const plugin = pluginRootFixture();
     const { planSha256, specSha256 } = planSpecShas(root);
@@ -195,7 +195,7 @@ try {
   });
 
   // ---- happy path: prepare -> install -> active -> covers -> close -----------------
-  check("GMW03 prepare -> install -> active -> windowCoversRule -> close -> absent", () => {
+  await check("GMW03 prepare -> install -> active -> windowCoversRule -> close -> absent", () => {
     const root = repoFixture();
     const plugin = pluginRootFixture();
     const { planSha256, specSha256 } = planSpecShas(root);
@@ -222,7 +222,7 @@ try {
   });
 
   // ---- fail-closed expiry parsing (F1: expiresAtMs lives INSIDE the signed subject) --
-  check("GMW04 a missing/malformed subject.expiresAtMs resolves to NOT active (fail-closed)", () => {
+  await check("GMW04 a missing/malformed subject.expiresAtMs resolves to NOT active (fail-closed)", () => {
     const root = repoFixture("gmw-expiry-");
     const plugin = pluginRootFixture();
     const { planSha256, specSha256 } = planSpecShas(root);
@@ -248,7 +248,7 @@ try {
   });
 
   // ---- F1: tampering the signed expiresAtMs directly breaks the subject/intent digest
-  check("GMW04b editing expiresAtMs in the stored record (a plaintext-looking field) fails verification, not renews", () => {
+  await check("GMW04b editing expiresAtMs in the stored record (a plaintext-looking field) fails verification, not renews", () => {
     const root = repoFixture("gmw-expiry-tamper-");
     const plugin = pluginRootFixture();
     const { planSha256, specSha256 } = planSpecShas(root);
@@ -270,7 +270,7 @@ try {
   });
 
   // ---- F2: install is not a renewal mechanism ---------------------------------------
-  check("GMW09 repeating install() with the identical {request, proof} never moves expiry later than the signed bound", () => {
+  await check("GMW09 repeating install() with the identical {request, proof} never moves expiry later than the signed bound", () => {
     const root = repoFixture("gmw-reinstall-");
     const plugin = pluginRootFixture();
     const { planSha256, specSha256 } = planSpecShas(root);
@@ -292,7 +292,7 @@ try {
     assert.equal(later.expiresAtMs, firstExpiresAtMs, "a repeated install must reinstall the identical signed bound, never extend it");
   });
 
-  check("GMW10 install refuses a request whose signed expiresAtMs has already passed", () => {
+  await check("GMW10 install refuses a request whose signed expiresAtMs has already passed", () => {
     const root = repoFixture("gmw-already-expired-");
     const plugin = pluginRootFixture();
     const { request: builtRequest, intent } = handBuiltRequest({
@@ -314,7 +314,7 @@ try {
   // exploit never gets a first foothold. This check reproduces Finding 1's exact
   // scenario (~100x MAX_WINDOW_TTL_MS, hand-built, bypassing prepare()'s own clamp)
   // and asserts the FIRST installGuardMaintenanceWindow call itself throws.
-  check("GMW05 a signed expiresAtMs far beyond nowMs + MAX_WINDOW_TTL_MS is refused at the FIRST install, never silently honored (Finding 1)", () => {
+  await check("GMW05 a signed expiresAtMs far beyond nowMs + MAX_WINDOW_TTL_MS is refused at the FIRST install, never silently honored (Finding 1)", () => {
     const root = repoFixture("gmw-ttl-");
     const plugin = pluginRootFixture();
     const before = Date.now();
@@ -331,7 +331,7 @@ try {
     assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "absent", "a refused install must leave no window record behind");
   });
 
-  check("GMW13 the exploit does not get a foothold: re-attempting install() of the same oversized request never succeeds, even much later", () => {
+  await check("GMW13 the exploit does not get a foothold: re-attempting install() of the same oversized request never succeeds, even much later", () => {
     // Finding 1's actual attack shape was REPEATED install() calls walking the
     // read-time ceiling forward. Confirms the fix holds not just on the first
     // attempt but on every subsequent one -- there is no "wait a bit, try again"
@@ -354,7 +354,7 @@ try {
   });
 
   // ---- physical-repository binding --------------------------------------------------
-  check("GMW06 a window prepared for one physical repository does not verify for another", () => {
+  await check("GMW06 a window prepared for one physical repository does not verify for another", () => {
     const rootA = repoFixture("gmw-repoA-");
     const rootB = repoFixture("gmw-repoB-");
     const plugin = pluginRootFixture();
@@ -371,7 +371,7 @@ try {
   });
 
   // ---- tamper detection ---------------------------------------------------------------
-  check("GMW07 a tampered window.json (any byte changed post-install) fails currentGuardMaintenanceWindow", () => {
+  await check("GMW07 a tampered window.json (any byte changed post-install) fails currentGuardMaintenanceWindow", () => {
     const root = repoFixture("gmw-tamper-");
     const plugin = pluginRootFixture();
     const { planSha256, specSha256 } = planSpecShas(root);
@@ -391,7 +391,7 @@ try {
   });
 
   // ---- F3: closed-scope re-validation at install AND at read time, defense in depth --
-  check("GMW11 install rejects a hand-built request naming a non-liftable rule id, bypassing prepare()", () => {
+  await check("GMW11 install rejects a hand-built request naming a non-liftable rule id, bypassing prepare()", () => {
     const root = repoFixture("gmw-install-scope-");
     const plugin = pluginRootFixture();
     for (const scope of [["GS-2"], ["GS-1"], ["unknown-id"]]) {
@@ -405,7 +405,7 @@ try {
     assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "absent");
   });
 
-  check("GMW12 currentGuardMaintenanceWindow/windowCoversRule never report a non-liftable id as covered, even from an already-stored record", () => {
+  await check("GMW12 currentGuardMaintenanceWindow/windowCoversRule never report a non-liftable id as covered, even from an already-stored record", () => {
     // Construct a record whose install-time scope check has been bypassed by writing
     // window.json directly (simulating a bug in an earlier version of install(), or a
     // record written before this defense existed) -- currentGuardMaintenanceWindow must
@@ -423,7 +423,7 @@ try {
   });
 
   // ---- kernel-path anchoring (both anchors: project-relative and plugin-root-relative)
-  check("GMW08 isNeverLiftableKernelPath matches both anchors and nothing else", () => {
+  await check("GMW08 isNeverLiftableKernelPath matches both anchors and nothing else", () => {
     const root = repoFixture("gmw-kernel-");
     assert.equal(isNeverLiftableKernelPath("project/critical-human-proof.json", { rootDir: root }), true);
     assert.equal(isNeverLiftableKernelPath("README.md", { rootDir: root }), false);
@@ -466,7 +466,7 @@ try {
   // verifies all future windows -- the exact "recursive hole" Decision 3 exists to
   // close, reproduced verbatim in the implemented list but incomplete relative to
   // the ADR's own stated principle.
-  check("F2 NVA-A7FIX-1: NEVER_LIFTABLE_KERNEL_PATHS covers the two window-verifier modules", () => {
+  await check("F2 NVA-A7FIX-1: NEVER_LIFTABLE_KERNEL_PATHS covers the two window-verifier modules", () => {
     const root = repoFixture("gmw-kernel-verifiers-");
     assert.equal(
       isNeverLiftableKernelPath(
@@ -493,11 +493,11 @@ try {
   // re-derives to exactly the digest that is about to be signed -- the same derivation
   // install() performs. A record that does not re-derive is not "shown with a warning",
   // it is not shown.
-  check("GMW14 describeGuardMaintenanceWindowRequest shows reason, scope and expiry for the digest it resolves", () => {
+  await check("GMW14 describeGuardMaintenanceWindowRequest shows reason, scope and expiry for the digest it resolves", () => {
     const root = repoFixture("gmw-describe-");
     const plugin = pluginRootFixture();
     const { planSha256, specSha256 } = planSpecShas(root);
-    const { intent, subject } = prepareGuardMaintenanceWindowRequest({
+    const { intent, subject } = prepareGuardMaintenanceWindowRequest({ authorshipMode: "goldfish-dispatch",
       rootDir: root, scopeRuleIds: ["GS-6", "TP-1"], ttlSeconds: 900, reason: "fix the release preflight base-commit peel",
       featureId: "f", planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
     });
@@ -515,7 +515,7 @@ try {
     assert.match(body, /guard-lift/u);
   });
 
-  check("GMW15 an unresolvable digest yields no lines at all -- no record, no invented description", () => {
+  await check("GMW15 an unresolvable digest yields no lines at all -- no record, no invented description", () => {
     const root = repoFixture("gmw-describe-none-");
     const plugin = pluginRootFixture();
     const { planSha256, specSha256 } = planSpecShas(root);
@@ -525,7 +525,7 @@ try {
     assert.deepEqual(empty.lines, [], "an unresolved record must contribute no display lines");
     assert.equal(typeof empty.code, "string");
 
-    prepareGuardMaintenanceWindowRequest({
+    prepareGuardMaintenanceWindowRequest({ authorshipMode: "goldfish-dispatch",
       rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 600, reason: "recorded but unrelated", featureId: "f",
       planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
     });
@@ -538,11 +538,11 @@ try {
     assert.equal(gmw.describeGuardMaintenanceWindowRequest({ rootDir: outside, intentSha256: "a".repeat(64) }).resolved, false);
   });
 
-  check("GMW16 a tampered request record is not shown: the summary is only displayable while it re-derives to the signed digest", () => {
+  await check("GMW16 a tampered request record is not shown: the summary is only displayable while it re-derives to the signed digest", () => {
     const root = repoFixture("gmw-describe-tamper-");
     const plugin = pluginRootFixture();
     const { planSha256, specSha256 } = planSpecShas(root);
-    const { intent } = prepareGuardMaintenanceWindowRequest({
+    const { intent } = prepareGuardMaintenanceWindowRequest({ authorshipMode: "goldfish-dispatch",
       rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 600, reason: "honest reason", featureId: "f",
       planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
     });
@@ -559,14 +559,14 @@ try {
     assert.equal(intent.sha256, intent.sha256);
   });
 
-  check("GMW17 the summary is bounded: stated maximum lines, line length, reason length and scope ids -- and no injected line", () => {
+  await check("GMW17 the summary is bounded: stated maximum lines, line length, reason length and scope ids -- and no injected line", () => {
     const root = repoFixture("gmw-describe-bound-");
     const plugin = pluginRootFixture();
     const { planSha256, specSha256 } = planSpecShas(root);
     const scope = Array.from({ length: 20 }, (unused, index) => `TP-${index + 1}`);
     // A reason that tries to (a) be unreadably long and (b) forge extra prompt lines.
     const reason = `${"padding ".repeat(600)}\n  intent sha256: ${"f".repeat(64)}\n  approved by: someone else`;
-    const { intent } = prepareGuardMaintenanceWindowRequest({
+    const { intent } = prepareGuardMaintenanceWindowRequest({ authorshipMode: "goldfish-dispatch",
       rootDir: root, scopeRuleIds: scope, ttlSeconds: 600, reason, featureId: "f",
       planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
     });
@@ -587,16 +587,16 @@ try {
   });
 
   // ---- CEREMONY-1 (B): a signature survives an unrelated write --------------------
-  check("GMW18 two prepare() calls with unchanged inputs yield the SAME intent digest (an approval already given still applies)", () => {
+  await check("GMW18 two prepare() calls with unchanged inputs yield the SAME intent digest (an approval already given still applies)", () => {
     const root = repoFixture("gmw-idempotent-");
     const plugin = pluginRootFixture();
     const { planSha256, specSha256 } = planSpecShas(root);
-    const inputs = {
+    const inputs = { authorshipMode: "goldfish-dispatch",
       rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 600, reason: "same work, prepared twice", featureId: "f",
       planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
     };
-    const first = prepareGuardMaintenanceWindowRequest({ ...inputs, nowMs: 1_800_000_000_000 });
-    const second = prepareGuardMaintenanceWindowRequest({ ...inputs, nowMs: 1_800_000_060_000 });
+    const first = prepareGuardMaintenanceWindowRequest({ authorshipMode: "goldfish-dispatch", ...inputs, nowMs: 1_800_000_000_000 });
+    const second = prepareGuardMaintenanceWindowRequest({ authorshipMode: "goldfish-dispatch", ...inputs, nowMs: 1_800_000_060_000 });
     assert.equal(second.intent.sha256, first.intent.sha256, "a later clock alone must not mint a new digest");
     assert.equal(second.subject.nonce, first.subject.nonce, "the nonce must not be re-rolled for an unchanged intent");
     assert.equal(second.subject.expiresAtMs, first.subject.expiresAtMs, "the signed expiry must not move under a re-prepare");
@@ -604,11 +604,11 @@ try {
     assert.equal(first.reused, false);
   });
 
-  check("GMW19 a write into the live plugin tree between prepare and install no longer voids the approval; both hashes are recorded", () => {
+  await check("GMW19 a write into the live plugin tree between prepare and install no longer voids the approval; both hashes are recorded", () => {
     const root = repoFixture("gmw-tree-write-");
     const plugin = pluginRootFixture();
     const { planSha256, specSha256 } = planSpecShas(root);
-    const inputs = {
+    const inputs = { authorshipMode: "goldfish-dispatch",
       rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 600, reason: "unrelated write must not cost a signature", featureId: "f",
       planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
     };
@@ -638,11 +638,11 @@ try {
     assert.equal(installed.observedTreeSha256, observedTreeSha256);
   });
 
-  check("GMW20 a CHANGED scope, expiry basis or reason still mints a new digest and therefore still needs a new signature", () => {
+  await check("GMW20 a CHANGED scope, expiry basis or reason still mints a new digest and therefore still needs a new signature", () => {
     const root = repoFixture("gmw-changed-inputs-");
     const plugin = pluginRootFixture();
     const { planSha256, specSha256 } = planSpecShas(root);
-    const base = {
+    const base = { authorshipMode: "goldfish-dispatch",
       rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 600, reason: "baseline", featureId: "f",
       planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
     };
@@ -653,7 +653,7 @@ try {
       ["reason", { reason: "something else entirely" }],
       ["feature", { featureId: "other-feature" }],
     ]) {
-      const changed = prepareGuardMaintenanceWindowRequest({ ...base, ...override });
+      const changed = prepareGuardMaintenanceWindowRequest({ authorshipMode: "goldfish-dispatch", ...base, ...override });
       assert.notEqual(changed.intent.sha256, first.intent.sha256, `a changed ${label} must mint a new digest`);
       assert.equal(changed.reused, false, `a changed ${label} must not reuse the recorded request`);
       // ...and the earlier signature no longer installs against the new request.
@@ -669,7 +669,7 @@ try {
   // (backlog/items/2026-08-09-elephant-authored-production-diff-closed-its-own-gating-criterion.md,
   // roles/elephant.md EL-01's own stage-0 fast-path definition: <=2 files, <=~25 diff
   // lines, no test-file changes).
-  check("GMW14 prepare rejects a missing/invalid authorshipMode -- mandatory, not skippable", () => {
+  await check("GMW14 prepare rejects a missing/invalid authorshipMode -- mandatory, not skippable", () => {
     const root = repoFixture("gmw-authorship-missing-");
     const plugin = pluginRootFixture();
     const { planSha256, specSha256 } = planSpecShas(root);
@@ -691,11 +691,11 @@ try {
   // silently widened without any check turning red. Addition only: it pins that the
   // idempotency introduced for CEREMONY-1 (B) is keyed on the WHOLE intent envelope,
   // not merely on the fields the human is shown.
-  check("GMW20b a CHANGED plan or spec digest also mints a new digest, and the earlier proof still does not install it", () => {
+  await check("GMW20b a CHANGED plan or spec digest also mints a new digest, and the earlier proof still does not install it", () => {
     const root = repoFixture("gmw-changed-plan-spec-");
     const plugin = pluginRootFixture();
     const { planSha256, specSha256 } = planSpecShas(root);
-    const base = {
+    const base = { authorshipMode: "goldfish-dispatch",
       rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 600, reason: "baseline", featureId: "f",
       planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
     };
@@ -704,7 +704,7 @@ try {
       ["plan", { planSha256: "1".repeat(64) }],
       ["spec", { specSha256: "2".repeat(64) }],
     ]) {
-      const changed = prepareGuardMaintenanceWindowRequest({ ...base, ...override });
+      const changed = prepareGuardMaintenanceWindowRequest({ authorshipMode: "goldfish-dispatch", ...base, ...override });
       assert.notEqual(changed.intent.sha256, first.intent.sha256, `a changed ${label} digest must mint a new intent digest`);
       assert.equal(changed.reused, false, `a changed ${label} digest must not reuse the recorded request`);
       let error;
@@ -717,12 +717,12 @@ try {
     }
   });
 
-  check("GMW21 the four-hour TTL cap still clamps at prepare AND is still enforced at install", () => {
+  await check("GMW21 the four-hour TTL cap still clamps at prepare AND is still enforced at install", () => {
     const root = repoFixture("gmw-ttl-cap-");
     const plugin = pluginRootFixture();
     const { planSha256, specSha256 } = planSpecShas(root);
     const nowMs = Date.now();
-    const { subject, request, intent } = prepareGuardMaintenanceWindowRequest({
+    const { subject, request, intent } = prepareGuardMaintenanceWindowRequest({ authorshipMode: "goldfish-dispatch",
       rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 10 * 24 * 60 * 60, reason: "ten days requested", featureId: "f",
       planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin, nowMs,
     });
@@ -752,11 +752,11 @@ try {
   // that gap, without reintroducing the removed live-plugin-TREE check under another
   // name: they compare against `git rev-parse HEAD`/`HEAD^{tree}`, never against bytes
   // under `livePluginRoot`.
-  check("GMW22 install refuses when the current HEAD commit differs from the signed candidate commit (a new commit landed since prepare)", () => {
+  await check("GMW22 install refuses when the current HEAD commit differs from the signed candidate commit (a new commit landed since prepare)", () => {
     const root = repoFixture("gmw-candidate-commit-");
     const plugin = pluginRootFixture();
     const { planSha256, specSha256 } = planSpecShas(root);
-    const { intent, request } = prepareGuardMaintenanceWindowRequest({
+    const { intent, request } = prepareGuardMaintenanceWindowRequest({ authorshipMode: "goldfish-dispatch",
       rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 300, reason: "candidate binding, commit", featureId: "f",
       planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
     });
@@ -781,7 +781,7 @@ try {
     assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "absent", "a refused install must leave no window record behind");
   });
 
-  check("GMW23 install refuses when only the HEAD tree differs from the signed candidate tree, even when the candidate commit matches", () => {
+  await check("GMW23 install refuses when only the HEAD tree differs from the signed candidate tree, even when the candidate commit matches", () => {
     // Honestly constructed: a real commit object's tree is immutable, so "commit
     // matches, tree differs" cannot arise from an unmodified prepare()-derived
     // candidate. It is constructed here as a hand-built candidate that tells the truth
@@ -808,7 +808,7 @@ try {
     assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "absent", "a refused install must leave no window record behind");
   });
 
-  check("GMW24 install admits when only uncommitted working-tree bytes changed since prepare -- the candidate binding checks HEAD, not the working tree", () => {
+  await check("GMW24 install admits when only uncommitted working-tree bytes changed since prepare -- the candidate binding checks HEAD, not the working tree", () => {
     // Distinct from GMW19 (which pins the SAME property for the live plugin tree
     // specifically): this confirms the new candidate-binding checks added by
     // CANDBIND-1 do not regress it for the repository's own working tree either. An
@@ -817,7 +817,7 @@ try {
     const root = repoFixture("gmw-candidate-uncommitted-");
     const plugin = pluginRootFixture();
     const { planSha256, specSha256 } = planSpecShas(root);
-    const { intent, request } = prepareGuardMaintenanceWindowRequest({
+    const { intent, request } = prepareGuardMaintenanceWindowRequest({ authorshipMode: "goldfish-dispatch",
       rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 300, reason: "uncommitted bytes must not void the signature", featureId: "f",
       planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
     });
@@ -833,11 +833,11 @@ try {
     assert.equal(installed.status, "active", "an uncommitted working-tree edit must not void an already-signed candidate binding");
   });
 
-  check("GMW25 install fails closed when the candidate check's own git invocation fails, never admitting on an unresolvable HEAD", () => {
+  await check("GMW25 install fails closed when the candidate check's own git invocation fails, never admitting on an unresolvable HEAD", () => {
     const root = repoFixture("gmw-candidate-git-fail-");
     const plugin = pluginRootFixture();
     const { planSha256, specSha256 } = planSpecShas(root);
-    const { intent, request } = prepareGuardMaintenanceWindowRequest({
+    const { intent, request } = prepareGuardMaintenanceWindowRequest({ authorshipMode: "goldfish-dispatch",
       rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 300, reason: "git failure at install", featureId: "f",
       planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
     });
@@ -874,10 +874,10 @@ try {
   // verify subcommand (GF-069). Exercised at the CLI level (via `run`), not the lib
   // level, because the lib's `installGuardMaintenanceWindow` never saw the bug -- the
   // narrowing belongs to the CLI's own `install --authority` branch.
-  check("GMW26 CLI install --authority accepts a fresh SETUP-1 (3-field) authority file, exactly like a legacy 2-field one", () => {
+  await check("GMW26 CLI install --authority accepts a fresh SETUP-1 (3-field) authority file, exactly like a legacy 2-field one", async () => {
     const root = repoFixture("gmw-cli-authority-");
-    const prepared = runGuardMaintenanceWindowCli([
-      "prepare", "--repo-root", root, "--scope", "GS-6", "--ttl-seconds", "300",
+    const prepared = await runGuardMaintenanceWindowCli([
+      "prepare", "--repo-root", root, "--scope", "GS-6", "--ttl-seconds", "300", "--authorship-mode", "goldfish-dispatch",
       "--reason", "cli authority narrowing", "--plan", "plan.md", "--spec", "spec.md",
     ]);
     assert.equal(prepared.ok, true);
@@ -892,7 +892,7 @@ try {
     const authorityPath = join(external, "authority-setup1.json");
     writeFileSync(authorityPath, JSON.stringify({ ...trustPolicy, humanName: "Test Operator" }));
 
-    const installed = runGuardMaintenanceWindowCli([
+    const installed = await runGuardMaintenanceWindowCli([
       "install", "--repo-root", root, "--request", requestPath,
       "--proof", proofPath, "--authority", authorityPath,
     ]);
@@ -910,13 +910,13 @@ try {
   // `absent` on every single check, including the one `install` itself performs to
   // build its own return value. These checks pin the fix at both bug sites.
 
-  check("GMW27 a v3-only critical-human-proof.json (trustAnchors array, no legacy trustAnchor field) reads an installed window back as active, not absent", () => {
+  await check("GMW27 a v3-only critical-human-proof.json (trustAnchors array, no legacy trustAnchor field) reads an installed window back as active, not absent", () => {
     const root = repoFixture("gmw-v3-populated-", { policy: v3PolicyWithAnchors([{ keyReference: "gmw-test-key", publicKeySha256 }]) });
     const plugin = pluginRootFixture();
     const { planSha256, specSha256 } = planSpecShas(root);
     assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "absent", "no window installed yet");
 
-    const { intent, request } = prepareGuardMaintenanceWindowRequest({
+    const { intent, request } = prepareGuardMaintenanceWindowRequest({ authorshipMode: "goldfish-dispatch",
       rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 300, reason: "v3 populated set", featureId: "f",
       planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
     });
@@ -930,7 +930,7 @@ try {
     assert.equal(windowCoversRule({ rootDir: root, ruleId: "GS-6" }).covered, true);
   });
 
-  check("GMW28 an explicit EMPTY v3 trustAnchors: [] is treated as no anchor available and fails closed at install -- GMW never adopts the \"any well-formed key\" posture, unlike the CRITICAL_ACTION_KINDS ceremonies", () => {
+  await check("GMW28 an explicit EMPTY v3 trustAnchors: [] is treated as no anchor available and fails closed at install -- GMW never adopts the \"any well-formed key\" posture, unlike the CRITICAL_ACTION_KINDS ceremonies", () => {
     // NVA-GMWFIX-2: GMW28 previously asserted the WRONG (undisclosed) behavior imported by
     // e31f0233/NVA-GMWFIX-1 -- an empty v3 trustAnchors set installing as "active". GMW is
     // the ceremony that LIFTS GS-6/TP-* protection in the first place, so that posture here
@@ -940,7 +940,7 @@ try {
     const root = repoFixture("gmw-v3-empty-", { policy: v3PolicyWithAnchors([]) });
     const plugin = pluginRootFixture();
     const { planSha256, specSha256 } = planSpecShas(root);
-    const { intent, request } = prepareGuardMaintenanceWindowRequest({
+    const { intent, request } = prepareGuardMaintenanceWindowRequest({ authorshipMode: "goldfish-dispatch",
       rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 300, reason: "v3 empty set, must fail closed", featureId: "f",
       planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
     });
@@ -957,7 +957,7 @@ try {
     assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "absent", "a refused install must leave no window record behind, and a read against an empty committed policy must also report absent");
   });
 
-  check("GMW29 a legacy-only policy (singular trustAnchor, no trustAnchors array at all) still reads an installed window back as active -- the fix is additive, not breaking", () => {
+  await check("GMW29 a legacy-only policy (singular trustAnchor, no trustAnchors array at all) still reads an installed window back as active -- the fix is additive, not breaking", () => {
     // The suite's DEFAULT repoFixture() already writes exactly this shape (v1 schema,
     // singular trustAnchor, no `trustAnchors` key present at all) -- pinned here as its
     // own named regression case per NVA-GMWFIX-1's DoD, not merely incidentally covered
@@ -965,7 +965,7 @@ try {
     const root = repoFixture("gmw-legacy-singular-");
     const plugin = pluginRootFixture();
     const { planSha256, specSha256 } = planSpecShas(root);
-    const { intent, request } = prepareGuardMaintenanceWindowRequest({
+    const { intent, request } = prepareGuardMaintenanceWindowRequest({ authorshipMode: "goldfish-dispatch",
       rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 300, reason: "legacy singular anchor", featureId: "f",
       planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
     });
@@ -976,7 +976,7 @@ try {
     assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "active");
   });
 
-  check("GMW30 a populated v3 trustAnchors set refuses a signature from a key that matches neither the legacy singular anchor nor any set entry -- the fix must not widen acceptance", () => {
+  await check("GMW30 a populated v3 trustAnchors set refuses a signature from a key that matches neither the legacy singular anchor nor any set entry -- the fix must not widen acceptance", () => {
     const outsider = generateKeyPairSync("ed25519");
     const outsiderPublicKey = outsider.publicKey.export({ type: "spki", format: "pem" });
     const outsiderPublicKeySha256 = createHash("sha256").update(outsiderPublicKey).digest("hex");
@@ -991,7 +991,7 @@ try {
     const root = repoFixture("gmw-v3-negative-", { policy: v3PolicyWithAnchors([{ keyReference: "gmw-test-key", publicKeySha256 }]) });
     const plugin = pluginRootFixture();
     const { planSha256, specSha256 } = planSpecShas(root);
-    const { intent, request } = prepareGuardMaintenanceWindowRequest({
+    const { intent, request } = prepareGuardMaintenanceWindowRequest({ authorshipMode: "goldfish-dispatch",
       rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 300, reason: "negative case, outsider key", featureId: "f",
       planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
     });
@@ -1007,10 +1007,10 @@ try {
     assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "absent");
   });
 
-  check("GMW31 CLI install WITHOUT --authority reads the v3 trustAnchors array from the committed policy and installs successfully -- the exact live ceremony this bug broke", () => {
+  await check("GMW31 CLI install WITHOUT --authority reads the v3 trustAnchors array from the committed policy and installs successfully -- the exact live ceremony this bug broke", async () => {
     const root = repoFixture("gmw-cli-v3-default-", { policy: v3PolicyWithAnchors([{ keyReference: "gmw-test-key", publicKeySha256 }]) });
-    const prepared = runGuardMaintenanceWindowCli([
-      "prepare", "--repo-root", root, "--scope", "GS-6", "--ttl-seconds", "300",
+    const prepared = await runGuardMaintenanceWindowCli([
+      "prepare", "--repo-root", root, "--scope", "GS-6", "--ttl-seconds", "300", "--authorship-mode", "goldfish-dispatch",
       "--reason", "v3 default-authority ceremony", "--plan", "plan.md", "--spec", "spec.md",
     ]);
     assert.equal(prepared.ok, true);
@@ -1025,18 +1025,18 @@ try {
 
     // NO --authority: exercises the CLI's default-authority branch reading the
     // v3-shaped project/critical-human-proof.json this repository fixture committed.
-    const installed = runGuardMaintenanceWindowCli([
+    const installed = await runGuardMaintenanceWindowCli([
       "install", "--repo-root", root, "--request", requestPath, "--proof", proofPath,
     ]);
     assert.equal(installed.ok, true);
     assert.equal(installed.value.status, "active", "install's own return value must read back active, not absent, under a v3-only committed policy");
 
-    const status = runGuardMaintenanceWindowCli(["status", "--repo-root", root]);
+    const status = await runGuardMaintenanceWindowCli(["status", "--repo-root", root]);
     assert.equal(status.value.status, "active");
     assert.equal(closeGuardMaintenanceWindow({ rootDir: root }).status, "closed");
   });
 
-  check("GMW32 installGuardMaintenanceWindow's defense-in-depth check refuses a caller-supplied empty trustPolicy array even when the repository's OWN committed policy is populated -- proving the check trusts no caller's shape, not only the CLI's own resolution path", () => {
+  await check("GMW32 installGuardMaintenanceWindow's defense-in-depth check refuses a caller-supplied empty trustPolicy array even when the repository's OWN committed policy is populated -- proving the check trusts no caller's shape, not only the CLI's own resolution path", () => {
     // Distinct from GMW28: GMW28's fixture carries an empty v3 set on disk too, so it
     // exercises the resolution-site fix. This fixture uses the suite's DEFAULT (populated
     // legacy trustAnchor) policy, and the caller still hands `trustPolicy: []` directly --
@@ -1045,7 +1045,7 @@ try {
     const root = repoFixture("gmw-empty-anchor-defense-");
     const plugin = pluginRootFixture();
     const { planSha256, specSha256 } = planSpecShas(root);
-    const { intent, request } = prepareGuardMaintenanceWindowRequest({
+    const { intent, request } = prepareGuardMaintenanceWindowRequest({ authorshipMode: "goldfish-dispatch",
       rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 300, reason: "defense in depth, empty caller-supplied trustPolicy", featureId: "f",
       planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
     });
@@ -1078,11 +1078,11 @@ try {
     return plugin;
   }
 
-  check("GMW33 install now tolerates a new commit landing between prepare and install, PROVIDED its only changed file is inside the window's own already-signed GS-6 scope", () => {
+  await check("GMW33 install now tolerates a new commit landing between prepare and install, PROVIDED its only changed file is inside the window's own already-signed GS-6 scope", () => {
     const root = repoFixture("gmw-tolerate-commit-");
     const plugin = nestedPluginFixture(root);
     const { planSha256, specSha256 } = planSpecShas(root);
-    const { intent, request } = prepareGuardMaintenanceWindowRequest({
+    const { intent, request } = prepareGuardMaintenanceWindowRequest({ authorshipMode: "goldfish-dispatch",
       rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 300, reason: "in-scope commit must not void the signature", featureId: "f",
       planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
     });
@@ -1103,11 +1103,11 @@ try {
     assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "active");
   });
 
-  check("GMW34 install still refuses an intervening commit that ALSO touches a file OUTSIDE the window's own scope -- the tolerance must not weaken this", () => {
+  await check("GMW34 install still refuses an intervening commit that ALSO touches a file OUTSIDE the window's own scope -- the tolerance must not weaken this", () => {
     const root = repoFixture("gmw-outofscope-commit-");
     const plugin = nestedPluginFixture(root);
     const { planSha256, specSha256 } = planSpecShas(root);
-    const { intent, request } = prepareGuardMaintenanceWindowRequest({
+    const { intent, request } = prepareGuardMaintenanceWindowRequest({ authorshipMode: "goldfish-dispatch",
       rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 300, reason: "mixed-scope commit must still refuse", featureId: "f",
       planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
     });
@@ -1127,11 +1127,11 @@ try {
     assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "absent", "a refused install must leave no window record behind");
   });
 
-  check("GMW35 install refuses when a MERGE commit lands between prepare and install, even when every file it touches is inside scope -- fails closed rather than trusting a multi-parent commit", () => {
+  await check("GMW35 install refuses when a MERGE commit lands between prepare and install, even when every file it touches is inside scope -- fails closed rather than trusting a multi-parent commit", () => {
     const root = repoFixture("gmw-merge-commit-");
     const plugin = nestedPluginFixture(root);
     const { planSha256, specSha256 } = planSpecShas(root);
-    const { intent, request } = prepareGuardMaintenanceWindowRequest({
+    const { intent, request } = prepareGuardMaintenanceWindowRequest({ authorshipMode: "goldfish-dispatch",
       rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 300, reason: "merge commit must still refuse", featureId: "f",
       planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
     });
@@ -1157,11 +1157,11 @@ try {
     assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "absent");
   });
 
-  check("GMW36 install refuses when the tolerance check's own git invocation fails, never admitting on an unusable range", () => {
+  await check("GMW36 install refuses when the tolerance check's own git invocation fails, never admitting on an unusable range", () => {
     const root = repoFixture("gmw-tolerance-git-fail-");
     const plugin = nestedPluginFixture(root);
     const { planSha256, specSha256 } = planSpecShas(root);
-    const { intent, request } = prepareGuardMaintenanceWindowRequest({
+    const { intent, request } = prepareGuardMaintenanceWindowRequest({ authorshipMode: "goldfish-dispatch",
       rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 300, reason: "tolerance check git failure", featureId: "f",
       planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
     });
@@ -1185,11 +1185,11 @@ try {
     assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "absent");
   });
 
-  check("GMW37 install refuses an intervening commit that RENAMES a file within scope -- fails closed rather than trusting rename detection, even though both halves are individually in-scope", () => {
+  await check("GMW37 install refuses an intervening commit that RENAMES a file within scope -- fails closed rather than trusting rename detection, even though both halves are individually in-scope", () => {
     const root = repoFixture("gmw-rename-commit-");
     const plugin = nestedPluginFixture(root);
     const { planSha256, specSha256 } = planSpecShas(root);
-    const { intent, request } = prepareGuardMaintenanceWindowRequest({
+    const { intent, request } = prepareGuardMaintenanceWindowRequest({ authorshipMode: "goldfish-dispatch",
       rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 300, reason: "rename must still refuse", featureId: "f",
       planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
     });
@@ -1209,7 +1209,7 @@ try {
     assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "absent");
   });
 
-  check("GMW38 install tolerates an intervening commit whose only changed file matches the window's own signed TP-* scope, reusing guard-testpath.mjs's own protectedTestPaths config rather than a new mapping", () => {
+  await check("GMW38 install tolerates an intervening commit whose only changed file matches the window's own signed TP-* scope, reusing guard-testpath.mjs's own protectedTestPaths config rather than a new mapping", () => {
     const root = repoFixture("gmw-tolerate-tp-commit-");
     mkdirSync(join(root, ".claude"), { recursive: true });
     writeFileSync(
@@ -1223,7 +1223,7 @@ try {
     // window's scope, so this fixture proves the TP-9 path alone carries the tolerance.
     const plugin = pluginRootFixture();
     const { planSha256, specSha256 } = planSpecShas(root);
-    const { intent, request } = prepareGuardMaintenanceWindowRequest({
+    const { intent, request } = prepareGuardMaintenanceWindowRequest({ authorshipMode: "goldfish-dispatch",
       rootDir: root, scopeRuleIds: ["TP-9"], ttlSeconds: 300, reason: "in-scope TP-9 commit must not void the signature", featureId: "f",
       planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
     });
@@ -1245,11 +1245,11 @@ try {
   // livePluginRoot nested inside the repository), but targets a REAL kernel path
   // (plugins/pipeline-core/hooks/hooks.json) instead of the ordinary guard-example.mjs
   // GMW33 uses -- pre-fix, this tolerated (wrongly); post-fix, it must still refuse.
-  check("GMW39 (F1) a GS-6-scoped window still refuses an intervening commit that touches a NEVER_LIFTABLE_KERNEL_PATHS file, even though it sits physically inside the window's own signed livePluginRoot", () => {
+  await check("GMW39 (F1) a GS-6-scoped window still refuses an intervening commit that touches a NEVER_LIFTABLE_KERNEL_PATHS file, even though it sits physically inside the window's own signed livePluginRoot", () => {
     const root = repoFixture("gmw-kernel-in-gs6-scope-");
     const plugin = nestedPluginFixture(root);
     const { planSha256, specSha256 } = planSpecShas(root);
-    const { intent, request } = prepareGuardMaintenanceWindowRequest({
+    const { intent, request } = prepareGuardMaintenanceWindowRequest({ authorshipMode: "goldfish-dispatch",
       rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 300, reason: "kernel path must never be tolerated even under GS-6", featureId: "f",
       planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
     });
@@ -1271,7 +1271,7 @@ try {
     assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "absent", "a refused install must leave no window record behind");
   });
 
-  check("GMW40 (F1) a TP-* scoped window whose own pattern happens to match a kernel path (mirroring this repository's own TP-4 on hooks/hooks.json) still refuses a commit touching that kernel path", () => {
+  await check("GMW40 (F1) a TP-* scoped window whose own pattern happens to match a kernel path (mirroring this repository's own TP-4 on hooks/hooks.json) still refuses a commit touching that kernel path", () => {
     const root = repoFixture("gmw-kernel-in-tp-scope-");
     mkdirSync(join(root, ".claude"), { recursive: true });
     writeFileSync(
@@ -1283,7 +1283,7 @@ try {
     const plugin = nestedPluginFixture(root);
 
     const { planSha256, specSha256 } = planSpecShas(root);
-    const { intent, request } = prepareGuardMaintenanceWindowRequest({
+    const { intent, request } = prepareGuardMaintenanceWindowRequest({ authorshipMode: "goldfish-dispatch",
       rootDir: root, scopeRuleIds: ["TP-9"], ttlSeconds: 300, reason: "TP pattern overlapping a kernel path must never tolerate it", featureId: "f",
       planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
     });
@@ -1305,7 +1305,7 @@ try {
   // one FROZEN at prepare time, never a fresh read of the live, mutable guard-config.json
   // -- an intervening edit (here, a widened pattern, left uncommitted exactly like the
   // finding's own attack description) must not broaden what a signed TP-<n> id means.
-  check("GMW41 (F2) a live guard-config.json pattern WIDENED after prepare, before install, does not broaden the tolerance check -- the frozen prepare-time pattern still governs", () => {
+  await check("GMW41 (F2) a live guard-config.json pattern WIDENED after prepare, before install, does not broaden the tolerance check -- the frozen prepare-time pattern still governs", () => {
     const root = repoFixture("gmw-tp-frozen-widen-");
     mkdirSync(join(root, ".claude"), { recursive: true });
     writeFileSync(
@@ -1317,7 +1317,7 @@ try {
 
     const plugin = pluginRootFixture();
     const { planSha256, specSha256 } = planSpecShas(root);
-    const { intent, request } = prepareGuardMaintenanceWindowRequest({
+    const { intent, request } = prepareGuardMaintenanceWindowRequest({ authorshipMode: "goldfish-dispatch",
       rootDir: root, scopeRuleIds: ["TP-9"], ttlSeconds: 300, reason: "frozen TP pattern must not follow a live widen", featureId: "f",
       planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
     });
@@ -1344,7 +1344,7 @@ try {
     assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "absent", "a refused install must leave no window record behind");
   });
 
-  check("GMW42 (F2 regression guard) an UNMUTATED guard-config.json (identical TP pattern at prepare and install) still tolerates a commit that matches it -- the frozen-pattern fix must not break the ordinary case", () => {
+  await check("GMW42 (F2 regression guard) an UNMUTATED guard-config.json (identical TP pattern at prepare and install) still tolerates a commit that matches it -- the frozen-pattern fix must not break the ordinary case", () => {
     const root = repoFixture("gmw-tp-frozen-unmutated-");
     mkdirSync(join(root, ".claude"), { recursive: true });
     writeFileSync(
@@ -1356,7 +1356,7 @@ try {
 
     const plugin = pluginRootFixture();
     const { planSha256, specSha256 } = planSpecShas(root);
-    const { intent, request } = prepareGuardMaintenanceWindowRequest({
+    const { intent, request } = prepareGuardMaintenanceWindowRequest({ authorshipMode: "goldfish-dispatch",
       rootDir: root, scopeRuleIds: ["TP-9"], ttlSeconds: 300, reason: "unmutated config, still tolerated", featureId: "f",
       planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
     });
@@ -1377,11 +1377,11 @@ try {
   // sha itself (backlog: "the signing ceremony is designed for the verifier, not the
   // signer", finding 1). Purely a disclosure/text check -- GMW-CANDIDATE-COMMIT-MISMATCH's
   // enforcement logic and the GMWFIX-4 commit-tolerance behavior are unchanged.
-  check("GMW43 (NVA-SIGDISCLOSE-1 F1) the confirmation summary states the commit-invalidation condition next to the candidate commit line", () => {
+  await check("GMW43 (NVA-SIGDISCLOSE-1 F1) the confirmation summary states the commit-invalidation condition next to the candidate commit line", () => {
     const root = repoFixture("gmw-describe-disclose-");
     const plugin = pluginRootFixture();
     const { planSha256, specSha256 } = planSpecShas(root);
-    const { intent } = prepareGuardMaintenanceWindowRequest({
+    const { intent } = prepareGuardMaintenanceWindowRequest({ authorshipMode: "goldfish-dispatch",
       rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 600, reason: "F1 disclosure check", featureId: "f",
       planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
     });
@@ -1396,7 +1396,7 @@ try {
     assert.ok(described.lines.length <= gmw.GMW_SUMMARY_MAX_LINES, "the new line must stay within the stated bound");
   });
 
-  check("GMW15 prepare rejects authorshipMode \"elephant-direct\" with a missing/malformed stage0Selfcheck", () => {
+  await check("GMW15 prepare rejects authorshipMode \"elephant-direct\" with a missing/malformed stage0Selfcheck", () => {
     const root = repoFixture("gmw-stage0-shape-");
     const plugin = pluginRootFixture();
     const { planSha256, specSha256 } = planSpecShas(root);
@@ -1418,7 +1418,7 @@ try {
     }
   });
 
-  check("GMW16 prepare rejects authorshipMode \"elephant-direct\" whose declared diff does not qualify for EL-01 stage-0 (the actual gate DoD demonstration)", () => {
+  await check("GMW16 prepare rejects authorshipMode \"elephant-direct\" whose declared diff does not qualify for EL-01 stage-0 (the actual gate DoD demonstration)", () => {
     const root = repoFixture("gmw-stage0-not-qualified-");
     const plugin = pluginRootFixture();
     const { planSha256, specSha256 } = planSpecShas(root);
@@ -1440,7 +1440,7 @@ try {
     assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "absent", "a refused prepare() must leave no request/window trace of an unqualified elephant-direct claim");
   });
 
-  check("GMW17 prepare+install accept authorshipMode \"elephant-direct\" whose declared diff DOES qualify for EL-01 stage-0, and the declaration survives into the active window's status", () => {
+  await check("GMW17 prepare+install accept authorshipMode \"elephant-direct\" whose declared diff DOES qualify for EL-01 stage-0, and the declaration survives into the active window's status", () => {
     const root = repoFixture("gmw-stage0-qualified-");
     const plugin = pluginRootFixture();
     const { planSha256, specSha256 } = planSpecShas(root);
@@ -1458,7 +1458,7 @@ try {
     assert.deepEqual(installed.stage0Selfcheck, stage0Selfcheck);
   });
 
-  check("GMW18 install independently re-verifies the stage-0 declaration (F3 defense in depth): a hand-built request cannot bypass prepare()'s check", () => {
+  await check("GMW18 install independently re-verifies the stage-0 declaration (F3 defense in depth): a hand-built request cannot bypass prepare()'s check", () => {
     const root = repoFixture("gmw-install-stage0-");
     const plugin = pluginRootFixture();
 
@@ -1487,7 +1487,7 @@ try {
     assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "absent", "neither refused install must leave a window record behind");
   });
 
-  check("GMW19 authorshipMode \"goldfish-dispatch\" never requires (or carries) a stage0Selfcheck", () => {
+  await check("GMW19 authorshipMode \"goldfish-dispatch\" never requires (or carries) a stage0Selfcheck", () => {
     const root = repoFixture("gmw-goldfish-mode-");
     const plugin = pluginRootFixture();
     const { planSha256, specSha256 } = planSpecShas(root);
@@ -1508,7 +1508,7 @@ try {
   // an empty/invalid value) must still read as active -- only NEWLY created windows
   // (via prepare()/install()) get full mandatory validation; see
   // validStoredStage0Declaration()'s doc comment for the rationale.
-  check("GMW20 a legacy stored window record with authorshipMode entirely absent (pre-existing field) still reads as active, not absent", () => {
+  await check("GMW20 a legacy stored window record with authorshipMode entirely absent (pre-existing field) still reads as active, not absent", () => {
     const root = repoFixture("gmw-legacy-record-");
     const plugin = pluginRootFixture();
     const { planSha256, specSha256 } = planSpecShas(root);
@@ -1533,7 +1533,7 @@ try {
     assert.equal(status.status, "active", "a legacy record missing authorshipMode entirely must still be honored as active");
   });
 
-  check("GMW21 a stored window record that DOES carry an authorshipMode key, but an invalid/unrecognised one, is still rejected as absent (backcompat is for absence only, not for tampering)", () => {
+  await check("GMW21 a stored window record that DOES carry an authorshipMode key, but an invalid/unrecognised one, is still rejected as absent (backcompat is for absence only, not for tampering)", () => {
     const root = repoFixture("gmw-tampered-mode-");
     const plugin = pluginRootFixture();
     const { planSha256, specSha256 } = planSpecShas(root);
@@ -1559,7 +1559,7 @@ try {
     }
   });
 
-  check("GMW22 validStoredStage0Declaration: unit-level split between a genuinely absent field (legacy, valid) and a present-but-invalid one (rejected)", () => {
+  await check("GMW22 validStoredStage0Declaration: unit-level split between a genuinely absent field (legacy, valid) and a present-but-invalid one (rejected)", () => {
     const { validStoredStage0Declaration } = guardMaintenanceWindowInternals;
     assert.equal(validStoredStage0Declaration(undefined, undefined), true, "absent authorshipMode is legacy-valid");
     assert.equal(validStoredStage0Declaration(undefined, { filesChanged: 1, diffLines: 1, touchesTestFile: false }), true, "absent authorshipMode is legacy-valid regardless of any stray stage0Selfcheck");

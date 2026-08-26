@@ -21,6 +21,14 @@
 # source tree, not a path relative to `--source`) -- verified by testing a strict
 # `^backlog/transitions\.ndjson$` anchor, which never matched, against the working
 # `.*backlog/transitions\.ndjson$` form used below.
+#
+# VFX3-SECURITY, 2026-08-26: the Nova/Phoenix merge introduced a second hash-chained ledger,
+# `backlog/transitions-phoenix-history.ndjson` (the Phoenix-side history carried across the
+# merge; same schema, same bare-hex `entryHash`/`previousHash`/`referenceSha256`/
+# `supersedesEntryHash` shape that trips these two rules). The original single-path allowlist
+# below did not cover it, so its lines surfaced as 39 unignored `sentry-access-token` findings.
+# Extended to both ledger files rather than filed as 39 individual .gitleaksignore entries --
+# consistent with why this file exists at all (see header).
 
 [extend]
 useDefault = true
@@ -29,10 +37,10 @@ useDefault = true
 id = "sentry-access-token"
 
 [[rules.allowlists]]
-paths = ['''.*backlog/transitions\.ndjson$''']
+paths = ['''.*backlog/transitions\.ndjson$''', '''.*backlog/transitions-phoenix-history\.ndjson$''']
 
 [[rules]]
 id = "generic-api-key"
 
 [[rules.allowlists]]
-paths = ['''.*backlog/transitions\.ndjson$''']
+paths = ['''.*backlog/transitions\.ndjson$''', '''.*backlog/transitions-phoenix-history\.ndjson$''']

@@ -46,9 +46,26 @@ export const TEST_TMP_BUDGET_SCHEMA = "pipeline.test-tmp-budget-measurement.v1";
  * suite within a day or two of unattended test runs. Like
  * `BOOTSTRAP_PAYLOAD_MAX_BYTES`, THE single owner of these numbers is this
  * module -- raise them here, on an explicit PO decision, not at a call site.
+ *
+ * ENTRIES BOUND REVISED 2026-08-26 (VFX3-TMPDIR, sprint_phoenix merge into
+ * feat/sprint-nova-codex-v046): this module existed only on the Nova side
+ * pre-merge, so 40,000 was calibrated to Nova's own corpus alone. Measured
+ * usage right after the merge landed was 68,488 entries / ~51.6 MB (well
+ * under the byte bound) -- both branches' crash-simulation fixture suites
+ * (`onboarding-continuity.test.mjs` and others, none of which clean up their
+ * `mkdtempTestScratch()` output by design; see `test-tmpdir.mjs`) now share
+ * one `scratch/test-tmp/` accumulation point across repeated verify runs.
+ * Raised to 150,000 -- still an order of magnitude below the historical
+ * 1,048,576-inode incident, with headroom over the measured post-merge
+ * figure for continued accumulation across a verify-fixing session. Bytes
+ * left untouched: 51.6 MB is nowhere near the existing 500 MiB bound. This
+ * remains a canary for runaway growth, not a structural corpus-size fact --
+ * periodic bulk cleanup (`git clean -fdx -- scratch/test-tmp/`, an
+ * operator/Elephant action, not a Goldfish one) is the actual maintenance
+ * step; raising the bound only buys headroom, it does not stop the growth.
  */
 export const TEST_TMP_MAX_BYTES = 500 * 1024 * 1024; // 500 MiB
-export const TEST_TMP_MAX_ENTRIES = 40_000; // files + directories, combined
+export const TEST_TMP_MAX_ENTRIES = 150_000; // files + directories, combined (was 40_000 pre-merge)
 
 function walk(root) {
   let bytes = 0;

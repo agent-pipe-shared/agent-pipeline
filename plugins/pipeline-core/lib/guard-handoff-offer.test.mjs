@@ -59,9 +59,17 @@ function verifiedAppend(sink) {
 // One case per external-operator route code recoveryRoute() can return, with a
 // leak canary in every tool input the event must never carry.
 const CANARY = "leak-canary-fixture-command.mjs";
+// ADR-0059 Decision 6 (cross-repository-target eligibility): an out-of-root
+// Edit/Write escape is only refused (and therefore only reaches the
+// external-operator route this suite exercises) when the escaped ABSOLUTE
+// target itself matches the same sensitive-path pattern every in-root path is
+// already held to (hardBoundaryPath()); an escape into an ordinary,
+// non-sensitive out-of-root location is legitimately eligible ("planned")
+// since that ADR landed, not refused. `../secrets/...` keeps this a genuine
+// HGO-EXTERNAL-PROJECT-BOUNDARY case under the current rule.
 const EXTERNAL_ROUTES = [
   ["HGO-EXTERNAL-SENSITIVE-INPUT", "Bash", { command: `node ${CANARY} --tok` + "en=fixture-not-a-secret" }],
-  ["HGO-EXTERNAL-PROJECT-BOUNDARY", "Write", { file_path: "../outside-canary.txt", content: CANARY }],
+  ["HGO-EXTERNAL-PROJECT-BOUNDARY", "Write", { file_path: "../secrets/outside-canary.txt", content: CANARY }],
   ["HGO-EXTERNAL-ADAPTER-BOUNDARY", "Read", { file_path: CANARY }],
 ];
 
@@ -289,7 +297,10 @@ test("the three non-external route statuses keep their exact current shape and j
       nowMs: NOW,
       appendCommandOffer: verifiedAppend(appended),
     });
-    assert.deepEqual(Object.keys(planned), ["status", "requestSha256"]);
+    // NVA-CROSSREPOGUIDANCE-1: `planned` now additionally carries `root` so a
+    // cross-repository-target denial's guidance can name the repository the
+    // request was actually bound to -- additive field, not a schema change.
+    assert.deepEqual(Object.keys(planned), ["status", "requestSha256", "root"]);
     assert.equal(planned.status, "planned");
 
     const authorRepair = recordHumanGuardDenial({
@@ -301,7 +312,7 @@ test("the three non-external route statuses keep their exact current shape and j
       nowMs: NOW,
       appendCommandOffer: verifiedAppend(appended),
     });
-    assert.deepEqual(Object.keys(authorRepair), ["status", "requestSha256", "candidateSourceRoot"]);
+    assert.deepEqual(Object.keys(authorRepair), ["status", "requestSha256", "root", "candidateSourceRoot"]);
     assert.equal(authorRepair.status, "author-repair-required");
 
     assert.deepEqual(appended, []);
@@ -329,11 +340,14 @@ test("R-AC-08: the production writer appends to its own journal file without rew
     assert.deepEqual(validateCommandOfferEvent(event), event);
     assert.equal(event.state, "offered");
 
+    // Same ADR-0059 Decision 6 rule as EXTERNAL_ROUTES above: only an escape
+    // whose absolute target itself matches the sensitive-path pattern is
+    // refused into the external-operator route this test exercises.
     const second = recordHumanGuardDenial({
       rootDir: root,
       pluginRoot: PLUGIN_ROOT,
       toolName: "Write",
-      toolInput: { file_path: "../outside-canary.txt", content: CANARY },
+      toolInput: { file_path: "../secrets/outside-canary.txt", content: CANARY },
       denials: denial,
       nowMs: NOW + 1000,
     });

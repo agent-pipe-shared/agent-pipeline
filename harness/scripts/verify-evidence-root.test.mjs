@@ -40,7 +40,7 @@
  */
 import assert from "node:assert/strict";
 import test from "node:test";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -101,6 +101,16 @@ test(
       // Belt-and-suspenders dirtiness signal, explicit and independent of the copy above.
       writeFileSync(join(worktreeDir, ".verify-evidence-root-test-dirty-marker"), "dirty\n");
 
+      // Snapshot the invoking worktree's `evidence/` dir BEFORE running verify.mjs, not just
+      // assert non-existence: a handful of root `evidence/dispatch-record-*.json` files got
+      // `git add -f`'d in history despite the ANCHORED `/evidence/` .gitignore rule (see
+      // .gitignore's "Already-tracked files stayed visible..." comment next to that rule), so a
+      // fixture checked out at a commit carrying that mistake legitimately has a pre-existing,
+      // tracked `evidence/` directory here -- through no fault of verify.mjs. The protective
+      // intent of this test is untouched: verify.mjs itself must add nothing to it.
+      const worktreeEvidenceDir = join(worktreeDir, "evidence");
+      const evidenceEntriesBefore = existsSync(worktreeEvidenceDir) ? readdirSync(worktreeEvidenceDir).sort() : null;
+
       const run = spawnSync(process.execPath, [join(worktreeDir, "harness", "scripts", "verify.mjs")], {
         cwd: worktreeDir,
         encoding: "utf8",
@@ -116,7 +126,12 @@ test(
       assert.match(run.stderr || "", /VERIFY-CANDIDATE-PREFLIGHT/, "must take the dirty-candidate preflight branch, not run any suite");
 
       // Evidence write LOCATION: must land at the PRIMARY root, never inside the invoking worktree.
-      assert.equal(existsSync(join(worktreeDir, "evidence")), false, "must not create an evidence/ directory inside the invoking worktree");
+      const evidenceEntriesAfter = existsSync(worktreeEvidenceDir) ? readdirSync(worktreeEvidenceDir).sort() : null;
+      assert.deepEqual(
+        evidenceEntriesAfter,
+        evidenceEntriesBefore,
+        "must not write any new file into the invoking worktree's evidence/ directory (verify.mjs may only leave pre-existing tracked content, if any, untouched)",
+      );
       assert.ok(existsSync(realEvidencePath), "must write evidence/verify-latest.json at the primary worktree root");
       const escapedPath = realEvidencePath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       assert.match(run.stdout || "", new RegExp(`Evidence written: ${escapedPath}`), "must log the primary evidence path");
