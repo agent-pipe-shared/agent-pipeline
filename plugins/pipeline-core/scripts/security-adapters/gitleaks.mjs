@@ -22,8 +22,10 @@
  * MODULE's own on-disk location (see `GITLEAKS_CONFIG_PATH` below), never from `rootDir` -- that
  * file `[extend]`s gitleaks' full built-in ruleset (`useDefault = true`) and adds a narrow,
  * path-scoped allowlist that disables ONLY `sentry-access-token`/`generic-api-key` for
- * `backlog/transitions.ndjson` (the hash-chained ledger's bare-hex-digest false positives --
- * backlog/2026-08-08-the-hash-chained-ledger-collides-permanently-with-the-secret-scanner.md);
+ * `backlog/transitions.ndjson` and `backlog/transitions-phoenix-history.ndjson` (both hash-chained
+ * ledgers' bare-hex-digest false positives --
+ * backlog/2026-08-08-the-hash-chained-ledger-collides-permanently-with-the-secret-scanner.md;
+ * second path added by the Nova/Phoenix merge, VFX3-SECURITY 2026-08-26);
  * every rule stays fully armed, unchanged, everywhere else. `--no-git` makes gitleaks "treat git repo as a regular directory
  * and scan those files" (its own --help wording): a pure filesystem content scan of <root> with
  * ZERO git object/ref/history traversal. This is the architecturally correct scope, not a
@@ -79,6 +81,7 @@ const MAX_IGNORE_BYTES = 256 * 1024;
 
 // Fixed, repo-relative gitleaks rule config (PHX-WP-GITLEAKS-RULE-SCOPE): a per-path allowlist
 // that disables ONLY `sentry-access-token`/`generic-api-key` for `backlog/transitions.ndjson`
+// and `backlog/transitions-phoenix-history.ndjson`
 // (see the config file's own header for the full rationale). Resolved from THIS module's own
 // on-disk location (`import.meta.url`), never from `rootDir` -- `rootDir` is a detached
 // candidate-tree snapshot of the commit under scan (see INVOCATION/--source note above), and the
@@ -416,7 +419,7 @@ export const CAPABILITY_CONTRACT_V2 = Object.freeze({
   }),
   confidenceNormalization: null,
   coverageLimitations: Object.freeze([
-    "A fixed `--config <repo-root>/.gitleaks.toml` is always passed to `detect` (PHX-WP-GITLEAKS-RULE-SCOPE), resolved from this adapter module's own on-disk location, never from rootDir (the candidate tree must never supply its own scanner-config override). That config extends gitleaks' full built-in default ruleset (`useDefault = true`) unchanged and adds exactly one narrow, path-scoped allowlist: `sentry-access-token` and `generic-api-key` are disabled ONLY for `backlog/transitions.ndjson` (the hash-chained ledger's bare-64-hex-digest false positives); every other rule, and this rule pair on every other path, remains fully armed and unmodified.",
+    "A fixed `--config <repo-root>/.gitleaks.toml` is always passed to `detect` (PHX-WP-GITLEAKS-RULE-SCOPE), resolved from this adapter module's own on-disk location, never from rootDir (the candidate tree must never supply its own scanner-config override). That config extends gitleaks' full built-in default ruleset (`useDefault = true`) unchanged and adds exactly one narrow, path-scoped allowlist: `sentry-access-token` and `generic-api-key` are disabled ONLY for `backlog/transitions.ndjson` and `backlog/transitions-phoenix-history.ndjson` (both hash-chained ledgers' bare-64-hex-digest false positives; the second path was added by the Nova/Phoenix merge, VFX3-SECURITY 2026-08-26); every other rule, and this rule pair on every other path, remains fully armed and unmodified.",
     "`--no-git` is passed to `detect`, so the scan is a pure filesystem content scan of rootDir (gitleaks' own --help wording: \"treat git repo as a regular directory and scan those files\") with ZERO git object/ref/history traversal. rootDir is an immutable, identity-verified single-commit-tree snapshot (security-scan.mjs materializeCandidate, git-detached-worktree.v1), so this is the literal `candidate-tree` coverage the security-evidence schema claims. Historical / deleted-secret / cross-ancestry mining is deliberately NOT performed: it was never a documented capability of this adapter and, because a git worktree shares the main clone's `.git` object database, that default `detect` traversal was the source of cross-branch false positives (backlog 2026-07-25-security-scan-cross-branch-gitleaks-findings).",
     "Single-shot, full scan per invocation -- no --baseline-path or other incremental/diff mechanism; every run() call re-scans the entirety of rootDir from scratch.",
   ]),

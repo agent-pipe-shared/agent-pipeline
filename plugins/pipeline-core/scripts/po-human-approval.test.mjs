@@ -730,13 +730,17 @@ async function forkedRepositoryFixture() {
 }
 
 /** Declares the fixture's own throwaway key as the repository's trust anchor — the
- * store accepts no caller-supplied one, exactly as the library tests establish. */
+ * store accepts no caller-supplied one, exactly as the library tests establish.
+ * RW1-TRUSTANCHOR: v3 (`trustAnchors`, plural), the schema the repository actually
+ * ships, not the v1 legacy `trustAnchor` singular this fixture declared before — a v1
+ * fixture never exercised the resolution bug the singular-field read had under v3. */
 function declareTrustAnchor(repoRoot, authority) {
   mkdirSync(join(repoRoot, "project"), { recursive: true });
   writeFileSync(join(repoRoot, "project/critical-human-proof.json"), JSON.stringify({
-    schema: "pipeline.critical-human-proof-policy.v1",
+    schema: "pipeline.critical-human-proof-policy.v3",
     requiredKinds: ["governance-fork-disposition"],
-    trustAnchor: { keyReference: authority.keyReference, publicKeySha256: authority.publicKeySha256 },
+    waivedKinds: [],
+    trustAnchors: [{ keyReference: authority.keyReference, publicKeySha256: authority.publicKeySha256 }],
   }));
 }
 

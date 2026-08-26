@@ -1386,7 +1386,27 @@ export async function runForkDispositionApproval(argv = process.argv.slice(2), d
   }
   if (!exists(paths.authority) || !exists(paths.proof)) fail("run approve-fork-disposition before verifying");
   const policy = readCriticalHumanProofPolicy(repository);
-  if (!policy.ok || policy.trustAnchor === null) fail("project/critical-human-proof.json declares no usable trustAnchor, so the store can verify no external approval");
+  if (!policy.ok) fail("project/critical-human-proof.json declares no usable trustAnchor, so the store can verify no external approval");
+  // RW1-TRUSTANCHOR: this used to read the legacy SINGULAR `policy.trustAnchor` field
+  // only, which is permanently `null` once `critical-human-proof.json` carries the v3
+  // `trustAnchors` SET (critical-human-proof-policy.mjs) -- every v3 policy made this
+  // command fail closed regardless of what it actually declares. Mirrors the resolution
+  // `guard-maintenance-window.mjs` (NVA-GMWFIX-1/2) established for this exact class of
+  // ceremony: a NON-EMPTY v3 set wins; an absent OR EMPTY v3 set falls through to the
+  // legacy singular field; and, unlike the general "any well-formed key may sign"
+  // default posture `trustAnchorsFor`/push/deploy/release-preflight use for an absent
+  // set, fork-disposition deliberately does NOT adopt that posture here -- "the
+  // fork-disposition commands refuse every self-minting shortcut"
+  // (po-human-approval.test.mjs) requires an undeclared key to stay unverifiable, since
+  // this ceremony resolves conflicting governance-ledger content and must never become
+  // self-serviceable by an agent holding no PO key at all. `governance-event-store.mjs`'s
+  // `authorizeForkDisposition` -- the store's own write-time check this command predicts
+  // (see this function's doc comment) -- carries the identical fix for the identical
+  // reason.
+  const anchors = Array.isArray(policy.trustAnchors) && policy.trustAnchors.length > 0
+    ? policy.trustAnchors
+    : (policy.trustAnchor !== null ? [policy.trustAnchor] : []);
+  if (anchors.length === 0) fail("project/critical-human-proof.json declares no usable trustAnchor, so the store can verify no external approval");
   const intent = request?.approvalIntent?.value;
   if (intent?.featureId !== GOVERNANCE_FORK_DISPOSITION_APPROVAL.featureId
     || intent?.planSha256 !== GOVERNANCE_FORK_DISPOSITION_APPROVAL.planSha256
@@ -1394,7 +1414,11 @@ export async function runForkDispositionApproval(argv = process.argv.slice(2), d
     fail("the prepared request was not issued for the fork-disposition authority");
   }
   const proof = json(paths.proof);
-  const verified = verifyCriticalActionApprovalRequest({ request, trustPolicy: policy.trustAnchor, proof, expectedCandidate: subject.candidate, expectedAction: request.action });
+  let verified;
+  for (const trustPolicy of anchors) {
+    verified = verifyCriticalActionApprovalRequest({ request, trustPolicy, proof, expectedCandidate: subject.candidate, expectedAction: request.action });
+    if (verified.verified || verified.code !== "CRITICAL-ACTION-EXTERNAL-AUTHORITY-REQUIRED") break;
+  }
   if (!verified.verified) fail(`the fork disposition approval does not verify (${verified.code}${verified.cause ? `; ${verified.cause}` : ""})`);
   return {
     ok: true,

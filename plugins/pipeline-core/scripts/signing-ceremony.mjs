@@ -32,12 +32,16 @@
  * VFX4-SIGNING: `guard-maintenance-window.mjs`'s `prepare` now requires
  * `--authorship-mode <goldfish-dispatch|elephant-direct>` (PHX-WP-GMW-PREPARE-
  * AUTHORSHIP) and `install` now requires `--plan`/`--spec` unconditionally
- * (PHX-WP-GMW-LEDGER-EMISSION). This orchestrator has no stage-0 self-check
- * inputs of its own to offer, so it defaults `--authorship-mode` to
- * `"goldfish-dispatch"` (the mode that needs no stage-0 numbers) unless a caller
- * explicitly overrides it; `--plan`/`--spec` are now REQUIRED on this CLI too, so
- * the exact same paths are used for both the `prepare` digest and the `install`
- * ledger entry. Separately, `guard-maintenance-window.mjs`'s `run()` became
+ * (PHX-WP-GMW-LEDGER-EMISSION). `guard-maintenance-window.mjs` itself refuses an
+ * implicit authorship-mode default by contract (GMW-AUTHORSHIP-MODE-INVALID: "no
+ * implicit default" -- an Elephant-authored commit that never states its mode
+ * must never be waved through as if it had declared "goldfish-dispatch"), so this
+ * orchestrator does not paper over that refusal with a default of its own either:
+ * `--authorship-mode` is now REQUIRED on this CLI too, exactly like `--plan`/
+ * `--spec`, and is forwarded to `prepare` verbatim -- the caller states it, or the
+ * call fails closed via `parseSigningCeremonyArgs` before anything runs.
+ *
+ * Separately, `guard-maintenance-window.mjs`'s `run()` became
  * `async` in the same merge (the ledger append it now performs on `install`/
  * `close` is async) -- every call into it below is now awaited; calling an async
  * function without awaiting it returns a pending Promise with no `.value`
@@ -47,7 +51,8 @@
  * Usage:
  *   signing-ceremony.mjs maintenance-window --repo-root <path> --directory <external-dir> \
  *     --scope <ids> --ttl-seconds <n> --reason <text> --plan <repo-path> --spec <repo-path> \
- *     [--feature-id <id>] [--authorship-mode <goldfish-dispatch|elephant-direct>] \
+ *     --authorship-mode <goldfish-dispatch|elephant-direct> \
+ *     [--feature-id <id>] \
  *     [--files-changed <n> --diff-lines <n> --touches-test-file <true|false>] \
  *     [--authority <external-public-json>]
  */
@@ -59,14 +64,13 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { run as runGuardMaintenanceWindowCli } from "./guard-maintenance-window.mjs";
 import { runHumanApproval } from "./po-human-approval.mjs";
 
-const USAGE = "Usage: signing-ceremony.mjs maintenance-window --repo-root <path> --directory <external-dir> --scope <ids> --ttl-seconds <n> --reason <text> --plan <repo-path> --spec <repo-path> [--feature-id <id>] [--authorship-mode <goldfish-dispatch|elephant-direct>] [--files-changed <n> --diff-lines <n> --touches-test-file <true|false>] [--authority <external-public-json>]";
+const USAGE = "Usage: signing-ceremony.mjs maintenance-window --repo-root <path> --directory <external-dir> --scope <ids> --ttl-seconds <n> --reason <text> --plan <repo-path> --spec <repo-path> --authorship-mode <goldfish-dispatch|elephant-direct> [--feature-id <id>] [--files-changed <n> --diff-lines <n> --touches-test-file <true|false>] [--authority <external-public-json>]";
 
 const KNOWN_FLAGS = new Set([
   "repoRoot", "directory", "scope", "ttlSeconds", "reason", "featureId", "plan", "spec", "authority",
   "authorshipMode", "filesChanged", "diffLines", "touchesTestFile",
 ]);
-const REQUIRED_FLAGS = ["repoRoot", "directory", "scope", "ttlSeconds", "reason", "plan", "spec"];
-const DEFAULT_AUTHORSHIP_MODE = "goldfish-dispatch";
+const REQUIRED_FLAGS = ["repoRoot", "directory", "scope", "ttlSeconds", "reason", "plan", "spec", "authorshipMode"];
 
 /** Same shape/conventions as guard-maintenance-window.mjs's own parseArgs: `--flag value`
  * pairs only, unknown or duplicate flags fail closed to `null` (never a partial parse). */
@@ -116,7 +120,15 @@ export async function runSigningCeremony(argv = process.argv.slice(2), dependenc
   const runSign = dependencies.runHumanApproval ?? runHumanApproval;
 
   write("STEP 1/4 -- prepare: recording the maintenance-window request (unsigned).");
-  const authorshipMode = parsed.authorshipMode ?? DEFAULT_AUTHORSHIP_MODE;
+  // No implicit default here, matching guard-maintenance-window.mjs's own
+  // GMW-AUTHORSHIP-MODE-INVALID contract: `authorshipMode` is a REQUIRED_FLAG
+  // above, so `parsed.authorshipMode` is guaranteed a non-empty string by the time
+  // this line runs -- the caller stated it, or parseSigningCeremonyArgs already
+  // failed closed before STEP 1 ever started. Membership in the closed
+  // goldfish-dispatch/elephant-direct set is re-validated downstream by
+  // guard-maintenance-window.mjs's own assertStage0Declaration(), same as any
+  // other pass-through flag this CLI does not itself validate.
+  const authorshipMode = parsed.authorshipMode;
   const prepareArgv = [
     "prepare", "--repo-root", parsed.repoRoot, "--scope", parsed.scope,
     "--ttl-seconds", parsed.ttlSeconds, "--reason", parsed.reason,

@@ -143,6 +143,7 @@ test("maintenance-window ceremony runs prepare, present+sign, install, verify en
       "--reason", "signing-ceremony orchestrator end-to-end test",
       "--plan", "plan.md",
       "--spec", "spec.md",
+      "--authorship-mode", "goldfish-dispatch",
     ],
     {
       write: (line) => narration.push(line),
@@ -200,6 +201,7 @@ test("maintenance-window ceremony aborts before install when the human declines 
         "--reason", "decline path",
         "--plan", "plan.md",
         "--spec", "spec.md",
+        "--authorship-mode", "goldfish-dispatch",
       ],
       {
         write: () => {},
@@ -250,6 +252,7 @@ test("maintenance-window ceremony surfaces GMW-CANDIDATE-COMMIT-MISMATCH plainly
         "--reason", "drift path",
         "--plan", "plan.md",
         "--spec", "spec.md",
+        "--authorship-mode", "goldfish-dispatch",
       ],
       {
         write: () => {},
@@ -266,16 +269,22 @@ test("maintenance-window ceremony surfaces GMW-CANDIDATE-COMMIT-MISMATCH plainly
 });
 
 test("parseSigningCeremonyArgs rejects a missing required flag, an unknown flag and a duplicate flag", () => {
-  assert.equal(parseSigningCeremonyArgs(["--repo-root", "/r", "--directory", "/d"]), null, "missing --scope/--ttl-seconds/--reason must fail closed");
+  assert.equal(parseSigningCeremonyArgs(["--repo-root", "/r", "--directory", "/d"]), null, "missing --scope/--ttl-seconds/--reason/--plan/--spec/--authorship-mode must fail closed");
+  // Both cases below supply every OTHER required flag (including --plan/--spec/
+  // --authorship-mode, PHX-WP-GMW-PREPARE-AUTHORSHIP/PHX-WP-GMW-LEDGER-EMISSION)
+  // so that null can only be explained by the unknown/duplicate flag itself --
+  // without this, both calls would already return null from the missing-required-
+  // flags check alone, and the assertion would pass even if the unknown-flag/
+  // duplicate-flag rejection logic were silently deleted.
   assert.equal(
-    parseSigningCeremonyArgs(["--repo-root", "/r", "--directory", "/d", "--scope", "GS-6", "--ttl-seconds", "60", "--reason", "r", "--bogus", "x"]),
+    parseSigningCeremonyArgs(["--repo-root", "/r", "--directory", "/d", "--scope", "GS-6", "--ttl-seconds", "60", "--reason", "r", "--plan", "plan.md", "--spec", "spec.md", "--authorship-mode", "goldfish-dispatch", "--bogus", "x"]),
     null,
-    "an unrecognised flag must fail closed",
+    "an unrecognised flag must fail closed even when every other required flag is present",
   );
   assert.equal(
-    parseSigningCeremonyArgs(["--repo-root", "/r", "--repo-root", "/other", "--directory", "/d", "--scope", "GS-6", "--ttl-seconds", "60", "--reason", "r"]),
+    parseSigningCeremonyArgs(["--repo-root", "/r", "--repo-root", "/other", "--directory", "/d", "--scope", "GS-6", "--ttl-seconds", "60", "--reason", "r", "--plan", "plan.md", "--spec", "spec.md", "--authorship-mode", "goldfish-dispatch"]),
     null,
-    "a duplicate flag must fail closed",
+    "a duplicate flag must fail closed even when every other required flag is present",
   );
 });
 

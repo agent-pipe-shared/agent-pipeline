@@ -40,6 +40,12 @@ e32f34c5aa03f2498844a7fa5d35be5b612c051b:harness/scripts/pipeline-state.test.mjs
 # a historical record only; see
 # specs/sprint-phoenix-epic/evidence/merge-0.5.2-what-fell-away.md for the
 # reconversion-to-content-v1 follow-up this requires.
+# Owner: PO. Review/expiry: 2026-09-26 (QG-06: a documented risk without a
+# due date is a finding, not a mitigation -- not urgent today, 0 live
+# gitleaks findings on these entries as of this note, but must not sit
+# undated indefinitely). At review: either the reconversion-to-content-v1
+# follow-up above has been done, or this note is re-dated with a fresh
+# justification -- no silent extension.
 2a31a3b2268edd0a8d9f93cb89d94717b9526ff8:specs/sprint-phoenix-epic/evidence/lifecycle/feature-package-phx-0a-r3-reconcile.json:generic-api-key:1
 6f4fe95ad267e0c35f34f6dbdb90379dcc1d2dc7:specs/sprint-phoenix-epic/evidence/lifecycle/feature-package-phx-0a-r3-reconcile.json:generic-api-key:1
 6f4fe95ad267e0c35f34f6dbdb90379dcc1d2dc7:harness/scripts/pipeline-state.test.mjs:generic-api-key:2080

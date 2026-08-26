@@ -142,13 +142,24 @@ test("descriptionMatches: significant-word overlap decides the fuzzy match, empt
   assert.equal(descriptionMatches("a b c", "Anything"), true); // no word reaches the 4-char floor
 });
 
-test("isOutOfCitationScope excludes ADRs, specs, backlog, and docs/state.md", () => {
-  assert.equal(isOutOfCitationScope("docs/adr/0001-example.md"), true);
+test("isOutOfCitationScope excludes specs, backlog, and docs/state.md, but NOT canonical ADRs", () => {
+  // docs/adr/ is the canonical source of live "Full articulation: ... §N" pointers
+  // (e.g. ADR-0009) and is deliberately IN scope -- only specs/backlog stay excluded
+  // as archival "quoting the defect" surfaces (RW1-CITATIONSCOPE).
+  assert.equal(isOutOfCitationScope("docs/adr/0001-example.md"), false);
   assert.equal(isOutOfCitationScope("specs/2026-01-01-topic/spec.md"), true);
   assert.equal(isOutOfCitationScope("backlog/items/example.md"), true);
   assert.equal(isOutOfCitationScope("docs/state.md"), true);
   assert.equal(isOutOfCitationScope("CLAUDE.md"), false);
   assert.equal(isOutOfCitationScope("roles/elephant.md"), false);
+});
+
+test("isOutOfCitationScope excludes ONLY the generated vendored ADR mirror, not its canonical docs/adr/ source", () => {
+  assert.equal(isOutOfCitationScope("plugins/pipeline-core/docs/adr/0056-push-approval-mode.md"), true);
+  assert.equal(isOutOfCitationScope("docs/adr/0056-push-approval-mode.md"), false);
+  // Sibling vendored directories are NOT ADR-exempt -- only the ADR mirror is.
+  assert.equal(isOutOfCitationScope("plugins/pipeline-core/roles/elephant.md"), false);
+  assert.equal(isOutOfCitationScope("plugins/pipeline-core/docs/push-release-flow.md"), false);
 });
 
 test("checkSectionCitations: hard-fails a nonexistent section and a nonexistent subsection", () => {
@@ -189,18 +200,35 @@ test("checkSectionCitations: a bare §N with no named anchor is out of detection
   assert.equal(result.warnings.length, 0);
 });
 
-test("checkSectionCitations: excluded classes (ADR/specs/backlog/state.md) are never scanned even when they carry stale citations", () => {
+test("checkSectionCitations: excluded classes (specs/backlog/state.md) are never scanned even when they carry stale citations", () => {
   const root = fixture({
-    "docs/adr/0099-example.md": "Historical: `operating-model.md` §2.4 used to be the Critic contract.",
     "docs/state.md": "Narrative: `OM §2.4` was the old citation, now fixed elsewhere.",
     "backlog/items/example.md": "Quoting the defect: `operating-model.md` §9.9.",
   });
   const result = checkSectionCitations(root, {
-    markdownPaths: ["docs/operating-model.md", "docs/adr/0099-example.md", "docs/state.md", "backlog/items/example.md"],
+    markdownPaths: ["docs/operating-model.md", "docs/state.md", "backlog/items/example.md"],
   });
   assert.equal(result.stats.markdownFiles, 1); // only docs/operating-model.md itself remains in scope
   assert.equal(result.stats.citationsChecked, 0);
   assert.equal(result.failures.length, 0);
+});
+
+test("checkSectionCitations: canonical docs/adr/ IS scanned and catches a genuinely stale citation; its generated mirror is excluded", () => {
+  const root = fixture({
+    // A real defect shape (ADR-0009 precedent): a live "Full articulation" pointer
+    // to a subsection that no longer exists must be caught in the canonical source.
+    "docs/adr/0099-example.md": "Full articulation: `operating-model.md` §9.9.",
+    // Same stale citation, vendored copy -- must stay exempt (byte-identical, would
+    // just duplicate the canonical finding under a second path).
+    "plugins/pipeline-core/docs/adr/0099-example.md": "Full articulation: `operating-model.md` §9.9.",
+  });
+  const result = checkSectionCitations(root, {
+    markdownPaths: ["docs/operating-model.md", "docs/adr/0099-example.md", "plugins/pipeline-core/docs/adr/0099-example.md"],
+  });
+  assert.equal(result.stats.markdownFiles, 2); // operating-model.md + the canonical ADR; mirror stays excluded
+  assert.equal(result.stats.citationsChecked, 1);
+  assert.equal(result.failures.length, 1);
+  assert.match(result.failures[0], /docs\/adr\/0099-example\.md:1 -> §9\.9: section does not exist/);
 });
 
 test("checkSectionCitations: absolute repo root and relative markdownPaths together resolve correctly (real harness contract)", () => {

@@ -28,12 +28,32 @@
  * A bare `§N` with no named anchor is out of scope by the same precedent.
  *
  * Scope excludes archival/quoting-the-defect surfaces, matching that same
- * precedent exactly: `docs/adr/**`, `specs/**`, `backlog/**` (ADRs, design
- * archives and backlog items legitimately quote a stale citation as a
- * described defect, not as a live cross-reference a reader would follow) plus
- * `docs/state.md` (the running decision journal, which narrates past defect
- * instances found elsewhere rather than carrying live cross-references
- * itself) and `AGENTS.md` (the sibling doc-contract check's own exclusion).
+ * precedent: `specs/**`, `backlog/**` (design archives and backlog items
+ * legitimately quote a stale citation as a described defect, not as a live
+ * cross-reference a reader would follow) plus `docs/state.md` (the running
+ * decision journal, which narrates past defect instances found elsewhere
+ * rather than carrying live cross-references itself) and `AGENTS.md` (the
+ * sibling doc-contract check's own exclusion).
+ *
+ * `docs/adr/**` is DELIBERATELY IN SCOPE (2026-08, Nova/Phoenix merge review
+ * rework, RW1-CITATIONSCOPE) — reversing an earlier blanket exclusion that
+ * treated every ADR as archival-only. ADRs carry live "Full articulation: ..."
+ * pointers a reader genuinely follows (e.g. ADR-0009's own "Full articulation:
+ * `docs/operating-model.md` §5.2, ..." sentence), not just historical quotes
+ * of past defects; a probe against the real corpus confirmed a genuinely
+ * broken `§5.2` citation in `docs/adr/0009-session-hygiene-lifecycle.md` that
+ * the old blanket exclusion hid. Only `plugins/pipeline-core/docs/adr/**` —
+ * the generated, byte-identical vendored mirror of the `UNIVERSAL_ADRS`
+ * subset (`generate-vendored-canon.mjs`) — stays excluded: scanning it too
+ * would just duplicate the same canonical-file finding under a second path;
+ * `generate-vendored-canon.test.mjs` already asserts the mirror is
+ * byte-identical to its canonical origin, so checking the canonical copy
+ * covers the mirror by construction. Before this rework, the exclusion ran
+ * the other way (`docs/adr/**` excluded, its mirror not), which meant the
+ * mirror was the ONLY copy scanned for the ~20 vendored ADRs and the other
+ * ~50+ non-vendored canonical ADRs were never checked by either copy — an
+ * unintended asymmetry, not a deliberate design (previously recorded only in
+ * a commit message body, QG-06).
  *
  * Deliberately NOT built here: Option 3 from the backlog item (backticked
  * `path:line` citation checking) — explicitly deferred, larger false-positive
@@ -47,7 +67,7 @@ import { enumerateTrackedMarkdown, stripFencedCode } from "./check-doc-contracts
 
 const OPERATING_MODEL_PATH = "docs/operating-model.md";
 const DE_REFERENCE_MARKER = "<!-- DE-REFERENCE-BELOW";
-const EXTRA_EXCLUDED_PREFIXES = ["docs/adr/", "specs/", "backlog/"];
+const EXTRA_EXCLUDED_PREFIXES = ["plugins/pipeline-core/docs/adr/", "specs/", "backlog/"];
 const EXTRA_EXCLUDED_PATHS = new Set(["docs/state.md"]);
 
 function defaultReadText(file) {

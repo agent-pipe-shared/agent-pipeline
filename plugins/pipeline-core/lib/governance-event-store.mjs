@@ -1142,19 +1142,35 @@ function authorizeForkDisposition(root, registry, streamId, disposition, fork, n
     });
   }
   const policy = readCriticalHumanProofPolicy(root);
-  if (!policy.ok || policy.trustAnchor === null) fail("GES-FORK-DISPOSITION-TRUST-ANCHOR", "project/critical-human-proof.json carries no usable trustAnchor, so no external approval can be verified.");
+  if (!policy.ok) fail("GES-FORK-DISPOSITION-TRUST-ANCHOR", "project/critical-human-proof.json carries no usable trustAnchor, so no external approval can be verified.");
+  // RW1-TRUSTANCHOR: mirrors the identical fix in `po-human-approval.mjs`'s
+  // `verify-fork-disposition` (this function's caller-side predictor, per that
+  // function's own doc comment) -- reading only the legacy singular `trustAnchor` made
+  // this fail closed for every v3 policy. Same NON-EMPTY-v3-set-wins /
+  // falls-through-to-legacy-singular / else-absent resolution as
+  // `guard-maintenance-window.mjs` (NVA-GMWFIX-1/2); deliberately no "any well-formed
+  // key" fallback for an absent set -- this ceremony must never become
+  // self-serviceable by an agent holding no PO key at all.
+  const anchors = Array.isArray(policy.trustAnchors) && policy.trustAnchors.length > 0
+    ? policy.trustAnchors
+    : (policy.trustAnchor !== null ? [policy.trustAnchor] : []);
+  if (anchors.length === 0) fail("GES-FORK-DISPOSITION-TRUST-ANCHOR", "project/critical-human-proof.json carries no usable trustAnchor, so no external approval can be verified.");
   const action = authorization.request.action;
   if (!isRecord(action) || action.kind !== FORK_DISPOSITION_ACTION_KIND || action.subjectSha256 !== subjectSha256) {
     fail("GES-FORK-DISPOSITION-APPROVAL-SUBJECT", "The approval does not bind this exact stream, sequence and set of conflicting content digests.");
   }
-  const verified = verifyCriticalActionApprovalRequest({
-    request: authorization.request,
-    trustPolicy: policy.trustAnchor,
-    proof: authorization.proof,
-    expectedCandidate: candidate,
-    expectedAction: action,
-    now,
-  });
+  let verified;
+  for (const trustPolicy of anchors) {
+    verified = verifyCriticalActionApprovalRequest({
+      request: authorization.request,
+      trustPolicy,
+      proof: authorization.proof,
+      expectedCandidate: candidate,
+      expectedAction: action,
+      now,
+    });
+    if (verified.verified || verified.code !== "CRITICAL-ACTION-EXTERNAL-AUTHORITY-REQUIRED") break;
+  }
   if (!verified.verified) fail("GES-FORK-DISPOSITION-APPROVAL-UNVERIFIED", `The fork disposition approval could not be verified (${verified.code}).`);
   // Pin the intent's own authority fields, exactly as `pipeline-state.mjs`
   // pins them for push: `verifyCriticalActionApprovalRequest` rebuilds the
