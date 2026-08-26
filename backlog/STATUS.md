@@ -22,8 +22,8 @@
 | pipeline.agents-are-judged-by-rules-no-artifact-ever-tells-them | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.agents-read-the-source-because-nothing-describes-the-interface | open | workflow-improvement | pipeline | 2026-08-09 | — |
 | pipeline.antigravity-hard-enforcement-layer-has-two-fail-open-paths | open | defect | pipeline | 2026-08-23 | — |
-| pipeline.antigravity-plugin-registration-points-one-level-above-the-plugin-root | open | defect | pipeline | 2026-08-23 | — |
-| pipeline.antigravity-sandbox-containment-push-escape-route-unclosed | open | defect | pipeline | 2026-08-23 | — |
+| pipeline.antigravity-plugin-registration-points-one-level-above-the-plugin-root | closed | defect | pipeline | 2026-08-23 | — |
+| pipeline.antigravity-sandbox-containment-push-escape-route-unclosed | closed | defect | pipeline | 2026-08-23 | — |
 | pipeline.approval-authority-setup-echoes-generic-values-not-supplied-ones | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.approve-push-rejects-any-fresh-post-setup1-authority-file | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.approved-not-implementing-is-a-silent-trap | closed | defect | pipeline | 2026-08-08 | — |
@@ -332,6 +332,6 @@
 
 ## Counts
 
-- open: 48
+- open: 46
 - in_progress: 3
-- closed: 273
+- closed: 275

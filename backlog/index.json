@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "bd91537f7e77896b4976c6a1c5de98994c1998f3d2bcf6c0563beea558729eef"
+    "transitionHead": "f17dde7b3a8708d0b652606a5854670c5cf7c69b0093357606755ec21f18f2d2"
   },
   "counts": {
-    "open": 48,
+    "open": 46,
     "in_progress": 3,
-    "closed": 273
+    "closed": 275
   },
   "items": [
     {
@@ -211,21 +211,29 @@
     },
     {
       "id": "pipeline.antigravity-plugin-registration-points-one-level-above-the-plugin-root",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-23",
       "source": "Delta Critic review D7 (specs/sprint-agy-runner/evidence/2026-08-23-delta-critic-review-agy-runner.md), escalated by post-review verification against the object database and working tree",
-      "deferred": true
+      "deferred": true,
+      "closedAt": "2026-08-26",
+      "closureRepository": "self",
+      "closureCommit": "2b6680edb65771858e46826013c63c98d717fe12",
+      "closureEvidence": "backlog/items/2026-08-23-antigravity-plugin-registration-points-one-level-above-the-plugin-root.md"
     },
     {
       "id": "pipeline.antigravity-sandbox-containment-push-escape-route-unclosed",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-23",
       "source": "AGY-FIX-PUSHGUARD dispatch (evidence/dispatch-record-AGY-FIX-PUSHGUARD.json) and v3-bootstrap-authority.mjs's own removal-comment for the `.git/hooks/pre-push` workaround it used to install; spec gap closed by AGY-FIX-SPECGAP (specs/sprint-agy-runner/spec.md sec.8.2)",
-      "deferred": true
+      "deferred": true,
+      "closedAt": "2026-08-26",
+      "closureRepository": "self",
+      "closureCommit": "2b6680edb65771858e46826013c63c98d717fe12",
+      "closureEvidence": "backlog/items/2026-08-23-antigravity-sandbox-containment-push-escape-route-unclosed.md"
     },
     {
       "id": "pipeline.approval-authority-setup-echoes-generic-values-not-supplied-ones",
