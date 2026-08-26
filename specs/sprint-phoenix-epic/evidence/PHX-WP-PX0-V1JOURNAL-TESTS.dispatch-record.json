@@ -1,0 +1,31 @@
+{
+  "taskId": "PHX-WP-PX0-V1JOURNAL-TESTS",
+  "model": "claude-sonnet-5",
+  "rulesetSha": "ce50d74d16fdbcd0b9f8b3b606297e88af3d2f139b3cd14b692f4ea15599b023",
+  "dispatcher": "goldfish-deep",
+  "outcome": "landed",
+  "report": "PHX-GMW-TP5-TESTS (2026-08-11, signed GMW window scope TP-3/TP-5) landed both AR06h and AR06i in harness/scripts/pipeline-state.test.mjs, per this record's own naming note (AR06h = v1-loads, AR06i = fails-closed contrast, sequenced after PHX-WP-PX0-CASOUTCOME's AR06g to avoid a name collision). AR06h reuses the AR06b/AR06f interrupted-apply pattern to get a genuine .v2 journal + on-disk 32-byte HMAC key, hand-rewrites it into the exact 8-key .v1 shape identified in the investigation log entry above, re-MACs it with the same key, and confirms recover completes forward to the postimage via the expiresAt:null sentinel. AR06i reuses the same setup but omits `receipt` (7 keys, matching neither .v1's 8 nor .v2's 9), confirming loadAuthorityRevisionJournal's exactObjectKeys check refuses it with AR-JOURNAL before anything downstream inspects the missing field. Full suite: 482/482 passed (473 baseline after AR06g + 9 new AR06h/AR06i cases), 0 regressed. Committed as 0d9f3690.",
+  "log": [
+    {
+      "phase": "bootstrap",
+      "toolUseCount": 3,
+      "note": "Briefing loaded. Scratchpad write blocked by GUARD-CROSS-REPO-MUTATION (session rooted to repo, not /tmp). Writing dispatch-record.json under specs/sprint-phoenix-epic/evidence/ following existing repo convention (e.g. PHX-VF-BACKLOG.dispatch-record.json)."
+    },
+    {
+      "phase": "investigation",
+      "toolUseCount": 9,
+      "note": "Read commit 43d42a23 diff (F2 fix). Confirmed exact .v1 8-key shape: [schema, intentSha256, planSha256, preStateSha256, postStateSha256, postStateBase64, receipt, mac] (no expiresAt); schema value 'pipeline.continuity-authority-revision-journal.v1'. Located existing AR06b/AR06f fixture pattern in harness/scripts/pipeline-state.test.mjs (interrupted-after-journal-publication via afterAuthorityRevisionJournal:()=>false, producing a genuine .v2 journal + 32-byte HMAC key on disk) as the established construction pattern to adapt: swap the persisted .v2 journal for a hand-rewritten, correctly re-MACed .v1-shaped one using the same on-disk key, then invoke -recover. Confirmed no encryption on the journal/key files (plain 0600 files), so this rewrite approach is viable.",
+      "planned_edit": "Add createHmac import; add two new test blocks (AR06g: v1-shaped journal loads via expiresAt:null sentinel and completes recovery; AR06h contrast: journal shaped like neither valid .v1 nor .v2 (missing receipt) still fails closed AR-JOURNAL)."
+    },
+    {
+      "phase": "edit-attempt",
+      "toolUseCount": 10,
+      "note": "First Edit call to harness/scripts/pipeline-state.test.mjs (adding createHmac to the node:crypto import) was BLOCKED by guard-testpath.mjs (Rule ID: TP-5). Guard message: 'guard-push and guard-push-v2 test suites gate the release/deploy push-enforcement hook (v1 severity-based + v2 policy-completeness checks), and pipeline-state test suite gates the deployApprovals state writer (E5/QG-04) -- no ad-hoc edits outside a briefed test-change task... Clearance: gates.push_approval is signature, so the in-session activation step is refused... Human override available (one use; audited)...'. Per briefing field 5 stop condition (guard refuses edit to pipeline-state.test.mjs as protected path TP-5), stopping immediately without attempting the offered override/workaround."
+    },
+    {
+      "phase": "landed",
+      "toolUseCount": "~60 (shared research phase covered (a)/(b)/(c) together under the PHX-GMW-TP5-TESTS dispatch)",
+      "note": "Signed GMW window (scope TP-3,TP-5) installed 2026-08-11 admitted the edit this time. Confirmed the exact journal/key on-disk paths already used by this file's own AR05e test (join(fx.dir, '.fake-git-common', 'agent-pipeline', 'continuity-authority-revision', 'journal'|'key')) and the readPrivateBootstrap mode requirement ((mode & 0o077) === 0) that a plain writeFileSync would violate without an explicit chmodSync(path, 0o600) afterward -- added that chmod step, which this record's earlier investigation entry did not yet flag. Added createHmac to the node:crypto import. Added AR06h immediately after AR06g (PHX-WP-PX0-CASOUTCOME, landed first in the same dispatch, occupying the AR06g name), then AR06i. node --test harness/scripts/pipeline-state.test.mjs -> 482/482 passed, 0 failed. Committed harness/scripts/pipeline-state.test.mjs alone as 0d9f3690 (commit message written to a file under .git/ rather than the session scratchpad, which GUARD-CROSS-REPO-MUTATION refuses as outside the physical project root; removed immediately after). No other file touched."
+    }
+  ]
+}

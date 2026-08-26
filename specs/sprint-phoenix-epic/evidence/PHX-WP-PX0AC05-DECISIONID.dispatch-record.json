@@ -1,0 +1,36 @@
+{
+  "taskId": "PHX-WP-PX0AC05-DECISIONID",
+  "model": "claude-opus-5",
+  "rulesetSha": "ce50d74d16fdbcd0b9f8b3b606297e88af3d2f139b3cd14b692f4ea15599b023",
+  "dispatcher": "elephant",
+  "outcome": "partial-stop-condition-commit-022718b0",
+  "log": [
+    {
+      "phase": "opening",
+      "toolUseCount": 3,
+      "note": "Dispatch record created before any code edit. Beginning orientation: reading context files."
+    },
+    {
+      "phase": "orientation",
+      "toolUseCount": 18,
+      "note": "Read authority-revision-proof.mjs, its test file, PX0-AC-05, Critic Finding 1, and pipeline-state.test.mjs AR04/AR05 blocks. Confirmed baseline green: pipeline-state.test.mjs 504/504, authority-revision-proof.test.mjs 2/2. Real-usage check: every existing decision.id fixture in the repo (\"decision-01\", \"phoenix-section-seven\") is slug-shaped and matches ID verbatim; chose candidate (a) -- reuse ID regex verbatim on decision.id."
+    },
+    {
+      "phase": "red",
+      "toolUseCount": 20,
+      "note": "Added 4 new node:test cases to authority-revision-proof.test.mjs (private path, whitespace/newline, length boundary, existing-legit-regression). RED run against unfixed code: specs/sprint-phoenix-epic/evidence/PHX-WP-PX0AC05-DECISIONID-unit-red.tap -- 3/6 fail exactly as expected (hostile decision.id NOT rejected; missing expected exception), exit 1."
+    },
+    {
+      "phase": "fix",
+      "toolUseCount": 41,
+      "note": "authority-revision-proof.mjs:19 -- added !ID.test(decision.id) to the existing validation clause (candidate (a): reuse ID verbatim, matching sibling featureId/idempotencyKey). GREEN: unit-green.tap 6/6 pass."
+    },
+    {
+      "phase": "blocked-scope-item",
+      "toolUseCount": 45,
+      "note": "guard-testpath (TP-5) BLOCKED the Edit to harness/scripts/pipeline-state.test.mjs (the one briefed end-to-end AR05 case) -- unconditional technical block, no task-type exception; only escape is an audited human-guard-override with an external Ed25519 signature (this repo is in signature mode), which this Goldfish cannot produce and must not attempt to route around. Stop condition triggered: 'guard refusal you cannot resolve within the Forbidden-list boundaries' / 'task requires a secret/credential value'. Confirmed no regression instead: pipeline-state.test.mjs (unchanged) still 504/504 against the FIXED module -- pipelinestate-green.tap.",
+      "outcome": "partial"
+    }
+  ],
+  "report": "1. DoD results: fix (decision.id constrained in createAuthorityRevisionIntent) passed; new unit regression tests (4 cases) passed; reproduce-first RED-before-fix ordering passed; end-to-end AR05 case in harness/scripts/pipeline-state.test.mjs FAILED to apply (guard-testpath TP-5 blocked the Edit; stop condition triggered, not silently dropped).\n2. Evidence: RED specs/sprint-phoenix-epic/evidence/PHX-WP-PX0AC05-DECISIONID-unit-red.tap (exit 1, 3/6 fail, right reason: hostile decision.id NOT rejected). GREEN unit specs/sprint-phoenix-epic/evidence/PHX-WP-PX0AC05-DECISIONID-unit-green.tap (exit 0, 6/6 pass). GREEN pipeline-state (file unchanged, regression-only check against the fixed module) specs/sprint-phoenix-epic/evidence/PHX-WP-PX0AC05-DECISIONID-pipelinestate-green.tap (exit 0, 504/504 pass). Commands: node --test --test-reporter=tap --test-reporter-destination=<path> plugins/pipeline-core/lib/authority-revision-proof.test.mjs; same for harness/scripts/pipeline-state.test.mjs. Commit: 022718b0.\n3. Constraint chosen: candidate (a), reuse ID (/^[a-z][a-z0-9-]{0,63}$/u) verbatim on decision.id, matching sibling featureId/idempotencyKey. Real-usage evidence: every decision.id fixture in the repo ('decision-01' in pipeline-state.test.mjs, 'phoenix-section-seven' in authority-revision-proof.test.mjs) is already lowercase-slug-shaped; no production caller constructs decision.id from free text. A sibling but DIFFERENT field, decisionId in decision-reference-dual-evaluation.mjs (H-AC-12 schema), uses a wider pattern with fixture 'PHX-DEC-1' -- noted, but it is a different field on a different schema, not evidence this field needs widening.\n4. Changed files: plugins/pipeline-core/lib/authority-revision-proof.mjs (added !ID.test(decision.id) to the validation clause); plugins/pipeline-core/lib/authority-revision-proof.test.mjs (4 new regression tests).\n5. Deliberately not changed: harness/scripts/pipeline-state.test.mjs -- the briefed AR05g case was drafted but guard-testpath TP-5 blocked the Edit unconditionally (no task-type exception; only escape is a PO-executed signature-mode human-guard-override, which a Goldfish cannot produce). Confirmed no regression instead (504/504 unchanged). plugins/pipeline-core/scripts/pipeline-state.mjs untouched per Forbidden list. No other existing test assertion modified.\n6. Deviations: none in the fix; the one gap is DoD item 5 (end-to-end AR05 case), reported not silently dropped.\n7. Open items: STOP CONDITION -- guard-testpath TP-5 on harness/scripts/pipeline-state.test.mjs, unresolvable within Goldfish authority. PO next step: run the guard's printed human-guard-override flow (plan / prepare-authorization / authorize-by-signature) and re-dispatch, or edit the file directly, adding the AR05g case (drafted in this record's 'blocked-scope-item' log entry): reviseProposal with decision.id='/home/attacker/secret-project/notes.txt', planCmd, assert exit 2, /AR-INTENT-INVALID/, and stateBytes unchanged -- inserted after AR05c, before the durable-retention block."
+}

@@ -1,0 +1,13 @@
+fix(phoenix): constrain decision.id in authority revision intent
+
+PX0-AC-05's negative clause had no enforcing code path: decision.id was
+checked only for typeof, so a private path, a prompt/command fragment, or
+unbounded text could reach the durable, git-tracked authority revision
+receipt verbatim (Critic Finding 1, px0-ac0305-06-critic-review-d827c1b3.md).
+Apply the same bounded slug pattern (ID) already used for the sibling
+featureId/idempotencyKey fields in the same intent -- every existing
+decision.id fixture in the repo is already slug-shaped, so no real caller
+is affected.
+
+Dispatch: PHX-WP-PX0AC05-DECISIONID (goldfish)
+AI-Assisted: true

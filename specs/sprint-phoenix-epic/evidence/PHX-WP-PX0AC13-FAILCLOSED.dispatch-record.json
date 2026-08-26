@@ -1,0 +1,52 @@
+{
+  "taskId": "PHX-WP-PX0AC13-FAILCLOSED",
+  "model": "claude-opus-5",
+  "rulesetSha": "ce50d74d16fdbcd0b9f8b3b606297e88af3d2f139b3cd14b692f4ea15599b023",
+  "dispatcher": "elephant",
+  "outcome": "done",
+  "log": [
+    {
+      "phase": "start",
+      "toolUseCount": 0,
+      "note": "Dispatch record created as opening act; beginning context-file reads."
+    },
+    {
+      "phase": "orientation",
+      "toolUseCount": 8,
+      "note": "Read PX0-AC-13 acceptance text, both files in scope, and two prior related evidence records (PHX-WP-PX0AC13-REMOVEATTESTATION, PHX-WP-PX0AC13-HOSTDELEGATION) confirming this narrower clause-2-only task is a distinct, correctly-scoped follow-up to a broader clause-1 task that correctly stopped. Grepped repo for createWslHostAttestedSpawn/wslHostControlAttested/WSL_UPDATE_AVAILABILITY_GIT/HOST_CONTROL_IDENTITY_KEYS/isNetworkDelegatedGitInvocation: confirmed zero references outside the two in-scope files."
+    },
+    {
+      "phase": "main-file-edit",
+      "toolUseCount": 13,
+      "note": "Edited ruleset-freshness.mjs: removed unused CODEX_APP_SERVER_HEALTH_SCHEMA/observeCodexAppServer import; removed WSL_UPDATE_AVAILABILITY_GIT/_ENV, HOST_CONTROL_IDENTITY_KEYS, wslHostControlAttested, and old createWslHostAttestedSpawn; kept isNetworkDelegatedGitInvocation unchanged; added new createWslHostFailClosedSpawn (no observeHostControl param, always synthetic non-zero for network-delegated calls, no spawn attempt). Renamed runPipelineUpdateAvailabilityCli's deps.createAttestedSpawn hook to deps.createFailClosedSpawn."
+    },
+    {
+      "phase": "test-file-edit",
+      "toolUseCount": 20,
+      "note": "Edited ruleset-freshness.test.mjs: renamed import to createWslHostFailClosedSpawn, dropped CODEX_APP_SERVER_HEALTH_SCHEMA import; deleted dead CODEX_HEALTH_DAEMON/readyHostControlObservation/staleHostControlObservation helpers (confirmed via grep unused elsewhere); deleted the first PX0-AC-13 test (attested-success premise no longer exists) and rewrote the second into the new contract: network-delegated ls-remote/fetch never reach the substitute spawn, a local rev-parse HEAD call still genuinely spawns via git, result.status/reason/exitCode assertions kept from the original."
+    },
+    {
+      "phase": "verify",
+      "toolUseCount": 27,
+      "note": "node --check on both files: clean. `node --test plugins/pipeline-core/scripts/ruleset-freshness.test.mjs` and the bare `node plugins/pipeline-core/scripts/ruleset-freshness.test.mjs` (exact invocation harness/scripts/verify.mjs's runVerifyJournal uses via spawn(process.execPath, [suite.file, ...(suite.args??[])]) for the ruleset-freshness-tests entry, confirmed by reading verify-journal.mjs:345 and verify.mjs:179 -- suite.args/suite.cwd both undefined for this entry) both ran all 15 tests green, 0 fail. Wrote machine TAP evidence via `node --test --test-reporter=tap --test-reporter-destination=specs/sprint-phoenix-epic/evidence/PHX-WP-PX0AC13-FAILCLOSED-green.tap plugins/pipeline-core/scripts/ruleset-freshness.test.mjs`: 1..15, # pass 15, # fail 0. Did not additionally run the full harness/scripts/verify.mjs (would execute ~40 unrelated suites, unnecessary tool-budget spend once the exact suite invocation was confirmed and run directly)."
+    },
+    {
+      "phase": "grep-confirm",
+      "toolUseCount": 30,
+      "note": "Post-edit repo-wide grep for createWslHostAttestedSpawn/wslHostControlAttested/WSL_UPDATE_AVAILABILITY_GIT/HOST_CONTROL_IDENTITY_KEYS/readyHostControlObservation/staleHostControlObservation/CODEX_APP_SERVER_HEALTH_SCHEMA/CODEX_HEALTH_DAEMON/createAttestedSpawn across both edited files: zero hits."
+    },
+    {
+      "phase": "commit",
+      "toolUseCount": 35,
+      "note": "git status showed an unrelated pre-existing modification to harness/scripts/pipeline-state.test.mjs (AR05g PX0-AC-05 decision.id path-injection fix, not touched by this dispatch -- left alone). Staged and committed ONLY the two in-scope files via `git add -- <paths>` then `git commit -F <msgfile> -- <paths>` (guard required the two-call form once a multi-line message needed a file). Commit f51d6348f7a3d33a7358dd509bff59ca569d3f40, trailer block present (Dispatch: PHX-WP-PX0AC13-FAILCLOSED (goldfish), AI-Assisted: true)."
+    }
+  ],
+  "commitSha": "ad5a537e3cc7006bf97069c81d0035732c53a8bc",
+  "commitAttributionAnomaly": {
+    "originalCommitSha": "f51d6348f7a3d33a7358dd509bff59ca569d3f40",
+    "originalCommitStatus": "orphaned-loose-object-not-reachable-from-any-ref",
+    "note": "My own `git commit -F <msgfile> -- <2 in-scope paths>` produced f51d6348 cleanly (correct message, correct Dispatch: PHX-WP-PX0AC13-FAILCLOSED trailer, only my 2 files, confirmed via git show --stat immediately after). A concurrent process in this shared (non-worktree) checkout then ran `git commit --amend` (git reflog: 'HEAD@{0}: commit (amend)') which landed on MY commit (since I had moved HEAD past its own last commit, 979e579c, in the interim) instead of its own tip. Result: ad5a537e now carries MY exact tree/diff (135/95 lines changed, byte-identical to f51d6348's stat) but the AR05g dispatch's commit message and 'Dispatch: PHX-WP-PX0AC05-AR05G (goldfish)' trailer instead of mine. Content is unaffected (parent 979e579c already carried the unrelated harness/scripts/pipeline-state.test.mjs AR05g change; nothing lost). This is a race-condition attribution corruption from a concurrent git operation outside this dispatch's control, not a defect in this dispatch's own work. Not repaired here: fixing it requires a history rewrite (reword/rebase) forbidden to a Goldfish without explicit authorization -- flagged to the dispatcher as an open item."
+  },
+  "evidenceArtifact": "specs/sprint-phoenix-epic/evidence/PHX-WP-PX0AC13-FAILCLOSED-green.tap",
+  "report": "See final assistant message returned to the Elephant for the full completion report."
+}

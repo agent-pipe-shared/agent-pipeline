@@ -1,0 +1,46 @@
+TAP version 13
+# Subtest: proof binds the complete authority revision intent
+ok 1 - proof binds the complete authority revision intent
+  ---
+  duration_ms: 7.914564
+  type: 'test'
+  ...
+# Subtest: external proof becomes the authority revision approval shape
+ok 2 - external proof becomes the authority revision approval shape
+  ---
+  duration_ms: 7.29786
+  type: 'test'
+  ...
+# Subtest: decision.id rejects a plausible private absolute path
+ok 3 - decision.id rejects a plausible private absolute path
+  ---
+  duration_ms: 0.382468
+  type: 'test'
+  ...
+# Subtest: decision.id rejects embedded whitespace/newline (a pasted prompt/command fragment)
+ok 4 - decision.id rejects embedded whitespace/newline (a pasted prompt/command fragment)
+  ---
+  duration_ms: 0.377899
+  type: 'test'
+  ...
+# Subtest: decision.id enforces a bounded length -- accepted at the bound, refused one past it
+ok 5 - decision.id enforces a bounded length -- accepted at the bound, refused one past it
+  ---
+  duration_ms: 0.444516
+  type: 'test'
+  ...
+# Subtest: decision.id still accepts the existing legitimate slug shape unchanged (regression protection)
+ok 6 - decision.id still accepts the existing legitimate slug shape unchanged (regression protection)
+  ---
+  duration_ms: 0.407826
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 143.337639

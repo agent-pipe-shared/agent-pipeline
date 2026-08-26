@@ -1,0 +1,30 @@
+{
+  "taskId": "PHX-GMW-TP5-TESTS",
+  "model": "claude-sonnet-5",
+  "rulesetSha": "ce50d74d16fdbcd0b9f8b3b606297e88af3d2f139b3cd14b692f4ea15599b023",
+  "dispatcher": "elephant",
+  "outcome": "completed",
+  "report": "Written retroactively by the Elephant (2026-08-11) to resolve independent Critic finding F-D (pac08-f3-critic-review-3fdf8b9f.md): three commits carried the trailer 'Dispatch: PHX-GMW-TP5-TESTS (goldfish)' but no dispatch record with this taskId existed anywhere in the evidence set, breaking trailer-to-record traceability. This task landed three TP-5-scoped regression additions to harness/scripts/pipeline-state.test.mjs under the active GMW window (--scope TP-3,TP-5, PO-authorized 2026-08-11), across two goldfish-deep sub-dispatches that were each resumed once after a harness turn-boundary cutoff truncated their first attempt before real work landed or was reported.",
+  "log": [
+    {
+      "phase": "sub-task-1-casoutcome",
+      "toolUseCount": "n/a (reconstructed from commit content and PHX-WP-PX0-CASOUTCOME.dispatch-record.json, whose design/implementation phases this test case proves)",
+      "note": "AR06g landed in commit 433e73db: a new test block asserting the recovered-preimage branch of runAuthorityRevisionRecoverCommand echoes receipt.casOutcome === 'stale' (alongside the pre-existing status/mutated invariant, not weakening it) -- the regression coverage for the staleReceipt shallow-copy hunk designed by PHX-WP-PX0-CASOUTCOME and swept into 55e60f67 by the unrelated PHX-WP-PAC08-WIRING dispatch. Independently re-verified by the Elephant as part of the full pipeline-state.test.mjs pass."
+    },
+    {
+      "phase": "sub-task-2-v1journal",
+      "toolUseCount": "n/a (reconstructed from commit content)",
+      "note": "AR06h/AR06i landed in commit 0d9f3690: AR06h is a hand-rewritten genuine legacy .v1-shaped journal fixture (8 keys, no expiresAt, re-MACed with the real on-disk HMAC key) that loads via an expiresAt:null sentinel and completes recovery; AR06i is the fail-closed contrast, a journal missing the receipt key entirely, which refuses with AR-JOURNAL. Together these close the PHX-WP-PX0-V1JOURNAL-TESTS gap this task's second sub-dispatch was briefed to land."
+    },
+    {
+      "phase": "sub-task-3-pac08-wiring-regressions",
+      "toolUseCount": "n/a (reconstructed from commit content and PHX-WP-PAC08-RECONCILE-APPROVAL.dispatch-record.json's tp5-tests-pac08 log entry)",
+      "note": "RGi through RGn landed in commit 3fdf8b9f: new helpers pac08GatesYaml/seedPac08GoverningSession/pac08Proof (the last building a genuine Ed25519 keypair via generateKeyPairSync('ed25519') and a real signature via sign(null, ...), not a stub); test cases covering signature-mode success + actual manifest rewrite (RGi/RGi-2), chat-mode success (RGj), missing-proof refusal (RGk), wrong-candidate-bound-proof refusal (RGl), dir-vs-root governing-session binding proving --root's own committed chat setting is correctly ignored in favor of the governing dir's signature default (RGm), and a push regression proving the ALWAYS_REQUIRED_KINDS bypass stays scoped to feature-package-reconcile only (RGn/RGn-2). First sub-dispatch attempt for this piece reported 'completed' with zero actual commits and a clean tree; resumed via SendMessage with an explicit incremental-commit instruction, after which the real work above landed."
+    },
+    {
+      "phase": "re-verification",
+      "toolUseCount": "n/a (Elephant verification pass)",
+      "note": "node --test harness/scripts/pipeline-state.test.mjs at HEAD 3fdf8b9f: 490/490 cases passed, independently re-run by the Elephant rather than trusted from either sub-dispatch's self-report. This run is also what surfaced (via a separate registered-suite check, not this file) the OT09 guard-testpath-override regression recorded as F-A / docs/state.md commit c5e2e602 -- a pre-existing condition of an unrelated commit in this same window, not of this task's own test additions."
+    }
+  ]
+}

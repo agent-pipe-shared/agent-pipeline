@@ -1,0 +1,846 @@
+TAP version 13
+# Error: approve-plan requires --by <name> (non-empty) -- an unattributed approval is refused.
+# PASS  PS01a approve-plan without --by refused (exit 2)
+# PASS  PS01b nothing written (state file absent)
+# PASS  PS02 approve-plan with empty --by refused (exit 2)
+# PASS  PS03 revoke-plan without --by refused (exit 2)
+# Error: approve-plan requires --by <name> (non-empty) -- an unattributed approval is refused.
+# Error: revoke-plan requires --by <name> (non-empty) -- an unattributed revocation is refused.
+# Error: approve-push requires --by, --remote, --destination, --proof-request, --proof-authority and --proof.
+# PASS  PS04 approve-push without --by refused (exit 2)
+# Error: existing state file is invalid (invalid JSON (Expected property name or '}' in JSON at position 2 (line 1 column 3))) -- aborting WITHOUT changes.
+# File: /tmp/pipeline-state-malformed-existing-m63nJq/.claude/pipeline-state.json
+# Fix the file manually (or deliberately delete it) before pipeline-state.mjs writes again.
+# PASS  PS05a malformed existing file -> exit 2
+# PASS  PS05b file left byte-identical (no silent overwrite)
+# Feature "ap1-pipeline-tuning" set. Plan path: .claude/plans/x.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# Plan submitted by "coordinator" on 2026-07-07T21:00:00.000Z; lifecycle="awaiting-approval".
+# Plan approved by "po-test" on 2026-07-07T21:00:00.000Z; lifecycle="approved".
+# PASS  PS06a-1 continuity-init exit 0
+# PASS  PS06a0 submit-plan exit 0
+# PASS  PS06a approve-plan exit 0
+# PASS  PS06b schema field correct
+# PASS  PS06c planApproved true
+# PASS  PS06d planApproval is exact v4 and binds the submitted Plan, Spec, profile authority, and an empty audit seal
+# PASS  PS06e activeFeature preserved from set-feature
+# Feature "f1" set. Plan path: p1.md. planApproved=false, phase="design".
+# Feature "f2" set. Plan path: p2.md. planApproved=false, phase="design".
+# PASS  PS07a new feature resets planApproved=false
+# PASS  PS07b phase reset to design (inside activeFeature, F1 fix)
+# PASS  PS07c prior planApproval cleared
+# PASS  PS07d activeFeature reflects the NEW feature
+# Feature "f1" set. Plan path: p1.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# Plan submitted by "coordinator" on 2026-07-07T21:00:00.000Z; lifecycle="awaiting-approval".
+# Plan approved by "po-test" on 2026-07-07T21:00:00.000Z; lifecycle="approved".
+# Design reopened by "po-test" on 2026-07-07T21:00:00.000Z; lifecycle="draft".
+# PASS  PS08a reopen-design exit 0
+# PASS  PS08b planApproved false after reopen
+# PASS  PS08c exact invalidation recorded
+# Design is already open; zero-write replay accepted.
+# PASS  PS08d reopen replay accepts the stored timestamp after an ambiguous response
+# PASS  PS08e reopen replay leaves state byte-identical
+# Feature "approval-audit-seal" set. Plan path: specs/seal/prd_seal.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# Plan submitted by "coordinator" on 2026-07-07T21:00:00.000Z; lifecycle="awaiting-approval".
+# Plan approved by "po-test" on 2026-07-07T21:00:00.000Z; lifecycle="approved".
+# Design reopened by "po-test" on 2026-07-07T21:00:00.000Z; lifecycle="draft".
+# Plan submitted by "coordinator" on 2026-07-08T21:00:00.000Z; lifecycle="awaiting-approval".
+# Plan approved by "po-test" on 2026-07-08T21:00:00.000Z; lifecycle="approved".
+# PASS  PS08a-1 fixture reopens a prior approval before retaining a successor v3 audit record
+# PASS  PS08a-2 seal-plan-approval upgrades only a retained v3 approval and emits its audit receipt
+# PASS  PS08a-3 seal readback is exact v4 and binds the canonical retained invalidation
+# Phase set: "implementation"; lifecycle="implementing".
+# PASS  PS08a-4 exact v4 readback permits the implementation lifecycle transition
+# PASS  PS08a-5 seal replay rejects the already-v4 approval without a false success claim or mutation
+# PASS  PS08a-6 seal CLI refuses caller arguments without mutating the exact v4 readback
+# Feature "bind-replay" set. Plan path: specs/bind/prd_bind.md. planApproved=false, phase="design".
+# Plan approval spec-bound by "po-test" on 2026-07-07T21:00:00.000Z.
+# Plan approval is already spec-bound for "po-test" on 2026-07-07T21:00:00.000Z.
+# PASS  PS08f bind-plan-spec initial transition exits 0
+# PASS  PS08g bind-plan-spec replay exits 0 with a newer wall clock
+# PASS  PS08h bind-plan-spec replay leaves state byte-identical
+# Feature "f1" set. Plan path: p1.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# Plan submitted by "coordinator" on 2026-07-07T21:00:00.000Z; lifecycle="awaiting-approval".
+# Plan approved by "po-test" on 2026-07-07T21:00:00.000Z; lifecycle="approved".
+# Phase set: "implementation"; lifecycle="implementing".
+# PASS  PS09a set-phase exit 0
+# PASS  PS09b phase updated (inside activeFeature, F1 fix)
+# PASS  PS09c planApproved untouched
+# PASS  PS09d activeFeature id/planPath untouched by set-phase
+# Error: approve-push requires --by, --remote, --destination, --proof-request, --proof-authority and --proof.
+# PASS  PS10a approve-push without a critical proof is refused
+# PASS  PS10b attribution-only approval leaves state absent
+# Error: approve-push requires --by, --remote, --destination, --proof-request, --proof-authority and --proof.
+# PASS  PS11 approve-push without a resolvable HEAD refused (exit 2)
+# PASS  PS12a subprocess set-feature exit 0
+# PASS  PS12a1 subprocess continuity-init exit 0
+# PASS  PS12b0 subprocess submit-plan exit 0
+# PASS  PS12b subprocess approve-plan exit 0
+# PASS  PS12c subprocess approve-push without critical proof is refused
+# PASS  PS12d final state has planApproved true
+# PASS  PS12e final state has no attribution-only pushApproval
+# PASS  PS12f state file is pretty-printed (contains newline+indent)
+# PASS  PS13 unknown subcommand refused (exit 2)
+# PASS  PS13b nothing written
+# Error: unknown command "frobnicate". Allowed: set-feature, submit-plan, approve-plan, reopen-design, seal-plan-approval, set-phase, set-gate-estimate, revoke-plan, bind-plan-spec, approve-push, close-feature, approve-deploy, consume-deploy, clear-deploy, po-authority-rebind-plan, po-authority-rebind-apply, po-authority-decision-plan, po-authority-decision-select, po-authority-decision-apply, continuity-init, continuity-cas, continuity-apply-native, continuity-integrate-final, continuity-record-course-brief, continuity-select-course, continuity-apply-decision, continuity-clear-decision, continuity-result-bootstrap-plan, continuity-result-bootstrap-apply, continuity-result-rebind-plan, continuity-result-rebind-apply, continuity-result-case-migration-plan, continuity-result-case-migration-apply, continuity-result-close-plan, continuity-result-close-apply, continuity-authority-revision-plan, continuity-authority-revision-apply, continuity-authority-revision-recover, publication-prepare, publication-approve, publication-authorize, publication-reconcile, publication-observe, publication-start-readback, publication-close, publication-rearm, publication-block, feature-package-inspect, feature-package-status, feature-package-plan, feature-package-apply, feature-package-reconcile, feature-package-recover.
+# PASS  PS14a F1-integration: real set-feature subprocess exit 0
+# PASS  PS14a-1 F1-integration: real continuity-init subprocess exit 0
+# PASS  PS14a0 F1-integration: real submit-plan subprocess exit 0
+# PASS  PS14b F1-integration: real approve-plan subprocess exit 0
+# PASS  PS14c F1-integration: real set-phase subprocess exit 0
+# PASS  PS14d F1-integration: real manifest loads ok via stop-suggest's loadManifestSafe
+# PASS  PS14e F1-integration: real CLI-written state file loads via stop-suggest's loadStateSafe
+# PASS  PS14f F1-integration: real state has activeFeature.phase populated (THE F1 bug: this used to be undefined)
+# PASS  PS14g F1-integration: resolveSuggestion produces a NON-EMPTY suggestion against the REAL CLI-written state
+# PASS  PS14h F1-integration: suggestion names the next phase (security-scan)
+# Error: close-feature requires --by <name> (non-empty) -- an unattributed close is refused.
+# PASS  PS15a close-feature without --by refused (exit 2)
+# PASS  PS15b nothing written (state file absent)
+# Error: close-feature requires --by <name> (non-empty) -- an unattributed close is refused.
+# PASS  PS16 close-feature with empty --by refused (exit 2)
+# PASS  PS17a close-feature without activeFeature refused (exit 2)
+# Error: no active feature present -- nothing to close.
+# PASS  PS17b nothing written (state file absent)
+# Feature "f-close" set. Plan path: p-close.md. planApproved=false, phase="design".
+# Error: approve-plan requires an exact current submitted plan (PLAN-LIFECYCLE-CURRENT); run submit-plan first.
+# Feature "f-close" closed by "po-test" (commit abc123deadbeef, 2026-07-07T21:00:00.000Z). activeFeature removed, planApproved=false.
+# PASS  PS18a close-feature exit 0
+# PASS  PS18b activeFeature removed
+# PASS  PS18c planApproved false
+# PASS  PS18d planApproval cleared
+# PASS  PS18e planRevocation cleared
+# PASS  PS18f closedFeatures[0] shape correct
+# PASS  PS18g close-feature does not synthesize a pushApproval
+# Feature "f-coordinated" set. Plan path: specs/f/plan.md. planApproved=false, phase="design".
+# Error: close-feature coordinator is not bound to this exact feature-close-prepared State transition.
+# PASS  PS18h close-feature rejects a stale coordinator digest
+# Error: close-feature coordinator is not bound to this exact feature-close-prepared State transition.
+# PASS  PS18i coordinator-bound close rejects byte-level Pipeline State drift
+# Feature "f-coordinated" closed by "po-test" (commit abc123deadbeef, 2026-07-07T21:00:00.000Z). activeFeature removed, planApproved=false.
+# PASS  PS18j exact feature-close-prepared coordinator permits the State sub-effect
+# PASS  PS18k close audit binds the exact coordinator lifecycle/revision/digest
+# Feature "f-git-err" set. Plan path: p.md. planApproved=false, phase="design".
+# Warning: current commit (git rev-parse HEAD) could not be determined: not a git repository.
+# close-feature proceeds anyway -- forCommit is recorded as null.
+# Feature "f-git-err" closed by "po-test" (commit —, 2026-07-07T21:00:00.000Z). activeFeature removed, planApproved=false.
+# PASS  PS19a close-feature with unresolvable git HEAD still exits 0
+# PASS  PS19b forCommit null on git failure
+# PASS  PS19c activeFeature still removed despite git failure
+# Feature "f-first" set. Plan path: p1.md. planApproved=false, phase="design".
+# Feature "f-first" closed by "po-test" (commit abc123deadbeef, 2026-07-07T21:00:00.000Z). activeFeature removed, planApproved=false.
+# Feature "f-second" set. Plan path: p2.md. planApproved=false, phase="design".
+# Feature "f-second" closed by "po-test" (commit abc123deadbeef, 2026-07-07T21:00:00.000Z). activeFeature removed, planApproved=false.
+# PASS  PS20a second close-feature exit 0
+# PASS  PS20b closedFeatures length 2
+# PASS  PS20c first closedFeatures entry unchanged
+# PASS  PS20d second closedFeatures entry appended
+# Feature "nudge-test" set. Plan path: .claude/plans/nudge.md. planApproved=false, phase="design".
+# Error: serialized state write failed before commit (PLAN-IMPLEMENTATION-STATE-INVALID); zero mutation.
+# Error: set-phase implementation requires an exact approved submission (PLAN-IMPLEMENTATION-STATE-INVALID).
+# PASS  PS21a sanity: BEFORE close-feature the nudge is non-empty
+# Feature "nudge-test" closed by "po-test" (commit abc123deadbeef, 2026-07-07T21:00:00.000Z). activeFeature removed, planApproved=false.
+# PASS  PS21b close-feature exit 0
+# PASS  PS21c AFTER close-feature the nudge is silent (null)
+# Error: activeFeature.id and activeFeature.planPath must both be non-empty -- close-feature refused (no unattributed audit entry).
+# PASS  PS22a close-feature with blank activeFeature.id refused (exit 2)
+# PASS  PS22b file left byte-identical (no silent write)
+# Error: activeFeature.id and activeFeature.planPath must both be non-empty -- close-feature refused (no unattributed audit entry).
+# PASS  PS23a close-feature with blank activeFeature.planPath refused (exit 2)
+# PASS  PS23b file left byte-identical (no silent write)
+# Error: existing closedFeatures is not an array -- aborting WITHOUT changes (no silent overwrite).
+# PASS  PS24a close-feature with non-array closedFeatures refused (exit 2)
+# PASS  PS24b file left byte-identical (no silent overwrite with [])
+# Feature "f2-happy" set. Plan path: p2-happy.md. planApproved=false, phase="design".
+# Feature "f2-happy" closed by "po-test" (commit abc123deadbeef, 2026-07-07T21:00:00.000Z). activeFeature removed, planApproved=false.
+# PASS  PS25a close-feature happy path exit 0
+# PASS  PS25b closedFeatures[0] appended with correct id/planPath
+# PASS  PS25c activeFeature removed
+# Deploy approval granted by "po-test" for artifact "v1.0.0" / environment "prod" (2026-07-07T21:00:00.000Z).
+# PASS  PS26a approve-deploy exit 0
+# PASS  PS26b deployApprovals[0] shape correct
+# Error: approve-deploy requires --env, --artifact and --by and, when critical proof is enabled, exactly --proof-request/--proof-authority/--proof.
+# PASS  PS27a approve-deploy blank --env refused (exit 2)
+# PASS  PS27b nothing written
+# Error: approve-deploy requires --env, --artifact and --by and, when critical proof is enabled, exactly --proof-request/--proof-authority/--proof.
+# PASS  PS27c approve-deploy blank --artifact refused (exit 2)
+# PASS  PS27d nothing written
+# Error: approve-deploy requires --env, --artifact and --by and, when critical proof is enabled, exactly --proof-request/--proof-authority/--proof.
+# PASS  PS27e approve-deploy blank --by refused (exit 2)
+# PASS  PS27f nothing written
+# Error: approve-deploy requires --env, --artifact and --by and, when critical proof is enabled, exactly --proof-request/--proof-authority/--proof.
+# PASS  PS27g approve-deploy missing --env refused (exit 2)
+# Deploy approval granted by "po-test" for artifact "v1.0.0" / environment "test" (2026-07-07T21:00:00.000Z).
+# Error: no open deploy approval found for artifact "v1.0.0" / environment "prod" (absent or already consumed) -- consume-deploy refused (no silent no-op).
+# PASS  PS28a consume-deploy for prod fails when only a test approval exists (exit 2)
+# PASS  PS28b test approval left untouched (still unconsumed) after the failed prod check
+# Deploy approval consumed by "po-test" for artifact "v1.0.0" / environment "test" (2026-07-07T21:00:00.000Z).
+# PASS  PS28c consume-deploy for the matching test env succeeds (exit 0)
+# Deploy approval granted by "po-test" for artifact "v1.0.0" / environment "prod" (2026-07-07T21:00:00.000Z).
+# Deploy approval consumed by "po-test" for artifact "v1.0.0" / environment "prod" (2026-07-07T21:00:00.000Z).
+# PASS  PS29a first consume-deploy exit 0
+# PASS  PS29b usedAt set after first consume
+# PASS  PS29c second consume-deploy on the same record fails (exit 2, never a silent no-op)
+# Error: no open deploy approval found for artifact "v1.0.0" / environment "prod" (absent or already consumed) -- consume-deploy refused (no silent no-op).
+# Deploy approval granted by "po-test" for artifact "v1.0.0" / environment "prod" (2026-07-07T21:00:00.000Z).
+# Error: consume-deploy requires --env <env>, --artifact <ref> and --by <name> (all three non-empty).
+# PASS  PS30a consume-deploy blank --env refused (exit 2)
+# Deploy approval granted by "po-test" for artifact "v1.0.0" / environment "prod" (2026-07-07T21:00:00.000Z).
+# Error: consume-deploy requires --env <env>, --artifact <ref> and --by <name> (all three non-empty).
+# PASS  PS30b consume-deploy blank --artifact refused (exit 2)
+# Deploy approval granted by "po-test" for artifact "v1.0.0" / environment "prod" (2026-07-07T21:00:00.000Z).
+# Error: consume-deploy requires --env <env>, --artifact <ref> and --by <name> (all three non-empty).
+# PASS  PS30c consume-deploy blank --by refused (exit 2)
+# Error: no open deploy approval found for artifact "v1.0.0" / environment "prod" (absent or already consumed) -- consume-deploy refused (no silent no-op).
+# PASS  PS31a consume-deploy with no prior approval refused (exit 2)
+# PASS  PS31b nothing written (state file absent)
+# Deploy approval granted by "po-test" for artifact "v1.0.0" / environment "prod" (2026-07-07T21:00:00.000Z).
+# Deploy approval granted by "po-test" for artifact "v2.0.0" / environment "prod" (2026-07-07T21:00:00.000Z).
+# Deploy approval consumed by "po-test" for artifact "v1.0.0" / environment "prod" (2026-07-07T21:00:00.000Z).
+# 1 open deploy approval(s) for environment "prod" removed by "po-test" (2026-07-07T21:00:00.000Z).
+# PASS  PS32a clear-deploy exit 0
+# PASS  PS32b only the pending (unconsumed) v2.0.0 record was removed -- the consumed v1.0.0 record stays
+# Deploy approval granted by "po-test" for artifact "v1.0.0" / environment "prod" (2026-07-07T21:00:00.000Z).
+# Deploy approval granted by "po-test" for artifact "v2.0.0" / environment "prod" (2026-07-07T21:00:00.000Z).
+# 1 open deploy approval(s) for environment "prod" / artifact "v1.0.0" removed by "po-test" (2026-07-07T21:00:00.000Z).
+# PASS  PS33a clear-deploy narrowed by --artifact exit 0
+# PASS  PS33b only v1.0.0 removed, v2.0.0 stays pending
+# Deploy approval granted by "po-test" for artifact "v1.0.0" / environment "prod" (2026-07-07T21:00:00.000Z).
+# Error: clear-deploy requires --env <env> and --by <name> (both non-empty); --artifact is optional.
+# PASS  PS34a clear-deploy blank --env refused (exit 2)
+# Deploy approval granted by "po-test" for artifact "v1.0.0" / environment "prod" (2026-07-07T21:00:00.000Z).
+# Error: clear-deploy requires --env <env> and --by <name> (both non-empty); --artifact is optional.
+# PASS  PS34b clear-deploy blank --by refused (exit 2)
+# Deploy approval granted by "po-test" for artifact "v1.0.0" / environment "prod" (2026-07-07T21:00:00.000Z).
+# 1 open deploy approval(s) for environment "prod" removed by "po-test" (2026-07-07T21:00:00.000Z).
+# PASS  PS34c clear-deploy without --artifact (optional) still succeeds (exit 0)
+# Error: no open deploy approval found for environment "prod" -- clear-deploy refused (nothing to remove).
+# PASS  PS35a clear-deploy with no matching pending approval refused (exit 2)
+# PASS  PS35b nothing written (state file absent)
+# Deploy approval granted by "po-test" for artifact "v1.0.0" / environment "prod" (2026-07-07T21:00:00.000Z).
+# Deploy approval consumed by "po-test" for artifact "v1.0.0" / environment "prod" (2026-07-07T21:00:00.000Z).
+# Error: no open deploy approval found for environment "prod" -- clear-deploy refused (nothing to remove).
+# PASS  PS35c clear-deploy with only an already-consumed record refused (exit 2)
+# PASS  PS35d file left byte-identical (no silent write)
+# Error: existing state file is invalid (invalid JSON (Expected property name or '}' in JSON at position 2 (line 1 column 3))) -- aborting WITHOUT changes.
+# File: /tmp/pipeline-state-malformed-existing-deploy-0oO6Yq/.claude/pipeline-state.json
+# Fix the file manually (or deliberately delete it) before pipeline-state.mjs writes again.
+# PASS  PS36a approve-deploy on malformed existing file -> exit 2
+# PASS  PS36b file left byte-identical after approve-deploy attempt
+# Error: existing state file is invalid (invalid JSON (Expected property name or '}' in JSON at position 2 (line 1 column 3))) -- aborting WITHOUT changes.
+# File: /tmp/pipeline-state-malformed-existing-deploy-0oO6Yq/.claude/pipeline-state.json
+# Fix the file manually (or deliberately delete it) before pipeline-state.mjs writes again.
+# PASS  PS36c consume-deploy on malformed existing file -> exit 2
+# PASS  PS36d file left byte-identical after consume-deploy attempt
+# Error: existing state file is invalid (invalid JSON (Expected property name or '}' in JSON at position 2 (line 1 column 3))) -- aborting WITHOUT changes.
+# File: /tmp/pipeline-state-malformed-existing-deploy-0oO6Yq/.claude/pipeline-state.json
+# Fix the file manually (or deliberately delete it) before pipeline-state.mjs writes again.
+# PASS  PS36e clear-deploy on malformed existing file -> exit 2
+# PASS  PS36f file left byte-identical after clear-deploy attempt
+# Error: existing deployApprovals is not an array -- aborting WITHOUT changes (no silent overwrite).
+# PASS  PS37a approve-deploy with non-array deployApprovals refused (exit 2)
+# PASS  PS37b file left byte-identical (no silent overwrite)
+# Feature "phase26-test" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PASS  PS38a continuity-init exit 0
+# PASS  PS38b initialized continuity is persisted at revision 0
+# PASS  PS38c continuity feature is bound to activeFeature.id
+# PASS  PS38d owned lock is released
+# PASS  PS38e same-directory temp is absent after rename
+# Feature "phase26-test" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# CS-CAS-APPLIED: continuity revision 1 written.
+# PASS  PS39a exact continuity CAS exit 0
+# PASS  PS39b exact continuity CAS advances to revision 1
+# Error: continuity transition refused (CS-STALE); zero mutation.
+# PASS  PS39c stale continuity CAS is refused
+# PASS  PS39d stale continuity CAS performs zero byte mutation
+# Feature "phase26-test" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# Error: continuity transition refused (CS-INVALID); zero mutation.
+# PASS  PS40a queueHead+blocker XOR violation is refused
+# PASS  PS40b invalid XOR transition performs zero byte mutation
+# Feature "phase26-test" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# Error: continuity writer refused (PS-CONTINUITY-LOCKED).
+# PASS  PS41a fresh foreign continuity lock blocks
+# PASS  PS41b foreign lock remains byte-owned by the foreign token
+# PASS  PS41c blocked writer performs zero state mutation
+# Error: continuity writer refused (PS-CONTINUITY-LOCKED).
+# PASS  PS41d even a stale foreign-token lock cannot be recovered
+# Feature "phase26-test" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PASS  PS42a same-token stale lock is recovered and transition succeeds
+# PASS  PS42b recovered owned lock is released
+# PASS  PS42c exclusive recovery guard is released after complete takeover
+# PASS  PS42d only the stale owner's bound temp is cleaned
+# PASS  PS42e orphaned recovery guard fails closed instead of admitting another owner
+# PASS  PS42f orphaned recovery guard remains for explicit disposition
+# Feature "phase26-test" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# Error: continuity request refused (PS-CONTINUITY-REQUEST-FILE).
+# Error: continuity request refused (PS-CONTINUITY-REQUEST-FILE).
+# PASS  PS43a traversing request path is refused
+# PASS  PS43b symlink request path is refused
+# PASS  PS43c unsafe request attempts perform zero mutation
+# PASS  PS43d unsafe request attempts never acquire a lock
+# Feature "phase26-test" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PS-CONTINUITY-FINAL-COMMITTED: continuity revision 1; transaction persisted.
+# PASS  PS44a final integration writer exits 0
+# PASS  PS44b acknowledgement and next head share revision 1
+# PASS  PS44c persisted acknowledgement binds canonical final digest
+# PASS  PS44d persisted next head is dispatchable and has no stale dispatch
+# PASS  PS44e Result contains exactly one canonical immutable final integration
+# PS-CONTINUITY-DUPLICATE-FINAL: continuity revision 1; accepted with zero mutation.
+# PASS  PS44f matching final replay is accepted without either write
+# Error: continuity final transaction refused (PS-CONTINUITY-REQUEST); zero State and Result mutation.
+# PASS  PS44g non-closed final request envelope is refused byte-null
+# Feature "phase26-test" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# Error: continuity final transaction refused (PS-CONTINUITY-WRITE-IO); Result prepare or repair may be durable; mutation is NOT reported as zero.
+# PASS  PS44Ra State fault reports failure after durable Result prepare
+# PS-CONTINUITY-FINAL-COMMITTED: continuity revision 1; transaction persisted.
+# PASS  PS44Rb exact Result-before-State replay commits State without duplicate append
+# Feature "phase26-test" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PS-CONTINUITY-FINAL-COMMITTED: continuity revision 1; transaction persisted.
+# PS-CONTINUITY-RESULT-REPAIRED: continuity revision 1; transaction persisted.
+# PASS  PS44Sa committed transaction fixture is valid
+# PASS  PS44Sb exact old Result is reconstructively repaired without State rewrite
+# Error: continuity final transaction refused (PS-CONTINUITY-RESULT-NONCANONICAL); zero State and Result mutation.
+# PASS  PS44Sc noncanonical/tampered old Result fails closed
+# Feature "phase26-test" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# Error: continuity Result authority mismatch (PS-CONTINUITY-RESULT-INVALID); zero mutation.
+# PASS  PS44T Result digest drift blocks other continuity commands byte-null
+# Feature "phase26-test" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PASS  PS44Ua Result pre-rename fault is explicitly zero-mutation
+# Feature "phase26-test" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PASS  PS44Ub Result rename-effect-then-throw is explicitly committed/not-zero
+# Feature "phase26-test" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PASS  PS44U pre-write Result fault is distinctly zero-mutation
+# Feature "phase26-test" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PASS  PS44Uc Result fd-sync fault after exact temp write remains explicitly pre-commit
+# Feature "phase26-test" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PASS  PS44Ud Result directory-sync fault is explicitly committed/durability-unknown
+# Feature "phase26-test" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PASS  PS44Ue State rename-effect-then-throw is explicitly committed/durability-unknown
+# Feature "phase26-test" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PASS  PS44Va lock loss after durable Result explicitly blocks State without zero claim
+# Feature "phase26-test" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PASS  PS44Vb exact Result tamper explicitly blocks State without zero claim
+# Feature "phase26-test" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PS-CONTINUITY-FINAL-COMMITTED: continuity revision 1; transaction persisted.
+# PASS  PS44Vc concurrent lock contender is refused while owner commits
+# Feature "phase26-test" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# Error: continuity final transaction refused (PS-CONTINUITY-RESULT-INVALID); zero State and Result mutation.
+# PASS  PS44W duplicate-key Result bytes are refused byte-null
+# Feature "phase26-test" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# Error: continuity final transaction refused (PS-CONTINUITY-RESULT-FENCE); zero State and Result mutation.
+# PASS  PS44W duplicate-fence Result bytes are refused byte-null
+# Feature "phase26-test" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# Error: continuity final transaction refused (PS-CONTINUITY-RESULT-CODEC); zero State and Result mutation.
+# PASS  PS44W crlf Result bytes are refused byte-null
+# Feature "phase26-test" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# Error: continuity final transaction refused (PS-CONTINUITY-RESULT-CODEC); zero State and Result mutation.
+# PASS  PS44W bom Result bytes are refused byte-null
+# Feature "phase26-test" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# Error: continuity Result authority mismatch (PS-CONTINUITY-RESULT-PATH); zero mutation.
+# PASS  PS44W ancestor symlink in Result path is refused before mutation
+# Feature "phase26-test" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PS-CONTINUITY-FINAL-COMMITTED: continuity revision 1; transaction persisted.
+# Error: continuity final transaction refused (PS-CONTINUITY-RESULT-NONCANONICAL); zero State and Result mutation.
+# PASS  PS44Xa self-consistent historical identity garbage is refused
+# Feature "phase26-test" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PS-CONTINUITY-FINAL-COMMITTED: continuity revision 1; transaction persisted.
+# Error: continuity final transaction refused (PS-CONTINUITY-RESULT-NONCANONICAL); zero State and Result mutation.
+# PASS  PS44Xb self-consistent malformed historical transition is refused
+# Feature "phase26-test" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PS-CONTINUITY-FINAL-COMMITTED: continuity revision 1; transaction persisted.
+# Error: continuity final transaction refused (PS-CONTINUITY-RESULT-NONCANONICAL); zero State and Result mutation.
+# PASS  PS44Xc self-consistent literal post-Result digest is refused without sentinel
+# Feature "phase26-test" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PS-CONTINUITY-FINAL-COMMITTED: continuity revision 1; transaction persisted.
+# Error: continuity final transaction refused (PS-CONTINUITY-RESULT-NONCANONICAL); zero State and Result mutation.
+# PASS  PS44Xd self-consistent failed final with queue instead of blocker is refused
+# Feature "phase26-test" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PS-CONTINUITY-FINAL-COMMITTED: continuity revision 1; transaction persisted.
+# Error: continuity final transaction refused (PS-CONTINUITY-WRITE-IO); Result prepare or repair may be durable; mutation is NOT reported as zero.
+# PS-CONTINUITY-FINAL-COMMITTED: continuity revision 2; transaction persisted.
+# PASS  PS44Ya first historical integration commits
+# PASS  PS44Yb second Result tail survives interrupted State write exactly once
+# PASS  PS44Yc multi-entry prior replay commits without splice/duplication
+# Feature "phase26-test" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PS-CONTINUITY-FINAL-COMMITTED: continuity revision 1; transaction persisted.
+# PS-CONTINUITY-DUPLICATE-FINAL: continuity revision 1; accepted with zero mutation.
+# PASS  PS44Z canonical duplicate replay ignores object insertion order
+# Feature "phase26-test" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# CS-CAS-APPLIED: continuity revision 1 written.
+# PASS  PS45a decision state-applied marker persists at selected revision
+# CS-CAS-APPLIED: continuity revision 2 written.
+# PASS  PS45b bound receipt clears decision marker at pre-bound revision
+# Feature "phase26-test" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PS-CONTINUITY-COURSE-BRIEF-COMMITTED: continuity revision 1; transaction persisted.
+# PS-CONTINUITY-DUPLICATE-COURSE-BRIEF: continuity revision 1; accepted with zero mutation.
+# PASS  PS45Ca Result-first course brief advances State with its exact Result pointer
+# PASS  PS45Cb course brief replay is exact and performs zero mutation
+# Feature "phase26-test" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# Error: continuity course-brief transaction refused (PS-CONTINUITY-WRITE-IO); Result prepare may be durable; mutation is NOT reported as zero.
+# PS-CONTINUITY-COURSE-BRIEF-COMMITTED: continuity revision 1; transaction persisted.
+# PASS  PS45Cc interrupted State write reports durable Result preparation
+# PASS  PS45Cd exact Result-before-State course replay commits without duplicate
+# Feature "phase26-test" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PS-CONTINUITY-COURSE-BRIEF-COMMITTED: continuity revision 1; transaction persisted.
+# PS-CONTINUITY-COURSE-SELECTION-COMMITTED: continuity revision 3; transaction persisted.
+# PS-CONTINUITY-DUPLICATE-COURSE-SELECTION: continuity revision 3; accepted with zero mutation.
+# PASS  PS45Da selection commits intent receipt and dispatchable state in bound revisions
+# PASS  PS45Db selection replay admits only the same idempotency key with zero mutation
+# Feature "phase26-test" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PS-CONTINUITY-COURSE-BRIEF-COMMITTED: continuity revision 1; transaction persisted.
+# Error: continuity course-selection transaction refused (PS-CONTINUITY-WRITE-IO); a write-ahead stage may be durable; mutation is NOT reported as zero.
+# PS-CONTINUITY-COURSE-SELECTION-COMMITTED: continuity revision 3; transaction persisted.
+# PASS  PS45Dc receipt-before-clear interruption leaves a dispatch-blocking marker
+# PASS  PS45Dd receipt-backed replay clears without a second intent or receipt
+# Feature "phase26-test" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PS-CONTINUITY-COURSE-BRIEF-COMMITTED: continuity revision 1; transaction persisted.
+# PS-CONTINUITY-COURSE-SELECTION-COMMITTED: continuity revision 3; transaction persisted.
+# PASS  PS45De stop selection has no SHA fixed point and remains terminally blocked
+# PASS  PS46a old owner cannot release exchanged nonce
+# PASS  PS46b exchanged lock remains present and byte-identical
+# Feature "phase26-test" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# Error: serialized state write failed before commit (PS-CONTINUITY-LOCKED); zero mutation.
+# PASS  PS47a legacy writer is blocked by the shared continuity lock
+# PASS  PS47b blocked legacy writer performs zero byte mutation
+# Deploy approval granted by "po-test" for artifact "candidate" / environment "test" (2026-07-07T21:00:00.000Z).
+# PASS  PS47c serialized legacy writer succeeds after lock release
+# PASS  PS47d non-lifecycle legacy transition preserves continuity exactly
+# Feature "phase26-test" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# Error: set-feature cannot replace an active continuity feature; close it through the revision/evidence-bound close gate first.
+# PASS  PS48a set-feature cannot discard an open continuity feature
+# PASS  PS48b refused replacement leaves state byte-identical
+# Error: active continuity requires --continuity-close-request <repo-relative-json> bound to the exact revision, Result and close evidence.
+# PASS  PS48c close-feature without revision/evidence request is refused
+# Feature "phase26-test" closed by "po-test" (commit abc123deadbeef, 2026-07-07T21:00:00.000Z). activeFeature removed, planApproved=false.
+# PASS  PS48d revision/evidence-bound close-feature succeeds
+# PASS  PS48e closing active feature removes continuity with activeFeature
+# PASS  PS48f closed audit entry persists the exact close request
+# Feature "phase26-test" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# Error: existing state file is invalid (PA-STATE-SESSION-CLEANUP-PRIVATE: portable State retains a machine-local session cleanup binding) -- aborting WITHOUT changes.
+# File: /tmp/pipeline-state-continuity-bound-cleanup-active-fOeTF1/project/pipeline-state.json
+# Fix the file manually (or deliberately delete it) before pipeline-state.mjs writes again.
+# PASS  PS48g close-feature refuses to discard an active cleanup binding
+# PASS  PS48h refused bound close is byte-identical
+# Feature "phase26-test" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# Error: existing state file is invalid (PA-STATE-SESSION-CLEANUP-PRIVATE: portable State retains a machine-local session cleanup binding) -- aborting WITHOUT changes.
+# File: /tmp/pipeline-state-continuity-bound-cleanup-closed-eiQs5V/project/pipeline-state.json
+# Fix the file manually (or deliberately delete it) before pipeline-state.mjs writes again.
+# PASS  PS48j neutral close rejects even an already-closed portable cleanup binding
+# PASS  PS48k rejected hostile neutral close remains byte-identical
+# Feature "phase26-test" set. Plan path: specs/prd.md. planApproved=false, phase="design".
+# PASS  PS49a directory-sync failure reports committed durability-unknown
+# PASS  PS49b exact renamed target is observable despite red durability result
+# PASS  PS49c pre-rename failure reports committed=false
+# PASS  PS49d pre-rename failure preserves target byte-identically
+# PASS  PS49e pre-rename failure cleans its owned temp
+# PASS  PS50a unrelated partial candidate cannot become the published lock
+# PASS  PS50b published lock atomically carries exact token and owner nonce
+# Feature "eta-feature" set. Plan path: specs/eta/prd_eta.md. planApproved=false, phase="design".
+# Gate estimate "eta-prd-1" recorded for feature "eta-feature".
+# PASS  PS51a set-gate-estimate writes only a source/evidence-bound coordinator record
+# Gate estimate "eta-prd-1" already recorded; zero-write replay accepted.
+# PASS  PS51b identical estimate retry is a zero-write CAS replay
+# PASS  PS51c non-coordinator estimate attribution is refused without mutation
+# Error: set-gate-estimate requires exactly --id <safe-id> --expected-current-id <absent|safe-id> --feature-id <id> --gate <gate> --object-format <sha1|sha256> --source-oid <hex> --evidence-path <repo-relative-path> --evidence-sha256 <64-lowercase-hex> --min-minutes <integer> --max-minutes <integer> --by coordinator.
+# Deploy approval granted by "po-test" for artifact "candidate" / environment "test" (2026-07-07T21:00:00.000Z).
+# PASS  PS51d a later successful state mutation clears the persisted estimate
+# PASS  PS52a exact legacy request yields a digest-bound plan
+# PASS  PS52a1 apply action is absolute and digest/confirmation bound
+# PASS  PS52b planner is read-only
+# PASS  PS52b1 updatedAt/root drift is refused without mutation
+# PASS  PS52-root-root extra
+# PASS  PS52-root-activeFeature extra
+# PASS  PS52-root-activeFeature wrong id
+# PASS  PS52-root-approval extra
+# PASS  PS52-root-approval actor
+# PASS  PS52-root-approval timestamp
+# PASS  PS52-root-authority extra
+# PASS  PS52-root-authority digest
+# PASS  PS52-release-candidate-head may differ from the release tag
+# PASS  PS52-release-tagObject
+# PASS  PS52-release-commit
+# PASS  PS52-release-tree
+# PASS  PS52-release-remoteCommit
+# PASS  PS52-release-remoteTagObject
+# PASS  PS52-release-remoteTagCommit
+# PASS  PS52-release-historical bytes
+# PASS  PS52-artifact-artifact missing
+# PASS  PS52-artifact-artifact hash
+# PASS  PS52-artifact-history mismatch
+# PASS  PS52-artifact-symlink
+# PASS  PS52-state-oversized
+# PASS  PS52c1 State drift between plan/apply is refused byte-null
+# PASS  PS52c2 pre-rename write failure reports committed=false and zero mutation
+# PASS  PS52c3 post-rename directory-sync failure reports committed durability and revision4
+# PASS  PS52c4 postimage-malformed readback fails closed without success claim
+# PASS  PS52c4 postimage-drifted readback fails closed without success claim
+# PASS  PS52c4 postimage-planApproved drift readback fails closed without success claim
+# PASS  PS52c4 postimage-planApproval drift readback fails closed without success claim
+# CS-LEGACY-ADOPTION-APPLIED: continuity revision 4 written.
+# PASS  PS52c exact apply advances revision and close action
+# PASS  PS52d conflicting replay is refused without mutation
+# PASS  PS52d1 lock contention refuses apply with zero State mutation
+# PASS  PS52e extra request key is rejected
+# PASS  PS53a retained root history above the continuity budget remains rebindable
+# PASS  PS53a Nova-shaped stale marker yields a closed digest-bound plan
+# PASS  PS53b planning binds matching stale authority preimages without writes
+# PASS  PS53c apply rejects a missing explicit confirmation byte-null
+# PASS  PS53d Nova-shaped confirmed apply preserves Human approvals and converges marker, PO gate and Continuity in design
+# PASS  PS53e replay is a closed refusal after a verified non-no-op
+# PASS  PS54a general PRD/Spec drift yields two neutral physical candidates
+# PASS  PS54b explicit Spec selection returns a separately digest-bound confirmed apply
+# PASS  PS54c confirmed decision apply converges marker and both authority surfaces in design
+# PASS  PS54d coherent documents with stale State yield the same PO plan and design re-entry
+# PASS  PS55a Phoenix-shaped current documents with only older Continuity yield a neutral bound plan
+# PASS  PS55b Phoenix-shaped confirmed apply preserves payload and converges all three intents
+# PASS  PS55c Nova-shaped four-generation drift discloses marker, documents, PO gate, Continuity and both profiles
+# PASS  PS55d Nova-shaped confirmed apply converges to current documents/profile exactly once and preserves payload
+# PASS  PS55e Nova-shaped completed selection replay fails closed without a second revision
+# PASS  PS55f malformed historical schema is a typed byte-null refusal
+# PASS  PS55f malformed historical extra key is a typed byte-null refusal
+# PASS  PS55f malformed historical noncanonical path is a typed byte-null refusal
+# PASS  PS55f malformed historical uppercase digest is a typed byte-null refusal
+# PASS  PS55f malformed historical provenance type is a typed byte-null refusal
+# PASS  PS55f malformed historical Continuity path is a typed byte-null refusal
+# PASS  PS55f malformed historical Continuity schema is a typed byte-null refusal
+# PASS  PS55f malformed historical Continuity extra key is a typed byte-null refusal
+# PASS  PS55g malformed current profile schema is a typed byte-null refusal
+# PASS  PS55g malformed current profile extra key is a typed byte-null refusal
+# PASS  PS55g malformed current profile uppercase digest is a typed byte-null refusal
+# PASS  PS55h malformed current PRD marker is a typed byte-null refusal
+# PASS  PS55i current-profile drift after selection fails closed before mutation
+# PASS  PS54e document drift after selection is byte-null
+# PASS  PS53f mismatched stale Continuity PRD authority is not a repair target
+# PASS  PS53g Spec preimage drift blocks apply before mutation
+# PASS  PS53u valid Human postimage drift fails state-value readback and restores exact preimages
+# PASS  PS53g PRD prepare failure is byte-null before the transaction begins
+# PASS  PS53h State prepare failure rolls the already-written PRD back completely
+# PASS  PS53i State rename-effect failure rolls both postimages back completely
+# PASS  PS53j postimage V4 failure rolls both authority surfaces back without logging readback payload
+# PASS  PS53k prepared-journal crash retains exact preimages and its recovery anchor
+# PASS  PS53l exact confirmed replay resumes a prepared transaction without a false no-op
+# PASS  PS53m mixed-journal crash preserves the journal and exposes no success
+# PASS  PS53n mixed replay rolls back completely and permits a fresh closed plan
+# PASS  PS53o committed-journal crash retains both postimages and its recovery anchor
+# PASS  PS53p same-byte postimage inode replacement is rolled back and requires a fresh plan
+# PASS  PS53q linked PRD is refused before any plan or mutation
+# PASS  PS53r hard-linked PRD is refused before any plan or mutation
+# PASS  PS53s permission/identity drift blocks apply before mutation
+# PASS  PS53t failed existing PO-profile DACL assurance blocks planning byte-null
+# PASS  PS54a inspect reports a valid package and exits 0
+# PASS  PS54b inspect exits non-zero on an invalid manifest yet still reports it
+# PASS  PS54c inspect never guesses a lifecycle state for legacy or unknown entries
+# PASS  PS54d inspect without --root refuses fail-closed naming the argument
+# PASS  PS54e inspect refuses a --root that is not a readable directory, naming the path
+# PASS  PS54f inspect refuses an unknown argument by name
+# PASS  PS54g a value-less argument is refused by name
+# PASS  PS54h a duplicated argument is refused by name
+# PASS  PS54i a positional argument is refused rather than ignored
+# PASS  PS54j status reports state, artifact set and validity for one package
+# PASS  PS54k status reports an invalid package and exits non-zero
+# PASS  PS54l status refuses an absent manifest naming the path
+# PASS  PS54m status refuses a malformed manifest naming the path
+# PASS  PS54n status without --manifest refuses naming the argument
+# PASS  PS54o status refuses a non-canonical --manifest (traversal)
+# PASS  PS54o status refuses a non-canonical --manifest (absolute)
+# PASS  PS54o status refuses a non-canonical --manifest (dot segment)
+# PASS  PS54p plan returns the planner's exact transition preview
+# PASS  PS54q plan passes an idempotent no-op through unchanged
+# PASS  PS54r plan surfaces the planner's rejection unchanged (unsupported state)
+# PASS  PS54r plan surfaces the planner's rejection unchanged (inadmissible edge)
+# PASS  PS54s plan without --next-state on an existing manifest refuses naming the argument
+# PASS  PS54t plan refuses to preview a transition out of an invalid package
+# PASS  PS54u plan returns the planner's exact absent-manifest draft bootstrap preview
+# PASS  PS54v the bootstrap preview creates no manifest
+# PASS  PS54w a non-draft bootstrap target is rejected by the planner, not by a local rule
+# PASS  PS54x a bootstrap proposal whose digest does not bind the file is rejected
+# PASS  PS54y an absent manifest without --proposal refuses naming the argument and the path
+# PASS  PS54z an unreadable --proposal refuses naming the argument and the path
+# PASS  PS54aa a --proposal that is not a regular file is refused
+# PASS  PS54ab --proposal is refused for a manifest that already exists
+# PASS  PS54ac none of the three commands writes anything into the fixture tree
+# PASS  PS54ad no command created a state file as a side effect
+# PASS  PS54ae inspect finds this repository's Phoenix package and its exit code encodes validity
+# PASS  PS54af status reports the live Phoenix package's real current state
+# PASS  PS54ag plan previews the live Phoenix transition from its real current state
+# PASS  PS54ah the repository's porcelain status is unchanged across all three commands
+# PASS  WRa fixture preview is an actionable preview (sanity)
+# PASS  WRa transition apply succeeds and returns the pipeline.feature-package-apply.v1 receipt
+# PASS  WRa persisted manifest has ONLY state changed; artifacts/candidate/supersedes untouched
+# PASS  WRa the persisted manifest re-validates ok through the accepted validator
+# PASS  WRb fixture preview is a bootstrap-preview (sanity)
+# PASS  WRb bootstrap apply creates the manifest and returns the receipt
+# PASS  WRb persisted bytes are byte-identical to the exact proposal bytes
+# PASS  WRc a drifted manifest since the preview is refused (stale --plan-sha256)
+# PASS  WRc the manifest state is untouched after the refusal
+# PASS  WRc2 a changed --next-state since the preview is refused (stale --plan-sha256)
+# PASS  WRc3 a drifted proposal since the preview is refused (stale --plan-sha256)
+# PASS  WRc3 no manifest file was created by the refused bootstrap
+# PASS  WRd interrupted after journal publication refuses, ending in 'recovery journal retained.'
+# PASS  WRd the manifest bytes are untouched (the journal precedes the write)
+# PASS  WRd a retry while the journal is pending is refused and names it
+# PASS  WRd feature-package-recover diagnoses the retained journal as not-yet-applied
+# PASS  WRd2 the retained feature-package-recover report contains NO absolute path, repo root, /home/, /tmp/ or a root/dir key
+# PASS  WRe interrupted after the manifest write refuses, ending in 'recovery journal retained.'
+# PASS  WRe the manifest bytes already reflect the postimage
+# PASS  WRe recover diagnoses applied-pending-retirement
+# PASS  WRe2 the retained feature-package-recover report contains NO absolute path, repo root, /home/, /tmp/ or a root/dir key
+# PASS  WRf recover reports clean and exits 0 when no journal is retained
+# PASS  WRg a manual artifact-digest replacement cannot stand in for the transaction
+# PASS  WRg the tampered manifest was not further mutated by the refused apply
+# PASS  WRi a postimage mismatching the predicted digest is refused, ending in 'recovery journal retained.'
+# PASS  WRi recover diagnoses the corrupted write as diverged
+# PASS  WRi2 the retained feature-package-recover report contains NO absolute path, repo root, /home/, /tmp/ or a root/dir key
+# PASS  WRh apply refuses a missing --root by name
+# PASS  WRh apply refuses a missing --plan-sha256 by name
+# PASS  WRh apply refuses a malformed --plan-sha256 by name
+# PASS  WRh apply refuses an unknown argument by name
+# PASS  WRh recover refuses a missing --root by name
+# Feature "ar-feat" set. Plan path: specs/ar-feat/prd_ar-feat.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PASS  AR01a a generic continuity-cas that rewrites authority.prd outside the sanctioned revision path is refused (CS-PROTECTED-AUTHORITY)
+# PASS  AR01b State bytes are untouched after the refused generic PRD-authority CAS
+# PASS  AR01c a generic continuity-cas that rewrites authority.spec outside the sanctioned revision path is refused (CS-PROTECTED-AUTHORITY)
+# PASS  AR01d State bytes are untouched after the refused generic Spec-authority CAS
+# Feature "ar-feat" set. Plan path: specs/ar-feat/prd_ar-feat.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PASS  AR02a plan exit 0 and emits pipeline.continuity-authority-revision-plan.v1
+# PASS  AR02b plan intent binds featureId/revision/preStateSha256/oldAuthority/nextAuthority/decision/candidate/evidence/idempotencyKey/expiresAt
+# PASS  AR02c plan writes NO State (byte-identical before/after)
+# Feature "ar-feat" set. Plan path: specs/ar-feat/prd_ar-feat.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PASS  AR03a apply succeeds and returns status applied with the new revision
+# PASS  AR03b the persisted State's continuity.authority reads back the exact new authority
+# Feature "ar-feat" set. Plan path: specs/ar-feat/prd_ar-feat.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PASS  AR03c a next-authority artifact drift AFTER plan (TOCTOU) is refused at apply time, zero mutation
+# PASS  AR03d State is untouched after the TOCTOU refusal
+# Feature "ar-feat" set. Plan path: specs/ar-feat/prd_ar-feat.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# CS-CAS-APPLIED: continuity revision 1 written.
+# PASS  AR03e-setup an unrelated continuity-cas advances State to revision 1 before apply
+# PASS  AR03f apply's own fresh recheck (not the stale plan) catches the State preimage drift and refuses (AR-REVISION-STALE)
+# PASS  AR03g State is untouched after the preimage-drift refusal
+# Feature "ar-feat" set. Plan path: specs/ar-feat/prd_ar-feat.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# Plan submitted by "coordinator" on 2026-07-07T21:00:00.000Z; lifecycle="awaiting-approval".
+# Plan approved by "po-test" on 2026-07-07T21:00:00.000Z; lifecycle="approved".
+# Phase set: "implementation"; lifecycle="implementing".
+# PASS  AR03h-setup a real plan-approval lifecycle moves the active feature to implementation phase after the AR plan was already built
+# PASS  AR03h PX0-AC-03: apply refuses (AR-DECISION-SCOPE) when the active feature's phase has moved away from design between plan and apply
+# PASS  AR03i State is untouched by the refused apply itself
+# Feature "ar-feat" set. Plan path: specs/ar-feat/prd_ar-feat.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PASS  AR04a mismatched featureId is refused (AR-FEATURE-MISMATCH), zero mutation
+# Feature "ar-feat" set. Plan path: specs/ar-feat/prd_ar-feat.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PASS  AR04b stale expectedRevision is refused (AR-REVISION-STALE)
+# Feature "ar-feat" set. Plan path: specs/ar-feat/prd_ar-feat.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PASS  AR04c stale preStateSha256 is refused (AR-PRESTATE-STALE)
+# Feature "ar-feat" set. Plan path: specs/ar-feat/prd_ar-feat.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PASS  AR04d old-authority digest mismatch vs live State is refused (AR-OLD-AUTHORITY-STALE)
+# Feature "ar-feat" set. Plan path: specs/ar-feat/prd_ar-feat.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PASS  AR04e new-authority digest not matching the actual current file bytes is refused (AR-NEXT-AUTHORITY-STALE)
+# Feature "ar-feat" set. Plan path: specs/ar-feat/prd_ar-feat.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PASS  AR04f an already-expired expiresAt is refused (AR-EXPIRED)
+# Feature "ar-feat" set. Plan path: specs/ar-feat/prd_ar-feat.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PASS  AR04g a candidate not matching the observed git candidate is refused (AR-CANDIDATE-STALE)
+# Feature "ar-feat" set. Plan path: specs/ar-feat/prd_ar-feat.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PASS  AR04h an out-of-scope decision phase is refused closed (the closed intent shape itself fixes phase=design)
+# Feature "ar-feat" set. Plan path: specs/ar-feat/prd_ar-feat.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PASS  AR04i-setup first apply succeeds
+# PASS  AR04i a different proposal reusing the same idempotencyKey against now-stale revision/preState fails closed
+# Feature "ar-feat" set. Plan path: specs/ar-feat/prd_ar-feat.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PASS  AR05a receipt has the stable operation/reason classes, references and a typed outcome
+# PASS  AR05b the apply receipt contains NO absolute path, repo root, /home/, /tmp/ or a root/dir key
+# PASS  AR05c the plan payload (the pre-image of the receipt) is equally free of any absolute path or root/dir key
+# Feature "ar-feat" set. Plan path: specs/ar-feat/prd_ar-feat.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PASS  AR05d-setup apply succeeds
+# PASS  AR05d PX0-AC-05: the receipt is durably retained in State (not only journal/stdout), correlated via intentSha256
+# PASS  AR05e the private recovery journal is retired after a clean apply -- AR05d's receipt above was read from State, not from it
+# Feature "ar-feat" set. Plan path: specs/ar-feat/prd_ar-feat.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PASS  AR05f-setup apply interrupted after journal publication
+# PASS  AR05f-setup2 recover rolls forward to the postimage
+# PASS  AR05f PX0-AC-05: the receipt is durably retained in State even when the postimage is reached via recovery, not a fresh apply
+# Feature "ar-feat" set. Plan path: specs/ar-feat/prd_ar-feat.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PASS  AR06a recover with no retained journal reports status clean
+# Feature "ar-feat" set. Plan path: specs/ar-feat/prd_ar-feat.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PASS  AR06b-1 apply interrupted after journal publication refuses and names the journal as retained
+# PASS  AR06b-2 State is still exactly the preimage after the interruption
+# PASS  AR06b-3 recover rolls forward to the exact intended postimage despite a decoy temp file AND a since-changed git candidate
+# PASS  AR06b-4 the persisted State now carries exactly the planned postimage authority
+# PASS  AR06b-5 a second recover afterwards reports clean (journal retired)
+# Feature "ar-feat" set. Plan path: specs/ar-feat/prd_ar-feat.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PASS  AR06c-1 apply interrupted after the State write refuses and names the journal as retained
+# PASS  AR06c-2 recover finds the durable stage already reached and only retires (mutated: false)
+# Feature "ar-feat" set. Plan path: specs/ar-feat/prd_ar-feat.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PASS  AR06d recover reports diverged and retains the journal rather than guessing
+# PASS  AR06d recover attempted zero writes on divergence
+# Feature "ar-feat" set. Plan path: specs/ar-feat/prd_ar-feat.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PASS  AR06e-setup0 plan still valid against the fixed 12:00:00 clock (expires 12:00:05)
+# PASS  AR06e-setup1 apply interrupted after journal publication, State still exactly the preimage
+# PASS  AR06e PX0-AC-06: recover reports recovered-preimage (not recovered-postimage) once the frozen decision's expiresAt has passed
+# PASS  AR06e-2 State remains byte-identical to the preimage -- the postimage was NOT written
+# PASS  AR06e-3 a second recover afterwards reports clean (journal retired)
+# Feature "ar-feat" set. Plan path: specs/ar-feat/prd_ar-feat.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PASS  AR06f-setup apply interrupted after journal publication
+# PASS  AR06f PX0-AC-06: recover still rolls forward to recovered-postimage when the frozen expiresAt has NOT yet passed
+# PASS  AR06f-2 the persisted State carries exactly the planned postimage authority
+# Feature "ar-feat" set. Plan path: specs/ar-feat/prd_ar-feat.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PASS  AR06g-setup0 plan still valid against the fixed 12:00:00 clock (expires 12:00:05)
+# PASS  AR06g-setup1 the frozen plan's own receipt carries casOutcome "applied" (the value this branch must NOT echo)
+# PASS  AR06g-setup2 apply interrupted after journal publication, State still exactly the preimage
+# PASS  AR06g PX0-AC-06 casOutcome regression: recovered-preimage echoes receipt.casOutcome "stale", alongside the existing status/mutated invariant (not weakened, added to)
+# PASS  AR06g-2 State remains byte-identical to the preimage -- the postimage was NOT written
+# Feature "ar-feat" set. Plan path: specs/ar-feat/prd_ar-feat.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PASS  AR06h-setup1 apply interrupted after journal publication, State still exactly the preimage
+# PASS  AR06h-setup2 the genuine interrupted journal is v2-shaped with a frozen expiresAt (setup sanity)
+# PASS  AR06h-setup3 the on-disk HMAC key is the expected 32 bytes
+# PASS  AR06h PX0-AC-06/F2: a .v1-shaped legacy journal loads via the expiresAt:null sentinel and completes recovery to the postimage
+# PASS  AR06h-2 the persisted State carries exactly the planned postimage authority
+# PASS  AR06h-3 a second recover afterwards reports clean (journal retired)
+# Feature "ar-feat" set. Plan path: specs/ar-feat/prd_ar-feat.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PASS  AR06i-setup1 apply interrupted after journal publication, State still exactly the preimage
+# PASS  AR06i a journal shaped like neither valid .v1 nor .v2 (missing receipt) fails closed with AR-JOURNAL, not silently accepted
+# PASS  AR06i-2 State remains byte-identical to the preimage -- zero mutation on the malformed-journal refusal
+# Feature "ar-feat" set. Plan path: specs/ar-feat/prd_ar-feat.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PASS  AR07a-setup first apply succeeds
+# PASS  AR07a the exact same completed request replayed is a verified zero-write success
+# PASS  AR07a-2 State bytes are byte-identical after the replay (zero-write)
+# Feature "ar-feat" set. Plan path: specs/ar-feat/prd_ar-feat.md. planApproved=false, phase="design".
+# PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+# PASS  AR07b-setup foreign lock acquired
+# PASS  AR07b a concurrent second writer is refused closed (writer lock unavailable)
+# PASS  AR07b-2 State is preserved exactly as the first read-back authority (untouched)
+# PASS  RGa plan is an actionable reconcile-preview carrying the shared plan schema
+# PASS  RGa the plan reports exactly one change: the prd's old->new digest pair
+# PASS  RGa preimage/postimage keep state/candidate/supersedes/artifact-set&order identical except the one digest
+# PASS  RGa2 an already-fresh package (no stale digest) reconciles to noop
+# PASS  RGb a digest-only postimage passes the no-drift invariant
+# PASS  RGb2 a postimage that ALSO changes a second field (state) is refused by the invariant
+# PASS  RGb3 a postimage that changes the candidate binding is refused by the invariant
+# PASS  RGb4 a postimage that reorders the artifact set is refused by the invariant
+# PASS  RGc fixture reconcile preview is actionable (sanity)
+# PASS  RGc reconcile apply succeeds and returns the pipeline.feature-package-reconcile.v1 receipt
+# PASS  RGc persisted manifest has ONLY the prd digest changed; state/candidate/supersedes/other artifacts untouched
+# PASS  RGc DoD 7: the persisted manifest is re-read and re-validates ok through the accepted validator before the journal retires
+# PASS  RGd a drifted artifact since the preview is refused (stale --plan-sha256), zero mutation
+# PASS  RGd the manifest is untouched after the refusal
+# PASS  RGe apply with no injected approval function fails closed (FTP-RECONCILE-APPROVAL-UNAVAILABLE)
+# PASS  RGe apply with a rejected approval fails closed (FTP-RECONCILE-APPROVAL-REJECTED)
+# PASS  RGe zero mutation: the manifest bytes are byte-identical before and after both refusals
+# PASS  RGf a manual hand-edit of the manifest's digest cannot stand in for the reconcile transaction
+# PASS  RGf the hand-edited manifest was not further mutated by the refused apply
+# PASS  RGg1 a Result reconcile with no Continuity State binding is refused (reconcile-result-unbound)
+# PASS  RGg2 a Result digest refresh with no canonical fence marker is refused BY NAME (reconcile-result-metadata-only)
+# PASS  RGg3 a Result whose preserved prefix does not hash to the stale digest is refused (reconcile-result-fence-mismatch), distinct from RGg2's code
+# PASS  RGg4 a Result whose fenced prefix DOES hash to the stale digest and IS Continuity-bound is admitted
+# PASS  RGh interrupted after journal publication refuses, ending in 'recovery journal retained.'
+# PASS  RGh the manifest bytes are untouched (the journal precedes the write)
+# PASS  RGh the unmodified feature-package-recover diagnoses the retained reconcile journal as not-yet-applied
+# PASS  RGi signature-mode default approval: a genuine Ed25519 proof over the real subject verifies and the reconcile applies
+# PASS  RGi-2 the manifest was actually rewritten -- the default approval genuinely gated a real write, not a no-op
+# PASS  RGj chat-mode default approval: --by alone (no proof flags) succeeds when gates.reconcile_approval is chat
+# PASS  RGk signature mode with --by but no --proof-* flags is refused (FTP-RECONCILE-APPROVAL-REJECTED), zero mutation
+# PASS  RGl a proof bound to a DIFFERENT candidate than the one the reconcile actually observes is refused, zero mutation
+# PASS  RGm the approval reads gates.reconcile_approval and Continuity State from `dir`, never `--root` -- root's committed chat is ignored, dir's un-configured signature default still demands a proof
+# PASS  RGn push's CRITICAL-PROOF-POLICY-KIND-REQUIRED refusal is byte-identical to before the ALWAYS_REQUIRED_KINDS bypass -- the bypass is scoped to feature-package-reconcile only
+# PASS  RGn-2 state is left absent -- zero mutation on the kind-required refusal
+# PASS  RGo first signature-mode reconcile applies
+# FAIL  RGo governing state records featurePackageReconcileApproval.lastApproved with approvedBy/approvedAt/forCommit and a real criticalProof -- {"status":"ok","state":{"schema":"pipeline.state.v0","planApproved":true,"activeFeature":{"id":"pac08-reconcile","planPath":"specs/pac08-reconcile/prd.md","phase":"implementation"},"planApproval":{"poGateAuthority":{"planSha256":"8ca015717717ab3d192bdd3a9334e4c809b64e5de118bb3f09d65be5c835f9f7","specSha256":"ca1e348377045b6cf029c51f147521421067eed8e8717f1127ee54cd5aed17da"}}}}
+# FAIL  RGo criticalProofConsumption carries exactly one entry tagged kind: feature-package-reconcile, matching the recorded criticalProof
+# PASS  RGq-setup the fresh package's subject (manifestRel/planSha256) is byte-identical to RGo's, so proofA's subject binding still matches
+# FAIL  RGq a proof already consumed by an earlier reconcile is refused, zero mutation on the new package's manifest
+# PASS  RGq the governing session's state is byte-identical after the refused replay -- no second consumption entry, no lastApproved overwrite
+# PASS  RGr a different, never-before-used genuine proof against the SAME governing dir succeeds
+# FAIL  RGr the governing state now carries TWO consumption entries (RGo's + RGr's), both tagged feature-package-reconcile, and lastApproved now reflects RGr's own distinct proof
+# PASS  RGp chat-mode reconcile applies
+# FAIL  RGp chat-mode approval is commit-bound and attributed even though criticalProof is null -- {"status":"ok","state":{"schema":"pipeline.state.v0","planApproved":true,"activeFeature":{"id":"pac08-reconcile","planPath":"specs/pac08-reconcile/prd.md","phase":"implementation"},"planApproval":{"poGateAuthority":{"planSha256":"8ca015717717ab3d192bdd3a9334e4c809b64e5de118bb3f09d65be5c835f9f7","specSha256":"ca1e348377045b6cf029c51f147521421067eed8e8717f1127ee54cd5aed17da"}}}}
+# PASS  RGp no criticalProofConsumption entry is added in chat mode (nothing to consume)
+# 496/501 cases passed.
+# Failures:
+#   - RGo governing state records featurePackageReconcileApproval.lastApproved with approvedBy/approvedAt/forCommit and a real criticalProof: {"status":"ok","state":{"schema":"pipeline.state.v0","planApproved":true,"activeFeature":{"id":"pac08-reconcile","planPath":"specs/pac08-reconcile/prd.md","phase":"implementation"},"planApproval":{"poGateAuthority":{"planSha256":"8ca015717717ab3d192bdd3a9334e4c809b64e5de118bb3f09d65be5c835f9f7","specSha256":"ca1e348377045b6cf029c51f147521421067eed8e8717f1127ee54cd5aed17da"}}}}
+#   - RGo criticalProofConsumption carries exactly one entry tagged kind: feature-package-reconcile, matching the recorded criticalProof
+#   - RGq a proof already consumed by an earlier reconcile is refused, zero mutation on the new package's manifest
+#   - RGr the governing state now carries TWO consumption entries (RGo's + RGr's), both tagged feature-package-reconcile, and lastApproved now reflects RGr's own distinct proof
+#   - RGp chat-mode approval is commit-bound and attributed even though criticalProof is null: {"status":"ok","state":{"schema":"pipeline.state.v0","planApproved":true,"activeFeature":{"id":"pac08-reconcile","planPath":"specs/pac08-reconcile/prd.md","phase":"implementation"},"planApproval":{"poGateAuthority":{"planSha256":"8ca015717717ab3d192bdd3a9334e4c809b64e5de118bb3f09d65be5c835f9f7","specSha256":"ca1e348377045b6cf029c51f147521421067eed8e8717f1127ee54cd5aed17da"}}}}
+# Subtest: harness/scripts/pipeline-state.test.mjs
+not ok 1 - harness/scripts/pipeline-state.test.mjs
+  ---
+  duration_ms: 5044.43794
+  type: 'test'
+  location: '/home/skar667/src/agent-pipeline-shared_phoenix/harness/scripts/pipeline-state.test.mjs:1:1'
+  failureType: 'testCodeFailure'
+  exitCode: 1
+  signal: ~
+  error: 'test failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 0
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 5061.900545

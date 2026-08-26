@@ -1,0 +1,16 @@
+fix(phoenix): retract two stale not-started findings, reconfirm two others
+
+Re-measures A-AC-03, A-AC-09, P-AC-09, EPIC-AC-02 against HEAD -- unmeasured
+since the first two 2026-08-08 passes (tags C/J) despite dozens of later
+implementation waves. A-AC-09 and P-AC-09 had real, tested, never-credited
+carriers (governance-event-store.mjs's sampled-out capture decision;
+organization-policy-activation.mjs's backfillRange preview, already credited
+to P-AC-03) -- both move designed-only/not-started -> partial, capped there
+per this repo's implemented-needs-Critic-PASS rule. A-AC-03 and EPIC-AC-02
+are reconfirmed with no carrier found; verdicts unchanged. Also corrects the
+--mode closure map: PX0-AC-05/PX0-AC-13 move build -> po, since DELTA-0811
+already found their code+tests complete, leaving only an independent Critic
+PASS as the remaining blocker.
+
+Dispatch: PHX-WP-DELTA-STALE4 (goldfish)
+AI-Assisted: true

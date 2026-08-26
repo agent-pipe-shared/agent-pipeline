@@ -1,0 +1,46 @@
+{
+  "taskId": "PHX-WP-PAC08-LOCK-REENTRANCY",
+  "model": "claude-opus-5",
+  "rulesetSha": "ce50d74d16fdbcd0b9f8b3b606297e88af3d2f139b3cd14b692f4ea15599b023",
+  "dispatcher": "elephant",
+  "outcome": "success",
+  "commit": "3e1a727e",
+  "report": "See final assistant message returned to the dispatcher for the full mandatory-format report (DoD results, evidence pointers, mechanism rationale, changed files, deliberately-not-changed, deviations, open items).",
+  "log": [
+    {
+      "phase": "opening",
+      "toolUseCount": 3,
+      "note": "Dispatch record created as opening act, before any context-file reading or code edit."
+    },
+    {
+      "phase": "design",
+      "toolUseCount": 44,
+      "note": "Read acceptance.md P-AC-08, Critic review pac08-fb-critic-review-5420c5e7.md (F1/F2/F3), and the named pipeline-state.mjs/pipeline-state.test.mjs regions. Rejected the offered candidate (module-level path-based reentrant lock, blind to caller identity) after finding it would flip PS44Vc (an existing in-process foreign-contender mutual-exclusion test at harness/scripts/pipeline-state.test.mjs:2216-2224) from a correct refusal to an incorrect success, because that test's synthetic contender call is ALSO nested inside the same held lock's critical section, indistinguishable from the legitimate reentrant case by path alone. Chose instead an explicit lock-handoff: runFeaturePackageReconcileCommand passes its own held lock (holderLock/holderRoot) into the approval call; defaultFeaturePackageReconcileApproval reuses it (only when resolved lock paths match) via a new writeState(..., { reuseLock }) option, instead of acquiring a second lock. acquireContinuityLock/releaseContinuityLock are left byte-identical -- zero risk to PS41/PS44V/PS46-52/AR07."
+    },
+    {
+      "phase": "implementation",
+      "toolUseCount": 44,
+      "note": "Applied 5 edits to plugins/pipeline-core/scripts/pipeline-state.mjs: (1) approval call site adds holderLock/holderRoot and branches the refusal message on CRITICAL-PROOF-REPLAY (F3); (2) defaultFeaturePackageReconcileApproval closure signature + doc comment; (3) its writeState call computes reuseLock from resolved-path equality; (4) writeState(dir, state, expectedState, options) accepts options.reuseLock; (5) writeState's finally only releases when it acquired the lock itself. Not yet run; not yet committed."
+    },
+    {
+      "phase": "test-authoring",
+      "toolUseCount": 46,
+      "note": "Added RGs/RGs-2/RGs-3 to harness/scripts/pipeline-state.test.mjs (deps.dir omitted, --root == projectDir() via a save/restore try/finally CLAUDE_PROJECT_DIR override, seeded as both a reconcile package and a governing session in the same fx.dir). Updated RGq's assertion to check the corrected CRITICAL-PROOF-REPLAY message and the absence of the generic FTP-RECONCILE-APPROVAL-REJECTED text."
+    },
+    {
+      "phase": "reproduce-first-red",
+      "toolUseCount": 51,
+      "note": "Reverted only writeState's reuseLock consumption (1 edit: reusedLock forced to undefined) to reproduce the pre-fix collision, then ran node --test --test-reporter=tap --test-reporter-destination=specs/sprint-phoenix-epic/evidence/PHX-WP-PAC08-LOCK-REENTRANCY-red.tap harness/scripts/pipeline-state.test.mjs. Exit code 1. RGs/RGs-2/RGs-3 failed with 'Error: serialized state write failed before commit (PS-CONTINUITY-LOCKED); zero mutation' (tap:819-822); every other case, including RGq (F3, not reverted), passed. Restored the writeState edit immediately after."
+    },
+    {
+      "phase": "green-verify",
+      "toolUseCount": 55,
+      "note": "Ran node --test --test-reporter=tap --test-reporter-destination=specs/sprint-phoenix-epic/evidence/PHX-WP-PAC08-LOCK-REENTRANCY-green.tap harness/scripts/pipeline-state.test.mjs (exit 0, 504/504 cases, 0 FAIL lines) and separately node --test harness/scripts/pipeline-state.test.mjs (the exact briefed verify command, exit 0, '504/504 cases passed.', ok 1/fail 0). Confirmed by grep: PS41a-PS41d PASS, RGi-RGr PASS, RGs/RGs-2/RGs-3 PASS, PS44Vc (foreign same-process contender, the case that falsified the offered candidate reentrancy design) still PASS. No plugins/pipeline-core/scripts/pipeline-state.test.mjs duplicate exists (checked via ls; only pipeline-state.mjs is there)."
+    },
+    {
+      "phase": "commit",
+      "toolUseCount": 60,
+      "note": "git add -- plugins/pipeline-core/scripts/pipeline-state.mjs harness/scripts/pipeline-state.test.mjs; git commit -F specs/sprint-phoenix-epic/evidence/PHX-WP-PAC08-LOCK-REENTRANCY.commit-msg.txt -- <same two paths> (heredoc -m rejected by the shell grammar guard, used -F with an in-repo message file instead, since a scratchpad write outside the project root was blocked by GUARD-CROSS-REPO-MUTATION). Commit 3e1a727e. git status clean afterward for tracked paths."
+    }
+  ]
+}
