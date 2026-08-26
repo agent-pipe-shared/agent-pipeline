@@ -108,7 +108,7 @@ Six mandatory sections, in this order (report language: English, ADR-0011):
 - **Why condensed:** the report returns into the Elephant's context — it must carry decisions and evidence, not noise. Why "Deliberately not changed": it protects scope discipline while preserving observations that would otherwise be lost.
 - **Check:** Format check by the Elephant at the gate; missing evidence section = automatic rework.
 
-**Light-profile variant (GF-09-light).** When the dispatch briefing sets `Profil: light` (stage-0 / uniform-mechanical tasks, `docs/operating-model.md` — *Rigor, risk and gates*), a condensed **3-field** report replaces the six sections above:
+**Light-profile variant (GF-09-light).** When the dispatch briefing sets `Profil: light` (stage-0 / uniform-mechanical tasks, `docs/operating-model.md` §3.3), a condensed **3-field** report replaces the six sections above:
 
 1. **DoD + evidence** — result per DoD check (`passed` / `failed` / `not verifiable`) AND the machine-written evidence artifact (path + exact command + exit code). GF-08 is unchanged: no machine artifact = unverified.
 2. **Changed files** — each with a one-line rationale.

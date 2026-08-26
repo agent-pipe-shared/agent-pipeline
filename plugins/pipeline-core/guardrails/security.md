@@ -176,12 +176,13 @@ new term for this case).
   at the accepted ceiling for human-facing friction; a new proposal that
   would add to it needs the PO's explicit, threat-model-aware sign-off,
   never an Elephant default.
-- **Why:** PO ruling (2026-08-07, verbatim): *"PO schlüssel?! ne jetzt
-  übertreiben wir hier wieder! wir sichern den agenten ab und nicht den
-  human. Das signieren ausserhalb ist schon heftig genug."* — stated while
-  rejecting a proposed second PO-held release-signing key, and generalized
-  by the PO as a standing scope rule for this repository's guard work, not
-  a one-off rejection of that specific proposal.
+- **Why:** PO ruling (2026-08-07, translated from the original German):
+  *"A PO key?! No — we're overdoing it again here! We secure against the
+  agent, not against the human. The external signing step alone is
+  already burden enough."* — stated while rejecting a proposed second
+  PO-held release-signing key, and generalized by the PO as a standing
+  scope rule for this repository's guard work, not a one-off rejection of
+  that specific proposal.
 - **Verification:** A design/ADR proposing a new human-facing signing/
   approval mechanism names, explicitly, which agent-side threat it closes;
   a proposal whose only justification is human-adversary resistance is a

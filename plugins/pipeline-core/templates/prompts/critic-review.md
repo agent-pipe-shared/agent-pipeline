@@ -250,6 +250,20 @@ session's START, not now — never use it as a freshness reference; your diff
 and commit state come exclusively from {{COMMIT_SHAS}} above, confirmed via
 your own `git diff`/`git show`.
 
+**The same staleness applies to the auto-injected CLAUDE.md TEXT itself, and
+it has produced false blocker findings twice.** The copy pasted into your
+prompt is the file as it stood when the PARENT session started, which may be
+many commits — or an entire unfinished merge — ago. During a merge it can
+still contain raw conflict markers that the working tree no longer has. Twice
+in one session a reviewer read those markers out of its own prompt and
+reported "CLAUDE.md carries unresolved conflict markers" as a finding; both
+times the file on disk and at HEAD was clean. **Never cite the injected
+CLAUDE.md text as evidence about the file's current content.** If a rule's
+present wording matters to a finding, read the file yourself with your
+Read/Grep grant, or `git show <sha>:CLAUDE.md` at a commit from the review
+object. The injected copy is context for orienting you, never an artifact
+under review.
+
 **Scratchpad isolation (evidence-contamination guard):** the scratch location
 is the project's own `scratch/dispatch/` directory — inside the repository,
 gitignored, reused by every session, and never an external host-temp path; no
