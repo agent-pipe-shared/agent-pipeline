@@ -7,7 +7,7 @@ status: closed
 created: 2026-08-19
 closed_at: "2026-08-23"
 closure_repository: "self"
-closure_commit: "40fe7258dc66bde8e6d305627bb83312ea068dfd"
+closure_commit: "887ac164e61fdb81effe8de50e2464ff95753e6c"
 closure_evidence: "plugins/pipeline-core/lib/human-guard-override.test.mjs"
 source: "Split out of backlog/items/2026-08-07-gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger.md at its close (2026-08-19) -- that item's HGO hook-side (denial+consumption) ledger emission landed and is tested; its CLI-side (granted) wiring hit a genuine architectural conflict, was correctly reverted, and needs a design review rather than a fourth goldfish-scale dispatch on the same file."
 ---
