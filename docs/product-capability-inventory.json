@@ -137,6 +137,12 @@
       "member": "guard-devplan"
     },
     {
+      "surfaceId": "guard:plugins/pipeline-core/hooks/guard-dispatch-budget.mjs:guard-dispatch-budget",
+      "kind": "guard",
+      "path": "plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+      "member": "guard-dispatch-budget"
+    },
+    {
       "surfaceId": "guard:plugins/pipeline-core/hooks/guard-dispatch.mjs:guard-dispatch",
       "kind": "guard",
       "path": "plugins/pipeline-core/hooks/guard-dispatch.mjs",
@@ -3381,6 +3387,7 @@
       "surfaceIds": [
         "guard:plugins/pipeline-core/hooks/guard-apply-patch.mjs:guard-apply-patch",
         "guard:plugins/pipeline-core/hooks/guard-devplan.mjs:guard-devplan",
+        "guard:plugins/pipeline-core/hooks/guard-dispatch-budget.mjs:guard-dispatch-budget",
         "guard:plugins/pipeline-core/hooks/guard-dispatch.mjs:guard-dispatch",
         "guard:plugins/pipeline-core/hooks/guard-el01-tripwire.mjs:guard-el01-tripwire",
         "guard:plugins/pipeline-core/hooks/guard-gate-strength.mjs:guard-gate-strength",
