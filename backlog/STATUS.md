@@ -14,6 +14,7 @@
 | pipeline.a-deferred-item-is-terminal-so-a-live-defect-can-be-parked-invisibly | open | defect | pipeline | 2026-08-31 | — |
 | pipeline.a-dirty-claude-directory-blocks-verify-which-blocks-push-approval | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.a-doc-edit-silently-obligates-its-vendored-copy | open | defect | pipeline | 2026-09-01 | — |
+| pipeline.a-fresh-clone-loses-all-machine-local-pipeline-state-with-no-provisioning-readback | open | defect | pipeline | 2026-08-27 | — |
 | pipeline.a-ledger-entry-stores-an-abbreviated-oid-the-hash-chain-blocks-repair | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.a-node-script-defeats-every-file-protection-guard | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.a-promoted-feature-can-never-pass-the-plan-gate | closed | defect | pipeline | 2026-08-07 | — |
@@ -620,7 +621,7 @@
 
 ## Counts
 
-- open: 108
+- open: 110
 - in_progress: 0
 - closed: 488
 - rejected: 3
