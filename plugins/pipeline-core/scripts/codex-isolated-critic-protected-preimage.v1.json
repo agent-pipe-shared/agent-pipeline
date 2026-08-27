@@ -8,7 +8,7 @@
     },
     {
       "path": "plugins/pipeline-core/agents/critic.md",
-      "rawSha256": "3a293cf1657bfda4a36a5d05c84664088c3e8f2873873bbe3e9eb51eb10a2085"
+      "rawSha256": "ca4e896cbd2922831cbcc1473992b41b8f6b424295e940cc8df75df889f7d98c"
     },
     {
       "path": "plugins/pipeline-core/scripts/codex-critic-dispatch.schema.json",
@@ -36,7 +36,7 @@
     },
     {
       "path": "roles/critic.md",
-      "rawSha256": "68e6d94752a9f7d28f8fa8510ee5d501735e926863065611b1f4238dcc8362f9"
+      "rawSha256": "9584b9b147f5c18f9dc388088fb336ac7718562c00a10ef7b677344ac6b28fae"
     }
   ]
 }
