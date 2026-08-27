@@ -115,8 +115,13 @@ below assumes it holds and is written to catch a change that would break it.
   2026-08-27) added: `lib/onboarding-staging-authoring.mjs`, imported by both
   `guard-gate-strength.mjs` (GS-15) and `guard-lifecycle-ready.mjs` — it holds
   the shared predicate that decides when the GS-15 refusal stands down for the
-  bootstrap-binding staging-PRD/spec authoring admission, so a window covering
-  it would let an edit widen that stand-down.
+  bootstrap-binding design-package authoring admission, so a window covering
+  it would let an edit widen that stand-down. A fifth (NVA-INTAKEARGV-1,
+  2026-08-27) added: `lib/onboarding-argv-shapes.mjs`, reached from
+  `guard-lifecycle-ready.mjs` through both `project-onboarding-v3.mjs` modules —
+  it holds the single declaration of the argv shape the guard admits for every
+  mutating onboarding command, so a window covering it would let one edit widen
+  that admission for all five commands at once.
 - The window record's cryptographic integrity and its TTL.
 - The audit visibility of an open or recently-closed window (the bootstrap
   warning).
