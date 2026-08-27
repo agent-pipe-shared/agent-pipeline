@@ -52,7 +52,7 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { canonicalSha256, parseStrictJson } from "../lib/governance-event.mjs";
 import { readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
 import { readPublicRepositoryFile } from "../lib/threat-model-approval-request.mjs";
-import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
+import { readLocalRepositoryFingerprint } from "../lib/governance-event-store.mjs";
 import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
 import {
   appendHumanGovernanceDecision,
@@ -147,12 +147,18 @@ function currentCandidate(primaryRoot) {
   return { commit: lines[0], tree: lines[1] };
 }
 
-function repositoryFingerprintFor(rootDir) {
+// NVA-REPOID-3: the store's bound identity (readLocalRepositoryFingerprint,
+// f7623bca), not the legacy path-derived derivePoGateRepositoryFingerprint
+// hash -- appendHumanGovernanceDecision/queryHumanGovernanceDecisions both
+// require it exactly. Bind-on-first-use persists a fixed value once minted,
+// so calling this separately in prepare() and install() still yields the
+// SAME fingerprint the PO's signature was computed over.
+async function repositoryFingerprintFor(rootDir) {
   const repo = discoverRepository(rootDir);
-  return { repo, fingerprint: derivePoGateRepositoryFingerprint({ gitCommonDir: repo.commonDir, primaryRoot: repo.primaryRoot }) };
+  return { repo, fingerprint: await readLocalRepositoryFingerprint({ repositoryRoot: repo.primaryRoot }) };
 }
 
-function runPrepare(args) {
+async function runPrepare(args) {
   const rootDir = resolve(args.repoRoot);
   const required = ["decisionId", "packageId", "action", "plan", "spec", "ttlSeconds", "reasonCode", "policyDigest", "ruleDigest", "request"];
   for (const key of required) if (!args[key]) throw new Error(usage);
@@ -160,7 +166,7 @@ function runPrepare(args) {
   if (!Number.isFinite(ttlSeconds) || ttlSeconds <= 0) throw new Error("HAG-TTL-INVALID: ttlSeconds must be a positive number");
   const environment = args.environment ?? "local";
 
-  const { repo, fingerprint } = repositoryFingerprintFor(rootDir);
+  const { repo, fingerprint } = await repositoryFingerprintFor(rootDir);
   const candidate = currentCandidate(repo.primaryRoot);
 
   // F2: read from the AUTHORITATIVE resolved root (`repo.primaryRoot`), never
@@ -247,7 +253,7 @@ async function runInstall(args) {
   // Authoritative repository identity, computed once and reused for both the
   // containment check (F2) and the trust anchor / fingerprint checks below —
   // never the raw `--repo-root` string a caller supplies.
-  const { repo, fingerprint } = repositoryFingerprintFor(rootDir);
+  const { repo, fingerprint } = await repositoryFingerprintFor(rootDir);
   const proof = externalJson(repo.primaryRoot, args.proof);
 
   // F1/N1: the ONLY trust anchor is this repository's own committed

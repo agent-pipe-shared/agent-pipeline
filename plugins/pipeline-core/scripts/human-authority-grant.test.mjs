@@ -10,8 +10,7 @@ import test from "node:test";
 
 import { canonicalizeJson } from "../lib/governance-event.mjs";
 import { queryHumanGovernanceDecisions } from "../lib/human-governance-ledger.mjs";
-import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
-import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
+import { readLocalRepositoryFingerprint } from "../lib/governance-event-store.mjs";
 import { run } from "./human-authority-grant.mjs";
 
 function registry(fingerprint) {
@@ -62,8 +61,10 @@ async function fixture(keys) {
   execFileSync("git", ["init", "-q", root]);
   execFileSync("git", ["-C", root, "add", "-A"]);
   execFileSync("git", ["-C", root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "fixture"]);
-  const repository = discoverRepository(root);
-  const fingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: repository.commonDir, primaryRoot: repository.primaryRoot });
+  // NVA-REPOID-3: the store's bound identity, matching what
+  // scripts/human-authority-grant.mjs's own repositoryFingerprintFor() now
+  // reads (readLocalRepositoryFingerprint) -- not the legacy path-derived hash.
+  const fingerprint = await readLocalRepositoryFingerprint({ repositoryRoot: root });
   const policy = capturePolicy();
   await mkdir(path.join(root, "governance/events"), { recursive: true });
   await writeFile(path.join(root, "governance/events/registry.json"), `${canonicalizeJson(registry(fingerprint))}\n`);
