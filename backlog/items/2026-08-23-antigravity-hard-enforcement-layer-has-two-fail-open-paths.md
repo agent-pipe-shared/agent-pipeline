@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.antigravity-hard-enforcement-layer-has-two-fail-open-paths
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-23
+closed_at: "2026-08-27"
+closure_repository: "self"
+closure_commit: "ab347a74fd9750a17de610ed3d5ff958c313a336"
+closure_evidence: "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs"
 source: "Critic review finding F8, specs/sprint-agy-runner/evidence/2026-08-23-critic-review-agy-runner.md"
 due: 2026-08-30
 ---
@@ -61,6 +65,16 @@ in point 2:
   the mandatory-bootstrap hard block) is entirely inert whenever the
   Antigravity daemon cannot resolve `node`; nothing in-repo can detect or
   fix this from inside a hook that never runs.
+  **Superseded 2026-08-27 — this sentence is no longer true.** The
+  "candidate future direction" named at the end of this Proposal was built:
+  `observeAntigravityHardEnforcement()`
+  (`plugins/pipeline-core/scripts/pipeline-start-preflight.mjs`, commit
+  `ab347a74`) is a non-hook-based self-check that scans
+  `.git/agent-pipeline/run/session-*/requires-bootstrap.lock` for a
+  sufficiently fresh mtime and emits a typed warning when none is found. It
+  detects its own layer's non-invocation from outside the layer, which is
+  exactly the property a hook-based check cannot have. See the closure note
+  at the end of this item.
 - **Owner:** Product Owner (PO) — QG-06's own text names the gate owner as
   "the PO"; `docs/sprint-cyborg-tp-waiver.md` is this repository's precedent
   for stating that literally ("**Owner:** Product Owner (PO)").
@@ -96,3 +110,29 @@ purely from the operator noticing nothing was ever blocked.
 - **Assignment (if accepted):** n/a — QG-06 record, self-scheduled re-review
   at expiry.
 - **Date:** 2026-08-24
+
+## Closure (2026-08-27)
+
+Closed three days ahead of its own `due:` re-triage date, because the residual
+it was holding open has actually been addressed rather than merely re-dated.
+
+Point 1 (the swallowed-error fix) was already confirmed landed at triage time,
+commit `3ae43380`.
+
+Point 2 is closed by commit `ab347a74`, "feat(preflight): detect whether the
+Antigravity hard-enforcement hook fired this session". It implements the exact
+shape this item's own Proposal named as the candidate future direction: a
+self-check that is not itself a hook, verifying from outside the enforcement
+layer that at least one hard-enforcement hook actually executed this session.
+`observeAntigravityHardEnforcement()` is wired into
+`pipeline-start-preflight.mjs` for the Antigravity runner and returns a typed
+warning when no sufficiently fresh bootstrap lock is found. A future mtime is
+deliberately not trusted as freshness.
+
+**What this closure does NOT claim**, stated so it is not read as broader than
+it is: the observation is Antigravity-scoped, which is correct for this item
+but leaves the general question open — nobody currently answers "are the guards
+firing in this session the ones this checkout defines". That gap is tracked
+separately in
+`backlog/items/2026-08-27-a-repository-agent-definition-is-inert-the-runtime-loads-the-installed-copy.md`,
+where it was measured costing two dispatches their reports on 2026-08-27.
