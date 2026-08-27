@@ -100,6 +100,12 @@ const SESSION_CAPABILITY_DIAGNOSE_SCRIPT = fileURLToPath(new URL("../scripts/ses
 const PIPELINE_STATE_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url));
 const PO_PROFILE_REPAIR_SCRIPT = fileURLToPath(new URL("../scripts/po-gate-profile-repair.mjs", import.meta.url));
 const PROJECT_AUTHORITY_MIGRATION_SCRIPT = fileURLToPath(new URL("../scripts/project-authority-migration.mjs", import.meta.url));
+// NVA-VERIFYGREEN-1: sanctionedMigrationArgs()'s own script -- distinct from
+// PROJECT_AUTHORITY_MIGRATION_SCRIPT just above, which is project-authority-migration.mjs and is
+// gated by a different guard function (sanctionedProjectAuthorityMigrationArgs()). This is the
+// runner-profile-migration-v3.mjs the MIGRATION_SCRIPT constant in guard-lifecycle-ready.mjs
+// resolves to; the test file previously had zero coverage of this script's admission branch.
+const RUNNER_PROFILE_MIGRATION_SCRIPT = fileURLToPath(new URL("../scripts/runner-profile-migration-v3.mjs", import.meta.url));
 const RESUME_HINT_SCRIPT = fileURLToPath(new URL("../scripts/resume-hint.mjs", import.meta.url));
 const HUMAN_OVERRIDE_SCRIPT = fileURLToPath(new URL("../scripts/guard-human-override.mjs", import.meta.url));
 const PRIVATE_OVERLAY_SCRIPT = fileURLToPath(new URL("../scripts/codex-private-overlay-activation.mjs", import.meta.url));
@@ -2245,6 +2251,106 @@ test("NVA-W5-GUARDADMIT-1: intake-consent-apply admits exactly the full-bundle s
       `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --git-author-name 'PO Name' --git-author-email 'po@example.com' --language en --profile epic --activate --extra flag`,
       // wrong --root
       `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root /tmp/other --granted --git-author-name 'PO Name' --git-author-email 'po@example.com' --language en --profile epic --activate`,
+    ]) {
+      assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
+ * NVA-VERIFYGREEN-1: regression test for an observed autonomous-onboarding failure. A live
+ * Antigravity run supplied consent alone -- --granted/--activate only, none of the four
+ * individually-optional value flags (--git-author-name/--git-author-email/--language/
+ * --profile) -- and was refused, even though applyOnboardingIntakeConsent
+ * (onboarding-continuity.mjs) never requires any of the four (NVA-BOOTADMIT-2 above already
+ * widened the branch to admit this shape; this pins it against regression). The test above
+ * ("intake-consent-apply admits exactly the full-bundle shape...") only ever omits a SUBSET
+ * of the four together with the other two present -- never all four omitted at once, which is
+ * the exact shape the live run sent.
+ */
+test("NVA-VERIFYGREEN-1: intake-consent-apply admits consent alone (--granted/--activate, no optional value flags) and refuses a duplicated flag", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const consentAlone = `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --activate`;
+    assert.equal(isSanctionedLifecycleCommand(consentAlone, path), true, consentAlone);
+    // Flag order is insensitive here too (NVA-BOOTADMIT-2), so the two bare flags in either
+    // order both admit -- proving the admission is not an accidental side effect of position.
+    const consentAloneReordered = `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --activate --granted`;
+    assert.equal(isSanctionedLifecycleCommand(consentAloneReordered, path), true, consentAloneReordered);
+    // NVA-VERIFYGREEN-1: the exactness invariant matchFlagSpec() upholds beyond the target
+    // parsers it gates -- both project-onboarding-v3.mjs's parse() and
+    // runner-profile-migration-v3.mjs's parseArgs() below let a duplicated flag silently win
+    // last (last-write-wins on the parsed value/boolean); matchFlagSpec() refuses a duplicate
+    // outright instead of matching either target's leniency here. The undeclared-flag, wrong
+    // --root, and out-of-set --language/--profile negatives for this branch are already pinned
+    // by the "full-bundle shape" test directly above (the "extra trailing arg" case there is an
+    // undeclared-flag negative; "wrong --root" and the invalid --language/--profile enum cases
+    // are pinned by name) -- not duplicated here.
+    for (const command of [
+      // duplicated --granted
+      `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --granted --activate`,
+      // duplicated --activate
+      `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --activate --activate`,
+      // duplicated --root
+      `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --root '${path}' --granted --activate`,
+      // duplicated optional value flag (--language), even though it validates the same value twice
+      `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --activate --language en --language en`,
+    ]) {
+      assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
+ * NVA-VERIFYGREEN-1: regression test for an observed autonomous-onboarding failure. A live
+ * Antigravity run invoked runner-profile-migration-v3.mjs's `apply` with `--activate` before
+ * `--root <root>` (flags transposed relative to `apply --root <root> --activate`) and was
+ * refused, even though runner-profile-migration-v3.mjs's own parseArgs() (a flat,
+ * order-insensitive flag walk) accepts either order identically. sanctionedMigrationArgs()
+ * (guard-lifecycle-ready.mjs) had never had a single test in this file before this dispatch --
+ * RUNNER_PROFILE_MIGRATION_SCRIPT above is the first reference to it.
+ */
+test("NVA-VERIFYGREEN-1: runner-profile-migration apply admits --activate before --root, and stays exact everywhere else", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const canonical = `node '${RUNNER_PROFILE_MIGRATION_SCRIPT}' apply --root '${path}' --activate`;
+    assert.equal(isSanctionedLifecycleCommand(canonical, path), true, canonical);
+    // The regression shape itself: --activate before --root.
+    const transposed = `node '${RUNNER_PROFILE_MIGRATION_SCRIPT}' apply --activate --root '${path}'`;
+    assert.equal(isSanctionedLifecycleCommand(transposed, path), true, transposed);
+    // The optional --initialize-missing-runtime flag, in either position relative to the rest.
+    const withInit = `node '${RUNNER_PROFILE_MIGRATION_SCRIPT}' apply --root '${path}' --initialize-missing-runtime --activate`;
+    assert.equal(isSanctionedLifecycleCommand(withInit, path), true, withInit);
+    const withInitTransposed = `node '${RUNNER_PROFILE_MIGRATION_SCRIPT}' apply --activate --initialize-missing-runtime --root '${path}'`;
+    assert.equal(isSanctionedLifecycleCommand(withInitTransposed, path), true, withInitTransposed);
+    // The bare read-only inspect/plan shapes are unaffected by this dispatch; pinned here since
+    // this is this file's first-ever coverage of sanctionedMigrationArgs() at all.
+    assert.equal(isSanctionedLifecycleCommand(`node '${RUNNER_PROFILE_MIGRATION_SCRIPT}' inspect --root '${path}'`, path), true);
+    assert.equal(isSanctionedLifecycleCommand(`node '${RUNNER_PROFILE_MIGRATION_SCRIPT}' plan --root '${path}'`, path), true);
+    // NVA-VERIFYGREEN-1: the exactness invariant -- runner-profile-migration-v3.mjs's own
+    // parseArgs() lets a duplicated flag silently win last (each recognized token just
+    // overwrites `parsed.root`/sets `parsed.activate = true` again); matchFlagSpec() refuses a
+    // duplicate outright instead. The apply branch declares no --language/--profile flags at
+    // all (only --root/--activate/--initialize-missing-runtime), so that half of the exactness
+    // sweep briefed for this piece does not apply to this branch structurally -- there is no
+    // such flag here to test.
+    for (const command of [
+      // duplicated --root
+      `node '${RUNNER_PROFILE_MIGRATION_SCRIPT}' apply --root '${path}' --root '${path}' --activate`,
+      // duplicated --activate
+      `node '${RUNNER_PROFILE_MIGRATION_SCRIPT}' apply --root '${path}' --activate --activate`,
+      // duplicated --initialize-missing-runtime
+      `node '${RUNNER_PROFILE_MIGRATION_SCRIPT}' apply --root '${path}' --initialize-missing-runtime --initialize-missing-runtime --activate`,
+      // undeclared flag
+      `node '${RUNNER_PROFILE_MIGRATION_SCRIPT}' apply --root '${path}' --activate --bogus`,
+      // wrong --root value
+      `node '${RUNNER_PROFILE_MIGRATION_SCRIPT}' apply --root /tmp/other --activate`,
+      // missing --activate (apply requires it)
+      `node '${RUNNER_PROFILE_MIGRATION_SCRIPT}' apply --root '${path}'`,
+      // vendor-sync is not a recognized subcommand for this script (unlike project-authority-migration.mjs)
+      `node '${RUNNER_PROFILE_MIGRATION_SCRIPT}' vendor-sync --root '${path}' --activate`,
     ]) {
       assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
     }
