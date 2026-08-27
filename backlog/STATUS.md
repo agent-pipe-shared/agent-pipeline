@@ -314,6 +314,7 @@
 | pipeline.preflight-user-and-matching-project-scope-still-collide-as-ambiguous | closed | defect | pipeline | 2026-08-11 | — |
 | pipeline.preimage-repin-disclosure-incomplete-for-roles-critic | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.prepared-maintenance-window-dies-at-the-next-commit | closed | defect | pipeline | 2026-08-08 | — |
+| pipeline.pretooluse-guards-do-not-fire-in-dispatched-subagents | open | defect | pipeline | 2026-08-27 | — |
 | pipeline.privacy-review-critic-dispatch-was-time-boxed-not-exhaustive | deferred | workflow-improvement | pipeline | 2026-08-17 | — |
 | pipeline.private-overlay-activation-bridge | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.product-capability-inventory-missing-two-new-guard-hooks | closed | defect | pipeline | 2026-08-19 | — |
@@ -446,7 +447,7 @@
 
 ## Counts
 
-- open: 45
+- open: 46
 - in_progress: 5
 - closed: 374
 - rejected: 3

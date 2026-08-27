@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "45070dc3f285265c80e237025aee184cd97ed99df1fcca25b969ed892084341c"
+    "transitionHead": "03c412e679b90e2a2d5bce84d8c596bce81fafca0c2999b30fca2e1134f1e839"
   },
   "counts": {
-    "open": 45,
+    "open": 46,
     "in_progress": 5,
     "closed": 374,
     "rejected": 3,
@@ -3867,6 +3867,15 @@
       "closureRepository": "self",
       "closureCommit": "2e22cc023491bba454db7ddecb219aa87a9261b4",
       "closureEvidence": "backlog/items/2026-08-08-a-prepared-maintenance-window-dies-at-the-next-commit.md"
+    },
+    {
+      "id": "pipeline.pretooluse-guards-do-not-fire-in-dispatched-subagents",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-27",
+      "source": "Measured live, 2026-08-27, while investigating why the dispatch-budget counter never moved: plugin PreToolUse hooks fire in the main session and never inside a dispatched subagent. Four independent measurements, listed below.",
+      "deferred": false
     },
     {
       "id": "pipeline.privacy-review-critic-dispatch-was-time-boxed-not-exhaustive",

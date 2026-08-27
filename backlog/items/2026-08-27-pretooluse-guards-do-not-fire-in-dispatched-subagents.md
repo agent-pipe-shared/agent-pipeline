@@ -8,7 +8,14 @@ created: 2026-08-27
 source: "Measured live, 2026-08-27, while investigating why the dispatch-budget counter never moved: plugin PreToolUse hooks fire in the main session and never inside a dispatched subagent. Four independent measurements, listed below."
 ---
 
-# Plugin PreToolUse guards do not fire inside dispatched subagents — the whole enforcement layer is inert for dispatched work
+# In Claude Code, plugin PreToolUse guards do not fire inside dispatched subagents — the enforcement layer is inert for dispatched work
+
+> **Scope correction, same day.** This was first recorded without naming the
+> runner. All four measurements below are Claude Code. A PO hardening test in
+> **Antigravity** on 2026-08-27 had its subagent refused by the push gate with
+> the same guard error the parent received, so that runner does apply plugin
+> guards across agents. The finding is a runner difference, not an
+> architectural law — cite it with the runner named.
 
 ## Description
 
@@ -68,6 +75,26 @@ was rewritten twice instead of the invocation path being questioned.
 - **The push gate has the same hole for dispatched work** — though the
   separately built `pre-push` git hook closes that one specific case, because a
   git hook runs inside the real git process regardless of which agent invoked it.
+
+## A second hole, runner-independent, found by the same hardening test
+
+Any guard that inspects tool-call parameter text is blind to what a permitted
+command reads from disk. The PO's Antigravity hardening test defeated the push
+gate in two steps that each look legitimate: write the forbidden command into
+`scratch/push_bypass.sh` with the file-writing tool, then run
+`bash scratch/push_bypass.sh`. The guard saw only the second string.
+
+This is structural, not a pattern gap: no improvement to command classification
+closes it, because the classifier never sees the payload. It applies to both
+runners and to every guard in the manifest, and it is the strongest argument
+for the same conclusion the proposal below reaches independently.
+
+The installed `pre-push` git hook does close this specific case — git runs it
+inside its own process regardless of how git was invoked. `git push --no-verify`
+written inside such a script still defeats it, because `--no-verify` disables
+git hooks by git's own design. The PO accepted that residual gap on 2026-08-27
+rather than pay for OS-level sandboxing: an agent that goes that far is outside
+the threat model this pipeline addresses.
 
 ## Proposal
 
