@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.po-decision-bs26-unsatisfiable-under-the-phoenix-ledger-split
 type: requirement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-27
+closed_at: 2026-08-27
+closure_repository: self
+closure_commit: ec7d2e11705e8c90502445737859c3965259f87a
+closure_evidence: docs/adr/0068-backlog-ledger-merge-semantics.md
 source: "Phoenix merge, dispatch VFX3-BACKLOG plus direct verification, 2026-08-26"
 ---
 
@@ -136,3 +140,20 @@ introduced the strict OID check was wrong — that check exists on both branches
 
 - **Decision:** open, owned by the PO. Was queued as PO-2 during the Phoenix
   merge. BS26 was left red; nothing silenced, nothing faked.
+
+## Closure, 2026-08-27
+
+This item's own "RESOLVED 2026-08-27" section already named its successor:
+`docs/adr/0068-backlog-ledger-merge-semantics.md`, whose header states it
+closes this item "through" the ledger-merge item above. Verified directly
+rather than trusted: `node --test
+plugins/pipeline-core/lib/backlog-state.test.mjs` passes 58/58 at closure
+time, including **BS26** itself ("evidence.commit format/reachability
+findings are DRIFT, and a closure_commit cross-check inherits DRIFT only
+when caused by that same event's drifted evidence.commit") — green, not
+red. `node plugins/pipeline-core/scripts/check-backlog-state.mjs` reports
+only the two pre-existing tolerated DRIFT findings this item's own
+"Also red, and NOT part of this decision" section already distinguished
+from the BS26 defect. Closing via the same evidence and commits as
+`backlog/items/2026-08-27-the-pipeline-cannot-merge-two-parallel-sprint-ledgers.md`
+(`87203a08`, `14f028bb`, `ec855142`, `ec7d2e11`).

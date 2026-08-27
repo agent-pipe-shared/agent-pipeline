@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.the-pipeline-cannot-merge-two-parallel-sprint-ledgers
 type: requirement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-27
+closed_at: 2026-08-27
+closure_repository: self
+closure_commit: ec7d2e11705e8c90502445737859c3965259f87a
+closure_evidence: docs/adr/0068-backlog-ledger-merge-semantics.md
 source: "PO decision during the sprint_phoenix merge close-out, 2026-08-27: parallel sprints that later merge are a normal mode of work and the Pipeline must support it"
 ---
 
@@ -106,3 +110,50 @@ BS26 resolves when this item does, and no earlier.
   to do it.
 - **Blocks:** the migration of Phoenix's 38 reachability amendments, and with
   it BS26 and `backlog-state-check` on this merge candidate.
+
+## Closure, 2026-08-27
+
+`docs/adr/0068-backlog-ledger-merge-semantics.md` decides the general
+capability the PO asked for, and its own header states it explicitly:
+"Closes `backlog/items/2026-08-27-the-pipeline-cannot-merge-two-parallel-
+sprint-ledgers.md` and, through it,
+`backlog/items/2026-08-27-po-decision-bs26-unsatisfiable-under-the-phoenix-
+ledger-split.md`." Verified independently against the repository rather than
+taken on that self-description, mapping each of this item's five
+requirements to the decision that covers it:
+
+1. **Two valid continuations of one chain** → D1 (exactly one active chain;
+   every other chain is archived byte-identical under
+   `backlog/transitions-<origin>-history.ndjson`, which side stays active is
+   the PO's per-merge call).
+2. **Status convergence** → D5 (the active chain's terminal status governs
+   explicitly; D1 additionally forbids interleaving chains, so no status is
+   ever decided by append order).
+3. **Amendments whose target has moved on** → D2 + D3 (an amendment is
+   status-neutral, binds its target by `supersedesEntryHash` rather than a
+   status precondition, and migrating one re-issues it rather than
+   authoring false history).
+4. **Verification of the archived side** → D1 (`check-backlog-state.mjs`
+   validates every `backlog/transitions-*-history.ndjson`'s internal
+   integrity — sequence continuity, hash chaining, event shape — without
+   requiring it to agree with current item state).
+5. **Assertions that index by sequence number** → D6 (amendment target
+   resolution, including `item-hash-rescope-amendment`'s `amendsSequence`,
+   binds by `amendsEntryHash`/content hash instead of physical position; a
+   legacy event with no `amendsEntryHash` falls back to the positional
+   check, proven by a dedicated backward-compatibility test).
+
+Implementation landed in commits `87203a08` (ADR-0068 decided), `14f028bb`
+(repair-path tolerance addendum), `ec855142` (D2/D6 amendment-lookup fix,
+`fix(backlog-state): bind amendment lookups by content hash, not
+position`), and `ec7d2e11` (renumbering D7→D6, closing the numbering gap).
+Observable end state, re-run live at closure time:
+`node --test plugins/pipeline-core/lib/backlog-state.test.mjs` — 58/58
+passing, including BS35/BS36/BS37 (the D6 assertions) and BS26 (green, no
+longer red on the sequence-index defect). `node
+plugins/pipeline-core/scripts/check-backlog-state.mjs` reports only the two
+pre-existing, tolerated DRIFT findings (ledger event 403's truncated OID;
+the codex-read-only-steps item's `closure_commit` DRIFT) — the same two the
+item's own "observable end state" section named as the bar to clear.
+
+All five requirements are covered. Closing.
