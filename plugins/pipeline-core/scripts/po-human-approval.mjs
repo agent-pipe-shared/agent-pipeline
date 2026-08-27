@@ -364,7 +364,7 @@ function artifactPath(directory, name) {
 }
 
 /**
- * The three fork-disposition commands (ADR-0063). They are a sibling of the
+ * The three fork-disposition commands (ADR-0072). They are a sibling of the
  * `-critical` trio, not a fourth `--kind` for it: a fork disposition's subject
  * is DERIVED from the fork that actually exists, so the parameters that locate
  * that fork replace the ones `prepare-critical` accepts verbatim.
@@ -375,7 +375,7 @@ const FORK_DISPOSITION_COMMANDS = new Set(["prepare-fork-disposition", "approve-
 // ceremony-gives-no-path-feedback.md): the fixed set of recognised
 // subcommands, named once and reused both for validation (below) and for the
 // "did you mean" suggestion on an unrecognised one -- a single list, never
-// two that could drift apart. Includes the fork-disposition trio (ADR-0063)
+// two that could drift apart. Includes the fork-disposition trio (ADR-0072)
 // so an unrecognised fork-disposition subcommand also gets a suggestion.
 const KNOWN_COMMANDS = ["setup", "prepare", "prepare-all", "approve", "approve-all", "verify", "verify-all", "prepare-critical", "approve-critical", "verify-critical", "authorize-critical", "sign-intent", ...FORK_DISPOSITION_COMMANDS];
 
@@ -429,7 +429,7 @@ function suggestSubcommand(input, candidates) {
  * taken from `CRITICAL_ACTION_KINDS`.
  *
  * That import is what admitted `governance-fork-disposition` the moment the
- * family grew a fourth member (ADR-0063), and every branch behind it is wrong
+ * family grew a fourth member (ADR-0072), and every branch behind it is wrong
  * for that kind: `prepare-critical` binds the git candidate and real repository
  * plan/spec bytes, none of which the disposition's verifier accepts, and it
  * writes the request to `request-critical-governance-fork-disposition.json` --
@@ -539,7 +539,7 @@ export function parseHumanArgs(argv, dependencies = {}) {
   if (!FORK_DISPOSITION_COMMANDS.has(command) && (values.repositoryFingerprint || values.streamId || values.sequence)) return { error: USAGE };
   if (FORK_DISPOSITION_COMMANDS.has(command)) {
     // No `--subject-sha256` here, ever: accepting a bare digest is precisely
-    // the self-minting route ADR-0063 closes. Nor plan/spec/feature paths --
+    // the self-minting route ADR-0072 closes. Nor plan/spec/feature paths --
     // GOVERNANCE_FORK_DISPOSITION_APPROVAL fixes all three.
     if (values.kind || values.subjectSha256 || values.featureId || values.plan || values.spec || values.model) return { error: USAGE };
     if (!SHA.test(values.repositoryFingerprint ?? "") || !text(values.streamId) || !SEQUENCE.test(values.sequence ?? "")) return { error: USAGE };
@@ -1285,7 +1285,7 @@ async function forkDispositionSubject(args, repository, sequence) {
 }
 
 /**
- * The fork-disposition half of the ceremony (ADR-0063), split from
+ * The fork-disposition half of the ceremony (ADR-0072), split from
  * `runHumanApproval` because inspecting the fork is asynchronous and because
  * nothing about the `push`/`deploy`/`publication` branches may change to
  * accommodate it.

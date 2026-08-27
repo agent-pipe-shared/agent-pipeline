@@ -110,7 +110,7 @@ async function append(root, event = intent()) {
 
 async function cleanup(root) { await rm(root, { recursive: true, force: true }); }
 
-/* ADR-0063 fixtures: a fork disposition is no longer self-mintable, so every
+/* ADR-0072 fixtures: a fork disposition is no longer self-mintable, so every
  * disposition below now carries a real, verified PO approval. The trust anchor
  * is declared in the repository's OWN policy file because the store accepts no
  * caller-supplied one — a library caller that could hand in the anchor its own
@@ -516,20 +516,20 @@ test("K-AC-05 inspectForkedGovernanceStream reports a recorded disposition's own
   }, "the recorded governed disposition must be readable straight from inspectForkedGovernanceStream's own output, not from the internal fork-disposition path");
 });
 
-test("ADR-0063 CRITICAL_ACTION_KINDS gains the fork-disposition kind without disturbing its three original members", () => {
+test("ADR-0072 CRITICAL_ACTION_KINDS gains the fork-disposition kind without disturbing its three original members", () => {
   assert.equal(CRITICAL_ACTION_KINDS.includes("governance-fork-disposition"), true);
   assert.deepEqual(CRITICAL_ACTION_KINDS.slice(0, 3), ["push", "deploy", "publication"], "the three original kinds must keep their identity and order");
 });
 
-test("ADR-0063 a fork disposition carrying no approval at all is refused — the record is no longer self-mintable", async (t) => {
+test("ADR-0072 a fork disposition carrying no approval at all is refused — the record is no longer self-mintable", async (t) => {
   const { root } = await forkedLifecycleFixture(); t.after(() => cleanup(root));
   const bare = { idempotencyKey: "fork-disp-bare", sequence: 2, acknowledgedEventIds: ["evt-2", "evt-fork"], reasonCode: "GOVERNED_ACK", disposedAtEpochMs: 1 };
-  await assert.rejects(() => recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition: bare }), (error) => error.code === "GES-FORK-DISPOSITION", "the exact pre-ADR-0063 shape — every field a caller could mint alone — must now be refused as an incomplete disposition");
+  await assert.rejects(() => recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition: bare }), (error) => error.code === "GES-FORK-DISPOSITION", "the exact pre-ADR-0072 shape — every field a caller could mint alone — must now be refused as an incomplete disposition");
   await assert.rejects(() => recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition: { ...bare, approval: null } }), (error) => error.code === "GES-FORK-DISPOSITION-APPROVAL");
   await assert.rejects(() => recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition: { ...bare, approval: { mode: "none" } } }), (error) => error.code === "GES-FORK-DISPOSITION-APPROVAL");
 });
 
-test("ADR-0063 a fork disposition proof must come from the repository's declared trust anchor, must not be expired, and must not be forged", async (t) => {
+test("ADR-0072 a fork disposition proof must come from the repository's declared trust anchor, must not be expired, and must not be forged", async (t) => {
   const { root } = await forkedLifecycleFixture(); t.after(() => cleanup(root));
   const base = { idempotencyKey: "fork-disp-proof", sequence: 2, acknowledgedEventIds: ["evt-2", "evt-fork"], reasonCode: "GOVERNED_ACK", disposedAtEpochMs: 1 };
   const dispose = (approval, overrides = {}) => recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition: { ...base, ...overrides, approval } });
@@ -546,7 +546,7 @@ test("ADR-0063 a fork disposition proof must come from the repository's declared
   assert.equal((await dispose(valid)).status, "fork-disposition-recorded");
 });
 
-test("ADR-0063 a fork disposition proof binds the exact stream position and the exact conflicting CONTENT digests, not the caller's claim", async (t) => {
+test("ADR-0072 a fork disposition proof binds the exact stream position and the exact conflicting CONTENT digests, not the caller's claim", async (t) => {
   const { root } = await forkedLifecycleFixture(); t.after(() => cleanup(root));
   const declared = await poAuthority(root);
   const base = { idempotencyKey: "fork-disp-subject", sequence: 2, acknowledgedEventIds: ["evt-2", "evt-fork"], reasonCode: "GOVERNED_ACK", disposedAtEpochMs: 1 };
@@ -559,7 +559,7 @@ test("ADR-0063 a fork disposition proof binds the exact stream position and the 
   await assert.rejects(async () => dispose({ ...wrongSequence, request: { ...wrongSequence.request, action: { ...wrongSequence.request.action, subjectSha256: otherSequence.subjectSha256 } } }), (error) => error.code === "GES-FORK-DISPOSITION-APPROVAL-SUBJECT", "an approval bound to another sequence must not clear this one");
 });
 
-test("ADR-0063 a fork disposition needs a declared trust anchor, and chat clearance is refused while gates.push_approval resolves to signature", async (t) => {
+test("ADR-0072 a fork disposition needs a declared trust anchor, and chat clearance is refused while gates.push_approval resolves to signature", async (t) => {
   const { root } = await forkedLifecycleFixture(); t.after(() => cleanup(root));
   const base = { idempotencyKey: "fork-disp-mode", sequence: 2, acknowledgedEventIds: ["evt-2", "evt-fork"], reasonCode: "GOVERNED_ACK", disposedAtEpochMs: 1 };
   const dispose = (approval) => recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition: { ...base, approval } });
@@ -570,7 +570,7 @@ test("ADR-0063 a fork disposition needs a declared trust anchor, and chat cleara
   await assert.rejects(async () => dispose(await approvalFor(root, "lifecycle", 2, { authority: undeclared, forkedEventDigests: digests })), (error) => error.code === "GES-FORK-DISPOSITION-TRUST-ANCHOR", "with no committed trustAnchor there is no external authority to verify against, so the disposition must fail closed rather than accept the caller's own key");
 });
 
-test("ADR-0063 gates.push_approval: chat records an attributed, self-declaring in-session clearance — exactly as weak as push's own chat mode", async (t) => {
+test("ADR-0072 gates.push_approval: chat records an attributed, self-declaring in-session clearance — exactly as weak as push's own chat mode", async (t) => {
   const { root } = await forkedLifecycleFixture(); t.after(() => cleanup(root));
   await writeFile(path.join(root, "pipeline.user.yaml"), "gates:\n  push_approval: chat\n");
   execFileSync("git", ["-C", root, "add", "--", "pipeline.user.yaml"]);
@@ -587,7 +587,7 @@ test("ADR-0063 gates.push_approval: chat records an attributed, self-declaring i
   assert.equal(Object.hasOwn(approval, "proofSha256"), false, "a chat clearance must never masquerade as carrying proof material");
 });
 
-test("ADR-0063 the durable record references the verified approval and never re-embeds the raw proof or signature", async (t) => {
+test("ADR-0072 the durable record references the verified approval and never re-embeds the raw proof or signature", async (t) => {
   const { root } = await forkedLifecycleFixture(); t.after(() => cleanup(root));
   const approval = await approvalFor(root, "lifecycle", 2);
   const disposition = { idempotencyKey: "fork-disp-reference", sequence: 2, acknowledgedEventIds: ["evt-2", "evt-fork"], reasonCode: "GOVERNED_ACK", disposedAtEpochMs: 1, approval };
@@ -599,7 +599,7 @@ test("ADR-0063 the durable record references the verified approval and never re-
   assert.deepEqual(Object.keys(persisted.approval).sort(), ["expiresAt", "intentSha256", "keyReference", "mode", "proofSha256", "subjectSha256"], "the record must carry a closed approval REFERENCE, mirroring how pushApproval.lastApproved references an approval");
 });
 
-test("ADR-0063 / K-AC-05 Finding 3 the read path re-checks a recorded disposition against the conflicting entries that actually exist now", async (t) => {
+test("ADR-0072 / K-AC-05 Finding 3 the read path re-checks a recorded disposition against the conflicting entries that actually exist now", async (t) => {
   const { root } = await forkedLifecycleFixture(); t.after(() => cleanup(root));
   const disposition = { idempotencyKey: "fork-disp-recheck", sequence: 2, acknowledgedEventIds: ["evt-2", "evt-fork"], reasonCode: "GOVERNED_ACK", disposedAtEpochMs: 1, approval: await approvalFor(root, "lifecycle", 2) };
   const recorded = await recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition });
@@ -618,7 +618,7 @@ test("ADR-0063 / K-AC-05 Finding 3 the read path re-checks a recorded dispositio
   assert.equal((await inspectForkedGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle" })).forks[0].disposition.reasonCode, "GOVERNED_ACK", "the untouched record must still read back cleanly, so the rejections above discriminate");
 });
 
-test("ADR-0063 / K-AC-05 Finding 4 a symlinked ancestor on the disposition path is refused on the read side too", async (t) => {
+test("ADR-0072 / K-AC-05 Finding 4 a symlinked ancestor on the disposition path is refused on the read side too", async (t) => {
   const { root } = await forkedLifecycleFixture(); t.after(() => cleanup(root));
   const outside = await mkdtemp(path.join(os.tmpdir(), "governance-fork-disposition-outside-")); t.after(() => cleanup(outside));
   await mkdir(path.join(outside, "lifecycle"), { recursive: true });

@@ -76,7 +76,7 @@ function recoveryRequest(value) {
 }
 
 /**
- * K-AC-05 Finding 2 / ADR-0063: before this, the fork-disposition mechanism
+ * K-AC-05 Finding 2 / ADR-0072: before this, the fork-disposition mechanism
  * was reachable only from inside the library — no sanctioned operator surface
  * led to it at all. The detached proof arrives as its own `--proof` file,
  * exactly as the push flow keeps request and proof separate: the request is

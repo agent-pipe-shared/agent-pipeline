@@ -9,7 +9,7 @@ import { createHash } from "node:crypto";
 import { createPoApprovalIntent, verifyPoApprovalProof } from "./po-approval-proof.mjs";
 
 export const CRITICAL_ACTION_APPROVAL_REQUEST_SCHEMA = "pipeline.critical-action-approval-request.v1";
-// `release-preflight` adds the fourth member. ADR-0063 adds the fifth. PHX-WP-PAC08-
+// `release-preflight` adds the fourth member. ADR-0072 adds the fifth. PHX-WP-PAC08-
 // RECONCILE-APPROVAL (ADR-0056's 2026-08-11 Follow-up) adds the sixth. The three
 // original kinds keep their exact behaviour: every use of this list in this file and in
 // every consumer is an `includes()` membership test, so a new member widens what is

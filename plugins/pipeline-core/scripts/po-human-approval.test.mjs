@@ -28,7 +28,7 @@
  * material or the signing flow itself.
  *
  * WP-K-AC05-REWORK1 adds a second scope to this file: the `*-fork-disposition`
- * commands (ADR-0063). Their central proof is deliberately end-to-end rather
+ * commands (ADR-0072). Their central proof is deliberately end-to-end rather
  * than shape-level — a request this CLI builds, signed by a real OpenSSL round
  * trip, must be accepted by the store's OWN verifier (`authorizeForkDisposition`
  * via `recoverPortableGovernanceProjection`), because "the command runs" is
@@ -806,7 +806,7 @@ test("a fork-disposition request built by the CLI, signed with the PO key, is ac
 test("the fork-disposition commands refuse every self-minting shortcut", async () => {
   const dirs = await forkedRepositoryFixture();
   try {
-    // A bare subject digest or a caller-chosen kind is exactly what ADR-0063 closes.
+    // A bare subject digest or a caller-chosen kind is exactly what ADR-0072 closes.
     for (const extra of [["--subject-sha256", "a".repeat(64), "--expires-at", FAR_FUTURE], ["--kind", "push", "--expires-at", FAR_FUTURE]]) {
       await assert.rejects(() => runForkDispositionApproval(["prepare-fork-disposition", ...forkArgs(dirs, extra)], {}), /Usage:/u);
     }

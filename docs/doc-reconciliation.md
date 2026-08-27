@@ -1138,7 +1138,7 @@ evidence-map/closure-plan/design-doc set stays ADR-0045. `harness/scripts/pipeli
 run — no test file was edited by either FIX2 or REDO dispatch) and the other touched
 `plugins/pipeline-core/{lib,scripts}/*.mjs`/`*.test.mjs`/`governance/*` files touch no path any
 `Governs:` line in the corpus names. `docs/adr/0058-guard-maintenance-window.md` and
-`docs/adr/0063-fork-disposition-approval-proof.md` were themselves amended in this range —
+`docs/adr/0072-fork-disposition-approval-proof.md` were themselves amended in this range —
 unreconciled by this layer for the same already-filed reason as every prior range:
 `pipeline.doc-reconciliation-blind-to-adr-corpus-changes`. The two new `backlog/items/*.md` files
 confirm `backlog/`'s own dedicated class again, same as every prior occurrence in this chain.

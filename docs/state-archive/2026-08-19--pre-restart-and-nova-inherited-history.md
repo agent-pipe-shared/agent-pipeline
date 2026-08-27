@@ -4345,7 +4345,7 @@ All four decisions landed:
 1. **K-AC-05:** redesign (not narrow, not deferred) — *"wir machen 1. aber bewusst falls
    möglich auch an die signature funktion und chat alternative binden (ja chat ist unsicher
    aber wer das aktiv wählt nimmt das in kauf - default ist die externe signature funktion
-   die zB auch bei push genutzt wird)"*. Wrote **[ADR-0063](adr/0063-fork-disposition-approval-proof.md)**
+   die zB auch bei push genutzt wird)"*. Wrote **[ADR-0063](adr/0072-fork-disposition-approval-proof.md)**
    (`984ea5e1`) formalizing this: fork disposition becomes a fourth `CRITICAL_ACTION_KINDS`
    entry, reusing `po-approval-proof.mjs` unmodified and the existing `gates.push_approval`
    mode (no new config key) rather than a disposition-specific mechanism — directly extending

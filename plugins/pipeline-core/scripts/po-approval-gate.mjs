@@ -14,7 +14,7 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
 const USAGE = "Usage: po-approval-gate.mjs prepare --repo-root <repo> --directory <external-dir> [--feature-id <id>] | prepare-all --repo-root <repo> --directory <external-dir> | verify --repo-root <repo> --directory <external-dir> [--feature-id <id>] | verify-all --repo-root <repo> --directory <external-dir> | prepare-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication> --subject-sha256 <sha256> --expires-at <ISO-8601> | verify-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication> | prepare-fork-disposition --repo-root <repo> --directory <external-dir> --repository-fingerprint <sha256> --stream-id <id> --sequence <n> --expires-at <ISO-8601> | verify-fork-disposition --repo-root <repo> --directory <external-dir> --repository-fingerprint <sha256> --stream-id <id> --sequence <n>";
 
 /**
- * The public half of the fork-disposition ceremony (ADR-0063). Preparation
+ * The public half of the fork-disposition ceremony (ADR-0072). Preparation
  * writes only public bytes and verification only reads them, exactly like
  * `prepare`/`verify` — so an agent driving this control plane can reach both.
  * `approve-fork-disposition` is absent on purpose and stays absent: it delegates

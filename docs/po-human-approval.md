@@ -55,7 +55,7 @@ expiry for a critical action), or the intent digest for `sign-intent`.
 One exception to read carefully, because the line looks like a commit and is
 not: for the `governance-fork-disposition` kind the `candidate commit` field is
 a DERIVED binding value, not a Git commit that exists in this repository. A
-governance-stream fork is not commit-scoped (ADR-0063), so the disposition binds
+governance-stream fork is not commit-scoped (ADR-0072), so the disposition binds
 the repository fingerprint, stream, sequence and the content digests of the
 conflicting entries instead. Check the `action subject sha256` line against the
 digest the agent showed you; that is the value that identifies what you are
@@ -209,7 +209,7 @@ down — the writer action rejects instead (ADR-0055); standing the proof down
 takes an explicit, reasoned waiver.
 
 A fourth kind exists and is deliberately outside that field's reach:
-`governance-fork-disposition` (ADR-0063). The governance-event store never
+`governance-fork-disposition` (ADR-0072). The governance-event store never
 consults `requiredKinds` for it — it demands a verified approval
 unconditionally, reading only the `trustAnchor` from that same file, plus
 `gates.push_approval` to decide whether a `chat` clearance is admissible at all.

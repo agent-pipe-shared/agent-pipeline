@@ -40,7 +40,7 @@ step could sign the wrong thing with no error at any point.
 
 **Divergence check before porting (per this port's own dispatch stop
 condition):** Phoenix's `po-human-approval.mjs` has diverged substantially
-from origin/main's — Phoenix carries the fork-disposition trio (ADR-0063,
+from origin/main's — Phoenix carries the fork-disposition trio (ADR-0072,
 `GOVERNANCE_FORK_DISPOSITION_APPROVAL`) and a fourth `CRITICAL_COMMAND_KINDS`
 member (`feature-package-reconcile`, PHX-WP-POHUMAN-SIGNING-ERGO) that
 origin/main's snapshot examined here does not carry; origin/main in turn

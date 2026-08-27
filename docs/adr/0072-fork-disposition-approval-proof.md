@@ -1,4 +1,6 @@
-# ADR-0063: fork disposition requires a PO approval proof, using the same signature/chat mode this repository already applies to push
+# ADR-0072: fork disposition requires a PO approval proof, using the same signature/chat mode this repository already applies to push
+
+> Previously numbered ADR-0063 (until 2026-08-27).
 
 > Agent-Pipeline · Sprint Phoenix · as of 2026-08-10
 

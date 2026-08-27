@@ -905,7 +905,7 @@ function assertForkDisposition(disposition) {
 }
 
 /* ------------------------------------------------------------------------ *
- * K-AC-05 / ADR-0063: a fork disposition requires a verified PO approval.
+ * K-AC-05 / ADR-0072: a fork disposition requires a verified PO approval.
  *
  * Finding 1 was that the record above is self-mintable: any caller holding
  * library access could produce the exact shape this module then treated as
@@ -957,7 +957,7 @@ function isIsoTimestamp(value) {
  * A push is naturally bound to the commit/tree it would publish. A fork is
  * not: it exists independently of any one commit, so binding the proof to a
  * candidate commit would either let the proof outlive the fork state it was
- * signed for, or force re-signing on every unrelated commit (ADR-0063,
+ * signed for, or force re-signing on every unrelated commit (ADR-0072,
  * Alternatives). The primitive's `candidate` slot is nonetheless mandatory and
  * shape-checked (two distinct 40-64 hex identifiers), so it is filled with a
  * deterministic, domain-separated derivation of the disposition's OWN identity.
@@ -1407,7 +1407,7 @@ async function recordGovernanceForkDisposition(root, registry, streamId, disposi
     if (actualEventIds.length !== namedEventIds.length || actualEventIds.some((eventId, index) => eventId !== namedEventIds[index])) {
       fail("GES-FORK-DISPOSITION-MISMATCH", "The disposition's acknowledged event identifiers do not exactly match the conflicting entries at this sequence.");
     }
-    // ADR-0063: reality-binding above proves the disposition names the fork
+    // ADR-0072: reality-binding above proves the disposition names the fork
     // that exists; this proves a human with the repository's declared external
     // authority approved disposing of exactly THAT fork. Verified inside the
     // stream's exclusive lock and against the inspection just performed, so

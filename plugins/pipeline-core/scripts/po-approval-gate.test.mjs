@@ -9,7 +9,7 @@
  * `plugins/pipeline-core/lib/threat-model-approval-request.test.mjs` alongside
  * the request primitives; what that leaves untested is the property the script
  * is actually for — WHICH commands it admits, and that widening the set for the
- * fork-disposition ceremony (ADR-0063) did not carry the signing command in with
+ * fork-disposition ceremony (ADR-0072) did not carry the signing command in with
  * it. That is what this file pins, plus the dispatch shape the two new commands
  * required (they are asynchronous; the pre-existing ones are not, and a caller
  * that stops awaiting the old ones would silently drop every failure).
