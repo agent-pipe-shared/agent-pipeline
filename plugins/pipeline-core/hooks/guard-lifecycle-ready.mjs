@@ -1421,11 +1421,17 @@ function exactRoot(args, root, index) {
 // leftover positional token where nothing is declared all fall through to no-match -- the
 // walk only ever advances by consuming a declared token (plus its value, for a value flag),
 // so anything else it encounters ends the match immediately.
+//   - `spec.requiredValueOneOf`: a map from value flag to validator of which EXACTLY ONE
+//     must be present (NVA-INTAKEARGV-1). It consumes its value like any other value flag;
+//     the difference is only in the end-of-walk check. Zero alternatives supplied, or two,
+//     both fall through to no-match -- so this never widens the admitted set beyond "one of
+//     these, and only one".
 function matchFlagSpec(argsTail, spec) {
   const required = spec.required ?? {};
   const optional = spec.optional ?? {};
   const requiredValue = spec.requiredValue ?? {};
   const optionalValue = spec.optionalValue ?? {};
+  const requiredValueOneOf = spec.requiredValueOneOf ?? {};
   const seen = new Set();
   let index = 0;
   while (index < argsTail.length) {
@@ -1437,9 +1443,10 @@ function matchFlagSpec(argsTail, spec) {
       index += 1;
       continue;
     }
-    const validator = Object.prototype.hasOwnProperty.call(requiredValue, token)
-      ? requiredValue[token]
-      : optionalValue[token];
+    let validator;
+    if (Object.prototype.hasOwnProperty.call(requiredValue, token)) validator = requiredValue[token];
+    else if (Object.prototype.hasOwnProperty.call(requiredValueOneOf, token)) validator = requiredValueOneOf[token];
+    else validator = optionalValue[token];
     if (validator !== undefined) {
       if (seen.has(token)) return false;
       const value = argsTail[index + 1];
@@ -1450,6 +1457,8 @@ function matchFlagSpec(argsTail, spec) {
     }
     return false;
   }
+  const oneOfFlags = Object.keys(requiredValueOneOf);
+  if (oneOfFlags.length > 0 && oneOfFlags.filter((flag) => seen.has(flag)).length !== 1) return false;
   return Object.keys(required).every((flag) => seen.has(flag))
     && Object.keys(requiredValue).every((flag) => seen.has(flag));
 }
@@ -2589,6 +2598,10 @@ function sanctionedOnboardingArgs(rawArgs, root) {
   const MUTATING_ONBOARDING_FLAG_VALIDATORS = {
     "--root": isRootValue,
     "--text": nonEmptyTrimmed,
+    // NVA-INTAKEARGV-1: a repository-relative path, not free text. Containment (must resolve
+    // inside the project root) is enforced CLI-side in resolveIntakeCaptureText(), where the
+    // root is actually resolved; the guard's job here stays the flag SET plus a value SHAPE.
+    "--text-file": nonEmptyTrimmedNotFlag,
     "--answers-json": nonEmptyTrimmedNotFlag,
     "--plan-sha256": isHexDigest,
     "--git-author-name": nonEmptyTrimmedNotFlag,
@@ -2598,9 +2611,10 @@ function sanctionedOnboardingArgs(rawArgs, root) {
   };
   const mutatingShape = MUTATING_ONBOARDING_ARGV_SHAPES[args[0]];
   if (mutatingShape !== undefined) {
-    const spec = { required: {}, requiredValue: {}, optionalValue: {} };
+    const spec = { required: {}, requiredValue: {}, requiredValueOneOf: {}, optionalValue: {} };
     for (const flag of mutatingShape.required) spec.required[flag] = true;
     for (const flag of mutatingShape.requiredValue) spec.requiredValue[flag] = MUTATING_ONBOARDING_FLAG_VALIDATORS[flag];
+    for (const flag of mutatingShape.requiredValueOneOf ?? []) spec.requiredValueOneOf[flag] = MUTATING_ONBOARDING_FLAG_VALIDATORS[flag];
     for (const flag of mutatingShape.optionalValue) spec.optionalValue[flag] = MUTATING_ONBOARDING_FLAG_VALIDATORS[flag];
     return matchFlagSpec(args.slice(1), spec);
   }
