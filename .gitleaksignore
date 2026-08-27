@@ -133,7 +133,7 @@ content-v1:7f4a6eb6eb7abcb42eb8f728c8c5cad714173f4fb84a4759615b42506a551c7a:back
 # PHX-WP-GITLEAKS-FALSEPOS-IGNORE (2026-08-19): 4 confirmed false positives from the clean-
 # candidate run at commit 7fc34e0baeade3244f43158e7b2d5cdc57703204, each verified by direct
 # content inspection (not by rule/pattern alone) before being added.
-content-v1:dc13c203f36ba1f87e1c6762d938350de71a78a30c472f26c40314a155500d3f:plugins/pipeline-core/scripts/security-adapters/gitleaks.test.mjs:sentry-access-token:252:10
+content-v1:0bc710a9b34b2b7bf9fa91316f2a9f6e28c9e8c7fb06f9b10c5211a8bb27d4c0:plugins/pipeline-core/scripts/security-adapters/gitleaks.test.mjs:sentry-access-token:379:10
 # ^ deliberate, already-commented test fixture (see the file's own comment above this line):
 # "the literal that trips gitleaks' sentry-access-token rule (empirically confirmed while
 # designing this fix)" -- a bare 64-hex-character digest used to exercise gitleaks' own
@@ -147,7 +147,7 @@ content-v1:ee35fd882218d795d28f7f4a61ffb7114ffb57f16ee09bcfbf779ecd44008431:spec
 # PHX-WP-GITLEAKS-ATTRIBUTION-KEY-FP (2026-08-19): confirmed false positive, verified by direct
 # content inspection, not by rule/pattern alone (see backlog/items/2026-08-19-gitleaks-false-
 # positive-in-guard-maintenance-window-attribution-key-generation-tag.md).
-content-v1:dd4c651733fc54fa15348f7bb3dc75465a6327a2cd8e0e6b6cafc590f04fb43f:plugins/pipeline-core/scripts/guard-maintenance-window.mjs:generic-api-key:172:8
+content-v1:70149480ae7a581891393face743205d01a83dc38a96531695930813069f884a:plugins/pipeline-core/scripts/guard-maintenance-window.mjs:generic-api-key:171:8
 # ^ the ATTRIBUTION_KEY_GENERATION constant at that line -- a pinned key-generation version tag
 # (the restricted attribution store's own keyGeneration shape check requires a string), not a
 # secret or credential. Deliberately not quoting the assigned literal here -- see the source
