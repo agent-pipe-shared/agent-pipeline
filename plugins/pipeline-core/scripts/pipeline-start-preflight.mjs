@@ -22,6 +22,7 @@ import {
   inspectSessionOwnerRuntime,
   listActiveSessionDescriptors,
 } from "../lib/worktree-lifecycle.mjs";
+import { planInstall } from "./pre-push-hook-install.mjs";
 import { WSL_FRESHNESS_BOUNDARY_ID } from "./ruleset-freshness.mjs";
 
 export const SCHEMA = "pipeline.start-preflight.v1";
@@ -443,6 +444,96 @@ function lockVersionMatches(read, lockPath, currentVersion) {
   }
 }
 
+export const PRE_PUSH_HOOK_OBSERVATION_SCHEMA = "pipeline.pre-push-hook-observation.v1";
+/**
+ * NVA-PREPUSHOBSERVE-1: the distinct, exported non-ready status this preflight reports
+ * (instead of "ready") when the repository's `pre-push` git hook is not confirmed
+ * installed-and-current this session -- see the `status` computation in
+ * `observePipelineStartPreflight`. Mirrors ANTIGRAVITY_HARD_ENFORCEMENT_NOT_OBSERVED_STATUS's
+ * own role for that sibling observation: a plausible but actually-unenforced session must
+ * never silently report "ready".
+ */
+export const PRE_PUSH_HOOK_NOT_INSTALLED_STATUS = "pre-push-hook-not-installed";
+
+// This installer script's own absolute, on-disk location -- resolved once, from THIS exact
+// plugin copy, never a repo-relative guess (DoD (c)). pre-push-hook-install.mjs is a fixed
+// sibling of this file (both live directly under plugins/pipeline-core/scripts/).
+const PRE_PUSH_HOOK_INSTALLER_SCRIPT_PATH = fileURLToPath(new URL("./pre-push-hook-install.mjs", import.meta.url));
+
+/** The exact command a human or agent runs to install the hook -- the installer's own
+ * documented `--install` verb (pre-push-hook-install.mjs's CLI surface), resolved against the
+ * repository actually being inspected. Never a hand-written shell line. */
+function prePushHookInstallCommand(rootDir) {
+  return {
+    kind: "command",
+    executable: "node",
+    argv: [PRE_PUSH_HOOK_INSTALLER_SCRIPT_PATH, "--install"],
+    cwd: resolve(rootDir),
+    mutation: true,
+    requiresConfirmation: false,
+  };
+}
+
+/**
+ * Detects -- never fixes, never installs -- whether `pre-push-hook-install.mjs`'s generated
+ * `pre-push` git hook is installed for `rootDir`'s repository and still matches what that
+ * installer's own marker recorded, using ONLY that installer's existing read-only
+ * `planInstall` surface (never a second, duplicated read of the hook/marker files itself).
+ *
+ * STATES `planInstall` ACTUALLY DISTINGUISHES, and how they map here (DoD (a) "state in your
+ * report which states you found and which you surfaced"):
+ *   - "ready-to-upgrade" (hook present, belongs to this installer, its content sha256 still
+ *     matches the marker's recorded hash) -> "installed-and-current".
+ *   - "ready" (no hook file exists at all yet) -> "absent".
+ *   - "foreign-hook-present" (a hook exists but there is no marker for it, the marker is
+ *     unreadable/unparseable, or the hook's content no longer matches the marker's recorded
+ *     hash) -> "present-but-not-ours-or-modified". `readMarker` (pre-push-hook-install.mjs)
+ *     already folds an unreadable marker AND a malformed marker into "no marker" -- both
+ *     degenerate inputs surface through this exact same branch, not a separate one.
+ *   - "repository-unresolved" (no git directory resolvable at all, e.g. `rootDir` is not a
+ *     git repository) -> "repository-unresolved", surfaced here as ITS OWN state rather than
+ *     folded into "absent": no repository exists to hold a hook, so nothing about push
+ *     enforcement was actually determined (unlike "absent", which IS a determination). See
+ *     `observePipelineStartPreflight`'s own wiring comment for why this state deliberately
+ *     never participates in the ready/non-ready gate.
+ *
+ * NEVER THROWS: an unexpected exception from `planInstallFn` (never observed from the real,
+ * documented-read-only `planInstall`, but guarded here anyway) folds into
+ * "repository-unresolved" -- the same "nothing was determined" outcome a genuine absence of a
+ * repository already produces, never a crash. NEVER MUTATES OR INSTALLS ANYTHING: this
+ * function only reads, via `planInstall`'s own read-only surface.
+ */
+export function observePrePushHookInstallation({ rootDir = process.cwd(), planInstallFn = planInstall } = {}) {
+  let plan;
+  try {
+    plan = planInstallFn({ rootDir });
+  } catch {
+    plan = null;
+  }
+  if (!plan || plan.status === "repository-unresolved") {
+    return { schema: PRE_PUSH_HOOK_OBSERVATION_SCHEMA, state: "repository-unresolved", installed: false, installCommand: null };
+  }
+  if (plan.status === "ready-to-upgrade") {
+    return { schema: PRE_PUSH_HOOK_OBSERVATION_SCHEMA, state: "installed-and-current", installed: true, installCommand: null };
+  }
+  if (plan.status === "foreign-hook-present") {
+    return {
+      schema: PRE_PUSH_HOOK_OBSERVATION_SCHEMA,
+      state: "present-but-not-ours-or-modified",
+      installed: false,
+      detail: plan.detail ?? null,
+      installCommand: prePushHookInstallCommand(rootDir),
+    };
+  }
+  // plan.status === "ready": the hook path does not exist yet.
+  return {
+    schema: PRE_PUSH_HOOK_OBSERVATION_SCHEMA,
+    state: "absent",
+    installed: false,
+    installCommand: prePushHookInstallCommand(rootDir),
+  };
+}
+
 /**
  * Return only the selected host route after a WSL preflight. Control identity
  * selection occurs in the authorized host helper immediately before it starts
@@ -550,6 +641,7 @@ export function observePipelineStartPreflight({
   cwd = process.cwd(),
   knownMarketplaces = readClaudeKnownMarketplaces,
   observeAntigravityHardEnforcementFn = observeAntigravityHardEnforcement,
+  observePrePushHookInstallationFn = observePrePushHookInstallation,
   observe,
   // PHX-WP-AAC01-MULTISESSION: identifies which already-registered session
   // descriptor (if any) is "this" call's own, so it is excluded from the
@@ -622,6 +714,13 @@ export function observePipelineStartPreflight({
   const antigravityHardEnforcement = runner === "antigravity"
     ? observeAntigravityHardEnforcementFn({ rootDir: cwd, currentVersion: version })
     : null;
+  // NVA-PREPUSHOBSERVE-1: unlike the Antigravity check above, this one is NOT runner-gated --
+  // git hooks fire in every runner alike -- so it is always computed. "repository-unresolved"
+  // (rootDir is not a resolvable git repository -- true for several existing tests' synthetic,
+  // never-`git init`'d cwd fixtures) deliberately never gates status below: nothing about push
+  // enforcement was actually determined for it, unlike a real, resolvable repository that
+  // genuinely has no hook installed yet.
+  const prePushHookObservation = observePrePushHookInstallationFn({ rootDir: cwd });
   const status = !version
     ? "plugin-identity-unavailable"
     : installedIdentity?.ambiguous === true || installedVersion !== null && installedVersion !== version || attestationFailed
@@ -635,7 +734,14 @@ export function observePipelineStartPreflight({
       // own reason rather than being masked by this one.
       : runner === "antigravity" && antigravityHardEnforcement.observed !== true
         ? ANTIGRAVITY_HARD_ENFORCEMENT_NOT_OBSERVED_STATUS
-        : "ready";
+        // Fail-closed (NVA-PREPUSHOBSERVE-1), same discipline, checked last of all: a session
+        // must never assume push enforcement exists just because nothing else already flagged
+        // it non-ready. "repository-unresolved" is deliberately excluded -- see the comment on
+        // `prePushHookObservation` above.
+        : prePushHookObservation.state !== "installed-and-current"
+            && prePushHookObservation.state !== "repository-unresolved"
+          ? PRE_PUSH_HOOK_NOT_INSTALLED_STATUS
+          : "ready";
   // PX0-AC-08: one closed runner-neutral source observation per bootstrap
   // resolution. Only built when a loaded distribution was actually resolved
   // (`version` truthy) -- the acceptance clause itself is conditioned on
@@ -755,6 +861,12 @@ export function observePipelineStartPreflight({
     // byte-identical to before this addition. Reuses the SAME observation the
     // `status` computation above already made -- see the comment there.
     ...(runner === "antigravity" ? { antigravityHardEnforcement } : {}),
+    // Present for every runner alike (unlike the Antigravity field above) whenever the
+    // observation actually determined something -- omitted only for "repository-unresolved"
+    // so the envelope's key set stays exactly what it was before this addition for every
+    // pre-existing caller whose `cwd` never resolves to a real repository (several of this
+    // file's own pre-existing tests use exactly that fixture shape).
+    ...(prePushHookObservation.state !== "repository-unresolved" ? { prePushHook: prePushHookObservation } : {}),
   };
   return {
     ...result,
@@ -785,10 +897,10 @@ export function observePipelineStartPreflight({
 // session-end hook.
 
 export function pipelineStartPreflightExitCode(result) {
-  // ANTIGRAVITY_HARD_ENFORCEMENT_NOT_OBSERVED_STATUS is deliberately absent from
-  // this allowlist (NVA-ARMEDPROOF-1, fail-closed by omission): it falls
-  // through to the same blocking exit code "plugin-identity-unavailable"
-  // already gets, with no separate case needed here.
+  // ANTIGRAVITY_HARD_ENFORCEMENT_NOT_OBSERVED_STATUS and PRE_PUSH_HOOK_NOT_INSTALLED_STATUS
+  // are both deliberately absent from this allowlist (NVA-ARMEDPROOF-1 / NVA-PREPUSHOBSERVE-1,
+  // fail-closed by omission): each falls through to the same blocking exit code
+  // "plugin-identity-unavailable" already gets, with no separate case needed here.
   return result?.status === "ready" || result?.status === "plugin-refresh-required" ? 0 : 2;
 }
 
