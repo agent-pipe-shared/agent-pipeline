@@ -56,8 +56,7 @@ import { appendHumanGovernanceDecision, queryHumanGovernanceDecisions } from "..
 import { buildAppendIntent, buildOverrideDecisions, requestDecisionId } from "../lib/guard-authority-ledger-intake.mjs";
 import { canonicalizeJson, canonicalSha256, parseStrictJson } from "../lib/governance-event.mjs";
 import { readPublicRepositoryFile } from "../lib/threat-model-approval-request.mjs";
-import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
-import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
+import { readLocalRepositoryFingerprint } from "../lib/governance-event-store.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PLUGIN_ROOT = join(HERE, "..");
@@ -99,7 +98,7 @@ function capturePolicy() {
  * Only its two `project/`-prefixed entries can ever match the artifact path pattern,
  * so one of them must exist in this fixture or every decision below is
  * "not representable". */
-function fixture() {
+async function fixture() {
   const root = mkdtempSync(join(tmpdir(), "gate-strength-ledger-"));
   git(root, "init", "-q", "-b", "main");
   git(root, "config", "user.name", "Fixture");
@@ -110,8 +109,7 @@ function fixture() {
   writeFileSync(join(root, "project", "guard-config.json"), JSON.stringify({ schema: "pipeline.guard-config.v1" }));
   git(root, "add", "README.md", "pipeline.user.yaml", "project/guard-config.json");
   git(root, "commit", "-q", "-m", "fixture");
-  const repository = discoverRepository(root);
-  const fingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: repository.commonDir, primaryRoot: repository.primaryRoot });
+  const fingerprint = await readLocalRepositoryFingerprint({ repositoryRoot: root });
   mkdirSync(join(root, "governance", "events"), { recursive: true });
   writeFileSync(join(root, "governance", "events", "registry.json"), `${canonicalizeJson(registry(fingerprint))}\n`);
   writeFileSync(join(root, "governance", "events", "capture-policy.json"), `${canonicalizeJson(capturePolicy())}\n`);
@@ -125,7 +123,7 @@ function capturePolicyDigestOf(root) {
 const DENIALS = [{ guard: "guard-gate-strength.mjs", reason: "GS-1: fixture reason" }];
 
 test("appendOverrideDeniedLedgerEvent produces a correctly-linked requested+denied pair", async () => {
-  const { root } = fixture();
+  const { root } = await fixture();
   try {
     const toolInput = { file_path: "pipeline.user.yaml", content: "fixture edit\n" };
     const recorded = recordHumanGuardDenial({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: DENIALS });
@@ -135,7 +133,7 @@ test("appendOverrideDeniedLedgerEvent produces a correctly-linked requested+deni
     });
     assert.equal(result.appended, true);
 
-    const fingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: discoverRepository(root).commonDir, primaryRoot: root });
+    const fingerprint = await readLocalRepositoryFingerprint({ repositoryRoot: root });
     const { decisions } = await queryHumanGovernanceDecisions({ repositoryRoot: root, repositoryFingerprint: fingerprint });
     const requestId = requestDecisionId({ intentSha256: recorded.requestSha256, producer: "hgo" });
     const requested = decisions.find((entry) => entry.event === "requested" && entry.decisionId === requestId);
@@ -160,7 +158,7 @@ test("appendOverrideDeniedLedgerEvent produces a correctly-linked requested+deni
  * the CLI-side blocker documented at the top of this file entirely.
  */
 test("appendOverrideConsumedLedgerEvent produces a correctly-linked consumed event against a live prior grant", async () => {
-  const { root, fingerprint } = fixture();
+  const { root, fingerprint } = await fixture();
   try {
     const toolInput = { file_path: "pipeline.user.yaml", content: "consumed fixture\n" };
     const recorded = recordHumanGuardDenial({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: DENIALS });

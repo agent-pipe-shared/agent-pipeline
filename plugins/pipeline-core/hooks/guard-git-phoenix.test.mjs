@@ -10,8 +10,7 @@ import test from "node:test";
 
 import { canonicalSha256, canonicalizeJson } from "../lib/governance-event.mjs";
 import { appendHumanGovernanceDecision } from "../lib/human-governance-ledger.mjs";
-import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
-import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
+import { readLocalRepositoryFingerprint } from "../lib/governance-event-store.mjs";
 
 const guard = path.resolve("plugins/pipeline-core/hooks/guard-git.mjs");
 const unavailable = { state: "not-applicable" };
@@ -47,8 +46,7 @@ async function fixture() {
   execFileSync("git", ["-C", root, "add", "fixture.txt"]);
   execFileSync("git", ["-C", root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "fixture"]);
   await mkdir(path.join(root, ".claude"), { recursive: true });
-  const repository = discoverRepository(root);
-  const fingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: repository.commonDir, primaryRoot: repository.primaryRoot });
+  const fingerprint = await readLocalRepositoryFingerprint({ repositoryRoot: root });
   const policy = capturePolicy();
   await mkdir(path.join(root, "governance/events"), { recursive: true });
   await writeFile(path.join(root, "governance/events/registry.json"), `${canonicalizeJson(registry(fingerprint))}\n`);

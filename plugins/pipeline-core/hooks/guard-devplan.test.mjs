@@ -20,8 +20,7 @@ import { fileURLToPath } from "node:url";
 import { sha256CanonicalJson } from "../lib/plan-spec-state-v2.mjs";
 import { canonicalSha256, canonicalizeJson } from "../lib/governance-event.mjs";
 import { appendHumanGovernanceDecision } from "../lib/human-governance-ledger.mjs";
-import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
-import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
+import { readLocalRepositoryFingerprint } from "../lib/governance-event-store.mjs";
 
 const GUARD = fileURLToPath(new URL("./guard-devplan.mjs", import.meta.url));
 
@@ -611,8 +610,7 @@ function governanceGrantIntent({ fingerprint, capturePolicyDigest, decision }) {
 /** Real git-init + governance-ledger fixture backing a genuinely resolvable grant. */
 async function writeGovernanceLedgerGrant(dir, { decisionId, packageId, artifacts }) {
   spawnSync("git", ["init", "-q", dir]);
-  const repository = discoverRepository(dir);
-  const fingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: repository.commonDir, primaryRoot: repository.primaryRoot });
+  const fingerprint = await readLocalRepositoryFingerprint({ repositoryRoot: dir });
   const policy = governanceCapturePolicy();
   await mkdir(join(dir, "governance", "events"), { recursive: true });
   await writeFile(join(dir, "governance", "events", "registry.json"), `${canonicalizeJson(governanceRegistry(fingerprint))}\n`);

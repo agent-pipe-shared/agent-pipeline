@@ -73,7 +73,7 @@ import {
   recordHumanGuardDenial,
 } from "../lib/human-guard-override.mjs";
 import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
-import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
+import { readLocalRepositoryFingerprint } from "../lib/governance-event-store.mjs";
 import { canonicalSha256, parseStrictJson } from "../lib/governance-event.mjs";
 import { readPublicRepositoryFile } from "../lib/threat-model-approval-request.mjs";
 import {
@@ -253,10 +253,18 @@ export function gateStrengthRuleFor(filePath, projectDir) {
 // CLI-side `granted` append, which stays fail-closed per §8.1's other branch).
 // ---------------------------------------------------------------------------------
 
-/** The AUTHORITATIVE repository identity for the ledger -- never the raw rootDir string. */
-export function gateStrengthRepositoryFingerprint(rootDir) {
+/**
+ * The AUTHORITATIVE repository identity for the ledger -- never the raw rootDir
+ * string, and never the path-derived `derivePoGateRepositoryFingerprint` hash
+ * either (NVA-GSFP-1): every governance-event-store.mjs call below requires the
+ * store's own bound identity (`readLocalRepositoryFingerprint`, bind-on-first-use)
+ * or fails closed with GES-CROSS-REPOSITORY. Mirrors
+ * scripts/guard-maintenance-window.mjs's own `repositoryFingerprintFor` and
+ * scripts/human-authority-grant.mjs's identical local helper.
+ */
+export async function gateStrengthRepositoryFingerprint(rootDir) {
   const repo = discoverRepository(rootDir);
-  return { repo, fingerprint: derivePoGateRepositoryFingerprint({ gitCommonDir: repo.commonDir, primaryRoot: repo.primaryRoot }) };
+  return { repo, fingerprint: await readLocalRepositoryFingerprint({ repositoryRoot: repo.primaryRoot }) };
 }
 
 export function gateStrengthCapturePolicyDigest(primaryRoot) {
@@ -285,7 +293,7 @@ export function gateStrengthCapturePolicyDigest(primaryRoot) {
 export async function appendOverrideDeniedLedgerEvent({ rootDir, pluginRoot, requestSha256, authorizationChannel, nowMs = Date.now() }) {
   const scriptPath = join(pluginRoot, "scripts", "guard-human-override.mjs");
   const plan = planHumanGuardOverride({ rootDir, pluginRoot, requestSha256, scriptPath });
-  const { repo, fingerprint } = gateStrengthRepositoryFingerprint(rootDir);
+  const { repo, fingerprint } = await gateStrengthRepositoryFingerprint(rootDir);
   const capturePolicyDigest = gateStrengthCapturePolicyDigest(repo.primaryRoot);
   const { decisions: existing } = await queryHumanGovernanceDecisions({ repositoryRoot: repo.primaryRoot, repositoryFingerprint: fingerprint });
   const requestId = requestDecisionId({ intentSha256: requestSha256, producer: "hgo" });
@@ -340,7 +348,7 @@ function gateStrengthGenerationOf(decisionId) {
  * rather than there because that module is out of scope for this dispatch.
  */
 export async function appendOverrideConsumedLedgerEvent({ rootDir, pluginRoot, requestSha256, nowMs = Date.now() }) {
-  const { repo, fingerprint } = gateStrengthRepositoryFingerprint(rootDir);
+  const { repo, fingerprint } = await gateStrengthRepositoryFingerprint(rootDir);
   const requestId = requestDecisionId({ intentSha256: requestSha256, producer: "hgo" });
   const { decisions, events } = await queryHumanGovernanceDecisions({ repositoryRoot: repo.primaryRoot, repositoryFingerprint: fingerprint });
   const grant = decisions.find((entry) => entry.event === "granted" && entry.outcome === "granted"
