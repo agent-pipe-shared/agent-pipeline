@@ -61,11 +61,32 @@ export function isBootstrapBindingStagingAuthoringWrite(input, root) {
   const filePath = writeTargetPath(input?.tool_input, toolName);
   if (filePath === "") return false;
   const resolved = resolve(root, filePath);
+  const name = basename(resolved);
+  const parent = dirname(resolved);
+
+  // NVA-INTAKESPECS-1: the design package now lives at `specs/<featureId>/` (ADR-0045's own
+  // location). The admission got NARROWER in the move, not wider: the containing directory
+  // must itself be a generated feature id, and a `prd_<id>.md` is admitted only when that id
+  // matches its own directory -- so a PRD carried into a different feature's directory is
+  // refused, which the flat staging directory could not express at all.
+  const featureId = basename(parent);
+  if (INTAKE_FEATURE_ID_PATTERN.test(featureId) && parent === join(root, "specs", featureId)) {
+    if (name === "spec.md") return true;
+    const prdMatch = name.match(/^prd_(.+)\.md$/u);
+    return prdMatch !== null && prdMatch[1] === featureId;
+  }
+
+  // NVA-INTAKESPECS-1 transitional. Nothing generates into the old staging directory any more.
+  // This branch exists ONLY so GS-15 and its TP-6-protected regression test (GST38) keep
+  // describing a real, still-admitted path until the single signed override that removes all
+  // three can run -- scratch/NVA-INTAKESPECS-1-UMSETZUNG.md names the exact removal steps.
+  // Removing it early would turn a green protected suite red with no route to fix it in the
+  // same session. Delete this block, GS-15, INTAKE_STAGING_DIRNAME and GST38 together.
   const stagingDirectory = join(root, INTAKE_STAGING_DIRNAME);
   if (resolved === join(stagingDirectory, "spec.md")) return true;
-  if (dirname(resolved) !== stagingDirectory) return false;
-  const prdMatch = basename(resolved).match(/^prd_(.+)\.md$/u);
-  return prdMatch !== null && INTAKE_FEATURE_ID_PATTERN.test(prdMatch[1]);
+  if (parent !== stagingDirectory) return false;
+  const legacyPrdMatch = name.match(/^prd_(.+)\.md$/u);
+  return legacyPrdMatch !== null && INTAKE_FEATURE_ID_PATTERN.test(legacyPrdMatch[1]);
 }
 
 /**
