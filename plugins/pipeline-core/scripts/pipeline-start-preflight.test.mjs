@@ -11,6 +11,7 @@ import { pathToFileURL } from "node:url";
 
 import { validateRulesetSource } from "../lib/ruleset-source.mjs";
 import { startSessionDescriptor } from "../lib/worktree-lifecycle.mjs";
+import { applyInstall } from "./pre-push-hook-install.mjs";
 import {
   installedPipelineIdentity, installedPipelineVersion, observePipelineStartPreflight,
   normalBootstrapPayloadReceipt, pipelineStartPreflightExitCode, freshnessHostActionForPreflight, SCHEMA,
@@ -960,6 +961,12 @@ test("PX0-AC-08(c): the previously-dangling freshnessHostActionForPreflight read
  * this fixture root, decoupled from `scriptUrl`/`observe` (which stay on
  * this actual repo's own real self-application checkout, as in every other
  * test in this file).
+ *
+ * Also installs the pre-push hook (pre-push-hook-install.mjs's own
+ * `applyInstall`) so this fixture represents a fully-set-up repository --
+ * since commit f225bc23 the preflight reports PRE_PUSH_HOOK_NOT_INSTALLED_STATUS
+ * for a repo with no hook installed, which is not what these multi-session
+ * descriptor tests are about.
  */
 function buildConcurrencyRepoFixture() {
   const gitRoot = realpathSync(mkdtempSync(join(tmpdir(), "pipeline-start-preflight-concurrency-")));
@@ -970,6 +977,10 @@ function buildConcurrencyRepoFixture() {
   writeFileSync(join(gitRoot, "README.md"), "fixture\n");
   git(["add", "-A"]);
   git(["commit", "--quiet", "-m", "fixture"]);
+  const install = applyInstall({ rootDir: gitRoot });
+  if (install.status !== "installed") {
+    throw new Error(`buildConcurrencyRepoFixture: pre-push hook install failed (${JSON.stringify(install)})`);
+  }
   return gitRoot;
 }
 
