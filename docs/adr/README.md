@@ -75,7 +75,6 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required 
 | [0061](0061-uniform-human-approval-ceremony.md) | The adversary is the agent, not the human: every human gate is the same three acts — copy one command, type approve, enter the PIN — whatever it authorizes, with the gate and the signature untouched | accepted (requirement) / open (mechanism) | 2026-08-07 |
 | [0061](0061-local-supervisor-state-authority.md) | Local supervisor state authority (renumbered from the 0047 numbering collision) | accepted | 2026-07-25 |
 | [0062](0062-production-execution-and-selected-sandbox-launch.md) | Production execution and selected-sandbox launch extend ADR-0044's frozen boundary, within its own constraints | accepted | 2026-08-11 |
-| [0062](0062-governance-event-kernel.md) | Governance event kernel uses separate immutable stream records (Phoenix PHX-1; renumbered from the 0047 numbering collision) | accepted | 2026-08-02 |
 | [0063](0063-repository-directory-contract.md) | Repository directory contract — kinds, one home per kind, ignore anchoring, agent-facing surface, future check, consumer inheritance (lean, Nightwing-pending) | accepted (lean scope, deliberately incomplete) | 2026-08-12 |
 | [0063](0063-fork-disposition-approval-proof.md) | Fork disposition requires a PO approval proof, reusing push's signature/chat mode and `po-approval-proof.mjs` rather than a disposition-specific mechanism | accepted | 2026-08-10 |
 | [0064](0064-release-preflight-consent-reuses-the-uniform-approval-ceremony.md) | Release-preflight consent is a fourth critical-action kind, not a fourth ceremony — reuses `po-human-approval.mjs authorize-critical` under ADR-0061 instead of inventing a new mechanism | accepted | 2026-08-17 |
@@ -87,6 +86,7 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required 
 | [0067](0067-tri-runner-antigravity-integration.md) | Elevate Google Antigravity CLI (`agy`) with Gemini models to a full 3rd runner with hard hook enforcement, headless dispatch and honest profile mapping, extending ADR-0051/0057 | accepted | 2026-08-22 |
 | [0068](0068-backlog-ledger-merge-semantics.md) | Merging two parallel sprints' backlog ledgers: one active chain with archived, integrity-checked siblings; amendments become status-neutral and bind their target by `entryHash` rather than by physical sequence | accepted | 2026-08-27 |
 | [0069](0069-adr-numbers-are-allocated-at-acceptance.md) | ADR numbers are allocated at acceptance into the trunk, never at drafting time, and carry no sprint prefix; duplicates are a hard Verify failure, and an existing collision is resolved by reference load with a forwarding line rather than by rewriting archives | accepted | 2026-08-27 |
+| [0071](0071-governance-event-kernel.md) | Governance event kernel uses separate immutable stream records (Phoenix PHX-1; renumbered from the 0047 numbering collision, then renumbered again from 0062 under ADR-0069 D4) | accepted | 2026-08-02 |
 
 ### Resubmissions
 
