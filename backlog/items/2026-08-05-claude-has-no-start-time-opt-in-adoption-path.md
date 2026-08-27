@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.claude-has-no-start-time-opt-in-adoption-path
 type: idea
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-05
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "88dc3ba6952f226ed4f9caa57bad982cb660a425"
+closure_evidence: "backlog/items/2026-08-05-claude-has-no-start-time-opt-in-adoption-path.md"
 source: "PO observation, Sprint Nova session 2026-08-05, in the same session that reproduced the setup.mjs marketplace collision by hand"
 due: 2026-09-05
 ---
@@ -90,3 +94,19 @@ matching what Codex's onboarding already offered). Closing.
 implementation this update describes is exactly a hint-only stopgap. Status
 kept `open` pending an Elephant/PO re-check of which of these two stands;
 do not treat this item as closed on the strength of this update alone.
+
+## PO decision, 2026-08-27 — the contradiction is resolved in favour of the closure
+
+The PO was shown both records side by side during the sprint_phoenix merge
+close-out and decided: **the item stays closed.** The 2026-08-12 position —
+"a full V4-onboarding-parity flow ... not a hint-text-only stopgap" — is
+**superseded**, not overridden by accident: the shipped hint-only hook was
+accepted as satisfying the item's core ask.
+
+The 2026-08-12 decision text above is left in place deliberately. It is a
+true record of what was decided that day, and a decision that was later
+superseded is not the same thing as a decision that never happened. Anyone
+reading this item's history should see both, in order, with the outcome named.
+
+Status therefore moves `open` → `closed`, carrying the Phoenix line's closure
+commit and evidence, which are the ones that describe the accepted work.

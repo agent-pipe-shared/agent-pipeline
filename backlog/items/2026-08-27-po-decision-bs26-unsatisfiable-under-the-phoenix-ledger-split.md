@@ -1,8 +1,8 @@
 ---
 schema: pipeline.backlog-item.v1
 id: pipeline.po-decision-bs26-unsatisfiable-under-the-phoenix-ledger-split
-type: decision
-owner: po
+type: requirement
+owner: pipeline
 status: open
 created: 2026-08-27
 source: "Phoenix merge, dispatch VFX3-BACKLOG plus direct verification, 2026-08-26"
