@@ -620,7 +620,7 @@
 
 ## Counts
 
-- open: 106
+- open: 108
 - in_progress: 0
 - closed: 488
 - rejected: 3

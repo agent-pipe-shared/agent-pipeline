@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "95f9588d52491bbd389fdf13f1af1e1bd7c429ac35530cbbcc4679c0519ce4ce"
+    "transitionHead": "c70061d5d2c2192569f23f0c83c0bd52f8ea413888557bb93f74bf2b7e0982c6"
   },
   "counts": {
-    "open": 106,
+    "open": 108,
     "in_progress": 0,
     "closed": 488,
     "rejected": 3,
