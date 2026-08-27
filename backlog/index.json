@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "4b1960a41ae18ccff8ec8879ef9a4ef4a3c14cde8004df8a2563173e8e25fd49"
+    "transitionHead": "30ead268c6821247a0b2a59a7d8723efa349e987a70cef4c01a5e92a298cfc54"
   },
   "counts": {
-    "open": 47,
+    "open": 49,
     "in_progress": 5,
     "closed": 377,
     "rejected": 3,
@@ -25,6 +25,15 @@
       "closureRepository": "self",
       "closureCommit": "615bcd247ccc0f339102d669e5d78cd6e684d874",
       "closureEvidence": "backlog/items/2026-08-08-a-checkout-that-cannot-be-clean-defeats-every-cleanliness-gate.md"
+    },
+    {
+      "id": "pipeline.a-closed-result-can-be-amended-after-close-with-no-detection-and-no-repair",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-27",
+      "source": "Hit live, 2026-08-27, in the Alfred clone: the sprint-nova-epic discard exposed a 2026-07-31 post-close amendment to the 0.4.7-hotfix Result that had been invisible for four weeks. Full incident narrative: scratch/incident-report.md of that session; durable facts restated here in full.",
+      "deferred": false
     },
     {
       "id": "pipeline.a-promoted-feature-can-never-pass-the-plan-gate",
@@ -1401,6 +1410,15 @@
       "closureRepository": "self",
       "closureCommit": "695cd8e59aa7131c5c9595c1d713f6a1951d9620",
       "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
+    },
+    {
+      "id": "pipeline.discard-feature-writes-a-state-the-cleanup-observer-rejects-and-strands-the-session",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-27",
+      "source": "Hit live, 2026-08-27, in the Alfred clone, executing the epic switch the tool itself directs (discard-feature then set-feature). Reproduced against the source the same session; line references verified.",
+      "deferred": false
     },
     {
       "id": "pipeline.dispatch-provenance",

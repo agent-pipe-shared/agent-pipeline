@@ -6,6 +6,7 @@
 | ID | Status | Type | Owner | Created | Tracking |
 | --- | --- | --- | --- | --- | --- |
 | pipeline.a-checkout-that-cannot-be-clean-defeats-every-cleanliness-gate | closed | defect | pipeline | 2026-08-08 | — |
+| pipeline.a-closed-result-can-be-amended-after-close-with-no-detection-and-no-repair | open | defect | pipeline | 2026-08-27 | — |
 | pipeline.a-promoted-feature-can-never-pass-the-plan-gate | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.a-read-only-command-is-refused-for-naming-a-protected-path | open | defect | pipeline | 2026-08-27 | — |
 | pipeline.a-runner-improvised-the-po-signature-instructions | open | defect | pipeline | 2026-08-27 | — |
@@ -117,6 +118,7 @@
 | pipeline.cross-repository-override-ledger-binding | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.cross-repository-redirect-eligibility-does-not-consult-the-sensitive-path-boundary | closed | defect | pipeline | 2026-08-12 | — |
 | pipeline.decouple-hosted-project-document-language-from-operator-facing-language | closed | workflow-improvement | pipeline | 2026-08-09 | — |
+| pipeline.discard-feature-writes-a-state-the-cleanup-observer-rejects-and-strands-the-session | open | defect | pipeline | 2026-08-27 | — |
 | pipeline.dispatch-provenance | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.dispatch-record-contaminates-every-critic-review | deferred | defect | pipeline | 2026-08-09 | — |
 | pipeline.dispatch-record-does-not-bind-to-its-commit | closed | defect | pipeline | 2026-08-09 | — |
@@ -451,7 +453,7 @@
 
 ## Counts
 
-- open: 47
+- open: 49
 - in_progress: 5
 - closed: 377
 - rejected: 3
