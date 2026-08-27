@@ -62,6 +62,28 @@ function capturePolicyFixture() {
   ], sanitizedReceipt: { allowEventId: true, allowEventDigest: true, allowCheckpoint: true, allowReasonText: false }, mandatoryEventClasses: [] };
 }
 
+/*
+ * NVA-REPOID-1: the physical binding this store reads is no longer a
+ * function of `repositoryRoot`/`gitCommonDir` -- it is a randomly generated
+ * identity, minted and persisted on first use under the git common
+ * directory. `derivePoGateRepositoryFingerprint` is kept here only as a
+ * convenient deterministic 64-hex value generator per fixture root (nothing
+ * about its shape or meaning is asserted by this suite any more); every
+ * fixture that wants the store to see it as the bound identity must SEED the
+ * local binding file directly, exactly the way `assertPhysicalRoot` would
+ * have written it on first use. This keeps every existing test's `fingerprint`
+ * variable meaningful without rewriting each test to first learn a
+ * store-generated value it cannot predict.
+ */
+const REPOSITORY_BINDING_SCHEMA = "pipeline.governance-event-repository-binding.v2";
+
+async function seedRepositoryBinding(root, repositoryFingerprint, legacyAliases = []) {
+  const repository = discoverRepository(root);
+  const directory = path.join(repository.commonDir, "agent-pipeline", "governance-events");
+  await mkdir(directory, { recursive: true });
+  await writeFile(path.join(directory, "repository-binding.json"), `${canonicalizeJson({ schema: REPOSITORY_BINDING_SCHEMA, repositoryFingerprint, legacyAliases, boundAtEpochMs: 1 })}\n`);
+}
+
 async function fixtureRoot() {
   const root = await mkdtemp(path.join(os.tmpdir(), "governance-event-store-"));
   execFileSync("git", ["init", "-q", root]);
@@ -71,6 +93,7 @@ async function fixtureRoot() {
   await mkdir(path.join(root, "governance/events"), { recursive: true });
   await writeFile(path.join(root, "governance/events/registry.json"), `${canonicalizeJson(registryFixture())}\n`);
   await writeFile(path.join(root, "governance/events/capture-policy.json"), `${canonicalizeJson(capturePolicy)}\n`);
+  await seedRepositoryBinding(root, fingerprint);
   return root;
 }
 
@@ -254,6 +277,7 @@ async function mandatoryFixtureRoot(mandatoryEventClasses) {
   await mkdir(path.join(root, "governance/events"), { recursive: true });
   await writeFile(path.join(root, "governance/events/registry.json"), `${canonicalizeJson(registryFixture())}\n`);
   await writeFile(path.join(root, "governance/events/capture-policy.json"), `${canonicalizeJson(capturePolicy)}\n`);
+  await seedRepositoryBinding(root, fingerprint);
   return root;
 }
 
@@ -730,6 +754,7 @@ async function placeholderRegistryFixtureRoot() {
   await mkdir(path.join(root, "governance/events"), { recursive: true });
   await writeFile(path.join(root, "governance/events/registry.json"), `${canonicalizeJson({ ...registryFixture(), repositoryFingerprint: PLACEHOLDER_REPOSITORY_FINGERPRINT })}\n`);
   await writeFile(path.join(root, "governance/events/capture-policy.json"), `${canonicalizeJson(capturePolicy)}\n`);
+  await seedRepositoryBinding(root, fingerprint);
   return root;
 }
 
