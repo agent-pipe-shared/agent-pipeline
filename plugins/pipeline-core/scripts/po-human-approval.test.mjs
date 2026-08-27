@@ -73,7 +73,7 @@ import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs"
 import * as gmw from "../lib/guard-maintenance-window.mjs";
 import { canonicalSha256, canonicalizeJson, sealGovernanceEvent } from "../lib/governance-event.mjs";
 import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
-import { appendPortableGovernanceEvent, recoverPortableGovernanceProjection } from "../lib/governance-event-store.mjs";
+import { appendPortableGovernanceEvent, readLocalRepositoryFingerprint, recoverPortableGovernanceProjection } from "../lib/governance-event-store.mjs";
 
 function openssl(args) {
   const result = spawnSync("openssl", args, { stdio: "pipe" });
@@ -714,7 +714,19 @@ async function forkedRepositoryFixture() {
   const repoRoot = mkdtempSync(join(tmpdir(), "po-fork-disposition-repo-"));
   execFileSync("git", ["init", "-q", repoRoot]);
   const repository = discoverRepository(repoRoot);
-  const fingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: repository.commonDir, primaryRoot: repository.primaryRoot });
+  // NVA-REPOID-3: two distinct fingerprints now serve two distinct needs.
+  // `fingerprint` is the store's BOUND identity (governance-event-store.mjs's
+  // `readLocalRepositoryFingerprint`, bind-on-first-use against this fresh
+  // fixture checkout) -- every governance-store call (append, query, and the
+  // CLI's own `--repository-fingerprint` argument, which flows straight into
+  // `inspectForkedGovernanceStream`) now requires exactly this value.
+  // `derivedFingerprint` is the unrelated, still-path-derived value
+  // `po-human-approval.mjs` itself uses ONLY to namespace its request/proof
+  // filenames (PO-KEYDIR-01(B)); that naming scheme was never changed by
+  // NVA-REPOID-1/2 and still calls `derivePoGateRepositoryFingerprint`
+  // directly, so filename assertions below must keep using it.
+  const derivedFingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: repository.commonDir, primaryRoot: repository.primaryRoot });
+  const fingerprint = await readLocalRepositoryFingerprint({ repositoryRoot: repoRoot });
   const capturePolicy = capturePolicyFixture();
   const capturePolicyDigest = canonicalSha256(capturePolicy);
   mkdirSync(join(repoRoot, "governance/events"), { recursive: true });
@@ -726,7 +738,7 @@ async function forkedRepositoryFixture() {
   const fork = sealGovernanceEvent({ ...intent({ eventId: "evt-fork", idempotencyKey: "idem-fork" }), sequence: 2, previousEventDigest: first.eventDigest, payloadDigest: "0".repeat(64), eventDigest: "0".repeat(64) });
   writeFileSync(join(repoRoot, "governance/events/lifecycle/2-evt-fork.json"), `${canonicalizeJson(fork)}\n`);
   const directory = mkdtempSync(join(tmpdir(), "po-fork-disposition-external-"));
-  return { repoRoot, directory, fingerprint };
+  return { repoRoot, directory, fingerprint, derivedFingerprint };
 }
 
 /** Declares the fixture's own throwaway key as the repository's trust anchor — the
@@ -762,12 +774,14 @@ test("a fork-disposition request built by the CLI, signed with the PO key, is ac
     assert.equal(prepared.forkedEventDigests.length, 2);
     assert.notDeepEqual(prepared.candidate, FORK_CANDIDATE, "the candidate must be the derived one, never a repository commit/tree");
 
-    // dirs.fingerprint is the SAME full derivePoGateRepositoryFingerprint() digest
+    // dirs.derivedFingerprint is the SAME full derivePoGateRepositoryFingerprint() digest
     // po-human-approval.mjs computes for this real-git fixture (via discoverRepository's
     // commonDir/primaryRoot, mirrored by resolveGitCommonDir there); only the first 12
     // hex chars land in filenames (PO-KEYDIR-01(B)) -- repositoryFingerprintFor() below
-    // assumes a non-git tmpdir fixture and would be wrong here.
-    const forkFp = dirs.fingerprint.slice(0, 12);
+    // assumes a non-git tmpdir fixture and would be wrong here. dirs.fingerprint (the
+    // store's bound identity, NVA-REPOID-3) is a different value and never appears in a
+    // filename.
+    const forkFp = dirs.derivedFingerprint.slice(0, 12);
     const written = JSON.parse(readFileSync(join(dirs.directory, `request-${forkFp}-critical-governance-fork-disposition.json`), "utf8"));
     assert.equal(written.action.kind, "governance-fork-disposition");
     assert.equal(written.action.subjectSha256, prepared.subjectSha256);
@@ -835,7 +849,7 @@ test("approve-fork-disposition refuses a tampered approvalIntent before any sign
     const { authority } = keyFixture(dirs.directory);
     declareTrustAnchor(dirs.repoRoot, authority);
     await runForkDispositionApproval(["prepare-fork-disposition", ...forkArgs(dirs, ["--expires-at", FAR_FUTURE])], {});
-    const requestPath = join(dirs.directory, `request-${dirs.fingerprint.slice(0, 12)}-critical-governance-fork-disposition.json`);
+    const requestPath = join(dirs.directory, `request-${dirs.derivedFingerprint.slice(0, 12)}-critical-governance-fork-disposition.json`);
     const request = JSON.parse(readFileSync(requestPath, "utf8"));
     // action.kind/action.subjectSha256 stay correct (they pass the earlier
     // check at :419-421); only the approvalIntent's own authority field is
@@ -849,7 +863,7 @@ test("approve-fork-disposition refuses a tampered approvalIntent before any sign
       /not issued for the fork-disposition authority/u,
     );
     assert.equal(confirmations.length, 0, "the confirmation prompt -- and therefore OpenSSL -- must never be reached once the intent is tampered");
-    assert.equal(existsSync(join(dirs.directory, `proof-${dirs.fingerprint.slice(0, 12)}-critical-governance-fork-disposition.json`)), false, "no signature may be produced for a request with a tampered approvalIntent");
+    assert.equal(existsSync(join(dirs.directory, `proof-${dirs.derivedFingerprint.slice(0, 12)}-critical-governance-fork-disposition.json`)), false, "no signature may be produced for a request with a tampered approvalIntent");
   } finally {
     cleanup(dirs);
   }
@@ -897,7 +911,7 @@ test("the -critical trio refuses the fork-disposition kind, so no operator route
     writeFileSync(join(dirs.repoRoot, "plan.md"), "plan bytes\n");
     writeFileSync(join(dirs.repoRoot, "spec.md"), "spec bytes\n");
     const prepared = await runForkDispositionApproval(["prepare-fork-disposition", ...forkArgs(dirs, ["--expires-at", FAR_FUTURE])], {});
-    const requestPath = join(dirs.directory, `request-${dirs.fingerprint.slice(0, 12)}-critical-governance-fork-disposition.json`);
+    const requestPath = join(dirs.directory, `request-${dirs.derivedFingerprint.slice(0, 12)}-critical-governance-fork-disposition.json`);
     const before = readFileSync(requestPath, "utf8");
 
     // The exact escape route: the CORRECT receipt's subject digest, copied into
@@ -958,7 +972,7 @@ test("po-approval-gate.mjs drives the public half of the fork-disposition ceremo
     // The signing half is not the control plane's to run: it delegates to the
     // approve-critical branch and therefore reads the private key.
     assert.throws(() => runApprovalGate(["approve-fork-disposition", ...forkArgs(dirs)], { readConfirmation: () => "approve", spawn: () => ({ status: 0 }) }), /Usage:/u);
-    assert.equal(existsSync(join(dirs.directory, `proof-${dirs.fingerprint.slice(0, 12)}-critical-governance-fork-disposition.json`)), false, "no proof may exist before the human has signed");
+    assert.equal(existsSync(join(dirs.directory, `proof-${dirs.derivedFingerprint.slice(0, 12)}-critical-governance-fork-disposition.json`)), false, "no proof may exist before the human has signed");
 
     await runForkDispositionApproval(["approve-fork-disposition", ...forkArgs(dirs)], { readConfirmation: () => "approve" });
     const verified = await runApprovalGate(["verify-fork-disposition", ...forkArgs(dirs)], {});
