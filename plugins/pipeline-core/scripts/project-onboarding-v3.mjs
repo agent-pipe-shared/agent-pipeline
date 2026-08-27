@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 
+import { readFileSync } from "node:fs";
+import { isAbsolute, relative, resolve } from "node:path";
+
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { requireAttendedChatGateConfirmation } from "../lib/chat-gate-ceremony.mjs";
 import { loadManifestSafe, resolveHumanFacingLanguage } from "../lib/manifest.mjs";
@@ -38,6 +41,57 @@ import {
   applyProjectRemoteAdoptionV4,
   planProjectOnboardingSourceRecoveryV4,
 } from "../lib/project-onboarding-v3.mjs";
+// NVA-INTAKEARGV-1: the mutating-onboarding argv shape table and its argv renderer moved to
+// lib/onboarding-argv-shapes.mjs so the third consumer -- the `nextAction.guidance` string in
+// lib/project-onboarding-v3.mjs, the only one an agent actually reads -- can derive from the
+// same declaration the CLI emits from and the guard admits by. It could not before: this file
+// imports lib/project-onboarding-v3.mjs, so the guidance side importing back would be a cycle.
+// Re-exported here unchanged, because guard-lifecycle-ready.mjs and the suites already reach
+// them through this module's seam.
+import { MUTATING_ONBOARDING_ARGV_SHAPES, automatedMutatingApplyArgv } from "../lib/onboarding-argv-shapes.mjs";
+
+export { MUTATING_ONBOARDING_ARGV_SHAPES, automatedMutatingApplyArgv };
+
+/**
+ * NVA-INTAKEARGV-1: resolve intake-capture-apply's material text from exactly one of its two
+ * routes. `--text` carries the value inline. `--text-file` reads it from a file, and is the
+ * only way a real design document can reach the intake at all: the closed Pipeline shell
+ * grammar refuses any command text containing a newline, while this very input is declared
+ * multi-line prose by intakeCaptureAction() itself (`singleLine: false`). Measured 2026-08-27
+ * on a Codex greenfield run -- the PO's design document could not be passed, in any quoting.
+ *
+ * The file must resolve INSIDE the project root. A capture is repository-scoped material, and
+ * reading an arbitrary host path on the strength of a relative-looking argument is exactly the
+ * shape the containment rules exist to refuse; `scratch/` is the intended home for it and is
+ * inside the root. Returns `options.text` untouched when no file route was used, so
+ * applyOnboardingIntakeCapture's own non-empty validation stays the single authority on an
+ * absent or empty value.
+ */
+function resolveIntakeCaptureText(options) {
+  if (options.text !== undefined && options.textFile !== undefined) {
+    const conflict = new Error("intake-capture-apply accepts exactly one of --text or --text-file, never both");
+    conflict.code = "INTAKE-CAPTURE-TEXT-AMBIGUOUS";
+    throw conflict;
+  }
+  if (options.textFile === undefined) return options.text;
+  const root = resolve(options.root);
+  const candidate = resolve(root, options.textFile);
+  const inside = relative(root, candidate);
+  if (inside === "" || inside.startsWith("..") || isAbsolute(inside)) {
+    const escape = new Error("--text-file must name a path inside the project root");
+    escape.code = "INTAKE-CAPTURE-TEXT-FILE-OUTSIDE-ROOT";
+    throw escape;
+  }
+  let bytes;
+  try {
+    bytes = readFileSync(candidate, "utf8");
+  } catch {
+    const unreadable = new Error("--text-file could not be read");
+    unreadable.code = "INTAKE-CAPTURE-TEXT-FILE-UNREADABLE";
+    throw unreadable;
+  }
+  return bytes;
+}
 
 // GUARDDERIVE-1 (backlog:
 // 2026-08-16-guard-lifecycle-allowlist-should-derive-from-the-onboarding-cli-table.md).
@@ -155,93 +209,6 @@ export function automatedLifecycleArgvCommands(subcommands = ONBOARDING_SUBCOMMA
     .map((entry) => entry.name));
 }
 
-// NVA-CODEXARGV-1 (backlog: NVA-CODEXARGV-1's own dispatch briefing, 2026-08-27). The exact
-// admitted automated argv FLAG SET for the five `mutates: true, automatedArgvShape: null`
-// ONBOARDING_SUBCOMMANDS entries whose admission is not the bare "lifecycle" shape
-// (intake-consent-apply/intake-capture-apply/intake-design-questions-apply/
-// intake-generate-apply/bootstrap-bind-apply -- see the comments beside those five table
-// entries above for their individual history). Before this, the flag SET each one admits
-// existed only inside guard-lifecycle-ready.mjs's own hand-written matchFlagSpec() calls --
-// correct today, but with nothing forcing the CLI side and the guard side to ever agree
-// again if either changes. Declared ONCE here and consumed by both sides through the SAME
-// import seam GUARDDERIVE-1 already uses (guard-lifecycle-ready.mjs already imports
-// automatedLifecycleArgvCommands from this module): guard-lifecycle-ready.mjs's
-// sanctionedOnboardingArgs() builds its admission for these five names directly from this
-// table (never a second hand-copy of the flag SET), and automatedMutatingApplyArgv() below
-// can never emit a flag outside it. Per-flag VALUE validation (is this a real hex digest, a
-// real language code, a real project root...) deliberately stays guard-side, unchanged and
-// exactly as narrow as before -- what this table closes is drift in the flag SET itself,
-// the property that went stale three separate times for the read-only "lifecycle" shape
-// before GUARDDERIVE-1 (backlog 2026-08-08/09/16) and, per this dispatch's own briefing, was
-// about to go the same way here (a false "KNOWN GAP, not fixed here" comment surviving past
-// the fix that closed it).
-//
-//   required      -- flags that consume only themselves and MUST be present.
-//   requiredValue -- flags that consume themselves plus one value and MUST be present.
-//   optionalValue -- flags that consume themselves plus one value and MAY be present.
-//
-// `--root` is always requiredValue and always validated against the caller's own resolved
-// root -- never listed as a flag NAME needing a separate value-shape declaration here, since
-// every branch needs the identical `value === root` check the guard already applies
-// elsewhere; automatedMutatingApplyArgv() below fills it in from its own `root` parameter.
-const MUTATING_ONBOARDING_ARGV_SHAPES = Object.freeze({
-  "intake-consent-apply": Object.freeze({
-    required: Object.freeze(["--granted", "--activate"]),
-    requiredValue: Object.freeze(["--root"]),
-    optionalValue: Object.freeze(["--git-author-name", "--git-author-email", "--language", "--profile"]),
-  }),
-  "intake-capture-apply": Object.freeze({
-    required: Object.freeze(["--activate"]),
-    requiredValue: Object.freeze(["--root", "--text"]),
-    optionalValue: Object.freeze([]),
-  }),
-  "intake-design-questions-apply": Object.freeze({
-    required: Object.freeze(["--activate"]),
-    requiredValue: Object.freeze(["--root", "--answers-json"]),
-    optionalValue: Object.freeze([]),
-  }),
-  "intake-generate-apply": Object.freeze({
-    required: Object.freeze(["--activate"]),
-    requiredValue: Object.freeze(["--root", "--plan-sha256"]),
-    optionalValue: Object.freeze([]),
-  }),
-  "bootstrap-bind-apply": Object.freeze({
-    required: Object.freeze(["--activate"]),
-    requiredValue: Object.freeze(["--root", "--plan-sha256"]),
-    optionalValue: Object.freeze([]),
-  }),
-});
-
-export { MUTATING_ONBOARDING_ARGV_SHAPES };
-
-/**
- * NVA-CODEXARGV-1: build the exact automated apply argv for one
- * MUTATING_ONBOARDING_ARGV_SHAPES-declared subcommand -- the mutating-command counterpart to
- * lib/project-onboarding-v3.mjs's lifecycleArgv() for the read-only "lifecycle" shape. Every
- * required flag (boolean or value) is always emitted; an optional value flag is emitted only
- * when `values` carries a non-undefined entry for it; nothing outside the declared shape is
- * ever emitted -- structurally, not by discipline, since the loop below only ever reads flag
- * names off the shared table. `values` is keyed by the flag's own literal name (e.g.
- * `"--plan-sha256"`), not a camelCased field name, so no second name-mapping table is needed
- * on this side either. Throws on an unknown subcommand name or a missing required value --
- * both are caller bugs, never a shape this function should silently paper over.
- */
-export function automatedMutatingApplyArgv(name, root, values = {}) {
-  const shape = MUTATING_ONBOARDING_ARGV_SHAPES[name];
-  if (!shape) throw new TypeError(`${name} has no declared mutating apply argv shape`);
-  const argv = [name];
-  for (const flag of shape.requiredValue) {
-    const value = flag === "--root" ? root : values[flag];
-    if (value === undefined) throw new TypeError(`${name} requires ${flag}`);
-    argv.push(flag, value);
-  }
-  for (const flag of shape.optionalValue) {
-    if (values[flag] !== undefined) argv.push(flag, values[flag]);
-  }
-  for (const flag of shape.required) argv.push(flag);
-  return argv;
-}
-
 // The argv[0] tokens parse() recognises directly (the compound `kickoff`,
 // `kickoff promote`, `adopt-remote` and `continuity` forms are handled by their
 // own branches below and synthesize the remaining names in the table).
@@ -328,6 +295,7 @@ function parse(args) {
     else if (arg === "--git-author-name") { const value = args[index + 1]; if (!value || value.startsWith("--")) return { error: "--git-author-name requires a name" }; output.gitAuthorName = value; index += 1; }
     else if (arg === "--git-author-email") { const value = args[index + 1]; if (!value || value.startsWith("--")) return { error: "--git-author-email requires an email" }; output.gitAuthorEmail = value; index += 1; }
     else if (arg === "--text") { const value = args[index + 1]; if (value === undefined) return { error: "--text requires one argv text element" }; output.text = value; index += 1; }
+    else if (arg === "--text-file") { const value = args[index + 1]; if (!value || value.startsWith("--")) return { error: "--text-file requires one file path" }; output.textFile = value; index += 1; }
     else if (arg === "--answers-json") { const value = args[index + 1]; if (!value || value.startsWith("--")) return { error: "--answers-json requires a JSON array" }; output.answersJson = value; index += 1; }
     else if (arg === "--activate") output.activate = true;
     else if (arg === "--help" || arg === "-h") output.help = true;
@@ -606,7 +574,7 @@ export function main(args = process.argv.slice(2), {
       deps,
     });
     else if (options.command === "intake-capture-apply") output = applyOnboardingIntakeCapture({
-      rootDir: options.root, text: options.text, activate: options.activate, deps,
+      rootDir: options.root, text: resolveIntakeCaptureText(options), activate: options.activate, deps,
     });
     else if (options.command === "intake-design-questions-apply") {
       let answers;

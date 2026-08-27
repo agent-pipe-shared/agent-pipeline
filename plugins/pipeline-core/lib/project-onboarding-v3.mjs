@@ -30,6 +30,11 @@ import {
   RUNNERS_WITHOUT_APP_SERVER,
 } from "./codex-onboarding-app-server.mjs";
 import { observeCodexOnboardingCapabilities } from "./codex-onboarding-capabilities.mjs";
+// NVA-INTAKEARGV-1: guidance strings render their command form from the SAME declaration the
+// CLI emits from and guard-lifecycle-ready.mjs admits by, so a nextAction can no longer tell
+// an agent to run a command the guard refuses. Hand-written prose here omitted the mandatory
+// --activate and deadlocked a real Codex greenfield session on 2026-08-27.
+import { mutatingApplyCommandHint } from "./onboarding-argv-shapes.mjs";
 import {
   applyOnboardingContinuityRepair,
   applyOnboardingKickoff,
@@ -2036,7 +2041,7 @@ function intakeConsentAction() {
     ],
     mutation: false,
     requiresConfirmation: false,
-    guidance: "no private intake checkpoint exists yet (or one exists with no recorded consent); ask the PO once, in plain language, for explicit affirmative consent to begin the intake conversation, plus their git author name and email, human-facing language (de or en), and profile (epic, feature, or mini) for whichever of those the PO has not already stated. Then call intake-consent-apply with --granted plus whichever of --git-author-name/--git-author-email/--language/--profile were answered -- omit any the PO has not stated yet, they can be filled on a later call.",
+    guidance: `no private intake checkpoint exists yet (or one exists with no recorded consent); ask the PO once, in plain language, for explicit affirmative consent to begin the intake conversation, plus their git author name and email, human-facing language (de or en), and profile (epic, feature, or mini) for whichever of those the PO has not already stated. Then call \`${mutatingApplyCommandHint("intake-consent-apply")}\`, supplying whichever of --git-author-name/--git-author-email/--language/--profile were answered -- omit any the PO has not stated yet, they can be filled on a later call.`,
     expected: { schema: SCHEMA, statuses: ["intake-required"] },
   };
 }
@@ -2059,7 +2064,7 @@ function intakeCaptureAction() {
     input: { name: "text", encoding: "utf8", trim: false, minBytes: 1, maxBytes: INTAKE_MATERIAL_TEXT_MAX_BYTES, singleLine: false, rejectNul: true },
     mutation: false,
     requiresConfirmation: false,
-    guidance: "consent is already recorded; ask the PO for their next message containing project requirements, goals, constraints, or existing decisions, then call intake-capture-apply with --text set to exactly what they wrote. Call this once per PO message, repeatedly, until the PO indicates they are done describing the project.",
+    guidance: `consent is already recorded; ask the PO for their next message containing project requirements, goals, constraints, or existing decisions, then call \`${mutatingApplyCommandHint("intake-capture-apply", { "--text": "<exactly what the PO wrote>", "--text-file": "<repo-relative file holding exactly what the PO wrote>" })}\`. Use --text-file whenever the PO's message contains a newline: the closed Pipeline shell grammar refuses a command carrying one, so a multi-line design document cannot be passed through --text in any quoting -- write it to a file under scratch/ first and pass that path. Call this once per PO message, repeatedly, until the PO indicates they are done describing the project.`,
     expected: { schema: SCHEMA, statuses: ["intake-required"] },
   };
 }
@@ -2074,7 +2079,7 @@ function intakeDesignQuestionsAction() {
     input: { name: "answersJson", encoding: "utf8", trim: true, minBytes: 2, maxBytes: 65_536, singleLine: false, rejectNul: true },
     mutation: false,
     requiresConfirmation: false,
-    guidance: "at least one material-input chunk is captured; ask the PO the ONE bundled round of design questions this project still needs answered (never a second round -- intake-design-questions-apply refuses a different answer set once the round is answered), then call intake-design-questions-apply with --answers-json set to a JSON array of {question, answer} objects covering everything asked.",
+    guidance: `at least one material-input chunk is captured; ask the PO the ONE bundled round of design questions this project still needs answered (never a second round -- intake-design-questions-apply refuses a different answer set once the round is answered), then call \`${mutatingApplyCommandHint("intake-design-questions-apply", { "--answers-json": "<JSON array of {question, answer} objects covering everything asked>" })}\`.`,
     expected: { schema: SCHEMA, statuses: ["intake-design-questions-required"] },
   };
 }

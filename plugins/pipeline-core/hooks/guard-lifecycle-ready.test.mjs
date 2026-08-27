@@ -24,6 +24,9 @@ import {
   PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES,
   ProjectOnboardingReadyError,
 } from "../lib/project-onboarding-ready-gate.mjs";
+// NVA-INTAKEARGV-1: the guidance renderer comes from the lib module that now owns the shape
+// table; the table and argv emitter keep arriving through the CLI seam below, unchanged.
+import { mutatingApplyCommandHint } from "../lib/onboarding-argv-shapes.mjs";
 import {
   BASE_GOVERNANCE_MARKERS,
   claudeSessionMemoryDirectory,
@@ -6145,5 +6148,93 @@ test("NVA-BOOTRECEIPT-1: every gate decision is observed, and the guard writes n
     rmSync(commonDir, { recursive: true, force: true });
     rmSync(dirname(dirname(denyTranscript)), { recursive: true, force: true });
     rmSync(dirname(dirname(allowTranscript)), { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------------
+// NVA-INTAKEARGV-1. The loop that was never closed.
+//
+// NVA-CODEXARGV-1 pinned the CLI's emitted argv against this guard's admission -- two
+// machine components -- and the suite was green. The third consumer was the
+// `nextAction.guidance` string, the ONLY one an agent actually reads, and it was
+// hand-written prose that named no `--activate` while every shape here requires it.
+// Measured 2026-08-27 on a live Codex greenfield run: the agent followed the guidance
+// exactly, this guard refused the result as GUARD-LIFECYCLE-NOT-READY, and the refusal's
+// own recovery pointed back at the inspection that re-emitted the same guidance. Onboarding
+// could not be completed at all. A suite that proves two of three consumers agree does not
+// prove the flow works; these two cases close guidance->guard directly.
+// ---------------------------------------------------------------------------------
+
+test("NVA-INTAKEARGV-1: the agent-facing command hint names every flag its own shape requires", () => {
+  // The direct regression on the outage: `--activate` (and every other mandatory flag)
+  // must appear in the text handed to the agent, for every mutating subcommand -- derived
+  // from the shape, never asserted against a hand-copied expected string.
+  for (const [name, shape] of Object.entries(MUTATING_ONBOARDING_ARGV_SHAPES)) {
+    const hint = mutatingApplyCommandHint(name);
+    assert.ok(hint.startsWith(`${name} `), `${name}: hint does not name its own subcommand`);
+    for (const flag of shape.required) {
+      assert.ok(hint.includes(flag), `${name}: mandatory ${flag} missing from the agent-facing hint`);
+    }
+    for (const flag of shape.requiredValue) {
+      assert.ok(hint.includes(flag), `${name}: mandatory ${flag} missing from the agent-facing hint`);
+    }
+    for (const flag of shape.requiredValueOneOf ?? []) {
+      assert.ok(hint.includes(flag), `${name}: one-of alternative ${flag} missing from the agent-facing hint`);
+    }
+  }
+});
+
+test("NVA-INTAKEARGV-1: the one-of text routes admit exactly one alternative, and every mandatory flag is load-bearing", () => {
+  // Same admission seam as NVA-CODEXARGV-1 AC-3/AC-4 above (isSanctionedLifecycleCommand,
+  // each token quoted) -- deliberately not the whole guard, because a command missing
+  // --activate is not write-shaped at all and would be admitted for an unrelated reason,
+  // which says nothing about the admission being tested here.
+  //
+  // What this adds beyond AC-3/AC-4: the `--text` / `--text-file` one-of group, and EVERY
+  // mandatory flag rather than only --activate. Without the "exactly one" half, a second
+  // text route could silently decay into an alias accepted alongside the first.
+  const path = root();
+  const values = {
+    "--text": "one captured PO message",
+    "--text-file": "scratch/design-input.md",
+    "--answers-json": JSON.stringify([{ question: "What is the goal?", answer: "Ship it." }]),
+    "--plan-sha256": "a".repeat(64),
+    "--git-author-name": "PO Name",
+    "--git-author-email": "po@example.com",
+    "--language": "en",
+    "--profile": "feature",
+  };
+  const admits = (argv) =>
+    isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' ${argv.map((token) => `'${token}'`).join(" ")}`, path);
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    for (const [name, shape] of Object.entries(MUTATING_ONBOARDING_ARGV_SHAPES)) {
+      const oneOf = shape.requiredValueOneOf ?? [];
+      for (const alternative of oneOf.length > 0 ? oneOf : [null]) {
+        const supplied = { ...values };
+        if (alternative !== null) for (const other of oneOf) if (other !== alternative) delete supplied[other];
+        assert.equal(admits(automatedMutatingApplyArgv(name, path, supplied)), true,
+          `${name}${alternative === null ? "" : ` via ${alternative}`} was refused`);
+      }
+      if (oneOf.length > 1) {
+        // Both alternatives at once, and neither -- each must fail the "exactly one" check.
+        const single = { ...values };
+        for (const other of oneOf) if (other !== oneOf[0]) delete single[other];
+        const both = [...automatedMutatingApplyArgv(name, path, single), oneOf[1], values[oneOf[1]]];
+        assert.equal(admits(both), false, `${name}: two one-of alternatives were admitted together`);
+        const neither = automatedMutatingApplyArgv(name, path, single)
+          .filter((token, index, argv) => token !== oneOf[0] && argv[index - 1] !== oneOf[0]);
+        assert.equal(admits(neither), false, `${name}: admitted with no one-of alternative at all`);
+      }
+      // Every mandatory bare flag is load-bearing, not just --activate.
+      const complete = { ...values };
+      for (const other of oneOf.slice(1)) delete complete[other];
+      for (const flag of shape.required) {
+        assert.equal(admits(automatedMutatingApplyArgv(name, path, complete).filter((token) => token !== flag)), false,
+          `${name}: admitted without its mandatory ${flag}`);
+      }
+    }
+  } finally {
+    rmSync(path, { recursive: true, force: true });
   }
 });
