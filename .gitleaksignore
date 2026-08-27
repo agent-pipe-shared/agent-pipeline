@@ -159,3 +159,23 @@ content-v1:77159af8b199d45fcabdd13fdac69e2e9b37c7144680a08f90decf3dd5823d3c:gove
 # ^ the matched value is this governance event envelope's own idempotencyKey field
 # ("gmw-revoke-fe36b8abcccb9227a11e33c3bc80dbb1-0"), the same GMW request-id-derived shape
 # already covered by the PHX-WP-GITLEAKS-ATTRIBUTION-KEY-FP entry above -- not a credential.
+#
+# NVA-GOVFP-1 (2026-08-27): the same shape, twice more. A guard denial appends a
+# request/deny pair to the human governance stream, and each deny envelope's own
+# `eventId` ("evt-hgo-deny-<32 hex>-0") carries a bare hex run long enough for
+# generic-api-key. Verified by direct content inspection of both files: every field
+# is a digest, id, timestamp, enum or repo-relative path, and both envelopes carry
+# their own "classification": "repository-public-safe" -- there is no free-text field
+# in pipeline.governance-event-envelope.v1 where a credential could land.
+# Both authority lines were generated with the adapter's own exported
+# gitleaksContentAuthorityLine(), not hand-computed; the generator was self-checked by
+# reproducing the entry above byte-identically before these two were written.
+# Kept as per-file entries rather than a .gitleaks.toml path allowlist for
+# governance/events/: the two allowlists in that file are justified by the exempted
+# bytes being frozen ("it does not open a lane for anything written later"), which a
+# directory that keeps receiving new events would not satisfy. Cost of that choice,
+# recorded honestly: every future denial event that trips the rule needs its own
+# reviewed entry, and no tooling exists to add one (gitleaks-repair-ignore.mjs only
+# re-lines an existing entry).
+content-v1:6a4dcd139c642bd9b0b7b9ff689714c993fe75e6b884a5e9ea4450f03b7ed31c:governance/events/human/5-evt-hgo-deny-87fb0a78687eb36a7202eb5919c05f33-0.json:generic-api-key:1:987
+content-v1:7d42e3d3962b10f58824ebf7b423400bc3ad7d5a8a638348f3e6857b21960fa9:governance/events/human/7-evt-hgo-deny-ad6c14aeff5e66083cfb10db9da16b76-0.json:generic-api-key:1:987
