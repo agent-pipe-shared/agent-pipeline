@@ -582,8 +582,10 @@ function main() {
     return 1;
   }
 
-  console.log("  [PASS] hook manifest parses, grew by exactly one registration, and nothing else changed");
-  console.log("\nWired and verified.");
+  console.log(mode === "repair-matcher"
+    ? "  [PASS] hook manifest parses, the guard's own registration changed, and no other registration did"
+    : "  [PASS] hook manifest parses, grew by exactly one registration, and nothing else changed");
+  console.log(mode === "repair-matcher" ? "\nMatcher repaired and verified." : "\nWired and verified.");
   console.log("");
   console.log("Next, in this order:");
   console.log(`  1. review:  git diff -- ${rel(HOOKS_PATH)} ${rel(INVENTORY_PATH)}`);

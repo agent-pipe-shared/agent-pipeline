@@ -215,10 +215,10 @@
       "member": "SessionStart:startup|resume|clear|compact:node \"${PLUGIN_ROOT}/hooks/codex-session-start-hint.mjs\""
     },
     {
-      "surfaceId": "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:*:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch-budget.mjs\"",
+      "surfaceId": "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|Edit|Glob|Grep|NotebookEdit|Read|Task|TodoWrite|WebFetch|WebSearch|Write:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch-budget.mjs\"",
       "kind": "hook",
       "path": "plugins/pipeline-core/hooks/hooks.json",
-      "member": "PreToolUse:*:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch-budget.mjs\""
+      "member": "PreToolUse:Bash|Edit|Glob|Grep|NotebookEdit|Read|Task|TodoWrite|WebFetch|WebSearch|Write:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch-budget.mjs\""
     },
     {
       "surfaceId": "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-git.mjs\"",
@@ -3419,7 +3419,7 @@
         "guard:plugins/pipeline-core/hooks/guard-onboarding-consent-lock.mjs:guard-onboarding-consent-lock",
         "guard:plugins/pipeline-core/hooks/guard-push.mjs:guard-push",
         "guard:plugins/pipeline-core/hooks/guard-testpath.mjs:guard-testpath",
-        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:*:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch-budget.mjs\"",
+        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|Edit|Glob|Grep|NotebookEdit|Read|Task|TodoWrite|WebFetch|WebSearch|Write:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch-budget.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-git.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-lifecycle-ready.mjs\" --runner claude",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-push.mjs\"",
