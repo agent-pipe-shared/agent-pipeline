@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 /**
- * Operator tool: apply the two protected-path edits an agent session cannot.
+ * Operator tool: apply the protected-path edits an agent session cannot.
  *
- * WHY THIS EXISTS. Two files in this repository are protected test paths, and
- * both have finished, reviewed content waiting for them:
+ * WHY THIS EXISTS. Three files in this repository are protected test paths, and
+ * each has finished, verified content waiting for it:
  *
  *   A. `harness/scripts/verify.mjs`  (TP-3) -- suites written in this and earlier
  *      blocks are not registered, so Verify does not run them. The list grows: the
@@ -14,6 +14,12 @@
  *   B. `plugins/pipeline-core/hooks/guard-gate-strength.test.mjs` (TP-6) -- four
  *      checks (GST33-GST36) plus a title repair for GST14, validated 4/4 against
  *      the real committed guard.
+ *   C. `plugins/pipeline-core/lib/entrypoint.test.mjs` (TP-8) -- EP07 pointed
+ *      CLAUDE_PROJECT_DIR at this repository, so every run recorded two REAL guard
+ *      denials against it and appended four governance events (NVA-VERIFYPOLLUTE-1,
+ *      measured 2026-08-27). That is why Verify needed two runs: it dirtied its own
+ *      working tree mid-flight and failed security-scan and candidate-binding on the
+ *      result. Verified green via `--preview` before being offered here.
  *
  * `guard-testpath` refuses both from inside a session, and for (B) there is no
  * override at all: the target is Pipeline plugin source in a source checkout, so
@@ -38,6 +44,7 @@
  *   node harness/scripts/apply-pending-protected-edits.mjs           # apply both steps
  *   node harness/scripts/apply-pending-protected-edits.mjs --only=verify
  *   node harness/scripts/apply-pending-protected-edits.mjs --only=gate-strength
+ *   node harness/scripts/apply-pending-protected-edits.mjs --only=entrypoint
  *
  * Exit code 0 = every requested step is applied and verified (or was already
  * applied). Any other exit code means nothing was left changed by the failing
@@ -52,6 +59,7 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 const VERIFY_PATH = join(REPO_ROOT, "harness", "scripts", "verify.mjs");
 const GATE_STRENGTH_PATH = join(REPO_ROOT, "plugins", "pipeline-core", "hooks", "guard-gate-strength.test.mjs");
+const ENTRYPOINT_PATH = join(REPO_ROOT, "plugins", "pipeline-core", "lib", "entrypoint.test.mjs");
 
 /* ------------------------------------------------------------------ helpers */
 
@@ -76,6 +84,19 @@ function run(argv, cwd = REPO_ROOT) {
     code: result.status,
     output: `${result.stdout ?? ""}${result.stderr ?? ""}`,
   };
+}
+
+/**
+ * The working tree as one comparable string, untracked files included. Step C uses
+ * it to assert that running a suite changes nothing -- the property NVA-VERIFYPOLLUTE-1
+ * violated.
+ */
+function gitStatus() {
+  const result = spawnSync("git", ["status", "--porcelain=v1", "--untracked-files=all"], {
+    cwd: REPO_ROOT, encoding: "utf8", shell: false,
+  });
+  if (result.status !== 0) throw new Error(`git status failed: ${result.stderr ?? ""}`);
+  return result.stdout ?? "";
 }
 
 /**
@@ -175,6 +196,15 @@ const VERIFY_REGISTRATIONS = [
     line: '  { name: "test-tmpdir-budget-tests", file: join(libDir, "test-tmpdir-budget.test.mjs") },',
     file: join(REPO_ROOT, "plugins", "pipeline-core", "lib", "test-tmpdir-budget.test.mjs"),
   },
+  // Added 2026-08-27. The dispatch-budget guard was built and unit-tested this
+  // block; `check-verify-suite-registration.mjs` reports it as the ONE remaining
+  // unregistered suite in the repository. Registering the suite is independent of
+  // wiring the guard itself into hooks.json (TP-4), which stays a separate step.
+  {
+    name: "guard-dispatch-budget-tests",
+    line: '  { name: "guard-dispatch-budget-tests", file: join(hooksDir, "guard-dispatch-budget.test.mjs") },',
+    file: join(REPO_ROOT, "plugins", "pipeline-core", "hooks", "guard-dispatch-budget.test.mjs"),
+  },
 ];
 
 // The terminator moves every time a batch is registered, so this constant is
@@ -185,7 +215,13 @@ const VERIFY_REGISTRATIONS = [
 // again 2026-08-18: `reference-path-check` was no longer the last entry either (the
 // 2026-08-09 resume-hint batch landed after it, per docs/pending-verify-registrations.md);
 // confirmed against the real, current `harness/scripts/verify.mjs` before this edit.
-const VERIFY_ANCHOR = '  { name: "resume-hint-tests", file: join(libDir, "resume-hint.test.mjs") },\n];';
+// Re-pointed again 2026-08-27: the 2026-08-18 test-tmpdir batch and the
+// `pipeline-start-preflight-antigravity-hard-enforcement-tests` entry (commit
+// ab347a74) both landed after `resume-hint-tests`, so the previous anchor was
+// stale and the next operator run would have aborted on a missing anchor --
+// correctly, but with the tool unusable. Confirmed against the real, current
+// `harness/scripts/verify.mjs` (its TEST_SUITES terminator) before this edit.
+const VERIFY_ANCHOR = '  { name: "pipeline-start-preflight-antigravity-hard-enforcement-tests", file: join(pluginScriptsDir, "pipeline-start-preflight-antigravity-hard-enforcement.test.mjs") },\n];';
 
 function stepVerify({ dryRun }) {
   const original = readFileSync(VERIFY_PATH, "utf8");
@@ -425,6 +461,119 @@ function stepGateStrength({ dryRun, preview }) {
   return { status: "applied", detail };
 }
 
+/* ------------------------------------------- C. entrypoint.test.mjs (TP-8) */
+
+// WHY. Measured 2026-08-27 with a temporary probe inside
+// `appendOverrideDeniedLedgerEvent` (hooks/guard-gate-strength.mjs, the ONLY
+// writer of governance/events/human/**): EP07's gate-strength case spawned the
+// guard twice -- direct and through the symlinked plugin root -- with
+// `CLAUDE_PROJECT_DIR: REPO_ROOT` and a real gate-strength target. The guard
+// therefore took THIS repository as the governed root of two REAL denials and
+// appended four governance events plus an advanced heads.json on every run.
+//
+// That is the whole of NVA-VERIFYPOLLUTE-1: Verify dirtied its own working tree
+// mid-flight, `security-scan.mjs`'s observeCandidate() typed the result as
+// `working-tree-not-clean` (all four adapters ERROR, exit 2), and
+// candidate-binding saw the same change as drift. Both were artifacts, not
+// product failures -- the identical scan run standalone was CLEAN, exit 0.
+//
+// EP07 asserts only that the guard is REACHABLE (observable output) and that the
+// direct and symlinked invocations agree on the exit code. Neither half needs the
+// denial to be recorded against the real repository; it only needs a root the
+// guard will claim as governed. This uses the same minimal governed shape
+// guard-gate-strength.test.mjs's own `governed()` fixture already uses.
+
+const EP_IMPORT_ANCHOR = 'import { mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync } from "node:fs";';
+const EP_IMPORT_REPLACEMENT = 'import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";';
+
+const EP_RUN_ANCHOR = 'function run(scriptPath, argv, { input = "", cwd = REPO_ROOT, env = {} } = {}) {';
+const EP_FIXTURE_REPLACEMENT = `/**
+ * A governed root the gate-strength guard will claim, with no relationship to this
+ * repository. EP07 used to point CLAUDE_PROJECT_DIR at REPO_ROOT, which made every
+ * run of this suite record two REAL guard denials against the checkout and append
+ * four governance events to it (NVA-VERIFYPOLLUTE-1). The assertions need a claimed
+ * root, not this one.
+ */
+function governedFixture() {
+  const base = mkdtempSync(join(tmpdir(), "entrypoint-governed-"));
+  roots.push(base);
+  mkdirSync(join(base, "project"), { recursive: true });
+  writeFileSync(join(base, "pipeline.user.yaml"), 'schema: "pipeline.user.v3"\\ngates:\\n  push_approval: "signature"\\n');
+  writeFileSync(join(base, "project", "pipeline.yaml"), "schema: pipeline.manifest.v0\\n");
+  writeFileSync(join(base, "project", "guard-config.json"), '{"protectedTestPaths":[]}\\n');
+  writeFileSync(join(base, "project", "critical-human-proof.json"), '{"schema":"pipeline.critical-human-proof-policy.v1","requiredKinds":["push"]}\\n');
+  writeFileSync(join(base, "README.md"), "# fixture\\n");
+  return base;
+}
+
+${EP_RUN_ANCHOR}`;
+
+const EP_ENV_ANCHOR = "        env: { CLAUDE_PROJECT_DIR: REPO_ROOT },";
+const EP_ENV_REPLACEMENT = "        env: { CLAUDE_PROJECT_DIR: governedFixture() },";
+
+const ENTRYPOINT_EXPECTED = /entrypoint: 10 passed, 0 failed/u;
+
+// TP-8 matches `entrypoint\.test\.mjs$`, so this sibling name is not protected.
+// A sibling of the real suite keeps `LIB`/`PLUGIN_ROOT`/`REPO_ROOT` resolving
+// identically -- EP07/EP08/EP09 all depend on that.
+const ENTRYPOINT_PREVIEW_PATH = join(dirname(ENTRYPOINT_PATH), "entrypoint.preview-check.mjs");
+
+function stepEntrypoint({ dryRun, preview }) {
+  const original = readFileSync(ENTRYPOINT_PATH, "utf8");
+  if (original.includes("function governedFixture()")) {
+    return { status: "already-applied", detail: "EP07 already uses a governed fixture root" };
+  }
+
+  let next = anchoredReplace(original, EP_IMPORT_ANCHOR, EP_IMPORT_REPLACEMENT, "node:fs import");
+  next = anchoredReplace(next, EP_RUN_ANCHOR, EP_FIXTURE_REPLACEMENT, "run() helper");
+  next = anchoredReplace(next, EP_ENV_ANCHOR, EP_ENV_REPLACEMENT, "EP07 gate-strength CLAUDE_PROJECT_DIR");
+
+  // The point of this step is that the suite stops writing to the repository, so
+  // both lanes below assert BOTH halves: the suite still passes, and running it
+  // left the working tree byte-identical.
+  if (preview) {
+    // Both snapshots are taken with the preview sibling ABSENT, so the only thing
+    // a difference can mean is that the suite itself wrote something.
+    const before = gitStatus();
+    let summary;
+    try {
+      writeFileSync(ENTRYPOINT_PREVIEW_PATH, next, "utf8");
+      const suite = run([ENTRYPOINT_PREVIEW_PATH]);
+      summary = suite.output.split("\n").filter((line) => /^(FAIL|entrypoint:)/u.test(line)).join("\n");
+      if (suite.code !== 0 || !ENTRYPOINT_EXPECTED.test(suite.output)) {
+        throw new Error(`preview run did not reach "10 passed, 0 failed" (exit ${suite.code}):\n${summary || suite.output.slice(-2000)}`);
+      }
+    } finally {
+      rmSync(ENTRYPOINT_PREVIEW_PATH, { force: true });
+    }
+    const after = gitStatus();
+    if (after !== before) {
+      throw new Error(`the transformed suite still dirtied the working tree -- that is the defect this step exists to fix:\n${after}`);
+    }
+    return { status: "preview-green", detail: `${summary}; working tree unchanged by the run -- ${rel(ENTRYPOINT_PATH)} was not touched` };
+  }
+
+  if (dryRun) {
+    return { status: "would-apply", detail: "3 anchored edits: node:fs import, governedFixture() helper, EP07 CLAUDE_PROJECT_DIR" };
+  }
+
+  const detail = writeThenVerifyOrRevert(ENTRYPOINT_PATH, original, next, () => {
+    const before = gitStatus();
+    const suite = run([ENTRYPOINT_PATH]);
+    if (suite.code !== 0 || !ENTRYPOINT_EXPECTED.test(suite.output)) {
+      const summary = suite.output.split("\n").filter((line) => /^(FAIL|entrypoint:)/u.test(line)).join("\n");
+      return { ok: false, detail: `expected "10 passed, 0 failed", got exit ${suite.code}:\n${summary || suite.output.slice(-2000)}` };
+    }
+    // `before` already contains this step's own edit to the protected file, so a
+    // difference here is the suite writing, not the step writing.
+    const after = gitStatus();
+    if (after !== before) return { ok: false, detail: `the suite still dirtied the working tree:\n${after}` };
+    return { ok: true, detail: "entrypoint: 10 passed, 0 failed; working tree unchanged by the run" };
+  });
+
+  return { status: "applied", detail };
+}
+
 /* ---------------------------------------------------------------- driver */
 
 const argv = process.argv.slice(2);
@@ -436,7 +585,10 @@ const only = onlyFlag ? onlyFlag.slice("--only=".length) : null;
 const STEPS = [
   { key: "verify", label: `A. register pending suites in ${rel(VERIFY_PATH)} (TP-3)`, fn: stepVerify },
   { key: "gate-strength", label: `B. apply GST33-GST36 + GST14 rename to ${rel(GATE_STRENGTH_PATH)} (TP-6)`, fn: stepGateStrength },
+  { key: "entrypoint", label: `C. stop EP07 recording real guard denials against this repo in ${rel(ENTRYPOINT_PATH)} (TP-8)`, fn: stepEntrypoint },
 ];
+
+const PREVIEWABLE = new Set(["gate-strength", "entrypoint"]);
 
 if (only !== null && !STEPS.some((step) => step.key === only)) {
   process.stderr.write(`unknown --only value: ${only}\nExpected one of: ${STEPS.map((step) => step.key).join(", ")}\n`);
@@ -449,7 +601,7 @@ else process.stdout.write(dryRun ? "Dry run -- nothing will be written.\n\n" : "
 let failures = 0;
 for (const step of STEPS) {
   if (only !== null && step.key !== only) continue;
-  if (preview && step.key !== "gate-strength") continue; // only step B has a previewable form
+  if (preview && !PREVIEWABLE.has(step.key)) continue; // steps B and C have a previewable form
   process.stdout.write(`${step.label}\n`);
   try {
     const { status, detail } = step.fn({ dryRun, preview });
