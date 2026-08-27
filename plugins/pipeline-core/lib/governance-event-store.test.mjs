@@ -710,6 +710,59 @@ test("symlink, cross-repository, and writer-owned intent fields are rejected", a
   await assert.rejects(() => append(root), (error) => error.code === "GES-SYMLINK");
 });
 
+/* NVA-GESBIND-2 / dd50d386: the tracked registry.json in this repository now
+ * carries a fixed, non-path-derived 64-zero placeholder for
+ * `repositoryFingerprint` (governance/events/registry.json) instead of a
+ * hash baked in at one machine's absolute path. A fixture built with that
+ * exact placeholder is therefore a genuinely non-vacuous reproduction of the
+ * fixed clone-at-a-different-path defect, PROVIDED the placeholder never
+ * equals a real derived physical fingerprint -- asserted below rather than
+ * assumed. */
+const PLACEHOLDER_REPOSITORY_FINGERPRINT = "0".repeat(64);
+
+async function placeholderRegistryFixtureRoot() {
+  const root = await mkdtemp(path.join(os.tmpdir(), "governance-event-store-placeholder-registry-"));
+  execFileSync("git", ["init", "-q", root]);
+  const repository = discoverRepository(root);
+  fingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: repository.commonDir, primaryRoot: repository.primaryRoot });
+  assert.notEqual(fingerprint, PLACEHOLDER_REPOSITORY_FINGERPRINT, "fixture precondition: this checkout's physical fingerprint must genuinely differ from the tracked placeholder, or the mismatch this test exercises would be vacuous");
+  const capturePolicy = capturePolicyFixture(); capturePolicyDigest = canonicalSha256(capturePolicy);
+  await mkdir(path.join(root, "governance/events"), { recursive: true });
+  await writeFile(path.join(root, "governance/events/registry.json"), `${canonicalizeJson({ ...registryFixture(), repositoryFingerprint: PLACEHOLDER_REPOSITORY_FINGERPRINT })}\n`);
+  await writeFile(path.join(root, "governance/events/capture-policy.json"), `${canonicalizeJson(capturePolicy)}\n`);
+  return root;
+}
+
+test("NVA-GESBIND-2: a tracked registry carrying a fingerprint that does not match the physical repository is now usable (the fixed clone-at-a-different-path defect)", async (t) => {
+  const root = await placeholderRegistryFixtureRoot(); t.after(() => cleanup(root));
+  const registry = await loadGovernanceEventRegistry({ repositoryRoot: root });
+  assert.equal(registry.repositoryFingerprint, PLACEHOLDER_REPOSITORY_FINGERPRINT, "fixture precondition: the tracked registry carries the placeholder, not the physical fingerprint");
+  assert.notEqual(registry.repositoryFingerprint, fingerprint, "fixture precondition: the tracked registry fingerprint genuinely mismatches the physical repository -- this is the exact defect scenario, not a vacuous fixture");
+  const observed = await append(root);
+  assert.equal(observed.outcome, "appended", "a mismatched tracked registry fingerprint must no longer block append against the physical repository");
+  const verified = await verifyPortableGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle" });
+  assert.equal(verified.integrity, "prefix-valid");
+  assert.equal(verified.eventCount, 1, "verify must also succeed against a physically bound repository whose tracked registry fingerprint does not match it");
+});
+
+test("NVA-GESBIND-2: an event copied verbatim from a genuinely different physical repository still fails closed on read-back (GES-EVENT-PATH, not GES-CROSS-REPOSITORY)", async (t) => {
+  const rootA = await fixtureRoot(); t.after(() => cleanup(rootA));
+  const observedA = await append(rootA);
+  const eventBytes = await readFile(path.join(rootA, observedA.eventPath));
+
+  const rootB = await fixtureRoot(); t.after(() => cleanup(rootB));
+  assert.notEqual(fingerprint, observedA.repositoryFingerprint, "fixture precondition: root A and root B are genuinely different physical repositories");
+  const streamDirB = path.join(rootB, "governance/events/lifecycle");
+  await mkdir(streamDirB, { recursive: true });
+  await writeFile(path.join(streamDirB, path.basename(observedA.eventPath)), eventBytes);
+
+  await assert.rejects(
+    () => verifyPortableGovernanceStream({ repositoryRoot: rootB, repositoryFingerprint: fingerprint, streamId: "lifecycle" }),
+    (error) => error instanceof GovernanceEventStoreError && error.code === "GES-EVENT-PATH",
+    "an event carrying repository A's own physical fingerprint, copied verbatim into repository B's stream directory, must still fail closed on read-back -- per design this is GES-EVENT-PATH now (event-vs-binding disagreement), not GES-CROSS-REPOSITORY (registry-vs-binding disagreement)",
+  );
+});
+
 test("projection recovery requires a retained checkpoint and rebuilds a stale head without touching canonical events", async (t) => {
   const root = await fixtureRoot(); t.after(() => cleanup(root));
   const first = await append(root);
