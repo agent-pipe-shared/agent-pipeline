@@ -215,6 +215,15 @@ const VERIFY_REGISTRATIONS = [
     line: '  { name: "guard-dispatch-budget-tests", file: join(hooksDir, "guard-dispatch-budget.test.mjs") },',
     file: join(REPO_ROOT, "plugins", "pipeline-core", "hooks", "guard-dispatch-budget.test.mjs"),
   },
+  // Added 2026-08-27 (NVA-AGYDRIFT-2). The within-v3 pipeline.user.yaml drift
+  // detector (pipeline-user-v3-drift.mjs, inspectPipelineUserV3Drift) was
+  // built and unit-tested this dispatch (7/7 green). Registering the suite
+  // is independent of any other pending step.
+  {
+    name: "pipeline-user-v3-drift-tests",
+    line: '  { name: "pipeline-user-v3-drift-tests", file: join(libDir, "pipeline-user-v3-drift.test.mjs") },',
+    file: join(REPO_ROOT, "plugins", "pipeline-core", "lib", "pipeline-user-v3-drift.test.mjs"),
+  },
 ];
 
 // The terminator moves every time a batch is registered, so this constant is
