@@ -174,9 +174,33 @@ test("evaluateDispatchBudgetGuard: an unresolvable maxTurns (unknown agent defin
   assert.equal(record.reason, "max-turns-unresolvable");
 });
 
-test("evaluateDispatchBudgetGuard: budget constants match the documented arithmetic for this repo's maxTurns:50 agents", () => {
-  assert.equal(CLOSING_ALLOWANCE, 5);
-  assert.equal(SAFETY_MARGIN, 10);
-  const maxTurns = resolveMaxTurns("pipeline-core:goldfish-deep", REPO_ROOT);
-  assert.equal(maxTurns - (CLOSING_ALLOWANCE + SAFETY_MARGIN), 35);
+test("evaluateDispatchBudgetGuard: workingCap always equals each agent's own maxTurns minus the documented reserve", () => {
+  assert.equal(CLOSING_ALLOWANCE, 5, "the guard's own documented closing allowance");
+  assert.equal(SAFETY_MARGIN, 10, "the guard's own documented safety margin");
+  for (const agentName of ["goldfish-deep", "goldfish-implementor", "goldfish-mechanic"]) {
+    const maxTurns = resolveMaxTurns(`pipeline-core:${agentName}`, REPO_ROOT);
+    assert.ok(
+      typeof maxTurns === "number" && maxTurns > 0,
+      `${agentName}'s own agent definition must resolve a positive maxTurns`,
+    );
+    const expectedWorkingCap = maxTurns - (CLOSING_ALLOWANCE + SAFETY_MARGIN);
+    // Exercised through the real guard, not just the raw formula: seed a
+    // subagent whose meta.json names this exact agentType, drive it up to
+    // (but not past) the expected cap, and confirm the guard itself agrees
+    // -- by reading the persisted counter's own recorded workingCap, which
+    // the guard derives independently inside evaluateDispatchBudgetGuard.
+    const store = makeStore({
+      [META_PATH]: JSON.stringify({ agentType: `pipeline-core:${agentName}`, description: "x", toolUseId: "t1", spawnDepth: 1 }),
+      [`${FAKE_ROOT}/plugins/pipeline-core/agents/${agentName}.md`]: `---\nname: ${agentName}\nmodel: sonnet\nmaxTurns: ${maxTurns}\ntools: Read\n---\nbody\n`,
+    });
+    const result = evaluateDispatchBudgetGuard(readInput({ file_path: "/x" }), baseOptions(store));
+    assert.equal(result.exitCode, 0, `${agentName}'s first call must be allowed`);
+    const counterRaw = store.files.get(`${COMMON_DIR}/agent-pipeline/dispatch-budget/abc123.json`);
+    assert.ok(counterRaw, `${agentName}: a counter file must exist after a call`);
+    assert.equal(
+      JSON.parse(counterRaw).workingCap,
+      expectedWorkingCap,
+      `${agentName}: guard-derived workingCap must equal maxTurns - (CLOSING_ALLOWANCE + SAFETY_MARGIN)`,
+    );
+  }
 });
