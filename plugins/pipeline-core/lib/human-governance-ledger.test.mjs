@@ -10,8 +10,7 @@ import test from "node:test";
 import { existsSync, readFileSync } from "node:fs";
 import { canonicalSha256, canonicalizeJson } from "./governance-event.mjs";
 import { createConsumedHumanRoleExceptionDecision, isHumanRoleExceptionDecision, validateHumanRoleExceptionDecision } from "./human-role-exception-decision.mjs";
-import { discoverRepository } from "./worktree-lifecycle.mjs";
-import { derivePoGateRepositoryFingerprint } from "./po-gate-authority.mjs";
+import { readLocalRepositoryFingerprint } from "./governance-event-store.mjs";
 import { HumanGovernanceLedgerError, appendConsumedHumanGovernanceDecision, appendHumanGovernanceDecision, createConsumedHumanGovernanceDecision, createExternalHumanGovernanceIntent, queryHumanGovernanceDecisions, resolveExternallyVerifiedHumanGovernanceAuthority, resolveHumanGovernanceAuthority, validateHumanGovernanceDecision, verifyExternalHumanGovernanceProof } from "./human-governance-ledger.mjs";
 
 const sha = "a".repeat(64);
@@ -28,8 +27,8 @@ function capturePolicy() { return { schema: "pipeline.governance-capture-policy.
 async function ledgerFixture() {
   const root = await mkdtemp(path.join(os.tmpdir(), "phoenix-human-ledger-"));
   execFileSync("git", ["init", "-q", root]);
-  const repository = discoverRepository(root);
-  const fingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: repository.commonDir, primaryRoot: repository.primaryRoot });
+  // NVA-REPOID-3: the store's bound identity, not the legacy path-derived hash.
+  const fingerprint = await readLocalRepositoryFingerprint({ repositoryRoot: root });
   const policy = capturePolicy();
   await mkdir(path.join(root, "governance/events"), { recursive: true });
   await writeFile(path.join(root, "governance/events/registry.json"), `${canonicalizeJson(registry(fingerprint))}\n`);
