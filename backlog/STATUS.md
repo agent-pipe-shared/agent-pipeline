@@ -306,6 +306,7 @@
 | pipeline.plan-partial-authority-guard-allowlist-does-not-admit-its-own-profile-source-flags | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.plan-path-guidance-attached-to-unlike-causes | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.plugin-package-should-vendor-canon-references-via-build-step | closed | workflow-improvement | pipeline | 2026-08-10 | — |
+| pipeline.plugin-update-under-an-onboarded-project-derails-the-next-session-into-repair | open | workflow-improvement | pipeline | 2026-08-27 | — |
 | pipeline.po-approval-confirmation-missing-intent-digest | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.po-approval-request-verify-still-rejects-a-fresh-setup1-authority | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.po-authority-decision-prd-candidate-static | deferred | defect | pipeline | 2026-08-08 | — |
@@ -464,7 +465,7 @@
 
 ## Counts
 
-- open: 50
+- open: 51
 - in_progress: 5
 - closed: 379
 - rejected: 3
