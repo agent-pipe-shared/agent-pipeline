@@ -417,6 +417,7 @@ import {
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { nextActionSection, syncStateMdNextAction } from "../lib/onboarding-continuity.mjs";
 import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
+import { refusePlanAuthorityStagingPath } from "../lib/plan-authority-staging-guard.mjs";
 
 export const SCHEMA_ID = "pipeline.state.v0";
 export const CONTINUITY_LOCK_SCHEMA_ID = "pipeline.continuity-lock.v0";
@@ -7321,6 +7322,15 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         console.error(`Error: submit-plan blocked by ${authority?.code ?? profile?.code ?? "PO-GATE-AUTHORITY-INVALID"}.`);
         return 2;
       }
+      // NVA-STAGINGBOLT-1: a plan or spec path still resolving inside the
+      // onboarding staging directory carries its own "not yet bound as
+      // project authority" banner -- submit-plan must not bind it as
+      // authority regardless of what else checks out.
+      const submitStagingRefusal = refusePlanAuthorityStagingPath({ rootDir: dir, planPath: authority.value.planPath, specPath: authority.value.specPath });
+      if (!submitStagingRefusal.ok) {
+        console.error(`Error: submit-plan blocked by ${submitStagingRefusal.code}: ${submitStagingRefusal.message}`);
+        return 2;
+      }
       const profileSha256 = sha256CanonicalJson(profile.value);
       const expectedPlanSha256 = authority.value.planSha256;
       const expectedSpecSha256 = authority.value.specSha256;
@@ -7524,6 +7534,15 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         || !profile?.ok
       ) {
         console.error(`Error: approve-plan blocked by ${authority?.code ?? "PO-GATE-AUTHORITY-INVALID"}; repair the repository-scoped PO profile and single-PRD authority first.`);
+        return 2;
+      }
+      // NVA-STAGINGBOLT-1: independent of submit-plan's own gate (defense in
+      // depth -- a submission bound before this bolt existed, or written by
+      // any other path, must not be approvable while its authority still
+      // resolves inside the onboarding staging directory).
+      const approveStagingRefusal = refusePlanAuthorityStagingPath({ rootDir: dir, planPath: authority.value.planPath, specPath: authority.value.specPath });
+      if (!approveStagingRefusal.ok) {
+        console.error(`Error: approve-plan blocked by ${approveStagingRefusal.code}: ${approveStagingRefusal.message}`);
         return 2;
       }
       const expectedPlanSha256 = authority.value.planSha256;

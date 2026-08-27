@@ -23,6 +23,12 @@ import { fileURLToPath } from "node:url";
 
 import { createCriticalActionApprovalRequest, criticalActionSubjectSha256 } from "../lib/critical-action-approval-request.mjs";
 import { SCHEMA_ID, continuityLockPath, externalPathIsOutsideRoot, run, statePath } from "./pipeline-state.mjs";
+import { INTAKE_STAGING_DIRNAME } from "../lib/onboarding-continuity.mjs";
+import {
+  PLAN_AUTHORITY_PROMOTION_SUBCOMMAND,
+  PLAN_AUTHORITY_STAGING_CODE,
+} from "../lib/plan-authority-staging-guard.mjs";
+import { ONBOARDING_SUBCOMMANDS } from "./project-onboarding-v3.mjs";
 
 const candidate = { commit: "a".repeat(40), tree: "b".repeat(40) };
 const planSha256 = createHash("sha256").update("plan").digest("hex");
@@ -609,6 +615,132 @@ function invokeCaptured(argv, deps) {
   const realAttendedDeps = { ...deps, isattyFn: () => true, readLineFn: () => "PO" };
   const applied = invokeCaptured(realArgv, realAttendedDeps);
   assert.equal(applied.status, 0, applied.err);
+}
+
+// NVA-STAGINGBOLT-1: a plan submission or approval whose plan or spec path
+// resolves inside the onboarding staging directory must be refused -- the
+// generated staging files' own banner says they are NOT yet bound as project
+// authority (backlog:
+// 2026-08-27-plan-approval-binds-a-staging-draft-as-project-authority.md).
+// Fixture shape mirrors acknowledgeFixture() above: a state/continuity pair
+// already bound to a plan/spec pair, deps mocking poGateAuthority/poGateProfile
+// so no real onboarded project tree is needed.
+function planAuthorityFixture({ featureId, planPath, specPath, now = "2026-08-27T10:00:00.000Z" }) {
+  const root = mktempProjectDir();
+  mkdirSync(join(root, "project"), { recursive: true });
+  const planSha256 = sha256Hex(`plan:${planPath}`);
+  const specSha256 = sha256Hex(`spec:${specPath}`);
+  const profile = {
+    schema: "pipeline.po-gate-authority-evidence.v1", humanFacing: "en",
+    sourceSha256: "1".repeat(64), runtimeSha256: "2".repeat(64),
+    receiptSha256: "3".repeat(64), repositoryFingerprint: "4".repeat(64),
+  };
+  const continuity = {
+    schema: "pipeline.continuity.v0", featureId, revision: 0,
+    runtime: { humanFacingLanguage: "en", activeDuty: "Coordinator", sessionCleanup: null },
+    authority: { prd: { path: planPath, sha256: planSha256 }, spec: { path: specPath, sha256: specSha256 }, result: null },
+    queueHead: { packageId: "initial-planning", actionId: "review-plan", nextAction: "review", productRetryCount: 0, environmentRerouteCount: 0, dispatch: null },
+    blocker: null, acknowledgedFinal: null, resume: { mode: "immediate", sourceRevision: 0, reasonCode: "active-turn" }, recovery: null, decisionTxn: null,
+    capacity: { concurrencyLimit: 4, reservedCriticSlots: 1, reservedRecoverySlots: 1, fallbackPolicy: "defer" },
+  };
+  const state = {
+    schema: SCHEMA_ID, activeFeature: { id: featureId, planPath, phase: "design" }, planApproved: false,
+    continuity, updatedAt: now,
+  };
+  writeFileSync(statePath(root), JSON.stringify(state, null, 2) + "\n");
+  const deps = {
+    dir: root, now: () => now,
+    poGateProfile: () => ({ ok: true, value: profile }),
+    poGateAuthority: () => ({
+      ok: true,
+      value: { ...profile, schema: "pipeline.po-gate-authority.v2", planPath, planSha256, specPath, specSha256 },
+    }),
+  };
+  return { root, deps, planPath, specPath, planSha256, specSha256 };
+}
+
+// Scenario 1: submit-plan is refused when the plan path resolves inside the
+// staging directory (both plan and spec staged -- the exact live shape).
+{
+  const featureId = "stagingbolt-submit-plan";
+  const planPath = `${INTAKE_STAGING_DIRNAME}/prd_${featureId}.md`;
+  const specPath = `${INTAKE_STAGING_DIRNAME}/spec.md`;
+  const { root, deps } = planAuthorityFixture({ featureId, planPath, specPath });
+  const attempt = capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps));
+  assert.equal(attempt.result, 2, attempt.lines.join(" "));
+  assert.ok(attempt.lines.some((line) => line.includes(PLAN_AUTHORITY_STAGING_CODE)),
+    `refusal must name the typed staging code: ${attempt.lines.join(" ")}`);
+  assert.ok(attempt.lines.some((line) => line.includes(PLAN_AUTHORITY_PROMOTION_SUBCOMMAND)),
+    `refusal must name the real promotion action: ${attempt.lines.join(" ")}`);
+  const state = JSON.parse(readFileSync(statePath(root), "utf8"));
+  assert.equal(state.planSubmission, undefined, "a refused submission must not be recorded");
+}
+
+// Scenario 2: submit-plan is refused when ONLY the spec path resolves inside
+// staging -- the plan path is an ordinary specs/<feature>/ path. Proves the
+// refusal checks both paths independently, not just the plan path.
+{
+  const featureId = "stagingbolt-submit-spec";
+  const planPath = `specs/${featureId}/prd_${featureId}.md`;
+  const specPath = `${INTAKE_STAGING_DIRNAME}/spec.md`;
+  const { deps } = planAuthorityFixture({ featureId, planPath, specPath });
+  const attempt = capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps));
+  assert.equal(attempt.result, 2, attempt.lines.join(" "));
+  assert.ok(attempt.lines.some((line) => line.includes(PLAN_AUTHORITY_STAGING_CODE)),
+    `a staged spec path alone must also be refused: ${attempt.lines.join(" ")}`);
+}
+
+// Scenario 3: approve-plan refuses a staging-bound submission INDEPENDENTLY
+// of submit-plan's own gate -- the submission here is bound directly into
+// state (bypassing the submit-plan CLI), simulating a submission written
+// before this bolt existed or by any other path. Defense in depth: each
+// writer must refuse on its own, not rely on the other having refused first.
+{
+  const featureId = "stagingbolt-approve";
+  const planPath = `${INTAKE_STAGING_DIRNAME}/prd_${featureId}.md`;
+  const specPath = `${INTAKE_STAGING_DIRNAME}/spec.md`;
+  const { root, deps, planSha256, specSha256 } = planAuthorityFixture({ featureId, planPath, specPath });
+  const state = JSON.parse(readFileSync(statePath(root), "utf8"));
+  state.planSubmission = {
+    schema: "pipeline.plan-submission.v1",
+    featureId, planPath, planSha256, specPath, specSha256,
+    profile: "feature", profileSha256: sha256Hex("profile"),
+    submittedBy: "coordinator", submittedAt: "2026-08-27T10:01:00.000Z",
+  };
+  writeFileSync(statePath(root), JSON.stringify(state, null, 2) + "\n");
+  const attempt = capturedStderr(() => run(["approve-plan", "--by", "po-test"], deps));
+  assert.equal(attempt.result, 2, attempt.lines.join(" "));
+  assert.ok(attempt.lines.some((line) => line.includes(PLAN_AUTHORITY_STAGING_CODE)),
+    `approve-plan must independently refuse a staging-bound submission: ${attempt.lines.join(" ")}`);
+  assert.ok(attempt.lines.some((line) => line.includes(PLAN_AUTHORITY_PROMOTION_SUBCOMMAND)),
+    `refusal must name the real promotion action: ${attempt.lines.join(" ")}`);
+  const after = JSON.parse(readFileSync(statePath(root), "utf8"));
+  assert.equal(after.planApproved, false, "a refused approval must not flip planApproved");
+}
+
+// Scenario 4 (regression guard, DoD "would fail if the bolt were too
+// broad"): an ordinary specs/<feature>/ plan+spec pair is unaffected --
+// submit-plan and approve-plan both succeed end to end.
+{
+  const featureId = "stagingbolt-ordinary";
+  const planPath = `specs/${featureId}/prd_${featureId}.md`;
+  const specPath = `specs/${featureId}/spec.md`;
+  const { root, deps } = planAuthorityFixture({ featureId, planPath, specPath });
+  const submitted = capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps));
+  assert.equal(submitted.result, 0, `an ordinary path must not be refused by the staging bolt: ${submitted.lines.join(" ")}`);
+  const approved = capturedStderr(() => run(["approve-plan", "--by", "po-test"], deps));
+  assert.equal(approved.result, 0, `an ordinary path must not be refused by the staging bolt: ${approved.lines.join(" ")}`);
+  const state = JSON.parse(readFileSync(statePath(root), "utf8"));
+  assert.equal(state.planApproved, true, "an ordinary specs/ path must approve normally");
+}
+
+// The refusal must point at a REAL registered action, not a plausible-looking
+// fabrication: PLAN_AUTHORITY_PROMOTION_SUBCOMMAND has to be an actual member
+// of project-onboarding-v3.mjs's own ONBOARDING_SUBCOMMANDS table.
+{
+  const names = ONBOARDING_SUBCOMMANDS.map((entry) => entry.name);
+  assert.ok(names.includes(PLAN_AUTHORITY_PROMOTION_SUBCOMMAND),
+    `the named promotion action "${PLAN_AUTHORITY_PROMOTION_SUBCOMMAND}" must be a real registered subcommand; got: ${names.join(", ")}`);
 }
 
 console.log("pipeline-state.test.mjs (CB-1a): all checks passed");
