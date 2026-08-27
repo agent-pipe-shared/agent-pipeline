@@ -138,6 +138,7 @@
 | pipeline.evidence-gitignore-left-dozens-of-durable-artifacts-untracked | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.execution-model-switchback | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.existing-repos-drift-on-agy-pipeline-user-yaml-update-no-migration | open | defect | pipeline | 2026-08-26 | — |
+| pipeline.expires-at-rejects-a-non-round-trip-timestamp-and-the-doc-says-otherwise | open | defect | pipeline | 2026-08-27 | — |
 | pipeline.explicit-final-acceptance-gate | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.external-public-json-cross-drive-windows-paths-are-not-recognized-as-outside-the-project-root | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.external-reference-adapter-has-no-typed-response-to-an-unreachable-external-system | closed | defect | pipeline | 2026-08-09 | — |
@@ -224,6 +225,7 @@
 | pipeline.kickoff-untracked-files-missing-from-commits | closed | defect | pipeline | 2026-08-21 | — |
 | pipeline.language-selection-scope-is-unclear-and-arrives-too-late | closed | workflow-improvement | pipeline | 2026-08-09 | — |
 | pipeline.ledger-backed-plan-and-push-authority-absent-on-merged-base | closed | defect | pipeline | 2026-08-07 | — |
+| pipeline.ledger-commit-discipline-rules-live-only-in-checkpoint-prose | open | workflow-improvement | pipeline | 2026-08-27 | — |
 | pipeline.ledger-drift-classification-has-no-reachability-cutoff | closed | defect | pipeline | 2026-08-16 | — |
 | pipeline.ledger-event-403-has-a-short-hash-evidence-commit | closed | defect | pipeline | 2026-08-12 | — |
 | pipeline.ledger-genesis-event-hash-rebind-has-no-amendment-mechanism | closed | defect | pipeline | 2026-08-19 | — |
@@ -380,6 +382,7 @@
 | pipeline.source-available-commercial-licensing | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.spec-retention-on-close | closed | defect | pipeline | 2026-07-20 | — |
 | pipeline.stale-checkout-runs-outdated-human-approval-ceremony-against-current-trust-policy | open | defect | pipeline | 2026-08-12 | — |
+| pipeline.stale-worktree-directories-accumulate-with-no-sweep | open | defect | pipeline | 2026-08-27 | — |
 | pipeline.staleness-check-unsettled-top-level-await-warning | closed | defect | pipeline | 2026-08-19 | — |
 | pipeline.stateful-design-contract-template | deferred | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; deferred per PO triage 2026-08-23. |
 | pipeline.t1-governance-path-preflight | closed | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
@@ -434,7 +437,7 @@
 
 ## Counts
 
-- open: 41
+- open: 44
 - in_progress: 5
 - closed: 368
 - rejected: 1

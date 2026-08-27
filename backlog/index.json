@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "f9f043d67e703f07150b221e3901531af505b411ca101e24cdc034bd4784fecb"
+    "transitionHead": "82e369d12b6c1bb02cd5647efe4e5d10575fabd06e591cdfd613a0fe97017a6a"
   },
   "counts": {
-    "open": 41,
+    "open": 44,
     "in_progress": 5,
     "closed": 368,
     "rejected": 1,
@@ -1663,6 +1663,15 @@
       "deferred": false
     },
     {
+      "id": "pipeline.expires-at-rejects-a-non-round-trip-timestamp-and-the-doc-says-otherwise",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-27",
+      "source": "Handover-rotation extraction pass over Phoenix checkpoint 69, 2026-08-27; the defect itself was hit live during a push ceremony on 2026-08-19",
+      "deferred": false
+    },
+    {
       "id": "pipeline.explicit-final-acceptance-gate",
       "status": "closed",
       "type": "workflow-improvement",
@@ -2747,6 +2756,15 @@
       "closureRepository": "self",
       "closureCommit": "8b34e1fb3fff85996c8cd550b5e12f327acbff2b",
       "closureEvidence": "backlog/items/2026-08-07-ledger-backed-plan-and-push-authority-absent-on-merged-base.md"
+    },
+    {
+      "id": "pipeline.ledger-commit-discipline-rules-live-only-in-checkpoint-prose",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-27",
+      "source": "Handover-rotation extraction pass over Phoenix checkpoints 61-71, 2026-08-27 (ADR-0066 Decision 6/7)",
+      "deferred": false
     },
     {
       "id": "pipeline.ledger-drift-classification-has-no-reachability-cutoff",
@@ -4708,6 +4726,15 @@
       "created": "2026-08-12",
       "source": "Cross-repo observation from a sibling Phoenix session, relayed by the PO into this Nova session for filing.",
       "deferred": true
+    },
+    {
+      "id": "pipeline.stale-worktree-directories-accumulate-with-no-sweep",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-27",
+      "source": "Handover-rotation extraction pass over Phoenix checkpoint 67, 2026-08-27",
+      "deferred": false
     },
     {
       "id": "pipeline.staleness-check-unsettled-top-level-await-warning",
