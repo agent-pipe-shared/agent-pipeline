@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "e6b2f44dc20b4e4c7a7b680d4120ab12e5883683946e8511255a5f710906f3da"
+    "transitionHead": "d5d51117934df02818f0dffc0c648acc039c82cd813f5d16908345e1a0f672f4"
   },
   "counts": {
-    "open": 55,
+    "open": 50,
     "in_progress": 5,
     "closed": 379,
     "rejected": 3,
@@ -4635,6 +4635,15 @@
       "closureEvidence": "evidence/dispatch-record-NVA-BL-32.json"
     },
     {
+      "id": "pipeline.sed-regex-address-is-misread-as-an-absolute-path",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-27",
+      "source": "Live refusal in an Elephant session, 2026-08-27, isolated to a root cause by controlled probe in the same session.",
+      "deferred": false
+    },
+    {
       "id": "pipeline.seeded-verify-contract-is-always-green",
       "status": "closed",
       "type": "defect",
@@ -4826,6 +4835,15 @@
       "created": "2026-08-12",
       "source": "Independently reported by three separate goldfish dispatches (NVA-BL-40-FIX, NVA-BL-42-FIX, NVA-BL-64) in one wave, 2026-08-12, each hitting the same shared-single-slot evidence artifact while running their own closing `verify.mjs`.",
       "deferred": true
+    },
+    {
+      "id": "pipeline.shell-grammar-reads-quoted-content-as-shell-syntax",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-27",
+      "source": "Three live refusals in one Elephant session, 2026-08-27, each on a read-only command whose only offending characters sat inside a quoted argument.",
+      "deferred": false
     },
     {
       "id": "pipeline.shipped-artifacts-assume-the-pipelines-own-repository",
@@ -5106,6 +5124,15 @@
       "owner": "pipeline",
       "created": "2026-08-27",
       "source": "SUITEGAP-1 measurement 2026-08-27, re-verified against the live verify.mjs the same day; three of the nine reported suites are genuinely absent, six were false positives",
+      "deferred": false
+    },
+    {
+      "id": "pipeline.three-independent-copies-of-the-wsl-windows-path-normalization",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-27",
+      "source": "Noted while fixing the third instance of the WSL/Windows path-identity defect, commit d96e14c5, 2026-08-27.",
       "deferred": false
     },
     {
