@@ -8,8 +8,7 @@ import path from "node:path";
 import test from "node:test";
 import { canonicalSha256, canonicalizeJson } from "../lib/governance-event.mjs";
 import { appendHumanGovernanceDecision } from "../lib/human-governance-ledger.mjs";
-import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
-import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
+import { readLocalRepositoryFingerprint } from "../lib/governance-event-store.mjs";
 import { main } from "./governance-authority.mjs";
 
 const candidate = { commit: "b".repeat(40), tree: "c".repeat(40) };
@@ -34,8 +33,8 @@ function capturePolicy() {
 async function fixture() {
   const root = await mkdtemp(path.join(os.tmpdir(), "governance-authority-"));
   execFileSync("git", ["init", "-q", root]);
-  const repository = discoverRepository(root);
-  const fingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: repository.commonDir, primaryRoot: repository.primaryRoot });
+  // NVA-REPOID-3: the store's bound identity, not the legacy path-derived hash.
+  const fingerprint = await readLocalRepositoryFingerprint({ repositoryRoot: root });
   const policy = capturePolicy();
   await mkdir(path.join(root, "governance/events"), { recursive: true });
   await writeFile(path.join(root, "governance/events/registry.json"), `${canonicalizeJson(registry(fingerprint))}\n`);
