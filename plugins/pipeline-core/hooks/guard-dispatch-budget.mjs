@@ -184,6 +184,15 @@ export function resolveGitCommonDir(rootDir, dependencies = {}) {
     const out = execFileSyncFn("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], {
       cwd: rootDir,
       encoding: "utf8",
+      // Discard the child's stderr. Without this it is INHERITED, and in a
+      // PreToolUse hook stderr is the channel the guard speaks to the agent
+      // on -- so a non-repository cwd would print `fatal: not a git
+      // repository` to the agent on a branch where this function has already
+      // decided to FAIL OPEN and allow the call. A guard that prints `fatal:`
+      // while permitting is worse than one that says nothing: it reads as a
+      // denial or a broken tool. The failure is still reported, through the
+      // null return and the caller's own observation line.
+      stdio: ["ignore", "pipe", "ignore"],
     });
     const trimmed = String(out).trim();
     return trimmed === "" ? null : trimmed;
