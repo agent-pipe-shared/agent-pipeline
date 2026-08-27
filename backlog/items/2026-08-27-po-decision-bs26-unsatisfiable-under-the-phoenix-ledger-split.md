@@ -83,7 +83,29 @@ was a byte-identical append, and rewriting those fields would author
 amendments Phoenix never wrote. It reverted `transitions.ndjson`, `STATUS.md`
 and `index.json` to their exact HEAD bytes and stopped.
 
-## The options as they now stand
+## RESOLVED 2026-08-27 — superseded by a general fix
+
+The PO's final call: **do not patch this locally at all.** Build the general
+capability for merging two parallel sprints' ledgers, then migrate all 38
+amendments under that one defined semantics.
+
+A partial migration (18 safe, 20 contradicting — the classification was run)
+was explicitly rejected: it would leave some amendments in the active chain
+and others not, split by a rule recorded only in a commit message, and it
+would make this ledger the awkward special case the real mechanism later has
+to work around.
+
+Tracked as
+`backlog/items/2026-08-27-the-pipeline-cannot-merge-two-parallel-sprint-ledgers.md`,
+with the PO's framing: two sprints running in parallel and merging later is a
+NORMAL mode of work, and the Pipeline must support it.
+
+**BS26 and `backlog-state-check` therefore stay red on this merge candidate**,
+as a recorded consequence rather than an open task. They resolve when that
+item does. The 38 amendments remain intact in the Phoenix history file; the
+active chain is untouched and verifies.
+
+## The options as they stood before that decision
 
 - **(a) Migrate only the safe subset** — amendments whose target item has not
   changed status since. Honest, but BS26 likely stays red: it expects all 38.
