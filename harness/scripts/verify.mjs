@@ -688,6 +688,13 @@ const TEST_SUITES = [
   { name: "wire-dispatch-budget-hook-tests", file: join(repoRoot, "harness", "scripts", "wire-dispatch-budget-hook.test.mjs") },
   { name: "pipeline-user-v3-drift-tests", file: join(libDir, "pipeline-user-v3-drift.test.mjs") },
   { name: "hooks-manifest-shape-tests", file: join(hooksDir, "hooks-manifest-shape.test.mjs") },
+  // AK-2: suites that existed but were never registered here, so the gate could
+  // pass while they were never run. check-suite-registration.mjs reports the gap.
+  { name: "check-adr-consistency-tests", file: join(repoRoot, "harness", "scripts", "check-adr-consistency.test.mjs") },
+  { name: "check-critic-contract-citations-tests", file: join(repoRoot, "harness", "scripts", "check-critic-contract-citations.test.mjs") },
+  { name: "check-doc-reconciliation-tests", file: join(repoRoot, "harness", "scripts", "check-doc-reconciliation.test.mjs") },
+  { name: "pipeline-start-preflight-pre-push-observation-tests", file: join(pluginScriptsDir, "pipeline-start-preflight-pre-push-observation.test.mjs") },
+  { name: "pre-push-hook-install-tests", file: join(pluginScriptsDir, "pre-push-hook-install.test.mjs") },
 ];
 
 // Manifest-gated phase steps: see header — only projects that carry a manifest at
