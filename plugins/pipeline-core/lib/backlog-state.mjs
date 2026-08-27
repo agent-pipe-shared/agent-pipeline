@@ -674,10 +674,11 @@ export function validateTransitionShape(event, label, { readDispositionBytes = n
     }
     if (reachabilityAmendment) {
       const target = REACHABILITY_REPAIR_TARGETS[event.id];
+      // ADR-0068 D2 point 1: an amendment is status-neutral by construction;
+      // this no longer compares against the frozen historical status.
       if (!target
         || event.actor !== REACHABILITY_REPAIR_ACTOR
-        || event.from !== target.status
-        || event.to !== target.status) {
+        || event.from !== event.to) {
         errors.push(`${label}: reachability amendment is not an authorized 0.4.7 target`);
       }
       for (const key of ["supersedesSequence", "supersedesEntryHash", "referenceBlobOid", "referenceSha256"]) {
@@ -707,11 +708,12 @@ export function validateTransitionShape(event, label, { readDispositionBytes = n
       const target2 = Number.isSafeInteger(event.evidence.supersedesSequence)
         ? PRE_PUBLIC_CORE_REACHABILITY_TARGETS[event.evidence.supersedesSequence]
         : undefined;
+      // ADR-0068 D2 point 1: an amendment is status-neutral by construction;
+      // this no longer compares against the frozen historical status.
       if (!target2
         || target2.id !== event.id
         || event.actor !== PRE_PUBLIC_CORE_REACHABILITY_ACTOR
-        || event.from !== target2.status
-        || event.to !== target2.status) {
+        || event.from !== event.to) {
         errors.push(`${label}: reachability amendment is not an authorized PHX-LEDGER-REACH target`);
       }
       if (target2 && event.evidence.supersedesEntryHash !== target2.entryHash) {
@@ -795,11 +797,14 @@ export function validateTransitionLedger(events, items, { commitExists = null, r
   for (const event of events) {
     if (event?.evidence?.kind !== "reachability-amendment") continue;
     const target = REACHABILITY_REPAIR_TARGETS[event.id];
-    const superseded = events[event.evidence.supersedesSequence - 1];
+    // ADR-0068 D2 point 3: bind by entryHash, never by physical position --
+    // supersedesSequence stays as historical documentation only.
+    const superseded = events.find((candidate) => candidate?.entryHash === event.evidence.supersedesEntryHash);
     if (target
       && event.actor === REACHABILITY_REPAIR_ACTOR
-      && event.from === target.status
-      && event.to === target.status
+      // ADR-0068 D2 point 1: an amendment is status-neutral by construction;
+      // this no longer compares against the frozen historical status.
+      && event.from === event.to
       && event.evidence.supersedesSequence === target.sequence
       && event.evidence.supersedesEntryHash === target.entryHash
       && superseded?.id === event.id
@@ -814,12 +819,15 @@ export function validateTransitionLedger(events, items, { commitExists = null, r
   for (const event of events) {
     if (event?.evidence?.kind !== PRE_PUBLIC_CORE_REACHABILITY_KIND) continue;
     const target = PRE_PUBLIC_CORE_REACHABILITY_TARGETS[event.evidence.supersedesSequence];
-    const superseded = events[event.evidence.supersedesSequence - 1];
+    // ADR-0068 D2 point 3: bind by entryHash, never by physical position --
+    // supersedesSequence stays as historical documentation only.
+    const superseded = events.find((candidate) => candidate?.entryHash === event.evidence.supersedesEntryHash);
     if (target
       && target.id === event.id
       && event.actor === PRE_PUBLIC_CORE_REACHABILITY_ACTOR
-      && event.from === target.status
-      && event.to === target.status
+      // ADR-0068 D2 point 1: an amendment is status-neutral by construction;
+      // this no longer compares against the frozen historical status.
+      && event.from === event.to
       && event.evidence.supersedesEntryHash === target.entryHash
       && superseded?.id === event.id
       && superseded?.entryHash === target.entryHash
@@ -1383,8 +1391,10 @@ export function planBacklogReachabilityRepair(items, events, input) {
       || historical?.evidence?.reference !== reference?.reference) {
       errors.push(`reachability repair target ${id} does not bind canonical history`);
     }
-    if (!item || item.metadata.status !== target.status) {
-      errors.push(`reachability repair target ${id} must preserve ${target.status}`);
+    // ADR-0068 D2 point 4: the frozen registry status is documentation only,
+    // never a precondition on the item's present state -- only existence is.
+    if (!item) {
+      errors.push(`reachability repair target ${id} item is missing`);
     }
     if (!isPlainObject(reference)
       || !exactReferenceKeys(reference)
@@ -1401,12 +1411,15 @@ export function planBacklogReachabilityRepair(items, events, input) {
   for (const [index, id] of expectedIds.entries()) {
     const target = REACHABILITY_REPAIR_TARGETS[id];
     const reference = input.references[index];
+    // ADR-0068 D2 point 2: from/to are the item's CURRENT status, not the
+    // frozen historical one -- that is what keeps the chain check satisfiable.
+    const status = items.find((entry) => entry?.metadata?.id === id).metadata.status;
     const event = {
       schema: TRANSITION_SCHEMA,
       sequence: nextEvents.length + 1,
       id,
-      from: target.status,
-      to: target.status,
+      from: status,
+      to: status,
       at: input.at,
       actor: input.actor,
       reason: `Append reachable evidence for historical event ${target.sequence} without rewriting it or changing item status.`,
@@ -1494,8 +1507,10 @@ export function planPrePublicCoreReachabilityRepair(items, events, input, { comm
     if (historical?.id !== target.id || historical?.entryHash !== target.entryHash) {
       errors.push(`pre-public-core reachability repair target ${sequence} does not bind canonical history`);
     }
-    if (!item || item.metadata.status !== target.status) {
-      errors.push(`pre-public-core reachability repair target ${sequence} must preserve ${target.status}`);
+    // ADR-0068 D2 point 4: the frozen registry status is documentation only,
+    // never a precondition on the item's present state -- only existence is.
+    if (!item) {
+      errors.push(`pre-public-core reachability repair target ${sequence} item is missing`);
     }
     if (!isPlainObject(reference)
       || !exactPrePublicCoreReferenceKeys(reference)
@@ -1516,12 +1531,15 @@ export function planPrePublicCoreReachabilityRepair(items, events, input, { comm
   for (const sequence of expectedSequences) {
     const target = PRE_PUBLIC_CORE_REACHABILITY_TARGETS[sequence];
     const reference = input.references.find((entry) => entry.sequence === sequence);
+    // ADR-0068 D2 point 2: from/to are the item's CURRENT status, not the
+    // frozen historical one -- that is what keeps the chain check satisfiable.
+    const status = items.find((entry) => entry?.metadata?.id === target.id).metadata.status;
     const event = {
       schema: TRANSITION_SCHEMA,
       sequence: nextEvents.length + 1,
       id: target.id,
-      from: target.status,
-      to: target.status,
+      from: status,
+      to: status,
       at: input.at,
       actor: input.actor,
       reason: `Append reachable evidence for historical event ${sequence} without rewriting it or changing item status.`,
