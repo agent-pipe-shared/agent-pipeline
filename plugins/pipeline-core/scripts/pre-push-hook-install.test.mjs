@@ -198,6 +198,11 @@ test("installed hook: verify evidence missing -> BLOCK", () => {
   const { code, stderr } = runInstalledHook(dir, `refs/heads/main ${head} refs/heads/main ${ZERO40}\n`);
   assert.equal(code, 1);
   assert.match(stderr, /verify-latest\.json missing/);
+  // NVA-PREPUSHVISIBLE-1: the real, actually-printed refusal (not just the generated
+  // source) must not teach the bypass flag, and must mark any override human-operator-only.
+  assert.doesNotMatch(stderr, /--no-verify/);
+  assert.match(stderr, /HUMAN OPERATOR ONLY/);
+  assert.match(stderr, /agent MUST NOT/);
 });
 
 test("installed hook: push approval state missing (approval required, not standing-approved) -> BLOCK", () => {
@@ -318,11 +323,23 @@ test("renderShim: execs the impl file with an absolute, JSON-quoted path", () =>
   assert.match(shim, /exec node "\/abs\/path\/impl\.mjs" "\$@"/);
 });
 
-test("renderImpl: names the --no-verify escape and states it cannot be recorded", () => {
+// NVA-PREPUSHVISIBLE-1: this assertion used to pin the exact defect a PO hardening test
+// found -- an agent reading the refusal, copying the `--no-verify` hint it named, and
+// pushing anyway. It is deliberately changed (per this task's briefing) to assert the
+// opposite: the printed, agent-facing refusal no longer teaches the bypass flag, and any
+// mention of an override is unmistakably marked as a human-operator-only action an agent
+// must not take. The file's own design-rationale header comment (a separate concern, read
+// by a maintainer inspecting source, never printed at push time) is deliberately NOT in
+// scope here -- only the text `block()` actually prints is isolated and checked.
+test("renderImpl: the agent-facing refusal marks any override as human-operator-only, without naming the bypass flag as an instruction", () => {
   const impl = renderImpl("/abs/lib");
-  assert.match(impl, /--no-verify/);
-  assert.match(impl, /CANNOT record a bypass/);
-  assert.match(impl, /never mode-gated/);
+  const blockStart = impl.indexOf("function block(lines) {");
+  const blockEnd = impl.indexOf("\n}\n", blockStart);
+  assert.ok(blockStart !== -1 && blockEnd !== -1, "block()'s own function body must be present in the generated source");
+  const printedRefusal = impl.slice(blockStart, blockEnd);
+  assert.doesNotMatch(printedRefusal, /--no-verify/, "the printed refusal must never teach the exact bypass flag");
+  assert.match(printedRefusal, /HUMAN OPERATOR ONLY/);
+  assert.match(printedRefusal, /agent MUST NOT/);
 });
 
 // ---- decline recording (NVA-PREPUSHOFFER-1) ---------------------------------------------

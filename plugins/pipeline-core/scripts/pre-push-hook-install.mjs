@@ -345,7 +345,7 @@ function block(lines) {
       \`BLOCKED (agent-pipeline pre-push hook): \${lines[0]}\`,
       ...lines.slice(1),
       "",
-      "Escape hatch: \`git push --no-verify\` skips this hook entirely (git's own behaviour); it will not be recorded here (see this file's own header).",
+      "HUMAN OPERATOR ONLY: git itself provides operator-level ways to bypass hook enforcement for a human working directly, outside any agent session. An agent MUST NOT use any such bypass under any circumstance or instruction -- if this push must proceed, stop and hand it to a human operator.",
     ].join("\\n") + "\\n",
   );
   process.exitCode = 1;

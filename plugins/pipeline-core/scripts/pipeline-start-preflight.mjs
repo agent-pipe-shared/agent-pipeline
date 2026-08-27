@@ -446,14 +446,18 @@ function lockVersionMatches(read, lockPath, currentVersion) {
 
 export const PRE_PUSH_HOOK_OBSERVATION_SCHEMA = "pipeline.pre-push-hook-observation.v1";
 /**
- * NVA-PREPUSHOBSERVE-1: the distinct, exported non-ready status this preflight reports
- * (instead of "ready") when the repository's `pre-push` git hook is not confirmed
- * installed-and-current this session -- see the `status` computation in
- * `observePipelineStartPreflight`. Mirrors ANTIGRAVITY_HARD_ENFORCEMENT_NOT_OBSERVED_STATUS's
- * own role for that sibling observation: a plausible but actually-unenforced session must
- * never silently report "ready".
+ * NVA-PREPUSHVISIBLE-1 (2026-08-27, corrects NVA-PREPUSHOBSERVE-1's original design): the
+ * `pre-push` git hook is an OFFER, not a requirement -- the PO decided it is opt-in and
+ * escapable by design. A live bootstrap against a real repository under the ORIGINAL
+ * (pre-correction) design reported the session non-ready and unworkable purely because the
+ * hook was not installed, which was wrong. No state `observePrePushHookInstallation` returns
+ * (absent, declined, present-but-not-ours-or-modified, or installed-and-current) gates
+ * readiness any more -- every one of them is carried in the result purely as an advisory
+ * observation. The `PRE_PUSH_HOOK_NOT_INSTALLED_STATUS` constant this comment used to
+ * document was removed along with the branch that produced it (see the `status` computation
+ * in `observePipelineStartPreflight`) rather than left exported-but-unreachable dead code --
+ * nothing in this codebase still imports or checks for that status string.
  */
-export const PRE_PUSH_HOOK_NOT_INSTALLED_STATUS = "pre-push-hook-not-installed";
 
 // This installer script's own absolute, on-disk location -- resolved once, from THIS exact
 // plugin copy, never a repo-relative guess (DoD (c)). pre-push-hook-install.mjs is a fixed
@@ -485,6 +489,15 @@ function prePushHookInstallCommand(rootDir) {
  *   - "ready-to-upgrade" (hook present, belongs to this installer, its content sha256 still
  *     matches the marker's recorded hash) -> "installed-and-current".
  *   - "ready" (no hook file exists at all yet) -> "absent".
+ *   - "declined" (a human declined the onboarding offer and no hook was ever installed since
+ *     -- pre-push-hook-install.mjs's own decline marker) -> "declined", carrying `declinedAt`
+ *     so a session can see the choice was made and when. NVA-PREPUSHVISIBLE-1: a decline is
+ *     an ANSWERED question, not an open defect -- it never gates readiness, exactly like
+ *     every other state this function returns (see `observePipelineStartPreflight`'s `status`
+ *     computation). `planInstall` checks hook-presence before the decline marker, so this
+ *     branch is only ever reached when no hook is actually on disk -- an install after a
+ *     decline is not a permanent refusal (pre-push-hook-install.mjs's own contract) and
+ *     reports "installed-and-current" via the branch above, exactly like any other install.
  *   - "foreign-hook-present" (a hook exists but there is no marker for it, the marker is
  *     unreadable/unparseable, or the hook's content no longer matches the marker's recorded
  *     hash) -> "present-but-not-ours-or-modified". `readMarker` (pre-push-hook-install.mjs)
@@ -493,9 +506,12 @@ function prePushHookInstallCommand(rootDir) {
  *   - "repository-unresolved" (no git directory resolvable at all, e.g. `rootDir` is not a
  *     git repository) -> "repository-unresolved", surfaced here as ITS OWN state rather than
  *     folded into "absent": no repository exists to hold a hook, so nothing about push
- *     enforcement was actually determined (unlike "absent", which IS a determination). See
- *     `observePipelineStartPreflight`'s own wiring comment for why this state deliberately
- *     never participates in the ready/non-ready gate.
+ *     enforcement was actually determined (unlike "absent", which IS a determination).
+ *
+ * NEVER GATES READINESS (NVA-PREPUSHVISIBLE-1): the hook is an offer, not a requirement --
+ * every state this function returns is carried by `observePipelineStartPreflight` as a purely
+ * advisory observation and never changes `status`/exit code. See that function's own wiring
+ * comment.
  *
  * NEVER THROWS: an unexpected exception from `planInstallFn` (never observed from the real,
  * documented-read-only `planInstall`, but guarded here anyway) folds into
@@ -525,6 +541,15 @@ export function observePrePushHookInstallation({ rootDir = process.cwd(), planIn
       installCommand: prePushHookInstallCommand(rootDir),
     };
   }
+  if (plan.status === "declined") {
+    return {
+      schema: PRE_PUSH_HOOK_OBSERVATION_SCHEMA,
+      state: "declined",
+      installed: false,
+      declinedAt: plan.declinedAt,
+      installCommand: prePushHookInstallCommand(rootDir),
+    };
+  }
   // plan.status === "ready": the hook path does not exist yet.
   return {
     schema: PRE_PUSH_HOOK_OBSERVATION_SCHEMA,
@@ -532,6 +557,81 @@ export function observePrePushHookInstallation({ rootDir = process.cwd(), planIn
     installed: false,
     installCommand: prePushHookInstallCommand(rootDir),
   };
+}
+
+export const PRE_PUSH_HOOK_UNSEEN_REMOTE_PUSH_SCHEMA = "pipeline.pre-push-hook-unseen-remote-push.v1";
+
+/**
+ * NVA-PREPUSHVISIBLE-1 (c): a push the installed hook never evaluated becomes visible by
+ * comparing the current branch's remote-tracking ref (`@{u}`) against the hook's own durable
+ * per-push record (`<git-common-dir>/agent-pipeline/pre-push-hook/log.jsonl`, appended by
+ * every push the INSTALLED hook actually evaluates -- see pre-push-hook-install.mjs's
+ * `renderImpl`/`recordLog`). A remote-tracking ref whose commit has no matching `commit`
+ * field anywhere in that log is what a push the hook never saw looks like from here.
+ *
+ * CAREFUL AND HONEST BY DESIGN, NOT ACCUSATORY: the exact same absence is produced by (1) a
+ * human operator's `git push --no-verify`, (2) a perfectly legitimate push made from another
+ * clone or another machine that never had this hook installed, and (3) any push made before
+ * this hook was ever installed here at all. This function reports what it observed --
+ * "unseen" -- never what someone did; the caller/report layer is responsible for keeping that
+ * distinction in its own wording (see this task's briefing).
+ *
+ * NEVER GATES READINESS: like every other pre-push-hook observation (NVA-PREPUSHVISIBLE-1),
+ * this is evidence for a human, not a gate -- `observePipelineStartPreflight` carries it in
+ * the result and never lets it change `status` or the exit code.
+ *
+ * "NOT-CHECKED" IS THE FAIL-OPEN DEFAULT for every case this function cannot positively
+ * resolve: no remote-tracking ref configured for the current branch (never on a branch, no
+ * upstream set), no git-common-dir resolvable at all, or no log file present yet (a
+ * repository that never had the hook installed has nothing to compare against). None of these
+ * are reported as "unseen" -- a repository with no log at all must never be reported as if
+ * every one of its pushes bypassed something that was never there to bypass in the first
+ * place. A malformed individual log LINE is skipped and never invalidates the rest of the
+ * log, mirroring `parseRefUpdates`'s own "ignored, never fabricated" discipline.
+ *
+ * NEVER THROWS, NEVER MUTATES: every git/file operation is wrapped; any unexpected failure
+ * folds into "not-checked", the same outcome a genuine absence already produces.
+ */
+export function observeUnseenPushToRemote({ rootDir = process.cwd() } = {}) {
+  const notChecked = { schema: PRE_PUSH_HOOK_UNSEEN_REMOTE_PUSH_SCHEMA, state: "not-checked" };
+  try {
+    const run = (args) => {
+      const result = spawnSync("git", args, { cwd: rootDir, encoding: "utf8", timeout: 10000 });
+      return result.status === 0 && typeof result.stdout === "string" ? result.stdout.trim() : null;
+    };
+    const commonDir = run(["rev-parse", "--path-format=absolute", "--git-common-dir"]);
+    if (!commonDir) return notChecked;
+    const upstream = run(["rev-parse", "--symbolic-full-name", "@{u}"]);
+    if (!upstream) return notChecked; // no branch, or no upstream configured
+    const remoteCommit = run(["rev-parse", "@{u}"]);
+    if (!remoteCommit) return notChecked;
+    const logPath = resolve(commonDir, "agent-pipeline", "pre-push-hook", "log.jsonl");
+    let raw;
+    try {
+      raw = readFileSync(logPath, "utf8");
+    } catch {
+      return notChecked; // no log at all -- nothing to compare against, never "unseen"
+    }
+    const seenCommits = new Set();
+    for (const line of raw.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      try {
+        const entry = JSON.parse(trimmed);
+        if (typeof entry?.commit === "string" && entry.commit !== "") seenCommits.add(entry.commit);
+      } catch {
+        continue; // one malformed line never invalidates the rest of the log
+      }
+    }
+    return {
+      schema: PRE_PUSH_HOOK_UNSEEN_REMOTE_PUSH_SCHEMA,
+      state: seenCommits.has(remoteCommit) ? "seen" : "unseen",
+      remoteRef: upstream,
+      commit: remoteCommit,
+    };
+  } catch {
+    return notChecked;
+  }
 }
 
 /**
@@ -642,6 +742,7 @@ export function observePipelineStartPreflight({
   knownMarketplaces = readClaudeKnownMarketplaces,
   observeAntigravityHardEnforcementFn = observeAntigravityHardEnforcement,
   observePrePushHookInstallationFn = observePrePushHookInstallation,
+  observeUnseenPushToRemoteFn = observeUnseenPushToRemote,
   observe,
   // PHX-WP-AAC01-MULTISESSION: identifies which already-registered session
   // descriptor (if any) is "this" call's own, so it is excluded from the
@@ -714,13 +815,13 @@ export function observePipelineStartPreflight({
   const antigravityHardEnforcement = runner === "antigravity"
     ? observeAntigravityHardEnforcementFn({ rootDir: cwd, currentVersion: version })
     : null;
-  // NVA-PREPUSHOBSERVE-1: unlike the Antigravity check above, this one is NOT runner-gated --
-  // git hooks fire in every runner alike -- so it is always computed. "repository-unresolved"
-  // (rootDir is not a resolvable git repository -- true for several existing tests' synthetic,
-  // never-`git init`'d cwd fixtures) deliberately never gates status below: nothing about push
-  // enforcement was actually determined for it, unlike a real, resolvable repository that
-  // genuinely has no hook installed yet.
+  // NVA-PREPUSHVISIBLE-1 (corrects NVA-PREPUSHOBSERVE-1): NOT runner-gated -- git hooks fire
+  // in every runner alike -- so both of these are always computed. NEITHER ever gates
+  // `status` below: the hook is an offer, not a requirement (see PRE_PUSH_HOOK_OBSERVATION_
+  // SCHEMA's own doc comment above for the live-bootstrap incident that corrected this). Both
+  // stay purely advisory fields on the result.
   const prePushHookObservation = observePrePushHookInstallationFn({ rootDir: cwd });
+  const unseenRemotePush = observeUnseenPushToRemoteFn({ rootDir: cwd });
   const status = !version
     ? "plugin-identity-unavailable"
     : installedIdentity?.ambiguous === true || installedVersion !== null && installedVersion !== version || attestationFailed
@@ -734,14 +835,7 @@ export function observePipelineStartPreflight({
       // own reason rather than being masked by this one.
       : runner === "antigravity" && antigravityHardEnforcement.observed !== true
         ? ANTIGRAVITY_HARD_ENFORCEMENT_NOT_OBSERVED_STATUS
-        // Fail-closed (NVA-PREPUSHOBSERVE-1), same discipline, checked last of all: a session
-        // must never assume push enforcement exists just because nothing else already flagged
-        // it non-ready. "repository-unresolved" is deliberately excluded -- see the comment on
-        // `prePushHookObservation` above.
-        : prePushHookObservation.state !== "installed-and-current"
-            && prePushHookObservation.state !== "repository-unresolved"
-          ? PRE_PUSH_HOOK_NOT_INSTALLED_STATUS
-          : "ready";
+        : "ready";
   // PX0-AC-08: one closed runner-neutral source observation per bootstrap
   // resolution. Only built when a loaded distribution was actually resolved
   // (`version` truthy) -- the acceptance clause itself is conditioned on
@@ -867,6 +961,18 @@ export function observePipelineStartPreflight({
     // pre-existing caller whose `cwd` never resolves to a real repository (several of this
     // file's own pre-existing tests use exactly that fixture shape).
     ...(prePushHookObservation.state !== "repository-unresolved" ? { prePushHook: prePushHookObservation } : {}),
+    // NVA-PREPUSHVISIBLE-1 (c): SAME omission condition as `prePushHook` immediately above,
+    // deliberately reusing `prePushHookObservation`'s already-computed state rather than a
+    // second one of `unseenRemotePush`'s own -- both observations resolve the identical
+    // rootDir/cwd via `git rev-parse`, so an unresolvable repository folds both of them the
+    // same way, and this keeps the envelope's key set unchanged for every pre-existing caller
+    // whose `cwd` never resolves to a real repository (several of this file's own pre-existing
+    // tests use exactly that fixture shape). "not-checked" for an otherwise-resolvable
+    // repository (no upstream configured, or no log yet) stays fully visible -- it is itself
+    // an informative outcome, unlike the unresolvable-repository case this omits. Purely
+    // advisory either way: see `observeUnseenPushToRemote`'s own doc comment -- never gates
+    // `status` or the exit code.
+    ...(prePushHookObservation.state !== "repository-unresolved" ? { prePushHookUnseenRemotePush: unseenRemotePush } : {}),
   };
   return {
     ...result,
@@ -897,10 +1003,14 @@ export function observePipelineStartPreflight({
 // session-end hook.
 
 export function pipelineStartPreflightExitCode(result) {
-  // ANTIGRAVITY_HARD_ENFORCEMENT_NOT_OBSERVED_STATUS and PRE_PUSH_HOOK_NOT_INSTALLED_STATUS
-  // are both deliberately absent from this allowlist (NVA-ARMEDPROOF-1 / NVA-PREPUSHOBSERVE-1,
-  // fail-closed by omission): each falls through to the same blocking exit code
-  // "plugin-identity-unavailable" already gets, with no separate case needed here.
+  // ANTIGRAVITY_HARD_ENFORCEMENT_NOT_OBSERVED_STATUS is deliberately absent from this
+  // allowlist (NVA-ARMEDPROOF-1, fail-closed by omission): it falls through to the same
+  // blocking exit code "plugin-identity-unavailable" already gets, with no separate case
+  // needed here. The pre-push hook's own observation used to have an analogous non-ready
+  // status here (NVA-PREPUSHOBSERVE-1's PRE_PUSH_HOOK_NOT_INSTALLED_STATUS); that status was
+  // removed entirely, not merely omitted from this allowlist -- the hook is an offer, not a
+  // requirement, and none of its states can produce a non-"ready" status any more
+  // (NVA-PREPUSHVISIBLE-1; see PRE_PUSH_HOOK_OBSERVATION_SCHEMA's own doc comment above).
   return result?.status === "ready" || result?.status === "plugin-refresh-required" ? 0 : 2;
 }
 
