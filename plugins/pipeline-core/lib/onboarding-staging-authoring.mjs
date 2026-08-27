@@ -76,12 +76,16 @@ export function isBootstrapBindingStagingAuthoringWrite(input, root) {
     return prdMatch !== null && prdMatch[1] === featureId;
   }
 
-  // NVA-INTAKESPECS-1 transitional. Nothing generates into the old staging directory any more.
-  // This branch exists ONLY so GS-15 and its TP-6-protected regression test (GST38) keep
-  // describing a real, still-admitted path until the single signed override that removes all
-  // three can run -- scratch/NVA-INTAKESPECS-1-UMSETZUNG.md names the exact removal steps.
-  // Removing it early would turn a green protected suite red with no route to fix it in the
-  // same session. Delete this block, GS-15, INTAKE_STAGING_DIRNAME and GST38 together.
+  // NVA-INTAKESPECS-1: nothing GENERATES into the old staging directory any more, but projects
+  // onboarded before that change still carry their PRD/Spec there, sometimes bound as project
+  // authority. This branch keeps that authoring write admitted for them, exactly as before, so
+  // an existing project does not become unwritable the moment the plugin updates underneath it
+  // -- which is a real event for every consumer (see backlog:
+  // 2026-08-27-a-plugin-update-under-an-onboarded-project-derails-the-next-session-into-repair.md).
+  //
+  // Retire this together with GS-15 and INTAKE_STAGING_DIRNAME only once no supported project
+  // can still carry the old layout. Until then removing it would leave those projects' design
+  // packages simultaneously unprotected (GS-15 gone) and unwritable (this admission gone).
   const stagingDirectory = join(root, INTAKE_STAGING_DIRNAME);
   if (resolved === join(stagingDirectory, "spec.md")) return true;
   if (parent !== stagingDirectory) return false;
