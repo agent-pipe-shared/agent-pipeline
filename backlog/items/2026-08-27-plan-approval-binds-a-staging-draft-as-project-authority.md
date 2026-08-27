@@ -96,7 +96,22 @@ refused with a typed reason naming the promotion action.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted, and fixed by removing the staging location rather than
+  by guarding the approval path. PO decision 2026-08-27, chosen from three
+  options presented (keep staging and fix ordering / remove staging / collapse
+  the whole intake chain).
+- **Rationale:** the item's own analysis names the real constraint — either the
+  approval path refuses a self-declared pre-authority document, or promotion
+  becomes a precondition of approval. Both accept the premise that two kinds of
+  "design document" exist. `intake-generate-apply` now writes straight into
+  `specs/<featureId>/` (`1c264e28`), so there is no pre-authority draft, no
+  promotion step to skip, and no second route that can bind the wrong thing.
+  Approval binding a `specs/` path is now simply correct. The cheap guard this
+  item proposed as a first step was deliberately NOT built: it would have
+  defended a distinction that no longer exists.
+- **Assignment (if accepted):** substantially delivered in `1c264e28`. Stays
+  `open` for one remaining step: GS-15, its TP-6-protected regression test
+  GST38, and the transitional legacy branch in `onboarding-staging-authoring.mjs`
+  must be removed together, which needs one signed author-repair override. Exact
+  steps in `scratch/NVA-INTAKESPECS-1-UMSETZUNG.md`.
+- **Date:** 2026-08-27
