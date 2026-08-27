@@ -9,6 +9,7 @@
 | pipeline.a-promoted-feature-can-never-pass-the-plan-gate | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.a-schema-less-project-pipeline-yaml-has-no-known-repair-path | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.a-second-dispatch-claimed-an-evidence-artifact-it-never-wrote | closed | defect | pipeline | 2026-08-09 | — |
+| pipeline.a-stale-version-stamp-makes-a-plugin-reload-a-silent-no-op | open | defect | pipeline | 2026-08-27 | — |
 | pipeline.a7-gate-review-found-a-spec-plan-contradiction-and-a-lifecycle-admission-question | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.absent-runner-flag-silently-defaults-to-codex | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.acceptance-md-edits-repeatedly-drift-lifecycle-json-bound-digest | closed | defect | pipeline | 2026-08-17 | — |
@@ -151,6 +152,7 @@
 | pipeline.full-push-preflight-before-signature | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.gate-strength-override-route-advertised-not-offered | deferred | defect | pipeline | 2026-08-08 | — |
 | pipeline.gate-strength-shell-comment-understates-its-own-scope | closed | defect | pipeline | 2026-08-07 | — |
+| pipeline.gate-strength-shell-lane-refuses-any-command-containing-a-quoted-wildcard | open | defect | pipeline | 2026-08-27 | — |
 | pipeline.git-appears-despite-initializes-git-false | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.git-identity-ask-step-unreachable-through-live-cli-path | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.git-identity-must-be-set-immediately-before-first-commit-not-at-setup-time | closed | defect | pipeline | 2026-08-17 | — |
@@ -444,7 +446,7 @@
 
 ## Counts
 
-- open: 43
+- open: 45
 - in_progress: 5
 - closed: 374
 - rejected: 3

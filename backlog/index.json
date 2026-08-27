@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "af6121dd3aab83281f07e169e099ca548643db5888f3bcb6b0b93ae4061b393c"
+    "transitionHead": "45070dc3f285265c80e237025aee184cd97ed99df1fcca25b969ed892084341c"
   },
   "counts": {
-    "open": 43,
+    "open": 45,
     "in_progress": 5,
     "closed": 374,
     "rejected": 3,
@@ -64,6 +64,15 @@
       "closureRepository": "self",
       "closureCommit": "de7cf0d41cd1dff1c0f878de20834535447c0a37",
       "closureEvidence": "backlog/items/2026-08-09-a-second-dispatch-claimed-an-evidence-artifact-it-never-wrote.md"
+    },
+    {
+      "id": "pipeline.a-stale-version-stamp-makes-a-plugin-reload-a-silent-no-op",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-27",
+      "source": "Live observation, 2026-08-27: the PO caught a stale cachebuster in plugin.json after a block of work that included wiring a new PreToolUse hook; nothing in Verify compares the stamp against HEAD. Corrected in ruleset a49cd41a.",
+      "deferred": false
     },
     {
       "id": "pipeline.a7-gate-review-found-a-spec-plan-contradiction-and-a-lifecycle-admission-question",
@@ -1822,6 +1831,15 @@
       "closureRepository": "self",
       "closureCommit": "e0a87ecee3a643d1e498c390ca8b9ee2730f879d",
       "closureEvidence": "backlog/items/2026-08-07-gate-strength-shell-comment-understates-its-own-scope.md"
+    },
+    {
+      "id": "pipeline.gate-strength-shell-lane-refuses-any-command-containing-a-quoted-wildcard",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-27",
+      "source": "Live observation, 2026-08-27: a cat >> heredoc appending to a gitignored scratch note was refused with GUARD-GATE-STRENGTH-SHELL. Independently reproduced in the same session by a diagnostic command whose text happened to contain a quoted asterisk.",
+      "deferred": false
     },
     {
       "id": "pipeline.git-appears-despite-initializes-git-false",
