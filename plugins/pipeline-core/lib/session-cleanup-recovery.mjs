@@ -1791,6 +1791,175 @@ export function retireOrphanScratchDescriptors({ rootDir, deps = {} } = {}) {
   return { retiredCount: retired, retained };
 }
 
+const SAFE_WORKTREE_DIR_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
+
+/**
+ * Read-only: which absolute paths `git worktree list --porcelain` currently reports for
+ * `root`'s repository, resolved through realpathSync so a symlinked or differently-cased
+ * mount matches the same directory this sweep inspects on disk. `null` on any command
+ * failure -- callers MUST fail closed on `null` (never treat "the list command broke" as
+ * "git knows about nothing"), exactly the same discipline `recoveryJournalPaths` already
+ * applies to its own `git rev-parse --git-common-dir` call.
+ */
+function listRegisteredGitWorktrees(root, deps) {
+  const spawn = deps.spawn ?? spawnSync;
+  const result = spawn("git", ["worktree", "list", "--porcelain"], {
+    cwd: root,
+    encoding: "utf8",
+    shell: false,
+    timeout: 5000,
+  });
+  if (result?.status !== 0 || result?.error || typeof result.stdout !== "string") return null;
+  const registered = new Set();
+  for (const line of result.stdout.split("\n")) {
+    if (!line.startsWith("worktree ")) continue;
+    const raw = line.slice("worktree ".length).trim();
+    if (raw === "") continue;
+    try { registered.add(realpathSync(raw)); } catch { /* the path no longer exists; not a live match either way */ }
+  }
+  return registered;
+}
+
+/**
+ * Reads a worktree checkout's own `.git` FILE (never a directory -- that is a separate
+ * clone, not a worktree remnant) and returns its recorded `gitdir:` target, resolved to an
+ * absolute path. `null` on anything that does not look like a genuine worktree pointer file.
+ */
+function readWorktreeGitdirTarget(gitFilePath, worktreeDirectory) {
+  let content;
+  try { content = readFileSync(gitFilePath, "utf8"); } catch { return null; }
+  const match = /^gitdir:\s*(.+)$/mu.exec(content);
+  if (!match) return null;
+  const target = match[1].trim();
+  if (target === "") return null;
+  return isAbsolute(target) ? target : resolve(worktreeDirectory, target);
+}
+
+/**
+ * Read-only inspection of every directory directly under `.claude/worktrees/` (the Agent
+ * tool / Workflow `agent()` worktree-isolation convention -- CLAUDE.md's own worktree
+ * self-heal note; NOT the `.git/agent-pipeline/**` administrative registry
+ * `worktree-lifecycle.mjs` owns, which this function never reads or touches). NEVER creates
+ * `.claude/worktrees/` -- absence reads as "nothing to sweep", exactly like
+ * `runBootstrapScratchLifecycle`'s own "no pre-existing scratch/, no sweep" rule, so a
+ * project that has never used worktree isolation is never dirtied by this check.
+ *
+ * A directory is "orphan" -- the ONLY status `retireOrphanWorktreeDirectories` will ever
+ * remove -- when ALL of the following hold, checked in order, each one fail-closed to a
+ * non-"orphan" status on any doubt:
+ *   1. Its name is safe and it is a plain direct-child directory of `.claude/worktrees/`,
+ *      never a symlink.
+ *   2. `git worktree list --porcelain` (from THIS repository root) does not report it -- the
+ *      AC-3 hard rule inverted: a worktree git still knows about is NEVER a candidate,
+ *      regardless of age. A `null` (list command failed) fails every entry closed to
+ *      "unknown-git-worktree-list-unavailable", never to "orphan".
+ *   3. It actually carries the fingerprint of a genuine worktree checkout: a `.git` FILE
+ *      (not a directory -- a full clone is a different, more dangerous thing to touch and is
+ *      always left alone) containing a `gitdir:` pointer. A directory the write-path
+ *      allowlist merely permitted an agent to `mkdir -p` for unrelated scratch-like use, with
+ *      no such file, is never a candidate -- it was never a worktree in the first place.
+ *   4. The `.git` file's own recorded `gitdir:` target no longer exists on disk -- git's own
+ *      administrative record for it is confirmed gone, not merely absent from one `list`
+ *      invocation that might itself be racing a legitimate, in-progress `git worktree add`.
+ * Any directory failing one of these is reported with an explicit non-"orphan" status and is
+ * therefore always retained by the caller below -- ambiguity always resolves to leaving the
+ * directory alone (AC-2).
+ */
+export function planOrphanWorktreeDirectories({ rootDir, deps = {} } = {}) {
+  const root = realpathSync(resolve(rootDir));
+  const worktreesRoot = resolve(root, ".claude", "worktrees");
+  if (!existsSync(worktreesRoot)) return [];
+  const rootInfo = lstatSync(worktreesRoot);
+  if (!rootInfo.isDirectory() || rootInfo.isSymbolicLink()) {
+    fail("WT-WORKTREE-SWEEP", ".claude/worktrees is not a plain directory");
+  }
+  const registered = listRegisteredGitWorktrees(root, deps);
+  const entries = [];
+  for (const name of readdirSync(worktreesRoot).sort()) {
+    if (!SAFE_WORKTREE_DIR_NAME.test(name)) {
+      entries.push({ name, status: "skipped-unsafe-name" });
+      continue;
+    }
+    const candidate = join(worktreesRoot, name);
+    let candidateInfo;
+    try { candidateInfo = lstatSync(candidate); } catch { continue; }
+    if (!candidateInfo.isDirectory() || candidateInfo.isSymbolicLink() || dirname(candidate) !== worktreesRoot) {
+      entries.push({ name, status: "skipped-not-plain-directory" });
+      continue;
+    }
+    if (registered === null) {
+      entries.push({ name, status: "unknown-git-worktree-list-unavailable" });
+      continue;
+    }
+    let realCandidate;
+    try { realCandidate = realpathSync(candidate); } catch { entries.push({ name, status: "unknown" }); continue; }
+    if (registered.has(realCandidate)) {
+      entries.push({ name, status: "active-registered" });
+      continue;
+    }
+    const gitFile = join(candidate, ".git");
+    let gitFileInfo;
+    try { gitFileInfo = lstatSync(gitFile); } catch { entries.push({ name, status: "not-a-worktree-checkout" }); continue; }
+    if (!gitFileInfo.isFile() || gitFileInfo.isSymbolicLink()) {
+      entries.push({ name, status: "not-a-worktree-checkout" });
+      continue;
+    }
+    const gitdirTarget = readWorktreeGitdirTarget(gitFile, candidate);
+    if (gitdirTarget === null) {
+      entries.push({ name, status: "unknown" });
+      continue;
+    }
+    entries.push({
+      name,
+      status: existsSync(gitdirTarget) ? "unknown" : "orphan",
+      path: candidate,
+    });
+  }
+  return entries;
+}
+
+/**
+ * Retire every verified-orphaned worktree directory found by planOrphanWorktreeDirectories.
+ * Mirrors retireOrphanScratchDescriptors's own discipline exactly: never a wholesale clear of
+ * `.claude/worktrees/`, and every candidate is re-checked against a FRESH
+ * `git worktree list --porcelain` immediately before deletion (defends against a race with a
+ * concurrent, legitimate `git worktree add` landing between the plan and this call).
+ */
+export function retireOrphanWorktreeDirectories({ rootDir, deps = {} } = {}) {
+  const root = realpathSync(resolve(rootDir));
+  const worktreesRoot = resolve(root, ".claude", "worktrees");
+  const plan = planOrphanWorktreeDirectories({ rootDir, deps });
+  let retired = 0;
+  const retained = [];
+  for (const entry of plan) {
+    if (entry.status !== "orphan") {
+      retained.push(entry);
+      continue;
+    }
+    const candidate = join(worktreesRoot, entry.name);
+    let info;
+    try { info = lstatSync(candidate); } catch { retained.push({ ...entry, status: "changed" }); continue; }
+    if (!info.isDirectory() || info.isSymbolicLink() || dirname(candidate) !== worktreesRoot) {
+      retained.push({ ...entry, status: "changed" });
+      continue;
+    }
+    const registered = listRegisteredGitWorktrees(root, deps);
+    if (registered === null) {
+      retained.push({ ...entry, status: "unknown-git-worktree-list-unavailable" });
+      continue;
+    }
+    let realCandidate;
+    try { realCandidate = realpathSync(candidate); } catch { retained.push({ ...entry, status: "changed" }); continue; }
+    if (registered.has(realCandidate)) {
+      retained.push({ ...entry, status: "active-registered" });
+      continue;
+    }
+    rmSync(candidate, { recursive: true, force: false });
+    retired += 1;
+  }
+  return { retiredCount: retired, retained };
+}
+
 export const sessionCleanupRecoveryInternals = {
   securePrivateDirectory,
   safePrivateFile,

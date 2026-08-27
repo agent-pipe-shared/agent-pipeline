@@ -17,7 +17,11 @@ import {
   evaluateSelfApplicationAttestation,
   pluginRootHasSelfApplicationGit,
 } from "../lib/self-application-attestation-gate.mjs";
-import { bindScratchDescriptor, retireOrphanScratchDescriptors } from "../lib/session-cleanup-recovery.mjs";
+import {
+  bindScratchDescriptor,
+  retireOrphanScratchDescriptors,
+  retireOrphanWorktreeDirectories,
+} from "../lib/session-cleanup-recovery.mjs";
 import {
   inspectSessionOwnerRuntime,
   listActiveSessionDescriptors,
@@ -1091,6 +1095,42 @@ export function runBootstrapScratchLifecycle({
   return { schema: SCRATCH_LIFECYCLE_SCHEMA, sweep, binding, faults };
 }
 
+export const WORKTREE_SWEEP_SCHEMA = "pipeline.bootstrap-worktree-sweep.v1";
+
+/**
+ * A SEPARATE bootstrap event from `runBootstrapScratchLifecycle` above -- deliberately not
+ * folded into that function or its `pipeline.bootstrap-scratch-lifecycle.v1` schema, so that
+ * function's own pinned wiring tests (`pipeline-start-scratch-lifecycle.test.mjs`, asserting
+ * exact `faults`/`sweep` shapes for the scratch-only lifecycle) stay unaffected by this
+ * addition. Backlog: 2026-08-27-stale-worktree-directories-accumulate-with-no-sweep.md, whose
+ * own Proposal names `retireOrphanScratchDescriptors`'s "sweep orphans on a later bootstrap"
+ * shape as exactly what `.claude/worktrees/` needs -- this reuses that shape via the sibling
+ * `retireOrphanWorktreeDirectories`, not a second, differently-designed sweeper.
+ *
+ * FAIL-OPEN, ALWAYS, identically to the scratch sweep: any fault is recorded as a typed code
+ * and bootstrap continues. `retireOrphanWorktreeDirectories` never removes a directory git
+ * still knows about (`git worktree list`) regardless of age, and never removes a directory
+ * that does not carry a genuine worktree checkout's own `.git` pointer file -- see that
+ * function's own doc comment in session-cleanup-recovery.mjs for the full safety predicate.
+ */
+export function runBootstrapWorktreeSweep({ rootDir = process.cwd(), deps = {} } = {}) {
+  const faultCode = (error) => String(error?.code ?? "unknown");
+  try {
+    const retired = retireOrphanWorktreeDirectories({ rootDir, deps });
+    return {
+      schema: WORKTREE_SWEEP_SCHEMA,
+      sweep: { retiredCount: retired.retiredCount, retainedCount: retired.retained.length },
+      faults: [],
+    };
+  } catch (error) {
+    return {
+      schema: WORKTREE_SWEEP_SCHEMA,
+      sweep: null,
+      faults: [`sweep:${faultCode(error)}`],
+    };
+  }
+}
+
 export function main() {
   const result = observePipelineStartPreflight();
   process.stdout.write(`${JSON.stringify(result)}\n`);
@@ -1112,6 +1152,14 @@ export function main() {
   // budget, so the housekeeping receipt travels beside it rather than inside it.
   try {
     process.stderr.write(`${JSON.stringify(runBootstrapScratchLifecycle())}\n`);
+  } catch {
+    // Housekeeping never decides a bootstrap's exit code.
+  }
+  // A second, independent housekeeping event (see runBootstrapWorktreeSweep's own doc
+  // comment for why this is deliberately not folded into the scratch lifecycle above).
+  // Wrapped the same way: never allowed to affect this function's return value.
+  try {
+    process.stderr.write(`${JSON.stringify(runBootstrapWorktreeSweep())}\n`);
   } catch {
     // Housekeeping never decides a bootstrap's exit code.
   }
