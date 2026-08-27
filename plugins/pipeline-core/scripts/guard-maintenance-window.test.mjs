@@ -27,11 +27,9 @@ import path from "node:path";
 import test from "node:test";
 
 import { canonicalizeJson } from "../lib/governance-event.mjs";
-import { createRestrictedAuthorization, queryRestrictedGovernanceEvent } from "../lib/governance-event-store.mjs";
+import { createRestrictedAuthorization, queryRestrictedGovernanceEvent, readLocalRepositoryFingerprint } from "../lib/governance-event-store.mjs";
 import { queryHumanGovernanceDecisions } from "../lib/human-governance-ledger.mjs";
 import { PO_APPROVAL_PROOF_SCHEMA } from "../lib/po-approval-proof.mjs";
-import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
-import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
 import { livePluginRoots } from "../hooks/guard-gate-strength.mjs";
 import { prepareGuardMaintenanceWindowRequest } from "../lib/guard-maintenance-window.mjs";
 import { run } from "./guard-maintenance-window.mjs";
@@ -103,8 +101,11 @@ async function fixture() {
   execFileSync("git", ["init", "-q", root]);
   execFileSync("git", ["-C", root, "add", "-A"]);
   execFileSync("git", ["-C", root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "fixture"]);
-  const repository = discoverRepository(root);
-  const fingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: repository.commonDir, primaryRoot: repository.primaryRoot });
+  // NVA-REPOID-3: the store's bound identity, matching what
+  // scripts/guard-maintenance-window.mjs's repositoryFingerprintFor() itself
+  // now reads (readLocalRepositoryFingerprint) -- not the legacy path-derived
+  // hash.
+  const fingerprint = await readLocalRepositoryFingerprint({ repositoryRoot: root });
   await mkdir(path.join(root, "governance/events"), { recursive: true });
   await writeFile(path.join(root, "governance/events/registry.json"), `${canonicalizeJson(registry(fingerprint))}\n`);
   await writeFile(path.join(root, "governance/events/capture-policy.json"), `${canonicalizeJson(capturePolicy())}\n`);

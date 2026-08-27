@@ -91,8 +91,7 @@ import {
   prepareGuardMaintenanceWindowRequest,
 } from "../lib/guard-maintenance-window.mjs";
 import { canonicalSha256, parseStrictJson, sealGovernanceEvent } from "../lib/governance-event.mjs";
-import { createRestrictedAuthorization, putRestrictedGovernanceEvent } from "../lib/governance-event-store.mjs";
-import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
+import { createRestrictedAuthorization, putRestrictedGovernanceEvent, readLocalRepositoryFingerprint } from "../lib/governance-event-store.mjs";
 import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
 import { appendHumanGovernanceDecision, queryHumanGovernanceDecisions } from "../lib/human-governance-ledger.mjs";
 import {
@@ -241,10 +240,19 @@ async function appendWindowAttribution({ repo, fingerprint, rationale, reasonCod
 // at its own top for its physical-safety primitives).
 // ---------------------------------------------------------------------------------
 
-/** The AUTHORITATIVE repository identity -- never the raw `--repo-root` string. */
-function repositoryFingerprintFor(rootDir) {
+/**
+ * The AUTHORITATIVE repository identity -- never the raw `--repo-root` string,
+ * and (NVA-REPOID-3) never the path-derived `derivePoGateRepositoryFingerprint`
+ * hash either. Every governance-event-store.mjs call below requires the
+ * store's own bound identity (`readLocalRepositoryFingerprint`,
+ * bind-on-first-use, f7623bca) -- passing the legacy derived hash instead
+ * fails every one of them closed with GES-CROSS-REPOSITORY, aborting `install`
+ * before the window ever arms (confirmed empirically by this dispatch,
+ * NVA-REPOID-3, against this file's own guard-maintenance-window.test.mjs).
+ */
+async function repositoryFingerprintFor(rootDir) {
   const repo = discoverRepository(rootDir);
-  return { repo, fingerprint: derivePoGateRepositoryFingerprint({ gitCommonDir: repo.commonDir, primaryRoot: repo.primaryRoot }) };
+  return { repo, fingerprint: await readLocalRepositoryFingerprint({ repositoryRoot: repo.primaryRoot }) };
 }
 
 function capturePolicyDigestFor(primaryRoot) {
@@ -386,7 +394,7 @@ export async function run(argv = process.argv.slice(2)) {
     // portable human-governance ledger BEFORE arming, using the AUTHORITATIVE repository
     // identity -- never the raw `rootDir` string (the same F2 discipline
     // scripts/human-authority-grant.mjs already applies).
-    const { repo, fingerprint } = repositoryFingerprintFor(rootDir);
+    const { repo, fingerprint } = await repositoryFingerprintFor(rootDir);
     const nowMs = Date.now();
     const intentSha256 = request?.intent?.sha256;
     const plan = { path: args.plan, sha256: sha256(readPublicRepositoryFile(repo.primaryRoot, args.plan)) };
@@ -478,7 +486,7 @@ export async function run(argv = process.argv.slice(2)) {
     let ledger = null;
     if ((priorWindow.status === "active" || priorWindow.status === "expired") && typeof priorWindow.intentSha256 === "string") {
       try {
-        const { repo, fingerprint } = repositoryFingerprintFor(rootDir);
+        const { repo, fingerprint } = await repositoryFingerprintFor(rootDir);
         const intentSha256 = priorWindow.intentSha256;
         const reqId = requestDecisionId({ intentSha256 });
         const { decisions } = await queryHumanGovernanceDecisions({ repositoryRoot: repo.primaryRoot, repositoryFingerprint: fingerprint });
