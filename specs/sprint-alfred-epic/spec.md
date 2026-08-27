@@ -60,10 +60,15 @@ Frozen families (shapes in §9):
 | Module/contract receipt | `pipeline.module-interaction-receipt.v1` | D2 | B1, D3 |
 | Rigor derivation | `pipeline.rigor-derivation.v1` | B1 | E2 |
 | Adoption state + proposal | `pipeline.adoption-state.v1` / `-proposal.v1` | D4 | B1, E2 |
+| Verify-suite registration | `pipeline.verify-suite-registration.v1` | B2-ii | every WP (§12 registration duty), C2, D3 |
 
 Freeze rules: a revision bump after freeze is a PO-visible decision recorded
 in the freeze artifact's own append-only `revisions[]`; consumers pin the
 digest they were built against; E2 verifies all pins agree at qualification.
+C2's consolidation fields on the registration schema (`invariantPinned`,
+`nonOverlapNote`, §6.2) are a pre-declared revision of exactly this kind,
+landed through that `revisions[]` mechanism when C2 ships — not an unpinned
+mid-sprint shape change.
 
 ## 4. Track A — Enforcement ground truth and control integrity
 
@@ -92,9 +97,14 @@ plus its Verify-registered check + fixtures.
 
 **Consumption.** The record is required input to A2; the stale `$comment` in
 `plugins/pipeline-core/hooks/hooks.json` (which asserts subagent hooks fire)
-is replaced by a pointer to the record (TP-4 ceremony via B2-ii's batbatchable
-route). Probe re-runs are cheap and mandatory on runner/plugin version
-change; the record carries `{runnerVersion, pluginVersion, measuredAt}`.
+is replaced by a pointer to the record. That file is TP-4 — its own protected
+class, which B2-ii's route does not cover (B2-ii exists solely for TP-3 suite
+registration and lands a wave later) — so the replacement is one contiguous
+edit performed through the existing human-guard-override signature ceremony,
+scheduled inside A1's own Wave-0 slot; no new authorization route is designed
+or required for it. Probe re-runs are cheap and mandatory on runner/plugin
+version change; the record carries `{runnerVersion, pluginVersion,
+measuredAt}`.
 A1 also produces the minimal reproduction for an upstream runner report
 (PRD §6: reported, not owned).
 
@@ -332,9 +342,11 @@ A1 subagent-hook finding.
   code + normalized category, classification + derivation revision,
   timestamps, blocked wall time, attempt/recovery counts, resolution
   reference, candidate binding, collection status).
-- Seed registry entries include the four 2026-08-27 measured classes
-  (read-only-refusal; TP-ceremony wait as `external-wait`; dispatch
-  truncation; readiness-`partial` deadlock) so dogfood starts on real codes.
+- Seed registry entries include the four interruption classes measured live
+  in this repository (read-only-refusal and the readiness-`partial`
+  deadlock, both 2026-08-27; TP-ceremony wait as `external-wait`,
+  2026-08-18; dispatch truncation, 2026-08-08 — provenance in
+  `design/issue-intake.md` #103) so dogfood starts on real codes.
 - Privacy: no prompts/transcripts/secrets/private paths; receipts live under
   the ignored `evidence/` root, aggregates under `telemetry/`.
 - **Dogfood clock:** first wave lands it; `interruption-baseline.json`
@@ -381,8 +393,8 @@ recommendation, policy already encoded).
 
 **Deliverables:** significance rubric + assessment
 (`plugins/pipeline-core/scripts/architecture-baseline.mjs`), decision skill
-(`skills/architecture-decision/`), decision-record schema, close-path impact
-recording, adoption flow, fixtures.
+(`plugins/pipeline-core/skills/architecture-decision/`), decision-record
+schema, close-path impact recording, adoption flow, fixtures.
 
 - **Rubric:** deterministic checklist over the five #99 significance axes;
   output one of `initial-adr-required | architecture-baseline-sufficient |
@@ -564,6 +576,14 @@ All closed records per §2; all evidence candidate-bound per Nova §2.2.
   `acceptance.md` maps each to its suite.
 - E2 runs full Verify + security gate + Critic reviews per block (house
   rules unchanged); the sprint adds no bypass of any existing gate.
+- **Design-phase review duty (PO constraint, `design/po-input-2026-08-27.md`
+  item 3):** every design document of this epic — the `design/*.md` intake
+  set, the PRD, this specification, `acceptance.md` — receives at least one
+  independent Critic round before PO review, with fail-then-fix cycles
+  documented under `evidence/critic/` and re-review rounds bounded by
+  `templates/prompts/critic-review.md` (at most four rounds per package).
+  §13's wave-completion predicate extends the same bar to implementation
+  deliverables.
 
 ## 13. Readiness and completion predicates
 
