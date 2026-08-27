@@ -326,6 +326,59 @@ try {
     assert.equal(result.ok, false, "an unrelated outstanding finding must still block -- never a blanket bypass");
     assert.equal(result.wrote, false);
   });
+
+  // F2 (backlog/items/2026-08-27-phoenix-merge-re-critic-minor-findings.md): checkPhoenixHistoryImmutable
+  // was reachable by no existing fixture -- fixture() never populates the archival path, so both its
+  // branches ran untested. These three cases build a fixture that actually contains the path.
+  check("CBS11 checkPhoenixHistoryImmutable stands down cleanly when the archival path is absent", () => {
+    const { base } = fixture({
+      items: [ITEM("omicron", "open")],
+      events: [{ id: "pipeline.omicron", from: null, to: "open", reference: "2026-07-20-omicron.md", commit: "a".repeat(40) }],
+    });
+    const written = writeBacklogProjections(base);
+    assert.equal(written.ok, true, written.findings.join("; "));
+    // fixture() never writes backlog/transitions-phoenix-history.ndjson -- the presence gate itself.
+    const result = checkBacklogState(base);
+    assert.equal(result.ok, true, result.findings.join("; "));
+    assert.ok(!result.findings.some((finding) => finding.includes("transitions-phoenix-history.ndjson")), result.findings.join("; "));
+  });
+
+  check("CBS12 checkPhoenixHistoryImmutable blocks as INTEGRITY when the archived bytes drift from the pin", () => {
+    const { base } = fixture({
+      items: [ITEM("pi", "open")],
+      events: [{ id: "pipeline.pi", from: null, to: "open", reference: "2026-07-20-pi.md", commit: "a".repeat(40) }],
+    });
+    writeFileSync(join(base, "backlog", "transitions-phoenix-history.ndjson"), "not the preserved Phoenix archive bytes\n");
+    const result = checkBacklogState(base);
+    assert.equal(result.ok, false, "byte drift on the archived Phoenix ledger tail must block");
+    assert.match(
+      result.findings.join("\n"),
+      /backlog\/transitions-phoenix-history\.ndjson: bytes changed since the Nova\/Phoenix merge \(expected sha256 [0-9a-f]{64}, got [0-9a-f]{64}\); this file is an immutable archived copy and must never be edited or appended to/u,
+    );
+    // INTEGRITY, never DRIFT: it must decide `ok`, not merely be reported alongside it.
+    assert.ok(
+      !(result.drift ?? []).some((entry) => entry.finding.includes("transitions-phoenix-history.ndjson")),
+      "archival-pin drift must never be classified as ledger DRIFT",
+    );
+  });
+
+  check("CBS13 checkPhoenixHistoryImmutable holds when the archived bytes match the real, currently-pinned copy", () => {
+    const { base } = fixture({
+      items: [ITEM("rho", "open")],
+      events: [{ id: "pipeline.rho", from: null, to: "open", reference: "2026-07-20-rho.md", commit: "a".repeat(40) }],
+    });
+    // Real production bytes, copied rather than a second hardcoded digest -- this proves today's
+    // real archival file still matches its own pin, the same fact F1's own text records.
+    cpSync(
+      join(REPO_ROOT, "backlog", "transitions-phoenix-history.ndjson"),
+      join(base, "backlog", "transitions-phoenix-history.ndjson"),
+    );
+    const written = writeBacklogProjections(base);
+    assert.equal(written.ok, true, written.findings.join("; "));
+    const result = checkBacklogState(base);
+    assert.equal(result.ok, true, result.findings.join("; "));
+    assert.ok(!result.findings.some((finding) => finding.includes("bytes changed since the Nova/Phoenix merge")), result.findings.join("; "));
+  });
 } finally {
   console.log(`${passed} passed, ${failed} failed`);
 }
