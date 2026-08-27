@@ -21,10 +21,14 @@
  * -- see that constant's own comment for the exact ADR lines and why "Cyborg" is deliberately
  * excluded.
  *
- * EXIT CODES: 0 = every declared `sprint` value (if any) is in the closed set. Items with NO
- * declaration are counted and reported, never a failure -- assigning all of them is a separate
- * human triage pass that has not happened yet (see backlog/README.md). 1 = at least one item
- * declares a `sprint` value outside the closed set, or the items directory itself could not be
+ * EXIT CODES (revised NVA-SPRINTGATE-1): 0 = every declared `sprint` value (if any) is in the
+ * closed set, and every `open` item declares one. A `closed`/`in_progress`/`rejected`/`deferred`
+ * item with no `sprint` is still counted and reported, never a failure -- that stays the human
+ * triage pass this comment used to describe as "not happened yet". It has now happened for the
+ * one status that matters mechanically: commit 6d81b33b (2026-08-27) declared a sprint for all
+ * 47 items that were `open` at the time, so the rule for `open` items graduates from reported to
+ * enforced. 1 = at least one `open` item declares no `sprint`, at least one item declares a
+ * `sprint` value outside the closed set, or the items directory itself could not be
  * enumerated/read.
  *
  * Usage:
@@ -50,6 +54,7 @@ export function checkBacklogSprintAssignment(root = DEFAULT_ROOT) {
   const findings = [];
   const counts = Object.fromEntries(BACKLOG_SPRINTS.map((sprint) => [sprint, 0]));
   const undeclaredItems = [];
+  const openUndeclaredItems = [];
   let itemNames = [];
   try {
     itemNames = readdirSync(join(root, ITEMS_DIR), { withFileTypes: true })
@@ -57,7 +62,7 @@ export function checkBacklogSprintAssignment(root = DEFAULT_ROOT) {
       .map((entry) => entry.name)
       .sort((left, right) => left.localeCompare(right));
   } catch (error) {
-    return { ok: false, findings: [`${ITEMS_DIR} is missing or unreadable: ${error.message}`], counts, undeclared: 0, undeclaredItems, total: 0 };
+    return { ok: false, findings: [`${ITEMS_DIR} is missing or unreadable: ${error.message}`], counts, undeclared: 0, undeclaredItems, openUndeclared: 0, openUndeclaredItems, total: 0 };
   }
   for (const name of itemNames) {
     const repoPath = `${ITEMS_DIR}/${name}`;
@@ -72,6 +77,12 @@ export function checkBacklogSprintAssignment(root = DEFAULT_ROOT) {
     const sprint = parsed.item?.metadata?.sprint;
     if (sprint === undefined) {
       undeclaredItems.push(repoPath);
+      // NVA-SPRINTGATE-1: an `open` item with no `sprint` declaration is a failure -- every
+      // other status keeps today's report-only behaviour (see EXIT CODES above).
+      if (parsed.item?.metadata?.status === "open") {
+        openUndeclaredItems.push(repoPath);
+        findings.push(`${repoPath}: status is open but declares no sprint`);
+      }
       continue;
     }
     if (!BACKLOG_SPRINTS.includes(sprint)) {
@@ -80,7 +91,16 @@ export function checkBacklogSprintAssignment(root = DEFAULT_ROOT) {
     }
     counts[sprint] += 1;
   }
-  return { ok: findings.length === 0, findings, counts, undeclared: undeclaredItems.length, undeclaredItems, total: itemNames.length };
+  return {
+    ok: findings.length === 0,
+    findings,
+    counts,
+    undeclared: undeclaredItems.length,
+    undeclaredItems,
+    openUndeclared: openUndeclaredItems.length,
+    openUndeclaredItems,
+    total: itemNames.length,
+  };
 }
 
 function main(argv) {
@@ -94,6 +114,7 @@ function main(argv) {
     `backlog items enumerated: ${result.total}`,
     ...BACKLOG_SPRINTS.map((sprint) => `- ${sprint}: ${result.counts[sprint]}`),
     `- undeclared: ${result.undeclared}`,
+    `- undeclared and open (failing): ${result.openUndeclared}`,
   ];
   process.stdout.write(`${lines.join("\n")}\n`);
   if (result.findings.length > 0) {

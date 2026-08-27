@@ -59,20 +59,44 @@ test("checkBacklogSprintAssignment: an unrecognized sprint value is a finding an
   assert.equal(result.undeclared, 0);
 });
 
-test("checkBacklogSprintAssignment: an item with no sprint field is reported, not a failure, and exit stays ok", () => {
-  const root = fixture([ITEM("no-sprint-item")]);
+test("checkBacklogSprintAssignment: a non-open item with no sprint field is reported, not a failure, and exit stays ok", () => {
+  const root = fixture([ITEM("no-sprint-item", { status: "deferred" })]);
   const result = checkBacklogSprintAssignment(root);
   assert.equal(result.ok, true);
   assert.deepEqual(result.findings, []);
   assert.equal(result.undeclared, 1);
   assert.deepEqual(result.undeclaredItems, ["backlog/items/2026-08-27-no-sprint-item.md"]);
+  assert.equal(result.openUndeclared, 0);
+  assert.deepEqual(result.openUndeclaredItems, []);
+});
+
+// NVA-SPRINTGATE-1: the sprint declaration is now mandatory, mechanically, for `open` items.
+test("checkBacklogSprintAssignment: an open item with no sprint field is a finding and fails", () => {
+  const root = fixture([ITEM("open-no-sprint-item")]);
+  const result = checkBacklogSprintAssignment(root);
+  assert.equal(result.ok, false);
+  assert.equal(result.findings.length, 1);
+  assert.match(result.findings[0], /status is open but declares no sprint/);
+  assert.equal(result.undeclared, 1);
+  assert.deepEqual(result.undeclaredItems, ["backlog/items/2026-08-27-open-no-sprint-item.md"]);
+  assert.equal(result.openUndeclared, 1);
+  assert.deepEqual(result.openUndeclaredItems, ["backlog/items/2026-08-27-open-no-sprint-item.md"]);
+});
+
+test("checkBacklogSprintAssignment: an open item with a valid declared sprint produces no finding", () => {
+  const root = fixture([ITEM("open-valid-sprint-item", { sprint: "batman" })]);
+  const result = checkBacklogSprintAssignment(root);
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.findings, []);
+  assert.equal(result.openUndeclared, 0);
+  assert.deepEqual(result.openUndeclaredItems, []);
 });
 
 test("checkBacklogSprintAssignment: a mix of declared/undeclared/invalid items counts each bucket independently", () => {
   const root = fixture([
     ITEM("mix-a", { sprint: "alfred" }),
     ITEM("mix-b", { sprint: "alfred" }),
-    ITEM("mix-c"),
+    ITEM("mix-c", { status: "in_progress" }),
     ITEM("mix-d", { sprint: "not-a-real-sprint" }),
   ]);
   const result = checkBacklogSprintAssignment(root);
@@ -81,6 +105,7 @@ test("checkBacklogSprintAssignment: a mix of declared/undeclared/invalid items c
   assert.equal(result.undeclared, 1);
   assert.equal(result.findings.length, 1);
   assert.equal(result.total, 4);
+  assert.equal(result.openUndeclared, 0, "mix-c is non-open, so it must not count as an open-undeclared finding");
 });
 
 test("checkBacklogSprintAssignment: the real repository exits ok today", () => {
