@@ -291,6 +291,8 @@
 | pipeline.po-approval-request-verify-still-rejects-a-fresh-setup1-authority | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.po-authority-decision-prd-candidate-static | deferred | defect | pipeline | 2026-08-08 | — |
 | pipeline.po-authority-rebind-plan-checks-for-the-wrong-plan-approval-schema-version | closed | defect | pipeline | 2026-08-19 | — |
+| pipeline.po-decision-bs26-unsatisfiable-under-the-phoenix-ledger-split | open | decision | po | 2026-08-27 | — |
+| pipeline.po-decision-claude-start-time-item-closed-on-a-rejected-approach | open | decision | po | 2026-08-27 | — |
 | pipeline.po-gate-authority-path-canonicalization | closed | defect | pipeline | 2026-07-25 | — |
 | pipeline.po-gate-authority-receipt-readback | closed | defect | pipeline | 2026-07-25 | — |
 | pipeline.po-gate-worktree-authority | closed | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
@@ -431,7 +433,7 @@
 
 ## Counts
 
-- open: 39
+- open: 41
 - in_progress: 5
 - closed: 367
 - rejected: 1

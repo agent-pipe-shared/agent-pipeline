@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "4cbbcabeda1b85911654ce902e5072074c61ccd88136be75fa063ba0060f17b6"
+    "transitionHead": "71feb1ee8b3874522432a3798e3cb751f8f243602cebba6e716daf423f0953d2"
   },
   "counts": {
-    "open": 39,
+    "open": 41,
     "in_progress": 5,
     "closed": 367,
     "rejected": 1,
@@ -3587,6 +3587,24 @@
       "closureRepository": "self",
       "closureCommit": "2dd82be31765992217e6a3eecab4aab38d2cc49b",
       "closureEvidence": "backlog/items/2026-08-19-po-authority-rebind-plan-checks-for-the-wrong-plan-approval-schema-version.md"
+    },
+    {
+      "id": "pipeline.po-decision-bs26-unsatisfiable-under-the-phoenix-ledger-split",
+      "status": "open",
+      "type": "decision",
+      "owner": "po",
+      "created": "2026-08-27",
+      "source": "Phoenix merge, dispatch VFX3-BACKLOG plus direct verification, 2026-08-26",
+      "deferred": false
+    },
+    {
+      "id": "pipeline.po-decision-claude-start-time-item-closed-on-a-rejected-approach",
+      "status": "open",
+      "type": "decision",
+      "owner": "po",
+      "created": "2026-08-27",
+      "source": "Phoenix merge conflict resolution, dispatch PHX-ITEMS-2, 2026-08-26",
+      "deferred": false
     },
     {
       "id": "pipeline.po-gate-authority-path-canonicalization",
