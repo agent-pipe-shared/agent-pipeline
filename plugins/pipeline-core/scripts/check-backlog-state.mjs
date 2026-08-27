@@ -1007,10 +1007,32 @@ export function applyManagedOnboardingLedgerRepair(root = DEFAULT_ROOT, input, o
   return transaction.ok ? { ...current, ok: true, findings: [], wrote: true, transition: planned.event } : { ...current, ok: false, findings: transaction.findings, wrote: false, transition: null };
 }
 
-/** Append one item-hash-rescope-amendment; never touches the amended event or the item file. */
+/**
+ * Append one item-hash-rescope-amendment; never touches the amended event or
+ * the item file. ADR-0068 D4's corrective use re-binds a stale pin after a
+ * merge moved the item's bytes -- exactly the condition that makes
+ * checkBacklogState itself report the pin as broken. The precondition below
+ * therefore tolerates ONLY the specific stale-pin finding THIS call's own
+ * amendsSequence/id would resolve (bound to a real target event, never a
+ * blanket `!current.ok` bypass); any other outstanding finding still blocks
+ * -- same discipline as applyItemHashAmendment above.
+ */
 export function applyBacklogItemHashRescopeAmendment(root = DEFAULT_ROOT, input, options = {}) {
   const current = checkBacklogState(root, options);
-  if (!current.ok) return { ...current, wrote: false, transition: null };
+  if (!current.ok) {
+    const target = Number.isSafeInteger(input?.amendsSequence)
+      ? current.events.find((event) => event?.sequence === input.amendsSequence && event?.id === input?.id && event?.evidence?.kind === "missing-initial-ledger-repair")
+      : undefined;
+    const expectedFindings = target
+      ? [
+          `ledger event ${input.amendsSequence}: itemSha256 does not bind the current item bytes`,
+          `ledger event ${input.amendsSequence}: item-hash-rescope-amendment itemSha256 does not bind the current item's pre-Triage bytes`,
+        ]
+      : [];
+    if (!target || current.findings.length !== 1 || !expectedFindings.includes(current.findings[0])) {
+      return { ...current, ok: false, findings: ["item hash rescope amendment requires its own target's exact stale-pin finding, with nothing else outstanding", ...current.findings], wrote: false, transition: null };
+    }
+  }
   const planned = planBacklogItemHashRescopeAmendment(current.items, current.events, input);
   if (!planned.ok) return { ...current, ok: false, findings: planned.errors, wrote: false, transition: null };
   const item = current.items.find((entry) => entry.metadata.id === input.id);

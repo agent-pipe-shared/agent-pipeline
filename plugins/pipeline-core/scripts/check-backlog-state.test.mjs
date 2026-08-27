@@ -2,13 +2,14 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { canonicalJson, transitionHash } from "../lib/backlog-state.mjs";
-import { checkBacklogState, writeBacklogProjections } from "./check-backlog-state.mjs";
+import { canonicalJson, itemPreTriageContent, transitionHash } from "../lib/backlog-state.mjs";
+import { applyBacklogItemHashRescopeAmendment, checkBacklogState, writeBacklogProjections } from "./check-backlog-state.mjs";
 
 const REPO_ROOT = resolve(fileURLToPath(new URL("../../..", import.meta.url)));
 
@@ -74,7 +75,7 @@ function fixture({ items = [], events = [] } = {}) {
       at: event.at ?? "2026-07-20",
       actor: event.actor ?? "fixture",
       reason: "fixture baseline",
-      evidence: { kind: event.kind ?? "fixture", commit: event.commit, reference: `backlog/items/${event.reference}` },
+      evidence: { kind: event.kind ?? "fixture", commit: event.commit, reference: `backlog/items/${event.reference}`, ...(event.evidenceExtra ?? {}) },
       previousHash: chain.length === 0 ? null : chain.at(-1).entryHash,
       entryHash: "",
     };
@@ -92,6 +93,43 @@ const ITEM = (id, status, extra = {}) => ({
   metadata: {
     id: `pipeline.${id}`, type: "defect", owner: "pipeline", status,
     created: "2026-07-20", source: "fixture", ...extra,
+  },
+});
+
+/**
+ * ADR-0068 D4 regression fixture: a managed-onboarding-success-contract item
+ * whose missing-initial-ledger-repair pin (ledger event 1) does not bind the
+ * item's current bytes -- the exact self-lock condition
+ * applyBacklogItemHashRescopeAmendment exists to repair. `extraItems` lets a
+ * caller add an item with no ledger entry of its own, to prove an unrelated
+ * outstanding finding still blocks the repair rather than a blanket bypass.
+ */
+function managedOnboardingStalePinFixture(extraItems = []) {
+  const { base } = fixture({
+    items: [ITEM("managed-onboarding-success-contract", "open"), ...extraItems],
+    events: [{
+      id: "pipeline.managed-onboarding-success-contract", from: null, to: "open",
+      reference: "2026-07-20-managed-onboarding-success-contract.md",
+      commit: "a".repeat(40), actor: "hotfix-047-missing-initial-ledger-repair", kind: "missing-initial-ledger-repair",
+      evidenceExtra: { itemSha256: "f".repeat(64) }, // deliberately stale: never the real item bytes
+    }],
+  });
+  const itemBytes = readFileSync(join(base, "backlog", "items", "2026-07-20-managed-onboarding-success-contract.md"), "utf8");
+  const itemSha256 = createHash("sha256").update(itemPreTriageContent(itemBytes)).digest("hex");
+  return { base, itemSha256 };
+}
+
+const RESCOPE_INPUT = (base, itemSha256) => ({
+  root: base,
+  input: {
+    id: "pipeline.managed-onboarding-success-contract",
+    amendsSequence: 1,
+    scope: "pre-triage",
+    itemSha256,
+    at: "2026-07-27",
+    actor: "test-rescope",
+    reason: "regression fixture re-binds the pin to the current bytes",
+    rationale: "regression fixture re-binds the pin to the current bytes",
   },
 });
 
@@ -256,6 +294,37 @@ try {
     assert.equal(result.ok, false, "a tampered previousHash must still block — no severity regression");
     assert.match(result.findings.join("\n"), /previousHash does not bind the preceding ledger event/u);
     assert.ok(!(result.drift ?? []).some((entry) => entry.finding.includes("previousHash")), "hash-chain tampering must never be classified drift");
+  });
+
+  // ADR-0068 D4: the sanctioned repair path must not lock itself out the
+  // moment the damage it exists to repair actually occurs.
+  check("CBS09 applyBacklogItemHashRescopeAmendment succeeds when the only outstanding finding is the stale pin it resolves", () => {
+    const { base, itemSha256 } = managedOnboardingStalePinFixture();
+    const before = checkBacklogState(base);
+    assert.equal(before.ok, false, "fixture setup must reproduce the self-lock precondition");
+    assert.deepEqual(before.findings, ["ledger event 1: itemSha256 does not bind the current item bytes"]);
+    const { root, input } = RESCOPE_INPUT(base, itemSha256);
+    const result = applyBacklogItemHashRescopeAmendment(root, input);
+    assert.equal(result.ok, true, (result.findings ?? []).join("; "));
+    assert.equal(result.wrote, true);
+    assert.equal(result.transition?.evidence?.kind, "item-hash-rescope-amendment");
+    assert.equal(result.transition?.evidence?.amendsSequence, 1);
+    const after = checkBacklogState(base);
+    assert.equal(after.ok, true, after.findings.join("; "));
+  });
+
+  // Negative direction: a genuinely unrelated outstanding finding must still
+  // block -- proving the tolerance is bound to this call's own
+  // amendsSequence/id, never a blanket `!current.ok` bypass.
+  check("CBS10 applyBacklogItemHashRescopeAmendment still refuses when an unrelated finding is also outstanding", () => {
+    const { base, itemSha256 } = managedOnboardingStalePinFixture([ITEM("rescope-unrelated-orphan", "open")]);
+    const before = checkBacklogState(base);
+    assert.equal(before.ok, false);
+    assert.equal(before.findings.length, 2, before.findings.join("; "));
+    const { root, input } = RESCOPE_INPUT(base, itemSha256);
+    const result = applyBacklogItemHashRescopeAmendment(root, input);
+    assert.equal(result.ok, false, "an unrelated outstanding finding must still block -- never a blanket bypass");
+    assert.equal(result.wrote, false);
   });
 } finally {
   console.log(`${passed} passed, ${failed} failed`);
