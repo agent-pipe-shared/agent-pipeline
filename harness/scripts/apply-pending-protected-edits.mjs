@@ -224,6 +224,17 @@ const VERIFY_REGISTRATIONS = [
     line: '  { name: "pipeline-user-v3-drift-tests", file: join(libDir, "pipeline-user-v3-drift.test.mjs") },',
     file: join(REPO_ROOT, "plugins", "pipeline-core", "lib", "pipeline-user-v3-drift.test.mjs"),
   },
+  // Added 2026-08-27 (NVA-AGYHOOKS-1). Pins the handler shape of all three
+  // runner hook manifests (Claude, Codex, Antigravity) and confirms every
+  // declared command references a hook script that exists on disk -- the
+  // first suite to cover plugins/pipeline-core/hooks.json (the Antigravity
+  // manifest) at all, closing the D-2 gap named in
+  // scratch/ANALYSIS-agy-retro-2026-08-27.md. 12/12 green.
+  {
+    name: "hooks-manifest-shape-tests",
+    line: '  { name: "hooks-manifest-shape-tests", file: join(hooksDir, "hooks-manifest-shape.test.mjs") },',
+    file: join(REPO_ROOT, "plugins", "pipeline-core", "hooks", "hooks-manifest-shape.test.mjs"),
+  },
 ];
 
 // The terminator moves every time a batch is registered, so this constant is
