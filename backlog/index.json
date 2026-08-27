@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "1e01ff919892d982629a275715c16177a8cbb7a213719e06cff9041982806a7b"
+    "transitionHead": "afd986370d88e0286d3c81bc49b0c5006d55784b963a45eff69d404b039a9933"
   },
   "counts": {
-    "open": 39,
+    "open": 41,
     "in_progress": 5,
     "closed": 373,
     "rejected": 1,
@@ -3115,6 +3115,15 @@
       "closureEvidence": "backlog/items/2026-08-18-new-docs-file-needs-governance-registry-rule-has-no-repo-level-home.md"
     },
     {
+      "id": "pipeline.nine-test-suites-run-in-no-verify-invocation",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-27",
+      "source": "SUITEGAP-1, scratch/SUITEGAP-report.md, 2026-08-27 — measurement via node plugins/pipeline-core/scripts/check-suite-registration.mjs",
+      "deferred": false
+    },
+    {
       "id": "pipeline.no-check-validates-prose-section-citations",
       "status": "closed",
       "type": "workflow-improvement",
@@ -3439,6 +3448,15 @@
       "closureRepository": "self",
       "closureCommit": "67335361ad70924cd5668db72d994c152f2db035",
       "closureEvidence": "backlog/items/2026-08-17-partial-lifecycle-blocks-read-only-diagnosis-and-tmp-fallback.md"
+    },
+    {
+      "id": "pipeline.path-bound-fingerprints-break-across-windows-wsl-access",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-27",
+      "source": "NVA-PATHBIND-AUDIT-1, scratch/PATHBIND-audit.md, 2026-08-27 — read-only audit of every path-derived identifier used in durable state",
+      "deferred": false
     },
     {
       "id": "pipeline.per-phase-progress-message-budget",

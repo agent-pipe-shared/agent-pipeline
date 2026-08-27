@@ -254,6 +254,7 @@
 | pipeline.native-windows-verify-red-suite-class | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.neutral-authority-tier-is-a-frozen-snapshot-the-compiler-never-updates | closed | defect | pipeline | 2026-08-06 | — |
 | pipeline.new-docs-file-needs-governance-registry-rule-has-no-repo-level-home | closed | workflow-improvement | pipeline | 2026-08-18 | — |
+| pipeline.nine-test-suites-run-in-no-verify-invocation | open | defect | pipeline | 2026-08-27 | — |
 | pipeline.no-check-validates-prose-section-citations | closed | workflow-improvement | pipeline | 2026-08-07 | — |
 | pipeline.no-design-to-implementation-handover-exists | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.no-durable-practice-for-mining-session-transcripts-for-happy-path-defects | closed | workflow-improvement | pipeline | 2026-08-09 | — |
@@ -279,6 +280,7 @@
 | pipeline.parallel-goldfish-dispatches-race-on-shared-checkout | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.part-a-limitation-2-orphaned-by-the-r2-rework | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.partial-lifecycle-blocks-read-only-diagnosis-and-tmp-fallback | closed | defect | pipeline | 2026-08-17 | — |
+| pipeline.path-bound-fingerprints-break-across-windows-wsl-access | open | defect | pipeline | 2026-08-27 | — |
 | pipeline.per-phase-progress-message-budget | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.permitted-edit-drops-session-into-unrecoverable-readiness | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.phase-aware-bootstrap-readiness | closed | workflow-improvement | pipeline | 2026-08-18 | — |
@@ -437,7 +439,7 @@
 
 ## Counts
 
-- open: 39
+- open: 41
 - in_progress: 5
 - closed: 373
 - rejected: 1
