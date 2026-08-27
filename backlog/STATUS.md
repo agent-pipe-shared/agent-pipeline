@@ -9,6 +9,7 @@
 | pipeline.a-captured-resume-hint-card-reds-the-verify-gate-until-another-session-consumes-it | open | defect | pipeline | 2026-08-31 | — |
 | pipeline.a-change-creates-an-obligation-elsewhere-that-only-a-gate-run-reveals | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.a-checkout-that-cannot-be-clean-defeats-every-cleanliness-gate | closed | defect | pipeline | 2026-08-08 | — |
+| pipeline.a-closed-result-can-be-amended-after-close-with-no-detection-and-no-repair | open | defect | pipeline | 2026-08-27 | — |
 | pipeline.a-critic-has-no-writable-location-for-its-own-report | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.a-deferred-item-is-terminal-so-a-live-defect-can-be-parked-invisibly | open | defect | pipeline | 2026-08-31 | — |
 | pipeline.a-dirty-claude-directory-blocks-verify-which-blocks-push-approval | closed | defect | pipeline | 2026-08-29 | — |
@@ -162,6 +163,7 @@
 | pipeline.decouple-hosted-project-document-language-from-operator-facing-language | closed | workflow-improvement | pipeline | 2026-08-09 | — |
 | pipeline.delivery-is-not-always-a-git-push | open | workflow-improvement | pipeline | 2026-08-28 | Batman (PO decision 2026-08-29) — gate model extension to cover non-agent-invoked deploys, scheduled for Batman, not blocking the Nova/0.6.0 candidate |
 | pipeline.design-to-implementation-path-has-no-driver | closed | workflow-improvement | pipeline | 2026-08-28 | Nova A — re-prioritized 2026-08-30, retrospective-analysis follow-up item #4 ('ja das brauchen wir') |
+| pipeline.discard-feature-writes-a-state-the-cleanup-observer-rejects-and-strands-the-session | open | defect | pipeline | 2026-08-27 | — |
 | pipeline.discarded-feature-dead-end | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — delivered 2026-08-28, same session it was reported |
 | pipeline.dispatch-evidence-record-shape-not-enforced-beyond-taskid-and-outcome | closed | workflow-improvement | pipeline | 2026-08-29 | — |
 | pipeline.dispatch-provenance | closed | workflow-improvement | pipeline | 2026-07-20 | — |
@@ -618,7 +620,7 @@
 
 ## Counts
 
-- open: 104
+- open: 106
 - in_progress: 0
 - closed: 488
 - rejected: 3
