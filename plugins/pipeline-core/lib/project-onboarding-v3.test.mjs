@@ -41,7 +41,7 @@ import { validateV3BootstrapAuthority } from "../scripts/v3-bootstrap-authority.
 import { parseYaml } from "./yaml-lite.mjs";
 import { validatePipelineUserV3 } from "./runner-profiles-v3.mjs";
 import { validCurrentPlanApproval, validPlanSubmission } from "./plan-spec-state-v2.mjs";
-import { main as onboardingCli } from "../scripts/project-onboarding-v3.mjs";
+import { main as onboardingCli, ONBOARDING_SUBCOMMANDS, automatedLifecycleArgvCommands } from "../scripts/project-onboarding-v3.mjs";
 import { main as sessionCleanupCli } from "../scripts/session-cleanup.mjs";
 import { run as pipelineStateRun } from "../scripts/pipeline-state.mjs";
 import {
@@ -348,14 +348,50 @@ function assertBoundedRestartCopyCommand(action) {
   return copy;
 }
 
-function assertDiagnostic(result, code) {
+function assertDiagnostic(result, code, extraKeys = []) {
   assert.equal(result.diagnostics.length, 1);
-  assert.deepEqual(Object.keys(result.diagnostics[0]).sort(), ["code", "guidance", "message", "path"]);
+  assert.deepEqual(Object.keys(result.diagnostics[0]).sort(), ["code", "guidance", "message", "path", ...extraKeys].sort());
   assert.equal(result.diagnostics[0].code, code);
-  for (const value of Object.values(result.diagnostics[0])) {
+  for (const [key, value] of Object.entries(result.diagnostics[0])) {
+    if (extraKeys.includes(key)) continue;
     assert.equal(typeof value, "string");
     assert.equal(/[\r\n]/u.test(value), false);
   }
+}
+
+/**
+ * NVA-SOURCERECOVERY-1: assert the discriminated `repairCommand` field a
+ * source-recovery "unrepairable" diagnostic now always carries. `available:
+ * false` proves the typed "no automated route" shape (a reason distinct from
+ * the diagnostic's own `code`, plus its own human-readable guidance) without
+ * duplicating the diagnostic's message. `available: true` proves the exact
+ * `plan-source-recovery` re-triage command is named -- derived from the CLI's
+ * own registered subcommand table (`ONBOARDING_SUBCOMMANDS`), never a literal
+ * typed into this test, so a future rename of the subcommand or a change to
+ * its declared shape fails this assertion instead of silently drifting.
+ */
+function assertNoAutomatedRepairRoute(repairCommand) {
+  assert.deepEqual(Object.keys(repairCommand).sort(), ["available", "guidance", "reason"]);
+  assert.equal(repairCommand.available, false);
+  assert.equal(repairCommand.reason, "no_automated_repair_route");
+  assert.equal(typeof repairCommand.guidance, "string");
+  assert.match(repairCommand.guidance, /no automated repair route applies/u);
+}
+
+function assertSourceRecoveryRepairCommand(repairCommand, plan, root) {
+  const registered = ONBOARDING_SUBCOMMANDS.find((entry) => entry.name === "plan-source-recovery");
+  assert.ok(registered, "plan-source-recovery must stay registered in the CLI's own subcommand table");
+  assert.equal(registered.flat, true);
+  assert.equal(registered.mutates, false);
+  assert.equal(registered.automatedArgvShape, "lifecycle");
+  assert.ok(automatedLifecycleArgvCommands(ONBOARDING_SUBCOMMANDS).includes(registered.name));
+  assert.equal(repairCommand.available, true);
+  assert.equal(repairCommand.kind, "command");
+  assert.equal(repairCommand.executable, "node");
+  assert.deepEqual(repairCommand.argv, [ONBOARDING_SCRIPT, registered.name, "--root", root]);
+  assert.equal(repairCommand.mutation, false);
+  assert.equal(repairCommand.requiresConfirmation, false);
+  assert.deepEqual(repairCommand.expected, { schema: plan.schema, statuses: ["recoverable", "unrepairable"] });
 }
 
 function treeSnapshot(rootDir) {
@@ -5426,7 +5462,11 @@ test("source recovery planner distinguishes invalid authority and unsupported ru
     const invalidPlan = planProjectOnboardingSourceRecoveryV4({ rootDir: invalid, deps: fakeDeps });
     assert.equal(invalidPlan.status, "unrepairable");
     assert.equal(invalidPlan.category, "invalid-authority");
-    assertDiagnostic(invalidPlan, "source_authority_unrepairable");
+    assertDiagnostic(invalidPlan, "source_authority_unrepairable", ["repairCommand"]);
+    // NVA-SOURCERECOVERY-1: this is the exact live incident -- a session that
+    // reaches this diagnostic must be handed the real plan-source-recovery
+    // invocation, machine-readably, not left to freehand a remedy.
+    assertSourceRecoveryRepairCommand(invalidPlan.diagnostics[0].repairCommand, invalidPlan, invalid);
 
     const seed = planProjectOnboardingV3({ runner: "codex", rootDir: unsupported, deps: fakeDeps });
     assert.equal(applyProjectOnboardingV3(seed, { rootDir: unsupported, activate: true, deps: fakeDeps }).status, "applied");
@@ -5437,7 +5477,11 @@ test("source recovery planner distinguishes invalid authority and unsupported ru
     const unsupportedPlan = planProjectOnboardingSourceRecoveryV4({ rootDir: unsupported, deps: fakeDeps });
     assert.equal(unsupportedPlan.status, "unrepairable");
     assert.equal(unsupportedPlan.category, "unsupported-source-transition");
-    assertDiagnostic(unsupportedPlan, "source_runner_transition_unsupported");
+    assertDiagnostic(unsupportedPlan, "source_runner_transition_unsupported", ["repairCommand"]);
+    // NVA-SOURCERECOVERY-1: this planner explicitly refuses to rewrite the
+    // runner allowlist itself, so no plan-source-recovery command can help --
+    // the typed "no automated route" shape must say so, not point in a circle.
+    assertNoAutomatedRepairRoute(unsupportedPlan.diagnostics[0].repairCommand);
   } finally { dispose(invalid); dispose(unsupported); }
 });
 
@@ -5462,8 +5506,24 @@ test("source recovery planner admits a Claude-default, Claude-invoked current V3
     // the source is genuinely current for the invoking Claude session.
     assert.equal(plan.status, "unrepairable");
     assert.equal(plan.category, "current-authority");
-    assertDiagnostic(plan, "source_is_current");
+    assertDiagnostic(plan, "source_is_current", ["repairCommand"]);
+    // NVA-SOURCERECOVERY-1: the source itself is fine here -- this planner is
+    // not the controlling issue, so it must say plainly that no
+    // plan-source-recovery command is the fix, not hand back a dead command.
+    assertNoAutomatedRepairRoute(plan.diagnostics[0].repairCommand);
   } finally { dispose(path); }
+});
+
+test("NVA-SOURCERECOVERY-1: the recoverable source-recovery paths are unchanged by the repairCommand fix", () => {
+  const legacy = root();
+  try {
+    writeFileSync(join(legacy, "pipeline.user.yaml"), yaml(v0Source()));
+    const plan = planProjectOnboardingSourceRecoveryV4({ runner: "codex", rootDir: legacy, deps: fakeDeps });
+    assert.equal(plan.status, "recoverable");
+    assert.equal(plan.category, "unsupported-source-transition");
+    assert.equal(plan.nextAction?.mutation, false);
+    assertDiagnostic(plan, "legacy_source_transition_required");
+  } finally { dispose(legacy); }
 });
 
 test("owned runtime drift and invalid V3 sources stay in closed lifecycle classifications", () => {

@@ -2889,6 +2889,49 @@ function sourceRecoveryResult({
   };
 }
 
+// Repair-route metadata attached to every "unrepairable" diagnostic this
+// planner returns (NVA-SOURCERECOVERY-1). `repairCommand` is a discriminated
+// union, never absent on an "unrepairable" diagnostic: `available: true`
+// names the exact, real, consumer-invokable `plan-source-recovery`
+// re-triage command for the inspected root (safe to run again once a human
+// has corrected the source externally -- this planner never claims it will
+// silently fix the file's own content); `available: false` states
+// explicitly, in typed form, that no automated repair route applies here and
+// what the human must decide, so a session that reaches this diagnostic is
+// never left to improvise a remedy the way the originating incident
+// documents happened once already (a session that fabricated an unrelated
+// "missing identity block" diagnosis and pointed at a pre-v3 sibling file).
+// The original `message`/`guidance` text on each diagnostic is never
+// replaced by this -- only paired with it.
+const NO_AUTOMATED_REPAIR_ROUTE_REASON = "no_automated_repair_route";
+
+function noAutomatedRepairRoute(guidance) {
+  return { available: false, reason: NO_AUTOMATED_REPAIR_ROUTE_REASON, guidance };
+}
+
+/**
+ * The one real automated route this planner can ever point a diagnostic at:
+ * itself, as a read-only re-triage step. `commandAction`'s own `argv` is
+ * built from `ONBOARDING_SCRIPT` (resolved from `import.meta.url`, never a
+ * source-checkout-only literal) and `lifecycleArgv` (which echoes the
+ * observing runner rather than guessing one, ADR-0051/ADR-0057 R1) -- the
+ * exact same construction `nextAction` already uses elsewhere in this file,
+ * so a test can assert this against the CLI's own registered
+ * `plan-source-recovery` subcommand shape instead of a literal typed here.
+ */
+function sourceRecoveryRepairCommand(root, runner, intent) {
+  return {
+    available: true,
+    ...commandAction(
+      lifecycleArgv([ONBOARDING_SCRIPT, "plan-source-recovery", "--root", root], runner, intent),
+      false,
+      false,
+      SOURCE_RECOVERY_SCHEMA,
+      ["recoverable", "unrepairable"],
+    ),
+  };
+}
+
 /**
  * Diagnose only the source-owning boundary. This read-only planner must end
  * either in one exact sanctioned workflow or an explicit terminal
@@ -2912,12 +2955,17 @@ export function planProjectOnboardingSourceRecoveryV4({
       status: "unrepairable",
       root: null,
       category: "unavailable-evidence",
-      diagnostics: [lifecycleDiagnostic(
-        "$.root",
-        "source_evidence_unavailable",
-        "the source root cannot be observed safely",
-        "restore read access to the canonical physical project root",
-      )],
+      diagnostics: [{
+        ...lifecycleDiagnostic(
+          "$.root",
+          "source_evidence_unavailable",
+          "the source root cannot be observed safely",
+          "restore read access to the canonical physical project root",
+        ),
+        repairCommand: noAutomatedRepairRoute(
+          "no automated repair route applies: this planner cannot resolve the project root at all, so it cannot even re-triage; a human must restore read access to the canonical physical project root before any command here can run",
+        ),
+      }],
     });
   }
   const inspected = inspectRunnerProfileMigrationV3({ rootDir: root, deps: fs });
@@ -2946,12 +2994,15 @@ export function planProjectOnboardingSourceRecoveryV4({
       status: "unrepairable",
       root,
       category: "invalid-authority",
-      diagnostics: [lifecycleDiagnostic(
-        "$.source",
-        "source_authority_unrepairable",
-        "the source is not one recognized authority that Public Core can reconstruct safely",
-        "restore or correct pipeline.user.yaml through its external source-owning workflow",
-      )],
+      diagnostics: [{
+        ...lifecycleDiagnostic(
+          "$.source",
+          "source_authority_unrepairable",
+          "the source is not one recognized authority that Public Core can reconstruct safely",
+          "restore or correct pipeline.user.yaml through its external source-owning workflow",
+        ),
+        repairCommand: sourceRecoveryRepairCommand(root, runner, intent),
+      }],
     });
   }
   if (inspected.sourceKind === "v3-refresh") {
@@ -3005,12 +3056,17 @@ export function planProjectOnboardingSourceRecoveryV4({
       root,
       category: "unsupported-source-transition",
       sourceSha256: inspected.sourceSha256,
-      diagnostics: [lifecycleDiagnostic(
-        "$.source.runners.enabled",
-        "source_runner_transition_unsupported",
-        "this V3 source does not enable the invoking session's own runner",
-        "enable this runner in the source's authority, or switch to a runner it already enables; this recovery planner will not rewrite it",
-      )],
+      diagnostics: [{
+        ...lifecycleDiagnostic(
+          "$.source.runners.enabled",
+          "source_runner_transition_unsupported",
+          "this V3 source does not enable the invoking session's own runner",
+          "enable this runner in the source's authority, or switch to a runner it already enables; this recovery planner will not rewrite it",
+        ),
+        repairCommand: noAutomatedRepairRoute(
+          "no automated repair route applies: enabling a runner in the source's authority is a decision only a human makes -- this planner will not rewrite it; once the source enables the invoking runner, rerun plan-source-recovery to re-triage",
+        ),
+      }],
     });
   }
   return sourceRecoveryResult({
@@ -3018,12 +3074,17 @@ export function planProjectOnboardingSourceRecoveryV4({
     root,
     category: "current-authority",
     sourceSha256: inspected.sourceSha256,
-    diagnostics: [lifecycleDiagnostic(
-      "$.source",
-      "source_is_current",
-      "the V3 source is current and is not the controlling recovery failure",
-      "rerun the V4 lifecycle inspection and follow its controlling action",
-    )],
+    diagnostics: [{
+      ...lifecycleDiagnostic(
+        "$.source",
+        "source_is_current",
+        "the V3 source is current and is not the controlling recovery failure",
+        "rerun the V4 lifecycle inspection and follow its controlling action",
+      ),
+      repairCommand: noAutomatedRepairRoute(
+        "no automated repair route applies here: the source itself is not broken, so no source-recovery command is the fix; rerun the V4 lifecycle inspection (plan-source-recovery's own caller) and follow whatever controlling action it names instead",
+      ),
+    }],
   });
 }
 
