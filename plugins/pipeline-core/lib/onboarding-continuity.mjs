@@ -5477,11 +5477,16 @@ export function intakeDesignDirname(featureId) {
   return `specs/${featureId}`;
 }
 
-// NVA-INTAKESPECS-1 transitional: nothing writes here any more. Retained ONLY so GS-15 and its
-// TP-6-protected regression test keep describing a real path until the one signed override that
-// removes both can run (scratch/NVA-INTAKESPECS-1-UMSETZUNG.md names the exact removal steps).
-// Delete this constant, GS-15, and the legacy branch in onboarding-staging-authoring.mjs
-// together -- it is a bridge with a named end, not a second supported location.
+// NVA-INTAKESPECS-1: nothing GENERATES here any more -- new projects get `specs/<featureId>/`
+// from intakeDesignDirname() above. This constant is retained for projects onboarded BEFORE
+// that change, which still carry their PRD/Spec at this path and may have it bound as project
+// authority. GS-15 keeps protecting it and onboarding-staging-authoring.mjs keeps admitting the
+// authoring write for it, so an existing project stays both defended and workable.
+//
+// It is therefore NOT dead code awaiting a sweep. Removing it, GS-15, and the legacy branch in
+// onboarding-staging-authoring.mjs would leave every already-onboarded project's design package
+// simultaneously unprotected and unwritable. Retire them only once no supported project can
+// still carry the old layout -- which is a migration decision, not a cleanup.
 export const INTAKE_STAGING_DIRNAME = "project/.onboarding-staging";
 // Exported so guard-lifecycle-ready.mjs's narrow bootstrap-binding-required
 // staging-authoring admission (NVA-BL-INTAKEBIND-1) can recognize a real
