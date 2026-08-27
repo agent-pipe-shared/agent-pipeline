@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "f3496237b14a60be5c1334a8910d5433f9b2e1cdf98d423478c8405f4df698f0"
+    "transitionHead": "f7dc2c8609013982e07cfc2db1a8d246ea0e23dd9556f5999b273da45f203e3c"
   },
   "counts": {
-    "open": 40,
+    "open": 41,
     "in_progress": 5,
     "closed": 368,
     "rejected": 1,
@@ -4801,6 +4801,15 @@
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "Observed directly on 2026-08-08 while filing three items: reconcile-backlog-ledger.mjs --activate recorded transitions for two items whose frontmatter does not validate.",
+      "deferred": false
+    },
+    {
+      "id": "pipeline.the-pipeline-cannot-merge-two-parallel-sprint-ledgers",
+      "status": "open",
+      "type": "requirement",
+      "owner": "pipeline",
+      "created": "2026-08-27",
+      "source": "PO decision during the sprint_phoenix merge close-out, 2026-08-27: parallel sprints that later merge are a normal mode of work and the Pipeline must support it",
       "deferred": false
     },
     {

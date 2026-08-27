@@ -388,6 +388,7 @@
 | pipeline.test-path-guard-blocks-the-briefed-edit-and-offers-no-route | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.test-suites-use-host-tmp-instead-of-the-repos-own-scratch-convention | closed | workflow-improvement | pipeline | 2026-08-17 | — |
 | pipeline.the-ledger-reconciler-writes-before-the-items-are-validated | deferred | defect | pipeline | 2026-08-08 | — |
+| pipeline.the-pipeline-cannot-merge-two-parallel-sprint-ledgers | open | requirement | pipeline | 2026-08-27 | — |
 | pipeline.this-hosts-local-marketplace-copy-is-not-symlinked-to-source | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.three-smaller-greenfield-defects | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.tp-guard-rules-lifted-on-the-merging-machine-must-be-restored | open | defect | pipeline | 2026-08-27 | — |
@@ -433,7 +434,7 @@
 
 ## Counts
 
-- open: 40
+- open: 41
 - in_progress: 5
 - closed: 368
 - rejected: 1
