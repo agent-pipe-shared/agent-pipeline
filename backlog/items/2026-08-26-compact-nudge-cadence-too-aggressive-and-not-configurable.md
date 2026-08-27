@@ -5,6 +5,7 @@ type: idea
 owner: pipeline
 status: open
 created: 2026-08-26
+sprint: nightwing
 source: "PO observation (chat), 2026-08-26, during a long Phoenix-merge session"
 ---
 

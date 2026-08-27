@@ -5,6 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-08-27
+sprint: alfred
 source: "Handover-rotation extraction pass over Phoenix checkpoint 69, 2026-08-27; the defect itself was hit live during a push ceremony on 2026-08-19"
 ---
 

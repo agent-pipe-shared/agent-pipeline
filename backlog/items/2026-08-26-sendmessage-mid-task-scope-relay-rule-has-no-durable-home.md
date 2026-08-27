@@ -5,6 +5,7 @@ type: workflow-improvement
 owner: pipeline
 status: open
 created: 2026-08-26
+sprint: alfred
 source: "Handover-rotation extraction pass (ADR-0066 Decision 6/7) over docs/state.md's 2026-08-25 'Antigravity CLI 3rd Runner Integration & Hardening' section, before rotating it to archive"
 ---
 

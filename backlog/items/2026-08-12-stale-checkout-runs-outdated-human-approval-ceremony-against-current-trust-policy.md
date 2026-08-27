@@ -5,6 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-08-12
+sprint: alfred
 source: "Cross-repo observation from a sibling Phoenix session, relayed by the PO into this Nova session for filing."
 due: 2026-09-12
 expires: 2026-09-12

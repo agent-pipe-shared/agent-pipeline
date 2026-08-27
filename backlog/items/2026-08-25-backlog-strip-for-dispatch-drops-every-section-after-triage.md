@@ -5,6 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-08-25
+sprint: alfred
 source: "Confirmed twice in one session, 2026-08-25: AGY-KICKOFFPOQ-1's own completion report (Deviations #1) and directly reproduced by the Elephant while preparing this item's own follow-up dispatch"
 ---
 

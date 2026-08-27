@@ -5,6 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-08-08
+sprint: nova
 due: 2026-08-15
 source: "SCRATCH-1 dispatch, 2026-08-08, reported as its own open item. The PO had asked the question directly the same night: 'hoffe nur es gibt einen Event der die Sachen auch wieder aufräumt'."
 ---

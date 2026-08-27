@@ -5,6 +5,7 @@ type: idea
 owner: pipeline
 status: open
 created: 2026-08-09
+sprint: alfred
 source: "Critic review (round 2, PASS) of GF-062/GF-065's critical-human-proof.json onboarding fix, scratch/critic-1f03ce024c82/critic-notes.md, deliberately not flagged as a finding of that diff."
 ---
 

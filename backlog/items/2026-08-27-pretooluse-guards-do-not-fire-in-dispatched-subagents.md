@@ -5,6 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-08-27
+sprint: alfred
 source: "Measured live, 2026-08-27, while investigating why the dispatch-budget counter never moved: plugin PreToolUse hooks fire in the main session and never inside a dispatched subagent. Four independent measurements, listed below."
 ---
 

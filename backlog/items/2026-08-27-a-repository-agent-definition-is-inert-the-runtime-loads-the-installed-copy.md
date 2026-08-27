@@ -5,6 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-08-27
+sprint: nightwing
 source: "Directly measured during the 2026-08-27 Nova-A candidate session: four deep-tier dispatches truncated at a maxTurns the repository had already raised"
 ---
 

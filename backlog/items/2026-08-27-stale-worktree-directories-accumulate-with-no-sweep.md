@@ -5,6 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-08-27
+sprint: nova
 source: "Handover-rotation extraction pass over Phoenix checkpoint 67, 2026-08-27"
 ---
 

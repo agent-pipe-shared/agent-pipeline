@@ -5,6 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-08-27
+sprint: nova
 source: "Live observation, 2026-08-27: a cat >> heredoc appending to a gitignored scratch note was refused with GUARD-GATE-STRENGTH-SHELL. Independently reproduced in the same session by a diagnostic command whose text happened to contain a quoted asterisk."
 ---
 

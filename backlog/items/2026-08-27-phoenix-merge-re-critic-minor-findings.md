@@ -5,6 +5,7 @@ type: workflow-improvement
 owner: pipeline
 status: open
 created: 2026-08-27
+sprint: phoenix
 source: "Re-Critic (delta) on the Phoenix-merge rework diff 290bd599..eeebeed5, PASS with three minor findings, 2026-08-27"
 ---
 

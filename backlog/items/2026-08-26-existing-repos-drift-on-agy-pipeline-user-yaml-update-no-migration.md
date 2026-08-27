@@ -5,6 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-08-26
+sprint: nightwing
 source: "PO observation (chat), 2026-08-26: updating a consumer repo onto the sprint_agy ruleset changes pipeline.user.yaml's expected shape; an already-onboarded repository that does not also update its own pipeline.user.yaml drifts and the pipeline breaks with no repair path."
 ---
 

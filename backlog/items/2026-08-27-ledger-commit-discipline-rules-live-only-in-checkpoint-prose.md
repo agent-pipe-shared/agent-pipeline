@@ -5,6 +5,7 @@ type: workflow-improvement
 owner: pipeline
 status: open
 created: 2026-08-27
+sprint: alfred
 source: "Handover-rotation extraction pass over Phoenix checkpoints 61-71, 2026-08-27 (ADR-0066 Decision 6/7)"
 ---
 

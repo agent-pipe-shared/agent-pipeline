@@ -5,6 +5,7 @@ type: workflow-improvement
 owner: pipeline
 status: open
 created: 2026-08-16
+sprint: alfred
 source: "PO, 2026-08-16: 'Was man hier an dem repo gut sehen kann ist, dass verify inzwischen unglaublich krass angeschwollen ist und sehr lange dauert.' Counts and the absent-duration finding were measured in the same session."
 ---
 

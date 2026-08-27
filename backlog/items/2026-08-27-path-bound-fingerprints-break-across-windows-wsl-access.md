@@ -5,6 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-08-27
+sprint: nova
 source: "NVA-PATHBIND-AUDIT-1, scratch/PATHBIND-audit.md, 2026-08-27 — read-only audit of every path-derived identifier used in durable state"
 ---
 

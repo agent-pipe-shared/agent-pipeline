@@ -5,6 +5,7 @@ type: workflow-improvement
 owner: pipeline
 status: open
 created: 2026-08-17
+sprint: alfred
 source: "PO observation, 2026-08-17, live during a session dispatching several goldfish-deep and Critic subagents back-to-back for Nova A Windows bugfix work."
 ---
 

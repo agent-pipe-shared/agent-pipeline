@@ -5,6 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-08-07
+sprint: alfred
 due: 2026-08-21
 source: "Reported by the ONECMD-1 dispatch (2026-08-07) as an adjacent finding it deliberately left alone rather than fixing outside its briefed scope."
 ---

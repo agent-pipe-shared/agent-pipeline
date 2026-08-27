@@ -5,6 +5,7 @@ type: workflow-improvement
 owner: pipeline
 status: open
 created: 2026-08-09
+sprint: nightwing
 source: "Full command-level analysis of the PO's Codex greenfield happy path against the 0.5.4 candidate (rollout 019fe56c + 019fe56f, 2026-08-09), read from the Codex rollout logs rather than the chat transcript."
 due: 2026-08-20
 ---

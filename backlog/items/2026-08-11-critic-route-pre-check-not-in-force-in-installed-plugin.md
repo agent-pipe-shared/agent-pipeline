@@ -5,6 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-08-11
+sprint: alfred
 due: 2026-08-25
 source: "Critic review (FAIL, F3) of NVA-BL-42 (plugins/pipeline-core/agents/critic.md, goldfish-deep.md, templates/prompts/critic-review.md, commit 08684e7874b79c04a44601c487f343be0dfaefa5), 2026-08-11."
 ---

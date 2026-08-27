@@ -5,6 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-08-24
+sprint: phoenix
 source: "Third delta Critic review of sprint-agy-runner, finding F3 (specs/sprint-agy-runner/evidence/2026-08-24-delta3-critic-review-agy-runner.md); PO-accepted disposition 2026-08-24"
 due: 2026-08-31
 ---

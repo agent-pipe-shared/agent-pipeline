@@ -5,6 +5,7 @@ type: workflow-improvement
 owner: pipeline
 status: open
 created: 2026-08-21
+sprint: nightwing
 source: Manual observation during sprint_agy kickoff testing (Rune_Test1_Agy_060_59)
 ---
 

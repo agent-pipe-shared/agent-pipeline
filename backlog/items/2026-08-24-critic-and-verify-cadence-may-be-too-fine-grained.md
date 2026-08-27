@@ -5,6 +5,7 @@ type: workflow-improvement
 owner: pipeline
 status: open
 created: 2026-08-24
+sprint: alfred
 source: "PO observation during the sprint-agy-runner D-fix wave, 2026-08-24 (\"seltener Critics und Verifys fahren und diese eher nur an große Sammelblöcke setzen ... dadurch dauern selbst kleine Fixes und kleine Erweiterungen immer viele Stunden\")"
 due: 2026-08-31
 ---

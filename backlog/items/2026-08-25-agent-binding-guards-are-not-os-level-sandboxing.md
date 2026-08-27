@@ -5,6 +5,7 @@ type: idea
 owner: pipeline
 status: open
 created: 2026-08-25
+sprint: nova
 source: "PO relay (chat), 2026-08-25, from a separate Agy greenfield-test session's own threat-model self-analysis (Q&A transcript pasted verbatim by the PO); PO's own framing: 'eher was fürs backlog was aber nicht zeitnah angegangen wird (Thema eher für nova B)'"
 ---
 

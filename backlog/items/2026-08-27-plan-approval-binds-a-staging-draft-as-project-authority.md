@@ -5,6 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-08-27
+sprint: alfred
 source: "Live state of a greenfield Antigravity test project, read 2026-08-27: the PO plan approval bound project/.onboarding-staging/ paths as project authority and advanced the feature to implementation. The generated staging files' own banner states they must not be bound as authority."
 ---
 

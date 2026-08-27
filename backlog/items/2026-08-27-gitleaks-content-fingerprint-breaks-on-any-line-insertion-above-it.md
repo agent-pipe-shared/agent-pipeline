@@ -5,6 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-08-27
+sprint: alfred
 source: "Hit twice in one session during the Phoenix merge, 2026-08-27"
 ---
 
