@@ -3,10 +3,23 @@ schema: pipeline.backlog-item.v1
 id: pipeline.the-two-suite-registration-checkers-disagree
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-27
+closed_at: "2026-08-27"
+closure_repository: "self"
+closure_commit: "d38f65df9457f6c6ca32c87c2a7c2fb9b15d9d2f"
+closure_evidence: "plugins/pipeline-core/scripts/check-suite-registration.mjs"
 source: "Observed 2026-08-27 while re-verifying an inherited nine-suite registration claim: the two checkers return 9 and 0 on the same tree"
 ---
+
+## Closed — 2026-08-27
+
+The item's own preferred proposal (option 1) was taken — the checker was
+taught the folded-in scoped arrays instead of being deleted. Both checkers
+now agree on the same tree: `check-suite-registration.mjs` reports
+`OK: 451 suite file(s) enumerated against 478 TEST_SUITES/SCOPED_VERIFY_SUITES/WINDOWS_ASSURANCE_VERIFY_SUITES entries; all registered or opted out with a reason.`,
+and `verify-suite-registration-check` reported 0 in the full Verify run. The
+six false positives are gone.
 
 # Two suite-registration checkers disagree, and the unwired one reports six false positives
 

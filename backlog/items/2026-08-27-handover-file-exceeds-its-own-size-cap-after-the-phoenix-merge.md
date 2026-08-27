@@ -3,10 +3,20 @@ schema: pipeline.backlog-item.v1
 id: pipeline.handover-file-exceeds-its-own-size-cap-after-the-phoenix-merge
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-27
+closed_at: "2026-08-27"
+closure_repository: "self"
+closure_commit: "7081e476015c41a54b9f3f960e9dde89bfdafbf8"
+closure_evidence: "docs/state.md"
 source: "Observed directly while trying to record merge open points in the canonical handover, 2026-08-27"
 ---
+
+## Closed — 2026-08-27
+
+The handover was rotated on 2026-08-27; `docs/state.md` now measures 20,890
+bytes against the 30,000-byte hard cap (measured directly via `wc -c
+docs/state.md`), so a session can edit it again.
 
 # docs/state.md is 48,825 bytes against a 30,000-byte hard cap, so no session can edit it
 

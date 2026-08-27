@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "01a84142493b41892987047603366e49d81bf5e37870d24734968b095c55965e"
+    "transitionHead": "b0f1f44ea06cfeb85ed53ff96ca4951c02e874fc396229795d1d0fc6b9e9241e"
   },
   "counts": {
-    "open": 47,
+    "open": 44,
     "in_progress": 5,
-    "closed": 374,
+    "closed": 377,
     "rejected": 3,
     "deferred": 11
   },
@@ -2390,12 +2390,16 @@
     },
     {
       "id": "pipeline.handover-file-exceeds-its-own-size-cap-after-the-phoenix-merge",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-27",
       "source": "Observed directly while trying to record merge open points in the canonical handover, 2026-08-27",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-27",
+      "closureRepository": "self",
+      "closureCommit": "7081e476015c41a54b9f3f960e9dde89bfdafbf8",
+      "closureEvidence": "docs/state.md"
     },
     {
       "id": "pipeline.handover-file-has-no-rotation-obligation",
@@ -3147,12 +3151,16 @@
     },
     {
       "id": "pipeline.nine-test-suites-run-in-no-verify-invocation",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-27",
       "source": "SUITEGAP-1, scratch/SUITEGAP-report.md, 2026-08-27 — measurement via node plugins/pipeline-core/scripts/check-suite-registration.mjs",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-27",
+      "closureRepository": "self",
+      "closureCommit": "4630dd26395c713432c378298e68f3e119b4e369",
+      "closureEvidence": "harness/scripts/verify.mjs"
     },
     {
       "id": "pipeline.no-check-validates-prose-section-citations",
@@ -4942,12 +4950,16 @@
     },
     {
       "id": "pipeline.the-two-suite-registration-checkers-disagree",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-27",
       "source": "Observed 2026-08-27 while re-verifying an inherited nine-suite registration claim: the two checkers return 9 and 0 on the same tree",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-27",
+      "closureRepository": "self",
+      "closureCommit": "d38f65df9457f6c6ca32c87c2a7c2fb9b15d9d2f",
+      "closureEvidence": "plugins/pipeline-core/scripts/check-suite-registration.mjs"
     },
     {
       "id": "pipeline.this-hosts-local-marketplace-copy-is-not-symlinked-to-source",

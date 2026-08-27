@@ -3,10 +3,24 @@ schema: pipeline.backlog-item.v1
 id: pipeline.nine-test-suites-run-in-no-verify-invocation
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-27
+closed_at: "2026-08-27"
+closure_repository: "self"
+closure_commit: "4630dd26395c713432c378298e68f3e119b4e369"
+closure_evidence: "harness/scripts/verify.mjs"
 source: "SUITEGAP-1, scratch/SUITEGAP-report.md, 2026-08-27 — measurement via node plugins/pipeline-core/scripts/check-suite-registration.mjs"
 ---
+
+## Closed — 2026-08-27
+
+The item's own same-day correction reduced the real count from nine to
+three — `check-adr-consistency.test.mjs`, `check-critic-contract-citations.test.mjs`,
+`check-doc-reconciliation.test.mjs`. All three are now registered, in a
+TP-3-protected path, so the registration went through a signed human guard
+override. Re-run confirms no unregistered suites:
+`node plugins/pipeline-core/scripts/check-suite-registration.mjs` →
+`OK: 451 suite file(s) enumerated against 478 TEST_SUITES/SCOPED_VERIFY_SUITES/WINDOWS_ASSURANCE_VERIFY_SUITES entries; all registered or opted out with a reason.`
 
 # Three test suites exist in the tree but run under no `verify.mjs` invocation
 
