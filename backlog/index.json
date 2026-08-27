@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "8ef1c3b4b50148d919098cb67cf4cbb133f6908873575c946638fd5c5ca1ab8a"
+    "transitionHead": "4cbbcabeda1b85911654ce902e5072074c61ccd88136be75fa063ba0060f17b6"
   },
   "counts": {
-    "open": 38,
+    "open": 39,
     "in_progress": 5,
     "closed": 367,
     "rejected": 1,
@@ -3452,6 +3452,15 @@
       "closureRepository": "self",
       "closureCommit": "0f8bdafcd7b7b4ea42fbdbfb9085aafa8aa75a15",
       "closureEvidence": "backlog/items/2026-08-18-phase-aware-bootstrap-readiness.md"
+    },
+    {
+      "id": "pipeline.phoenix-merge-re-critic-minor-findings",
+      "status": "open",
+      "type": "improvement",
+      "owner": "pipeline",
+      "created": "2026-08-27",
+      "source": "Re-Critic (delta) on the Phoenix-merge rework diff 290bd599..eeebeed5, PASS with three minor findings, 2026-08-27",
+      "deferred": false
     },
     {
       "id": "pipeline.pipeline-author-repair-signature-mode-never-actually-admits-the-edit",
