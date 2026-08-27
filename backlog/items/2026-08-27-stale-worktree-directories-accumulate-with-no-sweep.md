@@ -3,9 +3,13 @@ schema: pipeline.backlog-item.v1
 id: pipeline.stale-worktree-directories-accumulate-with-no-sweep
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-27
 sprint: nova
+closed_at: 2026-08-27
+closure_repository: self
+closure_commit: f1d9fe45607be531901f69c7f67c7590e9541fdb
+closure_evidence: backlog/items/2026-08-27-stale-worktree-directories-accumulate-with-no-sweep.md
 source: "Handover-rotation extraction pass over Phoenix checkpoint 67, 2026-08-27"
 ---
 
@@ -57,3 +61,21 @@ lifecycle shape. Confirm before assuming — the worktree lifecycle is governed 
 - **Decision:** open, unassigned. Low urgency on its own; the point of filing it
   is so it is in scope when the scratch-cleanup item is picked up, rather than
   rediscovered later as a separate surprise.
+
+## Closed, 2026-08-27
+
+Resolved by commit `f1d9fe45` ("feat(scratch-sweep): give the built
+scratch-cleanup mechanism a real caller, and cover .claude/worktrees/",
+NVA-SCRATCHSWEEP-1). Verified via `git show --stat f1d9fe45`: it adds
+`planOrphanWorktreeDirectories`/`retireOrphanWorktreeDirectories` to
+`plugins/pipeline-core/lib/session-cleanup-recovery.mjs` and wires
+`runBootstrapWorktreeSweep` into `main()` of
+`plugins/pipeline-core/scripts/pipeline-start-preflight.mjs`, with 9 new
+tests across `session-cleanup-recovery.test.mjs` and
+`pipeline-start-scratch-lifecycle.test.mjs` (117 + 87 new lines,
+confirmed via the commit's own diffstat). Per the commit message, a
+directory is only removed when `git worktree list` no longer knows it AND
+it carries a genuine dangling worktree `.git` pointer file; any ambiguity
+leaves it alone; the sweep is fail-open. This is exactly the "sweep
+orphans on a later bootstrap" shape the item's "Why it is worth filing"
+section named as the fix. Item closed.
