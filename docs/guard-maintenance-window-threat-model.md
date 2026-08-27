@@ -111,7 +111,12 @@ below assumes it holds and is written to catch a change that would break it.
   open) added: `hooks/guard-dispatch-budget.mjs`,
   `lib/plan-authority-staging-guard.mjs`, `lib/security-completeness-gate.mjs`,
   `lib/security-evidence-evaluator.mjs`, `lib/verify-evidence-path.mjs`, and
-  `scripts/pre-push-hook-install.mjs`.
+  `scripts/pre-push-hook-install.mjs`. A fourth closure gap (NVA-KERNELDOC-1,
+  2026-08-27) added: `lib/onboarding-staging-authoring.mjs`, imported by both
+  `guard-gate-strength.mjs` (GS-15) and `guard-lifecycle-ready.mjs` — it holds
+  the shared predicate that decides when the GS-15 refusal stands down for the
+  bootstrap-binding staging-PRD/spec authoring admission, so a window covering
+  it would let an edit widen that stand-down.
 - The window record's cryptographic integrity and its TTL.
 - The audit visibility of an open or recently-closed window (the bootstrap
   warning).
