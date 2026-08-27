@@ -119,6 +119,15 @@ function utf8Compare(left, right) {
   return a.compare(b);
 }
 
+/** Insert `item` at its byte-sorted position, leaving every other entry where it was. */
+function insertSorted(array, item, keyOf) {
+  const key = keyOf(item);
+  const at = array.findIndex((existing) => utf8Compare(keyOf(existing), key) > 0);
+  if (at === -1) array.push(item);
+  else array.splice(at, 0, item);
+  return array;
+}
+
 /** Insert `addition` immediately after `anchor`, refusing unless the anchor occurs exactly once. */
 function anchoredInsert(source, anchor, addition, label) {
   const first = source.indexOf(anchor);
@@ -396,15 +405,19 @@ function main() {
     if (!Array.isArray(inventory.surfaces)) throw new Error("inventory.surfaces is not an array");
     const capability = (inventory.capabilities ?? []).find((item) => item?.id === CAPABILITY_ID);
     if (!capability || !Array.isArray(capability.surfaceIds)) throw new Error(`capability ${CAPABILITY_ID} not found, or it has no surfaceIds array`);
-    inventory.surfaces.push({
+    // Insert at the byte-sorted position rather than re-sorting the arrays.
+    // A full re-sort also normalises entries that were already stored out of
+    // order, which sweeps unrelated changes into this commit: the first live
+    // run moved `protected-test-paths-tests`, which had nothing to do with
+    // wiring a hook. Equivalent for an already-sorted array, strictly less
+    // invasive for one that is not.
+    insertSorted(inventory.surfaces, {
       surfaceId: SURFACE_ID,
       kind: "hook",
       path: "plugins/pipeline-core/hooks/hooks.json",
       member: `PreToolUse:${MATCHER}:${GUARD_COMMAND}`,
-    });
-    inventory.surfaces.sort((left, right) => utf8Compare(left.surfaceId, right.surfaceId));
-    capability.surfaceIds.push(SURFACE_ID);
-    capability.surfaceIds.sort(utf8Compare);
+    }, (surface) => surface.surfaceId);
+    insertSorted(capability.surfaceIds, SURFACE_ID, (id) => id);
     nextInventory = `${JSON.stringify(inventory, null, 2)}\n`;
   } catch (error) {
     console.error(`  [FAIL] inventory update: ${String(error?.message ?? error)}`);

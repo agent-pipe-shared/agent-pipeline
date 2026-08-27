@@ -37,9 +37,25 @@ import {
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const HOOKS_PATH = join(REPO_ROOT, "plugins", "pipeline-core", "hooks", "hooks.json");
 
-/** The real manifest, plus the tool's own insertion applied in memory. */
+/**
+ * The manifest as it looks WITHOUT the dispatch-budget registration.
+ *
+ * The suite has to hold whether or not the live manifest is already wired --
+ * it was written before the wiring landed and would otherwise start inserting
+ * a second copy the moment it did, turning green tests red for the one reason
+ * that is not a defect. So the baseline is derived: if the live file contains
+ * the exact block the tool inserts, strip it back out; otherwise it is already
+ * the baseline.
+ */
+function baselineText() {
+  const live = readFileSync(HOOKS_PATH, "utf8");
+  if (!live.includes(HOOKS_ADDITION)) return live;
+  return live.replace(HOOKS_ADDITION, "");
+}
+
+/** The baseline manifest, plus the tool's own insertion applied in memory. */
 function wiredInMemory() {
-  const original = readFileSync(HOOKS_PATH, "utf8");
+  const original = baselineText();
   return {
     before: JSON.parse(original),
     after: JSON.parse(anchoredInsert(original, HOOKS_ANCHOR, HOOKS_ADDITION, "test")),
@@ -92,6 +108,20 @@ test("WDB07: idempotency is decided structurally, so a second run cannot duplica
   assert.ok(
     after.hooks.PreToolUse.some(invokesGuard),
     "an already-wired manifest must report as wired; the text-search form answered no here and would have inserted a duplicate",
+  );
+});
+
+test("WDB09: the live manifest carries the registration exactly once, never twice", () => {
+  const live = JSON.parse(readFileSync(HOOKS_PATH, "utf8"));
+  const matched = live.hooks.PreToolUse.filter(invokesGuard);
+  assert.equal(matched.length, 1, "the guard must be wired exactly once -- 0 means the wiring was lost, 2 means a duplicate landed");
+});
+
+test("WDB10: the block the tool would insert is the block the live manifest actually carries", () => {
+  const live = readFileSync(HOOKS_PATH, "utf8");
+  assert.ok(
+    live.includes(HOOKS_ADDITION),
+    "the tool's insertion payload has drifted from what is installed; the baseline this suite derives would then be wrong, so fix the drift rather than the assertion",
   );
 });
 
