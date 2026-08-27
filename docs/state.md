@@ -91,8 +91,16 @@ critic scratch-note persistence is structurally unavailable (defeats
 CR-06-D truncation recovery), and no sanctioned `Dispatch:` trailer form
 exists for direct Elephant design-phase commits. **Round 2** (delta
 re-review per template item 4, claude-opus-5 at max, candidate `ea392b28`,
-registry as neutral input) dispatched; its report gets persisted beside
-round 1 on arrival.
+registry as neutral input): **FAIL** — 11/13 invariants resolved, but the
+round-1 B-F3 fix had substituted a route the generated obligations doc rules
+out for plugin source (`author-repair-required`, stop condition) — new major
+R2-F1, plus three minors. Fixed in **`03d97ac5`** (TP-4 `$comment` edit
+redesigned as a PO-performed act, pointer declared non-load-bearing with a
+typed A2 residual when deferred; §B header re-dated; authoring-record fact
+made evergreen; marker recomputed `4133223e…a503b6`). Round-2
+report/registry/response persisted beside round 1. **Round 3** (delta,
+claude-opus-5 at max, candidate `03d97ac5`, invariants R2-F1/R2-F2/R2-F4 +
+marker; R2-F3 = standing trailer disposition, excluded) dispatched.
 
 **Post-compact observation (extra evidence for defect 2 above):** after a
 `/compact`, the SessionStart reground classifier reported
@@ -104,11 +112,12 @@ the discarded→fresh-design shape), new surface (post-compact reground).
 Recorded here instead of editing the committed item, to avoid ledger DRIFT
 noise; fold into the item at its next legitimate touch.
 
-**Next:** on a green/resolved round 2 →
+**Next:** on a green/resolved round 3 →
 `pipeline-state.mjs submit-plan --by Elephant --profile epic`, then the
 **Haltepunkt**: present the PRD readably (EL-19), the five open PO
-decisions of PRD §9, the MP-01 gate switch away from Fable-max, and a
-proposed `/goal`; wait for the PO's "approved".
+decisions of PRD §9, the standing trailer disposition, the MP-01 gate
+switch away from Fable-max, and a proposed `/goal`; wait for the PO's
+"approved".
 
 ## Prior handover — 2026-09-01/02: the autonomous Nova B block
 
