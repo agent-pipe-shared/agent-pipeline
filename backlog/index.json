@@ -3,13 +3,13 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "8758f1b1af183567af48bbd8dc82fcc5f8d209629e34ff9bd194a325c49b51cc"
+    "transitionHead": "af6121dd3aab83281f07e169e099ca548643db5888f3bcb6b0b93ae4061b393c"
   },
   "counts": {
-    "open": 45,
+    "open": 43,
     "in_progress": 5,
     "closed": 374,
-    "rejected": 1,
+    "rejected": 3,
     "deferred": 11
   },
   "items": [
@@ -3473,7 +3473,7 @@
     },
     {
       "id": "pipeline.path-bound-repository-fingerprints-break-between-windows-and-wsl",
-      "status": "open",
+      "status": "rejected",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-27",
@@ -4928,7 +4928,7 @@
     },
     {
       "id": "pipeline.three-doc-and-adr-checkers-never-run-in-verify",
-      "status": "open",
+      "status": "rejected",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-27",

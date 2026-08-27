@@ -282,7 +282,7 @@
 | pipeline.part-a-limitation-2-orphaned-by-the-r2-rework | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.partial-lifecycle-blocks-read-only-diagnosis-and-tmp-fallback | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.path-bound-fingerprints-break-across-windows-wsl-access | open | defect | pipeline | 2026-08-27 | — |
-| pipeline.path-bound-repository-fingerprints-break-between-windows-and-wsl | open | defect | pipeline | 2026-08-27 | — |
+| pipeline.path-bound-repository-fingerprints-break-between-windows-and-wsl | rejected | defect | pipeline | 2026-08-27 | — |
 | pipeline.per-phase-progress-message-budget | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.permitted-edit-drops-session-into-unrecoverable-readiness | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.phase-aware-bootstrap-readiness | closed | workflow-improvement | pipeline | 2026-08-18 | — |
@@ -399,7 +399,7 @@
 | pipeline.the-pipeline-cannot-merge-two-parallel-sprint-ledgers | closed | requirement | pipeline | 2026-08-27 | — |
 | pipeline.the-two-suite-registration-checkers-disagree | open | defect | pipeline | 2026-08-27 | — |
 | pipeline.this-hosts-local-marketplace-copy-is-not-symlinked-to-source | closed | defect | pipeline | 2026-08-17 | — |
-| pipeline.three-doc-and-adr-checkers-never-run-in-verify | open | defect | pipeline | 2026-08-27 | — |
+| pipeline.three-doc-and-adr-checkers-never-run-in-verify | rejected | defect | pipeline | 2026-08-27 | — |
 | pipeline.three-smaller-greenfield-defects | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.tp-guard-rules-lifted-on-the-merging-machine-must-be-restored | closed | defect | pipeline | 2026-08-27 | — |
 | pipeline.transactional-readbacks-not-status-cascades | closed | workflow-improvement | pipeline | 2026-08-18 | — |
@@ -444,8 +444,8 @@
 
 ## Counts
 
-- open: 45
+- open: 43
 - in_progress: 5
 - closed: 374
-- rejected: 1
+- rejected: 3
 - deferred: 11
