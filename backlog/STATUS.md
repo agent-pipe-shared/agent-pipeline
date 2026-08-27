@@ -216,7 +216,7 @@
 | pipeline.inherited-still-open-claims-need-a-re-check-before-dispatch-no-durable-home | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.installed-plugin-gmw-hgo-v3-anchor-gap-blocks-all-protected-edits | closed | defect | pipeline | 2026-08-16 | — |
 | pipeline.installing-consumer-is-never-asked-any-setup-decision | closed | defect | pipeline | 2026-08-08 | — |
-| pipeline.intake-generate-coordinator-path-undocumented-in-skill-references | open | defect | pipeline | 2026-08-24 | — |
+| pipeline.intake-generate-coordinator-path-undocumented-in-skill-references | closed | defect | pipeline | 2026-08-24 | — |
 | pipeline.intake-values-restart-resilient-immediately | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.kickoff-apply-action-drops-runner | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.kickoff-design-names-the-wrong-repair-for-projection-drift | closed | defect | pipeline | 2026-08-09 | — |
@@ -294,7 +294,7 @@
 | pipeline.po-authority-decision-prd-candidate-static | deferred | defect | pipeline | 2026-08-08 | — |
 | pipeline.po-authority-rebind-plan-checks-for-the-wrong-plan-approval-schema-version | closed | defect | pipeline | 2026-08-19 | — |
 | pipeline.po-decision-bs26-unsatisfiable-under-the-phoenix-ledger-split | open | requirement | pipeline | 2026-08-27 | — |
-| pipeline.po-decision-claude-start-time-item-closed-on-a-rejected-approach | open | requirement | pipeline | 2026-08-27 | — |
+| pipeline.po-decision-claude-start-time-item-closed-on-a-rejected-approach | closed | requirement | pipeline | 2026-08-27 | — |
 | pipeline.po-gate-authority-path-canonicalization | closed | defect | pipeline | 2026-07-25 | — |
 | pipeline.po-gate-authority-receipt-readback | closed | defect | pipeline | 2026-07-25 | — |
 | pipeline.po-gate-worktree-authority | closed | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
@@ -394,7 +394,7 @@
 | pipeline.the-pipeline-cannot-merge-two-parallel-sprint-ledgers | open | requirement | pipeline | 2026-08-27 | — |
 | pipeline.this-hosts-local-marketplace-copy-is-not-symlinked-to-source | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.three-smaller-greenfield-defects | closed | defect | pipeline | 2026-08-08 | — |
-| pipeline.tp-guard-rules-lifted-on-the-merging-machine-must-be-restored | open | defect | pipeline | 2026-08-27 | — |
+| pipeline.tp-guard-rules-lifted-on-the-merging-machine-must-be-restored | closed | defect | pipeline | 2026-08-27 | — |
 | pipeline.transactional-readbacks-not-status-cascades | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.triage-verdict-text-can-contaminate-a-backlog-item-as-a-later-spec-reference | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.trust-mismatch-names-neither-key-nor-directory | closed | defect | pipeline | 2026-08-08 | — |
@@ -437,8 +437,8 @@
 
 ## Counts
 
-- open: 44
+- open: 41
 - in_progress: 5
-- closed: 368
+- closed: 371
 - rejected: 1
 - deferred: 11

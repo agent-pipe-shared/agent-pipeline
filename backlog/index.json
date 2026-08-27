@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "82e369d12b6c1bb02cd5647efe4e5d10575fabd06e591cdfd613a0fe97017a6a"
+    "transitionHead": "09b950f703ef80451a0fa59e2f9f2ca19476ab14241a037cbe5e149ea694240a"
   },
   "counts": {
-    "open": 44,
+    "open": 41,
     "in_progress": 5,
-    "closed": 368,
+    "closed": 371,
     "rejected": 1,
     "deferred": 11
   },
@@ -2650,12 +2650,16 @@
     },
     {
       "id": "pipeline.intake-generate-coordinator-path-undocumented-in-skill-references",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-24",
       "source": "AGY-KICKOFFSTAGING-1 dispatch, follow-up trace on backlog/items/2026-08-21-kickoff-staging-directory-mismatch.md, 2026-08-24",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-25",
+      "closureRepository": "self",
+      "closureCommit": "288739086c0f76ff6370379d9a3ffa177d350833",
+      "closureEvidence": "plugins/pipeline-core/skills/pipeline-start/references/intake-generate-design.md"
     },
     {
       "id": "pipeline.intake-values-restart-resilient-immediately",
@@ -3621,12 +3625,16 @@
     },
     {
       "id": "pipeline.po-decision-claude-start-time-item-closed-on-a-rejected-approach",
-      "status": "open",
+      "status": "closed",
       "type": "requirement",
       "owner": "pipeline",
       "created": "2026-08-27",
       "source": "Phoenix merge conflict resolution, dispatch PHX-ITEMS-2, 2026-08-26",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-27",
+      "closureRepository": "self",
+      "closureCommit": "2fb9dded45b732e26a13f611a639a47e324f8a9d",
+      "closureEvidence": "backlog/items/2026-08-05-claude-has-no-start-time-opt-in-adoption-path.md"
     },
     {
       "id": "pipeline.po-gate-authority-path-canonicalization",
@@ -4867,12 +4875,16 @@
     },
     {
       "id": "pipeline.tp-guard-rules-lifted-on-the-merging-machine-must-be-restored",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-27",
       "source": "Critic round 1 over the Phoenix merge (areas CR1-GUARDS and CR1-VERIFY, independently), 2026-08-27",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-27",
+      "closureRepository": "self",
+      "closureCommit": "7630f3b13588a213fc8870585695da4016c1ed0d",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/tp-lift-audit.ndjson"
     },
     {
       "id": "pipeline.transactional-readbacks-not-status-cascades",
