@@ -41,7 +41,7 @@ import { validateV3BootstrapAuthority } from "../scripts/v3-bootstrap-authority.
 import { parseYaml } from "./yaml-lite.mjs";
 import { validatePipelineUserV3 } from "./runner-profiles-v3.mjs";
 import { validCurrentPlanApproval, validPlanSubmission } from "./plan-spec-state-v2.mjs";
-import { main as onboardingCli, ONBOARDING_SUBCOMMANDS, automatedLifecycleArgvCommands } from "../scripts/project-onboarding-v3.mjs";
+import { main as onboardingCli } from "../scripts/project-onboarding-v3.mjs";
 import { main as sessionCleanupCli } from "../scripts/session-cleanup.mjs";
 import { run as pipelineStateRun } from "../scripts/pipeline-state.mjs";
 import {
@@ -360,15 +360,16 @@ function assertDiagnostic(result, code, extraKeys = []) {
 }
 
 /**
- * NVA-SOURCERECOVERY-1: assert the discriminated `repairCommand` field a
- * source-recovery "unrepairable" diagnostic now always carries. `available:
- * false` proves the typed "no automated route" shape (a reason distinct from
- * the diagnostic's own `code`, plus its own human-readable guidance) without
- * duplicating the diagnostic's message. `available: true` proves the exact
- * `plan-source-recovery` re-triage command is named -- derived from the CLI's
- * own registered subcommand table (`ONBOARDING_SUBCOMMANDS`), never a literal
- * typed into this test, so a future rename of the subcommand or a change to
- * its declared shape fails this assertion instead of silently drifting.
+ * NVA-SOURCERECOVERY-1, corrected by NVA-RECOVERYDEADEND-1: assert the typed
+ * `repairCommand` field a source-recovery "unrepairable" diagnostic now
+ * always carries. Every diagnostic this planner emits resolves to
+ * `available: false` -- a reason distinct from the diagnostic's own `code`,
+ * plus its own human-readable guidance, without duplicating the diagnostic's
+ * message. The one route that used to name `plan-source-recovery` itself as
+ * an `available: true` repair command was removed entirely
+ * (NVA-RECOVERYDEADEND-1): that command is this planner's own single caller
+ * (background fact in the briefing), so naming it as a repair pointed a
+ * diagnostic at its own producer.
  */
 function assertNoAutomatedRepairRoute(repairCommand) {
   assert.deepEqual(Object.keys(repairCommand).sort(), ["available", "guidance", "reason"]);
@@ -378,20 +379,23 @@ function assertNoAutomatedRepairRoute(repairCommand) {
   assert.match(repairCommand.guidance, /no automated repair route applies/u);
 }
 
-function assertSourceRecoveryRepairCommand(repairCommand, plan, root) {
-  const registered = ONBOARDING_SUBCOMMANDS.find((entry) => entry.name === "plan-source-recovery");
-  assert.ok(registered, "plan-source-recovery must stay registered in the CLI's own subcommand table");
-  assert.equal(registered.flat, true);
-  assert.equal(registered.mutates, false);
-  assert.equal(registered.automatedArgvShape, "lifecycle");
-  assert.ok(automatedLifecycleArgvCommands(ONBOARDING_SUBCOMMANDS).includes(registered.name));
-  assert.equal(repairCommand.available, true);
-  assert.equal(repairCommand.kind, "command");
-  assert.equal(repairCommand.executable, "node");
-  assert.deepEqual(repairCommand.argv, [ONBOARDING_SCRIPT, registered.name, "--root", root]);
-  assert.equal(repairCommand.mutation, false);
-  assert.equal(repairCommand.requiresConfirmation, false);
-  assert.deepEqual(repairCommand.expected, { schema: plan.schema, statuses: ["recoverable", "unrepairable"] });
+/**
+ * NVA-RECOVERYDEADEND-1: assert the additive `underlyingDiagnostics` field --
+ * the actual validation diagnostics/errors already present on the
+ * `inspectRunnerProfileMigrationV3` result the case-3 branch inspects,
+ * carried through so a reader learns why the source was not recognized
+ * instead of only that it wasn't. Checked structurally (same
+ * `{path, code, message, repair}` shape `diagnostic()` in
+ * runner-profile-migration-v3.mjs produces), never against a literal message
+ * string, so unrelated wording changes in that module do not fail this test.
+ */
+function assertUnderlyingDiagnostics(underlyingDiagnostics) {
+  assert.ok(Array.isArray(underlyingDiagnostics));
+  assert.ok(underlyingDiagnostics.length > 0);
+  for (const entry of underlyingDiagnostics) {
+    assert.deepEqual(Object.keys(entry).sort(), ["code", "message", "path", "repair"]);
+    for (const value of Object.values(entry)) assert.equal(typeof value, "string");
+  }
 }
 
 function treeSnapshot(rootDir) {
@@ -5462,11 +5466,21 @@ test("source recovery planner distinguishes invalid authority and unsupported ru
     const invalidPlan = planProjectOnboardingSourceRecoveryV4({ rootDir: invalid, deps: fakeDeps });
     assert.equal(invalidPlan.status, "unrepairable");
     assert.equal(invalidPlan.category, "invalid-authority");
-    assertDiagnostic(invalidPlan, "source_authority_unrepairable", ["repairCommand"]);
-    // NVA-SOURCERECOVERY-1: this is the exact live incident -- a session that
-    // reaches this diagnostic must be handed the real plan-source-recovery
-    // invocation, machine-readably, not left to freehand a remedy.
-    assertSourceRecoveryRepairCommand(invalidPlan.diagnostics[0].repairCommand, invalidPlan, invalid);
+    assertDiagnostic(invalidPlan, "source_authority_unrepairable", ["repairCommand", "underlyingDiagnostics"]);
+    // NVA-RECOVERYDEADEND-1: this is the exact live incident -- `invalid`'s
+    // pipeline.user.yaml is v3-valid at the top level (recognized schema) but
+    // fails a nested constraint, and the diagnostic this produces must not
+    // point back at plan-source-recovery (its own single caller); it must
+    // instead surface the real validation reason so a reader is not sent in
+    // a circle.
+    assertNoAutomatedRepairRoute(invalidPlan.diagnostics[0].repairCommand);
+    // This diagnostic's own guidance must not point back at
+    // plan-source-recovery -- its own single caller (background fact in the
+    // briefing) -- unlike the unsupported-runner-transition guidance checked
+    // a few lines below, which legitimately names it as a valid next step
+    // once a human has externally fixed a *different* problem.
+    assert.doesNotMatch(invalidPlan.diagnostics[0].repairCommand.guidance, /\bplan-source-recovery\b/u);
+    assertUnderlyingDiagnostics(invalidPlan.diagnostics[0].underlyingDiagnostics);
 
     const seed = planProjectOnboardingV3({ runner: "codex", rootDir: unsupported, deps: fakeDeps });
     assert.equal(applyProjectOnboardingV3(seed, { rootDir: unsupported, activate: true, deps: fakeDeps }).status, "applied");

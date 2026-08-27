@@ -2890,46 +2890,24 @@ function sourceRecoveryResult({
 }
 
 // Repair-route metadata attached to every "unrepairable" diagnostic this
-// planner returns (NVA-SOURCERECOVERY-1). `repairCommand` is a discriminated
-// union, never absent on an "unrepairable" diagnostic: `available: true`
-// names the exact, real, consumer-invokable `plan-source-recovery`
-// re-triage command for the inspected root (safe to run again once a human
-// has corrected the source externally -- this planner never claims it will
-// silently fix the file's own content); `available: false` states
-// explicitly, in typed form, that no automated repair route applies here and
-// what the human must decide, so a session that reaches this diagnostic is
-// never left to improvise a remedy the way the originating incident
-// documents happened once already (a session that fabricated an unrelated
-// "missing identity block" diagnosis and pointed at a pre-v3 sibling file).
-// The original `message`/`guidance` text on each diagnostic is never
-// replaced by this -- only paired with it.
+// planner returns (NVA-SOURCERECOVERY-1, corrected by NVA-RECOVERYDEADEND-1).
+// `repairCommand` states explicitly, in typed form, that no automated repair
+// route applies here and what the human must decide, so a session that
+// reaches this diagnostic is never left to improvise a remedy the way the
+// originating incident documents happened once already (a session that
+// fabricated an unrelated "missing identity block" diagnosis and pointed at
+// a pre-v3 sibling file). It also never names `plan-source-recovery` itself
+// as an available next command: this planner is invoked from exactly one
+// place, the `plan-source-recovery` subcommand
+// (plugins/pipeline-core/scripts/project-onboarding-v3.mjs), so a diagnostic
+// that named it as its own repair would be pointing at its own producer --
+// the exact dead-end NVA-RECOVERYDEADEND-1 removed. The original
+// `message`/`guidance` text on each diagnostic is never replaced by this --
+// only paired with it.
 const NO_AUTOMATED_REPAIR_ROUTE_REASON = "no_automated_repair_route";
 
 function noAutomatedRepairRoute(guidance) {
   return { available: false, reason: NO_AUTOMATED_REPAIR_ROUTE_REASON, guidance };
-}
-
-/**
- * The one real automated route this planner can ever point a diagnostic at:
- * itself, as a read-only re-triage step. `commandAction`'s own `argv` is
- * built from `ONBOARDING_SCRIPT` (resolved from `import.meta.url`, never a
- * source-checkout-only literal) and `lifecycleArgv` (which echoes the
- * observing runner rather than guessing one, ADR-0051/ADR-0057 R1) -- the
- * exact same construction `nextAction` already uses elsewhere in this file,
- * so a test can assert this against the CLI's own registered
- * `plan-source-recovery` subcommand shape instead of a literal typed here.
- */
-function sourceRecoveryRepairCommand(root, runner, intent) {
-  return {
-    available: true,
-    ...commandAction(
-      lifecycleArgv([ONBOARDING_SCRIPT, "plan-source-recovery", "--root", root], runner, intent),
-      false,
-      false,
-      SOURCE_RECOVERY_SCHEMA,
-      ["recoverable", "unrepairable"],
-    ),
-  };
 }
 
 /**
@@ -3001,7 +2979,14 @@ export function planProjectOnboardingSourceRecoveryV4({
           "the source is not one recognized authority that Public Core can reconstruct safely",
           "restore or correct pipeline.user.yaml through its external source-owning workflow",
         ),
-        repairCommand: sourceRecoveryRepairCommand(root, runner, intent),
+        repairCommand: noAutomatedRepairRoute(
+          "no automated repair route applies: this diagnostic is produced by the same read-only re-triage that would otherwise be offered as its own repair command, so naming it again would only send the reader in a circle; correct pipeline.user.yaml directly, using the validation diagnostics listed alongside this one for the specific reason it failed, through its external source-owning workflow",
+        ),
+        // NVA-RECOVERYDEADEND-1: the underlying validation diagnostics/errors
+        // already present on `inspected` (from `inspectRunnerProfileMigrationV3`,
+        // status "invalid-root" or "invalid-source") -- the actual reason the
+        // source was not recognized, so a reader is not left to guess it.
+        underlyingDiagnostics: inspected.diagnostics,
       }],
     });
   }
