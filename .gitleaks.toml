@@ -46,10 +46,20 @@
 # What justifies exempting `transitions-phoenix-history.ndjson` specifically: unlike
 # `transitions.ndjson` (live, append-only, checked by the ledger tooling on every write), the
 # history file is a frozen archival copy (backlog/README.md) that nothing projects or appends to.
-# `check-backlog-state.mjs`'s `checkPhoenixHistoryImmutable` pins its bytes to a fixed SHA-256 and
-# blocks the gate on any drift -- so no new content, secret or otherwise, can reach this path
-# without failing that check first. The exemption only ever covers bytes already scanned once, at
-# merge time; it does not open a lane for anything written later.
+# `check-backlog-state.mjs`'s `checkPhoenixHistoryImmutable` pins the single top-level
+# `backlog/transitions-phoenix-history.ndjson` file (`PHOENIX_HISTORY_PATH` joined to the
+# repository root) to a fixed SHA-256 and blocks the gate on any drift there -- so no new
+# content, secret or otherwise, can reach THAT top-level file without failing that check first.
+#
+# Re-Critic F1, 2026-08-27 (backlog/items/2026-08-27-phoenix-merge-re-critic-minor-findings.md):
+# this pin is narrower than the exemption regex above, which -- like the RW2-GITLEAKSCONFIG
+# anchor note above, but for the *pin* rather than the *anchoring* -- matches ANY nested
+# `.../backlog/transitions-phoenix-history.ndjson`, not only the one top-level file the pin
+# covers; a file at a nested `backlog/` segment would be exempted from these two secret rules and
+# pinned by nothing. Known, accepted limitation of this allowlist mechanism (same class as
+# RW2-GITLEAKSCONFIG), not fixed by this comment. The pin only ever covers bytes already scanned
+# once, at merge time, for the top-level file; it does not open a lane for anything written later
+# there.
 
 [extend]
 useDefault = true
