@@ -1355,6 +1355,58 @@ function exactRoot(args, root, index) {
   return args[index] === "--root" && args[index + 1] === root;
 }
 
+// NVA-BOOTADMIT-2 (backlog: onboarding/runner-profile-migration allowlist admitted a flag
+// SET only in one fixed order, so a caller that wrote the same flags in a different order --
+// or, for intake-consent-apply, omitted an individually-optional value flag its own library
+// function never required -- fell through to refusal even though the underlying command was
+// exactly as sanctioned as the canonical ordering). Matches an argv TAIL (flags only; the
+// caller has already peeled off any fixed leading subcommand/positional tokens such as
+// `apply` or `plan repair`) against a declared per-subcommand spec, order-insensitive on the
+// flag SET while staying exact on everything else:
+//   - `spec.required` / `spec.optional`: sets of bare flags (e.g. `--activate`) that consume
+//     only themselves; the only difference between the two is whether the flag has to have
+//     been seen by the end of the walk.
+//   - `spec.requiredValue` / `spec.optionalValue`: maps from a value flag to its validator.
+//     A value flag consumes itself plus exactly the next token, which the validator must
+//     accept; the only difference between the two maps is whether the flag has to have been
+//     seen by the end of the walk.
+// An unknown flag, a duplicated flag, a value flag with a missing or failing value, or a
+// leftover positional token where nothing is declared all fall through to no-match -- the
+// walk only ever advances by consuming a declared token (plus its value, for a value flag),
+// so anything else it encounters ends the match immediately.
+function matchFlagSpec(argsTail, spec) {
+  const required = spec.required ?? {};
+  const optional = spec.optional ?? {};
+  const requiredValue = spec.requiredValue ?? {};
+  const optionalValue = spec.optionalValue ?? {};
+  const seen = new Set();
+  let index = 0;
+  while (index < argsTail.length) {
+    const token = argsTail[index];
+    if (Object.prototype.hasOwnProperty.call(required, token)
+      || Object.prototype.hasOwnProperty.call(optional, token)) {
+      if (seen.has(token)) return false;
+      seen.add(token);
+      index += 1;
+      continue;
+    }
+    const validator = Object.prototype.hasOwnProperty.call(requiredValue, token)
+      ? requiredValue[token]
+      : optionalValue[token];
+    if (validator !== undefined) {
+      if (seen.has(token)) return false;
+      const value = argsTail[index + 1];
+      if (value === undefined || !validator(value)) return false;
+      seen.add(token);
+      index += 2;
+      continue;
+    }
+    return false;
+  }
+  return Object.keys(required).every((flag) => seen.has(flag))
+    && Object.keys(requiredValue).every((flag) => seen.has(flag));
+}
+
 // Exported so the artifact that PRINTS this command can be tested against the rule
 // that admits it. It was not, and the two disagreed: the bootstrap skill described a
 // free `--card-file <json>` while this admits one fixed path, so the §6 duty was
@@ -2143,29 +2195,23 @@ function withoutRunnerFlag(args) {
 
 function sanctionedOnboardingArgs(rawArgs, root) {
   const args = withoutRunnerFlag(rawArgs);
-  // NVA-LCGUARD-3 (backlog: 2026-08-17-lifecycle-guard-omits-the-operator-authority-repair-shape.md).
-  // collectOperatorContinuityAuthorityAction() (lib/project-onboarding-v3.mjs) is the
-  // guidance a session actually reads once plan-repair reports operator-authority-required:
-  // "rerun plan-repair/apply-repair with --id --plan-path --prd-path --spec-path --language
-  // set to those exact values" -- the same five-field, all-or-none operator-confirmed
-  // continuity claim the CLI's own usage string documents (scripts/project-onboarding-v3.mjs,
-  // "<plan-repair|apply-repair> --root <project-dir> [--id <feature-id> --plan-path <path>
-  // --prd-path <path> --spec-path <path> --language <de|en>] ..."). Exact position, like every
-  // sibling here: parse() is flag-name-based and order-tolerant, but the guard is the only
-  // place order actually matters. --id/--plan-path/--prd-path/--spec-path are a feature id and
-  // repository-relative paths, checked only as non-empty, non-flag-shaped strings -- the same
-  // defensive idiom the adopt-remote branch already applies to its own free-form --remote
-  // value below -- never re-deriving the path-safety/existence validation that stays the
-  // library's job. --language is the CLI's own closed two-value enum, exactly as the kickoff
-  // branches below already check it.
-  const operatorContinuityAuthorityAt = (index) => {
-    const nonEmptyPathArg = (value) => typeof value === "string" && value !== "" && !value.startsWith("--");
-    return args[index] === "--id" && nonEmptyPathArg(args[index + 1])
-      && args[index + 2] === "--plan-path" && nonEmptyPathArg(args[index + 3])
-      && args[index + 4] === "--prd-path" && nonEmptyPathArg(args[index + 5])
-      && args[index + 6] === "--spec-path" && nonEmptyPathArg(args[index + 7])
-      && args[index + 8] === "--language" && ["de", "en"].includes(args[index + 9]);
-  };
+  // NVA-BOOTADMIT-2: every branch below matches its argv TAIL through matchFlagSpec()
+  // (defined near exactRoot()) rather than checking fixed positions -- the declared flag SET
+  // still has to be exactly right, but the ORDER the caller wrote the flags in no longer has
+  // to match construction order. Shared validators, one per flag semantics, reused across
+  // branches below exactly where the original per-branch checks already agreed with each
+  // other; every branch still states its OWN flag set and required/optional split.
+  const isRootValue = (value) => value === root;
+  const isHexDigest = (value) => HEX.test(value);
+  const isIntentValue = (value) => ["onboarding", "bootstrap", "session", "dispatch"].includes(value);
+  const isLanguageValue = (value) => ["de", "en"].includes(value);
+  const isProfileValue = (value) => ["epic", "feature", "mini"].includes(value);
+  const nonEmptyTrimmed = (value) => typeof value === "string" && value.trim() !== "";
+  const nonEmptyTrimmedNotFlag = (value) => typeof value === "string" && value.trim() !== "" && !value.startsWith("--");
+  const nonEmptyNotFlag = (value) => typeof value === "string" && value !== "" && !value.startsWith("--");
+  const isRefValue = (value) => typeof value === "string"
+    && /^refs\/heads\/[A-Za-z0-9][A-Za-z0-9._/-]*$/u.test(value)
+    && !value.includes("..") && !value.includes("//") && !value.endsWith("/") && !value.endsWith(".lock");
   // GF-093: same reasoning as START_PREFLIGHT_SCRIPT's and REPAIR_MAP_SCRIPT's own bare
   // no-arg admissions above -- a stuck agent needs the CLI's own usage text precisely in the
   // state this function exists to gate. `main()` returns immediately on `options.help`
@@ -2173,15 +2219,17 @@ function sanctionedOnboardingArgs(rawArgs, root) {
   // and `--help`/`-h` is accepted before `--root` is even required (line 106). Narrow by
   // construction: exactly one argument, exactly `--help` or `-h`, nothing else -- never an
   // escape hatch bolted onto a real command (`--root <path> --help` and `kickoff plan --help`
-  // both still fall through to refusal below, same as every other malformed shape here).
+  // both still fall through to refusal below, same as every other malformed shape here). Not
+  // routed through matchFlagSpec(): there is no subcommand prefix and no --root here, and a
+  // single admissible token has no flag order to be insensitive to.
   if (args.length === 1 && (args[0] === "--help" || args[0] === "-h")) return true;
   if (args[0] === "inspect"
-    && exactRoot(args, root, 1)
-    && (args.length === 3
-      || (args.length === 5 && args[3] === "--intent"
-        && ["onboarding", "bootstrap", "session", "dispatch"].includes(args[4])))) return true;
+    && matchFlagSpec(args.slice(1), {
+      requiredValue: { "--root": isRootValue },
+      optionalValue: { "--intent": isIntentValue },
+    })) return true;
   if (args[0] === "continuity" && args[1] === "inspect"
-    && exactRoot(args, root, 2) && args.length === 4) return true;
+    && matchFlagSpec(args.slice(2), { requiredValue: { "--root": isRootValue } })) return true;
   // GUARDDERIVE-1 (backlog:
   // 2026-08-16-guard-lifecycle-allowlist-should-derive-from-the-onboarding-cli-table.md).
   // This branch used to carry a hand-maintained array of plan* names, and it had gone stale
@@ -2202,24 +2250,47 @@ function sanctionedOnboardingArgs(rawArgs, root) {
   // 2026-08-17-plan-partial-authority-guard-allowlist-does-not-admit-its-own-profile-source-flags.md),
   // not an oversight, so deriving the NAME set never widens the SHAPE set.
   if (AUTOMATED_LIFECYCLE_ARGV_COMMANDS.includes(args[0])
-    && exactRoot(args, root, 1)
-    && (args.length === 3
-      || (args.length === 5 && args[3] === "--intent"
-        && ["onboarding", "bootstrap", "session", "dispatch"].includes(args[4])))) return true;
-  // NVA-LCGUARD-3: the operator-authority form -- only plan-repair ever accepts these five
-  // fields (isRepairCommand in the CLI's own parse()); no other sibling in the bare-form
-  // branch above does, so this is a plan-repair-only addition, not a widening of that
-  // shared branch.
-  if (args[0] === "plan-repair" && exactRoot(args, root, 1) && operatorContinuityAuthorityAt(3)
-    && (args.length === 13
-      || (args.length === 15 && args[13] === "--intent"
-        && ["onboarding", "bootstrap", "session", "dispatch"].includes(args[14])))) return true;
+    && matchFlagSpec(args.slice(1), {
+      requiredValue: { "--root": isRootValue },
+      optionalValue: { "--intent": isIntentValue },
+    })) return true;
+  // NVA-LCGUARD-3 (backlog: 2026-08-17-lifecycle-guard-omits-the-operator-authority-repair-shape.md).
+  // collectOperatorContinuityAuthorityAction() (lib/project-onboarding-v3.mjs) is the
+  // guidance a session actually reads once plan-repair reports operator-authority-required:
+  // "rerun plan-repair/apply-repair with --id --plan-path --prd-path --spec-path --language
+  // set to those exact values" -- the same five-field, all-or-none operator-confirmed
+  // continuity claim the CLI's own usage string documents (scripts/project-onboarding-v3.mjs,
+  // "<plan-repair|apply-repair> --root <project-dir> [--id <feature-id> --plan-path <path>
+  // --prd-path <path> --spec-path <path> --language <de|en>] ..."). --id/--plan-path/
+  // --prd-path/--spec-path are a feature id and repository-relative paths, checked only as
+  // non-empty, non-flag-shaped strings -- the same defensive idiom the adopt-remote branch
+  // below already applies to its own free-form --remote value -- never re-deriving the
+  // path-safety/existence validation that stays the library's job. --language is the CLI's
+  // own closed two-value enum, exactly as the kickoff branches below already check it. All
+  // five, like --root, are required value flags; matchFlagSpec() no longer cares which order
+  // the caller wrote them in, only that each is present exactly once (NVA-LCGUARD-3: the
+  // operator-authority form -- only plan-repair ever accepts these five fields
+  // (isRepairCommand in the CLI's own parse()); no other sibling in the bare-form branch
+  // above does, so this is a plan-repair-only addition, not a widening of that shared branch).
+  if (args[0] === "plan-repair"
+    && matchFlagSpec(args.slice(1), {
+      requiredValue: {
+        "--root": isRootValue,
+        "--id": nonEmptyNotFlag,
+        "--plan-path": nonEmptyNotFlag,
+        "--prd-path": nonEmptyNotFlag,
+        "--spec-path": nonEmptyNotFlag,
+        "--language": isLanguageValue,
+      },
+      optionalValue: { "--intent": isIntentValue },
+    })) return true;
   if (["plan-source-recovery", "plan-manifest-repair"].includes(args[0])
-    && exactRoot(args, root, 1) && args.length === 3) return true;
+    && matchFlagSpec(args.slice(1), { requiredValue: { "--root": isRootValue } })) return true;
   if (args[0] === "apply-manifest-repair"
-    && exactRoot(args, root, 1)
-    && args[3] === "--plan-sha256" && HEX.test(args[4] ?? "")
-    && args[5] === "--activate" && args.length === 6) return true;
+    && matchFlagSpec(args.slice(1), {
+      requiredValue: { "--root": isRootValue, "--plan-sha256": isHexDigest },
+      required: { "--activate": true },
+    })) return true;
   // NVA-LCGUARD-1 (backlog: 2026-08-17-lifecycle-guard-allowlist-still-misses-apply-partial-authority-and-adopt-remote.md).
   // lib/project-onboarding-v3.mjs:470 constructs exactly this command as the plan's own
   // applyAction -- the very next step after a successful plan-partial-authority -- and
@@ -2230,11 +2301,15 @@ function sanctionedOnboardingArgs(rawArgs, root) {
   // the applyAction construction -- PARTIAL_AUTHORITY_SOURCE, "canonical-fresh-v3" -- since
   // any other source returns selection-required before that command is ever built.
   if (args[0] === "apply-partial-authority"
-    && exactRoot(args, root, 1)
-    && args[3] === "--profile" && ["epic", "feature", "mini"].includes(args[4])
-    && args[5] === "--source" && args[6] === "canonical-fresh-v3"
-    && args[7] === "--plan-sha256" && HEX.test(args[8] ?? "")
-    && args[9] === "--activate" && args.length === 10) return true;
+    && matchFlagSpec(args.slice(1), {
+      requiredValue: {
+        "--root": isRootValue,
+        "--profile": isProfileValue,
+        "--source": (value) => value === "canonical-fresh-v3",
+        "--plan-sha256": isHexDigest,
+      },
+      required: { "--activate": true },
+    })) return true;
   // lib/project-onboarding-v3.mjs:4198 and :4111 construct exactly these two commands --
   // the documented onboarding-recovery.md path for portable-seed-required when an existing
   // remote+branch is supplied. Only these two adopt-remote subcommands are ever admitted;
@@ -2244,105 +2319,123 @@ function sanctionedOnboardingArgs(rawArgs, root) {
   // its REMOTE_REF_RE half -- that gate also refuses "..", "//", a trailing "/", and a ".lock"
   // suffix before either adopt-remote command is ever constructed, so a guard admitting those
   // four extra shapes was a strict superset of what any construction site can emit.
-  if (args[0] === "adopt-remote" && ["plan", "apply"].includes(args[1])
-    && exactRoot(args, root, 2)
-    && args[4] === "--remote" && typeof args[5] === "string" && args[5] !== "" && !args[5].startsWith("--")
-    && args[6] === "--ref" && /^refs\/heads\/[A-Za-z0-9][A-Za-z0-9._/-]*$/u.test(args[7] ?? "")
-    && !(args[7] ?? "").includes("..") && !(args[7] ?? "").includes("//")
-    && !(args[7] ?? "").endsWith("/") && !(args[7] ?? "").endsWith(".lock")
-    && ((args[1] === "plan" && args.length === 8)
-      || (args[1] === "apply" && args[8] === "--plan-sha256" && HEX.test(args[9] ?? "")
-        && args[10] === "--activate" && args.length === 11))) return true;
+  if (args[0] === "adopt-remote" && args[1] === "plan"
+    && matchFlagSpec(args.slice(2), {
+      requiredValue: { "--root": isRootValue, "--remote": nonEmptyNotFlag, "--ref": isRefValue },
+    })) return true;
+  if (args[0] === "adopt-remote" && args[1] === "apply"
+    && matchFlagSpec(args.slice(2), {
+      requiredValue: {
+        "--root": isRootValue, "--remote": nonEmptyNotFlag, "--ref": isRefValue,
+        "--plan-sha256": isHexDigest,
+      },
+      required: { "--activate": true },
+    })) return true;
   // The apply half of the same defect the plan* branch above already closed. `plan-runtime
   // --intent session` returns `initialize-runtime --root <root> --plan-sha256 <hex>
   // --activate --runner <runner> --intent session` (lib/project-onboarding-v3.mjs:3608-3627
   // building it through lifecycleArgv at :1315-1318), so the planner emitted a command this
   // very allowlist refused, and the printed recovery instruction -- run the returned
   // nextAction verbatim -- pointed straight back at the refusal. Measured 2026-08-08.
-  // The trailing `--intent <value>` pair is optional and positional exactly as in the two
-  // branches above; the closed value set is the CLI's own
-  // (scripts/project-onboarding-v3.mjs:62). Nothing else moves: no new subcommand, no
-  // reordering tolerance, both digest and `--activate` still checked by position.
+  // The trailing `--intent <value>` pair is optional, exactly as in the two branches above;
+  // the closed value set is the CLI's own (scripts/project-onboarding-v3.mjs:62). Nothing
+  // else moves: no new subcommand, no new flags -- only matchFlagSpec()'s order-insensitivity
+  // (NVA-BOOTADMIT-2), same as every sibling branch in this function.
   if (["apply-portable-seed", "apply-reinstall", "initialize-runtime", "apply-repair", "apply-readback"].includes(args[0])
-    && exactRoot(args, root, 1)
-    && args[3] === "--plan-sha256" && HEX.test(args[4] ?? "")
-    && args[5] === "--activate"
-    && (args.length === 6
-      || (args.length === 8 && args[6] === "--intent"
-        && ["onboarding", "bootstrap", "session", "dispatch"].includes(args[7])))) return true;
+    && matchFlagSpec(args.slice(1), {
+      requiredValue: { "--root": isRootValue, "--plan-sha256": isHexDigest },
+      required: { "--activate": true },
+      optionalValue: { "--intent": isIntentValue },
+    })) return true;
   // NVA-LCGUARD-3: apply-repair's own operator-authority form. applyLifecycle()
   // (lib/project-onboarding-v3.mjs) re-threads operatorAuthority into the apply-side
   // recomputation of the repair plan, so the digest only matches when these five fields are
   // supplied again alongside --plan-sha256/--activate -- only apply-repair ever accepts them
   // (isRepairCommand), so this is an apply-repair-only addition, not a widening of the
   // shared digest+activate branch above.
-  if (args[0] === "apply-repair" && exactRoot(args, root, 1) && operatorContinuityAuthorityAt(3)
-    && args[13] === "--plan-sha256" && HEX.test(args[14] ?? "")
-    && args[15] === "--activate"
-    && (args.length === 16
-      || (args.length === 18 && args[16] === "--intent"
-        && ["onboarding", "bootstrap", "session", "dispatch"].includes(args[17])))) return true;
-  // --language <de|en> is mandatory for kickoff plan/apply since the CLI's
-  // GF-066 addition (scripts/project-onboarding-v3.mjs:56,92,114); it sits
-  // between --goal <text> and --plan-sha256 <sha256> in the CLI's own
-  // documented canonical order. Exact position, exact two-value enum, like
-  // every other branch in this function -- no reordering tolerance.
+  if (args[0] === "apply-repair"
+    && matchFlagSpec(args.slice(1), {
+      requiredValue: {
+        "--root": isRootValue,
+        "--id": nonEmptyNotFlag,
+        "--plan-path": nonEmptyNotFlag,
+        "--prd-path": nonEmptyNotFlag,
+        "--spec-path": nonEmptyNotFlag,
+        "--language": isLanguageValue,
+        "--plan-sha256": isHexDigest,
+      },
+      required: { "--activate": true },
+      optionalValue: { "--intent": isIntentValue },
+    })) return true;
+  // --language <de|en> is mandatory for kickoff plan/apply since the CLI's GF-066 addition
+  // (scripts/project-onboarding-v3.mjs:56,92,114), alongside --goal <text> -- and, for apply,
+  // --plan-sha256 <sha256> and --activate. Exact flag SET and exact two-value enum, like
+  // every other branch in this function; matchFlagSpec() is order-insensitive on where each
+  // flag sits (NVA-BOOTADMIT-2).
   if (args[0] === "kickoff" && args[1] === "plan"
-    && exactRoot(args, root, 2) && args[4] === "--goal"
-    && typeof args[5] === "string" && args[5].trim() !== ""
-    && args[6] === "--language" && ["de", "en"].includes(args[7])
-    && args.length === 8) return true;
+    && matchFlagSpec(args.slice(2), {
+      requiredValue: { "--root": isRootValue, "--goal": nonEmptyTrimmed, "--language": isLanguageValue },
+    })) return true;
   if (args[0] === "kickoff" && args[1] === "apply"
-    && exactRoot(args, root, 2) && args[4] === "--goal"
-    && typeof args[5] === "string" && args[5].trim() !== ""
-    && args[6] === "--language" && ["de", "en"].includes(args[7])
-    && args[8] === "--plan-sha256" && HEX.test(args[9] ?? "")
-    && args[10] === "--activate" && args.length === 11) return true;
+    && matchFlagSpec(args.slice(2), {
+      requiredValue: {
+        "--root": isRootValue, "--goal": nonEmptyTrimmed, "--language": isLanguageValue,
+        "--plan-sha256": isHexDigest,
+      },
+      required: { "--activate": true },
+    })) return true;
   // NVA-W5-GUARDADMIT-1 (backlog:
   // 2026-08-19-guard-lifecycle-ready-has-no-admission-branch-for-the-intake-checkpoint-subcommands.md).
   // Wave 4 onboarding coordinator, step 1-3 (NVA-W4-COORD-1). These three ONBOARDING_SUBCOMMANDS
   // entries are `mutates: true, automatedArgvShape: null`, so GUARDDERIVE-1's derived admission
   // above never covers them -- design.md SSb's claim that no guard change is needed was FALSE for
   // this reason (see the comment beside the table entries in scripts/project-onboarding-v3.mjs).
-  // Each branch below admits exactly ONE narrow, positional shape -- the same discipline every
-  // other mutating branch in this function already applies -- rather than the full optional-flag
+  // Each branch below admits exactly ONE narrow flag SET -- the same discipline every other
+  // mutating branch in this function already applies -- rather than the full optional-flag
   // grammar parse() accepts for these subcommands.
   //
   // intake-consent-apply's own function (applyOnboardingIntakeConsent, onboarding-continuity.mjs)
-  // always requires --granted (there is no shape where it may be omitted: `if (granted !== true)
-  // fail(...)` is unconditional). --git-author-name/--git-author-email/--language/--profile are
-  // individually optional there (each field is filled only once, then ignored on replay), but
-  // design SSa.5 point 1 frames this command as bundling consent PLUS "any still-missing required
-  // values ... in one bundled ask" -- so a caller that always supplies the full bundle is both the
-  // documented usage and always safe (an already-filled field is silently ignored, never
-  // overwritten). The full-bundle shape is therefore the one admitted here; a caller that omits
-  // one of these fields still falls through to refusal, exactly like every other narrow branch in
-  // this function -- reported as a deliberate, disclosed scoping choice (no construction site
-  // exists yet to ground a narrower or wider shape against).
+  // always requires --granted and --activate: `if (granted !== true) fail(...)` and
+  // `if (activate !== true) fail(...)` are both unconditional, no shape omits either.
+  // --git-author-name/--git-author-email/--language/--profile are each individually optional
+  // there: gitAuthor/language/profile all default to null and are merged as
+  // base.values.X ?? X (applyOnboardingIntakeConsent) -- a caller may supply any subset of the
+  // four, including none, and each field it does supply is still validated exactly as before.
+  // NVA-BOOTADMIT-2 (2026-08-27): the guard used to require the full four-field bundle as a
+  // "deliberate, disclosed scoping choice", stricter than the library it gates -- an
+  // autonomous onboarding run that supplied only --granted/--activate (the library's actual
+  // minimum) was refused for a reason the library itself never imposes. Widened to match
+  // applyOnboardingIntakeConsent exactly: --root/--granted/--activate stay required, the
+  // other four become optional value flags, each still validated when present.
   if (args[0] === "intake-consent-apply"
-    && exactRoot(args, root, 1)
-    && args[3] === "--granted"
-    && args[4] === "--git-author-name" && typeof args[5] === "string" && args[5].trim() !== "" && !args[5].startsWith("--")
-    && args[6] === "--git-author-email" && typeof args[7] === "string" && args[7].trim() !== "" && !args[7].startsWith("--")
-    && args[8] === "--language" && ["de", "en"].includes(args[9])
-    && args[10] === "--profile" && ["epic", "feature", "mini"].includes(args[11])
-    && args[12] === "--activate" && args.length === 13) return true;
+    && matchFlagSpec(args.slice(1), {
+      requiredValue: { "--root": isRootValue },
+      required: { "--granted": true, "--activate": true },
+      optionalValue: {
+        "--git-author-name": nonEmptyTrimmedNotFlag,
+        "--git-author-email": nonEmptyTrimmedNotFlag,
+        "--language": isLanguageValue,
+        "--profile": isProfileValue,
+      },
+    })) return true;
   // intake-capture-apply's own function (applyOnboardingIntakeCapture) requires --text to be a
   // non-empty string; --text.trim() !== "" mirrors the same idiom the kickoff --goal branches
   // above already apply to a free-form caller text value.
   if (args[0] === "intake-capture-apply"
-    && exactRoot(args, root, 1)
-    && args[3] === "--text" && typeof args[4] === "string" && args[4].trim() !== ""
-    && args[5] === "--activate" && args.length === 6) return true;
+    && matchFlagSpec(args.slice(1), {
+      requiredValue: { "--root": isRootValue, "--text": nonEmptyTrimmed },
+      required: { "--activate": true },
+    })) return true;
   // intake-design-questions-apply's own function (applyOnboardingIntakeDesignQuestions) parses
   // --answers-json as a JSON array of {question, answer} entries; --answers-json is checked only
   // loosely (non-empty, not flag-shaped) here, the same idiom the adopt-remote --remote and
   // plan-partial-authority --source branches above already apply to a free-form caller value --
   // deep JSON-shape validation stays the library's job, not this shell-argv allowlist's.
   if (args[0] === "intake-design-questions-apply"
-    && exactRoot(args, root, 1)
-    && args[3] === "--answers-json" && typeof args[4] === "string" && args[4].trim() !== "" && !args[4].startsWith("--")
-    && args[5] === "--activate" && args.length === 6) return true;
+    && matchFlagSpec(args.slice(1), {
+      requiredValue: { "--root": isRootValue, "--answers-json": nonEmptyTrimmedNotFlag },
+      required: { "--activate": true },
+    })) return true;
   // intake-generate-apply (Wave 4 onboarding coordinator step 4, landed after this item was
   // originally filed with only 3 subcommands -- confirmed a 4th, `mutates: true,
   // automatedArgvShape: null` entry in ONBOARDING_SUBCOMMANDS with no admission branch either).
@@ -2350,9 +2443,10 @@ function sanctionedOnboardingArgs(rawArgs, root) {
   // --plan-sha256/HEX/--activate shape the kickoff-apply and adopt-remote-apply branches above
   // already use for a digest-bound apply step.
   if (args[0] === "intake-generate-apply"
-    && exactRoot(args, root, 1)
-    && args[3] === "--plan-sha256" && HEX.test(args[4] ?? "")
-    && args[5] === "--activate" && args.length === 6) return true;
+    && matchFlagSpec(args.slice(1), {
+      requiredValue: { "--root": isRootValue, "--plan-sha256": isHexDigest },
+      required: { "--activate": true },
+    })) return true;
   // bootstrap-bind-apply (Wave 4 onboarding coordinator step 5, NVA-W5-COORD-STEP5-2, design.md
   // SSa.5 point 5, SSc.3). applyOnboardingBootstrapBind() requires expectedPlanSha256 like every
   // other digest-bound apply step -- the same --plan-sha256/HEX/--activate shape intake-generate-apply
@@ -2362,16 +2456,23 @@ function sanctionedOnboardingArgs(rawArgs, root) {
   // first `--runner <claude|codex>` pair found anywhere in argv before any branch below ever runs
   // -- so the shape checked here is the POST-STRIPPING one, identical to intake-generate-apply's.
   return args[0] === "bootstrap-bind-apply"
-    && exactRoot(args, root, 1)
-    && args[3] === "--plan-sha256" && HEX.test(args[4] ?? "")
-    && args[5] === "--activate" && args.length === 6;
+    && matchFlagSpec(args.slice(1), {
+      requiredValue: { "--root": isRootValue, "--plan-sha256": isHexDigest },
+      required: { "--activate": true },
+    });
 }
 
 function sanctionedMigrationArgs(args, root) {
-  if (["inspect", "plan"].includes(args[0]) && exactRoot(args, root, 1) && args.length === 3) return true;
-  if (args[0] !== "apply" || !exactRoot(args, root, 1)) return false;
-  return (args.length === 4 && args[3] === "--activate")
-    || (args.length === 5 && args[3] === "--initialize-missing-runtime" && args[4] === "--activate");
+  // NVA-BOOTADMIT-2: both branches route through matchFlagSpec() so the flag SET stays exact
+  // while its ORDER no longer matters, same rationale as sanctionedOnboardingArgs() above.
+  if (["inspect", "plan"].includes(args[0])
+    && matchFlagSpec(args.slice(1), { requiredValue: { "--root": (value) => value === root } })) return true;
+  if (args[0] !== "apply") return false;
+  return matchFlagSpec(args.slice(1), {
+    requiredValue: { "--root": (value) => value === root },
+    required: { "--activate": true },
+    optional: { "--initialize-missing-runtime": true },
+  });
 }
 
 // GF-060 (backlog: 2026-08-09-guard-lifecycle-ready-runner-allowlist-incomplete.md;

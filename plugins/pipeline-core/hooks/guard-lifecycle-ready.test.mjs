@@ -1583,6 +1583,13 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
         requireProjectOnboardingReadyFn() { deny("runtime-attestation-required"); },
       }), { exitCode: 0, stderr: "" });
     }
+    // NVA-BOOTADMIT-2: flag order carries no behavioural meaning to the target CLI --
+    // project-onboarding-v3.mjs parse() (lines 195-250) walks a flat, order-insensitive
+    // flag set for every subcommand, so --language before --goal parses identically to the
+    // canonical order above. The guard's old positional strictness excluded a shape its own
+    // target already accepted unchanged; this pair is pre-authorized to flip to admitted.
+    assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' kickoff plan --root '${path}' --language de --goal 'Build one HTML game'`, path), true);
+    assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' kickoff apply --root '${path}' --language de --goal 'Build one HTML game' --plan-sha256 ${"c".repeat(64)} --activate`, path), true);
     for (const command of [
       `${inspect}; printf bypass > src/output.txt`,
       `node '${ONBOARDING_SCRIPT}' apply-readback --root /tmp/other --plan-sha256 ${"a".repeat(64)} --activate`,
@@ -1608,10 +1615,6 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
       // Invalid --language value (not de|en).
       `node '${ONBOARDING_SCRIPT}' kickoff plan --root '${path}' --goal 'Build one HTML game' --language fr`,
       `node '${ONBOARDING_SCRIPT}' kickoff apply --root '${path}' --goal 'Build one HTML game' --language fr --plan-sha256 ${"c".repeat(64)} --activate`,
-      // --language in the wrong position (before --goal); this allowlist enforces exact
-      // positional shape like every other branch in this function, not flag reordering.
-      `node '${ONBOARDING_SCRIPT}' kickoff plan --root '${path}' --language de --goal 'Build one HTML game'`,
-      `node '${ONBOARDING_SCRIPT}' kickoff apply --root '${path}' --language de --goal 'Build one HTML game' --plan-sha256 ${"c".repeat(64)} --activate`,
       // GF-093: --help is a bare, argument-free admission only -- never an escape hatch
       // bolted onto a real command. Combined with anything else it still falls through to
       // exact refusal, same as every other malformed onboarding shape.
@@ -2094,6 +2097,10 @@ test("NVA-LCGUARD-1: apply-partial-authority admits exactly the applyAction shap
       const command = `node '${ONBOARDING_SCRIPT}' apply-partial-authority --root '${path}' --profile ${profile} --source canonical-fresh-v3 --plan-sha256 ${sha} --activate`;
       assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
     }
+    // NVA-BOOTADMIT-2: project-onboarding-v3.mjs parse() (lines 195-250) is a flat,
+    // order-insensitive flag walk, so --source before --profile parses identically to the
+    // canonical order above -- pre-authorized to flip from refused to admitted.
+    assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' apply-partial-authority --root '${path}' --source canonical-fresh-v3 --profile epic --plan-sha256 ${sha} --activate`, path), true);
     for (const command of [
       // invalid --profile enum value
       `node '${ONBOARDING_SCRIPT}' apply-partial-authority --root '${path}' --profile bogus --source canonical-fresh-v3 --plan-sha256 ${sha} --activate`,
@@ -2102,8 +2109,6 @@ test("NVA-LCGUARD-1: apply-partial-authority admits exactly the applyAction shap
       `node '${ONBOARDING_SCRIPT}' apply-partial-authority --root '${path}' --profile epic --source canonical-fresh-v3 --plan-sha256 ${"g".repeat(64)} --activate`,
       // missing --activate (shorter argv)
       `node '${ONBOARDING_SCRIPT}' apply-partial-authority --root '${path}' --profile epic --source canonical-fresh-v3 --plan-sha256 ${sha}`,
-      // wrong order: --source before --profile
-      `node '${ONBOARDING_SCRIPT}' apply-partial-authority --root '${path}' --source canonical-fresh-v3 --profile epic --plan-sha256 ${sha} --activate`,
       // extra trailing arg / wrong length
       `node '${ONBOARDING_SCRIPT}' apply-partial-authority --root '${path}' --profile epic --source canonical-fresh-v3 --plan-sha256 ${sha} --activate --extra flag`,
       // missing --source pair entirely
@@ -2147,6 +2152,10 @@ test("NVA-LCGUARD-1: adopt-remote admits exactly the plan and apply shapes and n
     assert.equal(isSanctionedLifecycleCommand(planCommand, path), true, planCommand);
     const applyCommand = `node '${ONBOARDING_SCRIPT}' adopt-remote apply --root '${path}' --remote origin --ref refs/heads/main --plan-sha256 ${sha} --activate`;
     assert.equal(isSanctionedLifecycleCommand(applyCommand, path), true, applyCommand);
+    // NVA-BOOTADMIT-2: project-onboarding-v3.mjs parse() (lines 195-250) is a flat,
+    // order-insensitive flag walk, so --ref before --remote parses identically to the
+    // canonical order above -- pre-authorized to flip from refused to admitted.
+    assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' adopt-remote plan --root '${path}' --ref refs/heads/main --remote origin`, path), true);
     for (const command of [
       // wrong length: extra trailing arg on plan
       `node '${ONBOARDING_SCRIPT}' adopt-remote plan --root '${path}' --remote origin --ref refs/heads/main --extra flag`,
@@ -2154,8 +2163,6 @@ test("NVA-LCGUARD-1: adopt-remote admits exactly the plan and apply shapes and n
       `node '${ONBOARDING_SCRIPT}' adopt-remote apply --root '${path}' --remote origin --ref refs/heads/main --plan-sha256 ${sha}`,
       // missing --activate, wrong trailing word instead (same length as apply)
       `node '${ONBOARDING_SCRIPT}' adopt-remote apply --root '${path}' --remote origin --ref refs/heads/main --plan-sha256 ${sha} --bypass`,
-      // wrong order: --ref before --remote
-      `node '${ONBOARDING_SCRIPT}' adopt-remote plan --root '${path}' --ref refs/heads/main --remote origin`,
       // malformed / non-hex --plan-sha256 on apply
       `node '${ONBOARDING_SCRIPT}' adopt-remote apply --root '${path}' --remote origin --ref refs/heads/main --plan-sha256 ${"a".repeat(63)} --activate`,
       `node '${ONBOARDING_SCRIPT}' adopt-remote apply --root '${path}' --remote origin --ref refs/heads/main --plan-sha256 ${"g".repeat(64)} --activate`,
@@ -2211,13 +2218,19 @@ test("NVA-W5-GUARDADMIT-1: intake-consent-apply admits exactly the full-bundle s
         assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
       }
     }
+    // NVA-BOOTADMIT-2: applyOnboardingIntakeConsent (onboarding-continuity.mjs:5276-5300)
+    // requires only --granted/--activate unconditionally; gitAuthor/language/profile each
+    // default null and merge as base.values.X ?? X, so a caller may omit any subset of the
+    // four value flags, including none -- pre-authorized to flip from refused to admitted.
+    assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --language en --profile epic --activate`, path), true);
+    assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --git-author-name 'PO Name' --git-author-email 'po@example.com' --activate`, path), true);
+    // NVA-BOOTADMIT-2: and, independently, project-onboarding-v3.mjs parse() (lines 195-250)
+    // is a flat, order-insensitive flag walk, so --git-author-email before --git-author-name
+    // parses identically to the canonical order -- pre-authorized to flip too.
+    assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --git-author-email 'po@example.com' --git-author-name 'PO Name' --language en --profile epic --activate`, path), true);
     for (const command of [
       // missing --granted entirely
       `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --git-author-name 'PO Name' --git-author-email 'po@example.com' --language en --profile epic --activate`,
-      // missing --git-author-name/--git-author-email pair
-      `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --language en --profile epic --activate`,
-      // missing --language/--profile pair
-      `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --git-author-name 'PO Name' --git-author-email 'po@example.com' --activate`,
       // missing --activate
       `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --git-author-name 'PO Name' --git-author-email 'po@example.com' --language en --profile epic`,
       // invalid --language enum value
@@ -2228,8 +2241,6 @@ test("NVA-W5-GUARDADMIT-1: intake-consent-apply admits exactly the full-bundle s
       `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --git-author-name '' --git-author-email 'po@example.com' --language en --profile epic --activate`,
       // flag-shaped --git-author-email value (smuggled flag instead of a value)
       `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --git-author-name 'PO Name' --git-author-email --bogus --language en --profile epic --activate`,
-      // wrong order: --git-author-email pair before --git-author-name pair
-      `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --git-author-email 'po@example.com' --git-author-name 'PO Name' --language en --profile epic --activate`,
       // extra trailing arg / wrong length
       `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --git-author-name 'PO Name' --git-author-email 'po@example.com' --language en --profile epic --activate --extra flag`,
       // wrong --root
@@ -2402,6 +2413,11 @@ test("NVA-LCGUARD-3: plan-repair and apply-repair admit exactly the operator-aut
     assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}' --intent session`, path), true);
     assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' apply-repair --root '${path}' --plan-sha256 ${sha} --activate`, path), true);
     assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' apply-repair --root '${path}' --plan-sha256 ${sha} --activate --intent session`, path), true);
+    // NVA-BOOTADMIT-2: project-onboarding-v3.mjs parse() (lines 195-250) is a flat,
+    // order-insensitive flag walk, so reordering any of the five operator fields parses
+    // identically to the canonical order -- both pre-authorized to flip to admitted.
+    assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}' --plan-path specs/plan.md --id feat-1 --prd-path specs/plan.md --spec-path specs/spec.md --language en`, path), true);
+    assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}' --id feat-1 --plan-path specs/plan.md --prd-path specs/plan.md --language en --spec-path specs/spec.md`, path), true);
     for (const command of [
       // each of the five operator fields missing entirely (positions shift, so no branch matches)
       `node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}' --plan-path specs/plan.md --prd-path specs/plan.md --spec-path specs/spec.md --language en`,
@@ -2409,10 +2425,6 @@ test("NVA-LCGUARD-3: plan-repair and apply-repair admit exactly the operator-aut
       `node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}' --id feat-1 --plan-path specs/plan.md --spec-path specs/spec.md --language en`,
       `node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}' --id feat-1 --plan-path specs/plan.md --prd-path specs/plan.md --language en`,
       `node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}' --id feat-1 --plan-path specs/plan.md --prd-path specs/plan.md --spec-path specs/spec.md`,
-      // reordered: --plan-path before --id
-      `node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}' --plan-path specs/plan.md --id feat-1 --prd-path specs/plan.md --spec-path specs/spec.md --language en`,
-      // reordered: --language before --spec-path
-      `node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}' --id feat-1 --plan-path specs/plan.md --prd-path specs/plan.md --language en --spec-path specs/spec.md`,
       // flag-shaped values (e.g. --id --plan-path with no value)
       `node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}' --id --plan-path specs/plan.md --prd-path specs/plan.md --spec-path specs/spec.md --language en`,
       `node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}' --id feat-1 --plan-path --prd-path specs/plan.md --spec-path specs/spec.md --language en`,
@@ -2493,6 +2505,18 @@ test("GUARDFIX-1: the apply family admits exactly the runner-plus-intent argv th
       }
     }
     const base = `node '${ONBOARDING_SCRIPT}' initialize-runtime --root '${path}' --plan-sha256 ${sha} --activate`;
+    // NVA-BOOTADMIT-2: project-onboarding-v3.mjs parse() (lines 195-250) is a flat,
+    // order-insensitive flag walk, so any reordering of --root/--plan-sha256/--activate/
+    // --intent parses identically to the canonical order (--runner is stripped before this
+    // shape is even checked, by the pre-existing withoutRunnerFlag scan) -- pre-authorized
+    // to flip from refused to admitted.
+    for (const reordered of [
+      `node '${ONBOARDING_SCRIPT}' initialize-runtime --root '${path}' --plan-sha256 ${sha} --intent session --activate --runner claude`,
+      `node '${ONBOARDING_SCRIPT}' initialize-runtime --root '${path}' --activate --plan-sha256 ${sha} --runner claude --intent session`,
+      `node '${ONBOARDING_SCRIPT}' initialize-runtime --plan-sha256 ${sha} --root '${path}' --activate --runner claude --intent session`,
+    ]) {
+      assert.equal(isSanctionedLifecycleCommand(reordered, path), true, reordered);
+    }
     for (const command of [
       // an --intent value outside the CLI's closed set
       `${base} --runner claude --intent onboarding-v2`,
@@ -2503,12 +2527,6 @@ test("GUARDFIX-1: the apply family admits exactly the runner-plus-intent argv th
       `${base} --runner claude --intent session --extra flag`,
       `${base} --runner claude --intent session --activate`,
       `${base} --runner claude --intent`,
-      // the positionally checked flags reordered (the guard compares a fixed sequence and
-      // must keep doing so; --runner/--intent pair order is normalized by the pre-existing
-      // withoutRunnerFlag scan and is deliberately not asserted here)
-      `node '${ONBOARDING_SCRIPT}' initialize-runtime --root '${path}' --plan-sha256 ${sha} --intent session --activate --runner claude`,
-      `node '${ONBOARDING_SCRIPT}' initialize-runtime --root '${path}' --activate --plan-sha256 ${sha} --runner claude --intent session`,
-      `node '${ONBOARDING_SCRIPT}' initialize-runtime --plan-sha256 ${sha} --root '${path}' --activate --runner claude --intent session`,
       // the digest and the root stay checked under the new length
       `node '${ONBOARDING_SCRIPT}' initialize-runtime --root '${path}' --plan-sha256 ${"a".repeat(63)} --activate --runner claude --intent session`,
       `node '${ONBOARDING_SCRIPT}' initialize-runtime --root /tmp/other --plan-sha256 ${sha} --activate --runner claude --intent session`,
