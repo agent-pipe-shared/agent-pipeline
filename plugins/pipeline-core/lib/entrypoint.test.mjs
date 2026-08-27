@@ -21,7 +21,7 @@
  */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir, platform } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -46,6 +46,25 @@ function linkedPluginRoot() {
   const link = join(base, "pipeline-core");
   symlinkSync(PLUGIN_ROOT, link, platform() === "win32" ? "junction" : "dir");
   return link;
+}
+
+/**
+ * A governed root the gate-strength guard will claim, with no relationship to this
+ * repository. EP07 used to point CLAUDE_PROJECT_DIR at REPO_ROOT, which made every
+ * run of this suite record two REAL guard denials against the checkout and append
+ * four governance events to it (NVA-VERIFYPOLLUTE-1). The assertions need a claimed
+ * root, not this one.
+ */
+function governedFixture() {
+  const base = mkdtempSync(join(tmpdir(), "entrypoint-governed-"));
+  roots.push(base);
+  mkdirSync(join(base, "project"), { recursive: true });
+  writeFileSync(join(base, "pipeline.user.yaml"), 'schema: "pipeline.user.v3"\ngates:\n  push_approval: "signature"\n');
+  writeFileSync(join(base, "project", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+  writeFileSync(join(base, "project", "guard-config.json"), '{"protectedTestPaths":[]}\n');
+  writeFileSync(join(base, "project", "critical-human-proof.json"), '{"schema":"pipeline.critical-human-proof-policy.v1","requiredKinds":["push"]}\n');
+  writeFileSync(join(base, "README.md"), "# fixture\n");
+  return base;
 }
 
 function run(scriptPath, argv, { input = "", cwd = REPO_ROOT, env = {} } = {}) {
@@ -138,7 +157,7 @@ try {
         rel: "hooks/guard-gate-strength.mjs",
         argv: [],
         input: JSON.stringify({ tool_name: "Edit", tool_input: { file_path: "pipeline.user.yaml" } }),
-        env: { CLAUDE_PROJECT_DIR: REPO_ROOT },
+        env: { CLAUDE_PROJECT_DIR: governedFixture() },
       },
     ];
     for (const entry of cases) {

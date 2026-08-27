@@ -684,6 +684,7 @@ const TEST_SUITES = [
   { name: "usage-ledger-tests", file: join(pluginScriptsDir, "usage-ledger.test.mjs") },
   // Landed after both merge sides diverged (commit ab347a74); registered here per PHX-VERIFY 1b.
   { name: "pipeline-start-preflight-antigravity-hard-enforcement-tests", file: join(pluginScriptsDir, "pipeline-start-preflight-antigravity-hard-enforcement.test.mjs") },
+  { name: "guard-dispatch-budget-tests", file: join(hooksDir, "guard-dispatch-budget.test.mjs") },
 ];
 
 // Manifest-gated phase steps: see header — only projects that carry a manifest at
