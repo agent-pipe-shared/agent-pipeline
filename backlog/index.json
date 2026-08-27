@@ -3930,7 +3930,7 @@
       "closedAt": "2026-08-19",
       "closureRepository": "self",
       "closureCommit": "77e28eda2a51c5f60d140ee0f4e5a9387b52e80a",
-      "closureEvidence": "docs/adr/0066-publication-approval-time-signature-accepted-tradeoff.md"
+      "closureEvidence": "docs/adr/0075-publication-approval-time-signature-accepted-tradeoff.md"
     },
     {
       "id": "pipeline.published-lifecycle-event-schema-still-enumerates-cancellation",

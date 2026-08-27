@@ -1,4 +1,6 @@
-# ADR-0066: publication's approval-time-only Ed25519 signature check is an accepted, bounded tradeoff — no execution-time re-verification
+# ADR-0075: publication's approval-time-only Ed25519 signature check is an accepted, bounded tradeoff — no execution-time re-verification
+
+> Previously numbered ADR-0066 (until 2026-08-27).
 
 > Agent-Pipeline · Sprint Phoenix · as of 2026-08-19
 

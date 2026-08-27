@@ -232,13 +232,13 @@
           "docs/adr/0064-release-preflight-consent-reuses-the-uniform-approval-ceremony.md",
           "docs/adr/0065-a-voided-gate-is-re-earned-from-declared-inputs.md",
           "docs/adr/0066-handover-rotation-extraction-archive-hard-size-gate.md",
-          "docs/adr/0066-publication-approval-time-signature-accepted-tradeoff.md",
           "docs/adr/0067-tri-runner-antigravity-integration.md",
           "docs/adr/0068-backlog-ledger-merge-semantics.md",
           "docs/adr/0069-adr-numbers-are-allocated-at-acceptance.md",
           "docs/adr/0071-governance-event-kernel.md",
           "docs/adr/0073-handover-rotation-extraction-archive-hard-size-gate.md",
           "docs/adr/0074-port-authorize-critical-ceremony.md",
+          "docs/adr/0075-publication-approval-time-signature-accepted-tradeoff.md",
           "docs/adr/README.md"
         ]
       },
