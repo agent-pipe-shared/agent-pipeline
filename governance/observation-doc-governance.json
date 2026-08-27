@@ -238,6 +238,7 @@
           "docs/adr/0066-publication-approval-time-signature-accepted-tradeoff.md",
           "docs/adr/0067-tri-runner-antigravity-integration.md",
           "docs/adr/0068-backlog-ledger-merge-semantics.md",
+          "docs/adr/0069-adr-numbers-are-allocated-at-acceptance.md",
           "docs/adr/README.md"
         ]
       },
