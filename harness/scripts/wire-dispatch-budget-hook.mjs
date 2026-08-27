@@ -84,10 +84,45 @@ const VERIFY_PATH = join(REPO_ROOT, "harness", "scripts", "verify.mjs");
 const INVENTORY_PATH = join(REPO_ROOT, "docs", "product-capability-inventory.json");
 const INVENTORY_CHECKER = join(REPO_ROOT, "harness", "scripts", "check-product-capability-inventory.mjs");
 
-const MATCHER = "*";
+/**
+ * MEASURED 2026-08-27, and the reason this is not `"*"`.
+ *
+ * The hook was first wired with a match-all `"*"` matcher, chosen because the
+ * budget counts ALL tool calls and a matcher naming individual tools
+ * undercounts silently. The installed runtime binary was searched first and
+ * does contain a match-all predicate accepting an absent matcher, `"*"` and
+ * `".*"` -- so the literal was believed proven rather than assumed.
+ *
+ * It was not. A live dispatch afterwards made 34 tool calls and the guard's
+ * counter did not move once: the wiring was a silent no-op, exactly the
+ * failure the `"*"` choice was reasoned about and exactly the failure that
+ * looks identical to success. The binary search proved the predicate EXISTS
+ * somewhere in the runtime; it did not prove that predicate governs plugin
+ * PreToolUse matchers, and it does not.
+ *
+ * Hooks do reach subagents -- the same dispatch was refused mid-run by
+ * `guard-lifecycle-ready` (matcher `Bash|PowerShell`), which is the control
+ * that separates "hooks do not fire in subagents" from "this matcher is not
+ * honoured". Only the matcher form was wrong.
+ *
+ * So this enumerates, using the identical alternation construction every other
+ * working matcher in `hooks.json` already uses -- zero novelty. The list is
+ * deliberately wider than any single agent's toolset, because undercounting is
+ * the failure mode this guard exists to prevent. `".*"` may well work and is a
+ * one-character change, but it is untested, and untested is what produced this
+ * comment.
+ */
+const MATCHER = "Bash|Edit|Glob|Grep|NotebookEdit|Read|Task|TodoWrite|WebFetch|WebSearch|Write";
+
+/** The match-all literal this hook was first wired with; silently matched nothing. */
+const SUPERSEDED_MATCHER = "*";
 const GUARD_COMMAND = 'node "${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch-budget.mjs"';
 const VERIFY_SUITE_NAME = "guard-dispatch-budget-tests";
 const SURFACE_ID = `hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:${MATCHER}:${GUARD_COMMAND}`;
+// The surface id embeds the matcher, so repairing the matcher retires one
+// surface and introduces another -- the inventory has to follow, or
+// check-product-capability-inventory (and therefore Verify) goes red.
+const SUPERSEDED_SURFACE_ID = `hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:${SUPERSEDED_MATCHER}:${GUARD_COMMAND}`;
 const CAPABILITY_ID = "claude-hook-safety";
 
 /* ------------------------------------------------------------------ helpers */
@@ -233,6 +268,45 @@ const HOOKS_ADDITION = [
   "      },\n",
 ].join("");
 
+/**
+ * Repair applied when the hook is already wired but carries the superseded
+ * match-all matcher. Each anchor must occur exactly once or nothing is written.
+ * The comments are CORRECTED IN PLACE rather than rewritten: what was tried and
+ * why it failed is more useful to the next reader than a clean comment that
+ * hides the fact that a plausible-looking matcher matched nothing.
+ */
+const MATCHER_REPAIRS = [
+  {
+    label: "the registration's matcher",
+    anchor: `        "matcher": ${JSON.stringify(SUPERSEDED_MATCHER)},\n`,
+    replacement: `        "matcher": ${JSON.stringify(MATCHER)},\n`,
+  },
+  {
+    label: "the registration's $comment",
+    anchor: "Wired by harness/scripts/wire-dispatch-budget-hook.mjs; see hooks/guard-dispatch-budget.mjs.",
+    replacement:
+      "CORRECTION (2026-08-27, same day): this registration first carried a match-all matcher, and it matched NOTHING -- "
+      + "a live dispatch made 34 tool calls without moving the counter once. The runtime binary does contain a match-all "
+      + "predicate accepting an absent matcher and the two wildcard literals, which is why the choice was believed proven; "
+      + "that predicate simply does not govern plugin PreToolUse matchers. Hooks DO reach subagents -- the same dispatch was "
+      + "refused mid-run by guard-lifecycle-ready on its Bash|PowerShell matcher, which is the control separating "
+      + "\\\"hooks do not fire in subagents\\\" from \\\"this matcher is not honoured\\\". The matcher now enumerates, using the "
+      + "identical alternation construction every other working matcher here already uses, deliberately wider than any single "
+      + "agent's toolset because undercounting is the failure this guard exists to prevent. "
+      + "Wired by harness/scripts/wire-dispatch-budget-hook.mjs; see hooks/guard-dispatch-budget.mjs.",
+  },
+  {
+    label: "the header's (9) clause",
+    anchor:
+      "The installed runtime treats an absent matcher, \\\"*\\\" and \\\".*\\\" as match-all; this was verified against the running"
+      + " binary rather than assumed, because an unrecognised matcher is a SILENT no-op that looks exactly like success.",
+    replacement:
+      "CORRECTED 2026-08-27: the matcher was first match-all and matched nothing (34 tool calls, counter unmoved). The runtime's"
+      + " match-all predicate exists but does not govern plugin PreToolUse matchers, so the matcher now ENUMERATES the tools,"
+      + " deliberately wider than any single agent's toolset. Hooks themselves do reach subagents; only the matcher form was wrong.",
+  },
+];
+
 const HEADER_COUNT_ANCHOR = "). EIGHT hooks: (1)";
 const HEADER_COUNT_REPLACEMENT = "). NINE hooks: (1)";
 
@@ -300,9 +374,15 @@ function main() {
     return { ok: true, detail: `${parsedHooks.hooks.PreToolUse.length} PreToolUse registrations` };
   });
 
-  const alreadyWired = (parsedHooks?.hooks?.PreToolUse ?? []).some(invokesGuard);
-  check("wiring is not already present (idempotency)", () =>
-    alreadyWired ? { ok: true, detail: "already wired -- nothing to do" } : { ok: true, detail: "not yet wired" });
+  const existing = (parsedHooks?.hooks?.PreToolUse ?? []).find(invokesGuard) ?? null;
+  let mode = "insert";
+  check("wiring state (idempotency)", () => {
+    if (existing === null) return { ok: true, detail: "not yet wired -- will insert" };
+    if (existing.matcher === MATCHER) { mode = "already-wired"; return { ok: true, detail: "already wired with the intended matcher -- nothing to do" }; }
+    if (existing.matcher === SUPERSEDED_MATCHER) { mode = "repair-matcher"; return { ok: true, detail: `wired with the superseded match-all matcher ${JSON.stringify(SUPERSEDED_MATCHER)} -- will repair` }; }
+    return { ok: false, detail: `wired with an unrecognised matcher ${JSON.stringify(existing.matcher)}; this tool will not overwrite a matcher it did not write. Resolve by hand.` };
+  });
+  const alreadyWired = mode !== "insert";
 
   check("both target files are unmodified in git", () => {
     const dirty = [HOOKS_PATH, INVENTORY_PATH].filter((path) => {
@@ -332,36 +412,30 @@ function main() {
       : { ok: false, detail: `${VERIFY_SUITE_NAME} absent from ${rel(VERIFY_PATH)} -- wiring a guard whose suite Verify never runs` };
   });
 
-  check("match-all matcher is accepted by the installed runtime", () => {
-    if (MATCHER === "") return { ok: true, detail: 'the empty matcher is match-all by definition' };
-    const cli = whichOnPath("claude");
-    if (!cli) {
+  // WHY THIS CHECK CHANGED. It used to search the installed runtime binary for
+  // a match-all predicate, and it passed -- on a matcher that then matched
+  // nothing across 34 live tool calls. Finding a predicate in a 250 MB bundle
+  // proved the string exists somewhere, not that it governs plugin PreToolUse
+  // matchers. That is a check that produced false confidence, which is worse
+  // than no check. The property that actually distinguishes a matcher that
+  // fires from one that does not, on the evidence available here, is
+  // PRECEDENT: every matcher in this manifest that is known to fire is a plain
+  // alternation of tool names, and the one that did not fire was the only one
+  // that was not.
+  check("matcher uses the alternation form other working matchers in this manifest use", () => {
+    if (!/^[A-Za-z][A-Za-z0-9_]*(\|[A-Za-z][A-Za-z0-9_]*)*$/.test(MATCHER)) {
+      return { ok: false, detail: `${JSON.stringify(MATCHER)} is not a plain alternation of tool names; this tool will not wire a matcher form with no working precedent in this file` };
+    }
+    const others = (parsedHooks?.hooks?.PreToolUse ?? [])
+      .filter((entry) => !invokesGuard(entry))
+      .map((entry) => entry.matcher)
+      .filter((matcher) => typeof matcher === "string" && /^[A-Za-z][A-Za-z0-9_]*(\|[A-Za-z][A-Za-z0-9_]*)*$/.test(matcher));
+    if (others.length === 0) {
       return acceptUnverifiedMatcher
-        ? { ok: true, detail: "runtime not found on PATH -- accepted under --accept-unverified-matcher" }
-        : { ok: false, detail: "runtime not found on PATH; cannot prove the matcher fires. Re-run with --accept-unverified-matcher to proceed anyway." };
+        ? { ok: true, detail: "no same-form precedent in this manifest -- accepted under --accept-unverified-matcher" }
+        : { ok: false, detail: "no other registration in this manifest uses the alternation form, so there is no working precedent to rely on" };
     }
-    let bundle = cli;
-    try {
-      bundle = realpathSync(cli);
-    } catch { /* keep the PATH entry */ }
-    const needles = [
-      `matcher==="${MATCHER}"`,
-      `matcher === "${MATCHER}"`,
-      `matcher==='${MATCHER}'`,
-    ];
-    let hit = null;
-    try {
-      hit = binaryContainsAny(bundle, needles);
-    } catch (error) {
-      hit = null;
-      if (!acceptUnverifiedMatcher) {
-        return { ok: false, detail: `could not read the runtime bundle (${String(error?.message ?? error)}). Re-run with --accept-unverified-matcher to proceed anyway.` };
-      }
-    }
-    if (hit) return { ok: true, detail: `runtime treats ${JSON.stringify(MATCHER)} as match-all (found ${JSON.stringify(hit)} in the installed bundle)` };
-    return acceptUnverifiedMatcher
-      ? { ok: true, detail: `predicate not found in the installed bundle -- accepted under --accept-unverified-matcher` }
-      : { ok: false, detail: `the installed runtime does not visibly special-case ${JSON.stringify(MATCHER)}; wiring it could produce a SILENT no-op. Re-run with --accept-unverified-matcher only if you have another reason to trust it.` };
+    return { ok: true, detail: `${others.length} other registration(s) use the same form, e.g. ${JSON.stringify(others[0])}` };
   });
 
   check("inventory document round-trips without reformatting", () => {
@@ -374,14 +448,14 @@ function main() {
 
   if (failures.length > 0) return report(dryRun);
 
-  if (alreadyWired) {
-    console.log("\nAlready wired. Nothing was written.");
+  if (mode === "already-wired") {
+    console.log("\nAlready wired with the intended matcher. Nothing was written.");
     return 0;
   }
 
   if (dryRun) {
     console.log(`\nDry run: ${checked} checks, all green. Nothing was written.`);
-    console.log("Re-run without --check to apply.");
+    console.log(mode === "repair-matcher" ? "Re-run without --check to repair the matcher." : "Re-run without --check to apply.");
     return 0;
   }
 
@@ -391,9 +465,16 @@ function main() {
 
   let nextHooks;
   try {
-    nextHooks = anchoredInsert(originalHooks, HOOKS_ANCHOR, HOOKS_ADDITION, "PreToolUse registration");
-    nextHooks = anchoredReplace(nextHooks, HEADER_COUNT_ANCHOR, HEADER_COUNT_REPLACEMENT, "header hook count");
-    nextHooks = anchoredReplace(nextHooks, HEADER_CLAUSE_ANCHOR, HEADER_CLAUSE_REPLACEMENT, "header clause (9)");
+    if (mode === "repair-matcher") {
+      nextHooks = originalHooks;
+      for (const repair of MATCHER_REPAIRS) {
+        nextHooks = anchoredReplace(nextHooks, repair.anchor, repair.replacement, repair.label);
+      }
+    } else {
+      nextHooks = anchoredInsert(originalHooks, HOOKS_ANCHOR, HOOKS_ADDITION, "PreToolUse registration");
+      nextHooks = anchoredReplace(nextHooks, HEADER_COUNT_ANCHOR, HEADER_COUNT_REPLACEMENT, "header hook count");
+      nextHooks = anchoredReplace(nextHooks, HEADER_CLAUSE_ANCHOR, HEADER_CLAUSE_REPLACEMENT, "header clause (9)");
+    }
   } catch (error) {
     console.error(`  [FAIL] ${String(error?.message ?? error)}`);
     return 1;
@@ -411,6 +492,13 @@ function main() {
     // run moved `protected-test-paths-tests`, which had nothing to do with
     // wiring a hook. Equivalent for an already-sorted array, strictly less
     // invasive for one that is not.
+    if (mode === "repair-matcher") {
+      const beforeCount = inventory.surfaces.length + capability.surfaceIds.length;
+      inventory.surfaces = inventory.surfaces.filter((surface) => surface.surfaceId !== SUPERSEDED_SURFACE_ID);
+      capability.surfaceIds = capability.surfaceIds.filter((id) => id !== SUPERSEDED_SURFACE_ID);
+      const removed = beforeCount - (inventory.surfaces.length + capability.surfaceIds.length);
+      if (removed !== 2) throw new Error(`expected to retire the superseded surface from both the surfaces array and ${CAPABILITY_ID}, removed ${removed} entr(ies)`);
+    }
     insertSorted(inventory.surfaces, {
       surfaceId: SURFACE_ID,
       kind: "hook",
@@ -447,8 +535,9 @@ function main() {
     if (!Array.isArray(after)) {
       problems.push("hooks.PreToolUse is no longer an array");
     } else {
-      if (after.length !== before.length + 1) {
-        problems.push(`PreToolUse should have grown by exactly one entry (${before.length} -> ${before.length + 1}), but has ${after.length}`);
+      const expectedLength = mode === "repair-matcher" ? before.length : before.length + 1;
+      if (after.length !== expectedLength) {
+        problems.push(`PreToolUse should have ${expectedLength} entries (${mode}), but has ${after.length}`);
       }
       const added = after.filter(invokesGuard);
       if (added.length !== 1) {
@@ -460,9 +549,12 @@ function main() {
           problems.push(`the new registration's command is ${JSON.stringify(commands)}, expected exactly [${JSON.stringify(GUARD_COMMAND)}]`);
         }
       }
+      // Compare the NON-guard registrations on both sides: in repair mode the
+      // guard's own entry legitimately changed, everything else must not have.
       const survivors = after.filter((entry) => !invokesGuard(entry));
-      if (JSON.stringify(survivors) !== JSON.stringify(before)) {
-        problems.push("a pre-existing PreToolUse registration was altered -- this script may only add");
+      const beforeSurvivors = before.filter((entry) => !invokesGuard(entry));
+      if (JSON.stringify(survivors) !== JSON.stringify(beforeSurvivors)) {
+        problems.push("a PreToolUse registration other than the guard's own was altered -- this script may not touch them");
       }
     }
     const otherEvents = Object.keys(written.hooks ?? {}).filter((event) => event !== "PreToolUse");
@@ -514,7 +606,7 @@ function report(dryRun) {
 // could catch -- it reported `found 0` for a registration that had in fact
 // been inserted correctly, reverted a good write, and would have let a second
 // run insert a duplicate. These are the exact pieces that got it wrong.
-export { GUARD_COMMAND, HOOKS_ADDITION, HOOKS_ANCHOR, MATCHER, anchoredInsert, invokesGuard };
+export { GUARD_COMMAND, HOOKS_ADDITION, HOOKS_ANCHOR, MATCHER, SUPERSEDED_MATCHER, anchoredInsert, invokesGuard };
 
 // Only run when invoked as a program; importing this module must not execute it.
 if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {

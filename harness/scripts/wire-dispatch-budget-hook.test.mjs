@@ -30,6 +30,7 @@ import {
   HOOKS_ADDITION,
   HOOKS_ANCHOR,
   MATCHER,
+  SUPERSEDED_MATCHER,
   anchoredInsert,
   invokesGuard,
 } from "./wire-dispatch-budget-hook.mjs";
@@ -49,8 +50,17 @@ const HOOKS_PATH = join(REPO_ROOT, "plugins", "pipeline-core", "hooks", "hooks.j
  */
 function baselineText() {
   const live = readFileSync(HOOKS_PATH, "utf8");
-  if (!live.includes(HOOKS_ADDITION)) return live;
-  return live.replace(HOOKS_ADDITION, "");
+  const marker = live.indexOf('"$comment": "Dispatch budget');
+  if (marker === -1) return live; // not wired at all -- already the baseline
+  // Cut the whole registration object, whatever matcher it currently carries.
+  // Matching on HOOKS_ADDITION verbatim was not enough: while the matcher is
+  // being repaired, the live block and the block the tool would insert
+  // deliberately differ, and a verbatim test would then silently fall through
+  // and insert a SECOND registration.
+  const open = live.lastIndexOf("      {\n", marker);
+  const close = live.indexOf("\n      },\n", marker);
+  if (open === -1 || close === -1) throw new Error("could not delimit the dispatch-budget registration in the live manifest");
+  return live.slice(0, open) + live.slice(close + "\n      },\n".length);
 }
 
 /** The baseline manifest, plus the tool's own insertion applied in memory. */
@@ -117,11 +127,20 @@ test("WDB09: the live manifest carries the registration exactly once, never twic
   assert.equal(matched.length, 1, "the guard must be wired exactly once -- 0 means the wiring was lost, 2 means a duplicate landed");
 });
 
-test("WDB10: the block the tool would insert is the block the live manifest actually carries", () => {
-  const live = readFileSync(HOOKS_PATH, "utf8");
+test("WDB10: the live registration carries either the intended matcher or the one known-superseded value", () => {
+  const live = JSON.parse(readFileSync(HOOKS_PATH, "utf8"));
+  const [wired] = live.hooks.PreToolUse.filter(invokesGuard);
   assert.ok(
-    live.includes(HOOKS_ADDITION),
-    "the tool's insertion payload has drifted from what is installed; the baseline this suite derives would then be wrong, so fix the drift rather than the assertion",
+    wired.matcher === MATCHER || wired.matcher === SUPERSEDED_MATCHER,
+    `the live matcher is ${JSON.stringify(wired.matcher)}, which this tool neither writes nor recognises as its own superseded value -- resolve by hand rather than relaxing this assertion`,
+  );
+});
+
+test("WDB11: the superseded matcher is not the intended one, so the repair path is reachable", () => {
+  assert.notEqual(MATCHER, SUPERSEDED_MATCHER);
+  assert.ok(
+    /^[A-Za-z][A-Za-z0-9_]*(\|[A-Za-z][A-Za-z0-9_]*)*$/.test(MATCHER),
+    "the intended matcher must be a plain alternation of tool names -- the form every matcher in this manifest that is known to fire uses, and the form the one that silently matched nothing did not",
   );
 });
 
