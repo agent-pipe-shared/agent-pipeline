@@ -695,6 +695,9 @@ const TEST_SUITES = [
   { name: "check-doc-reconciliation-tests", file: join(repoRoot, "harness", "scripts", "check-doc-reconciliation.test.mjs") },
   { name: "pipeline-start-preflight-pre-push-observation-tests", file: join(pluginScriptsDir, "pipeline-start-preflight-pre-push-observation.test.mjs") },
   { name: "pre-push-hook-install-tests", file: join(pluginScriptsDir, "pre-push-hook-install.test.mjs") },
+  // NVA-SPRINTFIELD-1: the sprint-assignment reporter's own suite. Registered here so the
+  // closed sprint value set is enforced by the gate rather than only by the script itself.
+  { name: "check-backlog-sprint-assignment-tests", file: join(pluginScriptsDir, "check-backlog-sprint-assignment.test.mjs") },
 ];
 
 // Manifest-gated phase steps: see header — only projects that carry a manifest at
