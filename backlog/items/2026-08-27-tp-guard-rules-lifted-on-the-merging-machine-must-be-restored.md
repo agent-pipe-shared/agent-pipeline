@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.tp-guard-rules-lifted-on-the-merging-machine-must-be-restored
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-27
+closed_at: "2026-08-27"
+closure_repository: "self"
+closure_commit: "7630f3b13588a213fc8870585695da4016c1ed0d"
+closure_evidence: "specs/sprint-nova-epic/evidence/tp-lift-audit.ndjson"
 source: "Critic round 1 over the Phoenix merge (areas CR1-GUARDS and CR1-VERIFY, independently), 2026-08-27"
 ---
 
@@ -63,5 +67,12 @@ machine performing it.
 
 ## Triage
 
-- **Decision:** open, owned by the session that finishes the Phoenix merge.
-  Not deferrable past that merge's completion.
+- **Decision:** closed. Verified directly against the repository (not
+  inherited): commit `7630f3b13588a213fc8870585695da4016c1ed0d`
+  ("chore(security): restore the lifted TP guard rules and close their
+  audit trail") restored TP-3/4/5/6/7, confirmed `status: armed` via a
+  byte-identical SHA-256 match to the pre-lift file, appended the closing
+  entry to `specs/sprint-nova-epic/evidence/tp-lift-audit.ndjson` (now 2
+  chained entries: lift, restore), and deleted the merge-support scratch
+  scripts — `scratch/tp-lift.mjs` is absent from this checkout, confirming
+  step 5 of "What has to happen" above also completed.

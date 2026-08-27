@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.intake-generate-coordinator-path-undocumented-in-skill-references
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-24
+closed_at: "2026-08-25"
+closure_repository: "self"
+closure_commit: "288739086c0f76ff6370379d9a3ffa177d350833"
+closure_evidence: "plugins/pipeline-core/skills/pipeline-start/references/intake-generate-design.md"
 source: "AGY-KICKOFFSTAGING-1 dispatch, follow-up trace on backlog/items/2026-08-21-kickoff-staging-directory-mismatch.md, 2026-08-24"
 ---
 
