@@ -91,8 +91,15 @@ redesigned as a PO-performed act, pointer declared non-load-bearing with a
 typed A2 residual when deferred; §B header re-dated; authoring-record fact
 made evergreen; marker recomputed `4133223e…a503b6`). Round-2
 report/registry/response persisted beside round 1. **Round 3** (delta,
-claude-opus-5 at max, candidate `03d97ac5`, invariants R2-F1/R2-F2/R2-F4 +
-marker; R2-F3 = standing trailer disposition, excluded) dispatched.
+claude-opus-5 at max, candidate `03d97ac5`): **FAIL with exactly one
+minor** — R2-F1/R2-F2/marker resolved; R2-F4's "evergreen" reformulation
+was still false at its own commit (`commits[]` can never contain the
+marker-recomputing commit itself — self-reference lag). Fixed in
+**`0181fe4b`**: the declared fact is now commit-independent (sha256(spec.md)
+== committed marker at every commit of the line since `584acbda`; no
+`commits[]` dependency). **Round 4** (delta, claude-opus-5 at max,
+candidate `0181fe4b`, invariants R3-F1 + marker — the LAST of max four
+rounds for this package) dispatched.
 
 **Post-compact observation (extra evidence for defect 2 above):** after a
 `/compact`, the SessionStart reground classifier reported
@@ -104,7 +111,7 @@ the discarded→fresh-design shape), new surface (post-compact reground).
 Recorded here instead of editing the committed item, to avoid ledger DRIFT
 noise; fold into the item at its next legitimate touch.
 
-**Next:** on a green/resolved round 3 →
+**Next:** on a green/resolved round 4 →
 `pipeline-state.mjs submit-plan --by Elephant --profile epic`, then the
 **Haltepunkt**: present the PRD readably (EL-19), the five open PO
 decisions of PRD §9, the standing trailer disposition, the MP-01 gate
