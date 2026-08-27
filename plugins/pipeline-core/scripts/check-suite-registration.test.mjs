@@ -3,11 +3,14 @@
 /**
  * check-suite-registration.test.mjs -- covers the PURE comparison/parsing functions of
  * check-suite-registration.mjs with synthetic inputs. No real filesystem walk and no real
- * verify.mjs read: `parseRegisteredSuiteFiles`/`parseTestSuitesBlock` are exercised against
- * a synthetic `TEST_SUITES`-shaped source snippet, and `compareSuiteRegistration` against
- * synthetic enumerated/registered/opt-out sets. The real repo-state run (real filesystem,
- * real verify.mjs) is exercised separately, by hand, as this dispatch's DoD evidence -- not
- * by this suite.
+ * verify.mjs read: `parseRegisteredSuiteFiles`/`parseTestSuitesBlock` (and, since
+ * NVA-SUITEREGSCOPE-1, `parseScopedVerifySuiteFiles`/`parseScopedVerifySuitesBlock`,
+ * `parseWindowsAssuranceVerifySuiteFiles`/`parseWindowsAssuranceVerifySuitesBlock`, and
+ * `parseAllRegisteredSuiteFiles`) are exercised against a synthetic source snippet carrying
+ * all three registration-array shapes, and `compareSuiteRegistration` against synthetic
+ * enumerated/registered/opt-out sets. The real repo-state run (real filesystem, real
+ * verify.mjs) is exercised separately, by hand, as this dispatch's DoD evidence -- not by
+ * this suite.
  */
 import assert from "node:assert/strict";
 import test from "node:test";
@@ -15,8 +18,13 @@ import test from "node:test";
 import {
   compareSuiteRegistration,
   normalizeRepoRelativePath,
+  parseAllRegisteredSuiteFiles,
   parseRegisteredSuiteFiles,
+  parseScopedVerifySuiteFiles,
+  parseScopedVerifySuitesBlock,
   parseTestSuitesBlock,
+  parseWindowsAssuranceVerifySuiteFiles,
+  parseWindowsAssuranceVerifySuitesBlock,
   validateOptOutEntries,
 } from "./check-suite-registration.mjs";
 
@@ -110,6 +118,20 @@ const TEST_SUITES = [
 ];
 
 const trailingUseOfBrackets = [];
+
+const SCOPED_VERIFY_SUITES = Object.freeze([
+  Object.freeze({
+    name: "scoped-example-tests",
+    file: "plugins/pipeline-core/lib/scoped-example.test.mjs",
+  }),
+]);
+
+const WINDOWS_ASSURANCE_VERIFY_SUITES = Object.freeze([
+  Object.freeze({
+    name: "windows-example-tests",
+    file: "plugins/pipeline-core/lib/windows-example.test.mjs",
+  }),
+]);
 `;
 
 test("parseTestSuitesBlock: slices from the start marker to the true closing '\\n];' line, not an inline '[]'", () => {
@@ -201,4 +223,102 @@ const TEST_SUITES = [
   }
   assert.ok(thrown, "must throw rather than returning a truncated path");
   assert.match(thrown.message, /computedSegment/);
+});
+
+// NVA-SUITEREGSCOPE-1: SCOPED_VERIFY_SUITES and WINDOWS_ASSURANCE_VERIFY_SUITES are folded
+// into `registeredSuites` by verify.mjs alongside TEST_SUITES, but use a different `file:`
+// value shape (a plain quoted repo-relative string, not a `join(...)` call).
+
+test("parseScopedVerifySuitesBlock: slices from the start marker to the true closing '\\n]);' line", () => {
+  const block = parseScopedVerifySuitesBlock(SYNTHETIC_VERIFY_SOURCE);
+  assert.ok(block.startsWith("["));
+  assert.ok(block.endsWith("]"));
+  assert.ok(block.includes("scoped-example-tests"));
+  assert.ok(!block.includes("windows-example-tests"), "must not run into the following WINDOWS_ASSURANCE_VERIFY_SUITES array");
+});
+
+test("parseWindowsAssuranceVerifySuitesBlock: slices from the start marker to the true closing '\\n]);' line", () => {
+  const block = parseWindowsAssuranceVerifySuitesBlock(SYNTHETIC_VERIFY_SOURCE);
+  assert.ok(block.startsWith("["));
+  assert.ok(block.endsWith("]"));
+  assert.ok(block.includes("windows-example-tests"));
+  assert.ok(!block.includes("scoped-example-tests"), "must not include the preceding SCOPED_VERIFY_SUITES array");
+});
+
+test("parseScopedVerifySuiteFiles: resolves the fully-quoted string-literal file: value directly, with no join(...) resolution", () => {
+  const files = parseScopedVerifySuiteFiles(SYNTHETIC_VERIFY_SOURCE);
+  assert.deepEqual(files, ["plugins/pipeline-core/lib/scoped-example.test.mjs"]);
+});
+
+test("parseWindowsAssuranceVerifySuiteFiles: resolves the fully-quoted string-literal file: value directly, with no join(...) resolution", () => {
+  const files = parseWindowsAssuranceVerifySuiteFiles(SYNTHETIC_VERIFY_SOURCE);
+  assert.deepEqual(files, ["plugins/pipeline-core/lib/windows-example.test.mjs"]);
+});
+
+test("parseScopedVerifySuiteFiles: throws a named PARSE-SCOPED-VERIFY-SUITES-START-NOT-FOUND error when the array is absent, rather than returning an empty list", () => {
+  assert.throws(() => parseScopedVerifySuiteFiles("const NOT_IT = Object.freeze([]);"), /PARSE-SCOPED-VERIFY-SUITES-START-NOT-FOUND/);
+});
+
+test("parseScopedVerifySuiteFiles: throws a named PARSE-SCOPED-VERIFY-SUITES-END-NOT-FOUND error when no closing '\\n]);' terminator follows", () => {
+  const source = `
+const SCOPED_VERIFY_SUITES = Object.freeze([
+  Object.freeze({ name: "unterminated", file: "x.test.mjs" }),
+`;
+  assert.throws(() => parseScopedVerifySuiteFiles(source), /PARSE-SCOPED-VERIFY-SUITES-END-NOT-FOUND/);
+});
+
+test("parseScopedVerifySuiteFiles: fails closed on a file: value that is not a fully-quoted string literal -- not silently skipped", () => {
+  const source = `
+const SCOPED_VERIFY_SUITES = Object.freeze([
+  Object.freeze({ name: "bogus", file: someVariable }),
+]);
+`;
+  assert.throws(() => parseScopedVerifySuiteFiles(source), /PARSE-SCOPED-VERIFY-SUITES-UNRECOGNIZED-SHAPE/);
+  assert.throws(() => parseScopedVerifySuiteFiles(source), /file: value is not a fully-quoted string literal/);
+  assert.throws(() => parseScopedVerifySuiteFiles(source), /someVariable/);
+});
+
+test("parseWindowsAssuranceVerifySuiteFiles: throws a named PARSE-WINDOWS-ASSURANCE-VERIFY-SUITES-START-NOT-FOUND error when the array is absent", () => {
+  assert.throws(() => parseWindowsAssuranceVerifySuiteFiles("const NOT_IT = Object.freeze([]);"), /PARSE-WINDOWS-ASSURANCE-VERIFY-SUITES-START-NOT-FOUND/);
+});
+
+test("parseWindowsAssuranceVerifySuiteFiles: throws a named PARSE-WINDOWS-ASSURANCE-VERIFY-SUITES-END-NOT-FOUND error when no closing '\\n]);' terminator follows", () => {
+  const source = `
+const WINDOWS_ASSURANCE_VERIFY_SUITES = Object.freeze([
+  Object.freeze({ name: "unterminated", file: "x.test.mjs" }),
+`;
+  assert.throws(() => parseWindowsAssuranceVerifySuiteFiles(source), /PARSE-WINDOWS-ASSURANCE-VERIFY-SUITES-END-NOT-FOUND/);
+});
+
+test("parseWindowsAssuranceVerifySuiteFiles: fails closed on a file: value that is not a fully-quoted string literal -- not silently skipped", () => {
+  const source = `
+const WINDOWS_ASSURANCE_VERIFY_SUITES = Object.freeze([
+  Object.freeze({ name: "bogus", file: someVariable }),
+]);
+`;
+  assert.throws(() => parseWindowsAssuranceVerifySuiteFiles(source), /PARSE-WINDOWS-ASSURANCE-VERIFY-SUITES-UNRECOGNIZED-SHAPE/);
+  assert.throws(() => parseWindowsAssuranceVerifySuiteFiles(source), /file: value is not a fully-quoted string literal/);
+  assert.throws(() => parseWindowsAssuranceVerifySuiteFiles(source), /someVariable/);
+});
+
+test("parseAllRegisteredSuiteFiles: combines TEST_SUITES, SCOPED_VERIFY_SUITES, and WINDOWS_ASSURANCE_VERIFY_SUITES into one repo-relative path list", () => {
+  const files = parseAllRegisteredSuiteFiles(SYNTHETIC_VERIFY_SOURCE);
+  assert.ok(files.includes("setup.test.mjs"), "must still include a TEST_SUITES entry");
+  assert.ok(files.includes("plugins/pipeline-core/lib/scoped-example.test.mjs"), "must include the SCOPED_VERIFY_SUITES entry");
+  assert.ok(files.includes("plugins/pipeline-core/lib/windows-example.test.mjs"), "must include the WINDOWS_ASSURANCE_VERIFY_SUITES entry");
+});
+
+test("compareSuiteRegistration: a file registered only via SCOPED_VERIFY_SUITES or only via WINDOWS_ASSURANCE_VERIFY_SUITES is recognized as registered, while a genuinely unregistered file is still reported", () => {
+  const registeredPaths = parseAllRegisteredSuiteFiles(SYNTHETIC_VERIFY_SOURCE);
+  const result = compareSuiteRegistration({
+    enumeratedPaths: [
+      "plugins/pipeline-core/lib/scoped-example.test.mjs",
+      "plugins/pipeline-core/lib/windows-example.test.mjs",
+      "plugins/pipeline-core/lib/rogue.test.mjs",
+    ],
+    registeredPaths,
+    optOut: [],
+  });
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.unaccounted, ["plugins/pipeline-core/lib/rogue.test.mjs"], "only the genuinely-unregistered file must be reported");
 });

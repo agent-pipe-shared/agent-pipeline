@@ -20,32 +20,45 @@
  * strength.
  *
  * PARSING STRATEGY: a depth-aware character scan (comments and string contents skipped)
- * locates EVERY `file:` key inside the `TEST_SUITES` array's source text and captures its
- * value verbatim, whatever shape it is written in -- no AST dependency, matching this
- * codebase's existing comfort with pure string/character-scan logic over its own source
- * (see `git-cmd.mjs`'s header and `guard-maintenance-window-kernel-closure.test.mjs`'s
- * scanner, which this mirrors). Only a value that is, in its entirety, a
- * `join(<base>, "<segment>", ...)` call is resolved to a path; `<base>` must be one of the
- * five directory constants `verify.mjs` itself defines (`repoRoot`, `scriptDir`, `hooksDir`,
- * `libDir`, `pluginScriptsDir`), and every remaining argument must be a fully-quoted string.
- * Every other shape -- a `file:` value that is not a `join(...)` call at all, an unrecognized
- * base identifier, or a `join(...)` call mixing a quoted segment with an unquoted/variable
- * argument -- FAILS CLOSED with a named diagnostic rather than being silently skipped,
+ * locates EVERY `file:` key inside a target array's source text and captures its value
+ * verbatim, whatever shape it is written in -- no AST dependency, matching this codebase's
+ * existing comfort with pure string/character-scan logic over its own source (see
+ * `git-cmd.mjs`'s header and `guard-maintenance-window-kernel-closure.test.mjs`'s scanner,
+ * which this mirrors). Three arrays are read this way, because `verify.mjs` itself folds all
+ * three into the suites it actually runs at runtime
+ * (`registeredSuites = [...TEST_SUITES, ...scopedTests, ...windowsAssuranceTests, ...]`), and
+ * each uses its own `file:` value shape:
+ *
+ *   - `TEST_SUITES` -- a value that is, in its entirety, a `join(<base>, "<segment>", ...)`
+ *     call is resolved to a path; `<base>` must be one of the five directory constants
+ *     `verify.mjs` itself defines (`repoRoot`, `scriptDir`, `hooksDir`, `libDir`,
+ *     `pluginScriptsDir`), and every remaining argument must be a fully-quoted string.
+ *   - `SCOPED_VERIFY_SUITES` / `WINDOWS_ASSURANCE_VERIFY_SUITES` -- a value that is, in its
+ *     entirety, a fully-quoted repo-relative string literal (e.g.
+ *     `"plugins/pipeline-core/lib/example.test.mjs"`) is taken as the path directly -- no
+ *     `join(...)` wrapping, no base-directory resolution. This is a genuinely different
+ *     source shape from `TEST_SUITES`, not a variant of the same one.
+ *
+ * Every other shape -- for `TEST_SUITES`, a `file:` value that is not a `join(...)` call at
+ * all, an unrecognized base identifier, or a `join(...)` call mixing a quoted segment with an
+ * unquoted/variable argument; for the other two, a `file:` value that is not a fully-quoted
+ * string literal -- FAILS CLOSED with a named diagnostic rather than being silently skipped,
  * truncated, or guessed at by a general-purpose JS-expression evaluator. A parser that
  * silently under-reads its own registration list would defeat the entire point of this check.
  *
  * LIMITS -- what this script does NOT establish, stated plainly:
  *
- *   - IT PARSES ONLY THE `TEST_SUITES` ARRAY, NOT VERIFY.MJS'S FULL REGISTERED-SUITE SET.
- *     `verify.mjs` also folds `SCOPED_VERIFY_SUITES` and `WINDOWS_ASSURANCE_VERIFY_SUITES`
- *     (both under `plugins/pipeline-core/`) into the suites it actually runs at runtime
- *     (`registeredSuites = [...TEST_SUITES, ...scopedTests, ...windowsAssuranceTests, ...]`).
- *     Suite files registered ONLY through those two arrays will therefore be reported as
- *     "unaccounted" by this script even though `verify.mjs` does run them -- a known,
- *     deliberate scope limit of this dispatch (NVA-SUITEREG-1), not a bug to be silently
- *     worked around here. The exact false-positive list this produces on this repo's current
- *     state belongs in the dispatch report for the Elephant to triage; this script does not
- *     special-case those two arrays away.
+ *   - IT PARSES `TEST_SUITES`, `SCOPED_VERIFY_SUITES`, AND `WINDOWS_ASSURANCE_VERIFY_SUITES` --
+ *     the exact three arrays `verify.mjs` folds into `registeredSuites` at runtime, and no
+ *     more. `verify.mjs` also runs a fourth registration source, `PHASE_STEPS`
+ *     (`validate-manifest.mjs`, `security-scan.mjs`) -- deliberately not read here, because
+ *     neither of its files matches this script's own `*.test.mjs` enumeration filter, so
+ *     omitting it changes no result. If `verify.mjs` ever grows a FIFTH array folded into
+ *     `registeredSuites` and holding `*.test.mjs` entries, this script will not know about
+ *     it and will start reporting false positives again for that array specifically --
+ *     watch for that class of drift the same way this dispatch (NVA-SUITEREGSCOPE-1) closed
+ *     the prior one (NVA-SUITEREG-1, which named this exact two-array gap as a known,
+ *     deliberate, and now-closed scope limit).
  *   - IT DOES NOT DETECT WHETHER A REGISTERED SUITE ACTUALLY PASSES. Registration and
  *     correctness are different questions; this script answers only "does every suite file
  *     appear somewhere the gate looks."
@@ -59,7 +72,8 @@
  *
  * EXIT CODES: 0 = every enumerated suite is registered or opted out with a reason.
  * 1 = at least one unaccounted suite file or invalid opt-out entry. 3 = usage/environment
- * error (verify.mjs unreadable, or its `TEST_SUITES` array could not be parsed at all).
+ * error (verify.mjs unreadable, or any of its three registration arrays -- `TEST_SUITES`,
+ * `SCOPED_VERIFY_SUITES`, `WINDOWS_ASSURANCE_VERIFY_SUITES` -- could not be parsed).
  *
  * Usage:
  *   node plugins/pipeline-core/scripts/check-suite-registration.mjs
@@ -136,22 +150,54 @@ export function enumerateTestFiles(roots, { repoRoot = REPO_ROOT } = {}) {
 }
 
 /**
- * Slice out the `TEST_SUITES` array's own source text, from `const TEST_SUITES = [`
- * (inclusive of the opening bracket) up to the first `\n];` line after it. Bracket-counting
- * is deliberately NOT used: entries carry their own inline `[]` (e.g. `args: [...] : []`),
- * and the array's actual closing line is reliably the first bare `];` on its own line.
+ * Slice out a named array's own source text, from `startMarker` (inclusive of the opening
+ * bracket) up to the first line matching `terminator` after it. Bracket-counting is
+ * deliberately NOT used: entries carry their own inline `[]` (e.g. `args: [...] : []`), and
+ * the array's actual closing line is reliably the first occurrence of `terminator` -- which
+ * must itself start with `"\n]"` so the slice below lands on the array's own closing `]`
+ * regardless of what immediately follows it (`;` for a bare `const X = [...]`, `);` for a
+ * `const X = Object.freeze([...])`). `codePrefix` names the array in both thrown error codes,
+ * in the same shape `PARSE-TEST-SUITES-START-NOT-FOUND` / `PARSE-TEST-SUITES-END-NOT-FOUND`
+ * already use -- a distinguishable, hard usage-error code per array, never a silently-empty
+ * result standing in for "this array registers nothing".
+ */
+function sliceArrayBlock(sourceText, startMarker, terminator, codePrefix) {
+  const startIndex = sourceText.indexOf(startMarker);
+  if (startIndex === -1) throw new Error(`${codePrefix}-START-NOT-FOUND: \`${startMarker}\` not found in verify.mjs source`);
+  const bodyStart = startIndex + startMarker.length - 1; // position of the opening "["
+  const terminatorIndex = sourceText.indexOf(terminator, bodyStart);
+  if (terminatorIndex === -1) {
+    throw new Error(`${codePrefix}-END-NOT-FOUND: no \`${JSON.stringify(terminator)}\` terminator found after the ${codePrefix} start marker`);
+  }
+  // terminatorIndex points at the "\n" that opens `terminator`; the closing "]" is one
+  // character further, at terminatorIndex + 1, so the slice's exclusive end must be
+  // terminatorIndex + 2 to include it (and nothing of what follows the "]").
+  return sourceText.slice(bodyStart, terminatorIndex + 2); // include the closing "]"
+}
+
+/**
+ * Slice out the `TEST_SUITES` array's own source text. See `sliceArrayBlock` for the shared
+ * mechanics.
  */
 export function parseTestSuitesBlock(sourceText) {
-  const startMarker = "const TEST_SUITES = [";
-  const startIndex = sourceText.indexOf(startMarker);
-  if (startIndex === -1) throw new Error("PARSE-TEST-SUITES-START-NOT-FOUND: `const TEST_SUITES = [` not found in verify.mjs source");
-  const bodyStart = startIndex + startMarker.length - 1; // position of the opening "["
-  const terminator = "\n];";
-  const terminatorIndex = sourceText.indexOf(terminator, bodyStart);
-  if (terminatorIndex === -1) throw new Error("PARSE-TEST-SUITES-END-NOT-FOUND: no `\\n];` terminator found after the TEST_SUITES start marker");
-  // terminatorIndex points at the "\n" of "\n];"; the closing "]" is one character further, at
-  // terminatorIndex + 1, so the slice's exclusive end must be terminatorIndex + 2 to include it.
-  return sourceText.slice(bodyStart, terminatorIndex + 2); // include the closing "]"
+  return sliceArrayBlock(sourceText, "const TEST_SUITES = [", "\n];", "PARSE-TEST-SUITES");
+}
+
+/**
+ * Slice out the `SCOPED_VERIFY_SUITES` array's own source text (declared as
+ * `const SCOPED_VERIFY_SUITES = Object.freeze([ ... ]);` in verify.mjs, hence the `\n]);`
+ * terminator rather than `TEST_SUITES`'s bare `\n];`).
+ */
+export function parseScopedVerifySuitesBlock(sourceText) {
+  return sliceArrayBlock(sourceText, "const SCOPED_VERIFY_SUITES = Object.freeze([", "\n]);", "PARSE-SCOPED-VERIFY-SUITES");
+}
+
+/**
+ * Slice out the `WINDOWS_ASSURANCE_VERIFY_SUITES` array's own source text (same
+ * `Object.freeze([ ... ]);` wrapping and `\n]);` terminator as `SCOPED_VERIFY_SUITES`).
+ */
+export function parseWindowsAssuranceVerifySuitesBlock(sourceText) {
+  return sliceArrayBlock(sourceText, "const WINDOWS_ASSURANCE_VERIFY_SUITES = Object.freeze([", "\n]);", "PARSE-WINDOWS-ASSURANCE-VERIFY-SUITES");
 }
 
 /**
@@ -369,6 +415,60 @@ export function parseRegisteredSuiteFiles(sourceText) {
 }
 
 /**
+ * Parse every `file:` key's value inside `blockText` (the sliced source text of a
+ * `SCOPED_VERIFY_SUITES`- or `WINDOWS_ASSURANCE_VERIFY_SUITES`-shaped array) into a
+ * repo-relative path. Unlike `TEST_SUITES`, these two arrays' `file:` values are already
+ * fully-quoted repo-relative string literals (no `join(...)` wrapping) -- see the module
+ * header's PARSING STRATEGY. FAILS CLOSED (throws, naming every problem found in one message,
+ * under `codePrefix`) on a `file:` value that is not, in its entirety, a fully-quoted string
+ * literal -- a bare identifier, a template literal, a `join(...)` call -- is named and rejected
+ * rather than silently producing no entry for that suite. See the module header for why: a
+ * parser that silently under-reads its own registration list would defeat the entire point of
+ * this check.
+ */
+function parseStringShapeSuiteFiles(blockText, codePrefix) {
+  const files = [];
+  const problems = [];
+  for (const { value } of extractFileKeyValues(blockText)) {
+    const quotedMatch = QUOTED_ARG_RE.exec(value);
+    if (!quotedMatch) {
+      problems.push(`file: value is not a fully-quoted string literal: \`${value}\``);
+      continue;
+    }
+    files.push(normalizeRepoRelativePath(quotedMatch[1]));
+  }
+  if (problems.length > 0) {
+    throw new Error(`${codePrefix}-UNRECOGNIZED-SHAPE (fails closed rather than guessing at a general-purpose JS-expression evaluator): ${problems.join("; ")}`);
+  }
+  return files;
+}
+
+/** Parse `SCOPED_VERIFY_SUITES`'s `file:` string-literal values into repo-relative paths. */
+export function parseScopedVerifySuiteFiles(sourceText) {
+  return parseStringShapeSuiteFiles(parseScopedVerifySuitesBlock(sourceText), "PARSE-SCOPED-VERIFY-SUITES");
+}
+
+/**
+ * Parse `WINDOWS_ASSURANCE_VERIFY_SUITES`'s `file:` string-literal values into repo-relative
+ * paths.
+ */
+export function parseWindowsAssuranceVerifySuiteFiles(sourceText) {
+  return parseStringShapeSuiteFiles(parseWindowsAssuranceVerifySuitesBlock(sourceText), "PARSE-WINDOWS-ASSURANCE-VERIFY-SUITES");
+}
+
+/**
+ * The three arrays `verify.mjs` actually folds into `registeredSuites` at runtime
+ * (`TEST_SUITES`, `SCOPED_VERIFY_SUITES`, `WINDOWS_ASSURANCE_VERIFY_SUITES` -- see the module
+ * header's LIMITS section for the one array it does NOT read and why that is safe), combined
+ * into one repo-relative path list. A parse failure in any one of the three propagates as that
+ * array's own distinguishable error code -- never silently treated as "this array registers
+ * nothing".
+ */
+export function parseAllRegisteredSuiteFiles(sourceText) {
+  return [...parseRegisteredSuiteFiles(sourceText), ...parseScopedVerifySuiteFiles(sourceText), ...parseWindowsAssuranceVerifySuiteFiles(sourceText)];
+}
+
+/**
  * Validate opt-out entries. Returns a `Map` of normalized path -> reason for entries that pass
  * validation, and a list of `{ entry, code }` for entries that do not (missing path, missing
  * reason, or not an object at all). Invalid entries do NOT suppress the underlying finding.
@@ -428,7 +528,7 @@ function main(argv) {
   }
   let registeredPaths;
   try {
-    registeredPaths = parseRegisteredSuiteFiles(source);
+    registeredPaths = parseAllRegisteredSuiteFiles(source);
   } catch (error) {
     process.stderr.write(`${error.message}\n`);
     return 3;
@@ -448,7 +548,7 @@ function main(argv) {
       for (const path of result.unaccounted) process.stdout.write(`  - ${path}\n`);
     }
     if (result.ok) {
-      process.stdout.write(`OK: ${enumeratedPaths.length} suite file(s) enumerated against ${registeredPaths.length} TEST_SUITES entries; all registered or opted out with a reason.\n`);
+      process.stdout.write(`OK: ${enumeratedPaths.length} suite file(s) enumerated against ${registeredPaths.length} TEST_SUITES/SCOPED_VERIFY_SUITES/WINDOWS_ASSURANCE_VERIFY_SUITES entries; all registered or opted out with a reason.\n`);
     }
   }
   return result.ok ? 0 : 1;
