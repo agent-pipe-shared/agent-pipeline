@@ -49,7 +49,54 @@ assertion. Neither is an implementation call.
   kind of plausible-looking-but-wrong ledger content that nothing downstream
   would catch.
 
-## Recommendation, for what it is worth
+## UPDATE 2026-08-27 — the PO chose (c), it was attempted, and it does not work
+
+The PO decided to migrate the 38 amendments. A dispatch executed it, measured
+the result, reverted cleanly and stopped. What it found changes the options.
+
+**The dispatcher's pre-check was right but incomplete.** All 38 amendment
+targets ARE present in Nova's active chain at the same sequence with the same
+id and the same `supersedesEntryHash` — verified twice, zero mismatches. The
+amendments target sequences 1–41, inside the prefix both chains share, so
+their target bindings need no adjustment.
+
+**The missed invariant: the amendments carry hardcoded `from`/`to` statuses.**
+A sample amendment asserts `"from":"in_progress","to":"in_progress"`. For many
+of the 38 items, Nova has since moved the status on — through work Phoenix
+never saw. Appending the amendment then asserts a transition that contradicts
+the item's current state.
+
+**Measured, not inferred** — a controlled before/after run of
+`check-backlog-state.mjs` against the exact same ledger bytes:
+
+| | findings |
+|---|---|
+| before the migration | 13 |
+| after appending all 38 | 73 |
+| net | **+60 new, 0 resolved** |
+
+BS26 does go green (55/55). It goes green at the cost of sixty new
+violations — the local pass masks the regression the checker exposes in full.
+
+The dispatch correctly refused to adjust `from`/`to` to make it fit: its brief
+was a byte-identical append, and rewriting those fields would author
+amendments Phoenix never wrote. It reverted `transitions.ndjson`, `STATUS.md`
+and `index.json` to their exact HEAD bytes and stopped.
+
+## The options as they now stand
+
+- **(a) Migrate only the safe subset** — amendments whose target item has not
+  changed status since. Honest, but BS26 likely stays red: it expects all 38.
+- **(b) Mark BS26 not-applicable** with a dated reason. Now better supported
+  than when first proposed: the amendments do not merely sit at the wrong
+  coordinates, they contradict the current item states.
+- **(c) Migrate with adjusted `from`/`to`** — authors amendment events Phoenix
+  never wrote. Not recommended.
+- **(d) Change `validateTransitionLedger`** so such amendments classify as
+  DRIFT rather than FAIL. A larger intervention affecting every future ledger
+  check.
+
+## Original recommendation, for what it is worth
 
 **(a).** The amendments repaired a specific historical defect on the Phoenix
 line. That defect does not exist on Nova's chain, so the repair has nothing to
