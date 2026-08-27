@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.po-decision-claude-start-time-item-closed-on-a-rejected-approach
 type: requirement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-27
+closed_at: "2026-08-27"
+closure_repository: "self"
+closure_commit: "2fb9dded45b732e26a13f611a639a47e324f8a9d"
+closure_evidence: "backlog/items/2026-08-05-claude-has-no-start-time-opt-in-adoption-path.md"
 source: "Phoenix merge conflict resolution, dispatch PHX-ITEMS-2, 2026-08-26"
 ---
 
@@ -64,10 +68,12 @@ shows both in order with the outcome named.
 ## Triage
 
 - **Decision:** answered by the PO on 2026-08-27 and applied to the subject
-  item in the same session. Status stays `open` only until this change is
-  committed: a `closed` item requires a `closure_commit`, and that commit
-  cannot exist before the change it records. Closed in the follow-up commit
-  that can name it.
+  item in commit `2fb9dded45b732e26a13f611a639a47e324f8a9d`
+  ("docs(backlog): apply the PO decision on the Claude start-time item, and
+  fix six items I filed against the wrong schema"), which moved
+  `backlog/items/2026-08-05-claude-has-no-start-time-opt-in-adoption-path.md`
+  to `status: closed`. This decision item itself now closes in the
+  follow-up dispatch that verified that commit landed.
 - Was queued as PO-1 during the Phoenix merge and filed as a tracked item
   after two independent Critic reviews flagged that such obligations must not
   live only in the merge's scratch notes.
