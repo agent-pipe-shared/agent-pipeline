@@ -7,7 +7,7 @@
  * `lib/handover-rotation.mjs`'s `HANDOVER_MAX_BYTES`, overridable
  * per-project via a `handover.maxBytes` calibration key), independent of
  * any close event. NVA-HANDOVER-ROT-1 Piece C. Also fulfills the parallel
- * requirement from ADR-0064 Decision 1(b) ("an independent hard size
+ * requirement from ADR-0073 Decision 1(b) ("an independent hard size
  * gate") -- both ADRs converge on the same guard; this implementation is
  * the one both merge sides settled on, per PHX-MERGE-1A-HANDOVERSIZE's own
  * conflict-resolution finding (Nova's proposed-post-write-size simulation

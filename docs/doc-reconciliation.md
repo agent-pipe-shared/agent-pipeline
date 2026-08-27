@@ -72,7 +72,7 @@ implicated below — it was silently never enforced before this fix.
   `docs/state.md` (ADR-0012's own governed artifact) grew by 33 checkpoint
   entries (36 through 68) and was rotated once (checkpoints 1-60 archived to
   `docs/state-archive/2026-08-19--checkpoints-1-through-60.md` via
-  `handover-rotate.mjs`, per [ADR-0064](adr/0064-handover-rotation-extraction-archive-hard-size-gate.md))
+  `handover-rotate.mjs`, per [ADR-0073](adr/0073-handover-rotation-extraction-archive-hard-size-gate.md))
   once it exceeded its hard size cap. Both are exactly the canonicalized
   handover's normal operation (one versioned file, rotated not duplicated) —
   no change to the one-file/memory-mirror-only decision itself.

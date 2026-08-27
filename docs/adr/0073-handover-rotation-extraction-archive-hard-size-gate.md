@@ -1,4 +1,6 @@
-# ADR-0064: adopt Nova's extraction-then-archive rotation shape for Phoenix's own handover, re-derived against this repo's file — mechanism build and rotation itself are NOT done by this ADR
+# ADR-0073: adopt Nova's extraction-then-archive rotation shape for Phoenix's own handover, re-derived against this repo's file — mechanism build and rotation itself are NOT done by this ADR
+
+> Previously numbered ADR-0064 (until 2026-08-27).
 
 > Agent-Pipeline · Sprint Phoenix · as of 2026-08-18
 
@@ -230,7 +232,7 @@ preserved verbatim in `docs/state-archive/2026-08-19--pre-restart-and-nova-
 inherited-history.md`, whose own `## Provenance` section documents the
 source range, the PO authorization (2026-08-19 in-session decision to
 archive all three candidate ranges, none deleted), and the extraction-pass
-summary above in full. Committed together with the ADR-0064-required
+summary above in full. Committed together with the ADR-0073-required
 inventory entry in `governance/observation-doc-governance.json` classifying
 the new archive file (`audience: maintainer`, `lifecycle: normative-record`).
 

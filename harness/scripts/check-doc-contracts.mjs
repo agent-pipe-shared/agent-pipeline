@@ -18,7 +18,7 @@ import { checkObservationGovernance } from "./check-observation-governance.mjs";
 
 const decoder = new TextDecoder("utf-8", { fatal: true });
 const EXCLUDED_PATH = "AGENTS.md";
-// Archived-history directories (ADR-0064): a verbatim, never-re-edited copy of
+// Archived-history directories (ADR-0073): a verbatim, never-re-edited copy of
 // a prior handover section whose internal relative links resolved correctly
 // only at its original location. Excluded the same way AGENTS.md is: never
 // scanned as a link source, and any link INTO it resolves without checking

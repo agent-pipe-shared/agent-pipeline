@@ -8,8 +8,8 @@
 per this repository's never-rewrite convention, read Decision 5 as historical
 context for the question ADR-0066 answers, not as the current mechanism.
 Separately, on the Phoenix line, the rotation-mechanism *shape* (Decision 5)
-is addressed by [ADR-0064](0064-handover-rotation-extraction-archive-hard-size-gate.md),
-2026-08-18, which cross-references ADR-0066 as the shape's origin; ADR-0064
+is addressed by [ADR-0073](0073-handover-rotation-extraction-archive-hard-size-gate.md),
+2026-08-18, which cross-references ADR-0066 as the shape's origin; ADR-0073
 itself records that the extraction pass is partial and the mechanism
 build/rotation are NOT yet done on that line — Decision 5 is therefore
 shape-closed there, not fully discharged.
