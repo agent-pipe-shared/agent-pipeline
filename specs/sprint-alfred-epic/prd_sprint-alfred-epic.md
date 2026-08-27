@@ -1,7 +1,7 @@
 # Sprint Alfred Epic — Product Requirements
 
 <!-- po-language: en -->
-<!-- technical-spec-sha256: ef121a85768912a36efb10f9a79244e155fbefc324be7ef009950ac640912959 -->
+<!-- technical-spec-sha256: e57a2d1ffa9bae538078303f6f999a166ffe0bc16cbc66ab2abd77c8823e3223 -->
 
 **Feature ID:** `sprint-alfred-epic`
 **Profile / rigor / risk:** Epic / 2 / high (guard, canon, and authority
@@ -255,6 +255,16 @@ Follows #108's five stages, concretized:
    blocking behavior only after fixtures + dogfood calibration.
 6. **Wave 5:** E2 qualification, member-issue closure, sprint close.
 
+**Declared sequencing deviation (vs. #108 stage 1):** #108 places #99's
+decision authority in stage 1 so #104/#106 consume accepted rather than
+provisional module identities. Alfred moves D1 to the head of Wave 2, behind
+the control-integrity foundation of Waves 0–1: the falsified enforcement
+findings (§1) make measured control placement a precondition for trusting any
+new authority surface, including D1's own decision records. The stage-1
+intent survives in substance — D1 still lands before D2/D3 consume
+identities, and the interim is bounded by the provisional-identity marking
+(spec §7.2 module inventory). Argued in `design/issue-intake.md` (#108).
+
 **Entry conditions (from #108, live-verified 2026-08-27):**
 - **#100 (P0 push-approval fail-closed hotfix) is still OPEN** — required
   "accepted on `main`" before an Alfred implementation branch is cut; outside
@@ -262,6 +272,15 @@ Follows #108's five stages, concretized:
 - Upstream #46 authority contracts: available on the accepted base (Nova).
 - Shared schema boundaries frozen: delivered as E1 (first act).
 - PO names any `sprint:NONE` items that must land first: decision below.
+- **No active Sprint branch is expanded or coupled to Alfred** — reconciled
+  explicitly rather than merely asserted, because Alfred's design base is a
+  clone of the Nova line: the PO's 2026-08-27 switch decision fixes that all
+  Nova work continues in Nova sessions only; Alfred lives on its own branch
+  (`feat/sprint-alfred`, pushed to `origin/sprint_alfred`, never to a Nova
+  ref); and no Alfred implementation begins before Nova has landed on `main`
+  and this branch is rebased onto that state (§8 A-1). Design-time file
+  inheritance from the clone base is read-only and ends at that rebase — it
+  is not an expansion of, or live coupling to, an active Sprint branch.
 
 ## 6. Non-goals
 
@@ -281,16 +300,17 @@ not owned, here.
 ## 7. Acceptance requirements (PRD level)
 
 The epic is acceptable when — testable, each backed by fixtures/evidence
-named in `spec.md` §V and `acceptance.md`:
+named in `spec.md` §12 and `acceptance.md`:
 
 1. S1–S7 (§3) hold with evidence bound to one exact candidate.
 2. Every member issue's own acceptance-criteria list is satisfied or its
    deviations are explicitly PO-accepted at closure (the intake's argued
    deviations in `design/issue-intake.md` are the starting set).
 3. The eight B2 routes exist with their refusal messages naming the route;
-   the four 2026-08-27 incident receipts (guard-refused read-only command;
-   TP ceremony; truncation; readiness deadlock) are reproducible as C1
-   fixtures.
+   the four live-measured incident receipt classes (guard-refused read-only
+   command and readiness deadlock, 2026-08-27; TP ceremony, 2026-08-18;
+   dispatch truncation, 2026-08-08 — provenance in `design/issue-intake.md`
+   #103) are reproducible as C1 fixtures.
 4. All 24 in-scope backlog items are closed with closure evidence, or
    explicitly re-triaged with a PO-visible rationale, by sprint close.
 5. Report-only phases produce at least the #103-mandated two-week dogfood
@@ -305,7 +325,9 @@ named in `spec.md` §V and `acceptance.md`:
   without redesign; the state-machine surfaces Alfred hardens (state writer,
   observers, guards) are Nova's shipped versions. *Risk:* rebase conflicts in
   guard/observer code → wave 0 re-verifies A1/A5 assumptions post-rebase
-  before any further work.
+  before any further work. A-1 is also the reconciliation ground for #108's
+  fifth entry condition (§5): the rebase is where design-time inheritance
+  from the Nova clone base ends.
 - **A-2:** The measured subagent-hook gap is runner-version behavior, not
   spec. *Risk either direction* — A1 makes it a measurement, so the design
   does not depend on which way it resolves.
@@ -343,7 +365,7 @@ named in `spec.md` §V and `acceptance.md`:
 
 | Source | Where it binds |
 |---|---|
-| PO input 2026-08-27 | `design/po-input-2026-08-27.md` → §1–2 outcomes, §5 model economics (Haltepunkt), Critic-per-document duty (§7.2 of spec) |
+| PO input 2026-08-27 | `design/po-input-2026-08-27.md` → §1–2 outcomes, §5 model economics (Haltepunkt), Critic-per-document duty (spec §12, design-phase review duty) |
 | GitHub #99–#109 | `design/issue-intake.md` → WP mapping table + per-issue take/add/deviate |
 | 24 backlog items | `design/backlog-intake.md` → cluster tables, ⚖ PO-decided directions |
 | External research | `design/external-research.md` → D2 representation pin, D3 deterministic-pass rule, A1 rationale, positioning |
