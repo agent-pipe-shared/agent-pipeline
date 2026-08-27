@@ -22,6 +22,13 @@ import { fileURLToPath } from "node:url";
 import { GATE_STRENGTH_PATHS, LIVE_PLUGIN_RULE, gateStrengthRuleFor, insideLivePlugin, livePluginRoots } from "./guard-gate-strength.mjs";
 import { GATE_STRENGTH_SHELL_READ_ONLY_SCRIPTS } from "./guard-lifecycle-ready.mjs";
 import { installGuardMaintenanceWindow, prepareGuardMaintenanceWindowRequest } from "../lib/guard-maintenance-window.mjs";
+import {
+  applyOnboardingIntakeCapture,
+  applyOnboardingIntakeConsent,
+  applyOnboardingIntakeDesignQuestions,
+  applyOnboardingIntakeGenerate,
+  planOnboardingIntakeGenerate,
+} from "../lib/onboarding-continuity.mjs";
 import { createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA } from "../lib/po-approval-proof.mjs";
 import {
   HGO_SIGNATURE_REASON,
@@ -828,6 +835,77 @@ try {
       assert.equal(write.status, 0, `write lane refuses ${rule.path} without any governance marker present`);
       assert.doesNotMatch(shell(base, `touch ${rule.path}`).stderr, /GUARD-GATE-STRENGTH-SHELL/u,
         `shell lane refuses ${rule.path} without any governance marker present`);
+    }
+  });
+
+  check("GST38 GS-15 stands down for exactly the two staging authoring writes, and only in the state that admits them", () => {
+    // NVA-GS15-1, the greenfield deadlock. guard-lifecycle-ready.mjs already admitted the
+    // Edit that authors a freshly generated staging PRD/spec; GS-15 refused the identical
+    // write. The PO's `po-plan-acknowledged` marker could therefore never be written and
+    // every greenfield onboarding stalled. Both guards were individually self-consistent
+    // and contradicted each other only once wired together -- which is why this case drives
+    // the real hook end to end. A unit test of the shared predicate cannot see the class of
+    // defect that caused the outage, because the predicate was never the thing that was wrong.
+    const root = governed();
+    execFileSync("git", ["init", "-q"], { cwd: root });
+    applyOnboardingIntakeConsent({ rootDir: root, granted: true, language: "en", profile: "feature", activate: true });
+    applyOnboardingIntakeCapture({ rootDir: root, text: "requirement material one", activate: true });
+    applyOnboardingIntakeDesignQuestions({
+      rootDir: root,
+      answers: [{ question: "What is the goal?", answer: "Ship the coordinator." }],
+      activate: true,
+    });
+    const plan = planOnboardingIntakeGenerate({ rootDir: root });
+    const applied = applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
+    assert.equal(applied.checkpoint.transactionState, "generated",
+      "fixture never reached the one lifecycle state this admission exists for");
+
+    const target = (toolName, filePath, dir = root) => {
+      const key = toolName === "NotebookEdit" ? "notebook_path" : "file_path";
+      const result = spawnSync(process.execPath, [GUARD], {
+        input: JSON.stringify({ tool_name: toolName, tool_input: { [key]: filePath }, cwd: dir }),
+        encoding: "utf8",
+        cwd: dir,
+        env: { ...process.env, CLAUDE_PROJECT_DIR: dir },
+      });
+      return { blocked: result.status !== 0, stderr: result.stderr ?? "" };
+    };
+    const prdPath = `project/.onboarding-staging/prd_${plan.featureId}.md`;
+    const specPath = "project/.onboarding-staging/spec.md";
+
+    // The admission itself: exactly the two hand-authored targets, for both write tools.
+    for (const toolName of ["Edit", "Write"]) {
+      for (const filePath of [prdPath, specPath]) {
+        assert.equal(target(toolName, filePath).blocked, false, `${toolName}:${filePath}`);
+      }
+    }
+
+    // Narrow by construction, asserted in the very state that admits the two writes above:
+    // design-input.md is an immutable verbatim capture, a nested path is not the staging
+    // directory itself, a malformed featureId is not the generated one, and NotebookEdit is
+    // never an authoring tool for a `.md` staging target.
+    for (const filePath of [
+      "project/.onboarding-staging/design-input.md",
+      "project/.onboarding-staging/other.md",
+      "project/.onboarding-staging/nested/spec.md",
+      "project/.onboarding-staging/prd_not-a-real-feature-id.md",
+    ]) {
+      const refused = target("Edit", filePath);
+      assert.equal(refused.blocked, true, filePath);
+      assert.match(refused.stderr, /Rule ID: GS-15/u, filePath);
+    }
+    const notebook = target("NotebookEdit", specPath);
+    assert.equal(notebook.blocked, true, "NotebookEdit is not one of the admitted authoring tools");
+    assert.match(notebook.stderr, /Rule ID: GS-15/u);
+
+    // The stand-down is checkpoint-gated, not shape-gated: the identical two paths, in a
+    // governed repository that never reached `generated`, stay refused. This is the
+    // assertion that fails if the admission is ever loosened to the shape predicate alone.
+    const unstaged = governed();
+    for (const filePath of [prdPath, specPath]) {
+      const refused = target("Edit", filePath, unstaged);
+      assert.equal(refused.blocked, true, `no intake checkpoint must never admit ${filePath}`);
+      assert.match(refused.stderr, /Rule ID: GS-15/u, filePath);
     }
   });
 
