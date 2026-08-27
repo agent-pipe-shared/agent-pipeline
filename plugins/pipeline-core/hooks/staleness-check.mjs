@@ -13,6 +13,9 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+// NVA-STALENESSTLA-1: statically imported so this session-start hook needs no top-level
+// await at all -- see inspectSessionStartUpdateAvailabilitySync below for why that matters.
+import { inspectPipelineUpdateAvailability } from "../scripts/ruleset-freshness.mjs";
 
 export const PLUGIN_ID = "pipeline-core@agent-pipeline";
 export const BOOTSTRAP_LINE = "Agent-Pipeline: run /pipeline-core:pipeline-start before any work";
@@ -173,37 +176,61 @@ export function decideOutput(observed) {
   };
 }
 
-export async function inspectSessionStartUpdateAvailability(projectDir, deps = {}) {
-  if (typeof deps.inspect === "function") {
-    return deps.inspect(projectDir, {
-      distributionTopology: "installed-consumer",
-      timeoutMs: deps.timeoutMs ?? UPDATE_TIMEOUT_MS,
-    });
-  }
+/**
+ * NVA-STALENESSTLA-1 (measured 2026-08-27 on a live Claude Code session on Windows):
+ *
+ *   SessionStart:startup hook error
+ *   Failed with non-blocking status code: Warning: Detected unsettled top-level
+ *   await at .../hooks/staleness-check.mjs:208
+ *
+ * The observation this hook performs is entirely synchronous -- `ruleset-freshness.mjs`
+ * uses `spawnSync` throughout and has no top-level await of its own. The ONLY asynchrony
+ * in the whole path was the `await import(...)` below, and the only reason the module
+ * needed a top-level await at all was to await it. That combination is what Node reported:
+ * a module-level await pending while the loop drains, on a hook that runs at every single
+ * session start.
+ *
+ * The fix is structural, not a timeout: the helper is now a static import, the observation
+ * is synchronous end to end, and the module's entry point is a plain synchronous call. A
+ * hook on the session-start path cannot carry a top-level await, so this failure class is
+ * removed rather than made less likely. `run()` stays async purely so existing callers and
+ * the suite can keep awaiting it; its body no longer awaits anything real, so it always
+ * settles on the microtask queue.
+ *
+ * The static import is safe where the dynamic one was defensive: `ruleset-freshness.mjs`
+ * ships inside this same plugin, next to `entrypoint.mjs` which this file already imports
+ * statically, so "the helper might be missing" was never a reachable state. A genuine load
+ * failure now surfaces as a real error instead of being silently reported as `unavailable`.
+ */
+export function inspectSessionStartUpdateAvailabilitySync(projectDir, deps = {}) {
+  const options = {
+    distributionTopology: "installed-consumer",
+    timeoutMs: deps.timeoutMs ?? UPDATE_TIMEOUT_MS,
+  };
   try {
-    const helper = await import("../scripts/ruleset-freshness.mjs");
-    return helper.inspectPipelineUpdateAvailability(projectDir, {
-      distributionTopology: "installed-consumer",
-      timeoutMs: deps.timeoutMs ?? UPDATE_TIMEOUT_MS,
-    });
+    if (typeof deps.inspect === "function") return deps.inspect(projectDir, options);
+    return inspectPipelineUpdateAvailability(projectDir, options);
   } catch {
     return unavailable();
   }
 }
 
-export async function run(deps = {}) {
+export async function inspectSessionStartUpdateAvailability(projectDir, deps = {}) {
+  return inspectSessionStartUpdateAvailabilitySync(projectDir, deps);
+}
+
+export function runSync(deps = {}) {
   const projectDir = deps.projectDir ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd();
-  let observed;
-  try {
-    observed = await inspectSessionStartUpdateAvailability(projectDir, deps);
-  } catch {
-    observed = unavailable();
-  }
+  const observed = inspectSessionStartUpdateAvailabilitySync(projectDir, deps);
   const decision = decideOutput(observed);
   (deps.stdout ?? process.stdout).write(decision.stdout);
   return { exitCode: 0, decision };
 }
 
+export async function run(deps = {}) {
+  return runSync(deps);
+}
+
 if (isDirectInvocation(import.meta.url)) {
-  await run();
+  runSync();
 }
