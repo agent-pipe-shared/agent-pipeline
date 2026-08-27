@@ -14,6 +14,7 @@
     "tracking": { "type": "string" },
     "due": { "type": "string", "format": "date" },
     "expires": { "type": "string", "format": "date" },
+    "sprint": { "enum": ["alfred", "batman", "nightwing", "nova", "phoenix"] },
     "closed_at": { "type": "string", "format": "date" },
     "closure_repository": { "type": "string" },
     "closure_commit": { "type": "string", "pattern": "^[a-f0-9]{40}$" },

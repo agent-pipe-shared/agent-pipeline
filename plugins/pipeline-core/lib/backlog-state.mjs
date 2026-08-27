@@ -20,6 +20,16 @@ export const SENTINEL_RECOVERY_CATALOG_SCHEMA = "pipeline.sentinel-backlog-recov
 export const PROJECT_CLOSURE_READBACK_SCHEMA = "pipeline.project-closure-readback.v1";
 export const BACKLOG_STATUSES = Object.freeze(["open", "in_progress", "closed", "rejected", "deferred"]);
 export const BACKLOG_TYPES = Object.freeze(["workflow-improvement", "tooling-radar", "defect", "idea", "requirement"]);
+// The closed set of planning-window slugs formally reserved by
+// docs/adr/0043-post-go-live-sprint-model.md, read as data: `nightwing`,
+// `phoenix`, `nova` (Decision, lines 23-26) plus `alfred`, `nightwing`
+// (confirmed, not new), `batman` (Amendment 2026-08-17, lines 89-91). "Cyborg"
+// appears once in that ADR's Amendment status prose ("Cyborg is complete",
+// line 109) but is never given a parenthetical slug/label pair there the way
+// every other window is -- it is a pre-ADR-0043 Sprint mentioned in passing,
+// not one this ADR reserves a machine value for, so it is deliberately absent
+// here.
+export const BACKLOG_SPRINTS = Object.freeze(["alfred", "batman", "nightwing", "nova", "phoenix"]);
 // `open` branches three ways (backlog/README.md Triage rules: accept moves work
 // into `in_progress`; reject/defer are the two other triage outcomes, applied
 // only to `open` items "at a natural session/phase boundary, not mid-execution" —
@@ -33,7 +43,7 @@ const FORWARD_TRANSITIONS = Object.freeze({
 const STATUS_ENUM_TEXT = `${BACKLOG_STATUSES.slice(0, -1).join(", ")}, or ${BACKLOG_STATUSES.at(-1)}`;
 
 const ITEM_REQUIRED = Object.freeze(["schema", "id", "type", "owner", "status", "created", "source"]);
-const ITEM_OPTIONAL = Object.freeze(["tracking", "due", "expires", "closed_at", "closure_repository", "closure_commit", "closure_evidence", "closure_readback"]);
+const ITEM_OPTIONAL = Object.freeze(["tracking", "due", "expires", "sprint", "closed_at", "closure_repository", "closure_commit", "closure_evidence", "closure_readback"]);
 const ITEM_KEYS = new Set([...ITEM_REQUIRED, ...ITEM_OPTIONAL]);
 const ITEM_ID = /^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$/u;
 const OWNER = /^(?:pipeline|project:[a-z][a-z0-9]*(?:-[a-z0-9]+)*)$/u;
