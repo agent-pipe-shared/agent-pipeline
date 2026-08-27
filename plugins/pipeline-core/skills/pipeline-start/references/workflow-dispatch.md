@@ -29,14 +29,34 @@ See `CLAUDE.md`'s Environment note for the full root-cause writeup (the
 authoritative source — this is a pointer, not a duplicate). In short: a fresh
 worktree is provisioned from the LOCAL `refs/remotes/origin/HEAD` symbolic
 ref's target, not the current branch, so it can land on a stale base. Every
-`isolation: "worktree"` dispatch prompt MUST open with: check
-`git rev-parse HEAD` against an exact expected SHA supplied in the prompt
-(the Elephant's own `git rev-parse HEAD` immediately before dispatch); on
+`isolation: "worktree"` dispatch prompt MUST supply both an exact expected
+SHA (the Elephant's own `git rev-parse HEAD` immediately before dispatch)
+AND the expected worktree path the dispatch was asked to be provisioned
+into, and MUST open with a containment check performed BEFORE any
+`checkout --detach`: compare its own `git rev-parse --show-toplevel` against
+that expected worktree path. If they do not match, the dispatch is running
+in a shared checkout, not its own worktree — it STOPS and reports; it never
+runs `checkout --detach` (see "Concurrent non-isolated dispatches" below for
+why that matters). Only when they match does the existing self-check
+proceed: check `git rev-parse HEAD` against the exact expected SHA; on
 mismatch, self-heal via `git checkout --detach <exact-expected-sha>`,
 re-verify, then proceed normally; only STOP if that checkout itself fails.
-Live-tested 2026-08-18: with this instruction present, 9/9 parallel worktree
-dispatches landed on the correct HEAD (0/9 without it, in the same session,
-same cluster set, before the fix).
+Live-tested 2026-08-18: with the SHA self-check present, 9/9 parallel
+worktree dispatches landed on the correct HEAD (0/9 without it, in the same
+session, same cluster set, before the fix). The containment check was added
+2026-08-27 after a 2026-08-25 incident in which three `isolation: "worktree"`
+dispatches never actually received a worktree (`git worktree list` showed a
+single entry) and a retry's self-heal step detached the Elephant's own live
+HEAD instead.
+
+The `git worktree list` check the Elephant runs right after launching (see
+CLAUDE.md's Environment note) has a hard failure branch, not just a sanity
+glance: a result showing only the single main worktree entry means isolation
+was NOT granted for that dispatch. That is a hard stop for launching further
+`isolation: "worktree"` dispatches in the same session until the cause is
+understood — serialize the remaining work through the shared tree instead
+(see the next section), or re-brief it explicitly as a non-isolated,
+shared-tree dispatch with no self-heal block at all.
 
 ## Concurrent non-isolated dispatches can orphan or lose commits — self-heal is worktree-only
 
