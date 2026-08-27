@@ -150,7 +150,7 @@ ever established by which chain happened to be appended second — which is what
 structurally impossible for amendments, and what D1 makes explicit for ordinary events by
 refusing to interleave chains at all.
 
-### D7 — Amendment target resolution binds by content hash, matching D2 for `amendsSequence` too
+### D6 — Amendment target resolution binds by content hash, matching D2 for `amendsSequence` too
 
 `item-hash-rescope-amendment` was the one amendment kind D2 point 3 did not yet cover: its target
 binding (`amendsSequence`) still resolved by indexing `events[amendsSequence - 1]`, and unlike
