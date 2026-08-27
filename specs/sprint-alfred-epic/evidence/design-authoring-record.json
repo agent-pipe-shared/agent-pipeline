@@ -33,6 +33,16 @@
         "specs/sprint-alfred-epic/spec.md"
       ],
       "note": "Critic round-1 fix commit; dispositions in evidence/critic/round-1-response.md"
+    },
+    {
+      "sha": "03d97ac5",
+      "files": [
+        "specs/sprint-alfred-epic/acceptance.md",
+        "specs/sprint-alfred-epic/evidence/design-authoring-record.json",
+        "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md",
+        "specs/sprint-alfred-epic/spec.md"
+      ],
+      "note": "Critic round-2 fix commit; dispositions in evidence/critic/round-2-response.md"
     }
   ],
   "inputs": {
