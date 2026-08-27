@@ -50,7 +50,7 @@ const V2_EVIDENCE_AMENDMENT_KEYS = new Set(["schema", "kind", "targetSequence", 
 const V2_ORDINARY_EVIDENCE_KEYS = new Set(["kind", "commit", "reference", "legacyStatus"]);
 const AFK_REPAIR_ID = "pipeline.elephant-direct-implementation-under-afk-authorization";
 const MANAGED_ONBOARDING_REPAIR_ID = "pipeline.managed-onboarding-success-contract";
-// ADR-0068 D7: amendsEntryHash is additive alongside amendsSequence -- optional
+// ADR-0068 D6: amendsEntryHash is additive alongside amendsSequence -- optional
 // so a legacy event recorded before this field existed (the shape every event
 // in the live ledger has today) still validates via the amendsSequence-only
 // fallback in validateTransitionLedger.
@@ -750,7 +750,7 @@ export function validateTransitionShape(event, label, { readDispositionBytes = n
     if (managedRepair && !HASH.test(asString(event.evidence.itemSha256))) errors.push(`${label}: itemSha256 must be a SHA-256 hex digest`);
     if (hashRescopeAmendment) {
       if (!Number.isSafeInteger(event.evidence.amendsSequence) || event.evidence.amendsSequence < 1) errors.push(`${label}: amendsSequence must be a positive integer`);
-      // ADR-0068 D7: amendsEntryHash is optional (additive) so a legacy event
+      // ADR-0068 D6: amendsEntryHash is optional (additive) so a legacy event
       // without it still validates; when present it must be a real hash.
       if (own(event.evidence, "amendsEntryHash") && !HASH.test(asString(event.evidence.amendsEntryHash))) errors.push(`${label}: amendsEntryHash must be a SHA-256 hex digest`);
       if (event.evidence.itemId !== event.id) errors.push(`${label}: itemId must match the event id`);
@@ -859,7 +859,7 @@ export function validateTransitionLedger(events, items, { commitExists = null, r
     const item = itemById.get(event.id);
     if (event?.evidence?.kind === "missing-initial-ledger-repair" && event.evidence.sourceSha256 && event.evidence.sourceSha256 !== createHash("sha256").update(asString(item?.metadata?.source)).digest("hex")) errors.push(`${label}: sourceSha256 does not bind the current item source`);
     if (event?.evidence?.kind === "item-hash-rescope-amendment") {
-      // ADR-0068 D7: bind by amendsEntryHash (immutable, position-independent)
+      // ADR-0068 D6: bind by amendsEntryHash (immutable, position-independent)
       // when the event carries one -- amendsSequence then stays as
       // documentation only, mirroring D2 point 3/4 for the other amendment
       // kinds. A legacy event recorded before amendsEntryHash existed carries
@@ -1343,7 +1343,7 @@ export function planBacklogItemHashRescopeAmendment(items, events, input) {
   const index = items.findIndex((entry) => entry?.metadata?.id === id);
   if (index === -1) return { ok: false, errors: [`item hash rescope amendment: unknown item id ${id}`], items, events, projection: null };
   const original = items[index];
-  // ADR-0068 D7: amendsSequence still names the target against the live
+  // ADR-0068 D6: amendsSequence still names the target against the live
   // ledger passed in here (always self-consistent at construction time), but
   // resolving by the sequence VALUE rather than a raw array index avoids
   // baking in an assumption the events array is a contiguous, gap-free
@@ -1529,7 +1529,7 @@ export function planPrePublicCoreReachabilityRepair(items, events, input, { comm
   }
   for (const sequence of expectedSequences) {
     const target = PRE_PUBLIC_CORE_REACHABILITY_TARGETS[sequence];
-    // ADR-0068 D7/D2 point 3: bind by entryHash, never by physical position --
+    // ADR-0068 D6/D2 point 3: bind by entryHash, never by physical position --
     // the registry's own entryHash is already the authoritative pin, so this
     // mirrors the events.find(...) pattern validateTransitionLedger already
     // uses for this event kind (see :802, :824) instead of trusting that

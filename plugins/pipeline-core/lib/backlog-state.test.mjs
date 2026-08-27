@@ -1828,10 +1828,10 @@ const MANAGED_ONBOARDING_TARGET = "backlog/items/2026-07-25-managed-onboarding-s
     [...applied.findings, ...afterApply.findings, ...rejectedWrongHash.findings].join("; "));
 }
 
-// ADR-0068 D7: the one legitimate positional exception. A hand-assembled test
+// ADR-0068 D6: the one legitimate positional exception. A hand-assembled test
 // ledger must itself be contiguous (events[i].sequence === i + 1) for
 // validateTransitionLedger's own chain check to accept it at all -- that is a
-// property of the ledger format, not the amendment-lookup anti-pattern D7
+// property of the ledger format, not the amendment-lookup anti-pattern D6
 // targets. This pins that assumption as a named, asserted invariant instead
 // of a silent one.
 function assertContiguousLedgerFixture(events, label) {
@@ -1844,7 +1844,7 @@ function assertContiguousLedgerFixture(events, label) {
 }
 
 {
-  // NVA-BS27-1 (ADR-0068 D7): an item-hash-rescope-amendment resolves its
+  // NVA-BS27-1 (ADR-0068 D6): an item-hash-rescope-amendment resolves its
   // target by amendsEntryHash, not by amendsSequence used as an array index.
   // amendsSequence alone is a merge hazard: a merge that lands a new event
   // ahead of the target shifts its physical position (and its own entryHash,
@@ -1906,7 +1906,7 @@ function assertContiguousLedgerFixture(events, label) {
   const rescopeBindingFinding = "item-hash-rescope-amendment amendsSequence does not identify a missing-initial-ledger-repair event for this item";
   const hashBoundFinding = "item-hash-rescope-amendment amendsEntryHash does not identify a missing-initial-ledger-repair event for this item";
 
-  check("BS35 (ADR-0068 D7) an item-hash-rescope-amendment resolves its target by amendsEntryHash after a merge shifts amendsSequence's physical position, which a raw positional lookup would resolve wrong",
+  check("BS35 (ADR-0068 D6) an item-hash-rescope-amendment resolves its target by amendsEntryHash after a merge shifts amendsSequence's physical position, which a raw positional lookup would resolve wrong",
     beforePlan.ok
       && positionalResolvesWrong
       && !afterFindings.some((finding) => finding.includes(rescopeBindingFinding))
@@ -1915,7 +1915,7 @@ function assertContiguousLedgerFixture(events, label) {
 }
 
 {
-  // ADR-0068 D7 backward compatibility: every item-hash-rescope-amendment
+  // ADR-0068 D6 backward compatibility: every item-hash-rescope-amendment
   // event in the live ledger today predates amendsEntryHash. Validation must
   // keep accepting that exact legacy shape via the amendsSequence-positional
   // fallback -- proven, not merely asserted, against a genuinely contiguous
@@ -1941,7 +1941,7 @@ function assertContiguousLedgerFixture(events, label) {
   const legacyItems = [item({ id: "pipeline.legacy-noise" }), item({ id: "pipeline.legacy-rescope-example" })];
   const legacyFindings = validateTransitionLedger(legacyEvents, legacyItems);
   const rescopeBindingFinding = "item-hash-rescope-amendment amendsSequence does not identify a missing-initial-ledger-repair event for this item";
-  check("BS36 (ADR-0068 D7) a legacy item-hash-rescope-amendment with no amendsEntryHash field -- the shape every event in the live ledger has today -- still validates via the amendsSequence-positional fallback",
+  check("BS36 (ADR-0068 D6) a legacy item-hash-rescope-amendment with no amendsEntryHash field -- the shape every event in the live ledger has today -- still validates via the amendsSequence-positional fallback",
     !("amendsEntryHash" in legacyAmendment.evidence)
       && !legacyFindings.some((finding) => finding.includes(rescopeBindingFinding)),
     JSON.stringify(legacyFindings));
@@ -1960,7 +1960,7 @@ function assertContiguousLedgerFixture(events, label) {
   } catch (error) {
     threw = error;
   }
-  check("BS37 (ADR-0068 D7) assertContiguousLedgerFixture fails by name when a fixture's chain stops being contiguous",
+  check("BS37 (ADR-0068 D6) assertContiguousLedgerFixture fails by name when a fixture's chain stops being contiguous",
     threw instanceof Error && threw.message.includes("BS37 probe") && threw.message.includes("array index 1"),
     String(threw));
 }

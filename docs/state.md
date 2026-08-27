@@ -50,7 +50,7 @@ protocol. Checkpoints 61–71 rotated to `docs/state-archive/2026-08-27--phoenix
    checker already existed and already worked; `verify.mjs` simply never ran it,
    which is why six collisions could land unreported. Do this AFTER 0063, or
    Verify goes red by design.
-3. **BS25/BS26 durability** (ADR-0068 D7, not yet written): three positional
+3. **BS25/BS26 durability** (ADR-0068 D6, not yet written): three positional
    lookups remain (`backlog-state.mjs:1326`, `:1504`, and the test's fixture).
    Two can bind by `entryHash`; `amendsSequence` has no hash in its event shape
    and needs an additive `amendsEntryHash`. The test fixture must stay
