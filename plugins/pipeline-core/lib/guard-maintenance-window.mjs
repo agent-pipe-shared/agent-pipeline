@@ -251,6 +251,21 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/onboarding-consent-marker.mjs",
   "plugins/pipeline-core/lib/threat-model-approval-request.mjs",
   "plugins/pipeline-core/lib/threat-model.mjs",
+  // NVA-KERNELDYN-1 (2026-08-27): project-onboarding-v3.mjs (already kernel above)
+  // gained a static import of pre-push-hook-install.mjs; that file's dynamic
+  // `import()` edges (declared in DYNAMIC_IMPORT_EDGES,
+  // guard-maintenance-window-kernel-closure.test.mjs, since PLUGIN_LIB_DIR is an
+  // install-time-bound path, not a literal specifier the scanner can read) and their
+  // own further imports pull in the rest of this group. guard-dispatch-budget.mjs and
+  // plan-authority-staging-guard.mjs are unrelated pre-existing closure gaps GMWKC01
+  // found already open at this dispatch's base commit -- caught by the same
+  // non-decomposable closure assertion, not by the dynamic-import fix.
+  "plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+  "plugins/pipeline-core/lib/plan-authority-staging-guard.mjs",
+  "plugins/pipeline-core/lib/security-completeness-gate.mjs",
+  "plugins/pipeline-core/lib/security-evidence-evaluator.mjs",
+  "plugins/pipeline-core/lib/verify-evidence-path.mjs",
+  "plugins/pipeline-core/scripts/pre-push-hook-install.mjs",
 ]);
 
 // The "plugins/pipeline-core/..." entries above are written against whatever

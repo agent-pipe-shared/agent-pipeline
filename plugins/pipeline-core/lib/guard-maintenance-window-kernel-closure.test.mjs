@@ -45,13 +45,31 @@
  *   - anything else (a member expression, a call, a template literal, spread, ...) is a
  *     shape the scanner cannot classify.
  *
- * FAILS CLOSED on a shape it cannot classify: a dynamic `import(` call anywhere in a
- * kernel file's source, an identifier passed to `spawnSync(process.execPath, [...])`
- * that cannot be statically traced to a script-path constant, or any other unclassifiable
- * first array element in that same call shape, aborts this check with a named-file
- * diagnostic instead of silently proceeding -- a silently-skipped file would defeat the
- * entire point of this test (a missed dynamic import, or a missed spawn edge, is exactly
- * the kind of hole a hand-maintained enumeration already produced once).
+ * DYNAMIC IMPORT EDGES (NVA-KERNELDYN-1): a kernel file's `import("...")` whose specifier
+ * is built at runtime (e.g. `import(pathToFileURL(join(PLUGIN_LIB_DIR, "manifest.mjs")).
+ * href)`) cannot be traced back to a literal string the way a static `from "..."` clause
+ * or a spawn-edge string-literal argument can -- there is no specifier to read. Rather than
+ * fail closed on every such call forever, `DYNAMIC_IMPORT_EDGES` below is a hand-declared,
+ * per-kernel-file table naming exactly which first-party modules that file's dynamic
+ * imports resolve to; a declared target is folded into the walked closure exactly like a
+ * static import specifier -- it still has to be a kernel path, or GMWKC01 fails on it same
+ * as anything else. A kernel file with NO table entry still throws on its first `import(`
+ * exactly as before (unclassified shape, resolved by hand). A file WITH an entry is also
+ * checked for staleness: the number of dynamic-import call sites the source actually
+ * contains must equal the table's declared count, or the check throws -- an edge added or
+ * removed in the source without updating the table would otherwise silently stop being
+ * covered. The call-site count deliberately requires a non-empty argument
+ * (`\bimport\s*\(\s*[^)\s]`) so a *prose* mention of the `import()` operator in a comment
+ * (no argument between the parens) is not miscounted as a real call site.
+ *
+ * FAILS CLOSED on a shape it cannot classify: an UNDECLARED dynamic `import(` call in a
+ * kernel file's source, a stale `DYNAMIC_IMPORT_EDGES` entry, an identifier passed to
+ * `spawnSync(process.execPath, [...])` that cannot be statically traced to a script-path
+ * constant, or any other unclassifiable first array element in that same call shape, aborts
+ * this check with a named-file diagnostic instead of silently proceeding -- a
+ * silently-skipped file would defeat the entire point of this test (a missed dynamic
+ * import, or a missed spawn edge, is exactly the kind of hole a hand-maintained
+ * enumeration already produced once).
  *
  * GMWKC03 (pipeline.gwm-kernel-doc-enumeration-diverges-from-the-code-array, 2026-08-25):
  * GMWKC01 only proves the CODE array is closed under import -- it says nothing about
@@ -78,7 +96,30 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", ".."
 
 const IMPORT_FROM_RE = /\b(?:import|export)\s+[A-Za-z0-9_$,{}*\s]*?\bfrom\s+["']([^"']+)["']/g;
 const SIDE_EFFECT_IMPORT_RE = /^\s*import\s+["']([^"']+)["']\s*;?\s*$/gm;
-const DYNAMIC_IMPORT_RE = /\bimport\s*\(/;
+// Requires a non-empty argument between the parens so a prose mention of the `import()`
+// operator in a comment (no argument) is never counted as a real dynamic-import call site
+// -- see the "DYNAMIC IMPORT EDGES" section of the file header.
+const DYNAMIC_IMPORT_RE = /\bimport\s*\(\s*[^)\s]/g;
+
+// Declared dynamic-import edges (see "DYNAMIC IMPORT EDGES" in the file header): one entry
+// per kernel file whose dynamic `import()` specifiers are built at runtime rather than
+// written as a literal string, naming every first-party module those calls resolve to,
+// relative to the declaring file's own directory -- resolved and kernel-membership-checked
+// exactly like a static import specifier. The declared count is cross-checked against the
+// actual number of dynamic-import call sites in that file's source (relativeImportSpecifiers
+// below), so an edge added or removed in the source without updating this table fails
+// rather than silently stops being covered.
+const DYNAMIC_IMPORT_EDGES = {
+  // pre-push-hook-install.mjs's evaluateOneCommit() dynamically imports these four via
+  // `pathToFileURL(join(PLUGIN_LIB_DIR, "<name>")).href` -- PLUGIN_LIB_DIR is an
+  // install-time-bound absolute path, not a literal specifier the static scanner can read.
+  "plugins/pipeline-core/scripts/pre-push-hook-install.mjs": [
+    "../lib/manifest.mjs",
+    "../lib/verify-evidence-path.mjs",
+    "../lib/security-completeness-gate.mjs",
+    "../lib/project-authority.mjs",
+  ],
+};
 
 // Spawn-edge scanner (pipeline.gmw-kernel-closure-test-does-not-model-spawn-edges): see
 // the "SPAWN EDGES" section of the file header for the shapes this classifies.
@@ -156,14 +197,34 @@ function spawnEdgeSpecifiers(source, repoRelativePath) {
   return specs;
 }
 
-/** Every first-party (relative-specifier) import/spawn-edge ONE kernel file's source declares. */
+/** Number of real dynamic-import call sites (non-empty argument) in ONE file's source. */
+function countDynamicImports(source) {
+  DYNAMIC_IMPORT_RE.lastIndex = 0;
+  let count = 0;
+  while (DYNAMIC_IMPORT_RE.exec(source) !== null) count += 1;
+  return count;
+}
+
+/** Every first-party (relative-specifier) import/spawn-edge/declared-dynamic-import-edge
+ * ONE kernel file's source declares. */
 function relativeImportSpecifiers(absPath, repoRelativePath) {
   const source = readFileSync(absPath, "utf8");
-  if (DYNAMIC_IMPORT_RE.test(source)) {
+  const dynamicImportCount = countDynamicImports(source);
+  const declaredDynamicTargets = DYNAMIC_IMPORT_EDGES[repoRelativePath];
+  if (dynamicImportCount > 0 && !declaredDynamicTargets) {
     throw new Error(
       `${repoRelativePath} contains a dynamic import() the static scanner cannot classify -- ` +
       "this shape must be resolved by hand (name the target module and add it to " +
-      "NEVER_LIFTABLE_KERNEL_PATHS if first-party), not silently skipped.",
+      "DYNAMIC_IMPORT_EDGES, and to NEVER_LIFTABLE_KERNEL_PATHS if first-party), not silently skipped.",
+    );
+  }
+  if (declaredDynamicTargets && declaredDynamicTargets.length !== dynamicImportCount) {
+    throw new Error(
+      `${repoRelativePath} declares ${declaredDynamicTargets.length} dynamic-import edge(s) in ` +
+      `DYNAMIC_IMPORT_EDGES but its source actually contains ${dynamicImportCount} dynamic-import ` +
+      "call site(s) -- a stale declaration (an edge added, removed, or changed in the source " +
+      "without updating the table) would otherwise silently stop covering a real edge; fix the " +
+      "table to match the source exactly.",
     );
   }
   const specs = new Set();
@@ -173,6 +234,7 @@ function relativeImportSpecifiers(absPath, repoRelativePath) {
   SIDE_EFFECT_IMPORT_RE.lastIndex = 0;
   while ((match = SIDE_EFFECT_IMPORT_RE.exec(source)) !== null) specs.add(match[1]);
   for (const spec of spawnEdgeSpecifiers(source, repoRelativePath)) specs.add(spec);
+  if (declaredDynamicTargets) for (const spec of declaredDynamicTargets) specs.add(spec);
   const relativeSpecs = [];
   for (const spec of specs) {
     if (spec.startsWith("./") || spec.startsWith("../")) relativeSpecs.push(spec);

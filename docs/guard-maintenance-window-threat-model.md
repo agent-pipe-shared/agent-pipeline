@@ -104,7 +104,14 @@ below assumes it holds and is written to catch a change that would break it.
   `lib/human-decision-attribution.mjs`, `lib/human-governance-decision.mjs`,
   `lib/human-governance-ledger.mjs`, `lib/human-role-exception-decision.mjs`,
   `lib/lifecycle-governance-events.mjs`, `lib/onboarding-consent-marker.mjs`,
-  `lib/threat-model-approval-request.mjs`, and `lib/threat-model.mjs`.
+  `lib/threat-model-approval-request.mjs`, and `lib/threat-model.mjs`. A third
+  closure gap (NVA-KERNELDYN-1, 2026-08-27 — `pre-push-hook-install.mjs`'s
+  dynamic `import()` edges, resolved via a declared table rather than the
+  static scanner, plus two unrelated pre-existing gaps GMWKC01 found already
+  open) added: `hooks/guard-dispatch-budget.mjs`,
+  `lib/plan-authority-staging-guard.mjs`, `lib/security-completeness-gate.mjs`,
+  `lib/security-evidence-evaluator.mjs`, `lib/verify-evidence-path.mjs`, and
+  `scripts/pre-push-hook-install.mjs`.
 - The window record's cryptographic integrity and its TTL.
 - The audit visibility of an open or recently-closed window (the bootstrap
   warning).
