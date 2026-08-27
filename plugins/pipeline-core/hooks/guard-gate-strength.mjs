@@ -64,6 +64,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { writeTargetPath } from "../lib/tool-write-target.mjs";
+import { bootstrapBindingStagingAuthoringAdmitted } from "../lib/onboarding-staging-authoring.mjs";
 import { isNeverLiftableKernelPath, windowCoversRule } from "../lib/guard-maintenance-window.mjs";
 import { readPushApprovalMode } from "../lib/critical-human-proof-policy.mjs";
 import {
@@ -409,6 +410,28 @@ if (process.argv[1] && resolve(process.argv[1]).endsWith("guard-gate-strength.mj
       "project/pipeline.json", ".claude/pipeline.json",
     ].some((marker) => existsSync(join(resolve(projectDir), marker)));
     if (!governed) process.exit(0);
+
+    // NVA-GS15-1: GS-15 (project/.onboarding-staging/*) stands down, and only GS-15,
+    // for the one narrow Edit/Write a real session performs to author/review the
+    // freshly generated staging PRD/spec before bootstrap-bind-apply can bind it
+    // (NVA-BL-INTAKEBIND-1) -- the identical write guard-lifecycle-ready.mjs already
+    // admits, via the same shared predicate (../lib/onboarding-staging-authoring.mjs),
+    // so the two guards no longer contradict each other on this exact write and the
+    // PO's po-plan-acknowledged marker can actually be written. Checked here, before
+    // the HGO block below, so an admitted edit never consumes or plans an override
+    // capability for a write this guard is about to allow anyway. Fails CLOSED: any
+    // thrown error inside the predicate (a malformed checkpoint, an unreadable
+    // repository) leaves this refusal standing, exactly like every other exit path
+    // in this file.
+    if (matched.id === "GS-15") {
+      let admitted = false;
+      try {
+        admitted = bootstrapBindingStagingAuthoringAdmitted({
+          input: { tool_name: toolName, tool_input: toolInput }, root: projectDir,
+        });
+      } catch { admitted = false; }
+      if (admitted) process.exit(0);
+    }
   }
 
   // GMW (ADR-0058): the ONLY new allow path for this file, and only for GS-6. The

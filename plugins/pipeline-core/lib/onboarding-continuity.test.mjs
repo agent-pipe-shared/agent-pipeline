@@ -3111,6 +3111,20 @@ function bootstrapBindReadyRoot(name) {
     },
   );
   assert.equal(admission.exitCode, 0, "the guard must actually admit this exact staging-PRD edit before we perform it");
+  // NVA-GS15-1 (AC-5): guard-gate-strength.mjs (GS-15, project/.onboarding-staging/*) must
+  // ALSO admit this identical Edit -- spawned as a real subprocess against the identical
+  // payload, never a call into internals, exactly like the guard-lifecycle-ready admission
+  // proven above. Before the fix this failed (exit 2, GS-15 refused); the two guards
+  // contradicted each other and the PO's po-plan-acknowledged marker could never be written.
+  const gateStrengthGuard = join(dirname(fileURLToPath(import.meta.url)), "..", "hooks", "guard-gate-strength.mjs");
+  const gateStrength = spawnSync(process.execPath, [gateStrengthGuard], {
+    input: JSON.stringify({ tool_name: "Edit", tool_input: { file_path: generatePlan.targets.prd.path } }),
+    encoding: "utf8",
+    cwd: root,
+    env: { ...process.env, CLAUDE_PROJECT_DIR: root },
+  });
+  assert.equal(gateStrength.status, 0,
+    `NVA-GS15-1: guard-gate-strength.mjs must admit this exact staging-PRD edit once the checkpoint is generated (GS-15 stand-down) -- stderr: ${gateStrength.stderr}`);
   writeFileSync(prdAbsolute, `${readFileSync(prdAbsolute, "utf8")}${PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER}\n`);
   return { root, featureId: generatePlan.featureId };
 }

@@ -266,6 +266,12 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/security-evidence-evaluator.mjs",
   "plugins/pipeline-core/lib/verify-evidence-path.mjs",
   "plugins/pipeline-core/scripts/pre-push-hook-install.mjs",
+  // NVA-GS15-1: onboarding-staging-authoring.mjs is imported by both
+  // guard-gate-strength.mjs and guard-lifecycle-ready.mjs (already kernel above), so it
+  // is kernel by construction -- a GS-6 window covering it would let the first edit
+  // change what either guard admits as the bootstrap-binding-required staging-authoring
+  // write.
+  "plugins/pipeline-core/lib/onboarding-staging-authoring.mjs",
 ]);
 
 // The "plugins/pipeline-core/..." entries above are written against whatever
