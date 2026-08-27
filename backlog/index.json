@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "b0f1f44ea06cfeb85ed53ff96ca4951c02e874fc396229795d1d0fc6b9e9241e"
+    "transitionHead": "4b1960a41ae18ccff8ec8879ef9a4ef4a3c14cde8004df8a2563173e8e25fd49"
   },
   "counts": {
-    "open": 44,
+    "open": 47,
     "in_progress": 5,
     "closed": 377,
     "rejected": 3,
@@ -38,6 +38,24 @@
       "closureRepository": "self",
       "closureCommit": "72a293d59694e6184f190bb3c141f7b2d509b8da",
       "closureEvidence": "plugins/pipeline-core/lib/po-gate-authority.test.mjs"
+    },
+    {
+      "id": "pipeline.a-read-only-command-is-refused-for-naming-a-protected-path",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-27",
+      "source": "Measured live, 2026-08-27 session: a read-only node -e command that only printed a sorted-insertion index over docs/product-capability-inventory.json was refused as a write because the string \"verify.mjs\" appeared inside its interpreter code text.",
+      "deferred": false
+    },
+    {
+      "id": "pipeline.a-runner-improvised-the-po-signature-instructions",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-27",
+      "source": "Recorded 2026-08-27 from a PO-pasted transcript of an Antigravity session against a separate repository — a transcript the PO pasted, not something reproduced live in this session.",
+      "deferred": false
     },
     {
       "id": "pipeline.a-schema-less-project-pipeline-yaml-has-no-known-repair-path",
@@ -4289,6 +4307,15 @@
       "closureRepository": "self",
       "closureCommit": "6b5157c186038cea33039acdd107b7214efbfc80",
       "closureEvidence": "plugins/pipeline-core/lib/recovery-preview-attestation.test.mjs"
+    },
+    {
+      "id": "pipeline.registering-a-verify-suite-silently-invalidates-the-capability-inventory",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-27",
+      "source": "Measured live, 2026-08-27 session: two more product-capability-inventory breakages within the same evening, the second within the hour of a session that had just repaired the first — following two prior instances on 2026-08-19.",
+      "deferred": false
     },
     {
       "id": "pipeline.regulated-document-hooks",

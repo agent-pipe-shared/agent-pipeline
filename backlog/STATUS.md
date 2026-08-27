@@ -7,6 +7,8 @@
 | --- | --- | --- | --- | --- | --- |
 | pipeline.a-checkout-that-cannot-be-clean-defeats-every-cleanliness-gate | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.a-promoted-feature-can-never-pass-the-plan-gate | closed | defect | pipeline | 2026-08-07 | — |
+| pipeline.a-read-only-command-is-refused-for-naming-a-protected-path | open | defect | pipeline | 2026-08-27 | — |
+| pipeline.a-runner-improvised-the-po-signature-instructions | open | defect | pipeline | 2026-08-27 | — |
 | pipeline.a-schema-less-project-pipeline-yaml-has-no-known-repair-path | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.a-second-dispatch-claimed-an-evidence-artifact-it-never-wrote | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.a-stale-version-stamp-makes-a-plugin-reload-a-silent-no-op | open | defect | pipeline | 2026-08-27 | — |
@@ -347,6 +349,7 @@
 | pipeline.reconcile-lock-reuse-regression-test-needs-a-tp5-window | closed | requirement | pipeline | 2026-08-18 | — |
 | pipeline.recovery-preview-ack-unstable-getter-poisons-replay-ledger | closed | defect | pipeline | 2026-07-27 | — |
 | pipeline.recovery-preview-callback-attestation | closed | defect | pipeline | 2026-07-20 | — |
+| pipeline.registering-a-verify-suite-silently-invalidates-the-capability-inventory | open | defect | pipeline | 2026-08-27 | — |
 | pipeline.regulated-document-hooks | deferred | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; deferred per PO triage 2026-08-23. |
 | pipeline.release-preflight-cli-base-commit-not-peeled | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.release-preflight-has-a-builder-but-no-cli | closed | defect | pipeline | 2026-08-06 | — |
@@ -448,7 +451,7 @@
 
 ## Counts
 
-- open: 44
+- open: 47
 - in_progress: 5
 - closed: 377
 - rejected: 3
