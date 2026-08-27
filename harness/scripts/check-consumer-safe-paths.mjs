@@ -399,6 +399,12 @@ export const ALLOWLIST = Object.freeze([
       "Class B: header doc comment describing this standalone diagnostic's own relationship to the calibrated Verify gate (deliberately not registered in it), not a consumer-facing path assumption.",
   },
   {
+    file: "plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+    match: "`harness/scripts/wire-dispatch-budget-hook.mjs`, run outside the session",
+    reason:
+      "Class B: a doc comment correcting this guard's own wiring route. The header previously named a signed maintenance-window ceremony, which cannot exist -- hooks.json is on NEVER_LIFTABLE_KERNEL_PATHS -- and the correction names the attended operator tool that IS the route. That tool wires the Pipeline's own hook manifest and is self-application-only (ADR-0015): a consumer project never runs it, and never needs to, because the wiring ships already applied in the plugin. Deleting the citation would leave the correction naming no route at all, which is the state that made the header wrong in the first place.",
+  },
+  {
     file: "plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs",
     match: "harness/scripts/generate-agent-obligations.mjs (elephant-generated)",
     reason:
