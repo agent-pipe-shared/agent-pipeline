@@ -215,6 +215,12 @@
       "member": "SessionStart:startup|resume|clear|compact:node \"${PLUGIN_ROOT}/hooks/codex-session-start-hint.mjs\""
     },
     {
+      "surfaceId": "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:*:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch-budget.mjs\"",
+      "kind": "hook",
+      "path": "plugins/pipeline-core/hooks/hooks.json",
+      "member": "PreToolUse:*:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch-budget.mjs\""
+    },
+    {
       "surfaceId": "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-git.mjs\"",
       "kind": "hook",
       "path": "plugins/pipeline-core/hooks/hooks.json",
@@ -2501,12 +2507,6 @@
       "member": "private-overlay-runtime-projection-tests"
     },
     {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:protected-test-paths-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "protected-test-paths-tests"
-    },
-    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:product-capability-inventory-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -2553,6 +2553,12 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "project-reset-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:protected-test-paths-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "protected-test-paths-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:provenance-attestation-tests",
@@ -3401,6 +3407,7 @@
         "guard:plugins/pipeline-core/hooks/guard-onboarding-consent-lock.mjs:guard-onboarding-consent-lock",
         "guard:plugins/pipeline-core/hooks/guard-push.mjs:guard-push",
         "guard:plugins/pipeline-core/hooks/guard-testpath.mjs:guard-testpath",
+        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:*:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch-budget.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-git.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-lifecycle-ready.mjs\" --runner claude",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-push.mjs\"",
