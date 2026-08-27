@@ -47,7 +47,7 @@
  * entry point.
  */
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, createPrivateKey, sign } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -102,6 +102,54 @@ function keyFixture(directory) {
   const authority = { keyReference: "sign-intent-test-key", publicKeySha256: createHash("sha256").update(publicKeyPem).digest("hex") };
   writeFileSync(join(directory, "trust-policy.json"), `${JSON.stringify({ ...authority, humanName: "Test Operator" }, null, 2)}\n`);
   return { publicKeyPem, authority };
+}
+
+/**
+ * NVA-SIGNONCE-1: a passphrase-protected Ed25519 keypair, generated the same way
+ * `setup`'s fresh-key-creation branch generates one in production (`openssl
+ * genpkey -algorithm ED25519 -aes-256-cbc`). The only difference from that real
+ * command is `-pass pass:<passphrase>` supplying the passphrase non-interactively
+ * -- fine for a throwaway test fixture only (per this dispatch's hazard note: the
+ * real `sign-intent` command is never invoked against a real key directory from
+ * this suite; signing below goes through `fakeSignSpawn`, never real OpenSSL).
+ * The resulting PEM carries the "ENCRYPTED PRIVATE KEY" PKCS#8 armor
+ * `isPrivateKeyPassphraseProtected` reads.
+ */
+function encryptedKeyFixture(directory, passphrase) {
+  const privateKey = join(directory, "po-private.pem");
+  const publicKey = join(directory, "po-public.pem");
+  openssl(["genpkey", "-algorithm", "ED25519", "-aes-256-cbc", "-pass", `pass:${passphrase}`, "-out", privateKey]);
+  openssl(["pkey", "-in", privateKey, "-passin", `pass:${passphrase}`, "-pubout", "-out", publicKey]);
+  const privateKeyPem = readFileSync(privateKey, "utf8");
+  const publicKeyPem = readFileSync(publicKey, "utf8");
+  const authority = { keyReference: "sign-intent-test-key-encrypted", publicKeySha256: createHash("sha256").update(publicKeyPem).digest("hex") };
+  writeFileSync(join(directory, "trust-policy.json"), `${JSON.stringify({ ...authority, humanName: "Test Operator" }, null, 2)}\n`);
+  return { privateKeyPem, publicKeyPem, authority };
+}
+
+/**
+ * NVA-SIGNONCE-1: intercepts exactly the `openssl pkeyutl -sign` call
+ * `signIntentIntoProof` shells out to, and signs the digest itself via
+ * `node:crypto` using the encrypted fixture key and the passphrase this fixture
+ * already knows -- in-process, so the real interactive OpenSSL passphrase prompt
+ * is never reached. Every other command this suite might reach (genpkey/pkey
+ * during `setup`, not exercised by `sign-intent`) stays real, unmodified
+ * `openssl`.
+ */
+function fakeSignSpawn(privateKeyPem, passphrase) {
+  return (executable, args) => {
+    if (executable === "openssl" && args[0] === "pkeyutl") {
+      const inIndex = args.indexOf("-in");
+      const outIndex = args.indexOf("-out");
+      const rawInput = readFileSync(args[inIndex + 1]);
+      const keyObject = createPrivateKey({ key: privateKeyPem, format: "pem", passphrase });
+      const signature = sign(null, rawInput, keyObject);
+      writeFileSync(args[outIndex + 1], signature);
+      return { status: 0 };
+    }
+    const result = spawnSync(executable, args, { stdio: "pipe" });
+    return { status: result.status };
+  };
 }
 
 function fixtureDirs() {
@@ -638,6 +686,72 @@ test("sign-intent cancels on a mismatched confirmation: OpenSSL is never invoked
     assert.equal(existsSync(join(dirs.directory, "proof-manual.json")), false);
     assert.equal(existsSync(join(dirs.directory, "signature-manual.bin")), false);
     assert.equal(existsSync(join(dirs.directory, "intent-manual.txt")), false);
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+/* ------------------------------------------------------------------ *
+ * NVA-SIGNONCE-1: one human decision, not two.
+ * ------------------------------------------------------------------ */
+
+test("NVA-SIGNONCE-1: sign-intent skips the typed confirmation for a passphrase-protected private key, but still prints the disclosure", () => {
+  const dirs = fixtureDirs();
+  try {
+    const passphrase = "sign-intent-fixture-passphrase";
+    const { privateKeyPem, authority } = encryptedKeyFixture(dirs.directory, passphrase);
+    const intentSha256 = createHash("sha256").update("pipeline.guard-lift-intent-passphrase-fixture").digest("hex");
+    const dependencies = {
+      spawn: fakeSignSpawn(privateKeyPem, passphrase),
+      // A spy that throws rather than a silent no-op: if the passphrase-protected
+      // branch ever regresses into still reading a confirmation, this test fails
+      // loudly instead of quietly passing on an unread stub answer.
+      readConfirmation: () => { throw new Error("readConfirmation must not be called for a passphrase-protected key"); },
+    };
+    let result;
+    const output = captureStdout(() => {
+      result = runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", intentSha256], dependencies);
+    });
+    assert.equal(result.ok, true);
+    assert.equal(result.code, "PO-HUMAN-SIGN-INTENT-READY");
+    assert.equal(result.intentSha256, intentSha256);
+    assert.equal(result.signer.keyReference, authority.keyReference);
+
+    // The disclosure -- what is being signed -- is still printed, unconditionally,
+    // even though no confirmation token is read from stdin.
+    assert.match(output, new RegExp(intentSha256, "u"), "the digest being signed must still be disclosed");
+    assert.match(output, /guard-lift\/guard-override/u, "the generic consequence class must still be disclosed");
+
+    const proofPath = join(dirs.directory, "proof-manual.json");
+    const proof = JSON.parse(readFileSync(proofPath, "utf8"));
+    assert.equal(proof.intentSha256, intentSha256);
+    const verified = verifyPoApprovalProof({ intent: { sha256: intentSha256 }, trustPolicy: authority, proof });
+    assert.equal(verified.verified, true, "the signature produced without a typed confirmation must still be a genuine, verifying one");
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("NVA-SIGNONCE-1: an unencrypted private key still requires and can cancel on a mismatched confirmation, OpenSSL never invoked", () => {
+  const dirs = fixtureDirs();
+  try {
+    // Same key shape as the pre-existing mismatched-confirmation test above; this
+    // test pins the NEW routing decision specifically -- that
+    // isPrivateKeyPassphraseProtected() correctly resolves an unencrypted key to
+    // `false` and still funnels sign-intent through the confirmation-required path.
+    keyFixture(dirs.directory);
+    const intentSha256 = createHash("sha256").update("pipeline.guard-lift-intent-signonce-unencrypted-fixture").digest("hex");
+    let spawnCalled = false;
+    const dependencies = {
+      readConfirmation: () => "definitely not approve",
+      spawn: () => { spawnCalled = true; return { status: 0 }; },
+    };
+    assert.throws(
+      () => runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", intentSha256], dependencies),
+      /approval cancelled: explicit confirmation was not given/,
+    );
+    assert.equal(spawnCalled, false, "OpenSSL must never be invoked once confirmation is cancelled for a key with no passphrase");
+    assert.equal(existsSync(join(dirs.directory, "proof-manual.json")), false);
   } finally {
     cleanup(dirs);
   }

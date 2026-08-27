@@ -682,16 +682,56 @@ function defaultReadConfirmation(prompt) {
  * language variant can widen, weaken or reorder what counts as consent. An
  * unknown or omitted `language` renders the English frame.
  */
+/**
+ * The disclosure half of the frame above (header, the caller-supplied summary
+ * lines, the consequence sentence) shared by `requireExplicitConfirmation` and
+ * `printDisclosureOnly` below -- factored out so the two can never drift apart:
+ * both must show the human the identical "what is being signed" content, and
+ * only the confirming variant appends the typed-token instruction on top.
+ */
+function composeDisclosureLines(summaryLines, language = DEFAULT_HUMAN_FACING_LANGUAGE) {
+  const frame = CONFIRMATION_PROMPT_FRAME[language] ?? CONFIRMATION_PROMPT_FRAME[DEFAULT_HUMAN_FACING_LANGUAGE];
+  return [frame.header, ...summaryLines.map((line) => `  ${line}`), frame.consequence];
+}
+
 function requireExplicitConfirmation(summaryLines, dependencies, language = DEFAULT_HUMAN_FACING_LANGUAGE) {
   const frame = CONFIRMATION_PROMPT_FRAME[language] ?? CONFIRMATION_PROMPT_FRAME[DEFAULT_HUMAN_FACING_LANGUAGE];
-  const prompt = [
-    frame.header,
-    ...summaryLines.map((line) => `  ${line}`),
-    frame.consequence,
-    frame.instruction,
-  ].join("\n");
+  const prompt = [...composeDisclosureLines(summaryLines, language), frame.instruction].join("\n");
   const read = dependencies.readConfirmation ?? defaultReadConfirmation;
   if (read(prompt) !== CONFIRMATION_TOKEN) fail("approval cancelled: explicit confirmation was not given");
+}
+
+/**
+ * NVA-SIGNONCE-1: the disclosure alone, printed with no token read from stdin --
+ * used only when the private key about to sign is passphrase-protected (see the
+ * call site in the `sign-intent` branch), where entering that passphrase next at
+ * the OpenSSL prompt is already the deliberate human act; a second typed token
+ * first would only train the human to type past it without reading. Same frame,
+ * same disclosure content as `requireExplicitConfirmation` (header, the
+ * caller-supplied summary lines, the consequence sentence) via the shared
+ * `composeDisclosureLines`; the one thing this omits is the instruction line
+ * asking for a typed token, because nothing here is being typed.
+ */
+function printDisclosureOnly(summaryLines, language = DEFAULT_HUMAN_FACING_LANGUAGE) {
+  process.stdout.write(`${composeDisclosureLines(summaryLines, language).join("\n")}\n`);
+}
+
+/**
+ * NVA-SIGNONCE-1: whether the private key at `pemPath` needs a passphrase,
+ * decided by reading the key's own PEM armor -- never a flag, a config value, an
+ * environment variable, or a question to the human. `setup`'s only key-generation
+ * path (`openssl genpkey -algorithm ED25519 -aes-256-cbc`, this file's `setup`
+ * branch) always emits PKCS#8 "ENCRYPTED PRIVATE KEY" armor for a
+ * passphrase-protected key and plain "PRIVATE KEY" armor otherwise; no other PEM
+ * shape reaches this command. A key that cannot be read returns `false`, which
+ * routes the caller to the stricter, confirmation-required path -- unreadable
+ * key material never widens what gets skipped.
+ */
+function isPrivateKeyPassphraseProtected(pemPath, dependencies) {
+  const read = dependencies.readFile ?? readFileSync;
+  let pem;
+  try { pem = read(pemPath, "utf8"); } catch { return false; }
+  return pem.includes("-----BEGIN ENCRYPTED PRIVATE KEY-----");
 }
 
 /**
@@ -1176,14 +1216,28 @@ function executeHumanApproval(args, dependencies = {}) {
     if (!record.resolved) {
       record = describeHgo({ rootDir: repository, pluginRoot: PLUGIN_ROOT, intentSha256, scriptPath: SCRIPT });
     }
-    requireExplicitConfirmation([
+    const disclosureLines = [
       `intent sha256: ${intentSha256}`,
       ...(record.resolved ? record.lines : [
         `no recorded request resolves for this digest in this repository (${record.code}): this command has no description of that action and will not invent one.`,
         "it signs a one-time, audited guard-lift/guard-override (HGO/GMW) authorization for whatever was recorded against this exact digest elsewhere.",
       ]),
       "this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.",
-    ], dependencies, humanFacingLanguage);
+    ];
+    // NVA-SIGNONCE-1: one human decision, not two. When the private key about to
+    // sign is passphrase-protected, entering that passphrase at the OpenSSL
+    // prompt below IS the deliberate human act, so the typed confirmation this
+    // command otherwise requires is skipped -- but the disclosure itself (what is
+    // being signed, and the recorded reason/scope/expiry when known) is composed
+    // and printed either way, unconditionally, before OpenSSL ever runs. For a
+    // key with no passphrase this stays byte-for-byte what it was before: the
+    // confirmation remains the only human gate in that case, and removing it too
+    // would leave none.
+    if (isPrivateKeyPassphraseProtected(paths.privateKey, dependencies)) {
+      printDisclosureOnly(disclosureLines, humanFacingLanguage);
+    } else {
+      requireExplicitConfirmation(disclosureLines, dependencies, humanFacingLanguage);
+    }
     const manual = {
       intent: artifactPath(directory, "intent-manual.txt"),
       signature: artifactPath(directory, "signature-manual.bin"),
