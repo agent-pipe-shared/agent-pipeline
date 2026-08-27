@@ -38,7 +38,9 @@ import test from "node:test";
 
 import {
   applySessionCleanupRecovery,
+  planOrphanWorktreeDirectories,
   planSessionCleanupRecovery,
+  retireOrphanWorktreeDirectories,
   sessionCleanupRecoveryInternals,
 } from "./session-cleanup-recovery.mjs";
 import {
@@ -673,5 +675,120 @@ test("release-closed-feature auto-executes without confirmation, backs up onboar
     // from that coordinator-close branch and is NOT covered by this file --
     // see this dispatch's completion report).
     assert.equal(readOnboardingSessionCleanupBinding({ rootDir: root }).status, "released");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// NVA-SCRATCHSWEEP-1: planOrphanWorktreeDirectories / retireOrphanWorktreeDirectories --
+// the `.claude/worktrees/` half of the sweep (backlog:
+// 2026-08-27-stale-worktree-directories-accumulate-with-no-sweep.md). Each test uses its own
+// minimal real `git init` repository -- the safety predicate is defined entirely in terms of
+// `git worktree list` and an on-disk `.git` pointer file, so a real repository is required
+// rather than a mocked one.
+
+function freshWorktreeSweepRepo() {
+  const root = mkdtempSync(join(tmpdir(), "session-cleanup-recovery-worktree-sweep-"));
+  const run = (args) => {
+    const result = spawnSync("git", args, { cwd: root, encoding: "utf8" });
+    assert.equal(result.status, 0, `fixture git ${args.join(" ")} failed: ${result.stderr}`);
+    return result;
+  };
+  run(["init", "--quiet"]);
+  run(["config", "user.email", "fixture@example.invalid"]);
+  run(["config", "user.name", "Fixture"]);
+  writeFileSync(join(root, "seed.txt"), "seed\n");
+  run(["add", "seed.txt"]);
+  run(["commit", "--quiet", "-m", "seed"]);
+  return root;
+}
+
+test("planOrphanWorktreeDirectories reports nothing and creates nothing when .claude/worktrees does not exist", () => {
+  const root = freshWorktreeSweepRepo();
+  try {
+    assert.deepEqual(planOrphanWorktreeDirectories({ rootDir: root }), []);
+    assert.equal(existsSync(join(root, ".claude", "worktrees")), false);
+    const retired = retireOrphanWorktreeDirectories({ rootDir: root });
+    assert.deepEqual(retired, { retiredCount: 0, retained: [] });
+    assert.equal(existsSync(join(root, ".claude", "worktrees")), false);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("a worktree directory git still knows about is never removed, regardless of age", () => {
+  const root = freshWorktreeSweepRepo();
+  try {
+    const worktreePath = join(root, ".claude", "worktrees", "live-one");
+    const add = spawnSync("git", ["worktree", "add", "--detach", worktreePath], { cwd: root, encoding: "utf8" });
+    assert.equal(add.status, 0, `fixture git worktree add failed: ${add.stderr}`);
+    assert.equal(existsSync(worktreePath), true);
+
+    const plan = planOrphanWorktreeDirectories({ rootDir: root });
+    assert.equal(plan.length, 1);
+    assert.equal(plan[0].status, "active-registered");
+
+    const retired = retireOrphanWorktreeDirectories({ rootDir: root });
+    assert.equal(retired.retiredCount, 0);
+    assert.equal(existsSync(worktreePath), true, "a git-known worktree must survive the sweep");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("a directory with no .git pointer file is never a candidate, even though git does not know it", () => {
+  const root = freshWorktreeSweepRepo();
+  try {
+    const bystander = join(root, ".claude", "worktrees", "not-a-worktree");
+    mkdirSync(bystander, { recursive: true });
+    writeFileSync(join(bystander, "notes.txt"), "unrelated scratch-like content\n");
+
+    const plan = planOrphanWorktreeDirectories({ rootDir: root });
+    assert.equal(plan.length, 1);
+    assert.equal(plan[0].status, "not-a-worktree-checkout");
+
+    const retired = retireOrphanWorktreeDirectories({ rootDir: root });
+    assert.equal(retired.retiredCount, 0);
+    assert.equal(existsSync(bystander), true, "a directory that was never a worktree checkout must never be removed");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("an orphaned worktree directory -- git no longer knows it, and its own gitdir record is gone -- is retired", () => {
+  const root = freshWorktreeSweepRepo();
+  try {
+    const worktreePath = join(root, ".claude", "worktrees", "orphaned-one");
+    const add = spawnSync("git", ["worktree", "add", "--detach", worktreePath], { cwd: root, encoding: "utf8" });
+    assert.equal(add.status, 0, `fixture git worktree add failed: ${add.stderr}`);
+    // Simulate exactly what a partial/failed `git worktree remove` leaves behind: the
+    // administrative record under .git/worktrees/<name> is gone (so `git worktree list` no
+    // longer reports this path, and the directory's own recorded gitdir target is dangling),
+    // but the working directory itself was never actually deleted.
+    const pointerRaw = readFileSync(join(worktreePath, ".git"), "utf8");
+    const pointerMatch = /^gitdir:\s*(.+)$/mu.exec(pointerRaw);
+    assert.ok(pointerMatch, "fixture worktree must carry a gitdir pointer file");
+    const adminDir = pointerMatch[1].trim();
+    assert.equal(existsSync(adminDir), true);
+    rmSync(adminDir, { recursive: true, force: true });
+    assert.equal(existsSync(worktreePath), true, "the working directory itself must still be present");
+
+    const plan = planOrphanWorktreeDirectories({ rootDir: root });
+    assert.equal(plan.length, 1);
+    assert.equal(plan[0].status, "orphan");
+
+    const retired = retireOrphanWorktreeDirectories({ rootDir: root });
+    assert.equal(retired.retiredCount, 1);
+    assert.equal(existsSync(worktreePath), false, "a confirmed orphan must be removed");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("planOrphanWorktreeDirectories fails every entry closed when git worktree list itself is unavailable", () => {
+  const root = freshWorktreeSweepRepo();
+  try {
+    const worktreePath = join(root, ".claude", "worktrees", "unresolvable");
+    const add = spawnSync("git", ["worktree", "add", "--detach", worktreePath], { cwd: root, encoding: "utf8" });
+    assert.equal(add.status, 0, `fixture git worktree add failed: ${add.stderr}`);
+
+    const brokenSpawn = () => ({ status: 1, stdout: "", stderr: "simulated failure" });
+    const plan = planOrphanWorktreeDirectories({ rootDir: root, deps: { spawn: brokenSpawn } });
+    assert.equal(plan.length, 1);
+    assert.equal(plan[0].status, "unknown-git-worktree-list-unavailable");
+
+    const retired = retireOrphanWorktreeDirectories({ rootDir: root, deps: { spawn: brokenSpawn } });
+    assert.equal(retired.retiredCount, 0);
+    assert.equal(existsSync(worktreePath), true, "an unresolvable liveness check must never cause a removal");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
