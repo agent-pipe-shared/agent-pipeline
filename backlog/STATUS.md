@@ -196,6 +196,7 @@
 | pipeline.guard-lifecycle-ready-rejects-plan-runtime-intent-argv | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.guard-lifecycle-ready-runner-allowlist-incomplete | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.guard-maintenance-window-rejects-a-fresh-setup1-authority-file | closed | defect | pipeline | 2026-08-09 | — |
+| pipeline.guard-maintenance-window-repofingerprint-shares-the-fixed-path-bound-defect | open | defect | pipeline | 2026-08-27 | — |
 | pipeline.guard-reclassification-changed-what-a-signature-can-lift | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.guard-refuses-documented-bounded-diagnostic | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.guard-refuses-the-prescribed-recovery | closed | defect | pipeline | 2026-08-08 | — |
@@ -292,7 +293,7 @@
 | pipeline.parallel-goldfish-dispatches-race-on-shared-checkout | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.part-a-limitation-2-orphaned-by-the-r2-rework | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.partial-lifecycle-blocks-read-only-diagnosis-and-tmp-fallback | closed | defect | pipeline | 2026-08-17 | — |
-| pipeline.path-bound-fingerprints-break-across-windows-wsl-access | open | defect | pipeline | 2026-08-27 | — |
+| pipeline.path-bound-fingerprints-break-across-windows-wsl-access | closed | defect | pipeline | 2026-08-27 | — |
 | pipeline.path-bound-repository-fingerprints-break-between-windows-and-wsl | rejected | defect | pipeline | 2026-08-27 | — |
 | pipeline.per-phase-progress-message-budget | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.permitted-edit-drops-session-into-unrecoverable-readiness | closed | defect | pipeline | 2026-08-08 | — |
@@ -364,6 +365,7 @@
 | pipeline.repair-map-crashes-on-a-fresh-repository-with-no-head | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.report-early-duty-is-conditional-in-writing-and-unconditional-in-practice | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.repository-agent-definition-is-inert-runtime-loads-installed-copy | open | defect | pipeline | 2026-08-27 | — |
+| pipeline.resolved-backlog-items-can-keep-status-open-indefinitely | open | defect | pipeline | 2026-08-27 | — |
 | pipeline.restart-launch-is-codex-only-for-every-runner | closed | defect | pipeline | 2026-08-06 | — |
 | pipeline.restart-resume-hint-write-misses-the-project-prefix | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.resume-hint-opaque-token-rejects-hyphenated-english | closed | defect | pipeline | 2026-08-09 | — |
@@ -402,7 +404,7 @@
 | pipeline.source-available-commercial-licensing | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.spec-retention-on-close | closed | defect | pipeline | 2026-07-20 | — |
 | pipeline.stale-checkout-runs-outdated-human-approval-ceremony-against-current-trust-policy | open | defect | pipeline | 2026-08-12 | — |
-| pipeline.stale-worktree-directories-accumulate-with-no-sweep | open | defect | pipeline | 2026-08-27 | — |
+| pipeline.stale-worktree-directories-accumulate-with-no-sweep | closed | defect | pipeline | 2026-08-27 | — |
 | pipeline.staleness-check-unsettled-top-level-await-warning | closed | defect | pipeline | 2026-08-19 | — |
 | pipeline.stateful-design-contract-template | deferred | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; deferred per PO triage 2026-08-23. |
 | pipeline.t1-governance-path-preflight | closed | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
@@ -461,6 +463,6 @@
 
 - open: 55
 - in_progress: 5
-- closed: 377
+- closed: 379
 - rejected: 3
 - deferred: 11

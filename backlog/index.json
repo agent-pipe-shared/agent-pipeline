@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "2f70060e47c48971c7858689457cb0f0de232052c024805b0dd39f77db1131fe"
+    "transitionHead": "e6b2f44dc20b4e4c7a7b680d4120ab12e5883683946e8511255a5f710906f3da"
   },
   "counts": {
     "open": 55,
     "in_progress": 5,
-    "closed": 377,
+    "closed": 379,
     "rejected": 3,
     "deferred": 11
   },
@@ -2357,6 +2357,15 @@
       "closureEvidence": "backlog/evidence/2026-08-09-guard-maintenance-window-humanname-fix-closure.md"
     },
     {
+      "id": "pipeline.guard-maintenance-window-repofingerprint-shares-the-fixed-path-bound-defect",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-27",
+      "source": "NVA-BLRECONCILE-1, 2026-08-27 — residual-scope re-check while closing backlog/items/2026-08-27-path-bound-fingerprints-break-across-windows-wsl-access.md",
+      "deferred": false
+    },
+    {
       "id": "pipeline.guard-reclassification-changed-what-a-signature-can-lift",
       "status": "closed",
       "type": "defect",
@@ -3571,12 +3580,16 @@
     },
     {
       "id": "pipeline.path-bound-fingerprints-break-across-windows-wsl-access",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-27",
       "source": "NVA-PATHBIND-AUDIT-1, scratch/PATHBIND-audit.md, 2026-08-27 — read-only audit of every path-derived identifier used in durable state",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-27",
+      "closureRepository": "self",
+      "closureCommit": "1858a21b276a2cf96247079b89ed69a3f68d42c6",
+      "closureEvidence": "backlog/items/2026-08-27-path-bound-fingerprints-break-across-windows-wsl-access.md"
     },
     {
       "id": "pipeline.path-bound-repository-fingerprints-break-between-windows-and-wsl",
@@ -4465,6 +4478,15 @@
       "deferred": false
     },
     {
+      "id": "pipeline.resolved-backlog-items-can-keep-status-open-indefinitely",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-27",
+      "source": "NVA-BLRECONCILE-1, 2026-08-27 — process-defect finding from the briefing that reported two same-day dispatches briefed against already-finished work",
+      "deferred": false
+    },
+    {
       "id": "pipeline.restart-launch-is-codex-only-for-every-runner",
       "status": "closed",
       "type": "defect",
@@ -4933,12 +4955,16 @@
     },
     {
       "id": "pipeline.stale-worktree-directories-accumulate-with-no-sweep",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-27",
       "source": "Handover-rotation extraction pass over Phoenix checkpoint 67, 2026-08-27",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-27",
+      "closureRepository": "self",
+      "closureCommit": "f1d9fe45607be531901f69c7f67c7590e9541fdb",
+      "closureEvidence": "backlog/items/2026-08-27-stale-worktree-directories-accumulate-with-no-sweep.md"
     },
     {
       "id": "pipeline.staleness-check-unsettled-top-level-await-warning",
