@@ -20,7 +20,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { checkSecurityCompleteness } from "./security-completeness-gate.mjs";
+import { checkSecurityCompleteness, resolveSecurityGateMode } from "./security-completeness-gate.mjs";
 
 const HEAD = "a".repeat(40);
 const TREE = "b".repeat(40);
@@ -246,6 +246,23 @@ test("envelope schema-shape validation failure (e.g. wrong schema string) is rep
       `expected an envelope-schema-invalid failure line, got: ${JSON.stringify(failures)}`,
     );
   });
+});
+
+// NVA-SECGATE-1: pins the shared absent-key default this module now exports, so a future
+// change reintroducing a divergent default here would fail THIS suite even if
+// security-scan.test.mjs's own end-to-end pinning test were somehow not run.
+test("resolveSecurityGateMode: an ABSENT gates.security key resolves to \"blocking\" (never permissive by default)", () => {
+  assert.equal(resolveSecurityGateMode(null), "blocking");
+  assert.equal(resolveSecurityGateMode(undefined), "blocking");
+  assert.equal(resolveSecurityGateMode({}), "blocking");
+  assert.equal(resolveSecurityGateMode({ gates: {} }), "blocking");
+  assert.equal(resolveSecurityGateMode({ gates: { security: {} } }), "blocking");
+});
+
+test("resolveSecurityGateMode: an explicit gates.security.mode is honored unchanged", () => {
+  assert.equal(resolveSecurityGateMode({ gates: { security: { mode: "warn" } } }), "warn");
+  assert.equal(resolveSecurityGateMode({ gates: { security: { mode: "off" } } }), "off");
+  assert.equal(resolveSecurityGateMode({ gates: { security: { mode: "blocking" } } }), "blocking");
 });
 
 after(() => {

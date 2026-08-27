@@ -31,6 +31,9 @@ import * as osvScannerAdapter from "./security-adapters/osv-scanner.mjs";
 import * as semgrepAdapter from "./security-adapters/semgrep.mjs";
 import * as licenseCheckAdapter from "./security-adapters/license-check.mjs";
 import { runSecurityScan } from "./security-scan.mjs";
+// NVA-SECGATE-1: security-scan.mjs's own gate-mode resolution now delegates to this exact
+// shared function -- see the pinning test below.
+import { resolveSecurityGateMode } from "../lib/security-completeness-gate.mjs";
 
 const SCRIPT = fileURLToPath(new URL("./security-scan.mjs", import.meta.url));
 const REPO_ROOT = join(dirname(SCRIPT), "..", "..", "..");
@@ -1377,6 +1380,39 @@ security:
   const { evidence, exitCode } = await runSecurityScan({ rootDir, env, spawnFn: fixtureSpawnFn, timeoutMs: 5000, assessTrustedExecutablePath: mockAssessFixtureBinary });
   assertEqual("runner: ERROR + zero findings -> findings array empty", evidence.findings.length, 0);
   assertEqual("runner: ERROR + zero findings -> still blocking-class -> exit 2", exitCode, 2);
+}
+
+{
+  // NVA-SECGATE-1: a manifest that omits `gates.security` entirely (the exact "compiled
+  // manifest never got the key" shape that produced the reported disagreement) must still
+  // resolve to the shared "blocking" default -- an ERROR-status scanner (blocking-class
+  // regardless of thresholds) proves it end-to-end via the observable exit code, and the
+  // direct `resolveSecurityGateMode` call pins that security-scan.mjs's own resolution and
+  // security-completeness-gate.mjs's shared default agree on the SAME manifest shape (a test
+  // that would fail if either side drifted independently again).
+  const rootDir = makeRootDir("runner-absent-gate-key-root");
+  const manifestYaml = `schema: pipeline.manifest.v0
+
+security:
+  scanners:
+    gitleaks:
+      enabled: false
+    osv-scanner:
+      enabled: false
+    semgrep:
+      enabled: true
+    license-check:
+      enabled: false
+`;
+  writeManifest(rootDir, manifestYaml);
+  const env = { PIPELINE_SEMGREP_PATH: semgrepCrash };
+  const { exitCode } = await runSecurityScan({ rootDir, env, spawnFn: fixtureSpawnFn, timeoutMs: 5000, assessTrustedExecutablePath: mockAssessFixtureBinary });
+  assertEqual("runner: absent gates.security key -> ERROR still blocking-class -> exit 2 (mode resolved to \"blocking\")", exitCode, 2);
+  assertEqual(
+    "resolveSecurityGateMode: absent gates.security key on a manifest object shaped like the fixture above also resolves to \"blocking\"",
+    resolveSecurityGateMode({ schema: "pipeline.manifest.v0", security: { scanners: {} } }),
+    "blocking",
+  );
 }
 
 {

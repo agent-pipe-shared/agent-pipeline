@@ -85,6 +85,31 @@ import { evaluateAllCapabilities, aggregateVerdict, validateSecurityEvidenceV2 }
 const DEFAULT_ENVELOPE_PATH = "evidence/security-latest.v2.json";
 const DEFAULT_VERDICT_PATH = "evidence/security-latest.v2.verdict.json";
 
+/**
+ * NVA-SECGATE-1: shared absent-key default for `gates.security.mode`, consulted by
+ * `security-scan.mjs` (imports `resolveSecurityGateMode` below rather than keeping its own
+ * copy) so the two never independently drift again. Before this fix, THIS module had no
+ * stance of its own at all -- `security-scan.mjs` alone decided that an absent key means
+ * "blocking", while nothing here recorded (or could be asked) what an absent key means to the
+ * completeness-gate side of the same decision. Chosen direction: "blocking" (never
+ * permissive-by-default) -- an absent key is a configuration gap, not an explicit opt-out, and
+ * must fail closed the same way a missing/stale v2 evidence pair already does just below.
+ */
+const DEFAULT_SECURITY_GATE_MODE = "blocking";
+
+/**
+ * Resolves the effective `gates.security.mode` string from a (possibly null/malformed)
+ * manifest object. Mirrors `gateConfig(manifest, "security")?.mode ?? DEFAULT` byte-for-byte
+ * (see the constant above for why "blocking" is the chosen absent-key default) without
+ * importing `gateConfig` itself, to keep this module's existing zero-import-surface minimal;
+ * optional chaining already handles every malformed shape (non-object manifest/gates/security,
+ * or a `security` value that is a primitive rather than an object) the same way `gateConfig`'s
+ * explicit `typeof === "object"` guards do.
+ */
+export function resolveSecurityGateMode(manifest) {
+  return manifest?.gates?.security?.mode ?? DEFAULT_SECURITY_GATE_MODE;
+}
+
 /** Reads + JSON-parses an evidence file relative to `projectDir`; returns {ok:true, data} | {ok:false, reason}. */
 function readEvidence(projectDir, relPath) {
   const p = join(projectDir, relPath);

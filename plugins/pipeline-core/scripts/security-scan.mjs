@@ -50,7 +50,9 @@
  *   - `security.thresholds.block_on` -- default `["critical", "high"]`.
  *   - `governance.policies_path` -- default `"governance/examples/policies"`; used to build
  *     the license-check allowlist path `<rootDir>/<policies_path>/license-allowlist.json`.
- *   - gate mode via `gateConfig(manifest, "security")?.mode` -- default `"blocking"`.
+ *   - gate mode via `resolveSecurityGateMode(manifest)` (../lib/security-completeness-gate.mjs,
+ *     NVA-SECGATE-1) -- default `"blocking"`, shared with that module so an absent
+ *     `gates.security` key can never resolve to two different modes across the two consumers.
  *
  * EXIT-CODE POLICY (briefing, verbatim): any adapter status ERROR -> blocking-class
  * (fail-closed: an adapter that crashed is worse than one with findings, never silently
@@ -81,8 +83,12 @@ import { basename, join, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-import { loadManifestSafe, gateConfig } from "../lib/manifest.mjs";
+import { loadManifestSafe } from "../lib/manifest.mjs";
 import { resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
+// NVA-SECGATE-1: gate-mode resolution now lives in security-completeness-gate.mjs (the
+// SHARED absent-key default both consumers use) -- see that function's own doc comment for
+// why "blocking" was chosen and why it moved rather than staying duplicated here.
+import { resolveSecurityGateMode } from "../lib/security-completeness-gate.mjs";
 import { assessTrustedExecutablePath, resolveTrustedSystemExecutable } from "./tool-identity.mjs";
 
 import * as gitleaksAdapter from "./security-adapters/gitleaks.mjs";
@@ -107,7 +113,10 @@ const DEFAULT_TIMEOUT_MS = 60000;
 const PREFLIGHT_TIMEOUT_MS = 5000;
 const DEFAULT_BLOCK_ON = ["critical", "high"];
 const DEFAULT_GOVERNANCE_POLICIES_PATH = "governance/examples/policies";
-const DEFAULT_GATE_MODE = "blocking";
+// NVA-SECGATE-1: no local DEFAULT_GATE_MODE / resolveGateMode anymore -- both now live as
+// the single shared `resolveSecurityGateMode()` in ../lib/security-completeness-gate.mjs
+// (imported above) so this file and security-completeness-gate.mjs can never independently
+// resolve an absent `gates.security` key to two different modes again.
 
 // Fixed run order; every key here must match the manifest's security.scanners.<key> key.
 const SCANNER_DEFS = [
@@ -136,10 +145,6 @@ function isScannerEnabled(manifest, key) {
 function resolveBlockOn(manifest) {
   const configured = manifest?.security?.thresholds?.block_on;
   return Array.isArray(configured) ? configured : DEFAULT_BLOCK_ON;
-}
-
-function resolveGateMode(manifest) {
-  return gateConfig(manifest, "security")?.mode ?? DEFAULT_GATE_MODE;
 }
 
 function resolveGovernancePoliciesPath(manifest) {
@@ -765,7 +770,7 @@ export async function runSecurityScan({
       authority.status === "ready" ? { manifestRelPath: authority.manifest } : undefined,
     );
   const blockOn = resolveBlockOn(manifest);
-  const mode = resolveGateMode(manifest);
+  const mode = resolveSecurityGateMode(manifest);
   const policiesPathAbs = scanRoot ? join(scanRoot, resolveGovernancePoliciesPath(manifest)) : null;
 
   const scanners = [];
