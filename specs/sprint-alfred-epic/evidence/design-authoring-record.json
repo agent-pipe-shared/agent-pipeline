@@ -42,7 +42,7 @@
   },
   "declaredFacts": [
     "The design was authored ahead of Nova/Phoenix go-live under an explicit PO decision recorded in specs/sprint-alfred-epic/design/po-input-2026-08-27.md.",
-    "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md carries a technical-spec-sha256 marker bound to spec.md as committed in 584acbda.",
+    "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md carries a technical-spec-sha256 marker that is recomputed whenever spec.md changes; it binds spec.md as committed in the newest commits[] entry above that lists spec.md among its files.",
     "No plan submission exists yet; the package is pre-submission design material at the time of this record."
   ]
 }
