@@ -1828,6 +1828,143 @@ const MANAGED_ONBOARDING_TARGET = "backlog/items/2026-07-25-managed-onboarding-s
     [...applied.findings, ...afterApply.findings, ...rejectedWrongHash.findings].join("; "));
 }
 
+// ADR-0068 D7: the one legitimate positional exception. A hand-assembled test
+// ledger must itself be contiguous (events[i].sequence === i + 1) for
+// validateTransitionLedger's own chain check to accept it at all -- that is a
+// property of the ledger format, not the amendment-lookup anti-pattern D7
+// targets. This pins that assumption as a named, asserted invariant instead
+// of a silent one.
+function assertContiguousLedgerFixture(events, label) {
+  for (const [index, evt] of events.entries()) {
+    if (evt?.sequence !== index + 1) {
+      throw new Error(`${label}: fixture is not a contiguous ledger at array index ${index} (expected sequence ${index + 1}, got ${evt?.sequence})`);
+    }
+  }
+  return events;
+}
+
+{
+  // NVA-BS27-1 (ADR-0068 D7): an item-hash-rescope-amendment resolves its
+  // target by amendsEntryHash, not by amendsSequence used as an array index.
+  // amendsSequence alone is a merge hazard: a merge that lands a new event
+  // ahead of the target shifts its physical position (and its own entryHash,
+  // since transitionHash covers sequence/previousHash too -- any append
+  // changes all three, D3), stranding a purely positional lookup on the
+  // wrong event.
+  const noiseGenesis = event({ id: "pipeline.merge-noise-1", evidence: { kind: "baseline-migration", commit: "a".repeat(40) } });
+  const target = event({
+    sequence: 2,
+    id: "pipeline.merge-rescope-example",
+    from: null,
+    to: "open",
+    evidence: { kind: "missing-initial-ledger-repair", commit: "b".repeat(40), reference: "backlog/items/example.md" },
+    previousHash: noiseGenesis.entryHash,
+  });
+  const beforeEvents = [noiseGenesis, target];
+  const beforeItems = [item({ id: "pipeline.merge-noise-1" }), item({ id: "pipeline.merge-rescope-example" })];
+  const rescopeAmendmentInput = {
+    id: "pipeline.merge-rescope-example",
+    at: "2026-08-27",
+    actor: "nva-bs27-1",
+    reason: "Regression coverage: amendsSequence must not be trusted as a positional index after a merge.",
+    amendsSequence: 2,
+    scope: "pre-triage",
+    itemSha256: "d".repeat(64),
+    rationale: "Prove the amendment binds by content hash, not physical position.",
+  };
+  const beforePlan = planBacklogItemHashRescopeAmendment(beforeItems, beforeEvents, rescopeAmendmentInput);
+
+  // Simulate the merge: a second unrelated event lands ahead of the target,
+  // shifting it (and everything appended after it, including the amendment
+  // above) to a new physical position -- re-issued exactly as D3 already
+  // requires for a migrated amendment: new sequence/previousHash/entryHash,
+  // amendsSequence left as-is (now stale, documentation only), amendsEntryHash
+  // re-pointed at the target's re-issued hash.
+  const mergedNoise2 = event({ sequence: 2, id: "pipeline.merge-noise-2", from: null, to: "open", evidence: { kind: "baseline-migration", commit: "c".repeat(40) }, previousHash: noiseGenesis.entryHash });
+  const mergedTarget = { ...target, sequence: 3, previousHash: mergedNoise2.entryHash, entryHash: "" };
+  mergedTarget.entryHash = transitionHash(mergedTarget);
+  const mergedAmendment = {
+    ...beforePlan.event,
+    sequence: 4,
+    previousHash: mergedTarget.entryHash,
+    evidence: { ...beforePlan.event.evidence, amendsEntryHash: mergedTarget.entryHash },
+    entryHash: "",
+  };
+  mergedAmendment.entryHash = transitionHash(mergedAmendment);
+  const afterEvents = [noiseGenesis, mergedNoise2, mergedTarget, mergedAmendment];
+  const afterItems = [item({ id: "pipeline.merge-noise-1" }), item({ id: "pipeline.merge-noise-2" }), item({ id: "pipeline.merge-rescope-example" })];
+
+  // The literal positional lookup this dispatch removes: what amendsSequence
+  // (still "2", now stale) would resolve to as a raw array index after the
+  // merge is the WRONG event -- mergedNoise2, not the missing-initial-
+  // ledger-repair target.
+  const positionalResolution = afterEvents[mergedAmendment.evidence.amendsSequence - 1];
+  const positionalResolvesWrong = positionalResolution?.entryHash === mergedNoise2.entryHash
+    && positionalResolution?.evidence?.kind !== "missing-initial-ledger-repair";
+
+  const afterFindings = validateTransitionLedger(afterEvents, afterItems);
+  const rescopeBindingFinding = "item-hash-rescope-amendment amendsSequence does not identify a missing-initial-ledger-repair event for this item";
+  const hashBoundFinding = "item-hash-rescope-amendment amendsEntryHash does not identify a missing-initial-ledger-repair event for this item";
+
+  check("BS35 (ADR-0068 D7) an item-hash-rescope-amendment resolves its target by amendsEntryHash after a merge shifts amendsSequence's physical position, which a raw positional lookup would resolve wrong",
+    beforePlan.ok
+      && positionalResolvesWrong
+      && !afterFindings.some((finding) => finding.includes(rescopeBindingFinding))
+      && !afterFindings.some((finding) => finding.includes(hashBoundFinding)),
+    JSON.stringify({ beforePlanErrors: beforePlan.errors, positionalResolution, afterFindings }));
+}
+
+{
+  // ADR-0068 D7 backward compatibility: every item-hash-rescope-amendment
+  // event in the live ledger today predates amendsEntryHash. Validation must
+  // keep accepting that exact legacy shape via the amendsSequence-positional
+  // fallback -- proven, not merely asserted, against a genuinely contiguous
+  // fixture chain.
+  const genesis = event({ id: "pipeline.legacy-noise", evidence: { kind: "baseline-migration", commit: "e".repeat(40) } });
+  const target = event({
+    sequence: 2,
+    id: "pipeline.legacy-rescope-example",
+    from: null,
+    to: "open",
+    evidence: { kind: "missing-initial-ledger-repair", commit: "f".repeat(40), reference: "backlog/items/example.md" },
+    previousHash: genesis.entryHash,
+  });
+  const legacyAmendment = event({
+    sequence: 3,
+    id: "pipeline.legacy-rescope-example",
+    from: "open",
+    to: "open",
+    evidence: { kind: "item-hash-rescope-amendment", amendsSequence: 2, itemId: "pipeline.legacy-rescope-example", scope: "pre-triage", itemSha256: "0".repeat(64), rationale: "Legacy shape: no amendsEntryHash field." },
+    previousHash: target.entryHash,
+  });
+  const legacyEvents = assertContiguousLedgerFixture([genesis, target, legacyAmendment], "BS36 legacy rescope fixture");
+  const legacyItems = [item({ id: "pipeline.legacy-noise" }), item({ id: "pipeline.legacy-rescope-example" })];
+  const legacyFindings = validateTransitionLedger(legacyEvents, legacyItems);
+  const rescopeBindingFinding = "item-hash-rescope-amendment amendsSequence does not identify a missing-initial-ledger-repair event for this item";
+  check("BS36 (ADR-0068 D7) a legacy item-hash-rescope-amendment with no amendsEntryHash field -- the shape every event in the live ledger has today -- still validates via the amendsSequence-positional fallback",
+    !("amendsEntryHash" in legacyAmendment.evidence)
+      && !legacyFindings.some((finding) => finding.includes(rescopeBindingFinding)),
+    JSON.stringify(legacyFindings));
+}
+
+{
+  // The named invariant itself: a future edit to a fixture chain that breaks
+  // contiguity must fail loudly by name here, not let some other lookup
+  // quietly resolve the wrong event.
+  let threw = null;
+  try {
+    assertContiguousLedgerFixture([
+      event({ id: "pipeline.invariant-example" }),
+      event({ sequence: 3, id: "pipeline.invariant-example" }),
+    ], "BS37 probe");
+  } catch (error) {
+    threw = error;
+  }
+  check("BS37 (ADR-0068 D7) assertContiguousLedgerFixture fails by name when a fixture's chain stops being contiguous",
+    threw instanceof Error && threw.message.includes("BS37 probe") && threw.message.includes("array index 1"),
+    String(threw));
+}
+
 for (const root of roots) rmSync(root, { recursive: true, force: true });
 console.log(`\n${passed}/${passed + failed} checks passed.`);
 process.exit(failed === 0 ? 0 : 1);

@@ -150,6 +150,47 @@ ever established by which chain happened to be appended second — which is what
 structurally impossible for amendments, and what D1 makes explicit for ordinary events by
 refusing to interleave chains at all.
 
+### D7 — Amendment target resolution binds by content hash, matching D2 for `amendsSequence` too
+
+`item-hash-rescope-amendment` was the one amendment kind D2 point 3 did not yet cover: its target
+binding (`amendsSequence`) still resolved by indexing `events[amendsSequence - 1]`, and unlike
+`supersedesSequence` it carried no companion hash field to fall back on. This closes that gap.
+
+1. The evidence gains `amendsEntryHash`, additive alongside the existing `amendsSequence` (never
+   replacing it) — the same shape D2 point 3 already establishes for `supersedesEntryHash`.
+2. Resolution binds by `amendsEntryHash` when the event carries one — `events.find(candidate =>
+   candidate.entryHash === amendsEntryHash)`, never a physical index. `amendsSequence` becomes
+   documentation only in that case, exactly as D2 point 4 already treats the frozen `status` field.
+3. A legacy event — every `item-hash-rescope-amendment` in the live ledger as of this decision —
+   carries no `amendsEntryHash`. It is not refused: validation falls back to the original
+   `amendsSequence`-positional check unchanged. This is a deliberate, disclosed exception, not a
+   silent gap — the fallback is proven by a dedicated backward-compatibility test, not merely
+   assumed.
+4. `planBacklogItemHashRescopeAmendment` now resolves its construction-time target by matching
+   `events` on the `sequence` VALUE rather than trusting the array's own physical layout, and
+   records the resolved target's `entryHash` as `amendsEntryHash` on every newly appended event
+   going forward, so a future merge that renumbers the target still resolves it correctly.
+5. `planPrePublicCoreReachabilityRepair`'s one remaining `events[sequence - 1]` lookup is converted
+   to the same `events.find(candidate => candidate.entryHash === target.entryHash)` pattern
+   `validateTransitionLedger` already uses for this event kind (D2 point 3) — the registry already
+   carries the target's `entryHash`, so no additive field is needed there.
+
+**Scope, disclosed rather than silent:** `planBacklogReachabilityRepair` and
+`resolveItemHashAmendmentOverlay`/`planItemHashAmendment` contain structurally similar positional
+lookups, immediately followed by an `entryHash` equality check against a frozen registry target —
+the same pattern point 5 converts. They are left unconverted here: this decision closes exactly the
+two gaps identified when this work was scoped, not every lookup that happens to share the shape.
+Nothing here argues they are safe to leave — only that widening this decision's scope was not this
+dispatch's call to make unilaterally.
+
+**The test fixture exception:** a hand-assembled test ledger still indexes its own events
+positionally when building a chain (`events[i].sequence` must equal `i + 1` for
+`validateTransitionLedger`'s own chain check to accept it) — a property of the ledger format
+itself, not the amendment-lookup anti-pattern this decision targets. What changes is that this
+assumption is now a named, asserted invariant (`assertContiguousLedgerFixture`,
+`backlog-state.test.mjs`) instead of a silent one: a fixture edit that breaks contiguity fails by
+name rather than letting some other lookup quietly resolve the wrong event.
+
 ## Consequences
 
 - The 38 Phoenix reachability amendments become migratable under one defined semantics — all of
