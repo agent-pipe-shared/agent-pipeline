@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.three-doc-and-adr-checkers-never-run-in-verify
 type: defect
 owner: pipeline
-status: open
+status: rejected
 created: 2026-08-27
 source: "SUITEGAP-1 measurement 2026-08-27, re-verified against the live verify.mjs the same day; three of the nine reported suites are genuinely absent, six were false positives"
 ---
@@ -63,9 +63,20 @@ operator run it is the whole change.
 Registering the ADR consistency checker should be sequenced first: it is the one with
 a known, already-realised cost.
 
-## Triage (filled in by the Elephant of the next Pipeline session)
+## Triage
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** rejected — duplicate of
+  `backlog/items/2026-08-27-nine-test-suites-run-in-no-verify-invocation.md`
+  (`pipeline.nine-test-suites-run-in-no-verify-invocation`), which was filed
+  earlier the same day from the same SUITEGAP-1 measurement and is the
+  authoritative record.
+- **Rationale:** filed without first checking whether an item already existed —
+  the same omission as the path-fingerprint duplicate filed in the same pass.
+  The correction this item carries (three, not nine, with the six false
+  positives named) was NOT discarded: it has been merged into the authoritative
+  item as a dated correction block, including the observation that the wired
+  checker reports zero on the same tree and did not surface the three either.
+  The genuinely new half of this pass — that the two registration checkers
+  disagree — remains open as its own item.
+- **Assignment (if accepted):** n/a — see the authoritative item.
+- **Date:** 2026-08-27

@@ -8,7 +8,30 @@ created: 2026-08-27
 source: "SUITEGAP-1, scratch/SUITEGAP-report.md, 2026-08-27 — measurement via node plugins/pipeline-core/scripts/check-suite-registration.mjs"
 ---
 
-# Nine test suites exist in the tree but run under no `verify.mjs` invocation
+# Three test suites exist in the tree but run under no `verify.mjs` invocation
+
+> **Correction, 2026-08-27 (same day, after re-verification against the live
+> `verify.mjs`).** The count in this item's original title and body — nine — is
+> wrong. It is **three**. Six of the nine are false positives: they ARE
+> registered and demonstrably run, in a *scoped* registration block
+> (`verify.mjs:146-180`) that `check-suite-registration.mjs` does not read.
+> Confirmed green in the full run at `5fd963fc`:
+> `scoped-verify-registration-tests`, `workflow-preflight-tests`,
+> `interaction-continuity-tests`, `trusted-tool-resolution-tests`,
+> `advisory-receipt-assurance-tests`, `toolchain-preflight-tests`.
+>
+> The three that genuinely never run: `check-adr-consistency.test.mjs`,
+> `check-critic-contract-citations.test.mjs`, `check-doc-reconciliation.test.mjs`
+> — zero matches for any of their names in `verify.mjs`. The first of those is
+> the direct cause of the ADR-numbering collisions this item was filed to explain,
+> so the traceability purpose stands; only the number was wrong.
+>
+> The checker disagreement itself is tracked separately as
+> `pipeline.the-two-suite-registration-checkers-disagree`.
+>
+> Also note: `verify-suite-registration-check`, the checker that IS wired into
+> Verify, reports 0 unregistered on the same tree — it did not surface these
+> three either.
 
 ## Description
 

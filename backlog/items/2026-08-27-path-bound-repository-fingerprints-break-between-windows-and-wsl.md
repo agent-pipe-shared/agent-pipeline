@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.path-bound-repository-fingerprints-break-between-windows-and-wsl
 type: defect
 owner: pipeline
-status: open
+status: rejected
 created: 2026-08-27
 source: "NVA-PATHBIND-AUDIT-1, a read-only audit of every repository-fingerprint derivation, 2026-08-27 (scratch/PATHBIND-audit.md)"
 ---
@@ -66,9 +66,23 @@ that the defect is harmless.
 **Explicitly out of scope:** the tracked `governance/events/registry.json` binding.
 That is a separate and harder defect (NVA-GESBIND-1) and is being handled in Nova A.
 
-## Triage (filled in by the Elephant of the next Pipeline session)
+## Triage
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** rejected — duplicate of
+  `backlog/items/2026-08-27-path-bound-fingerprints-break-across-windows-wsl-access.md`
+  (`pipeline.path-bound-fingerprints-break-across-windows-wsl-access`), which is
+  the authoritative record. Kept rather than deleted, per backlog/README.md:
+  a rejected item stays with its reasoning attached.
+- **Rationale:** filed the same day, from the same source (NVA-PATHBIND-AUDIT-1,
+  `scratch/PATHBIND-audit.md`), because it was written from a queued scratch note
+  without first checking whether the item already existed. That check is the
+  cheap half of filing an item and it was skipped.
+  **The duplication is not the important part.** This item's Proposal recommends
+  **Nova B**, and the authoritative item already records the opposite as a PO
+  decision: "the originating audit's own recommendation line named Nova B. The PO
+  has since overridden that: **this item is Nova A scope.**" Leaving both open
+  would have put a stale agent recommendation next to a live PO decision, with
+  nothing marking which one wins.
+- **Assignment (if accepted):** n/a — see the authoritative item, which is
+  **Nova A** scope by PO decision.
+- **Date:** 2026-08-27
