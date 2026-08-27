@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "71feb1ee8b3874522432a3798e3cb751f8f243602cebba6e716daf423f0953d2"
+    "transitionHead": "f3496237b14a60be5c1334a8910d5433f9b2e1cdf98d423478c8405f4df698f0"
   },
   "counts": {
-    "open": 41,
+    "open": 40,
     "in_progress": 5,
-    "closed": 367,
+    "closed": 368,
     "rejected": 1,
     "deferred": 11
   },
@@ -849,12 +849,16 @@
     },
     {
       "id": "pipeline.claude-has-no-start-time-opt-in-adoption-path",
-      "status": "open",
+      "status": "closed",
       "type": "idea",
       "owner": "pipeline",
       "created": "2026-08-05",
       "source": "PO observation, Sprint Nova session 2026-08-05, in the same session that reproduced the setup.mjs marketplace collision by hand",
-      "deferred": true
+      "deferred": true,
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "88dc3ba6952f226ed4f9caa57bad982cb660a425",
+      "closureEvidence": "backlog/items/2026-08-05-claude-has-no-start-time-opt-in-adoption-path.md"
     },
     {
       "id": "pipeline.cli-docs-generated-from-parser",
@@ -3456,7 +3460,7 @@
     {
       "id": "pipeline.phoenix-merge-re-critic-minor-findings",
       "status": "open",
-      "type": "improvement",
+      "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-27",
       "source": "Re-Critic (delta) on the Phoenix-merge rework diff 290bd599..eeebeed5, PASS with three minor findings, 2026-08-27",
@@ -3591,8 +3595,8 @@
     {
       "id": "pipeline.po-decision-bs26-unsatisfiable-under-the-phoenix-ledger-split",
       "status": "open",
-      "type": "decision",
-      "owner": "po",
+      "type": "requirement",
+      "owner": "pipeline",
       "created": "2026-08-27",
       "source": "Phoenix merge, dispatch VFX3-BACKLOG plus direct verification, 2026-08-26",
       "deferred": false
@@ -3600,8 +3604,8 @@
     {
       "id": "pipeline.po-decision-claude-start-time-item-closed-on-a-rejected-approach",
       "status": "open",
-      "type": "decision",
-      "owner": "po",
+      "type": "requirement",
+      "owner": "pipeline",
       "created": "2026-08-27",
       "source": "Phoenix merge conflict resolution, dispatch PHX-ITEMS-2, 2026-08-26",
       "deferred": false

@@ -72,7 +72,7 @@
 | pipeline.citation-coordinate-checker-bare-basename | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.claude-dir-leftovers-defeat-runner-neutral-project-migration | closed | defect | pipeline | 2026-08-05 | — |
 | pipeline.claude-greenfield-run-happy-path-findings | closed | defect | pipeline | 2026-08-09 | — |
-| pipeline.claude-has-no-start-time-opt-in-adoption-path | open | idea | pipeline | 2026-08-05 | — |
+| pipeline.claude-has-no-start-time-opt-in-adoption-path | closed | idea | pipeline | 2026-08-05 | — |
 | pipeline.cli-docs-generated-from-parser | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.close-spec-retention-and-consent | closed | workflow-improvement | pipeline | 2026-07-21 | — |
 | pipeline.closed-input-channel-review-economics | closed | workflow-improvement | pipeline | 2026-07-20 | — |
@@ -280,7 +280,7 @@
 | pipeline.per-phase-progress-message-budget | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.permitted-edit-drops-session-into-unrecoverable-readiness | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.phase-aware-bootstrap-readiness | closed | workflow-improvement | pipeline | 2026-08-18 | — |
-| pipeline.phoenix-merge-re-critic-minor-findings | open | improvement | pipeline | 2026-08-27 | — |
+| pipeline.phoenix-merge-re-critic-minor-findings | open | workflow-improvement | pipeline | 2026-08-27 | — |
 | pipeline.pipeline-author-repair-signature-mode-never-actually-admits-the-edit | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.pipeline-state-rebind-codex-default-runner | closed | defect | pipeline | 2026-08-05 | — |
 | pipeline.pipeline-state-scripts-test-file-never-runs-in-full-verify | closed | defect | pipeline | 2026-08-09 | — |
@@ -291,8 +291,8 @@
 | pipeline.po-approval-request-verify-still-rejects-a-fresh-setup1-authority | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.po-authority-decision-prd-candidate-static | deferred | defect | pipeline | 2026-08-08 | — |
 | pipeline.po-authority-rebind-plan-checks-for-the-wrong-plan-approval-schema-version | closed | defect | pipeline | 2026-08-19 | — |
-| pipeline.po-decision-bs26-unsatisfiable-under-the-phoenix-ledger-split | open | decision | po | 2026-08-27 | — |
-| pipeline.po-decision-claude-start-time-item-closed-on-a-rejected-approach | open | decision | po | 2026-08-27 | — |
+| pipeline.po-decision-bs26-unsatisfiable-under-the-phoenix-ledger-split | open | requirement | pipeline | 2026-08-27 | — |
+| pipeline.po-decision-claude-start-time-item-closed-on-a-rejected-approach | open | requirement | pipeline | 2026-08-27 | — |
 | pipeline.po-gate-authority-path-canonicalization | closed | defect | pipeline | 2026-07-25 | — |
 | pipeline.po-gate-authority-receipt-readback | closed | defect | pipeline | 2026-07-25 | — |
 | pipeline.po-gate-worktree-authority | closed | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
@@ -433,8 +433,8 @@
 
 ## Counts
 
-- open: 41
+- open: 40
 - in_progress: 5
-- closed: 367
+- closed: 368
 - rejected: 1
 - deferred: 11
