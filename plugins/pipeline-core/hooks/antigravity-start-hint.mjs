@@ -1,8 +1,12 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { sessionStartDecision } from './codex-session-start-hint.mjs';
+import { resolvePluginManifestVersion } from '../scripts/pipeline-start-preflight.mjs';
+
+const PLUGIN_ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 
 // Failure-visibility note (backlog item
 // 2026-08-23-antigravity-start-hint-fail-open-swallows-bootstrap-lock-write-failures.md,
@@ -56,7 +60,21 @@ function main() {
     const sessionId = input.conversationId || input.session_id || 'default';
     const sessionDir = join(rootDir, '.git', 'agent-pipeline', 'run', `session-${sessionId}`);
     mkdirSync(sessionDir, { recursive: true });
-    writeFileSync(join(sessionDir, 'requires-bootstrap.lock'), 'locked\n', 'utf8');
+    // NVA-ARMEDPROOF-1: bind the lock to the exact plugin build that wrote
+    // it, using the SAME manifest-version resolution
+    // pipeline-start-preflight.mjs already uses for this runner (Antigravity
+    // ships no manifest of its own, so it reads the Codex-shaped
+    // `.codex-plugin/plugin.json` -- see resolvePluginManifestVersion's own
+    // runner branch) rather than a second, independently-derived one. A
+    // version this hook cannot resolve (manifest missing/unreadable) is
+    // written as `null`, which the observer treats exactly like a lock with
+    // no version field at all.
+    const version = resolvePluginManifestVersion(PLUGIN_ROOT, 'antigravity');
+    writeFileSync(
+      join(sessionDir, 'requires-bootstrap.lock'),
+      `${JSON.stringify({ locked: true, version })}\n`,
+      'utf8',
+    );
   } catch (e) {
     reportFailure('bootstrap-lock-not-written', e);
     return;

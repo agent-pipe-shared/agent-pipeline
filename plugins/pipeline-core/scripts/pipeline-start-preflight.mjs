@@ -274,7 +274,34 @@ export function installedPipelineVersion(pluginList = () => readInstalledPluginL
   return installedPipelineIdentity(pluginList, runner)?.version ?? null;
 }
 
+/**
+ * The ONE place this file resolves "what version is this loaded plugin
+ * distribution" -- reads the plugin's own manifest file directly
+ * (`.claude-plugin/plugin.json` for the Claude runner, `.codex-plugin/plugin.json`
+ * for every other runner, Antigravity included: it ships no manifest of its
+ * own and is observed through the Codex-shaped one exactly like Codex itself).
+ * `observePipelineStartPreflight` uses this for its own `version` field below;
+ * `antigravity-start-hint.mjs` imports it directly for the SAME resolution
+ * rather than re-deriving a second one (NVA-ARMEDPROOF-1) -- a lock's
+ * recorded version must trace to this exact function, or a drift between two
+ * independently-written manifest readers could silently un-bind the proof
+ * from the build it is supposed to name.
+ */
+export function resolvePluginManifestVersion(pluginRoot, runner, read = readFileSync) {
+  const manifestRelativePath = runner === "claude" ? ".claude-plugin/plugin.json" : ".codex-plugin/plugin.json";
+  try {
+    const manifest = JSON.parse(read(resolve(pluginRoot, manifestRelativePath), "utf8"));
+    return typeof manifest?.version === "string" && manifest.version.trim() !== "" ? manifest.version : null;
+  } catch {
+    return null;
+  }
+}
+
 export const ANTIGRAVITY_HARD_ENFORCEMENT_SCHEMA = "pipeline.antigravity-hard-enforcement-observation.v1";
+// NVA-ARMEDPROOF-1: the fail-closed status `observePipelineStartPreflight` reports
+// (instead of "ready") when the runner is Antigravity and the hard-enforcement
+// layer was not observed this session -- see the `status` computation there.
+export const ANTIGRAVITY_HARD_ENFORCEMENT_NOT_OBSERVED_STATUS = "antigravity-hard-enforcement-not-observed";
 // 30 minutes: generous enough to absorb a slow session start (network calls, a
 // subagent dispatch chain, IDE/daemon warm-up) between the hook's own write and
 // this preflight running, while still being short enough that a lock left over
@@ -330,6 +357,28 @@ const ANTIGRAVITY_HARD_ENFORCEMENT_WARNING =
  * (run directory absent, unreadable, a raced/partial entry, a permissions
  * error) folds into "not observed" -- the same outcome a genuine absence
  * produces -- rather than propagating.
+ *
+ * VERSION BINDING (NVA-ARMEDPROOF-1): freshness alone is not proof. A lock
+ * left behind by a plugin build that was since uninstalled or upgraded would
+ * otherwise keep vouching for guards that are no longer installed -- the
+ * proof must be bound to the exact build it proves, not merely to a recent
+ * point in time. Every candidate lock's own recorded `version` must equal
+ * `currentVersion` (the caller's already-resolved build version -- see
+ * `resolvePluginManifestVersion`, reused here rather than re-derived) or it
+ * is treated exactly like an absent lock: it never contributes to
+ * `freshestAgeMs`, and the scan continues to other session entries. A lock
+ * with no version field at all (written by a pre-binding build) or
+ * unparseable content matches nothing, by the same rule. This is an
+ * ADDITIONAL necessary condition alongside the freshness window above,
+ * never a replacement for it.
+ *
+ * FAIL-OPEN SCOPE IS UNCHANGED BY THE ABOVE: "never throws" describes this
+ * function's own robustness only. What changed with version binding is the
+ * CONSEQUENCE a caller attaches to `observed: false`
+ * (`observePipelineStartPreflight`'s `status` computation is now fail-closed
+ * for it) -- the observer itself still folds every failure (a bad read, a
+ * malformed lock, an absent or mismatched version) into the same
+ * `observed: false` it already produced for "never fired at all".
  */
 export function observeAntigravityHardEnforcement({
   rootDir = process.cwd(),
@@ -337,6 +386,8 @@ export function observeAntigravityHardEnforcement({
   freshWindowMs = ANTIGRAVITY_HARD_ENFORCEMENT_FRESH_WINDOW_MS,
   readdir = readdirSync,
   stat = statSync,
+  read = readFileSync,
+  currentVersion = null,
 } = {}) {
   let freshestAgeMs = null;
   try {
@@ -345,12 +396,17 @@ export function observeAntigravityHardEnforcement({
     for (const entry of entries) {
       if (!entry?.isDirectory?.() || !entry.name.startsWith("session-")) continue;
       try {
-        const info = stat(resolve(runDir, entry.name, "requires-bootstrap.lock"));
+        const lockPath = resolve(runDir, entry.name, "requires-bootstrap.lock");
+        const info = stat(lockPath);
         if (!info.isFile()) continue;
         const ageMs = now - info.mtimeMs;
         // A future mtime (clock skew, a corrupted filesystem) is never trusted
         // as evidence of freshness -- treated the same as no usable entry.
         if (ageMs < 0) continue;
+        // Version binding: an entry whose lock does not name the CURRENT
+        // build is skipped exactly like an absent lock (see doc comment
+        // above) -- never counted towards `freshestAgeMs`.
+        if (!lockVersionMatches(read, lockPath, currentVersion)) continue;
         if (freshestAgeMs === null || ageMs < freshestAgeMs) freshestAgeMs = ageMs;
       } catch {
         continue; // this one entry raced away or is unreadable; keep scanning the rest
@@ -366,6 +422,25 @@ export function observeAntigravityHardEnforcement({
     freshWindowMs,
     warning: observed ? null : ANTIGRAVITY_HARD_ENFORCEMENT_WARNING,
   };
+}
+
+/**
+ * A lock's recorded version must equal `currentVersion` exactly. Fail-closed
+ * throughout: a mismatch, a missing version field, unparseable content, or a
+ * `currentVersion` that is itself not a real non-empty string (the caller
+ * could not resolve its own build's version, so there is nothing to bind a
+ * lock to) all resolve to "does not match" -- never to "matches", and never
+ * by throwing.
+ */
+function lockVersionMatches(read, lockPath, currentVersion) {
+  if (typeof currentVersion !== "string" || currentVersion.trim() === "") return false;
+  try {
+    const parsed = JSON.parse(read(lockPath, "utf8"));
+    const recordedVersion = parsed?.version;
+    return typeof recordedVersion === "string" && recordedVersion.trim() !== "" && recordedVersion === currentVersion;
+  } catch {
+    return false; // older-build plain-text body, or any unreadable/malformed content
+  }
 }
 
 /**
@@ -495,16 +570,7 @@ export function observePipelineStartPreflight({
   // installed-plugin-list read must resolve through this same runner
   // identity, so each runner reads and reports its own distribution only.
   const runner = env.CLAUDECODE === "1" ? "claude" : (env.ANTIGRAVITY_AGENT === "1" || env.AI_AGENT === "antigravity") ? "antigravity" : "codex";
-  const manifestRelativePath = runner === "claude" ? ".claude-plugin/plugin.json" : ".codex-plugin/plugin.json";
-  let version;
-  try {
-    const manifest = JSON.parse(read(resolve(pluginRoot, manifestRelativePath), "utf8"));
-    version = typeof manifest?.version === "string" && manifest.version.trim() !== ""
-      ? manifest.version
-      : null;
-  } catch {
-    version = null;
-  }
+  const version = resolvePluginManifestVersion(pluginRoot, runner, read);
   const resolvedPluginList = pluginList ?? (() => readInstalledPluginList(runner));
   const installedIdentity = installedPipelineIdentity(resolvedPluginList, runner, knownMarketplaces, cwd);
   const installedVersion = installedIdentity?.version ?? null;
@@ -546,11 +612,30 @@ export function observePipelineStartPreflight({
   const attestationFailed = evaluateSelfApplicationAttestation({
     pluginRoot, runner, version, observe: captureObserve,
   }).failed;
+  // NVA-ARMEDPROOF-1: computed once, here, so both the `status` decision
+  // below and the `antigravityHardEnforcement` field on the result (see the
+  // `result` object further down) reuse the SAME observation -- never
+  // invoked twice, and never invoked at all for a non-Antigravity runner
+  // (observeAntigravityHardEnforcement's own "ANTIGRAVITY ONLY, BY DESIGN"
+  // doc comment; proven by the "never invokes the Antigravity detector"
+  // tests).
+  const antigravityHardEnforcement = runner === "antigravity"
+    ? observeAntigravityHardEnforcementFn({ rootDir: cwd, currentVersion: version })
+    : null;
   const status = !version
     ? "plugin-identity-unavailable"
     : installedIdentity?.ambiguous === true || installedVersion !== null && installedVersion !== version || attestationFailed
       ? "plugin-refresh-required"
-      : "ready";
+      // Fail-closed (NVA-ARMEDPROOF-1): a session whose Antigravity hard-
+      // enforcement layer did not fire this session must never report
+      // "ready" -- a plausible but actually-unenforced session is strictly
+      // worse than one that visibly refuses to call itself ready. Checked
+      // LAST, after the pre-existing non-ready reasons above, so a result
+      // that is already non-ready for one of THOSE reasons keeps naming its
+      // own reason rather than being masked by this one.
+      : runner === "antigravity" && antigravityHardEnforcement.observed !== true
+        ? ANTIGRAVITY_HARD_ENFORCEMENT_NOT_OBSERVED_STATUS
+        : "ready";
   // PX0-AC-08: one closed runner-neutral source observation per bootstrap
   // resolution. Only built when a loaded distribution was actually resolved
   // (`version` truthy) -- the acceptance clause itself is conditioned on
@@ -667,10 +752,9 @@ export function observePipelineStartPreflight({
     // Antigravity-only, and gated at the CALL itself (not merely at the field):
     // for Claude/Codex, observeAntigravityHardEnforcementFn is never invoked and
     // this key is absent from the envelope entirely, keeping their output
-    // byte-identical to before this addition.
-    ...(runner === "antigravity"
-      ? { antigravityHardEnforcement: observeAntigravityHardEnforcementFn({ rootDir: cwd }) }
-      : {}),
+    // byte-identical to before this addition. Reuses the SAME observation the
+    // `status` computation above already made -- see the comment there.
+    ...(runner === "antigravity" ? { antigravityHardEnforcement } : {}),
   };
   return {
     ...result,
@@ -701,6 +785,10 @@ export function observePipelineStartPreflight({
 // session-end hook.
 
 export function pipelineStartPreflightExitCode(result) {
+  // ANTIGRAVITY_HARD_ENFORCEMENT_NOT_OBSERVED_STATUS is deliberately absent from
+  // this allowlist (NVA-ARMEDPROOF-1, fail-closed by omission): it falls
+  // through to the same blocking exit code "plugin-identity-unavailable"
+  // already gets, with no separate case needed here.
   return result?.status === "ready" || result?.status === "plugin-refresh-required" ? 0 : 2;
 }
 
