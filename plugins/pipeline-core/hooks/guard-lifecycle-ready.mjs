@@ -2,7 +2,15 @@
 // SPDX-License-Identifier: SUL-1.0
 
 /** Codex implementation-write guard for already Pipeline-governed roots. */
-import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import {
   basename,
   dirname,
@@ -53,6 +61,10 @@ import {
   TESTPATH_SHELL_DENIAL_CODE,
 } from "../lib/protected-test-paths.mjs";
 import { writeTargetPath } from "../lib/tool-write-target.mjs";
+// NVA-BOOTRECEIPT-1: the identity chain and git-common-dir resolution are proven and
+// already keyed on the same agentId/private-state tree by guard-dispatch-budget.mjs --
+// reused here rather than copied, per that dispatch's own briefing.
+import { resolveGitCommonDir, subagentIdentity } from "./guard-dispatch-budget.mjs";
 import { GATE_STRENGTH_PATHS } from "./guard-gate-strength.mjs";
 import {
   isBoundedReadOnlyPipeline,
@@ -2683,13 +2695,42 @@ function sanctionedHumanOverrideArgs(args, root) {
     || (exactAuthorRoot(13) && args[15] === "--activate" && args.length === 16));
 }
 
-export function isSanctionedLifecycleCommand(command, root, options = {}) {
+/**
+ * NVA-BOOTRECEIPT-1: the `node <script> <args...>` shape every branch of
+ * `isSanctionedLifecycleCommand` below decides against, factored out so the bootstrap-
+ * receipt feature can recognise ONE specific script (START_PREFLIGHT_SCRIPT) without
+ * duplicating -- and risking drifting from -- this admission preamble. Returns `null` for
+ * anything that is not a trusted-node invocation of a script at all; otherwise the
+ * identified `script` path and its `args`, exactly as `isSanctionedLifecycleCommand`
+ * itself used to compute them inline.
+ */
+function resolveSanctionedScriptInvocation(command, root, options = {}) {
   const words = simpleWords(command, root, options);
   const platform = options.platform ?? process.platform;
   const directNode = platform === "win32" ? ["node", "node.exe"] : ["node"];
   const trustedNode = options.processExecPath ?? process.execPath;
-  if (!words || words.length < 2 || ![...directNode, trustedNode].includes(words[0])) return false;
+  if (!words || words.length < 2 || ![...directNode, trustedNode].includes(words[0])) return null;
   const [script, ...args] = words.slice(1);
+  return { script, args };
+}
+
+/**
+ * NVA-BOOTRECEIPT-1: the receipt trigger for the bootstrap-obligation gate below -- the
+ * exact same recognition `isSanctionedLifecycleCommand` already applies for
+ * START_PREFLIGHT_SCRIPT (`args.length === 0`), reached through the identical shared
+ * preamble above rather than a second, looser matcher. A command carrying extra
+ * arguments, a different script, or no `node <script>` shape at all is NOT this
+ * invocation -- it is a near miss, not a match.
+ */
+export function isSanctionedStartPreflightInvocation(command, root, options = {}) {
+  const resolved = resolveSanctionedScriptInvocation(command, root, options);
+  return resolved !== null && resolved.script === START_PREFLIGHT_SCRIPT && resolved.args.length === 0;
+}
+
+export function isSanctionedLifecycleCommand(command, root, options = {}) {
+  const resolved = resolveSanctionedScriptInvocation(command, root, options);
+  if (resolved === null) return false;
+  const { script, args } = resolved;
   if (script === ONBOARDING_SCRIPT) return sanctionedOnboardingArgs(args, root);
   if (script === MIGRATION_SCRIPT) return sanctionedMigrationArgs(args, root);
   if (script === V3_BOOTSTRAP_AUTHORITY_SCRIPT) {
@@ -2878,6 +2919,163 @@ function onboardingConsentBlocked(input, root) {
 }
 
 /**
+ * NVA-BOOTRECEIPT-1: the private, agent-write-refused tree a dispatched subagent's
+ * sanctioned preflight run is recorded into. Never a tracked or agent-writable path --
+ * writes under `.git/agent-pipeline/**` are already refused as pipeline-owned private
+ * state (guard-testpath.mjs / the cross-repository-mutation checks in this same file),
+ * so a subagent cannot forge its own receipt.
+ */
+function bootstrapReceiptDir(commonDir) {
+  return join(commonDir, "agent-pipeline", "bootstrap-receipt");
+}
+
+function bootstrapReceiptPath(commonDir, agentId) {
+  return join(bootstrapReceiptDir(commonDir), `${agentId}.json`);
+}
+
+function bootstrapObservationsPath(commonDir) {
+  return join(bootstrapReceiptDir(commonDir), "observations.jsonl");
+}
+
+/**
+ * NVA-BOOTRECEIPT-1: append-only, best-effort observability for this feature's own
+ * decisions -- mirrors guard-dispatch-budget.mjs's recordUnresolved() (that module's own
+ * lines 96-106/248-290, the fail-open-but-visible model this feature follows). A logging
+ * failure must never change the verdict already decided; the catch here is deliberately
+ * silent for exactly that reason.
+ */
+function recordBootstrapObservation(commonDir, record, dependencies) {
+  try {
+    const mkdirSyncFn = dependencies.mkdirSyncFn ?? mkdirSync;
+    const appendFileSyncFn = dependencies.appendFileSyncFn ?? appendFileSync;
+    mkdirSyncFn(bootstrapReceiptDir(commonDir), { recursive: true, mode: 0o700 });
+    appendFileSyncFn(bootstrapObservationsPath(commonDir), `${JSON.stringify(record)}\n`, "utf8");
+  } catch {
+    // best-effort observability only -- never let a logging failure change the guard's verdict
+  }
+}
+
+/**
+ * NVA-BOOTRECEIPT-1: writes the one durable proof that a dispatched subagent's process
+ * ran the sanctioned preflight command in this session -- and nothing stronger. This
+ * proves the process ran for this agentId; it does NOT and cannot prove the agent read or
+ * understood the preflight result (that obligation stays the agent's own, validated --
+ * never executed on the agent's behalf -- per skills/pipeline-start/SKILL.md:20-27).
+ * Fires only for a Bash call whose parsed command is EXACTLY the sanctioned preflight
+ * invocation (isSanctionedStartPreflightInvocation, reusing isSanctionedLifecycleCommand's
+ * own START_PREFLIGHT_SCRIPT recognition, never a looser match) from a resolved dispatched
+ * subagent. A pure side effect: it never changes the verdict for the Bash call that
+ * triggered it, which the unmodified logic elsewhere in this file already decides.
+ * Fails open silently when no git common dir is resolvable (nowhere safe to persist or
+ * record); fails open WITH an observation line for every other unresolvable branch.
+ */
+function recordBootstrapPreflightReceipt(input, root, dependencies) {
+  const identity = (dependencies.subagentIdentityFn ?? subagentIdentity)(input, dependencies);
+  if (identity.kind !== "subagent") return;
+  const commonDir = (dependencies.resolveGitCommonDirFn ?? resolveGitCommonDir)(root, dependencies);
+  if (commonDir === null) return; // nowhere safe to persist or record -- fail open, silently
+  const nowFn = dependencies.nowFn ?? (() => new Date().toISOString());
+  try {
+    const writeFileSyncFn = dependencies.writeFileSyncFn ?? writeFileSync;
+    const mkdirSyncFn = dependencies.mkdirSyncFn ?? mkdirSync;
+    mkdirSyncFn(bootstrapReceiptDir(commonDir), { recursive: true, mode: 0o700 });
+    const receipt = {
+      schema: "pipeline.bootstrap-receipt.v1",
+      agentId: identity.agentId,
+      agentType: identity.agentType,
+      observedAt: nowFn(),
+    };
+    writeFileSyncFn(bootstrapReceiptPath(commonDir, identity.agentId), `${JSON.stringify(receipt, null, 2)}\n`, "utf8");
+  } catch (error) {
+    recordBootstrapObservation(commonDir, {
+      agentId: identity.agentId,
+      agentType: identity.agentType,
+      decision: "fail-open-receipt-write-error",
+      toolName: "Bash",
+      error: String(error?.message ?? error),
+      at: nowFn(),
+    }, dependencies);
+  }
+}
+
+function bootstrapReceiptMissingBlocked(identity, toolName) {
+  return verdict(
+    2,
+    "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-BOOTSTRAP-RECEIPT-MISSING: "
+      + `This dispatched subagent (${identity.agentType}, agent ${identity.agentId}) has no recorded `
+      + `bootstrap preflight run in this session, so its first ${toolName} is refused.\n`
+      + `Run exactly: node "${START_PREFLIGHT_SCRIPT}"\n`
+      + "Then retry the identical write once that command has completed.\n",
+  );
+}
+
+/**
+ * NVA-BOOTRECEIPT-1: denies a dispatched subagent's first Edit/Write/NotebookEdit while no
+ * bootstrap-preflight receipt exists for its agentId. Returns `null` to allow (the caller
+ * falls through to every other existing check, unchanged); returns a verdict(2, ...) only
+ * for a resolved subagent with no readable receipt. Never reached for the orchestrator --
+ * the caller filters `identity.kind === "orchestrator"` before this runs, so the
+ * orchestrating session is never gated and never logged, whatever the receipt state.
+ * Fails open -- allow, plus an observation line wherever a common dir is resolvable -- on
+ * every branch this gate cannot resolve, exactly like guard-dispatch-budget.mjs's own
+ * model: a guard that fails closed on its own confusion would halt every dispatch in the
+ * repository.
+ */
+function evaluateBootstrapReceiptGate(input, root, toolName, dependencies) {
+  const identity = (dependencies.subagentIdentityFn ?? subagentIdentity)(input, dependencies);
+  if (identity.kind === "orchestrator") return null;
+  const commonDir = (dependencies.resolveGitCommonDirFn ?? resolveGitCommonDir)(root, dependencies);
+  if (commonDir === null) return null; // nowhere safe to persist or record -- fail open, silently
+  const nowFn = dependencies.nowFn ?? (() => new Date().toISOString());
+  if (identity.kind === "unresolved") {
+    recordBootstrapObservation(commonDir, {
+      ...identity, decision: "fail-open-unresolved-identity", toolName, at: nowFn(),
+    }, dependencies);
+    return null;
+  }
+  const existsSyncFn = dependencies.existsSyncFn ?? existsSync;
+  const readFileSyncFn = dependencies.readFileSyncFn ?? readFileSync;
+  const receiptPath = bootstrapReceiptPath(commonDir, identity.agentId);
+  let receiptExists;
+  try {
+    receiptExists = existsSyncFn(receiptPath);
+  } catch (error) {
+    recordBootstrapObservation(commonDir, {
+      agentId: identity.agentId,
+      agentType: identity.agentType,
+      decision: "fail-open-error",
+      toolName,
+      error: String(error?.message ?? error),
+      at: nowFn(),
+    }, dependencies);
+    return null;
+  }
+  if (receiptExists) {
+    try {
+      JSON.parse(readFileSyncFn(receiptPath, "utf8"));
+    } catch (error) {
+      recordBootstrapObservation(commonDir, {
+        agentId: identity.agentId,
+        agentType: identity.agentType,
+        decision: "fail-open-unreadable-receipt",
+        toolName,
+        error: String(error?.message ?? error),
+        at: nowFn(),
+      }, dependencies);
+      return null;
+    }
+    recordBootstrapObservation(commonDir, {
+      agentId: identity.agentId, agentType: identity.agentType, decision: "allow-receipt-present", toolName, at: nowFn(),
+    }, dependencies);
+    return null;
+  }
+  recordBootstrapObservation(commonDir, {
+    agentId: identity.agentId, agentType: identity.agentType, decision: "deny-no-receipt", toolName, at: nowFn(),
+  }, dependencies);
+  return bootstrapReceiptMissingBlocked(identity, toolName);
+}
+
+/**
  * ADR-0059 Decision 5 / NOVA-LCR-HGO-2: everything below -- the LAUNCH_SCRIPT
  * external-restart refusal and the onboarding-readiness gate (denial code
  * GUARD-LIFECYCLE-NOT-READY) -- stays outside HGO's authority no matter how the
@@ -3036,6 +3234,23 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
     return blocked();
   }
   if (!governed) return onboardingConsentBlocked(input, root) ?? verdict(0);
+  // NVA-BOOTRECEIPT-1: a pure side effect, never a verdict of its own -- the sanctioned
+  // preflight command is already admitted or refused by the unmodified logic below. This
+  // only additionally records that it ran, for a resolved dispatched subagent, when the
+  // command is EXACTLY the sanctioned invocation (never a looser match).
+  if (toolName === "Bash"
+    && isSanctionedStartPreflightInvocation((input.tool_input.command ?? input.tool_input.CommandLine), root)) {
+    recordBootstrapPreflightReceipt(input, root, dependencies);
+  }
+  // The bootstrap-obligation gate itself: a dispatched subagent's first Edit/Write/
+  // NotebookEdit is refused while no receipt exists for its agentId. Orthogonal to every
+  // other WRITE_TOOLS check below (destination, cross-repo, protected State) -- deciding
+  // it first, and returning outright on a denial, keeps this file's existing WRITE_TOOLS
+  // branch entirely unmodified for every call this gate does not refuse.
+  if (WRITE_TOOLS.includes(toolName)) {
+    const receiptDenial = evaluateBootstrapReceiptGate(input, root, toolName, dependencies);
+    if (receiptDenial !== null) return receiptDenial;
+  }
   if (toolName === "Bash" && isHumanPoSigningCommand((input.tool_input.command ?? input.tool_input.CommandLine), root)) {
     return externalPoSigningOnly();
   }

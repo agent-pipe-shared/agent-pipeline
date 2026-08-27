@@ -38,6 +38,7 @@ import {
   isRestartResumeHintInputWrite,
   isSanctionedGhReadOnlyDiagnostic,
   isSanctionedLifecycleCommand,
+  isSanctionedStartPreflightInvocation,
   machinePlaneFilePath,
   main,
   MANIFEST_FAILURE_WARNING,
@@ -5385,4 +5386,308 @@ test("DEVPLANSHELL-4: a classifier fault fails closed (GL-09), never silently ad
     assert.match(result.stderr, new RegExp(`${DEVPLAN_SHELL_DENIAL_CODE}-FAULT`, "u"));
     assert.match(result.stderr, /synthetic devplan classifier fault/u, "the fault reason is surfaced, not swallowed silently");
   } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// ---------------------------------------------------------------------------------------
+// NVA-BOOTRECEIPT-1: makes a dispatched subagent's preflight obligation mechanically
+// checkable. Fixtures below build REAL directories (never an in-memory fake store) so the
+// governance-marker check (`existsSyncFn` at the project root) and the bootstrap-receipt
+// gate (the same dependency key, at the fake `<git-common-dir>`) both resolve against real
+// disk without a fixture collision.
+// ---------------------------------------------------------------------------------------
+
+/**
+ * A real dispatched-subagent transcript: parent directory literally named `subagents`,
+ * with the sibling `<stem>.meta.json` `subagentIdentity()` (guard-dispatch-budget.mjs)
+ * requires -- matching that module's own empirically observed on-disk shape, never a
+ * guessed layout. `agentType: null` omits the meta.json sibling entirely, for the
+ * unresolved-identity fixtures below.
+ */
+function subagentTranscript(agentId = "abc123", agentType = "pipeline-core:goldfish-deep", spawnDepth = 1) {
+  const sessionDir = mkdtempSync(join(tmpdir(), "guard-lifecycle-subagent-session-"));
+  const subagentsDir = join(sessionDir, "subagents");
+  mkdirSync(subagentsDir, { recursive: true });
+  const transcriptPath = join(subagentsDir, `agent-${agentId}.jsonl`);
+  writeFileSync(transcriptPath, "");
+  if (agentType !== null) {
+    writeFileSync(join(subagentsDir, `agent-${agentId}.meta.json`), JSON.stringify({
+      agentType, description: "test", toolUseId: "t1", spawnDepth,
+    }));
+  }
+  return transcriptPath;
+}
+
+/** A real, throwaway directory standing in for `<git-common-dir>` -- never a real `.git`. */
+function bootstrapCommonDirFixture() {
+  return mkdtempSync(join(tmpdir(), "guard-lifecycle-bootstrap-common-"));
+}
+
+function bootstrapReceiptPathFixture(commonDir, agentId) {
+  return join(commonDir, "agent-pipeline", "bootstrap-receipt", `${agentId}.json`);
+}
+
+function bootstrapObservationsPathFixture(commonDir) {
+  return join(commonDir, "agent-pipeline", "bootstrap-receipt", "observations.jsonl");
+}
+
+function subagentInput(toolName, transcriptPath, toolInput) {
+  return { tool_name: toolName, tool_input: toolInput, transcript_path: transcriptPath };
+}
+
+function bootstrapGovernedRoot() {
+  const path = root();
+  writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+  return path;
+}
+
+test("isSanctionedStartPreflightInvocation: matches only the exact zero-argument preflight invocation, never a looser shape", () => {
+  const path = root();
+  try {
+    assert.equal(isSanctionedStartPreflightInvocation(`node '${START_PREFLIGHT_SCRIPT}'`, path), true);
+    // Near misses: this is the case NVA-BOOTRECEIPT-1's whole design turns on.
+    assert.equal(isSanctionedStartPreflightInvocation("pwd", path), false);
+    assert.equal(isSanctionedStartPreflightInvocation(`node '${START_PREFLIGHT_SCRIPT}' --extra`, path), false);
+    assert.equal(isSanctionedStartPreflightInvocation(`node '${ONBOARDING_SCRIPT}'`, path), false);
+    assert.equal(isSanctionedStartPreflightInvocation("echo not-node", path), false);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("NVA-BOOTRECEIPT-1: a subagent's sanctioned preflight Bash call writes a receipt, and a subsequent Edit then passes", () => {
+  const path = bootstrapGovernedRoot();
+  const commonDir = bootstrapCommonDirFixture();
+  const transcriptPath = subagentTranscript();
+  try {
+    const bashResult = evaluateLifecycleReadyGuard(
+      subagentInput("Bash", transcriptPath, { command: `node "${START_PREFLIGHT_SCRIPT}"` }),
+      { projectDir: path, resolveGitCommonDirFn: () => commonDir, requireProjectOnboardingReadyFn: () => deny() },
+    );
+    assert.equal(bashResult.exitCode, 0, "the sanctioned preflight command itself must still be admitted");
+
+    const receiptPath = bootstrapReceiptPathFixture(commonDir, "abc123");
+    assert.ok(existsSync(receiptPath), "a receipt file must exist after the sanctioned preflight ran");
+    const receipt = JSON.parse(readFileSync(receiptPath, "utf8"));
+    assert.equal(receipt.agentId, "abc123");
+    assert.equal(receipt.agentType, "pipeline-core:goldfish-deep");
+
+    const editResult = evaluateLifecycleReadyGuard(
+      subagentInput("Edit", transcriptPath, { file_path: join(path, "src", "implementation.mjs") }),
+      { projectDir: path, resolveGitCommonDirFn: () => commonDir, requireProjectOnboardingReadyFn: () => readyStub() },
+    );
+    assert.equal(editResult.exitCode, 0, "an Edit from the same subagent must pass once its receipt exists");
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(commonDir, { recursive: true, force: true });
+    rmSync(dirname(dirname(transcriptPath)), { recursive: true, force: true });
+  }
+});
+
+test("NVA-BOOTRECEIPT-1: near-miss Bash commands do not write a receipt", () => {
+  const path = bootstrapGovernedRoot();
+  const commonDir = bootstrapCommonDirFixture();
+  const transcriptPath = subagentTranscript("nearmiss1");
+  try {
+    for (const command of ["pwd", `node "${START_PREFLIGHT_SCRIPT}" --extra`]) {
+      evaluateLifecycleReadyGuard(
+        subagentInput("Bash", transcriptPath, { command }),
+        { projectDir: path, resolveGitCommonDirFn: () => commonDir, requireProjectOnboardingReadyFn: () => deny() },
+      );
+    }
+    assert.equal(existsSync(bootstrapReceiptPathFixture(commonDir, "nearmiss1")), false, "a near-miss command must never write a receipt");
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(commonDir, { recursive: true, force: true });
+    rmSync(dirname(dirname(transcriptPath)), { recursive: true, force: true });
+  }
+});
+
+test("NVA-BOOTRECEIPT-1: a subagent's first Edit/Write/NotebookEdit with no receipt is denied, naming the exact preflight command", () => {
+  const path = bootstrapGovernedRoot();
+  const commonDir = bootstrapCommonDirFixture();
+  try {
+    for (const [toolName, toolInput] of [
+      ["Edit", { file_path: "src/implementation.mjs" }],
+      ["Write", { file_path: join(path, "src", "implementation.mjs") }], // absolute path fixture
+      ["NotebookEdit", { notebook_path: "src/implementation.ipynb" }],
+    ]) {
+      const transcriptPath = subagentTranscript(`deny-${toolName}`);
+      try {
+        const result = evaluateLifecycleReadyGuard(
+          subagentInput(toolName, transcriptPath, toolInput),
+          { projectDir: path, resolveGitCommonDirFn: () => commonDir },
+        );
+        assert.equal(result.exitCode, 2, toolName);
+        assert.match(result.stderr, /GUARD-BOOTSTRAP-RECEIPT-MISSING/u, toolName);
+        assert.match(result.stderr, new RegExp(`node "${START_PREFLIGHT_SCRIPT.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}"`, "u"), toolName);
+      } finally { rmSync(dirname(dirname(transcriptPath)), { recursive: true, force: true }); }
+    }
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(commonDir, { recursive: true, force: true });
+  }
+});
+
+test("NVA-BOOTRECEIPT-1: a subagent's Edit WITH a receipt is allowed", () => {
+  const path = bootstrapGovernedRoot();
+  const commonDir = bootstrapCommonDirFixture();
+  const transcriptPath = subagentTranscript("hasreceipt1");
+  try {
+    const receiptPath = bootstrapReceiptPathFixture(commonDir, "hasreceipt1");
+    mkdirSync(dirname(receiptPath), { recursive: true });
+    writeFileSync(receiptPath, JSON.stringify({ schema: "pipeline.bootstrap-receipt.v1", agentId: "hasreceipt1" }));
+    const result = evaluateLifecycleReadyGuard(
+      subagentInput("Edit", transcriptPath, { file_path: "src/implementation.mjs" }),
+      { projectDir: path, resolveGitCommonDirFn: () => commonDir, requireProjectOnboardingReadyFn: () => readyStub() },
+    );
+    assert.equal(result.exitCode, 0);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(commonDir, { recursive: true, force: true });
+    rmSync(dirname(dirname(transcriptPath)), { recursive: true, force: true });
+  }
+});
+
+test("NVA-BOOTRECEIPT-1: the orchestrating session is never gated, whatever the receipt state", () => {
+  const path = bootstrapGovernedRoot();
+  const commonDir = bootstrapCommonDirFixture();
+  const { transcriptPath } = claudeMemorySessionFixture(); // parent dir NOT named `subagents`
+  try {
+    const result = evaluateLifecycleReadyGuard(
+      subagentInput("Edit", transcriptPath, { file_path: "src/implementation.mjs" }),
+      { projectDir: path, resolveGitCommonDirFn: () => commonDir, requireProjectOnboardingReadyFn: () => readyStub() },
+    );
+    assert.equal(result.exitCode, 0);
+    assert.equal(existsSync(bootstrapObservationsPathFixture(commonDir)), false, "the orchestrator must never be logged by this gate either");
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(commonDir, { recursive: true, force: true });
+    rmSync(dirname(transcriptPath), { recursive: true, force: true });
+  }
+});
+
+test("NVA-BOOTRECEIPT-1: Read, Grep and Glob are never gated for a subagent with no receipt", () => {
+  const path = bootstrapGovernedRoot();
+  const commonDir = bootstrapCommonDirFixture();
+  const transcriptPath = subagentTranscript("readonly1");
+  try {
+    for (const toolName of ["Read", "Grep", "Glob"]) {
+      const result = evaluateLifecycleReadyGuard(
+        subagentInput(toolName, transcriptPath, { file_path: "src/implementation.mjs" }),
+        { projectDir: path, resolveGitCommonDirFn: () => commonDir },
+      );
+      assert.deepEqual(result, { exitCode: 0, stderr: "" }, toolName);
+    }
+    assert.equal(existsSync(bootstrapObservationsPathFixture(commonDir)), false, "a non-write, non-shell tool must never reach this gate at all");
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(commonDir, { recursive: true, force: true });
+    rmSync(dirname(dirname(transcriptPath)), { recursive: true, force: true });
+  }
+});
+
+test("NVA-BOOTRECEIPT-1: an unresolved subagent identity (missing meta.json) allows the call and appends an observation line", () => {
+  const path = bootstrapGovernedRoot();
+  const commonDir = bootstrapCommonDirFixture();
+  const transcriptPath = subagentTranscript("unresolved1", null); // no meta.json sibling written
+  try {
+    const result = evaluateLifecycleReadyGuard(
+      subagentInput("Edit", transcriptPath, { file_path: "src/implementation.mjs" }),
+      { projectDir: path, resolveGitCommonDirFn: () => commonDir, requireProjectOnboardingReadyFn: () => readyStub() },
+    );
+    assert.equal(result.exitCode, 0, "an unresolvable identity must fail open, never closed");
+    const lines = readFileSync(bootstrapObservationsPathFixture(commonDir), "utf8").trim().split("\n");
+    const records = lines.map((line) => JSON.parse(line));
+    assert.ok(records.some((record) => record.decision === "fail-open-unresolved-identity" && record.reason === "meta-file-missing"));
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(commonDir, { recursive: true, force: true });
+    rmSync(dirname(dirname(transcriptPath)), { recursive: true, force: true });
+  }
+});
+
+test("NVA-BOOTRECEIPT-1: an unreadable/corrupt receipt file allows the call and appends an observation line", () => {
+  const path = bootstrapGovernedRoot();
+  const commonDir = bootstrapCommonDirFixture();
+  const transcriptPath = subagentTranscript("corrupt1");
+  try {
+    const receiptPath = bootstrapReceiptPathFixture(commonDir, "corrupt1");
+    mkdirSync(dirname(receiptPath), { recursive: true });
+    writeFileSync(receiptPath, "not valid json {{{");
+    const result = evaluateLifecycleReadyGuard(
+      subagentInput("Edit", transcriptPath, { file_path: "src/implementation.mjs" }),
+      { projectDir: path, resolveGitCommonDirFn: () => commonDir, requireProjectOnboardingReadyFn: () => readyStub() },
+    );
+    assert.equal(result.exitCode, 0, "an unreadable receipt must fail open, never closed");
+    const lines = readFileSync(bootstrapObservationsPathFixture(commonDir), "utf8").trim().split("\n");
+    const records = lines.map((line) => JSON.parse(line));
+    assert.ok(records.some((record) => record.decision === "fail-open-unreadable-receipt" && record.agentId === "corrupt1"));
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(commonDir, { recursive: true, force: true });
+    rmSync(dirname(dirname(transcriptPath)), { recursive: true, force: true });
+  }
+});
+
+test("NVA-BOOTRECEIPT-1: a thrown filesystem error while checking the receipt allows the call and appends an observation line", () => {
+  const path = bootstrapGovernedRoot();
+  const commonDir = bootstrapCommonDirFixture();
+  const transcriptPath = subagentTranscript("faulterr1");
+  try {
+    const result = evaluateLifecycleReadyGuard(
+      subagentInput("Edit", transcriptPath, { file_path: "src/implementation.mjs" }),
+      {
+        projectDir: path,
+        resolveGitCommonDirFn: () => commonDir,
+        requireProjectOnboardingReadyFn: () => readyStub(),
+        existsSyncFn(target) {
+          if (target === bootstrapReceiptPathFixture(commonDir, "faulterr1")) throw new Error("synthetic disk fault");
+          return existsSync(target);
+        },
+      },
+    );
+    assert.equal(result.exitCode, 0, "a thrown error while resolving the receipt must fail open, never closed");
+    const lines = readFileSync(bootstrapObservationsPathFixture(commonDir), "utf8").trim().split("\n");
+    const records = lines.map((line) => JSON.parse(line));
+    assert.ok(records.some((record) => record.decision === "fail-open-error" && record.agentId === "faulterr1"));
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(commonDir, { recursive: true, force: true });
+    rmSync(dirname(dirname(transcriptPath)), { recursive: true, force: true });
+  }
+});
+
+test("NVA-BOOTRECEIPT-1: every gate decision is observed, and the guard writes nothing outside bootstrap-receipt/", () => {
+  const path = bootstrapGovernedRoot();
+  const commonDir = bootstrapCommonDirFixture();
+  const denyTranscript = subagentTranscript("obs-deny");
+  const allowTranscript = subagentTranscript("obs-allow");
+  try {
+    const receiptPath = bootstrapReceiptPathFixture(commonDir, "obs-allow");
+    mkdirSync(dirname(receiptPath), { recursive: true });
+    writeFileSync(receiptPath, JSON.stringify({ schema: "pipeline.bootstrap-receipt.v1", agentId: "obs-allow" }));
+
+    evaluateLifecycleReadyGuard(
+      subagentInput("Edit", denyTranscript, { file_path: "src/implementation.mjs" }),
+      { projectDir: path, resolveGitCommonDirFn: () => commonDir },
+    );
+    evaluateLifecycleReadyGuard(
+      subagentInput("Edit", allowTranscript, { file_path: "src/implementation.mjs" }),
+      { projectDir: path, resolveGitCommonDirFn: () => commonDir },
+    );
+
+    const lines = readFileSync(bootstrapObservationsPathFixture(commonDir), "utf8").trim().split("\n");
+    const records = lines.map((line) => JSON.parse(line));
+    assert.ok(records.some((record) => record.decision === "deny-no-receipt" && record.agentId === "obs-deny"));
+    assert.ok(records.some((record) => record.decision === "allow-receipt-present" && record.agentId === "obs-allow"));
+
+    // Every entry written under commonDir must live under agent-pipeline/bootstrap-receipt/.
+    const pipelineDirEntries = readdirSync(join(commonDir, "agent-pipeline"));
+    assert.deepEqual(pipelineDirEntries, ["bootstrap-receipt"]);
+    const receiptDirEntries = readdirSync(join(commonDir, "agent-pipeline", "bootstrap-receipt")).sort();
+    assert.deepEqual(receiptDirEntries, ["obs-allow.json", "observations.jsonl"]);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(commonDir, { recursive: true, force: true });
+    rmSync(dirname(dirname(denyTranscript)), { recursive: true, force: true });
+    rmSync(dirname(dirname(allowTranscript)), { recursive: true, force: true });
+  }
 });
