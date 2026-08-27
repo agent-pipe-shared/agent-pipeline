@@ -32,7 +32,7 @@ import {
   inspectProjectOnboardingV3,
   PO_AUTHORITY_REBIND_UNAVAILABLE_DIAGNOSTICS,
 } from "../lib/project-onboarding-v3.mjs";
-import { automatedLifecycleArgvCommands } from "../scripts/project-onboarding-v3.mjs";
+import { automatedLifecycleArgvCommands, MUTATING_ONBOARDING_ARGV_SHAPES } from "../scripts/project-onboarding-v3.mjs";
 import { isBootstrapBindingStagingAuthoringWrite } from "../lib/onboarding-staging-authoring.mjs";
 import { loadRuntimeProjectionV3OwnedKeys } from "../lib/runtime-projection-v3.mjs";
 import {
@@ -2503,82 +2503,60 @@ function sanctionedOnboardingArgs(rawArgs, root) {
       },
       required: { "--activate": true },
     })) return true;
-  // NVA-W5-GUARDADMIT-1 (backlog:
-  // 2026-08-19-guard-lifecycle-ready-has-no-admission-branch-for-the-intake-checkpoint-subcommands.md).
-  // Wave 4 onboarding coordinator, step 1-3 (NVA-W4-COORD-1). These three ONBOARDING_SUBCOMMANDS
-  // entries are `mutates: true, automatedArgvShape: null`, so GUARDDERIVE-1's derived admission
-  // above never covers them -- design.md SSb's claim that no guard change is needed was FALSE for
-  // this reason (see the comment beside the table entries in scripts/project-onboarding-v3.mjs).
-  // Each branch below admits exactly ONE narrow flag SET -- the same discipline every other
-  // mutating branch in this function already applies -- rather than the full optional-flag
-  // grammar parse() accepts for these subcommands.
+  // NVA-CODEXARGV-1 (2026-08-27): the five mutating-onboarding admission branches that used to
+  // live here individually (intake-consent-apply/intake-capture-apply/intake-design-questions-
+  // apply added by NVA-W5-GUARDADMIT-1, commit 70bd1fb3; intake-generate-apply added directly in
+  // the same closure pass, commit 0b2386fd; bootstrap-bind-apply added by NVA-W5-COORD-STEP5-2 --
+  // backlog: 2026-08-19-guard-lifecycle-ready-has-no-admission-branch-for-the-intake-checkpoint-subcommands.md)
+  // are now ONE generic loop reading MUTATING_ONBOARDING_ARGV_SHAPES, the shared declaration
+  // scripts/project-onboarding-v3.mjs exports through the same import seam GUARDDERIVE-1 already
+  // uses. The FLAG SET each subcommand admits can therefore never silently diverge between the
+  // CLI and this guard again -- design.md SSb's claim that no guard change is needed for these
+  // subcommands was FALSE for the reason the backlog item above documents; nothing below widens
+  // what was already admitted, it only sources the same flag names from one place instead of five
+  // separate hand-written literals.
   //
-  // intake-consent-apply's own function (applyOnboardingIntakeConsent, onboarding-continuity.mjs)
-  // always requires --granted and --activate: `if (granted !== true) fail(...)` and
-  // `if (activate !== true) fail(...)` are both unconditional, no shape omits either.
-  // --git-author-name/--git-author-email/--language/--profile are each individually optional
-  // there: gitAuthor/language/profile all default to null and are merged as
-  // base.values.X ?? X (applyOnboardingIntakeConsent) -- a caller may supply any subset of the
-  // four, including none, and each field it does supply is still validated exactly as before.
-  // NVA-BOOTADMIT-2 (2026-08-27): the guard used to require the full four-field bundle as a
-  // "deliberate, disclosed scoping choice", stricter than the library it gates -- an
-  // autonomous onboarding run that supplied only --granted/--activate (the library's actual
-  // minimum) was refused for a reason the library itself never imposes. Widened to match
-  // applyOnboardingIntakeConsent exactly: --root/--granted/--activate stay required, the
-  // other four become optional value flags, each still validated when present.
-  if (args[0] === "intake-consent-apply"
-    && matchFlagSpec(args.slice(1), {
-      requiredValue: { "--root": isRootValue },
-      required: { "--granted": true, "--activate": true },
-      optionalValue: {
-        "--git-author-name": nonEmptyTrimmedNotFlag,
-        "--git-author-email": nonEmptyTrimmedNotFlag,
-        "--language": isLanguageValue,
-        "--profile": isProfileValue,
-      },
-    })) return true;
-  // intake-capture-apply's own function (applyOnboardingIntakeCapture) requires --text to be a
-  // non-empty string; --text.trim() !== "" mirrors the same idiom the kickoff --goal branches
-  // above already apply to a free-form caller text value.
-  if (args[0] === "intake-capture-apply"
-    && matchFlagSpec(args.slice(1), {
-      requiredValue: { "--root": isRootValue, "--text": nonEmptyTrimmed },
-      required: { "--activate": true },
-    })) return true;
-  // intake-design-questions-apply's own function (applyOnboardingIntakeDesignQuestions) parses
-  // --answers-json as a JSON array of {question, answer} entries; --answers-json is checked only
-  // loosely (non-empty, not flag-shaped) here, the same idiom the adopt-remote --remote and
-  // plan-partial-authority --source branches above already apply to a free-form caller value --
-  // deep JSON-shape validation stays the library's job, not this shell-argv allowlist's.
-  if (args[0] === "intake-design-questions-apply"
-    && matchFlagSpec(args.slice(1), {
-      requiredValue: { "--root": isRootValue, "--answers-json": nonEmptyTrimmedNotFlag },
-      required: { "--activate": true },
-    })) return true;
-  // intake-generate-apply (Wave 4 onboarding coordinator step 4, landed after this item was
-  // originally filed with only 3 subcommands -- confirmed a 4th, `mutates: true,
-  // automatedArgvShape: null` entry in ONBOARDING_SUBCOMMANDS with no admission branch either).
-  // applyOnboardingIntakeGenerate() requires expectedPlanSha256, mirroring the same
-  // --plan-sha256/HEX/--activate shape the kickoff-apply and adopt-remote-apply branches above
-  // already use for a digest-bound apply step.
-  if (args[0] === "intake-generate-apply"
-    && matchFlagSpec(args.slice(1), {
-      requiredValue: { "--root": isRootValue, "--plan-sha256": isHexDigest },
-      required: { "--activate": true },
-    })) return true;
-  // bootstrap-bind-apply (Wave 4 onboarding coordinator step 5, NVA-W5-COORD-STEP5-2, design.md
-  // SSa.5 point 5, SSc.3). applyOnboardingBootstrapBind() requires expectedPlanSha256 like every
-  // other digest-bound apply step -- the same --plan-sha256/HEX/--activate shape intake-generate-apply
-  // above already uses. The nextAction promotionApplyAction() constructs for the coordinator-sourced
-  // branch (planBoundApplyAction(), onboarding-continuity.mjs) always carries a trailing
-  // `--runner <runner>` pair too, but withoutRunnerFlag() at the top of this function strips the
-  // first `--runner <claude|codex>` pair found anywhere in argv before any branch below ever runs
-  // -- so the shape checked here is the POST-STRIPPING one, identical to intake-generate-apply's.
-  return args[0] === "bootstrap-bind-apply"
-    && matchFlagSpec(args.slice(1), {
-      requiredValue: { "--root": isRootValue, "--plan-sha256": isHexDigest },
-      required: { "--activate": true },
-    });
+  // Per-flag VALUE validation stays here, unchanged and exactly as narrow as every branch above
+  // already is -- this map is a lookup by flag NAME, not a rewrite of any validator:
+  //   --root            -- the caller's own resolved project root (isRootValue).
+  //   --text            -- intake-capture-apply's PO-message text (applyOnboardingIntakeCapture
+  //                        requires non-empty; nonEmptyTrimmed mirrors the kickoff --goal idiom).
+  //   --answers-json    -- checked only loosely here (non-empty, not flag-shaped); deep JSON-shape
+  //                        validation stays applyOnboardingIntakeDesignQuestions's job.
+  //   --plan-sha256     -- the same HEX digest shape every other digest-bound apply step uses.
+  //   --git-author-name/--git-author-email -- free-form PO-supplied identity text, checked loosely
+  //                        like every other free-form value flag in this function.
+  //   --language/--profile -- the CLI's own closed enums, same idiom as the kickoff branches.
+  // NVA-BOOTADMIT-2 (2026-08-27): intake-consent-apply's own function
+  // (applyOnboardingIntakeConsent, onboarding-continuity.mjs) always requires --granted and
+  // --activate unconditionally; the other four value flags each default to null and merge as
+  // base.values.X ?? X, so a caller may supply any subset of them, including none -- reflected in
+  // MUTATING_ONBOARDING_ARGV_SHAPES's optionalValue list for this command.
+  //
+  // bootstrap-bind-apply's nextAction (promotionApplyAction(), onboarding-continuity.mjs) always
+  // carries a trailing `--runner <runner>` pair too, but withoutRunnerFlag() at the top of this
+  // function already stripped the first `--runner <claude|codex|antigravity>` pair found anywhere
+  // in argv before this loop ever runs -- so the shape matched below is the POST-STRIPPING one,
+  // identical to every sibling here.
+  const MUTATING_ONBOARDING_FLAG_VALIDATORS = {
+    "--root": isRootValue,
+    "--text": nonEmptyTrimmed,
+    "--answers-json": nonEmptyTrimmedNotFlag,
+    "--plan-sha256": isHexDigest,
+    "--git-author-name": nonEmptyTrimmedNotFlag,
+    "--git-author-email": nonEmptyTrimmedNotFlag,
+    "--language": isLanguageValue,
+    "--profile": isProfileValue,
+  };
+  const mutatingShape = MUTATING_ONBOARDING_ARGV_SHAPES[args[0]];
+  if (mutatingShape !== undefined) {
+    const spec = { required: {}, requiredValue: {}, optionalValue: {} };
+    for (const flag of mutatingShape.required) spec.required[flag] = true;
+    for (const flag of mutatingShape.requiredValue) spec.requiredValue[flag] = MUTATING_ONBOARDING_FLAG_VALIDATORS[flag];
+    for (const flag of mutatingShape.optionalValue) spec.optionalValue[flag] = MUTATING_ONBOARDING_FLAG_VALIDATORS[flag];
+    return matchFlagSpec(args.slice(1), spec);
+  }
+  return false;
 }
 
 function sanctionedMigrationArgs(args, root) {
