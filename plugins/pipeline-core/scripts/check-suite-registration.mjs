@@ -34,8 +34,8 @@
  *     `verify.mjs` itself defines (`repoRoot`, `scriptDir`, `hooksDir`, `libDir`,
  *     `pluginScriptsDir`), and every remaining argument must be a fully-quoted string.
  *   - `SCOPED_VERIFY_SUITES` / `WINDOWS_ASSURANCE_VERIFY_SUITES` -- a value that is, in its
- *     entirety, a fully-quoted repo-relative string literal (e.g.
- *     `"plugins/pipeline-core/lib/example.test.mjs"`) is taken as the path directly -- no
+ *     entirety, a fully-quoted repo-relative string literal (one path from the repository
+ *     root, ending in `.test.mjs`) is taken as the path directly -- no
  *     `join(...)` wrapping, no base-directory resolution. This is a genuinely different
  *     source shape from `TEST_SUITES`, not a variant of the same one.
  *

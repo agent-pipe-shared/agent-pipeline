@@ -145,6 +145,18 @@ No overall score, ever. Binary pass/fail only where the dispatch explicitly
 requests a verdict — every T1 runner-native or functional-equivalent
 JSON-schema-shaped verdict does.
 
+**Verdict precondition — resolved identity, or INCONCLUSIVE.** A `PASS` is
+admissible only when both the **ruleset identity** and the **candidate
+identity** are resolved in your own report header before you write the
+verdict line: a concrete ruleset SHA actually loaded (never a placeholder
+token such as `{{SHA_FROM_DISPATCH}}`, never blank), AND a concrete candidate
+commit/diff identity actually reviewed (never a placeholder project name or an
+unresolved `{{...}}` token). Check this against what your own header actually
+shows, not against what the dispatch claims. If either identity is
+unresolved, ambiguous, or still a placeholder, the verdict is `INCONCLUSIVE`
+— never `PASS` and never `FAIL`. An assurance verdict with no bound candidate
+identity is not a pass: there is nothing for the caller to act on as one.
+
 ### 5.5 Report durability (CR-06-D) — authoritative for the Critic's persistence duty
 
 Your judgement is your *entire* deliverable. A Goldfish that loses its report still leaves a diff in the tree; a truncated Critic run consumes a full review budget and leaves nothing — and no way to tell from outside whether it had found anything. So the report must exist as a file before it exists as a message.
