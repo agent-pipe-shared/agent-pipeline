@@ -109,10 +109,16 @@ thresholds, no external telemetry.
 **Add:** C1 is the *scheduling driver* of the sprint — its two-week dogfood
 gates #105 calibration and #104 friction thresholds, so it lands in the first
 implementation wave and starts the clock. The receipt registry also gets four
-concrete first-class codes measured in this repo on 2026-08-27 (guard refusal
-of a read-only command; TP-ceremony cost; dispatch truncation; readiness
-`partial` deadlock) so the dogfood starts with known-real categories, not
-invented ones.
+concrete first-class codes measured live in this repo, each with named
+provenance: guard refusal of a read-only command (2026-08-27,
+`backlog/items/2026-08-27-a-read-only-command-is-refused-for-naming-a-protected-path.md`);
+readiness-`partial` deadlock (2026-08-27,
+`backlog/items/2026-08-27-discard-feature-writes-a-state-the-cleanup-observer-rejects-and-strands-the-session.md`);
+TP-ceremony cost (2026-08-18 — the two live OT09 ceremony attempts recorded
+in `CLAUDE.md`'s guard-testpath rule and `docs/state.md`'s prior handovers;
+no standalone backlog item); dispatch truncation (2026-08-08,
+`backlog/items/2026-08-08-long-dispatches-truncate-before-emitting-their-report.md`).
+The dogfood therefore starts with known-real categories, not invented ones.
 
 ### #104 — Agent-first architecture standard → WP-D2
 
@@ -191,6 +197,17 @@ every WP builds against frozen identities. E2 additionally qualifies the two
 2026-08-27 incident classes (closed-evidence drift; writer/observer
 conformance) because they are Alfred-filed control-integrity defects on the
 same surfaces the sprint hardens.
+
+**Deviate (argued):** #108 stage 1 asks for #99's decision authority early so
+#104/#106 consume accepted rather than provisional module identities. The
+PRD's wave plan (§5) moves D1 to the head of Wave 2, behind the
+control-integrity foundation of Waves 0–1, and declares this there as a
+sequencing deviation: the falsified-enforcement findings make measured
+control placement (A1/A2) a precondition for trusting any new authority
+surface, including D1's own decision records. The stage-1 intent survives in
+substance — D1 still lands before D2/D3 consume identities, and the interim
+is bounded by the provisional-identity marking in the module inventory
+(spec §7.2).
 
 ### #109 — Adoption demand → WP-D4
 
