@@ -272,6 +272,12 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   // change what either guard admits as the bootstrap-binding-required staging-authoring
   // write.
   "plugins/pipeline-core/lib/onboarding-staging-authoring.mjs",
+  // NVA-INTAKEARGV-1: onboarding-argv-shapes.mjs holds the single declaration of the argv
+  // shape guard-lifecycle-ready.mjs admits for every mutating onboarding command, reached
+  // through both project-onboarding-v3.mjs modules (already kernel above). A GS-6 window
+  // covering it would let the first edit widen what the guard admits -- which is exactly
+  // the drift this module was created to make impossible.
+  "plugins/pipeline-core/lib/onboarding-argv-shapes.mjs",
 ]);
 
 // The "plugins/pipeline-core/..." entries above are written against whatever
