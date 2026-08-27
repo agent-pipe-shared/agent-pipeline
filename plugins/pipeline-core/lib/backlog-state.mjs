@@ -1411,7 +1411,12 @@ export function planBacklogReachabilityRepair(items, events, input) {
   }
   for (const [index, id] of expectedIds.entries()) {
     const target = REACHABILITY_REPAIR_TARGETS[id];
-    const historical = events[target.sequence - 1];
+    // ADR-0068 D2 point 3 / NVA-AMENDLOOKUP-1: bind by entryHash, never by
+    // physical position -- mirrors the events.find(...) pattern
+    // validateTransitionLedger and planPrePublicCoreReachabilityRepair
+    // already use for this amendment kind; target.sequence stays
+    // documentation only, never an events-array index.
+    const historical = events.find((candidate) => candidate?.entryHash === target.entryHash);
     const reference = input.references?.[index];
     const item = items.find((entry) => entry?.metadata?.id === id);
     if (historical?.id !== id
@@ -1627,8 +1632,11 @@ export function resolveItemHashAmendmentOverlay(events) {
     const target = Number.isSafeInteger(evidence.supersedesSequence)
       ? ITEM_HASH_AMENDMENT_TARGETS[evidence.supersedesSequence]
       : undefined;
-    const superseded = Number.isSafeInteger(evidence.supersedesSequence)
-      ? events[evidence.supersedesSequence - 1]
+    // ADR-0068 D2 point 3 / NVA-AMENDLOOKUP-1: bind by entryHash, never by
+    // physical position -- supersedesSequence stays only the registry lookup
+    // key above, never an events-array index.
+    const superseded = target
+      ? events.find((candidate) => candidate?.entryHash === target.entryHash)
       : undefined;
     if (!target
       || target.id !== event.id
@@ -1673,7 +1681,10 @@ export function planItemHashAmendment(items, events, input) {
   if (events.some((event) => event?.evidence?.kind === ITEM_HASH_AMENDMENT_KIND && event?.evidence?.supersedesSequence === input.supersedesSequence)) {
     errors.push("item hash amendment was already appended for this target");
   }
-  const historical = target && Number.isSafeInteger(input.supersedesSequence) ? events[input.supersedesSequence - 1] : undefined;
+  // ADR-0068 D2 point 3 / NVA-AMENDLOOKUP-1: bind by entryHash, never by
+  // physical position -- mirrors planPrePublicCoreReachabilityRepair's
+  // events.find(...) pattern for this amendment shape.
+  const historical = target ? events.find((candidate) => candidate?.entryHash === target.entryHash) : undefined;
   if (target && (historical?.id !== target.id || historical?.entryHash !== target.entryHash || historical?.evidence?.reference !== target.reference)) {
     errors.push("item hash amendment target does not bind canonical history");
   }

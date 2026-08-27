@@ -1965,6 +1965,110 @@ function assertContiguousLedgerFixture(events, label) {
     String(threw));
 }
 
+{
+  // NVA-AMENDLOOKUP-1 (ADR-0068 D2 point 3, 0.6.0 AK-4): planBacklogReachabilityRepair
+  // resolved its historical target via events[target.sequence - 1] -- a raw
+  // physical array index -- one of the two gaps ADR-0068's "Scope, disclosed
+  // rather than silent" paragraph explicitly named as left unconverted. Prove
+  // it now binds by entryHash: shift the real historical prefix by one
+  // physical position (exactly the re-sequencing a parallel-sprint merge
+  // produces) and show the raw positional index resolves the WRONG event for
+  // both authorized targets, while the actual planner still binds the RIGHT
+  // ones and never reports a canonical-history mismatch for them.
+  const canonical = loadBacklogState(process.cwd(), { checkCommit: false });
+  const historical = canonical.events.slice(0, 41);
+  const terminalById = new Map();
+  for (const evt of historical) terminalById.set(evt.id, evt);
+  const historicalItems = canonical.items
+    .filter((entry) => terminalById.has(entry.metadata.id))
+    .map((entry) => {
+      const terminal = terminalById.get(entry.metadata.id);
+      const metadata = { ...entry.metadata, status: terminal.to };
+      if (terminal.to === "closed") {
+        const closure = [...historical].reverse().find((evt) => evt.id === terminal.id && evt.evidence?.kind !== "reachability-amendment");
+        metadata.closure_commit = closure.evidence.commit;
+        metadata.closure_evidence = closure.evidence.reference;
+      } else {
+        for (const key of ["closed_at", "closure_repository", "closure_commit", "closure_evidence", "closure_readback"]) delete metadata[key];
+      }
+      return { ...entry, metadata };
+    });
+  const decoy = { sequence: 0, id: "pipeline.amendlookup-decoy", from: null, to: "open", at: "2020-01-01", actor: "decoy", reason: "Shim to shift the physical array position of every real event by one.", evidence: { kind: "decoy" }, previousHash: null, entryHash: "0".repeat(64) };
+  const shifted = [decoy, ...historical];
+  const input = {
+    at: "2026-07-30",
+    actor: "hotfix-047-reachability-repair",
+    commit: "83640cec22d494d227eebc82929370277ce926b9",
+    references: [
+      {
+        id: "pipeline.elephant-direct-implementation-under-afk-authorization",
+        reference: "backlog/items/2026-07-23-elephant-direct-implementation-under-afk-authorization.md",
+        referenceBlobOid: "708c5c05b1868b616e0d56974da4316bf6fc43d5",
+        referenceSha256: "90ba0093cf0494ce44c3f1c7cdb207cff0813c55c3a11eac5f2cebc46e701024",
+      },
+      {
+        id: "pipeline.source-available-commercial-licensing",
+        reference: "backlog/evidence/2026-07-23-snt-1-activation-result.json",
+        referenceBlobOid: "60e389bac6077092f7d36055bf90dc915d734036",
+        referenceSha256: "8fc2763647282368716dfe43e9bfb848f0cf572b7de284e508be1ac9d316076d",
+      },
+    ],
+  };
+  // The literal positional lookup this dispatch removes: target.sequence (39
+  // and 40) resolved as a raw array index into `shifted` after the shift is
+  // the WRONG event for both targets.
+  const wrongAt39 = shifted[39 - 1];
+  const wrongAt40 = shifted[40 - 1];
+  const realAt39 = historical[39 - 1];
+  const realAt40 = historical[40 - 1];
+  const positionalResolvesWrong = wrongAt39?.entryHash !== realAt39.entryHash && wrongAt40?.entryHash !== realAt40.entryHash;
+  const planned = planBacklogReachabilityRepair(historicalItems, shifted, input);
+  const bindingFinding = "does not bind canonical history";
+  check("NVA-AMENDLOOKUP-1 planBacklogReachabilityRepair resolves its historical target by entryHash after a one-position shift, which a raw positional lookup would resolve wrong",
+    positionalResolvesWrong
+      && !planned.errors.some((error) => error.includes(bindingFinding)),
+    JSON.stringify({ wrongAt39: wrongAt39?.id, wrongAt40: wrongAt40?.id, plannedErrors: planned.errors }));
+}
+
+{
+  // NVA-AMENDLOOKUP-1 (ADR-0068 D2 point 3, 0.6.0 AK-4): planItemHashAmendment
+  // and resolveItemHashAmendmentOverlay both resolved their historical target
+  // via events[supersedesSequence - 1] -- the second gap ADR-0068 explicitly
+  // named as left unconverted. Prove both now bind by entryHash the same way,
+  // under the same one-position shift.
+  const { historicalEvents, historicalItems } = historicalManagedOnboardingFixture();
+  const target = ITEM_HASH_AMENDMENT_TARGETS[41];
+  const currentSha256 = createHash("sha256").update(readFileSync(join(process.cwd(), MANAGED_ONBOARDING_TARGET))).digest("hex");
+  const input = {
+    at: "2026-08-19",
+    actor: "hotfix-phx-ledger-itemsha256-repair",
+    commit: "1a685d26f6839928193c69e5d6ee04d170491827",
+    supersedesSequence: 41,
+    itemSha256: currentSha256,
+  };
+  const decoy = { sequence: 0, id: "pipeline.amendlookup-decoy", from: null, to: "open", at: "2020-01-01", actor: "decoy", reason: "Shim to shift the physical array position of every real event by one.", evidence: { kind: "decoy" }, previousHash: null, entryHash: "1".repeat(64) };
+  const shifted = [decoy, ...historicalEvents];
+  // The literal positional lookup this dispatch removes: events[41 - 1] on
+  // the shifted array is the WRONG event -- the genesis event now physically
+  // sits at index 41, not 40.
+  const wrongPositional = shifted[41 - 1];
+  const positionalResolvesWrong = wrongPositional?.entryHash !== target.entryHash;
+  const planned = planItemHashAmendment(historicalItems, shifted, input);
+  const bindingFinding = "item hash amendment target does not bind canonical history";
+  // Build the amendment event against the UNSHIFTED events (a structurally
+  // valid, hash-chained event on its own), then re-check overlay resolution
+  // against a shifted array carrying it.
+  const cleanPlan = planItemHashAmendment(historicalItems, historicalEvents, input);
+  const overlayEvents = [decoy, ...historicalEvents, cleanPlan.event];
+  const overlay = resolveItemHashAmendmentOverlay(overlayEvents);
+  check("NVA-AMENDLOOKUP-1 planItemHashAmendment and resolveItemHashAmendmentOverlay resolve their historical target by entryHash after a one-position shift, which a raw positional lookup would resolve wrong",
+    positionalResolvesWrong
+      && cleanPlan.ok
+      && !planned.errors.some((error) => error.includes(bindingFinding))
+      && overlay.get(41) === currentSha256,
+    JSON.stringify({ wrongPositionalId: wrongPositional?.id, plannedErrors: planned.errors, cleanPlanErrors: cleanPlan.errors, overlayHas41: overlay.has(41) }));
+}
+
 for (const root of roots) rmSync(root, { recursive: true, force: true });
 console.log(`\n${passed}/${passed + failed} checks passed.`);
 process.exit(failed === 0 ? 0 : 1);
