@@ -76,6 +76,40 @@ branch's triage, Nova/general per the Phoenix-line cross-triage).
 `#108`'s entry condition `#100` (P0, fail-closed push-approval absence) is
 still OPEN on GitHub — tracked as an entry condition, outside Alfred.
 
+**Design package + review round 1 (2026-08-27, late evening):** package
+committed — intake analyses `74e5a4d4` (po-input, issue-intake,
+backlog-intake, external-research), PRD/spec/acceptance `584acbda`, issue
+snapshot + authoring record `56cda4c7`. Round-1 Critic reviews: 1A intakes
+(claude-sonnet-5 at max) **PASS**, 2 minor findings; 1B PRD/spec/acceptance
+(claude-opus-5 at max, ARCHITECTURE functional-equivalent lane) **FAIL**, 3
+major + 7 minor. Every finding fixed or dispositioned in **`ea392b28`**
+(PRD spec-sha256 marker recomputed, now `e57a2d1f…3223`); verbatim reports,
+the neutral findings registry, and the disposition map persisted under
+`specs/sprint-alfred-epic/evidence/critic/` (`007f9669`). Two further
+process defects filed from the round (`553e43d7`, ledger `c2f3eeed`):
+critic scratch-note persistence is structurally unavailable (defeats
+CR-06-D truncation recovery), and no sanctioned `Dispatch:` trailer form
+exists for direct Elephant design-phase commits. **Round 2** (delta
+re-review per template item 4, claude-opus-5 at max, candidate `ea392b28`,
+registry as neutral input) dispatched; its report gets persisted beside
+round 1 on arrival.
+
+**Post-compact observation (extra evidence for defect 2 above):** after a
+`/compact`, the SessionStart reground classifier reported
+`PCR-CONTINUITY-MISSING` with `workResumptionAllowed: false` and
+`dispatchEligibility CS-INVALID` against a state the live observers accept
+(`inspect --intent session`: active feature, phase `design`, lifecycle
+`draft`, `PLAN-LIFECYCLE-CURRENT`) — same root class (observer coverage of
+the discarded→fresh-design shape), new surface (post-compact reground).
+Recorded here instead of editing the committed item, to avoid ledger DRIFT
+noise; fold into the item at its next legitimate touch.
+
+**Next:** on a green/resolved round 2 →
+`pipeline-state.mjs submit-plan --by Elephant --profile epic`, then the
+**Haltepunkt**: present the PRD readably (EL-19), the five open PO
+decisions of PRD §9, the MP-01 gate switch away from Fable-max, and a
+proposed `/goal`; wait for the PO's "approved".
+
 ## Prior handover — 2026-09-01/02: the autonomous Nova B block
 
 **Lifecycle phase:** feature `sprint-nova-epic` · phase `implementation`
