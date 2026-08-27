@@ -2399,6 +2399,12 @@
       "member": "pipeline-update-channel-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:pipeline-user-v3-drift-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "pipeline-user-v3-drift-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:plan-spec-state-v2-legacy-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -3347,6 +3353,12 @@
       "member": "windows-private-state-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:wire-dispatch-budget-hook-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "wire-dispatch-budget-hook-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:workflow-runner-boundary-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -3848,6 +3860,7 @@
         "verify-phase:harness/scripts/verify.mjs:pipeline-state-reopen-design-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-state-revocation-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-state-tests",
+        "verify-phase:harness/scripts/verify.mjs:pipeline-user-v3-drift-tests",
         "verify-phase:harness/scripts/verify.mjs:plan-spec-state-v2-legacy-tests",
         "verify-phase:harness/scripts/verify.mjs:plan-spec-state-v2-tests",
         "verify-phase:harness/scripts/verify.mjs:po-approval-gate-tests",
@@ -4006,6 +4019,7 @@
         "verify-phase:harness/scripts/verify.mjs:verify-topology-preflight-tests",
         "verify-phase:harness/scripts/verify.mjs:windows-assurance-verify-registration-tests",
         "verify-phase:harness/scripts/verify.mjs:windows-private-state-tests",
+        "verify-phase:harness/scripts/verify.mjs:wire-dispatch-budget-hook-tests",
         "verify-phase:harness/scripts/verify.mjs:workflow-runner-boundary-tests",
         "verify-phase:harness/scripts/verify.mjs:workflow-writer-preflight-tests",
         "verify-phase:harness/scripts/verify.mjs:worktree-create-tests",

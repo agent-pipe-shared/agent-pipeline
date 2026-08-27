@@ -685,6 +685,8 @@ const TEST_SUITES = [
   // Landed after both merge sides diverged (commit ab347a74); registered here per PHX-VERIFY 1b.
   { name: "pipeline-start-preflight-antigravity-hard-enforcement-tests", file: join(pluginScriptsDir, "pipeline-start-preflight-antigravity-hard-enforcement.test.mjs") },
   { name: "guard-dispatch-budget-tests", file: join(hooksDir, "guard-dispatch-budget.test.mjs") },
+  { name: "wire-dispatch-budget-hook-tests", file: join(repoRoot, "harness", "scripts", "wire-dispatch-budget-hook.test.mjs") },
+  { name: "pipeline-user-v3-drift-tests", file: join(libDir, "pipeline-user-v3-drift.test.mjs") },
 ];
 
 // Manifest-gated phase steps: see header — only projects that carry a manifest at
