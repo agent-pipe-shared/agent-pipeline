@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { RESUME_HINT_SCHEMA, buildResumeHint, resumeHintContextDetail, validateResumeHint } from "./resume-hint.mjs";
+import { RESUME_HINT_SCHEMA, buildResumeHint, resumeHintContextDetail, validateResumeHint, verbatimMaterialRejection } from "./resume-hint.mjs";
 
 const BASE = {
   intent: "Resume the bounded rollout review where it stopped.",
@@ -402,4 +402,186 @@ test("RH-SCHEMA-DIAG-2 an invalid createdAt with a fully-valid context does not 
     assert.equal(error.message, "RH-SCHEMA", "falls back to the bare code since the cause is createdAt, not context");
     return true;
   });
+});
+
+/**
+ * NVA-RESUMEVERBATIM-1 AC-1/AC-2. verbatimMaterialRejection() screens the NEW verbatim
+ * material-input field carried by scripts/resume-hint.mjs's `capture` (a card key,
+ * never a new argv flag): the same credential/secret/host-path/URL/private-identifier
+ * shapes as validText() (SECRET_PATH_SHAPES/secretAssignment/opaqueToken, reused, never
+ * a second copy), but NOT the transcript/command-line shapes and NOT the long hex digest
+ * or the single-line/480-byte caps -- a user-authored design document is project content,
+ * not a transcript (AC-2), and this field is explicitly exempt from the short-string caps
+ * the distilled intent/scope/constraints/questions/progress keys still carry (AC-1).
+ */
+test("verbatimMaterialRejection rejects credentials, secrets, host paths, URLs and private identifiers", () => {
+  for (const text of [
+    "https://internal.example.invalid/runbook",
+    "/home/operator/private/notes.md",
+    "C:\\Users\\operator\\Desktop\\notes.txt",
+    "ops@internal.example.invalid",
+    "password: hunter2",
+    "secret: correcthorsebattery",
+    ["AKIA", "IOSFODNN7EXAMPLE"].join(""),
+    "Bearer sk-secret",
+  ]) {
+    assert.ok(verbatimMaterialRejection(text), `admitted a forbidden shape: ${JSON.stringify(text)}`);
+  }
+});
+
+test("verbatimMaterialRejection admits multi-line design prose, fenced code, a quoted transcript line and a short commit reference", () => {
+  const designDocument = [
+    "# Design input",
+    "",
+    "Multiple paragraphs, several lines long -- unbounded, never a short-string cap.",
+    "",
+    "```js",
+    "console.log('example snippet, legitimately fenced code');",
+    "```",
+    "",
+    "The PO wrote: \"User: please add a retry button\" as a direct quote of a stakeholder.",
+    "",
+    "Referenced commit: 70bd1fb3 (a short commit reference, LONG_HEX_DIGEST_SHAPE excluded).",
+    "",
+    "git commit -m wip -- an example command mentioned in prose, not executed.",
+  ].join("\n");
+  assert.equal(verbatimMaterialRejection(designDocument), null);
+});
+
+/**
+ * KNOWN RESIDUAL, pinned deliberately (same idiom as ADMITTED_RESIDUAL above and the
+ * existing "not always the literal long guard code" test): verbatimMaterialRejection()
+ * excludes LONG_HEX_DIGEST_SHAPE on purpose (see the comment above it), but reuses
+ * opaqueToken() unchanged, and opaqueToken()'s OWN high-entropy heuristic (a token
+ * >=24 characters, digit-bearing) independently catches a FULL 40+ character hex
+ * digest (a git SHA-1 or sha256 content hash) regardless of that exclusion. A SHORT
+ * commit reference (<24 characters, e.g. "70bd1fb3") stays admitted, proven above.
+ * Not fixed here: loosening opaqueToken() is a shared-filter change (also used by
+ * intent/scope/constraints/questions/progress) with real over-admission risk, out of
+ * this dispatch's bounded scope -- reported as a limitation, not silently patched
+ * around (same disposition as the existing guard-code residual this file already pins).
+ */
+test("verbatimMaterialRejection: a full-length hex digest is still caught via opaqueToken(), not via the excluded LONG_HEX_DIGEST_SHAPE", () => {
+  assert.equal(verbatimMaterialRejection("da39a3ee5e6b4b0d3255bfef95601890afd80709"), "RH-MATERIAL-SECRET");
+});
+
+test("verbatimMaterialRejection rejects empty, whitespace-only and null-byte text", () => {
+  for (const text of ["", "   ", "nul\u0000byte"]) {
+    assert.equal(verbatimMaterialRejection(text), "RH-MATERIAL-EMPTY");
+  }
+});
+
+/** Fixture root: git-initialized AND carrying project/pipeline.yaml, the precondition
+ * both captureResumeHint (RH-PROJECT-UNINITIALIZED) and the intake checkpoint
+ * (readGitCommonDirectory) each independently require. */
+function gitInitRoot(prefix) {
+  const root = mkdtempSync(join(tmpdir(), prefix));
+  mkdirSync(join(root, "project"), { recursive: true });
+  writeFileSync(join(root, "project", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+  const git = spawnSync("git", ["init", "-q"], { cwd: root, encoding: "utf8", shell: false });
+  assert.equal(git.status, 0, git.stderr);
+  return root;
+}
+
+/**
+ * NVA-RESUMEVERBATIM-1 AC-1/AC-3/AC-5. End-to-end round trip through the ONE guard-admitted
+ * argv shape: a card carrying verbatim material input and answered onboarding values, a
+ * FRESH process reading it back (simulating the restart), byte-identical text, and a second
+ * capture proving the already-answered values are never overwritten (ask once).
+ */
+test("NVA-RESUMEVERBATIM-1 capture carries verbatim material input and answered values across a restart, byte-identical, ask-once", () => {
+  const root = gitInitRoot("resume-hint-verbatim-");
+  try {
+    const helper = fileURLToPath(new URL("../scripts/resume-hint.mjs", import.meta.url));
+    const cardPath = join(root, "resume-card.json");
+
+    const designDocument = [
+      "# A multi-page design brief",
+      "",
+      `Line two of the same paragraph, well past 480 bytes if repeated -- ${"x".repeat(600)}`,
+      "",
+      "A second paragraph with a fenced snippet:",
+      "```js",
+      "const answer = 42;",
+      "```",
+    ].join("\n");
+    const secondChunk = "A second, later chunk of user input.";
+
+    writeFileSync(cardPath, JSON.stringify({
+      ...BASE,
+      materialInput: [designDocument, secondChunk],
+      values: {
+        gitAuthor: { name: "Jane PO", email: "jane@example.com" },
+        language: "en",
+        profile: "feature",
+      },
+    }));
+    const captured = spawnSync(process.execPath, [helper, "capture", "--root", root, "--card-file", cardPath], { encoding: "utf8" });
+    assert.equal(captured.status, 0, captured.stderr);
+    const capturedOutput = JSON.parse(captured.stdout);
+    assert.equal(capturedOutput.intake.captures.length, 2);
+
+    // A SEPARATE process, standing in for "the far side of the restart".
+    const inspected = spawnSync(process.execPath, [helper, "inspect", "--root", root], { encoding: "utf8" });
+    assert.equal(inspected.status, 0, inspected.stderr);
+    const inspectedOutput = JSON.parse(inspected.stdout);
+    assert.deepEqual(inspectedOutput.intakeCheckpoint.values, {
+      gitAuthor: { name: "Jane PO", email: "jane@example.com" },
+      language: "en",
+      profile: "feature",
+    });
+    assert.deepEqual(
+      inspectedOutput.intakeCheckpoint.materialInput.map((chunk) => chunk.text),
+      [designDocument, secondChunk],
+    );
+
+    // Ask-once: a second capture with DIFFERENT values does not overwrite the
+    // already-answered ones (base.values.X ?? X idempotency, fed not reinvented).
+    writeFileSync(cardPath, JSON.stringify({
+      ...BASE,
+      values: { gitAuthor: { name: "Someone Else", email: "else@example.com" }, language: "de", profile: "mini" },
+    }));
+    const recaptured = spawnSync(process.execPath, [helper, "capture", "--root", root, "--card-file", cardPath], { encoding: "utf8" });
+    assert.equal(recaptured.status, 0, recaptured.stderr);
+    const reinspected = spawnSync(process.execPath, [helper, "inspect", "--root", root], { encoding: "utf8" });
+    assert.equal(reinspected.status, 0, reinspected.stderr);
+    assert.deepEqual(JSON.parse(reinspected.stdout).intakeCheckpoint.values, {
+      gitAuthor: { name: "Jane PO", email: "jane@example.com" },
+      language: "en",
+      profile: "feature",
+    });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("NVA-RESUMEVERBATIM-1 AC-2: a card carrying a secret-shaped materialInput chunk is refused, nothing persisted", () => {
+  const root = gitInitRoot("resume-hint-verbatim-secret-");
+  try {
+    const helper = fileURLToPath(new URL("../scripts/resume-hint.mjs", import.meta.url));
+    const cardPath = join(root, "resume-card.json");
+    writeFileSync(cardPath, JSON.stringify({ ...BASE, materialInput: ["password: hunter2 in the design doc"] }));
+    const result = spawnSync(process.execPath, [helper, "capture", "--root", root, "--card-file", cardPath], { encoding: "utf8" });
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /RH-MATERIAL-SECRET/);
+    const inspected = spawnSync(process.execPath, [helper, "inspect", "--root", root], { encoding: "utf8" });
+    assert.equal(inspected.status, 0, inspected.stderr);
+    assert.equal(JSON.parse(inspected.stdout).intakeCheckpoint.status, "absent");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("NVA-RESUMEVERBATIM-1 a legacy four-key card (no materialInput/values) is unaffected: no intake key on output", () => {
+  const root = gitInitRoot("resume-hint-verbatim-legacy-");
+  try {
+    const helper = fileURLToPath(new URL("../scripts/resume-hint.mjs", import.meta.url));
+    const cardPath = join(root, "resume-card.json");
+    writeFileSync(cardPath, JSON.stringify(BASE));
+    const result = spawnSync(process.execPath, [helper, "capture", "--root", root, "--card-file", cardPath], { encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr);
+    assert.ok(!("intake" in JSON.parse(result.stdout)), "a legacy card must not gain a new output key");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });

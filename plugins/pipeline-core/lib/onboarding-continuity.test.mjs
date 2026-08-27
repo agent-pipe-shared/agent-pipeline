@@ -60,6 +60,7 @@ import {
   planOnboardingKickoffPromotion,
   planOnboardingKickoffPromotionCleanupRecovery,
   readOnboardingIntakeCheckpoint,
+  readOnboardingIntakeMaterialInput,
   readOnboardingSessionCleanupBinding,
   reconstructOnboardingKickoffPlan,
   reconstructOnboardingKickoffPromotionPlan,
@@ -2724,6 +2725,36 @@ check("applyOnboardingIntakeCapture: an idempotent duplicate-content capture con
   const second = applyOnboardingIntakeCapture({ rootDir: root, text: "same content", activate: true });
   assert.equal(second.mutated, false);
   assert.equal(second.checkpoint.materialInput.length, 1);
+});
+
+// NVA-RESUMEVERBATIM-1: readOnboardingIntakeMaterialInput() is the read-side companion
+// scripts/resume-hint.mjs's `inspect` uses to surface the verbatim material input a
+// prior `capture` routed into this SAME checkpoint -- resolving each entry's evidence
+// blob back to its actual bytes and re-verifying the sha256 that references it.
+
+check("readOnboardingIntakeMaterialInput: absent checkpoint returns status absent and an empty chunk list", () => {
+  const root = fixture("intake-material-input-absent");
+  const result = readOnboardingIntakeMaterialInput({ rootDir: root });
+  assert.equal(result.status, "absent");
+  assert.deepEqual(result.chunks, []);
+});
+
+check("readOnboardingIntakeMaterialInput: resolves every captured chunk back to its byte-identical text, in capture order", () => {
+  const root = fixture("intake-material-input-present");
+  grantIntakeConsent(root);
+  const first = "Line one of a design brief.\nLine two, multi-line, unbounded by the short-string caps.";
+  const second = "A second, later chunk of user input -- unicode: café, 日本語, emoji 🚀.";
+  applyOnboardingIntakeCapture({ rootDir: root, text: first, activate: true });
+  applyOnboardingIntakeCapture({ rootDir: root, text: second, activate: true });
+  const result = readOnboardingIntakeMaterialInput({ rootDir: root });
+  assert.equal(result.status, "present");
+  assert.equal(result.chunks.length, 2);
+  assert.deepEqual(result.chunks.map((chunk) => chunk.text), [first, second]);
+  for (const chunk of result.chunks) {
+    assert.equal(chunk.sha256, createHash("sha256").update(chunk.text, "utf8").digest("hex"));
+    assert.equal(chunk.byteLength, Buffer.byteLength(chunk.text, "utf8"));
+    assert.ok(chunk.receivedAt);
+  }
 });
 
 check("applyOnboardingIntakeDesignQuestions: happy path records the bundled round and flips to ready-to-generate", () => {
