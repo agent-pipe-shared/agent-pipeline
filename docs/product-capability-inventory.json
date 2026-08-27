@@ -1823,6 +1823,12 @@
       "member": "harness-lib-plan-spec-state-v2-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:hooks-manifest-shape-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "hooks-manifest-shape-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:host-advisor-status-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -3766,6 +3772,7 @@
         "verify-phase:harness/scripts/verify.mjs:handover-rotate-tests",
         "verify-phase:harness/scripts/verify.mjs:handover-rotation-tests",
         "verify-phase:harness/scripts/verify.mjs:harness-lib-plan-spec-state-v2-tests",
+        "verify-phase:harness/scripts/verify.mjs:hooks-manifest-shape-tests",
         "verify-phase:harness/scripts/verify.mjs:host-advisor-status-tests",
         "verify-phase:harness/scripts/verify.mjs:host-advisor-workspace-tests",
         "verify-phase:harness/scripts/verify.mjs:human-authority-grant-tests",

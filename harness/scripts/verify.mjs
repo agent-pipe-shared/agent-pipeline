@@ -687,6 +687,7 @@ const TEST_SUITES = [
   { name: "guard-dispatch-budget-tests", file: join(hooksDir, "guard-dispatch-budget.test.mjs") },
   { name: "wire-dispatch-budget-hook-tests", file: join(repoRoot, "harness", "scripts", "wire-dispatch-budget-hook.test.mjs") },
   { name: "pipeline-user-v3-drift-tests", file: join(libDir, "pipeline-user-v3-drift.test.mjs") },
+  { name: "hooks-manifest-shape-tests", file: join(hooksDir, "hooks-manifest-shape.test.mjs") },
 ];
 
 // Manifest-gated phase steps: see header — only projects that carry a manifest at
