@@ -235,6 +235,15 @@ const VERIFY_REGISTRATIONS = [
     line: '  { name: "hooks-manifest-shape-tests", file: join(hooksDir, "hooks-manifest-shape.test.mjs") },',
     file: join(REPO_ROOT, "plugins", "pipeline-core", "hooks", "hooks-manifest-shape.test.mjs"),
   },
+  // Added 2026-08-27 (NVA-PREPUSH-1). Covers the git-level pre-push hook installer
+  // (plugins/pipeline-core/scripts/pre-push-hook-install.mjs) that mirrors guard-
+  // push.mjs's evidence/approval gate at the git hook layer, so it still applies when
+  // the plugin hook layer itself has failed to load. 25/25 green.
+  {
+    name: "pre-push-hook-install-tests",
+    line: '  { name: "pre-push-hook-install-tests", file: join(pluginScriptsDir, "pre-push-hook-install.test.mjs") },',
+    file: join(REPO_ROOT, "plugins", "pipeline-core", "scripts", "pre-push-hook-install.test.mjs"),
+  },
 ];
 
 // The terminator moves every time a batch is registered, so this constant is

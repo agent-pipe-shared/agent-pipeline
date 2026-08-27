@@ -17,13 +17,25 @@
  *   exitCode 0 when it is not, and must not fabricate evidence to satisfy the
  *   gate.
  *   The documented fallback for exactly this situation is the PO running the
- *   push themselves, outside any guarded session. There are no actual git
- *   hooks installed (.git/hooks/pre-push does not exist) — guard-push only
- *   intercepts an agent's own Bash/PowerShell tool calls inside a session, so
- *   this script does not disable, patch, or bypass anything; it simply runs
- *   the same `git push` a human could always run directly. Wrapping it here
+ *   push themselves, outside any guarded session. guard-push only intercepts
+ *   an agent's own Bash/PowerShell tool calls inside a session, so this
+ *   script does not disable, patch, or bypass anything; it simply runs the
+ *   same `git push` a human could always run directly. Wrapping it here
  *   exists only to force a deliberate reason and leave a durable record, the
  *   same generalization request that produced po-guarded-edit.mjs.
+ *   NVA-PREPUSH-1 update: a project MAY now also have a git-level
+ *   `.git/hooks/pre-push` installed (plugins/pipeline-core/scripts/pre-push-
+ *   hook-install.mjs) — a narrower, git-native backstop that mirrors ONLY
+ *   guard-push.mjs's evidence-freshness + general-mode-approval checks (never
+ *   its full signature-mode/critical-proof chain; see that installer's own
+ *   header). If one is installed here, this script's `git push` still passes
+ *   through it like any other push — that hook can ALSO refuse, independent
+ *   of and in addition to whatever this script already checked. The
+ *   documented human escape for that layer specifically is
+ *   `git push --no-verify`, which this script does not add on the PO's
+ *   behalf; if the git-level hook's own refusal is itself the reason a
+ *   PO-guarded push is needed, that is for the PO running this script to
+ *   decide, not this script to route around silently.
  *
  * THIS IS NOT A GENERAL "SKIP TESTS AND PUSH" TOOL.
  *   Use it only when you (the PO) have independently confirmed that every

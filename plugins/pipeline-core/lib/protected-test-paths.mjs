@@ -43,6 +43,21 @@
  *     match: the same accepted trade-off `guard-testpath.mjs` and `guard-git.mjs` already
  *     document. This raises the gate from "any shell write walks past it" to "a shell write
  *     that names its target is refused"; it does not turn a regex guard into a sandbox.
+ *
+ * NVA-PREPUSH-1 UPDATE (2026-08-27): the first bullet above ("a write performed by a
+ * SCRIPT the command merely executes ... is invisible to any classifier that can only
+ * read a command line") was, until now, ALSO the description of the residual gap for
+ * `git push` specifically — commit a8f861cc's message points here for exactly that
+ * reason. That half is now covered, for `push` only, by a DIFFERENT mechanism than
+ * this file's classifier: an optional git-level `.git/hooks/pre-push` hook
+ * (plugins/pipeline-core/scripts/pre-push-hook-install.mjs) that git itself invokes
+ * for every `git push` reaching this repository's remote, regardless of what shell
+ * command, sub-process, or script issued it — so a sub-process-mediated push is no
+ * longer invisible the way a sub-process-mediated protected-path WRITE still is here.
+ * That hook mirrors ONLY guard-push.mjs's evidence-freshness + general-mode-approval
+ * checks (see its own header for the exact, narrower scope and why); it is a git-level
+ * backstop for `push`, not a fix to this classifier, and it does nothing for the other
+ * two bullets above or for any protected-path write that is not a `git push`.
  */
 import { existsSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
