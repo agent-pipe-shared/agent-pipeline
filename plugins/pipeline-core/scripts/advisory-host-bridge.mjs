@@ -28,8 +28,7 @@ import { validateAdvisoryReceipt } from "../lib/advisory-receipt.mjs";
 import { AdvisoryReceiptAssuranceError, persistAdvisoryReceipt } from "../lib/advisory-receipt-assurance.mjs";
 import { canonicalJson } from "../lib/codex-sandbox-compatibility.mjs";
 import { canonicalSha256, parseStrictJson } from "../lib/governance-event.mjs";
-import { appendPortableGovernanceEvent } from "../lib/governance-event-store.mjs";
-import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
+import { appendPortableGovernanceEvent, readLocalRepositoryFingerprint } from "../lib/governance-event-store.mjs";
 import { readPublicRepositoryFile } from "../lib/threat-model-approval-request.mjs";
 import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
 import { ROUTES, selectHostAdvisorRoute } from "./codex-host-advisor-route.mjs";
@@ -456,7 +455,7 @@ async function recordAdvisoryDecisionEvent(receipt, { repoRoot }) {
   try {
     const event = buildAdvisoryDecisionEvent({ receipt });
     const repo = discoverRepository(repoRoot);
-    const fingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: repo.commonDir, primaryRoot: repo.primaryRoot });
+    const fingerprint = await readLocalRepositoryFingerprint({ repositoryRoot: repo.primaryRoot });
     const intent = {
       schema: "pipeline.governance-event-envelope.v1",
       payloadSchema: "pipeline.agent-decision-event.v1",

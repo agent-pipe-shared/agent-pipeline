@@ -15,9 +15,7 @@ import {
   createAdvisoryDemand,
 } from "../lib/advisory-lifecycle-v2.mjs";
 import { canonicalizeJson } from "../lib/governance-event.mjs";
-import { queryPortableGovernanceStream } from "../lib/governance-event-store.mjs";
-import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
-import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
+import { queryPortableGovernanceStream, readLocalRepositoryFingerprint } from "../lib/governance-event-store.mjs";
 import {
   runAdvisoryHostBridge,
   runCodexAdvisoryThroughSelectedSandbox,
@@ -300,8 +298,7 @@ function agentGovernanceCapturePolicyFixture() {
 async function governanceRepoRoot() {
   const root = await mkdtemp(join(tmpdir(), "advisory-decision-governance-"));
   execFileSync("git", ["init", "-q", root]);
-  const repository = discoverRepository(root);
-  const fingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: repository.commonDir, primaryRoot: repository.primaryRoot });
+  const fingerprint = await readLocalRepositoryFingerprint({ repositoryRoot: root });
   await mkdir(join(root, "governance/events"), { recursive: true });
   await writeFile(join(root, "governance/events/registry.json"), `${canonicalizeJson(agentGovernanceRegistryFixture(fingerprint))}\n`);
   await writeFile(join(root, "governance/events/capture-policy.json"), `${canonicalizeJson(agentGovernanceCapturePolicyFixture())}\n`);

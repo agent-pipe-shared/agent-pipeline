@@ -331,7 +331,7 @@ import path from "node:path";
 import { canonicalSha256, canonicalizeJson, sealGovernanceEvent } from "./governance-event.mjs";
 import { derivePoGateRepositoryFingerprint } from "./po-gate-authority.mjs";
 import { discoverRepository } from "./worktree-lifecycle.mjs";
-import { GovernanceEventStoreError, appendPortableGovernanceEvent, putRestrictedGovernanceEvent, queryPortableGovernanceStream, verifyPortableGovernanceStream } from "./governance-event-store.mjs";
+import { GovernanceEventStoreError, appendPortableGovernanceEvent, putRestrictedGovernanceEvent, queryPortableGovernanceStream, readLocalRepositoryFingerprint, verifyPortableGovernanceStream } from "./governance-event-store.mjs";
 import { projectGovernanceEvent, validateGovernanceExportPolicy } from "./governance-event-projection.mjs";
 
 const AGENT_CANDIDATE={commit:"b".repeat(40),tree:"c".repeat(40)};
@@ -353,8 +353,7 @@ function agentCapturePolicyFixture(){
 async function agentFixtureRoot(){
   const root=await mkdtemp(path.join(os.tmpdir(),"agent-decision-journal-"));
   execFileSync("git",["init","-q",root]);
-  const repository=discoverRepository(root);
-  const fingerprint=derivePoGateRepositoryFingerprint({gitCommonDir:repository.commonDir,primaryRoot:repository.primaryRoot});
+  const fingerprint=await readLocalRepositoryFingerprint({repositoryRoot:root});
   const capturePolicy=agentCapturePolicyFixture();
   const capturePolicyDigest=canonicalSha256(capturePolicy);
   await mkdir(path.join(root,"governance/events"),{recursive:true});

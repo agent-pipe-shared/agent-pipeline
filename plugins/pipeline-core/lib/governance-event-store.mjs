@@ -792,6 +792,23 @@ export async function loadGovernanceEventRegistry({ repositoryRoot, registryPath
 }
 
 /**
+ * NVA-REPOID-2: the single caller-facing accessor for "what identity is this
+ * checkout bound to" -- the question every other export above requires an
+ * answer to before it can accept a caller-supplied `repositoryFingerprint`
+ * (GES-CROSS-REPOSITORY otherwise). Bind-on-first-use: calling this against a
+ * fresh checkout mints and persists the identity exactly as every other
+ * physical-root export already does via `assertPhysicalRoot` -- this is not a
+ * second code path or a second read of the binding file, only a narrower
+ * return shape. A caller must read the identity here rather than recompute it
+ * (`derivePoGateRepositoryFingerprint` answers a different, path-derived
+ * question and is no longer this store's identity source, AK14-direction.md).
+ */
+export async function readLocalRepositoryFingerprint({ repositoryRoot } = {}) {
+  const { fingerprint } = await assertPhysicalRoot(repositoryRoot);
+  return fingerprint;
+}
+
+/**
  * Append one event intent. Writer-owned sequence/digests must be omitted from
  * `intent`; the returned receipt exposes only public metadata and checkpoint.
  */
