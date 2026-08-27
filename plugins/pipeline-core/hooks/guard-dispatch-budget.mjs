@@ -15,7 +15,16 @@
  * NOT wired into `hooks.json` by this dispatch (TP-4 protected, no
  * in-session override for this class of protected file --
  * `templates/prompts/agent-obligations.md` §2). Built and unit-tested
- * only; wiring is a separate, signed maintenance-window ceremony. Mirrors
+ * only. CORRECTION (2026-08-27): this header used to describe wiring as
+ * "a separate, signed maintenance-window ceremony". That route does not
+ * exist. `plugins/pipeline-core/hooks/hooks.json` is on
+ * `NEVER_LIFTABLE_KERNEL_PATHS` (`lib/guard-maintenance-window.mjs`), so no
+ * maintenance window -- signed or not -- can lift it; `GMW40` is the test
+ * that proves a TP-scoped window matching a kernel path still refuses. The
+ * real route is the attended operator tool
+ * `harness/scripts/wire-dispatch-budget-hook.mjs`, run outside the session
+ * by the PO, which is the "explicit PO approval" hooks.json's own
+ * `$comment` names. Mirrors
  * `guard-lifecycle-ready.mjs`'s PreToolUse input contract (stdin JSON,
  * `tool_name`/`tool_input`, exit 0 allow / 2 block) and
  * `guard-handover-size.mjs`'s "not yet wired, mirror the shape not the
