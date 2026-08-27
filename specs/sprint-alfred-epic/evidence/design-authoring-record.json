@@ -1,0 +1,38 @@
+{
+  "schema": "pipeline.design-authoring-record.v0",
+  "featureId": "sprint-alfred-epic",
+  "phase": "design",
+  "authoredBy": "Elephant (design-phase document authoring per roles/elephant.md design duties; no production code in these commits)",
+  "runner": "claude",
+  "sessionModel": "Fable 5 (claude-fable-5) at effort max, PO-set 2026-08-27 (MP-01 named session exception for the design phase)",
+  "date": "2026-08-27",
+  "commits": [
+    {
+      "sha": "74e5a4d4",
+      "files": [
+        "specs/sprint-alfred-epic/design/po-input-2026-08-27.md",
+        "specs/sprint-alfred-epic/design/issue-intake.md",
+        "specs/sprint-alfred-epic/design/backlog-intake.md",
+        "specs/sprint-alfred-epic/design/external-research.md"
+      ]
+    },
+    {
+      "sha": "584acbda",
+      "files": [
+        "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md",
+        "specs/sprint-alfred-epic/spec.md",
+        "specs/sprint-alfred-epic/acceptance.md"
+      ]
+    }
+  ],
+  "inputs": {
+    "issueSnapshot": "specs/sprint-alfred-epic/evidence/issues-snapshot-2026-08-27.md",
+    "backlogItems": "the 24 open sprint: alfred items under backlog/items/ (read in full 2026-08-27)",
+    "externalResearch": "web sources listed in specs/sprint-alfred-epic/design/external-research.md"
+  },
+  "declaredFacts": [
+    "The design was authored ahead of Nova/Phoenix go-live under an explicit PO decision recorded in specs/sprint-alfred-epic/design/po-input-2026-08-27.md.",
+    "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md carries a technical-spec-sha256 marker bound to spec.md as committed in 584acbda.",
+    "No plan submission exists yet; the package is pre-submission design material at the time of this record."
+  ]
+}
