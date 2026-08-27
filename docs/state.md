@@ -21,7 +21,62 @@
 | 2026-08-11 to 2026-08-19 | Checkpoints 1-60 (2026-08-11 through 2026-08-19 checkpoint 60): superseded session narrative; durable decisions already live in ADRs/backlog/guardrails per this repo's own standing convention, not uniquely in this prose. | [docs/state-archive/2026-08-19--checkpoints-1-through-60.md](state-archive/2026-08-19--checkpoints-1-through-60.md) |
 | 2026-08-26 | 2026-08-25 Antigravity chat-gate-ceremony standardization, verify-tuner stage 2 acceptance, sprint-agy-runner delta4 Critic fix and candidate status | [docs/state-archive/2026-08-26--agy-runner-2026-08-25-handover.md](state-archive/2026-08-26--agy-runner-2026-08-25-handover.md) |
 
-## Current handover — 2026-09-01/02: the autonomous Nova B block
+## Current handover — Alfred clone: sprint-alfred-epic opened in design (2026-08-27, evening)
+
+**READ THIS FIRST on the `feat/sprint-alfred` branch.** This clone switched its
+machine state from the inherited `sprint-nova-epic` to **`sprint-alfred-epic`**
+(phase `design`, `planApproved: false`) on PO release: `discard-feature --by
+APS` (Nova continues in its own repo; the discard is an honest abandonment
+record on this branch only, `discardedFeatures[0]`), then `set-feature`.
+Base `a50c8093`; state transition committed as `0d0031ea`.
+
+**The switch exposed two control-integrity defects, both filed with
+`sprint: alfred` (commit `f8431081`, ledger `ef9fa2f7`):**
+
+1. *A closed Result can be amended after close with no detection and no
+   repair* — the 0.4.7-hotfix Result was amended by `d545ae4a` ten hours after
+   its close; the Phoenix merge carried the drifted bytes here; an active
+   continuity masked the pin mismatch for four weeks; the discard unmasked it
+   as `continuity-damaged` with `plan-repair` honestly answering
+   `continuity_repair_unavailable`. PO repaired by restoring the closed bytes
+   (`git checkout d545ae4a^ -- specs/2026-07-27-agent-pipeline-0.4.7-hotfix/result.md`,
+   committed `c3a9e203`). The amendment text (owner + 2026-08-31 review date
+   for the #21 worker-pool gap) survives in `d545ae4a` and still needs a
+   legitimate home in that backlog item.
+2. *`discard-feature` writes a state shape `observeSessionCleanupState`
+   rejects* — readiness `partial`, `guard-lifecycle-ready` then blocks every
+   tool call including the `set-feature` that exits the condition;
+   `plan-human-recovery` offers only non-mutating candidates. Escape: the PO
+   ran `set-feature` in their own shell. Line-verified root cause in the item.
+
+**Session facts:** pipeline 0.6.0+claude.20260827181725.5071b04
+(local-development), onboarding `ready`/continuity `valid` re-verified after
+the switch. Pre-push hook installed in this clone (untracked, `.git/hooks`).
+PO trust anchor verified byte-identical to the configured
+`local-po-key` (`2de20a39…`) — nothing to add. Push target later:
+`git push -u origin feat/sprint-alfred:sprint_alfred`; rebase onto
+`origin/main` only after Nova lands there, before implementation.
+
+**Design phase is running under an explicit PO go** (2026-08-27, ahead of
+Nova/Phoenix go-live — a deliberate PO decision deviating from ADR-0043's
+"once Phoenix and Nova are live" ordering for the *design* work only; the
+implementation start stays gated on the Nova rebase). Session model: Fable 5 at
+effort `max`, PO-set for the design phase — the MP-01 named session exception;
+the PO announced the one sanctioned gate switch to a cheaper configuration at
+the PRD gate ("Haltepunkt"). Deliverable under construction:
+`specs/sprint-alfred-epic/` (PRD, spec, acceptance, design analyses) from the 9
+`sprint:alfred` GitHub issues (#99 #101–#106 #108 #109), 24 open
+`sprint: alfred` backlog items, and external research — ≥1 independent Critic
+round per design document before the PO gate. Known intake conflicts needing a
+PO word at the gate: two items whose frontmatter says `alfred` but whose own
+Triage prose says Nightwing (`2026-08-12-stale-checkout…`,
+`2026-08-08-the-bootstrap-skill-grows…`), and
+`2026-07-25-managed-onboarding-success-contract` (deferred, Alfred per this
+branch's triage, Nova/general per the Phoenix-line cross-triage).
+`#108`'s entry condition `#100` (P0, fail-closed push-approval absence) is
+still OPEN on GitHub — tracked as an entry condition, outside Alfred.
+
+## Prior handover — 2026-09-01/02: the autonomous Nova B block
 
 **Lifecycle phase:** feature `sprint-nova-epic` · phase `implementation`
 
@@ -355,4 +410,3 @@ line's own checkpoint 71).
 - specs/2026-07-19-sprint-sentinel-epic/RECOVERY.md
 - specs/2026-07-19-sprint-sentinel-epic/platform-support-contract.md
 - specs/2026-07-19-sprint-sentinel-epic/windows-blockers-scope.md
-
