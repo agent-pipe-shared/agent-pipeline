@@ -5111,6 +5111,26 @@ export function readOnboardingIntakeCheckpoint({
   return { paths, ...observed };
 }
 
+/**
+ * NVA-RESUMEVERBATIM-1: read-side companion to readOnboardingIntakeCheckpoint()
+ * above -- resolves each captured material-input entry back to its actual
+ * bytes via the checkpoint's own content-addressed evidence store
+ * (writeIntakeCheckpointEvidence/readIntakeMaterialInputChunks below,
+ * reused unchanged), re-verifying each blob's sha256 against the checkpoint
+ * entry that references it. An absent checkpoint is not an error: mirrors
+ * readOnboardingIntakeCheckpoint()'s own "status: absent" shape with an
+ * empty chunk list, so a caller (scripts/resume-hint.mjs's `inspect`) can
+ * call this unconditionally, including before any intake capture has ever
+ * happened.
+ */
+export function readOnboardingIntakeMaterialInput({
+  rootDir, repositoryCapability = "local", spawn = defaultGitSpawn,
+} = {}) {
+  const observed = readOnboardingIntakeCheckpoint({ rootDir, repositoryCapability, spawn });
+  if (observed.status !== "present") return { status: observed.status, chunks: [] };
+  return { status: "present", chunks: readIntakeMaterialInputChunks(observed.paths, observed.value) };
+}
+
 function ensureIntakeEvidenceDirectory(paths) {
   if (existsSync(paths.evidenceDirectory)) return;
   mkdirSync(paths.evidenceDirectory, { mode: 0o700 });

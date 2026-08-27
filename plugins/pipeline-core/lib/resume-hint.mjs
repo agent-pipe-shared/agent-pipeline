@@ -44,27 +44,47 @@ const VALUE_MIN_DIGIT_LENGTH = 4;  // with a digit inside it, four characters ar
 // finite set that does not grow. A clause that resumes on one of them has ended a noun phrase, so
 // the candidate before it was that noun phrase — the value — and not the opening word of a sentence.
 const VALUE_TRAILER = /^\s*(?:about|above|across|after|against|along|among|around|as|at|before|behind|below|beneath|beside|besides|between|beyond|by|despite|down|during|except|for|from|in|inside|into|near|of|off|on|onto|opposite|out|outside|over|past|per|since|than|through|throughout|till|to|toward|towards|under|underneath|until|up|upon|versus|via|with|within|without|and|but|nor|or|plus|so|yet)\b/i;
-const FORBIDDEN_SHAPES = [
+// NVA-RESUMEVERBATIM-1: split into named groups so a verbatim, unbounded,
+// possibly multi-line material-input chunk (see verbatimMaterialRejection()
+// below) can reuse the credential/secret/host-path/URL/private-identifier
+// subset WITHOUT the transcript- and command-line-shaped forms that exist
+// only to keep a DISTILLED field from carrying a raw transcript or shell
+// invocation -- a user-authored design document is project content, not a
+// transcript (AC-2), and legitimately contains fenced code, example commands
+// or a quoted "User:" line. FORBIDDEN_SHAPES below is the exact same 19
+// regex objects, in a different order, that this file has always used for
+// the distilled fields -- a pure reorganization, not a behaviour change.
+const TRANSCRIPT_SHAPES = [
   /```|~~~/,                                                                                        // fenced code block
   /^\s*(?:user|assistant|system|human|developer|tool)\s*:/i,                                        // transcript role marker opening the text
   /\b(?:user|assistant|system)\s*:.*\b(?:user|assistant|system)\s*:/i,                              // several transcript turns inlined
   /<\s*\/?\s*(?:system|assistant|user|human|instructions?|prompt|script|tool_use|tool_result)\b/i,   // instruction or markup tag
+];
+const COMMAND_LINE_SHAPES = [
+  /&&|\|\||\$\(|\$\{|\$[A-Z_]{2,}\b|>>|<<|\d?>&\d/,                                                 // shell operator, redirect or expansion
+  new RegExp(`(?:^|[\\s"'\\x60(;|&])(?:${SHELL_TOOLS})\\s+(?:${COMMAND_ARGUMENT})`, "i"),           // command line carrying a flag or path argument
+  /\bgit\s+(?:add|clone|commit|push|pull|fetch|checkout|switch|restore|branch|merge|rebase|reset|revert|stash|status|log|diff|show|init|config|remote|tag|worktree|cherry-pick|apply)\b/i, // git invocation
+  /\b(?:npm|pnpm|yarn|npx|bun|deno|pip3?|cargo|docker|kubectl|brew|apt(?:-get)?)\s+(?:install|uninstall|add|remove|run|exec|ci|test|build|start|publish|login|pull|push|apply)\b/i,        // package or container invocation
+];
+// Reused UNCHANGED by verbatimMaterialRejection() below -- never a second copy.
+const SECRET_PATH_SHAPES = [
   /\b[a-z][a-z0-9+.-]*:\/\//i,                                                                      // scheme-qualified URL
   /\b(?:javascript|vbscript):|\bdata:[a-z]+\/[a-z0-9.+-]+/i,                                        // executable or inline-payload scheme
   /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/,                                          // mailbox or ssh target
   /(?:^|[\s"'`(\[{<,;=|:])(?:~|\.{1,2})?\/[A-Za-z0-9._~-]/,                                         // POSIX absolute, home or relative path
   /\b[A-Za-z]:[\\/]|\\\\[A-Za-z0-9._-]+\\|%[A-Za-z_][A-Za-z0-9_]{2,}%/,                             // Windows drive path, UNC share or environment expansion
-  /&&|\|\||\$\(|\$\{|\$[A-Z_]{2,}\b|>>|<<|\d?>&\d/,                                                 // shell operator, redirect or expansion
-  new RegExp(`(?:^|[\\s"'\\x60(;|&])(?:${SHELL_TOOLS})\\s+(?:${COMMAND_ARGUMENT})`, "i"),           // command line carrying a flag or path argument
-  /\bgit\s+(?:add|clone|commit|push|pull|fetch|checkout|switch|restore|branch|merge|rebase|reset|revert|stash|status|log|diff|show|init|config|remote|tag|worktree|cherry-pick|apply)\b/i, // git invocation
-  /\b(?:npm|pnpm|yarn|npx|bun|deno|pip3?|cargo|docker|kubectl|brew|apt(?:-get)?)\s+(?:install|uninstall|add|remove|run|exec|ci|test|build|start|publish|login|pull|push|apply)\b/i,        // package or container invocation
   /\b(?:\d{1,3}\.){3}\d{1,3}\b/,                                                                    // IPv4 address
   /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/,                                 // JWT
   /\b(?:ghp_|gho_|ghu_|ghs_|github_pat_|glpat[-_]|sk-|xox[baprs]-|AIza)/,                           // vendor credential prefix
   /(?:AKIA|ASIA)[A-Z0-9]{16}/i,                                                                     // AWS key id, deliberately not word-bounded
-  /\b[0-9a-f]{16,}\b/i,                                                                             // long hex digest
   new RegExp(String.raw`\bbearer\s+[A-Za-z0-9._~+\/-]{8,}`, "i"),                                   // bearer credential
 ];
+// Distilled-field-only. Excluded from SECRET_PATH_SHAPES on purpose: design prose in
+// THIS repository routinely carries a legitimate commit/content sha256 reference, and
+// rejecting every mention of one would defeat the "nothing lost" mandate a verbatim
+// material-input chunk exists to satisfy (AC-2 lists no "no long hex digest" rule).
+const LONG_HEX_DIGEST_SHAPE = /\b[0-9a-f]{16,}\b/i;
+const FORBIDDEN_SHAPES = [...TRANSCRIPT_SHAPES, ...COMMAND_LINE_SHAPES, ...SECRET_PATH_SHAPES, LONG_HEX_DIGEST_SHAPE];
 
 function object(value) { return value !== null && typeof value === "object" && !Array.isArray(value); }
 function exact(value, keys) { return object(value) && Object.keys(value).length === keys.length && Object.keys(value).every((key) => keys.includes(key)); }
@@ -118,6 +138,40 @@ function secretAssignment(value) {
   }
   return false;
 }
+/**
+ * NVA-RESUMEVERBATIM-1: screens a verbatim, unbounded, possibly multi-line
+ * material-input chunk (the user's own design input, carried across a
+ * restart via a NEW optional resume-hint card key -- see scripts/resume-hint.mjs)
+ * for the same credential/secret/host-path/URL/private-identifier shapes
+ * validText() already screens the DISTILLED fields for: SECRET_PATH_SHAPES,
+ * secretAssignment() and opaqueToken(), all reused unchanged, never a second,
+ * weaker copy. Deliberately does NOT apply TRANSCRIPT_SHAPES,
+ * COMMAND_LINE_SHAPES or LONG_HEX_DIGEST_SHAPE (AC-2: a user-authored design
+ * document is project content, not a transcript), and does not enforce
+ * MAX_FIELD_BYTES or the single-line rule (AC-1: this field is explicitly
+ * exempt from the short-string caps that bound intent/scope/constraints/
+ * questions/progress). The per-chunk byte ceiling stays
+ * onboarding-continuity.mjs's own INTAKE_MAX_MATERIAL_BYTES, enforced
+ * downstream by applyOnboardingIntakeCapture -- not duplicated here.
+ * Returns a short, shape-only reason code, never the rejected text itself --
+ * same discipline as resumeHintContextDetail().
+ *
+ * KNOWN RESIDUAL (pinned in resume-hint.test.mjs, same idiom as this file's
+ * existing guard-code residual): excluding LONG_HEX_DIGEST_SHAPE does not
+ * fully open the door to hex-digest-shaped prose -- opaqueToken(), reused
+ * unchanged, independently catches any token >=24 characters that is
+ * digit-bearing, which still flags a full 40+ character git SHA-1 or 64
+ * character sha256 content hash. A short commit reference (<24 characters,
+ * this repository's own everyday style) is unaffected.
+ */
+export function verbatimMaterialRejection(text) {
+  if (typeof text !== "string" || text.trim().length === 0) return "RH-MATERIAL-EMPTY";
+  if (/\0/.test(text)) return "RH-MATERIAL-EMPTY";
+  if (secretAssignment(text) || opaqueToken(text)) return "RH-MATERIAL-SECRET";
+  if (SECRET_PATH_SHAPES.some((shape) => shape.test(text))) return "RH-MATERIAL-FORBIDDEN-SHAPE";
+  return null;
+}
+
 function validText(value) {
   return typeof value === "string" && value === value.trim() && value.length > 0
     && !/[\r\n\0]/.test(value) && Buffer.byteLength(value, "utf8") <= MAX_FIELD_BYTES
