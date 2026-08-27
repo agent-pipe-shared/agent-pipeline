@@ -108,6 +108,25 @@ That line is what keeps every frozen historical mention resolvable. Without it, 
 archives would leave dangling references; with it, the archives stay honest AND readable. It is a
 required part of a renumbering, not a courtesy.
 
+**Living vs. frozen for backlog items is decided by the item's own status**, not by the directory:
+an OPEN item referencing an ADR is a living reference and is rewritten; a CLOSED or REJECTED item
+is a historical record and is left alone, resolvable through the forwarding line. Without this
+distinction the enumeration above reads as excluding `backlog/items/` wholesale, which would strand
+live work items pointing at a number that has moved.
+
+**A rename needs BOTH paths in the commit pathspec.** Learned the expensive way on 2026-08-27: two
+renumbering commits (`a3b945ef`, `69606200`) each added the new file but never committed the
+deletion of the old one, because `git mv` stages a delete plus an add while the commit discipline
+requires `git commit -- <exact paths>` — and naming only the NEW path satisfies that discipline
+while silently dropping the delete half. HEAD then carried both names at once: a collision turned
+into a duplicate, which is strictly worse than what the renumbering set out to fix.
+
+Nothing reports this. The working tree looks correct, the new file is present, and
+`check-adr-consistency.mjs` stops complaining about that number because it reads the working tree,
+not HEAD. It was caught only by `git status` showing staged deletions that should already have been
+committed. So: name both paths, and verify with `git show --name-status <sha>` that the commit
+contains a delete for the old path, not only an add for the new one.
+
 ### D6 — Same document under two numbers is a removal, not a renumbering
 
 Where two files under different numbers turn out to be the SAME document, the stale copy is
