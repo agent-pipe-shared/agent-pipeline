@@ -24,6 +24,9 @@ import {
   applyInstall,
   planRemoval,
   applyRemoval,
+  planDecline,
+  applyDecline,
+  DECLINE_MARKER_SCHEMA,
 } from "./pre-push-hook-install.mjs";
 
 const PLUGIN_LIB_DIR = fileURLToPath(new URL("../lib", import.meta.url));
@@ -320,4 +323,60 @@ test("renderImpl: names the --no-verify escape and states it cannot be recorded"
   assert.match(impl, /--no-verify/);
   assert.match(impl, /CANNOT record a bypass/);
   assert.match(impl, /never mode-gated/);
+});
+
+// ---- decline recording (NVA-PREPUSHOFFER-1) ---------------------------------------------
+
+test("applyDecline: records a decline marker with a timestamp, no name/credential", () => {
+  const { dir } = freshRepo("decline-record");
+  const result = applyDecline({ rootDir: dir });
+  assert.equal(result.status, "declined");
+  assert.match(result.declinedAt, /^\d{4}-\d{2}-\d{2}T/);
+  const res = spawnSync("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], { cwd: dir, encoding: "utf8" });
+  const commonDir = res.stdout.trim();
+  const markerPath = join(commonDir, "agent-pipeline", "pre-push-hook", "decline-marker.json");
+  assert.ok(existsSync(markerPath));
+  const marker = JSON.parse(readFileSync(markerPath, "utf8"));
+  assert.equal(marker.schema, DECLINE_MARKER_SCHEMA);
+  assert.deepEqual(Object.keys(marker).sort(), ["declinedAt", "schema"]);
+});
+
+test("planDecline: read-only, repository-unresolved when no git repo present", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pre-push-hook-plandecline-norepo-"));
+  const plan = planDecline({ rootDir: dir });
+  assert.equal(plan.status, "repository-unresolved");
+});
+
+test("planInstall: reports 'declined' distinctly from 'ready' after a decline is recorded", () => {
+  const { dir } = freshRepo("decline-then-plan");
+  const before = planInstall({ rootDir: dir, pluginLibDir: PLUGIN_LIB_DIR });
+  assert.equal(before.status, "ready");
+  const decline = applyDecline({ rootDir: dir });
+  assert.equal(decline.status, "declined");
+  const after = planInstall({ rootDir: dir, pluginLibDir: PLUGIN_LIB_DIR });
+  assert.equal(after.status, "declined");
+  assert.equal(after.declinedAt, decline.declinedAt);
+});
+
+test("applyInstall: installing after a decline succeeds (declining is not a permanent refusal)", () => {
+  const { dir } = freshRepo("decline-then-install");
+  const decline = applyDecline({ rootDir: dir });
+  assert.equal(decline.status, "declined");
+  const install = applyInstall({ rootDir: dir, pluginLibDir: PLUGIN_LIB_DIR });
+  assert.equal(install.status, "installed");
+  assert.ok(existsSync(install.hookPath));
+});
+
+test("planInstall: a decline marker never suppresses an already-installed hook", () => {
+  const { dir } = freshRepo("decline-does-not-suppress-installed");
+  const install = applyInstall({ rootDir: dir, pluginLibDir: PLUGIN_LIB_DIR });
+  assert.equal(install.status, "installed");
+  // A stale decline record from before this install (or written by mistake
+  // afterward) must not make planInstall report "declined" once the hook is
+  // actually present -- hook-presence checks run first (see planInstall).
+  const decline = applyDecline({ rootDir: dir });
+  assert.equal(decline.status, "declined");
+  const plan = planInstall({ rootDir: dir, pluginLibDir: PLUGIN_LIB_DIR });
+  assert.equal(plan.status, "ready-to-upgrade");
+  assert.notEqual(plan.status, "declined");
 });

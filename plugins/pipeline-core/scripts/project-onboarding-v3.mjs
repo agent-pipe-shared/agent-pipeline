@@ -3,6 +3,8 @@
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { requireAttendedChatGateConfirmation } from "../lib/chat-gate-ceremony.mjs";
+import { loadManifestSafe, resolveHumanFacingLanguage } from "../lib/manifest.mjs";
+import { planInstall as planPrePushHookInstall, MARKER_SCHEMA as PRE_PUSH_HOOK_MARKER_SCHEMA, DECLINE_MARKER_SCHEMA as PRE_PUSH_HOOK_DECLINE_MARKER_SCHEMA } from "./pre-push-hook-install.mjs";
 import {
   applyOnboardingIntakeConsent,
   applyOnboardingIntakeCapture,
@@ -334,6 +336,79 @@ function formatOnboardingRerunCommand(args) {
   return `node plugins/pipeline-core/scripts/project-onboarding-v3.mjs ${args.map((value) => JSON.stringify(value)).join(" ")}`;
 }
 
+// NVA-PREPUSHOFFER-1: the offer text a human actually reads before consenting
+// (the same `language.human_facing` authority that resolves every other
+// operator-facing surface here -- resolveHumanFacingLanguage, lib/manifest.mjs
+// -- never a hardcoded English literal). Kept as a small closed frame table,
+// same idiom as scripts/po-human-approval.mjs's CONFIRMATION_PROMPT_FRAME:
+// a value with no entry, or that cannot be resolved at all, always falls back
+// to English rather than failing the whole onboarding read.
+const PRE_PUSH_HOOK_OFFER_DEFAULT_LANGUAGE = "en";
+const PRE_PUSH_HOOK_OFFER_TEXT = Object.freeze({
+  en: "Installs a git pre-push hook (under this repository's hooks path) that re-checks the Push-Gate even outside an agent session; `git push --no-verify` bypasses it (git's own escape, by design); it can be removed later with this installer's --remove verb.",
+  de: "Installiert einen Git-pre-push-Hook (im Hooks-Pfad dieses Repositorys), der das Push-Gate auch außerhalb einer Agenten-Sitzung erneut prüft; `git push --no-verify` umgeht ihn (Gits eigene, beabsichtigte Ausweichmöglichkeit); er kann später mit dem --remove-Verb dieses Installers wieder entfernt werden.",
+});
+
+/** Never throws, never asks the CLI's own caller for a language: reads the
+ * project's already-compiled manifest the same way every other operator-facing
+ * surface in this codebase does (lib/manifest.mjs's `loadManifestSafe` +
+ * `resolveHumanFacingLanguage`), and falls back to English on anything short
+ * of a resolved `de`/`en` value -- an absent/unreadable/invalid manifest, a
+ * missing `language.human_facing`, or any unexpected exception. */
+function resolvePrePushHookOfferLanguage(rootDir) {
+  try {
+    const manifest = loadManifestSafe(rootDir);
+    if (!manifest) return PRE_PUSH_HOOK_OFFER_DEFAULT_LANGUAGE;
+    const resolved = resolveHumanFacingLanguage(manifest);
+    return resolved.ok ? resolved.value : PRE_PUSH_HOOK_OFFER_DEFAULT_LANGUAGE;
+  } catch {
+    return PRE_PUSH_HOOK_OFFER_DEFAULT_LANGUAGE;
+  }
+}
+
+// Read-only: never installs, removes, or declines anything itself (DoD (g)) --
+// `planPrePushHookInstall` (pre-push-hook-install.mjs's `planInstall`) only
+// inspects. Three outcomes:
+//   - hook absent, never offered/declined ("ready"): return the real,
+//     confirmation-requiring offer, same base action shape
+//     (`kind: "command"`/`executable`/`argv`/`mutation`/`requiresConfirmation`/
+//     `expected`) every other confirmation-requiring onboarding action in this
+//     codebase uses (see lib/project-onboarding-v3.mjs's `commandAction`) --
+//     plus the human-facing `text` field DoD (c) requires, which that shared
+//     shape does not otherwise carry.
+//   - already declined once ("declined"): a settled, informational note --
+//     never re-asked, never itself a `requiresConfirmation` action (that is
+//     the whole point: a human answers once).
+//   - anything else (already installed, a foreign hook present, or the
+//     repository root could not even be resolved yet): nothing to offer.
+function buildPrePushHookOfferAction({ rootDir }) {
+  const plan = planPrePushHookInstall({ rootDir });
+  if (plan.status === "declined") {
+    return { kind: "info", feature: "pre-push-hook", status: "declined", declinedAt: plan.declinedAt ?? null };
+  }
+  if (plan.status !== "ready") return null;
+  const language = resolvePrePushHookOfferLanguage(rootDir);
+  return {
+    kind: "command",
+    executable: "node",
+    argv: ["plugins/pipeline-core/scripts/pre-push-hook-install.mjs", "--install"],
+    mutation: true,
+    requiresConfirmation: true,
+    expected: { schema: PRE_PUSH_HOOK_MARKER_SCHEMA, statuses: ["installed"] },
+    text: PRE_PUSH_HOOK_OFFER_TEXT[language] ?? PRE_PUSH_HOOK_OFFER_TEXT[PRE_PUSH_HOOK_OFFER_DEFAULT_LANGUAGE],
+    declineAction: {
+      kind: "command",
+      executable: "node",
+      argv: ["plugins/pipeline-core/scripts/pre-push-hook-install.mjs", "--decline"],
+      mutation: true,
+      requiresConfirmation: false,
+      expected: { schema: PRE_PUSH_HOOK_DECLINE_MARKER_SCHEMA, statuses: ["declined"] },
+    },
+  };
+}
+
+export { buildPrePushHookOfferAction };
+
 export function main(args = process.argv.slice(2), {
   write = process.stdout.write.bind(process.stdout),
   writeError = process.stderr.write.bind(process.stderr),
@@ -484,6 +559,16 @@ export function main(args = process.argv.slice(2), {
     const message = String(error?.message ?? "onboarding command failed").replace(/[\r\n]+/gu, " ");
     writeError(`${code}: ${message}\n`);
     return 2;
+  }
+  // NVA-PREPUSHOFFER-1: surfaced only on the two read-only state-observation
+  // commands (never on an apply-shaped call, and never executed here -- this
+  // only READS pre-push-hook-install.mjs's own planner, see
+  // buildPrePushHookOfferAction above). `null` (already installed, a foreign
+  // hook present, or the repository root not resolvable yet) adds nothing --
+  // never an empty/placeholder field on every other command's output.
+  if (options.command === "inspect" || options.command === "continuity-inspect") {
+    const prePushHookOffer = buildPrePushHookOfferAction({ rootDir: options.root });
+    if (prePushHookOffer) output.prePushHookOffer = prePushHookOffer;
   }
   write(`${JSON.stringify(output, null, 2)}\n`);
   // Wave 4 step 4 (NVA-W4-COORD-2): intake-generate-plan is `{ schema, root,

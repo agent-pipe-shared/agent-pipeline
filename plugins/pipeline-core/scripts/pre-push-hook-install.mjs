@@ -45,6 +45,13 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 export const INSTALLER_VERSION = "1";
 export const MARKER_SCHEMA = "pipeline.pre-push-hook-install.v1";
+// NVA-PREPUSHOFFER-1: a human declining the onboarding offer for this hook is
+// recorded so a later bootstrap can report "not installed, declined on <date>"
+// instead of asking indefinitely -- deliberately its own marker file, never
+// folded into MARKER_SCHEMA's install marker, so an install and a decline can
+// never be confused for one another and a later install never has to first
+// erase a decline record to proceed (declining is not a permanent refusal).
+export const DECLINE_MARKER_SCHEMA = "pipeline.pre-push-hook-decline.v1";
 
 // This installer's own plugin root -- same self-location idiom guard-push.mjs and
 // guard-lifecycle-ready.mjs already use (`resolve(dirname(fileURLToPath(import.meta.
@@ -82,11 +89,24 @@ function markerPath(commonDir) {
 function implPath(commonDir) {
   return join(commonDir, "agent-pipeline", "pre-push-hook", "impl.mjs");
 }
+function declineMarkerPath(commonDir) {
+  return join(commonDir, "agent-pipeline", "pre-push-hook", "decline-marker.json");
+}
 
 function readMarker(commonDir) {
   try {
     const parsed = JSON.parse(readFileSync(markerPath(commonDir), "utf8"));
     if (parsed?.schema !== MARKER_SCHEMA) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function readDeclineMarker(commonDir) {
+  try {
+    const parsed = JSON.parse(readFileSync(declineMarkerPath(commonDir), "utf8"));
+    if (parsed?.schema !== DECLINE_MARKER_SCHEMA) return null;
     return parsed;
   } catch {
     return null;
@@ -414,7 +434,10 @@ if (isDirectlyInvoked()) {
 `;
 }
 
-/** Read-only: what an install would do, without writing anything. */
+/** Read-only: what an install would do, without writing anything. A hook actually
+ * present on disk always wins over a decline record (checked first, below) -- a
+ * stale decline marker left over from before an install, or from before a foreign
+ * hook was placed, must never suppress reporting what is really there now. */
 export function planInstall({ rootDir, pluginLibDir = DEFAULT_PLUGIN_LIB_DIR } = {}) {
   const paths = resolveGitPaths(rootDir);
   if (!paths) return { status: "repository-unresolved" };
@@ -435,7 +458,36 @@ export function planInstall({ rootDir, pluginLibDir = DEFAULT_PLUGIN_LIB_DIR } =
     }
     return { status: "ready-to-upgrade", hookPath, commonDir, pluginLibDir };
   }
+  const decline = readDeclineMarker(commonDir);
+  if (decline) {
+    return { status: "declined", hookPath, commonDir, pluginLibDir, declinedAt: decline.declinedAt };
+  }
   return { status: "ready", hookPath, commonDir, pluginLibDir };
+}
+
+/** Read-only: whether a decline can be recorded (mirrors `planInstall`'s
+ * fail-closed root resolution; declining never inspects hook content). */
+export function planDecline({ rootDir } = {}) {
+  const paths = resolveGitPaths(rootDir);
+  if (!paths) return { status: "repository-unresolved" };
+  return { status: "ready", commonDir: paths.commonDir };
+}
+
+/** Writes the decline marker only -- never touches the hook, its impl file, or the
+ * install marker. Declining is always reversible: a later `applyInstall` call is
+ * governed entirely by `planInstall`'s hook-presence checks above, which run before
+ * the decline check and are therefore never blocked by a decline record. */
+export function applyDecline({ rootDir } = {}) {
+  const plan = planDecline({ rootDir });
+  if (plan.status !== "ready") return plan;
+  const { commonDir } = plan;
+  const marker = {
+    schema: DECLINE_MARKER_SCHEMA,
+    declinedAt: new Date().toISOString(),
+  };
+  mkdirSync(join(commonDir, "agent-pipeline", "pre-push-hook"), { recursive: true, mode: 0o700 });
+  writeFileSync(declineMarkerPath(commonDir), `${JSON.stringify(marker, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
+  return { status: "declined", declinedAt: marker.declinedAt };
 }
 
 /** Writes the hook, its impl file, and the install marker. Refuses (never overwrites) a
@@ -519,8 +571,12 @@ if (isDirectInvocation(import.meta.url)) {
     console.log(JSON.stringify(planInstall({ rootDir }), null, 2));
   } else if (verb === "--plan-remove") {
     console.log(JSON.stringify(planRemoval({ rootDir }), null, 2));
+  } else if (verb === "--decline") {
+    const result = applyDecline({ rootDir });
+    console.log(JSON.stringify(result, null, 2));
+    process.exit(result.status === "declined" ? 0 : 1);
   } else {
-    console.error("usage: pre-push-hook-install.mjs --plan-install|--install|--plan-remove|--remove");
+    console.error("usage: pre-push-hook-install.mjs --plan-install|--install|--plan-remove|--remove|--decline");
     process.exit(2);
   }
 }
