@@ -378,6 +378,7 @@
 | pipeline.securedirectory-only-acl-hardens-the-leaf-of-a-recursive-mkdir-not-shared-intermediates | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.security-scan-cross-branch-gitleaks-findings | closed | defect | pipeline | 2026-07-25 | — |
 | pipeline.security-scan-license-allowlist-assumes-the-pipeline-repository | closed | defect | pipeline | 2026-08-09 | — |
+| pipeline.sed-regex-address-is-misread-as-an-absolute-path | open | defect | pipeline | 2026-08-27 | — |
 | pipeline.seeded-verify-contract-is-always-green | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.self-application-integrity-check-absent | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.self-healing-local-cleanup-recovery | closed | workflow-improvement | pipeline | 2026-08-18 | — |
@@ -394,6 +395,7 @@
 | pipeline.seven-unregistered-suites-are-red | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.shared-external-po-signing-directory-lets-an-unrelated-project-overwrite-a-proof | closed | defect | pipeline | 2026-08-11 | — |
 | pipeline.shared-verify-evidence-slot-corrupted-by-concurrent-dispatches | open | defect | pipeline | 2026-08-12 | — |
+| pipeline.shell-grammar-reads-quoted-content-as-shell-syntax | open | defect | pipeline | 2026-08-27 | — |
 | pipeline.shipped-artifacts-assume-the-pipelines-own-repository | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.shipped-guidance-sends-agents-to-a-directory-a-gate-refuses | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.signed-authority-binding-durability | closed | defect | pipeline | 2026-08-06 | — |
@@ -417,6 +419,7 @@
 | pipeline.the-two-suite-registration-checkers-disagree | closed | defect | pipeline | 2026-08-27 | — |
 | pipeline.this-hosts-local-marketplace-copy-is-not-symlinked-to-source | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.three-doc-and-adr-checkers-never-run-in-verify | rejected | defect | pipeline | 2026-08-27 | — |
+| pipeline.three-independent-copies-of-the-wsl-windows-path-normalization | open | defect | pipeline | 2026-08-27 | — |
 | pipeline.three-smaller-greenfield-defects | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.tp-guard-rules-lifted-on-the-merging-machine-must-be-restored | closed | defect | pipeline | 2026-08-27 | — |
 | pipeline.transactional-readbacks-not-status-cascades | closed | workflow-improvement | pipeline | 2026-08-18 | — |
@@ -461,7 +464,7 @@
 
 ## Counts
 
-- open: 55
+- open: 50
 - in_progress: 5
 - closed: 379
 - rejected: 3
