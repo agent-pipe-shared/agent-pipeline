@@ -96,6 +96,22 @@ function rel(absolute) {
   return relative(REPO_ROOT, absolute).split("\\").join("/");
 }
 
+/**
+ * Does this PreToolUse registration invoke the dispatch-budget guard?
+ *
+ * Structural, never a text search. The command contains literal double quotes
+ * (`node "${CLAUDE_PLUGIN_ROOT}/..."`), so it appears in the file bytes AND in
+ * any `JSON.stringify` output with those quotes backslash-escaped -- a raw
+ * substring test silently answers "no" on a manifest that plainly does contain
+ * it. That mistake cost this script one reverted run: the post-write check
+ * reported `found 0` for a registration that had in fact been inserted
+ * correctly, and would have let a second run insert a duplicate.
+ */
+function invokesGuard(registration) {
+  return Array.isArray(registration?.hooks)
+    && registration.hooks.some((hook) => hook?.command === GUARD_COMMAND);
+}
+
 /** Byte-for-byte UTF-8 ordering -- the same comparison the inventory checker uses. */
 function utf8Compare(left, right) {
   const a = Buffer.from(left, "utf8");
@@ -275,7 +291,7 @@ function main() {
     return { ok: true, detail: `${parsedHooks.hooks.PreToolUse.length} PreToolUse registrations` };
   });
 
-  const alreadyWired = originalHooks.includes(GUARD_COMMAND);
+  const alreadyWired = (parsedHooks?.hooks?.PreToolUse ?? []).some(invokesGuard);
   check("wiring is not already present (idempotency)", () =>
     alreadyWired ? { ok: true, detail: "already wired -- nothing to do" } : { ok: true, detail: "not yet wired" });
 
@@ -421,7 +437,7 @@ function main() {
       if (after.length !== before.length + 1) {
         problems.push(`PreToolUse should have grown by exactly one entry (${before.length} -> ${before.length + 1}), but has ${after.length}`);
       }
-      const added = after.filter((entry) => JSON.stringify(entry?.hooks ?? []).includes(GUARD_COMMAND));
+      const added = after.filter(invokesGuard);
       if (added.length !== 1) {
         problems.push(`the new registration should occur exactly once, found ${added.length}`);
       } else {
@@ -431,7 +447,7 @@ function main() {
           problems.push(`the new registration's command is ${JSON.stringify(commands)}, expected exactly [${JSON.stringify(GUARD_COMMAND)}]`);
         }
       }
-      const survivors = after.filter((entry) => !JSON.stringify(entry?.hooks ?? []).includes(GUARD_COMMAND));
+      const survivors = after.filter((entry) => !invokesGuard(entry));
       if (JSON.stringify(survivors) !== JSON.stringify(before)) {
         problems.push("a pre-existing PreToolUse registration was altered -- this script may only add");
       }
@@ -480,4 +496,14 @@ function report(dryRun) {
   return 1;
 }
 
-process.exit(main());
+// Exported for `wire-dispatch-budget-hook.test.mjs` only. The suite exists
+// because the post-write predicate was wrong once in a way no precondition
+// could catch -- it reported `found 0` for a registration that had in fact
+// been inserted correctly, reverted a good write, and would have let a second
+// run insert a duplicate. These are the exact pieces that got it wrong.
+export { GUARD_COMMAND, HOOKS_ADDITION, HOOKS_ANCHOR, MATCHER, anchoredInsert, invokesGuard };
+
+// Only run when invoked as a program; importing this module must not execute it.
+if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  process.exit(main());
+}

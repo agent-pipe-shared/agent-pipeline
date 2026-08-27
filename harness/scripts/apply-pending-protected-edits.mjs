@@ -128,6 +128,16 @@ function writeThenVerifyOrRevert(path, original, next, verifier) {
 // script does not introduce new ones.
 const VERIFY_REGISTRATIONS = [
   {
+    // Guards the tool that wires the dispatch-budget hook. Its post-write
+    // predicate was wrong once in a way none of its own nine preconditions
+    // could catch (a raw substring search against JSON.stringify output, which
+    // escapes the quotes the command contains): it reverted a correct write and
+    // would have let a second run insert a duplicate registration.
+    name: "wire-dispatch-budget-hook-tests",
+    line: '  { name: "wire-dispatch-budget-hook-tests", file: join(repoRoot, "harness", "scripts", "wire-dispatch-budget-hook.test.mjs") },',
+    file: join(REPO_ROOT, "harness", "scripts", "wire-dispatch-budget-hook.test.mjs"),
+  },
+  {
     name: "machine-plane-tests",
     line: '  { name: "machine-plane-tests", file: join(libDir, "machine-plane.test.mjs") },',
     file: join(REPO_ROOT, "plugins", "pipeline-core", "lib", "machine-plane.test.mjs"),
@@ -221,7 +231,30 @@ const VERIFY_REGISTRATIONS = [
 // stale and the next operator run would have aborted on a missing anchor --
 // correctly, but with the tool unusable. Confirmed against the real, current
 // `harness/scripts/verify.mjs` (its TEST_SUITES terminator) before this edit.
-const VERIFY_ANCHOR = '  { name: "pipeline-start-preflight-antigravity-hard-enforcement-tests", file: join(pluginScriptsDir, "pipeline-start-preflight-antigravity-hard-enforcement.test.mjs") },\n];';
+// Re-pointed for the LAST time 2026-08-27. The four comment paragraphs above
+// are the whole argument against a hardcoded anchor: it named whichever suite
+// happened to be last, so every successful run of this very script moved the
+// terminator and left the anchor stale, and the next run aborted on a missing
+// anchor -- correctly, but with the tool unusable until a human re-pointed it.
+// It went stale three times. The terminator is now DERIVED from the array's
+// own bounds, which no insertion can move: locate the sole `const TEST_SUITES =
+// [` and take the first array terminator after it. Same guarantee as before --
+// a marker that is missing or ambiguous aborts before a byte is written -- but
+// nothing left to maintain.
+const TEST_SUITES_MARKER = "const TEST_SUITES = [";
+const TEST_SUITES_TERMINATOR = "\n];";
+
+/** Byte offset at which a new registration line must be inserted, or a thrown refusal. */
+function verifyInsertionPoint(source) {
+  const start = source.indexOf(TEST_SUITES_MARKER);
+  if (start === -1) throw new Error(`marker not found (verify.mjs TEST_SUITES): the file does not contain ${JSON.stringify(TEST_SUITES_MARKER)}. Nothing was written.`);
+  if (source.indexOf(TEST_SUITES_MARKER, start + TEST_SUITES_MARKER.length) !== -1) {
+    throw new Error(`marker is ambiguous (verify.mjs TEST_SUITES): ${JSON.stringify(TEST_SUITES_MARKER)} occurs more than once. Nothing was written.`);
+  }
+  const end = source.indexOf(TEST_SUITES_TERMINATOR, start + TEST_SUITES_MARKER.length);
+  if (end === -1) throw new Error("terminator not found (verify.mjs TEST_SUITES): the array is not closed by a line containing only `];`. Nothing was written.");
+  return end;
+}
 
 function stepVerify({ dryRun }) {
   const original = readFileSync(VERIFY_PATH, "utf8");
@@ -236,12 +269,8 @@ function stepVerify({ dryRun }) {
     throw new Error(`these suite files do not exist, refusing to register them:\n${missing.map((entry) => `  - ${rel(entry.file)}`).join("\n")}`);
   }
 
-  const next = anchoredReplace(
-    original,
-    VERIFY_ANCHOR,
-    `${VERIFY_ANCHOR.slice(0, -2)}${pending.map((entry) => entry.line).join("\n")}\n];`,
-    "verify.mjs TEST_SUITES terminator",
-  );
+  const at = verifyInsertionPoint(original);
+  const next = `${original.slice(0, at)}\n${pending.map((entry) => entry.line).join("\n")}${original.slice(at)}`;
 
   if (dryRun) {
     return { status: "would-apply", detail: `${pending.length} registration(s):\n${pending.map((entry) => `  + ${entry.name}`).join("\n")}` };
