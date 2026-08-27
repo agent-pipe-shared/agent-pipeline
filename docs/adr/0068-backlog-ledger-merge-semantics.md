@@ -121,6 +121,27 @@ suppress the check. Consecutive rescope amendments against the same `amendsSeque
 permitted and the LAST one governs; the pin's purpose (proving the repair event belongs to this
 item) survives, while a merge stops being able to strand it permanently.
 
+**A repair path must tolerate exactly the damage it repairs.** Found while applying this decision:
+`applyBacklogItemHashRescopeAmendment` (`check-backlog-state.mjs:1012-1013`) opens with
+`checkBacklogState(root)` and refuses when `!current.ok` — but `ok` is false *precisely because of
+the stale-pin finding this call exists to clear*. The sanctioned repair path locks itself out the
+moment the damage it was built for actually occurs. The underlying planner accepts the same input
+cleanly, so nothing is wrong with the correction itself; only the wrapper's precondition.
+
+The module already contains the right pattern for repair paths — `applyBacklogReachabilityRepair`
+(`:1035`) and `applyItemHashAmendment` require their exact expected finding to be PRESENT, and
+refuse when it is absent, so a repair cannot run against undamaged state. But a rescope amendment
+has two legitimate uses: preventive (narrowing a pin before a routine edit, with a clean tree —
+how ledger event 644 came about) and corrective (re-binding after a merge moved the bytes).
+Neither "tree must be clean" nor "the finding must be present" is right on its own.
+
+The rule is therefore: **the wrapper proceeds when the only outstanding finding is the one THIS
+call would resolve** — matched against `input.amendsSequence` and `input.id`, never a blanket
+suppression. Any other finding still blocks. This is the same discipline
+`planBacklogItemHashRescopeAmendment` already applies internally, where a tolerated pre-existing
+DRIFT elsewhere in the ledger does not block a valid append: the gate rejects bad writes, not the
+past.
+
 ### D5 — Status convergence is a rule, not an artifact of append order
 
 Where both lines moved the same item, the merged status is decided explicitly. The active chain's
