@@ -33,10 +33,20 @@ const GIT_GLOBAL_OPT_FLAG =
   "--no-pager|--paginate|-p|-P|--literal-pathspecs|--no-optional-locks|" +
   "--icase-pathspecs|--glob-pathspecs|--noglob-pathspecs|--bare|--no-replace-objects|" +
   "--no-lazy-fetch|--no-advice";
+// A single global-option VALUE token: ordinarily a run of non-whitespace characters
+// (`\S+`), but a backslash immediately followed by whitespace is now consumed as part
+// of the SAME token instead of ending it -- in an unquoted shell argument `\ ` is an
+// escaped space (still one shell word, exactly like the quoted equivalent `' '`), and
+// treating the bare `\S+` as a hard stop let a value such as `-c
+// core.sshCommand=ssh\ -i\ /path\ -o\ IdentitiesOnly=yes` fracture into an accepted
+// prefix plus an unrecognized leftover, which is how that exact form previously
+// escaped push classification (NVA-PUSHCLASS-1). String.raw so the intended
+// backslash count is what is actually typed, not derived by counting escapes.
+const GIT_OPT_VALUE_TOKEN = String.raw`(?:\\\s|\S)+`;
 const GIT_GLOBAL_OPT_ALT =
-  `(?:${GIT_GLOBAL_OPT_SPACE_ARG})(?![\\w-])\\s+\\S+` +
-  `|(?:${GIT_GLOBAL_OPT_EQ_OR_SPACE_ARG})(?:=\\S*|\\s+\\S+)` +
-  `|(?:${GIT_GLOBAL_OPT_EQ_ONLY_ARG})(?![\\w-])(?:=\\S*)?` +
+  `(?:${GIT_GLOBAL_OPT_SPACE_ARG})(?![\\w-])\\s+${GIT_OPT_VALUE_TOKEN}` +
+  `|(?:${GIT_GLOBAL_OPT_EQ_OR_SPACE_ARG})(?:=${GIT_OPT_VALUE_TOKEN}|\\s+${GIT_OPT_VALUE_TOKEN})` +
+  `|(?:${GIT_GLOBAL_OPT_EQ_ONLY_ARG})(?![\\w-])(?:=${GIT_OPT_VALUE_TOKEN})?` +
   `|(?:${GIT_GLOBAL_OPT_FLAG})(?![\\w-])`;
 // Repeats the recognized-option group directly after `git` so a whole run (`-C x -c
 // a=b`) collapses in one pass, independently for every `git` invocation in the string
@@ -163,6 +173,34 @@ export function refMatchesPattern(ref, pattern) {
 // ---- shared push-command detection --------------------------------------------------
 
 /**
+ * hasUnterminatedQuote(cmd) -- true when `cmd` ends still "inside" an open single- or
+ * double-quote. Mirrors `tokenizeArgv`'s own quote-state tracking exactly (a `'` while
+ * inside a `"..."` span is literal, and vice versa) so it agrees with how this module's
+ * own tokenizer would actually see the string, rather than a naive quote-character
+ * count (which would misfire on a legitimate case like `git commit -m "it's fine"`, one
+ * single quote nested inside a balanced double-quoted span). Used by `commandIsGitPush`
+ * to fail closed rather than trust token boundaries downstream of an unparseable
+ * quoting state (NVA-PUSHCLASS-1).
+ */
+function hasUnterminatedQuote(cmd) {
+  let inSingle = false;
+  let inDouble = false;
+  for (const ch of cmd) {
+    if (inSingle) {
+      if (ch === "'") inSingle = false;
+      continue;
+    }
+    if (inDouble) {
+      if (ch === '"') inDouble = false;
+      continue;
+    }
+    if (ch === "'") inSingle = true;
+    else if (ch === '"') inDouble = true;
+  }
+  return inSingle || inDouble;
+}
+
+/**
  * commandIsGitPush(cmd) -- the ONE source of truth for "is this command a git push",
  * extracted VERBATIM from guard-push.mjs's own three-branch `isPush` computation
  * (former lines ~239-336: the heredoc-aware whole-string-regex branch tested against
@@ -197,10 +235,33 @@ export function refMatchesPattern(ref, pattern) {
  * Branch 3 (`shellWrapperPush`, positional): matches a `sh`/`bash`/`zsh`/`dash`/`pwsh`/
  * `powershell`/`cmd`/`ssh` wrapper whose argument contains `git ... push`.
  *
- * Returns `true` if ANY of the three branches match.
+ * Fail-closed on uncertainty (NVA-PUSHCLASS-1), checked BEFORE the three branches and
+ * independently of them: at every call site this function has (codex-pretool-guard.mjs's
+ * prefilter deciding whether guard-push.mjs runs at all; guard-push.mjs's own `if
+ * (!isPush) process.exit(0)` fast path), returning `false` and returning "I cannot tell"
+ * currently have the EXACT SAME effect -- the push gate never runs. For an ordinary
+ * function that is a reasonable simplification; for a gate's own classifier it is the
+ * wrong default, because it silently converts "unrecognized" into "definitely safe". So
+ * this function now over-approximates on purpose in two situations, at the cost of
+ * occasionally routing a genuinely non-push command to guard-push.mjs for nothing:
+ * guard-push.mjs does the real evaluation once it actually runs, and a spurious run costs
+ * nothing a missed push does not.
+ *   1. An unresolvable quoting state anywhere in a command that mentions `git`/`git.exe`
+ *      at all (an unterminated `'` or `"`) -- `stripQuotedSegments` and `tokenizeArgv`
+ *      both assume balanced quoting, so downstream token boundaries cannot be trusted.
+ *   2. A `git`/`git.exe` occurrence still immediately followed (after every RECOGNIZED
+ *      global option has already been collapsed away by `normalizeGlobalGitOptions`) by a
+ *      token that starts with `-` -- that token names a global option this file's
+ *      whitelist does not know, so its value-consuming shape (does it take a value at
+ *      all? space-separated or `=`-only? can the value contain more `-`-prefixed text?)
+ *      is unknown, and the real subcommand position cannot be located with certainty.
+ *
+ * Returns `true` if either fail-closed check fires, or if ANY of the three branches
+ * match.
  */
 export function commandIsGitPush(cmd) {
   if (typeof cmd !== "string" || cmd === "") return false;
+  if (/\bgit(?:\.exe)?\b/iu.test(cmd) && hasUnterminatedQuote(cmd)) return true;
   const stripped = stripQuotedSegments(cmd);
   const normalized = normalizeGlobalGitOptions(stripped.toLowerCase());
   const commandRegion = (() => {
@@ -230,6 +291,11 @@ export function commandIsGitPush(cmd) {
     // the safe direction; this is the branch that must never silently open the gate.
     return normalized;
   })();
+  // Fail-closed check #2 (see this function's own header): every RECOGNIZED global
+  // option has already been collapsed away by normalizeGlobalGitOptions above, so a
+  // `git`/`git.exe` still immediately followed by a `-`-prefixed token here names an
+  // option this file does not know how to consume. Do not guess "not a push".
+  if (/\bgit(?:\.exe)?\b\s+-\S/iu.test(commandRegion)) return true;
   const rawDetectionTokens = tokenizeArgv(cmd);
   // Skip a leading `NAME=value` run and an optional `env`, so `FOO=bar git push` and
   // `env git push` are still detected POSITIONALLY.

@@ -256,6 +256,100 @@ for (const [cmd, why] of PUSH_NEGATIVE_TABLE) {
   );
 }
 
+// ---- commandIsGitPush fail-closed / escaping fixes (NVA-PUSHCLASS-1) -----------------
+// Reproduction: scratch/probe-git-push-classifier.mjs -- a command form that reached a
+// remote past a blocking signature gate in a real session. Two forms escaped
+// classification entirely (backslash-escaped whitespace inside a `-c` value;
+// `--config-env=key=VAR`, an unrecognized global option) and, independently, a git
+// invocation whose subcommand position cannot be resolved with certainty must now fail
+// closed to "push" rather than silently being treated as "not a push" (see
+// commandIsGitPush's own header, "Fail-closed on uncertainty").
+
+// The reproduction's own lines, verbatim, as explicit cases -- every one except
+// "git status" must classify PUSH.
+const PUSHCLASS_REPRODUCTION_TABLE = [
+  ["git push -u origin Rune_Test1_Codex_060_58", true],
+  ["git -c core.sshCommand=ssh\\ -i\\ /home/u/.ssh/id\\ -o\\ IdentitiesOnly=yes push -u origin branch", true],
+  ["git -c core.sshCommand='ssh -i /home/u/.ssh/id' push -u origin branch", true],
+  ["git -C /some/repo push origin HEAD", true],
+  ["git --git-dir=/some/.git push origin HEAD", true],
+  ["git --no-pager push origin HEAD", true],
+  ["git.exe push origin HEAD", true],
+  ["git -c a=b -c c=d push origin HEAD", true],
+  ["git --config-env=core.sshCommand=VAR push origin HEAD", true],
+  ["git status", false],
+];
+for (const [cmd, expected] of PUSHCLASS_REPRODUCTION_TABLE) {
+  const out = commandIsGitPush(cmd);
+  record(`PUSHCLASS-REPRO ${JSON.stringify(cmd)}`, out === expected, `cmd=${JSON.stringify(cmd)} expected=${expected} out=${out}`);
+}
+
+const PUSHCLASS_EVIDENCE_TABLE = [
+  [
+    "git -c core.sshCommand=ssh\\ -i\\ /home/u/.ssh/id\\ -o\\ IdentitiesOnly=yes push -u origin branch",
+    true,
+    "backslash-escaped whitespace inside a -c value is consumed as one shell word, not several",
+  ],
+  [
+    "git --config-env=core.sshCommand=VAR push origin HEAD",
+    true,
+    "--config-env is an unrecognized global option before the subcommand: fail-closed",
+  ],
+  [
+    "git -c a=b -c 'c=d' -c \"e=f\" push origin main",
+    true,
+    "repeated -c options with mixed quoting styles (bare/single/double) all collapse away",
+  ],
+  [
+    "git --totally-unknown-flag status",
+    true,
+    "an unknown option before the subcommand fails closed even though the real subcommand (status) is not a push -- the intended over-approximation",
+  ],
+  [
+    'git -c core.sshCommand="unterminated status',
+    true,
+    "an unterminated double quote is an unparseable quoting state: fail-closed",
+  ],
+  [
+    "git -c core.sshCommand='unterminated status",
+    true,
+    "an unterminated single quote is an unparseable quoting state: fail-closed",
+  ],
+];
+for (const [cmd, expected, why] of PUSHCLASS_EVIDENCE_TABLE) {
+  const out = commandIsGitPush(cmd);
+  record(`PUSHCLASS ${JSON.stringify(cmd)}  ${why}`, out === expected, `cmd=${JSON.stringify(cmd)} expected=${expected} out=${out}`);
+}
+
+// Negative cases (DoD (c)): plain read commands and non-git commands must stay
+// unaffected -- an over-approximation that swallows every command would make the
+// adapter run the push guard constantly.
+const PUSHCLASS_NEGATIVE_TABLE = [
+  ["git status", "a plain read command with no pre-subcommand option stays not-a-push"],
+  ["git log", "a plain read command with no pre-subcommand option stays not-a-push"],
+  ["git diff", "a plain read command with no pre-subcommand option stays not-a-push"],
+  ["npm run build", "a non-git command stays not-a-push"],
+  ["echo hello", "a non-git command stays not-a-push"],
+  ["echo \"it's fine\"", "a non-git command with a legitimately nested quote stays not-a-push (no false unterminated-quote trip)"],
+];
+for (const [cmd, why] of PUSHCLASS_NEGATIVE_TABLE) {
+  const out = commandIsGitPush(cmd);
+  record(`PUSHCLASS-NEGATIVE ${JSON.stringify(cmd)}  ${why}`, out === false, `cmd=${JSON.stringify(cmd)} out=${out}`);
+}
+
+{
+  // Regression guard for hasUnterminatedQuote's own nested-quote handling: a single
+  // quote legitimately nested inside a balanced double-quoted commit message must not
+  // be mistaken for an unterminated quote (matches the existing STRIP double-quote case
+  // above, now exercised through the fail-closed path too).
+  const out = commandIsGitPush('git commit -m "it\'s fine, not a push"');
+  record(
+    "PUSHCLASS-NEGATIVE nested-quote  a single quote nested inside a balanced double-quoted message is not an unterminated quote",
+    out === false,
+    `out=${out}`,
+  );
+}
+
 // ---- Summary ------------------------------------------------------------------------------
 const total = pass + failures.length;
 console.log(`\n${pass}/${total} cases passed.`);
