@@ -23,6 +23,16 @@
         "specs/sprint-alfred-epic/spec.md",
         "specs/sprint-alfred-epic/acceptance.md"
       ]
+    },
+    {
+      "sha": "ea392b28",
+      "files": [
+        "specs/sprint-alfred-epic/acceptance.md",
+        "specs/sprint-alfred-epic/design/issue-intake.md",
+        "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md",
+        "specs/sprint-alfred-epic/spec.md"
+      ],
+      "note": "Critic round-1 fix commit; dispositions in evidence/critic/round-1-response.md"
     }
   ],
   "inputs": {
