@@ -21,9 +21,7 @@ import { deliverGovernanceExportBatch } from "./governance-export-delivery.mjs";
 import { createGovernanceExportOutbox, enqueueGovernanceExport } from "./governance-export-outbox.mjs";
 import { createGovernanceDeliveryReceipt } from "./governance-event-projection.mjs";
 import { canonicalSha256, canonicalizeJson } from "./governance-event.mjs";
-import { derivePoGateRepositoryFingerprint } from "./po-gate-authority.mjs";
-import { discoverRepository } from "./worktree-lifecycle.mjs";
-import { appendPortableGovernanceEvent, queryPortableGovernanceStream, verifyPortableGovernanceStream } from "./governance-event-store.mjs";
+import { appendPortableGovernanceEvent, queryPortableGovernanceStream, readLocalRepositoryFingerprint, verifyPortableGovernanceStream } from "./governance-event-store.mjs";
 
 const sha = (character) => character.repeat(64);
 const profile = { schema: "pipeline.governance-export-adapter-profile.v1", profileId: "audit", format: "ndjson", adapterVersion: "v1", maxBatchEvents: 10, maxPayloadBytes: 10_000, acknowledgement: "per-event", ordering: "per-stream", deduplication: true, advisory: false };
@@ -137,8 +135,10 @@ test("E-AC-09 canonical local governance appends, queries and verifies with zero
   const root = await mkdtemp(path.join(os.tmpdir(), "governance-export-delivery-eac09-"));
   try {
     execFileSync("git", ["init", "-q", root]);
-    const repository = discoverRepository(root);
-    const repositoryFingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: repository.commonDir, primaryRoot: repository.primaryRoot });
+    // NVA-REPOID-3: the store's bound identity, not the legacy path-derived
+    // hash -- this fixture has no filename-matching need pinning it to
+    // derivePoGateRepositoryFingerprint.
+    const repositoryFingerprint = await readLocalRepositoryFingerprint({ repositoryRoot: root });
     const capturePolicy = { schema: "pipeline.governance-capture-policy.v1", policyId: "fixture", revision: sha("c"), defaultAction: "deny", streams: [
       { origin: "human", purpose: "authority-history", materiality: "required", personalIdentifiability: "prohibited", contextualIdentifiability: "prohibited", storageProfile: "repository-public-safe", retention: "repository-retained", disclosure: "repository-visible", encryptionGeneration: null },
       { origin: "agent", purpose: "declared-assumption", materiality: "policy-selected", personalIdentifiability: "prohibited", contextualIdentifiability: "prohibited", storageProfile: "repository-public-safe", retention: "repository-retained", disclosure: "repository-visible", encryptionGeneration: null },
