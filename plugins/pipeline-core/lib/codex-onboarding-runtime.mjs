@@ -12,7 +12,7 @@ import {
   openSync, readFileSync, readdirSync, realpathSync, renameSync, rmdirSync, unlinkSync,
   writeFileSync,
 } from "node:fs";
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep, win32 as win32Path } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { loadRuntimeProjectionV3OwnedKeys } from "./runtime-projection-v3.mjs";
@@ -418,7 +418,31 @@ function readSoleLiveLaunchTicket(paths, barrierSha256, ticketId, now, fs = NATI
   return live[0];
 }
 
-export function repositoryFingerprint(rootDir) { return canonicalSha256({ root: canonicalRoot(rootDir) }); }
+/**
+ * Fold the WSL2 default-automount `/mnt/<drive>/...` spelling and the native
+ * Windows `<DRIVE>:\...` spelling of one physical directory into a single
+ * lower-cased identity before it is hashed into `repositoryFingerprint` --
+ * the SAME construction as `derivePoGateRepositoryFingerprint`
+ * (plugins/pipeline-core/lib/po-gate-authority.mjs, NVA-FINGERPRINT-1),
+ * deliberately duplicated rather than imported to keep the two
+ * independently-named mechanisms independent. This only feeds the hash;
+ * `canonicalRoot`'s own REAL, native-platform realpath output (used to
+ * build actual filesystem paths elsewhere in this module, see
+ * `resolveOnboardingPrivateState`) is never touched or re-derived from this.
+ */
+function windowsDriveLetterFingerprintIdentity(candidate) {
+  const normalized = candidate.replaceAll("/", "\\");
+  if (!win32Path.isAbsolute(normalized)) return candidate;
+  const resolved = win32Path.resolve(normalized);
+  return resolved === normalized ? resolved.toLocaleLowerCase("en-US") : candidate;
+}
+export function fingerprintIdentity(realPath) {
+  const wslMount = /^\/mnt\/([A-Za-z])(\/.*)?$/u.exec(realPath);
+  if (wslMount !== null) return windowsDriveLetterFingerprintIdentity(`${wslMount[1].toUpperCase()}:${wslMount[2] ?? "/"}`);
+  if (/^[A-Za-z]:[\\/]/u.test(realPath)) return windowsDriveLetterFingerprintIdentity(realPath);
+  return realPath;
+}
+export function repositoryFingerprint(rootDir) { return canonicalSha256({ root: fingerprintIdentity(canonicalRoot(rootDir)) }); }
 export function validateRuntimeTargets(runtimeTargets) {
   if (!Array.isArray(runtimeTargets) || runtimeTargets.length !== targetPaths().length) throw new Error("runtime target set is incomplete");
   const expected = targetPaths();

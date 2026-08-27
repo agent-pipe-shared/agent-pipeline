@@ -25,9 +25,11 @@ import {
   dirname,
   isAbsolute,
   join,
+  posix as posixPath,
   relative,
   resolve,
   sep,
+  win32 as win32Path,
 } from "node:path";
 import { TextDecoder } from "node:util";
 
@@ -361,12 +363,89 @@ export function normalizeRepositoryPath(value) {
   return parts.join("/");
 }
 
-/** Local fingerprint. Its path inputs are hashed and never returned as evidence. */
+/**
+ * Fold the WSL2 default-automount `/mnt/<drive>/...` spelling and the native
+ * Windows `<DRIVE>:\...` spelling of the SAME physical NTFS directory into
+ * one canonical, lower-cased identity string before it is ever hashed. A
+ * bare separator/case rewrite is not enough on its own -- WSL's mount prefix
+ * has no Windows-side counterpart to rewrite against unless it is
+ * recognized specifically (confirmed empirically, NVA-FINGERPRINT-1:
+ * neither spelling is literally the other with only `/` swapped for `\`).
+ * NTFS and the WSL DrvFs bridge over it are both case-insensitive, so
+ * lower-casing is safe -- but ONLY once a path is recognized as belonging to
+ * that drive-letter world: a plain POSIX path outside it (`/home/user/repo`)
+ * can be a genuinely different physical directory from a same-string
+ * different-case sibling on a real case-sensitive filesystem, so it is left
+ * byte-for-byte, never folded. `path.win32`/`path.posix` are used
+ * explicitly rather than the platform-bound default `node:path` import this
+ * file otherwise uses: the two spellings of one physical path must
+ * canonicalize to the SAME key no matter which OS the deriving process
+ * happens to be running on -- a WSL-mode process and a native-Windows-mode
+ * process must each recognize BOTH spellings, not only their own host's
+ * native one, or nothing here would ever collapse.
+ */
+function windowsDriveLetterIdentity(candidate) {
+  const normalized = candidate.replaceAll("/", "\\");
+  if (!win32Path.isAbsolute(normalized)) return null;
+  const resolved = win32Path.resolve(normalized);
+  return resolved === normalized ? resolved.toLocaleLowerCase("en-US") : null;
+}
+function canonicalRepositoryPathIdentity(path) {
+  if (typeof path !== "string" || path.length === 0 || path.includes("\0")) return null;
+  const wslMount = /^\/mnt\/([A-Za-z])(\/.*)?$/u.exec(path);
+  if (wslMount !== null) return windowsDriveLetterIdentity(`${wslMount[1].toUpperCase()}:${wslMount[2] ?? "/"}`);
+  if (/^[A-Za-z]:[\\/]/u.test(path)) return windowsDriveLetterIdentity(path);
+  if (!posixPath.isAbsolute(path)) return null;
+  const resolved = posixPath.resolve(path);
+  return resolved === path ? resolved : null;
+}
+
+/**
+ * Local fingerprint. Its path inputs are hashed and never returned as
+ * evidence. The hash tag is deliberately kept at `v1`: for a path outside
+ * the WSL-mount/Windows-drive-letter world (the common case -- a plain
+ * Linux or macOS checkout), `canonicalRepositoryPathIdentity` returns
+ * byte-for-byte what `normalizeAbsolute` already produced, so this fix
+ * requires no migration at all for that majority case -- confirmed by test
+ * ("a plain POSIX path is unaffected"). Only a path recognized as one of
+ * the two folded notations changes value versus before, by construction,
+ * since collapsing that boundary is the entire point.
+ */
 export function derivePoGateRepositoryFingerprint({ gitCommonDir, primaryRoot }) {
+  const common = canonicalRepositoryPathIdentity(gitCommonDir);
+  const primary = canonicalRepositoryPathIdentity(primaryRoot);
+  if (common === null || primary === null) throw new TypeError("canonical absolute roots are required");
+  return sha256(`pipeline.po-gate.repository.v1\0${common}\0${primary}`);
+}
+
+/**
+ * The pre-NVA-FINGERPRINT-1 formula, kept verbatim (raw `normalizeAbsolute`
+ * output, no cross-notation folding) so a receipt a previous pipeline
+ * version already published under it can still be recognized -- read-only
+ * lookback, never a write. `poGateReceiptFingerprintMatches` is the only
+ * intended caller.
+ */
+export function derivePoGateRepositoryFingerprintLegacy({ gitCommonDir, primaryRoot }) {
   const common = normalizeAbsolute(gitCommonDir);
   const primary = normalizeAbsolute(primaryRoot);
   if (common === null || primary === null) throw new TypeError("canonical absolute roots are required");
   return sha256(`pipeline.po-gate.repository.v1\0${common}\0${primary}`);
+}
+
+/**
+ * True when a stored `receiptFingerprint` binds `{ gitCommonDir, primaryRoot
+ * }` under the current formula OR the pre-fix one -- a receipt published by
+ * older code (same or a differently-notated access path) is still found,
+ * never silently orphaned. The next fresh receipt publish naturally moves a
+ * repository onto the current formula; this function never writes.
+ */
+export function poGateReceiptFingerprintMatches({ receiptFingerprint, gitCommonDir, primaryRoot }) {
+  if (typeof receiptFingerprint !== "string") return false;
+  let current = null;
+  let legacy = null;
+  try { current = derivePoGateRepositoryFingerprint({ gitCommonDir, primaryRoot }); } catch { /* handled below */ }
+  try { legacy = derivePoGateRepositoryFingerprintLegacy({ gitCommonDir, primaryRoot }); } catch { /* handled below */ }
+  return receiptFingerprint === current || receiptFingerprint === legacy;
 }
 
 export function poGateProfileReceiptPath(gitCommonDir) {
@@ -653,7 +732,12 @@ function validatePoGateProfileSnapshot({ repoRoot, gitCommonDir, primaryRoot, re
   } catch {
     return fail("PO-PROFILE-RECEIPT-INVALID", "The repository fingerprint cannot be derived safely.", PROFILE_REPAIR);
   }
-  if (receipt.repositoryFingerprint !== expectedFingerprint || receipt.canonicalPrimaryRoot !== primary) {
+  // A receipt published by a pre-NVA-FINGERPRINT-1 pipeline version still
+  // carries the old formula's value; accept it too rather than forcing an
+  // unnecessary re-publish (poGateReceiptFingerprintMatches never writes).
+  const fingerprintBinds = receipt.repositoryFingerprint === expectedFingerprint
+    || poGateReceiptFingerprintMatches({ receiptFingerprint: receipt.repositoryFingerprint, gitCommonDir: common, primaryRoot: primary });
+  if (!fingerprintBinds || receipt.canonicalPrimaryRoot !== primary) {
     return fail("PO-PROFILE-RECEIPT-STALE", "The common PO profile receipt does not bind the current primary checkout.", PROFILE_REPAIR);
   }
 

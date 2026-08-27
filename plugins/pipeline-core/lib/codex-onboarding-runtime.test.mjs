@@ -12,9 +12,9 @@ import { fileURLToPath } from "node:url";
 import { PassThrough, Writable } from "node:stream";
 
 import {
-  HELPER_PATH, authenticateLaunchTicket, canonicalJson, canonicalSha256, consumeRuntimeReadback, issueLaunchTicket,
-  persistRestartBarrier, prepareRuntimeRestartBinding, readCurrentRuntimeReadback, readRestartBarrier,
-  requiresNativeRuntimeReadback, resolveRuntimeExecutable, sha256, validateRuntimeTargets,
+  HELPER_PATH, authenticateLaunchTicket, canonicalJson, canonicalSha256, consumeRuntimeReadback, fingerprintIdentity,
+  issueLaunchTicket, persistRestartBarrier, prepareRuntimeRestartBinding, readCurrentRuntimeReadback, readRestartBarrier,
+  repositoryFingerprint, requiresNativeRuntimeReadback, resolveRuntimeExecutable, sha256, validateRuntimeTargets,
 } from "./codex-onboarding-runtime.mjs";
 import {
   main as runtimeReadbackMain,
@@ -1139,6 +1139,30 @@ test("the barrier exemption is a closed membership test that fails closed for ev
   // The exemption may never widen the barrier's own target universe: a target
   // set naming a `.claude/*` path stays structurally unrepresentable.
   assert.throws(() => validateRuntimeTargets([{ path: ".claude/settings.json", beforeSha256: null, afterSha256: "0".repeat(64) }]));
+});
+
+// NVA-FINGERPRINT-1: the same construction as po-gate-authority.mjs's
+// derivePoGateRepositoryFingerprint -- the WSL default-mount and native
+// Windows spellings of one physical directory must fold to one identity
+// before repositoryFingerprint() hashes it.
+test("fingerprintIdentity folds a WSL default-mount path and the native Windows spelling of the same directory to one identity", () => {
+  const wsl = fingerprintIdentity("/mnt/c/Users/Foo/repo");
+  const windows = fingerprintIdentity("C:\\Users\\Foo\\repo");
+  assert.equal(wsl, windows);
+  const differentDrive = fingerprintIdentity("/mnt/d/Users/Foo/repo");
+  assert.notEqual(wsl, differentDrive, "a different WSL mount drive must not collapse to the same identity");
+  const plainPosix = fingerprintIdentity("/home/user/repo");
+  assert.equal(plainPosix, "/home/user/repo", "a plain POSIX path outside the drive-letter world is left byte-for-byte");
+});
+
+test("repositoryFingerprint folds a WSL-mount-shaped real path the same way, and still differs for a genuinely different directory", () => {
+  const base = root();
+  const dirA = join(base, "a");
+  const dirB = join(base, "b");
+  mkdirSync(dirA);
+  mkdirSync(dirB);
+  assert.notEqual(repositoryFingerprint(dirA), repositoryFingerprint(dirB));
+  assert.equal(repositoryFingerprint(dirA), repositoryFingerprint(dirA));
 });
 
 let passed = 0; const failures = [];

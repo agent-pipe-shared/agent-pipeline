@@ -27,7 +27,9 @@ import {
   PO_GATE_PROFILE_RECEIPT_RELATIVE_PATH,
   createPoGateProfileReceipt,
   derivePoGateRepositoryFingerprint,
+  derivePoGateRepositoryFingerprintLegacy,
   normalizeRepositoryPath,
+  poGateReceiptFingerprintMatches,
   parseGitWorktreeList,
   poGateProfileReceiptPath,
   resolvePoGateRepositoryTopology,
@@ -1549,6 +1551,91 @@ check("the re-signposted failures still expose no machine-local absolute path", 
       assert.equal(output.includes(secretPath), false, output);
     }
   });
+});
+
+// NVA-FINGERPRINT-1: the same physical working copy, reached through two
+// different access-path spellings, must hash to one identical fingerprint.
+check("a WSL default-mount spelling and the native Windows spelling of the same physical checkout hash identically", () => {
+  const wsl = derivePoGateRepositoryFingerprint({
+    gitCommonDir: "/mnt/c/Users/Foo/repo/.git",
+    primaryRoot: "/mnt/c/Users/Foo/repo",
+  });
+  const windows = derivePoGateRepositoryFingerprint({
+    gitCommonDir: "C:\\Users\\Foo\\repo\\.git",
+    primaryRoot: "C:\\Users\\Foo\\repo",
+  });
+  assert.equal(wsl, windows, "the two access-path spellings of one physical checkout must collapse to one fingerprint");
+  // Mixed separators/case for the native spelling must fold to the same value too.
+  const mixed = derivePoGateRepositoryFingerprint({
+    gitCommonDir: "c:/USERS/foo/REPO/.git",
+    primaryRoot: "c:/USERS/foo/REPO",
+  });
+  assert.equal(mixed, windows, "case and separator variants of the native spelling must fold identically");
+});
+
+check("a bare separator/case rewrite is not what collapses the WSL/Windows boundary -- the mount prefix itself must be recognized", () => {
+  // Confirms the fix is not merely "lowercase and swap slashes": the WSL
+  // mount prefix `/mnt/<drive>` has no Windows-side counterpart to rewrite
+  // against, so two GENUINELY different WSL mount drives must still differ.
+  const driveC = derivePoGateRepositoryFingerprint({ gitCommonDir: "/mnt/c/Users/Foo/repo/.git", primaryRoot: "/mnt/c/Users/Foo/repo" });
+  const driveD = derivePoGateRepositoryFingerprint({ gitCommonDir: "/mnt/d/Users/Foo/repo/.git", primaryRoot: "/mnt/d/Users/Foo/repo" });
+  assert.notEqual(driveC, driveD, "two different WSL mount drives must not collapse to one fingerprint");
+});
+
+check("two genuinely different working copies still yield different fingerprints", () => {
+  const repoA = derivePoGateRepositoryFingerprint({ gitCommonDir: "/mnt/c/Users/Foo/repoA/.git", primaryRoot: "/mnt/c/Users/Foo/repoA" });
+  const repoB = derivePoGateRepositoryFingerprint({ gitCommonDir: "/mnt/c/Users/Foo/repoB/.git", primaryRoot: "/mnt/c/Users/Foo/repoB" });
+  assert.notEqual(repoA, repoB, "different physical checkouts must not collapse to one fingerprint");
+  const posixA = derivePoGateRepositoryFingerprint({ gitCommonDir: "/home/user/repoA/.git", primaryRoot: "/home/user/repoA" });
+  const posixB = derivePoGateRepositoryFingerprint({ gitCommonDir: "/home/user/repoB/.git", primaryRoot: "/home/user/repoB" });
+  assert.notEqual(posixA, posixB, "different plain-POSIX checkouts must not collapse to one fingerprint");
+  // A same-string different-case plain-POSIX pair is a case-sensitive filesystem's
+  // two genuinely different directories -- this must NOT be folded the way the
+  // Windows/WSL drive-letter world is.
+  const lower = derivePoGateRepositoryFingerprint({ gitCommonDir: "/home/user/repo/.git", primaryRoot: "/home/user/repo" });
+  const upper = derivePoGateRepositoryFingerprint({ gitCommonDir: "/home/User/Repo/.git", primaryRoot: "/home/User/Repo" });
+  assert.notEqual(lower, upper, "a plain POSIX path must be hashed byte-for-byte, case included, never folded");
+});
+
+check("a plain POSIX repository path is unaffected by the fix (no migration needed for that majority case)", () => {
+  const current = derivePoGateRepositoryFingerprint({ gitCommonDir: "/home/user/repo/.git", primaryRoot: "/home/user/repo" });
+  const legacy = derivePoGateRepositoryFingerprintLegacy({ gitCommonDir: "/home/user/repo/.git", primaryRoot: "/home/user/repo" });
+  assert.equal(current, legacy, "outside the WSL-mount/Windows-drive-letter world the new and pre-fix formulas must agree byte-for-byte");
+});
+
+check("a receipt fingerprint published under the pre-fix formula for a WSL-mount checkout is still found", () => {
+  // `derivePoGateRepositoryFingerprintLegacy` reproduces the OLD, platform-bound
+  // formula exactly (raw `normalizeAbsolute`, native `node:path` `isAbsolute`/
+  // `resolve`): on a win32 host it accepts a `C:\...` string, and on a POSIX
+  // host -- exactly what this suite runs on, and exactly what a real WSL
+  // process also is -- it accepts a `/mnt/c/...` string. This test exercises
+  // the WSL-mount side, which is reproducible on any POSIX runner (a Windows
+  // native process is not available in this test environment; the analogous
+  // native-Windows case is the same code path exercised via `path.win32` and
+  // is covered structurally by the case/separator-fold assertions above).
+  const gitCommonDir = "/mnt/c/Users/Foo/repo/.git";
+  const primaryRoot = "/mnt/c/Users/Foo/repo";
+  const legacy = derivePoGateRepositoryFingerprintLegacy({ gitCommonDir, primaryRoot });
+  const current = derivePoGateRepositoryFingerprint({ gitCommonDir, primaryRoot });
+  // Migration is actually needed for this notation: the two formulas differ
+  // (the fold to the Windows-drive-letter form changes the value even with no
+  // cross-notation access at all -- a WSL-only user's own receipt goes stale too).
+  assert.notEqual(legacy, current, "the pre-fix and current formulas must differ for a WSL-mount path, or there is nothing to migrate");
+  assert.equal(
+    poGateReceiptFingerprintMatches({ receiptFingerprint: legacy, gitCommonDir, primaryRoot }),
+    true,
+    "a receipt carrying the pre-fix fingerprint must still be recognized as bound",
+  );
+  assert.equal(
+    poGateReceiptFingerprintMatches({ receiptFingerprint: current, gitCommonDir, primaryRoot }),
+    true,
+    "a receipt carrying the current fingerprint must be recognized as bound",
+  );
+  assert.equal(
+    poGateReceiptFingerprintMatches({ receiptFingerprint: "0".repeat(64), gitCommonDir, primaryRoot }),
+    false,
+    "an unrelated fingerprint value must never be treated as bound",
+  );
 });
 
 process.stdout.write(`po-gate-authority: ${passed} checks passed\n`);
