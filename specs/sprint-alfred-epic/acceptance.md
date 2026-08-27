@@ -31,13 +31,13 @@ deliberately disjoint from the WP ids (`A1`–`A5`, `B1`–`B3`, `C1`–`C3`,
 | AC-14 | Every wave's deliverables passed ≥1 independent Critic round (fresh context, paths-only dispatch); fail-then-fix cycles documented — and the same bar held for every design document of this epic before PO review (spec §12 design-phase review duty) | Critic evidence under `evidence/critic/` |
 | AC-15 | Documentation acceptance per member issue against the exact accepted candidate | per-issue doc evidence links |
 
-## B. Incident-derived regression criteria (2026-08-27 class)
+## B. Incident-derived regression criteria (live-measured classes)
 
 | # | Criterion | Evidence |
 |---|---|---|
 | IR-1 | A post-close write to a bound Result is refused (agent routes) and detected (any route) at next state read — not at the next lifecycle transition weeks later | A3 dynamic-class + A5(i) fixtures |
 | IR-2 | A `discard-feature` on a repo with active continuity and null Result completes into a `ready` session with no human shell step | A5(ii) end-to-end fixture |
-| IR-3 | The four seed interruption classes emit correct receipts when reproduced | C1 seed fixtures |
+| IR-3 | The four seed interruption classes (per-class dates and provenance: `design/issue-intake.md` #103) emit correct receipts when reproduced | C1 seed fixtures |
 | IR-4 | A guard-refused read-only interpreter command receives a typed read-only retry action, not a signature demand | B2-iii fixture |
 
 ## C. Fixture inventory floor

@@ -99,10 +99,20 @@ plus its Verify-registered check + fixtures.
 `plugins/pipeline-core/hooks/hooks.json` (which asserts subagent hooks fire)
 is replaced by a pointer to the record. That file is TP-4 — its own protected
 class, which B2-ii's route does not cover (B2-ii exists solely for TP-3 suite
-registration and lands a wave later) — so the replacement is one contiguous
-edit performed through the existing human-guard-override signature ceremony,
-scheduled inside A1's own Wave-0 slot; no new authorization route is designed
-or required for it. Probe re-runs are cheap and mandatory on runner/plugin
+registration and lands a wave later) — and it is plugin source in a source
+checkout, for which the standard human-guard-override plans
+`author-repair-required` rather than an armed override, and needing such a
+path is a dispatch stop condition (`templates/prompts/agent-obligations.md`
+§2). The replacement is therefore designed as a **PO-performed act, not an
+agent-side ceremony**: A1 prepares the exact contiguous replacement text,
+and the PO applies it in their own shell outside the agent boundary (§1 —
+the human repository owner is unconstrained; §10 — the sprint adds
+PO-executable routes, never agent mutation rights), recorded in the A1
+evidence and scheduled inside A1's Wave-0 slot. The pointer edit is a
+courtesy, not load-bearing: the A1 record is authoritative over the
+`$comment` from the moment it exists, so a deferred PO edit blocks no gate —
+the stale comment is then carried as a typed residual row in the A2 table
+until edited. Probe re-runs are cheap and mandatory on runner/plugin
 version change; the record carries `{runnerVersion, pluginVersion,
 measuredAt}`.
 A1 also produces the minimal reproduction for an upstream runner report
