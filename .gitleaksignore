@@ -179,3 +179,17 @@ content-v1:77159af8b199d45fcabdd13fdac69e2e9b37c7144680a08f90decf3dd5823d3c:gove
 # re-lines an existing entry).
 content-v1:6a4dcd139c642bd9b0b7b9ff689714c993fe75e6b884a5e9ea4450f03b7ed31c:governance/events/human/5-evt-hgo-deny-87fb0a78687eb36a7202eb5919c05f33-0.json:generic-api-key:1:987
 content-v1:7d42e3d3962b10f58824ebf7b423400bc3ad7d5a8a638348f3e6857b21960fa9:governance/events/human/7-evt-hgo-deny-ad6c14aeff5e66083cfb10db9da16b76-0.json:generic-api-key:1:987
+# NVA-GOVFP-1, second batch (2026-08-27): events 9 and 11, the deny halves of the two
+# denial pairs recorded in 1bd88d86. Exactly the cost the NVA-GOVFP-1 note above predicted
+# ("every future denial event that trips the rule needs its own reviewed entry"): the first
+# batch covered events 5 and 7, and these two were written after it.
+# Matched value confirmed against the raw gitleaks report, not inferred from the rule: it is
+# each envelope's own `idempotencyKey` ("hgo-deny-<32 hex>-0"), at the same column 987 as the
+# entries above. Both files inspected directly -- event 9 field by field, event 11 by
+# structural comparison against it (identical top-level and payload key sets, no top-level
+# string containing whitespace, so no free-text field exists where a credential could land);
+# both carry "classification": "repository-public-safe".
+# Generated with the adapter's own exported gitleaksContentAuthorityLine(), self-checked by
+# reproducing the event-5 entry above byte-identically before these two were written.
+content-v1:f5589e082bf9c3692b965dfb5bfa8b2d4fa917187ccb202895b31fc74cafd7f2:governance/events/human/9-evt-hgo-deny-258a9160177f0211af28dee9702e5480-0.json:generic-api-key:1:987
+content-v1:081327d87b1ab19f416c119d3504a9c913f2247cc95b810870c60f24d012f680:governance/events/human/11-evt-hgo-deny-963df309b2c7016255858da133289a8f-0.json:generic-api-key:1:987
