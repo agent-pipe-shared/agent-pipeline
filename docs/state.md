@@ -112,12 +112,34 @@ the discarded→fresh-design shape), new surface (post-compact reground).
 Recorded here instead of editing the committed item, to avoid ledger DRIFT
 noise; fold into the item at its next legitimate touch.
 
-**Next:** on a green/resolved round 3 →
-`pipeline-state.mjs submit-plan --by Elephant --profile epic`, then the
-**Haltepunkt**: present the PRD readably (EL-19), the five open PO
-decisions of PRD §9, the standing trailer disposition, the MP-01 gate
-switch away from Fable-max, and a proposed `/goal`; wait for the PO's
-"approved".
+**Round 4 (final): PASS**, scoped to `0181fe4b` — both invariants resolved;
+the design-review cycle is closed at 4/4 rounds (cycle table + reviewed-
+surface statement: `evidence/critic/round-4-response.md`, commit
+`3f2fcb31`). Every design-authored document byte at head is Critic-reviewed.
+
+**Road to submit-plan (three more measured lifecycle gaps, evening):**
+(1) `PO-PROFILE-RECEIPT-INVALID` — the machine-local receipt never survives
+a clone; republished via the typed route `setup.mjs --publish-po-profile`.
+(2) `PLAN-SUBMIT-CONTINUITY-INVALID` — `set-feature` leaves no continuity;
+bridged per the Phoenix-documented two-step workflow with `continuity-init`
+(revision 0, design shape, authority bound to current PRD/spec digests;
+state commit `ffb096a7`). (3) Items filed for both gap classes plus the
+clone-provisioning class: `516a9392`, ledger `9b16de71`.
+`submit-plan` now stops exactly at the intended PO gate:
+**`PO-GATE-PRD-ACKNOWLEDGEMENT-MISSING`** — the PRD needs the PO's
+acknowledgement marker `<!-- po-plan-acknowledged:
+content-sound-and-spec-consistent -->` exactly once, a PO judgment no agent
+may fabricate.
+
+**Next (Haltepunkt presented, awaiting the PO):** 1. PO reviews the PRD
+(EL-19) and answers PRD §9's five decisions; 2. on the PO's word, the
+acknowledgement marker line is added to the PRD and committed; 3.
+`pipeline-state.mjs submit-plan --by Elephant --profile epic` (rebinds
+continuity authority to the acknowledged bytes itself); 4. PO approval
+(`approve-plan`) and the MP-01 gate switch away from Fable-max. Standing
+gate-visible items: the Dispatch-trailer canon gap (disposition in
+`evidence/critic/round-1-response.md`) and the four defect items filed
+today.
 
 ## Prior handover — 2026-09-01/02: the autonomous Nova B block
 
