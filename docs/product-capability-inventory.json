@@ -887,6 +887,12 @@
       "member": "change-control-core-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:check-adr-consistency-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "check-adr-consistency-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:check-backlog-state-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -905,10 +911,22 @@
       "member": "check-completeness-vocabulary-doclint-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:check-critic-contract-citations-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "check-critic-contract-citations-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:check-directory-contract-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "check-directory-contract-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:check-doc-reconciliation-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "check-doc-reconciliation-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:check-gitignore-anchoring-tests",
@@ -2303,6 +2321,12 @@
       "member": "pipeline-start-preflight-antigravity-hard-enforcement-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:pipeline-start-preflight-pre-push-observation-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "pipeline-start-preflight-pre-push-observation-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:pipeline-start-preflight-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -2481,6 +2505,12 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "pr-contributor-gate-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:pre-push-hook-install-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "pre-push-hook-install-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:private-document-binding-tests",
@@ -3618,10 +3648,13 @@
         "verify-phase:harness/scripts/verify.mjs:capture-observation-intake-tests",
         "verify-phase:harness/scripts/verify.mjs:change-control-cli-tests",
         "verify-phase:harness/scripts/verify.mjs:change-control-core-tests",
+        "verify-phase:harness/scripts/verify.mjs:check-adr-consistency-tests",
         "verify-phase:harness/scripts/verify.mjs:check-backlog-state-tests",
         "verify-phase:harness/scripts/verify.mjs:check-close-security-completeness-tests",
         "verify-phase:harness/scripts/verify.mjs:check-completeness-vocabulary-doclint-tests",
+        "verify-phase:harness/scripts/verify.mjs:check-critic-contract-citations-tests",
         "verify-phase:harness/scripts/verify.mjs:check-directory-contract-tests",
+        "verify-phase:harness/scripts/verify.mjs:check-doc-reconciliation-tests",
         "verify-phase:harness/scripts/verify.mjs:check-gitignore-anchoring-tests",
         "verify-phase:harness/scripts/verify.mjs:check-ownership-tests",
         "verify-phase:harness/scripts/verify.mjs:check-release-state-consistency-tests",
@@ -3851,6 +3884,7 @@
         "verify-phase:harness/scripts/verify.mjs:phoenix-authority-approval-tests",
         "verify-phase:harness/scripts/verify.mjs:phoenix-governance-threat-model-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-start-preflight-antigravity-hard-enforcement-tests",
+        "verify-phase:harness/scripts/verify.mjs:pipeline-start-preflight-pre-push-observation-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-start-preflight-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-start-scratch-lifecycle-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-start-v3-tests",
@@ -3880,6 +3914,7 @@
         "verify-phase:harness/scripts/verify.mjs:po-language-projection-tests",
         "verify-phase:harness/scripts/verify.mjs:post-compact-reground-tests",
         "verify-phase:harness/scripts/verify.mjs:pr-contributor-gate-tests",
+        "verify-phase:harness/scripts/verify.mjs:pre-push-hook-install-tests",
         "verify-phase:harness/scripts/verify.mjs:private-document-binding-tests",
         "verify-phase:harness/scripts/verify.mjs:private-overlay-activation-cli-tests",
         "verify-phase:harness/scripts/verify.mjs:private-overlay-activation-e2e-tests",
