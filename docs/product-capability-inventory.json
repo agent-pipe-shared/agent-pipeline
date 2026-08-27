@@ -1655,6 +1655,12 @@
       "member": "guard-devplan-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-dispatch-budget-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "guard-dispatch-budget-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-dispatch-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -3714,6 +3720,7 @@
         "verify-phase:harness/scripts/verify.mjs:guard-apply-patch-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-authority-ledger-intake-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-devplan-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-dispatch-budget-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-dispatch-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-el01-tripwire-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-gate-strength-gmw-tests",
