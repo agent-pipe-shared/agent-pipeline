@@ -205,6 +205,39 @@ recommendation.
    URLs, credentials, secrets, or private identifiers. The validator rejects
    those forms rather than persisting them.
 
+   The same one guard-admitted argv shape above also accepts two further,
+   OPTIONAL top-level card keys — never a new flag: `materialInput`, an array
+   of the user's own material design input, one verbatim, unbounded,
+   possibly multi-line entry per chunk. This is additive: the existing
+   `intent`/`constraints`/`scope`/`questions` keys keep their shape, caps and
+   meaning exactly, and their "distilled statement, never a transcript" rule
+   is unaffected. That rule does NOT apply to `materialInput` — it is
+   explicitly exempt from the 4/4/3 short-string caps and the single-line/
+   480-byte limit, because a user-authored design document legitimately
+   contains fenced code, several paragraphs, or a quoted line. It is still
+   screened, like every other key, for credential, secret, host-path, URL and
+   private-identifier shapes; a chunk that fails this screen is refused and
+   nothing is persisted.
+
+   The same shape also accepts `values`, an object of already-answered
+   onboarding input (commit-author name and email, operator-facing language,
+   PO profile) captured before the restart barrier, so a session after the
+   mandatory restart finds them instead of asking twice. It is persisted into
+   the onboarding intake checkpoint, not into `project/resume-hint.json`, and
+   an already-answered value is never overwritten by a later capture — ask
+   once. `git config user.name`/`user.email` is still written only
+   immediately before the first commit, in this repository's local config
+   only, never sooner: only the SOURCE of that value changes, from
+   conversation memory to this persisted state, never the timing.
+
+   The MUST-DO consumption step above extends to both: at the start of the
+   next session, when `resume-hint.mjs inspect` reports them, the agent MUST
+   also read the persisted material-input chunks and the persisted answered
+   values in that same turn and incorporate them — never re-ask a value
+   already answered — with the same honesty duty on a failed or skipped read
+   and the same never-a-gate rule: this stays a consumption duty, never a
+   readiness precondition.
+
 7. **Normal restart is handover-only:** a same-topic restart, context cut, or
    request to save progress is not a block close. Update only the calibrated
    handover and, where needed, the sanitised Resume-Hint, then re-enter with
