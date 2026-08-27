@@ -1599,6 +1599,86 @@ try {
     assert.equal(validStoredStage0Declaration("elephant-direct", { filesChanged: 9, diffLines: 1, touchesTestFile: false }), false, "a non-qualifying elephant-direct declaration is still rejected");
   });
 
+  // NVA-GMWFINGERPRINT-1: repoFingerprint() cross-view identity fold. Literal path
+  // strings only (this dispatch's own AC-4 guidance) -- never dependent on the
+  // ambient platform this suite happens to run on, mirroring
+  // po-gate-authority.test.mjs's "a WSL default-mount spelling and the native
+  // Windows spelling..." checks and codex-onboarding-runtime.test.mjs's
+  // "fingerprintIdentity folds..." check.
+  await check("GMW44 repoPathIdentity folds a WSL default-mount path and the native Windows spelling of the same directory to one identity", () => {
+    const { repoPathIdentity } = guardMaintenanceWindowInternals;
+    const wsl = repoPathIdentity("/mnt/c/Users/Foo/repo");
+    const windows = repoPathIdentity("C:\\Users\\Foo\\repo");
+    assert.equal(wsl, windows, "the WSL-mount and native-Windows spellings of one physical directory must fold to one identity");
+    const mixed = repoPathIdentity("c:/USERS/foo/REPO");
+    assert.equal(mixed, windows, "case and separator variants of the native spelling must fold identically");
+    const differentDrive = repoPathIdentity("/mnt/d/Users/Foo/repo");
+    assert.notEqual(wsl, differentDrive, "a different WSL mount drive must not collapse to the same identity");
+    const plainPosix = repoPathIdentity("/home/user/repo");
+    assert.equal(plainPosix, "/home/user/repo", "a plain POSIX path outside the drive-letter/mount world is left byte-for-byte, never lower-cased");
+    assert.notEqual(repoPathIdentity("/home/User/Repo"), plainPosix, "a plain POSIX path is never case-folded -- a case-sensitive filesystem can hold two genuinely different directories under that pair");
+  });
+
+  await check("GMW45 repoFingerprint hashes the /mnt/c/... and C:\\... spellings of one physical repo to the same value, and two genuinely different repos still differ", () => {
+    const { repoFingerprint } = guardMaintenanceWindowInternals;
+    const wsl = repoFingerprint({ root: "/mnt/c/Users/Foo/repo", common: "/mnt/c/Users/Foo/repo/.git" });
+    const windows = repoFingerprint({ root: "C:\\Users\\Foo\\repo", common: "C:\\Users\\Foo\\repo\\.git" });
+    assert.equal(wsl, windows, "one physical repository reached via WSL or native Windows must hash identically");
+    const repoA = repoFingerprint({ root: "/mnt/c/Users/Foo/repoA", common: "/mnt/c/Users/Foo/repoA/.git" });
+    const repoB = repoFingerprint({ root: "/mnt/c/Users/Foo/repoB", common: "/mnt/c/Users/Foo/repoB/.git" });
+    assert.notEqual(repoA, repoB, "two genuinely different working copies must never collapse to one fingerprint");
+    const posixA = repoFingerprint({ root: "/home/user/repoA", common: "/home/user/repoA/.git" });
+    const posixB = repoFingerprint({ root: "/home/user/repoB", common: "/home/user/repoB/.git" });
+    assert.notEqual(posixA, posixB, "two genuinely different plain-POSIX checkouts must never collapse to one fingerprint");
+  });
+
+  await check("GMW46 a plain POSIX repo path is unaffected (current formula equals the pre-fix legacy one -- no migration needed for the majority case)", () => {
+    const { repoFingerprint, repoFingerprintLegacy } = guardMaintenanceWindowInternals;
+    const repo = { root: "/home/user/repo", common: "/home/user/repo/.git" };
+    assert.equal(repoFingerprint(repo), repoFingerprintLegacy(repo), "outside the WSL-mount/Windows-drive-letter world the new and pre-fix formulas must agree byte-for-byte");
+  });
+
+  await check("GMW47 a fingerprint recorded under the pre-fix legacy formula for a WSL-mount repo is still recognized as bound (repoFingerprintMatches)", () => {
+    const { repoFingerprint, repoFingerprintLegacy, repoFingerprintMatches } = guardMaintenanceWindowInternals;
+    const repo = { root: "/mnt/c/Users/Foo/repo", common: "/mnt/c/Users/Foo/repo/.git" };
+    const legacy = repoFingerprintLegacy(repo);
+    const current = repoFingerprint(repo);
+    assert.notEqual(legacy, current, "the pre-fix and current formulas must differ for a WSL-mount path, or there is nothing to migrate");
+    assert.equal(repoFingerprintMatches(legacy, repo), true, "a record carrying the pre-fix fingerprint must still be recognized as bound");
+    assert.equal(repoFingerprintMatches(current, repo), true, "a record carrying the current fingerprint must be recognized as bound");
+    assert.equal(repoFingerprintMatches("0".repeat(64), repo), false, "an unrelated fingerprint value must never be treated as bound");
+  });
+
+  await check("GMW48 an installed window is still found end-to-end when its stored repoFingerprintSha256 fields are the pre-fix legacy value (real repo/plugin fixtures, functional level)", () => {
+    const root = repoFixture("gmw-fingerprint-legacy-");
+    const plugin = pluginRootFixture();
+    const { planSha256, specSha256 } = planSpecShas(root);
+    const { intent, request } = prepareGuardMaintenanceWindowRequest({
+      rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 120, reason: "legacy fingerprint backcompat", featureId: "f",
+      planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin, authorshipMode: "goldfish-dispatch",
+    });
+    installGuardMaintenanceWindow({ rootDir: root, request, anchors: [trustPolicy], proof: proofFor(intent), livePluginRoot: plugin });
+    assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "active");
+
+    // Rewrite the stored window record's repoFingerprintSha256 fields to the legacy
+    // (pre-fix) formula -- for this real fixture's plain-POSIX root/common that value
+    // is byte-identical to the current one (GMW46), so this proves the FIELD is read
+    // through repoFingerprintMatches (accepting either formula) without regressing the
+    // normal path; the actual cross-notation collapse is proven by the literal-string
+    // checks GMW44/45/47 above, per this dispatch's own AC-4 guidance (a real dual-view
+    // filesystem is not available in this test environment).
+    const repo = guardMaintenanceWindowInternals.topology(root);
+    const paths = guardMaintenanceWindowInternals.storagePaths(repo.common);
+    const record = JSON.parse(readFileSync(paths.window, "utf8"));
+    const legacyValue = guardMaintenanceWindowInternals.repoFingerprintLegacy(repo);
+    record.repoFingerprintSha256 = legacyValue;
+    record.subject.repoFingerprintSha256 = legacyValue;
+    writeFileSync(paths.window, `${JSON.stringify(record)}\n`, { mode: 0o600 });
+
+    const status = currentGuardMaintenanceWindow({ rootDir: root });
+    assert.equal(status.status, "active", "a window record carrying the pre-fix legacy repoFingerprintSha256 must still read back as active");
+  });
+
   console.log(`\nguard-maintenance-window: ${passed} passed, ${failed} failed`);
 } finally {
   for (const entry of roots) rmSync(entry, { recursive: true, force: true });

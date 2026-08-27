@@ -59,7 +59,7 @@ import {
   unlinkSync,
   writeFileSync,
 } from "node:fs";
-import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { isAbsolute, join, relative, resolve, sep, win32 as win32Path } from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { createPoApprovalIntent } from "./po-approval-proof.mjs";
@@ -435,8 +435,75 @@ function pluginTreeSha256(root) {
   return sha(entries);
 }
 
+/**
+ * NVA-GMWFINGERPRINT-1: fold the WSL2 default-automount `/mnt/<drive>/...` spelling
+ * and the native Windows `<DRIVE>:\...` spelling of one physical path into a single
+ * lower-cased identity before `repoFingerprint()` hashes it -- the SAME construction
+ * as `canonicalRepositoryPathIdentity`/`windowsDriveLetterIdentity`
+ * (po-gate-authority.mjs) and `fingerprintIdentity`/`windowsDriveLetterFingerprintIdentity`
+ * (codex-onboarding-runtime.mjs, NVA-FINGERPRINT-1/1858a21b).
+ *
+ * MIRRORED here rather than imported: po-gate-authority.mjs's own pair is
+ * unexported (and this dispatch's Forbidden section bars editing that file to
+ * export them); codex-onboarding-runtime.mjs's `fingerprintIdentity` IS exported
+ * and its module is already a `NEVER_LIFTABLE_KERNEL_PATHS` entry (so importing it
+ * would need no new kernel-closure entry), but pulling in that much larger,
+ * domain-unrelated onboarding-runtime module -- with its own launch-ticket/host-
+ * adapter import surface -- for ~10 lines of pure regex logic would widen this
+ * never-liftable kernel file's own dependency surface for no reason: this file's
+ * own DUPLICATION NOTE above (physicalRoot/topology/secureDirectory/etc.) already
+ * establishes "small physical-safety primitive stays local" as the house rule here,
+ * not a novel shortcut. This is a third independently-named copy of the same ~10
+ * lines (the risk the dispatching item explicitly names) -- accepted deliberately
+ * for that reason, not overlooked.
+ *
+ * `repo.root`/`repo.common` are already realpathSync'd absolute paths by the time
+ * `repoFingerprint()` calls this (physicalRoot/topology above), so no further
+ * resolving is attempted here -- only the cross-notation fold. A path outside the
+ * recognized drive-letter/mount world (the common case: a plain POSIX checkout) is
+ * returned byte-for-byte, never lower-cased or otherwise touched: NTFS/DrvFs are
+ * case-insensitive so folding case is safe ONLY once a path is recognized as
+ * belonging to that world -- a same-string different-case plain POSIX pair can be
+ * two genuinely different directories on a case-sensitive filesystem and must never
+ * be merged (AC-2).
+ */
+function windowsDriveLetterRepoIdentity(candidate) {
+  const normalized = candidate.replaceAll("/", "\\");
+  if (!win32Path.isAbsolute(normalized)) return candidate;
+  const resolved = win32Path.resolve(normalized);
+  return resolved === normalized ? resolved.toLocaleLowerCase("en-US") : candidate;
+}
+function repoPathIdentity(path) {
+  const wslMount = /^\/mnt\/([A-Za-z])(\/.*)?$/u.exec(path);
+  if (wslMount !== null) return windowsDriveLetterRepoIdentity(`${wslMount[1].toUpperCase()}:${wslMount[2] ?? "/"}`);
+  if (/^[A-Za-z]:[\\/]/u.test(path)) return windowsDriveLetterRepoIdentity(path);
+  return path;
+}
+
 function repoFingerprint(repo) {
+  return sha({ physicalRoot: repoPathIdentity(repo.root), physicalCommon: repoPathIdentity(repo.common) });
+}
+
+/**
+ * Pre-NVA-GMWFINGERPRINT-1 formula, kept verbatim (raw `repo.root`/`repo.common`
+ * strings, no cross-notation folding) so a request/window record a previous
+ * pipeline version already wrote can still be recognized -- read-only lookback,
+ * mirrors po-gate-authority.mjs's `derivePoGateRepositoryFingerprintLegacy` /
+ * `poGateReceiptFingerprintMatches` split. Never used to WRITE a new record; every
+ * write below goes through `repoFingerprint()` above.
+ */
+function repoFingerprintLegacy(repo) {
   return sha({ physicalRoot: repo.root, physicalCommon: repo.common });
+}
+
+/**
+ * True when `storedFingerprint` binds `repo`'s physical identity under the current
+ * (normalized) formula OR the pre-fix (raw) one -- a request/window record written
+ * by older code, from either access-path notation, is still found. Never writes.
+ */
+function repoFingerprintMatches(storedFingerprint, repo) {
+  return typeof storedFingerprint === "string"
+    && (storedFingerprint === repoFingerprint(repo) || storedFingerprint === repoFingerprintLegacy(repo));
 }
 
 // ---------------------------------------------------------------------------------
@@ -957,7 +1024,11 @@ export function installGuardMaintenanceWindow({ rootDir, request, trustPolicy, a
   }
   const repo = topology(rootDir, spawn);
   const repoFingerprintSha256 = repoFingerprint(repo);
-  if (repoFingerprintSha256 !== request.subject.repoFingerprintSha256) {
+  // NVA-GMWFINGERPRINT-1: accepts the signed subject's fingerprint under EITHER the
+  // current (normalized) formula or the pre-fix (raw) one -- a request prepared by
+  // older code, or from the other access-path notation of this same physical repo,
+  // must still install rather than being reported as drift.
+  if (!repoFingerprintMatches(request.subject.repoFingerprintSha256, repo)) {
     fail("GMW-DRIFT", "physical repository identity drifted since the request was prepared");
   }
   // Candidate binding: repoFingerprintSha256 above proves this is physically the SAME
@@ -1177,9 +1248,15 @@ export function currentGuardMaintenanceWindow({ rootDir, nowMs = Date.now(), spa
   // validStoredStage0Declaration()'s own doc comment for why this split is safe.
   if (!validStoredStage0Declaration(record.authorshipMode, record.stage0Selfcheck)) return { status: "absent" };
 
-  const repoFingerprintSha256 = repoFingerprint(repo);
-  if (record.repoFingerprintSha256 !== repoFingerprintSha256 || record.root !== repo.root) return { status: "absent" };
-  if (record.subject.repoFingerprintSha256 !== repoFingerprintSha256) return { status: "absent" };
+  // NVA-GMWFINGERPRINT-1: both the stored fingerprint fields and the stored plain
+  // `root` string are matched under either the current (normalized) or the pre-fix
+  // (raw) identity -- a window record written from the other access-path notation
+  // of this same physical repo, or by older code, must still read back as active,
+  // never silently as "absent" mid-window.
+  if (!repoFingerprintMatches(record.repoFingerprintSha256, repo) || repoPathIdentity(record.root) !== repoPathIdentity(repo.root)) {
+    return { status: "absent" };
+  }
+  if (!repoFingerprintMatches(record.subject.repoFingerprintSha256, repo)) return { status: "absent" };
 
   // NVA-GMWFIX-1: this used to read the legacy SINGULAR `policy.trustAnchor` field only,
   // which is permanently `null` once `critical-human-proof.json` carries the v3
@@ -1402,6 +1479,10 @@ export const guardMaintenanceWindowInternals = {
   physicalRoot,
   storagePaths,
   pluginTreeSha256,
+  repoPathIdentity,
+  repoFingerprint,
+  repoFingerprintLegacy,
+  repoFingerprintMatches,
   validAuthorshipMode,
   validStage0Selfcheck,
   stage0Qualifies,
