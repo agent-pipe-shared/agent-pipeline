@@ -301,6 +301,38 @@ check("F1 round 2: codex adapter recognizes the directPush and shellWrapperPush 
   }
 });
 
+// F1 round 3 (NVA-PUSHCLASS-1): the shared classifier itself (commandIsGitPush,
+// lib/git-cmd.mjs) missed a backslash-escaped whitespace value inside a `-c` global
+// option and an unrecognized `--config-env` global option -- both slipped past this
+// adapter's prefilter (`commandIsGitPush(command) ? ["guard-push.mjs"] : []` above)
+// entirely, so guard-push.mjs never even ran to evaluate them; one of these exact
+// shapes reached a remote past a blocking signature gate in a real session. Fixed at
+// the shared classifier (both callers reuse it, so neither can independently drift),
+// proven here the same way F1 rounds 1/2 are: the adapter must now spawn
+// guard-push.mjs for these forms too.
+check("F1 round 3: codex adapter recognizes the escaped-value and unrecognized-global-option push shapes lib/git-cmd.mjs now classifies", () => {
+  const root = fixture();
+  writeFileSync(join(root, ".claude", "pipeline.yaml"), [
+    "schema: pipeline.manifest.v0",
+    "gates:",
+    "  push:",
+    "    mode: blocking",
+    "    type: human",
+    "    approval: required",
+    "",
+  ].join("\n"));
+  for (const command of [
+    // backslash-escaped whitespace inside a -c value (synthetic path, not a real key)
+    "git -c core.sshCommand=ssh\\ -i\\ /home/u/.ssh/id\\ -o\\ IdentitiesOnly=yes push -u origin branch",
+    // --config-env: an unrecognized global option before the subcommand
+    "git --config-env=core.sshCommand=VAR push origin HEAD",
+  ]) {
+    const output = decision(run({ tool_name: "Bash", tool_input: { command } }, root));
+    assert.equal(output.permissionDecision, "deny", command);
+    assert.match(output.permissionDecisionReason, /guard-push/, command);
+  }
+});
+
 check("bounded rg-to-rg search filtering remains read-only without an override loop", () => {
   const root = fixture();
   const git = (...args) => spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });
