@@ -6238,3 +6238,54 @@ test("NVA-INTAKEARGV-1: the one-of text routes admit exactly one alternative, an
     rmSync(path, { recursive: true, force: true });
   }
 });
+
+/**
+ * NVA-INTAKESPECS-1. The design package is generated straight into `specs/<featureId>/`
+ * (ADR-0045's own location) instead of a `project/.onboarding-staging/` holding area. The
+ * holding area created a second, parallel notion of "the design documents", which is what let
+ * the plan-approval route bind a document whose own banner said it must not be bound, and what
+ * forced GS-15 to protect that directory from the very agent whose job was to author it.
+ *
+ * The admission got NARROWER in the move: the containing directory must itself be a generated
+ * feature id, and a `prd_<id>.md` is admitted only when that id matches its own directory -- a
+ * property the flat staging directory could not express at all.
+ */
+test("NVA-INTAKESPECS-1: the bootstrap-binding authoring admission covers specs/<featureId>/, and a PRD in a foreign feature's directory is refused", () => {
+  const path = root();
+  const featureId = "onboarding-0123456789ab";
+  const otherId = "onboarding-ba9876543210";
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const bindingDeps = { projectDir: path, requireProjectOnboardingReadyFn() { deny("bootstrap-binding-required"); } };
+    const admits = (input) => evaluateLifecycleReadyGuard(input, bindingDeps).exitCode === 0;
+
+    // Admitted: exactly the two hand-authored targets of THIS feature, for both write tools.
+    for (const filePath of [`specs/${featureId}/prd_${featureId}.md`, `specs/${featureId}/spec.md`]) {
+      for (const input of [edit(filePath), write(filePath)]) {
+        assert.equal(admits(input), true, `${input.tool_name}:${filePath}`);
+      }
+    }
+
+    // Refused, in the same repository state. design-input.md stays an immutable verbatim
+    // capture; a PRD naming a DIFFERENT feature id than its own directory is the case the old
+    // flat layout could not distinguish; a nested path is not the package directory; and
+    // NotebookEdit is never an authoring tool for these.
+    for (const filePath of [
+      `specs/${featureId}/design-input.md`,
+      `specs/${featureId}/prd_${otherId}.md`,
+      `specs/${featureId}/other.md`,
+      `specs/${featureId}/nested/spec.md`,
+      "specs/not-a-generated-feature-id/spec.md",
+      "specs/spec.md",
+    ]) {
+      const result = evaluateLifecycleReadyGuard(edit(filePath), bindingDeps);
+      assert.equal(result.exitCode, 2, filePath);
+      assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u, filePath);
+    }
+    const notebook = evaluateLifecycleReadyGuard(notebookEdit(`specs/${featureId}/spec.md`), bindingDeps);
+    assert.equal(notebook.exitCode, 2, "NotebookEdit");
+    assert.match(notebook.stderr, /GUARD-LIFECYCLE-NOT-READY/u, "NotebookEdit");
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+  }
+});

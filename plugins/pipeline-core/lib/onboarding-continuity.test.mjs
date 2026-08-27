@@ -40,7 +40,7 @@ import {
   INTAKE_DESIGN_QUESTIONS_APPLY_SCHEMA,
   INTAKE_GENERATE_PLAN_SCHEMA,
   INTAKE_GENERATE_APPLY_SCHEMA,
-  INTAKE_STAGING_DIRNAME,
+  intakeDesignDirname,
   applyOnboardingBootstrapBind,
   planOnboardingBootstrapBind,
   applyOnboardingContinuityRepair,
@@ -2976,9 +2976,12 @@ check("planOnboardingIntakeGenerate / applyOnboardingIntakeGenerate: happy path 
   const plan = planOnboardingIntakeGenerate({ rootDir: root });
   assert.equal(plan.schema, INTAKE_GENERATE_PLAN_SCHEMA);
   assert.match(plan.featureId, /^onboarding-[a-f0-9]{12}$/);
-  assert.equal(plan.targets.designInput.path, `${INTAKE_STAGING_DIRNAME}/design-input.md`);
-  assert.equal(plan.targets.prd.path, `${INTAKE_STAGING_DIRNAME}/prd_${plan.featureId}.md`);
-  assert.equal(plan.targets.spec.path, `${INTAKE_STAGING_DIRNAME}/spec.md`);
+  // NVA-INTAKESPECS-1: the design package is generated straight into specs/<featureId>/, the
+  // location ADR-0045 already names, rather than a separate pre-authority holding area.
+  assert.equal(intakeDesignDirname(plan.featureId), `specs/${plan.featureId}`);
+  assert.equal(plan.targets.designInput.path, `specs/${plan.featureId}/design-input.md`);
+  assert.equal(plan.targets.prd.path, `specs/${plan.featureId}/prd_${plan.featureId}.md`);
+  assert.equal(plan.targets.spec.path, `specs/${plan.featureId}/spec.md`);
 
   const applied = applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
   assert.equal(applied.schema, INTAKE_GENERATE_APPLY_SCHEMA);
@@ -3021,15 +3024,25 @@ check("applyOnboardingIntakeGenerate: refuses a plan digest mismatch", () => {
   }));
 });
 
-check("applyOnboardingIntakeGenerate: requires the project/ directory to already exist", () => {
-  const root = fixture("intake-generate-no-project-dir");
+check("applyOnboardingIntakeGenerate: creates specs/ itself instead of demanding it, on a root that has neither specs/ nor project/", () => {
+  // NVA-INTAKESPECS-1 replaces the former INTAKE-GENERATE-PROJECT-DIRECTORY-MISSING
+  // precondition. A greenfield repository legitimately has no specs/ yet, and the very first
+  // onboarding is exactly when it must appear -- refusing there would be a dead end on the
+  // one path this step exists to serve. The fixture deliberately has no project/ either, so
+  // this also pins that the old precondition is genuinely gone rather than merely relocated.
+  const root = fixture("intake-generate-no-specs-dir");
+  assert.equal(existsSync(join(root, "specs")), false, "fixture must start without specs/");
+  assert.equal(existsSync(join(root, "project")), false, "fixture must start without project/");
   applyOnboardingIntakeConsent({ rootDir: root, granted: true, activate: true });
   applyOnboardingIntakeCapture({ rootDir: root, text: "material", activate: true });
   applyOnboardingIntakeDesignQuestions({ rootDir: root, answers: [{ question: "Q?", answer: "A." }], activate: true });
   const plan = planOnboardingIntakeGenerate({ rootDir: root });
-  expectIntakeError("INTAKE-GENERATE-PROJECT-DIRECTORY-MISSING", () => applyOnboardingIntakeGenerate({
-    rootDir: root, expectedPlanSha256: plan.planSha256, activate: true,
-  }));
+  const applied = applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
+  assert.equal(applied.mutated, true);
+  for (const key of ["designInput", "prd", "spec"]) {
+    assert.equal(existsSync(join(root, plan.targets[key].path)), true, plan.targets[key].path);
+  }
+  assert.equal(existsSync(join(root, "project")), false, "generation must not create project/ any more");
 });
 
 check("applyOnboardingIntakeGenerate: a re-run against the same checkpoint revision is a true no-op", () => {
@@ -3202,7 +3215,10 @@ check("planOnboardingBootstrapBind / applyOnboardingBootstrapBind: happy path bi
   assert.equal(state.activeFeature.id, featureId);
   assert.equal(state.activeFeature.planPath, plan.feature.planPath);
   assert.equal(state.continuity.revision, 0);
-  assert.equal(existsSync(join(root, INTAKE_STAGING_DIRNAME)), true, "staging dir still exists post-bind (never removed by this transaction)");
+  // NVA-INTAKESPECS-1: the design package is generated in place, so binding leaves it exactly
+  // where it already was -- there is no promotion move and nothing to clean up afterwards.
+  assert.equal(existsSync(join(root, intakeDesignDirname(featureId))), true,
+    "the design package still exists post-bind (bind never moves or removes it)");
   const history = JSON.parse(readFileSync(promotionHistoryPath(root), "utf8"));
   assert.equal(history.transactions.length, 1);
   assert.equal(history.transactions[0].kind, "bootstrap-binding");

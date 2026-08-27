@@ -5459,6 +5459,29 @@ export function applyOnboardingIntakeDesignQuestions({
 
 export const INTAKE_GENERATE_PLAN_SCHEMA = "pipeline.onboarding-intake-generate-plan.v1";
 export const INTAKE_GENERATE_APPLY_SCHEMA = "pipeline.onboarding-intake-generate-apply.v1";
+// NVA-INTAKESPECS-1 (PO decision 2026-08-27). The generated design package is written
+// straight into `specs/<featureId>/` -- the location ADR-0045 and roles/elephant.md already
+// name -- instead of a separate `project/.onboarding-staging/` holding area.
+//
+// The holding area was not merely a misplaced directory. It created a second, parallel notion
+// of "the design documents", which produced three defects at once, all observed live on
+// 2026-08-27: the plan-approval route bound the pre-authority draft AS the authority while
+// its own banner said it must not be (backlog:
+// 2026-08-27-plan-approval-binds-a-staging-draft-as-project-authority.md); GS-15 then had to
+// protect that directory from the very agent whose job was to author it, which deadlocked the
+// greenfield happy path until NVA-GS15-1 stood the rule down again; and a promotion step
+// existed on one route and not the other, so which route a project took decided whether the
+// PRD/Spec quality bar applied at all. Writing to the real location from the start removes the
+// distinction instead of adding a guard against getting it wrong.
+export function intakeDesignDirname(featureId) {
+  return `specs/${featureId}`;
+}
+
+// NVA-INTAKESPECS-1 transitional: nothing writes here any more. Retained ONLY so GS-15 and its
+// TP-6-protected regression test keep describing a real path until the one signed override that
+// removes both can run (scratch/NVA-INTAKESPECS-1-UMSETZUNG.md names the exact removal steps).
+// Delete this constant, GS-15, and the legacy branch in onboarding-staging-authoring.mjs
+// together -- it is a bridge with a named end, not a second supported location.
 export const INTAKE_STAGING_DIRNAME = "project/.onboarding-staging";
 // Exported so guard-lifecycle-ready.mjs's narrow bootstrap-binding-required
 // staging-authoring admission (NVA-BL-INTAKEBIND-1) can recognize a real
@@ -5657,19 +5680,20 @@ function buildOnboardingIntakeGeneratePlan({
   const specContent = buildIntakeSpecContent(checkpoint, featureId, chunks);
   const specSha256 = sha256(Buffer.from(specContent, "utf8"));
   const prdContent = buildIntakePrdContent(checkpoint, featureId, chunks, specSha256);
+  const designDirectory = intakeDesignDirname(featureId);
   const targets = {
     designInput: {
-      path: `${INTAKE_STAGING_DIRNAME}/design-input.md`,
+      path: `${designDirectory}/design-input.md`,
       afterSha256: sha256(Buffer.from(designInputContent, "utf8")),
       content: designInputContent,
     },
     prd: {
-      path: `${INTAKE_STAGING_DIRNAME}/prd_${featureId}.md`,
+      path: `${designDirectory}/prd_${featureId}.md`,
       afterSha256: sha256(Buffer.from(prdContent, "utf8")),
       content: prdContent,
     },
     spec: {
-      path: `${INTAKE_STAGING_DIRNAME}/spec.md`,
+      path: `${designDirectory}/spec.md`,
       afterSha256: specSha256,
       content: specContent,
     },
@@ -5690,16 +5714,21 @@ export function planOnboardingIntakeGenerate(options = {}) {
   return buildOnboardingIntakeGeneratePlan(options);
 }
 
-function ensureIntakeStagingDirectory(root) {
-  const projectDirectory = join(root, "project");
-  if (!existsSync(projectDirectory)) {
-    fail("INTAKE-GENERATE-PROJECT-DIRECTORY-MISSING", "intake staging generation requires the project/ directory to already exist");
+// NVA-INTAKESPECS-1: `specs/` is the repository's own design-package root (ADR-0045) and,
+// unlike the former `project/` precondition, is created here when absent rather than demanded
+// of the caller -- a greenfield repository legitimately has no specs/ yet, and refusing to
+// create it would reintroduce a dead end on the very first onboarding.
+function ensureIntakeDesignDirectory(root, featureId) {
+  const specsDirectory = join(root, "specs");
+  if (!existsSync(specsDirectory)) {
+    mkdirSync(specsDirectory, { mode: 0o755 });
+    fsyncDirectory(root);
   }
-  const stagingDirectory = join(root, INTAKE_STAGING_DIRNAME);
-  if (existsSync(stagingDirectory)) return stagingDirectory;
-  mkdirSync(stagingDirectory, { mode: 0o755 });
-  fsyncDirectory(projectDirectory);
-  return stagingDirectory;
+  const designDirectory = join(root, ...intakeDesignDirname(featureId).split("/"));
+  if (existsSync(designDirectory)) return designDirectory;
+  mkdirSync(designDirectory, { mode: 0o755 });
+  fsyncDirectory(specsDirectory);
+  return designDirectory;
 }
 
 /**
@@ -5768,7 +5797,7 @@ export function applyOnboardingIntakeGenerate({
   if (!SHA256_RE.test(expectedPlanSha256 ?? "") || plan.planSha256 !== expectedPlanSha256) {
     fail("INTAKE-GENERATE-PLAN-DIGEST", "intake staging generation plan digest does not match");
   }
-  const stagingDirectory = ensureIntakeStagingDirectory(plan.root);
+  const stagingDirectory = ensureIntakeDesignDirectory(plan.root, plan.featureId);
   const targets = {
     designInput: writeIntakeStagingTargetIfDifferent(plan.root, stagingDirectory, "designInput", plan.targets.designInput, deps),
     prd: writeIntakeStagingTargetIfDifferent(plan.root, stagingDirectory, "prd", plan.targets.prd, deps),
@@ -5846,9 +5875,10 @@ function resolveBootstrapBindInputs({ rootDir, repositoryCapability = "local", s
     fail("BOOTSTRAP-BIND-PRECONDITION", "coordinator-sourced binding requires a profile already recorded on the checkpoint");
   }
   const featureId = deriveIntakeFeatureId(checkpoint);
-  const prdPath = `${INTAKE_STAGING_DIRNAME}/prd_${featureId}.md`;
-  const specPath = `${INTAKE_STAGING_DIRNAME}/spec.md`;
-  const designInputPath = `${INTAKE_STAGING_DIRNAME}/design-input.md`;
+  const designDirectory = intakeDesignDirname(featureId);
+  const prdPath = `${designDirectory}/prd_${featureId}.md`;
+  const specPath = `${designDirectory}/spec.md`;
+  const designInputPath = `${designDirectory}/design-input.md`;
   return {
     root: observed.paths.root, profile: checkpoint.values.profile, featureId,
     planPath: prdPath, prdPath, specPath, designInputPath,
