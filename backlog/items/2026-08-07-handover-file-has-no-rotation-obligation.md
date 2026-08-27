@@ -379,7 +379,7 @@ deleted. `docs/state.md` is reduced from 19,155 lines to its live head
 archived range (original lines 4977–19155) is preserved verbatim in
 `docs/state-archive/2026-08-19--pre-restart-and-nova-inherited-history.md`,
 whose own Provenance section carries the full extraction-pass summary.
-Full account: [ADR-0064's 2026-08-19 addendum](../../docs/adr/0064-handover-rotation-extraction-archive-hard-size-gate.md#addendum--2026-08-19-extraction-pass-complete-live-rotation-has-run).
+Full account: [ADR-0064's 2026-08-19 addendum](../../docs/adr/0073-handover-rotation-extraction-archive-hard-size-gate.md#addendum--2026-08-19-extraction-pass-complete-live-rotation-has-run).
 
 **Item stays open.** ADR-0064's own Follow-up section still lists real
 remaining work this round did not do and was not scoped to do:

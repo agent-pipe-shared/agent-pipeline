@@ -108,6 +108,15 @@ That line is what keeps every frozen historical mention resolvable. Without it, 
 archives would leave dangling references; with it, the archives stay honest AND readable. It is a
 required part of a renumbering, not a courtesy.
 
+**A Markdown link TARGET is navigation, not attestation, and is repaired even in a frozen
+artifact — the prose is not.** A frozen record attests what it says; a link path is how a reader
+reaches the document it already names. Repointing `](../../docs/adr/0064-x.md)` at the renamed file
+falsifies nothing, because it resolves to the same document; leaving it dead makes the frozen
+record unusable and fails `check-doc-contracts.mjs`, which has no forwarding-aware exemption. The
+number written in the prose stays exactly as it was, and the forwarding line explains it. So:
+repair dead link paths anywhere, including closed backlog items; never touch a frozen artifact's
+sentences.
+
 **Living vs. frozen for backlog items is decided by the item's own status**, not by the directory:
 an OPEN item referencing an ADR is a living reference and is rewritten; a CLOSED or REJECTED item
 is a historical record and is left alone, resolvable through the forwarding line. Without this
