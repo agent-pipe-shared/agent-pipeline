@@ -24,6 +24,7 @@ import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { name, CAPABILITY_CONTRACT_V2, gitleaksContentAuthorityLine, gitleaksConfigMissingResult, run } from "./gitleaks.mjs";
 import { resolveTrustedSystemExecutable } from "../tool-identity.mjs";
+import { repairStaleIgnoreEntry } from "../gitleaks-repair-ignore.mjs";
 
 test("CAPABILITY_CONTRACT_V2 exists and is frozen", () => {
   assert.ok(CAPABILITY_CONTRACT_V2, "CAPABILITY_CONTRACT_V2 export is missing");
@@ -190,6 +191,132 @@ test("run() matches a content-v1 authority against the detached snapshot's absol
     assert.equal(result.status, "PASS");
     assert.equal(result.findings.length, 0);
     assert.equal(result.ignored.findingCount, 1);
+  } finally {
+    rmSync(rootDir, { recursive: true, force: true });
+  }
+});
+
+// ===============================================================================================
+// Near-miss diagnostic + repair command (NVA-GLFP-1) -- a stale `.gitleaksignore` entry (same
+// path+rule+column, different line) must say so explicitly and name the exact repair command; a
+// genuine new finding (no entry at that location at all) must stay silent about it.
+// ===============================================================================================
+
+test("run() flags a near-miss: a .gitleaksignore entry exists for the same path+rule+column but a different line, and names both lines plus the literal repair command", async () => {
+  const rootDir = mkdtempSync(join(tmpdir(), "gitleaks-nearmiss-"));
+  try {
+    const relPath = "backlog/fixture-nearmiss.txt";
+    mkdirSync(join(rootDir, "backlog"), { recursive: true });
+    writeFileSync(join(rootDir, relPath), "fixture content\n");
+    // Stale entry: recorded at line 10, but edits moved the same finding down to line 55.
+    const staleFinding = { File: relPath, RuleID: "fixture-rule", StartLine: 10, StartColumn: 4, Secret: "fixture-secret-value-a" };
+    writeFileSync(join(rootDir, ".gitleaksignore"), `${gitleaksContentAuthorityLine(staleFinding)}\n`);
+    const liveFinding = { File: join(rootDir, relPath), RuleID: "fixture-rule", StartLine: 55, StartColumn: 4, Secret: "fixture-secret-value-b", Description: "fixture finding" };
+    const spySpawn = (cmd, args) => {
+      writeFileSync(args[args.indexOf("--report-path") + 1], JSON.stringify([liveFinding]));
+      return { status: 0, stdout: "", stderr: "", error: null };
+    };
+    const result = await run({ rootDir, config: { binaryPath: join(rootDir, "unused-fake-gitleaks") }, spawnFn: spySpawn, timeoutMs: 5000 });
+    assert.equal(result.status, "FINDINGS", "the stale entry must NOT suppress the finding -- going inert stays the safe direction");
+    assert.equal(result.findings.length, 1);
+    const msg = result.findings[0].msg;
+    assert.match(msg, /stale/i);
+    assert.match(msg, /line 10/, "must name the entry's recorded line");
+    assert.match(msg, /line 55/, "must name the finding's current line");
+    assert.match(msg, /gitleaks-repair-ignore\.mjs/, "must name the repair command literally");
+    assert.match(msg, /--path backlog\/fixture-nearmiss\.txt/);
+    assert.match(msg, /--rule fixture-rule/);
+    assert.match(msg, /--column 4/);
+    assert.match(msg, /--old-line 10/);
+  } finally {
+    rmSync(rootDir, { recursive: true, force: true });
+  }
+});
+
+test("run() does NOT add the near-miss diagnostic when no .gitleaksignore entry exists at that path+rule+column at all (genuine new finding stays exactly as loud)", async () => {
+  const rootDir = mkdtempSync(join(tmpdir(), "gitleaks-genuine-"));
+  try {
+    const relPath = "backlog/fixture-genuine.txt";
+    mkdirSync(join(rootDir, "backlog"), { recursive: true });
+    writeFileSync(join(rootDir, relPath), "fixture content\n");
+    // The only ignore entry present is for an unrelated path -- proves the check is scoped to a
+    // real same-location match, not "some entry exists somewhere in the file".
+    const unrelatedFinding = { File: "backlog/unrelated.txt", RuleID: "fixture-rule", StartLine: 1, StartColumn: 1, Secret: "fixture-secret-value-c" };
+    writeFileSync(join(rootDir, ".gitleaksignore"), `${gitleaksContentAuthorityLine(unrelatedFinding)}\n`);
+    const liveFinding = { File: join(rootDir, relPath), RuleID: "fixture-rule", StartLine: 20, StartColumn: 4, Secret: "fixture-secret-value-d", Description: "fixture finding" };
+    const spySpawn = (cmd, args) => {
+      writeFileSync(args[args.indexOf("--report-path") + 1], JSON.stringify([liveFinding]));
+      return { status: 0, stdout: "", stderr: "", error: null };
+    };
+    const result = await run({ rootDir, config: { binaryPath: join(rootDir, "unused-fake-gitleaks") }, spawnFn: spySpawn, timeoutMs: 5000 });
+    assert.equal(result.status, "FINDINGS");
+    assert.equal(result.findings.length, 1);
+    assert.equal(result.findings[0].msg, "fixture finding", "no diagnostic text appended -- must stay byte-identical to the original message");
+    assert.doesNotMatch(result.findings[0].msg, /gitleaks-repair-ignore/);
+    assert.doesNotMatch(result.findings[0].msg, /stale/i);
+  } finally {
+    rmSync(rootDir, { recursive: true, force: true });
+  }
+});
+
+test("gitleaks-repair-ignore.mjs's repairStaleIgnoreEntry() recomputes a stale entry in place, and the scan then accepts it", async () => {
+  const rootDir = mkdtempSync(join(tmpdir(), "gitleaks-repair-"));
+  try {
+    const relPath = "backlog/fixture-repair.txt";
+    mkdirSync(join(rootDir, "backlog"), { recursive: true });
+    writeFileSync(join(rootDir, relPath), "fixture content\n");
+    const staleFinding = { File: relPath, RuleID: "fixture-rule", StartLine: 3, StartColumn: 7, Secret: "fixture-secret-value-e" };
+    const preexistingEntry = "content-v1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:backlog/other.txt:fixture-rule:1:1";
+    writeFileSync(join(rootDir, ".gitleaksignore"), `${preexistingEntry}\n${gitleaksContentAuthorityLine(staleFinding)}\n`);
+    const liveFinding = { File: join(rootDir, relPath), RuleID: "fixture-rule", StartLine: 48, StartColumn: 7, Secret: "fixture-secret-value-e", Description: "fixture finding" };
+    const spySpawn = (cmd, args) => {
+      writeFileSync(args[args.indexOf("--report-path") + 1], JSON.stringify([liveFinding]));
+      return { status: 0, stdout: "", stderr: "", error: null };
+    };
+
+    const before = await run({ rootDir, config: { binaryPath: join(rootDir, "unused-fake-gitleaks") }, spawnFn: spySpawn, timeoutMs: 5000 });
+    assert.equal(before.status, "FINDINGS", "sanity: the stale entry must not already suppress the moved finding");
+
+    const repairResult = await repairStaleIgnoreEntry({
+      rootDir,
+      path: relPath,
+      rule: "fixture-rule",
+      column: 7,
+      oldLine: 3,
+      spawnFn: spySpawn,
+      binaryPath: join(rootDir, "unused-fake-gitleaks"),
+    });
+    assert.equal(repairResult.ok, true, `expected repair to succeed: ${repairResult.reason ?? ""}`);
+    assert.equal(repairResult.oldLine, 3);
+    assert.equal(repairResult.newLine, 48);
+
+    const rewritten = readFileSync(join(rootDir, ".gitleaksignore"), "utf8");
+    assert.ok(rewritten.includes(preexistingEntry), "the unrelated pre-existing entry must be left untouched");
+    assert.equal(rewritten.includes(gitleaksContentAuthorityLine(staleFinding)), false, "the stale entry itself must be gone");
+
+    const after = await run({ rootDir, config: { binaryPath: join(rootDir, "unused-fake-gitleaks") }, spawnFn: spySpawn, timeoutMs: 5000 });
+    assert.equal(after.status, "PASS", `expected the repaired entry to now suppress the finding, got ${after.status} (${JSON.stringify(after.findings)})`);
+    assert.equal(after.ignored.findingCount, 1);
+  } finally {
+    rmSync(rootDir, { recursive: true, force: true });
+  }
+});
+
+test("repairStaleIgnoreEntry() refuses when no entry matches path+rule+column+old-line (nothing to repair, never guesses)", async () => {
+  const rootDir = mkdtempSync(join(tmpdir(), "gitleaks-repair-noop-"));
+  try {
+    writeFileSync(join(rootDir, ".gitleaksignore"), "content-v1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:backlog/other.txt:fixture-rule:1:1\n");
+    const result = await repairStaleIgnoreEntry({
+      rootDir,
+      path: "backlog/nonexistent.txt",
+      rule: "fixture-rule",
+      column: 7,
+      oldLine: 3,
+      spawnFn: () => { throw new Error("must not spawn gitleaks when there is nothing to repair"); },
+      binaryPath: join(rootDir, "unused-fake-gitleaks"),
+    });
+    assert.equal(result.ok, false);
+    assert.match(result.reason, /nothing to repair/);
   } finally {
     rmSync(rootDir, { recursive: true, force: true });
   }

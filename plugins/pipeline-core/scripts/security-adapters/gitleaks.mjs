@@ -62,6 +62,17 @@
  * behavior documented above, exported for CYB-2E's later aggregator work to read a uniform
  * capability contract across all four scanner adapters without re-deriving it from prose
  * comments. Purely additive data -- does not change any existing behavior in this file.
+ *
+ * NEAR-MISS DIAGNOSTIC (NVA-GLFP-1): the `.gitleaksignore` content-v1 authority deliberately binds
+ * the exact line (backlog: pipeline.gitleaks-content-fingerprint-breaks-on-any-line-insertion-
+ * above-it) -- a digest that ignored position would keep suppressing a rule at a location that no
+ * longer holds what was reviewed, so going inert when the line moves is the correct, SAFE
+ * direction and stays unchanged here. What changes is legibility only: a blocked finding whose
+ * path+rule+column matches an entry recorded at a DIFFERENT line gets an appended, human-readable
+ * note in its `msg` naming both lines and the exact `gitleaks-repair-ignore.mjs` command that
+ * recomputes the entry in place -- never run automatically, never touching detection. A finding
+ * with no entry at that location at all is untouched (still a genuine new finding, exactly as
+ * loud as before).
  */
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
@@ -149,7 +160,7 @@ function safeAuthorityPath(path) {
   return parts.length > 0 && parts.every((part) => part.length > 0 && part !== "." && part !== "..");
 }
 
-function parseContentAuthorityLine(line) {
+export function parseContentAuthorityLine(line) {
   if (!line.startsWith(CONTENT_AUTHORITY_PREFIX)) return { kind: "legacy" };
   const match = /^content-v1:([a-f0-9]{64}):(.+):([a-zA-Z0-9][a-zA-Z0-9._-]*):([1-9][0-9]*):([1-9][0-9]*)$/u.exec(line);
   if (!match) return { kind: "invalid" };
@@ -160,11 +171,22 @@ function parseContentAuthorityLine(line) {
   return { kind: "content", digest, path, rule, line: lineNumber, column };
 }
 
+// Near-miss index (NVA-GLFP-1): keyed on path+rule+column WITHOUT the line, so a blocked
+// finding whose line moved (e.g. lines inserted above it) can be told apart from a genuine new
+// finding. Deliberately does not affect `entries` (the exact-match suppression set) at all --
+// this is diagnostic-only and never widens what the scan silently ignores. First-seen line per
+// location key wins; a location covered by more than one stale line is a rare edge case left to
+// the (also first-match) repair command to report as ambiguous rather than guessed at here.
+function locationKeyLessLine(path, rule, column) {
+  return `${path}\0${rule}\0${column}`;
+}
+
 function loadContentAuthority(rootDir) {
   const path = pathJoin(rootDir, IGNORE_FILE);
   if (!existsSync(path)) return {
     ok: true,
     entries: new Set(),
+    linesByLocation: new Map(),
     sha256: null,
     path: IGNORE_FILE,
   };
@@ -180,6 +202,7 @@ function loadContentAuthority(rootDir) {
     const raw = readFileSync(physicalPath);
     if (raw.length > MAX_IGNORE_BYTES) return { ok: false, reason: `${IGNORE_FILE} exceeds ${MAX_IGNORE_BYTES} bytes` };
     const entries = new Set();
+    const linesByLocation = new Map();
     for (const rawLine of raw.toString("utf8").split(/\r?\n/u)) {
       const line = rawLine.trim();
       if (line === "" || line.startsWith("#")) continue;
@@ -189,11 +212,22 @@ function loadContentAuthority(rootDir) {
       const key = `${parsed.digest}\0${parsed.path}\0${parsed.rule}\0${parsed.line}\0${parsed.column}`;
       if (entries.has(key)) return { ok: false, reason: `${IGNORE_FILE} contains a duplicate content-v1 authority` };
       entries.add(key);
+      const locKey = locationKeyLessLine(parsed.path, parsed.rule, parsed.column);
+      if (!linesByLocation.has(locKey)) linesByLocation.set(locKey, parsed.line);
     }
-    return { ok: true, entries, sha256: sha256(raw), path: IGNORE_FILE };
+    return { ok: true, entries, linesByLocation, sha256: sha256(raw), path: IGNORE_FILE };
   } catch (error) {
     return { ok: false, reason: `${IGNORE_FILE} could not be authenticated: ${error.message}` };
   }
+}
+
+// Returns the OTHER recorded line for this finding's path+rule+column, or null when there is
+// none (a genuine new finding, per DoD -- must stay silent) or when the recorded line is this
+// finding's own current line (an exact match, already suppressed upstream, never reaches here).
+function findNearMissLine(linesByLocation, fingerprint) {
+  const entryLine = linesByLocation.get(locationKeyLessLine(fingerprint.path, fingerprint.rule, fingerprint.column));
+  if (entryLine === undefined || entryLine === fingerprint.line) return null;
+  return entryLine;
 }
 
 function authorityKey(finding) {
@@ -208,7 +242,7 @@ function authorityKey(finding) {
 // physical regular candidate descendant before computing that authority key.  External,
 // missing, linked, or otherwise ambiguous paths remain untouched and therefore cannot match
 // an authority entry.
-function normalizeCandidateFindingPath(finding, rootDir) {
+export function normalizeCandidateFindingPath(finding, rootDir) {
   const field = typeof finding?.File === "string" ? "File" : typeof finding?.file === "string" ? "file" : null;
   if (field === null || !isAbsolute(finding[field])) return finding;
   try {
@@ -409,14 +443,31 @@ export async function run({ rootDir, config = {}, spawnFn = nodeSpawnSync, timeo
     else retained.push(finding);
   }
 
-  const findings = retained.map((f) => ({
-    tool: name,
-    severity: "high", // fixed mapping -- see header (gitleaks has no native severity field)
-    rule: f?.RuleID ?? f?.rule ?? "unknown-rule",
-    path: f?.File ?? f?.file ?? null,
-    line: typeof f?.StartLine === "number" ? f.StartLine : typeof f?.line === "number" ? f.line : null,
-    msg: f?.Description ?? f?.description ?? f?.Message ?? "secret detected",
-  }));
+  const findings = retained.map((f) => {
+    const base = {
+      tool: name,
+      severity: "high", // fixed mapping -- see header (gitleaks has no native severity field)
+      rule: f?.RuleID ?? f?.rule ?? "unknown-rule",
+      path: f?.File ?? f?.file ?? null,
+      line: typeof f?.StartLine === "number" ? f.StartLine : typeof f?.line === "number" ? f.line : null,
+      msg: f?.Description ?? f?.description ?? f?.Message ?? "secret detected",
+    };
+    // Near-miss diagnostic (NVA-GLFP-1): a blocked finding whose path+rule+column matches a
+    // .gitleaksignore entry recorded at a DIFFERENT line is very likely that same suppression
+    // gone stale (something moved above it), not a genuine new secret. Never auto-repaired --
+    // this only names the mismatch and points at the standalone repair command a human runs on
+    // request (gitleaks-repair-ignore.mjs). A finding with no entry at this location at all gets
+    // none of this and stays exactly as loud as before.
+    const fingerprint = canonicalContentFingerprint(f);
+    if (fingerprint !== null) {
+      const nearMissLine = findNearMissLine(contentAuthority.linesByLocation, fingerprint);
+      if (nearMissLine !== null) {
+        const repairCmd = `node plugins/pipeline-core/scripts/gitleaks-repair-ignore.mjs --path ${fingerprint.path} --rule ${fingerprint.rule} --column ${fingerprint.column} --old-line ${nearMissLine}`;
+        base.msg = `${base.msg} [possibly-stale .gitleaksignore suppression: an entry exists for ${fingerprint.path}:${fingerprint.rule} column ${fingerprint.column} recorded at line ${nearMissLine}, but this finding is now at line ${fingerprint.line} -- likely the suppression just needs its line updated, not a new secret. Repair: ${repairCmd}]`;
+      }
+    }
+    return base;
+  });
 
   return {
     status: findings.length > 0 ? "FINDINGS" : "PASS",
