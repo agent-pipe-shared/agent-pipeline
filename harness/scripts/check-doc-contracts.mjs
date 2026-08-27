@@ -146,7 +146,7 @@ export const VENDORED_LINK_EXCLUSIONS = Object.freeze([
     "0059-signed-human-guard-override.md",
     "0060-handover-placement-and-rotation.md",
   ]),
-  vendoredLinkExclusion("docs/adr/0065-port-authorize-critical-ceremony.md", [
+  vendoredLinkExclusion("docs/adr/0074-port-authorize-critical-ceremony.md", [
     "0058-guard-maintenance-window.md",
     "0059-signed-human-guard-override.md",
   ]),

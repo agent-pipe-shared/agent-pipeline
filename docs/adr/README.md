@@ -80,13 +80,13 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required 
 | [0064](0064-release-preflight-consent-reuses-the-uniform-approval-ceremony.md) | Release-preflight consent is a fourth critical-action kind, not a fourth ceremony — reuses `po-human-approval.mjs authorize-critical` under ADR-0061 instead of inventing a new mechanism | accepted | 2026-08-17 |
 | [0064](0064-handover-rotation-extraction-archive-hard-size-gate.md) | Handover rotation: extraction, archive, hard size gate | accepted | 2026-08-18 |
 | [0065](0065-a-voided-gate-is-re-earned-from-declared-inputs.md) | A voided Verify gate is cheaply re-earned from per-suite declared inputs (finishing the existing `verify-resume.mjs` mechanism), not preserved by a coarser commit-diff envelope — Security and push approval stay whole-tree/whole-commit by design | accepted | 2026-08-17 |
-| [0065](0065-port-authorize-critical-ceremony.md) | Port origin/main's `authorize-critical` single-command ceremony (ADR-0061) into Phoenix | accepted | 2026-08-18 |
 | [0066](0066-handover-rotation-extraction-archive-hard-size-gate.md) | The handover rotates via extraction-then-archive (`docs/state-archive/`), gated by two independent triggers — block/feature-boundary rotation AND a hard size cap that fires even mid-sprint, closing ADR-0060 Decision 5 | accepted | 2026-08-17 |
 | [0066](0066-publication-approval-time-signature-accepted-tradeoff.md) | Publication's approval-time-only Ed25519 signature check is an accepted, bounded tradeoff (no execution-time re-verification) | accepted | 2026-08-19 |
 | [0067](0067-tri-runner-antigravity-integration.md) | Elevate Google Antigravity CLI (`agy`) with Gemini models to a full 3rd runner with hard hook enforcement, headless dispatch and honest profile mapping, extending ADR-0051/0057 | accepted | 2026-08-22 |
 | [0068](0068-backlog-ledger-merge-semantics.md) | Merging two parallel sprints' backlog ledgers: one active chain with archived, integrity-checked siblings; amendments become status-neutral and bind their target by `entryHash` rather than by physical sequence | accepted | 2026-08-27 |
 | [0069](0069-adr-numbers-are-allocated-at-acceptance.md) | ADR numbers are allocated at acceptance into the trunk, never at drafting time, and carry no sprint prefix; duplicates are a hard Verify failure, and an existing collision is resolved by reference load with a forwarding line rather than by rewriting archives | accepted | 2026-08-27 |
 | [0071](0071-governance-event-kernel.md) | Governance event kernel uses separate immutable stream records (Phoenix PHX-1; renumbered from the 0047 numbering collision, then renumbered again from 0062 under ADR-0069 D4) | accepted | 2026-08-02 |
+| [0074](0074-port-authorize-critical-ceremony.md) | Port origin/main's `authorize-critical` single-command ceremony (ADR-0061) into Phoenix (renumbered from 0065 under ADR-0069 D4) | accepted | 2026-08-18 |
 
 ### Resubmissions
 
