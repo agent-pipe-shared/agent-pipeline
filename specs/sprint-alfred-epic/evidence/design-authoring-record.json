@@ -43,53 +43,6 @@
         "specs/sprint-alfred-epic/spec.md"
       ],
       "note": "Critic round-2 fix commit; dispositions in evidence/critic/round-2-response.md"
-    },
-    {
-      "sha": "1d4060b1",
-      "files": [
-        "docs/state.md",
-        "specs/sprint-alfred-epic/evidence/critic/round-2-2026-08-27.md",
-        "specs/sprint-alfred-epic/evidence/critic/round-2-findings-registry.md",
-        "specs/sprint-alfred-epic/evidence/critic/round-2-response.md",
-        "specs/sprint-alfred-epic/evidence/design-authoring-record.json"
-      ],
-      "note": "Round-2 review-evidence commit (added retroactively per round-4 finding F2)"
-    },
-    {
-      "sha": "0181fe4b",
-      "files": [
-        "specs/sprint-alfred-epic/evidence/design-authoring-record.json"
-      ],
-      "note": "Critic round-3 fix commit; disposition in evidence/critic/round-3-response.md"
-    },
-    {
-      "sha": "7d184213",
-      "files": [
-        "docs/state.md",
-        "specs/sprint-alfred-epic/evidence/critic/round-3-2026-08-27.md",
-        "specs/sprint-alfred-epic/evidence/critic/round-3-findings-registry.md",
-        "specs/sprint-alfred-epic/evidence/critic/round-3-response.md",
-        "specs/sprint-alfred-epic/evidence/design-authoring-record.json"
-      ],
-      "note": "Round-3 review-evidence commit (added retroactively per round-4 finding F2)"
-    },
-    {
-      "sha": "3f2fcb31",
-      "files": [
-        "docs/state.md",
-        "specs/sprint-alfred-epic/evidence/critic/round-4-2026-08-27.md",
-        "specs/sprint-alfred-epic/evidence/critic/round-4-response.md"
-      ],
-      "note": "Round-4 review-evidence commit closing cycle 1 (PASS scoped)"
-    },
-    {
-      "sha": "bfa7cac8",
-      "files": [
-        "specs/sprint-alfred-epic/acceptance.md",
-        "specs/sprint-alfred-epic/design/backlog-intake.md",
-        "specs/sprint-alfred-epic/design/issue-intake.md"
-      ],
-      "note": "PO gate decisions of 2026-08-28 applied to the unbound package documents"
     }
   ],
   "commitsNote": "The newest evidence-recording commit is always absent from commits[] until the next entry adds it (a commit's sha cannot be known while its own tree is being authored). No declared fact depends on commits[] completeness.",
