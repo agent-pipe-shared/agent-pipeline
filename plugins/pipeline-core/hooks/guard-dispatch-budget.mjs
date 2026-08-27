@@ -101,9 +101,29 @@
  * git common dir itself unresolvable) allows the call (verdict 0). Where a
  * common dir COULD be resolved, one line is appended to
  * `<git-common-dir>/agent-pipeline/dispatch-budget/unresolved.jsonl`
- * recording the reason and whatever fields were available, so the gap is
- * measurable, never silent. This guard never fails closed on its own
- * confusion -- that would halt every dispatch in the repository.
+ * recording the branch taken, the reason, the resolved root and common dir,
+ * the raw `transcript_path`, an instant, and whatever identity fields were
+ * available, so the gap is measurable, never silent. This guard never fails
+ * closed on its own confusion -- that would halt every dispatch in the
+ * repository.
+ *
+ * Two further branches used to return an allow verdict with nothing recorded
+ * at all -- NVA-BUDGETROOT-1 closes both:
+ * - `identity.kind === "orchestrator"` fires on EVERY orchestrating-session
+ *   tool call, so an append-only log there would grow without limit for a
+ *   long session. The bound is one marker file per session, keyed off the
+ *   session's own transcript filename, under
+ *   `<git-common-dir>/agent-pipeline/dispatch-budget/orchestrator-seen/`:
+ *   the first call for a given session writes it, every later call for the
+ *   SAME session sees the file already exists and writes nothing further.
+ * - `commonDir === null` means there is no guard-owned location left to
+ *   write to at all (every sink above lives under the common dir that failed
+ *   to resolve). `scratch/` was considered and rejected for the same reason
+ *   the counter itself never lives there (see Storage below): it is
+ *   agent-writable, so a diagnostic log placed there would be exactly as
+ *   erasable as having none. This branch is instead surfaced on the guard's
+ *   own stderr -- the one channel guaranteed to exist for a PreToolUse hook
+ *   regardless of git state -- without changing the exit code.
  */
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
@@ -291,32 +311,92 @@ function recordUnresolved(commonDir, record, dependencies) {
   }
 }
 
+/** One line on the guard's own stderr -- see the Fail-open-but-visible doc block above for why this is the only channel left when `commonDir` itself could not be resolved. Never affects the exit code. */
+function observationLine(record) {
+  return `OBSERVE (guard-dispatch-budget): ${JSON.stringify(record)}\n`;
+}
+
+/**
+ * Bounded sink for the orchestrator branch (DoD b, NVA-BUDGETROOT-1): one
+ * marker file per session, keyed off the session's own transcript filename.
+ * `existsSync` is checked before every write, so a session that makes 500
+ * tool calls still produces exactly one file, not 500 -- the bound.
+ */
+function orchestratorMarkerPath(commonDir, transcriptPath) {
+  const stem = typeof transcriptPath === "string" && transcriptPath.trim() !== ""
+    ? basename(transcriptPath).replace(/\.jsonl$/u, "")
+    : "unknown-session";
+  return join(commonDir, "agent-pipeline", "dispatch-budget", "orchestrator-seen", `${stem}.json`);
+}
+
+function recordOrchestratorObservation(commonDir, record, dependencies) {
+  const existsSyncFn = dependencies.existsSyncFn ?? existsSync;
+  const mkdirSyncFn = dependencies.mkdirSyncFn ?? mkdirSync;
+  const writeFileSyncFn = dependencies.writeFileSyncFn ?? writeFileSync;
+  try {
+    const path = orchestratorMarkerPath(commonDir, record.transcriptPath);
+    if (existsSyncFn(path)) return; // already recorded once for this session -- the bound
+    mkdirSyncFn(dirname(path), { recursive: true, mode: 0o700 });
+    writeFileSyncFn(path, `${JSON.stringify(record, null, 2)}\n`, "utf8");
+  } catch {
+    // best-effort observability only -- never let a logging failure change the fail-open verdict
+  }
+}
+
 /**
  * @param {object} input the PreToolUse hook payload (`tool_name`, `tool_input`, `transcript_path`, ...)
  * @param {object} [options]
- * @param {string} [options.rootDir] the project root; defaults to `process.cwd()`
+ * @param {string} [options.rootDir] highest-precedence project-root override (tests only). Absent that,
+ *   resolution mirrors the working siblings that already resolve a project root this way --
+ *   `guard-lifecycle-ready.mjs` (`dependencies.projectDir ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd()`)
+ *   and `guard-testpath.mjs` (`process.env.CLAUDE_PROJECT_DIR || process.cwd()`), both of which read
+ *   `CLAUDE_PROJECT_DIR` -- the variable the host sets for hooks -- before falling back to the guard
+ *   process's own `process.cwd()`. `guard-push.mjs`'s host-declared payload `cwd` (`declaredCwd`,
+ *   `resolveShellCwd()`) is deliberately NOT part of this chain: that field answers a narrower question
+ *   (the exact directory ONE push command executes in) which `guard-push.mjs`'s own
+ *   `fallbackProjectDir()` -- its equivalent of a project-root resolver -- already excludes for the same
+ *   reason ("never anchors the critical-proof boundary... to a declared push target"). `rootDir` here
+ *   serves that same project-root role (locating the git common dir and an agent definition file), so it
+ *   follows `fallbackProjectDir()`'s precedent rather than inventing a combined order no sibling uses.
  * @param {() => string} [options.nowFn] clock override (tests only)
  * @param {object} [options] also doubles as the dependency-injection bag for every helper above (tests only)
  */
 export function evaluateDispatchBudgetGuard(input, options = {}) {
-  const rootDir = options.rootDir ?? process.cwd();
+  const rootDir = options.rootDir ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd();
   const nowFn = options.nowFn ?? (() => new Date().toISOString());
+  const rawTranscriptPath = input?.transcript_path;
 
   const identity = subagentIdentity(input, options);
-  if (identity.kind === "orchestrator") return verdict(0); // never limited, by construction
-
   const commonDir = (options.resolveGitCommonDirFn ?? resolveGitCommonDir)(rootDir, options);
-  if (commonDir === null) return verdict(0); // nowhere safe to persist or record -- fail open, silently
+
+  if (commonDir === null) {
+    // No guard-owned location survives to write to -- see the Fail-open-but-visible
+    // doc block above. Fail open, but say so on stderr rather than silently.
+    return verdict(0, observationLine({
+      branch: "common-dir-unresolved", identityKind: identity.kind,
+      root: rootDir, commonDir: null, transcriptPath: rawTranscriptPath, at: nowFn(),
+    }));
+  }
+
+  if (identity.kind === "orchestrator") {
+    recordOrchestratorObservation(commonDir, {
+      branch: "orchestrator", root: rootDir, commonDir, transcriptPath: rawTranscriptPath, at: nowFn(),
+    }, options);
+    return verdict(0); // never limited, by construction
+  }
 
   if (identity.kind === "unresolved") {
-    recordUnresolved(commonDir, { ...identity, at: nowFn() }, options);
+    recordUnresolved(commonDir, {
+      ...identity, branch: "unresolved-identity", root: rootDir, commonDir, transcriptPath: rawTranscriptPath, at: nowFn(),
+    }, options);
     return verdict(0);
   }
 
   const maxTurns = (options.resolveMaxTurnsFn ?? resolveMaxTurns)(identity.agentType, rootDir, options);
   if (maxTurns === null) {
     recordUnresolved(commonDir, {
-      kind: "unresolved", reason: "max-turns-unresolvable", agentId: identity.agentId, agentType: identity.agentType, at: nowFn(),
+      kind: "unresolved", reason: "max-turns-unresolvable", agentId: identity.agentId, agentType: identity.agentType,
+      branch: "max-turns-unresolved", root: rootDir, commonDir, transcriptPath: rawTranscriptPath, at: nowFn(),
     }, options);
     return verdict(0);
   }

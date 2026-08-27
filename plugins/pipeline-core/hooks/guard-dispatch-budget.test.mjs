@@ -150,7 +150,116 @@ test("evaluateDispatchBudgetGuard: the orchestrating session is never limited, h
     const result = evaluateDispatchBudgetGuard(orchestratorInput, baseOptions(store));
     assert.equal(result.exitCode, 0, `orchestrator call ${i} must never be blocked`);
   }
-  assert.equal(store.files.size, 0, "no counter or unresolved state should ever be written for the orchestrator");
+  // No per-agent counter is ever written for the orchestrator -- only the bounded
+  // once-per-session observation marker (NVA-BUDGETROOT-1; see the dedicated bound
+  // test below for the "still just one file" assertion).
+  const counterOrUnresolvedFiles = [...store.files.keys()].filter(
+    (p) => p.endsWith("unresolved.jsonl") || (p.includes("/dispatch-budget/") && !p.includes("orchestrator-seen")),
+  );
+  assert.deepEqual(counterOrUnresolvedFiles, [], "no counter or unresolved.jsonl state should ever be written for the orchestrator");
+});
+
+test("evaluateDispatchBudgetGuard: the orchestrator branch records exactly one bounded observation for its session (NVA-BUDGETROOT-1)", () => {
+  const store = makeStore();
+  const orchestratorInput = { transcript_path: "/fake/session/top-level.jsonl", tool_name: "Read", tool_input: { file_path: "/x" } };
+  const result = evaluateDispatchBudgetGuard(orchestratorInput, baseOptions(store));
+  assert.equal(result.exitCode, 0);
+  const markerPath = `${COMMON_DIR}/agent-pipeline/dispatch-budget/orchestrator-seen/top-level.json`;
+  const raw = store.files.get(markerPath);
+  assert.ok(raw, "an orchestrator observation marker must exist");
+  const record = JSON.parse(raw.trim());
+  assert.equal(record.branch, "orchestrator");
+  assert.equal(record.root, FAKE_ROOT);
+  assert.equal(record.commonDir, COMMON_DIR);
+  assert.equal(record.transcriptPath, "/fake/session/top-level.jsonl");
+  assert.equal(record.at, "2026-08-27T00:00:00.000Z");
+});
+
+test("evaluateDispatchBudgetGuard: the orchestrator observation sink is bounded -- one write per session, not one per call", () => {
+  const store = makeStore();
+  const orchestratorInput = { transcript_path: "/fake/session/top-level.jsonl", tool_name: "Read", tool_input: { file_path: "/x" } };
+  for (let i = 1; i <= 30; i += 1) evaluateDispatchBudgetGuard(orchestratorInput, baseOptions(store));
+  let writeCount = 0;
+  const spyOptions = baseOptions({
+    ...store,
+    writeFileSyncFn: (p, c) => { writeCount += 1; store.writeFileSyncFn(p, c); },
+  });
+  for (let i = 1; i <= 30; i += 1) evaluateDispatchBudgetGuard(orchestratorInput, spyOptions);
+  assert.equal(writeCount, 0, "once the marker exists for this session, no further write should ever occur");
+});
+
+test("evaluateDispatchBudgetGuard: rootDir precedence -- options.rootDir wins over CLAUDE_PROJECT_DIR and process.cwd()", () => {
+  const store = seedSubagent();
+  const calls = [];
+  const spy = (dir) => { calls.push(dir); return COMMON_DIR; };
+  const savedEnv = process.env.CLAUDE_PROJECT_DIR;
+  process.env.CLAUDE_PROJECT_DIR = "/env/root";
+  try {
+    evaluateDispatchBudgetGuard(readInput({}), { ...baseOptions(store), resolveGitCommonDirFn: spy });
+    assert.deepEqual(calls, [FAKE_ROOT], "options.rootDir must win over CLAUDE_PROJECT_DIR and process.cwd()");
+  } finally {
+    if (savedEnv === undefined) delete process.env.CLAUDE_PROJECT_DIR; else process.env.CLAUDE_PROJECT_DIR = savedEnv;
+  }
+});
+
+test("evaluateDispatchBudgetGuard: rootDir precedence -- CLAUDE_PROJECT_DIR wins over process.cwd() when options.rootDir is absent", () => {
+  const store = seedSubagent();
+  const calls = [];
+  const spy = (dir) => { calls.push(dir); return COMMON_DIR; };
+  const savedEnv = process.env.CLAUDE_PROJECT_DIR;
+  process.env.CLAUDE_PROJECT_DIR = "/env/root";
+  try {
+    const { rootDir: _drop, ...rest } = baseOptions(store);
+    evaluateDispatchBudgetGuard(readInput({}), { ...rest, resolveGitCommonDirFn: spy });
+    assert.deepEqual(calls, ["/env/root"], "CLAUDE_PROJECT_DIR must win over process.cwd() when no options.rootDir override is given");
+  } finally {
+    if (savedEnv === undefined) delete process.env.CLAUDE_PROJECT_DIR; else process.env.CLAUDE_PROJECT_DIR = savedEnv;
+  }
+});
+
+test("evaluateDispatchBudgetGuard: rootDir precedence -- process.cwd() is the final fallback when neither options.rootDir nor CLAUDE_PROJECT_DIR are set", () => {
+  const store = seedSubagent();
+  const calls = [];
+  const spy = (dir) => { calls.push(dir); return COMMON_DIR; };
+  const savedEnv = process.env.CLAUDE_PROJECT_DIR;
+  delete process.env.CLAUDE_PROJECT_DIR;
+  try {
+    const { rootDir: _drop, ...rest } = baseOptions(store);
+    evaluateDispatchBudgetGuard(readInput({}), { ...rest, resolveGitCommonDirFn: spy });
+    assert.deepEqual(calls, [process.cwd()], "process.cwd() must be used when neither options.rootDir nor CLAUDE_PROJECT_DIR are set");
+  } finally {
+    if (savedEnv === undefined) delete process.env.CLAUDE_PROJECT_DIR; else process.env.CLAUDE_PROJECT_DIR = savedEnv;
+  }
+});
+
+test("evaluateDispatchBudgetGuard: a null git common dir is observed on stderr, and the allow verdict is unchanged", () => {
+  const store = seedSubagent();
+  const options = { ...baseOptions(store), resolveGitCommonDirFn: () => null };
+  const result = evaluateDispatchBudgetGuard(readInput({ file_path: "/x" }), options);
+  assert.equal(result.exitCode, 0);
+  assert.match(result.stderr, /common-dir-unresolved/);
+  assert.match(result.stderr, /"identityKind":"subagent"/);
+});
+
+test("evaluateDispatchBudgetGuard: orchestrator with an unresolvable common dir is still allowed, observed via stderr only, and persists nothing", () => {
+  const store = makeStore();
+  const orchestratorInput = { transcript_path: "/fake/session/top-level.jsonl", tool_name: "Read", tool_input: {} };
+  const options = { ...baseOptions(store), resolveGitCommonDirFn: () => null };
+  const result = evaluateDispatchBudgetGuard(orchestratorInput, options);
+  assert.equal(result.exitCode, 0);
+  assert.match(result.stderr, /common-dir-unresolved/);
+  assert.equal(store.files.size, 0, "nothing should be persisted when there is nowhere safe to persist it");
+});
+
+test("evaluateDispatchBudgetGuard: a write failure in the new orchestrator observation sink never changes the allow verdict", () => {
+  const store = makeStore();
+  const orchestratorInput = { transcript_path: "/fake/session/top-level.jsonl", tool_name: "Read", tool_input: {} };
+  const throwingOptions = baseOptions({
+    ...store,
+    writeFileSyncFn: () => { throw new Error("disk full"); },
+  });
+  const result = evaluateDispatchBudgetGuard(orchestratorInput, throwingOptions);
+  assert.equal(result.exitCode, 0);
 });
 
 test("evaluateDispatchBudgetGuard: an unresolvable identity allows the call AND records it for visibility", () => {
