@@ -788,6 +788,86 @@ test("NVA-GESBIND-2: an event copied verbatim from a genuinely different physica
   );
 });
 
+test("NVA-REPOID-1: a fingerprint present at first use is adopted as a legacy alias and keeps validating, but a fingerprint that was never present is still refused", async (t) => {
+  const rootA = await fixtureRoot(); t.after(() => cleanup(rootA));
+  const observedA = await append(rootA);
+  const legacyBytes = await readFile(path.join(rootA, observedA.eventPath));
+
+  // Root B: a fresh checkout that already carries this repository's own
+  // committed event (as git would check it out) but has never been locally
+  // bound yet -- built WITHOUT seedRepositoryBinding.
+  const rootB = await mkdtemp(path.join(os.tmpdir(), "governance-event-store-legacy-"));
+  execFileSync("git", ["init", "-q", rootB]);
+  const capturePolicyB = capturePolicyFixture();
+  await mkdir(path.join(rootB, "governance/events"), { recursive: true });
+  await writeFile(path.join(rootB, "governance/events/registry.json"), `${canonicalizeJson(registryFixture())}\n`);
+  await writeFile(path.join(rootB, "governance/events/capture-policy.json"), `${canonicalizeJson(capturePolicyB)}\n`);
+  t.after(() => cleanup(rootB));
+  const streamDirB = path.join(rootB, "governance/events/lifecycle");
+  await mkdir(streamDirB, { recursive: true });
+  await writeFile(path.join(streamDirB, path.basename(observedA.eventPath)), legacyBytes);
+
+  // First real use of B must bind fresh and adopt A's fingerprint as the
+  // sole legacy alias.
+  await loadGovernanceEventRegistry({ repositoryRoot: rootB });
+  const repositoryB = discoverRepository(rootB);
+  const bindingB = JSON.parse(await readFile(path.join(repositoryB.commonDir, "agent-pipeline", "governance-events", "repository-binding.json"), "utf8"));
+  assert.deepEqual(bindingB.legacyAliases, [observedA.repositoryFingerprint], "the pre-existing event's own fingerprint must be adopted as the sole legacy alias at first bind");
+  assert.notEqual(bindingB.repositoryFingerprint, observedA.repositoryFingerprint, "the freshly bound identity must be new, not reused from the legacy event");
+
+  const verified = await verifyPortableGovernanceStream({ repositoryRoot: rootB, repositoryFingerprint: bindingB.repositoryFingerprint, streamId: "lifecycle" });
+  assert.equal(verified.integrity, "prefix-valid");
+  assert.equal(verified.eventCount, 1, "the legacy event, carrying only the adopted alias fingerprint rather than the new primary identity, must still read back");
+
+  // A wholly unrelated third fingerprint -- present at neither bind time nor
+  // as the primary identity -- must still fail closed rather than being
+  // silently accepted because SOME alias mechanism exists.
+  const legacyEvent = JSON.parse(legacyBytes.toString("utf8"));
+  const foreignFingerprint = "f".repeat(64);
+  fingerprint = foreignFingerprint;
+  const foreignSealed = sealGovernanceEvent({
+    ...intent({ eventId: "evt-foreign", idempotencyKey: "idem-foreign", repositoryFingerprint: foreignFingerprint, sourceUri: `urn:pipeline:repository:${foreignFingerprint}` }),
+    sequence: 2,
+    previousEventDigest: legacyEvent.eventDigest,
+    payloadDigest: "0".repeat(64),
+    eventDigest: "0".repeat(64),
+  });
+  await writeFile(path.join(streamDirB, `2-${foreignSealed.eventId}.json`), `${canonicalizeJson(foreignSealed)}\n`);
+  await assert.rejects(
+    () => verifyPortableGovernanceStream({ repositoryRoot: rootB, repositoryFingerprint: bindingB.repositoryFingerprint, streamId: "lifecycle" }),
+    (error) => error instanceof GovernanceEventStoreError && error.code === "GES-EVENT-PATH",
+    "a fingerprint that was neither adopted as a legacy alias nor is the bound identity must still fail closed -- the alias set is not a blanket accept-anything",
+  );
+});
+
+test("NVA-REPOID-1: the same repository resolves to one identity across two different absolute access paths", async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "governance-event-store-path-"));
+  execFileSync("git", ["init", "-q", root]);
+  const capturePolicy = capturePolicyFixture(); capturePolicyDigest = canonicalSha256(capturePolicy);
+  await mkdir(path.join(root, "governance/events"), { recursive: true });
+  await writeFile(path.join(root, "governance/events/registry.json"), `${canonicalizeJson(registryFixture())}\n`);
+  await writeFile(path.join(root, "governance/events/capture-policy.json"), `${canonicalizeJson(capturePolicy)}\n`);
+  t.after(() => cleanup(root));
+  const alias = `${root}-alias`;
+  await symlink(root, alias);
+  t.after(() => rm(alias, { force: true }));
+
+  // First access, via the real path, binds a fresh identity.
+  await loadGovernanceEventRegistry({ repositoryRoot: root });
+  const repository = discoverRepository(root);
+  const binding = JSON.parse(await readFile(path.join(repository.commonDir, "agent-pipeline", "governance-events", "repository-binding.json"), "utf8"));
+  fingerprint = binding.repositoryFingerprint;
+
+  // A second access via a DIFFERENT absolute path string naming the exact
+  // same physical checkout (simulating the WSL-vs-native-Windows case this
+  // fix targets) must resolve to the identical bound identity -- no fresh
+  // binding, no GES-CROSS-REPOSITORY.
+  const appendedViaAlias = await appendPortableGovernanceEvent({ repositoryRoot: alias, repositoryFingerprint: binding.repositoryFingerprint, intent: intent() });
+  assert.equal(appendedViaAlias.outcome, "appended", "the alias path must be accepted as the exact same bound identity");
+  const verifiedViaRealPath = await verifyPortableGovernanceStream({ repositoryRoot: root, repositoryFingerprint: binding.repositoryFingerprint, streamId: "lifecycle" });
+  assert.equal(verifiedViaRealPath.eventCount, 1, "an event appended via the alias path must read back via the real path -- one shared identity, one shared store");
+});
+
 test("projection recovery requires a retained checkpoint and rebuilds a stale head without touching canonical events", async (t) => {
   const root = await fixtureRoot(); t.after(() => cleanup(root));
   const first = await append(root);
