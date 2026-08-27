@@ -69,6 +69,46 @@ export function registeredCriticExportPolicy(registry = FROZEN_REGISTRY) {
   return clone(registry.criticExportPolicy);
 }
 
+/**
+ * Core-owned V3 source surfaces: top-level `pipeline.user.v3` keys the
+ * validator below requires to equal the frozen registry byte-for-byte
+ * (`compareExact(value.routing.profiles, registry.profiles, ...)`,
+ * `compareExact(value.routing.duties, registry.duties, ...)` and
+ * `compareExact(value.critic_export, FROZEN_REGISTRY.criticExportPolicy, ...)`
+ * a few lines further down). A surface the validator compares exactly against
+ * the registry is Core-owned by construction: refreshing it wholesale from
+ * the registry can never discard something a project owns. This table is the
+ * single source `refreshKnownV3RegistryDelta()` in runner-profile-migration-
+ * v3.mjs drives its recovery refresh from, by iteration -- adding a future
+ * Core-owned surface needs exactly one new entry here, never a new branch in
+ * that function. Deliberately NOT wired into the validator itself in this
+ * change: unifying the two risks a validator behavior change, which is a
+ * separate decision from "make the refresh table-driven".
+ */
+export const CORE_OWNED_V3_SURFACES = Object.freeze([
+  Object.freeze({
+    path: "routing",
+    registryValue: registeredRouting,
+    // Routing is refreshed as one whole registry, not per-route: an absent
+    // and a present-but-stale `routing` key are reported under the same
+    // compatibility-delta name, because both replace the identical whole
+    // subtree with the identical registered replacement.
+    absentDelta: Object.freeze({ name: "closed-v3-routing-registry-refresh", from: "previous-public-core-registry", to: "current-public-core-registry" }),
+    staleDelta: Object.freeze({ name: "closed-v3-routing-registry-refresh", from: "previous-public-core-registry", to: "current-public-core-registry" }),
+  }),
+  Object.freeze({
+    path: "critic_export",
+    registryValue: registeredCriticExportPolicy,
+    // Unlike routing, an absent and a stale `critic_export` are two distinct
+    // recoverable events: the first is a project that predates the export
+    // policy entirely, the second is one that has merely fallen behind the
+    // current registry. Reporting them under one name would make a
+    // re-validation failure caused by either look identical to the other.
+    absentDelta: Object.freeze({ name: "closed-critic-export-policy", from: "absent/default-deny", to: "digest-bound-allowlist" }),
+    staleDelta: Object.freeze({ name: "closed-critic-export-policy-refresh", from: "previous-public-core-registry", to: "current-public-core-registry" }),
+  }),
+]);
+
 function isObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }

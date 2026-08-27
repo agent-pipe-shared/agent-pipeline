@@ -25,7 +25,7 @@ import {
 } from "./runner-profile-migration-v3.mjs";
 import * as migrationV3Module from "./runner-profile-migration-v3.mjs";
 import { loadRunnerProfilesV2Registry } from "./runner-profiles-v2.mjs";
-import { loadRunnerProfilesV3Registry, validatePipelineUserV3 } from "./runner-profiles-v3.mjs";
+import { CORE_OWNED_V3_SURFACES, loadRunnerProfilesV3Registry, validatePipelineUserV3 } from "./runner-profiles-v3.mjs";
 import { loadRuntimeProjectionV3OwnedKeys } from "./runtime-projection-v3.mjs";
 import { parseYaml } from "./yaml-lite.mjs";
 import { main as migrationCli } from "../scripts/runner-profile-migration-v3.mjs";
@@ -1136,6 +1136,135 @@ record("legacy V3 Critic route and runnerRoutes refresh through sanctioned re-ap
     assert.doesNotMatch(readFileSync(join(root, ".claude/pipeline.yaml"), "utf8"), /runnerRoutes|worktype_mini_advisor/u);
     assert.match(readFileSync(join(root, ".claude/pipeline.yaml"), "utf8"), /criticExport:\n  policy: pipeline\.critic-export-policy\.v1/u);
     assert.equal(planRunnerProfileMigrationV3({ rootDir: root }).status, "noop");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+record("the registry-refresh table covers every declared Core-owned V3 surface generically", () => {
+  // NVA-REGISTRYREFRESH-1 (widened per coordinator correction): the refresh
+  // is table-driven (CORE_OWNED_V3_SURFACES, runner-profiles-v3.mjs) rather
+  // than a per-field branch, so this test derives the expected set of
+  // refreshed paths FROM that table -- never by enumerating "routing" and
+  // "critic_export" by hand -- proving the "one table entry, no new refresh
+  // code" property instead of merely asserting it.
+  const intent = v3Intent();
+  for (const surface of CORE_OWNED_V3_SURFACES) delete intent[surface.path];
+  const root = fixture(yaml(intent));
+  try {
+    const inspection = inspectRunnerProfileMigrationV3({ rootDir: root });
+    assert.equal(inspection.status, "ready");
+    assert.equal(inspection.sourceKind, "v3-refresh");
+    assert.deepEqual(
+      inspection.compatibilityDeltas.map((delta) => delta.path).sort(),
+      CORE_OWNED_V3_SURFACES.map((surface) => surface.path).sort(),
+    );
+    const plan = planRunnerProfileMigrationV3({ rootDir: root });
+    assert.equal(plan.status, "ready");
+    assert.equal(plan.sourceKind, "v3-refresh");
+    assert.equal(applyRunnerProfileMigrationV3(plan, { rootDir: root, activate: true }).status, "applied");
+    const refreshed = parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8"));
+    assert.equal(validatePipelineUserV3(refreshed).ok, true);
+    for (const surface of CORE_OWNED_V3_SURFACES) assert.deepEqual(refreshed[surface.path], surface.registryValue(loadRunnerProfilesV3Registry()));
+    assert.equal(planRunnerProfileMigrationV3({ rootDir: root }).status, "noop");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+record("a source stale in both routing and critic_export classifies as v3-refresh with both deltas recorded", () => {
+  const intent = v3Intent();
+  intent.routing.duties.critic_normal.codex.effort = "low";
+  intent.critic_export.rules.pop();
+  const root = fixture(yaml(intent));
+  try {
+    const inspection = inspectRunnerProfileMigrationV3({ rootDir: root });
+    assert.equal(inspection.status, "ready");
+    assert.equal(inspection.sourceKind, "v3-refresh");
+    assert.deepEqual(inspection.compatibilityDeltas, [
+      {
+        name: "closed-v3-routing-registry-refresh",
+        path: "routing",
+        from: "previous-public-core-registry",
+        to: "current-public-core-registry",
+      },
+      {
+        name: "closed-critic-export-policy-refresh",
+        path: "critic_export",
+        from: "previous-public-core-registry",
+        to: "current-public-core-registry",
+      },
+    ]);
+    const plan = planRunnerProfileMigrationV3({ rootDir: root });
+    assert.equal(plan.status, "ready");
+    assert.equal(plan.sourceKind, "v3-refresh");
+    assert.equal(applyRunnerProfileMigrationV3(plan, { rootDir: root, activate: true }).status, "applied");
+    const refreshed = parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8"));
+    const registry = loadRunnerProfilesV3Registry();
+    assert.deepEqual(refreshed.routing, { profiles: registry.profiles, duties: registry.duties });
+    assert.deepEqual(refreshed.critic_export, registry.criticExportPolicy);
+    assert.equal(validatePipelineUserV3(refreshed).ok, true);
+    assert.equal(planRunnerProfileMigrationV3({ rootDir: root }).status, "noop");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+record("a source stale only in critic_export classifies as v3-refresh", () => {
+  const intent = v3Intent();
+  intent.critic_export.mode = "audit-only";
+  const root = fixture(yaml(intent));
+  try {
+    const inspection = inspectRunnerProfileMigrationV3({ rootDir: root });
+    assert.equal(inspection.status, "ready");
+    assert.equal(inspection.sourceKind, "v3-refresh");
+    assert.deepEqual(inspection.compatibilityDeltas, [{
+      name: "closed-critic-export-policy-refresh",
+      path: "critic_export",
+      from: "previous-public-core-registry",
+      to: "current-public-core-registry",
+    }]);
+    const plan = planRunnerProfileMigrationV3({ rootDir: root });
+    assert.equal(plan.status, "ready");
+    assert.equal(plan.sourceKind, "v3-refresh");
+    assert.equal(applyRunnerProfileMigrationV3(plan, { rootDir: root, activate: true }).status, "applied");
+    const refreshed = parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8"));
+    assert.deepEqual(refreshed.critic_export, loadRunnerProfilesV3Registry().criticExportPolicy);
+    assert.equal(validatePipelineUserV3(refreshed).ok, true);
+    assert.equal(planRunnerProfileMigrationV3({ rootDir: root }).status, "noop");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+record("a source with critic_export entirely absent still fills it in unchanged", () => {
+  const intent = v3Intent();
+  delete intent.critic_export;
+  const root = fixture(yaml(intent));
+  try {
+    const inspection = inspectRunnerProfileMigrationV3({ rootDir: root });
+    assert.equal(inspection.status, "ready");
+    assert.equal(inspection.sourceKind, "v3-refresh");
+    assert.deepEqual(inspection.compatibilityDeltas, [{
+      name: "closed-critic-export-policy",
+      path: "critic_export",
+      from: "absent/default-deny",
+      to: "digest-bound-allowlist",
+    }]);
+    const plan = planRunnerProfileMigrationV3({ rootDir: root });
+    assert.equal(plan.status, "ready");
+    assert.equal(applyRunnerProfileMigrationV3(plan, { rootDir: root, activate: true }).status, "applied");
+    const refreshed = parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8"));
+    assert.deepEqual(refreshed.critic_export, loadRunnerProfilesV3Registry().criticExportPolicy);
+    assert.equal(validatePipelineUserV3(refreshed).ok, true);
+    assert.equal(planRunnerProfileMigrationV3({ rootDir: root }).status, "noop");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+record("a source with an unrelated defect that survives the registry refresh still classifies invalid", () => {
+  const intent = v3Intent();
+  intent.critic_export.mode = "audit-only";
+  intent.gates.claude_md_max_lines = 0;
+  const root = fixture(yaml(intent));
+  try {
+    const inspection = inspectRunnerProfileMigrationV3({ rootDir: root });
+    assert.equal(inspection.status, "invalid-source");
+    assert.ok(inspection.diagnostics.some((entry) => entry.path === "$.gates"));
+    const plan = planRunnerProfileMigrationV3({ rootDir: root });
+    assert.equal(plan.status, "invalid-source");
+    assert.equal(plan.targets.length, 0);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

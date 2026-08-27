@@ -41,7 +41,7 @@ import {
 import { freshCalibrationBytes, freshManifestBytes } from "./project-onboarding-v3.mjs";
 import { applyRunnerProfileMigrationV2, planRunnerProfileMigrationV2 } from "./runner-profile-migration-v2.mjs";
 import { validatePipelineUserV2 } from "./runner-profiles-v2.mjs";
-import { loadRunnerProfilesV3Registry, validatePipelineUserV3 } from "./runner-profiles-v3.mjs";
+import { CORE_OWNED_V3_SURFACES, loadRunnerProfilesV3Registry, validatePipelineUserV3 } from "./runner-profiles-v3.mjs";
 import {
   codexCustomAgentSeed,
   loadRuntimeProjectionV3OwnedKeys,
@@ -412,37 +412,29 @@ function v3IntentFromV2(v2) {
   };
 }
 
+// Recovers a V3 source that has fallen behind the current Public-Core
+// registry -- as opposed to one that is genuinely invalid -- by refreshing
+// every Core-owned surface named in CORE_OWNED_V3_SURFACES (runner-profiles-
+// v3.mjs, next to the registry it describes). Each surface is refreshed
+// wholesale, never merged field-by-field: a closed Public-Core authority can
+// only be replaced as one whole registered value, the same way a routing
+// entry always was. Nothing outside that table is ever read, written, or
+// compared here -- a future Core-owned surface needs exactly one new table
+// entry, never a new branch in this function.
 function refreshKnownV3RegistryDelta(parsed) {
   const registry = loadRunnerProfilesV3Registry();
   const candidate = clone(parsed);
   const compatibilityDeltas = [];
 
-  // Routing is a closed Public-Core authority, not a set of independently
-  // configurable model preferences.  A Core update can therefore only refresh
-  // it as one whole registry.  Keeping a one-route compatibility exception here
-  // previously let a lock update drift from the rest of the frozen contract.
-  const refreshedRouting = {
-    profiles: clone(registry.profiles),
-    duties: clone(registry.duties),
-  };
-  if (!same(parsed?.routing, refreshedRouting)) {
-    candidate.routing = refreshedRouting;
-    compatibilityDeltas.push({
-      name: "closed-v3-routing-registry-refresh",
-      path: "routing",
-      from: "previous-public-core-registry",
-      to: "current-public-core-registry",
-    });
+  for (const surface of CORE_OWNED_V3_SURFACES) {
+    const present = Object.hasOwn(parsed, surface.path);
+    const refreshedValue = surface.registryValue(registry);
+    if (present && same(parsed[surface.path], refreshedValue)) continue;
+    candidate[surface.path] = refreshedValue;
+    const delta = present ? surface.staleDelta : surface.absentDelta;
+    compatibilityDeltas.push({ name: delta.name, path: surface.path, from: delta.from, to: delta.to });
   }
-  if (!Object.hasOwn(parsed, "critic_export")) {
-    candidate.critic_export = clone(registry.criticExportPolicy);
-    compatibilityDeltas.push({
-      name: "closed-critic-export-policy",
-      path: "critic_export",
-      from: "absent/default-deny",
-      to: "digest-bound-allowlist",
-    });
-  }
+
   if (compatibilityDeltas.length === 0) return null;
   const validation = validatePipelineUserV3(candidate, { source: SOURCE_FILE });
   if (!validation.ok) return null;
