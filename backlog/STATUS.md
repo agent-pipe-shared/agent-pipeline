@@ -7,6 +7,7 @@
 | --- | --- | --- | --- | --- | --- |
 | pipeline.a-checkout-that-cannot-be-clean-defeats-every-cleanliness-gate | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.a-closed-result-can-be-amended-after-close-with-no-detection-and-no-repair | open | defect | pipeline | 2026-08-27 | — |
+| pipeline.a-fresh-clone-loses-all-machine-local-pipeline-state-with-no-provisioning-readback | open | defect | pipeline | 2026-08-27 | — |
 | pipeline.a-promoted-feature-can-never-pass-the-plan-gate | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.a-read-only-command-is-refused-for-naming-a-protected-path | open | defect | pipeline | 2026-08-27 | — |
 | pipeline.a-runner-improvised-the-po-signature-instructions | open | defect | pipeline | 2026-08-27 | — |
@@ -383,6 +384,7 @@
 | pipeline.session-keep-awake | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.session-scratchpad-is-unwritable-under-the-cross-repo-guard | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.session-told-ready-but-not-how-to-repair | closed | defect | pipeline | 2026-08-08 | — |
+| pipeline.set-feature-to-submit-plan-is-not-closed-without-a-coordinator-only-continuity-init | open | defect | pipeline | 2026-08-27 | — |
 | pipeline.setup-mjs-marketplace-name-collision-defeats-local-dev-installs | closed | defect | pipeline | 2026-08-05 | — |
 | pipeline.setup-promises-a-human-name-repair-it-cannot-perform | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.seven-unregistered-suites-are-red | closed | defect | pipeline | 2026-08-08 | — |
@@ -455,7 +457,7 @@
 
 ## Counts
 
-- open: 51
+- open: 53
 - in_progress: 5
 - closed: 377
 - rejected: 3
