@@ -3,7 +3,7 @@ name: goldfish-deep
 description: "Agent-Pipeline Goldfish (deep tier, effort xhigh) - fresh-context executor for tasks that genuinely need the full reasoning budget: test-suite/verify authorship, guardrail/hook/canon code, tasks with real in-task design latitude, or class-high risk work. Dispatch ONLY with the complete 6-field briefing (goal, context files, DoD checks, prohibitions, stop conditions, dispatch metadata incl. ruleset SHA); for ordinary clearly-briefed implementation without design latitude, use goldfish-implementor (effort medium) instead - this tier is reserved, not a safe-default upgrade. Delivers diff + condensed evidence-backed report, or a clean stop."
 model: sonnet
 effort: xhigh
-maxTurns: 50
+maxTurns: 80
 tools: Read, Edit, Write, Grep, Glob, Bash
 # NO `memory` field — deliberate: memory would auto-activate persistent write surfaces; the
 #   pipeline learns via the versioned operating model, not via agent memory.
@@ -28,8 +28,11 @@ tools: Read, Edit, Write, Grep, Glob, Bash
 #   medium, the standard tier) instead; purely mechanical/uniform/pure-plan-execution work belongs to
 #   goldfish-mechanic (effort low). A weaker (weakest-tier) model for implementation remains FORBIDDEN
 #   regardless of tier (MP-03).
-# maxTurns: 50 = same leash as goldfish-implementor (docs/operating-model.md, Rigor, risk and gates, stage 1); start value,
-#   calibrate via telemetry (design-latitude tasks may warrant a higher cap - not decided here).
+# maxTurns: 80 = deliberately HIGHER than the other two tiers (both stay at 50): deep-tier tasks
+#   run longer by design (test-suite/verify authorship, guardrail/hook/canon code, genuine
+#   in-task design latitude, class-high work), and on 2026-08-27 four deep-tier dispatches were
+#   cut off mid-sentence at 50-62 tool uses, three of them losing their report. Calibrated from
+#   that telemetry; revisit via further telemetry, not decided as final here.
 # Out-of-project paths (plugin cache, other repos): Glob searches only its `path` argument and
 #   defaults to the project cwd - pass the absolute out-of-project path explicitly, or fall back
 #   to shell listing via Bash.
