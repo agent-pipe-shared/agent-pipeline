@@ -6516,6 +6516,14 @@ test("NVA-STARNEEDLE-1 AC-4: the needle-derivation rule and its defensive filter
 // ---------------------------------------------------------------------------------
 // Read-only commands remain containment-bound. The admissible exceptions are derived
 // roots only: the loaded plugin and the host-provided session transcript/memory roots.
+// NVA-BL-76 (backlog: 2026-08-08-a-bounded-diagnostic-outside-the-repo-is-refused-under-
+// the-wrong-reason.md). The bounded rg-to-head / rg-to-rg pipeline reading a path OUTSIDE
+// the project root was refused as GUARD-OPERATOR-UNAPPROVED -- a reason that is false (the
+// identical operator is admitted one directory over) under a remedy that cannot work (the
+// pipeline was never the objection), in a message whose closing line names the very shape
+// it is refusing as admitted. It now has its own code, its own true remedy, and -- because
+// reading is not the mutation risk the cross-repository family exists to stop -- an override
+// route a human signature can actually reach.
 // ---------------------------------------------------------------------------------
 
 function readScopeFixture() {
