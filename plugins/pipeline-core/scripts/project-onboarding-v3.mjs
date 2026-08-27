@@ -103,11 +103,12 @@ const ONBOARDING_SUBCOMMANDS = Object.freeze([
   { name: "adopt-remote-apply", flat: false, mutates: true, automatedArgvShape: null },
   // Wave 4 onboarding coordinator, Phase 1 (NVA-W4-COORD-1, specs/wave4-onboarding-coordinator/design.md
   // SSa.5 steps 1-3). Apply-only: no separate plan step exists for these three (design SSa.5 lists them
-  // as single "-apply" commands, unlike steps 4-5's plan/apply pairs). KNOWN GAP, not fixed here: unlike
-  // every other `mutates: true` entry above, guard-lifecycle-ready.mjs's sanctionedOnboardingArgs() has no
-  // admission branch for these three names yet -- GUARDDERIVE-1's derived admission only ever covers
-  // `mutates: false` commands, so a Bash-invoked automated call to any of these three is still refused by
-  // GUARD-LIFECYCLE-NOT-READY until a follow-up dispatch adds the exact-argv-shape branch deliberately.
+  // as single "-apply" commands, unlike steps 4-5's plan/apply pairs). Like every other `mutates: true`
+  // entry above, GUARDDERIVE-1's derived admission never covers these three names -- but
+  // guard-lifecycle-ready.mjs's sanctionedOnboardingArgs() DOES have its own admission branch for each,
+  // closed by NVA-W5-GUARDADMIT-1 (commit 70bd1fb3, 2026-08-19; backlog:
+  // 2026-08-19-guard-lifecycle-ready-has-no-admission-branch-for-the-intake-checkpoint-subcommands.md).
+  // This is no longer a KNOWN GAP.
   { name: "intake-consent-apply", flat: true, mutates: true, automatedArgvShape: null },
   { name: "intake-capture-apply", flat: true, mutates: true, automatedArgvShape: null },
   { name: "intake-design-questions-apply", flat: true, mutates: true, automatedArgvShape: null },
@@ -117,9 +118,11 @@ const ONBOARDING_SUBCOMMANDS = Object.freeze([
   // (staging content is a pure function of the already-durable checkpoint), so it is
   // `automatedArgvShape: "lifecycle"` and is covered automatically by GUARDDERIVE-1's derived
   // admission -- no guard-lifecycle-ready.mjs change needed for the plan half. intake-generate-apply
-  // mutates, so it needs the SAME sanctionedOnboardingArgs() hand-list admission branch the three
-  // commands above are still missing (KNOWN GAP, not fixed here -- see the comment above and
+  // mutates, so it needed its own sanctionedOnboardingArgs() admission branch -- added in the same
+  // closure pass as the three commands above, directly (commit 0b2386fd, 2026-08-19; see the
+  // "Closure" note in
   // backlog/items/2026-08-19-guard-lifecycle-ready-has-no-admission-branch-for-the-intake-checkpoint-subcommands.md).
+  // This is no longer a KNOWN GAP.
   { name: "intake-generate-plan", flat: true, mutates: false, automatedArgvShape: "lifecycle" },
   { name: "intake-generate-apply", flat: true, mutates: true, automatedArgvShape: null },
   // Wave 4 onboarding coordinator, step 5 (NVA-W5-COORD-STEP5-2, design.md SSa.5 point 5, SSc.3).
@@ -127,8 +130,10 @@ const ONBOARDING_SUBCOMMANDS = Object.freeze([
   // beyond the bare lifecycle argv (every input -- profile/featureId/prdPath/specPath/designInputPath
   // -- is derived from the already-durable intake checkpoint, resolveBootstrapBindInputs() in
   // lib/onboarding-continuity.mjs), so it is `automatedArgvShape: "lifecycle"`, covered automatically
-  // by GUARDDERIVE-1's derived admission. bootstrap-bind-apply mutates, so it needs its own
-  // sanctionedOnboardingArgs() branch, added alongside intake-generate-apply's.
+  // by GUARDDERIVE-1's derived admission. bootstrap-bind-apply mutates, so it needed its own
+  // sanctionedOnboardingArgs() branch too -- added under this same NVA-W5-COORD-STEP5-2 dispatch,
+  // not literally alongside intake-generate-apply's (that one landed earlier, 2026-08-19, under
+  // NVA-W5-GUARDADMIT-1's closure). Both branches exist today.
   { name: "bootstrap-bind-plan", flat: true, mutates: false, automatedArgvShape: "lifecycle" },
   { name: "bootstrap-bind-apply", flat: true, mutates: true, automatedArgvShape: null },
 ].map((entry) => Object.freeze(entry)));
