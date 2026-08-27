@@ -105,6 +105,7 @@
 | pipeline.control-path-invalid-misfires-on-a-transient-repository-discovery-race | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.critic-and-verify-cadence-may-be-too-fine-grained | open | workflow-improvement | pipeline | 2026-08-24 | — |
 | pipeline.critic-context-isolation | closed | workflow-improvement | pipeline | 2026-07-20 | — |
+| pipeline.critic-dispatches-cannot-persist-their-scratch-notes | open | defect | pipeline | 2026-08-27 | — |
 | pipeline.critic-review-has-no-defined-path-for-a-root-commit | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.critic-review-round-cap-has-no-durable-home-and-two-inconsistent-values-circulate | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.critic-route-pre-check-not-in-force-in-installed-plugin | open | defect | pipeline | 2026-08-11 | — |
@@ -269,6 +270,7 @@
 | pipeline.no-governed-directory-contract | closed | workflow-improvement | pipeline | 2026-08-08 | — |
 | pipeline.no-pre-dispatch-check-catches-a-model-deviating-from-configured-routing | closed | workflow-improvement | pipeline | 2026-08-17 | — |
 | pipeline.no-rename-path-for-a-feature-id-continuity-already-fixed | closed | defect | pipeline | 2026-08-10 | — |
+| pipeline.no-sanctioned-dispatch-trailer-form-exists-for-direct-elephant-design-commits | open | defect | pipeline | 2026-08-27 | — |
 | pipeline.no-sanctioned-way-to-start-over | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.no-test-pins-the-ungoverned-path-rule-stand-down | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.nonblocking-interaction-continuity | closed | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
@@ -453,7 +455,7 @@
 
 ## Counts
 
-- open: 49
+- open: 51
 - in_progress: 5
 - closed: 377
 - rejected: 3

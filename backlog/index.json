@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "30ead268c6821247a0b2a59a7d8723efa349e987a70cef4c01a5e92a298cfc54"
+    "transitionHead": "6f180a36dbab26332cf05c5882c9800fd202869daa80365be3b74510ced46367"
   },
   "counts": {
-    "open": 49,
+    "open": 51,
     "in_progress": 5,
     "closed": 377,
     "rejected": 3,
@@ -1249,6 +1249,15 @@
       "closureRepository": "self",
       "closureCommit": "47c6d7fcfafde2823be4111234a8e8482408fcab",
       "closureEvidence": "plugins/pipeline-core/hooks/guard-dispatch.test.mjs"
+    },
+    {
+      "id": "pipeline.critic-dispatches-cannot-persist-their-scratch-notes",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-27",
+      "source": "Measured twice on 2026-08-27, independently, by both design-review Critic dispatches of the sprint-alfred-epic package (reports persisted under specs/sprint-alfred-epic/evidence/critic/).",
+      "deferred": false
     },
     {
       "id": "pipeline.critic-review-has-no-defined-path-for-a-root-commit",
@@ -3288,6 +3297,15 @@
       "closureRepository": "self",
       "closureCommit": "344b49620f2353749b8bb44fc0dc2889dbdc339c",
       "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-12-medium-low-triage-grouping.md"
+    },
+    {
+      "id": "pipeline.no-sanctioned-dispatch-trailer-form-exists-for-direct-elephant-design-commits",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-27",
+      "source": "Flagged independently by both 2026-08-27 design-review Critics (round 1A finding F1, round 1B finding F10; reports under specs/sprint-alfred-epic/evidence/critic/); scope question resolved against docs/operating-model.md §3.3 in the round-1 response.",
+      "deferred": false
     },
     {
       "id": "pipeline.no-sanctioned-way-to-start-over",
