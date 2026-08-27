@@ -85,6 +85,7 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required 
 | [0066](0066-handover-rotation-extraction-archive-hard-size-gate.md) | The handover rotates via extraction-then-archive (`docs/state-archive/`), gated by two independent triggers — block/feature-boundary rotation AND a hard size cap that fires even mid-sprint, closing ADR-0060 Decision 5 | accepted | 2026-08-17 |
 | [0066](0066-publication-approval-time-signature-accepted-tradeoff.md) | Publication's approval-time-only Ed25519 signature check is an accepted, bounded tradeoff (no execution-time re-verification) | accepted | 2026-08-19 |
 | [0067](0067-tri-runner-antigravity-integration.md) | Elevate Google Antigravity CLI (`agy`) with Gemini models to a full 3rd runner with hard hook enforcement, headless dispatch and honest profile mapping, extending ADR-0051/0057 | accepted | 2026-08-22 |
+| [0068](0068-backlog-ledger-merge-semantics.md) | Merging two parallel sprints' backlog ledgers: one active chain with archived, integrity-checked siblings; amendments become status-neutral and bind their target by `entryHash` rather than by physical sequence | accepted | 2026-08-27 |
 
 ### Resubmissions
 
