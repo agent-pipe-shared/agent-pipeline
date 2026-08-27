@@ -2,7 +2,12 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
+
+const HOOKS_DIR = dirname(fileURLToPath(import.meta.url));
 
 import {
   BOOTSTRAP_LINE,
@@ -137,4 +142,52 @@ test("SessionStart delegates channel/ref selection to the shared update helper",
       timeoutMs: UPDATE_TIMEOUT_MS,
     },
   }]);
+});
+
+/**
+ * NVA-STALENESSTLA-1. Measured on a live Claude Code session on Windows, 2026-08-27:
+ *
+ *   SessionStart:startup hook error
+ *   Failed with non-blocking status code: Warning: Detected unsettled top-level
+ *   await at .../hooks/staleness-check.mjs:208
+ *
+ * A session-start hook that carries a top-level await can leave the module's own promise
+ * pending when the loop drains, and the runner reports the hook as failed at every single
+ * session start. Every hook on this path does synchronous work (spawnSync throughout), so
+ * none of them needs one.
+ *
+ * Derived from hooks.json rather than naming staleness-check.mjs, so a hook added to the
+ * SessionStart wiring later is covered without anyone remembering to extend this test --
+ * the same single-source discipline GUARDDERIVE-1 applies to the onboarding allowlist.
+ *
+ * Its limit, stated rather than implied: this is a source-shape check, not a parse. It
+ * catches a top-level `await` written as its own statement -- the shape that actually
+ * failed, and the shape a module entry point takes -- and would miss one buried inside an
+ * expression on a line that starts with something else.
+ */
+test("NVA-STALENESSTLA-1: no SessionStart hook carries a top-level await", () => {
+  const wiring = JSON.parse(readFileSync(join(HOOKS_DIR, "hooks.json"), "utf8"));
+  const commands = (wiring.hooks?.SessionStart ?? [])
+    .flatMap((entry) => entry.hooks ?? [])
+    .map((hook) => hook.command ?? "");
+  assert.ok(commands.length >= 4, `expected the SessionStart wiring to carry hooks, got ${commands.length}`);
+
+  const scripts = commands
+    .map((command) => command.match(/\/hooks\/([A-Za-z0-9._-]+\.mjs)/u)?.[1])
+    .filter((name) => name !== undefined);
+  assert.equal(scripts.length, commands.length, "every SessionStart hook command must name a hooks/*.mjs script");
+  assert.ok(scripts.includes("staleness-check.mjs"), "the regression's own hook must be among those checked");
+
+  for (const script of scripts) {
+    const source = readFileSync(join(HOOKS_DIR, script), "utf8");
+    // Everything from the `isDirectInvocation(import.meta.url)` entry-point guard onwards is
+    // module top level, in both spellings these hooks use (a braced block and a single-line
+    // call). Checking that tail keeps the assertion exact: an `await` inside an async
+    // function body above it is legitimate and is deliberately not matched.
+    const marker = source.indexOf("isDirectInvocation(import.meta.url)");
+    assert.notEqual(marker, -1, `${script}: no isDirectInvocation entry point found to check`);
+    const entryPoint = source.slice(marker);
+    assert.ok(!/\bawait\b/u.test(entryPoint),
+      `${script}: the SessionStart entry point awaits, which is a top-level await:\n${entryPoint.trim()}`);
+  }
 });
