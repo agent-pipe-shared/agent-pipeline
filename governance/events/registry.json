@@ -1,6 +1,6 @@
 {
   "schema": "pipeline.governance-stream-registry.v1",
-  "repositoryFingerprint": "92f4f001424af56c17e443aec9969d0ff5ac0e426b8f388fe06d4b1800aa2d35",
+  "repositoryFingerprint": "0000000000000000000000000000000000000000000000000000000000000000",
   "canonicalization": "RFC8785",
   "digestAlgorithm": "sha-256",
   "eventDigestDomain": "pipeline.governance-event.v1\u0000",

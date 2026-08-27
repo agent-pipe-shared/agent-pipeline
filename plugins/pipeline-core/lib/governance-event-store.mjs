@@ -83,13 +83,49 @@ async function assertNoSymlink(target, { required = true, directory } = {}) {
   return entry;
 }
 
+const LOCAL_REPOSITORY_BINDING_SCHEMA = "pipeline.governance-event-repository-binding.v1";
+const LOCAL_REPOSITORY_BINDING_SEGMENTS = ["agent-pipeline", "governance-events", "repository-binding.json"];
+
+/**
+ * NVA-GESBIND-1: the physical-repository binding lives in LOCAL, UNTRACKED
+ * runtime state under the git common directory -- never inside the tracked
+ * working tree -- so a `governance/events/*` copy from a different
+ * repository never carries it along. Bind-on-first-use: a checkout with no
+ * binding file yet (every fresh clone) adopts the current physical
+ * fingerprint. Once bound, a mismatch against a later physical fingerprint
+ * is `GES-CROSS-REPOSITORY`; it is never silently rebound. This replaces
+ * comparing the CURRENT physical fingerprint against the tracked registry's
+ * `repositoryFingerprint`, which broke every clone at a different path.
+ */
+async function bindLocalRepositoryFingerprint(gitCommonDir, physicalFingerprint) {
+  const directory = path.join(gitCommonDir, ...LOCAL_REPOSITORY_BINDING_SEGMENTS.slice(0, -1));
+  const target = path.join(gitCommonDir, ...LOCAL_REPOSITORY_BINDING_SEGMENTS);
+  await assertNoSymlinkAncestry(target);
+  const existing = await lstatOrNull(target);
+  if (!existing) {
+    await mkdir(directory, { recursive: true, mode: 0o755 });
+    await assertNoSymlink(directory, { directory: true });
+    await writeAtomic(target, `${canonicalizeJson({ schema: LOCAL_REPOSITORY_BINDING_SCHEMA, repositoryFingerprint: physicalFingerprint, boundAtEpochMs: Date.now() })}\n`);
+    return physicalFingerprint;
+  }
+  await assertNoSymlink(target, { directory: false });
+  let binding;
+  try { binding = parseStrictJson(await readFile(target)); } catch { fail("GES-REPOSITORY-BINDING", "The local repository binding is not strict JSON."); }
+  if (!exactKeys(binding, ["schema", "repositoryFingerprint", "boundAtEpochMs"]) || binding.schema !== LOCAL_REPOSITORY_BINDING_SCHEMA
+    || !SHA256.test(binding.repositoryFingerprint) || !Number.isInteger(binding.boundAtEpochMs) || binding.boundAtEpochMs < 0) fail("GES-REPOSITORY-BINDING", "The local repository binding is invalid.");
+  if (binding.repositoryFingerprint !== physicalFingerprint) fail("GES-CROSS-REPOSITORY", "The expected repository fingerprint does not match the physical repository.");
+  return physicalFingerprint;
+}
+
 async function assertPhysicalRoot(repositoryRoot) {
   if (typeof repositoryRoot !== "string" || !path.isAbsolute(repositoryRoot)) fail("GES-ROOT", "repositoryRoot must be an absolute path.");
   const root = await realpath(repositoryRoot);
   await assertNoSymlink(root, { directory: true });
   let repository;
   try { repository = discoverRepository(root); } catch { fail("GES-REPOSITORY", "repositoryRoot is not a physical Git repository."); }
-  return { root, fingerprint: derivePoGateRepositoryFingerprint({ gitCommonDir: repository.commonDir, primaryRoot: repository.primaryRoot }) };
+  const physicalFingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: repository.commonDir, primaryRoot: repository.primaryRoot });
+  const fingerprint = await bindLocalRepositoryFingerprint(repository.commonDir, physicalFingerprint);
+  return { root, fingerprint };
 }
 
 function assertAbsoluteOutsideRepository(repositoryRoot, storeRoot) {
@@ -468,7 +504,7 @@ async function readEvent(file) {
  * file); throws on any unsafe or invalid entry; otherwise returns the parsed
  * `{ sequence, event }` pair, unvalidated against sibling entries.
  */
-async function readCandidateStreamEvent(root, registry, stream, streamId, entry) {
+async function readCandidateStreamEvent(root, registry, stream, streamId, entry, fingerprint) {
   if (entry.name === ".lock") return null;
   // The advisory acquisition guard is deliberately non-authoritative.  It
   // serializes lock acquisition and stale-lock recovery only; a lingering
@@ -483,11 +519,11 @@ async function readCandidateStreamEvent(root, registry, stream, streamId, entry)
   const event = await readEvent(repositoryPath(root, `${registry.storageRoot}/${stream.relativeRoot}/${entry.name}`));
   const sequence = Number(match[1]);
   if (event.sequence !== sequence || event.eventId !== match[2] || event.streamId !== streamId
-    || event.repositoryFingerprint !== registry.repositoryFingerprint) fail("GES-EVENT-PATH", "Event path and envelope binding disagree.");
+    || event.repositoryFingerprint !== fingerprint) fail("GES-EVENT-PATH", "Event path and envelope binding disagree.");
   return { sequence, event };
 }
 
-async function scanStream(root, registry, streamId) {
+async function scanStream(root, registry, streamId, fingerprint) {
   const stream = streamFor(registry, streamId);
   const streamRoot = repositoryPath(root, `${registry.storageRoot}/${stream.relativeRoot}`);
   await assertNoSymlinkAncestry(streamRoot);
@@ -499,7 +535,7 @@ async function scanStream(root, registry, streamId) {
   const byIdempotency = new Map();
   const events = [];
   for (const dirEntry of entries) {
-    const candidate = await readCandidateStreamEvent(root, registry, stream, streamId, dirEntry);
+    const candidate = await readCandidateStreamEvent(root, registry, stream, streamId, dirEntry, fingerprint);
     if (!candidate) continue;
     const { sequence, event } = candidate;
     if (bySequence.has(sequence)) fail("GES-FORK", "Multiple records claim one sequence.");
@@ -707,7 +743,7 @@ export async function loadGovernanceEventRegistry({ repositoryRoot, registryPath
 export async function appendPortableGovernanceEvent({ repositoryRoot, registryPath, repositoryFingerprint, intent, assertAppend, captureDecision = "captured" } = {}) {
   const { root, fingerprint } = await assertPhysicalRoot(repositoryRoot);
   const { registry } = await loadRegistry(root, registryPath);
-  if (repositoryFingerprint !== fingerprint || registry.repositoryFingerprint !== fingerprint) fail("GES-CROSS-REPOSITORY", "The expected repository fingerprint does not match the physical repository.");
+  if (repositoryFingerprint !== fingerprint) fail("GES-CROSS-REPOSITORY", "The expected repository fingerprint does not match the physical repository.");
   const streamId = intent?.streamId;
   const stream = streamFor(registry, streamId);
   const template = assertIntent(intent, stream, repositoryFingerprint);
@@ -731,7 +767,7 @@ export async function appendPortableGovernanceEvent({ repositoryRoot, registryPa
   }
   const streamRoot = await ensureSafeDirectory(root, `${registry.storageRoot}/${stream.relativeRoot}`);
   return withExclusiveStreamLock(streamRoot, async () => {
-    const scanned = await scanStream(root, registry, streamId);
+    const scanned = await scanStream(root, registry, streamId, fingerprint);
     const existing = scanned.events.find((event) => event.idempotencyKey === template.idempotencyKey);
     if (existing) {
       if (eventIntentDigest(existing) !== canonicalSha256(intent)) fail("GES-IDEMPOTENCY-CONFLICT", "Idempotency replay conflicts with the committed event.");
@@ -761,8 +797,8 @@ export async function appendPortableGovernanceEvent({ repositoryRoot, registryPa
 export async function verifyPortableGovernanceStream({ repositoryRoot, registryPath, repositoryFingerprint, streamId, checkpoint } = {}) {
   const { root, fingerprint } = await assertPhysicalRoot(repositoryRoot);
   const { registry } = await loadRegistry(root, registryPath);
-  if (repositoryFingerprint !== fingerprint || registry.repositoryFingerprint !== fingerprint) fail("GES-CROSS-REPOSITORY", "The expected repository fingerprint does not match the physical repository.");
-  const scanned = await scanStream(root, registry, streamId);
+  if (repositoryFingerprint !== fingerprint) fail("GES-CROSS-REPOSITORY", "The expected repository fingerprint does not match the physical repository.");
+  const scanned = await scanStream(root, registry, streamId, fingerprint);
   if (!checkpoint) return Object.freeze({ integrity: "prefix-valid", completeness: "unknown", streamId, eventCount: scanned.events.length });
   const witness = scanned.events.find((event) => event.sequence === checkpoint.sequence);
   if (!witness || !checkpointMatches(witness, checkpoint)) fail("GES-CHECKPOINT", "The retained checkpoint is not present in this stream.");
@@ -773,9 +809,9 @@ export async function verifyPortableGovernanceStream({ repositoryRoot, registryP
 /** Query is a projection boundary: validation happens before any event is returned. */
 export async function queryPortableGovernanceStream({ repositoryRoot, registryPath, repositoryFingerprint, streamId, checkpoint } = {}) {
   const verification = await verifyPortableGovernanceStream({ repositoryRoot, registryPath, repositoryFingerprint, streamId, checkpoint });
-  const { root } = await assertPhysicalRoot(repositoryRoot);
+  const { root, fingerprint } = await assertPhysicalRoot(repositoryRoot);
   const { registry } = await loadRegistry(root, registryPath);
-  const scanned = await scanStream(root, registry, streamId);
+  const scanned = await scanStream(root, registry, streamId, fingerprint);
   const limit = verification.completeness === "verified" ? scanned.events.length : checkpoint?.sequence ?? scanned.events.length;
   return Object.freeze({ ...verification, events: Object.freeze(scanned.events.slice(0, limit).map((event) => Object.freeze({ ...event }))) });
 }
@@ -820,18 +856,18 @@ export async function recoverPortableGovernanceProjection({ repositoryRoot, regi
   if (disposition !== undefined) {
     const { root, fingerprint } = await assertPhysicalRoot(repositoryRoot);
     const { registry } = await loadRegistry(root, registryPath);
-    if (repositoryFingerprint !== fingerprint || registry.repositoryFingerprint !== fingerprint) fail("GES-CROSS-REPOSITORY", "The expected repository fingerprint does not match the physical repository.");
-    return recordGovernanceForkDisposition(root, registry, streamId, disposition);
+    if (repositoryFingerprint !== fingerprint) fail("GES-CROSS-REPOSITORY", "The expected repository fingerprint does not match the physical repository.");
+    return recordGovernanceForkDisposition(root, registry, streamId, disposition, fingerprint);
   }
   if (!exactKeys(recovery, ["idempotencyKey", "expectedHeadsDigest", "requestedPostimageDigest"]) || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(recovery.idempotencyKey)
     || (recovery.expectedHeadsDigest !== null && !SHA256.test(recovery.expectedHeadsDigest)) || !SHA256.test(recovery.requestedPostimageDigest)) fail("GES-RECOVERY-REQUEST", "Recovery requires a closed idempotent preimage/postimage request.");
   const verification = await verifyPortableGovernanceStream({ repositoryRoot, registryPath, repositoryFingerprint, streamId, checkpoint });
   if (verification.integrity !== "valid") fail("GES-RECOVERY-CHECKPOINT", "Projection recovery requires a retained checkpoint.");
-  const { root } = await assertPhysicalRoot(repositoryRoot);
+  const { root, fingerprint } = await assertPhysicalRoot(repositoryRoot);
   const { registry } = await loadRegistry(root, registryPath);
   const streamRoot = await ensureSafeDirectory(root, `${registry.storageRoot}/${streamId}`);
   return withExclusiveStreamLock(streamRoot, async () => {
-    const rechecked = await scanStream(root, registry, streamId);
+    const rechecked = await scanStream(root, registry, streamId, fingerprint);
     const headsPath = repositoryPath(root, `${registry.storageRoot}/heads.json`);
     const receiptRoot = await ensureSafeDirectory(root, `${registry.storageRoot}/recovery`);
     const receiptPath = path.join(receiptRoot, `${recovery.idempotencyKey}.json`);
@@ -1209,7 +1245,7 @@ function authorizeForkDisposition(root, registry, streamId, disposition, fork, n
  * decide whether a governed fork disposition applies — there is no separate
  * detection path for that decision either.
  */
-async function inspectStreamForForks(root, registry, streamId) {
+async function inspectStreamForForks(root, registry, streamId, fingerprint) {
   const stream = streamFor(registry, streamId);
   const streamRoot = repositoryPath(root, `${registry.storageRoot}/${stream.relativeRoot}`);
   await assertNoSymlinkAncestry(streamRoot);
@@ -1220,7 +1256,7 @@ async function inspectStreamForForks(root, registry, streamId) {
     const entries = await readdir(streamRoot, { withFileTypes: true });
     const byIdempotency = new Map();
     for (const dirEntry of entries) {
-      const candidate = await readCandidateStreamEvent(root, registry, stream, streamId, dirEntry);
+      const candidate = await readCandidateStreamEvent(root, registry, stream, streamId, dirEntry, fingerprint);
       if (!candidate) continue;
       const { sequence, event } = candidate;
       if (!bySequence.has(sequence)) bySequence.set(sequence, []);
@@ -1355,8 +1391,8 @@ async function readForkDisposition(root, registry, streamId, sequence, fork = nu
 export async function inspectForkedGovernanceStream({ repositoryRoot, registryPath, repositoryFingerprint, streamId } = {}) {
   const { root, fingerprint } = await assertPhysicalRoot(repositoryRoot);
   const { registry } = await loadRegistry(root, registryPath);
-  if (repositoryFingerprint !== fingerprint || registry.repositoryFingerprint !== fingerprint) fail("GES-CROSS-REPOSITORY", "The expected repository fingerprint does not match the physical repository.");
-  const { prefix, forks } = await inspectStreamForForks(root, registry, streamId);
+  if (repositoryFingerprint !== fingerprint) fail("GES-CROSS-REPOSITORY", "The expected repository fingerprint does not match the physical repository.");
+  const { prefix, forks } = await inspectStreamForForks(root, registry, streamId, fingerprint);
   const dispositionedForks = await Promise.all(forks.map(async (fork) => Object.freeze({
     ...fork,
     disposition: await readForkDisposition(root, registry, streamId, fork.sequence, fork),
@@ -1394,12 +1430,12 @@ async function removeOrphanedTemporaryForkDispositions(dispositionRoot) {
  * exactly as before; restoring write availability afterward is a separate,
  * out-of-scope policy decision.
  */
-async function recordGovernanceForkDisposition(root, registry, streamId, disposition, now = new Date().toISOString()) {
+async function recordGovernanceForkDisposition(root, registry, streamId, disposition, fingerprint, now = new Date().toISOString()) {
   const stream = streamFor(registry, streamId);
   assertForkDisposition(disposition);
   const streamRoot = await ensureSafeDirectory(root, `${registry.storageRoot}/${stream.relativeRoot}`);
   return withExclusiveStreamLock(streamRoot, async () => {
-    const inspection = await inspectStreamForForks(root, registry, streamId);
+    const inspection = await inspectStreamForForks(root, registry, streamId, fingerprint);
     const fork = inspection.forks.find((entry) => entry.sequence === disposition.sequence);
     if (!fork) fail("GES-FORK-DISPOSITION-MISMATCH", "The disposition does not name a sequence that is actually forked in this stream.");
     const actualEventIds = fork.entries.map((entry) => entry.eventId).sort();
