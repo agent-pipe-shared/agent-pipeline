@@ -56,6 +56,8 @@ import {
 // restated here -- the whole point of the change is that one table is the single source.
 import {
   automatedLifecycleArgvCommands,
+  automatedMutatingApplyArgv,
+  MUTATING_ONBOARDING_ARGV_SHAPES,
   ONBOARDING_SUBCOMMANDS,
 } from "../scripts/project-onboarding-v3.mjs";
 // NOVA-LCR-HGO-1 (ADR-0059 Decision 3/4): the same generic HGO Bash class the guard now
@@ -2602,6 +2604,68 @@ test("NVA-W5-COORD-STEP5-2: bootstrap-bind-plan admits the bare lifecycle argv v
       `node '${ONBOARDING_SCRIPT}' bootstrap-bind-plan --root '${path}' --plan-sha256 ${"a".repeat(64)} --activate`,
       path,
     ), false);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// NVA-CODEXARGV-1 (AC-3): the closure proof for MUTATING_ONBOARDING_ARGV_SHAPES -- the CLI's
+// OWN real argv-emission function (automatedMutatingApplyArgv(), scripts/project-onboarding-v3.mjs),
+// fed straight into the guard's OWN real admission function (isSanctionedLifecycleCommand()).
+// Never a hand-typed string on either side, so the two sides genuinely cannot silently drift
+// again: a shape change to MUTATING_ONBOARDING_ARGV_SHAPES that the emission side and the
+// admission side disagreed about would fail THIS test, not merely two independent hand-written
+// literal assertions that happen to agree today.
+test("NVA-CODEXARGV-1 (AC-3): automatedMutatingApplyArgv's own emitted argv is admitted by the guard's real admission function, for every declared mutating subcommand", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const sampleValues = {
+      "intake-consent-apply": {
+        "--git-author-name": "PO Name", "--git-author-email": "po@example.com",
+        "--language": "en", "--profile": "feature",
+      },
+      "intake-capture-apply": { "--text": "requirement material" },
+      "intake-design-questions-apply": {
+        "--answers-json": JSON.stringify([{ question: "What is the goal?", answer: "Ship it." }]),
+      },
+      "intake-generate-apply": { "--plan-sha256": "a".repeat(64) },
+      "bootstrap-bind-apply": { "--plan-sha256": "b".repeat(64) },
+    };
+    assert.deepEqual(
+      Object.keys(sampleValues).sort(),
+      Object.keys(MUTATING_ONBOARDING_ARGV_SHAPES).sort(),
+      "this test must cover every declared mutating subcommand, not a stale subset",
+    );
+    for (const name of Object.keys(MUTATING_ONBOARDING_ARGV_SHAPES)) {
+      const argv = automatedMutatingApplyArgv(name, path, sampleValues[name]);
+      const command = `node '${ONBOARDING_SCRIPT}' ${argv.map((token) => `'${token}'`).join(" ")}`;
+      assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// NVA-CODEXARGV-1 (AC-4): regression pin for the specific Antigravity failure the dispatch
+// briefing named -- the same emitted command, minus --activate, must stay refused. Built from
+// automatedMutatingApplyArgv() (the shared emission this dispatch adds) with "--activate"
+// filtered out, so this exercises the SAME generic admission loop the AC-3 test above exercises
+// -- proving the loop's own `required` handling for --activate, not a separate hand-typed shape.
+test("NVA-CODEXARGV-1 (AC-4): the same emitted mutating-apply argv, with --activate removed, stays refused for every declared subcommand", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const sampleValues = {
+      "intake-consent-apply": { "--language": "en", "--profile": "feature" },
+      "intake-capture-apply": { "--text": "requirement material" },
+      "intake-design-questions-apply": {
+        "--answers-json": JSON.stringify([{ question: "What is the goal?", answer: "Ship it." }]),
+      },
+      "intake-generate-apply": { "--plan-sha256": "a".repeat(64) },
+      "bootstrap-bind-apply": { "--plan-sha256": "b".repeat(64) },
+    };
+    for (const name of Object.keys(MUTATING_ONBOARDING_ARGV_SHAPES)) {
+      const argv = automatedMutatingApplyArgv(name, path, sampleValues[name]).filter((token) => token !== "--activate");
+      const command = `node '${ONBOARDING_SCRIPT}' ${argv.map((token) => `'${token}'`).join(" ")}`;
+      assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+    }
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
