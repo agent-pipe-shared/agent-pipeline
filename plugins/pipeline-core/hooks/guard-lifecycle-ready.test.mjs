@@ -1185,6 +1185,123 @@ test("bounded rg-to-head pipeline accepts both head -n N and combined head -N", 
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
+// NVA-CATPIPE-1. Measured 2026-08-27: `cat <repo-file> | grep -c open` was refused
+// GUARD-OPERATOR-UNAPPROVED in this repository while the identical grep-sourced pipeline
+// (`grep -c open <repo-file> | head -n 1`) was admitted -- the only difference was `cat`
+// versus `grep` as the pipeline's first segment. Pins the exact live shape admitted.
+test("NVA-CATPIPE-1: cat-sourced bounded pipeline -- single-path grep and head sinks are admitted, the exact live GUARD-OPERATOR-UNAPPROVED refusal", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "notes.txt"), "keep this open line\nother line\n");
+    for (const command of ["cat notes.txt | grep open", "cat notes.txt | head -n 20"]) {
+      assert.equal(isReadOnlyDiagnosticCommand(command, path), true, command);
+      assert.equal(isForbiddenCrossRepositoryMutation(command, path), false, command);
+      assert.deepEqual(evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny("continuity-damaged"); },
+      }), { exitCode: 0, stderr: "" });
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// NVA-CATPIPE-1. The multi-path form the live Antigravity refusal actually used:
+// `cat .claude/pipeline.yaml .claude/pipeline.json .claude/settings.json | grep -E '...'`.
+test("NVA-CATPIPE-1: a multi-path cat source piped into grep -E is admitted -- the exact live multi-file refusal shape", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "a.txt"), "alpha\n");
+    writeFileSync(join(path, "b.txt"), "bravo\n");
+    writeFileSync(join(path, "c.txt"), "charlie\n");
+    const command = "cat a.txt b.txt c.txt | grep -E 'alpha|bravo'";
+    assert.equal(isReadOnlyDiagnosticCommand(command, path), true, command);
+    assert.equal(isForbiddenCrossRepositoryMutation(command, path), false, command);
+    assert.deepEqual(evaluateLifecycleReadyGuard(bash(command), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { deny("continuity-damaged"); },
+    }), { exitCode: 0, stderr: "" });
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// NVA-CATPIPE-1. Measured 2026-08-27 in a different governed repository: an Antigravity
+// session was refused twice with GUARD-GATE-STRENGTH-SHELL for a `cat ... | grep -E ...`
+// pipeline naming .claude/pipeline.yaml/.claude/pipeline.json/.claude/settings.json, and
+// separately for one naming pipeline.user.yaml -- even though that refusal's own text
+// claims cat reads are admitted (true only for the single-command form until now). Both
+// directions, matching GSSHELL-STAGE-1's own discipline: a genuine WRITE shape naming these
+// same paths must stay refused, proving the fixture is live rather than the assertions
+// passing vacuously.
+test("NVA-CATPIPE-1: a cat pipeline naming a gate-strength file is classified as a read, never GUARD-GATE-STRENGTH-SHELL", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+    writeFileSync(join(path, ".claude", "pipeline.yaml"), "schema: pipeline.yaml.v1\n");
+    const run = (command) => evaluateLifecycleReadyGuard(bash(command), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { deny("continuity-damaged"); },
+    });
+    assert.match(run("sed -i s/a/b/ pipeline.user.yaml").stderr, /GUARD-GATE-STRENGTH-SHELL/u,
+      "fixture check: the rule must actually be active here");
+    for (const command of [
+      "cat pipeline.user.yaml | grep push_approval",
+      "cat pipeline.user.yaml | head -n 5",
+      "cat .claude/pipeline.yaml pipeline.user.yaml | grep -E 'push_approval|routing'",
+    ]) {
+      const result = run(command);
+      assert.doesNotMatch(result.stderr, /GUARD-GATE-STRENGTH-SHELL/u, command);
+      assert.deepEqual(result, { exitCode: 0, stderr: "" }, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// NVA-CATPIPE-1. Exactness: the same closed bounds isBoundedGrepPipeline already enforces
+// (project-root-only read, exactly two segments, sink is grep or head only, canonical
+// 1..500 head count, only the 2>/dev/null redirect) all apply identically to the cat source.
+test("NVA-CATPIPE-1: exactness -- outside-root path, a third segment, a non-grep/head sink, an out-of-range head count, and a non-null-device redirect all stay refused", () => {
+  const path = root();
+  const outside = mkdtempSync(join(tmpdir(), "guard-lifecycle-catpipe-outside-"));
+  try {
+    writeFileSync(join(path, "notes.txt"), "keep this open line\n");
+    writeFileSync(join(outside, "secret.txt"), "outside\n");
+    for (const command of [
+      `cat ${join(outside, "secret.txt")} | grep open`,
+      "cat notes.txt | grep open | wc -l",
+      "cat notes.txt | wc -l",
+      "cat notes.txt | head -n 0",
+      "cat notes.txt | head -n 501",
+      "cat notes.txt > output.txt | head -n 5",
+      "cat notes.txt 2>diagnostic.log | head -n 5",
+    ]) {
+      assert.equal(isReadOnlyDiagnosticCommand(command, path), false, command);
+    }
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+// NVA-CATPIPE-1. CAT_PIPELINE_DISPLAY_FLAGS is a deliberate allowlist, not a denylist (unlike
+// grep's argv rule): a recognised display-only flag is admitted, an unrecognised one fails
+// closed rather than being silently ignored.
+test("NVA-CATPIPE-1: a recognised display-only cat flag is admitted, an unrecognised flag fails closed", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "notes.txt"), "keep this open line\n");
+    for (const command of [
+      "cat -n notes.txt | grep open",
+      "cat -A notes.txt | head -n 5",
+      "cat --number notes.txt | grep open",
+    ]) {
+      assert.equal(isReadOnlyDiagnosticCommand(command, path), true, command);
+    }
+    for (const command of [
+      "cat -w notes.txt | grep open",
+      "cat --unsafe-flag notes.txt | grep open",
+    ]) {
+      assert.equal(isReadOnlyDiagnosticCommand(command, path), false, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
 // backlog/items/2026-08-19-closed-shell-grammar-still-rejects-common-readonly-composition.md
 test("the small named &&-chain allowlist and trailing 2>/dev/null admit exactly the backlog's triggering shapes and nothing more", () => {
   const path = root();

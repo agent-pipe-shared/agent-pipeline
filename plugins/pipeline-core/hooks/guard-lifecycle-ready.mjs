@@ -815,7 +815,9 @@ function gateStrengthShellRefusal(command, root, dependencies = {}) {
       + "write: this rule cannot tell a read from a write inside an arbitrary shell command, "
       + "so it refuses both rather than risk letting the gate-weakening write through.\n"
       + "Reading is unaffected: cat, rg, head, sha256sum and git diff/log/show on this path "
-      + "are admitted, and so is the one exact, closed script exemption this rule grants "
+      + "are admitted -- including a bounded cat-to-grep/cat-to-head read pipeline naming this "
+      + "path, not only the single-command form -- and so is the one exact, closed script "
+      + "exemption this rule grants "
       + "(GATE_STRENGTH_SHELL_READ_ONLY_SCRIPTS) -- if this command was one of those shapes "
       + "and was still refused, that is this classifier under-covering, not this file "
       + "genuinely changing.\n"
@@ -1425,6 +1427,27 @@ export function isRestartResumeHintCapture(command, root, options = {}) {
     && args[5] === "--consume-card" && args.length === 6;
 }
 
+// Shared by every bounded-pipeline SINK below (isBoundedGrepPipeline's own grep-to-grep leg,
+// and now isBoundedCatPipeline's grep-to-grep leg too): the identical single-command grep
+// argv rule (`--files-with-matches` excluded, nothing else restricted) this file already
+// applies outside a pipeline (isReadOnlySimpleWords below). Factored out once so a second
+// pipeline SOURCE never means a second, parallel copy of this rule -- NVA-CATPIPE-1 briefing
+// field 3, "reuse the SAME argv predicates the existing grep/head sinks already use".
+function isValidPipelineGrepArgs(argv) {
+  return !argv.some((arg) => arg === "--files-with-matches");
+}
+
+// Shared by every bounded-pipeline SINK ending in `head`: the exact two-token `-n N` shape
+// (N in the same canonical 1..500 range guard-command-grammar.mjs's rg-to-head pipeline
+// uses) isBoundedGrepPipeline already enforced inline. Extracted, not widened -- the combined
+// `head -N` form guard-command-grammar.mjs's rg pipeline also accepts is deliberately NOT
+// added here, since neither pre-existing caller of this exact check ever accepted it either;
+// widening it now would be an unbriefed change riding along on an unrelated dispatch.
+function isValidPipelineHeadArgs(argv) {
+  return argv.length === 2 && argv[0] === "-n"
+    && /^(?:[1-9]|[1-9][0-9]|[1-4][0-9]{2}|500)$/u.test(argv[1]);
+}
+
 /**
  * Extends the bounded read-only pipeline family (guard-command-grammar.mjs's
  * isBoundedReadOnlyPipeline, rg-to-rg/rg-to-head only) with the "grep-to-grep"
@@ -1452,11 +1475,10 @@ function isBoundedGrepPipeline(parsed, root) {
   const expectedGrep = windows ? "grep.exe" : "grep";
   const sourceName = basename(parsed.segments[0].executable).toLowerCase();
   if (sourceName !== expectedGrep) return false;
-  const validGrepArgs = (argv) => !argv.some((arg) => arg === "--files-with-matches");
-  if (!validGrepArgs(parsed.segments[0].argv)) return false;
+  if (!isValidPipelineGrepArgs(parsed.segments[0].argv)) return false;
   const sinkName = basename(parsed.segments[1].executable).toLowerCase();
   if (sinkName === expectedGrep) {
-    return parsed.redirects.length === 0 && validGrepArgs(parsed.segments[1].argv);
+    return parsed.redirects.length === 0 && isValidPipelineGrepArgs(parsed.segments[1].argv);
   }
   if (sinkName !== (windows ? "head.exe" : "head")) return false;
   if (parsed.redirects.length === 1) {
@@ -1464,10 +1486,107 @@ function isBoundedGrepPipeline(parsed, root) {
     if (redirect.segment !== 0 || redirect.fd !== 2 || redirect.direction !== ">"
       || (windows ? redirect.target.toLowerCase() !== "nul" : redirect.target !== "/dev/null")) return false;
   }
-  const headArgs = parsed.segments[1].argv;
-  if (headArgs.length !== 2 || headArgs[0] !== "-n"
-    || !/^(?:[1-9]|[1-9][0-9]|[1-4][0-9]{2}|500)$/u.test(headArgs[1])) return false;
-  return true;
+  return isValidPipelineHeadArgs(parsed.segments[1].argv);
+}
+
+// NVA-CATPIPE-1: the exact GNU/POSIX `cat` flags this predicate admits alongside one or more
+// read paths, chosen deliberately narrow and as an ALLOWLIST (unlike isValidPipelineGrepArgs
+// above, which is a denylist -- grep's flag surface changes WHAT matches, so excluding the one
+// unsafe flag is the safe shape; cat's flags only ever change how already-read bytes are
+// DISPLAYED, never which bytes are read or whether anything is written, so admitting a fixed,
+// closed set and refusing everything else is both safe and simple). Every entry is a pure
+// formatting toggle (numbering lines, marking line ends/tabs, showing non-printing characters,
+// squeezing blank runs) or `-u` (unbuffered output, POSIX cat's only other defined flag) --
+// none writes, none changes which paths are read. A flag this set does not recognise falls
+// through to refusal below (fails closed), never silently ignored.
+const CAT_PIPELINE_DISPLAY_FLAGS = new Set([
+  "-A", "--show-all",
+  "-b", "--number-nonblank",
+  "-e",
+  "-E", "--show-ends",
+  "-n", "--number",
+  "-s", "--squeeze-blank",
+  "-t",
+  "-T", "--show-tabs",
+  "-u",
+  "-v", "--show-nonprinting",
+]);
+
+// A local twin of guard-command-grammar.mjs's approvedReadPath(): resolve `value` against
+// `root` and require it to stay inside `root`. Not imported -- approvedReadPath is not
+// exported from that file (only parseGuardCommand and isBoundedReadOnlyPipeline are), and this
+// dispatch's briefed scope excludes editing it. Uses this file's own already-local
+// `pathInside` (below), the same containment logic guard-command-grammar.mjs's copy applies.
+// Deliberately narrower than isReadOnlySimpleWords' existing single-command `cat` rule (which
+// carries no path restriction at all, matching every other entry in its executable list): this
+// dispatch's briefing asks for "the same approved-read-path rule the existing [rg] predicates
+// use", not a widening of the unrestricted single-command allowance to a new pipeline shape.
+function isApprovedCatPipelineReadPath(value, root) {
+  if (typeof value !== "string" || value === "" || value.includes("\0")) return false;
+  try {
+    return pathInside(resolve(root), resolve(root, value));
+  } catch {
+    return false;
+  }
+}
+
+// cat's argv, source side: zero or more CAT_PIPELINE_DISPLAY_FLAGS entries (an optional `--`
+// ends flag parsing, matching ordinary shell convention), then one or more read paths, each
+// approved by isApprovedCatPipelineReadPath above. At least one path is required -- a `cat`
+// with no path argument reads stdin only, which is not a file read this pipeline family
+// exists to admit.
+function isValidCatPipelineSourceArgs(argv, root) {
+  let afterDashDash = false;
+  const paths = [];
+  for (const arg of argv) {
+    if (!afterDashDash && arg === "--") { afterDashDash = true; continue; }
+    if (!afterDashDash && arg.startsWith("-") && arg !== "-") {
+      if (!CAT_PIPELINE_DISPLAY_FLAGS.has(arg)) return false;
+      continue;
+    }
+    paths.push(arg);
+  }
+  return paths.length > 0 && paths.every((path) => isApprovedCatPipelineReadPath(path, root));
+}
+
+/**
+ * NVA-CATPIPE-1. Extends the same bounded pipeline family isBoundedGrepPipeline established
+ * (above) with a `cat`-sourced source: `cat <paths...> | grep ...` and
+ * `cat <paths...> | head -n N`. Measured 2026-08-27: `cat <repo-file> | grep -c open` was
+ * refused GUARD-OPERATOR-UNAPPROVED in this repository, and in a different governed
+ * repository `cat .claude/pipeline.yaml .claude/pipeline.json .claude/settings.json | grep -E
+ * '...'` was refused GUARD-GATE-STRENGTH-SHELL even though that refusal's own text claims cat
+ * reads are admitted -- true only for the single-command form until now.
+ *
+ * Sink half identical to isBoundedGrepPipeline: the same isValidPipelineGrepArgs /
+ * isValidPipelineHeadArgs helpers, one sink rule shared by both sources, never a second
+ * parallel copy. Source half validated by isValidCatPipelineSourceArgs above -- see that
+ * function and CAT_PIPELINE_DISPLAY_FLAGS for the flag-allowlist and path-restriction
+ * rationale (deliberately narrower than the existing single-command `cat` rule).
+ */
+function isBoundedCatPipeline(parsed, root) {
+  if (!parsed || parsed.parseStatus !== "accepted"
+    || parsed.segments.length !== 2
+    || parsed.operators.length !== 1
+    || parsed.operators[0].operator !== "|"
+    || parsed.redirects.length > 1) return false;
+  const windows = parsed.dialect === "windows-readonly-pipeline";
+  const expectedCat = windows ? "cat.exe" : "cat";
+  const sourceName = basename(parsed.segments[0].executable).toLowerCase();
+  if (sourceName !== expectedCat) return false;
+  if (!isValidCatPipelineSourceArgs(parsed.segments[0].argv, root)) return false;
+  const sinkName = basename(parsed.segments[1].executable).toLowerCase();
+  const expectedGrep = windows ? "grep.exe" : "grep";
+  if (sinkName === expectedGrep) {
+    return parsed.redirects.length === 0 && isValidPipelineGrepArgs(parsed.segments[1].argv);
+  }
+  if (sinkName !== (windows ? "head.exe" : "head")) return false;
+  if (parsed.redirects.length === 1) {
+    const redirect = parsed.redirects[0];
+    if (redirect.segment !== 0 || redirect.fd !== 2 || redirect.direction !== ">"
+      || (windows ? redirect.target.toLowerCase() !== "nul" : redirect.target !== "/dev/null")) return false;
+  }
+  return isValidPipelineHeadArgs(parsed.segments[1].argv);
 }
 
 // backlog/items/2026-08-19-closed-shell-grammar-still-rejects-common-readonly-composition.md
@@ -1646,8 +1765,9 @@ function isChainEligibleSegment(segment, root) {
  * point 1 and 2026-08-19-readonly-and-chain-grep-pipe-trailing-stage-not-implemented.md.
  * Every non-trailing segment must independently parse as a single, simple, accepted command
  * (no nested operators/redirects of its own) AND be one of the small set
- * isChainEligibleSegment admits. The trailing segment may either be an isChainEligibleSegment
- * or an isBoundedGrepPipeline. Fails closed on anything else.
+ * isChainEligibleSegment admits. The trailing segment may either be an isChainEligibleSegment,
+ * an isBoundedGrepPipeline, or (NVA-CATPIPE-1) an isBoundedCatPipeline. Fails closed on
+ * anything else.
  */
 function isBoundedReadOnlyAndChain(command, root) {
   const parts = splitTopLevelAndChain(command);
@@ -1656,7 +1776,7 @@ function isBoundedReadOnlyAndChain(command, root) {
     const part = parts[index];
     const isLast = index === parts.length - 1;
     const parsedPart = parseGuardCommand(part, root);
-    if (isLast && isBoundedGrepPipeline(parsedPart, root)) {
+    if (isLast && (isBoundedGrepPipeline(parsedPart, root) || isBoundedCatPipeline(parsedPart, root))) {
       continue;
     }
     if (parsedPart.parseStatus !== "accepted"
@@ -1787,6 +1907,7 @@ export function isReadOnlyDiagnosticCommand(command, root) {
   const parsed = parseGuardCommand(command, root, { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM });
   if (isBoundedReadOnlyPipeline(parsed, root, BOUNDED_PIPELINE_ADDITIONAL_ROOTS)) return true;
   if (isBoundedGrepPipeline(parsed, root)) return true;
+  if (isBoundedCatPipeline(parsed, root)) return true;
   if (isBoundedReadOnlyAndChain(command, root)) return true;
   if (isReadOnlyDiagnosticCommandWithTrailingStderrRedirect(command, root)) return true;
   return isReadOnlySimpleWords(simpleWords(command, root), root);
@@ -2104,6 +2225,7 @@ export function isForbiddenCrossRepositoryMutation(command, root, dependencies =
   }
   if (isBoundedReadOnlyPipeline(parsed, root, BOUNDED_PIPELINE_ADDITIONAL_ROOTS)) return false;
   if (isBoundedGrepPipeline(parsed, root)) return false;
+  if (isBoundedCatPipeline(parsed, root)) return false;
   if (isBoundedReadOnlyAndChain(command, root)) return false;
   if (isReadOnlyDiagnosticCommandWithTrailingStderrRedirect(command, root)) return false;
   if (parsed.parseStatus !== "accepted" && hasExternalOutputRedirect(command, root)) return true;
