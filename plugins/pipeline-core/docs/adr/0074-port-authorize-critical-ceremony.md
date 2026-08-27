@@ -9,7 +9,7 @@
 2026-08-18 PO Decision: "port ADR-0061 ... into Phoenix now"). **Ports**
 origin/main's `0061-uniform-human-approval-ceremony.md` into this repo's own
 numbering (this repo's own `0061` is already taken by
-`0061-local-supervisor-state-authority.md`, an unrelated renumbering-collision
+`0070-local-supervisor-state-authority.md`, an unrelated renumbering-collision
 survivor per `docs/adr/README.md` — see that file's Conventions section on
 per-repo numbering). **Constrains** the same set origin/main's ADR-0061
 constrains here: [ADR-0055](0055-critical-human-proof-waiver.md),

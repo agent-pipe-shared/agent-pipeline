@@ -1,4 +1,6 @@
-# ADR-0061 — Local supervisor state authority and repair
+# ADR-0070 — Local supervisor state authority and repair
+
+> Previously numbered ADR-0061 (until 2026-08-27).
 
 **Status:** accepted · **Date:** 2026-07-25
 
@@ -78,7 +80,7 @@ The exact implementation manifest for the first feature-branch-only slice is:
 
 | Path | Responsibility |
 | --- | --- |
-| `docs/adr/0061-local-supervisor-state-authority.md` | D1 authority, exact manifest and rollback boundary |
+| `docs/adr/0070-local-supervisor-state-authority.md` | D1 authority, exact manifest and rollback boundary |
 | `docs/local-supervisor-state-threat-model.md` | D1 threat model and bounded deferred-risk ownership |
 | `docs/product-capability-inventory.json` | registered D1 verification surface |
 | `governance/observation-doc-governance.json` | classification for the D1 threat-model artifact |

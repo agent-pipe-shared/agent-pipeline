@@ -73,7 +73,7 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required 
 | [0059](0059-signed-human-guard-override.md) | Human Guard Override gains a signed admission path, usable in `signature` mode for everything else it already classifies | accepted | 2026-08-07 |
 | [0060](0060-handover-placement-and-rotation.md) | Mid-task findings go into the handover because a fresh context is a Goldfish; durable rules go into ADRs; the handover gains a retention obligation whose mechanism is still open | accepted (placement) / open (rotation) | 2026-08-07 |
 | [0061](0061-uniform-human-approval-ceremony.md) | The adversary is the agent, not the human: every human gate is the same three acts — copy one command, type approve, enter the PIN — whatever it authorizes, with the gate and the signature untouched | accepted (requirement) / open (mechanism) | 2026-08-07 |
-| [0061](0061-local-supervisor-state-authority.md) | Local supervisor state authority (renumbered from the 0047 numbering collision) | accepted | 2026-07-25 |
+| [0070](0070-local-supervisor-state-authority.md) | Local supervisor state authority (renumbered from the 0047 numbering collision, then from the 0061 collision) | accepted | 2026-07-25 |
 | [0062](0062-production-execution-and-selected-sandbox-launch.md) | Production execution and selected-sandbox launch extend ADR-0044's frozen boundary, within its own constraints | accepted | 2026-08-11 |
 | [0063](0063-repository-directory-contract.md) | Repository directory contract — kinds, one home per kind, ignore anchoring, agent-facing surface, future check, consumer inheritance (lean, Nightwing-pending) | accepted (lean scope, deliberately incomplete) | 2026-08-12 |
 | [0063](0063-fork-disposition-approval-proof.md) | Fork disposition requires a PO approval proof, reusing push's signature/chat mode and `po-approval-proof.mjs` rather than a disposition-specific mechanism | accepted | 2026-08-10 |
@@ -177,7 +177,7 @@ Architecture Decision Records der Agent-Pipeline. Die ADRs formalisieren das kan
 | [0045](0045-canonical-artifact-topology.md) | Kanonische Artefakt-Topologie | akzeptiert | 2026-07-24 |
 | [0046](0046-project-authority-layering.md) | Projekt-Authority-Layering | akzeptiert | 2026-07-24 |
 | [0047](0047-model-free-advisor-preflight-v2.md) | Modellfreier Advisor-Preflight und On-demand-Consultation v2 | akzeptiert | 2026-07-29 |
-| [0061](0061-local-supervisor-state-authority.md) | Lokale Supervisor-State-Authority (repo-lokale Nummernkollision beibehalten) | akzeptiert | 2026-07-26 |
+| [0070](0070-local-supervisor-state-authority.md) | Lokale Supervisor-State-Authority (repo-lokale Nummernkollision beibehalten) | akzeptiert | 2026-07-26 |
 | [0048](0048-local-goldfish-supervisor.md) | Lokaler Goldfish-Supervisor | akzeptiert | 2026-07-26 |
 | [0049](0049-gitlab-ci-constrained-remote-executor-pilot.md) | GitLab-CI-Pilot für eingeschränkte Remote-Ausführung | akzeptiert | 2026-07-27 |
 | [0050](0050-candidate-bound-verify-run-journal.md) | Kandidatengebundenes privates Verify-Run-Journal | akzeptiert | 2026-08-01 |
