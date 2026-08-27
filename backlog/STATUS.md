@@ -30,8 +30,9 @@
 | pipeline.agent-tool-isolation-worktree-snapshots-stale-upstream-ref | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.agents-are-judged-by-rules-no-artifact-ever-tells-them | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.agents-read-the-source-because-nothing-describes-the-interface | open | workflow-improvement | pipeline | 2026-08-09 | — |
+| pipeline.all-three-runners-should-install-against-the-stable-branch | open | requirement | pipeline | 2026-08-27 | — |
 | pipeline.anchor-check-passes-on-wrong-language-content | closed | defect | pipeline | 2026-08-07 | — |
-| pipeline.antigravity-hard-enforcement-layer-has-two-fail-open-paths | open | defect | pipeline | 2026-08-23 | — |
+| pipeline.antigravity-hard-enforcement-layer-has-two-fail-open-paths | closed | defect | pipeline | 2026-08-23 | — |
 | pipeline.antigravity-plugin-registration-points-one-level-above-the-plugin-root | closed | defect | pipeline | 2026-08-23 | — |
 | pipeline.antigravity-sandbox-containment-push-escape-route-unclosed | closed | defect | pipeline | 2026-08-23 | — |
 | pipeline.approval-authority-setup-echoes-generic-values-not-supplied-ones | closed | defect | pipeline | 2026-08-10 | — |
@@ -281,6 +282,7 @@
 | pipeline.part-a-limitation-2-orphaned-by-the-r2-rework | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.partial-lifecycle-blocks-read-only-diagnosis-and-tmp-fallback | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.path-bound-fingerprints-break-across-windows-wsl-access | open | defect | pipeline | 2026-08-27 | — |
+| pipeline.path-bound-repository-fingerprints-break-between-windows-and-wsl | open | defect | pipeline | 2026-08-27 | — |
 | pipeline.per-phase-progress-message-budget | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.permitted-edit-drops-session-into-unrecoverable-readiness | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.phase-aware-bootstrap-readiness | closed | workflow-improvement | pipeline | 2026-08-18 | — |
@@ -347,6 +349,7 @@
 | pipeline.reopen-design-invites-the-edit-that-ends-the-session | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.repair-map-crashes-on-a-fresh-repository-with-no-head | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.report-early-duty-is-conditional-in-writing-and-unconditional-in-practice | closed | defect | pipeline | 2026-08-08 | — |
+| pipeline.repository-agent-definition-is-inert-runtime-loads-installed-copy | open | defect | pipeline | 2026-08-27 | — |
 | pipeline.restart-launch-is-codex-only-for-every-runner | closed | defect | pipeline | 2026-08-06 | — |
 | pipeline.restart-resume-hint-write-misses-the-project-prefix | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.resume-hint-opaque-token-rejects-hyphenated-english | closed | defect | pipeline | 2026-08-09 | — |
@@ -394,7 +397,9 @@
 | pipeline.test-suites-use-host-tmp-instead-of-the-repos-own-scratch-convention | closed | workflow-improvement | pipeline | 2026-08-17 | — |
 | pipeline.the-ledger-reconciler-writes-before-the-items-are-validated | deferred | defect | pipeline | 2026-08-08 | — |
 | pipeline.the-pipeline-cannot-merge-two-parallel-sprint-ledgers | closed | requirement | pipeline | 2026-08-27 | — |
+| pipeline.the-two-suite-registration-checkers-disagree | open | defect | pipeline | 2026-08-27 | — |
 | pipeline.this-hosts-local-marketplace-copy-is-not-symlinked-to-source | closed | defect | pipeline | 2026-08-17 | — |
+| pipeline.three-doc-and-adr-checkers-never-run-in-verify | open | defect | pipeline | 2026-08-27 | — |
 | pipeline.three-smaller-greenfield-defects | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.tp-guard-rules-lifted-on-the-merging-machine-must-be-restored | closed | defect | pipeline | 2026-08-27 | — |
 | pipeline.transactional-readbacks-not-status-cascades | closed | workflow-improvement | pipeline | 2026-08-18 | — |
@@ -439,8 +444,8 @@
 
 ## Counts
 
-- open: 41
+- open: 45
 - in_progress: 5
-- closed: 373
+- closed: 374
 - rejected: 1
 - deferred: 11

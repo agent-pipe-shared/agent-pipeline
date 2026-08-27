@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "afd986370d88e0286d3c81bc49b0c5006d55784b963a45eff69d404b039a9933"
+    "transitionHead": "8758f1b1af183567af48bbd8dc82fcc5f8d209629e34ff9bd194a325c49b51cc"
   },
   "counts": {
-    "open": 41,
+    "open": 45,
     "in_progress": 5,
-    "closed": 373,
+    "closed": 374,
     "rejected": 1,
     "deferred": 11
   },
@@ -328,6 +328,15 @@
       "deferred": true
     },
     {
+      "id": "pipeline.all-three-runners-should-install-against-the-stable-branch",
+      "status": "open",
+      "type": "requirement",
+      "owner": "pipeline",
+      "created": "2026-08-27",
+      "source": "PO decision 2026-08-27, confirmed in session; distribution mapping performed the same day against the live installers and the update-channel resolver",
+      "deferred": false
+    },
+    {
       "id": "pipeline.anchor-check-passes-on-wrong-language-content",
       "status": "closed",
       "type": "defect",
@@ -342,12 +351,16 @@
     },
     {
       "id": "pipeline.antigravity-hard-enforcement-layer-has-two-fail-open-paths",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-23",
       "source": "Critic review finding F8, specs/sprint-agy-runner/evidence/2026-08-23-critic-review-agy-runner.md",
-      "deferred": true
+      "deferred": true,
+      "closedAt": "2026-08-27",
+      "closureRepository": "self",
+      "closureCommit": "ab347a74fd9750a17de610ed3d5ff958c313a336",
+      "closureEvidence": "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs"
     },
     {
       "id": "pipeline.antigravity-plugin-registration-points-one-level-above-the-plugin-root",
@@ -3459,6 +3472,15 @@
       "deferred": false
     },
     {
+      "id": "pipeline.path-bound-repository-fingerprints-break-between-windows-and-wsl",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-27",
+      "source": "NVA-PATHBIND-AUDIT-1, a read-only audit of every repository-fingerprint derivation, 2026-08-27 (scratch/PATHBIND-audit.md)",
+      "deferred": false
+    },
+    {
       "id": "pipeline.per-phase-progress-message-budget",
       "status": "closed",
       "type": "workflow-improvement",
@@ -4300,6 +4322,15 @@
       "closureEvidence": "backlog/items/2026-08-08-report-early-duty-is-conditional-in-writing-and-unconditional-in-practice.md"
     },
     {
+      "id": "pipeline.repository-agent-definition-is-inert-runtime-loads-installed-copy",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-27",
+      "source": "Directly measured during the 2026-08-27 Nova-A candidate session: four deep-tier dispatches truncated at a maxTurns the repository had already raised",
+      "deferred": false
+    },
+    {
       "id": "pipeline.restart-launch-is-codex-only-for-every-runner",
       "status": "closed",
       "type": "defect",
@@ -4874,6 +4905,15 @@
       "closureEvidence": "docs/adr/0068-backlog-ledger-merge-semantics.md"
     },
     {
+      "id": "pipeline.the-two-suite-registration-checkers-disagree",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-27",
+      "source": "Observed 2026-08-27 while re-verifying an inherited nine-suite registration claim: the two checkers return 9 and 0 on the same tree",
+      "deferred": false
+    },
+    {
       "id": "pipeline.this-hosts-local-marketplace-copy-is-not-symlinked-to-source",
       "status": "closed",
       "type": "defect",
@@ -4885,6 +4925,15 @@
       "closureRepository": "self",
       "closureCommit": "64654077003d35a133a942883d2da146c982dfda",
       "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-17-local-plugin-install-attestation-closure.md"
+    },
+    {
+      "id": "pipeline.three-doc-and-adr-checkers-never-run-in-verify",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-27",
+      "source": "SUITEGAP-1 measurement 2026-08-27, re-verified against the live verify.mjs the same day; three of the nine reported suites are genuinely absent, six were false positives",
+      "deferred": false
     },
     {
       "id": "pipeline.three-smaller-greenfield-defects",
