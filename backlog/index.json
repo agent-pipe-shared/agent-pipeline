@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "20cca1bac03a9799f82f83c894e771afa4d73f48556b2e1c4e3289716cf389c3"
+    "transitionHead": "8ef1c3b4b50148d919098cb67cf4cbb133f6908873575c946638fd5c5ca1ab8a"
   },
   "counts": {
-    "open": 37,
+    "open": 38,
     "in_progress": 5,
     "closed": 367,
     "rejected": 1,
@@ -1861,6 +1861,15 @@
       "closureRepository": "self",
       "closureCommit": "00350b2d4f46f86804f188cb84ceff6c947bfa3d",
       "closureEvidence": "backlog/items/2026-08-16-gitignore-evidence-rule-swallows-durable-spec-artifacts.md"
+    },
+    {
+      "id": "pipeline.gitleaks-content-fingerprint-breaks-on-any-line-insertion-above-it",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-27",
+      "source": "Hit twice in one session during the Phoenix merge, 2026-08-27",
+      "deferred": false
     },
     {
       "id": "pipeline.gitleaks-false-positive-in-guard-maintenance-window-attribution-key-generation-tag",

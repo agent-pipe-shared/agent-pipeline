@@ -154,6 +154,7 @@
 | pipeline.git-identity-must-be-set-immediately-before-first-commit-not-at-setup-time | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.git-identity-warn-only-diagnostic-does-not-meet-po-expectation | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.gitignore-evidence-rule-swallows-durable-spec-artifacts | closed | defect | pipeline | 2026-08-16 | — |
+| pipeline.gitleaks-content-fingerprint-breaks-on-any-line-insertion-above-it | open | defect | pipeline | 2026-08-27 | — |
 | pipeline.gitleaks-false-positive-in-guard-maintenance-window-attribution-key-generation-tag | closed | defect | pipeline | 2026-08-19 | — |
 | pipeline.gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger | closed | requirement | pipeline | 2026-08-07 | — |
 | pipeline.gmw-install-never-recognizes-its-own-window-under-v3-multi-anchor-schema | closed | defect | pipeline | 2026-08-16 | — |
@@ -429,7 +430,7 @@
 
 ## Counts
 
-- open: 37
+- open: 38
 - in_progress: 5
 - closed: 367
 - rejected: 1
