@@ -780,6 +780,43 @@ function matchesProtectedBasename(haystack, needle) {
   return new RegExp(`(?<![a-z0-9._-])${escaped}(?![a-z0-9._-])`, "u").test(haystack);
 }
 
+/**
+ * NVA-STARNEEDLE-1 (backlog: 2026-08-27-gate-strength-shell-lane-refuses-any-command-
+ * containing-a-quoted-wildcard.md). Derives ONE needle per GATE_STRENGTH_PATHS entry, and
+ * for a glob-suffixed entry (currently only GS-15, `project/.onboarding-staging/*`) mirrors
+ * guard-gate-strength.mjs's own write-lane semantics (`gateStrengthRuleFor()`): that
+ * function already strips the trailing `/*` and matches the DIRECTORY the entry describes,
+ * never the literal `*` character. This lane matched by basename instead of by directory
+ * prefix, so `basename("project/.onboarding-staging/*")` was the bare wildcard character
+ * itself -- a needle that is not a filename at all, and one `matchesProtectedBasename` then
+ * matched against ANY quoted `*` anywhere in a command's text, whatever the command actually
+ * targeted.
+ *
+ * Applies to every present and future glob-suffixed entry automatically, by shape (the
+ * trailing `/*` suffix), never by naming GS-15 specifically -- so this is not a one-entry
+ * patch. The directory basename is a real, meaningful multi-character identifier (here,
+ * `.onboarding-staging`), so a command genuinely naming a file under that directory keeps
+ * matching exactly like before (AC-1/AC-3); only the bare wildcard needle is gone.
+ */
+export function gateStrengthShellNeedleFor(path) {
+  const normalized = path.endsWith("/*") ? path.slice(0, -2) : path;
+  return basename(normalized);
+}
+
+/**
+ * NVA-STARNEEDLE-1 AC-4: the general defense, independent of gateStrengthShellNeedleFor()
+ * above and of today's specific GATE_STRENGTH_PATHS table. A needle carrying no
+ * alphanumeric character at all is never a real, meaningful filename/directory identifier
+ * -- it is exactly the shape that turned a wildcard glob suffix into a needle that matched
+ * almost anything. Exported so the shell lane's own test file can pin this predicate
+ * directly, against synthetic inputs, rather than only against today's one glob-suffixed
+ * entry (GS-15) -- a future entry that produced a degenerate needle would be caught by this
+ * same, entry-agnostic rule, not only by a test that happens to still be named after GS-15.
+ */
+export function isMeaningfulGateStrengthShellNeedle(needle) {
+  return typeof needle === "string" && /[a-z0-9]/iu.test(needle);
+}
+
 function gateStrengthShellRefusal(command, root, dependencies = {}) {
   if (typeof command !== "string" || command === "") return null;
   if (isReadOnlyDiagnosticCommand(command, root)) return null;
@@ -799,7 +836,18 @@ function gateStrengthShellRefusal(command, root, dependencies = {}) {
   // the project root, which is the arrangement docs/claude-local-plugin-development.md
   // now prescribes; the residual case is recorded in docs/state.md rather than closed by
   // a rule that would break bootstrap.
-  const needles = GATE_STRENGTH_PATHS.map((rule) => basename(rule.path));
+  //
+  // NVA-STARNEEDLE-1: derived via gateStrengthShellNeedleFor() (glob-aware, see its own
+  // header) rather than a bare basename(), and defensively filtered so a needle carrying no
+  // alphanumeric character at all -- a bare wildcard/punctuation "filename" that is never a
+  // real, meaningful identifier -- can never be produced, whatever future entry
+  // GATE_STRENGTH_PATHS grows. This is the general defense AC-4 asks for: it is not
+  // conditioned on GS-15's id or path, only on the needle's own shape once derived, so a
+  // brand-new glob-suffixed entry whose directory basename were somehow still degenerate
+  // would silently drop out of the needle set instead of silently reintroducing this class.
+  const needles = GATE_STRENGTH_PATHS
+    .map((rule) => gateStrengthShellNeedleFor(rule.path))
+    .filter(isMeaningfulGateStrengthShellNeedle);
   const haystack = command.replace(/\\/gu, "/").toLowerCase();
   const hit = needles.find((needle) => matchesProtectedBasename(haystack, needle.replace(/\\/gu, "/").toLowerCase()));
   if (hit === undefined) return null;

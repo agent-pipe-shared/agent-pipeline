@@ -28,10 +28,12 @@ import {
   BASE_GOVERNANCE_MARKERS,
   claudeSessionMemoryDirectory,
   evaluateLifecycleReadyGuard,
+  gateStrengthShellNeedleFor,
   governanceMarkers,
   isClaudeSessionMemoryWritePath,
   isForbiddenCrossRepositoryMutation,
   isMachinePlaneWritePath,
+  isMeaningfulGateStrengthShellNeedle,
   isNarrowRepositoryRecoveryCommand,
   isProjectWritePath,
   isReadOnlyDiagnosticCommand,
@@ -44,6 +46,10 @@ import {
   MANIFEST_FAILURE_WARNING,
   retryActionsForDeniedCommand,
 } from "./guard-lifecycle-ready.mjs";
+// NVA-STARNEEDLE-1 AC-3: imported straight from the module the shell lane itself imports
+// (GATE_STRENGTH_PATHS), never restated here as a copy or a fixed count -- the same
+// single-source discipline TPSHELL-5 pins for its own protected-test-path table.
+import { GATE_STRENGTH_PATHS } from "./guard-gate-strength.mjs";
 // AC-10: imported straight from the library module the guard now defers to, never
 // through the guard's own re-export, so this test cannot pass merely because both
 // names happen to reference the identical function object.
@@ -3285,14 +3291,24 @@ test("NVA-BL-INTAKEBIND-1: bootstrap-binding-required admits exactly the staging
       assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u, filePath);
     }
 
-    // AC-4: never a tool other than Edit/Write -- Bash (a write-shaped, non-read-only-
-    // diagnostic command, so it does not accidentally hit the unrelated read-only lane) and
-    // NotebookEdit both still refuse.
-    for (const input of [bash(`rm ${prdPath}`), notebookEdit(prdPath)]) {
-      const result = evaluateLifecycleReadyGuard(input, bindingDeps);
-      assert.equal(result.exitCode, 2, input.tool_name);
-      assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u, input.tool_name);
-    }
+    // AC-4: never a tool other than Edit/Write -- NotebookEdit (a write tool, gated by the
+    // ordinary readiness lane exactly like Edit/Write for every non-admitted path) still
+    // refuses under GUARD-LIFECYCLE-NOT-READY.
+    const notebookResult = evaluateLifecycleReadyGuard(notebookEdit(prdPath), bindingDeps);
+    assert.equal(notebookResult.exitCode, 2, "NotebookEdit");
+    assert.match(notebookResult.stderr, /GUARD-LIFECYCLE-NOT-READY/u, "NotebookEdit");
+    // Bash (a write-shaped, non-read-only-diagnostic command, so it does not accidentally
+    // hit the unrelated read-only lane) also stays refused -- but, since NVA-STARNEEDLE-1,
+    // by the gate-strength SHELL lane itself, before readiness is ever evaluated, exactly
+    // like every OTHER GATE_STRENGTH_PATHS entry already refuses a matching shell command
+    // (GSSHELL-STAGE-1 pins the identical shape for GS-1). Before that fix, GS-15's shell
+    // needle was the bare wildcard character and never actually matched a real path under
+    // this directory, so this exact command fell all the way through to the generic
+    // readiness fallback instead -- a weaker, later refusal than every sibling entry gets,
+    // which was the surface of the bug this test file's own NVA-STARNEEDLE-1 tests fix.
+    const bashResult = evaluateLifecycleReadyGuard(bash(`rm ${prdPath}`), bindingDeps);
+    assert.equal(bashResult.exitCode, 2, "Bash");
+    assert.match(bashResult.stderr, /GUARD-GATE-STRENGTH-SHELL/u, "Bash");
 
     // AC-5: never a lifecycleStatus other than bootstrap-binding-required -- the identical
     // admitted shapes stay refused under a different PORG-NOT-READY status.
@@ -5107,6 +5123,141 @@ test("NVA-LCGUARD-4 gap 1: a backup-style filename sharing a protected name as a
     }
   } finally {
     rmSync(path, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------------
+// NVA-STARNEEDLE-1 (backlog: 2026-08-27-gate-strength-shell-lane-refuses-any-command-
+// containing-a-quoted-wildcard.md). GS-15's path is `project/.onboarding-staging/*`, whose
+// basename() is the bare wildcard character "*" -- a needle that then matched ANY quoted
+// "*" anywhere in a command's text, whatever the command actually targeted. Fixed to derive
+// the needle from the DIRECTORY a glob-suffixed entry describes, mirroring
+// guard-gate-strength.mjs's own write-lane gateStrengthRuleFor() (which already strips the
+// trailing "/*" and matches the directory prefix), plus a general, entry-agnostic filter
+// that a needle carrying no alphanumeric character can never be produced at all.
+// ---------------------------------------------------------------------------------
+
+/**
+ * NVA-STARNEEDLE-1 AC-2. Both measured reproductions from the defect record: a scratch-note
+ * append whose text documents a hook-matcher literal "*", and an rg diagnostic searching for
+ * the literal character, piped to a non-bounded sink (`wc -l`) so it is not already
+ * exempted by the read-only classifier above. Neither command names a gate-strength path.
+ */
+test("NVA-STARNEEDLE-1: a command whose text merely quotes an asterisk is never refused by this lane", () => {
+  const readiness = { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+  mkdirSync(SCRATCH_ROOT, { recursive: true });
+  const path = mkdtempSync(join(SCRATCH_ROOT, "guard-lifecycle-starneedle-fp-"));
+  // The rule only defends a repository the Pipeline governs, so the fixture must carry the
+  // marker -- see GSSHELL-STAGE-1 above for why an unmarked fixture would pass vacuously.
+  writeFileSync(join(path, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+  const run = (command) => evaluateLifecycleReadyGuard(bash(command), {
+    projectDir: path,
+    requireProjectOnboardingReadyFn() { return readiness; },
+  });
+  try {
+    assert.match(run("sed -i s/a/b/ pipeline.user.yaml").stderr, /GUARD-GATE-STRENGTH-SHELL/u,
+      "fixture check: the rule must actually be active here");
+    for (const command of [
+      // Append to a gitignored scratch note whose text quotes an asterisk as a documented
+      // hook-matcher literal.
+      "printf '%s\\n' 'matcher: \"*\"' >> scratch/hook-notes.md",
+      // An rg diagnostic searching for a literal "*" character, piped to a sink this
+      // guard's own bounded-pipeline classifier does not admit -- so it is not already
+      // exempted as read-only before ever reaching the needle match this test pins.
+      "rg -n \"a literal * character\" backlog/items | wc -l",
+    ]) {
+      assert.doesNotMatch(run(command).stderr, /GUARD-GATE-STRENGTH-SHELL/u, command);
+    }
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+  }
+});
+
+/**
+ * NVA-STARNEEDLE-1 AC-1. The glob-suffixed GS-15 entry now contributes a needle that
+ * matches its DIRECTORY (".onboarding-staging"), never the bare wildcard -- and a shell
+ * command naming a REAL file under that directory stays refused exactly as before the fix,
+ * both by its bare relative path and by an absolute-looking one.
+ */
+test("NVA-STARNEEDLE-1: a shell command naming a real file under the GS-15 staging directory stays refused", () => {
+  const readiness = { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+  mkdirSync(SCRATCH_ROOT, { recursive: true });
+  const path = mkdtempSync(join(SCRATCH_ROOT, "guard-lifecycle-starneedle-gs15-"));
+  writeFileSync(join(path, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+  mkdirSync(join(path, "project", ".onboarding-staging"), { recursive: true });
+  const run = (command) => evaluateLifecycleReadyGuard(bash(command), {
+    projectDir: path,
+    requireProjectOnboardingReadyFn() { return readiness; },
+  });
+  try {
+    for (const command of [
+      "sed -i s/a/b/ project/.onboarding-staging/prd_test.md",
+      "rm project/.onboarding-staging/prd_test.md",
+      `rm ${join(path, "project", ".onboarding-staging", "prd_test.md")}`,
+    ]) {
+      assert.match(run(command).stderr, /GUARD-GATE-STRENGTH-SHELL/u, command);
+    }
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+  }
+});
+
+/**
+ * NVA-STARNEEDLE-1 AC-3. Every entry of GATE_STRENGTH_PATHS (imported straight from
+ * guard-gate-strength.mjs, the single shared definition -- TPSHELL-5's own discipline)
+ * still refuses a shell command naming a real instance of it. Iterates the live table
+ * rather than spot-checking one entry, so a future entry cannot silently drop out of this
+ * lane's coverage the way GS-15 did.
+ */
+test("NVA-STARNEEDLE-1 AC-3: every configured gate-strength path still refuses a shell command naming a real instance of it", () => {
+  const readiness = { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+  mkdirSync(SCRATCH_ROOT, { recursive: true });
+  const path = mkdtempSync(join(SCRATCH_ROOT, "guard-lifecycle-starneedle-ac3-"));
+  writeFileSync(join(path, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+  const run = (command) => evaluateLifecycleReadyGuard(bash(command), {
+    projectDir: path,
+    requireProjectOnboardingReadyFn() { return readiness; },
+  });
+  try {
+    assert.ok(GATE_STRENGTH_PATHS.length > 0, "fixture check: the shared table must not be empty");
+    for (const rule of GATE_STRENGTH_PATHS) {
+      const instancePath = rule.path.endsWith("/*") ? `${rule.path.slice(0, -2)}/example.md` : rule.path;
+      assert.match(run(`rm ${instancePath}`).stderr, /GUARD-GATE-STRENGTH-SHELL/u, `${rule.id}: ${instancePath}`);
+    }
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+  }
+});
+
+/**
+ * NVA-STARNEEDLE-1 AC-4. The derivation rule pinned directly, independent of today's
+ * specific GATE_STRENGTH_PATHS table: a glob-suffixed path's needle is its directory's own
+ * basename, never the wildcard segment; a non-glob path's needle is unchanged (basename of
+ * the path itself); and the general filter excludes any needle carrying no alphanumeric
+ * character at all -- so a future glob-suffixed entry gets the same treatment automatically
+ * and can never silently reintroduce a punctuation-only needle.
+ */
+test("NVA-STARNEEDLE-1 AC-4: the needle-derivation rule and its defensive filter, pinned directly", () => {
+  assert.equal(gateStrengthShellNeedleFor("project/.onboarding-staging/*"), ".onboarding-staging");
+  assert.equal(gateStrengthShellNeedleFor("pipeline.user.yaml"), "pipeline.user.yaml");
+  assert.equal(gateStrengthShellNeedleFor(".claude/policy-lock.json"), "policy-lock.json");
+  // A hypothetical future glob-suffixed entry with a longer directory name gets the
+  // identical treatment, automatically, by shape -- never by naming a specific rule id.
+  assert.equal(gateStrengthShellNeedleFor("project/.future-staging-dir/*"), ".future-staging-dir");
+  // The defensive filter: only a needle carrying at least one alphanumeric character is
+  // ever admitted into the match set. A bare wildcard, a lone punctuation character, or an
+  // empty string can never pass -- this is the rule that makes this whole class
+  // unreintroducible, independent of which entry produced the degenerate needle.
+  assert.equal(isMeaningfulGateStrengthShellNeedle("*"), false);
+  assert.equal(isMeaningfulGateStrengthShellNeedle("."), false);
+  assert.equal(isMeaningfulGateStrengthShellNeedle(""), false);
+  assert.equal(isMeaningfulGateStrengthShellNeedle(".onboarding-staging"), true);
+  assert.equal(isMeaningfulGateStrengthShellNeedle("pipeline.user.yaml"), true);
+  // Every needle GATE_STRENGTH_PATHS actually derives today passes the filter -- the live
+  // table has nothing degenerate in it once the derivation rule above is applied.
+  for (const rule of GATE_STRENGTH_PATHS) {
+    const needle = gateStrengthShellNeedleFor(rule.path);
+    assert.ok(isMeaningfulGateStrengthShellNeedle(needle), `${rule.id} produced a non-meaningful needle: ${JSON.stringify(needle)}`);
   }
 });
 
