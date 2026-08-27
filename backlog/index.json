@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "09b950f703ef80451a0fa59e2f9f2ca19476ab14241a037cbe5e149ea694240a"
+    "transitionHead": "1e01ff919892d982629a275715c16177a8cbb7a213719e06cff9041982806a7b"
   },
   "counts": {
-    "open": 41,
+    "open": 39,
     "in_progress": 5,
-    "closed": 371,
+    "closed": 373,
     "rejected": 1,
     "deferred": 11
   },
@@ -3616,12 +3616,16 @@
     },
     {
       "id": "pipeline.po-decision-bs26-unsatisfiable-under-the-phoenix-ledger-split",
-      "status": "open",
+      "status": "closed",
       "type": "requirement",
       "owner": "pipeline",
       "created": "2026-08-27",
       "source": "Phoenix merge, dispatch VFX3-BACKLOG plus direct verification, 2026-08-26",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-27",
+      "closureRepository": "self",
+      "closureCommit": "ec7d2e11705e8c90502445737859c3965259f87a",
+      "closureEvidence": "docs/adr/0068-backlog-ledger-merge-semantics.md"
     },
     {
       "id": "pipeline.po-decision-claude-start-time-item-closed-on-a-rejected-approach",
@@ -4840,12 +4844,16 @@
     },
     {
       "id": "pipeline.the-pipeline-cannot-merge-two-parallel-sprint-ledgers",
-      "status": "open",
+      "status": "closed",
       "type": "requirement",
       "owner": "pipeline",
       "created": "2026-08-27",
       "source": "PO decision during the sprint_phoenix merge close-out, 2026-08-27: parallel sprints that later merge are a normal mode of work and the Pipeline must support it",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-27",
+      "closureRepository": "self",
+      "closureCommit": "ec7d2e11705e8c90502445737859c3965259f87a",
+      "closureEvidence": "docs/adr/0068-backlog-ledger-merge-semantics.md"
     },
     {
       "id": "pipeline.this-hosts-local-marketplace-copy-is-not-symlinked-to-source",
