@@ -42,9 +42,10 @@ path-derived fingerprints that are correct within one host but not across two.
 - `plugins/pipeline-core/lib/codex-onboarding-runtime.mjs` — the parallel derivation
 - Consumers: PO gate receipt, external push ledger, local supervisor state, the
   restart barrier, and the restricted attribution store
-- [ADR-0057](../../docs/adr/0057-windows-support.md) — names Windows as a supported
-  platform and records a "native-Windows red-suite class" as a deliberately tracked,
-  non-release-blocking defect class
+- [ADR-0057](../../docs/adr/0057-runner-platform-support-is-an-implementation-obligation.md)
+  — makes runner/platform support an implementation obligation; the
+  "native-Windows red-suite class" is tracked as a deliberate,
+  non-release-blocking defect class under it
 
 ## Proposal
 

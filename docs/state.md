@@ -12,7 +12,50 @@
 | 2026-08-11 to 2026-08-19 | Checkpoints 1-60 (2026-08-11 through 2026-08-19 checkpoint 60): superseded session narrative; durable decisions already live in ADRs/backlog/guardrails per this repo's own standing convention, not uniquely in this prose. | [docs/state-archive/2026-08-19--checkpoints-1-through-60.md](state-archive/2026-08-19--checkpoints-1-through-60.md) |
 | 2026-08-26 | 2026-08-25 Antigravity chat-gate-ceremony standardization, verify-tuner stage 2 acceptance, sprint-agy-runner delta4 Critic fix and candidate status | [docs/state-archive/2026-08-26--agy-runner-2026-08-25-handover.md](state-archive/2026-08-26--agy-runner-2026-08-25-handover.md) |
 
-## Current handover — ledger-merge capability, ADR renumbering, handover rotation (2026-08-27)
+## Current handover — Verify is green in one run; candidate 0.6.0 local (2026-08-27)
+
+**READ THIS FIRST.** Verify passes 471/471, exit 0, in a **single** run with a
+clean tree before and after — candidate `5fd963fc`. The two-run requirement is
+gone, and its cause is named rather than worked around.
+
+**The cause.** `lib/entrypoint.test.mjs` case EP07 pointed `CLAUDE_PROJECT_DIR`
+at this repository while spawning the gate-strength guard twice, so the guard
+recorded two REAL denials against the checkout and appended four governance
+events plus an advanced `heads.json` on every run. That dirtied the tree
+mid-flight, which made `security-scan` (all four adapters ERROR, exit 2) and
+`candidate-binding` fail on an artifact rather than a defect. Identified with a
+temporary probe in `appendOverrideDeniedLedgerEvent`, the only writer of
+`governance/events/human/**` — two earlier attributions (`repair-map.test.mjs`,
+`guard-gate-strength.test.mjs`) were disproved by measurement first. Fixed in
+`a18cbafe` via `apply-pending-protected-edits.mjs` (TP-8), verified green in
+`--preview` before the operator applied it.
+
+**Stamp convention corrected.** The morning's `-prerelease` stamp was reverted
+to the documented `+build` form (`9e23430f`). The reasoning behind it was wrong
+about the mechanism: `docs/claude-local-plugin-development.md` states that
+`claude plugin install` names the cache directory after the version string with
+`+` replaced by `-`, so it is directory naming, not SemVer precedence. The same
+passage explains the six-day staleness measured that morning — pinning does not
+hold for a directory-sourced marketplace, the rsync had simply not been run.
+
+**AK status.** AK-9/10/11 met (full green run; both manifests + `VERSION` at
+0.6.0; every declared hook *wired* and byte-identical to the installed copy).
+AK-14 filed for Nova B. **AK-5 is the one true inert guard**:
+`guard-dispatch-budget.mjs` is built, 15/15, Verify-registered — but
+`hooks/hooks.json` is on `NEVER_LIFTABLE_KERNEL_PATHS`, so no maintenance window
+can wire it (the guard's own header wrongly claims one can). Prepared PO hand-edit:
+`scratch/AK-5-hooks-json-patch-for-the-PO.md`. **AK-6** is ready to re-dispatch
+against `pipeline-user-v3.schema.json` (the first attempt used the pre-v3 schema
+and would have flagged a correct calibration as drifted; withdrawn in `1d6dec55`,
+scaffolding kept at `8316dbd8`).
+
+**Backlog.** Five items filed, one closed (`0641d0d2`, ledger `6e20daa1`). One
+inherited claim was corrected twice before it was right: "nine suites never run
+in Verify" is **three**, not nine and not one — six are false positives from
+`check-suite-registration.mjs`, which is blind to `verify.mjs`'s scoped
+registration block. That is now its own item, alongside the three real gaps.
+
+## Prior handover — ledger-merge capability, ADR renumbering, handover rotation (2026-08-27)
 
 **READ THIS FIRST.** Three connected pieces of work, all committed, all on
 `feat/sprint-nova-codex-v046`.
