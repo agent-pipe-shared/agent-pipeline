@@ -8,8 +8,15 @@ this document fixes the contracts those plans implement. PRD:
 ## 1. Bound authority and scope
 
 - Scope authority: ADR-0043 (2026-08-17 amendment); membership authority:
-  GitHub #108. Issues #99, #101–#106, #109 plus the 24 open `sprint: alfred`
-  backlog items per [`design/backlog-intake.md`](design/backlog-intake.md).
+  GitHub #108. Issues #99, #101–#106, #109 plus the open `sprint: alfred`
+  backlog items per [`design/backlog-intake.md`](design/backlog-intake.md)
+  (27 as of 2026-08-28; the live assignment read via
+  `check-backlog-sprint-assignment.mjs` is authoritative over this count).
+- **Normative architecture basis:**
+  [`design/agent-first-architecture.md`](design/agent-first-architecture.md).
+  §7 implements it; where this document and the doctrine disagree on an
+  architectural property, evidence class, or enforcement semantic, the
+  doctrine governs and this document is corrected — not the other way round.
 - Design base `a50c8093` on `feat/sprint-alfred`; implementation base is the
   post-Nova `origin/main` after rebase (PRD §5 wave 0).
 - Everything here binds agents and tools. Nothing here constrains the human
@@ -406,35 +413,90 @@ recommendation, policy already encoded).
 (`plugins/pipeline-core/skills/architecture-decision/`), decision-record
 schema, close-path impact recording, adoption flow, fixtures.
 
-- **Rubric:** deterministic checklist over the five #99 significance axes;
-  output one of `initial-adr-required | architecture-baseline-sufficient |
+- **Rubric:** deterministic checklist over the five #99 significance axes,
+  enumerated rather than referenced — a decision is architecturally
+  significant when it materially affects (1) system structure or component
+  boundaries; (2) runtime, framework, dependency, storage, or integration
+  strategy; (3) deployment and execution environment; (4) quality attributes
+  (security, privacy, reliability, portability, performance, …); (5) choices
+  that are costly, risky, or hard to reverse. Output one of
+  `initial-adr-required | architecture-baseline-sufficient |
   no-material-architecture-decision`, evidence-bound (which axis fired).
+  Explicit non-goal: no ADR for every implementation detail.
+- **Decision skill capabilities** (project-neutral, explicitly invokable),
+  all seven: assess significance; draft a concise ADR from governed evidence;
+  identify applicable inherited decisions; propose an explicit human waiver
+  for a needed deviation; supersede rather than rewrite; update the living
+  summary and its references; validate status, identity, applicability,
+  supersession, and traceability. It never approves its own decision or its
+  own exception.
 - **Decision records:** `pipeline.architecture-decision.v1`
   `{id, status: proposed|accepted|superseded|waived, digest, scope,
   supersedes?, exception?: {authority, rationale, scope, expiry}}` stored in
   the governed repo's `docs/adr/` (existing convention; the schema is a
   frontmatter/JSON sidecar, not a new directory kind — ADR-0063 respected).
 - **Inherited layers:** resolver consumes configured org/team sources
-  through #9's interface *when configured*; unconfigured ⇒ Pipeline+project
-  layers, typed `org-source: none`. Follow-by-default / human-waiver
-  semantics exactly per #99 §4 conflict table; waivers are decision records
-  with `exception` filled, PO-authored (D-track shares B2's
-  signature-or-chat ceremony for the authorship act).
+  through #9's interface *when configured* (id, digest, layer, applicability,
+  authority class, freshness — referenced by identity, never copied
+  wholesale; public evidence sanitizes org coordinates); unconfigured ⇒
+  Pipeline+project layers, typed `org-source: none`. Applicable
+  company/team decisions are agent-enforced, human-waivable governed
+  defaults: an agent may not silently ignore, weaken, reinterpret, or
+  override them, and directory location or a folder name never establishes
+  authority.
+- **Conflict semantics — all seven #99 §4 cases, resolved deterministically:**
+  (1) governed default without exception → follow; (2) explicit scoped
+  exception → follow the exception and preserve the reference to the
+  original; (3) incompatible inherited decisions → escalate to the owning
+  human layer, never pick one; (4) project ADR against a higher authority →
+  rejected without a valid scoped exception; (5) advisory deviation →
+  allowed with a named rationale where acknowledgement is required;
+  (6) unavailable optional guidance → typed and unsatisfied, never falsely
+  consumed; (7) unavailable **mandatory** source → blocks the dependent
+  decision.
+- **Waiver record fields:** decision, rationale, scope, affected authority,
+  and duration or supersession condition. A waiver leaves the original
+  authority intact. Waivers are decision records with `exception` filled,
+  PO-authored (D-track shares B2's signature-or-chat ceremony for the
+  authorship act).
 - **Session consumption:** a compiled decision summary
   (`project/architecture-decisions.compiled.json`: ids, one-line summaries,
   applicability, status, active exceptions) bounded in size, regenerated by
   the assessment script, read at bootstrap — never the full ADR estate.
-- **Close impact:** typed enum per #99 §6 recorded via
-  `ritualExtensions.close.pre` (intake deviation: no second close path).
+- **Close impact:** every close reports exactly one typed value —
+  `architecture-conforms | architecture-decision-added |
+  architecture-decision-superseded | architecture-summary-updated |
+  no-architecture-impact` — recorded via `ritualExtensions.close.pre` (intake
+  deviation: no second close path). #97's change-request path consumes it, so
+  a bounded implementation-phase change can supersede architecture without
+  reopening design. A checkpoint exit without a close is covered by the
+  push-boundary staleness debt (§7.3) instead.
+- **Semantic conformance is the Critic's duty, not a file-presence check:**
+  the review verifies conformance to the applicable decisions and active
+  exceptions. The fixture set includes a **token ADR that does not match its
+  implementation**, which the review must catch (#99 §7). Material
+  architecture changed without a decision, supersession, or exception fails
+  closed before final acceptance; recovery never fabricates historical
+  decisions.
+- **Decision parity:** two fresh sessions on different supported runners,
+  given the same governed area and the same declared estate, reach the same
+  disposition, or the divergence is emitted as a typed finding (PRD S9).
 - **Adoption:** present-state baseline acceptance per #99 §8 — inventory,
-  human approval, forward-looking ADRs only.
+  human approval, forward-looking ADRs only. **The decision estate migrates
+  with the standard** (doctrine §6): the mechanism (`docs/adr/` + sidecars +
+  the decision skill) installs as part of adoption rather than being earned;
+  the accepted baseline is the estate's first record, honestly dated; the
+  existing codebase's implicit decision mass is captured **on touch** — when
+  work first materially touches an area, the rubric fires and a significant
+  inherited decision is recorded as `accepted` with its real capture date,
+  never backdated. Mass backfill is welcome and never demanded.
 
 ### 7.2 D2 — Agent-first architecture standard (#104)
 
 **Deliverables:** the shipped profile
 (`plugins/pipeline-core/architecture/agent-first-profile.v1.json`), module
 inventory + navigation bundle conventions, receipt emitters, profile
-resolution, fixtures.
+resolution, the remedy-comparison generator, fixtures.
 
 - **Profile:** the nine #104 property classes as versioned machine-readable
   properties `{propertyId, class, declaration | signal | check,
@@ -442,6 +504,33 @@ resolution, fixtures.
   honesty rule (intake deviation): properties whose measurement needs
   runner-side telemetry that A1 shows unavailable are declared with
   `signal: unavailable-on-<runner>` rather than fake numbers.
+- **The nine properties and their first-increment evidence class**
+  (doctrine §2, one row each; the doctrine holds the full definitions and
+  the per-property anti-goal):
+
+  | # | Property | First-increment evidence |
+  |---|---|---|
+  | 1 | Context locality | **signal** — receipts from briefing surface, candidate diff, transcript tool logs where exposed; `unknown` where the runner does not expose them |
+  | 2 | Contract sufficiency | **check** (contract exists, digest matches inventory revision) + the eleven signals below |
+  | 3 | Change locality | **check** — candidate diff vs. planned/authorized boundary set |
+  | 4 | Dependency legibility | **check** via language-scoped import-graph adapter, explicit `unsupported` for uncovered languages |
+  | 5 | Authority/effect locality | **declaration** (ownership rows) + **check** where mechanical; semantic depth `unsupported`, named as such |
+  | 6 | Verification locality | **check** — declared verification entry points exist; candidate records required affected-integration checks |
+  | 7 | Session re-entry stability | **check** — map currency for the candidate, plus the §3 estate; parity criterion across two runners |
+  | 8 | Parallel work safety | **check** — write-surface intersection across concurrently dispatched packages |
+  | 9 | Refactorability without churn | **check** — accepted identities change only through a D1 decision; tiny-module anti-gaming fixture |
+
+- **Contract-sufficiency signals.** #104 derives them "for at least" the
+  following eleven — a floor, not a closed set (items verbatim): missing
+  required contract; contract contradicted by implementation; stale contract
+  or architecture view; foreign implementation inspection required beyond the
+  accepted boundary; hidden dependency or cyclic traversal; repeated
+  cross-boundary lookup; late scope expansion; review-discovered architecture
+  assumption; verification not locally available; authority/side-effect
+  ownership unclear; and — the positive outcome — sufficient contract for the
+  bounded task. Signals preserve uncertainty, cannot claim semantic
+  completeness from file counts alone, feed the receipts, the optimization
+  loop and the rigor floor (#105), and never produce `pass`.
 - **Resolution:** `effectiveProfile = acceptedCustom ?? inherited-agent-first`
   (never `unconfigured`); missing/stale/invalid profile evidence is
   non-green (#104 verbatim); custom profiles are D1 decision records.
@@ -453,9 +542,38 @@ resolution, fixtures.
   entry point (research §1). Representation choice recorded as a repo ADR
   now, re-bound through D1 machinery once live (intake bootstrap
   deviation).
+- **Concept-file frontmatter fields.** Each concept file carries all six
+  #104 §2 contract-sufficiency fields — responsibility and
+  non-responsibilities; public inputs, outputs, invariants, errors, and side
+  effects; dependency and authority boundaries; compatibility and lifecycle
+  expectations; verification entry points; the exact implementation↔contract
+  revision binding — plus the module-identity fields of the governed-module
+  inventory below, because the concept file is where both physically live.
 - **Module inventory:** `pipeline.module-inventory.v1` rows exactly per
-  #104's governed-inventory list; provisional identities allowed and marked
+  #104's governed-inventory list — identities, owned paths, contract
+  surfaces, dependency direction, effect ownership, verification entry
+  points, ADR references, profile source, and the exact candidate/baseline
+  binding — never invented from directory names or one model's
+  interpretation (#104, verbatim); provisional identities allowed and marked
   until D1 acceptance.
+- **Re-entry reading order.** The estate declares the order a fresh session
+  reads it in: AGENTS.md → map bundle entry point → the concept files of the
+  modules in scope → the compiled decision summary → the module inventory
+  rows for the write surface → the fitness model. The order is part of the
+  contract, not a convention: PRD S8 measures re-entry against it, and D3
+  class 7 fails closed when the map it points into is stale for the touched
+  contracts.
+- **Derived views, never parallel ones.** Human-readable architecture
+  documentation (`docs/ARCHITECTURE.md` in a governed repo) is *generated*
+  from the map bundle. A hand-maintained parallel document is a defect, not
+  an alternative: it is the mechanism by which the machine-readable estate
+  silently goes stale.
+- **Active optimization (remedy comparison).** The profile ships a generator
+  that, for a finding, proposes conformant remedy options with their
+  comparison — the standard *proposes conformant structure*, it does not only
+  report violations (doctrine §5.3). It never applies a remedy and never
+  authorizes one: agent-proposed, human-decided, and subject to the same
+  anti-churn boundary as every other structural change (§2.9).
 - **Receipts:** `pipeline.module-interaction-receipt.v1` per applicable
   dispatch, first increment fed from briefing surface + candidate diff +
   transcript tool logs where exposed; every metric carries the §2.1 status.
@@ -470,6 +588,39 @@ for every 21-item #106 fixture list entry.
 - **Enforcement invariant:** exactly #106's — id, closed schemas,
   deterministic check or bounded adapter, outcome enum (§2.2), digests,
   blocking policy, fixtures — plus the deterministic-pass rule (§2.2).
+- **Fitness model.** One machine-readable file per governed repository,
+  representing at least the following eleven items (#106 §Scope-2, verbatim):
+  accepted/provisional module identities and owned surfaces; public contract
+  identities and implementation bindings; allowed, denied, and exceptional
+  dependency directions; allowed boundary crossings; authority and
+  side-effect ownership; verification entry points and locality; architecture
+  navigation/re-entry artifacts; planned parallel-work overlap constraints;
+  measurable context/change/contract thresholds from #104 once calibrated;
+  severity and blocking policy; and required evidence classes. Accepted
+  authority is never inferred solely from a directory tree or model output.
+- **Declared ↔ evaluated mapping.** The nine declared D2 properties and the
+  ten evaluated D3 classes interlock but are not 1:1; the joint is explicit
+  (doctrine §2.10) and complete in both directions — no declared property
+  without an evaluation route, no evaluated class without a declared parent:
+
+  | Declared property (D2) | Evaluated by (D3 class) | First-increment form |
+  |---|---|---|
+  | 1 Context locality | 10 calibrated friction thresholds (armed post-C1) + receipts | signal, status-carrying |
+  | 2 Contract sufficiency | 2 contract presence/freshness (+ contradiction signals) | check + signal |
+  | 3 Change locality | 4 boundary crossing vs. planned surface | check (diff-derived) |
+  | 4 Dependency legibility | 3 dependency direction/cycles | check / `unsupported` |
+  | 5 Authority/effect locality | 5 authority/side-effect ownership | declaration + partial check |
+  | 6 Verification locality | 6 verification locality | check |
+  | 7 Re-entry stability | 7 navigation/re-entry currency | check |
+  | 8 Parallel work safety | 8 parallel overlap | check |
+  | 9 Refactorability w/o churn | 9 profile drift (identity stability) | check |
+  | — foundation for all — | 1 module identity/ownership (path→module resolution) | check (inventory) |
+
+- **Promotion pathway.** A recurring agentic finding is promoted into a
+  deterministic rule, landing as a B2-ii suite registration that must name
+  the invariant it pins (`invariantPinned`, C2 consolidation rule). This is
+  how the property catalog gains checks over time — designed growth, not
+  accretion.
 - **Ten property classes:** first increment implements deterministically:
   module identity/ownership (path→module resolution), contract
   presence/freshness (digest match vs inventory), dependency
@@ -506,6 +657,12 @@ for every 21-item #106 fixture list entry.
   (`approved-scoped | deferred(+expiry/review) | partial`); re-raise only on
   expiry/material delta; work in undecided scope requires the decision (a
   deferral suffices) before implementation authority.
+- **Artifact orientation (#109 §5).** Adoption produces machine-consumable
+  artifacts first — the map bundle, contracts, inventory, fitness model — and
+  human-facing views are derived from them. A proposal that would produce
+  human documentation as its primary output, with the machine estate as a
+  by-product, is the wrong shape: it reproduces exactly the human-first
+  default the standard exists to replace.
 - Backfill safety: generated maps/contracts carry
   `{coverageClass, confidence}` and cannot `pass` (§2.2); #99 semantics for
   present-state acceptance.
@@ -560,6 +717,12 @@ All closed records per §2; all evidence candidate-bound per Nova §2.2.
   payload-indirection probe writes only to `scratch/`.
 - Residual accepted gaps stay visible: `git push --no-verify` (PO-accepted
   2026-08-27), post-hoc-only rows in the A2 table, `prose` declarations.
+- **Boundary against #107 (moved to Batman, PO decision 2026-08-28):** two of
+  B2's typed routes (B2-i briefed test-change authorization, B2-iv per-key
+  trust-on-first-use anchors) add *human authority surfaces*. They stay
+  strictly inside the existing signature-or-chat ceremony duality and
+  introduce no identity provider, no account model, and no multi-user
+  authorization tier — that is #107's scope, and it is not Alfred's.
 
 ## 11. Compatibility and migration
 
@@ -582,8 +745,13 @@ All closed records per §2; all evidence candidate-bound per Nova §2.2.
 - Fixture-driven, injectable adapters throughout (house pattern:
   `_testGitOperations`-style injection); no live-network tests.
 - The 21-fixture list of #106, the 14-fixture list of #105, the #101/#102
-  lists, and the four C1 seed classes are the minimum fixture inventory;
-  `acceptance.md` maps each to its suite.
+  lists, **#104's and #109's own fixture lists**, and the four C1 seed
+  classes are the minimum fixture inventory; `acceptance.md` maps each to its
+  suite. Named explicitly among them because they pin the doctrine's own
+  promises: the misleading tiny-module optimization fixture (#104,
+  anti-fragmentation), the token-ADR-that-does-not-match fixture (#99 §7,
+  semantic conformance), and #109's adoption-state fixtures including the
+  dogfood case.
 - E2 runs full Verify + security gate + Critic reviews per block (house
   rules unchanged); the sprint adds no bypass of any existing gate.
 - **Design-phase review duty (PO constraint, `design/po-input-2026-08-27.md`
@@ -602,7 +770,7 @@ All closed records per §2; all evidence candidate-bound per Nova §2.2.
   (PRD §9.3); E1 freeze artifact committed.
 - **Wave-complete:** each wave's WPs green in Verify + Critic-reviewed with
   documented fail-then-fix cycles; PO-visible wave summary.
-- **Epic-complete:** PRD §7 list; every S1–S7 evidenced on one exact
+- **Epic-complete:** PRD §7 list; every S1–S10 evidenced on one exact
   candidate; all member issues + in-scope backlog items closed or
   re-triaged PO-visibly; sprint close comment per #108.
 
@@ -610,7 +778,12 @@ All closed records per §2; all evidence candidate-bound per Nova §2.2.
 
 PRD §4 tracks ↔ this spec §4–§8 one-to-one; issue/backlog mapping in the
 intake docs is normative for "which requirement lives where"; acceptance
-mapping in [`acceptance.md`](acceptance.md).
+mapping in [`acceptance.md`](acceptance.md). The architecture doctrine
+(`design/agent-first-architecture.md`) ↔ §7: doctrine §2 → §7.2 property
+catalog and signals; §3 → §7.2 estate, frontmatter fields, reading order,
+derived views; §4 → §7.3 invariant, fitness model, mapping table, promotion
+pathway; §5 → §7.2 active optimization and §7.4 artifact orientation; §6 →
+§7.1 brownfield decision-estate migration and §7.4 adoption states.
 
 ## 15. Rejected alternatives
 
@@ -625,6 +798,14 @@ mapping in [`acceptance.md`](acceptance.md).
    lifecycle.
 4. **A numeric universal risk score for B1:** rejected by #105 itself;
    derivation returns classes and named triggers, never one scalar.
+5. **One merged property list for #104 and #106** (collapsing the nine
+   declared properties and the ten evaluated classes into a single
+   enumeration): rejected — declaration and evaluation are distinct views of
+   the same architecture and are deliberately not 1:1. A merged list would
+   force each declared property to have exactly one mechanical evaluator,
+   which is false for context locality (signal-only until calibration) and
+   for module identity (a foundation with no single declared parent). They
+   stay separate, joined by the explicit mapping table in §7.3.
 5. **Building org policy-pack resolution inside Alfred:** rejected — #9 owns
    it; Alfred consumes its interface and reports typed absence.
 6. **Auto-repair of drifted closed evidence:** rejected — repair is PO-gated
