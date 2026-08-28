@@ -172,6 +172,16 @@ export function governanceMarkers(dependencies = {}) {
 }
 const READY_RECEIPT_KEYS = ["intent", "schema", "status"];
 const ONBOARDING_SCRIPT = fileURLToPath(new URL("../scripts/project-onboarding-v3.mjs", import.meta.url));
+// NVA-K-DRIVERREACH (backlog: 2026-08-28-the-guided-driver-is-neither-discoverable-nor-
+// runnable.md): onboarding-init.mjs walks the onboarding CLI's `nextAction` chain to
+// completion in one invocation instead of an agent hand-running each step. Until this
+// admission it was refused by this exact gate in every non-ready state it exists to serve
+// (`GUARD-LIFECYCLE-NOT-READY`), so every chaining improvement built on top of it was
+// unreachable. Admitting it grants no new authority: the driver is read-only in itself --
+// it only reads the CLI's own typed `nextAction` and re-invokes it -- and every MUTATING
+// step it chains is a separately-admitted command this same guard evaluates on its own
+// terms when the driver spawns it, exactly as if an agent had typed that command by hand.
+const DRIVER_SCRIPT = fileURLToPath(new URL("../scripts/onboarding-init.mjs", import.meta.url));
 const ONBOARDING_CONSENT_MARK_SCRIPT = fileURLToPath(new URL("../scripts/onboarding-consent-mark.mjs", import.meta.url));
 const MIGRATION_SCRIPT = fileURLToPath(new URL("../scripts/runner-profile-migration-v3.mjs", import.meta.url));
 const V3_BOOTSTRAP_AUTHORITY_SCRIPT = fileURLToPath(new URL("../scripts/v3-bootstrap-authority.mjs", import.meta.url));
@@ -2742,6 +2752,31 @@ function sanctionedOnboardingArgs(rawArgs, root) {
   return false;
 }
 
+/**
+ * NVA-K-DRIVERREACH: the guided driver's own exact argv surface (`parseArgs()` in
+ * scripts/onboarding-init.mjs) and nothing wider than it -- `--root <root>` required,
+ * `--runner <claude|codex|antigravity>` and `--step-cap <positive integer>` both optional,
+ * order-insensitive via matchFlagSpec() like every sibling admission above. Deliberately
+ * NOT admitting `--help`/`-h` here (unlike GF-093's ONBOARDING_SCRIPT admission just above):
+ * the acceptance criteria this closes name only the three chaining flags, so this stays the
+ * narrower of the two shapes the driver's own parser would accept rather than the widest.
+ * `--step-cap`'s validator mirrors parseArgs()'s own `Number(raw)` / `Number.isInteger` /
+ * `>= 1` check exactly, so this can never admit a value the driver's own parser would itself
+ * refuse.
+ */
+function sanctionedDriverArgs(args, root) {
+  return matchFlagSpec(args, {
+    requiredValue: { "--root": (value) => value === root },
+    optionalValue: {
+      "--runner": (value) => VALID_RUNNERS.has(value),
+      "--step-cap": (value) => {
+        const parsed = Number(value);
+        return Number.isInteger(parsed) && parsed >= 1;
+      },
+    },
+  });
+}
+
 function sanctionedMigrationArgs(args, root) {
   // NVA-BOOTADMIT-2: both branches route through matchFlagSpec() so the flag SET stays exact
   // while its ORDER no longer matters, same rationale as sanctionedOnboardingArgs() above.
@@ -3113,6 +3148,11 @@ export function isSanctionedLifecycleCommand(command, root, options = {}) {
   if (resolved === null) return false;
   const { script, args } = resolved;
   if (script === ONBOARDING_SCRIPT) return sanctionedOnboardingArgs(args, root);
+  // NVA-K-DRIVERREACH: admitted read-only by exact argv shape (sanctionedDriverArgs() above)
+  // -- grants no authority beyond ONBOARDING_SCRIPT's own admissions just above, since every
+  // mutating step this driver spawns is itself re-checked against this same guard when it
+  // runs, on its own terms, exactly as if an agent had typed it directly.
+  if (script === DRIVER_SCRIPT) return sanctionedDriverArgs(args, root);
   if (script === MIGRATION_SCRIPT) return sanctionedMigrationArgs(args, root);
   if (script === V3_BOOTSTRAP_AUTHORITY_SCRIPT) {
     return exactRoot(args, root, 0) && args.length === 2;
