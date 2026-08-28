@@ -163,7 +163,11 @@ the reworked package.
 - §7.1 (D1): enumerate the five axes; the close-impact enum values; the
   waiver record fields; the 7-case conflict semantics; the skill's seven
   capabilities; the parity requirement; the Critic semantic-conformance
-  duty + token-ADR fixture.
+  duty + token-ADR fixture; the brownfield decision-estate migration rule
+  (doctrine §6, PO directive 2026-08-28: the mechanism installs with
+  adoption, the accepted baseline is the estate's first record, inherited
+  decisions are captured on touch via the significance rubric, honestly
+  dated — never backdated, never a demanded mass backfill).
 - §7.2 (D2): enumerate the nine properties with first-increment evidence
   class each (doctrine §2); the concept-file frontmatter field list —
   including compatibility/lifecycle expectations (all six #104 §2 fields);
