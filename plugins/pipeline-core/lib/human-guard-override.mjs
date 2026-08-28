@@ -1911,6 +1911,32 @@ function assertRequestNotExpired(request, repo, nowMs) {
 }
 
 /**
+ * `planned.expiresAt` freezes at plan first-creation (`payload.expiresAt =
+ * request.expiresAt` in planHumanGuardOverride()) and is never re-checked between
+ * then and an arm call -- but an arm call can happen much later, after an external
+ * signature ceremony that itself takes real wall-clock time. Both arming routes
+ * (authorizeHumanGuardOverride()'s chat-mode activation and
+ * authorizeHumanGuardOverrideBySignature()'s signed path) must refuse here, before
+ * ever building `capabilityCore`, or a capability is armed already past its own
+ * expiry -- observed live 2026-08-28 (`authorizedAt` sixteen minutes after
+ * `expiresAt`; backlog/items/2026-08-28-an-expired-override-is-armed-instead-of-
+ * refused.md). consumeHumanGuardOverride() already refuses an expired capability at
+ * consumption (its own `expired` check below); this closes the window one step
+ * earlier, where the human is still in the loop, without weakening that later
+ * check -- both stay armed. Mirrors assertRequestNotExpired()'s shape and error
+ * code; only which frozen timestamp is being compared differs.
+ */
+function assertPlanNotExpired(planned, nowMs) {
+  if (new Date(planned.expiresAt).getTime() <= nowMs) {
+    fail(
+      "HGO-EXPIRED",
+      "override plan window has closed; refreeze the plan (or start over with a fresh "
+        + "denial) and obtain a new signature before retrying authorize-by-signature",
+    );
+  }
+}
+
+/**
  * The identical, unconditional narrow drift gate design doc §1.4 steps 1 and 6 both
  * enforce against the frozen `request`: `fingerprintSha256` and `policyIdentity`
  * only -- never `statusSha256`/`head`/`tree`/`state`, and never `pluginIdentity`
@@ -2906,6 +2932,7 @@ export function authorizeHumanGuardOverride({
     scriptPath,
     authorSourceRoot,
   });
+  assertPlanNotExpired(planned, nowMs);
   // AGY-HGOFIX-2: this in-session `activate` path had ZERO attended-terminal check --
   // an agent could run plan -> prepare-authorization -> authorize --activate entirely by
   // itself, computing every required digest itself, with no human step at all. The
@@ -3125,6 +3152,7 @@ export function authorizeHumanGuardOverrideBySignature({
     scriptPath,
     authorSourceRoot,
   });
+  assertPlanNotExpired(planned, nowMs);
   const intent = buildHumanGuardOverrideSignatureIntent({ prepared, planned });
   // NVA-HGOFIX-1: this used to read the legacy SINGULAR `policy.trustAnchor` field only,
   // which is permanently `null` once `critical-human-proof.json` carries the v3

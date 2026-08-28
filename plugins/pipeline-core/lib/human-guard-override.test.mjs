@@ -198,11 +198,11 @@ const HGO_SIGNATURE_INTENT_SPEC_SHA256 = createHash("sha256").update("pipeline.h
 
 /** Runs denial -> plan -> prepare-authorization (fixed reason) -> builds a matching, genuinely signed proof. Does not call authorizeHumanGuardOverrideBySignature() itself. */
 function prepareSignedArming(root, {
-  toolName, toolInput, denials, nowMs = 1000, keyPair = sigPair, keyReference = SIG_KEY_REFERENCE,
+  toolName, toolInput, denials, nowMs = 1000, ttlMs, keyPair = sigPair, keyReference = SIG_KEY_REFERENCE,
 } = {}) {
   const scriptPath = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
   const shared = { rootDir: root, pluginRoot: PLUGIN_ROOT, scriptPath };
-  const recorded = recordHumanGuardDenial({ ...shared, toolName, toolInput, denials, nowMs });
+  const recorded = recordHumanGuardDenial({ ...shared, toolName, toolInput, denials, nowMs, ttlMs });
   assert.equal(recorded.status, "planned", `denial not plannable: ${JSON.stringify(recorded)}`);
   const plan = planHumanGuardOverride({ ...shared, requestSha256: recorded.requestSha256, nowMs: nowMs + 500 });
   const prepared = prepareHumanGuardOverrideAuthorization({
@@ -380,6 +380,45 @@ test("ADR-0059 Decision 1: re-authorizing with an identical proof is an idempote
       }),
       (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-REPLAY",
     );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// Regression for backlog/items/2026-08-28-an-expired-override-is-armed-instead-of-refused.md:
+// the plan's own `expiresAt` freezes at plan first-creation, but the arm call can land much
+// later (an external signature ceremony takes real wall-clock time) -- previously
+// authorize-by-signature copied `planned.expiresAt` into the capability without ever
+// comparing it to `nowMs`, so it happily armed a capability already past its own window.
+test("NVA-G-EXPIREDARM: authorize-by-signature refuses to arm once the plan window has closed, writes no capability, and still arms an unexpired plan", () => {
+  const root = fixtureSignature();
+  try {
+    const toolInput = { file_path: "notes.md", content: "expired arm\n" };
+    // A short ttlMs (2000ms from nowMs: 1000) puts the plan's expiresAt at 3000ms --
+    // well before the arm call below at nowMs: 9000.
+    const { scriptPath, recorded, plan, proof } = prepareSignedArming(root, {
+      toolName: "Write", toolInput, denials: denial, nowMs: 1000, ttlMs: 2000,
+    });
+    assert.throws(
+      () => authorizeHumanGuardOverrideBySignature({
+        rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, planSha256: plan.planSha256, proof, nowMs: 9000, scriptPath,
+      }),
+      (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-EXPIRED",
+    );
+    const common = git(root, "rev-parse", "--path-format=absolute", "--git-common-dir");
+    const capabilities = join(common, "agent-pipeline", "human-guard-overrides", "capabilities");
+    assert.equal(
+      existsSync(capabilities) ? readdirSync(capabilities).length : 0,
+      0,
+      "a refused arm must never write a capability file",
+    );
+    // The identical plan/proof pair, retried while the window is still open, still arms --
+    // the fix only moves the answer earlier; it never narrows the ordinary in-window case.
+    const armed = authorizeHumanGuardOverrideBySignature({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, planSha256: plan.planSha256, proof, nowMs: 2000, scriptPath,
+    });
+    assert.equal(armed.status, "armed");
+    assert.equal(armed.mutated, true);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -986,6 +1025,112 @@ test("drift, expiry and concurrent consumption fail closed", () => {
     });
     assert.equal(fresh.status, "planned");
     assert.notEqual(fresh.requestSha256, request.requestSha256);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// Regression for backlog/items/2026-08-28-an-expired-override-is-armed-instead-of-refused.md,
+// chat-mode sibling of the signed-path test above: authorizeHumanGuardOverride()'s in-session
+// `activate` path built the identical `capabilityCore` without checking `planned.expiresAt`
+// against `nowMs` either.
+test("NVA-G-EXPIREDARM: authorizeHumanGuardOverride (chat mode) refuses to arm once the plan window has closed, writes no capability, and still arms an unexpired plan", () => {
+  const root = fixture();
+  try {
+    const toolInput = { file_path: "notes.md", content: "expired chat arm\n" };
+    const scriptPath = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+    const request = recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: denial, nowMs: 1000, ttlMs: 2000,
+    });
+    const plan = planHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, nowMs: 1500, scriptPath,
+    });
+    const reason = "Exact attended retry";
+    const prepared = prepareHumanGuardOverrideAuthorization({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, planSha256: plan.planSha256, reason, nowMs: 1800, scriptPath,
+    });
+    const activate = (nowMs) => authorizeHumanGuardOverride({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      requestSha256: request.requestSha256,
+      planSha256: plan.planSha256,
+      selectionSha256: prepared.selectionSha256,
+      reason,
+      reasonSha256: reasonDigest(reason),
+      activate: true,
+      dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}` },
+      nowMs,
+      scriptPath,
+    });
+    // plan.expiresAt is 1000 + 2000 = 3000ms; 9000ms is well past the window.
+    assert.throws(
+      () => activate(9000),
+      (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-EXPIRED",
+    );
+    const common = git(root, "rev-parse", "--path-format=absolute", "--git-common-dir");
+    const capabilities = join(common, "agent-pipeline", "human-guard-overrides", "capabilities");
+    assert.equal(
+      existsSync(capabilities) ? readdirSync(capabilities).length : 0,
+      0,
+      "a refused arm must never write a capability file",
+    );
+    // The identical selection, retried while the window is still open, still arms.
+    const armed = activate(1900);
+    assert.equal(armed.status, "armed");
+    assert.equal(armed.mutated, true);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// Regression for backlog/items/2026-08-28-an-expired-override-is-armed-instead-of-refused.md's
+// Acceptance criterion 2: "A denial that rejected an armed-but-unusable capability names the
+// reason." The two shapes below must never collapse into the same rendering -- that collapse
+// is exactly what turned a one-line cause into a multi-step investigation in the incident.
+test("NVA-G-EXPIREDARM: a consumption denial that rejected an existing (but now-expired) armed capability is distinguishable from a first denial", () => {
+  const root = fixture();
+  try {
+    const toolInput = { file_path: "notes.md", content: "distinguishable denial\n" };
+    const scriptPath = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+    // A first denial: no capability of any shape has ever existed for this exact command.
+    const firstDenial = consumeHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: denial, nowMs: 1000,
+    });
+    assert.deepEqual(firstDenial, { status: "absent" });
+
+    // An armed capability that later expires unconsumed (armed inside its own window).
+    const request = recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: denial, nowMs: 2000, ttlMs: 2000,
+    });
+    const plan = planHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, nowMs: 2200, scriptPath,
+    });
+    const reason = "Exact attended retry";
+    const prepared = prepareHumanGuardOverrideAuthorization({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, planSha256: plan.planSha256, reason, nowMs: 2400, scriptPath,
+    });
+    authorizeHumanGuardOverride({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      requestSha256: request.requestSha256,
+      planSha256: plan.planSha256,
+      selectionSha256: prepared.selectionSha256,
+      reason,
+      reasonSha256: reasonDigest(reason),
+      activate: true,
+      dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}` },
+      nowMs: 2600,
+      scriptPath,
+    });
+    const expiredDenial = consumeHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: denial, nowMs: 5000,
+    });
+    assert.deepEqual(expiredDenial, { status: "replan", code: "HGO-EXPIRED" });
+    assert.notDeepEqual(
+      firstDenial,
+      expiredDenial,
+      "a denial rejecting an existing armed-but-expired capability must be distinguishable from a first denial",
+    );
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
