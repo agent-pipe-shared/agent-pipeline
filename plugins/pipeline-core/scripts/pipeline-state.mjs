@@ -5916,6 +5916,38 @@ function runPoAuthorityDecisionCommand(sub, rest, deps) {
   }
 }
 
+// Renders the failing predicate(s) from a
+// pipeline.po-authority-postimage-readback.v1 evidence object for a stderr
+// diagnostic. Only predicate names, sha256 digests, status/diagnostic codes
+// and short fixed labels are emitted here -- never file contents and never
+// absolute host paths (backlog/items/2026-08-28-a-fail-closed-rollback-
+// names-no-predicate-so-a-consumer-cannot-fix-it.md).
+function describeFailedPostimagePredicates(postimageEvidence) {
+  const predicates = postimageEvidence?.predicates ?? {};
+  const failures = [];
+  if (predicates.prdDigest && predicates.prdDigest.ok !== true) {
+    failures.push(`prdDigest (expected=${predicates.prdDigest.expected ?? "unknown"} observed=${predicates.prdDigest.observed ?? "unknown"})`);
+  }
+  if (predicates.stateFile && predicates.stateFile.ok !== true) {
+    failures.push(`stateFile (expected=regular observed=${predicates.stateFile.observed ?? "unknown"})`);
+  }
+  if (predicates.stateValue && predicates.stateValue.ok !== true) {
+    failures.push(`stateValue (expected=ok observed=${predicates.stateValue.observed ?? "unknown"})`);
+  }
+  if (predicates.poAuthority && predicates.poAuthority.ok !== true) {
+    failures.push(`poAuthority (expected=ready observed=${predicates.poAuthority.observed ?? "unknown"})`);
+  }
+  for (const readback of predicates.v4Intents ?? []) {
+    if (readback?.ok !== true) {
+      const diagnostics = Array.isArray(readback?.diagnostics) && readback.diagnostics.length > 0
+        ? ` diagnostics=${readback.diagnostics.join(",")}`
+        : "";
+      failures.push(`v4Intents.${readback?.intent ?? "unknown"} (expected=ready observed=${readback?.status ?? "unknown"}${diagnostics})`);
+    }
+  }
+  return failures.length > 0 ? failures.join("; ") : "no failing predicate identified";
+}
+
 function runPoAuthorityRebindApply(apply, deps, lock, io, stateIo, {
   buildPlan = buildPoAuthorityRebindPlan,
   resultSchema = "pipeline.po-authority-rebind-apply.v1",
@@ -6047,7 +6079,8 @@ function runPoAuthorityRebindApply(apply, deps, lock, io, stateIo, {
       const stateRollback = restoreRebindFile(stateFile.absolute, stateFile.bytes, stateFile.identity.mode, lock.ownerNonce, stateIo);
       const prdRollback = !prdWriteRequired || restoreRebindFile(prd.absolute, prd.bytes, prd.identity.mode, lock.ownerNonce, io);
       const cleared = stateRollback && prdRollback && clearRebindTransaction(deps.dir);
-      console.error(`Error: PO authority rebind postimage readback failed; ${stateRollback && prdRollback && cleared ? "rollback verified" : "rollback unresolved"}.`);
+      const predicateSummary = describeFailedPostimagePredicates(postimageEvidence);
+      console.error(`Error: PO authority rebind postimage readback failed (${predicateSummary}); ${stateRollback && prdRollback && cleared ? "rollback verified" : "rollback unresolved"}.`);
       return 2;
     }
     if (!clearRebindTransaction(deps.dir)) {
