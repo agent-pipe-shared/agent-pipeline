@@ -70,6 +70,7 @@ import { inspectObservationGovernanceBootstrap } from "./observation-governance-
 import { PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER, validatePoGateAuthorityForRepository } from "./po-gate-authority.mjs";
 import { initializePoGateProfileReceipt as initializeActualPoGateProfileReceipt } from "./po-gate-profile-publisher.mjs";
 import { isDirectInvocation } from "./entrypoint.mjs";
+import { requireProjectOnboardingReady } from "./project-onboarding-ready-gate.mjs";
 
 // This file is BOTH a 109-case suite and the fixture library other suites borrow
 // (`root`, `dispose`, `fakeDeps`, ... are exported below). Until this guard, an
@@ -2379,6 +2380,142 @@ test("a seeded configuration can never produce passing verify evidence without a
   } finally { dispose(projectRoot); }
 });
 
+// NVA-V13-ASKWINDOW (backlog: the onboarding asks survive past the one call
+// that publishes them): every ask above used to surface ONLY through the
+// single `apply-portable-seed --activate` call that happened to publish it
+// -- a plain, ordinary `inspect` at the exact same still-true status
+// reported `pendingAsks: []`. This drives the real CLI `inspect` path (not a
+// direct library call) and proves the regression is closed.
+test("an ordinary inspect surfaces every pending ask whose condition is still true, not only the apply-portable-seed call", () => {
+  const path = root();
+  const invoke = (args, deps) => {
+    let output = "";
+    const code = onboardingCli(args, { deps, write: (chunk) => { output += chunk; } });
+    return { code, result: JSON.parse(output) };
+  };
+  try {
+    const planned = invoke(["plan", "--root", path, "--runner", "codex"], fakeDeps);
+    assert.equal(planned.code, 0);
+    const digest = planned.result.nextAction.argv[planned.result.nextAction.argv.indexOf("--plan-sha256") + 1];
+    const applied = invoke(["apply-portable-seed", "--root", path, "--plan-sha256", digest, "--activate", "--runner", "codex"], fakeDeps);
+    assert.equal(applied.code, 0);
+    assert.equal(applied.result.status, "runtime-initialization-required");
+    assert.ok(Array.isArray(applied.result.nextAction?.pendingAsks) && applied.result.nextAction.pendingAsks.length > 0,
+      "fixture sanity: at least one ask must be pending after the apply");
+
+    // Live evidence this dispatch closes: a SECOND, ordinary `inspect` at the
+    // exact same still-true status must report the same pending asks, not an
+    // empty array.
+    const inspected = invoke(["inspect", "--root", path, "--runner", "codex"], fakeDeps);
+    assert.equal(inspected.code, 0);
+    assert.equal(inspected.result.status, "runtime-initialization-required");
+    assert.ok(Array.isArray(inspected.result.nextAction?.pendingAsks),
+      "an ordinary inspect must carry the same nextAction.pendingAsks channel a driver already reads");
+    assert.ok(inspected.result.nextAction.pendingAsks.length > 0,
+      "an ordinary inspect must surface every ask whose condition is still true");
+
+    // Same set of asks the apply-portable-seed response published.
+    const appliedSerialized = applied.result.nextAction.pendingAsks.map((ask) => JSON.stringify(ask)).sort();
+    const inspectedSerialized = inspected.result.nextAction.pendingAsks.map((ask) => JSON.stringify(ask)).sort();
+    assert.deepEqual(inspectedSerialized, appliedSerialized);
+
+    // No duplicate entries within a single result, and re-running the SAME
+    // ordinary inspect (a result passing through the composed wrapper a
+    // second time) must be idempotent, never additive.
+    assert.equal(new Set(inspectedSerialized).size, inspectedSerialized.length,
+      "pendingAsks must carry no duplicate entries");
+    const reinspected = invoke(["inspect", "--root", path, "--runner", "codex"], fakeDeps);
+    assert.deepEqual(reinspected.result, inspected.result);
+
+    // Ordinary inspect must never grow the raw per-field side channels --
+    // those are the apply-portable-seed path's own established shape and are
+    // NOT in project-onboarding-ready-gate.mjs's closed key sets; leaking
+    // them here would fail every non-ready session closed
+    // (PORG-INVALID-OBSERVATION) the moment any ask's condition is true.
+    for (const key of ["authorIdentityAction", "pushApprovalSetupAction", "verifyContractAction", "verifyContractStatus", "pushGateSatisfiable", "trustAnchorGuidanceAction", "projectIgnoreGapAction"]) {
+      assert.equal(Object.prototype.hasOwnProperty.call(inspected.result, key), false,
+        `ordinary inspect must not carry the raw side channel "${key}"`);
+    }
+  } finally { dispose(path); }
+});
+
+// Sibling of the test immediately above: an ask whose underlying condition
+// has actually been RESOLVED must stop appearing on the next ordinary
+// inspect, not linger as a stale entry.
+test("an ask whose condition has been resolved stops appearing on the next ordinary inspect", () => {
+  const path = root();
+  const invoke = (args, deps) => {
+    let output = "";
+    const code = onboardingCli(args, { deps, write: (chunk) => { output += chunk; } });
+    return { code, result: JSON.parse(output) };
+  };
+  const knowsItsAuthor = {
+    ...fakeDeps,
+    spawnSync(command, args, options) {
+      if (command === "git" && args[0] === "config" && args[1] === "--get") {
+        return { status: 0, stdout: "configured\n", stderr: "" };
+      }
+      return fakeDeps.spawnSync(command, args, options);
+    },
+  };
+  try {
+    const planned = invoke(["plan", "--root", path, "--runner", "codex"], knowsItsAuthor);
+    assert.equal(planned.code, 0);
+    const digest = planned.result.nextAction.argv[planned.result.nextAction.argv.indexOf("--plan-sha256") + 1];
+    const applied = invoke(["apply-portable-seed", "--root", path, "--plan-sha256", digest, "--activate", "--runner", "codex"], knowsItsAuthor);
+    assert.equal(applied.code, 0);
+    assert.equal(applied.result.status, "runtime-initialization-required");
+    assert.equal(Object.prototype.hasOwnProperty.call(applied.result, "authorIdentityAction"), false,
+      "fixture sanity: a resolved author identity must not be asked by the apply path either");
+
+    const inspected = invoke(["inspect", "--root", path, "--runner", "codex"], knowsItsAuthor);
+    assert.equal(inspected.code, 0);
+    const names = (inspected.result.nextAction?.pendingAsks ?? [])
+      .map((ask) => ask.input?.name ?? (ask.inputs ?? []).map((entry) => entry.name).join(","));
+    assert.ok(!names.some((name) => name.includes("gitAuthorName")),
+      "a resolved condition must not leave a stale ask behind on the next ordinary inspect");
+  } finally { dispose(path); }
+});
+
+// The single highest-risk consequence of this dispatch (its own briefing's
+// words): the "ready" status must be unaffected, checked against the REAL
+// gate function -- an unliftable, fail-closed exactKeys() check that any
+// stray extra top-level key, or a non-null nextAction on a ready result,
+// fails every session closed.
+test("the ready status observation is unaffected by the ask-window change, checked against the real ready gate", () => {
+  const path = root();
+  try {
+    const barrier = initializeRestartRequiredRoot(path);
+    clearRuntimeBarrier(path, barrier);
+    completeKickoff(path);
+
+    const observed = inspectProjectOnboardingV3({ rootDir: path, intent: "onboarding", runner: "codex", deps: fakeDeps });
+    assert.equal(observed.status, "ready");
+    assert.equal(observed.nextAction, null,
+      "a ready observation must still carry a null nextAction, never a pendingAsks-bearing object");
+
+    const receipt = requireProjectOnboardingReady({
+      rootDir: path,
+      intent: "onboarding",
+      runner: "codex",
+      inspect: ({ rootDir: r, intent: i, runner: rn }) => inspectProjectOnboardingV3({ rootDir: r, intent: i, runner: rn, deps: fakeDeps }),
+    });
+    assert.equal(receipt.status, "ready");
+    assert.equal(receipt.schema, "pipeline.project-onboarding-ready-gate.v1");
+  } finally { dispose(path); }
+});
+
+// The composition itself (DoD: "expressed ONCE"): mechanically guards against
+// a future re-inlining of the five-wrapper chain a second time, the exact
+// drift this dispatch was told not to add.
+test("the five-wrapper pending-asks composition is expressed exactly once in the library source", () => {
+  const source = readFileSync(fileURLToPath(new URL("./project-onboarding-v3.mjs", import.meta.url)), "utf8");
+  const composedChain = "withPendingAsksSurfacedOnNextAction(withPendingProjectIgnoreGapAsk(withPendingTrustAnchorGuidanceAsk(withPendingVerifyContractAsk(withPendingPushApprovalSetupAsk(withPendingAuthorIdentityAsk(";
+  const occurrences = source.split(composedChain).length - 1;
+  assert.equal(occurrences, 1,
+    "the five-wrapper ask chain must be composed through one named helper, never hand-copied a second time");
+});
+
 // Regression for backlog 2026-08-18-po-key-trust-anchor-onboarding.md and
 // 2026-08-28-onboarding-must-bootstrap-the-trust-anchor-once.md. A machine
 // that already held a signing key used to leave every fresh project on it
@@ -2742,10 +2879,27 @@ test("matrix source/runtime progress actions are exact, diagnostic-bound, and co
     assert.equal(missing.status, "runtime-initialization-required");
     assert.equal(missing.runtime.status, "missing");
     assertDiagnostic(missing, "runtime_missing");
-    assertSingleLineAction(missing.nextAction, action(
+    // NVA-V13-ASKWINDOW: "runtime-initialization-required" is one of the
+    // statuses an ordinary inspect now surfaces pending asks for (this
+    // dispatch's own fix) -- the primary chained command below stays
+    // byte-exact unchanged, but this still-unconfigured fixture's envelope
+    // additionally carries nextAction.pendingAsks. The exact per-ask content
+    // is pinned by the dedicated ask-step tests elsewhere in this file; this
+    // assertion proves the primary command fields stay exact and the
+    // pendingAsks channel is present, non-empty, and free of duplicates.
+    const { pendingAsks, ...primaryNextAction } = missing.nextAction;
+    assert.deepEqual(primaryNextAction, action(
       [ONBOARDING_SCRIPT, "plan-runtime", "--root", runtime, "--runner", "codex"],
       ["runtime-initialization-required"],
     ));
+    assert.ok(Array.isArray(pendingAsks) && pendingAsks.length > 0,
+      "a still-unconfigured fixture must carry at least one pending ask here");
+    const askNames = pendingAsks.map((ask) => ask.input?.name ?? (ask.inputs ?? []).map((entry) => entry.name).join(","));
+    assert.equal(new Set(askNames).size, askNames.length, "pendingAsks must carry no duplicate entries");
+    const rendered = renderProjectOnboardingAction(missing.nextAction);
+    assert.equal(typeof rendered, "string");
+    assert.equal(rendered.includes("\n"), false);
+    assert.ok(rendered.length > 0);
   } finally {
     dispose(empty); dispose(existing); dispose(legacy); dispose(runtime);
   }
