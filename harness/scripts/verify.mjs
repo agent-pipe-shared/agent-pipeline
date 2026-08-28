@@ -198,6 +198,7 @@ const TEST_SUITES = [
   { name: "routing-projection-check", file: join(pluginScriptsDir, "check-routing-projections.mjs") },
   { name: "route-receipt-tests", file: join(libDir, "route-receipt.test.mjs") },
   { name: "recovery-preview-attestation-tests", file: join(libDir, "recovery-preview-attestation.test.mjs") },
+  { name: "repository-path-identity-tests", file: join(libDir, "repository-path-identity.test.mjs") },
   { name: "artifact-lifecycle-tests", file: join(pluginScriptsDir, "check-artifact-lifecycle.test.mjs") },
   { name: "artifact-lifecycle-check", file: join(pluginScriptsDir, "check-artifact-lifecycle.mjs") },
   { name: "artifact-topology-tests", file: join(pluginScriptsDir, "check-artifact-topology.test.mjs") },
