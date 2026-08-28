@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.onboarding-must-elicit-the-real-verify-contract
 type: defect
 owner: pipeline
-status: open
+status: resolved
 created: 2026-08-28
 sprint: nova
 tracking: "NOW / Nova A — happy-path blocking: without a real verify contract the push gate is unsatisfiable by construction, so the path cannot reach its last step"
@@ -54,3 +54,16 @@ by construction.
 - The evidence producer's refusal semantics are unchanged.
 - A test asserts no seeded configuration can produce passing evidence without a
   real command having run.
+
+## Closing note (reconciliation, 2026-08-28)
+
+Verified in code, not from a commit message: `collectVerifyContractAction()` and
+`withPendingVerifyContractAsk()` (`plugins/pipeline-core/lib/project-onboarding-v3.mjs`
+lines ~5212-5259) now ask for the real verify command at init, offer a detected
+candidate for confirmation without silently adopting it, accept an explicit
+"defer" reply, and — when deferred or unconfigured — set a typed
+`pushGateSatisfiable: false` alongside `verifyContractStatus` rather than only
+prose. `UNCONFIGURED_VERIFY` (line 952) is unchanged and still fails on purpose.
+Pinned by `project-onboarding-v3.test.mjs` lines 2314-2340 (candidate-detected
+and no-candidate cases, both asserting `pushGateSatisfiable === false` and the
+"defer" guidance text). All three acceptance criteria are met.

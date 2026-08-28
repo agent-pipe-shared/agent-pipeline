@@ -62,3 +62,44 @@ It must, in one run:
 - The resulting artifacts are byte-identical in provability to today's — no
   binding, digest or signature is weakened to achieve the reduction.
 - Measured on a genuinely fresh repository, not asserted.
+
+## Closing note — partial (reconciliation, 2026-08-28)
+
+Verified against current code, not from a commit message. A guided driver now
+exists: `driveOnboardingInit()` (`plugins/pipeline-core/scripts/onboarding-init.mjs`)
+drives `project-onboarding-v3.mjs` as a subprocess, executing consecutive
+`command` actions itself and stopping only at a `collect-input` action or a
+`ready` status (lines ~206-320). This covers sub-goals 1-3 (deterministic
+chain without a turn per transition, re-entrant checkpointing per
+`onboarding-init.test.mjs` "is re-entrant" case) — confirmed by unit tests
+that drive it with a synthetic/mocked `run`, not a real fresh-repository
+measurement.
+
+Also confirmed landed, reused by this driver:
+- Sub-goal 4 (verify contract) — `collectVerifyContractAction()`, see the
+  closing note on `2026-08-28-onboarding-must-elicit-the-real-verify-contract.md`.
+- Sub-goal 5 (trust anchor) — `freshCriticalHumanProofPolicyBytes()` bootstraps
+  a v3 anchor when a local key exists (see the partial note on
+  `2026-08-28-a-v1-trust-anchor-makes-the-signature-push-route-functionless.md`).
+- Sub-goal 8 (multi-line design input via file) — `intake-capture-apply`'s
+  guidance explicitly directs a multi-line PO message to `--text-file` under
+  `scratch/`, because the shell grammar refuses a literal newline
+  (`lib/project-onboarding-v3.mjs` ~line 2106).
+
+**Not confirmed:**
+- Sub-goal 6 (pre-push hook installed BY DEFAULT) — only a separate "offer"
+  mechanism was found (`plugins/pipeline-core/scripts/pre-push-hook-install.mjs`,
+  `project-onboarding-v3-pre-push-hook-offer.test.mjs`); an offer is not a
+  default install, and this dispatch did not trace whether the guided driver
+  auto-accepts it.
+- Sub-goal 7 (scanner bootstrap) — not located in the time available; grep for
+  a scanner-bootstrap action in `project-onboarding-v3.mjs` came up empty.
+- The acceptance criterion "measured on a genuinely fresh repository, not
+  asserted" — `onboarding-init.test.mjs` only drives the loop against a
+  synthetic mocked `run`; no test or script drives a real fresh repository
+  end to end and counts turns.
+
+Left `status: open`: the core orchestration mechanism this item asked for
+exists and several sub-goals are done, but the item's own acceptance
+criterion (a real fresh-repo measurement) is not met, and two sub-goals
+(pre-push default, scanner bootstrap) are unconfirmed.

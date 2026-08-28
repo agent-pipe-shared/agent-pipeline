@@ -93,6 +93,40 @@ main:refs/heads/main`". Both forms were tested live at the consumer; both refuse
 - The empty-`trustAnchors` case still fails closed, exactly as `human-guard-override`'s own
   test already requires — this must not become an any-well-formed-key posture by accident.
 
+## Closing note — partial (reconciliation, 2026-08-28)
+
+Verified against current code, not from a commit message:
+
+- **Direction 2 (silent refusal names its cause) — landed.** `guard-push.mjs`
+  `attestedMainPublication()` (lines 806-852) now returns the specific
+  `PUSH-PROOF-*` code, and the refusal message interpolates it
+  (`no such proof verified here (${mainAttestation.code})`, line 875).
+- **Direction 4 (short-form refspec) — landed.** `mainPublicationAttempt`
+  recognizes the colon-less `git push origin main` form and, when the
+  destination cannot be resolved, the message names
+  `PUSH-PROOF-DESTINATION-UNRESOLVED` and tells the caller to use the
+  fully-qualified refspec (guard-push.mjs, ~line 862-885).
+- **Direction 3 (the two readers agree) — landed.** `push-prepare.mjs`'s
+  `critical-human-proof-policy` check (lines 206-260) now mirrors
+  `trustAnchorsFor()` exactly: a v1/v2 document with no `trustAnchor` reports
+  `posture: unavailable ... matches PUSH-PROOF-TRUST-ANCHOR-MISSING`, not
+  "unrestricted" — the two-readers-disagree defect this item reported is gone.
+- **Direction 1 (onboarding bootstraps the anchor) — partially landed.**
+  `freshCriticalHumanProofPolicyBytes()` (`lib/project-onboarding-v3.mjs`
+  lines 1120-1129) now seeds a v3 document WITH `trustAnchors` when
+  `detectExistingLocalTrustAnchor(fs)` finds an existing signing key on this
+  machine. But when no local key exists yet — the common case for a
+  genuinely fresh onboarding — the seed is still a bare v1 document with no
+  trust anchor, by explicit design (a `trustAnchorGuidanceAction` proposes
+  the PO add one afterward, but the route stays functionless until they do).
+  So the acceptance criterion "a freshly onboarded project completes a
+  signature push end to end" is not yet true unconditionally — only when a
+  machine key already exists at onboarding time.
+
+Left `status: open` because the onboarding-side gap is real and matches the
+item's own acceptance criteria; the guard-message and posture-agreement halves
+are done and should not be redone.
+
 ## Related
 
 - `2026-08-28-the-push-gate-is-unsatisfiable-in-any-installed-plugin-deployment.md` — the
