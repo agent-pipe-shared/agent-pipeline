@@ -783,21 +783,39 @@ function checkAnonymousPublicPush(binding, sourceCommit) {
  * `refs/heads/main` deterministically (no `remote.<name>.push` override, `main`
  * confirmed as a local branch, no same-named tag) before this runs, so it is admitted on
  * the same footing as the fully-qualified `git push origin main:refs/heads/main` --
- * both need a valid attestation for this exact commit, tree, remote and ref.
+ * both need a valid attestation for this exact commit, tree, remote and ref. When
+ * resolution genuinely declines instead (a configured `remote.<name>.push`, a same-named
+ * local tag, or a source not confirmed as a plain local branch), that stays refused here
+ * too, but as a NAMED, distinct predicate (`PUSH-PROOF-DESTINATION-UNRESOLVED`) rather than
+ * rendering identically to an attestation that was actually checked and failed
+ * (NVA-N-PUSHDIAG) -- this boundary still does not guess at a destination it never
+ * observed, it just says so plainly instead of collapsing into "no such proof verified".
  *
  * Failure of any kind — no state, no anchor, unreadable candidate — is not an exception.
+ *
+ * @returns {{authorized: boolean, code: string}} `code` is always a typed predicate name,
+ * never free text — see the call site for how (and how NOT) it is rendered into the
+ * operator-visible message. Every code below is either produced by `authorizeRecordedPush`
+ * itself (`../lib/critical-action-authorization.mjs`, already documented and pinned there)
+ * or, for a failure that never reached that call, one of this function's own local codes:
+ * `PUSH-PROOF-BINDING-INVALID`, `PUSH-PROOF-DESTINATION-UNRESOLVED`,
+ * `PUSH-PROOF-DESTINATION-MISMATCH`, `PUSH-PROOF-COMMIT-UNRESOLVED`,
+ * `PUSH-PROOF-TREE-UNREADABLE`, `PUSH-PROOF-STATE-UNREADABLE`, or `PUSH-PROOF-WAIVED`
+ * (the ADR-0056 §7 `chat`-mode fallback below, on success).
  */
 function attestedMainPublication(binding) {
-  if (!binding.ok || typeof binding.remote !== "string" || binding.destination !== "refs/heads/main") return false;
+  if (!binding.ok || typeof binding.remote !== "string") return { authorized: false, code: "PUSH-PROOF-BINDING-INVALID" };
+  if (binding.destination === null) return { authorized: false, code: "PUSH-PROOF-DESTINATION-UNRESOLVED" };
+  if (binding.destination !== "refs/heads/main") return { authorized: false, code: "PUSH-PROOF-DESTINATION-MISMATCH" };
   const commit = resolveSourceCommit(binding);
-  if (commit === null) return false;
+  if (commit === null) return { authorized: false, code: "PUSH-PROOF-COMMIT-UNRESOLVED" };
   const tree = spawnSync("git", ["-C", binding.projectDir, "rev-parse", `${commit}^{tree}`], { encoding: "utf8", timeout: 5000 });
-  if (tree.status !== 0 || !/^[0-9a-f]{40,64}$/i.test(tree.stdout?.trim() ?? "")) return false;
+  if (tree.status !== 0 || !/^[0-9a-f]{40,64}$/i.test(tree.stdout?.trim() ?? "")) return { authorized: false, code: "PUSH-PROOF-TREE-UNREADABLE" };
   let state;
   try {
     state = JSON.parse(readFileSync(join(binding.projectDir, projectStateRelPath(binding.projectDir)), "utf8"));
   } catch {
-    return false;
+    return { authorized: false, code: "PUSH-PROOF-STATE-UNREADABLE" };
   }
   // The anchor comes from the GOVERNED session, never from the repository the command
   // named. T6 Critic F1: `<root>/sub/project/critical-human-proof.json` is not a
@@ -814,7 +832,7 @@ function attestedMainPublication(binding) {
     destination: binding.destination,
     now: new Date().toISOString(),
   });
-  if (attested.authorized === true) return true;
+  if (attested.authorized === true) return { authorized: true, code: attested.code };
 
   // ADR-0056 §7: "every session must be able to push, on every branch and on main, when the
   // human clears it -- by signature or by chat, depending on the config." The Ed25519 lane
@@ -825,30 +843,49 @@ function attestedMainPublication(binding) {
   // matters most (2026-08-06 Critic round, F4): this call was the only route into `main` and
   // it consulted no waiver at all.
   const waiver = criticalProofWaiverFor(anchorDir, "push");
-  if (!waiver.waived) return false;
+  if (!waiver.waived) return { authorized: false, code: attested.code };
   const approval = state?.pushApproval?.lastApproved;
-  return approval?.forCommit === candidate.commit
+  const waiverBound = approval?.forCommit === candidate.commit
     && approval?.remote === binding.remote
     && approval?.destination === binding.destination
     && approval?.criticalProofWaiver?.kind === "push";
+  return waiverBound ? { authorized: true, code: "PUSH-PROOF-WAIVED" } : { authorized: false, code: attested.code };
 }
 
 const pushBinding = parsePushBinding(cmd);
-if (pushBinding.ok
+// ADR-0056 §6. main was previously unreachable by any route except the fixed
+// publication executor, which made "push without a release" impossible on the branch
+// that matters most. It is now reachable by exactly one route: a push the key holder
+// signed for this commit, this tree, this remote and this ref. Nothing else changes —
+// the executor keeps its exclusive claim on exact-candidate publication authority, and
+// the anonymous-public delivery path refuses main independently a few hundred lines up.
+const mainPublicationAttempt = pushBinding.ok
   && (pushBinding.destination === "refs/heads/main"
-    || (pushBinding.destination === null && new Set(["main", "refs/heads/main"]).has(pushBinding.source)))
-  // ADR-0056 §6. main was previously unreachable by any route except the fixed
-  // publication executor, which made "push without a release" impossible on the branch
-  // that matters most. It is now reachable by exactly one route: a push the key holder
-  // signed for this commit, this tree, this remote and this ref. Nothing else changes —
-  // the executor keeps its exclusive claim on exact-candidate publication authority, and
-  // the anonymous-public delivery path refuses main independently a few hundred lines up.
-  && !attestedMainPublication(pushBinding)) {
-  emit(2, [
+    || (pushBinding.destination === null && new Set(["main", "refs/heads/main"]).has(pushBinding.source)));
+// Only evaluated when actually needed (attestedMainPublication does real git/fs work).
+const mainAttestation = mainPublicationAttempt ? attestedMainPublication(pushBinding) : null;
+if (mainPublicationAttempt && !mainAttestation.authorized) {
+  // NVA-N-PUSHDIAG: the refusal names WHICH predicate refused, never just that one did.
+  // `mainAttestation.code` is always a typed identifier (PUSH-PROOF-*), never free text --
+  // it names the predicate that refused, not how to satisfy it, so it carries nothing an
+  // unauthorized caller could use to learn about the anchor or key material.
+  const lines = [
     "BLOCKED (guard-push publication boundary): raw Bash/Git cannot publish refs/heads/main.",
     "Only the plugin-owned fixed publication executor may consume exact-candidate main authority; GG-03 and Human Guard Override do not widen it.",
-    "The one exception is a push the human attested for this exact commit, tree, remote and ref (ADR-0056 §6); no such proof verified here.",
-  ]);
+    `The one exception is a push the human attested for this exact commit, tree, remote and ref (ADR-0056 §6); no such proof verified here (${mainAttestation.code}).`,
+  ];
+  if (mainAttestation.code === "PUSH-PROOF-DESTINATION-UNRESOLVED") {
+    // The colon-less form's destination could not be established at all (a configured
+    // `remote.<name>.push` override, a same-named local tag, or a source not confirmed as
+    // a plain local branch -- see resolveImplicitPushDestination's own docstring), so this
+    // boundary never even reached an attestation check. Say so, and name the one form that
+    // always resolves without guessing, rather than letting this render identically to an
+    // attestation that was actually checked and failed.
+    lines.push(
+      "This push's destination ref could not be resolved from the colon-less form, so it was never checked against an attestation at all. Use the fully-qualified refspec instead: git push origin main:refs/heads/main.",
+    );
+  }
+  emit(2, lines);
 }
 function fallbackProjectDir() {
   const candidate = process.env.CLAUDE_PROJECT_DIR || process.cwd();
