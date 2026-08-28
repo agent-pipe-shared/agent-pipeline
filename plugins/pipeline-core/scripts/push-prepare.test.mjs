@@ -32,6 +32,7 @@ import {
   checkPushThreatModel,
   checkWorkingTreeClean,
   criticalArtifactPaths,
+  isSecurityGateActive,
   parseArgs,
   preparePushSubject,
   pushPrepareReport,
@@ -239,6 +240,29 @@ test("checkCriticalHumanProofPolicy: unreadable policy file -> ok:false", () => 
 });
 
 // ---------------------------------------------------------------------------
+// NVA-J-PUSHPREPGATE -- isSecurityGateActive() respects gates.security
+// ---------------------------------------------------------------------------
+
+test("isSecurityGateActive: no manifest / no security gate configured -> false", () => {
+  const active = isSecurityGateActive(FIXTURE_DIR, { loadManifestSafe: () => null });
+  assert.equal(active, false);
+});
+
+test("isSecurityGateActive: gates.security.mode = 'off' -> false", () => {
+  const active = isSecurityGateActive(FIXTURE_DIR, {
+    loadManifestSafe: () => ({ gates: { security: { mode: "off" } } }),
+  });
+  assert.equal(active, false);
+});
+
+test("isSecurityGateActive: gates.security.mode = 'blocking' -> true", () => {
+  const active = isSecurityGateActive(FIXTURE_DIR, {
+    loadManifestSafe: () => ({ gates: { security: { mode: "blocking" } } }),
+  });
+  assert.equal(active, true);
+});
+
+// ---------------------------------------------------------------------------
 // resolveFeatureContext / criticalArtifactPaths
 // ---------------------------------------------------------------------------
 
@@ -382,6 +406,79 @@ test("pushPrepareReport: bad argv -> {ok:false, error}", () => {
   const result = pushPrepareReport(["--remote", "origin"], readyDeps());
   assert.equal(result.ok, false);
   assert.ok(result.error);
+});
+
+// ---------------------------------------------------------------------------
+// NVA-J-PUSHPREPGATE -- pushPrepareReport() honors gates.security end to end
+// (backlog/items/2026-08-28-the-push-gate-is-unsatisfiable-in-any-installed-plugin-deployment.md)
+// ---------------------------------------------------------------------------
+
+test("pushPrepareReport: gates.security off -> no security-evidence check, ready:true even without evidence/security-latest.json", () => {
+  const deps = readyDeps({
+    loadManifestSafe: () => ({ gates: { security: { mode: "off" } } }),
+    readFile: (path) => {
+      if (path.endsWith("trust-policy.json")) return JSON.stringify({ keyReference: "local-po-key", publicKeySha256: "a".repeat(64), humanName: "Test Human" });
+      if (path.endsWith("verify-latest.json")) return JSON.stringify({ exitCode: 0, commit: HEAD });
+      if (path.endsWith("security-latest.json")) throw new Error("ENOENT -- security evidence must not be read when the gate is off");
+      throw new Error(`unexpected read: ${path}`);
+    },
+  });
+  const result = pushPrepareReport(["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"], deps);
+  assert.equal(result.ok, true);
+  assert.equal(result.report.ready, true);
+  assert.equal(result.report.checks.find((check) => check.id === "security-evidence"), undefined);
+});
+
+test("pushPrepareReport: gates.security blocking, good evidence -> security-evidence check present and ok", () => {
+  const deps = readyDeps({ loadManifestSafe: () => ({ gates: { security: { mode: "blocking" } } }) });
+  const result = pushPrepareReport(["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"], deps);
+  assert.equal(result.ok, true);
+  assert.equal(result.report.ready, true);
+  const securityCheck = result.report.checks.find((check) => check.id === "security-evidence");
+  assert.equal(securityCheck.ok, true);
+});
+
+test("pushPrepareReport: gates.security blocking, missing evidence -> ready:false, security-evidence check present and failing", () => {
+  const deps = readyDeps({
+    loadManifestSafe: () => ({ gates: { security: { mode: "blocking" } } }),
+    readFile: (path) => {
+      if (path.endsWith("trust-policy.json")) return JSON.stringify({ keyReference: "local-po-key", publicKeySha256: "a".repeat(64), humanName: "Test Human" });
+      if (path.endsWith("verify-latest.json")) return JSON.stringify({ exitCode: 0, commit: HEAD });
+      if (path.endsWith("security-latest.json")) throw new Error("ENOENT");
+      throw new Error(`unexpected read: ${path}`);
+    },
+  });
+  const result = pushPrepareReport(["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"], deps);
+  assert.equal(result.ok, true);
+  assert.equal(result.report.ready, false);
+  const securityCheck = result.report.checks.find((check) => check.id === "security-evidence");
+  assert.equal(securityCheck.ok, false);
+  assert.match(securityCheck.message, /missing or unreadable/);
+});
+
+test("pushPrepareReport: HEAD unresolved + gates.security off -> no security-evidence failure pushed", () => {
+  const deps = readyDeps({
+    gitHead: () => null,
+    loadManifestSafe: () => ({ gates: { security: { mode: "off" } } }),
+  });
+  const result = pushPrepareReport(["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"], deps);
+  assert.equal(result.ok, true);
+  assert.equal(result.report.ready, false);
+  assert.equal(result.report.checks.find((check) => check.id === "security-evidence"), undefined);
+  const verifyCheck = result.report.checks.find((check) => check.id === "verify-evidence");
+  assert.equal(verifyCheck.ok, false);
+});
+
+test("pushPrepareReport: HEAD unresolved + gates.security blocking -> security-evidence failure still pushed", () => {
+  const deps = readyDeps({
+    gitHead: () => null,
+    loadManifestSafe: () => ({ gates: { security: { mode: "blocking" } } }),
+  });
+  const result = pushPrepareReport(["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"], deps);
+  assert.equal(result.ok, true);
+  assert.equal(result.report.ready, false);
+  const securityCheck = result.report.checks.find((check) => check.id === "security-evidence");
+  assert.equal(securityCheck.ok, false);
 });
 
 // ---------------------------------------------------------------------------
