@@ -29,6 +29,7 @@ import {
   PLAN_AUTHORITY_STAGING_CODE,
 } from "../lib/plan-authority-staging-guard.mjs";
 import { ONBOARDING_SUBCOMMANDS } from "./project-onboarding-v3.mjs";
+import { isSanctionedLifecycleCommand } from "../hooks/guard-lifecycle-ready.mjs";
 
 const candidate = { commit: "a".repeat(40), tree: "b".repeat(40) };
 const planSha256 = createHash("sha256").update("plan").digest("hex");
@@ -909,6 +910,42 @@ function awaitingApprovalFixture() {
     `the rendered command must parse; approve-plan rejected its own rendered argv: ${stderr}`);
   assert.ok(executed.status === 0 || /approve-plan (requires|blocked by)/.test(stderr),
     `the rendered command must reach approve-plan's own gate logic; got status ${executed.status}, stderr: ${stderr}`);
+}
+
+// NVA-V2-APPROVEREACH (PO's mandatory addendum, 2026-08-28): spelling a
+// command correctly is not proof it runs -- this repository has shipped
+// nextActions naming a command the readiness guard then refused. This test
+// takes the EXACT rendered command NVA-V2B-APPROVERENDER's guidance emits
+// (extracted from the live `inspect` payload, not a hand-typed copy of it,
+// same regex extraction the NVA-V2B-APPROVERENDER test above already uses)
+// and drives it straight into `guard-lifecycle-ready.mjs`'s own real
+// admission function, `isSanctionedLifecycleCommand` -- the same pattern
+// `guard-lifecycle-ready.test.mjs`'s "NVA-CODEXARGV-1 (AC-3)" test uses for
+// the CLI's mutating-apply argv. This closes the loop the PO named: the
+// guidance's rendered command is not merely well-typed prose, it is a
+// command this repository's own readiness guard actually admits, proven
+// against the guard's real function rather than asserted in a comment.
+{
+  const { root, deps } = awaitingApprovalFixture();
+  const inspected = capturedStdout(() => run(["inspect"], deps));
+  const { guidance } = JSON.parse(inspected.lines.join("\n")).nextAction;
+  const rendered = /running: (.+?) -- there is no command/s.exec(guidance)?.[1] ?? null;
+  assert.ok(rendered, `guidance must render a runnable command, got: ${guidance}`);
+
+  const substituted = rendered.replace('"<the PO\'s own name>"', "'Probe Person'");
+  const command = substituted.replace(process.execPath, `'${process.execPath}'`);
+  assert.equal(isSanctionedLifecycleCommand(command, root), true,
+    `the exact command this gate's guidance renders must be admitted by the readiness guard: ${command}`);
+
+  // Regression pin (mirrors AC-4's shape one gate earlier): a command this gate
+  // must NEVER be able to satisfy for the PO -- one with an invented/blank --by,
+  // or the mutating auto-fill shape the sibling `draft` gate is allowed to emit
+  // for itself -- stays refused. This is not a positive claim about what IS
+  // rendered (this gate never emits an executable/argv of its own); it is proof
+  // the guard's admission for THIS subcommand still refuses an unattributed run.
+  const blankBy = `'${process.execPath}' '${fileURLToPath(new URL("./pipeline-state.mjs", import.meta.url))}' approve-plan --by ''`;
+  assert.equal(isSanctionedLifecycleCommand(blankBy, root), false,
+    "an unattributed approve-plan must stay refused by the same guard");
 }
 
 console.log("pipeline-state.test.mjs (CB-1a): all checks passed");
