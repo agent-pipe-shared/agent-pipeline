@@ -244,6 +244,7 @@ const TEST_SUITES = [
   { name: "codex-session-start-hint-tests", file: join(hooksDir, "codex-session-start-hint.test.mjs") },
   { name: "guard-push-tests", file: join(hooksDir, "guard-push.test.mjs") },
   { name: "guard-push-v2-tests", file: join(hooksDir, "guard-push-v2.test.mjs") },
+  { name: "guard-push-attestation-diagnostics-tests", file: join(hooksDir, "guard-push-attestation-diagnostics.test.mjs") },
   { name: "stop-suggest-tests", file: join(hooksDir, "stop-suggest.test.mjs") },
   { name: "close-coordinator-tests", file: join(pluginScriptsDir, "close-coordinator.test.mjs") },
   { name: "post-compact-reground-tests", file: join(hooksDir, "post-compact-reground.test.mjs") },
