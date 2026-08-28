@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.marketplace-install-topology-unattested
 type: defect
 owner: pipeline
-status: in_progress
+status: closed
 created: 2026-08-07
+closed_at: 2026-08-28
+closure_repository: self
+closure_commit: 2cff90a68b4fe9f8949a3e0c26bcadf2fb22d24c
+closure_evidence: backlog/items/2026-08-07-marketplace-install-topology-unattested.md
 source: "Critic finding F1, delta re-review of the F-A/F-C/F-D/F-B rework (specs/sprint-phoenix-epic/evidence/wp2wp3-parta-rework-2-delta-critic-review-412d33d.md); the residual of *how* Critic finding F2 (WP2-WP3-partA-rework-1) was resolved. Recorded via the WP2-WP3-partA-rework-3 dispatch."
 due: 2026-09-06
 ---
@@ -211,3 +215,51 @@ github-sourced one that is the real end-user shape:
 Machine-readable artifact: `evidence/OBS-1-marketplace-install-measurement.json`
 (regenerable via `scratch/obs-1-marketplace-install.mjs`). No production code
 changed; this pass is measurement only.
+
+## Closure — PO decision, 2026-08-28: confirm the boundary, build nothing
+
+Both open questions the design put to the PO (§I.2.10 items 1 and 2) are
+answered, and the answer closes this item without code.
+
+- **§I.2.10 item 1 — confirmed.** The partial reinstatement of direction 3
+  stands: for a human attacker with local write access (class C) and for a
+  compromised distribution channel treated as a *gate* (class D), the integrity
+  guarantee is claimed **only** for self-application/dev checkouts; end-user
+  installs rely on the marketplace/host distribution channel's own integrity.
+  The override of 2026-08-07 was the PO's, and only the PO could partially
+  reinstate what it set aside; this is that act.
+- **§I.2.10 item 2 — build nothing.** R2-min-A is not built. The design itself
+  names this a legitimate answer ("'Build nothing and record the boundary' is a
+  legitimate answer here — it is direction 3 in full"), and the PO chose it.
+  R2-min-B is not built either.
+
+**What this decision does NOT rest on, stated so the record is not misread.**
+It does not rest on U4 failing — OBS-1 measured U4 as TRUE in both topologies,
+so R2-min-A's biggest disqualifying risk did not materialise and the direction
+was genuinely buildable. It was declined on marginal value, not on
+infeasibility. That distinction matters if this is ever revisited: the blocker
+that would have to be re-argued is worth-it-ness, not the hardlink risk, which
+is measured and clear.
+
+**What still stands from the original override.** Its *finding* — that leaving
+the topology every ordinary end-user install ships to entirely unchecked would
+hollow out Part A's purpose — is not erased by this closure. What changed is the
+threat model the PO themselves set (§0.5: the adversary is the agent; a human
+with local write access is out of scope; no new key or signing ceremony), under
+which authenticity is unreachable client-side and what remained was only an
+accident detector. The PO has now weighed that accident detector against its
+cost and declined it.
+
+**Consequences to carry forward, not silently dropped.**
+
+- The design document's disclosed limitation 1 (§A.1) becomes the **final**
+  statement rather than an interim one, exactly as candidate direction 3
+  described.
+- `pipeline.attestation-git-presence-gate-not-gs8-protected` (R1) is a separate
+  item and is untouched by this closure.
+- Finding **SL-1** (§I.2.10 item 5 — no rule in the guard family names the live
+  plugin root on the shell lane) is explicitly **not** closed here. It is guard
+  code, a different subject, and the design says no part of R2 should be
+  justified by it. It still needs its own item and its own review.
+- §I.2.10 item 4 (treating a no-anchor outcome as failure) is moot: there is no
+  anchor to be absent, because nothing is built.
