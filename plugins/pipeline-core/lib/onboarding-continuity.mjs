@@ -122,9 +122,17 @@ const TARGET_KEYS = {
   spec: new Set(["path", "beforeSha256", "afterSha256", "content"]),
   history: new Set(["path", "beforeSha256", "afterSha256", "value"]),
 };
+// NVA-F-PROMOTIONACTION: same `applyAction`/`nextAction` sibling convention as
+// `intakeGenerateApplyAction` below (NVA-D-PLANACTION) -- the generic guided
+// driver reads ONLY `nextAction`, never `applyAction`, so a promotion plan
+// that carries a real apply command under the wrong name still stalls the
+// driver dead. `nextAction` is attached AFTER `planSha256` is computed and is
+// deliberately NOT part of `promotionBinding()`, so publishing it changes no
+// plan digest.
 const PROMOTION_PLAN_KEYS = new Set([
   "schema", "root", "repositoryCapability", "profile", "feature", "authority",
   "kickoff", "targets", "transactionSha256", "onboardingScript", "runner", "planSha256", "applyAction",
+  "nextAction",
 ]);
 const PROMOTION_TARGET_KEYS = {
   state: new Set(["path", "beforeSha256", "afterSha256", "value"]),
@@ -4429,11 +4437,17 @@ function validatePromotionPlan(plan) {
       fail("KICKOFF-PROMOTION-PLAN", "promotion kickoff history binding is invalid");
     }
   }
+  const expectedApplyAction = promotionApplyAction(
+    plan.onboardingScript, plan.root, input.profile, input.featureId, input.planPath,
+    input.prdPath, input.specPath, input.designInputPath, plan.planSha256, plan.runner, coordinatorSourced,
+  );
   if (canonicalSha256(promotionBinding(plan)) !== plan.planSha256
-    || canonicalJson(plan.applyAction) !== canonicalJson(promotionApplyAction(
-      plan.onboardingScript, plan.root, input.profile, input.featureId, input.planPath,
-      input.prdPath, input.specPath, input.designInputPath, plan.planSha256, plan.runner, coordinatorSourced,
-    ))) {
+    || canonicalJson(plan.applyAction) !== canonicalJson(expectedApplyAction)
+    // `nextAction` is the same command object, published under the name the
+    // generic guided driver reads (NVA-F-PROMOTIONACTION) -- validated the
+    // same way `applyAction` already is: a plan whose `nextAction` disagrees
+    // with its own re-derived apply action is refused.
+    || canonicalJson(plan.nextAction) !== canonicalJson(expectedApplyAction)) {
     fail("KICKOFF-PROMOTION-PLAN", "promotion action binding is invalid");
   }
   return {
@@ -4488,9 +4502,9 @@ function buildCoordinatorSourcedPromotionPlan({
       transactionSha256: entry.transactionSha256, onboardingScript, runner,
     };
     const planSha256 = canonicalSha256(binding);
+    const applyAction = promotionApplyAction(onboardingScript, observed.root, input.profile, input.featureId, input.planPath, input.prdPath, input.specPath, input.designInputPath, planSha256, runner, true);
     const plan = {
-      ...binding, planSha256,
-      applyAction: promotionApplyAction(onboardingScript, observed.root, input.profile, input.featureId, input.planPath, input.prdPath, input.specPath, input.designInputPath, planSha256, runner, true),
+      ...binding, planSha256, applyAction, nextAction: applyAction,
     };
     validatePromotionPlan(plan);
     return plan;
@@ -4553,9 +4567,9 @@ function buildCoordinatorSourcedPromotionPlan({
     transactionSha256, onboardingScript, runner,
   };
   const planSha256 = canonicalSha256(binding);
+  const applyAction = promotionApplyAction(onboardingScript, observed.root, input.profile, featureId, input.planPath, input.prdPath, input.specPath, input.designInputPath, planSha256, runner, true);
   const plan = {
-    ...binding, planSha256,
-    applyAction: promotionApplyAction(onboardingScript, observed.root, input.profile, featureId, input.planPath, input.prdPath, input.specPath, input.designInputPath, planSha256, runner, true),
+    ...binding, planSha256, applyAction, nextAction: applyAction,
   };
   validatePromotionPlan(plan);
   return plan;
@@ -4629,7 +4643,8 @@ function buildKickoffPromotionPlan({
       runner,
     };
     const planSha256 = canonicalSha256(binding);
-    const plan = { ...binding, planSha256, applyAction: promotionApplyAction(onboardingScript, observed.root, input.profile, input.featureId, input.planPath, input.prdPath, input.specPath, input.designInputPath, planSha256, runner) };
+    const applyAction = promotionApplyAction(onboardingScript, observed.root, input.profile, input.featureId, input.planPath, input.prdPath, input.specPath, input.designInputPath, planSha256, runner);
+    const plan = { ...binding, planSha256, applyAction, nextAction: applyAction };
     validatePromotionPlan(plan);
     return plan;
   }
@@ -4755,9 +4770,9 @@ function buildKickoffPromotionPlan({
     runner,
   };
   const planSha256 = canonicalSha256(binding);
+  const applyAction = promotionApplyAction(onboardingScript, observed.root, input.profile, input.featureId, input.planPath, input.prdPath, input.specPath, input.designInputPath, planSha256, runner);
   const plan = {
-    ...binding, planSha256,
-    applyAction: promotionApplyAction(onboardingScript, observed.root, input.profile, input.featureId, input.planPath, input.prdPath, input.specPath, input.designInputPath, planSha256, runner),
+    ...binding, planSha256, applyAction, nextAction: applyAction,
   };
   validatePromotionPlan(plan);
   return plan;

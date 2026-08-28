@@ -3368,4 +3368,83 @@ check("a coordinator-sourced binding satisfies the PO plan gate's current contra
   assert.equal(authority.value.specPath, plan.authority.spec.path);
 });
 
+// ---- NVA-F-PROMOTIONACTION: promotion plans publish nextAction -----------
+// Same sibling-field convention as NVA-D-PLANACTION (intake-generate, above):
+// the generic guided driver (onboarding-init.mjs) reads ONLY `nextAction`,
+// never `applyAction`. Without a `nextAction` on the promotion plan, a fresh
+// repository's guided chain named `bootstrap-bind-plan` every round, forever
+// -- the plan already carried the apply command as `applyAction`, just not
+// under the name the driver reads.
+
+function assertPromotionPlanPublishesNextAction(plan) {
+  assert.deepEqual(plan.nextAction, plan.applyAction);
+  assert.equal(plan.nextAction.kind, "command");
+  assert.equal(plan.nextAction.executable, "node");
+  assert.ok(Array.isArray(plan.nextAction.argv));
+  const flagIndex = plan.nextAction.argv.indexOf("--plan-sha256");
+  assert.ok(flagIndex >= 0, "nextAction argv must carry --plan-sha256");
+  assert.equal(plan.nextAction.argv[flagIndex + 1], plan.planSha256);
+}
+
+check("planOnboardingKickoffPromotion (kickoff-sourced, freshly built): publishes nextAction identical to applyAction, carrying the plan's own digest", () => {
+  const seed = promotionSeed("promotionaction-kickoff-fresh");
+  const plan = planOnboardingKickoffPromotion(seed.request);
+  assertPromotionPlanPublishesNextAction(plan);
+});
+
+check("reconstructOnboardingKickoffPromotionPlan (kickoff-sourced, replay): the reconstructed plan also publishes nextAction identical to applyAction", () => {
+  const seed = promotionSeed("promotionaction-kickoff-replay");
+  const plan = planOnboardingKickoffPromotion(seed.request);
+  applyOnboardingKickoffPromotion({ plan, expectedPlanSha256: plan.planSha256, activate: true });
+  const replayed = reconstructOnboardingKickoffPromotionPlan(seed.request);
+  assertPromotionPlanPublishesNextAction(replayed);
+  assert.deepEqual(replayed, plan);
+});
+
+check("planOnboardingBootstrapBind (coordinator-sourced, freshly built): publishes nextAction identical to applyAction, carrying the plan's own digest", () => {
+  const { root } = bootstrapBindReadyRoot("promotionaction-coordinator-fresh");
+  const plan = planOnboardingBootstrapBind({ rootDir: root });
+  assertPromotionPlanPublishesNextAction(plan);
+});
+
+check("reconstructOnboardingKickoffPromotionPlan (coordinator-sourced, replay): the reconstructed binding also publishes nextAction identical to applyAction", () => {
+  const { root } = bootstrapBindReadyRoot("promotionaction-coordinator-replay");
+  const plan = planOnboardingBootstrapBind({ rootDir: root });
+  applyOnboardingBootstrapBind({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
+  const replayed = reconstructOnboardingKickoffPromotionPlan({
+    rootDir: root, profile: plan.profile, featureId: plan.feature.id, planPath: plan.feature.planPath,
+    prdPath: plan.authority.prd.path, specPath: plan.authority.spec.path, designInputPath: plan.authority.designInput.path,
+    coordinatorSourced: true,
+  });
+  assertPromotionPlanPublishesNextAction(replayed);
+  assert.deepEqual(replayed, plan);
+});
+
+check("planOnboardingKickoffPromotion: planSha256 is bound to the transaction alone -- publishing nextAction changes no plan digest (NVA-F-PROMOTIONACTION)", () => {
+  const seed = promotionSeed("promotionaction-digest-stability");
+  const plan = planOnboardingKickoffPromotion(seed.request);
+  // Same key set `promotionBinding()` (onboarding-continuity.mjs, private)
+  // projects out of the plan -- deliberately neither `planSha256` nor
+  // `applyAction`/`nextAction`. Recomputing the digest from exactly this
+  // projection, using the plugin's own canonical-JSON sha256 helper, proves
+  // planSha256 does not depend on nextAction's presence or value.
+  const binding = {
+    schema: plan.schema, root: plan.root, repositoryCapability: plan.repositoryCapability,
+    profile: plan.profile, feature: plan.feature, authority: plan.authority, kickoff: plan.kickoff,
+    targets: plan.targets, transactionSha256: plan.transactionSha256, onboardingScript: plan.onboardingScript,
+    runner: plan.runner,
+  };
+  assert.equal(sha256CanonicalJson(binding), plan.planSha256,
+    "planSha256 must be derivable from the transaction-bound fields alone -- applyAction and nextAction are excluded from the digest");
+});
+
+check("applyOnboardingKickoffPromotion: refuses a plan whose nextAction disagrees with its own re-derived apply action, exactly as a mismatched applyAction is refused (NVA-F-PROMOTIONACTION)", () => {
+  const seed = promotionSeed("promotionaction-nextaction-mismatch");
+  const plan = planOnboardingKickoffPromotion(seed.request);
+  const tampered = { ...plan, nextAction: { ...plan.nextAction, argv: [...plan.nextAction.argv, "--bogus"] } };
+  expectKickoffError("KICKOFF-PROMOTION-PLAN", () => applyOnboardingKickoffPromotion({
+    plan: tampered, expectedPlanSha256: tampered.planSha256, activate: true,
+  }));
+});
+
 console.log(`${passed} onboarding continuity/kickoff checks passed.`);
