@@ -28,10 +28,13 @@ import {
   requireProjectOnboardingReady,
 } from "../lib/project-onboarding-ready-gate.mjs";
 import {
-  boundedOpaqueCopyCommand,
   inspectProjectOnboardingV3,
   PO_AUTHORITY_REBIND_UNAVAILABLE_DIAGNOSTICS,
 } from "../lib/project-onboarding-v3.mjs";
+// NVA-GF-COPYSAFE: sourced from the shared renderer module rather than
+// project-onboarding-v3.mjs directly -- same function (re-exported there,
+// unchanged), so this file's bounded-rendering output stays byte-identical.
+import { boundedOpaqueCopyCommand } from "../lib/copy-safe-command.mjs";
 import { automatedLifecycleArgvCommands, MUTATING_ONBOARDING_ARGV_SHAPES } from "../scripts/project-onboarding-v3.mjs";
 import { isBootstrapBindingStagingAuthoringWrite } from "../lib/onboarding-staging-authoring.mjs";
 import { loadRuntimeProjectionV3OwnedKeys } from "../lib/runtime-projection-v3.mjs";
