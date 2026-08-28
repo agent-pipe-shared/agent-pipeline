@@ -165,6 +165,20 @@ function poKeyDirectoryStillExists(directory, dependencies) {
   } catch { return false; }
 }
 
+/** Existence check only -- never opens or inspects anything INSIDE the
+ * directory (mirrors machine-plane.mjs's own `validPoKeyDirectory`
+ * discipline). A non-directory at the path, or any read error, is treated as
+ * "does not resolve" -- the conservative direction for a predicate deciding
+ * whether a recorded pointer is still worth protecting from replacement. */
+function poKeyDirectoryStillExists(directory, dependencies) {
+  const exists = dependencies.existsSyncFn ?? existsSync;
+  try {
+    if (!exists(directory)) return false;
+    const stat = dependencies.statSyncFn ?? statSync;
+    return stat(directory).isDirectory();
+  } catch { return false; }
+}
+
 // PO-KEYDIR-01(A), 2026-08-11 PO decision (backlog/items/2026-08-10-po-key-directory-
 // default-should-be-repo-scoped-not-machine-wide.md): `setup`'s own auto-persist call
 // (runHumanApproval, below) now targets THIS repo-scoped store instead of the machine
