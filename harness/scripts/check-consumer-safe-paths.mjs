@@ -484,6 +484,34 @@ export const ALLOWLIST = Object.freeze([
     reason:
       "Class unclear: imports pipelineState from harness/scripts/pipeline-state.mjs by relative path. Whether this proof-gated continuity-authority-revision wrapper is ever consumer-invoked (vs. self-application-only maintenance tooling run from this repository's own checkout, matching the same-shaped scripts already marked Class B self-application-only above) was not confidently determined within this dispatch's budget -- left for the follow-up dispatch's judgment rather than guessed.",
   },
+
+  // --- NVA-V9-SAFEPATHS: push-init.mjs's three harness/ occurrences name
+  // RECONCILIATION_SCRIPT_RELATIVE_PATH ("WHY LAYER 1b IS CONDITIONAL" in its
+  // own header). Class B: the driver treats this path as OPTIONAL at the
+  // TARGET PROJECT ROOT (never the plugin's own install directory), probes
+  // for the file's existence with existsSync() before ever using it, and
+  // skips Layer 1b entirely -- not failing -- when it is absent. A consumer
+  // project without this file simply has nothing to reconcile against by
+  // construction; the constant is a conditional existence probe, not an
+  // assumption that the path is present.
+  {
+    file: "plugins/pipeline-core/scripts/push-init.mjs",
+    match: "(harness/scripts/), is genuinely OPTIONAL",
+    reason:
+      "Class B: header-comment prose describing check-doc-reconciliation.mjs's location, in the same sentence that already calls it 'genuinely OPTIONAL per project'. The driver probes for this path's existence at the target project root and skips Layer 1b when absent -- not a consumer-facing assumption that the path exists.",
+  },
+  {
+    file: "plugins/pipeline-core/scripts/push-init.mjs",
+    match: "<project-root>/harness/scripts/`, a path",
+    reason:
+      "Class B: header-comment prose explicitly stating this path 'will not exist in an arbitrary consumer project this plugin is installed into'. The driver checks for its existence at the target project root before running it and skips Layer 1b, not failed, when absent -- documenting the very conditionality that makes this safe.",
+  },
+  {
+    file: "plugins/pipeline-core/scripts/push-init.mjs",
+    match: "RECONCILIATION_SCRIPT_RELATIVE_PATH = \"harness/scripts/check-doc-reconciliation.mjs\"",
+    reason:
+      "Class B: the constant itself, declared 'Project-root-relative, never plugin-root-relative' one line above (comment immediately preceding it). The driver joins this against the TARGET PROJECT root and calls existsSync() on the result before using it, skipping Layer 1b -- not failing -- when the consumer project has no such file. Not an assumption the path exists, a probe for whether it does.",
+  },
 ]);
 
 function posixPath(value) {
