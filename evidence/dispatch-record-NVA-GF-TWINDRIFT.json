@@ -1,0 +1,21 @@
+{
+  "taskId": "NVA-GF-TWINDRIFT",
+  "agentType": "goldfish-implementor",
+  "model": "claude-sonnet-5",
+  "effort": "medium",
+  "rulesetSha": "0.6.0+claude.20260828131316.03c6e1e",
+  "dispatcher": "elephant",
+  "outcome": "committed-pending-report",
+  "log": [
+    {"phase": "containment-check", "toolCalls": 4, "note": "toplevel under worktrees/, HEAD self-healed to f51f8f4e via checkout --detach"},
+    {"phase": "commit-blocked", "toolCalls": null, "note": "git commit -F scratch/commit-msg.txt refused with GIT-03-UNREADABLE-MESSAGE-FILE: guard-git.mjs resolves a relative message-file path against CLAUDE_PROJECT_DIR (the main checkout), never the invoking cwd, so the file it wrote inside its own worktree was reported absent. The dispatch returned an empty result with its work left staged."},
+    {"phase": "orchestrator-recovery", "toolCalls": null, "note": "Elephant verified the staged diff by inspection and ran the suite (project-authority: 34 passed, 0 failed), then performed the commit act the dispatch could not. Trailer records Commit-Act: orchestrator accordingly."}
+  ],
+  "report": {
+    "text": "Adds twin-calibration drift detection to classifyProjectAuthority(). calibrationDriftDiagnostics() compares the sha256 of project/pipeline.json and .claude/pipeline.json once both are present and, on divergence, emits a PA-CALIBRATION-DRIFT diagnostic naming the authoritative file (the tier authority() resolved; neutral whenever no source could be determined). Two tests cover the diverging and matching pairs. Verified by the orchestrator, not by the dispatch: node plugins/pipeline-core/lib/project-authority.test.mjs -> 34 passed, 0 failed. Backlog acceptance criterion 1 (a divergence is reported) is met; criterion 2 is met at file granularity -- the check names the authoritative FILE, not the individual diverging field, because the comparison is whole-file sha256, consistent with how drift is detected elsewhere in this codebase. Field-level attribution remains open.",
+    "changedFiles": [
+      "plugins/pipeline-core/lib/project-authority.mjs - adds calibrationDriftDiagnostics() and a diagnostics field on the classification result",
+      "plugins/pipeline-core/lib/project-authority.test.mjs - adds the diverging-pair and matching-pair cases"
+    ]
+  }
+}
