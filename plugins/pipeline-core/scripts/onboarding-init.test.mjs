@@ -31,10 +31,55 @@ function dispose(path) {
   rmSync(path, { recursive: true, force: true });
 }
 
+// Every driver test below pins `runner` explicitly, and that is load-bearing rather than
+// tidy. Without it the onboarding CLI resolves the lane from the ENVIRONMENT, so this suite
+// asserted one thing under an agent (CLAUDECODE=1 -> claude -> a real collect-input
+// question) and a different thing in an operator's own shell (no marker -> codex -> a Codex
+// restart barrier the driver correctly refuses as `unsupported-next-action`). Measured
+// 2026-08-28: eight green runs under an agent, and a deterministic double failure under
+// `env -u CLAUDECODE`. A suite in the verify gate must not have two legitimate outcomes
+// depending on who runs it.
+test("driveOnboardingInit: the runner lane is the caller's, not the ambient environment's", () => {
+  const root = freshRoot();
+  try {
+    // Pinned claude: a fresh repository reaches a genuine human question.
+    const claude = driveOnboardingInit({ rootDir: root, runner: "claude" });
+    assert.equal(claude.runner, "claude", "the resolved lane is reported, not left for the caller to assume");
+    assert.equal(claude.outcome, "collect-input");
+    assert.equal(claude.steps[0].argv.includes("--runner"), true, "the pinned lane reaches the first inspect");
+
+    // Pinned codex on the SAME fresh repository shape: the Codex restart barrier is a
+    // nextAction kind this driver cannot execute, and it says so honestly rather than
+    // guessing. This is correct behaviour, pinned here so the two lanes stay distinguishable.
+    const other = freshRoot();
+    try {
+      const codex = driveOnboardingInit({ rootDir: other, runner: "codex" });
+      assert.equal(codex.runner, "codex");
+      assert.notEqual(codex.outcome, "collect-input",
+        "the codex lane does not reach the same question, which is exactly why the lane must be pinned rather than inherited");
+    } finally {
+      dispose(other);
+    }
+
+    // Omitting the runner stays the CLI's own environment resolution -- unchanged
+    // behaviour, reported as null so a caller can tell it was never pinned. Only the
+    // reported field is asserted: the OUTCOME of that path is environment-dependent by
+    // construction, which is the very thing this test exists to keep out of the others.
+    const ambient = freshRoot();
+    try {
+      assert.equal(driveOnboardingInit({ rootDir: ambient, runner: null }).runner, null);
+    } finally {
+      dispose(ambient);
+    }
+  } finally {
+    dispose(root);
+  }
+});
+
 test("driveOnboardingInit: stops at the first collect-input action without inventing any of its values", () => {
   const root = freshRoot();
   try {
-    const result = driveOnboardingInit({ rootDir: root });
+    const result = driveOnboardingInit({ rootDir: root, runner: "claude" });
     assert.equal(result.schema, SCHEMA);
     assert.equal(result.outcome, "collect-input");
     assert.equal(result.root, root);
@@ -58,7 +103,7 @@ test("driveOnboardingInit: stops at the first collect-input action without inven
 test("driveOnboardingInit: executes a run of consecutive command actions before it has to stop", () => {
   const root = freshRoot();
   try {
-    const result = driveOnboardingInit({ rootDir: root });
+    const result = driveOnboardingInit({ rootDir: root, runner: "claude" });
     // A fresh, empty repository needs several plan/apply steps (portable seed, runtime
     // init, ...) before the first genuine human question -- this exercises the CHAIN, not
     // just a single hop.
@@ -81,7 +126,7 @@ test("driveOnboardingInit: executes a run of consecutive command actions before 
 test("driveOnboardingInit: is re-entrant -- a second run continues from the checkpoint instead of restarting or double-applying", () => {
   const root = freshRoot();
   try {
-    const first = driveOnboardingInit({ rootDir: root });
+    const first = driveOnboardingInit({ rootDir: root, runner: "claude" });
     assert.equal(first.outcome, "collect-input");
     const firstAsk = (first.collectInput.inputs ?? [first.collectInput.input]).map((input) => input.name).sort();
 
@@ -101,7 +146,7 @@ test("driveOnboardingInit: is re-entrant -- a second run continues from the chec
     ], { encoding: "utf8", shell: false });
     assert.equal(answered.status, 0, answered.stderr);
 
-    const second = driveOnboardingInit({ rootDir: root });
+    const second = driveOnboardingInit({ rootDir: root, runner: "claude" });
     // Re-running must not repeat the already-answered consent question: whatever it stops
     // on next must be a DIFFERENT ask than the first run's.
     const secondAsk = second.outcome === "collect-input"
