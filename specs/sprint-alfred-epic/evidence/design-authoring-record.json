@@ -72,6 +72,24 @@
         "specs/sprint-alfred-epic/evidence/design-authoring-record.json"
       ],
       "note": "Round-3 review-evidence commit (added retroactively per round-4 finding F2)"
+    },
+    {
+      "sha": "3f2fcb31",
+      "files": [
+        "docs/state.md",
+        "specs/sprint-alfred-epic/evidence/critic/round-4-2026-08-27.md",
+        "specs/sprint-alfred-epic/evidence/critic/round-4-response.md"
+      ],
+      "note": "Round-4 review-evidence commit closing cycle 1 (PASS scoped)"
+    },
+    {
+      "sha": "bfa7cac8",
+      "files": [
+        "specs/sprint-alfred-epic/acceptance.md",
+        "specs/sprint-alfred-epic/design/backlog-intake.md",
+        "specs/sprint-alfred-epic/design/issue-intake.md"
+      ],
+      "note": "PO gate decisions of 2026-08-28 applied to the unbound package documents"
     }
   ],
   "commitsNote": "The newest evidence-recording commit is always absent from commits[] until the next entry adds it (a commit's sha cannot be known while its own tree is being authored). No declared fact depends on commits[] completeness.",
@@ -83,6 +101,7 @@
   "declaredFacts": [
     "The design was authored ahead of Nova/Phoenix go-live under an explicit PO decision recorded in specs/sprint-alfred-epic/design/po-input-2026-08-27.md.",
     "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md carries a technical-spec-sha256 marker that is recomputed in the same commit whenever spec.md changes: at every commit of this design line since 584acbda introduced the PRD/spec pair, the committed marker equals sha256 of spec.md as committed there. Verifiable by recomputation at any commit; independent of the commits[] bookkeeping above.",
-    "No plan submission exists yet; the package is pre-submission design material at the time of this record."
+    "No plan submission exists yet; the package is pre-submission design material at the time of this record.",
+    "On 2026-08-28 the PO reviewed the PRD at the gate and rejected it as far too shallow on the architecture mandate (design/po-input-2026-08-28.md). The rework wave (design/gap-analysis-2026-08-28.md, design/agent-first-architecture.md) is authored under Fable 5 at effort max, PO-set for the rework; the bound PRD/spec absorb the doctrine via the sanctioned acknowledge->submit->reopen->edit->resubmit route after the PO has seen the reworked package."
   ]
 }
