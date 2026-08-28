@@ -28,6 +28,7 @@ import {
 // table; the table and argv emitter keep arriving through the CLI seam below, unchanged.
 import { mutatingApplyCommandHint } from "../lib/onboarding-argv-shapes.mjs";
 import {
+  ADMITTED_GRAMMAR_SHAPES,
   BASE_GOVERNANCE_MARKERS,
   claudeSessionMemoryDirectory,
   evaluateLifecycleReadyGuard,
@@ -6421,5 +6422,141 @@ test("NVA-INTAKESPECS-1: the bootstrap-binding authoring admission covers specs/
     assert.match(notebook.stderr, /GUARD-LIFECYCLE-NOT-READY/u, "NotebookEdit");
   } finally {
     rmSync(path, { recursive: true, force: true });
+  }
+});
+
+// NVA-I-GRAMMAR DoD 1: the three live reproductions from backlog/items/2026-08-27-shell-
+// grammar-reads-quoted-content-as-shell-syntax.md, each paired with a genuinely-composed
+// control that must stay refused. The quote-aware tokenizer itself (guard-command-grammar.mjs,
+// out of this dispatch's scope) already read all three correctly by the time this dispatch
+// started -- this pins that fact as a regression test rather than leaving it undiscovered.
+// Only repro 3 (head -N for the grep/cat sinks) needed a real fix in this file.
+test("NVA-I-GRAMMAR DoD 1: quoted operator-looking characters are read as data, never as shell syntax, for all three backlog reproductions", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    // Repro 1: a ternary inside a quoted `node -e` script.
+    const ternary = `node -e 'const x = 1; console.log(x ? "yes" : "no")'`;
+    const ternaryParsed = parseGuardCommand(ternary, path);
+    assert.equal(ternaryParsed.parseStatus, "accepted", ternary);
+    assert.equal(ternaryParsed.operators.length, 0, ternary);
+    assert.equal(ternaryParsed.redirects.length, 0, ternary);
+    // Genuinely-composed control: a REAL, unquoted pipe between two `node -e` calls.
+    const ternaryControl = "node -e 'console.log(1)' | node -e 'process.exit(0)'";
+    assert.equal(isReadOnlyDiagnosticCommand(ternaryControl, path), false, ternaryControl);
+    const ternaryControlResult = evaluateLifecycleReadyGuard(bash(ternaryControl), { projectDir: path });
+    assert.equal(ternaryControlResult.exitCode, 2, ternaryControl);
+    assert.match(ternaryControlResult.stderr, /GUARD-OPERATOR-UNAPPROVED/u, ternaryControl);
+
+    // Repro 2: `\|` alternation inside a quoted grep pattern.
+    const alternation = `grep -n "^const X\\|^export function Y" some/file.mjs`;
+    const alternationParsed = parseGuardCommand(alternation, path);
+    assert.equal(alternationParsed.parseStatus, "accepted", alternation);
+    assert.equal(alternationParsed.operators.length, 0, alternation);
+    assert.equal(isReadOnlyDiagnosticCommand(alternation, path), true, alternation);
+    // Genuinely-composed control: a REAL, unquoted `||`.
+    const alternationControl = "grep -n X some/file.mjs || rm some/file.mjs";
+    assert.equal(isReadOnlyDiagnosticCommand(alternationControl, path), false, alternationControl);
+    const alternationControlResult = evaluateLifecycleReadyGuard(bash(alternationControl), { projectDir: path });
+    assert.equal(alternationControlResult.exitCode, 2, alternationControl);
+    assert.match(alternationControlResult.stderr, /GUARD-PARSE-UNSUPPORTED/u, alternationControl);
+
+    // Repro 3: `head -40` refused where `head -n 40` is admitted, for the grep sink (the rg
+    // sink already accepted both forms before this dispatch, per GF-078 bug 2).
+    const headCombined = "grep -n needle probe.txt | head -40";
+    assert.equal(isReadOnlyDiagnosticCommand(headCombined, path), true, headCombined);
+    assert.deepEqual(evaluateLifecycleReadyGuard(bash(headCombined), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { deny("continuity-damaged"); },
+    }), { exitCode: 0, stderr: "" });
+    // Genuinely-composed control: a THIRD pipeline stage, outside the bounded two-segment
+    // shape -- must stay refused regardless of the head -N fix.
+    const headControl = "grep -n needle probe.txt | head -40 | wc -l";
+    assert.equal(isReadOnlyDiagnosticCommand(headControl, path), false, headControl);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// NVA-I-GRAMMAR DoD 2: the identical bounded read, refused only because of which command
+// sourced it, now accepts `head -N` for every sink family, not only rg-to-head.
+test("NVA-I-GRAMMAR DoD 2: head -N is admitted wherever head -n N is, for grep-to-head and cat-to-head, with the same 1..500 bound", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "probe.txt"), "alpha\nbeta\n");
+    for (const [combined, twoToken] of [
+      ["grep -n alpha probe.txt | head -40", "grep -n alpha probe.txt | head -n 40"],
+      ["cat probe.txt | head -40", "cat probe.txt | head -n 40"],
+      ["grep -n alpha probe.txt | head -500", "grep -n alpha probe.txt | head -n 500"],
+    ]) {
+      assert.equal(isReadOnlyDiagnosticCommand(combined, path), isReadOnlyDiagnosticCommand(twoToken, path), combined);
+      assert.equal(isReadOnlyDiagnosticCommand(combined, path), true, combined);
+    }
+    // The bound is unchanged, both spellings: 0 and 501 stay refused either way.
+    for (const outOfBound of ["grep -n alpha probe.txt | head -0", "grep -n alpha probe.txt | head -501"]) {
+      assert.equal(isReadOnlyDiagnosticCommand(outOfBound, path), false, outOfBound);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// NVA-I-GRAMMAR DoD 5: the refusal text can never drift from the grammar it describes, because
+// this test runs what it prints -- every ADMITTED_GRAMMAR_SHAPES example is both (a) present
+// verbatim in a real refusal's remedy text and (b) independently admitted when submitted.
+test("NVA-I-GRAMMAR DoD 5: every admitted-grammar-shape example is printed in the refusal AND independently admitted when submitted", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    writeFileSync(join(path, "probe.txt"), "alpha\nbeta\n");
+    const refusal = evaluateLifecycleReadyGuard(bash("git status ; git log"), { projectDir: path });
+    assert.equal(refusal.exitCode, 2);
+    assert.match(refusal.stderr, /GUARD-PARSE-UNSUPPORTED/u);
+    assert.ok(ADMITTED_GRAMMAR_SHAPES.length > 0);
+    for (const shape of ADMITTED_GRAMMAR_SHAPES) {
+      assert.ok(shape.example, `table entry missing a runnable example: ${shape.spelling}`);
+      assert.ok(refusal.stderr.includes(shape.example), `refusal text missing example: ${shape.example}`);
+      assert.equal(isReadOnlyDiagnosticCommand(shape.example, path), true, shape.example);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// NVA-I-GRAMMAR DoD 6 -- THE DELIVERABLE (per this dispatch's own briefing, the && support is
+// not): drives every admitted-operator shape (the bounded rg/grep/cat pipelines and the
+// &&-chain union) and asserts that no mutating, protected-path, or cross-repo-mutating segment
+// ever becomes admitted merely by riding along BEFORE or AFTER a segment that IS independently
+// admitted -- the union rule (isChainSegmentAdmitted) must never let one admitted segment's
+// verdict leak onto its neighbour.
+test("NVA-I-GRAMMAR DoD 6: negative regression -- no mutating, protected-path, or cross-repo-mutating segment is admitted by composition with an admitted one", () => {
+  const path = root();
+  const outside = mkdtempSync(join(tmpdir(), "guard-lifecycle-negative-"));
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    writeFileSync(join(path, "probe.txt"), "alpha\n");
+    const admittedSegments = [
+      "git status",
+      "rg -n alpha probe.txt",
+      "grep -n alpha probe.txt | head -5",
+      "cat probe.txt | grep -n alpha",
+    ];
+    const forbiddenSegments = [
+      "rm -rf probe.txt", // mutating
+      "git commit -m x", // mutating
+      "touch new-file.txt", // mutating
+      "sed -i s/x/y/ probe.txt", // mutating (write flag)
+      `mkdir -p ${outside}`, // cross-repo-mutating (outside project root)
+      "mkdir -p guardrails/critic-probe", // in-repo write outside the chain-eligible prefixes
+    ];
+    for (const admitted of admittedSegments) {
+      assert.equal(isReadOnlyDiagnosticCommand(admitted, path), true, admitted);
+      for (const forbidden of forbiddenSegments) {
+        assert.equal(isReadOnlyDiagnosticCommand(forbidden, path), false, forbidden);
+        for (const chain of [`${admitted} && ${forbidden}`, `${forbidden} && ${admitted}`]) {
+          assert.equal(isReadOnlyDiagnosticCommand(chain, path), false, chain);
+          const result = evaluateLifecycleReadyGuard(bash(chain), { projectDir: path });
+          assert.equal(result.exitCode, 2, chain);
+          assert.match(result.stderr, /GUARD-PARSE-UNSUPPORTED/u, chain);
+        }
+      }
+    }
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
   }
 });
