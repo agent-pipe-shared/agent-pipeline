@@ -1135,10 +1135,17 @@ test("only bounded rg search pipelines and platform null redirect are read-only"
       "rg -n lifecycle . 2>diagnostic.log | rg guard",
       "rg --pre worker lifecycle . | head -n 20",
       "rg -n lifecycle .. | head -n 20",
-      "rg -n lifecycle . && head -n 20",
     ]) {
       assert.equal(isReadOnlyDiagnosticCommand(command, path), false, command);
     }
+    // NVA-I-GRAMMAR: `rg -n lifecycle . && head -n 20` used to be refused here -- not because
+    // either side was unsafe, but because the OLD &&-chain admission only ever recognized a
+    // small named allowlist, not the general read-only-diagnostic classifier. Both segments
+    // are independently admitted simple commands (bare `head -n N` with no path argument is
+    // already unconditionally admitted, isReadOnlySimpleWords above), so under the union rule
+    // (isBoundedReadOnlyAndChain, DoD 3) this is now correctly admitted -- no new authority,
+    // since each side is already independently callable as its own tool call.
+    assert.equal(isReadOnlyDiagnosticCommand("rg -n lifecycle . && head -n 20", path), true);
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
@@ -1318,7 +1325,7 @@ test("NVA-CATPIPE-1: a recognised display-only cat flag is admitted, an unrecogn
 });
 
 // backlog/items/2026-08-19-closed-shell-grammar-still-rejects-common-readonly-composition.md
-test("the small named &&-chain allowlist and trailing 2>/dev/null admit exactly the backlog's triggering shapes and nothing more", () => {
+test("the &&-chain union (read-only classifier plus the small always-safe-write allowlist) and trailing 2>/dev/null admit exactly the backlog's triggering shapes, widened per NVA-I-GRAMMAR, and nothing more", () => {
   const path = root();
   const outside = mkdtempSync(join(tmpdir(), "guard-lifecycle-and-chain-outside-"));
   try {
@@ -1330,6 +1337,19 @@ test("the small named &&-chain allowlist and trailing 2>/dev/null admit exactly 
       "git rev-parse HEAD && git log --max-count=3",
       'git rev-parse HEAD && grep -rl "pattern" backlog/items/ | head -n 5',
       'git status && grep -n "pattern" plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs | grep -v "test"',
+      // NVA-I-GRAMMAR (DoD 3): position no longer matters -- a bounded pipeline segment that
+      // is independently admitted as a standalone command is now admitted in ANY chain
+      // position, not only trailing, per the "no new authority" argument (each side is
+      // already separately callable). Previously refused as "non-trailing pipe fails closed".
+      'grep -rl "pattern" backlog/items/ | head -n 5 && git status',
+      // NVA-I-GRAMMAR (DoD 3): `git log --all` is unconditionally admitted as a STANDALONE
+      // command (isReadOnlySimpleWords's git branch admits `log` with any args -- it is
+      // already read-only regardless of flags), so under the union rule it is also admitted
+      // as a chain segment. The OLD chain-only GIT_LOG_CHAIN_ALLOWED_FLAGS restriction was
+      // stricter than the single-command rule for no reason the union principle preserves;
+      // this widening grants no new authority, since `git log --all` was always independently
+      // reachable as its own tool call. Previously refused as a "disclosed exclusion".
+      "git log --all && git status",
     ]) {
       assert.equal(isReadOnlyDiagnosticCommand(command, path), true, command);
       assert.equal(isForbiddenCrossRepositoryMutation(command, path), false, command);
@@ -1353,13 +1373,10 @@ test("the small named &&-chain allowlist and trailing 2>/dev/null admit exactly 
       "git status || git log",
       // Trailing pipe where source is not grep (git log | head -n 5) fails closed
       "git rev-parse HEAD && git log --oneline -5 | head -n 5",
-      // Non-trailing pipe fails closed
-      'grep -rl "pattern" backlog/items/ | head -n 5 && git status',
       // Trailing pipe where sink is neither grep nor head fails closed
       'git rev-parse HEAD && grep -rl "pattern" backlog/items/ | cat',
-      // Disclosed exclusions: an unrecognized git log flag, and a git global -c flag
-      // (never a subcommand match), both fail closed by construction.
-      "git log --all && git status",
+      // Disclosed exclusion: a git global -c flag is never a subcommand match, so the
+      // segment fails the read-only classifier and the chain fails closed by construction.
       "git -c core.pager=evil log && git status",
     ]) {
       assert.equal(isReadOnlyDiagnosticCommand(command, path), false, command);
@@ -1465,11 +1482,11 @@ test("redirect-looking quoted data stays argv while hostile composition is typed
       assert.match(result.stderr, /separate parallel tool calls/u, command);
       assert.match(result.stderr, /Do not construct a new composed command/u, command);
       assert.match(result.stderr, /If typed retryActions are present/u, command);
-      assert.match(
-        result.stderr,
-        /Only bounded rg-to-rg, rg-to-head, grep-to-grep, and grep-to-head diagnostic pipelines are admitted as exceptions/u,
-        command,
-      );
+      // NVA-I-GRAMMAR DoD 5: the refusal states the COMPLETE admitted grammar with bounds and
+      // exact spellings, not just the shape names -- pinned property-style, against the
+      // guard's own ADMITTED_GRAMMAR_SHAPES table, in the dedicated test below.
+      assert.match(result.stderr, /The complete admitted grammar, with bounds and exact spellings:/u, command);
+      assert.match(result.stderr, /N in 1\.\.500/u, command);
     }
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
@@ -1540,14 +1557,19 @@ test("GRAMMARHINT-1 AC-1: the rejected element is named from what the parser alr
     assert.match(newline.stderr, /Rejected element: a newline character inside the command text\./u);
 
     // Composed with && (also GUARD-PARSE-UNSUPPORTED, no raw control character): denied()
-    // does not preserve which of its several rejection paths fired, so this deliberately
-    // prints NO "Rejected element:" line rather than guessing one (see the function's own
-    // doc comment for why this specific case is out of reach without touching
-    // guard-command-grammar.mjs, out of this dispatch's scope).
+    // itself does not preserve which of its several rejection paths fired, but NVA-I-GRAMMAR
+    // DoD 4 closes this specific gap WITHOUT touching guard-command-grammar.mjs --
+    // rejectedAndChainSegment() independently re-splits the well-formed &&-chain (this file's
+    // own quote-aware splitTopLevelAndChain) and names the FIRST segment that fails the exact
+    // union isBoundedReadOnlyAndChain itself applies: "touch output.txt" is not read-only and
+    // not on the always-safe-write allowlist, so it is named as segment 2 of 2.
     const composed = evaluateLifecycleReadyGuard(bash("rg -n lifecycle . && touch output.txt"), { projectDir: path });
     assert.equal(composed.exitCode, 2);
     assert.match(composed.stderr, /GUARD-PARSE-UNSUPPORTED/u);
-    assert.doesNotMatch(composed.stderr, /Rejected element:/u);
+    assert.match(
+      composed.stderr,
+      /Rejected element: "&&"-chain segment 2 of 2 \("touch output\.txt"\) is not independently admitted/u,
+    );
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
