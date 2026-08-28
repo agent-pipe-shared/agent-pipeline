@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "dc592ba9ea4e852de41cb8db13da83c73942535e154565148eaba4b47cdefbf9"
+    "transitionHead": "73adffffdee14a11981979370d659a1e2c1dcb74b831d96ae119bd9c363d233e"
   },
   "counts": {
-    "open": 53,
+    "open": 54,
     "in_progress": 5,
     "closed": 380,
     "rejected": 3,
@@ -64,6 +64,15 @@
       "owner": "pipeline",
       "created": "2026-08-27",
       "source": "Measured live, 2026-08-27 session: a read-only node -e command that only printed a sorted-insertion index over docs/product-capability-inventory.json was refused as a write because the string \"verify.mjs\" appeared inside its interpreter code text.",
+      "deferred": false
+    },
+    {
+      "id": "pipeline.a-registered-but-abandoned-worktree-is-never-retired",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "NVA-VTPGATE-1 stopped on it live, 2026-08-28",
       "deferred": false
     },
     {
