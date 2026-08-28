@@ -30,6 +30,26 @@ A suite in the verify gate should not have two legitimate outcomes depending on 
 it. Worktree isolation cannot fix this: the machine plane lives outside the repository, so
 every worktree, and every concurrent dispatch, shares exactly one of them.
 
+## The failure that led here was a different cause — resolved 2026-08-28
+
+Recorded because the correction matters more than the guess. The one-off failure below was
+neither one-off nor caused by the coupling this item describes. It reproduces
+deterministically under `env -u CLAUDECODE`: without that marker the onboarding CLI's
+`resolveActiveRunner()` falls into its else-branch and answers `codex`, the fresh
+repository is handed a Codex restart barrier whose `nextAction.kind` is `restart-process`,
+and the driver correctly refuses it as `unsupported-next-action`. Every green run was green
+because it ran inside an agent session; both red runs were an operator's own shell.
+
+Fixed by pinning the lane in the driver and its suite (`8cbd2b15`), and the ambient guess
+itself stays open as
+`2026-08-28-a-po-ceremony-in-the-po-s-own-terminal-resolves-the-wrong-runner.md`.
+
+**This item is still open**, and its own subject is unchanged: the suite drives a real
+subprocess that reads real `$HOME` machine-plane state, and today's trust-anchor seeding
+made that read behavioural. That was true before the runner defect was found and is true
+after it. What is no longer true is the suggestion below that the two might be the same
+thing — they are not.
+
 ## The failure this was found through, stated honestly
 
 During an attended operator run, `onboarding-init-tests` exited 1 and the applier
