@@ -6,7 +6,7 @@ import { isAbsolute, relative, resolve } from "node:path";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { requireAttendedChatGateConfirmation } from "../lib/chat-gate-ceremony.mjs";
-import { loadManifestSafe, resolveHumanFacingLanguage } from "../lib/manifest.mjs";
+import { loadManifestSafe, resolveHumanFacingLanguage, gateConfig } from "../lib/manifest.mjs";
 import { planInstall as planPrePushHookInstall, MARKER_SCHEMA as PRE_PUSH_HOOK_MARKER_SCHEMA, DECLINE_MARKER_SCHEMA as PRE_PUSH_HOOK_DECLINE_MARKER_SCHEMA } from "./pre-push-hook-install.mjs";
 import {
   applyOnboardingIntakeConsent,
@@ -409,6 +409,30 @@ const PRE_PUSH_HOOK_OFFER_TEXT = Object.freeze({
   de: "Installiert einen Git-pre-push-Hook (im Hooks-Pfad dieses Repositorys), der das Push-Gate auch außerhalb einer Agenten-Sitzung erneut prüft; `git push --no-verify` umgeht ihn (Gits eigene, beabsichtigte Ausweichmöglichkeit); er kann später mit dem --remove-Verb dieses Installers wieder entfernt werden.",
 });
 
+// NVA-GF-PREPUSH (backlog: 2026-08-28-the-pre-push-hook-is-offered-not-installed-so-the-git-
+// backstop-can-be-absent.md): the manifest's `gates.push` chapter can declare `mode: blocking`
+// while nothing on disk actually enforces it at the git layer -- the hook is absent because it
+// was never offered/answered, or because it was declined. This text is what turns that from a
+// state merely PRINTED (`state: "absent"`/`"declined"`) into a state read as a GAP. Same closed
+// frame-table idiom as PRE_PUSH_HOOK_OFFER_TEXT immediately above (never a hardcoded English
+// literal, always falls back to English on an unresolved language).
+const PRE_PUSH_HOOK_GAP_TEXT = Object.freeze({
+  en: "UNBACKED GATE: this repository's manifest declares gates.push: blocking, but no git-layer pre-push hook enforces it. Anything that does not go through this session's own tool-call guard -- a spawned sub-process, a script wrapper, a human running `git push` directly -- can currently push unchecked.",
+  de: "UNGEDECKTES GATE: Das Manifest dieses Repositorys deklariert gates.push: blocking, aber kein Git-Ebene-pre-push-Hook setzt es durch. Alles, was nicht über die eigene Tool-Call-Guard dieser Sitzung läuft -- ein gestarteter Unterprozess, ein Skript-Wrapper, ein Mensch, der `git push` direkt ausführt -- kann derzeit ungeprüft pushen.",
+});
+
+/** True only when THIS repository's manifest actually declares `gates.push: blocking` --
+ * never when the manifest is absent/unreadable, or the gate is configured `warn`/`off`, or
+ * simply not configured at all: there is nothing declared for an absent hook to leave unbacked
+ * in any of those cases, so "absent" there is a plain state, not a gap. Reuses `gateConfig`
+ * (lib/manifest.mjs) -- the SAME reader `pre-push-hook-install.mjs`'s generated hook itself
+ * calls to decide its own verdict -- never a second, hand-rolled parse of the gate shape that
+ * could silently drift from what the hook actually enforces once installed. Never throws:
+ * `loadManifestSafe` already swallows every read/parse fault into `null`. */
+function isPushGateDeclaredBlocking(rootDir) {
+  return gateConfig(loadManifestSafe(rootDir), "push")?.mode === "blocking";
+}
+
 /** Never throws, never asks the CLI's own caller for a language: reads the
  * project's already-compiled manifest the same way every other operator-facing
  * surface in this codebase does (lib/manifest.mjs's `loadManifestSafe` +
@@ -444,10 +468,23 @@ function resolvePrePushHookOfferLanguage(rootDir) {
 function buildPrePushHookOfferAction({ rootDir }) {
   const plan = planPrePushHookInstall({ rootDir });
   if (plan.status === "declined") {
-    return { kind: "info", feature: "pre-push-hook", status: "declined", declinedAt: plan.declinedAt ?? null };
+    // NVA-GF-PREPUSH: the hook is absent here too (planInstall checks hook-presence
+    // BEFORE the decline marker, see its own doc comment) -- a declined offer is exactly
+    // as unbacked as an unanswered one for a repository whose manifest declares blocking.
+    const unbackedGate = isPushGateDeclaredBlocking(rootDir);
+    const language = resolvePrePushHookOfferLanguage(rootDir);
+    return {
+      kind: "info",
+      feature: "pre-push-hook",
+      status: "declined",
+      declinedAt: plan.declinedAt ?? null,
+      unbackedGate,
+      ...(unbackedGate ? { gap: PRE_PUSH_HOOK_GAP_TEXT[language] ?? PRE_PUSH_HOOK_GAP_TEXT[PRE_PUSH_HOOK_OFFER_DEFAULT_LANGUAGE] } : {}),
+    };
   }
   if (plan.status !== "ready") return null;
   const language = resolvePrePushHookOfferLanguage(rootDir);
+  const unbackedGate = isPushGateDeclaredBlocking(rootDir);
   return {
     kind: "command",
     executable: "node",
@@ -456,6 +493,14 @@ function buildPrePushHookOfferAction({ rootDir }) {
     requiresConfirmation: true,
     expected: { schema: PRE_PUSH_HOOK_MARKER_SCHEMA, statuses: ["installed"] },
     text: PRE_PUSH_HOOK_OFFER_TEXT[language] ?? PRE_PUSH_HOOK_OFFER_TEXT[PRE_PUSH_HOOK_OFFER_DEFAULT_LANGUAGE],
+    // NVA-GF-PREPUSH: `unbackedGate`/`gap` turn "never offered/declined" from a state
+    // printed as a bare fact into a state read as a currently-open enforcement gap when
+    // this repository's own manifest already declares gates.push: blocking -- exactly the
+    // "declining, or simply not answering, silently produces a repository whose gate is
+    // unenforceable" defect the backlog item names. Absent for every other repository
+    // (no manifest yet, or a non-blocking gate) -- there is nothing declared to be unbacked.
+    unbackedGate,
+    ...(unbackedGate ? { gap: PRE_PUSH_HOOK_GAP_TEXT[language] ?? PRE_PUSH_HOOK_GAP_TEXT[PRE_PUSH_HOOK_OFFER_DEFAULT_LANGUAGE] } : {}),
     declineAction: {
       kind: "command",
       executable: "node",
