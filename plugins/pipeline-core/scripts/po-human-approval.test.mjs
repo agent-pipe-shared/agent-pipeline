@@ -47,7 +47,7 @@
  * entry point.
  */
 import assert from "node:assert/strict";
-import { createHash, createPrivateKey, sign } from "node:crypto";
+import { createHash, createPrivateKey, createPublicKey, generateKeyPairSync, sign } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -81,6 +81,53 @@ function openssl(args) {
 }
 
 /**
+ * The ceremony's PRODUCTION signing path shells out to `openssl pkeyutl -sign`
+ * (po-human-approval.mjs:923) on purpose: the operator's private key is handed
+ * to openssl and never read into this process. Tests that drive a real signature
+ * therefore need the binary, and are gated on it rather than rewritten against
+ * node crypto -- reimplementing the signature here would test a different thing
+ * than the one that ships.
+ *
+ * Under CI's runner-free Core Verify the PATH holds only node/git/bash/sh, so
+ * those tests report a typed skip naming the missing tool instead of a wall of
+ * assertions that read like a broken ceremony (backlog:
+ * pipeline.core-verify-cannot-pass-under-the-ci-trimmed-path). Everything that
+ * does NOT reach the real signature -- argument parsing, fail-closed paths,
+ * confirmation cancellation, disclosure text, symlink refusals -- stays active
+ * on every host, and the fixture keypairs no longer need openssl at all.
+ */
+const opensslProbe = spawnSync("openssl", ["version"], { stdio: "pipe" });
+const REQUIRES_OPENSSL = opensslProbe.error != null || opensslProbe.status !== 0
+  ? "requires the openssl binary, which is not on PATH (the ceremony's production signing path shells out to it)"
+  : false;
+
+/**
+ * Fixture keypair generation, in exactly the encodings openssl produces:
+ * unencrypted PKCS#8 (`genpkey -algorithm ED25519`) or, with a passphrase,
+ * aes-256-cbc-encrypted PKCS#8 carrying the "ENCRYPTED PRIVATE KEY" armor that
+ * `isPrivateKeyPassphraseProtected` reads (`genpkey -aes-256-cbc`); the public
+ * half is SPKI either way (`pkey -pubout`).
+ *
+ * Generated through node:crypto rather than by shelling out, because CI's
+ * runner-free Core Verify step trims PATH to node/git/bash/sh and an openssl
+ * fixture call fails there with a bare assertion (backlog:
+ * pipeline.core-verify-cannot-pass-under-the-ci-trimmed-path). This is FIXTURE
+ * material only -- what production's `setup` generates and what `sign-intent`
+ * accepts is untouched.
+ */
+function writeEd25519KeyPair(privateKeyPath, publicKeyPath, passphrase = null) {
+  const privateKeyEncoding = passphrase === null
+    ? { type: "pkcs8", format: "pem" }
+    : { type: "pkcs8", format: "pem", cipher: "aes-256-cbc", passphrase };
+  const { privateKey, publicKey } = generateKeyPairSync("ed25519", {
+    privateKeyEncoding,
+    publicKeyEncoding: { type: "spki", format: "pem" },
+  });
+  writeFileSync(privateKeyPath, privateKey);
+  writeFileSync(publicKeyPath, publicKey);
+}
+
+/**
  * Throwaway, unencrypted, test-only Ed25519 keypair placed directly in the fixture's
  * external directory. This is fine for a test fixture only because a test cannot
  * supply an interactive passphrase; it does not change what the real `setup`
@@ -89,8 +136,7 @@ function openssl(args) {
 function keyFixture(directory) {
   const privateKey = join(directory, "po-private.pem");
   const publicKey = join(directory, "po-public.pem");
-  openssl(["genpkey", "-algorithm", "ED25519", "-out", privateKey]);
-  openssl(["pkey", "-in", privateKey, "-pubout", "-out", publicKey]);
+  writeEd25519KeyPair(privateKey, publicKey);
   const publicKeyPem = readFileSync(publicKey, "utf8");
   // `authority` stays the exact 2-key {keyReference, publicKeySha256} shape every
   // trustPolicy consumer (verifyPoApprovalProof, verifyCriticalActionApprovalRequest)
@@ -118,8 +164,7 @@ function keyFixture(directory) {
 function encryptedKeyFixture(directory, passphrase) {
   const privateKey = join(directory, "po-private.pem");
   const publicKey = join(directory, "po-public.pem");
-  openssl(["genpkey", "-algorithm", "ED25519", "-aes-256-cbc", "-pass", `pass:${passphrase}`, "-out", privateKey]);
-  openssl(["pkey", "-in", privateKey, "-passin", `pass:${passphrase}`, "-pubout", "-out", publicKey]);
+  writeEd25519KeyPair(privateKey, publicKey, passphrase);
   const privateKeyPem = readFileSync(privateKey, "utf8");
   const publicKeyPem = readFileSync(publicKey, "utf8");
   const authority = { keyReference: "sign-intent-test-key-encrypted", publicKeySha256: createHash("sha256").update(publicKeyPem).digest("hex") };
@@ -221,16 +266,36 @@ function thrown(fn) {
 /**
  * `setup`'s fresh-key-creation branch shells out to a real, interactive
  * `openssl genpkey -aes-256-cbc` that blocks on a passphrase this test cannot
- * supply. This fake `spawn` dependency intercepts only that one call and
- * generates an unencrypted key at the same `-out` path instead (fine for a
- * test-only key that is discarded with the fixture directory); the following
- * `pkey -pubout` call needs no passphrase and runs through unmodified.
+ * supply. This fake `spawn` dependency intercepts that call and generates an
+ * unencrypted key at the same `-out` path instead (fine for a test-only key that
+ * is discarded with the fixture directory).
+ *
+ * It intercepts the following `pkey -pubout` too. That call needs no passphrase
+ * and used to run through to real openssl unmodified, which made the whole test
+ * depend on the binary being installed -- and under CI's runner-free Core Verify
+ * the PATH holds only node/git/bash/sh (backlog:
+ * pipeline.core-verify-cannot-pass-under-the-ci-trimmed-path). Deriving the
+ * public half in-process is the same operation on the same key material, so the
+ * interception widens by one command without weakening what is exercised: what
+ * `setup` itself does with the resulting files is untouched.
  */
 function fakeSetupSpawn(executable, args) {
   if (executable === "openssl" && args[0] === "genpkey") {
     const outIndex = args.indexOf("-out");
-    const result = spawnSync("openssl", ["genpkey", "-algorithm", "ED25519", "-out", args[outIndex + 1]], { stdio: "pipe" });
-    return { status: result.status };
+    const { privateKey } = generateKeyPairSync("ed25519", {
+      privateKeyEncoding: { type: "pkcs8", format: "pem" },
+      publicKeyEncoding: { type: "spki", format: "pem" },
+    });
+    writeFileSync(args[outIndex + 1], privateKey);
+    return { status: 0 };
+  }
+  if (executable === "openssl" && args[0] === "pkey" && args.includes("-pubout")) {
+    const inPath = args[args.indexOf("-in") + 1];
+    const outPath = args[args.indexOf("-out") + 1];
+    const publicKey = createPublicKey(createPrivateKey(readFileSync(inPath, "utf8")))
+      .export({ type: "spki", format: "pem" });
+    writeFileSync(outPath, publicKey);
+    return { status: 0 };
   }
   const result = spawnSync(executable, args, { stdio: "pipe" });
   return { status: result.status };
@@ -347,7 +412,7 @@ test("sign-intent rejects an invalid --intent-sha256 (wrong length / non-hex)", 
   }
 });
 
-test("sign-intent signs a digest end-to-end with a real OpenSSL round trip and the proof verifies, after an accepted confirmation naming the digest", () => {
+test("sign-intent signs a digest end-to-end with a real OpenSSL round trip and the proof verifies, after an accepted confirmation naming the digest", { skip: REQUIRES_OPENSSL }, () => {
   const dirs = fixtureDirs();
   try {
     const { publicKeyPem, authority } = keyFixture(dirs.directory);
@@ -410,7 +475,7 @@ test("sign-intent signs a digest end-to-end with a real OpenSSL round trip and t
 // -- reading the digest straight out of this repository's own scratch/ tree and mirroring
 // the resulting proof/signer back into scratch/ next to the request, so the requesting
 // agent session finds them on its own next turn with no PO-run copy step in between.
-test("NVA-SWEEP-F2: sign-intent --request reads the digest from a repo-root scratch/ file and mirrors the proof/signer back into scratch/ next to it, with no external-directory copy in between", () => {
+test("NVA-SWEEP-F2: sign-intent --request reads the digest from a repo-root scratch/ file and mirrors the proof/signer back into scratch/ next to it, with no external-directory copy in between", { skip: REQUIRES_OPENSSL }, () => {
   const dirs = fixtureDirs();
   try {
     const { authority } = keyFixture(dirs.directory);
@@ -533,7 +598,7 @@ test("NVA-SWEEP-F2: sign-intent --request fails closed on malformed JSON, a miss
 // tmpdir, never `dirs.repoRoot`/`dirs.directory`), so each test removes that tmpdir
 // itself in its own `finally` -- `cleanup()` only knows about the two `fixtureDirs()`
 // paths and would otherwise leave a dangling symlink target behind.
-test("NVA-SWEEP-F2f-REWORK: sign-intent --request refuses to follow a symlink planted at the derived scratch proof/signer sibling path", () => {
+test("NVA-SWEEP-F2f-REWORK: sign-intent --request refuses to follow a symlink planted at the derived scratch proof/signer sibling path", { skip: REQUIRES_OPENSSL }, () => {
   const dirs = fixtureDirs();
   const outsideDir = mkdtempSync(join(tmpdir(), "po-sign-intent-outside-target-"));
   try {
@@ -626,7 +691,7 @@ test("NVA-SWEEP-F2f-REWORK: sign-intent rejects a malformed --intent-sha256 supp
   }
 });
 
-test("NVA-SIGDISCLOSE-1 Finding 3: sign-intent reports a missing --human-name specifically, distinct from a genuine key mismatch, when the trust-policy record predates --human-name but the key itself is correct", () => {
+test("NVA-SIGDISCLOSE-1 Finding 3: sign-intent reports a missing --human-name specifically, distinct from a genuine key mismatch, when the trust-policy record predates --human-name but the key itself is correct", { skip: REQUIRES_OPENSSL }, () => {
   const dirs = fixtureDirs();
   try {
     legacyKeyFixture(dirs.directory); // writes {keyReference, publicKeySha256} only, no humanName -- the SAME key sign-intent will use
@@ -645,15 +710,14 @@ test("NVA-SIGDISCLOSE-1 Finding 3: sign-intent reports a missing --human-name sp
   }
 });
 
-test("NVA-SIGDISCLOSE-1 Finding 3: sign-intent still reports a genuine key-digest mismatch as a mismatch, not as a missing --human-name", () => {
+test("NVA-SIGDISCLOSE-1 Finding 3: sign-intent still reports a genuine key-digest mismatch as a mismatch, not as a missing --human-name", { skip: REQUIRES_OPENSSL }, () => {
   const dirs = fixtureDirs();
   try {
     keyFixture(dirs.directory); // writes a NAMED trust-policy.json (humanName: "Test Operator") for one key...
     const otherPrivateKey = join(dirs.directory, "po-private.pem");
     // ...but the private key on disk is now regenerated, so it no longer matches the
     // publicKeySha256 the trust-policy.json record was written against.
-    openssl(["genpkey", "-algorithm", "ED25519", "-out", otherPrivateKey]);
-    openssl(["pkey", "-in", otherPrivateKey, "-pubout", "-out", join(dirs.directory, "po-public.pem")]);
+    writeEd25519KeyPair(otherPrivateKey, join(dirs.directory, "po-public.pem"));
     const intentSha256 = createHash("sha256").update("pipeline.sigdisclose-f3-mismatch-fixture").digest("hex");
     const dependencies = { readConfirmation: () => "approve" };
     const error = thrown(() => runHumanApproval(
@@ -876,7 +940,7 @@ const forkArgs = (dirs, extra = []) => [
   ...extra,
 ];
 
-test("a fork-disposition request built by the CLI, signed with the PO key, is accepted by the store's own verifier", async () => {
+test("a fork-disposition request built by the CLI, signed with the PO key, is accepted by the store's own verifier", { skip: REQUIRES_OPENSSL }, async () => {
   const dirs = await forkedRepositoryFixture();
   try {
     const { authority } = keyFixture(dirs.directory);
@@ -931,7 +995,7 @@ test("a fork-disposition request built by the CLI, signed with the PO key, is ac
   }
 });
 
-test("the fork-disposition commands refuse every self-minting shortcut", async () => {
+test("the fork-disposition commands refuse every self-minting shortcut", { skip: REQUIRES_OPENSSL }, async () => {
   const dirs = await forkedRepositoryFixture();
   try {
     // A bare subject digest or a caller-chosen kind is exactly what ADR-0072 closes.
@@ -1019,7 +1083,7 @@ test("prepare-critical keeps composing push/deploy/publication requests exactly 
   }
 });
 
-test("the -critical trio refuses the fork-disposition kind, so no operator route can build the unverifiable request or overwrite the correct one", async () => {
+test("the -critical trio refuses the fork-disposition kind, so no operator route can build the unverifiable request or overwrite the correct one", { skip: REQUIRES_OPENSSL }, async () => {
   const dirs = await forkedRepositoryFixture();
   try {
     writeFileSync(join(dirs.repoRoot, "plan.md"), "plan bytes\n");
@@ -1074,7 +1138,7 @@ test("the -critical trio refuses the fork-disposition kind, so no operator route
   }
 });
 
-test("po-approval-gate.mjs drives the public half of the fork-disposition ceremony, and only the public half", async () => {
+test("po-approval-gate.mjs drives the public half of the fork-disposition ceremony, and only the public half", { skip: REQUIRES_OPENSSL }, async () => {
   const dirs = await forkedRepositoryFixture();
   try {
     const { authority } = keyFixture(dirs.directory);
@@ -1189,7 +1253,7 @@ test("setup's already-exists branch still fails closed on an unrelated extra fie
   }
 });
 
-test("sign-intent accepts a 3-key trust policy carrying humanName", () => {
+test("sign-intent accepts a 3-key trust policy carrying humanName", { skip: REQUIRES_OPENSSL }, () => {
   const dirs = fixtureDirs();
   try {
     const { authority } = keyFixture(dirs.directory);
@@ -1204,7 +1268,7 @@ test("sign-intent accepts a 3-key trust policy carrying humanName", () => {
   }
 });
 
-test("sign-intent still fails closed on an unrelated extra field (not humanName)", () => {
+test("sign-intent still fails closed on an unrelated extra field (not humanName)", { skip: REQUIRES_OPENSSL }, () => {
   const dirs = fixtureDirs();
   try {
     const { authority } = keyFixture(dirs.directory);
@@ -1219,7 +1283,7 @@ test("sign-intent still fails closed on an unrelated extra field (not humanName)
   }
 });
 
-test("approve-critical accepts a 3-key trust policy carrying humanName and the confirmation summary names the intent digest (fix 3)", () => {
+test("approve-critical accepts a 3-key trust policy carrying humanName and the confirmation summary names the intent digest (fix 3)", { skip: REQUIRES_OPENSSL }, () => {
   const dirs = fixtureDirs();
   try {
     writeFileSync(join(dirs.repoRoot, "plan.md"), "plan bytes\n");
@@ -1321,7 +1385,7 @@ function criticalArtifacts(dirs, kind = "push") {
   };
 }
 
-test("authorize-critical prepares and signs in ONE invocation, and the proof is bound to the request built in that same invocation", () => {
+test("authorize-critical prepares and signs in ONE invocation, and the proof is bound to the request built in that same invocation", { skip: REQUIRES_OPENSSL }, () => {
   const dirs = criticalDirs();
   try {
     const { authority } = keyFixture(dirs.directory);
@@ -1396,7 +1460,7 @@ test("authorize-critical prepares and signs in ONE invocation, and the proof is 
   }
 });
 
-test("authorize-critical states what it is about to authorize -- and what it does not cover -- before the passphrase prompt", () => {
+test("authorize-critical states what it is about to authorize -- and what it does not cover -- before the passphrase prompt", { skip: REQUIRES_OPENSSL }, () => {
   const dirs = criticalDirs();
   try {
     keyFixture(dirs.directory);
@@ -1440,7 +1504,7 @@ const RELEASE_PREFLIGHT_SUBJECT = Object.freeze({
   retentionPolicySha256: "2".repeat(64),
 });
 
-test("authorize-critical --kind release-preflight with --subject derives --subject-sha256 and shows the decoded subject plus the kind-specific scope sentence", () => {
+test("authorize-critical --kind release-preflight with --subject derives --subject-sha256 and shows the decoded subject plus the kind-specific scope sentence", { skip: REQUIRES_OPENSSL }, () => {
   const dirs = criticalDirs();
   try {
     keyFixture(dirs.directory);
@@ -1498,7 +1562,7 @@ test("authorize-critical --subject refuses a --subject-sha256 that disagrees wit
   }
 });
 
-test("authorize-critical --kind release-preflight without --subject still states the kind-specific scope sentence, undecoded", () => {
+test("authorize-critical --kind release-preflight without --subject still states the kind-specific scope sentence, undecoded", { skip: REQUIRES_OPENSSL }, () => {
   const dirs = criticalDirs();
   try {
     keyFixture(dirs.directory);
@@ -1516,7 +1580,7 @@ test("authorize-critical --kind release-preflight without --subject still states
   }
 });
 
-test("authorize-critical --subject is kind-agnostic: it works unchanged for --kind push too", () => {
+test("authorize-critical --subject is kind-agnostic: it works unchanged for --kind push too", { skip: REQUIRES_OPENSSL }, () => {
   const dirs = criticalDirs();
   try {
     keyFixture(dirs.directory);
@@ -1569,7 +1633,7 @@ test("authorize-critical aborts on an input failure before the prompt and before
   }
 });
 
-test("authorize-critical never signs a stale request left in the external directory: it prepares its own and binds to that one", () => {
+test("authorize-critical never signs a stale request left in the external directory: it prepares its own and binds to that one", { skip: REQUIRES_OPENSSL }, () => {
   const dirs = criticalDirs();
   try {
     const { authority } = keyFixture(dirs.directory);
@@ -1790,7 +1854,7 @@ test("GF-080 Gap B: --expires-at accepts any parseable ISO-8601 timestamp and no
   }
 });
 
-test("the two-invocation prepare-critical + approve-critical flow is unchanged and still yields a verifiable proof", () => {
+test("the two-invocation prepare-critical + approve-critical flow is unchanged and still yields a verifiable proof", { skip: REQUIRES_OPENSSL }, () => {
   const dirs = criticalDirs();
   try {
     const { authority } = keyFixture(dirs.directory);
@@ -1922,7 +1986,7 @@ function armHgoRequest(repoRoot, toolInput) {
   return { requestSha256: recorded.requestSha256, planSha256: plan.planSha256, intent };
 }
 
-test("NVA-SIGENTRY-1: sign-intent resolves an HGO signature-mode intent digest and shows its eligible paths, denying rationale and expiry", () => {
+test("NVA-SIGENTRY-1: sign-intent resolves an HGO signature-mode intent digest and shows its eligible paths, denying rationale and expiry", { skip: REQUIRES_OPENSSL }, () => {
   const dirs = hgoFixtureDirs();
   try {
     keyFixture(dirs.directory);
@@ -1949,7 +2013,7 @@ test("NVA-SIGENTRY-1: sign-intent resolves an HGO signature-mode intent digest a
   }
 });
 
-test("NVA-SIGENTRY-1: a digest resolving to neither a GMW request nor an HGO request still falls into the honest fallback, unchanged", () => {
+test("NVA-SIGENTRY-1: a digest resolving to neither a GMW request nor an HGO request still falls into the honest fallback, unchanged", { skip: REQUIRES_OPENSSL }, () => {
   const dirs = hgoFixtureDirs();
   try {
     keyFixture(dirs.directory);
@@ -1973,7 +2037,7 @@ test("NVA-SIGENTRY-1: a digest resolving to neither a GMW request nor an HGO req
   }
 });
 
-test("sign-intent states the reason, scope and expiry of the request recorded behind the digest", () => {
+test("sign-intent states the reason, scope and expiry of the request recorded behind the digest", { skip: REQUIRES_OPENSSL }, () => {
   const dirs = windowFixture();
   try {
     keyFixture(dirs.directory);
@@ -2003,7 +2067,7 @@ test("sign-intent states the reason, scope and expiry of the request recorded be
   }
 });
 
-test("sign-intent says so plainly when no record resolves for the digest, and invents nothing", () => {
+test("sign-intent says so plainly when no record resolves for the digest, and invents nothing", { skip: REQUIRES_OPENSSL }, () => {
   const dirs = windowFixture();
   try {
     keyFixture(dirs.directory);
@@ -2024,7 +2088,7 @@ test("sign-intent says so plainly when no record resolves for the digest, and in
   }
 });
 
-test("a tampered record cannot change what is signed: the summary disappears, the digest does not", () => {
+test("a tampered record cannot change what is signed: the summary disappears, the digest does not", { skip: REQUIRES_OPENSSL }, () => {
   const dirs = windowFixture();
   try {
     const { authority } = keyFixture(dirs.directory);
@@ -2053,7 +2117,7 @@ test("a tampered record cannot change what is signed: the summary disappears, th
   }
 });
 
-test("the disclosure stays bounded: an oversized reason and scope cannot flood or forge the prompt", () => {
+test("the disclosure stays bounded: an oversized reason and scope cannot flood or forge the prompt", { skip: REQUIRES_OPENSSL }, () => {
   const dirs = windowFixture();
   try {
     keyFixture(dirs.directory);
@@ -2184,7 +2248,7 @@ test("an unsafe directory fed through PIPELINE_PO_APPROVAL_DIRECTORY is refused 
   }
 });
 
-test("PIPELINE_PO_APPROVAL_DIRECTORY runs a full sign-intent ceremony exactly like the same value passed via --directory", () => {
+test("PIPELINE_PO_APPROVAL_DIRECTORY runs a full sign-intent ceremony exactly like the same value passed via --directory", { skip: REQUIRES_OPENSSL }, () => {
   // Deliberately NOT `setup`: that subcommand's real branch shells out to
   // `openssl genpkey -aes-256-cbc`, which blocks on an interactive passphrase
   // prompt with no dependency-injection seam in this suite (every other test in
@@ -2323,7 +2387,7 @@ test("AC-14: a plane-sourced directory runs through the identical unsafe-directo
   }
 });
 
-test("AC-11/AC-14: a full sign-intent ceremony resolved entirely from the machine plane's poKeyDirectory behaves exactly like the same directory passed via --directory", () => {
+test("AC-11/AC-14: a full sign-intent ceremony resolved entirely from the machine plane's poKeyDirectory behaves exactly like the same directory passed via --directory", { skip: REQUIRES_OPENSSL }, () => {
   const dirs = fixtureDirs();
   const home = machinePlaneHomeFixture(dirs.directory);
   try {
@@ -2368,7 +2432,7 @@ function repoScopeStorePath(gitCommonDir) {
   return join(gitCommonDir, "agent-pipeline", "po-key-directory.json");
 }
 
-test("PO-KEYDIR-01(A): setup with an explicit --directory persists it into the REPO-SCOPED store (not the machine plane); a later command in the SAME repo resolves it without repeating --directory; the SAME command in a DIFFERENT repo (different git-common-dir) does NOT inherit it", () => {
+test("PO-KEYDIR-01(A): setup with an explicit --directory persists it into the REPO-SCOPED store (not the machine plane); a later command in the SAME repo resolves it without repeating --directory; the SAME command in a DIFFERENT repo (different git-common-dir) does NOT inherit it", { skip: REQUIRES_OPENSSL }, () => {
   const dirs = fixtureDirs();
   const home = noMachinePlaneHomeFixture();
   const otherRepo = mkdtempSync(join(tmpdir(), "po-gapA-other-repo-"));
@@ -2617,8 +2681,7 @@ test("GF-104: setup against an existing named authority record stays unchanged (
 function legacyKeyFixture(directory) {
   const privateKey = join(directory, "po-private.pem");
   const publicKey = join(directory, "po-public.pem");
-  openssl(["genpkey", "-algorithm", "ED25519", "-out", privateKey]);
-  openssl(["pkey", "-in", privateKey, "-pubout", "-out", publicKey]);
+  writeEd25519KeyPair(privateKey, publicKey);
   const publicKeyPem = readFileSync(publicKey, "utf8");
   const authority = { keyReference: "legacy-test-key", publicKeySha256: createHash("sha256").update(publicKeyPem).digest("hex") };
   writeFileSync(join(directory, "trust-policy.json"), `${JSON.stringify(authority, null, 2)}\n`);
@@ -2692,7 +2755,7 @@ test("GF-112: setup still fails with the original message for a legacy-shape rec
  * unsuffixed.
  * ------------------------------------------------------------------ */
 
-test("PO-KEYDIR-01(B): two repositories sharing one external directory and the same feature id get DISJOINT request/proof/signer filenames (repository-fingerprint segment), while the shared key/authority filenames stay UNCHANGED and usable by both", () => {
+test("PO-KEYDIR-01(B): two repositories sharing one external directory and the same feature id get DISJOINT request/proof/signer filenames (repository-fingerprint segment), while the shared key/authority filenames stay UNCHANGED and usable by both", { skip: REQUIRES_OPENSSL }, () => {
   const directory = mkdtempSync(join(tmpdir(), "po-fingerprint-shared-external-"));
   const dirsA = { repoRoot: mkdtempSync(join(tmpdir(), "po-fingerprint-repo-a-")), directory };
   const dirsB = { repoRoot: mkdtempSync(join(tmpdir(), "po-fingerprint-repo-b-")), directory };
@@ -2862,7 +2925,7 @@ function stateFixture(repoRoot, { language, raw } = {}) {
 const GERMAN_FRAME = /PO-FREIGABE BESTÄTIGEN/u;
 const ENGLISH_FRAME = /PO APPROVAL CONFIRMATION/u;
 
-test("NVA-BL-74: a repository configured for `de` gets the German prompt frame, while the typed token stays the English constant and the signature is produced exactly as before", () => {
+test("NVA-BL-74: a repository configured for `de` gets the German prompt frame, while the typed token stays the English constant and the signature is produced exactly as before", { skip: REQUIRES_OPENSSL }, () => {
   const dirs = fixtureDirs();
   try {
     const { authority } = keyFixture(dirs.directory);
@@ -2919,7 +2982,7 @@ test("NVA-BL-74: cancellation semantics are unchanged under the German prompt --
   }
 });
 
-test("NVA-BL-74: English is the hard fallback -- an absent, unrecognised, malformed or unreadable language value still produces a complete English prompt, never no prompt", () => {
+test("NVA-BL-74: English is the hard fallback -- an absent, unrecognised, malformed or unreadable language value still produces a complete English prompt, never no prompt", { skip: REQUIRES_OPENSSL }, () => {
   const scenarios = [
     { label: "no project-state artifact at all", prepare: () => {} },
     { label: "an unrecognised language value", prepare: (repoRoot) => stateFixture(repoRoot, { language: "fr" }) },
@@ -2954,7 +3017,7 @@ test("NVA-BL-74: English is the hard fallback -- an absent, unrecognised, malfor
   }
 });
 
-test("NVA-BL-74: the language selects only the frame -- the `de` and `en` prompts carry identical summary data lines and identical accepted-token semantics", () => {
+test("NVA-BL-74: the language selects only the frame -- the `de` and `en` prompts carry identical summary data lines and identical accepted-token semantics", { skip: REQUIRES_OPENSSL }, () => {
   const rendered = {};
   for (const language of ["de", "en"]) {
     const dirs = fixtureDirs();
@@ -3031,7 +3094,7 @@ test("NVA-WINPATH-1: outside() behavior on POSIX hosts is unchanged by the platf
   }
 });
 
-test("authorize-critical prepares and signs in ONE invocation, and the resulting proof verifies against the request built in that same invocation", () => {
+test("authorize-critical prepares and signs in ONE invocation, and the resulting proof verifies against the request built in that same invocation", { skip: REQUIRES_OPENSSL }, () => {
   const dirs = fixtureDirs();
   try {
     writeFileSync(join(dirs.repoRoot, "plan.md"), "plan bytes\n");
@@ -3085,7 +3148,7 @@ test("authorize-critical prepares and signs in ONE invocation, and the resulting
  * "publication": this test is the "publication" twin of "authorize-critical prepares
  * and signs in ONE invocation..." above, same assertions, same shape.
  * ------------------------------------------------------------------------- */
-test("authorize-critical round-trips kind publication exactly like push: one invocation prepares and signs, and the proof verifies against the request built in that same call", () => {
+test("authorize-critical round-trips kind publication exactly like push: one invocation prepares and signs, and the proof verifies against the request built in that same call", { skip: REQUIRES_OPENSSL }, () => {
   const dirs = fixtureDirs();
   try {
     writeFileSync(join(dirs.repoRoot, "plan.md"), "plan bytes\n");
@@ -3127,7 +3190,7 @@ test("authorize-critical round-trips kind publication exactly like push: one inv
   }
 });
 
-test("authorize-critical never signs a stale request left in the external directory: it overwrites it with the request it just built and signs THAT one (the failure mode ADR-0061 removes)", () => {
+test("authorize-critical never signs a stale request left in the external directory: it overwrites it with the request it just built and signs THAT one (the failure mode ADR-0061 removes)", { skip: REQUIRES_OPENSSL }, () => {
   const dirs = fixtureDirs();
   try {
     writeFileSync(join(dirs.repoRoot, "plan.md"), "plan bytes\n");

@@ -12,8 +12,31 @@ import { fileURLToPath } from "node:url";
 import { CONTROL_DECOMPOSITION_POLICY, buildNativeProbeProgram, parseProbeResult, resolveCodexBinary, runControlDecomposition, toolFreeJsonl } from "./codex-isolation-control-decomposition.mjs";
 
 let passed = 0;
+let skipped = 0;
 function check(name, fn) { fn(); passed += 1; process.stdout.write(`PASS  ${name}\n`); }
+function skip(name, reason) { skipped += 1; process.stdout.write(`SKIP  ${name} -- ${reason}\n`); }
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+
+/**
+ * `runControlDecomposition` accepts an injected `spawn`, so the check below never
+ * executes Codex -- but it calls `resolveCodexBinary()` with no `pathEnv`, so the
+ * real PATH is read and the call rejects when the binary is absent. Threading a
+ * test-supplied `pathEnv` down through `runControlDecomposition` is deliberately
+ * NOT done here: what that resolution produces (`sameBinary`, `binarySha256`) is
+ * the attestation the control decomposition exists to make, and an attestation
+ * whose binary is chosen by its caller attests to less than one that resolves its
+ * own. That is a design change for the isolation control to decide, not a
+ * side effect of making a check runnable.
+ *
+ * So the check is gated on Codex actually being installed. It stays live on any
+ * machine that has it -- 5/5 locally -- and reports a typed skip where it is
+ * absent: notably CI's runner-free Core Verify, whose PATH holds only
+ * node/git/bash/sh, and where a GitHub runner has no Codex CLI at all anyway
+ * (backlog: pipeline.core-verify-cannot-pass-under-the-ci-trimmed-path).
+ */
+async function codexBinaryAvailable() {
+  try { await resolveCodexBinary(); return true; } catch { return false; }
+}
 
 check("native probe program deterministically carries both denied write categories", () => {
   const program = buildNativeProbeProgram();
@@ -76,6 +99,11 @@ function fakeSpawn() {
 }
 
 await (async () => {
+  if (!await codexBinaryAvailable()) {
+    skip("same resolved binary binds deterministic probe and tool-free final critic",
+      "the Codex binary is not on PATH, and runControlDecomposition resolves it for real");
+    return;
+  }
   const head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
   const result = await runControlDecomposition({
     repoRoot: root, candidateCommit: head,
@@ -92,4 +120,4 @@ await (async () => {
   });
 })();
 
-process.stdout.write(`\n${passed}/${passed} checks passed.\n`);
+process.stdout.write(`\n${passed}/${passed} checks passed${skipped > 0 ? `, ${skipped} skipped` : ""}.\n`);

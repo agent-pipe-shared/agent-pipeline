@@ -573,7 +573,18 @@ test("a remote git process that ignores SIGTERM still settles within timeoutMs, 
   const timeoutMs = 200;
   const spawn = (command, args, opts) => {
     if (args.includes("ls-remote")) {
-      return spawnSync("bash", ["-c", "trap '' TERM; sleep 3"], opts);
+      // Ignores SIGTERM and stays alive ~3s, which is the only property this
+      // fixture needs. Spawned through process.execPath rather than
+      // `bash -c "trap '' TERM; sleep 3"` because CI's runner-free Core Verify
+      // step trims PATH to node/git/bash/sh: without `sleep` the child exited
+      // immediately, so the call returned "remote-unavailable" and the assertion
+      // below read as a real regression (backlog:
+      // pipeline.core-verify-cannot-pass-under-the-ci-trimmed-path).
+      return spawnSync(
+        process.execPath,
+        ["-e", "process.on('SIGTERM', () => {}); setTimeout(() => {}, 3000);"],
+        opts,
+      );
     }
     return spawnSync(command, args, opts);
   };
