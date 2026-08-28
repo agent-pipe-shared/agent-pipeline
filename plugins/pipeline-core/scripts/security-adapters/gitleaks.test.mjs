@@ -129,13 +129,14 @@ test("run() always passes --no-git to `gitleaks detect`, keeping every existing 
 // missing --config path.
 // ===============================================================================================
 
-test("gitleaksConfigMissingResult() returns an ERROR/config_missing result naming the missing path", () => {
-  const result = gitleaksConfigMissingResult("/nonexistent/marketplace-root/.gitleaks.toml");
-  assert.equal(result.status, "ERROR");
-  assert.equal(result.classification, "config_missing");
+test("gitleaksConfigMissingResult() returns a SKIPPED/success result naming both missing paths (NVA-J-GITLEAKSCONFIG: never a blocking ERROR)", () => {
+  const result = gitleaksConfigMissingResult("/nonexistent/marketplace-root/.gitleaks.toml", "/nonexistent/marketplace-root/plugins/pipeline-core/config/security/gitleaks-default.toml");
+  assert.equal(result.status, "SKIPPED");
+  assert.equal(result.classification, "success", "classification must be 'success' -- security-scan.mjs's scannerEntry() defaults an unclassified SKIPPED to scanner_error otherwise");
   assert.deepEqual(result.findings, []);
   assert.equal(result.raw, null);
   assert.match(result.reason, /\/nonexistent\/marketplace-root\/\.gitleaks\.toml/);
+  assert.match(result.reason, /\/nonexistent\/marketplace-root\/plugins\/pipeline-core\/config\/security\/gitleaks-default\.toml/);
 });
 
 test("run() short-circuits to gitleaksConfigMissingResult() BEFORE spawning gitleaks when GITLEAKS_CONFIG_PATH is absent (hermetic: fixture binaryPath points at a real, but config-less, sibling dir)", async () => {

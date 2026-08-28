@@ -16,11 +16,15 @@
  * the optional `env` param (defaults to `process.env`) -- this lets a unit test call run()
  * in isolation with a fixture env object, without needing the runner's glue.
  *
- * INVOCATION: `gitleaks detect --source <root> --no-git --config <repo-root>/.gitleaks.toml
+ * INVOCATION: `gitleaks detect --source <root> --no-git --config <resolved-config-path>
  * --report-format json --report-path <tmp> --no-banner --exit-code 0`. `--config` (PHX-WP-
- * GITLEAKS-RULE-SCOPE) always points at the fixed, repo-root `.gitleaks.toml` resolved from THIS
- * MODULE's own on-disk location (see `GITLEAKS_CONFIG_PATH` below), never from `rootDir` -- that
- * file `[extend]`s gitleaks' full built-in ruleset (`useDefault = true`) and adds a narrow,
+ * GITLEAKS-RULE-SCOPE) points at a config resolved from THIS MODULE's own on-disk location,
+ * never from `rootDir`: the repo-root `.gitleaks.toml` when this module runs from inside the
+ * Agent-Pipeline repo's own checkout (self-application scope), else the plugin-shipped default
+ * at `config/security/gitleaks-default.toml` (NVA-J-GITLEAKSCONFIG; see
+ * `resolveGitleaksConfigPath()` below) -- an installed-plugin deployment ships that file but not
+ * the repo root, so it now finds a real config instead of degrading to a blocking ERROR. That
+ * config `[extend]`s gitleaks' full built-in ruleset (`useDefault = true`) and adds a narrow,
  * path-scoped allowlist that disables ONLY `sentry-access-token`/`generic-api-key` for
  * `backlog/transitions.ndjson` and `backlog/transitions-phoenix-history.ndjson` (both hash-chained
  * ledgers' bare-hex-digest false positives --
@@ -108,19 +112,45 @@ const MAX_IGNORE_BYTES = 256 * 1024;
 // `../../../../.gitleaks.toml` from this file's own directory is the repo root's config,
 // regardless of what `rootDir` points at for any given run.
 //
-// SCOPE LIMITATION (RW2-GITLEAKSCONFIG, 2026-08-27): this resolution is self-application-scoped
-// (ADR-0015) -- it only finds `.gitleaks.toml` when this module executes from ITS canonical
-// position inside the Agent-Pipeline repo's own checkout, which is where the file actually
-// ships today. A plugin distribution/marketplace install that carries only `plugins/` (no repo
-// root, no `.gitleaks.toml`) will not have the file at the resolved path; `run()` below detects
-// that explicitly (`gitleaksConfigMissingResult`) rather than letting gitleaks itself fail
-// opaquely. Mirrors the same accepted, documented scoping this file's sibling adapter code takes
-// for `semgrep.rules_dir` in security-scan.mjs ("repo-root is sufficient for every DoD case
-// class" -- flagged as an open item, not solved here): making `.gitleaks.toml` ship inside the
-// plugin package itself, or otherwise portable across deployment topologies, is a packaging
-// decision with ripple effects on other consumers of the repo-root file, not a single adapter
-// fix -- left as an explicit, documented limitation rather than decided unilaterally here.
+// SCOPE + FALLBACK (RW2-GITLEAKSCONFIG 2026-08-27, superseded by NVA-J-GITLEAKSCONFIG
+// 2026-08-28): GITLEAKS_CONFIG_PATH resolution is self-application-scoped (ADR-0015) -- it only
+// finds `.gitleaks.toml` when this module executes from ITS canonical position inside the
+// Agent-Pipeline repo's own checkout, which is where that file actually ships today. A plugin
+// distribution/marketplace install that carries only `plugins/` (no repo root, no
+// `.gitleaks.toml` alongside it) does not have this file at the resolved path -- previously
+// (RW2-GITLEAKSCONFIG) that meant a blocking ERROR (`config_missing`) for every such deployment,
+// which is every consumer that installed the plugin rather than cloning this repo
+// (backlog/items/2026-08-28-the-push-gate-is-unsatisfiable-in-any-installed-plugin-deployment.md).
+// GITLEAKS_PLUGIN_DEFAULT_CONFIG_PATH below is the fix: a second candidate, resolved the same
+// self-application way but three directories up (the plugin root) rather than four (the repo
+// root), pointing at a config this plugin package ships itself. `resolveGitleaksConfigPath()`
+// tries the repo-root path FIRST (preserves this repo's own exact behavior unchanged -- same
+// file, same rules) and only falls back to the plugin-shipped default when that is absent. If
+// somehow NEITHER resolves, `run()` degrades to SKIPPED (never ERROR; see
+// `gitleaksConfigMissingResult()`) rather than blocking a push on a scanner that could not even
+// find a ruleset to run -- the same SKIPPED-as-success shape `osv-scanner`/`license-check`
+// already use for their own absent-input cases.
 const GITLEAKS_CONFIG_PATH = pathJoin(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..", ".gitleaks.toml");
+// Plugin-shipped default (NVA-J-GITLEAKSCONFIG): three directories up from this module's own
+// directory is the plugin root (`plugins/pipeline-core/`), mirroring the exact convention
+// `security-scan.mjs`'s `DEFAULT_SEMGREP_RULES_PATH`/`DEFAULT_LICENSE_ALLOWLIST_PATH` already use
+// for their own plugin-shipped defaults under `config/security/`. This file is a byte-for-byte
+// mirror of the repo-root `.gitleaks.toml` (see that file's own header) -- an installed consumer
+// gets the identical ruleset, including the ledger allowlist, which simply never matches
+// anything there.
+const GITLEAKS_PLUGIN_DEFAULT_CONFIG_PATH = pathJoin(dirname(fileURLToPath(import.meta.url)), "..", "..", "config", "security", "gitleaks-default.toml");
+
+/**
+ * Repo-root config first (self-application scope, unchanged priority/behavior for this repo's
+ * own checkout), else the plugin-shipped default (NVA-J-GITLEAKSCONFIG), else `null` when
+ * neither exists anywhere. NEVER considers `rootDir` -- the candidate tree must not be able to
+ * supply its own scanner-config override (see the constants' doc comments above).
+ */
+export function resolveGitleaksConfigPath() {
+  if (existsSync(GITLEAKS_CONFIG_PATH)) return GITLEAKS_CONFIG_PATH;
+  if (existsSync(GITLEAKS_PLUGIN_DEFAULT_CONFIG_PATH)) return GITLEAKS_PLUGIN_DEFAULT_CONFIG_PATH;
+  return null;
+}
 
 function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
@@ -301,23 +331,28 @@ function spawnFailure(error) {
 }
 
 /**
- * Explicit, honest failure result for a missing `.gitleaks.toml` (RW2-GITLEAKSCONFIG): returned
- * by `run()` BEFORE it ever spawns gitleaks, so a self-application-scope-only deployment (see
- * GITLEAKS_CONFIG_PATH doc comment above) fails with a specific, actionable diagnostic instead
- * of an opaque generic `scanner_error` produced by letting gitleaks itself choke on a `--config`
- * path that does not exist. Still ERROR-classified (blocking-class, same fail-closed exit-code
- * policy security-scan.mjs already applies to every ERROR status) -- this changes only the
- * clarity of the diagnostic, never the blocking outcome. Exported so it is directly unit-testable
- * without needing to fabricate a real missing-file deployment inside this repo's own checkout,
- * where GITLEAKS_CONFIG_PATH always resolves successfully.
+ * Explicit, honest SKIPPED-as-success result for the case where NEITHER the repo-root
+ * `.gitleaks.toml` NOR the plugin-shipped default resolved (NVA-J-GITLEAKSCONFIG; supersedes
+ * RW2-GITLEAKSCONFIG's ERROR/config_missing behavior): returned by `run()` BEFORE it ever spawns
+ * gitleaks. Since the plugin package now ships its own default (GITLEAKS_PLUGIN_DEFAULT_CONFIG_PATH,
+ * config/security/gitleaks-default.toml), this branch should be unreachable for any deployment
+ * that actually carries `plugins/pipeline-core/` intact -- it exists as a fail-safe for a
+ * corrupted/stripped install, not as the normal installed-plugin path. `classification: "success"`
+ * is load-bearing exactly as it is for `osv-scanner`/`license-check`'s own absent-input SKIPPED
+ * results: without it, security-scan.mjs's `scannerEntry` would default an unclassified SKIPPED
+ * to `scanner_error`. SKIPPED never contributes to security-scan.mjs's `hasErrorClass` blocking
+ * check (only ERROR does), so this never blocks a push -- the whole point of this fix (a
+ * correctly-signed push must be able to land in every installed-plugin deployment). Exported so
+ * it is directly unit-testable without needing to fabricate a real missing-file deployment inside
+ * this repo's own checkout, where GITLEAKS_CONFIG_PATH always resolves successfully.
  */
-export function gitleaksConfigMissingResult(configPath) {
+export function gitleaksConfigMissingResult(primaryPath, fallbackPath) {
   return {
-    status: "ERROR",
-    classification: "config_missing",
+    status: "SKIPPED",
+    classification: "success",
     findings: [],
     raw: null,
-    reason: `gitleaks config not found at ${configPath} -- resolved relative to this adapter module's own on-disk location (self-application scope, PHX-WP-GITLEAKS-RULE-SCOPE); an installed-plugin deployment outside this repository's own checkout will not have .gitleaks.toml at the resolved path (see CAPABILITY_CONTRACT_V2.coverageLimitations)`,
+    reason: `gitleaks config not found at ${primaryPath} (self-application scope, PHX-WP-GITLEAKS-RULE-SCOPE) or at the plugin-shipped default ${fallbackPath} (NVA-J-GITLEAKSCONFIG) -- resolved relative to this adapter module's own on-disk location, never rootDir; degrading to SKIPPED rather than blocking a push on a scanner that has no ruleset to run (see CAPABILITY_CONTRACT_V2.coverageLimitations)`,
   };
 }
 
@@ -341,8 +376,9 @@ export async function run({ rootDir, config = {}, spawnFn = nodeSpawnSync, timeo
   if (!resolved.installed) {
     return { status: "SKIPPED", classification: "binary_missing", findings: [], raw: null, reason: resolved.reason };
   }
-  if (!existsSync(GITLEAKS_CONFIG_PATH)) {
-    return gitleaksConfigMissingResult(GITLEAKS_CONFIG_PATH);
+  const configPath = resolveGitleaksConfigPath();
+  if (configPath === null) {
+    return gitleaksConfigMissingResult(GITLEAKS_CONFIG_PATH, GITLEAKS_PLUGIN_DEFAULT_CONFIG_PATH);
   }
   const contentAuthority = loadContentAuthority(rootDir);
   if (!contentAuthority.ok) {
@@ -369,7 +405,7 @@ export async function run({ rootDir, config = {}, spawnFn = nodeSpawnSync, timeo
     rootDir,
     "--no-git", // file-content-only scan of the candidate tree; no git history/ref traversal (see header INVOCATION + CAPABILITY_CONTRACT_V2.coverageLimitations)
     "--config",
-    GITLEAKS_CONFIG_PATH, // repo-fixed rule config -- see GITLEAKS_CONFIG_PATH doc comment above; never resolved from rootDir
+    configPath, // resolved via resolveGitleaksConfigPath() -- repo-root first, else the plugin-shipped default; never resolved from rootDir
     "--report-format",
     "json",
     "--report-path",
@@ -510,7 +546,7 @@ export const CAPABILITY_CONTRACT_V2 = Object.freeze({
     "A fixed `--config <repo-root>/.gitleaks.toml` is always passed to `detect` (PHX-WP-GITLEAKS-RULE-SCOPE), resolved from this adapter module's own on-disk location, never from rootDir (the candidate tree must never supply its own scanner-config override). That config extends gitleaks' full built-in default ruleset (`useDefault = true`) unchanged and adds exactly one narrow, path-scoped allowlist: `sentry-access-token` and `generic-api-key` are disabled ONLY for `backlog/transitions.ndjson` and `backlog/transitions-phoenix-history.ndjson` (both hash-chained ledgers' bare-64-hex-digest false positives; the second path was added by the Nova/Phoenix merge, VFX3-SECURITY 2026-08-26); every other rule, and this rule pair on every other path, remains fully armed and unmodified.",
     "`--no-git` is passed to `detect`, so the scan is a pure filesystem content scan of rootDir (gitleaks' own --help wording: \"treat git repo as a regular directory and scan those files\") with ZERO git object/ref/history traversal. rootDir is an immutable, identity-verified single-commit-tree snapshot (security-scan.mjs materializeCandidate, git-detached-worktree.v1), so this is the literal `candidate-tree` coverage the security-evidence schema claims. Historical / deleted-secret / cross-ancestry mining is deliberately NOT performed: it was never a documented capability of this adapter and, because a git worktree shares the main clone's `.git` object database, that default `detect` traversal was the source of cross-branch false positives (backlog 2026-07-25-security-scan-cross-branch-gitleaks-findings).",
     "Single-shot, full scan per invocation -- no --baseline-path or other incremental/diff mechanism; every run() call re-scans the entirety of rootDir from scratch.",
-    "GITLEAKS_CONFIG_PATH resolution is self-application-scoped (ADR-0015): it only finds .gitleaks.toml when this module executes from its canonical position inside the Agent-Pipeline repo's own checkout, which is where the file actually ships today. A plugin-only distribution/marketplace install (no repo root, no .gitleaks.toml alongside it) will not have the file at the resolved path; run() detects this explicitly before spawning gitleaks and returns an ERROR-classified config_missing result (RW2-GITLEAKSCONFIG) rather than an opaque scanner_error -- still blocking-class, same fail-closed exit-code policy, just an actionable diagnostic instead of a generic one.",
+    "GITLEAKS_CONFIG_PATH resolution is self-application-scoped (ADR-0015): the repo-root .gitleaks.toml is only found when this module executes from its canonical position inside the Agent-Pipeline repo's own checkout. A plugin-only distribution/marketplace install (no repo root) instead resolves GITLEAKS_PLUGIN_DEFAULT_CONFIG_PATH, a byte-for-byte mirror of that same config shipped inside the plugin package itself (config/security/gitleaks-default.toml, NVA-J-GITLEAKSCONFIG) -- so an installed deployment now finds a real ruleset and scans normally. Only if NEITHER resolves does run() degrade to a SKIPPED/success result before ever spawning gitleaks (gitleaksConfigMissingResult) rather than a blocking ERROR -- the same SKIPPED-as-success shape osv-scanner/license-check already use for their own absent-input cases; this is a fail-safe for a corrupted/stripped install, not the normal installed-plugin path.",
   ]),
   exitCodeMapping: Object.freeze({
     "0": "always -- status derived from parsed report content, never from exit code (forced via --exit-code 0)",
