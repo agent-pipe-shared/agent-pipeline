@@ -5,7 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-08-12
-sprint: alfred
+sprint: nightwing
 done_when: contains plugins/pipeline-core/scripts/po-human-approval.mjs may be older than the plugin installed
 source: "Cross-repo observation from a sibling Phoenix session, relayed by the PO into this Nova session for filing."
 due: 2026-09-12
