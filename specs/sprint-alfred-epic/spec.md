@@ -557,12 +557,19 @@ resolution, the remedy-comparison generator, fixtures.
   interpretation (#104, verbatim); provisional identities allowed and marked
   until D1 acceptance.
 - **Re-entry reading order.** The estate declares the order a fresh session
-  reads it in: AGENTS.md → map bundle entry point → the concept files of the
-  modules in scope → the compiled decision summary → the module inventory
-  rows for the write surface → the fitness model. The order is part of the
-  contract, not a convention: PRD S8 measures re-entry against it, and D3
-  class 7 fails closed when the map it points into is stale for the touched
-  contracts.
+  (or dispatch briefing generator) reads it in, exactly as doctrine §3.2
+  fixes it: (1) `AGENTS.md` — entry, conventions, map pointer; (2) the map
+  index — the graph's root; (3) the concept files of exactly the modules the
+  task touches, bounded by task surface and never by repository size; (4) the
+  compiled decision summary, filtered by applicability; (5) lifecycle state
+  and sanctioned next actions, via the existing bootstrap; (6) only then the
+  owned implementation surface. The order is part of the contract, not a
+  convention: PRD S8 measures re-entry against it, and D3 class 7 fails
+  closed when the map it points into is stale for the touched contracts. Its
+  defining rule is sufficient context **without foreign implementation
+  reads** — a task that needed them anyway produces the signal `foreign
+  implementation inspection required beyond the accepted boundary`, not a
+  session failure.
 - **Derived views, never parallel ones.** Human-readable architecture
   documentation (`docs/ARCHITECTURE.md` in a governed repo) is *generated*
   from the map bundle. A hand-maintained parallel document is a defect, not
@@ -573,7 +580,8 @@ resolution, the remedy-comparison generator, fixtures.
   comparison — the standard *proposes conformant structure*, it does not only
   report violations (doctrine §5.3). It never applies a remedy and never
   authorizes one: agent-proposed, human-decided, and subject to the same
-  anti-churn boundary as every other structural change (§2.9).
+  anti-churn boundary as every other structural change (doctrine §2.9,
+  refactorability without structural churn).
 - **Receipts:** `pipeline.module-interaction-receipt.v1` per applicable
   dispatch, first increment fed from briefing surface + candidate diff +
   transcript tool logs where exposed; every metric carries the §2.1 status.
@@ -798,14 +806,6 @@ pathway; §5 → §7.2 active optimization and §7.4 artifact orientation; §6 �
    lifecycle.
 4. **A numeric universal risk score for B1:** rejected by #105 itself;
    derivation returns classes and named triggers, never one scalar.
-5. **One merged property list for #104 and #106** (collapsing the nine
-   declared properties and the ten evaluated classes into a single
-   enumeration): rejected — declaration and evaluation are distinct views of
-   the same architecture and are deliberately not 1:1. A merged list would
-   force each declared property to have exactly one mechanical evaluator,
-   which is false for context locality (signal-only until calibration) and
-   for module identity (a foundation with no single declared parent). They
-   stay separate, joined by the explicit mapping table in §7.3.
 5. **Building org policy-pack resolution inside Alfred:** rejected — #9 owns
    it; Alfred consumes its interface and reports typed absence.
 6. **Auto-repair of drifted closed evidence:** rejected — repair is PO-gated
@@ -814,3 +814,11 @@ pathway; §5 → §7.2 active optimization and §7.4 artifact orientation; §6 �
 7. **Postponing C1 to a later wave:** rejected — its 14-day window is the
    critical path for every threshold-dependent promotion; landing it late
    forces either waiting or waiving #103's rule.
+8. **One merged property list for #104 and #106** (collapsing the nine
+   declared properties and the ten evaluated classes into a single
+   enumeration): rejected — declaration and evaluation are distinct views of
+   the same architecture and are deliberately not 1:1. A merged list would
+   force each declared property to have exactly one mechanical evaluator,
+   which is false for context locality (signal-only until calibration) and
+   for module identity (a foundation whose parents are all nine, not one).
+   They stay separate, joined by the explicit mapping table in §7.3.
