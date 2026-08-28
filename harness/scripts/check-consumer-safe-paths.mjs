@@ -512,6 +512,17 @@ export const ALLOWLIST = Object.freeze([
     reason:
       "Class B: the constant itself, declared 'Project-root-relative, never plugin-root-relative' one line above (comment immediately preceding it). The driver joins this against the TARGET PROJECT root and calls existsSync() on the result before using it, skipping Layer 1b -- not failing -- when the consumer project has no such file. Not an assumption the path exists, a probe for whether it does.",
   },
+
+  // --- NVA-V20-VENDOREDSAFEPATH: same push-init.mjs conditionality, now
+  // described in the vendored copy of the operator-facing push-release-flow
+  // walkthrough (plugins/pipeline-core/docs/push-release-flow.md, generated
+  // by harness/scripts/generate-vendored-canon.mjs from docs/push-release-flow.md).
+  {
+    file: "plugins/pipeline-core/docs/push-release-flow.md",
+    match: "chains Layer 1b (when `harness/scripts/check-doc-reconciliation.mjs`",
+    reason:
+      "Class B: this sentence exists specifically to tell the reader Layer 1b is conditional on harness/scripts/check-doc-reconciliation.mjs and is skipped when that file is absent -- naming the path precisely is the point, not an oversight. This file is GENERATED (harness/scripts/generate-vendored-canon.mjs writes it from docs/push-release-flow.md); a future occurrence must be fixed at the origin doc, never edited here directly, or generate-vendored-canon-tests will report drift.",
+  },
 ]);
 
 function posixPath(value) {
