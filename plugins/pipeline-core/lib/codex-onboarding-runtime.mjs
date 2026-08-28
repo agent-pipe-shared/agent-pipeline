@@ -12,9 +12,10 @@ import {
   openSync, readFileSync, readdirSync, realpathSync, renameSync, rmdirSync, unlinkSync,
   writeFileSync,
 } from "node:fs";
-import { basename, dirname, isAbsolute, join, relative, resolve, sep, win32 as win32Path } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { repositoryPathIdentityOrSelf } from "./repository-path-identity.mjs";
 import { loadRuntimeProjectionV3OwnedKeys } from "./runtime-projection-v3.mjs";
 import {
   assessWindowsPrivatePath,
@@ -430,17 +431,15 @@ function readSoleLiveLaunchTicket(paths, barrierSha256, ticketId, now, fs = NATI
  * build actual filesystem paths elsewhere in this module, see
  * `resolveOnboardingPrivateState`) is never touched or re-derived from this.
  */
-function windowsDriveLetterFingerprintIdentity(candidate) {
-  const normalized = candidate.replaceAll("/", "\\");
-  if (!win32Path.isAbsolute(normalized)) return candidate;
-  const resolved = win32Path.resolve(normalized);
-  return resolved === normalized ? resolved.toLocaleLowerCase("en-US") : candidate;
-}
+// NVA-PATHIDENT-1: the WSL-mount/drive-letter fold moved to
+// lib/repository-path-identity.mjs, which is now the single definition shared with
+// po-gate-authority.mjs and guard-maintenance-window.mjs. Behaviour is unchanged --
+// `repositoryPathIdentityOrSelf` reproduces the previous local pair exactly,
+// including its fallback to the candidate string (the REWRITTEN one in the mount
+// branch) when a recognized path does not canonicalize to itself. That fallback is
+// load-bearing: every fingerprint this module has ever written depends on it.
 export function fingerprintIdentity(realPath) {
-  const wslMount = /^\/mnt\/([A-Za-z])(\/.*)?$/u.exec(realPath);
-  if (wslMount !== null) return windowsDriveLetterFingerprintIdentity(`${wslMount[1].toUpperCase()}:${wslMount[2] ?? "/"}`);
-  if (/^[A-Za-z]:[\\/]/u.test(realPath)) return windowsDriveLetterFingerprintIdentity(realPath);
-  return realPath;
+  return repositoryPathIdentityOrSelf(realPath);
 }
 export function repositoryFingerprint(rootDir) { return canonicalSha256({ root: fingerprintIdentity(canonicalRoot(rootDir)) }); }
 export function validateRuntimeTargets(runtimeTargets) {

@@ -29,12 +29,12 @@ import {
   relative,
   resolve,
   sep,
-  win32 as win32Path,
 } from "node:path";
 import { TextDecoder } from "node:util";
 
 import { parseYaml } from "./yaml-lite.mjs";
 import { assessWindowsPrivatePath } from "./windows-private-state.mjs";
+import { windowsDriveLetterIdentity, windowsNotationCandidate } from "./repository-path-identity.mjs";
 import {
   LEGACY_MANIFEST,
   LEGACY_STATE,
@@ -384,17 +384,18 @@ export function normalizeRepositoryPath(value) {
  * process must each recognize BOTH spellings, not only their own host's
  * native one, or nothing here would ever collapse.
  */
-function windowsDriveLetterIdentity(candidate) {
-  const normalized = candidate.replaceAll("/", "\\");
-  if (!win32Path.isAbsolute(normalized)) return null;
-  const resolved = win32Path.resolve(normalized);
-  return resolved === normalized ? resolved.toLocaleLowerCase("en-US") : null;
-}
-function canonicalRepositoryPathIdentity(path) {
+// NVA-PATHIDENT-1: the two shared decisions (is this Windows notation, and what is
+// its canonical identity) now live in lib/repository-path-identity.mjs, which is the
+// single definition across this module, codex-onboarding-runtime.mjs and
+// guard-maintenance-window.mjs. What stays here is exactly what was never shared:
+// this caller's stricter contract -- it validates its input and returns `null` on any
+// path it cannot canonicalize, where the other two fall back to the string itself.
+// Merging those fallbacks into one function would have changed one caller's
+// fingerprints, which is the silent divergence the extraction exists to end.
+export function canonicalRepositoryPathIdentity(path) {
   if (typeof path !== "string" || path.length === 0 || path.includes("\0")) return null;
-  const wslMount = /^\/mnt\/([A-Za-z])(\/.*)?$/u.exec(path);
-  if (wslMount !== null) return windowsDriveLetterIdentity(`${wslMount[1].toUpperCase()}:${wslMount[2] ?? "/"}`);
-  if (/^[A-Za-z]:[\\/]/u.test(path)) return windowsDriveLetterIdentity(path);
+  const candidate = windowsNotationCandidate(path);
+  if (candidate !== null) return windowsDriveLetterIdentity(candidate);
   if (!posixPath.isAbsolute(path)) return null;
   const resolved = posixPath.resolve(path);
   return resolved === path ? resolved : null;

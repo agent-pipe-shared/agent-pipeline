@@ -59,13 +59,14 @@ import {
   unlinkSync,
   writeFileSync,
 } from "node:fs";
-import { isAbsolute, join, relative, resolve, sep, win32 as win32Path } from "node:path";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { createPoApprovalIntent } from "./po-approval-proof.mjs";
 import { readCriticalHumanProofPolicy, verifyAgainstTrustAnchors } from "./critical-human-proof-policy.mjs";
 import { assessWindowsPrivatePath, hardenWindowsPrivateDirectory } from "./windows-private-state.mjs";
 import { LEGACY_GUARD_CONFIG, NEUTRAL_GUARD_CONFIG, resolveProjectAuthorityPaths } from "./project-authority.mjs";
+import { repositoryPathIdentityOrSelf } from "./repository-path-identity.mjs";
 
 export class GuardMaintenanceWindowError extends Error {
   constructor(code, message) {
@@ -200,6 +201,13 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/publication-bundle-v2.mjs",
   "plugins/pipeline-core/lib/publication-capability-preflight.mjs",
   "plugins/pipeline-core/lib/recovery-preview-attestation.mjs",
+  // NVA-PATHIDENT-1: the single definition of how two spellings of one physical
+  // repository path fold into one identity, imported directly by THIS file (see
+  // repoPathIdentity below) and by po-gate-authority.mjs and
+  // codex-onboarding-runtime.mjs, both already entries here. It decides whether a
+  // stored fingerprint matches the repository a window is being verified against, so
+  // it is exactly the "code that verifies windows" ADR-0058 Decision 3 describes.
+  "plugins/pipeline-core/lib/repository-path-identity.mjs",
   "plugins/pipeline-core/lib/review-economy.mjs",
   "plugins/pipeline-core/lib/runner-native-continuation.mjs",
   "plugins/pipeline-core/lib/runner-profile-migration-v2.mjs",
@@ -449,19 +457,21 @@ function pluginTreeSha256(root) {
  * (po-gate-authority.mjs) and `fingerprintIdentity`/`windowsDriveLetterFingerprintIdentity`
  * (codex-onboarding-runtime.mjs, NVA-FINGERPRINT-1/1858a21b).
  *
- * MIRRORED here rather than imported: po-gate-authority.mjs's own pair is
- * unexported (and this dispatch's Forbidden section bars editing that file to
- * export them); codex-onboarding-runtime.mjs's `fingerprintIdentity` IS exported
- * and its module is already a `NEVER_LIFTABLE_KERNEL_PATHS` entry (so importing it
- * would need no new kernel-closure entry), but pulling in that much larger,
- * domain-unrelated onboarding-runtime module -- with its own launch-ticket/host-
- * adapter import surface -- for ~10 lines of pure regex logic would widen this
- * never-liftable kernel file's own dependency surface for no reason: this file's
- * own DUPLICATION NOTE above (physicalRoot/topology/secureDirectory/etc.) already
- * establishes "small physical-safety primitive stays local" as the house rule here,
- * not a novel shortcut. This is a third independently-named copy of the same ~10
- * lines (the risk the dispatching item explicitly names) -- accepted deliberately
- * for that reason, not overlooked.
+ * NVA-PATHIDENT-1 (2026-08-28): NO LONGER MIRRORED. The three copies were extracted
+ * into `lib/repository-path-identity.mjs`, imported above, and this function is now a
+ * one-line wrapper over `repositoryPathIdentityOrSelf`. The previous note here
+ * argued for keeping a local copy on the grounds that importing
+ * codex-onboarding-runtime.mjs would drag that module's launch-ticket/host-adapter
+ * import surface into this never-liftable kernel file for ~10 lines of regex. That
+ * reasoning was sound and is not overturned -- the extraction answers it instead:
+ * the shared module pulls in nothing but `node:path`, so this file's dependency
+ * surface does not widen. The house rule this file's own DUPLICATION NOTE states
+ * ("small physical-safety primitive stays local") is about primitives with no safe
+ * shared home; this one now has one.
+ *
+ * The shared module is itself a `NEVER_LIFTABLE_KERNEL_PATHS` entry (GMWKC01 would
+ * fail otherwise, since this is a kernel file) and is named in
+ * docs/guard-maintenance-window-threat-model.md (GMWKC03).
  *
  * `repo.root`/`repo.common` are already realpathSync'd absolute paths by the time
  * `repoFingerprint()` calls this (physicalRoot/topology above), so no further
@@ -473,17 +483,8 @@ function pluginTreeSha256(root) {
  * two genuinely different directories on a case-sensitive filesystem and must never
  * be merged (AC-2).
  */
-function windowsDriveLetterRepoIdentity(candidate) {
-  const normalized = candidate.replaceAll("/", "\\");
-  if (!win32Path.isAbsolute(normalized)) return candidate;
-  const resolved = win32Path.resolve(normalized);
-  return resolved === normalized ? resolved.toLocaleLowerCase("en-US") : candidate;
-}
 function repoPathIdentity(path) {
-  const wslMount = /^\/mnt\/([A-Za-z])(\/.*)?$/u.exec(path);
-  if (wslMount !== null) return windowsDriveLetterRepoIdentity(`${wslMount[1].toUpperCase()}:${wslMount[2] ?? "/"}`);
-  if (/^[A-Za-z]:[\\/]/u.test(path)) return windowsDriveLetterRepoIdentity(path);
-  return path;
+  return repositoryPathIdentityOrSelf(path);
 }
 
 function repoFingerprint(repo) {
