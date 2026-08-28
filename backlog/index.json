@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "dfac044c992db8e65f253d23b73d78ec4fe2b25d673c56519644c60a059ff0e7"
+    "transitionHead": "eed311a6da7857598ecb4f9e2b661291ebf7113884af7878aac5ee02bf4540e6"
   },
   "counts": {
-    "open": 57,
+    "open": 58,
     "in_progress": 3,
     "closed": 382,
     "rejected": 3,
@@ -1281,6 +1281,15 @@
       "closureRepository": "self",
       "closureCommit": "f57375ff77263a2df70bbb3201feb361912f07f6",
       "closureEvidence": "plugins/pipeline-core/lib/codex-onboarding-capabilities.mjs"
+    },
+    {
+      "id": "pipeline.core-verify-cannot-pass-under-the-ci-trimmed-path",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "Local replay of .github/workflows/verify.yml's `verify` job before the first PR to main, 2026-08-28, at HEAD bbdbfd02. Steps 1-7 pass; step 8 fails. Controlled 2x5 matrix isolates the trimmed PATH as the cause.",
+      "deferred": false
     },
     {
       "id": "pipeline.critic-and-verify-cadence-may-be-too-fine-grained",
