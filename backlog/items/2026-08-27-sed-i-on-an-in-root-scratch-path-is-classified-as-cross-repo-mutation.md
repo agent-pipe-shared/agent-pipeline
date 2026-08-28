@@ -5,7 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-08-27
-sprint: nova
+sprint: nightwing
 source: "Live refusal in an Elephant session, 2026-08-27, isolated to a root cause by controlled probe in the same session."
 ---
 
@@ -78,7 +78,17 @@ leading character.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted
+- **Rationale:** The root cause was isolated by controlled probe, not inferred,
+  and the discriminating pair is a one-character difference — that is a
+  regression test waiting to be written, not an investigation. The refusal is
+  also actively harmful rather than merely noisy: it offers a live PO signature
+  as the recovery for editing a gitignored scratch file, which is a real cost
+  charged for a misclassification. Same root class as
+  `pipeline.shell-grammar-reads-quoted-content-as-shell-syntax` (raw command
+  text where parsed argv exists); fix both in one pass.
+- **Assignment (if accepted):** Sprint Nightwing, together with the sibling item
+  above and under the same reasoning — out of Nova because the 0.6.0 candidate
+  is under live test and this touches `guard-lifecycle-ready.mjs`, out of Alfred
+  because Alfred is closed to new scope (PO, 2026-08-28).
+- **Date:** 2026-08-28
