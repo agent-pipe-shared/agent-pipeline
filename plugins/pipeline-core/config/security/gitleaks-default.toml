@@ -1,0 +1,35 @@
+# gitleaks-default.toml -- plugin-shipped DEFAULT gitleaks config (NVA-J-GITLEAKSCONFIG).
+#
+# gitleaks.mjs's GITLEAKS_CONFIG_PATH resolution prefers the repo-root `.gitleaks.toml`
+# (self-application scope, PHX-WP-GITLEAKS-RULE-SCOPE) when this module runs from inside the
+# Agent-Pipeline repo's own checkout; that file does not exist in an installed-plugin
+# deployment (marketplace install, no repo root present). This file is the fallback the
+# adapter resolves instead in that case, so an installed deployment finds a real config
+# rather than degrading to SKIPPED -- see gitleaks.mjs's GITLEAKS_PLUGIN_DEFAULT_CONFIG_PATH
+# and resolveGitleaksConfigPath() doc comments for the exact precedence.
+#
+# Content is a byte-for-byte mirror of the repo-root `.gitleaks.toml`, kept in sync
+# deliberately rather than drifting into a separate "consumer" ruleset: `[extend] useDefault =
+# true` loads gitleaks' full built-in default ruleset unchanged, and the `[[rules]]` blocks
+# below add a narrow, path-scoped allowlist for this repository's own hash-chained backlog
+# ledger files (see backlog/2026-08-08-the-hash-chained-ledger-collides-permanently-with-the-
+# secret-scanner.md and backlog/2026-08-26 Nova/Phoenix-merge note in the repo-root file). A
+# consumer project has neither `backlog/transitions.ndjson` nor
+# `backlog/transitions-phoenix-history.ndjson`, so that allowlist simply never matches
+# anything there -- harmless, not a weakening of that project's own scan. Every rule stays
+# fully armed everywhere else, identically to the repo-root file.
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "sentry-access-token"
+
+[[rules.allowlists]]
+paths = ['''.*/backlog/transitions\.ndjson$''', '''.*/backlog/transitions-phoenix-history\.ndjson$''']
+
+[[rules]]
+id = "generic-api-key"
+
+[[rules.allowlists]]
+paths = ['''.*/backlog/transitions\.ndjson$''', '''.*/backlog/transitions-phoenix-history\.ndjson$''']
