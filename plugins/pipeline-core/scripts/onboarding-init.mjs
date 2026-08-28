@@ -61,8 +61,30 @@ export const DEFAULT_STEP_CAP = 50;
 const ONBOARDING_SCRIPT_PATH = fileURLToPath(new URL("./project-onboarding-v3.mjs", import.meta.url));
 
 function usage() {
-  return "Usage: node plugins/pipeline-core/scripts/onboarding-init.mjs --root <project-dir> [--step-cap <n>]";
+  return "Usage: node plugins/pipeline-core/scripts/onboarding-init.mjs --root <project-dir> [--runner claude|codex|antigravity] [--step-cap <n>]";
 }
+
+// The runner lane, pinned rather than inherited.
+//
+// The onboarding CLI resolves its runner from the ENVIRONMENT when `--runner` is absent
+// (`resolveActiveRunner`, scripts/project-onboarding-v3.mjs): `CLAUDECODE=1` means claude,
+// an Antigravity marker means antigravity, and everything else falls into an else-branch
+// that answers `codex` -- including a plain human terminal, which is no runner at all.
+//
+// That guess reaches this driver as a real behavioural difference, not a label: a fresh
+// repository resolved as codex is handed a Codex restart barrier, whose `nextAction.kind`
+// is `restart-process`, which this driver correctly refuses to execute. The identical
+// invocation therefore reaches a `collect-input` question inside a Claude Code session and
+// `unsupported-next-action` in the operator's own shell -- measured 2026-08-28, where this
+// file's own suite passed eight times under an agent and failed deterministically under
+// `env -u CLAUDECODE`.
+//
+// So the lane is a caller decision here, threaded into the first `inspect` (every later
+// command is constructed BY the CLI, which carries its own resolved runner forward). An
+// omitted `--runner` keeps the CLI's existing environment resolution unchanged -- this adds
+// a way to be explicit, it does not change the default -- and the resolved-or-null value is
+// reported in the result so a caller can see which lane it is on instead of assuming.
+const RUNNERS = new Set(["claude", "codex", "antigravity"]);
 
 function parseArgs(argv) {
   const output = {};
@@ -72,6 +94,11 @@ function parseArgs(argv) {
       const value = argv[index + 1];
       if (!value || value.startsWith("--")) return { error: "--root requires a project directory" };
       output.root = value;
+      index += 1;
+    } else if (arg === "--runner") {
+      const value = argv[index + 1];
+      if (!RUNNERS.has(value)) return { error: `--runner requires one of: ${[...RUNNERS].join(", ")}` };
+      output.runner = value;
       index += 1;
     } else if (arg === "--step-cap") {
       const raw = argv[index + 1];
@@ -129,11 +156,13 @@ function runOnboardingStep({ executable, argv, run }) {
  * spawn the real onboarding CLI against a real temporary directory, or supply a synthetic
  * responder to exercise the step-cap path without a genuinely non-converging real chain.
  */
-export function driveOnboardingInit({ rootDir, stepCap = DEFAULT_STEP_CAP, run = spawnSync } = {}) {
+export function driveOnboardingInit({ rootDir, runner = null, stepCap = DEFAULT_STEP_CAP, run = spawnSync } = {}) {
   const root = resolve(rootDir);
   const steps = [];
   let executable = "node";
-  let argv = [ONBOARDING_SCRIPT_PATH, "inspect", "--root", root];
+  let argv = runner === null
+    ? [ONBOARDING_SCRIPT_PATH, "inspect", "--root", root]
+    : [ONBOARDING_SCRIPT_PATH, "inspect", "--root", root, "--runner", runner];
 
   for (let stepIndex = 0; stepIndex < stepCap; stepIndex += 1) {
     const stepResult = runOnboardingStep({ executable, argv, run });
@@ -147,6 +176,7 @@ export function driveOnboardingInit({ rootDir, stepCap = DEFAULT_STEP_CAP, run =
     if (!stepResult.ok) {
       return {
         schema: SCHEMA,
+        runner,
         root,
         outcome: "error",
         stepCap,
@@ -172,6 +202,7 @@ export function driveOnboardingInit({ rootDir, stepCap = DEFAULT_STEP_CAP, run =
       if (!argvValid) {
         return {
           schema: SCHEMA,
+          runner,
           root,
           outcome: "error",
           stepCap,
@@ -189,6 +220,7 @@ export function driveOnboardingInit({ rootDir, stepCap = DEFAULT_STEP_CAP, run =
     if (nextAction && typeof nextAction === "object" && nextAction.kind === "collect-input") {
       return {
         schema: SCHEMA,
+        runner,
         root,
         outcome: "collect-input",
         stepCap,
@@ -200,7 +232,7 @@ export function driveOnboardingInit({ rootDir, stepCap = DEFAULT_STEP_CAP, run =
     }
 
     if ((nextAction === null || nextAction === undefined) && output?.status === "ready") {
-      return { schema: SCHEMA, root, outcome: "ready", stepCap, stepsExecuted: steps.length, steps, final: output };
+      return { schema: SCHEMA, runner, root, outcome: "ready", stepCap, stepsExecuted: steps.length, steps, final: output };
     }
 
     if (nextAction === null || nextAction === undefined) {
@@ -209,6 +241,7 @@ export function driveOnboardingInit({ rootDir, stepCap = DEFAULT_STEP_CAP, run =
       // repository's own chain, but never guessed at if it somehow is: report and stop.
       return {
         schema: SCHEMA,
+        runner,
         root,
         outcome: "no-automatic-next-step",
         stepCap,
@@ -222,6 +255,7 @@ export function driveOnboardingInit({ rootDir, stepCap = DEFAULT_STEP_CAP, run =
     // which needs an attended external terminal) -- reported honestly, never attempted.
     return {
       schema: SCHEMA,
+      runner,
       root,
       outcome: "unsupported-next-action",
       stepCap,
@@ -231,7 +265,7 @@ export function driveOnboardingInit({ rootDir, stepCap = DEFAULT_STEP_CAP, run =
     };
   }
 
-  return { schema: SCHEMA, root, outcome: "step-cap-exceeded", stepCap, stepsExecuted: steps.length, steps, final: null };
+  return { schema: SCHEMA, runner, root, outcome: "step-cap-exceeded", stepCap, stepsExecuted: steps.length, steps, final: null };
 }
 
 export function main(args = process.argv.slice(2), {
@@ -247,7 +281,7 @@ export function main(args = process.argv.slice(2), {
     writeError(`${usage()}\n${options.error}\n`);
     return 2;
   }
-  const result = driveOnboardingInit({ rootDir: options.root, stepCap: options.stepCap });
+  const result = driveOnboardingInit({ rootDir: options.root, runner: options.runner ?? null, stepCap: options.stepCap });
   write(`${JSON.stringify(result, null, 2)}\n`);
   return result.outcome === "ready" || result.outcome === "collect-input" ? 0 : 1;
 }
