@@ -299,16 +299,69 @@ const GRAMMAR_DENIAL_GUIDANCE = {
  * reading a background job's log outside the checkout is not a signature that may authorize
  * mutating another repository.
  */
+// backlog/items/2026-08-19-closed-shell-grammar-still-rejects-common-readonly-composition.md
+// Proposal point 1: a SMALL, explicit allowlist of read-only commands admitted when
+// chained with `&&`. Deliberately bounded and small -- 6 segments comfortably covers the
+// 4-segment triggering example with headroom, without becoming an unbounded chain. Declared
+// here, ahead of ADMITTED_GRAMMAR_SHAPES below, because that table's array literal reads this
+// constant at module-load time -- a `const` a few hundred lines further down would still be in
+// its temporal dead zone at that point.
+const MAX_AND_CHAIN_SEGMENTS = 6;
 const READ_SCOPE_DENIAL_CODE = "GUARD-READ-SCOPE-OUTSIDE-ROOT";
 const READ_SCOPE_DENIAL_GUIDANCE = "The bounded read-only diagnostic pipeline reads a path outside the project root.";
+// NVA-I-GRAMMAR (PO, 2026-08-28, backlog: 2026-08-27-shell-grammar-reads-quoted-content-as-
+// shell-syntax.md): "wichtig ist, dass der guard das erlaubte grammar immer auch sagt" -- the
+// refusal must state the COMPLETE admitted grammar with bounds and exact spellings, not just
+// name the shapes. This is the single table the message below renders from AND the test suite
+// (guard-lifecycle-ready.test.mjs) submits every `example` from, so the printed text can never
+// drift from what is actually admitted -- the item's own complaint about the old fixed string
+// ("grep-to-head" named with no bound, `head -N` omitted entirely). Every `example` here must
+// be independently admitted by isReadOnlyDiagnosticCommand() on its own -- pinned by that same
+// test, executing rather than merely matching each line.
+export const ADMITTED_GRAMMAR_SHAPES = [
+  {
+    spelling: "one simple, un-piped read-only command (rg, grep, cat, head, tail, wc, stat, "
+      + "file, sed [non-mutating], find [non-mutating], pwd, git [read-only subcommands], and "
+      + "a few narrow hash/check forms)",
+    example: "rg -n needle probe.txt",
+  },
+  {
+    spelling: "bounded rg-to-rg or rg-to-head diagnostic pipeline: \"rg ... | rg ...\" or "
+      + "\"rg ... | head -n N\" / \"rg ... | head -N\" (N in 1..500), optionally followed by "
+      + "\"2>/dev/null\"",
+    example: "rg -n needle probe.txt | head -5",
+  },
+  {
+    spelling: "bounded grep-to-grep or grep-to-head diagnostic pipeline: \"grep ... | grep ...\" "
+      + "or \"grep ... | head -n N\" / \"grep ... | head -N\" (N in 1..500), optionally followed "
+      + "by \"2>/dev/null\"",
+    example: "grep -n needle probe.txt | head -5",
+  },
+  {
+    spelling: "bounded cat-to-grep or cat-to-head diagnostic pipeline: \"cat <paths...> | "
+      + "grep ...\" or \"cat <paths...> | head -n N\" / \"cat <paths...> | head -N\" "
+      + "(N in 1..500), optionally followed by \"2>/dev/null\"",
+    example: "cat probe.txt | head -5",
+  },
+  {
+    spelling: `up to ${MAX_AND_CHAIN_SEGMENTS} "&&"-chained segments, admitted only when EVERY `
+      + "segment is independently one of the shapes above or the small always-safe-write "
+      + "allowlist (echo; \"mkdir -p\" under scratch/ or .claude/worktrees/)",
+    example: "rg -n needle probe.txt && rg -n needle probe.txt",
+  },
+];
+function grammarShapeLines() {
+  return ADMITTED_GRAMMAR_SHAPES.map((shape) => `- ${shape.spelling} (e.g. "${shape.example}").`);
+}
 // The four lines every grammar denial has always printed, moved verbatim out of blocked()'s
 // template so a code that must NOT print them (READ_SCOPE_DENIAL_CODE) can say something
 // true instead. Byte-identical output for the three grammar codes.
 const GRAMMAR_DENIAL_REMEDY = [
   "Use one simple shell command per tool call; issue independent read-only commands as separate parallel tool calls.",
-  "Do not construct a new composed command with &&, ;, pipelines, redirects, or line continuation.",
+  "Do not construct a new composed command with ;, pipelines, redirects, or line continuation outside the admitted shapes below.",
   "If typed retryActions are present, run only those exact read-only actions as separate tool calls.",
-  "Only bounded rg-to-rg, rg-to-head, grep-to-grep, and grep-to-head diagnostic pipelines are admitted as exceptions.",
+  "The complete admitted grammar, with bounds and exact spellings:",
+  ...grammarShapeLines(),
 ];
 // Every line here is executable advice that actually clears THIS refusal -- the item's
 // second requirement ("make the remedy true or omit it"), and the reason the old text was a
@@ -347,7 +400,7 @@ const READ_SCOPE_DENIAL_REMEDY = [
  * a command matching this test. Reading that off is not a second parser: no tokenization, no
  * admission decision, no possible drift from what the real parser already concluded.
  */
-function rejectedGrammarElement(code, command, parsed) {
+function rejectedGrammarElement(code, command, parsed, root) {
   if (code === "GUARD-REDIRECT-UNAPPROVED" && parsed.redirects.length > 0) {
     const redirect = parsed.redirects[0];
     const token = redirect.fd === 2 ? "2>" : redirect.direction;
@@ -357,6 +410,16 @@ function rejectedGrammarElement(code, command, parsed) {
     return `the operator "${parsed.operators[0].operator}"`;
   }
   if (code === "GUARD-PARSE-UNSUPPORTED" && typeof command === "string") {
+    // NVA-I-GRAMMAR DoD 4: named FIRST -- a well-formed `&&`-chain whose only fault is that
+    // one segment is not independently admitted gets a specific, actionable reason instead of
+    // falling through to the generic messages below (which would say nothing at all: none of
+    // \n/\r/\0 need be present for this shape).
+    const chainFault = typeof root === "string" ? rejectedAndChainSegment(command, root) : null;
+    if (chainFault) {
+      return `"&&"-chain segment ${chainFault.position} of ${chainFault.total} `
+        + `("${chainFault.segment}") is not independently admitted as a read-only diagnostic `
+        + "or an approved always-safe write";
+    }
     if (/\n/u.test(command)) return "a newline character inside the command text";
     if (/\r/u.test(command)) return "a carriage-return character inside the command text";
     if (/\0/u.test(command)) return "a NUL character inside the command text";
@@ -1519,13 +1582,19 @@ function isValidPipelineGrepArgs(argv) {
 
 // Shared by every bounded-pipeline SINK ending in `head`: the exact two-token `-n N` shape
 // (N in the same canonical 1..500 range guard-command-grammar.mjs's rg-to-head pipeline
-// uses) isBoundedGrepPipeline already enforced inline. Extracted, not widened -- the combined
-// `head -N` form guard-command-grammar.mjs's rg pipeline also accepts is deliberately NOT
-// added here, since neither pre-existing caller of this exact check ever accepted it either;
-// widening it now would be an unbriefed change riding along on an unrelated dispatch.
+// uses) isBoundedGrepPipeline already enforced inline.
+//
+// NVA-I-GRAMMAR: the combined `head -N` form (backlog: 2026-08-27-shell-grammar-reads-quoted-
+// content-as-shell-syntax.md, repro 3) is now admitted here too, mirroring the identical
+// `headOk` bound guard-command-grammar.mjs's own isBoundedReadOnlyPipeline (rg-to-head) has
+// used since GF-078 bug 2 -- same canonical 1..500 range, same regex shape, checked both ways.
+// `head -N` was previously refused for grep-to-head/cat-to-head while already admitted for
+// rg-to-head: the identical bounded read, refused only because of which command sourced it.
+const HEAD_PIPELINE_COUNT = /^(?:[1-9]|[1-9][0-9]|[1-4][0-9]{2}|500)$/u;
 function isValidPipelineHeadArgs(argv) {
-  return argv.length === 2 && argv[0] === "-n"
-    && /^(?:[1-9]|[1-9][0-9]|[1-4][0-9]{2}|500)$/u.test(argv[1]);
+  return (argv.length === 2 && argv[0] === "-n" && HEAD_PIPELINE_COUNT.test(argv[1]))
+    || (argv.length === 1 && argv[0].startsWith("-") && argv[0] !== "-"
+      && HEAD_PIPELINE_COUNT.test(argv[0].slice(1)));
 }
 
 /**
@@ -1668,12 +1737,6 @@ function isBoundedCatPipeline(parsed, root) {
   }
   return isValidPipelineHeadArgs(parsed.segments[1].argv);
 }
-
-// backlog/items/2026-08-19-closed-shell-grammar-still-rejects-common-readonly-composition.md
-// Proposal point 1: a SMALL, explicit allowlist of read-only commands admitted when
-// chained with `&&`. Deliberately bounded and small -- 6 segments comfortably covers the
-// 4-segment triggering example with headroom, without becoming an unbounded chain.
-const MAX_AND_CHAIN_SEGMENTS = 6;
 
 /**
  * Splits a command string on top-level `&&` occurrences only, mirroring
@@ -1842,30 +1905,62 @@ function isChainEligibleSegment(segment, root) {
  * Extends the bounded-composition exception family (the same shape isBoundedGrepPipeline
  * above already established) to `&&`-chained read-only commands, per backlog/items/
  * 2026-08-19-closed-shell-grammar-still-rejects-common-readonly-composition.md Proposal
- * point 1 and 2026-08-19-readonly-and-chain-grep-pipe-trailing-stage-not-implemented.md.
- * Every non-trailing segment must independently parse as a single, simple, accepted command
- * (no nested operators/redirects of its own) AND be one of the small set
- * isChainEligibleSegment admits. The trailing segment may either be an isChainEligibleSegment,
- * an isBoundedGrepPipeline, or (NVA-CATPIPE-1) an isBoundedCatPipeline. Fails closed on
- * anything else.
+ * point 1, 2026-08-19-readonly-and-chain-grep-pipe-trailing-stage-not-implemented.md, and
+ * (NVA-I-GRAMMAR) the PO's 2026-08-28 decision to admit `&&` generally, recorded in backlog/
+ * items/2026-08-27-shell-grammar-reads-quoted-content-as-shell-syntax.md: "anything
+ * expressible as `a && b` is already expressible as two tool calls, each classified exactly
+ * as it would be inside the chain."
+ *
+ * Every segment (leading, middle, or trailing -- position no longer matters, per that same
+ * no-new-authority argument) is admitted if EITHER of two independent, unioned tests passes,
+ * never a verdict inherited from an earlier segment:
+ *
+ *   1. isReadOnlyDiagnosticCommand(part, root) -- the EXACT classifier a standalone Bash tool
+ *      call carrying that same text would be judged by (evaluateLifecycleReadyGuard calls it
+ *      identically, a few hundred lines below). Recursion is bounded: `part` is one segment
+ *      already split on `&&`, so its own splitTopLevelAndChain() call finds none and returns
+ *      null immediately, meaning isBoundedReadOnlyAndChain(part, ...) itself always resolves
+ *      to false one level down -- no unbounded recursion, one extra cheap check per part.
+ *   2. isChainEligibleSegment -- the small, pre-existing, explicitly-approved-even-though-not-
+ *      "read-only" allowlist (echo; mkdir -p restricted to scratch/.claude/worktrees) kept
+ *      unchanged so no previously-admitted chain shape regresses.
+ *
+ * A command failing this union is refused: it falls straight through to parseGuardCommand,
+ * whose own tokenizer treats a top-level `&&` as an unconditional CONTROL rejection
+ * (guard-command-grammar.mjs, out of this dispatch's scope) -- GUARD-PARSE-UNSUPPORTED, with
+ * rejectedAndChainSegment() (below) naming which exact segment failed and why.
  */
 function isBoundedReadOnlyAndChain(command, root) {
   const parts = splitTopLevelAndChain(command);
   if (!parts) return false;
-  for (let index = 0; index < parts.length; index += 1) {
-    const part = parts[index];
-    const isLast = index === parts.length - 1;
-    const parsedPart = parseGuardCommand(part, root);
-    if (isLast && (isBoundedGrepPipeline(parsedPart, root) || isBoundedCatPipeline(parsedPart, root))) {
-      continue;
-    }
-    if (parsedPart.parseStatus !== "accepted"
-      || parsedPart.segments.length !== 1
-      || parsedPart.operators.length !== 0
-      || parsedPart.redirects.length !== 0) return false;
-    if (!isChainEligibleSegment(parsedPart.segments[0], root)) return false;
-  }
-  return true;
+  return parts.every((part) => isChainSegmentAdmitted(part, root));
+}
+
+function isChainSegmentAdmitted(part, root) {
+  if (isReadOnlyDiagnosticCommand(part, root)) return true;
+  const parsedPart = parseGuardCommand(part, root);
+  return parsedPart.parseStatus === "accepted"
+    && parsedPart.segments.length === 1
+    && parsedPart.operators.length === 0
+    && parsedPart.redirects.length === 0
+    && isChainEligibleSegment(parsedPart.segments[0], root);
+}
+
+/**
+ * DoD 4 (NVA-I-GRAMMAR): a refused `&&`-chain names WHICH segment failed, not just that the
+ * whole command did -- "a chain refused as a whole teaches nothing" (backlog item, same id).
+ * Returns null for anything that is not itself a syntactically well-formed `&&`-chain (so the
+ * generic GUARD-PARSE-UNSUPPORTED messaging in rejectedGrammarElement is untouched for those);
+ * otherwise the 1-based index, the exact segment text, and the total segment count of the
+ * FIRST segment that fails the identical union isBoundedReadOnlyAndChain itself applies --
+ * never a second, competing definition of "admitted".
+ */
+function rejectedAndChainSegment(command, root) {
+  const parts = splitTopLevelAndChain(command);
+  if (!parts) return null;
+  const index = parts.findIndex((part) => !isChainSegmentAdmitted(part, root));
+  if (index === -1) return null;
+  return { position: index + 1, total: parts.length, segment: parts[index] };
 }
 
 /**
@@ -3713,7 +3808,7 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
           null,
           retryActionsForDeniedCommand((input.tool_input.command ?? input.tool_input.CommandLine), root),
           route.overrideGuidance,
-          rejectedGrammarElement(code, (input.tool_input.command ?? input.tool_input.CommandLine), parsed),
+          rejectedGrammarElement(code, (input.tool_input.command ?? input.tool_input.CommandLine), parsed, root),
           commitMessageFileRemediation((input.tool_input.command ?? input.tool_input.CommandLine)),
         ));
       }
