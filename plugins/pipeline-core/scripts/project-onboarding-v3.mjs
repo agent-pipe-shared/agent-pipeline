@@ -8,6 +8,7 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { requireAttendedChatGateConfirmation } from "../lib/chat-gate-ceremony.mjs";
 import { loadManifestSafe, resolveHumanFacingLanguage, gateConfig } from "../lib/manifest.mjs";
 import { planInstall as planPrePushHookInstall, MARKER_SCHEMA as PRE_PUSH_HOOK_MARKER_SCHEMA, DECLINE_MARKER_SCHEMA as PRE_PUSH_HOOK_DECLINE_MARKER_SCHEMA } from "./pre-push-hook-install.mjs";
+import { resolveActiveRunner } from "./pipeline-start-preflight.mjs";
 import {
   applyOnboardingIntakeConsent,
   applyOnboardingIntakeCapture,
@@ -228,15 +229,19 @@ const APPLY_SHAPED_COMMANDS = new Set(
 // a fact about the project that a helper must never guess. Here, at the
 // process entry point, the question is "which runner is executing this
 // process" -- and at exactly this boundary the two questions coincide,
-// because the entry point IS the running session. Same environment signal
-// pipeline-start-preflight.mjs already resolves the active runner from
-// (CLAUDECODE is set by every Claude Code session, main and subagent);
-// reused rather than re-derived so the two entry points speak one
-// convention. A CLI invocation that omits --runner therefore resolves and
+// because the entry point IS the running session. `resolveActiveRunner` is
+// imported from pipeline-start-preflight.mjs (the ONE shared implementation,
+// backlog: a-po-ceremony-in-the-po-s-own-terminal-resolves-the-wrong-runner.md
+// -- a duplicated copy of this expression was the reported defect) rather
+// than re-derived here. Unlike preflight's own internal call, this one DOES
+// pass `rootDir`/`read`: a genuinely signal-less shell (a PO's own attended
+// terminal, exactly the reported incident) then resolves through this
+// project's own declared `runners.default` instead of guessing "codex" by
+// elimination. A CLI invocation that omits --runner therefore resolves and
 // threads this value explicitly -- it never raises and never passes
 // `undefined` onward to a library helper.
-function resolveActiveRunner(env) {
-  return env.CLAUDECODE === "1" ? "claude" : (env.ANTIGRAVITY_AGENT === "1" || env.AI_AGENT === "antigravity") ? "antigravity" : "codex";
+function resolveOnboardingCliRunner(env, root, deps) {
+  return resolveActiveRunner({ env, rootDir: root, read: deps?.readFileSync ?? readFileSync });
 }
 
 function usage() {
@@ -392,8 +397,16 @@ function kickoffChatGateSpecFor(options) {
 // spirit as `approve-push`'s echoed command in pipeline-state.mjs. Each element
 // is JSON-quoted so a value containing spaces or shell metacharacters (a goal
 // sentence, for instance) still round-trips as one token when copy-pasted.
-function formatOnboardingRerunCommand(args) {
-  return `node plugins/pipeline-core/scripts/project-onboarding-v3.mjs ${args.map((value) => JSON.stringify(value)).join(" ")}`;
+//
+// `runner` is ALWAYS appended when `args` did not already spell out --runner
+// (backlog: a-po-ceremony-in-the-po-s-own-terminal-resolves-the-wrong-runner.md,
+// direction (2)): the value this AGENT session already resolved
+// (`options.runner`, from resolveOnboardingCliRunner above) is what the human
+// is handed, explicitly -- never left for their own attended shell to
+// re-derive from its own, possibly signal-less, environment.
+export function formatOnboardingRerunCommand(args, runner) {
+  const withRunner = args.includes("--runner") ? args : [...args, "--runner", runner];
+  return `node plugins/pipeline-core/scripts/project-onboarding-v3.mjs ${withRunner.map((value) => JSON.stringify(value)).join(" ")}`;
 }
 
 // NVA-PREPUSHOFFER-1: the offer text a human actually reads before consenting
@@ -523,7 +536,7 @@ export function main(args = process.argv.slice(2), {
   const options = parse(args);
   if (options.help) { write(`${usage()}\n`); return 0; }
   if (options.error) { write(`${usage()}\n${options.error}\n`); return 2; }
-  if (options.runner === undefined) options.runner = resolveActiveRunner(env);
+  if (options.runner === undefined) options.runner = resolveOnboardingCliRunner(env, options.root, deps);
 
   // AGY-CHATADAPTER-2: an agent's own tool-calling harness has no TTY on file
   // descriptor 0 and can never complete this step, no matter what value it
@@ -552,7 +565,7 @@ export function main(args = process.argv.slice(2), {
       if (confirmation.code === "CHAT-GATE-NOT-ATTENDED") {
         writeError(`Error: ${options.command} refused (${confirmation.code}); a human must confirm ${gateSpec.label} directly, in their own attended terminal -- an agent's own tool call cannot complete this step.\n`);
         writeError("Re-run this EXACT command yourself and type the value shown above when prompted:\n");
-        writeError(`${formatOnboardingRerunCommand(args)}\n`);
+        writeError(`${formatOnboardingRerunCommand(args, options.runner)}\n`);
       } else {
         writeError(`Error: ${options.command} refused (${confirmation.code}); the typed value did not match ${gateSpec.label}.\n`);
       }

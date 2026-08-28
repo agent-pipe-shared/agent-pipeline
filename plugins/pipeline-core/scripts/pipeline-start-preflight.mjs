@@ -13,6 +13,7 @@ import { measureBootstrapPayload } from "../lib/bootstrap-payload-budget.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { observeCodexPublicCoreIdentity, observePublicCoreIdentity } from "../lib/public-core-observation.mjs";
 import { RULESET_SOURCE_SCHEMA } from "../lib/ruleset-source.mjs";
+import { parseYaml } from "../lib/yaml-lite.mjs";
 import {
   evaluateSelfApplicationAttestation,
   pluginRootHasSelfApplicationGit,
@@ -737,6 +738,52 @@ export function observeConcurrentSessionWarning({
   return null;
 }
 
+/**
+ * The ONE shared "which runner is executing THIS process" resolution --
+ * `scripts/project-onboarding-v3.mjs` imports this rather than carrying a second
+ * copy of the same expression (backlog: a-po-ceremony-in-the-po-s-own-terminal-
+ * resolves-the-wrong-runner.md). Deliberately distinct from "which runner is
+ * this project for" (the `runner` parameter validated throughout
+ * lib/project-onboarding-v3.mjs) -- see that module's own
+ * OnboardingRunnerRequiredError comment for why an environment read was tried
+ * and reverted INSIDE that library; this is the legitimate CLI/session entry
+ * boundary that comment itself names.
+ *
+ * Three POSITIVE session signals, not two-plus-an-else-branch: CLAUDECODE=1 is
+ * Claude Code's own marker; ANTIGRAVITY_AGENT=1 / AI_AGENT=antigravity is
+ * Antigravity's; CODEX_SESSION_ID / CODEX_THREAD_ID (the same pair
+ * native-hook-failure-memory.mjs and codex-onboarding-launch.mjs already treat
+ * as Codex's own session identity) is now Codex's. Only when NONE of the three
+ * fire is this genuinely a signal-less shell -- most concretely a PO's own
+ * attended terminal, which is no runner at all and must never be guessed at by
+ * elimination. In exactly that state, and only then, `rootDir`/`read` (when
+ * supplied) are consulted for the project's OWN declared `runners.default` --
+ * never overriding an actual runner's positive signal, which would otherwise
+ * silently move a real Codex session onto the wrong lane in a dual-runner
+ * repository whose default is Claude. Falls back to "codex" (the historical
+ * default) when the repository declares nothing, or when no `rootDir`/`read`
+ * was supplied at all -- which is the deliberate choice this file's own
+ * preflight call below makes: `observePipelineStartPreflight` never reads
+ * `pipeline.user.yaml` (see its STATUS_SCOPE comment / SETUPSTATUS-1), so its
+ * own no-signal state stays exactly as it was before this change.
+ */
+export function resolveActiveRunner({ env = process.env, rootDir = null, read = readFileSync } = {}) {
+  if (env.CLAUDECODE === "1") return "claude";
+  if (env.ANTIGRAVITY_AGENT === "1" || env.AI_AGENT === "antigravity") return "antigravity";
+  const hasCodexSessionSignal = ["CODEX_SESSION_ID", "CODEX_THREAD_ID"]
+    .some((key) => typeof env[key] === "string" && env[key] !== "");
+  if (hasCodexSessionSignal) return "codex";
+  if (rootDir) {
+    try {
+      const parsed = parseYaml(read(resolve(rootDir, "pipeline.user.yaml"), "utf8"));
+      if (typeof parsed?.runners?.default === "string" && parsed.runners.default !== "") {
+        return parsed.runners.default;
+      }
+    } catch { /* absent/unreadable/unparseable source: fall through to the historical default */ }
+  }
+  return "codex";
+}
+
 export function observePipelineStartPreflight({
   env = process.env,
   pluginList,
@@ -766,7 +813,7 @@ export function observePipelineStartPreflight({
   // Resolved BEFORE the reads below: both the source-manifest read and the
   // installed-plugin-list read must resolve through this same runner
   // identity, so each runner reads and reports its own distribution only.
-  const runner = env.CLAUDECODE === "1" ? "claude" : (env.ANTIGRAVITY_AGENT === "1" || env.AI_AGENT === "antigravity") ? "antigravity" : "codex";
+  const runner = resolveActiveRunner({ env, read });
   const version = resolvePluginManifestVersion(pluginRoot, runner, read);
   const resolvedPluginList = pluginList ?? (() => readInstalledPluginList(runner));
   const installedIdentity = installedPipelineIdentity(resolvedPluginList, runner, knownMarketplaces, cwd);
