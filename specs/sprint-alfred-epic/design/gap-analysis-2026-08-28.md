@@ -130,6 +130,15 @@ acknowledge → submit → reopen → edit → resubmit sequence recorded in
 the reworked package.
 
 **PRD:**
+- Preamble — **normative-basis anchor** (PO directive at the re-review
+  gate, 2026-08-28: the doctrine must be named in the PRD as mandatory
+  basis, not merely cited): a dedicated **"Normative architecture basis"**
+  line naming `design/agent-first-architecture.md` as the epic's binding
+  doctrine — every track's work packages and their reviews conform to it;
+  a deviation requires a recorded decision (register/ADR), never silent
+  drift. The preamble's design-inputs list additionally gains the three
+  rework documents it predates (`design/agent-first-architecture.md`,
+  `design/gap-analysis-2026-08-28.md`, `design/po-input-2026-08-28.md`).
 - §1 rewritten architecture-first: fresh sessions plan blind; structure
   silently human-shaped; knowledge lives in transcripts; prompt-level
   governance (research §3) — then the incidents as proof that even the
@@ -146,6 +155,9 @@ the reworked package.
   estate/re-entry + enforcement + user-facing story (~1.5–2 pages), citing
   the doctrine; Tracks A/B/C re-introduced as "what makes D true".
 - §7: add the semantic-conformance review criterion (#99 §7).
+- §10 Traceability: a doctrine row mapping the PO's four questions to
+  doctrine sections (best practices → §2, enforcement → §4, machine
+  documentation/re-entry → §3, user-facing → §5).
 
 **spec:**
 - §7.1 (D1): enumerate the five axes; the close-impact enum values; the
