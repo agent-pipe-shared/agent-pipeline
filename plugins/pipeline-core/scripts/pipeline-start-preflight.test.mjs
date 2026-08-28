@@ -19,6 +19,16 @@ import {
 } from "./pipeline-start-preflight.mjs";
 import { formatOnboardingRerunCommand } from "./project-onboarding-v3.mjs";
 import { BOOTSTRAP_PAYLOAD_MAX_BYTES } from "../lib/bootstrap-payload-budget.mjs";
+// NVA-K-DRIVERREACH: `ProjectOnboardingReadyError` to inject a readiness denial exactly like
+// the readiness guard's own test suite does (guard-lifecycle-ready.test.mjs's `deny()`), and
+// `isSanctionedLifecycleCommand` -- the SAME real admission function that guard enforces at
+// runtime, imported straight from the module that owns it -- so the property test below
+// cannot pass merely by restating a string both sides happen to agree on.
+import {
+  PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES,
+  ProjectOnboardingReadyError,
+} from "../lib/project-onboarding-ready-gate.mjs";
+import { isSanctionedLifecycleCommand } from "../hooks/guard-lifecycle-ready.mjs";
 
 const manifest = JSON.stringify({ version: "0.4.5+test" });
 const pluginList = (
@@ -182,6 +192,115 @@ test("preflight reports exact identity and no-handoff without secret fields", ()
       schema: "pipeline.project-onboarding.v4",
     },
   });
+});
+
+// NVA-K-DRIVERREACH (backlog: 2026-08-28-the-guided-driver-is-neither-discoverable-nor-
+// runnable.md). Before this dispatch the bootstrap's own `nextAction` named the bare
+// `inspect` for a not-yet-onboarded project too -- the one place the pipeline-start skill
+// already instructs an agent to execute the returned action verbatim, and therefore the one
+// place discovery of the driver actually had to happen. `requireProjectOnboardingReadyFn` is
+// injected here exactly like the readiness guard's own test suite injects a denial
+// (guard-lifecycle-ready.test.mjs's `deny()`), never a real filesystem/git observation.
+function commandFromNextAction(action) {
+  const word = (value) => (/^[A-Za-z0-9_.:=-]+$/u.test(value) ? value : `'${value}'`);
+  return [action.executable, ...action.argv].map(word).join(" ");
+}
+
+test("NVA-K-DRIVERREACH: a not-ready project's nextAction names the guided driver, in its exact admitted shape", () => {
+  const cwd = "/projects/current";
+  const result = preflight({
+    env: {},
+    pluginList: pluginList(),
+    read: () => manifest,
+    cwd,
+    requireProjectOnboardingReadyFn() {
+      throw new ProjectOnboardingReadyError(
+        "PORG-NOT-READY",
+        "raw lifecycle message",
+        { intent: "bootstrap", lifecycleStatus: "kickoff-required" },
+      );
+    },
+  });
+  assert.equal(result.status, "ready");
+  assert.deepEqual(result.nextAction, {
+    kind: "command",
+    executable: "node",
+    argv: [
+      `${result.pluginRoot}/scripts/onboarding-init.mjs`,
+      "--root",
+      cwd,
+      "--runner",
+      "codex",
+    ],
+    mutation: false,
+    requiresConfirmation: false,
+    executionBoundary: "default",
+    expected: {
+      schema: "pipeline.onboarding-init.v1",
+    },
+  });
+});
+
+test("NVA-K-DRIVERREACH: an already-ready project's nextAction stays the pre-existing inspect action, unchanged", () => {
+  const cwd = "/projects/current";
+  const result = preflight({
+    env: {},
+    pluginList: pluginList(),
+    read: () => manifest,
+    cwd,
+    requireProjectOnboardingReadyFn() {
+      return { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "bootstrap" };
+    },
+  });
+  assert.deepEqual(result.nextAction, {
+    kind: "command",
+    executable: "node",
+    argv: [
+      `${result.pluginRoot}/scripts/project-onboarding-v3.mjs`,
+      "inspect",
+      "--root",
+      cwd,
+      "--intent",
+      "bootstrap",
+      "--runner",
+      "codex",
+    ],
+    mutation: false,
+    requiresConfirmation: false,
+    executionBoundary: "default",
+    expected: {
+      schema: "pipeline.project-onboarding.v4",
+    },
+  });
+});
+
+// AC-3: the property, not the string. Whatever command the bootstrap's own `nextAction`
+// names -- for every one of PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES, not just the
+// one status the two tests above happen to use -- the readiness guard's own real admission
+// function must admit it. The two cannot diverge: this repository has already been bitten
+// once by a refusal naming a command the guard refused (backlog:
+// 2026-08-28-the-readiness-guard-blocks-the-recovery-command-it-names.md).
+test("NVA-K-DRIVERREACH: whatever command a not-ready bootstrap's nextAction names, the readiness guard admits it -- the property, not a string", () => {
+  for (const lifecycleStatus of PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES) {
+    const cwd = "/projects/current";
+    const result = preflight({
+      env: {},
+      pluginList: pluginList(),
+      read: () => manifest,
+      cwd,
+      requireProjectOnboardingReadyFn() {
+        throw new ProjectOnboardingReadyError(
+          "PORG-NOT-READY",
+          "raw lifecycle message",
+          { intent: "bootstrap", lifecycleStatus },
+        );
+      },
+    });
+    assert.equal(result.nextAction.kind, "command", lifecycleStatus);
+    assert.equal(result.nextAction.mutation, false, lifecycleStatus);
+    const command = commandFromNextAction(result.nextAction);
+    assert.equal(isSanctionedLifecycleCommand(command, cwd), true, `${lifecycleStatus}: ${command}`);
+  }
 });
 
 test("preflight declares the Claude runner when CLAUDECODE marks the session", () => {

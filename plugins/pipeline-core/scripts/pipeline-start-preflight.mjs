@@ -11,6 +11,15 @@ import { fileURLToPath } from "node:url";
 
 import { measureBootstrapPayload } from "../lib/bootstrap-payload-budget.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+// NVA-K-DRIVERREACH (backlog: 2026-08-28-the-guided-driver-is-neither-discoverable-nor-
+// runnable.md): the same typed readiness check the readiness guard itself uses
+// (guard-lifecycle-ready.mjs), reused here read-only to decide whether THIS bootstrap's
+// `nextAction` should point a not-yet-onboarded project at the guided driver instead of the
+// bare `inspect` -- never to re-implement or duplicate that guard's own logic.
+import {
+  ProjectOnboardingReadyError,
+  requireProjectOnboardingReady,
+} from "../lib/project-onboarding-ready-gate.mjs";
 import { observeCodexPublicCoreIdentity, observePublicCoreIdentity } from "../lib/public-core-observation.mjs";
 import { RULESET_SOURCE_SCHEMA } from "../lib/ruleset-source.mjs";
 import { parseYaml } from "../lib/yaml-lite.mjs";
@@ -794,6 +803,7 @@ export function observePipelineStartPreflight({
   observeAntigravityHardEnforcementFn = observeAntigravityHardEnforcement,
   observePrePushHookInstallationFn = observePrePushHookInstallation,
   observeUnseenPushToRemoteFn = observeUnseenPushToRemote,
+  requireProjectOnboardingReadyFn = requireProjectOnboardingReady,
   observe,
   // PHX-WP-AAC01-MULTISESSION: identifies which already-registered session
   // descriptor (if any) is "this" call's own, so it is excluded from the
@@ -950,6 +960,25 @@ export function observePipelineStartPreflight({
   // `status`/`nextAction`/any other field above -- see that function's own
   // docstring for the exact false-positive-avoidance contract.
   const concurrentSessionWarning = observeConcurrentSessionWarning({ startPath: cwd, currentSessionId });
+  // NVA-K-DRIVERREACH: only asked when `status` (the PLUGIN/bootstrap-distribution
+  // question above) is already "ready" -- this is exactly the branch that used to
+  // unconditionally name the bare `inspect`, for a project that had not yet been
+  // asked whether IT is ready. A project that already IS onboarding-ready keeps this
+  // unchanged (falls through to the pre-existing `inspect` action below); only a
+  // project this readily-observable check can affirmatively place at a non-ready
+  // status gets pointed at the driver instead. Anything this check cannot cleanly
+  // decide (an unresolvable root, a malformed observation, an invalid runner) falls
+  // back to the pre-existing behaviour rather than guessing -- the same
+  // fail-toward-the-status-quo posture every sibling observation in this file takes.
+  let projectOnboardingNotReady = false;
+  if (status === "ready") {
+    try {
+      requireProjectOnboardingReadyFn({ rootDir: cwd, intent: "bootstrap", runner });
+    } catch (error) {
+      projectOnboardingNotReady = error instanceof ProjectOnboardingReadyError
+        && error.code === "PORG-NOT-READY";
+    }
+  }
   const result = {
     schema: SCHEMA,
     status,
@@ -963,26 +992,47 @@ export function observePipelineStartPreflight({
     handoff: ticket && token ? "ready" : ticket || token ? "malformed" : "none",
     concurrentSessionWarning,
     nextAction: status === "ready"
-      ? {
-          kind: "command",
-          executable: "node",
-          argv: [
-            resolve(pluginRoot, "scripts/project-onboarding-v3.mjs"),
-            "inspect",
-            "--root",
-            resolve(cwd),
-            "--intent",
-            "bootstrap",
-            "--runner",
-            runner,
-          ],
-          mutation: false,
-          requiresConfirmation: false,
-          executionBoundary,
-          expected: {
-            schema: "pipeline.project-onboarding.v4",
-          },
-        }
+      ? projectOnboardingNotReady
+        // NVA-K-DRIVERREACH: point discovery at the guided driver -- the one place this
+        // skill already instructs an agent to execute the returned action verbatim, so
+        // it is where an agent actually learns the driver exists and must be run.
+        ? {
+            kind: "command",
+            executable: "node",
+            argv: [
+              resolve(pluginRoot, "scripts/onboarding-init.mjs"),
+              "--root",
+              resolve(cwd),
+              "--runner",
+              runner,
+            ],
+            mutation: false,
+            requiresConfirmation: false,
+            executionBoundary,
+            expected: {
+              schema: "pipeline.onboarding-init.v1",
+            },
+          }
+        : {
+            kind: "command",
+            executable: "node",
+            argv: [
+              resolve(pluginRoot, "scripts/project-onboarding-v3.mjs"),
+              "inspect",
+              "--root",
+              resolve(cwd),
+              "--intent",
+              "bootstrap",
+              "--runner",
+              runner,
+            ],
+            mutation: false,
+            requiresConfirmation: false,
+            executionBoundary,
+            expected: {
+              schema: "pipeline.project-onboarding.v4",
+            },
+          }
       // "plugin-refresh-required" is a soft/advisory status, not a hard block
       // (design §A.5, correcting the prior nextAction: null defect -- that left
       // this branch with nothing to execute and no printable confirmation).
