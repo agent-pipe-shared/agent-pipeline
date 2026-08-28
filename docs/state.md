@@ -37,13 +37,38 @@ absent pre-push hook reported as an unbacked gate (7/7) · `131a9901` twin-manif
 drift detection (34/34) · `89f30758` shared copy-safe renderer (5/5, incl. a real
 `bash eval` round-trip). Merged guard suite: 162/162.
 
-*Round B — in flight (`wf_503c47db-c75`), based on `c67397d7`:* the guided init
-driver; the guard-git worktree fix; a push-gate satisfiability preflight; scanner
-bootstrap for security-on.
+*Rounds B through L — landed, each collected by worktree inspection rather than
+from its report.* The guided init driver exists and reaches a terminal `ready`
+in five driver invocations and four human rounds, with no repair subcommand
+(rounds F/H). Preflight resolves the active runner from three positive signals
+(G) and a not-ready project's bootstrap `nextAction` now names the driver, so
+an agent can learn it exists (K). The closed shell grammar admits bounded `&&`
+chains under a union rule and states the admitted grammar when it refuses (I).
+gitleaks resolves a plugin-shipped default config and downgrades a missing one
+to SKIPPED; `push-prepare` respects `gates.security` (J). The Critic contract
+gained **reachability and effect** as a seventh mandatory search dimension, and
+that addition is carried into the vendored plugin copies (L, `1f51ddc4`/`fa6309b5`).
 
-*Round C — not yet dispatched:* verify-contract elicitation, push-approval mode
-choice, trust-anchor bootstrap, repair-cycle elimination. All four live in
-`lib/project-onboarding-v3.mjs`, so they run sequentially rather than in parallel.
+*Rounds M and N — in flight, both worktree-isolated, based on `fa6309b5`.*
+M (`wf_92f3619d-88c`) fixes the PO profile receipt; N (`wf_9630b671-b19`) makes
+a refused signature push name its cause and makes the two readers of the
+trust-anchor policy agree. Their file scopes are disjoint by construction.
+
+**The receipt defect, measured rather than inferred.** A fresh local project
+driven to `ready` has no `.git/agent-pipeline/po-gate/profile-receipt.json` at
+all, so every `submit-plan` is refused `PO-PROFILE-RECEIPT-INVALID` with no
+route out. The check is correct and fail-closed; nothing publishes. The receipt
+is initialized only by `applyProjectOnboardingKickoffV4`, and the measured apply
+sequence never reaches it — it ends at `bootstrap-bind-apply`, whose
+`applyOnboardingBootstrapBind()` calls the promotion **directly**, bypassing the
+one wrapper that carries receipt responsibility. Two sibling callers, one
+repaired; the same shape as the trust-anchor finding below.
+
+**What a genuinely blind session can do, measured.** Walking the feature/push
+path with no pipeline knowledge, following only a structural `nextAction`, a
+fresh session chains **zero** commands where onboarding chains fifteen. That is
+the gap the `nextAction` protocol was built to close and does not yet close on
+this path.
 
 **A defect in the dispatch mechanism itself, found and filed mid-round**
 (`cb984294`, `8d403723`): `guard-git.mjs:542` resolves a `git commit -F` message
@@ -65,8 +90,23 @@ scanners were measured rather than assumed: with none reachable the run reports
 blocks is the v2 verdict's three offending required capabilities plus a license
 allowlist that resolves only inside this repository.
 
+**One defect class runs through all of this, and it is the reason for Round L.**
+Three capabilities shipped in one session passing their own tests while being
+unusable: the driver (refused by the readiness guard, named by nothing), the
+security gate's satisfying path (measured only inside this checkout, where alone
+its scanner config resolves), and the `nextAction` protocol (published by five
+builders, consumed by nothing on the path that needed it). One fault with three
+faces — **the mechanism was measured, the path to the mechanism was not.** None
+was caught by a test, by Verify or by review; two were caught by the PO asking.
+Filed as `a33ea0cc`, with a mechanical check specified there and the
+complementary Critic dimension landed in Round L. The consumer's B8 finding is
+the same family seen from the other side: the identical trust-anchor defect was
+found and closed in `human-guard-override.mjs` (NVA-HGOFIX-1, two pinning tests)
+and left standing in its sibling reader.
+
 **Still true and unchanged:** the push gate is `approval: required` with
-`gates.push_approval: signature`. Nothing here unblocks a push.
+`gates.push_approval: signature`. Nothing here unblocks a push, and no
+outstanding item may be reported as done while its Critic round is pending.
 
 ## Prior handover — Verify is green in one run; candidate 0.6.0 local (2026-08-27)
 
