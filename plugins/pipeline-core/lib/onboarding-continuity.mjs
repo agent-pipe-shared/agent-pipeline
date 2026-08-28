@@ -5941,6 +5941,40 @@ export function planOnboardingBootstrapBind({
   });
 }
 
+// NVA-D-ACKASK (backlog:
+// 2026-08-28-the-guided-init-ends-in-an-error-where-it-should-ask-the-po.md):
+// buildKickoffPromotionPlan()'s KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING
+// refusal is the correct fail-closed floor for a caller that runs
+// bootstrap-bind-plan directly, but a caller following v4Inspection's own
+// nextAction protocol (project-onboarding-v3.mjs) needs to know BEFORE
+// naming that command whether it can succeed -- the same reason every other
+// human decision in that protocol arrives as a `collect-input` action instead
+// of a raw refusal. This is the read-only observation that decides it: is the
+// marker present, and if not, what artifact identity (path + digest) should
+// the resulting ask name. It writes nothing, and must never be extended to --
+// the marker is the PO's own act; po-gate-authority.mjs's own
+// ACKNOWLEDGEMENT_REPAIR text draws exactly this line for the still-freely-
+// editable, pre-bind case this observes.
+export function observeBootstrapBindAcknowledgement({
+  rootDir, repositoryCapability = "local", spawn = defaultGitSpawn,
+} = {}) {
+  const resolved = resolveBootstrapBindInputs({ rootDir, repositoryCapability, spawn });
+  const prd = observeOptionalProjectFile(resolved.root, resolved.prdPath, "promotion PRD");
+  if (prd.status !== "present") {
+    fail("BOOTSTRAP-BIND-PRECONDITION", "coordinator-sourced binding requires an existing staging PRD");
+  }
+  const spec = observeOptionalProjectFile(resolved.root, resolved.specPath, "promotion specification");
+  if (spec.status !== "present") {
+    fail("BOOTSTRAP-BIND-PRECONDITION", "coordinator-sourced binding requires an existing staging specification");
+  }
+  const acknowledged = [...prd.raw.toString("utf8").matchAll(PRD_ACKNOWLEDGEMENT_MARKER)].length === 1;
+  return {
+    acknowledged,
+    prd: { path: resolved.prdPath, sha256: prd.sha256 },
+    spec: { path: resolved.specPath, sha256: spec.sha256 },
+  };
+}
+
 export function applyOnboardingBootstrapBind({
   rootDir, repositoryCapability = "local", runner = "codex",
   onboardingScript = DEFAULT_ONBOARDING_SCRIPT, expectedPlanSha256, activate = false, deps = {},
