@@ -106,6 +106,7 @@
 | pipeline.continuity-repair-has-no-case-for-an-established-project-missing-only-pipeline-state-json | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.contract-suite-borrows-its-fixture-by-importing-a-109-test-file | closed | workflow-improvement | pipeline | 2026-08-08 | — |
 | pipeline.control-path-invalid-misfires-on-a-transient-repository-discovery-race | closed | defect | pipeline | 2026-08-10 | — |
+| pipeline.core-verify-cannot-pass-under-the-ci-trimmed-path | open | defect | pipeline | 2026-08-28 | — |
 | pipeline.critic-and-verify-cadence-may-be-too-fine-grained | open | workflow-improvement | pipeline | 2026-08-24 | — |
 | pipeline.critic-context-isolation | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.critic-review-has-no-defined-path-for-a-root-commit | closed | defect | pipeline | 2026-08-09 | — |
@@ -464,7 +465,7 @@
 
 ## Counts
 
-- open: 57
+- open: 58
 - in_progress: 3
 - closed: 382
 - rejected: 3
