@@ -136,9 +136,15 @@ the reworked package.
   line naming `design/agent-first-architecture.md` as the epic's binding
   doctrine — every track's work packages and their reviews conform to it;
   a deviation requires a recorded decision (register/ADR), never silent
-  drift. The preamble's design-inputs list additionally gains the three
-  rework documents it predates (`design/agent-first-architecture.md`,
-  `design/gap-analysis-2026-08-28.md`, `design/po-input-2026-08-28.md`).
+  drift. The preamble's design-inputs list additionally gains the two rework
+  documents it predates that are *inputs* rather than the basis itself
+  (`design/gap-analysis-2026-08-28.md`, `design/po-input-2026-08-28.md`);
+  `design/agent-first-architecture.md` is carried by the normative-basis
+  line above instead of being demoted into that list. **Corrected after
+  execution** (graduation Critic F5a): this bullet originally said "the three
+  rework documents", and the graduation executed the stronger placement
+  without recording the deviation. The map is corrected to the execution, not
+  the reverse — the elevation is the better shape.
 - §1 rewritten architecture-first: fresh sessions plan blind; structure
   silently human-shaped; knowledge lives in transcripts; prompt-level
   governance (research §3) — then the incidents as proof that even the
@@ -153,7 +159,11 @@ the reworked package.
   navigation/touched contracts).
 - §4 Track D: expanded from four bullets to the property catalog summary +
   estate/re-entry + enforcement + user-facing story (~1.5–2 pages), citing
-  the doctrine; Tracks A/B/C re-introduced as "what makes D true".
+  the doctrine. Tracks A/B/C are re-introduced as "what makes D true" —
+  **executed in §1.2 and §2 rather than in §4** (graduation Critic F5b): the
+  substructure argument belongs where the problem and the outcomes are
+  stated, and §4 keeps its per-track structure unpolluted. Recorded here
+  rather than moved.
 - §7: add the semantic-conformance review criterion (#99 §7).
 - §10 Traceability: a doctrine row mapping the PO's four questions to
   doctrine sections (best practices → §2, enforcement → §4, machine

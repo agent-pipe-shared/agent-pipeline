@@ -1,7 +1,7 @@
 # Sprint Alfred Epic — Product Requirements
 
 <!-- po-language: en -->
-<!-- technical-spec-sha256: fc653b7252aa9b6dd6fa6235e7a9d30b794eaa7c06425cd889e876584d347ec9 -->
+<!-- technical-spec-sha256: 6e6c871326747c7d6399181f23204a885ce95934693ce31e22dca07834207155 -->
 
 **Feature ID:** `sprint-alfred-epic`
 **Profile / rigor / risk:** Epic / 2 / high (guard, canon, and authority
@@ -559,8 +559,29 @@ executed in the backlog, on GitHub, and in `acceptance.md`.
 5. **Scope trims — none.** C2's range-mode check and B2(viii) gitleaks
    diagnostics both stay in scope; both are small.
 
-**Open at this gate:** none. The remaining gate act is the PO's `approve-plan`
-on the resubmitted plan.
+### Still open — one decision this rework owes the PO
+
+6. **Should D-track work be pulled earlier than Wave 2?** The design's
+   recommendation is **no**: keep the current wave order and carry the
+   architecture emphasis through the reweighted story instead. The reason is
+   §1.2 — A1/A2 measure whether the enforcement layer actually executes, and
+   D3's conformance claims are only honest on top of that measurement; a D
+   pulled ahead of it would ship an architecture gate whose enforcement is
+   itself unverified. What the recommendation costs is calendar: the epic's
+   headline capability starts in Wave 2 rather than Wave 0, so the first
+   visible architecture artifact arrives later than the emphasis might
+   suggest. Pulling D earlier buys that visibility at the price of running it
+   on unmeasured enforcement, with D3 report-only for longer and its
+   promotion still gated on the A-track evidence — so the trade is *when the
+   work is visible*, not *whether it is trustworthy*.
+   **This decision was promised explicitly in
+   [`design/gap-analysis-2026-08-28.md`](design/gap-analysis-2026-08-28.md)
+   §E and was omitted from the first graduation of this section; it is
+   restored here rather than silently defaulted to the recommendation** (found
+   by the graduation Critic round, F1).
+
+**Open at this gate:** decision 6 above. The remaining gate acts are that
+answer and then the PO's `approve-plan` on the resubmitted plan.
 
 ## 10. Traceability
 
