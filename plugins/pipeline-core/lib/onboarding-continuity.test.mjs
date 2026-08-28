@@ -3366,15 +3366,29 @@ function bootstrapBindReadyRoot(name) {
   return { root, featureId: generatePlan.featureId };
 }
 
-// NVA-BL-INTAKEBIND-1 (AC-1, reproduce-first): before this fix, a genuinely
+// NVA-BL-INTAKEBIND-1 (AC-1, reproduce-first): before that fix, a genuinely
 // fresh, unmodified intake-generated staging PRD (no hand-injected markers)
 // failed planOnboardingBootstrapBind() with KICKOFF-PROMOTION-PRD-LANGUAGE-
 // MARKER-INVALID -- a dead end for the entire material-intake happy path
 // (confirmed live via scratch/repro-nva-bl-intakebind-1.mjs before any fix
 // landed). Proves the fix: the freshly generated PRD now already carries
-// BOTH mechanical markers with the correct values, and only the genuine
-// judgment-call marker (po-plan-acknowledged) is still missing.
-check("planOnboardingBootstrapBind: a fresh, unmodified intake-generated staging PRD already carries valid po-language/technical-spec-sha256 markers -- only the acknowledgement marker is still missing", () => {
+// BOTH mechanical markers with the correct values.
+//
+// NVA-R2-STAGINGACKTESTS: the final assertion below is updated, not silently
+// retuned -- documented here as the briefing for that task requires. Before
+// this task's base commit (NVA-R-STAGINGACK), the genuine judgment-call
+// marker (po-plan-acknowledged) being still missing on this EXACT fixture --
+// a fresh, unmodified, consent-recorded generator PRD -- correctly refused
+// with KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING (what this test
+// asserted until now). That base commit narrowly exempts precisely this
+// case: nobody has been asked to author a word of these bytes, so demanding
+// the PO's plan-acknowledgement marker on them would certify a judgement
+// nobody made. This fixture is now the exemption's own positive case
+// (pinned again, independently, by "the exemption fires" check below) --
+// updating the final assertion here to match is required by the base
+// commit's own design, not a weakening; the marker-content assertions above
+// are untouched and still pin the AC-1 regression fix they always did.
+check("planOnboardingBootstrapBind: a fresh, unmodified intake-generated staging PRD already carries valid po-language/technical-spec-sha256 markers -- the acknowledgement marker is exempt by design (NVA-BL-INTAKEBIND-1, NVA-R2-STAGINGACKTESTS)", () => {
   const root = readyToGenerateRoot("bootstrap-bind-ac1-markers");
   const generatePlan = planOnboardingIntakeGenerate({ rootDir: root });
   applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: generatePlan.planSha256, activate: true });
@@ -3382,8 +3396,8 @@ check("planOnboardingBootstrapBind: a fresh, unmodified intake-generated staging
   assert.equal(prdText.startsWith(
     `<!-- po-language: en -->\n<!-- technical-spec-sha256: ${generatePlan.targets.spec.afterSha256} -->\n`,
   ), true, prdText);
-  expectKickoffError("KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING",
-    () => planOnboardingBootstrapBind({ rootDir: root }));
+  const plan = planOnboardingBootstrapBind({ rootDir: root });
+  assert.equal(plan.schema, KICKOFF_PROMOTION_PLAN_SCHEMA);
 });
 
 check("planOnboardingBootstrapBind / applyOnboardingBootstrapBind: happy path binds with no kickoff predecessor", () => {
@@ -3482,6 +3496,129 @@ check("a coordinator-sourced binding satisfies the PO plan gate's current contra
   assert.equal(authority.code, "PO-GATE-AUTHORITY-VALID");
   assert.equal(authority.value.planPath, plan.authority.prd.path);
   assert.equal(authority.value.specPath, plan.authority.spec.path);
+});
+
+// ---------------------------------------------------------------------------
+// NVA-R2-STAGINGACKTESTS: pins the pureGeneratorExempt exemption
+// (pureGeneratorPromotionPrdSha256, promotionArtifacts' pureGeneratorExempt
+// branch, buildCoordinatorSourcedPromotionPlan's call site -- all above) as
+// narrow by construction: it must fire for a provably-untouched staging PRD
+// with recorded consent, and it must NOT fire the instant any one of those
+// conditions stops holding. Mirrors bootstrapBindReadyRoot's own setup
+// exactly, only withholding the final marker-append step -- the marker is
+// precisely what this exemption exists to make unnecessary here.
+function bootstrapBindPureGeneratorRoot(name) {
+  const root = readyToGenerateRoot(`bootstrap-bind-pure-${name}`);
+  const generatePlan = planOnboardingIntakeGenerate({ rootDir: root });
+  applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: generatePlan.planSha256, activate: true });
+  return { root, featureId: generatePlan.featureId, generatePlan };
+}
+
+// Written first, per the task's own instruction: this is the test that makes
+// the relaxation safe. Any single hand edit to the staging PRD -- even one
+// appended line of prose nobody reviewed, the marker lines themselves left
+// untouched -- must change prd.sha256 away from the checkpoint-derived digest
+// pureGeneratorPromotionPrdSha256 recomputes, so pureGeneratorExempt goes
+// false and the ordinary refusal (unchanged since NVA-W4-2B) fires again.
+check("planOnboardingBootstrapBind: a single hand edit to the pure-generator staging PRD revokes the exemption, refused with the same missing-marker code (NVA-R2-STAGINGACKTESTS)", () => {
+  const { root, generatePlan } = bootstrapBindPureGeneratorRoot("one-byte-edit");
+  const prdAbsolute = join(root, generatePlan.targets.prd.path);
+  const original = readFileSync(prdAbsolute, "utf8");
+  assert.equal(original.includes("po-plan-acknowledged"), false, "fixture must start marker-less");
+  writeFileSync(prdAbsolute, `${original}\nOne extra line of prose nobody reviewed.\n`);
+  expectKickoffError("KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING",
+    () => planOnboardingBootstrapBind({ rootDir: root }));
+});
+
+// NVA-R2-STAGINGACKTESTS: DoD item 1 ("the exemption fires ... binds through
+// the coordinator-sourced path") is deliberately NOT written as a passing
+// check here. It cannot be, against the implementation as it stands --
+// confirmed live, not assumed. The commented body below is exactly the test
+// this task's briefing asked for; running it throws INSIDE
+// applyOnboardingBootstrapBind (not planOnboardingBootstrapBind):
+//
+//   KickoffError: The promoted PRD must carry the PO's plan acknowledgement
+//   marker exactly once ...
+//     at fail (onboarding-continuity.mjs:232:9)
+//     at promotionArtifacts (onboarding-continuity.mjs:4264:7)
+//     at applyOnboardingKickoffPromotion (onboarding-continuity.mjs:6587:23)
+//     at applyOnboardingBootstrapBind (onboarding-continuity.mjs:6100:10)
+//   code: 'KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING'
+//
+// Root cause: buildCoordinatorSourcedPromotionPlan (plan time) threads
+// pureGeneratorPrdSha256 into its promotionArtifacts() call, but
+// applyOnboardingKickoffPromotion's OWN later re-admission call to
+// promotionArtifacts (line 6587, reached on every first real apply,
+// coordinator-sourced or not) calls it with no third argument at all --
+// checkMarkers defaults true, pureGeneratorPrdSha256 defaults null, so
+// pureGeneratorExempt is unconditionally false there. The exemption computed
+// at plan time is therefore never honoured at apply time: a pure-generator,
+// marker-less PRD can produce a *plan* (planOnboardingBootstrapBind succeeds,
+// see the AC-1 check above), but applyOnboardingBootstrapBind on that exact
+// plan always still refuses it. The relaxation this task was asked to pin
+// currently has no working end-to-end path -- confirmed by running the test
+// below against the unmodified base commit.
+//
+// This is a genuine defect in plugins/pipeline-core/lib/onboarding-continuity.mjs,
+// which this task's briefing forbids editing (scope: onboarding-continuity.test.mjs
+// and evidence/ only, "Do not change ... onboarding-continuity.mjs except to
+// revert your own temporary measurement"). Per that briefing's own stop
+// condition ("If a test cannot be written against the implementation as it
+// stands, that is a STOP-and-report"), this is reported rather than forced
+// green by touching a forbidden file or by weakening the assertion to match
+// the bug. See the completion report for the recommended one-call-site fix.
+//
+// check("planOnboardingBootstrapBind / applyOnboardingBootstrapBind: a fresh, unmodified intake-generated staging PRD with recorded consent and no acknowledgement marker binds through the coordinator-sourced path (NVA-R2-STAGINGACKTESTS)", () => {
+//   const { root, featureId, generatePlan } = bootstrapBindPureGeneratorRoot("exemption-fires");
+//   const prdText = readFileSync(join(root, generatePlan.targets.prd.path), "utf8");
+//   assert.equal(prdText.includes("po-plan-acknowledged"), false, "fixture must start marker-less");
+//   const plan = planOnboardingBootstrapBind({ rootDir: root });
+//   assert.equal(plan.schema, KICKOFF_PROMOTION_PLAN_SCHEMA);
+//   assert.equal(plan.kickoff, null);
+//   assert.equal(plan.feature.id, featureId);
+//   const applied = applyOnboardingBootstrapBind({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
+//   assert.equal(applied.schema, KICKOFF_PROMOTION_APPLY_SCHEMA);
+//   assert.equal(applied.status, "applied");
+//   assert.equal(applied.mutated, true);
+// });
+
+// Same pure-generator PRD bytes; only the checkpoint's own recorded consent
+// is hand-edited away (contentSha256 recomputed with the exact same
+// canonical-JSON algorithm onboarding-continuity.mjs's own canonicalSha256
+// uses, so the checkpoint stays well-formed rather than merely corrupt --
+// readOnboardingIntakeCheckpoint must still read it back as "present").
+// pureGeneratorPromotionPrdSha256 returns null on `consent === null` before
+// it ever re-derives a digest to compare, so this is refused for a different
+// reason than the byte-edit test above, and must be refused all the same.
+check("planOnboardingBootstrapBind: the same pure-generator staging PRD is refused when the checkpoint's recorded consent is absent (NVA-R2-STAGINGACKTESTS)", () => {
+  const { root } = bootstrapBindPureGeneratorRoot("no-consent");
+  const paths = resolveIntakeCheckpointPaths({ rootDir: root });
+  const checkpoint = JSON.parse(readFileSync(paths.checkpoint, "utf8"));
+  checkpoint.consent = null;
+  const { contentSha256: _stale, ...unsigned } = checkpoint;
+  checkpoint.contentSha256 = sha256CanonicalJson(unsigned);
+  writeFileSync(paths.checkpoint, `${JSON.stringify(checkpoint, null, 2)}\n`);
+  const observed = readOnboardingIntakeCheckpoint({ rootDir: root });
+  assert.equal(observed.status, "present", "the hand-edited checkpoint must still be well-formed -- only consent is absent");
+  assert.equal(observed.value.consent, null);
+  expectKickoffError("KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING",
+    () => planOnboardingBootstrapBind({ rootDir: root }));
+});
+
+// The other route is untouched: buildKickoffPromotionPlan's kickoff-sourced
+// branch (coordinatorSourced: false, planOnboardingKickoffPromotion's own
+// call site) never computes or passes pureGeneratorPrdSha256 at all -- it is
+// only ever supplied by the two coordinator-sourced call sites. A kickoff
+// promote of a marker-less PRD must therefore stay refused exactly as before
+// this feature, independent of and in addition to the pre-existing NVA-W4-2B
+// test above (which this change must leave passing unchanged).
+check("planOnboardingKickoffPromotion: a kickoff-sourced (non-coordinator) promotion of a marker-less PRD stays refused -- the exemption is unreachable from this route (NVA-R2-STAGINGACKTESTS)", () => {
+  const seed = promotionSeed("r2-stagingack-other-route-untouched");
+  const path = promotedArtifact(seed, "prd_promoted.md");
+  writeFileSync(path, readFileSync(path, "utf8").split("\n")
+    .filter((line) => !line.startsWith("<!-- po-plan-acknowledged:")).join("\n"));
+  expectKickoffError("KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING",
+    () => planOnboardingKickoffPromotion(seed.request));
 });
 
 // ---- NVA-F-PROMOTIONACTION: promotion plans publish nextAction -----------
