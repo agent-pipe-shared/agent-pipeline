@@ -1,0 +1,17 @@
+{
+  "taskId": "NVA-B-SCANNER",
+  "agentType": "goldfish-deep",
+  "model": "claude-sonnet-5",
+  "effort": "xhigh",
+  "rulesetSha": "0.6.0+claude.20260828131316.03c6e1e",
+  "dispatcher": "elephant",
+  "outcome": "in-progress",
+  "log": [
+    {
+      "phase": "bootstrap",
+      "detail": "Containment check passed (worktree path contains /.claude/worktrees/). HEAD was 0d5a6e6b, self-healed via checkout --detach to c67397d7 (expected SHA). Working tree clean after checkout.",
+      "toolUseCount": 4
+    }
+  ],
+  "report": null
+}
