@@ -90,156 +90,97 @@ artifact 0.6.0. (2) **AK-6** is ready to re-dispatch against
 have flagged a correct calibration as drifted; withdrawn `1d6dec55`, scaffolding
 kept at `8316dbd8`).
 
-### The V-wave — the PO's happy path, against the five touches
+### Where the candidate stands (night of 2026-08-28/29)
 
-PO ruling 2026-08-28: **"ALLE davon jetzt machen"** — what had been listed as
-shipping-knowingly-open is elementary to the happy-path test, not deferrable. Six
-packages, dispatched to Goldfish; five landed, each collected only after its diff
-was read rather than from its report.
+Twenty-one commits since `1c95de2c`. **486 of 488 Verify entries green** on a
+quiesced tree; security scan CLEAN, exit 0. The five touches are wired and
+measured live against an empty directory, not inferred: the guided driver runs ten
+steps on its own and stops exactly **three** times — author/push-mode/verify-command/
+trust-anchor bundled into one stop, then consent+language+profile+first description
+in a single call, then the one bundled design-question round — and the project
+reaches `ready` with a bound PRD/Spec.
 
-- **V1 `357be129`** — a dead `poKeyDirectory` pointer. On a machine that owns a
-  working key, a fresh onboarding seeded a bare v1 policy: the recorded directory
-  was a vanished `/tmp` test path; first-write-wins protected it forever because
-  its predicate tested for a non-empty string rather than a directory; and
-  detection folded a broken pointer into the same `null` as a genuine no-key
-  machine. Both halves fixed. **Nothing consumes the new status yet** — disclosed
-  by the dispatch, not glossed — so a fresh onboarding here still seeds bare v1
-  silently and Touch 5 stays dead until the trust-anchor ask reports it.
-- **V2 `7b2487b2` + `0d199c75`** — the `awaiting-approval` gate. An earlier claim
-  that it named no command was stale: it named the artifacts but only *described*
-  the command in prose. Rendered now, with `--by` deliberately left a placeholder
-  (deriving it would let a session approve the PO's plan for them). The test
-  executes the rendered command and drives it through the guard's own
-  `isSanctionedLifecycleCommand`. The `pipeline-start` skill names the driver.
-- **V3 `5e4b4d76`** — the driver reads `nextAction.pendingAsks`. Measured before:
-  it executed past all three published asks and stopped two commands later at an
-  unrelated question.
-- **V5 `fd74b6de`** — corrects a claim made earlier in this same session. Round 4
-  (acknowledge the staging PRD) was reported as removed by the R-chain; it was not.
-  The bind accepted the draft without the marker while the observation still asked
-  for it. `exempt` is now part of that observation. This also repaired a regression
-  the R-chain had left in the tree, caught only because a dispatch's
-  "pre-existing and unrelated" reading of a red test was checked, not believed.
-- **V4 push-path driver** — in flight (`scripts/push-init.mjs`).
+**The two remaining red Verify entries both need the PO's key, not more work.**
+`verify-suite-registration-check` (two suites that pass standalone but are not in
+`verify.mjs`, TP-3) and `pipeline-state-tests` (PS53j, TP-5, proven pre-existing by
+running the same check against `1c95de2c` in a separate worktree). Spec §8 already
+grants a standing Nova authorization to lift TP-1/TP-3/TP-5 for an exact task —
+this handover previously mis-recorded that as a PO gate to be requested. The
+authorization exists; `guard-testpath` reads `gates.push_approval`, this repository
+is on `signature`, and that mode has no in-session activation step. So the ask is
+"sign", not "authorize".
 
-### What still blocks a stamped candidate, in order
+**A standing authorization the mechanism cannot honour reads as a blocker to every
+agent, and did to three sessions in one night.** Whether §8 promises more than the
+guard delivers, or the guard's signature mode should know about §8, is an open
+design question.
 
-1. **Finish V1's other half** — surface the broken-pointer status, so Touch 5 works.
-2. **`intake-consent-apply --text`** — merges the two independent onboarding rounds,
-   taking Touch 2 to one. Measured absent.
-3. **Collect V4.**
-4. **ADR collision 0063 → 0072**, then **register `check-adr-consistency.mjs` in
-   `verify.mjs`** (ADR-0069 D3) — in that order, or Verify goes red by design. The
-   checker exists and works; `verify.mjs` never ran it, which is why six collisions
-   landed unreported. Carried forward from the rotated 2026-08-27 handover.
-5. **Full Verify on a quiesced tree.**
-6. **1+1 Critic** (opus/max, `routing.duties.critic_high_risk.claude`), with the
-   staging-marker exemption explicitly in scope because it relaxes a PO gate.
-7. **Manifest version bump, stamp both runner manifests, rsync.**
+### The 2+2 Critic round
 
-Also carried forward from that rotation, still live: **BS25/BS26 durability**
-(ADR-0068 D6) — three positional ledger lookups remain (`backlog-state.mjs:1326`,
-`:1504`, the test fixture); two can bind by `entryHash`, `amendsSequence` needs an
-additive `amendsEntryHash`, and the fixture must stay positional, so the prefix
-invariant becomes a named check. And the **Antigravity hard-enforcement layer's two
-fail-open paths** — PO instruction 2026-08-27 puts the agy security items in this
-candidate; the whole layer is inert whenever the daemon cannot resolve `node`, and
-it fails silently because the hook that would report it is the one that does not run.
+Two independent Critics on the frozen candidate: both **FAIL**, on a blocker aimed
+at the dispatch rather than the code — QG-01 forbids handing a diff to the Critic
+while deterministic gates are red, and that was done knowingly. Their verdict on
+the candidate therefore stands under that reservation and is not a release.
 
-Open and measured, not blocking a local test: the push gate is unsatisfiable in an
-installed-plugin deployment; reachability is a review-time Critic prompt with no
-mechanical check; the ready-gate shape is hand-maintained in three places; the five
-onboarding asks are published from one command's response and no observation.
+Two Re-Critics on the rework diff: both **PASS**.
 
-**The receipt defect, measured rather than inferred.** A fresh local project
-driven to `ready` has no `.git/agent-pipeline/po-gate/profile-receipt.json` at
-all, so every `submit-plan` is refused `PO-PROFILE-RECEIPT-INVALID` with no
-route out. The check is correct and fail-closed; nothing publishes. The receipt
-is initialized only by `applyProjectOnboardingKickoffV4`, and the measured apply
-sequence never reaches it — it ends at `bootstrap-bind-apply`, whose
-`applyOnboardingBootstrapBind()` calls the promotion **directly**, bypassing the
-one wrapper that carries receipt responsibility. Two sibling callers, one
-repaired; the same shape as the trust-anchor finding below.
+The round's yield was mostly about the dispatcher's own work: a wrong
+authorship-evidence artifact (fixed), one commit carrying no `Dispatch:` trailer
+(`278ce178`, unfixable without rewriting history), the TP-3 misreading above, and
+one security gap no tool could have found — `GMWKC01` walks kernel→imported, so a
+module that *imports* a kernel module is structurally invisible to it. The two
+Critics disagreed about that gap; the one who filed it was right.
 
-**What a genuinely blind session can do, measured.** Walking the feature/push
-path with no pipeline knowledge, following only a structural `nextAction`, a
-fresh session chains **zero** commands where onboarding chains fifteen. That is
-the gap the `nextAction` protocol was built to close and does not yet close on
-this path.
+### Open, measured, not blocking a local test
 
-**A defect in the dispatch mechanism itself, found and filed mid-round**
-(`cb984294`, `8d403723`): `guard-git.mjs:542` resolves a `git commit -F` message
-file against `CLAUDE_PROJECT_DIR` rather than the invoking cwd, so inside a
-worktree the file is looked for in the main checkout and the commit is refused as
-`GIT-03-UNREADABLE-MESSAGE-FILE`. Two sibling dispatches hit it; one guessed the
-absolute-path workaround and landed its commits, the other returned an empty result
-with finished work stranded. Combined with the closed grammar's refusal of a newline
-in `-m`, a correct multi-line commit is unreachable from a worktree. Fix dispatched
-as `NVA-B-GUARDF`; until it lands, every worktree briefing must state the
-absolute-path rule. A second contradiction of the same kind is recorded in that
-item: `templates/prompts/goldfish-task.md` instructs `git add … && git commit …` as
-one call, which the grammar refuses.
+The ready-gate shape is hand-maintained in three places. Reachability is a
+review-time prompt with no mechanical check. **BS25/BS26 durability** (ADR-0068 D6):
+three positional ledger lookups remain (`backlog-state.mjs:1326`, `:1504`, the test
+fixture); two can bind by `entryHash`, `amendsSequence` needs an additive
+`amendsEntryHash`, and the fixture must stay positional, so the prefix invariant
+becomes a named check. The **Antigravity hard-enforcement layer's two fail-open
+paths** (PO instruction 2026-08-27, in this candidate): the whole layer is inert
+whenever the daemon cannot resolve `node`, and it fails silently because the hook
+that would report it is the one that does not run.
 
 **Two of the four documented reasons for `security: off` are stale** (`c67397d7`).
-Onboarding now writes the `.gitignore` whose absence reason 1 describes, and missing
-scanners were measured rather than assumed: with none reachable the run reports
-`SKIPPED [binary_missing]` ×3, `license-check: OK`, **CLEAN, exit 0**. What actually
-blocks is the v2 verdict's three offending required capabilities plus a license
-allowlist that resolves only inside this repository.
+What actually blocks is the v2 verdict's three offending required capabilities plus
+a license allowlist that resolves only inside this repository.
 
-**The PO's acceptance bar for the happy path, stated 2026-08-28 and kept verbatim
-because it is what "done" means for this candidate.** Five human touches, and no
-others, when nothing needs asking back:
+**Codex restarts where a resume would do.** The barrier's contract requires "a
+ticket proving a fresh *Codex* process re-read those bytes" — a new process, not a
+new conversation. By that contract a resume clears it and keeps context. The one
+empirical fact it turns on is unmeasured: whether `codex resume` re-reads
+`.codex/*`. Measure that before changing any instruction.
+
+**One defect class runs through all of this.** Capabilities that pass their own
+tests while being unusable — *named but not admitted*, *admitted but not named*,
+*published but not consumed*. **The mechanism was measured, the path to the
+mechanism was not.** Filed as `a33ea0cc`, with the complementary Critic dimension
+landed in Round L; that dimension then found the night's largest defects, which is
+the evidence it is correctly worded.
+
+Its sibling shape, seen repeatedly during the night: **a change to A creates an
+obligation at B, and only a later gate run reveals it.** Editing a doc staled its
+vendored copy; regenerating that copy tripped the consumer-path scanner; extending
+the Critic search surface invalidated a security baseline pinned to it; registering
+five suites silently invalidated the capability inventory. None is carelessness;
+each is a missing coupling.
+
+### The PO's acceptance bar, kept verbatim because it is what "done" means
 
 > *"1. ich bestätige, dass die pipeline installiert werden soll 2. ich beantworte
 > eine reihe anfragen fürs onboarding (modus, author, etc.) 3. ich gebe PRD frei
 > 4. ich verlange den push 5. ich signiere den push"*
 
-Measured against a live blind walk at `60ab3d46`, touches 1+2 are already one
-bundled ask and 4+5 are already right. Two gaps remain, both confirmed by
-measurement rather than reading:
-
-- **The PRD is signalled twice.** Onboarding has the PO acknowledge the staging
-  PRD by writing a marker into it; `approve-plan` then asks the PO to read and
-  approve *the same file* — verified identical path in one run. One judgement,
-  two acts.
-- **`submit-plan` stops for values the project already holds.** The `draft` gate
-  asks for `--by` and `--profile`. Its own comment defends this as "cannot derive
-  from `project/pipeline-state.json`", which is true of that file and beside the
-  point: onboarding asked the PO for both and persisted them — `values.profile`
-  in the intake checkpoint, the git author in this repository's local Git config
-  (both read back live in a freshly onboarded project). Being fixed as
-  NVA-Q2-DRAFTDERIVE.
-
-The transition itself is otherwise clean: after approval, `set-phase` chains
-automatically and implementation is reached with no further human involvement.
-
-**Codex restarts where a resume would do.** The restart barrier's own contract
-requires "a ticket proving a fresh *Codex* process re-read those bytes"
-(`lib/codex-onboarding-runtime.mjs`) — a new process that re-read `.codex/*`,
-not a new conversation. By that contract a resume clears it exactly as a cold
-start does, and keeps the session's context; the code already contemplates the
-word ("a Claude-native restart/resume launcher still needs to be built"). What is
-NOT yet established is the one empirical fact it turns on: whether `codex resume`
-re-reads `.codex/*`. Measure that before changing any instruction.
-
-**One defect class runs through all of this, and it is the reason for Round L.**
-Three capabilities shipped in one session passing their own tests while being
-unusable: the driver (refused by the readiness guard, named by nothing), the
-security gate's satisfying path (measured only inside this checkout, where alone
-its scanner config resolves), and the `nextAction` protocol (published by five
-builders, consumed by nothing on the path that needed it). One fault with three
-faces — **the mechanism was measured, the path to the mechanism was not.** None
-was caught by a test, by Verify or by review; two were caught by the PO asking.
-Filed as `a33ea0cc`, with a mechanical check specified there and the
-complementary Critic dimension landed in Round L. The consumer's B8 finding is
-the same family seen from the other side: the identical trust-anchor defect was
-found and closed in `human-guard-override.mjs` (NVA-HGOFIX-1, two pinning tests)
-and left standing in its sibling reader.
+Touch 3 carries an open quality question rather than a defect: what the PO releases
+is a staging draft that is a verbatim intake transcript until an agent authors the
+product framing. The flow is coherent — binding is provisional, the real release is
+the plan-approval gate — but nothing forces the authoring step between the two.
 
 **Still true and unchanged:** the push gate is `approval: required` with
-`gates.push_approval: signature`. Nothing here unblocks a push, and no
-outstanding item may be reported as done while its Critic round is pending.
+`gates.push_approval: signature`. Nothing here unblocks a push, and no outstanding
+item may be reported as done while its gate is pending.
 
 ## Operational head
 
