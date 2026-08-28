@@ -415,7 +415,7 @@ import {
   readCloseCoordinator,
 } from "./publication-close-journal.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
-import { nextActionSection, syncStateMdNextAction } from "../lib/onboarding-continuity.mjs";
+import { nextActionSection, readOnboardingIntakeCheckpoint, syncStateMdNextAction } from "../lib/onboarding-continuity.mjs";
 import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
 import { refusePlanAuthorityStagingPath } from "../lib/plan-authority-staging-guard.mjs";
 
@@ -3156,21 +3156,84 @@ function resolvePushThreatModelArtifact(dir) {
 // invented (onboarding-init.mjs's own "NEVER INVENTS A VALUE" contract),
 // matching `intakeConsentAction()`'s "ask once, then call the apply command
 // with the answers" shape.
+/** Delivery profiles `submit-plan --profile` accepts; mirrors the case handler's own literal. */
+const DRAFT_PLAN_PROFILES = new Set(["epic", "feature", "mini"]);
+
+/**
+ * NVA-Q2-DRAFTDERIVE: the `draft` gate previously always asked a human for
+ * `--by`/`--profile`, even though onboarding already collected both and
+ * recorded them -- the profile in the intake checkpoint's `values.profile`
+ * (`applyOnboardingIntakeConsent`, lib/onboarding-continuity.mjs), the
+ * submitter in this repository's own local Git config (onboarding applies the
+ * PO's answer there). This derives both, NEVER inventing a value: a missing,
+ * malformed, or out-of-vocabulary source resolves to `null` here, which the
+ * caller below treats exactly like "onboarding never ran".
+ *
+ * The Git read is deliberately scoped to `dir`'s OWN local config, not
+ * whatever repository a upward directory walk happens to land on:
+ * `GIT_CEILING_DIRECTORIES` is set to `dir`'s parent so discovery stops
+ * before ascending past `dir` itself. Without this, a `dir` that is not
+ * itself a Git repository (an adopted project, a fixture nested inside a
+ * larger checkout) would silently pick up an ENCLOSING repository's
+ * unrelated `user.name` instead of correctly reporting the submitter absent.
+ */
+function resolveDraftPlanSubmissionDefaults(dir, deps = {}) {
+  const spawn = deps.spawn ?? spawnSync;
+  let by = null;
+  const gitResult = spawn("git", ["config", "--local", "--get", "user.name"], {
+    cwd: dir,
+    encoding: "utf8",
+    env: { ...process.env, GIT_CEILING_DIRECTORIES: dirname(dir) },
+  });
+  if (!gitResult.error && gitResult.status === 0 && typeof gitResult.stdout === "string") {
+    const trimmed = gitResult.stdout.trim();
+    if (trimmed !== "") by = trimmed;
+  }
+  let profile = null;
+  try {
+    const checkpoint = readOnboardingIntakeCheckpoint({ rootDir: dir });
+    const candidate = checkpoint.status === "present" ? checkpoint.value?.values?.profile : null;
+    if (typeof candidate === "string" && DRAFT_PLAN_PROFILES.has(candidate)) profile = candidate;
+  } catch {
+    // A malformed checkpoint is not a value this command may invent a
+    // reading from -- treat it exactly like "no checkpoint": ask.
+    profile = null;
+  }
+  return { by, profile };
+}
+
 function buildInspectNextAction(dir, state, lifecycle) {
   if (!lifecycle.ok || lifecycle.status === null) return null;
   if (lifecycle.status === "draft") {
+    const derived = resolveDraftPlanSubmissionDefaults(dir);
+    const scriptPath = fileURLToPath(import.meta.url);
+    if (derived.by !== null && derived.profile !== null) {
+      return {
+        kind: "command",
+        executable: process.execPath,
+        argv: [scriptPath, "submit-plan", "--by", derived.by, "--profile", derived.profile],
+        mutation: true,
+        requiresConfirmation: true,
+      };
+    }
+    const inputs = [];
+    if (derived.by === null) {
+      inputs.push({ name: "by", encoding: "utf8", trim: true, minBytes: 1, maxBytes: 128, singleLine: true, rejectNul: true });
+    }
+    if (derived.profile === null) {
+      inputs.push({ name: "profile", encoding: "utf8", trim: true, minBytes: 4, maxBytes: 7, singleLine: true, rejectNul: true });
+    }
+    const byRender = derived.by === null ? "<submitter's name>" : derived.by;
+    const profileRender = derived.profile === null ? "<epic|feature|mini>" : derived.profile;
+    const command = `${process.execPath} ${scriptPath} submit-plan --by "${byRender}" --profile "${profileRender}"`;
+    const askFor = inputs.map((input) => (input.name === "by" ? "who is submitting the plan" : "which delivery profile applies (epic, feature, or mini)")).join(" and ");
     return {
       kind: "collect-input",
-      inputs: [
-        { name: "by", encoding: "utf8", trim: true, minBytes: 1, maxBytes: 128, singleLine: true, rejectNul: true },
-        { name: "profile", encoding: "utf8", trim: true, minBytes: 4, maxBytes: 7, singleLine: true, rejectNul: true },
-      ],
+      inputs,
       mutation: false,
       requiresConfirmation: false,
-      guidance: "no plan has been submitted yet. Neither the submitter's name nor the delivery profile is"
-        + " recorded anywhere this command can read -- ask who is submitting the plan and which delivery"
-        + " profile applies (epic, feature, or mini), then call pipeline-state submit-plan with --by and"
-        + " --profile set to those exact answers.",
+      guidance: "no plan has been submitted yet, and this command cannot derive every value it needs -- ask"
+        + ` ${askFor}, then fill the missing placeholder(s) and run: ${command}`,
       expected: { schema: INSPECT_SCHEMA, statuses: ["draft"] },
     };
   }
