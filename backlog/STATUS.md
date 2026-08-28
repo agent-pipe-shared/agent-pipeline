@@ -217,6 +217,7 @@
 | pipeline.hardening-round-cannot-register-its-own-suites | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.harness-classifier-blocks-authorized-onboarding-action | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.hash-chained-ledger-collides-with-the-secret-scanner | closed | defect | pipeline | 2026-08-08 | — |
+| pipeline.heredoc-refusal-teaches-no-substitute | open | defect | pipeline | 2026-08-28 | — |
 | pipeline.hgo-author-repair-digest-withholding-is-bypassable-by-reading-the-request-store | closed | defect | pipeline | 2026-08-19 | — |
 | pipeline.hgo-ceremony-should-reduce-po-involvement-to-only-the-external-signing-step | closed | workflow-improvement | pipeline | 2026-08-19 | — |
 | pipeline.hgo-cli-side-granted-wiring-conflicts-with-arm-time-drift-check | closed | requirement | pipeline | 2026-08-19 | — |
@@ -246,7 +247,7 @@
 | pipeline.ledger-event-403-has-a-short-hash-evidence-commit | closed | defect | pipeline | 2026-08-12 | — |
 | pipeline.ledger-genesis-event-hash-rebind-has-no-amendment-mechanism | closed | defect | pipeline | 2026-08-19 | — |
 | pipeline.license-check-declared-path-absence-still-reads-as-scanner-error | closed | defect | pipeline | 2026-08-11 | — |
-| pipeline.lifecycle-event-schema-has-no-non-dispatch-correlation-shape | open | defect | pipeline | 2026-08-17 | — |
+| pipeline.lifecycle-event-schema-has-no-non-dispatch-correlation-shape | open | defect | pipeline | 2026-08-17 | Reassigned from phoenix to nova on 2026-08-28 by PO decision, after the Phoenix line was intaked into Nova |
 | pipeline.lifecycle-guard-allowlist-still-misses-apply-partial-authority-and-adopt-remote | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.lifecycle-guard-does-not-know-the-human-signing-commands | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.lifecycle-guard-omits-the-partial-authority-repair-it-prescribes | closed | defect | pipeline | 2026-08-16 | — |
@@ -302,7 +303,7 @@
 | pipeline.per-phase-progress-message-budget | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.permitted-edit-drops-session-into-unrecoverable-readiness | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.phase-aware-bootstrap-readiness | closed | workflow-improvement | pipeline | 2026-08-18 | — |
-| pipeline.phoenix-merge-re-critic-minor-findings | open | workflow-improvement | pipeline | 2026-08-27 | — |
+| pipeline.phoenix-merge-re-critic-minor-findings | open | workflow-improvement | pipeline | 2026-08-27 | Reassigned from phoenix to nova on 2026-08-28 by PO decision, after the Phoenix line was intaked into Nova |
 | pipeline.pipeline-author-repair-signature-mode-never-actually-admits-the-edit | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.pipeline-state-rebind-codex-default-runner | closed | defect | pipeline | 2026-08-05 | — |
 | pipeline.pipeline-state-scripts-test-file-never-runs-in-full-verify | closed | defect | pipeline | 2026-08-09 | — |
@@ -345,7 +346,7 @@
 | pipeline.publication-authority-lacks-execution-time-criticalproof-reverification | closed | defect | pipeline | 2026-08-19 | — |
 | pipeline.published-lifecycle-event-schema-still-enumerates-cancellation | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.push-approval-general-mode-lane-does-not-bind-remote-or-destination | closed | defect | pipeline | 2026-08-18 | — |
-| pipeline.push-approval-record-always-trails-the-signed-commit | open | defect | pipeline | 2026-08-26 | — |
+| pipeline.push-approval-record-always-trails-the-signed-commit | open | defect | pipeline | 2026-08-26 | Reassigned from phoenix to nova on 2026-08-28 by PO decision, after the Phoenix line was intaked into Nova |
 | pipeline.push-approval-signature-ceremony-is-not-staged-by-project-profile | closed | idea | pipeline | 2026-08-09 | — |
 | pipeline.push-approval-signature-commands-also-line-wrap | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.push-approval-skill-reference-predates-adr-0061 | closed | defect | pipeline | 2026-08-09 | — |
@@ -464,14 +465,14 @@
 | pipeline.windows-trusted-tool-resolution | closed | defect | pipeline | 2026-07-22 | PO-approved Sentinel scope extension; no implementation or closure claim. |
 | pipeline.windows-verify-brittle-test-hygiene | closed | defect | pipeline | 2026-07-25 | — |
 | pipeline.windows-verify-reproducibility | closed | defect | pipeline | 2026-07-22 | PO-approved Sentinel scope extension; no implementation or closure claim. |
-| pipeline.workflow-tool-dispatches-produce-no-dispatch-record-artifact | open | defect | pipeline | 2026-08-24 | — |
+| pipeline.workflow-tool-dispatches-produce-no-dispatch-record-artifact | open | defect | pipeline | 2026-08-24 | Reassigned from phoenix to nova on 2026-08-28 by PO decision, after the Phoenix line was intaked into Nova |
 | pipeline.workflow-tool-isolation-worktree-never-created-a-worktree-this-session | open | defect | pipeline | 2026-08-25 | — |
 | pipeline.worktree-hygiene-flags-onboardings-own-generated-files-as-dirty | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.worktree-isolated-dispatch-leaves-an-untracked-dir-that-blocks-verify | closed | defect | pipeline | 2026-08-11 | — |
 
 ## Counts
 
-- open: 56
+- open: 57
 - in_progress: 3
 - closed: 382
 - rejected: 3

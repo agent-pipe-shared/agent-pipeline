@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "e6124bcbcf59d696d5a573070ce1d1bbda3b0a39374dea230c1094fb55ef17ad"
+    "transitionHead": "dfac044c992db8e65f253d23b73d78ec4fe2b25d673c56519644c60a059ff0e7"
   },
   "counts": {
-    "open": 56,
+    "open": 57,
     "in_progress": 3,
     "closed": 382,
     "rejected": 3,
@@ -2614,6 +2614,15 @@
       "closureEvidence": "backlog/items/2026-08-08-the-hash-chained-ledger-collides-permanently-with-the-secret-scanner.md"
     },
     {
+      "id": "pipeline.heredoc-refusal-teaches-no-substitute",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "PO question, 2026-08-28: 'wäre es nicht sinnvoll heredoc gehärtet zuzulassen?' — asked after the Elephant hit the heredoc refusal twice in one session (a `cat >> … << 'CLOSURE'` append and a multi-line commit message), each time paying a detour through a scratch file or the Edit tool. Measured against guard-lifecycle-ready.mjs the same day.",
+      "deferred": false
+    },
+    {
       "id": "pipeline.hgo-author-repair-digest-withholding-is-bypassable-by-reading-the-request-store",
       "status": "closed",
       "type": "defect",
@@ -2989,7 +2998,8 @@
       "owner": "pipeline",
       "created": "2026-08-17",
       "source": "L-AC-01 investigation (PHX-WP-LAC01-REMAINING, 2026-08-17) plus this session's own re-check of validateLifecycleGovernanceEvent and the approve-push call site, specs/sprint-phoenix-epic/evidence/acceptance-evidence-map.mjs POINTERS['L-AC-01']. Migrated verbatim from the Phoenix checkout (agent-pipeline-share_phoenix, branch sprint_phoenix) into this Nova repository's backlog on 2026-08-19 per explicit PO instruction — see Migration note below.",
-      "deferred": true
+      "deferred": true,
+      "tracking": "Reassigned from phoenix to nova on 2026-08-28 by PO decision, after the Phoenix line was intaked into Nova"
     },
     {
       "id": "pipeline.lifecycle-guard-allowlist-still-misses-apply-partial-authority-and-adopt-remote",
@@ -3694,7 +3704,8 @@
       "owner": "pipeline",
       "created": "2026-08-27",
       "source": "Re-Critic (delta) on the Phoenix-merge rework diff 290bd599..eeebeed5, PASS with three minor findings, 2026-08-27",
-      "deferred": false
+      "deferred": false,
+      "tracking": "Reassigned from phoenix to nova on 2026-08-28 by PO decision, after the Phoenix line was intaked into Nova"
     },
     {
       "id": "pipeline.pipeline-author-repair-signature-mode-never-actually-admits-the-edit",
@@ -4230,7 +4241,8 @@
       "owner": "pipeline",
       "created": "2026-08-26",
       "source": "PO observation, 2026-08-26, live during a routine push: 'dieses update des push standes wird jetzt aber nicht auf dem anderen pc ankommen. das ist noch eine schwäche im ablauf da die infos verloren gehen' -- caught mid-session, reproduced twice in the same push sequence.",
-      "deferred": false
+      "deferred": false,
+      "tracking": "Reassigned from phoenix to nova on 2026-08-28 by PO decision, after the Phoenix line was intaked into Nova"
     },
     {
       "id": "pipeline.push-approval-signature-ceremony-is-not-staged-by-project-profile",
@@ -5694,7 +5706,8 @@
       "owner": "pipeline",
       "created": "2026-08-24",
       "source": "Third delta Critic review of sprint-agy-runner, finding F3 (specs/sprint-agy-runner/evidence/2026-08-24-delta3-critic-review-agy-runner.md); PO-accepted disposition 2026-08-24",
-      "deferred": false
+      "deferred": false,
+      "tracking": "Reassigned from phoenix to nova on 2026-08-28 by PO decision, after the Phoenix line was intaked into Nova"
     },
     {
       "id": "pipeline.workflow-tool-isolation-worktree-never-created-a-worktree-this-session",
