@@ -33,7 +33,15 @@
  *     tool's `enabled` field is unset (briefing: "absent manifest -> defaults:
  *     gitleaks+osv-scanner+license-check enabled, semgrep enabled").
  *   - `security.scanners.semgrep.rules_dir` -- resolved to `<rootDir>/<rules_dir>`; absent
- *     -> semgrep adapter falls back to "auto" itself.
+ *     -> NVA-B-SCANNER (2026-08-28): falls back to the plugin-shipped default ruleset
+ *     (`config/security/semgrep-default-rules.yml`, resolved relative to THIS file, never
+ *     rootDir), not semgrep's own "auto" registry mode -- "auto" was MEASURED to fail
+ *     outright under this codebase's fixed `SEMGREP_SEND_METRICS=off` scan env. See
+ *     `buildAdapterConfig()`'s own doc comment for the full rationale.
+ *   - license-check's allowlist likewise falls back to the plugin-shipped default
+ *     (`config/security/license-allowlist.default.json`) when the project ships none of its
+ *     own at `<governance.policies_path>/license-allowlist.json` -- same precedence,
+ *     same NVA-B-SCANNER change, same doc comment.
  *   - license-check's declared `third-party-licenses.json` is ALWAYS `<rootDir>/
  *     third-party-licenses.json` (repo root, per the briefing's "repo root or path from
  *     config" clause) -- a manifest-driven override was considered (mirroring
@@ -74,6 +82,13 @@
  * `path.basename(rootDir)` if that file is absent/malformed -- this script is meant to run
  * unmodified across every pipeline-bound project, not just this repo.
  *
+ * REPORT STATUS (NVA-B-SCANNER, additive): every `scanners[]` entry also carries
+ * `reportStatus`, one of "passed" / "findings" / "not-configured" / "tool-unavailable" /
+ * "not-applicable" / "error" -- see `deriveReportStatus()`'s own doc comment for why: today
+ * `classification: "success"` alone is reused for a real clean scan, an unconfigured
+ * project, and a project with nothing of that kind to scan, which reads identically without
+ * this field.
+ *
  * CLI: `node plugins/pipeline-core/scripts/security-scan.mjs [--root <dir>] [--timeout-ms N]`.
  */
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmdirSync, writeFileSync } from "node:fs";
@@ -113,6 +128,19 @@ const DEFAULT_TIMEOUT_MS = 60000;
 const PREFLIGHT_TIMEOUT_MS = 5000;
 const DEFAULT_BLOCK_ON = ["critical", "high"];
 const DEFAULT_GOVERNANCE_POLICIES_PATH = "governance/examples/policies";
+// NVA-B-SCANNER: plugin-shipped defaults, resolved relative to THIS file's own on-disk
+// location (never rootDir -- a candidate tree must never supply its own scanner-config
+// override, same principle resolveContainedPath already enforces for a manifest-declared
+// rules_dir). `buildAdapterConfig()` below falls back to these ONLY when the project itself
+// configures/ships nothing of its own -- see that function's doc comment for the exact
+// precedence and the measured defect (2026-08-28) this closes: semgrep's own "auto" fallback
+// needs registry/metrics network access and errors outright under the fixed
+// `SEMGREP_SEND_METRICS=off` every adapter invocation sets, and a bare consumer project has no
+// `governance/examples/policies/license-allowlist.json` at all (that path exists only in the
+// Pipeline's own repository).
+const PLUGIN_ROOT = fileURLToPath(new URL("..", import.meta.url));
+const DEFAULT_SEMGREP_RULES_PATH = join(PLUGIN_ROOT, "config", "security", "semgrep-default-rules.yml");
+const DEFAULT_LICENSE_ALLOWLIST_PATH = join(PLUGIN_ROOT, "config", "security", "license-allowlist.default.json");
 // NVA-SECGATE-1: no local DEFAULT_GATE_MODE / resolveGateMode anymore -- both now live as
 // the single shared `resolveSecurityGateMode()` in ../lib/security-completeness-gate.mjs
 // (imported above) so this file and security-completeness-gate.mjs can never independently
@@ -191,7 +219,16 @@ function resolveContainedPath(baseDir, relPath) {
 function buildAdapterConfig(key, { rootDir, manifest, policiesPathAbs }) {
   if (key === "semgrep") {
     const rulesDirRel = manifest?.security?.scanners?.semgrep?.rules_dir;
-    if (typeof rulesDirRel !== "string") return { rulesDir: undefined };
+    if (typeof rulesDirRel !== "string") {
+      // NVA-B-SCANNER: no project-configured rules_dir -- fall back to the plugin-shipped
+      // default ruleset (see PLUGIN_ROOT/DEFAULT_SEMGREP_RULES_PATH doc comment above) rather
+      // than leaving `rulesDir` undefined, which sends the semgrep adapter down its own
+      // "auto" path (semgrep's built-in registry mode). "auto" was MEASURED to fail outright
+      // under this codebase's fixed `SEMGREP_SEND_METRICS=off` scan env: "Cannot create auto
+      // config when metrics are off." A project that configures nothing of its own must still
+      // get a working, offline scan rather than a guaranteed ERROR.
+      return { rulesDir: DEFAULT_SEMGREP_RULES_PATH, rulesDirSource: "plugin-default" };
+    }
     const contained = resolveContainedPath(rootDir, rulesDirRel);
     if (contained === null) {
       return {
@@ -199,13 +236,23 @@ function buildAdapterConfig(key, { rootDir, manifest, policiesPathAbs }) {
         configViolation: `security.scanners.semgrep.rules_dir ("${rulesDirRel}") resolves outside rootDir; refusing to pass an out-of-root path to the semgrep adapter`,
       };
     }
-    return { rulesDir: contained };
+    return { rulesDir: contained, rulesDirSource: "project" };
   }
   if (key === "license-check") {
     // No manifest-driven override for declaredPath -- see header comment for why (schema
     // has no slot for it without risking the whole manifest collapsing to invalid/null).
+    const projectAllowlistPath = join(policiesPathAbs, "license-allowlist.json");
+    // NVA-B-SCANNER: prefer the project's own allowlist; fall back to the plugin-shipped
+    // default (DEFAULT_LICENSE_ALLOWLIST_PATH, see doc comment above) ONLY when the project
+    // ships none at all -- the same "prefer project, plugin-default as a floor" precedence
+    // semgrep's rules_dir fallback just above uses, deliberately: the measured defect this
+    // closes was gitleaks and semgrep each resolving their fallback config from a DIFFERENT
+    // kind of path (one plugin-anchored, one project-anchored), which is what made the gate
+    // impossible to satisfy consistently. A project that ships its own file always wins.
+    const usesProjectAllowlist = existsSync(projectAllowlistPath);
     return {
-      allowlistPath: join(policiesPathAbs, "license-allowlist.json"),
+      allowlistPath: usesProjectAllowlist ? projectAllowlistPath : DEFAULT_LICENSE_ALLOWLIST_PATH,
+      allowlistPathSource: usesProjectAllowlist ? "project" : "plugin-default",
       declaredPath: join(rootDir, "third-party-licenses.json"),
     };
   }
@@ -454,6 +501,49 @@ function scannerEntry(adapter, result, executableSha256 = null) {
   return entry;
 }
 
+/**
+ * NVA-B-SCANNER (backlog: scanner-bootstrap-is-not-self-sufficient-for-a-fresh-project,
+ * Direction 2): normalizes every per-scanner entry's existing {status, classification} pair
+ * into one of five reader-facing labels -- "passed", "findings", "not-configured",
+ * "tool-unavailable", "not-applicable" -- plus "error" for the (already unambiguous) ERROR
+ * status, added for completeness. PURELY ADDITIVE: this never replaces `status`/
+ * `classification`, and every existing consumer that matches on those two fields directly
+ * (e.g. `observedApplicabilityInputs` below, which checks
+ * `sca.classification === "success"` + a reason prefix) keeps doing so unchanged.
+ *
+ * WHY THIS EXISTS: before this field, "classification: success" was reused for three
+ * genuinely different meanings -- a real completed clean scan (status PASS), a project that
+ * configured no policy at all (license-check SKIPPED), and a project with nothing of that
+ * kind to scan (osv-scanner SKIPPED "no package sources") -- all indistinguishable without
+ * reading the free-text `reason` string. That is exactly the ambiguity the backlog item
+ * names: "an empty rule set must never read like a successful deep scan".
+ *
+ * Applied to every entry in the `scanners` array AFTER the run loop below, regardless of
+ * which code path built it (adapter-run entries via `scannerEntry()` above, or the
+ * hand-built authorityBlocked/candidate_snapshot/execution_environment/
+ * manifest_config_invalid/catch-block entries elsewhere in this file) -- so no entry shape
+ * is silently left unlabeled.
+ */
+function deriveReportStatus({ tool, status, classification }) {
+  if (status === "PASS") return "passed";
+  if (status === "FINDINGS") return "findings";
+  if (status === "ERROR") return "error";
+  if (status !== "SKIPPED") return null;
+  // license-check has no binary at all (isInstalled() always reports installed); every one
+  // of its SKIPPED results means "this project configured no policy/declaration" (see its own
+  // header comment) -- there is no other SKIPPED shape it can produce.
+  if (tool === "license-check") return "not-configured";
+  // osv-scanner's ONE non-binary_missing SKIPPED shape is its own "no package sources in
+  // project" honest signal (classification "success") -- a project state, not a broken tool.
+  if (tool === "osv-scanner" && classification === "success") return "not-applicable";
+  // Every other SKIPPED shape for a binary-backed scanner means the tool itself could not be
+  // used -- absent from PATH/trusted locations (classification "binary_missing") or rejected
+  // as untrusted by assessTrustedExecutablePath/resolveTrustedSystemExecutable (any other
+  // classification string those may report). Both read the same to a project: no working
+  // scan happened, and it is not this project's own "nothing to scan here" signal.
+  return "tool-unavailable";
+}
+
 // =============================================================================================
 // CYB-2E -- additive `pipeline.security-evidence.v2` emission (EXIT-NEUTRAL; Option B / D9).
 //
@@ -489,7 +579,11 @@ const V2_RULE_PACK_REF = Object.freeze({
 function rulePackRefFor(key, manifest) {
   if (key === "semgrep") {
     const rel = manifest?.security?.scanners?.semgrep?.rules_dir;
-    return `semgrep:${isNonEmptyStr(rel) ? rel : "auto"}`;
+    // NVA-B-SCANNER: an absent rules_dir no longer means the adapter actually ran semgrep's
+    // own "auto" registry mode -- buildAdapterConfig() now supplies the plugin-shipped
+    // default ruleset instead (see its own doc comment). Reflect that here too, so this v2
+    // reporting-only ref never claims a network-registry mode that did not run.
+    return `semgrep:${isNonEmptyStr(rel) ? rel : "plugin-default"}`;
   }
   return V2_RULE_PACK_REF[key] ?? `${key}:default`;
 }
@@ -848,6 +942,10 @@ export async function runSecurityScan({
     }
     scanners.push(entry);
   }
+
+  // NVA-B-SCANNER: additive, uniform pass over every entry regardless of which code path
+  // built it -- see deriveReportStatus()'s own doc comment above.
+  for (const entry of scanners) entry.reportStatus = deriveReportStatus(entry);
 
   const blockOnSet = new Set(blockOn);
   const hasErrorClass = scanners.some((s) => s.status === "ERROR");
