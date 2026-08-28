@@ -68,8 +68,11 @@ import {
   PRD_ACKNOWLEDGEMENT_MARKER,
   PRD_LANGUAGE_MARKER,
   TECHNICAL_SPEC_MARKER,
+  poGateProfileProjectionPaths,
+  resolvePoGateRepositoryTopology,
   validatePoGateLanguageProjection,
 } from "./po-gate-authority.mjs";
+import { initializePoGateProfileReceipt } from "./po-gate-profile-publisher.mjs";
 import {
   inspectSessionClosure,
   listActiveSessionDescriptors,
@@ -6325,6 +6328,106 @@ function publishKickoffSupersession(plan, suffix) {
   }
 }
 
+// The receipt this publishes must bind exactly the two files the PO-gate
+// authority reads back FOR THIS repository -- resolved through that
+// authority (`poGateProfileProjectionPaths`), never named here locally. That
+// exact shortcut is the recorded past defect po-gate-profile-publisher.mjs's
+// callers guard against: a receipt that bound the wrong manifest tier while
+// looking correct only because both tiers happened to be seeded
+// byte-identical.
+//
+// Coordinator-sourced promotion (bootstrap-bind-apply) is the measured real
+// terminal step of local onboarding and never went through kickoff-apply --
+// the one and only site that used to publish this receipt
+// (`initializeKickoffPoProfile`, project-onboarding-v3.mjs) -- so a project
+// that reaches "ready" through it previously ended with NO receipt at all,
+// permanently: `submit-plan` refuses with PO-PROFILE-RECEIPT-INVALID and
+// there is no site downstream that ever publishes one. Placing the ensure
+// call here, inside the promotion apply BOTH promotion callers share
+// (kickoff-promote-apply and bootstrap-bind-apply), closes it at the one
+// place every local "ready" project's apply path actually passes through,
+// rather than only the measured one -- and is a safe no-op for the
+// kickoff-sourced caller, which already has a valid receipt from kickoff by
+// the time promotion runs (`initializePoGateProfileReceipt` below is a pure
+// readback-and-skip when a receipt is already valid).
+//
+// `initializePoGateProfileReceipt` is idempotent by construction: a
+// currently-valid receipt is left completely untouched (no write, no
+// timestamp bump), and only a genuinely absent/invalid one is published --
+// atomically, and only if no receipt appears concurrently (link-then-unlink,
+// never a blind overwrite) -- so a promotion replay can never duplicate or
+// corrupt it.
+//
+// Local-repository projects only: a plugin-managed or remote project has a
+// different profile authority and must never have a receipt forced on it
+// from here, mirroring the existing repositoryCapability guard at the
+// kickoff site this mirrors.
+//
+// This runs AFTER the promotion transaction has already committed (or was
+// found already committed, on replay): receipt publication failing here must
+// never read as "the promotion itself failed to commit". It therefore uses
+// the same `{ committed: true }` KickoffError convention every other
+// post-commit readback failure in this module already uses (e.g.
+// KICKOFF-PROMOTION-PRIVATE-READBACK) instead of a bare throw a caller could
+// mistake for "nothing happened, safe to retry blindly without checking
+// state" -- a committed promotion left behind a receipt error is a real,
+// named outcome here, not an accident of copying the kickoff site's
+// unconditional throw. The retry story stays simple regardless: the commit
+// itself is already durable and this function is idempotent, so re-running
+// the same apply call both replays the commit cleanly and reattempts the
+// receipt.
+//
+// `deps.initializePoGateProfileReceipt` follows the exact same injection
+// convention every other collaborator on this apply already uses
+// (`deps.spawn ?? defaultGitSpawn`, `deps.randomUUID ?? randomUUID`): a
+// caller of the shared `applyOnboardingKickoffPromotion`/
+// `applyOnboardingBootstrapBind` apply may already inject a stub for this
+// exact dependency (project-onboarding-v3.mjs's own `deps(overrides)` has
+// carried an overridable `initializePoGateProfileReceipt` since before this
+// function existed, for callers that stub out real Git-topology resolution
+// entirely) -- hard-importing the concrete implementation here instead would
+// silently reach past that injection and spawn real `git` against whatever
+// the caller's own stub was standing in for.
+function ensureLocalPromotionPoProfileReceipt(plan, deps = {}) {
+  if (plan.repositoryCapability !== "local") return;
+  const projection = poGateProfileProjectionPaths(plan.root);
+  const source = observeOptionalProjectFile(plan.root, projection.source, "PO profile source");
+  const runtime = observeOptionalProjectFile(plan.root, projection.manifest, "PO profile runtime manifest");
+  // Both files are seeded early in the real onboarding flow (apply-portable-
+  // seed, lib/project-onboarding-v3.mjs) well before any promotion can run,
+  // so their absence here means this apply is exercising this module's
+  // promotion machinery on its own (as this module's own unit tests do, and
+  // as the kickoff-sourced caller's plan-building already requires elsewhere)
+  // rather than a real project reaching "ready" -- there is nothing to
+  // snapshot yet, and no defect to report from this layer: po-gate-
+  // authority.mjs's own validator still fails closed on a missing receipt
+  // exactly as it did before this function existed, so skipping here changes
+  // no downstream outcome, only defers when the receipt is first attempted.
+  if (source.status !== "present" || runtime.status !== "present") return;
+  const initialize = deps.initializePoGateProfileReceipt ?? initializePoGateProfileReceipt;
+  // Same reasoning, one layer down: the concrete `initializePoGateProfileReceipt`
+  // resolves Git topology itself (real `git` by default), so its OWN
+  // `resolveTopology` dependency must be pointed at this apply's already-
+  // injected `deps.spawn` too -- otherwise an apply running under a fake or
+  // stubbed `git` for every other collaborator would still shell out to a
+  // real `git` binary here, against a fixture that was never meant to answer
+  // one. A caller-supplied `initializePoGateProfileReceipt` stub (the other
+  // half of this injection) ignores this second argument entirely, so
+  // passing it is harmless when the concrete implementation is not in use.
+  const initialized = initialize({
+    rootDir: plan.root,
+    userYamlText: source.raw,
+    runtimeYamlText: runtime.raw,
+  }, { resolveTopology: (rootDir) => resolvePoGateRepositoryTopology(rootDir, { spawn: deps.spawn ?? defaultGitSpawn }) });
+  if (!initialized?.ok) {
+    fail(
+      "KICKOFF-PROMOTION-PO-PROFILE-RECEIPT",
+      `PO profile receipt initialization failed (${initialized?.code ?? "unavailable"})`,
+      { committed: true },
+    );
+  }
+}
+
 /**
  * Apply the public/private promotion under the same continuity locks as
  * kickoff. Publication order is history, private cleanup binding, then State:
@@ -6375,7 +6478,9 @@ export function applyOnboardingKickoffPromotion({
       : currentTarget(paths.handover, plan.targets.handover.afterSha256);
     if (state.status === "exact" && history.status === "exact" && cleanupBinding.status === "exact"
       && handover.status === "exact") {
-      return promotionResult(plan, "replayed", false, deps.spawn ?? defaultGitSpawn);
+      const replayed = promotionResult(plan, "replayed", false, deps.spawn ?? defaultGitSpawn);
+      ensureLocalPromotionPoProfileReceipt(plan, deps);
+      return replayed;
     }
     const stateBefore = currentTarget(paths.state, plan.targets.state.beforeSha256);
     const historyBefore = currentTarget(paths.history, plan.targets.history.beforeSha256);
@@ -6506,6 +6611,7 @@ export function applyOnboardingKickoffPromotion({
     // are only named superseded once this promotion has validated itself.
     const result = promotionResult(plan, "applied", true, deps.spawn ?? defaultGitSpawn);
     publishKickoffSupersession(plan, suffix);
+    ensureLocalPromotionPoProfileReceipt(plan, deps);
     return result;
   } finally {
     if (!simulatedCrash && privateLock) releaseLock(privateLock);

@@ -6635,9 +6635,17 @@ test("NVA-D-ACKASK: bootstrap-binding-required asks the PO for the acknowledgeme
     assert.equal(afterAck.nextAction.kind, "command");
     assert.equal(afterAck.nextAction.argv[1], "bootstrap-bind-plan");
     const bindPlan = planOnboardingBootstrapBind({ rootDir: path, repositoryCapability: "local", spawn: fakeGit });
+    // NVA-M-PORECEIPT: applyOnboardingBootstrapBind now also ensures a local
+    // PO-gate profile receipt post-commit (onboarding-continuity.mjs). This
+    // fixture's ".git" is fakeGit's own directory-only stand-in, not a real
+    // repository real `git` can answer topology questions against -- exactly
+    // what fakeDeps.initializePoGateProfileReceipt exists to stand in for
+    // everywhere else in this suite, so it is injected here too rather than
+    // exercising the concrete receipt publisher against a fixture it was
+    // never meant to run against.
     const bindApplied = applyOnboardingBootstrapBind({
       rootDir: path, repositoryCapability: "local", expectedPlanSha256: bindPlan.planSha256, activate: true,
-      deps: { spawn: fakeGit },
+      deps: { spawn: fakeGit, initializePoGateProfileReceipt: fakeDeps.initializePoGateProfileReceipt },
     });
     assert.equal(bindApplied.status, "applied");
   } finally { dispose(path); }
