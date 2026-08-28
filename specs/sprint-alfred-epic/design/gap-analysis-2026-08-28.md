@@ -2,10 +2,22 @@
 
 Triggered by the PO's gate-1 rejection (`po-input-2026-08-28.md`): the design
 is far too shallow on the primary mandate. Method: full re-read of
-`../evidence/issues-snapshot-2026-08-27.md` (all nine bodies; snapshot
-verified current — no issue changed since 2026-08-11), then a line-level
-audit of `../prd_sprint-alfred-epic.md` and `../spec.md` against the
-elementary requirements of #99, #104, #106, #109. Coverage classes used
+`../evidence/issues-snapshot-2026-08-27.md` (all nine bodies), then a
+line-level audit of `../prd_sprint-alfred-epic.md` and `../spec.md` against
+the elementary requirements of #99, #104, #106, #109.
+
+**Snapshot-currency artifact** (the check behind "snapshot verified
+current"; the snapshot itself carries no `updatedAt`, so the verification is
+recorded here): `gh issue list --repo agent-pipe-shared/agent-pipeline
+--label sprint:alfred --state open --json number,updatedAt`, run
+2026-08-28, returned — #99 `2026-08-08T20:59:33Z` · #101
+`2026-08-03T14:31:43Z` · #102 `2026-08-03T14:31:46Z` · #103
+`2026-08-03T14:31:52Z` · #104 `2026-08-11T16:21:33Z` · #105
+`2026-08-03T14:32:09Z` · #106 `2026-08-11T16:21:34Z` · #108
+`2026-08-08T21:29:46Z` · #109 `2026-08-11T16:21:36Z`. Every value predates
+the 2026-08-27 capture; the snapshot is current for this audit.
+Label-only edits refresh `updatedAt` too, so this check is conservative in
+the right direction: no body can have changed without it showing here. Coverage classes used
 below: **absent** (nowhere in PRD or spec), **name-only** (the concept is
 named, its content is not stated), **mechanism-only** (schemas/plumbing
 present, the normative content by reference), **covered**.
@@ -139,12 +151,16 @@ the reworked package.
   capabilities; the parity requirement; the Critic semantic-conformance
   duty + token-ADR fixture.
 - §7.2 (D2): enumerate the nine properties with first-increment evidence
-  class each (doctrine §2); the concept-file frontmatter field list; the
-  re-entry reading order; **add the missing deliverable: the
-  remedy-comparison generator (active optimization)**; the derived-views
-  principle (docs/ARCHITECTURE.md regenerated from the map).
+  class each (doctrine §2); the concept-file frontmatter field list —
+  including compatibility/lifecycle expectations (all six #104 §2 fields);
+  **the eleven contract-sufficiency signals as enumerated in doctrine §2.2**
+  (absorbed text, not an issue pointer); the re-entry reading order; **add
+  the missing deliverable: the remedy-comparison generator (active
+  optimization)**; the derived-views principle (docs/ARCHITECTURE.md
+  regenerated from the map).
 - §7.3 (D3): add the declared↔evaluated mapping table (doctrine §2.10) and
-  the fitness-model representation list (#106 §Scope-2).
+  the eleven-item fitness-model representation list **as absorbed in
+  doctrine §4(1)** (absorbed text, not an issue pointer).
 - §7.4 (D4): add the agent-first artifact-orientation principle.
 - §12: add #104's and #109's fixture lists to the named minimum inventory
   (they were the only two missing from the enumeration).
