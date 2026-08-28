@@ -2250,7 +2250,21 @@ function observeSessionCleanupState(rootDir, spawn = defaultGitSpawn) {
         sessionCleanup: null,
       };
     }
-    if (!validClosedTransitionState(observed.root, state)) {
+    // BOTH transition shapes, exactly as the projection's own check at the
+    // other call site already accepts both. A `discard-feature` deliberately
+    // never writes to `closedFeatures` (pipeline-state.mjs, and the comment on
+    // validDiscardedTransitionState), so a discard as the MOST RECENT
+    // transaction leaves `closedFeatures.at(-1).closedAt` pointing at some
+    // earlier close while `updatedAt` carries the discard's own timestamp --
+    // an equality validClosedTransitionState can never satisfy. Accepting only
+    // the closed shape here therefore made a perfectly ordinary discard an
+    // unrecoverable dead end: SESSION-CLEANUP-STATE-MALFORMED, readiness
+    // `partial`, and every pipeline script on that repository refused --
+    // including the recovery the refusal itself named. Confirmed live in a
+    // consumer project 2026-08-28 (incident report S56, B6); the fix belongs
+    // here at the call site, not in validClosedTransitionState, whose
+    // narrowness is deliberate and is relied on elsewhere.
+    if (!validClosedTransitionState(observed.root, state) && !validDiscardedTransitionState(observed.root, state)) {
       fail("SESSION-CLEANUP-STATE-MALFORMED", "Pipeline machine state cannot prove a cleanup descriptor");
     }
     if (observed.neutral && observed.privateBinding !== null) {
@@ -2264,7 +2278,11 @@ function observeSessionCleanupState(rootDir, spawn = defaultGitSpawn) {
         released: false,
       };
     }
-    const candidates = state.closedFeatures
+    // `?? []`: a repository whose only transition is a discard carries no
+    // `closedFeatures` array at all (validDiscardedTransitionState admits its
+    // absence), and there is nothing to derive a release proof from -- an
+    // empty candidate set, not a crash.
+    const candidates = (state.closedFeatures ?? [])
       .map((entry, index) => closedReleaseProof(observed.root, state, entry, index, spawn))
       .filter((entry) => entry !== null);
     const bound = candidates.filter((entry) => entry.sessionCleanup !== null);

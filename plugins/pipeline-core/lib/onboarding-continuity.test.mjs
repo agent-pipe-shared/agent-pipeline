@@ -332,6 +332,56 @@ check("writer-shaped discard state with a prior closed feature remains valid", (
   assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "valid");
 });
 
+// The projection above accepted a discard as the latest transaction from the
+// start; the cleanup OBSERVER did not, and that asymmetry was a dead end. A
+// consumer project hit it live 2026-08-28 (incident report S56, B6): a
+// discard-feature left readiness at `partial`, every pipeline script on that
+// repository was refused, and the refusal named a recovery command that was
+// itself refused. Both shapes are asserted here -- with a prior close (the
+// state the consumer actually had) and without one (where `closedFeatures` is
+// absent entirely and the release-proof scan has nothing to iterate).
+check("a discard as the latest transaction is observable by the cleanup reader, not only by the projection", () => {
+  for (const [name, closedFeatures] of [["discard-cleanup-after-close", [{
+    id: "earlier-feature",
+    planPath: "specs/earlier/prd.md",
+    phaseAtClose: "implementation",
+    closedAt: "2026-07-29T08:00:00.000Z",
+    closedBy: "PO",
+    forCommit: null,
+  }]], ["discard-cleanup-only", undefined]]) {
+    const root = fixture(name);
+    const kickoff = planOnboardingKickoff({ rootDir: root, goal: "Discard is a normal outcome" });
+    applyOnboardingKickoff({ plan: kickoff, expectedPlanSha256: kickoff.planSha256, activate: true });
+    const statePath = join(root, ".claude", "pipeline-state.json");
+    const before = JSON.parse(readFileSync(statePath, "utf8"));
+    const discardedAt = "2026-07-29T09:10:00.000Z";
+    const state = {
+      schema: "pipeline.state.v0",
+      discardedFeatures: [{
+        id: before.activeFeature.id,
+        planPath: before.activeFeature.planPath,
+        phaseAtDiscard: before.activeFeature.phase,
+        discardedAt,
+        discardedBy: "PO",
+        reason: "abandoned before implementation",
+        forCommit: null,
+      }],
+      planApproved: false,
+      updatedAt: discardedAt,
+    };
+    if (closedFeatures !== undefined) state.closedFeatures = closedFeatures;
+    writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
+
+    assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "valid",
+      `${name}: the projection already accepted this shape and must keep doing so`);
+    const binding = readOnboardingSessionCleanupBinding({ rootDir: root });
+    assert.notEqual(binding.status, "damaged",
+      `${name}: a discard must never make the repository unobservable -- that is the dead end`);
+    assert.equal(binding.sessionCleanup, null,
+      `${name}: nothing is bound after a discard, which is not the same as unreadable`);
+  }
+});
+
 function baseDiscardEntry() {
   return {
     id: "abandoned-feature",
