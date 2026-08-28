@@ -37,6 +37,9 @@ jobs:
       - name: Offline CI boundary conformance
         run: node plugins/pipeline-core/scripts/verify-topology-preflight.test.mjs && node plugins/pipeline-core/scripts/live-runner-certification.test.mjs
       - name: Typed Git topology preflight
+        env:
+          PIPELINE_SECURITY_REVIEWER_ID: ${{ vars.PIPELINE_SECURITY_REVIEWER_ID }}
+          PIPELINE_CANDIDATE_BASE: ${{ github.event.before || github.event.pull_request.base.sha || '' }}
         run: node plugins/pipeline-core/scripts/verify-topology-preflight.mjs
       - name: Offline security-evidence conformance
         run: node --import ./harness/scripts/network-lockdown.mjs --test plugins/pipeline-core/lib/security-evidence-evaluator.test.mjs
@@ -64,6 +67,9 @@ jobs:
         with:
           node-version: '22'
       - name: Typed Git topology preflight
+        env:
+          PIPELINE_SECURITY_REVIEWER_ID: ${{ vars.PIPELINE_SECURITY_REVIEWER_ID }}
+          PIPELINE_CANDIDATE_BASE: ${{ github.event.before || github.event.pull_request.base.sha || '' }}
         run: node plugins/pipeline-core/scripts/verify-topology-preflight.mjs
       - name: Pinned live-runner certification
         env:
