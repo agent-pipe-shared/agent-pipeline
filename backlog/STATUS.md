@@ -160,7 +160,7 @@
 | pipeline.full-push-preflight-before-signature | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.gate-strength-override-route-advertised-not-offered | deferred | defect | pipeline | 2026-08-08 | — |
 | pipeline.gate-strength-shell-comment-understates-its-own-scope | closed | defect | pipeline | 2026-08-07 | — |
-| pipeline.gate-strength-shell-lane-refuses-any-command-containing-a-quoted-wildcard | open | defect | pipeline | 2026-08-27 | — |
+| pipeline.gate-strength-shell-lane-refuses-any-command-containing-a-quoted-wildcard | closed | defect | pipeline | 2026-08-27 | — |
 | pipeline.git-appears-despite-initializes-git-false | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.git-identity-ask-step-unreachable-through-live-cli-path | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.git-identity-must-be-set-immediately-before-first-commit-not-at-setup-time | closed | defect | pipeline | 2026-08-17 | — |
@@ -465,8 +465,8 @@
 
 ## Counts
 
-- open: 51
+- open: 50
 - in_progress: 5
-- closed: 379
+- closed: 380
 - rejected: 3
 - deferred: 11

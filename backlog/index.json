@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "e7f093bcb6c4736e5f4cf55a6b483a505e82666bea18134fbff8b3acaee709c5"
+    "transitionHead": "f50cc7091927583e869ef1a215d2ad91d97b00124541866c71de4ecc0dab3d5f"
   },
   "counts": {
-    "open": 51,
+    "open": 50,
     "in_progress": 5,
-    "closed": 379,
+    "closed": 380,
     "rejected": 3,
     "deferred": 11
   },
@@ -1906,12 +1906,16 @@
     },
     {
       "id": "pipeline.gate-strength-shell-lane-refuses-any-command-containing-a-quoted-wildcard",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-27",
       "source": "Live observation, 2026-08-27: a cat >> heredoc appending to a gitignored scratch note was refused with GUARD-GATE-STRENGTH-SHELL. Independently reproduced in the same session by a diagnostic command whose text happened to contain a quoted asterisk.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-28",
+      "closureRepository": "self",
+      "closureCommit": "a80236d874b214f14593f1504ba9c4e7c3171234",
+      "closureEvidence": "backlog/items/2026-08-27-gate-strength-shell-lane-refuses-any-command-containing-a-quoted-wildcard.md"
     },
     {
       "id": "pipeline.git-appears-despite-initializes-git-false",
