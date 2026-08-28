@@ -96,6 +96,33 @@ function anchoredReplace(source, anchor, replacement, label) {
   return source.slice(0, first) + replacement + source.slice(first + anchor.length);
 }
 
+/**
+ * One failing-suite entry, WITH the suite's own output.
+ *
+ * This used to report only `exited <code>`. That made a refusal correct and
+ * unactionable at the same time: the step reverts the protected file (right),
+ * and the operator is told a suite failed without being told anything a person
+ * could act on (wrong). It cost two live operator rounds on 2026-08-28, where
+ * `onboarding-init-tests` failed twice under the applier and passed every time
+ * it was run by hand -- a difference nobody could diagnose, because the one run
+ * that reproduced it was also the one run that discarded its evidence.
+ *
+ * The tail rather than the head: node's test reporter prints the failure list
+ * and the counts at the end, so the last bytes are the ones that say what broke.
+ */
+function suiteFailureEntry(entry, suite) {
+  const line = `  - ${entry.name} (${rel(entry.file)}) exited ${suite.code}`;
+  const output = String(suite.output ?? "").trimEnd();
+  if (output === "") return `${line}\n      (the suite produced no output)`;
+  const tail = output.length > SUITE_FAILURE_OUTPUT_MAX
+    ? `...\n${output.slice(-SUITE_FAILURE_OUTPUT_MAX)}`
+    : output;
+  const indented = tail.split("\n").map((row) => `      ${row}`).join("\n");
+  return `${line}\n${indented}`;
+}
+
+const SUITE_FAILURE_OUTPUT_MAX = 4000;
+
 /** Run one command, returning its combined output and exit code. Never throws. */
 function run(argv, cwd = REPO_ROOT) {
   const result = spawnSync(process.execPath, argv, { cwd, encoding: "utf8", shell: false, timeout: 600_000 });
@@ -336,7 +363,7 @@ function stepVerify({ dryRun }) {
     const failures = [];
     for (const entry of pending) {
       const suite = run([entry.file]);
-      if (suite.code !== 0) failures.push(`  - ${entry.name} (${rel(entry.file)}) exited ${suite.code}`);
+      if (suite.code !== 0) failures.push(suiteFailureEntry(entry, suite));
     }
     if (failures.length > 0) return { ok: false, detail: `newly registered suites did not pass:\n${failures.join("\n")}` };
 
@@ -793,7 +820,7 @@ function stepVerifyNvaCProtected({ dryRun, preview }) {
       const failures = [];
       for (const entry of pending) {
         const suite = run([entry.file]);
-        if (suite.code !== 0) failures.push(`  - ${entry.name} (${rel(entry.file)}) exited ${suite.code}`);
+        if (suite.code !== 0) failures.push(suiteFailureEntry(entry, suite));
       }
       if (failures.length > 0) {
         throw new Error(`newly registered suites did not pass:\n${failures.join("\n")}`);
@@ -818,7 +845,7 @@ function stepVerifyNvaCProtected({ dryRun, preview }) {
     const failures = [];
     for (const entry of pending) {
       const suite = run([entry.file]);
-      if (suite.code !== 0) failures.push(`  - ${entry.name} (${rel(entry.file)}) exited ${suite.code}`);
+      if (suite.code !== 0) failures.push(suiteFailureEntry(entry, suite));
     }
     if (failures.length > 0) return { ok: false, detail: `newly registered suites did not pass:\n${failures.join("\n")}` };
 
