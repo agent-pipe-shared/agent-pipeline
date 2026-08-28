@@ -4,8 +4,8 @@ import test from "node:test";
 import {
   classifyInput, createDefinitionInventory, evaluateChangeIntegrity, evaluateCiAuthority,
   evaluateContextExport, evaluateHostFallback, evaluateRunnerNeutralConformance,
-  preserveMessageOrigin, rejectAuthorityFromContent, requalifyForDrift, routeSecurityReview,
-  validateEvidenceHygiene, validateTaskAuthority,
+  evaluateSelfExcludedCheck, preserveMessageOrigin, rejectAuthorityFromContent, requalifyForDrift,
+  routeSecurityReview, validateEvidenceHygiene, validateTaskAuthority,
 } from "./ai-assisted-hardening.mjs";
 
 const digest = "a".repeat(64);
@@ -31,3 +31,17 @@ test("AC11: inventory drift emits typed requalification", () => assert.equal(req
 test("AC12: injection corpus classes remain untrusted", () => { for (const [source, content] of [["repository", "# markdown"], ["repository", "\u202Eunicode filename"], ["log", "tool log"], ["tool", "tool output"], ["agent", "agent relay"], ["pull-request", "PR comment"]]) assert.equal(classifyInput({ source, content }).authority, "none"); });
 test("AC13: secret and hidden-reasoning evidence is rejected", () => { assert.equal(validateEvidenceHygiene({ receipt: "ok" }).allowed, true); assert.equal(validateEvidenceHygiene({ hiddenReasoning: "no" }).allowed, false); });
 test("AC14: Codex and every other runner use the same provider-neutral manifest", () => { for (const runner of ["codex", "claude", "unknown"]) assert.equal(evaluateRunnerNeutralConformance({ runner, manifest, request: { operations: ["read"], paths: manifest.paths } }).allowed, true); });
+test("AC15: an empty-string reviewerId never satisfies a required review", () => assert.equal(routeSecurityReview({ changedPaths: ["plugins/pipeline-core/hooks/guard.mjs"], authorId: "a", reviewerId: "" }).allowed, false));
+test("AC16: a whitespace-only reviewerId never satisfies a required review", () => assert.equal(routeSecurityReview({ changedPaths: ["plugins/pipeline-core/hooks/guard.mjs"], authorId: "a", reviewerId: "   " }).allowed, false));
+test("AC17: a genuine distinct reviewer is admitted", () => assert.equal(routeSecurityReview({ changedPaths: ["plugins/pipeline-core/hooks/guard.mjs"], authorId: "a", reviewerId: "reviewer-b" }).allowed, true));
+test("AC18: a self-excluded root-pointable check counts only when its base revision exits 0", () => {
+  assert.equal(evaluateSelfExcludedCheck({ kind: "scope", baseRevisionExitCode: 0 }).counted, true);
+  assert.equal(evaluateSelfExcludedCheck({ kind: "scope", baseRevisionExitCode: 2 }).counted, false);
+  assert.equal(evaluateSelfExcludedCheck({ kind: "dependency", baseRevisionExitCode: 0 }).counted, true);
+  assert.equal(evaluateSelfExcludedCheck({ kind: "scope", baseRevisionExitCode: null }).counted, false);
+});
+test("AC19: a self-excluded non-root-pointable check stays missing regardless of exit code", () => {
+  assert.equal(evaluateSelfExcludedCheck({ kind: "guard", baseRevisionExitCode: 0 }).counted, false);
+  assert.equal(evaluateSelfExcludedCheck({ kind: "test", baseRevisionExitCode: 0 }).rootPointable, false);
+  assert.equal(evaluateSelfExcludedCheck({ kind: "policy", baseRevisionExitCode: 0 }).counted, false);
+});
