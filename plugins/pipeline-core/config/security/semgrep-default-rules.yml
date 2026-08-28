@@ -1,0 +1,45 @@
+# Plugin-shipped DEFAULT semgrep ruleset (NVA-B-SCANNER).
+#
+# security-scan.mjs's buildAdapterConfig() passes this file's absolute path as
+# semgrep's `--config` ONLY when a hosted project configures no
+# `security.scanners.semgrep.rules_dir` of its own -- see that function's doc
+# comment for the exact precedence. Deliberately minimal and fully offline:
+# semgrep's own "auto" fallback needs registry/metrics network access and was
+# MEASURED (2026-08-28) to fail outright with `SEMGREP_SEND_METRICS=off` (the
+# fixed env every adapter invocation sets) -- "Cannot create auto config when
+# metrics are off. Please allow metrics or run with a specific config." A
+# project that never configures its own rules_dir must still get a working,
+# deterministic, network-free scan rather than a guaranteed ERROR. A project
+# that wants a deeper ruleset ships its own rules_dir; this is a floor, not a
+# ceiling.
+#
+# Severity mapping (semgrep.mjs, unchanged by this file): ERROR -> high,
+# WARNING -> medium, INFO -> info. Default `security.thresholds.block_on` is
+# ["critical", "high"], so only the ERROR-severity rule below is blocking by
+# default; the WARNING-severity rule surfaces as a visible, non-blocking
+# finding.
+rules:
+  - id: pipeline-default-hardcoded-private-key
+    languages: [generic]
+    severity: ERROR
+    message: >-
+      A PEM-format private key block appears to be committed to source
+      control. Rotate the key immediately and remove it from history.
+    metadata:
+      category: security
+      confidence: HIGH
+    pattern: |
+      -----BEGIN $KEYTYPE PRIVATE KEY-----
+  - id: pipeline-default-dynamic-code-eval
+    languages: [javascript, typescript, python]
+    severity: WARNING
+    message: >-
+      Dynamic evaluation of a runtime string (eval/exec) is a common
+      injection vector. Prefer an explicit, non-evaluated code path.
+    metadata:
+      category: security
+      confidence: LOW
+    patterns:
+      - pattern-either:
+          - pattern: eval(...)
+          - pattern: exec(...)

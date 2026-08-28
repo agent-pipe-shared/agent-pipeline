@@ -5,13 +5,26 @@
   "effort": "xhigh",
   "rulesetSha": "0.6.0+claude.20260828131316.03c6e1e",
   "dispatcher": "elephant",
-  "outcome": "in-progress",
+  "outcome": "partial",
   "log": [
     {
       "phase": "bootstrap",
       "detail": "Containment check passed (worktree path contains /.claude/worktrees/). HEAD was 0d5a6e6b, self-healed via checkout --detach to c67397d7 (expected SHA). Working tree clean after checkout.",
       "toolUseCount": 4
+    },
+    {
+      "phase": "orchestrator-recovery",
+      "detail": "The dispatch returned an empty result with its work uncommitted and this record still at outcome:in-progress with only the bootstrap entry. The Elephant inspected the diff, ran the suites, and performed the commit act. Everything below is the orchestrator's own measurement, not a recovered agent report.",
+      "toolUseCount": null
     }
   ],
-  "report": null
+  "report": {
+    "text": "PARTIAL. The packaging half of the task is done and verified; the turn-it-on half was not reached. DONE: semgrep and license-check now fall back to plugin-shipped defaults resolved relative to the script's own on-disk location, never rootDir, so a candidate tree cannot supply its own scanner config; a project that ships its own file still wins. This closes the mixed plugin-cache/project-path split the greenfield run complained about. The dispatch also recorded a genuinely measured defect behind it: semgrep's own 'auto' registry mode fails outright under this codebase's fixed SEMGREP_SEND_METRICS=off with 'Cannot create auto config when metrics are off', so a project configuring nothing was guaranteed an ERROR rather than a scan. A minimal default ruleset ships with a behavioural test proving its private-key rule actually fires on a real PEM block. DoD 4's five reader-facing statuses are implemented additively as scanners[].reportStatus, applied uniformly after the run loop so no entry shape is left unlabeled, and existing consumers matching on status/classification are untouched. NOT DONE, and not claimed: DoD 1 (measure the three offending required capabilities) has no recorded measurement; DoD 5 (correct the two stale reasons in the security seeding comment) was not performed; DoD 6 (measure whether security can now be seeded to a real mode) was not performed, and gates.security is therefore correctly left at 'off' -- an unmeasured seed was explicitly forbidden by the briefing. Verified by the orchestrator on the worktree: security-scan.test.mjs 135/135 exit 0; semgrep-default-rules.test.mjs 7/7 exit 0.",
+    "changedFiles": [
+      "plugins/pipeline-core/scripts/security-scan.mjs - plugin-shipped fallbacks for semgrep rules and the license allowlist, plus the additive reportStatus field",
+      "plugins/pipeline-core/config/security/semgrep-default-rules.yml - the shipped default ruleset",
+      "plugins/pipeline-core/config/security/semgrep-default-rules.test.mjs - behavioural test that the ruleset fires and stays clean",
+      "plugins/pipeline-core/config/security/license-allowlist.default.json - the shipped default allowlist"
+    ]
+  }
 }

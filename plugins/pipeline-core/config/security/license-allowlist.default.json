@@ -1,0 +1,5 @@
+{
+  "$comment": "Plugin-shipped DEFAULT license allowlist (NVA-B-SCANNER). security-scan.mjs's buildAdapterConfig() falls back to this file ONLY when a hosted project ships no allowlist of its own at <governance.policies_path>/license-allowlist.json (default governance/examples/policies/license-allowlist.json) -- see that function's own doc comment for the exact precedence. This is a permissive floor covering the most common truly-permissive OSS licenses plus this project's own SUL-1.0/CC0/Unlicense-style public-domain-equivalent terms; a project that wants a stricter or looser policy ships its own file at the project path, which always wins over this default. 'deny' names the strongest well-known copyleft licenses so an unconfigured project gets an honest, visible signal on those rather than silent 'unknown' treatment. A license absent from both lists is 'unknown' to the consuming license-check adapter and requires the same explicit-exception path as a denied one.",
+  "allow": ["MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC", "0BSD", "CC0-1.0", "Unlicense"],
+  "deny": ["GPL-3.0-only", "GPL-3.0-or-later", "AGPL-3.0-only", "AGPL-3.0-or-later"]
+}
