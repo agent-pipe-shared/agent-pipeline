@@ -4279,7 +4279,17 @@ function v4Inspection(rootDir, fs, intent = "onboarding", runner) {
  */
 export function inspectProjectOnboardingV3({ rootDir = process.cwd(), deps: overrides = {}, intent = "onboarding", runner } = {}) {
   requireRunner(runner, "inspectProjectOnboardingV3");
-  const result = v4Inspection(rootDir, deps(overrides), intent, runner);
+  const fs = deps(overrides);
+  // NVA-V13-ASKWINDOW: an onboarding ask whose condition is still true used
+  // to surface ONLY through the single `apply-portable-seed` call that
+  // happened to publish it -- every other reader of this function, including
+  // an ordinary `inspect`, saw the raw v4Inspection() with no ask attached,
+  // even when the underlying condition (a missing author identity, an
+  // unconfigured verify command, ...) was still true. See
+  // `withPendingOnboardingAsksOnNextActionOnly()`'s own comment for why this
+  // merges only into `nextAction.pendingAsks` rather than reusing the
+  // apply-portable-seed path's raw per-field side channels.
+  const result = withPendingOnboardingAsksOnNextActionOnly(v4Inspection(rootDir, fs, intent, runner), fs);
   if (intent === "session" && result?.status === "ready") {
     try {
       clearConsentMarker({ rootDir: result.root ?? rootDir, reason: "onboarding-complete" });
@@ -5526,6 +5536,41 @@ function withPendingProjectIgnoreGapAsk(observed, fs) {
   return { ...observed, projectIgnoreGapAction: collectProjectIgnoreGapAction(missing) };
 }
 
+// NVA-V13-ASKWINDOW (backlog: the onboarding asks survive past the one call
+// that publishes them): the five-wrapper ask chain used to be spelled out
+// TWICE, verbatim, on the two `applyLifecycle()` "portable" branch return
+// lines directly below -- a third and fourth hand-written copy of the same
+// composition is exactly the drift this dispatch was told not to add.
+// Anything that wants the full, apply-portable-seed-shaped envelope (the
+// five per-field side channels -- `authorIdentityAction` etc. -- PLUS the
+// `nextAction.pendingAsks` merge) composes through this one function
+// instead. Byte-for-byte the same composition the two call sites spelled out
+// before this refactor -- a pure extraction, not a behavior change.
+function withAllPendingOnboardingAsksAttached(observed, fs) {
+  return withPendingAsksSurfacedOnNextAction(withPendingProjectIgnoreGapAsk(withPendingTrustAnchorGuidanceAsk(withPendingVerifyContractAsk(withPendingPushApprovalSetupAsk(withPendingAuthorIdentityAsk(observed, fs), fs)), fs), fs));
+}
+
+// Sibling of `withAllPendingOnboardingAsksAttached()` immediately above, for
+// a caller that must NOT grow with the five raw per-field side channels:
+// `inspectProjectOnboardingV3()` below feeds every intent through
+// `project-onboarding-ready-gate.mjs`'s `requireProjectOnboardingReady()`,
+// whose `exactKeys()` check enforces a CLOSED top-level key set for EVERY
+// status, not only "ready" -- `BASE_RESULT_KEYS` gates every non-ready
+// status too. Reusing `withAllPendingOnboardingAsksAttached()`'s shape
+// verbatim there would grow the observation with keys that gate does not
+// expect the moment any ask's condition is true, failing every intent
+// closed (PORG-INVALID-OBSERVATION) -- the single highest-risk regression
+// this dispatch must not introduce. This exposes the SAME pending-ask
+// computation through the ONE channel a generic caller already reads
+// (`nextAction.pendingAsks`; see `onboarding-init.mjs`'s own doc comment),
+// returning the ORIGINAL `observed` object with nothing but `nextAction`
+// replaced -- the five side channels are computed internally and then
+// discarded, never attached to the object this function returns.
+function withPendingOnboardingAsksOnNextActionOnly(observed, fs) {
+  const augmented = withAllPendingOnboardingAsksAttached(observed, fs);
+  return augmented.nextAction === observed.nextAction ? observed : { ...observed, nextAction: augmented.nextAction };
+}
+
 function applyLifecycle(rootDir, fs, operation, planSha256, activate, intent = "onboarding", runner, operatorAuthority = null) {
   if (!activate || typeof planSha256 !== "string" || !/^[a-f0-9]{64}$/u.test(planSha256)) return v4Inspection(rootDir, fs, intent, runner);
   if (operation === "portable") {
@@ -5533,9 +5578,9 @@ function applyLifecycle(rootDir, fs, operation, planSha256, activate, intent = "
     // digest was produced with, or the digests never match and the apply is a
     // silent no-op that loops the caller back to adoption-required.
     const plan = planProjectOnboardingV3({ rootDir, deps: fs, runner: v4Inspection(rootDir, fs, intent, runner).runner });
-    if (plan.status !== "ready" || lifecyclePlanDigest(plan) !== planSha256) return withPendingAsksSurfacedOnNextAction(withPendingProjectIgnoreGapAsk(withPendingTrustAnchorGuidanceAsk(withPendingVerifyContractAsk(withPendingPushApprovalSetupAsk(withPendingAuthorIdentityAsk(v4Inspection(rootDir, fs, intent, runner), fs), fs)), fs), fs));
+    if (plan.status !== "ready" || lifecyclePlanDigest(plan) !== planSha256) return withAllPendingOnboardingAsksAttached(v4Inspection(rootDir, fs, intent, runner), fs);
     applyProjectOnboardingV3(plan, { rootDir, activate: true, deps: fs });
-    return withPendingAsksSurfacedOnNextAction(withPendingProjectIgnoreGapAsk(withPendingTrustAnchorGuidanceAsk(withPendingVerifyContractAsk(withPendingPushApprovalSetupAsk(withPendingAuthorIdentityAsk(v4Inspection(rootDir, fs, intent, runner), fs), fs)), fs), fs));
+    return withAllPendingOnboardingAsksAttached(v4Inspection(rootDir, fs, intent, runner), fs);
   }
   const beforeApply = v4Inspection(rootDir, fs, intent, runner);
   if (operation === "repair" && beforeApply.status === "continuity-damaged") {
