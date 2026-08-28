@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "e881568ef5a58d526eeeb0706f98eb6cb1eabc4e31306e614d6ee9dcc33d2b53"
+    "transitionHead": "8a47af62c8a7aa3f7621f31e640e6fa52f963de6c8d553aa5fefb11a687929a9"
   },
   "counts": {
-    "open": 86,
+    "open": 92,
     "in_progress": 3,
-    "closed": 384,
+    "closed": 390,
     "rejected": 3,
     "deferred": 11
   },
@@ -381,6 +381,16 @@
       "created": "2026-08-09",
       "source": "Full command-level analysis of the PO's Codex greenfield happy path against the 0.5.4 candidate (rollout 019fe56c + 019fe56f, 2026-08-09), read from the Codex rollout logs rather than the chat transcript.",
       "deferred": true
+    },
+    {
+      "id": "pipeline.agents-talk-the-po-out-of-the-signature",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "PO report 2026-08-28: 'aktuell jeder agent mich als PO erstmal zu überreden lieber selber zu pushen oder die config auf chat zu ändern weil signature zu kompliziert ist - und so ist das ja nicht gedacht'. Clarified by the PO: the agent is not able to change the setting, and that is not the problem -- it simply does not want to walk the path.",
+      "deferred": false,
+      "tracking": "NOW / Nova A — the one control in the model that is actual protection is the one agents routinely lobby the PO to abandon. Reported by the PO 2026-08-28 as recurring behaviour across agents, not a single incident."
     },
     {
       "id": "pipeline.all-three-runners-should-install-against-the-stable-branch",
@@ -779,6 +789,16 @@
       "closureRepository": "self",
       "closureCommit": "e3e521834f45f3733f597932ab1693bcdfaeb721",
       "closureEvidence": "plugins/pipeline-core/lib/multi-cli-benchmark.test.mjs"
+    },
+    {
+      "id": "pipeline.blind-session-zero-followable-steps-on-push-path",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "Measured 2026-08-28 at HEAD 129d8c8e by scratch/smoke-blind-push.mjs: a genuinely fresh repository onboarded to ready through the real driver, then walked following ONLY structural nextAction objects, exactly as onboarding-init.mjs does. The walk is deliberately ignorant -- it may never reach for a command name it was not handed.",
+      "deferred": false,
+      "tracking": "NOW / Nova A — measured, not argued: a fresh session gets 15 chained commands on the onboarding path and 0 on the feature/push path. PO 2026-08-28: the paths must be tested without the Pipeline's context knowledge, because a greenfield session does not have it."
     },
     {
       "id": "pipeline.blocking-push-gate-has-no-terminal-exception-boundary",
@@ -1258,7 +1278,7 @@
     {
       "id": "pipeline.consumer-must-allowlist-every-runner-lane",
       "status": "open",
-      "type": "improvement",
+      "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-28",
       "source": "Consumer project HA, incident report S56 finding B4 (2026-08-28, Windows, Claude runner).",
@@ -1521,12 +1541,22 @@
     {
       "id": "pipeline.delivery-is-not-always-a-git-push",
       "status": "open",
-      "type": "improvement",
+      "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-28",
       "source": "PO, 2026-08-28: some repositories barely push at all — live deployment runs by other routes, e.g. a Visual Studio build process, or SSH deployment straight onto the Home Assistant server.",
       "deferred": false,
       "tracking": "Backlog / someday — PO-raised 2026-08-28; not blocking the Nova candidate, but it decides whether the release model fits a whole class of the PO's repositories"
+    },
+    {
+      "id": "pipeline.design-to-implementation-path-has-no-driver",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "PO request 2026-08-28. Scope established by reading what onboarding-init.mjs drives (project-onboarding-v3.mjs's subcommand table only) against where the design-to-implementation transition actually lives (pipeline-state.mjs).",
+      "deferred": false,
+      "tracking": "Nova B — PO-raised 2026-08-28: the next path complex enough to need a driver. Ranked BEHIND the push driver, for the reason stated below."
     },
     {
       "id": "pipeline.discarded-feature-dead-end",
@@ -1984,7 +2014,7 @@
     {
       "id": "pipeline.gate-should-not-demand-a-human-name",
       "status": "open",
-      "type": "improvement",
+      "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-28",
       "source": "Follow-up from 2026-08-28-a-chat-gate-is-unusable-with-a-non-ascii-name-on-windows.md, consumer incident report S56 finding B1's own second suggestion.",
@@ -2527,6 +2557,16 @@
       "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
     },
     {
+      "id": "pipeline.guard-root-admission-compares-typed-to-realpathed",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "Found 2026-08-28 while independently verifying dispatch NVA-G-GUARDDEADLOCK's negative result against guard-lifecycle-ready.mjs. The dispatch refuted the reported cause of HA incident report S56 finding B3 and named this as the most plausible remaining one; the code was then re-read here to confirm the mechanism exists.",
+      "deferred": false,
+      "tracking": "NOW / Nova A — the surviving candidate cause for a consumer session that lost both its lanes on Windows, and a platform-neutrality defect in the guard that decides whether any recovery command runs at all"
+    },
+    {
       "id": "pipeline.guard-string-match-makes-a-file-uncommittable",
       "status": "closed",
       "type": "defect",
@@ -2566,14 +2606,38 @@
       "closureEvidence": "plugins/pipeline-core/hooks/guard-testpath-override.test.mjs"
     },
     {
-      "id": "pipeline.guided-init-ends-in-error-not-a-question",
+      "id": "pipeline.guided-driver-neither-discoverable-nor-runnable",
       "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "PO question 2026-08-28: 'ist sichergestellt, dass die agenten überhaupt diesen driver jeweils sofort finden und ihn nutzen müssen?' Measured by scratch/verify-driver-reachable.mjs against a governed fixture with an injected readiness denial.",
+      "deferred": false,
+      "tracking": "NOW / Nova A — the guided driver is refused by the readiness guard in every state it exists to serve, and named by nothing an agent reads. Every chaining improvement built this session is inert in practice until this lands."
+    },
+    {
+      "id": "pipeline.guided-init-ends-in-error-not-a-question",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-28",
       "source": "Measured 2026-08-28 by driving onboarding-init.mjs against a genuinely fresh repository at HEAD e9cc8d21, then reproducing the terminating step directly. Measured, not reported.",
       "deferred": false,
-      "tracking": "NOW / Nova A — the last gap between the guided init and a usable end-to-end path, and the exact wall a consumer project hit independently the same day"
+      "tracking": "NOW / Nova A — the last gap between the guided init and a usable end-to-end path, and the exact wall a consumer project hit independently the same day",
+      "closedAt": "2026-08-28",
+      "closureRepository": "self",
+      "closureCommit": "435063c5c49ceb332ab5348ada0e5eab9f9e5bcf",
+      "closureEvidence": "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs"
+    },
+    {
+      "id": "pipeline.guided-init-human-rounds-above-floor",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "Measured 2026-08-28 by driving scratch/smoke-guided-init-full.mjs against a genuinely fresh repository at HEAD 435063c5: 4 human rounds, 25 chained driver commands, 0 repair subcommands. Dependency analysis done against the intake state machine in onboarding-continuity.mjs, not from the measurement alone.",
+      "deferred": false,
+      "tracking": "NOW / Nova A — PO asked directly whether the four human rounds can be collapsed to one or two. Three is the floor; one of the four is removable, and it is the cheapest of the four to remove."
     },
     {
       "id": "pipeline.gwm-kernel-doc-enumeration-diverges-from-the-code-array",
@@ -3540,6 +3604,16 @@
       "closureEvidence": "plugins/pipeline-core/lib/interaction-continuity.test.mjs"
     },
     {
+      "id": "pipeline.nothing-checks-that-a-capability-is-reachable",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "Pattern identified 2026-08-28 after the PO asked whether agents can even find the guided driver. Each instance below was verified in code or by measurement in the same session.",
+      "deferred": false,
+      "tracking": "NOW / Nova A — three separate instances in one session, each found by the PO or by an end-to-end walk rather than by any check. This is the check that would have caught all three."
+    },
+    {
       "id": "pipeline.nothing-connects-an-acceptance-criterion-to-a-check-that-runs",
       "status": "closed",
       "type": "workflow-improvement",
@@ -3629,13 +3703,17 @@
     },
     {
       "id": "pipeline.onboarding-must-elicit-the-real-verify-contract",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-28",
       "source": "Greenfield happy-path test of candidate 0.6.0 across all three runners, 2026-08-28. Independent self-analyses: Claude/Windows (docs/pipeline-haertungstest-und-analyse.md), Agy/WSL (pipeline-analysis.md), Codex/WSL (docs/pipeline-session-analysis-2026-08-28.md), plus the PO's own cross-run observations.",
       "deferred": false,
-      "tracking": "NOW / Nova A — happy-path blocking: without a real verify contract the push gate is unsatisfiable by construction, so the path cannot reach its last step"
+      "tracking": "NOW / Nova A — happy-path blocking: without a real verify contract the push gate is unsatisfiable by construction, so the path cannot reach its last step",
+      "closedAt": "2026-08-28",
+      "closureRepository": "self",
+      "closureCommit": "674b1c0c85986a7d4a0aed0f8b1a124c99003d68",
+      "closureEvidence": "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs"
     },
     {
       "id": "pipeline.onboarding-needs-one-guided-init",
@@ -3921,13 +3999,17 @@
     },
     {
       "id": "pipeline.plan-result-publishes-no-next-action",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-28",
       "source": "Smoke test of onboarding-init.mjs against a fresh temporary repository, 2026-08-28, at HEAD 92d1b711. Measured, not reported by any runner.",
       "deferred": false,
-      "tracking": "NOW / Nova A — the last measured gap between the guided init and a full drive to ready; found by smoke-testing the driver against a genuinely fresh repository"
+      "tracking": "NOW / Nova A — five of seven builders fixed 2026-08-28 (NVA-D-PLANACTION, NVA-F-PROMOTIONACTION) and the guided init now reaches ready; NOT closed, because two builders still publish applyAction without nextAction",
+      "closedAt": "2026-08-28",
+      "closureRepository": "self",
+      "closureCommit": "5e43a16f98d0bce277d8000a0623a392023285fc",
+      "closureEvidence": "plugins/pipeline-core/lib/onboarding-continuity.mjs"
     },
     {
       "id": "pipeline.plugin-package-should-vendor-canon-references-via-build-step",
@@ -4001,13 +4083,17 @@
     },
     {
       "id": "pipeline.po-ceremony-resolves-the-wrong-runner",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-28",
       "source": "Consumer project HA, incident report S56 finding B5 (2026-08-28, Windows, pipeline-core 0.6.0+claude.20260828131316.03c6e1e). Mechanism re-verified in this repository's own code before filing, and the reported diagnosis sharpened.",
       "deferred": false,
-      "tracking": "NOW / Nova A — a gate that forces the PO into their own terminal must not land them on a different runner there; reported by a consumer project and confirmed in the code"
+      "tracking": "NOW / Nova A — a gate that forces the PO into their own terminal must not land them on a different runner there; reported by a consumer project and confirmed in the code",
+      "closedAt": "2026-08-28",
+      "closureRepository": "self",
+      "closureCommit": "8cbd2b152ab5a134fdf6444d09077cc32aec594b",
+      "closureEvidence": "plugins/pipeline-core/scripts/onboarding-init.test.mjs"
     },
     {
       "id": "pipeline.po-decision-bs26-unsatisfiable-under-the-phoenix-ledger-split",
@@ -4496,6 +4582,16 @@
       "closureEvidence": "backlog/items/2026-08-09-push-gate-reads-evidence-from-a-location-the-prescribed-verify-run-never-writes-to.md"
     },
     {
+      "id": "pipeline.push-gate-unsatisfiable-in-consumer-deployment",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "Consumer project HA, session 56 (2026-08-28, Windows). The PO explicitly chose the signature route, the ceremony ran correctly end to end, the PO signed -- and the push still could not land. All three mechanisms below were then verified in this repository's own code before filing.",
+      "deferred": false,
+      "tracking": "NOW / Nova A — happy-path blocking, and the most severe finding of the day: a correctly-signed push cannot land in ANY consumer deployment. Also blocks the security-gate-ON decision, whose measurement was taken in the one environment where this defect does not fire."
+    },
+    {
       "id": "pipeline.push-guard-worktree-target",
       "status": "closed",
       "type": "defect",
@@ -4508,6 +4604,16 @@
       "closureRepository": "self",
       "closureCommit": "81cc5f1a6cb384057fd49dd1a340e93c3aec3efb",
       "closureEvidence": "backlog/evidence/2026-07-24-po-sentinel-closure-disposition.md"
+    },
+    {
+      "id": "pipeline.push-path-has-no-driver",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "PO request 2026-08-28. Scope established by reading what onboarding-init.mjs actually drives (project-onboarding-v3.mjs's own subcommand table, nothing else) and docs/push-release-flow.md's five authorization layers.",
+      "deferred": false,
+      "tracking": "Nova B — PO-raised 2026-08-28 on seeing the guided onboarding reach ready: 'dann braucht der push pfad auch so was weil der kostet auch mega viel'. Deliberately NOT Nova A: the candidate must not grow a second driver before its first one is reviewed."
     },
     {
       "id": "pipeline.push-release-flow-unusable-for-third-party-adopters",
@@ -4583,6 +4689,16 @@
       "closureRepository": "self",
       "closureCommit": "f5e41744edfcc0f8cb76e36036cde90fa989582f",
       "closureEvidence": "backlog/evidence/2026-08-06-second-reconciliation-pass.md"
+    },
+    {
+      "id": "pipeline.ready-gate-hand-maintained-shape-mirror",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "Found live 2026-08-28 while the PO rsynced the candidate onto the local marketplace mid-session. The first instance is recorded in the file's own comment.",
+      "deferred": false,
+      "tracking": "NOW / Nova A — the second instance blocked every governed write in a ready project and was invisible until the candidate was actually installed. NVA-T-READYKEYS fixes that instance; this item is about the third one."
     },
     {
       "id": "pipeline.rebind-rollback-names-no-predicate",
@@ -4680,13 +4796,17 @@
     },
     {
       "id": "pipeline.relative-commit-message-file-unreadable-from-a-worktree",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-28",
       "source": "Observed live during the NVA-GF-* Workflow round, 2026-08-28, run wf_b6a26661-b19. Not relayed and not inferred: two sibling dispatches in the same run hit the identical denial, one recovered and one did not.",
       "deferred": false,
-      "tracking": "NOW / Nova A — blocks the Pipeline's own worktree-isolated dispatch pattern; fix dispatched as NVA-B-GUARDF in the same session it was found"
+      "tracking": "NOW / Nova A — blocks the Pipeline's own worktree-isolated dispatch pattern; fix dispatched as NVA-B-GUARDF in the same session it was found",
+      "closedAt": "2026-08-28",
+      "closureRepository": "self",
+      "closureCommit": "0c979a2722c7a29bf96ed3a02d3f6b9a861a1c21",
+      "closureEvidence": "plugins/pipeline-core/hooks/guard-git.mjs"
     },
     {
       "id": "pipeline.release-preflight-cli-base-commit-not-peeled",
@@ -4967,6 +5087,16 @@
       "deferred": false
     },
     {
+      "id": "pipeline.seed-security-gate-on",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "Measured 2026-08-28 against a genuinely fresh onboarded project at HEAD a304195d. Measured, not assumed — the same standard the original `off` decision was held to.",
+      "deferred": false,
+      "tracking": "NOW / Nova A — PO decision 2026-08-28 stands, but BLOCKED: the measurement below was taken in this repository's own checkout, the one place the consumer-side defect does not fire. See 'Correction' before implementing."
+    },
+    {
       "id": "pipeline.seeded-verify-contract-is-always-green",
       "status": "closed",
       "type": "defect",
@@ -5161,12 +5291,17 @@
     },
     {
       "id": "pipeline.shell-grammar-reads-quoted-content-as-shell-syntax",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-27",
-      "source": "Three live refusals in one Elephant session, 2026-08-27, each on a read-only command whose only offending characters sat inside a quoted argument.",
-      "deferred": false
+      "source": "Three live refusals in one Elephant session, 2026-08-27, each on a read-only command whose only offending characters sat inside a quoted argument. Reproduced twice more on 2026-08-28, and independently by a dispatched Goldfish which overran its tool budget for this reason and said so in its own report.",
+      "deferred": false,
+      "tracking": "NOW / Nova A — PO decision 2026-08-28: admit `&&`, and secure it. This item is the prerequisite half; the admission is unsafe until the parser stops reading quoted content as syntax.",
+      "closedAt": "2026-08-28",
+      "closureRepository": "self",
+      "closureCommit": "c702d3ff76816e1961d09fa418d114f6fc342a2e",
+      "closureEvidence": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs"
     },
     {
       "id": "pipeline.shipped-artifacts-assume-the-pipelines-own-repository",
@@ -5700,6 +5835,16 @@
       "closureRepository": "self",
       "closureCommit": "ebc6ea4c238f12aa8e4b0050b0c0ec4829a9d18a",
       "closureEvidence": "backlog/items/2026-08-07-unregistered-suite-is-red-and-invisible-to-verify.md"
+    },
+    {
+      "id": "pipeline.v1-trust-anchor-makes-signature-push-functionless",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "Consumer project HA, incident report S56 finding B8 (2026-08-28, Windows), added after the first handover. Both mechanisms re-verified in this repository's own code before filing.",
+      "deferred": false,
+      "tracking": "NOW / Nova A — critical: it makes gates.push_approval 'signature', the documented default and this repository's own setting, functionless. Stacks with the push-gate item; a consumer hits both."
     },
     {
       "id": "pipeline.vendored-dispatch-templates-drift-from-canon",

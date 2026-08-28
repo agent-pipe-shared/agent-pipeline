@@ -1,7 +1,7 @@
 ---
 schema: pipeline.backlog-item.v1
 id: pipeline.nothing-checks-that-a-capability-is-reachable
-type: improvement
+type: workflow-improvement
 owner: pipeline
 status: open
 created: 2026-08-28

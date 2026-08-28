@@ -1,7 +1,7 @@
 ---
 schema: pipeline.backlog-item.v1
 id: pipeline.delivery-is-not-always-a-git-push
-type: improvement
+type: workflow-improvement
 owner: pipeline
 status: open
 created: 2026-08-28

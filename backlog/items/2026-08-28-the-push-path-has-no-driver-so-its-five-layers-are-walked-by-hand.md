@@ -1,7 +1,7 @@
 ---
 schema: pipeline.backlog-item.v1
 id: pipeline.push-path-has-no-driver
-type: improvement
+type: workflow-improvement
 owner: pipeline
 status: open
 created: 2026-08-28

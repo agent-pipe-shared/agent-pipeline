@@ -3,11 +3,15 @@ schema: pipeline.backlog-item.v1
 id: pipeline.onboarding-must-elicit-the-real-verify-contract
 type: defect
 owner: pipeline
-status: resolved
+status: closed
 created: 2026-08-28
 sprint: nova
 tracking: "NOW / Nova A — happy-path blocking: without a real verify contract the push gate is unsatisfiable by construction, so the path cannot reach its last step"
 source: "Greenfield happy-path test of candidate 0.6.0 across all three runners, 2026-08-28. Independent self-analyses: Claude/Windows (docs/pipeline-haertungstest-und-analyse.md), Agy/WSL (pipeline-analysis.md), Codex/WSL (docs/pipeline-session-analysis-2026-08-28.md), plus the PO's own cross-run observations."
+closed_at: "2026-08-28"
+closure_repository: "self"
+closure_commit: "674b1c0c85986a7d4a0aed0f8b1a124c99003d68"
+closure_evidence: "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs"
 ---
 
 # Onboarding leaves a verify contract that cannot pass, and the push gate only discovers it at the very end

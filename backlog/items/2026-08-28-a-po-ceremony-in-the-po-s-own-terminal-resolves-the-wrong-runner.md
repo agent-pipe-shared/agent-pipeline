@@ -3,11 +3,15 @@ schema: pipeline.backlog-item.v1
 id: pipeline.po-ceremony-resolves-the-wrong-runner
 type: defect
 owner: pipeline
-status: resolved
+status: closed
 created: 2026-08-28
 sprint: nova
 tracking: "NOW / Nova A — a gate that forces the PO into their own terminal must not land them on a different runner there; reported by a consumer project and confirmed in the code"
 source: "Consumer project HA, incident report S56 finding B5 (2026-08-28, Windows, pipeline-core 0.6.0+claude.20260828131316.03c6e1e). Mechanism re-verified in this repository's own code before filing, and the reported diagnosis sharpened."
+closed_at: "2026-08-28"
+closure_repository: "self"
+closure_commit: "8cbd2b152ab5a134fdf6444d09077cc32aec594b"
+closure_evidence: "plugins/pipeline-core/scripts/onboarding-init.test.mjs"
 ---
 
 # A PO ceremony run in the PO's own terminal resolves the wrong runner

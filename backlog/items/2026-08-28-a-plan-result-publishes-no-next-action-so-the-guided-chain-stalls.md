@@ -3,11 +3,15 @@ schema: pipeline.backlog-item.v1
 id: pipeline.plan-result-publishes-no-next-action
 type: defect
 owner: pipeline
-status: resolved
+status: closed
 created: 2026-08-28
 sprint: nova
 tracking: "NOW / Nova A — five of seven builders fixed 2026-08-28 (NVA-D-PLANACTION, NVA-F-PROMOTIONACTION) and the guided init now reaches ready; NOT closed, because two builders still publish applyAction without nextAction"
 source: "Smoke test of onboarding-init.mjs against a fresh temporary repository, 2026-08-28, at HEAD 92d1b711. Measured, not reported by any runner."
+closed_at: "2026-08-28"
+closure_repository: "self"
+closure_commit: "5e43a16f98d0bce277d8000a0623a392023285fc"
+closure_evidence: "plugins/pipeline-core/lib/onboarding-continuity.mjs"
 ---
 
 # Some plan results publish no `nextAction`, so the guided chain stalls at exactly those steps
