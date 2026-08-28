@@ -1133,6 +1133,52 @@ function nestedAttestedRepo(prefix, { destination = "refs/heads/main", withManif
     });
 }
 {
+  // PG12s16-s20 -- Phoenix F3. `git push origin main` carries no refspec, so before the
+  // guard can ask whether anything attests the push it has to resolve the bare source
+  // itself. It resolves only where git's own resolution is unambiguous, and hands the
+  // resolved ref to the same binding check the fully-qualified form gets.
+  //
+  // Only s16 discriminates that resolution: without it the bare form never reaches an
+  // attestation at all. The four refusals below would each also pass against a guard that
+  // resolved nothing, and that is the property being pinned -- ambiguity, or a resolved
+  // ref nothing attests, may cost a refusal but must never become permission.
+  const { dir } = signedPushRepo("bare-resolved", { destination: "refs/heads/main" });
+  check("PG12s16 allow a bare `git push origin main` attested for the ref it resolves to",
+    "git push origin main", dir, ALLOW);
+}
+{
+  // PG12s17 -- git's own DWIM prefers a tag of the same name, so a local `main` tag makes
+  // the source genuinely ambiguous. The guard must not pick one of the two readings.
+  const { dir } = signedPushRepo("bare-ambiguous-tag", { destination: "refs/heads/main" });
+  gitAt(dir, "tag", "main");
+  check("PG12s17 block a bare push whose source is ambiguous with a same-named tag",
+    "git push origin main", dir, BLOCK, { stderrIncludes: ["publication boundary"] });
+}
+{
+  // PG12s18 -- nothing local named `main` as a branch, so there is no branch push to
+  // resolve and the attestation for refs/heads/main covers none of what git would send.
+  const { dir } = signedPushRepo("bare-no-branch", { destination: "refs/heads/main" });
+  gitAt(dir, "branch", "-m", "main", "trunk");
+  check("PG12s18 block a bare push when no local branch by that name exists",
+    "git push origin main", dir, BLOCK, { stderrIncludes: ["publication boundary"] });
+}
+{
+  // PG12s19 -- a configured push refspec means git's resolution is no longer the default
+  // one, so what the command will actually send is not the guard's to assume.
+  const { dir } = signedPushRepo("bare-configured", { destination: "refs/heads/main" });
+  gitAt(dir, "config", "remote.origin.push", "refs/heads/*:refs/heads/*");
+  check("PG12s19 block a bare push under a configured remote.origin.push refspec",
+    "git push origin main", dir, BLOCK, { stderrIncludes: ["publication boundary"] });
+}
+{
+  // PG12s20 -- the control for s16: resolution feeds the binding check, it does not stand
+  // in for it. This attestation names another ref, so the resolved refs/heads/main is
+  // unattested and the publication boundary holds.
+  const { dir } = signedPushRepo("bare-unattested-ref", { destination: "refs/heads/feature-test" });
+  check("PG12s20 block a bare push whose resolved ref no attestation covers",
+    "git push origin main", dir, BLOCK, { stderrIncludes: ["publication boundary"] });
+}
+{
   // An unreadable policy answers "required", never "waived".
   const { dir, head } = freshRepo("required-broken-policy");
   writeManifest(dir, manifestPush({ approval: "required" }));
