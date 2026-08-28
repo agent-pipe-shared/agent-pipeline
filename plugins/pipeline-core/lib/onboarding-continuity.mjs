@@ -5379,10 +5379,26 @@ function applyIntakeCheckpointMutation({
  * Step 1: captures consent + any still-missing required values (git
  * author/language/profile) in one bundled ask. Idempotent: safe to re-run,
  * only fills fields still null (design SSa.5 point 1).
+ *
+ * NVA-V10B-INTAKEONEROUND: `text` is an additional, optional parameter -- the same already-
+ * resolved material-input string `applyOnboardingIntakeCapture` accepts (resolution of
+ * --text vs. --text-file, and the "never both" caller-error check, both stay CLI-side in
+ * resolveIntakeCaptureText(), scripts/project-onboarding-v3.mjs; this function only ever sees
+ * a single resolved string or nothing). Omitted (`null`/`undefined`), this function's
+ * behaviour and returned shape are IDENTICAL to before this change. Supplied, the consent
+ * mutation below still runs and commits FIRST -- required, because
+ * applyOnboardingIntakeCapture refuses INTAKE-CAPTURE-CONSENT-REQUIRED until consent is
+ * durably recorded -- and this function then calls applyOnboardingIntakeCapture itself
+ * (reused, never reimplemented: same evidence-before-checkpoint ordering, same
+ * content-addressed convergence) to append that first chunk in the same call. If the capture
+ * step then throws, consent stays durably recorded (itself idempotent, so a retry re-running
+ * consent is a harmless no-op) and nothing about the checkpoint is left inconsistent: a
+ * retry -- whether a second call to this function with corrected text, or a plain
+ * intake-capture-apply call -- converges exactly as it would have from two separate calls.
  */
 export function applyOnboardingIntakeConsent({
   rootDir, repositoryCapability = "local", granted, gitAuthor = null, language = null,
-  profile = null, activate = false, deps = {},
+  profile = null, text = null, activate = false, deps = {},
 } = {}) {
   if (activate !== true) fail("INTAKE-CONSENT-ACTIVATION-REQUIRED", "intake consent apply requires explicit activation");
   if (granted !== true) fail("INTAKE-CONSENT-REQUIRED", "intake consent apply requires explicit affirmative consent");
@@ -5414,7 +5430,15 @@ export function applyOnboardingIntakeConsent({
       };
     },
   });
-  return { schema: INTAKE_CONSENT_APPLY_SCHEMA, root: result.paths.root, mutated: result.mutated, checkpoint: result.value };
+  const consentOutput = { schema: INTAKE_CONSENT_APPLY_SCHEMA, root: result.paths.root, mutated: result.mutated, checkpoint: result.value };
+  if (text === null || text === undefined) return consentOutput;
+  const captureResult = applyOnboardingIntakeCapture({ rootDir, repositoryCapability, text, activate, deps });
+  return {
+    ...consentOutput,
+    mutated: consentOutput.mutated || captureResult.mutated,
+    checkpoint: captureResult.checkpoint,
+    capture: { mutated: captureResult.mutated, evidence: captureResult.evidence },
+  };
 }
 
 /**
