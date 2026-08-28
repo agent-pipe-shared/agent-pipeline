@@ -2278,6 +2278,104 @@ test("apply-portable-seed --activate surfaces the push-approval-setup ask-step f
   } finally { dispose(unasked); dispose(asked); }
 });
 
+// Regression for backlog pipeline.onboarding-must-elicit-the-real-verify-
+// contract (NVA-D-VERIFYASK): onboarding never asked what a project's real
+// verify command is, so the seeded UNCONFIGURED_VERIFY placeholder
+// (deliberately failing) stayed in place unnoticed until the push gate
+// discovered it, at push time, after a human had already been asked for a
+// signature. Same shape as the author-identity/push-approval regressions
+// above: drives the real CLI `apply-portable-seed --activate` path and
+// proves the ask surfaces there, additively, without changing the resting
+// status or the primary chained nextAction.
+test("apply-portable-seed --activate surfaces the verify-contract ask-step, offering a REAL detected candidate, never a default", () => {
+  const withCandidate = root();
+  const withoutCandidate = root();
+  const invoke = (args, deps) => {
+    let output = "";
+    const code = onboardingCli(args, { deps, write: (chunk) => { output += chunk; } });
+    return { code, result: JSON.parse(output) };
+  };
+  try {
+    // (a) A project whose package.json names a real, distinctive test script:
+    // the ask must offer THAT exact script, never a hardcoded default.
+    writeFileSync(join(withCandidate, "package.json"), JSON.stringify({
+      name: "sample", scripts: { test: "node --test test/onboarding-sample.test.mjs" },
+    }, null, 2), "utf8");
+    const planned = invoke(["plan", "--root", withCandidate, "--runner", "codex"], fakeDeps);
+    assert.equal(planned.code, 0);
+    const digest = planned.result.nextAction.argv[planned.result.nextAction.argv.indexOf("--plan-sha256") + 1];
+    const applied = invoke(["apply-portable-seed", "--root", withCandidate, "--plan-sha256", digest, "--activate", "--runner", "codex"], fakeDeps);
+    assert.equal(applied.code, 0);
+    assert.equal(applied.result.status, "runtime-initialization-required",
+      "the ask-step must never replace or change the lifecycle's own resting status");
+    assert.equal(applied.result.nextAction.kind, "command",
+      "the ask-step must never replace the primary chained nextAction");
+    assert.equal(applied.result.verifyContractAction.kind, "collect-input");
+    assert.equal(applied.result.verifyContractAction.mutation, false);
+    assert.equal(applied.result.verifyContractAction.input.name, "verifyCommand");
+    assert.match(applied.result.verifyContractAction.guidance, /node --test test\/onboarding-sample\.test\.mjs/u,
+      "must offer the REAL detected script, not a hardcoded default");
+    assert.match(applied.result.verifyContractAction.guidance, /"npm test"/u);
+    assert.match(applied.result.verifyContractAction.guidance, /"defer"/u);
+    assert.equal(applied.result.verifyContractStatus, "placeholder");
+    assert.equal(applied.result.pushGateSatisfiable, false,
+      "typed field, not prose: a caller must be able to branch on this directly");
+    assert.ok(applied.result.nextAction.pendingAsks.some((ask) => ask.input?.name === "verifyCommand"),
+      "the ask must also surface on nextAction.pendingAsks like its siblings");
+
+    // A replay of the exact same apply call (zero-write, same digest) must
+    // observe the identical ask-step.
+    const replayed = invoke(["apply-portable-seed", "--root", withCandidate, "--plan-sha256", digest, "--activate", "--runner", "codex"], fakeDeps);
+    assert.deepEqual(replayed.result, applied.result);
+
+    // (b) No obvious candidate anywhere: the ask still fires (unsatisfiable
+    // stays visible), but never invents a command to offer.
+    const noCandidatePlanned = invoke(["plan", "--root", withoutCandidate, "--runner", "codex"], fakeDeps);
+    const noCandidateDigest = noCandidatePlanned.result.nextAction.argv[noCandidatePlanned.result.nextAction.argv.indexOf("--plan-sha256") + 1];
+    const noCandidateApplied = invoke(["apply-portable-seed", "--root", withoutCandidate, "--plan-sha256", noCandidateDigest, "--activate", "--runner", "codex"], fakeDeps);
+    assert.equal(noCandidateApplied.code, 0);
+    assert.equal(noCandidateApplied.result.verifyContractAction.kind, "collect-input");
+    assert.match(noCandidateApplied.result.verifyContractAction.guidance, /No obvious candidate/u);
+    assert.equal(noCandidateApplied.result.pushGateSatisfiable, false);
+  } finally { dispose(withCandidate); dispose(withoutCandidate); }
+});
+
+// Load-bearing (Acceptance criterion 3): proves the ask above can never
+// become a way to fake a green push gate. Even though a real candidate was
+// detected and OFFERED for confirmation, this library never applies it
+// itself -- the seeded verify command stays the deliberately-failing
+// UNCONFIGURED_VERIFY placeholder until a human actually edits
+// project/pipeline.json, so running the SEEDED command exits non-zero.
+test("a seeded configuration can never produce passing verify evidence without a real command having run", () => {
+  const projectRoot = root();
+  const invoke = (args, deps) => {
+    let output = "";
+    const code = onboardingCli(args, { deps, write: (chunk) => { output += chunk; } });
+    return { code, result: JSON.parse(output) };
+  };
+  try {
+    writeFileSync(join(projectRoot, "package.json"), JSON.stringify({
+      name: "sample", scripts: { test: "node --test" },
+    }, null, 2), "utf8");
+    const planned = invoke(["plan", "--root", projectRoot, "--runner", "codex"], fakeDeps);
+    const digest = planned.result.nextAction.argv[planned.result.nextAction.argv.indexOf("--plan-sha256") + 1];
+    const applied = invoke(["apply-portable-seed", "--root", projectRoot, "--plan-sha256", digest, "--activate", "--runner", "codex"], fakeDeps);
+    assert.equal(applied.code, 0);
+    assert.equal(applied.result.verifyContractAction.kind, "collect-input",
+      "a candidate was detected and offered, but never silently adopted");
+
+    const calibrationPath = existsSync(join(projectRoot, "project", "pipeline.json"))
+      ? join(projectRoot, "project", "pipeline.json")
+      : join(projectRoot, ".claude", "pipeline.json");
+    const calibration = JSON.parse(readFileSync(calibrationPath, "utf8"));
+    assert.match(calibration.verify, /the verify contract of this project is not configured/u,
+      "the offered candidate must never be silently applied to the seeded calibration");
+
+    const run = spawnSync(calibration.verify, { shell: true, encoding: "utf8" });
+    assert.notEqual(run.status, 0, "the seeded verify command must fail -- it never ran a real check");
+  } finally { dispose(projectRoot); }
+});
+
 // Regression for backlog 2026-08-18-po-key-trust-anchor-onboarding.md and
 // 2026-08-28-onboarding-must-bootstrap-the-trust-anchor-once.md. A machine
 // that already held a signing key used to leave every fresh project on it
