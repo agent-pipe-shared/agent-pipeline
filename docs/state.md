@@ -64,10 +64,11 @@ PO trust anchor verified byte-identical to the configured
 **Design phase is running under an explicit PO go** (2026-08-27, ahead of
 Nova/Phoenix go-live — a deliberate PO decision deviating from ADR-0043's
 "once Phoenix and Nova are live" ordering for the *design* work only; the
-implementation start stays gated on the Nova rebase). Session model: Fable 5 at
-effort `max`, PO-set for the design phase — the MP-01 named session exception;
-the PO announced the one sanctioned gate switch to a cheaper configuration at
-the PRD gate ("Haltepunkt"). Deliverable under construction:
+implementation start stays gated on the Nova rebase). Session model: Fable 5
+at effort `max`, PO-set (MP-01 named exception) — briefly switched to Opus 5
+(1M)/`xhigh` at the gate on 2026-08-28, then **set back to Fable-max by the
+PO the same day for the gate-1 rework** (design/po-input-2026-08-28.md); the
+cheap-configuration switch moves to the next gate presentation. Deliverable under construction:
 `specs/sprint-alfred-epic/` (PRD, spec, acceptance, design analyses) from the 9
 `sprint:alfred` GitHub issues (#99 #101–#106 #108 #109), the open
 `sprint: alfred` backlog items (24 at intake, **27 today** — composition in
@@ -172,34 +173,37 @@ while continuity must bind PRD/Spec before the first `submit-plan`. Filed as
 (`9e436147`, ledger `50ce3f89`). Everything not bound is already updated
 (`bfa7cac8`).
 
-**Next — the corrected sequence, read out of the writers before being written
-down here:**
-1. **PO, in their own attended terminal:**
-   `node plugins/pipeline-core/scripts/pipeline-state.mjs po-authority-acknowledge-plan --by "<name>"`,
-   then the `applyAction` it prints (`po-authority-acknowledge-apply
-   --plan-sha256 <from the plan> --updated-at <from the plan> --by "<name>"
-   --activate`), typing `<name>` when prompted. An agent tool call is refused
-   here with `CHAT-GATE-NOT-ATTENDED` by design. This writes the
-   acknowledgement marker into the PRD through the sanctioned transactional
-   writer; the marker carries no digest or timestamp, so later PRD edits do
-   not stale it (`po-gate-authority.mjs`).
-2. Agent: `submit-plan --by Elephant --profile epic` — creates the submission
-   and rebinds continuity authority.
-3. Agent: `reopen-design --by Elephant` — now effective, which releases the
-   authority-bound write refusal.
-4. Agent: apply decisions 1–5 to the PRD and `spec.md` (§5 entry conditions
-   incl. the corrected #100 line, §6 non-goals, §7 criterion 4's set, §9
-   rewritten as recorded decisions, spec §1's item count, spec §10's #107
-   boundary note), recompute the `technical-spec-sha256` marker, commit.
-5. Agent: `submit-plan --by Elephant --profile epic` again on the corrected
-   bytes — `approveSubmittedPlan` tolerates the retained invalidation; this
-   is the sanctioned reopen → submit → approve path, not a workaround.
-6. **PO:** `approve-plan --by "<name>"`. Then the phase transition;
-   implementation still gated on Nova landing on `main` and the rebase.
+**Gate-1 outcome (2026-08-28, after the §9 answers): PRD REJECTED — rework
+directed.** The PO's verdict: far too shallow on the primary mandate
+(agentic architecture); the elementary requirements of #99/#104/#106/#109
+are missing from the PRD's own text; governance is bycatch, not the
+headline. Directive + four test questions captured in
+`specs/sprint-alfred-epic/design/po-input-2026-08-28.md`. The rework wave
+delivered the same day: a full issue re-read (snapshot verified current),
+the line-level audit `design/gap-analysis-2026-08-28.md` (per-issue
+coverage verdicts + the exact PRD/spec/acceptance integration map §D), and
+the absorbed doctrine `design/agent-first-architecture.md` (property
+catalog, knowledge estate + re-entry contract, enforcement mechanics,
+user-facing representation, greenfield/brownfield paths). **The morning's
+`po-authority-acknowledge-apply` command (plan `6616d6fe…`) is obsolete and
+must NOT be run** — the PO must never acknowledge content-soundness of
+rejected bytes.
 
-Standing gate-visible items: the Dispatch-trailer canon gap (disposition in
-`evidence/critic/round-1-response.md`) and the five defect items this design
-phase filed.
+**Next:** (1) Critic round on the rework documents (MP-07 ARCHITECTURE →
+design-tier at max, tool-layer model param per MP-29); fix-then-fix cycle as
+needed. (2) Re-present to the PO. (3) On the PO's word, the verified
+bound-document route — PO attended acknowledge (`po-authority-acknowledge-plan`/
+`-apply`, agent calls refused `CHAT-GATE-NOT-ATTENDED` by design; the marker
+carries no digest, later edits do not stale it) → `submit-plan --by Elephant
+--profile epic` → `reopen-design` (now effective; a submission exists to
+invalidate) → apply the doctrine graduation (gap-analysis §D) **plus** the
+§9-decision edits already queued (PRD §5 #100 correction, §6, §7 crit. 4,
+§9 as decided, spec §1 count, spec §10 #107 note) → recompute the
+`technical-spec-sha256` marker → `submit-plan` again (sanctioned
+reopen→submit→approve path) → PO `approve-plan`. Implementation stays gated
+on Nova landing on `main` + rebase. Standing gate-visible items: the
+Dispatch-trailer canon gap (`evidence/critic/round-1-response.md`) and the
+five defect items this design phase filed.
 
 ## Prior handover — 2026-09-01/02: the autonomous Nova B block
 
