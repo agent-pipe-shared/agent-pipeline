@@ -122,8 +122,20 @@ export function evaluateChangeIntegrity({ paths = [], independentChecks = [] } =
   return Object.freeze({ schema: AI_HARDENING_SCHEMA, changed, missing, allowed: missing.length === 0, code: missing.length ? "AIH-INDEPENDENT-CHECK-MISSING" : "AIH-INTEGRITY-CHECKED" });
 }
 
+// Named prefixes, not another alternation growing the regex: the deciding
+// controls (the library holding every hardening decision, and the verify
+// gate itself) must route to independent review whenever touched, even
+// though neither matches the general pattern below. Adding the next such
+// path is a list entry here, not a regex edit (F4, `scratch/DESIGN-self-
+// excluded-review-path.md` section D).
+export const SENSITIVE_EXACT_PATHS = Object.freeze([
+  "plugins/pipeline-core/lib/ai-assisted-hardening.mjs",
+  "harness/scripts/verify.mjs",
+]);
+
 export function routeSecurityReview({ changedPaths = [], authorId, reviewerId } = {}) {
-  const sensitive = changedPaths.some((path) => /(^|\/)(hooks|\.claude|project|workflows|security|pipeline-core\/scripts\/(?:ai-assisted-hardening-gate|verify-topology-preflight))|\.test\.[cm]?js$/u.test(path));
+  const sensitive = changedPaths.some((path) => SENSITIVE_EXACT_PATHS.includes(path)
+    || /(^|\/)(hooks|\.claude|project|workflows|security|pipeline-core\/scripts\/(?:ai-assisted-hardening-gate|verify-topology-preflight))|\.test\.[cm]?js$/u.test(path));
   // A blank or whitespace-only reviewerId is not a reviewer: it is exactly the
   // unset/unconfigured shape `PIPELINE_SECURITY_REVIEWER_ID=""` takes when a
   // workflow forwards the variable before anyone has set it. `typeof "" ===
@@ -139,22 +151,42 @@ export const ROOT_POINTABLE_CHECK_KINDS = Object.freeze(["scope", "dependency"])
 
 /**
  * When a required check's own command file is inside the candidate diff, it
- * cannot certify itself. A root-pointable check may still be counted, but
- * only by re-running its BASE (pre-change) revision against the candidate
- * root and observing that base revision actually exit 0 -- never by trusting
- * the claim that it would. A non-root-pointable check (a test suite tests
- * the tree it lives in) always stays missing; there is nowhere else to point it.
+ * cannot certify itself on its own say-so. It counts when EITHER of two
+ * independent paths holds -- never neither:
+ *
+ * 1. base-revision path (root-pointable kinds only): the check's BASE
+ *    (pre-change) revision, re-run against the candidate root, actually
+ *    exits 0 -- never trusting the claim that it would. A non-root-pointable
+ *    check (a test suite tests the tree it lives in) has nowhere else to
+ *    point, so this path never counts it.
+ * 2. candidate-suite-and-review path (any kind): the check's own command, run
+ *    at the CANDIDATE revision, actually exits 0, AND a named reviewer
+ *    distinct from the author is present -- the same test `routeSecurityReview`
+ *    already applies (non-blank after trim, `!== authorId`). The candidate
+ *    suite passing is mechanical evidence, not authority; the authority is the
+ *    named human who is not the author. Both halves are required -- either
+ *    alone leaves the check missing.
+ *
+ * The base-revision path is evaluated first, so a caller that passes only
+ * `baseRevisionExitCode` keeps its exact previous behaviour and code.
  */
-export function evaluateSelfExcludedCheck({ kind, baseRevisionExitCode = null } = {}) {
+export function evaluateSelfExcludedCheck({
+  kind,
+  baseRevisionExitCode = null,
+  candidateRevisionExitCode = null,
+  reviewerId = null,
+  authorId = null,
+} = {}) {
   const rootPointable = ROOT_POINTABLE_CHECK_KINDS.includes(kind);
-  const counted = rootPointable && baseRevisionExitCode === 0;
-  return Object.freeze({
-    schema: AI_HARDENING_SCHEMA,
-    kind,
-    rootPointable,
-    counted,
-    code: counted ? "AIH-SELF-EXCLUDED-BASE-VERIFIED" : "AIH-SELF-EXCLUDED-MISSING",
-  });
+  const baseVerified = rootPointable && baseRevisionExitCode === 0;
+  const namedReviewer = typeof reviewerId === "string" && reviewerId.trim().length > 0;
+  const candidateReviewed = !baseVerified && candidateRevisionExitCode === 0 && namedReviewer && reviewerId !== authorId;
+  const counted = baseVerified || candidateReviewed;
+  const basis = baseVerified ? "base-revision" : (candidateReviewed ? "candidate-suite-and-review" : null);
+  const code = baseVerified
+    ? "AIH-SELF-EXCLUDED-BASE-VERIFIED"
+    : (candidateReviewed ? "AIH-SELF-EXCLUDED-REVIEWED" : "AIH-SELF-EXCLUDED-MISSING");
+  return Object.freeze({ schema: AI_HARDENING_SCHEMA, kind, rootPointable, counted, basis, code });
 }
 
 /** A forwarded message retains its least-trusted origin; relays cannot upgrade it. */

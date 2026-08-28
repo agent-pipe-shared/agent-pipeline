@@ -122,17 +122,40 @@ function verifySelfExcludedAtBase(repoRoot, base, kind, file) {
 }
 
 /**
+ * The candidate-suite-and-review path: run the check's own CANDIDATE-revision
+ * copy (the same spawn shape the non-excluded branch already uses) and feed
+ * its exit code, together with the reviewer/author identity, into
+ * `evaluateSelfExcludedCheck`. This is never self-certification -- the suite
+ * passing is mechanical evidence, the authority is the named human distinct
+ * from the author, and both halves are required by that function.
+ */
+function verifySelfExcludedAtCandidate(repoRoot, kind, file, reviewerId, authorId) {
+  const run = spawnSync(process.execPath, [file], { cwd: repoRoot, stdio: "ignore" });
+  return evaluateSelfExcludedCheck({
+    kind,
+    candidateRevisionExitCode: run.status,
+    reviewerId,
+    authorId,
+  }).counted;
+}
+
+/**
  * Run only fixed, separate checks for classes present in this candidate diff.
  * `base` is the delivery base (see `verify-topology-preflight.mjs`); it is
  * used ONLY to materialise a self-excluded, root-pointable check's own base
  * revision -- never to widen or narrow which classes are required.
+ * `reviewerId`/`authorId` feed the candidate-suite-and-review fallback path
+ * only; a caller that omits them keeps the exact previous base-only behaviour.
  */
-export function runIndependentChecks(repoRoot, changedPaths, base = null) {
+export function runIndependentChecks(repoRoot, changedPaths, base = null, { reviewerId = null, authorId = null } = {}) {
   const required = evaluateChangeIntegrity({ paths: changedPaths, independentChecks: [] }).changed;
   return required.filter((kind) => {
     const file = INDEPENDENT_CHECK_COMMANDS[kind];
     if (!file) return false;
-    if (changedPaths.includes(file)) return verifySelfExcludedAtBase(repoRoot, base, kind, file);
+    if (changedPaths.includes(file)) {
+      return verifySelfExcludedAtBase(repoRoot, base, kind, file)
+        || verifySelfExcludedAtCandidate(repoRoot, kind, file, reviewerId, authorId);
+    }
     return spawnSync(process.execPath, [file], { cwd: repoRoot, stdio: "ignore" }).status === 0;
   });
 }
@@ -142,15 +165,17 @@ function main() {
   const head = argument("--head", "HEAD");
   const base = argument("--base") ?? git(repoRoot, ["rev-parse", `${head}^`]);
   const changedPaths = changedPathsForCandidate(repoRoot, base, head);
+  const authorId = argument("--author-id", git(repoRoot, ["log", "-1", "--format=%ae", head]));
+  const reviewerId = argument("--reviewer-id", process.env.PIPELINE_SECURITY_REVIEWER_ID ?? null);
   const result = evaluateAiHardeningGate({
     changedPaths,
     event: argument("--event", process.env.GITHUB_EVENT_NAME ?? "local"),
     privileged: bool(argument("--privileged", "false")),
     isolated: bool(argument("--isolated", "false")),
     validated: bool(argument("--validated", "false")),
-    authorId: argument("--author-id", git(repoRoot, ["log", "-1", "--format=%ae", head])),
-    reviewerId: argument("--reviewer-id", process.env.PIPELINE_SECURITY_REVIEWER_ID ?? null),
-    independentChecks: runIndependentChecks(repoRoot, changedPaths, base),
+    authorId,
+    reviewerId,
+    independentChecks: runIndependentChecks(repoRoot, changedPaths, base, { reviewerId, authorId }),
   });
   process.stdout.write(`${JSON.stringify(result)}\n`);
   process.exitCode = result.allowed ? 0 : 1;
