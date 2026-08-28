@@ -54,12 +54,12 @@ import { MUTATING_ONBOARDING_ARGV_SHAPES, automatedMutatingApplyArgv } from "../
 export { MUTATING_ONBOARDING_ARGV_SHAPES, automatedMutatingApplyArgv };
 
 /**
- * NVA-INTAKEARGV-1: resolve intake-capture-apply's material text from exactly one of its two
- * routes. `--text` carries the value inline. `--text-file` reads it from a file, and is the
- * only way a real design document can reach the intake at all: the closed Pipeline shell
- * grammar refuses any command text containing a newline, while this very input is declared
- * multi-line prose by intakeCaptureAction() itself (`singleLine: false`). Measured 2026-08-27
- * on a Codex greenfield run -- the PO's design document could not be passed, in any quoting.
+ * NVA-INTAKEARGV-1: resolve one PO material-input chunk from exactly one of its two routes.
+ * `--text` carries the value inline. `--text-file` reads it from a file, and is the only way a
+ * real design document can reach the intake at all: the closed Pipeline shell grammar refuses
+ * any command text containing a newline, while this very input is declared multi-line prose by
+ * intakeCaptureAction() itself (`singleLine: false`). Measured 2026-08-27 on a Codex greenfield
+ * run -- the PO's design document could not be passed, in any quoting.
  *
  * The file must resolve INSIDE the project root. A capture is repository-scoped material, and
  * reading an arbitrary host path on the strength of a relative-looking argument is exactly the
@@ -67,10 +67,15 @@ export { MUTATING_ONBOARDING_ARGV_SHAPES, automatedMutatingApplyArgv };
  * inside the root. Returns `options.text` untouched when no file route was used, so
  * applyOnboardingIntakeCapture's own non-empty validation stays the single authority on an
  * absent or empty value.
+ *
+ * NVA-V10B-INTAKEONEROUND: shared unchanged by both intake-capture-apply (where at least one
+ * of the two is required) and intake-consent-apply (where both are optional and may be
+ * omitted entirely) -- resolution and the "never both" caller-error check are identical for
+ * either caller, so this stays the one place that owns them.
  */
 function resolveIntakeCaptureText(options) {
   if (options.text !== undefined && options.textFile !== undefined) {
-    const conflict = new Error("intake-capture-apply accepts exactly one of --text or --text-file, never both");
+    const conflict = new Error("accepts exactly one of --text or --text-file, never both");
     conflict.code = "INTAKE-CAPTURE-TEXT-AMBIGUOUS";
     throw conflict;
   }
@@ -628,6 +633,10 @@ export function main(args = process.argv.slice(2), {
         ? { name: options.gitAuthorName, email: options.gitAuthorEmail } : null,
       language: options.language ?? null,
       profile: options.profile ?? null,
+      // NVA-V10B-INTAKEONEROUND: optional -- resolveIntakeCaptureText() returns undefined when
+      // neither --text nor --text-file was supplied, and applyOnboardingIntakeConsent treats
+      // that identically to omitting `text` altogether (behaviour/shape unchanged).
+      text: resolveIntakeCaptureText(options) ?? null,
       activate: options.activate,
       deps,
     });

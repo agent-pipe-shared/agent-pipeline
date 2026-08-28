@@ -2825,6 +2825,98 @@ check("applyOnboardingIntakeConsent: idempotent re-run only fills fields still n
   assert.equal(third.checkpoint.revision, second.checkpoint.revision);
 });
 
+// NVA-V10B-INTAKEONEROUND: a PO who answers the onboarding questions AND supplies their first
+// chunk of project material in the same message can have both recorded by ONE call. `text` is
+// an additional optional parameter on applyOnboardingIntakeConsent, reusing
+// applyOnboardingIntakeCapture rather than reimplementing its body.
+
+check("applyOnboardingIntakeConsent: without text, behaviour and returned shape are unchanged", () => {
+  const root = fixture("intake-consent-notext-shape");
+  const result = applyOnboardingIntakeConsent({
+    rootDir: root, granted: true, language: "en", profile: "feature", activate: true,
+  });
+  assert.deepEqual(Object.keys(result).sort(), ["checkpoint", "mutated", "root", "schema"],
+    "no `capture` field, and no other shape change, when text is omitted");
+  assert.equal(result.schema, INTAKE_CONSENT_APPLY_SCHEMA);
+  assert.equal(result.mutated, true);
+  assert.equal(result.checkpoint.materialInput.length, 0);
+  assert.equal(result.checkpoint.transactionState, "collecting");
+});
+
+check("applyOnboardingIntakeConsent: text is likewise a true no-op when explicitly undefined", () => {
+  const root = fixture("intake-consent-undefined-text-shape");
+  const result = applyOnboardingIntakeConsent({
+    rootDir: root, granted: true, activate: true, text: undefined,
+  });
+  assert.deepEqual(Object.keys(result).sort(), ["checkpoint", "mutated", "root", "schema"]);
+  assert.equal(result.checkpoint.materialInput.length, 0);
+});
+
+check("applyOnboardingIntakeConsent: on a FRESH project (no checkpoint yet), supplying text records consent AND captures that material in one call -- proving consent is recorded before capture runs", () => {
+  const root = fixture("intake-consent-merged-fresh");
+  assert.equal(readOnboardingIntakeCheckpoint({ rootDir: root }).status, "absent",
+    "the entire point of this case: capture must see consent that this SAME call just recorded");
+  const result = applyOnboardingIntakeConsent({
+    rootDir: root, granted: true, language: "en", profile: "feature",
+    text: "The PO's first description of the project.", activate: true,
+  });
+  assert.equal(result.schema, INTAKE_CONSENT_APPLY_SCHEMA);
+  assert.equal(result.mutated, true);
+  assert.equal(result.checkpoint.consent.granted, true);
+  assert.equal(result.checkpoint.materialInput.length, 1);
+  // Same transactionState advance a separate intake-capture-apply call would have produced
+  // (applyOnboardingIntakeCapture: advances collecting -> design-questions-pending on the
+  // first accepted capture).
+  assert.equal(result.checkpoint.transactionState, "design-questions-pending");
+  assert.equal(result.capture.mutated, true);
+  assert.ok(result.capture.evidence.sha256);
+  // Reused, not reimplemented: the same content-addressed evidence file
+  // applyOnboardingIntakeCapture itself writes.
+  const paths = resolveIntakeCheckpointPaths({ rootDir: root });
+  const evidenceBytes = readFileSync(join(paths.evidenceDirectory, `${result.capture.evidence.sha256}.txt`));
+  assert.equal(evidenceBytes.toString("utf8"), "The PO's first description of the project.");
+});
+
+check("applyOnboardingIntakeConsent: a merged call produces the identical checkpoint (minus timestamps) as two separate consent-apply then capture-apply calls", () => {
+  const merged = fixture("intake-consent-merged-compare-merged");
+  const mergedResult = applyOnboardingIntakeConsent({
+    rootDir: merged, granted: true, language: "en", profile: "feature",
+    text: "Identical material.", activate: true,
+  });
+
+  const separate = fixture("intake-consent-merged-compare-separate");
+  applyOnboardingIntakeConsent({ rootDir: separate, granted: true, language: "en", profile: "feature", activate: true });
+  const separateCapture = applyOnboardingIntakeCapture({ rootDir: separate, text: "Identical material.", activate: true });
+
+  assert.equal(mergedResult.checkpoint.materialInput.length, separateCapture.checkpoint.materialInput.length);
+  assert.equal(mergedResult.checkpoint.materialInput[0].sha256, separateCapture.checkpoint.materialInput[0].sha256);
+  assert.equal(mergedResult.checkpoint.materialInput[0].evidencePath, separateCapture.checkpoint.materialInput[0].evidencePath);
+  assert.equal(mergedResult.checkpoint.transactionState, separateCapture.checkpoint.transactionState);
+  assert.deepEqual(mergedResult.checkpoint.values, separateCapture.checkpoint.values);
+});
+
+check("applyOnboardingIntakeConsent: a merged call that fails at the capture step leaves consent durably recorded, and a retry converges", () => {
+  const root = fixture("intake-consent-merged-capture-fails");
+  expectIntakeError("INTAKE-CAPTURE-EMPTY", () => applyOnboardingIntakeConsent({
+    rootDir: root, granted: true, language: "en", text: "", activate: true,
+  }));
+  // Consent survived the thrown capture failure: durably recorded, no materialInput yet.
+  const afterFailure = readOnboardingIntakeCheckpoint({ rootDir: root });
+  assert.equal(afterFailure.status, "present");
+  assert.equal(afterFailure.value.consent.granted, true);
+  assert.equal(afterFailure.value.materialInput.length, 0);
+  assert.equal(afterFailure.value.transactionState, "collecting");
+
+  // Retry with corrected text: consent-apply is idempotent (a true no-op re-run, since every
+  // field is already answered) and the capture step now succeeds -- exactly the state two
+  // separate calls would have converged to.
+  const retried = applyOnboardingIntakeConsent({
+    rootDir: root, granted: true, language: "en", text: "corrected material", activate: true,
+  });
+  assert.equal(retried.checkpoint.materialInput.length, 1);
+  assert.equal(retried.checkpoint.transactionState, "design-questions-pending");
+});
+
 check("applyOnboardingIntakeCapture: happy path appends one evidence file and one materialInput entry", () => {
   const root = fixture("intake-capture-happy");
   grantIntakeConsent(root);

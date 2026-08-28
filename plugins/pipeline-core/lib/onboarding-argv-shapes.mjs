@@ -32,11 +32,22 @@
  */
 
 export const MUTATING_ONBOARDING_ARGV_SHAPES = Object.freeze({
+  // NVA-V10B-INTAKEONEROUND: `--text`/`--text-file` are additionally admitted here, both
+  // individually optional (never `requiredValueOneOf` -- that shape demands exactly one be
+  // PRESENT, which is wrong for a flag pair that may legitimately be omitted entirely on this
+  // command). A PO who answers the consent/identity questions AND supplies their first chunk of
+  // project material in the same reply can have both recorded by this ONE call instead of two;
+  // omitting both leaves behaviour identical to before this change. Supplying both --text and
+  // --text-file at once is a caller error exactly as it is for intake-capture-apply, but that
+  // rejection is enforced CLI-side (resolveIntakeCaptureText() in
+  // scripts/project-onboarding-v3.mjs) rather than by this table: `optionalValue` has no
+  // cross-flag "at most one" concept, so the guard admits the flag SET and nothing wider than
+  // that -- it does not, and structurally cannot, also enforce the pairwise exclusion.
   "intake-consent-apply": Object.freeze({
     required: Object.freeze(["--granted", "--activate"]),
     requiredValue: Object.freeze(["--root"]),
     requiredValueOneOf: Object.freeze([]),
-    optionalValue: Object.freeze(["--git-author-name", "--git-author-email", "--language", "--profile"]),
+    optionalValue: Object.freeze(["--git-author-name", "--git-author-email", "--language", "--profile", "--text", "--text-file"]),
   }),
   // NVA-INTAKEARGV-1: `--text-file` is not a convenience alias. The captured value is the
   // PO's own material design input -- `intakeCaptureAction()` declares it `singleLine:

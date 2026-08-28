@@ -2532,6 +2532,54 @@ test("NVA-W5-GUARDADMIT-1: intake-consent-apply admits exactly the full-bundle s
 });
 
 /**
+ * NVA-V10B-INTAKEONEROUND: a PO who answers the onboarding questions AND supplies their first
+ * chunk of project material in the same message can have both recorded by ONE call --
+ * intake-consent-apply optionally accepts the same --text/--text-file material
+ * intake-capture-apply accepts. This pins the guard's admission of those two new optional
+ * flags (added to MUTATING_ONBOARDING_ARGV_SHAPES's intake-consent-apply entry) and nothing
+ * wider than that: every near-miss/refuse case the two tests above already pin keeps refusing,
+ * unaffected by this widening.
+ */
+test("NVA-V10B-INTAKEONEROUND: intake-consent-apply admits the same optional --text/--text-file material intake-capture-apply accepts, order-insensitively with the other four optional flags, and refuses a duplicated or malformed value", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const withText = `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --text 'the PO already described the project' --activate`;
+    assert.equal(isSanctionedLifecycleCommand(withText, path), true, withText);
+    const withTextFile = `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --text-file 'scratch/design-input.md' --activate`;
+    assert.equal(isSanctionedLifecycleCommand(withTextFile, path), true, withTextFile);
+    // Order-insensitive alongside every other optional value flag, same invariant NVA-BOOTADMIT-2
+    // already pins for the original four.
+    const withEverything = `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --activate --profile epic --text 'the PO already described the project' --language en --granted --git-author-email 'po@example.com' --git-author-name 'PO Name'`;
+    assert.equal(isSanctionedLifecycleCommand(withEverything, path), true, withEverything);
+    // Both text routes present at once IS admitted here: the guard's flag-SET admission has no
+    // cross-flag "at most one" concept (unlike intake-capture-apply's requiredValueOneOf) -- the
+    // caller-error rejection for supplying both lives CLI-side, in resolveIntakeCaptureText()
+    // (project-onboarding-v3.mjs), not in this guard.
+    const withBoth = `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --text 'material' --text-file 'scratch/design-input.md' --activate`;
+    assert.equal(isSanctionedLifecycleCommand(withBoth, path), true, withBoth);
+    for (const bad of [
+      // duplicated --text
+      `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --text 'material' --text 'material' --activate`,
+      // duplicated --text-file
+      `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --text-file 'scratch/design-input.md' --text-file 'scratch/design-input.md' --activate`,
+      // empty --text value
+      `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --text '' --activate`,
+      // whitespace-only --text value
+      `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --text '   ' --activate`,
+      // empty --text-file value
+      `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --text-file '' --activate`,
+      // flag-shaped --text-file value (smuggled flag instead of a value)
+      `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --text-file --bogus --activate`,
+      // missing --granted -- still required, unaffected by the new optional flags
+      `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --text 'material' --activate`,
+    ]) {
+      assert.equal(isSanctionedLifecycleCommand(bad, path), false, bad);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
  * NVA-VERIFYGREEN-1: regression test for an observed autonomous-onboarding failure. A live
  * Antigravity run supplied consent alone -- --granted/--activate only, none of the four
  * individually-optional value flags (--git-author-name/--git-author-email/--language/
