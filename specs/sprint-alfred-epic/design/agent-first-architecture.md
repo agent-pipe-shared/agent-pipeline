@@ -493,6 +493,21 @@ acceptance follows #99 — human-approved, forward-looking, no fabricated
 history. The decision is cheap and mandatory; the migration is expensive and
 deliberately released.
 
+**The ADR concept migrates with the standard, not after it** [PO question at
+the re-review gate, 2026-08-28]. Adoption installs the decision-estate
+mechanism itself — `docs/adr/` + sidecars (§3) and the decision skill — as
+part of the standard's arrival; a brownfield project does not first "earn"
+it. The accepted baseline is the estate's **first record**: present
+structure captured forward-looking and honestly dated, never a backdated
+ADR. The existing codebase's implicit decision mass then migrates **on
+touch**, not as a demanded retro-documentation pass: when work first
+materially touches an area, the §3 significance rubric fires
+(`initial-adr-required | architecture-baseline-sufficient`), and a
+significant inherited decision is captured as what it honestly is — decided
+historically, recorded now, `accepted` with its real capture date (#99 §8).
+Mass backfill stays welcome-but-never-demanded, exactly like every other
+brownfield improvement above.
+
 **Dogfood.** This repository is the first brownfield case, end to end:
 inventory across the ~60-script/471-suite estate, priced proposal, recorded
 PO decision — E2 qualification evidence (#109 §6).
