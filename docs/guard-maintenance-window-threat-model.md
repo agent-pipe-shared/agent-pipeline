@@ -122,7 +122,21 @@ below assumes it holds and is written to catch a change that would break it.
   `guard-lifecycle-ready.mjs` through both `project-onboarding-v3.mjs` modules —
   it holds the single declaration of the argv shape the guard admits for every
   mutating onboarding command, so a window covering it would let one edit widen
-  that admission for all five commands at once.
+  that admission for all five commands at once. A sixth closure gap
+  (NVA-V22-KERNELCLOSURE, 2026-08-28 — a comment-parsing false positive that
+  had been crashing the walk before it reached these edges was fixed in
+  `f7bfa43e`, and the closure test then reported this whole family, reached
+  from `guard-lifecycle-ready.mjs` and both `project-onboarding-v3.mjs`
+  modules above, in one pass) added: `hooks/staleness-check.mjs`,
+  `lib/bootstrap-payload-budget.mjs`, `lib/codex-host-plugin-list.mjs`,
+  `lib/copy-safe-command.mjs`, `lib/public-core-observation.mjs`,
+  `lib/public-core-origin-allowlist.mjs`, `lib/ruleset-source.mjs`,
+  `lib/self-application-attestation-gate.mjs`,
+  `lib/trusted-tool-resolution.mjs`, `scripts/pipeline-start-preflight.mjs`,
+  `scripts/pipeline-update-channel.mjs`, `scripts/po-approval-request.mjs`,
+  `scripts/po-human-approval.mjs` (the script the human uses to sign),
+  `scripts/push-gate-satisfiability.mjs`, `scripts/push-prepare.mjs`,
+  `scripts/ruleset-freshness.mjs`, and `scripts/ruleset-update-policy.mjs`.
 - The window record's cryptographic integrity and its TTL.
 - The audit visibility of an open or recently-closed window (the bootstrap
   warning).
