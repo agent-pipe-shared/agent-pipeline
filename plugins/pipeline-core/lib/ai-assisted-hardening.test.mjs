@@ -45,3 +45,35 @@ test("AC19: a self-excluded non-root-pointable check stays missing regardless of
   assert.equal(evaluateSelfExcludedCheck({ kind: "test", baseRevisionExitCode: 0 }).rootPointable, false);
   assert.equal(evaluateSelfExcludedCheck({ kind: "policy", baseRevisionExitCode: 0 }).counted, false);
 });
+test("AC20: the base-revision path still counts when only baseRevisionExitCode is supplied", () => {
+  const counted = evaluateSelfExcludedCheck({ kind: "scope", baseRevisionExitCode: 0 });
+  assert.equal(counted.counted, true);
+  assert.equal(counted.basis, "base-revision");
+  assert.equal(counted.code, "AIH-SELF-EXCLUDED-BASE-VERIFIED");
+});
+test("AC21: a self-excluded check counts through the candidate suite when a named reviewer differs from the author", () => {
+  const result = evaluateSelfExcludedCheck({ kind: "test", candidateRevisionExitCode: 0, reviewerId: "reviewer-b", authorId: "author-a" });
+  assert.equal(result.counted, true);
+  assert.equal(result.basis, "candidate-suite-and-review");
+  assert.equal(result.code, "AIH-SELF-EXCLUDED-REVIEWED");
+});
+test("AC22: the candidate-suite path stays missing without a named reviewer (blank or whitespace-only)", () => {
+  assert.equal(evaluateSelfExcludedCheck({ kind: "test", candidateRevisionExitCode: 0, reviewerId: "", authorId: "author-a" }).counted, false);
+  assert.equal(evaluateSelfExcludedCheck({ kind: "test", candidateRevisionExitCode: 0, reviewerId: "   ", authorId: "author-a" }).counted, false);
+});
+test("AC23: the candidate-suite path stays missing when the reviewer is identical to the author", () => {
+  assert.equal(evaluateSelfExcludedCheck({ kind: "test", candidateRevisionExitCode: 0, reviewerId: "author-a", authorId: "author-a" }).counted, false);
+});
+test("AC24: the candidate-suite path stays missing when the candidate-revision suite itself did not exit 0", () => {
+  assert.equal(evaluateSelfExcludedCheck({ kind: "test", candidateRevisionExitCode: 1, reviewerId: "reviewer-b", authorId: "author-a" }).counted, false);
+});
+test("AC25: a non-root-pointable kind is counted through the candidate-suite-and-review path", () => {
+  const result = evaluateSelfExcludedCheck({ kind: "guard", candidateRevisionExitCode: 0, reviewerId: "reviewer-b", authorId: "author-a" });
+  assert.equal(result.rootPointable, false);
+  assert.equal(result.counted, true);
+  assert.equal(result.basis, "candidate-suite-and-review");
+});
+test("AC26: the deciding library and the verify gate both route to independent review when touched", () => {
+  assert.equal(routeSecurityReview({ changedPaths: ["plugins/pipeline-core/lib/ai-assisted-hardening.mjs"], authorId: "a", reviewerId: "a" }).required, true);
+  assert.equal(routeSecurityReview({ changedPaths: ["harness/scripts/verify.mjs"], authorId: "a", reviewerId: "a" }).required, true);
+});
