@@ -77,7 +77,14 @@ function directorySourceLabel(source) {
 // next time something reads it, not silently repaired here), and it never overwrites a
 // DIFFERENT already-valid poKeyDirectory a human previously chose without them knowing --
 // only an absent/null value, or the identical one, is ever written.
-function persistExplicitDirectoryIntoMachinePlane(args, directory, dependencies) {
+// NVA-V1-KEYDIRPTR (backlog: 2026-08-28-a-dead-key-directory-pointer-is-
+// permanent-and-silent.md): the "already-valid poKeyDirectory" this function
+// must never overwrite means a directory that still RESOLVES on disk, not
+// merely a non-empty string. The predicate below narrows exactly that one
+// branch (`poKeyDirectoryStillExists`); every other property documented
+// above it -- best-effort, additive-only, never touches an invalid plane,
+// never fires for a non-flag source -- is unchanged.
+export function persistExplicitDirectoryIntoMachinePlane(args, directory, dependencies) {
   if (args.directorySource !== "flag") return;
   const readPlane = dependencies.readMachinePlaneFn ?? readMachinePlane;
   const writePlane = dependencies.writeMachinePlaneFn ?? writeMachinePlane;
@@ -85,7 +92,7 @@ function persistExplicitDirectoryIntoMachinePlane(args, directory, dependencies)
   if (plane.status === "invalid") return;
   const current = plane.status === "valid" ? plane.plane : null;
   if (current?.poKeyDirectory === directory) return;
-  if (current && text(current.poKeyDirectory)) return;
+  if (current && text(current.poKeyDirectory) && poKeyDirectoryStillExists(current.poKeyDirectory, dependencies)) return;
   const next = current
     ? { ...current, poKeyDirectory: directory, updatedAt: new Date().toISOString() }
     : {
@@ -99,6 +106,20 @@ function persistExplicitDirectoryIntoMachinePlane(args, directory, dependencies)
       updatedAt: new Date().toISOString(),
     };
   try { writePlane(next, dependencies); } catch { /* best-effort: never fails setup itself */ }
+}
+
+/** Existence check only -- never opens or inspects anything INSIDE the
+ * directory (mirrors machine-plane.mjs's own `validPoKeyDirectory`
+ * discipline). A non-directory at the path, or any read error, is treated as
+ * "does not resolve" -- the conservative direction for a predicate deciding
+ * whether a recorded pointer is still worth protecting from replacement. */
+function poKeyDirectoryStillExists(directory, dependencies) {
+  const exists = dependencies.existsSyncFn ?? existsSync;
+  try {
+    if (!exists(directory)) return false;
+    const stat = dependencies.statSyncFn ?? statSync;
+    return stat(directory).isDirectory();
+  } catch { return false; }
 }
 
 // PO-KEYDIR-01(A), 2026-08-11 PO decision (backlog/items/2026-08-10-po-key-directory-
