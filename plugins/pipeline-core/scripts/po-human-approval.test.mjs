@@ -75,11 +75,6 @@ import { canonicalSha256, canonicalizeJson, sealGovernanceEvent } from "../lib/g
 import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
 import { appendPortableGovernanceEvent, readLocalRepositoryFingerprint, recoverPortableGovernanceProjection } from "../lib/governance-event-store.mjs";
 
-function openssl(args) {
-  const result = spawnSync("openssl", args, { stdio: "pipe" });
-  assert.equal(result.status, 0, `openssl ${args.join(" ")} failed: ${result.stderr?.toString() ?? ""}`);
-}
-
 /**
  * The ceremony's PRODUCTION signing path shells out to `openssl pkeyutl -sign`
  * (po-human-approval.mjs:923) on purpose: the operator's private key is handed
