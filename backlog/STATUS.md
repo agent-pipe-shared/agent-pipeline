@@ -475,6 +475,7 @@
 | pipeline.verify-mjs-runs-385-suites-strictly-sequentially | closed | workflow-improvement | pipeline | 2026-08-24 | — |
 | pipeline.verify-range-mode-registration-for-orchestrator-commit-control | open | idea | pipeline | 2026-08-25 | — |
 | pipeline.verify-registration-check-fixtures-lack-real-git-topology | closed | defect | pipeline | 2026-08-19 | — |
+| pipeline.verify-suite-reads-real-machine-state | open | defect | pipeline | 2026-08-28 | NOW / Nova A — a suite about to enter the verify gate whose outcome depends on unrelated per-machine state; found while diagnosing a one-off failure of exactly that suite |
 | pipeline.warn-security-gate-hard-blocks-every-push | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.wave5-scope-categorization-missed-triage-level-sprint-deferrals | closed | defect | pipeline | 2026-08-19 | — |
 | pipeline.windows-acl-hardening-never-remediates-a-pre-existing-insecure-directory | closed | defect | pipeline | 2026-08-17 | — |
@@ -492,7 +493,7 @@
 
 ## Counts
 
-- open: 83
+- open: 84
 - in_progress: 3
 - closed: 384
 - rejected: 3
