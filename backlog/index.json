@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "eed311a6da7857598ecb4f9e2b661291ebf7113884af7878aac5ee02bf4540e6"
+    "transitionHead": "0987f105de3eb4c410673d96b7bc88747f6db4e217e00eba10a8472eb0e6b0d0"
   },
   "counts": {
-    "open": 58,
+    "open": 75,
     "in_progress": 3,
     "closed": 382,
     "rejected": 3,
@@ -262,11 +262,12 @@
     {
       "id": "pipeline.agent-binding-guards-are-not-os-level-sandboxing",
       "status": "open",
-      "type": "idea",
+      "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-25",
       "source": "PO relay (chat), 2026-08-25, from a separate Agy greenfield-test session's own threat-model self-analysis (Q&A transcript pasted verbatim by the PO); PO's own framing: 'eher was fürs backlog was aber nicht zeitnah angegangen wird (Thema eher für nova B)'",
-      "deferred": true
+      "deferred": true,
+      "tracking": "Escalated idea -> defect on 2026-08-28: vector 1 is no longer theoretical. Two independent greenfield runs executed it, one of them reaching the GitHub remote with no PO signature."
     },
     {
       "id": "pipeline.agent-can-self-arm-the-git-override",
@@ -1095,6 +1096,16 @@
       "closureEvidence": "backlog/items/2026-08-19-codex-runner-has-no-real-support-on-native-windows.md"
     },
     {
+      "id": "pipeline.codex-runner-needed-three-sessions-for-one-small-feature",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "Codex/WSL greenfield run, 2026-08-28 (docs/pipeline-session-analysis-2026-08-28.md), plus the PO's own observation that this runner needed three sessions and the most detours.",
+      "deferred": false,
+      "tracking": "Nova B — PO asked for this to be examined in detail"
+    },
+    {
       "id": "pipeline.codex-sandbox-critic-longterm",
       "status": "closed",
       "type": "defect",
@@ -1757,6 +1768,15 @@
       "deferred": true
     },
     {
+      "id": "pipeline.every-small-correction-costs-a-new-human-interaction",
+      "status": "open",
+      "type": "idea",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "Codex/WSL greenfield run, 2026-08-28 (docs/pipeline-session-analysis-2026-08-28.md), plus the PO's own observation that this runner needed three sessions and the most detours.",
+      "deferred": false
+    },
+    {
       "id": "pipeline.evidence-bound-review-retry-economics",
       "status": "closed",
       "type": "workflow-improvement",
@@ -2256,6 +2276,15 @@
       "closureRepository": "self",
       "closureCommit": "586f59edcffb9cebca139f1f4394a3c9ed9a66f9",
       "closureEvidence": "plugins/pipeline-core/hooks/guard-gate-strength.test.mjs"
+    },
+    {
+      "id": "pipeline.guard-bypass-paths-have-no-negative-regression-suite",
+      "status": "open",
+      "type": "requirement",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "Codex/WSL greenfield run, 2026-08-28 (docs/pipeline-session-analysis-2026-08-28.md), plus the PO's own observation that this runner needed three sessions and the most detours.",
+      "deferred": false
     },
     {
       "id": "pipeline.guard-command-grammar-dialectfor-infers-shell-dialect-from-os-not-actual-shell",
@@ -3389,6 +3418,16 @@
       "closureEvidence": "backlog/items/2026-08-17-no-pre-dispatch-check-catches-a-model-deviating-from-configured-routing.md"
     },
     {
+      "id": "pipeline.no-push-preflight-before-requesting-a-signature",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "Claude/Windows greenfield run, 2026-08-28, sections 7 and 11 of its own analysis (docs/pipeline-haertungstest-und-analyse.md).",
+      "deferred": false,
+      "tracking": "NOW / Nova A — happy-path blocking: a burned or expired signature stops the path at its last step and costs a live PO interaction to retry"
+    },
+    {
       "id": "pipeline.no-rename-path-for-a-feature-id-continuity-already-fixed",
       "status": "closed",
       "type": "defect",
@@ -3527,6 +3566,46 @@
       "closureRepository": "self",
       "closureCommit": "c860e1dd5bb11f2f02c5d9ade2aeb84c1787107a",
       "closureEvidence": "backlog/evidence/2026-08-06-onboarding-runner-identity-reverification.md"
+    },
+    {
+      "id": "pipeline.onboarding-must-bootstrap-the-trust-anchor-once",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "Greenfield happy-path test of candidate 0.6.0 across all three runners, 2026-08-28. Independent self-analyses: Claude/Windows (docs/pipeline-haertungstest-und-analyse.md), Agy/WSL (pipeline-analysis.md), Codex/WSL (docs/pipeline-session-analysis-2026-08-28.md), plus the PO's own cross-run observations.",
+      "deferred": false,
+      "tracking": "NOW / Nova A — happy-path blocking: its absence deadlocked the first human override in the Claude run and cost a live PO signature; PO asked for this explicitly"
+    },
+    {
+      "id": "pipeline.onboarding-must-elicit-the-real-verify-contract",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "Greenfield happy-path test of candidate 0.6.0 across all three runners, 2026-08-28. Independent self-analyses: Claude/Windows (docs/pipeline-haertungstest-und-analyse.md), Agy/WSL (pipeline-analysis.md), Codex/WSL (docs/pipeline-session-analysis-2026-08-28.md), plus the PO's own cross-run observations.",
+      "deferred": false,
+      "tracking": "NOW / Nova A — happy-path blocking: without a real verify contract the push gate is unsatisfiable by construction, so the path cannot reach its last step"
+    },
+    {
+      "id": "pipeline.onboarding-needs-one-guided-init",
+      "status": "open",
+      "type": "requirement",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "Greenfield happy-path test of candidate 0.6.0 across all three runners, 2026-08-28. Independent self-analyses: Claude/Windows (docs/pipeline-haertungstest-und-analyse.md), Agy/WSL (pipeline-analysis.md), Codex/WSL (docs/pipeline-session-analysis-2026-08-28.md), plus the PO's own cross-run observations.",
+      "deferred": false,
+      "tracking": "NOW / Nova A — PO decision 2026-08-28: rebuild the flow, keep the binding core untouched; pulled forward because the happy path cannot go live without it"
+    },
+    {
+      "id": "pipeline.onboarding-produces-drift-it-then-has-to-repair",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "Claude/Windows greenfield run, 2026-08-28, sections 7 and 11 of its own analysis (docs/pipeline-haertungstest-und-analyse.md).",
+      "deferred": false,
+      "tracking": "NOW / Nova A — happy-path blocking: four repair commands sit in the middle of the onboarding step the PO wants to be simple"
     },
     {
       "id": "pipeline.onboarding-ready-path-unconditional-restart-barrier-read",
@@ -3887,6 +3966,15 @@
       "closureEvidence": "backlog/items/2026-08-05-claude-has-no-start-time-opt-in-adoption-path.md"
     },
     {
+      "id": "pipeline.po-facing-commands-are-not-uniformly-rendered-break-safe",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "Codex/WSL greenfield run, 2026-08-28 (docs/pipeline-session-analysis-2026-08-28.md), plus the PO's own observation that this runner needed three sessions and the most detours.",
+      "deferred": false
+    },
+    {
       "id": "pipeline.po-gate-authority-path-canonicalization",
       "status": "closed",
       "type": "defect",
@@ -4016,6 +4104,15 @@
       "closureRepository": "self",
       "closureCommit": "f57375ff77263a2df70bbb3201feb361912f07f6",
       "closureEvidence": "docs/state.md"
+    },
+    {
+      "id": "pipeline.pre-push-hook-is-offered-not-installed",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "Agy/WSL greenfield run, 2026-08-28, its own hardening self-analysis (pipeline-analysis.md), corroborated by the Codex/WSL run's independent script-indirection probe.",
+      "deferred": false
     },
     {
       "id": "pipeline.preflight-user-and-matching-project-scope-still-collide-as-ambiguous",
@@ -4242,6 +4339,16 @@
       "closureRepository": "self",
       "closureCommit": "9ae28dad3f6c9c41833e7d629fa3d1d73872d2a2",
       "closureEvidence": "backlog/items/2026-08-18-push-approval-general-mode-lane-does-not-bind-remote-or-destination.md"
+    },
+    {
+      "id": "pipeline.push-approval-mode-is-not-chosen-at-onboarding",
+      "status": "open",
+      "type": "requirement",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "Agy/WSL greenfield run, 2026-08-28, its own hardening self-analysis (pipeline-analysis.md), corroborated by the Codex/WSL run's independent script-indirection probe.",
+      "deferred": false,
+      "tracking": "NOW / Nova A — happy-path blocking: the push approval is the last step of the path the PO named"
     },
     {
       "id": "pipeline.push-approval-record-always-trails-the-signed-commit",
@@ -4508,6 +4615,15 @@
       "closureEvidence": "plugins/pipeline-core/scripts/release-preflight-cli.mjs"
     },
     {
+      "id": "pipeline.remote-side-enforcement-is-the-last-instance",
+      "status": "open",
+      "type": "requirement",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "Codex/WSL greenfield run, 2026-08-28 (docs/pipeline-session-analysis-2026-08-28.md), plus the PO's own observation that this runner needed three sessions and the most detours.",
+      "deferred": false
+    },
+    {
       "id": "pipeline.reopen-design-invites-the-edit-that-ends-the-session",
       "status": "closed",
       "type": "defect",
@@ -4665,6 +4781,16 @@
       "closureEvidence": "plugins/pipeline-core/lib/runtime-projection-v2.test.mjs"
     },
     {
+      "id": "pipeline.scanner-bootstrap-is-not-self-sufficient",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "Codex/WSL greenfield run, 2026-08-28 (docs/pipeline-session-analysis-2026-08-28.md), plus the PO's own observation that this runner needed three sessions and the most detours.",
+      "deferred": false,
+      "tracking": "Nova B — part of the rebuilt guided init"
+    },
+    {
       "id": "pipeline.scratch-cleanup-mechanism-not-wired-to-any-event",
       "status": "open",
       "type": "defect",
@@ -4672,6 +4798,15 @@
       "created": "2026-08-08",
       "source": "SCRATCH-1 dispatch, 2026-08-08, reported as its own open item. The PO had asked the question directly the same night: 'hoffe nur es gibt einen Event der die Sachen auch wieder aufräumt'.",
       "deferred": true
+    },
+    {
+      "id": "pipeline.scratch-write-refused-during-intake-against-documented-exemption",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "Claude/Windows greenfield run, 2026-08-28, sections 7 and 11 of its own analysis (docs/pipeline-haertungstest-und-analyse.md).",
+      "deferred": false
     },
     {
       "id": "pipeline.securedirectory-only-acl-hardens-the-leaf-of-a-recursive-mkdir-not-shared-intermediates",
@@ -5315,6 +5450,15 @@
       "closureEvidence": "backlog/items/2026-08-17-trust-policy-shape-disagreement-between-sign-intent-and-verify-po-approval-proof.md"
     },
     {
+      "id": "pipeline.twin-manifest-files-can-drift-without-detection",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "Claude/Windows greenfield run, 2026-08-28, sections 7 and 11 of its own analysis (docs/pipeline-haertungstest-und-analyse.md).",
+      "deferred": false
+    },
+    {
       "id": "pipeline.two-guard-hook-test-files-unregistered-in-verify",
       "status": "closed",
       "type": "defect",
@@ -5398,6 +5542,16 @@
       "deferred": false
     },
     {
+      "id": "pipeline.unenforced-process-rules-vary-by-runner",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "Greenfield happy-path test of candidate 0.6.0 across all three runners, 2026-08-28. Independent self-analyses: Claude/Windows (docs/pipeline-haertungstest-und-analyse.md), Agy/WSL (pipeline-analysis.md), Codex/WSL (docs/pipeline-session-analysis-2026-08-28.md), plus the PO's own cross-run observations.",
+      "deferred": false,
+      "tracking": "Nova B"
+    },
+    {
       "id": "pipeline.unified-human-authorization-ux",
       "status": "closed",
       "type": "workflow-improvement",
@@ -5475,6 +5629,15 @@
       "closureRepository": "self",
       "closureCommit": "b844ea342557e5313fe0a2d0ba2485c39464dce4",
       "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
+    },
+    {
+      "id": "pipeline.verify-evidence-is-trusted-on-read-and-was-forged",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "Agy/WSL greenfield run, 2026-08-28, its own hardening self-analysis (pipeline-analysis.md), corroborated by the Codex/WSL run's independent script-indirection probe.",
+      "deferred": false
     },
     {
       "id": "pipeline.verify-gate-scoped-registration",
