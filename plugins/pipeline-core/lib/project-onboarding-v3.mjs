@@ -69,6 +69,7 @@ import {
   runtimeRestartBindingCurrent,
 } from "./codex-onboarding-runtime.mjs";
 import { validateV3BootstrapAuthority } from "../scripts/v3-bootstrap-authority.mjs";
+import { checkVerifyContractConfigured } from "../scripts/push-gate-satisfiability.mjs";
 import { applySessionCleanupRecovery, planSessionCleanupRecovery, SessionCleanupRecoveryError } from "./session-cleanup-recovery.mjs";
 import {
   LEGACY_CALIBRATION,
@@ -5009,6 +5010,116 @@ function withPendingPushApprovalSetupAsk(observed, fs) {
   return { ...observed, pushApprovalSetupAction: collectPushApprovalPreferenceAction(defaultPoKeyDirectoryHint(fs), machinePushApprovalPreference(fs)) };
 }
 
+/**
+ * Read-only detection of an OBVIOUS candidate verify command, checked in the
+ * same fixed priority order the backlog names them (Direction 1, backlog:
+ * pipeline.onboarding-must-elicit-the-real-verify-contract): an npm test
+ * script, then a Makefile "test" target, then a conventional shell test
+ * script file. Never runs anything, never guesses beyond these three
+ * concrete signals -- an absent or unrecognised project shape returns `null`
+ * rather than inventing a default, so `collectVerifyContractAction()` below
+ * can truthfully say "detected" only when this function actually found
+ * something in the project's own files.
+ */
+function detectVerifyCommandCandidate(root) {
+  const packageJsonPath = join(root, "package.json");
+  if (existsSync(packageJsonPath)) {
+    try {
+      const parsed = JSON.parse(readFileSync(packageJsonPath, "utf8"));
+      const script = parsed?.scripts?.test;
+      if (typeof script === "string" && script.trim().length > 0 && !/Error: no test specified/u.test(script)) {
+        return { command: "npm test", source: `package.json's "scripts.test" ("${script}")` };
+      }
+    } catch {
+      // Malformed package.json is not this ask's problem to diagnose -- no candidate from it.
+    }
+  }
+  const makefilePath = join(root, "Makefile");
+  if (existsSync(makefilePath)) {
+    try {
+      if (/^test:/mu.test(readFileSync(makefilePath, "utf8"))) {
+        return { command: "make test", source: "the Makefile's \"test\" target" };
+      }
+    } catch {
+      // Unreadable Makefile -- no candidate from it.
+    }
+  }
+  for (const name of ["test.sh", "run-tests.sh", "runtests.sh"]) {
+    if (existsSync(join(root, name))) {
+      return { command: `./${name}`, source: `the "${name}" script` };
+    }
+  }
+  return null;
+}
+
+// A generous single-line bound for a shell command -- same role
+// AUTHOR_IDENTITY_FIELD_MAX_BYTES/PUSH_APPROVAL_PREFERENCE_MAX_BYTES play
+// above, sized for a realistic verify invocation rather than a name or a
+// short token.
+const VERIFY_COMMAND_MAX_BYTES = 512;
+
+/**
+ * Builds the `collect-input` ask for the real verify command, OFFERING
+ * `candidate` (from `detectVerifyCommandCandidate()`) for confirmation when
+ * one was found -- never silently adopting it, and never inventing one when
+ * `candidate` is `null`. This library never writes the answer itself: same
+ * asymmetry as `collectAuthorIdentityAction()`/`collectPushApprovalPreferenceAction()`
+ * above -- the caller (with the PO present) edits project/pipeline.json's
+ * "verify" field after the PO actually confirms or supplies a command. A
+ * "defer" reply is a legitimate answer, not a dead end: `UNCONFIGURED_VERIFY`
+ * (which fails on purpose) stays in place, and `withPendingVerifyContractAsk()`
+ * below additionally records that the push gate is unsatisfiable while it does.
+ */
+function collectVerifyContractAction(candidate) {
+  return {
+    kind: "collect-input",
+    input: {
+      name: "verifyCommand",
+      encoding: "utf8",
+      trim: true,
+      minBytes: 1,
+      maxBytes: VERIFY_COMMAND_MAX_BYTES,
+      singleLine: true,
+      rejectNul: true,
+    },
+    mutation: false,
+    requiresConfirmation: false,
+    guidance: candidate
+      ? `this project's verify command in project/pipeline.json is still the plugin's UNCONFIGURED_VERIFY placeholder, which fails on purpose -- the push gate cannot be satisfied until it is replaced with this project's real verification command. A candidate was detected from ${candidate.source}: "${candidate.command}". Ask the PO to confirm this exact command, or type a different one to use instead, or reply "defer" to leave the placeholder in place for now. Never adopt the candidate silently -- only the PO's own confirmed answer may replace project/pipeline.json's "verify" field, and the placeholder must never be made to pass. Until this is answered and applied, the push gate stays unsatisfiable.`
+      : `this project's verify command in project/pipeline.json is still the plugin's UNCONFIGURED_VERIFY placeholder, which fails on purpose -- the push gate cannot be satisfied until it is replaced with this project's real verification command. No obvious candidate (an npm test script, a Makefile "test" target, or a conventional test script) was detected automatically. Ask the PO for the real verification command for this project (for example its test suite), or reply "defer" to leave the placeholder in place for now. Until this is answered and applied, the push gate stays unsatisfiable.`,
+    expected: { schema: SCHEMA, statuses: PORTABLE_APPLY_IDENTITY_ASK_STATUSES },
+  };
+}
+
+// Sibling of `withPendingPushApprovalSetupAsk()`/`withPendingAuthorIdentityAsk()`
+// above -- same gating shape, different question. Closes backlog
+// pipeline.onboarding-must-elicit-the-real-verify-contract: nothing before
+// this ever asked what a project's real verify command is, so the seeded
+// `UNCONFIGURED_VERIFY` placeholder (deliberately failing -- see its own
+// definition above) stayed in place unnoticed until the push gate discovered
+// it, at push time, after a human had already been asked for a signature.
+// Reuses `checkVerifyContractConfigured()` (push-gate-satisfiability.mjs)
+// rather than re-deriving the placeholder/missing/configured classification
+// a second time. Additive only, same as its siblings: never replaces
+// `nextAction`, never changes the lifecycle's resting status, and never
+// writes project/pipeline.json itself.
+function withPendingVerifyContractAsk(observed) {
+  if (observed.repository?.mode !== "local") return observed;
+  if (!PORTABLE_APPLY_IDENTITY_ASK_STATUSES.includes(observed.status)) return observed;
+  const check = checkVerifyContractConfigured(observed.root);
+  if (check.ok) return observed;
+  return {
+    ...observed,
+    verifyContractAction: collectVerifyContractAction(detectVerifyCommandCandidate(observed.root)),
+    // Typed, not prose (Acceptance criterion 2): a caller can branch on this
+    // field directly rather than pattern-matching `verifyContractAction`'s
+    // human-facing guidance text to learn the push gate cannot be satisfied
+    // yet.
+    verifyContractStatus: check.status,
+    pushGateSatisfiable: false,
+  };
+}
+
 // Closes backlog 2026-08-28-push-approval-mode-is-not-chosen-at-onboarding.md:
 // `withPendingAuthorIdentityAsk()`/`withPendingPushApprovalSetupAsk()`/
 // `withPendingTrustAnchorGuidanceAsk()` above each publish their own question
@@ -5045,7 +5156,7 @@ function withPendingPushApprovalSetupAsk(observed, fs) {
 // place, unchanged, for the existing tests and any caller already reading
 // them directly.
 function withPendingAsksSurfacedOnNextAction(observed) {
-  const pendingAsks = [observed.authorIdentityAction, observed.pushApprovalSetupAction, observed.trustAnchorGuidanceAction].filter(Boolean);
+  const pendingAsks = [observed.authorIdentityAction, observed.pushApprovalSetupAction, observed.verifyContractAction, observed.trustAnchorGuidanceAction].filter(Boolean);
   if (pendingAsks.length === 0 || observed.nextAction == null) return observed;
   return { ...observed, nextAction: { ...observed.nextAction, pendingAsks } };
 }
@@ -5148,9 +5259,9 @@ function applyLifecycle(rootDir, fs, operation, planSha256, activate, intent = "
     // digest was produced with, or the digests never match and the apply is a
     // silent no-op that loops the caller back to adoption-required.
     const plan = planProjectOnboardingV3({ rootDir, deps: fs, runner: v4Inspection(rootDir, fs, intent, runner).runner });
-    if (plan.status !== "ready" || lifecyclePlanDigest(plan) !== planSha256) return withPendingAsksSurfacedOnNextAction(withPendingTrustAnchorGuidanceAsk(withPendingPushApprovalSetupAsk(withPendingAuthorIdentityAsk(v4Inspection(rootDir, fs, intent, runner), fs), fs), fs));
+    if (plan.status !== "ready" || lifecyclePlanDigest(plan) !== planSha256) return withPendingAsksSurfacedOnNextAction(withPendingTrustAnchorGuidanceAsk(withPendingVerifyContractAsk(withPendingPushApprovalSetupAsk(withPendingAuthorIdentityAsk(v4Inspection(rootDir, fs, intent, runner), fs), fs)), fs));
     applyProjectOnboardingV3(plan, { rootDir, activate: true, deps: fs });
-    return withPendingAsksSurfacedOnNextAction(withPendingTrustAnchorGuidanceAsk(withPendingPushApprovalSetupAsk(withPendingAuthorIdentityAsk(v4Inspection(rootDir, fs, intent, runner), fs), fs), fs));
+    return withPendingAsksSurfacedOnNextAction(withPendingTrustAnchorGuidanceAsk(withPendingVerifyContractAsk(withPendingPushApprovalSetupAsk(withPendingAuthorIdentityAsk(v4Inspection(rootDir, fs, intent, runner), fs), fs)), fs));
   }
   const beforeApply = v4Inspection(rootDir, fs, intent, runner);
   if (operation === "repair" && beforeApply.status === "continuity-damaged") {
