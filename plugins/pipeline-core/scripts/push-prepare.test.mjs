@@ -21,7 +21,7 @@
  */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -41,6 +41,7 @@ import {
   resolveVerifyRemedy,
   segmentsForNodeCommand,
 } from "./push-prepare.mjs";
+import { authorizeRecordedPush } from "../lib/critical-action-authorization.mjs";
 import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
@@ -237,6 +238,82 @@ test("checkCriticalHumanProofPolicy: unreadable policy file -> ok:false", () => 
   });
   assert.equal(result.ok, false);
   assert.ok(result.remedy);
+});
+
+// ---------------------------------------------------------------------------
+// NVA-N-PUSHDIAG (b) -- a v1/v2 document with NO trustAnchor must read as
+// "route unavailable" here, exactly as `trustAnchorsFor()`
+// (../lib/critical-action-authorization.mjs) already reads it -- never as the
+// v3-empty-set "unrestricted" posture. This was the two-readers disagreement:
+// this reader used to fold "no set concept at all" and "explicit empty v3 set"
+// into the same `[]` and report green for both.
+// ---------------------------------------------------------------------------
+
+test("checkCriticalHumanProofPolicy: v1/v2 document with no trustAnchor -> ok:false, unavailable (NOT unrestricted)", () => {
+  const result = checkCriticalHumanProofPolicy(FIXTURE_DIR, {
+    readCriticalHumanProofPolicy: () => ({ ok: true, trustAnchor: null, trustAnchors: null }),
+  });
+  assert.equal(result.ok, false);
+  assert.match(result.message, /unavailable/);
+  assert.doesNotMatch(result.message, /unrestricted/);
+  assert.ok(result.remedy);
+});
+
+// ---------------------------------------------------------------------------
+// NVA-N-PUSHDIAG (DoD 1/2) -- ONE fixture policy document, driven through BOTH
+// readers (this script's checkCriticalHumanProofPolicy and the authorization
+// path's exported authorizeRecordedPush), asserting they agree. Each reader
+// being independently correct is exactly what let them disagree before this
+// fix; a fixture-level agreement test is the point, not a detail.
+// ---------------------------------------------------------------------------
+
+const FIXED_CANDIDATE = { commit: "1".repeat(40), tree: "2".repeat(40) };
+function agreementFixtureDir(name) {
+  const dir = mkdtempSync(join(SCRATCH, `push-prepare-agree-${name}-`));
+  after(() => rmSync(dir, { recursive: true, force: true }));
+  mkdirSync(join(dir, "project"), { recursive: true });
+  return dir;
+}
+function agreementAuthorize(dir) {
+  // No approval is recorded at all -- irrelevant to the trust-anchor step, which
+  // `authorizeRecordedPush` checks FIRST, before it ever looks at `state.pushApproval`.
+  return authorizeRecordedPush({
+    projectDir: dir, anchorDir: dir, state: {}, candidate: FIXED_CANDIDATE,
+    remote: "origin", destination: "refs/heads/main", now: new Date().toISOString(),
+  });
+}
+
+test("agreement: v1 document, no trustAnchor field -> BOTH readers refuse the route as unavailable", () => {
+  const dir = agreementFixtureDir("v1-no-anchor");
+  writeFileSync(
+    join(dir, "project", "critical-human-proof.json"),
+    JSON.stringify({ schema: "pipeline.critical-human-proof-policy.v1", requiredKinds: ["push"] }),
+  );
+  const prepared = checkCriticalHumanProofPolicy(dir);
+  const authorized = agreementAuthorize(dir);
+  assert.equal(prepared.ok, false, "push-prepare must refuse a v1 document with no trustAnchor");
+  assert.equal(authorized.authorized, false, "the authorization path must refuse the identical document");
+  assert.equal(authorized.code, "PUSH-PROOF-TRUST-ANCHOR-MISSING");
+  assert.match(prepared.message, /unavailable/);
+});
+
+test("agreement: v3 document, explicit EMPTY trustAnchors -> BOTH readers call it unrestricted, but the push still fails closed", () => {
+  const dir = agreementFixtureDir("v3-empty");
+  writeFileSync(
+    join(dir, "project", "critical-human-proof.json"),
+    JSON.stringify({ schema: "pipeline.critical-human-proof-policy.v3", requiredKinds: ["push"], waivedKinds: [], trustAnchors: [] }),
+  );
+  // Hermetic like the pre-existing "unrestricted posture" test above: never touch a real
+  // local approval directory, only this fixture.
+  const prepared = checkCriticalHumanProofPolicy(dir, { parseHumanArgs: () => ({ directory: dir }), exists: () => false });
+  const authorized = agreementAuthorize(dir);
+  assert.equal(prepared.ok, true, "push-prepare must call an explicit empty v3 set unrestricted");
+  assert.match(prepared.message, /unrestricted/);
+  // The empty set must NOT become "any push is authorized": with no approval recorded at
+  // all, the route is open to any well-formed KEY, but this specific push still has nothing
+  // to verify a signature against, and must still refuse -- fails closed, not silently open.
+  assert.equal(authorized.authorized, false, "an empty v3 trustAnchors set must not become an automatic pass");
+  assert.notEqual(authorized.code, "PUSH-PROOF-TRUST-ANCHOR-MISSING", "the trust-anchor step itself must NOT be what blocks an empty v3 set");
 });
 
 // ---------------------------------------------------------------------------
