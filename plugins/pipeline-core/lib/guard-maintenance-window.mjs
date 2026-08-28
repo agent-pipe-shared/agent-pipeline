@@ -286,6 +286,33 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   // covering it would let the first edit widen what the guard admits -- which is exactly
   // the drift this module was created to make impossible.
   "plugins/pipeline-core/lib/onboarding-argv-shapes.mjs",
+  // NVA-V22-KERNELCLOSURE (2026-08-28): GMWKC01's own single BFS run over the array
+  // above already walks its ENTIRE reachable closure regardless of kernel-set
+  // membership (it revisits every discovered node once, whether or not that node is
+  // already listed), so this addition is the full gap in one pass, not a partial fix
+  // needing a further round: guard-lifecycle-ready.mjs and both project-onboarding-v3.mjs
+  // entries above (already kernel) reach the ruleset-freshness/pipeline-start-preflight
+  // family below, which the walk had never reached before f7bfa43e fixed a
+  // comment-parsing false positive that was crashing it first. Includes
+  // scripts/po-human-approval.mjs -- the script the human uses to sign -- reached via
+  // scripts/push-prepare.mjs.
+  "plugins/pipeline-core/hooks/staleness-check.mjs",
+  "plugins/pipeline-core/lib/bootstrap-payload-budget.mjs",
+  "plugins/pipeline-core/lib/codex-host-plugin-list.mjs",
+  "plugins/pipeline-core/lib/copy-safe-command.mjs",
+  "plugins/pipeline-core/lib/public-core-observation.mjs",
+  "plugins/pipeline-core/lib/public-core-origin-allowlist.mjs",
+  "plugins/pipeline-core/lib/ruleset-source.mjs",
+  "plugins/pipeline-core/lib/self-application-attestation-gate.mjs",
+  "plugins/pipeline-core/lib/trusted-tool-resolution.mjs",
+  "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+  "plugins/pipeline-core/scripts/pipeline-update-channel.mjs",
+  "plugins/pipeline-core/scripts/po-approval-request.mjs",
+  "plugins/pipeline-core/scripts/po-human-approval.mjs",
+  "plugins/pipeline-core/scripts/push-gate-satisfiability.mjs",
+  "plugins/pipeline-core/scripts/push-prepare.mjs",
+  "plugins/pipeline-core/scripts/ruleset-freshness.mjs",
+  "plugins/pipeline-core/scripts/ruleset-update-policy.mjs",
 ]);
 
 // The "plugins/pipeline-core/..." entries above are written against whatever
