@@ -16,6 +16,24 @@ own job is to state it clearly and then wait.
 > `pipeline-start` SKILL.md's canon-reference rule) for the full, canonical,
 > layer-by-layer description this reference summarizes.
 
+## The fast path to the signature (NVA-V4-PUSHDRIVER)
+
+Before hand-running the layers below one at a time, one command chains the
+preparatory push layers up to the point of signature:
+
+```
+node plugins/pipeline-core/scripts/push-init.mjs --root <repo> --by <name> --remote <remote> --destination refs/heads/<branch> [--base <ref>]
+```
+
+It runs the same read-only checks documented in `docs/push-release-flow.md`
+layer by layer, in their existing order, and reports the first one that is
+not green — it never replaces those per-layer commands, only saves running
+them one at a time when nothing needs individual attention. **It stops at
+the signature and never executes it**: once every precondition is green it
+prints the exact `authorize-critical` command below, already filled in, for
+the human to run — the driver itself cannot sign it, approve it, or clear
+any gate.
+
 ## The one setting
 
 `gates.push_approval` in `pipeline.user.yaml` decides how a human clears a push.
