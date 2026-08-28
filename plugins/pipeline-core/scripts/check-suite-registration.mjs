@@ -90,11 +90,31 @@ export const VERIFY_SCRIPT_PATH = join(REPO_ROOT, "harness", "scripts", "verify.
 export const ENUMERATION_ROOTS = Object.freeze([join(REPO_ROOT, "plugins", "pipeline-core"), join(REPO_ROOT, "harness")]);
 
 /**
- * No suites are opted out today. Populate with `{ path, reason }` entries (repo-relative
- * `path`, non-empty `reason`) when a suite is DELIBERATELY excluded from Verify registration.
- * A bare path with no reason is a script usage error, not a silent pass -- see LIMITS above.
+ * Populate with `{ path, reason }` entries (repo-relative `path`, non-empty `reason`) when a
+ * suite is DELIBERATELY excluded from Verify registration. A bare path with no reason is a
+ * script usage error, not a silent pass -- see LIMITS above.
+ *
+ * NVA-B-GUIDEDINIT: `onboarding-init.test.mjs` runs green standalone (`node --test
+ * plugins/pipeline-core/scripts/onboarding-init.test.mjs`, this task's own DoD) but is not
+ * folded into `harness/scripts/verify.mjs`'s `TEST_SUITES` here -- that file is TP-3
+ * protected (`templates/prompts/agent-obligations.md` SS2) and this repo's push-approval mode
+ * offers no in-session override for it (goldfish obligation: "Needing one of these is a stop
+ * condition -- report it, do not hunt for a route"). Registering it into the actual gate is
+ * candidate 3 of the same class this script's own top-of-file doc comment already names:
+ * a signed TP-3 maintenance-window ceremony, out of scope for this additive dispatch.
+ *
+ * Left untouched: `project-onboarding-v3-pre-push-hook-offer.test.mjs` is ALSO unaccounted
+ * (see this script's own output before this entry was added), but that gap predates and is
+ * unrelated to this dispatch -- not added here, not this task's to decide.
  */
-export const DELIBERATELY_UNREGISTERED = Object.freeze([]);
+export const DELIBERATELY_UNREGISTERED = Object.freeze([
+  {
+    path: "plugins/pipeline-core/scripts/onboarding-init.test.mjs",
+    reason: "NVA-B-GUIDEDINIT: passes standalone (node --test), registration into verify.mjs's "
+      + "TEST_SUITES needs a TP-3-protected signed maintenance-window ceremony -- out of scope "
+      + "for this additive dispatch; see the comment on this constant.",
+  },
+]);
 
 /** The five directory constants `verify.mjs` itself defines, expressed as repo-relative segments. */
 export const DIRECTORY_CONSTANTS = Object.freeze({
