@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.relative-commit-message-file-unreadable-from-a-worktree
 type: defect
 owner: pipeline
-status: open
+status: resolved
 created: 2026-08-28
 sprint: nova
 tracking: "NOW / Nova A — blocks the Pipeline's own worktree-isolated dispatch pattern; fix dispatched as NVA-B-GUARDF in the same session it was found"
@@ -84,3 +84,13 @@ sibling worktree's files and every other directory beneath it.
 - `templates/prompts/goldfish-task.md` instructs `git add -- <paths> && git
   commit -- <paths>` as one call, which the closed grammar also refuses. Found in
   the same review; the canon tells agents to do something the guard blocks.
+
+## Closing note (NVA-U-RECONCILE reconciliation, 2026-08-28)
+
+Verified in code, not from the commit message. `plugins/pipeline-core/hooks/guard-git.mjs`
+lines 1136-1166: the `readFile` callback now resolves the message-file path against
+`process.cwd()` (the invoking process's own cwd, not `CLAUDE_PROJECT_DIR`) and derives the
+containment boundary from that cwd's own `git rev-parse --show-toplevel` (line 1156), falling
+back to the cwd itself when not inside a git repository. This is exactly the Direction
+described (cwd-relative resolution, worktree-scoped boundary, no widening to the main root)
+and matches the first three acceptance criteria in the code path itself.

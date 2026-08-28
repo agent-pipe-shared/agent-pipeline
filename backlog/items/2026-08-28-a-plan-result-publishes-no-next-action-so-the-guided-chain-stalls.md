@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.plan-result-publishes-no-next-action
 type: defect
 owner: pipeline
-status: open
+status: resolved
 created: 2026-08-28
 sprint: nova
 tracking: "NOW / Nova A — five of seven builders fixed 2026-08-28 (NVA-D-PLANACTION, NVA-F-PROMOTIONACTION) and the guided init now reaches ready; NOT closed, because two builders still publish applyAction without nextAction"
@@ -114,3 +114,17 @@ the same convention fixes it.
   same class: a question that exists but is published where the flow does not read it.
   Together these two are the pattern: the chain protocol is right, and it is applied
   inconsistently across the commands that should speak it.
+
+## Closing note (NVA-U-RECONCILE reconciliation, 2026-08-28)
+
+Verified in code, not from a commit message. The two builders this item's own "What has
+landed" section named as still missing now both publish `nextAction`:
+`plugins/pipeline-core/lib/onboarding-continuity.mjs` line 3978, `buildOnboardingKickoffPlan`
+returns `nextAction: kickoffApplyAction` (the goal-bound kickoff plan), and its validator at
+line 3808-3814 refuses a plan whose `nextAction` disagrees with the re-derived apply action
+("NVA-H-LASTBUILDERS" comment). `planOnboardingKickoffPromotionCleanupRecovery` at line 6712
+likewise publishes `nextAction: recoveryApplyAction` (comment at line 6697-6705 names the
+same convention, "same `applyAction`/`nextAction` sibling convention as ... ONLY `nextAction`,
+never `applyAction`"). All seven plan builders this item tracked now publish `nextAction`;
+the residual re-anchoring-`inspect` cost noted in the item's own last section is a separate,
+smaller efficiency concern, not a stall — not re-verified here.
