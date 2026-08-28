@@ -33,6 +33,39 @@ silently downgrade projects that need the strong mode.
 The defect is that the choice is never *offered*. A default is not a decision,
 and a human who was never asked cannot be said to have chosen maximum friction.
 
+## Mechanism, measured 2026-08-28 — the ask exists, on a channel nothing reads
+
+Re-checking "never offered" against the code before dispatching work on it found
+something more useful than a confirmation:
+
+- The ask is **built**. `collectPushApprovalPreferenceAction()` produces a
+  `collect-input` action whose `input.name` is `pushApprovalPreference`, whose
+  guidance names both `"signature"` and `"chat"`, pre-filled from a
+  machine-scoped default and confirmed per repository. It even carries a PO
+  key-directory hint. Tests assert all of it
+  (`lib/project-onboarding-v3.test.mjs:2247-2276`).
+- It is **never reachable through the documented chain.**
+  `withPendingPushApprovalSetupAsk()` (`lib/project-onboarding-v3.mjs:4918`)
+  attaches it as its own envelope field, `pushApprovalSetupAction`, and that is
+  the only place it is ever set. It is never assigned to `nextAction`.
+
+Compare `collectAuthorIdentityAction()`, which is used **both** ways: as
+`nextAction` at line 4546 and as the side-channel field `authorIdentityAction` at
+4903. The codebase carries two conventions at once, and only one of them is the
+chain agents are told to follow.
+
+That is why a runner reports never having been asked while the repository holds a
+tested ask for exactly that question. It is present in the data and absent from
+the flow.
+
+**Consequence beyond this item.** Any guided driver that follows `nextAction` —
+including the one being built under `pipeline.onboarding-needs-one-guided-init` —
+skips every question published this way unless it also collects the side-channel
+action fields. So the fix is not "add the ask": the ask exists. The fix is to put
+it on the channel the flow reads, or to make the flow read every channel a
+question can be published on — and whichever is chosen must cover
+`authorIdentityAction` too, so the two conventions stop disagreeing.
+
 ## Direction
 
 - Ask during init, as one of the small set of genuinely human questions, with the
