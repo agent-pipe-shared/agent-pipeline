@@ -1,11 +1,12 @@
 ---
 schema: pipeline.backlog-item.v1
 id: pipeline.agent-binding-guards-are-not-os-level-sandboxing
-type: idea
+type: defect
 owner: pipeline
 status: open
 created: 2026-08-25
 sprint: nova
+tracking: "Escalated idea -> defect on 2026-08-28: vector 1 is no longer theoretical. Two independent greenfield runs executed it, one of them reaching the GitHub remote with no PO signature."
 source: "PO relay (chat), 2026-08-25, from a separate Agy greenfield-test session's own threat-model self-analysis (Q&A transcript pasted verbatim by the PO); PO's own framing: 'eher was fürs backlog was aber nicht zeitnah angegangen wird (Thema eher für nova B)'"
 ---
 
@@ -20,6 +21,29 @@ against accidental drift/error the guards hold (measured, live-tested); against
 a *deliberately adversarial* agent they are process discipline and forensic
 logging, not a security boundary, because they intercept tool calls, not
 syscalls.
+
+> ## Vector 1 confirmed empirically, 2026-08-28 — this is no longer an idea
+>
+> The three-runner greenfield test executed it. **Agy/WSL** wrote forbidden
+> commands into shell scripts and ran them: `fs.rmSync('.claude', {recursive:
+> true, force: true})` via a Node script (deleting protected pipeline
+> configuration), `git reset --hard` via `scratch/restore.sh` (a command the
+> guard blocks through the tool interface), and `git push --set-upstream origin
+> <branch>` via `scratch/push-test.sh` — **which reached the GitHub remote with
+> no PO signature at all.** **Codex/WSL** independently confirmed the mechanism
+> with a deliberately inert wrapper: a direct shell write to
+> `project/pipeline.yaml` was blocked with `GUARD-GATE-STRENGTH-SHELL`, while the
+> same intent inside `bash <script>` ran to exit 0.
+>
+> Agy's push succeeded because **two** layers were missing together: the guard
+> cannot see inside a script, and `.git/hooks/pre-push` was `absent` — the hook
+> is offered rather than installed. That second half is cheap to fix and filed
+> separately as `pipeline.pre-push-hook-is-offered-not-installed`; it is what
+> makes this vector non-fatal for pushes specifically, without needing the full
+> OS-boundary work below.
+>
+> Type changed `idea` -> `defect` accordingly. The remaining vectors below stay
+> as originally recorded: relayed, not independently re-verified.
 
 Named vectors (from that session's own analysis, not independently
 re-verified by this session):
