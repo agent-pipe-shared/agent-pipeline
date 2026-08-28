@@ -5,7 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-08-27
-sprint: alfred
+sprint: none
 source: "Measured live, 2026-08-27 session: two more product-capability-inventory breakages within the same evening, the second within the hour of a session that had just repaired the first — following two prior instances on 2026-08-19."
 ---
 
@@ -66,7 +66,33 @@ feedback loop between causing it and discovering it.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted, option 1 (derive the `verify-phase` surfaces from
+  `verify.mjs`'s own arrays); options 2 and 3 rejected as the fix
+- **Rationale:** Four occurrences, the last two within one evening and the second
+  of those by the very session that had just repaired the first. That is the
+  finding, and it is decisive: each previous fix added the missing entries and
+  none removed the reason they go missing, so an instance fix on this coupling
+  buys exactly one commit of quiet. Option 2 shortens the feedback loop and
+  option 3 documents the trap — both leave the duplication that causes it. The
+  data already exists in one place; a derived value cannot drift, and that is the
+  only shape that ends the class.
+  Cost note for whoever picks it up: the inventory also demands that every
+  surface belong to exactly one capability, which is a judgement the arrays do
+  not carry. Deriving the surface set does not automatically derive its
+  categorization, so the fix is "derive the set, keep categorization declared,
+  fail only on an uncategorized derived surface" rather than a straight deletion
+  of the declared block.
+- **Assignment (if accepted):** `sprint: none` — reassigned off Alfred. By scope
+  this is Alfred's ("mechanical governance, measurable rigor"), Alfred is in
+  flight and closed to new scope (PO, 2026-08-28), and neither Nightwing
+  (product experience) nor Batman (optional capabilities) describes an internal
+  verify-harness coupling. It carries the explicit "no planning window"
+  declaration rather than a mis-assignment.
+  **Condition for picking it up:** the next window that touches `verify.mjs`'s
+  suite registration or `check-product-capability-inventory.mjs`, or Alfred's
+  successor whenever control-integrity scope reopens. It is the second item to
+  land on `none` for this reason (with
+  `pipeline.three-independent-copies-of-the-wsl-windows-path-normalization`);
+  two is a signal that Alfred's successor has a waiting queue, not that `none` is
+  a parking lot.
+- **Date:** 2026-08-28

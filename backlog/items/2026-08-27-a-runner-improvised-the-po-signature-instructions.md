@@ -73,7 +73,24 @@ novel.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted, option 1 (structured verbatim-relay action), with
+  option 2 as a cheap additional backstop
+- **Rationale:** A ceremony command is the one place the human cannot check the
+  agent's work, because the whole design has the human contribute a secret the
+  agent must not see. That makes "the agent composed this from memory" a control
+  failure, not a typo. The fix shape is not novel in this repository: the same
+  class was already closed once with a verbatim-relay rule, and
+  `restartCopyCommands` is a working implementation of exactly that pattern
+  (bounded, copy-safe, emitted by the tool rather than retyped by the agent).
+  The attached key-directory hazard is accepted as part of the same package
+  rather than split off: an omitted `--directory` silently resolving to a
+  superseded key directory already cost one live PO passphrase entry, and a
+  relay action that printed the RESOLVED directory would have shown it. A relay
+  that is verbatim but silent about which key it will use solves half the item.
+  Provenance is recorded honestly in the item and does not change the verdict:
+  the interface claim (`sign-intent` is real, `sign-digest` is not in
+  `KNOWN_COMMANDS`) was re-checked against the script at triage, so the defect
+  does not rest on the pasted transcript alone.
+- **Assignment (if accepted):** Sprint Nightwing (unchanged) — the item is about
+  what a human is handed and can act on, which is that window's scope.
+- **Date:** 2026-08-28

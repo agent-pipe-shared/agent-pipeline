@@ -82,7 +82,23 @@ functional commit, not the metadata commit).
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted
+- **Rationale:** The item is right that the correction is mechanical and the gap
+  is the missing check — and the evidence for that grew after filing. On
+  2026-08-27/28 the candidate had to be re-stamped twice (`94c40e87`, then
+  `009bb825`) because the first stamp named a commit the work had already moved
+  past; both times it was caught by a human noticing, which is precisely the
+  control this item says does not exist. A failure mode whose only detector is
+  the PO asking "did you bump it?" is not detected.
+  The item's own constraint section is the reason this is real work rather than
+  a one-line assertion: a released version deliberately carries no `+claude.<...>`
+  metadata, so a check cannot uniformly demand a stamp. It has to classify
+  release-vs-candidate first, which is a decision about what the tree IS, not a
+  string comparison. That is also why this should not be bolted onto an existing
+  suite as an afterthought.
+  Pairs with `pipeline.repository-agent-definition-is-inert-runtime-loads-installed-copy`:
+  same failure shape one layer down (an artifact authoritative in the repository
+  but not the one actually loaded), and a single session-start comparison could
+  answer both. Worth scoping them together before either is designed.
+- **Assignment (if accepted):** Sprint Nightwing (unchanged).
+- **Date:** 2026-08-28

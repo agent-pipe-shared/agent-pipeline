@@ -74,7 +74,30 @@ branch.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted as a PO requirement; split, because one third of it is
+  not agent work at all
+- **Rationale:** Type `requirement` is correct — this is a PO-stated obligation,
+  not a defect found or an improvement proposed. The item's own mapping is its
+  most valuable part and was verified rather than assumed: the channel default is
+  already `stable`, `local-ahead` already exists as a tolerated state, and
+  `staleness-check.mjs` already runs at SessionStart without blocking. So the
+  fail-open behaviour the PO asked for is largely built, and rebuilding it would
+  be the expensive mistake here.
+  The three gaps are genuinely different kinds of work and must not be scheduled
+  as one:
+  1. **Default branch (`main` → `stable`)** — not solvable in code; `marketplace
+     add` has no branch flag. This is a PO action on the distribution repository.
+     It currently works only because `main` and `stable` happen to point at the
+     same commit, which is a coincidence, not a design.
+  2. **Antigravity remote installer** — plain build work, the largest piece, and
+     the only one that is straightforwardly dispatchable today.
+  3. **Update flow** — deliberately not fully automatic. The plugin IS the
+     enforcement layer, so a silent self-update is the supply-chain surface
+     `docs/marketplace-supply-chain-threat-model.md` exists to describe. Accepted
+     shape: detect → report unmistakably → execute on confirmation → require a
+     restart. The restart is not optional advice: this session re-confirmed that
+     a running process keeps the copy it loaded.
+- **Assignment (if accepted):** Sprint Nightwing (unchanged) for gaps 2 and 3.
+  **Gap 1 is a PO action and carries no window** — it should not sit in a sprint
+  waiting for an agent that cannot perform it.
+- **Date:** 2026-08-28

@@ -5,7 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-08-27
-sprint: alfred
+sprint: nightwing
 source: "Measured live, 2026-08-27, while investigating why the dispatch-budget counter never moved: plugin PreToolUse hooks fire in the main session and never inside a dispatched subagent. Four independent measurements, listed below."
 ---
 
@@ -123,7 +123,36 @@ candidates, none of them exclusive:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted, and split: the one concrete, immediately buildable
+  piece is scheduled now; the architectural question is not forced into a window
+  that cannot answer it
+- **Rationale:** This is the most consequential item in the current open set. It
+  is not an inference — four independent measurements, including the control that
+  disproves `hooks.json`'s own `$comment`, and the `$comment` being wrong is
+  load-bearing because it is the reason the budget guard's matcher was rewritten
+  twice instead of the invocation path being questioned. Correcting that comment
+  is itself part of the work (and the file is TP-4 protected, so it needs a
+  briefed test-change task, not a drive-by edit).
+  What makes it schedulable today is that one proposal needs no design at all:
+  **`plugins/pipeline-core/scripts/pre-push-hook-install.mjs` already exists and
+  nothing installs it during onboarding.** Wiring an existing installer into the
+  onboarding path is ordinary onboarding work, and a git hook is the one layer
+  measured to run for any caller — the same reasoning already recorded as "a
+  guard cannot enforce its own absence; real blocking needs a git hook".
+  Proposals 2 and 3 (tool allowlists, post-hoc verification) are accepted in
+  principle but deliberately left unscheduled: they are the architecture question
+  of where enforcement lives after a dispatch, and that belongs to a
+  control-integrity window rather than to whichever sprint happens to be open.
+  The residual `--no-verify` gap stays accepted per the PO's 2026-08-27 ruling
+  and is explicitly not reopened here.
+- **Assignment (if accepted):** Sprint Nightwing for the pre-push-hook
+  installation during onboarding ONLY — that piece is onboarding work and fits
+  the window honestly. The remainder carries no window yet.
+  Reassigned off Alfred, which is where it belongs by scope (control integrity)
+  and where it cannot go: Alfred is in flight and closed to new scope
+  (PO, 2026-08-28), and this item had never been triaged, so confirming `alfred`
+  would be keying it there for the first time. **This is the one item in the
+  2026-08-28 triage batch where that rule costs something real** — if any single
+  finding deserves to enter the in-flight control-integrity sprint, it is this
+  one. Flagged for the PO to overrule if they want it in Alfred after all.
+- **Date:** 2026-08-28
