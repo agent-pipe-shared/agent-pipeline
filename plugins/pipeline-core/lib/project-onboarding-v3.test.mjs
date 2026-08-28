@@ -2278,13 +2278,19 @@ test("apply-portable-seed --activate surfaces the push-approval-setup ask-step f
   } finally { dispose(unasked); dispose(asked); }
 });
 
-// Regression for backlog 2026-08-18-po-key-trust-anchor-onboarding.md,
-// Option A: a machine that already has a signing key still leaves every
-// fresh project on it with no propagated trust anchor -- nothing offered to
-// carry the machine-wide authority's public digest into a new project.
-test("apply-portable-seed --activate proposes a trust-anchor materialization snippet once a machine-wide key exists and this repository has no matching anchor yet", () => {
-  const unmatched = root();
-  const matched = root();
+// Regression for backlog 2026-08-18-po-key-trust-anchor-onboarding.md and
+// 2026-08-28-onboarding-must-bootstrap-the-trust-anchor-once.md. A machine
+// that already held a signing key used to leave every fresh project on it
+// with no propagated trust anchor: the first human-override ceremony then
+// discovered the absence as HGO-TRUST-ANCHOR-MISSING, a circularity nothing
+// in the flow had explained. Onboarding now MATERIALIZES the anchor in the
+// same transaction that writes the rest of the fresh baseline, and the older
+// "here is a snippet, paste it yourself" guidance survives only for the one
+// case the seed cannot reach -- a repository that already owns a policy file
+// (every write site is create-only, `flag: "wx"`) without the anchor.
+test("apply-portable-seed --activate seeds the machine's trust anchor into a fresh repository, and still guides one that already owns an anchorless policy", () => {
+  const seeded = root();
+  const preexisting = root();
   const keyDir = root();
   const invoke = (args, deps) => {
     let output = "";
@@ -2307,52 +2313,70 @@ test("apply-portable-seed --activate proposes a trust-anchor materialization sni
       };
     } };
 
-    // (a) This repository's own trust-anchor policy has no matching anchor
-    // yet (none at all): the guidance surfaces with the exact digest and a
-    // ready-to-use snippet, additive only.
-    const planned = invoke(["plan", "--root", unmatched, "--runner", "codex"], machineHasKey);
+    // (a) A fresh repository on a machine that has a key: the anchor is
+    // MATERIALIZED, not explained. Nothing is left to ask, so the guidance
+    // stays silent -- and seeding it changes neither the lifecycle's own
+    // resting status nor the primary chained nextAction.
+    const planned = invoke(["plan", "--root", seeded, "--runner", "codex"], machineHasKey);
     const digest = planned.result.nextAction.argv[planned.result.nextAction.argv.indexOf("--plan-sha256") + 1];
-    const applied = invoke(["apply-portable-seed", "--root", unmatched, "--plan-sha256", digest, "--activate", "--runner", "codex"], machineHasKey);
+    const applied = invoke(["apply-portable-seed", "--root", seeded, "--plan-sha256", digest, "--activate", "--runner", "codex"], machineHasKey);
     assert.equal(applied.code, 0);
     assert.equal(applied.result.status, "runtime-initialization-required",
-      "the guidance must never replace or change the lifecycle's own resting status");
+      "seeding the anchor must never change the lifecycle's own resting status");
     assert.equal(applied.result.nextAction.kind, "command",
-      "the guidance must never replace the primary chained nextAction");
-    assert.equal(applied.result.trustAnchorGuidanceAction.kind, "collect-input");
-    assert.equal(applied.result.trustAnchorGuidanceAction.mutation, false);
-    assert.match(applied.result.trustAnchorGuidanceAction.guidance, new RegExp(publicKeySha256, "u"));
-    assert.match(applied.result.trustAnchorGuidanceAction.guidance, /po-key-1/u);
-    assert.match(applied.result.trustAnchorGuidanceAction.guidance, /André/u);
-    assert.match(applied.result.trustAnchorGuidanceAction.guidance, /trustAnchors/u);
-    assert.match(applied.result.trustAnchorGuidanceAction.guidance, /guard-gate-strength\.mjs/u,
-      "must disclose that GS-2 forbids any agent write to this file");
+      "seeding the anchor must never replace the primary chained nextAction");
+    const policyBytes = readFileSync(join(seeded, "project", "critical-human-proof.json"), "utf8");
+    const policy = JSON.parse(policyBytes);
+    assert.equal(policy.schema, "pipeline.critical-human-proof-policy.v3");
+    assert.deepEqual(policy.requiredKinds, ["push"]);
+    assert.deepEqual(policy.trustAnchors, [{ keyReference: "po-key-1", publicKeySha256 }]);
+    assert.equal(policyBytes.includes(keyDir), false,
+      "the seeded anchor carries the key's public digest and its own reference only -- never the key's filesystem location, which is machine-specific and not this project's to record");
+    assert.equal(Object.prototype.hasOwnProperty.call(applied.result, "trustAnchorGuidanceAction"), false,
+      "an anchor onboarding itself just materialized leaves nothing to ask about");
     assert.equal(applied.result.pushApprovalSetupAction.kind, "collect-input",
-      "the per-repository push-approval confirm is orthogonal to the trust-anchor guidance and still fires");
+      "the per-repository push-approval confirm is orthogonal to the trust anchor and still fires");
 
-    // (b) This repository's own trust-anchor policy already carries the
-    // matching digest: no proposal, silence is correct. Onboard `matched`
-    // through the identical clean flow first (pre-seeding project/ before
-    // "plan" runs confuses the planner into a different repository state,
-    // not what this case means to test), then inject the matching anchor
-    // into the file onboarding itself just materialized, and replay the
-    // exact same apply call (zero-write, same digest) -- v4Inspection
-    // re-reads the actual file fresh each time, so the replay observes the
-    // post-hoc edit exactly as a real PO commit would be observed.
-    const quietPlanned = invoke(["plan", "--root", matched, "--runner", "codex"], machineHasKey);
+    // (b) A repository that already owns an anchorless policy file. Every
+    // write site for these bytes is create-only (`flag: "wx"`), so the seed
+    // deliberately never rewrites one -- which is precisely the case the
+    // older guidance still exists for. Onboard cleanly first (pre-seeding
+    // project/ before "plan" runs confuses the planner into a different
+    // repository state, not what this case means to test), then replace the
+    // materialized file with an anchorless one and replay the identical
+    // apply call (zero-write, same digest): v4Inspection re-reads the actual
+    // file fresh each time, so the replay observes the edit exactly as a real
+    // PO commit would be observed.
+    const quietPlanned = invoke(["plan", "--root", preexisting, "--runner", "codex"], machineHasKey);
     const quietDigest = quietPlanned.result.nextAction.argv[quietPlanned.result.nextAction.argv.indexOf("--plan-sha256") + 1];
-    const firstApplied = invoke(["apply-portable-seed", "--root", matched, "--plan-sha256", quietDigest, "--activate", "--runner", "codex"], machineHasKey);
+    const firstApplied = invoke(["apply-portable-seed", "--root", preexisting, "--plan-sha256", quietDigest, "--activate", "--runner", "codex"], machineHasKey);
     assert.equal(firstApplied.code, 0);
-    assert.equal(firstApplied.result.trustAnchorGuidanceAction.kind, "collect-input",
-      "sanity: the same guidance must appear here too before the anchor is added");
     writeFileSync(
-      join(matched, "project", "critical-human-proof.json"),
+      join(preexisting, "project", "critical-human-proof.json"),
+      `${JSON.stringify({ schema: "pipeline.critical-human-proof-policy.v1", requiredKinds: ["push"] }, null, 2)}\n`,
+    );
+    const guided = invoke(["apply-portable-seed", "--root", preexisting, "--plan-sha256", quietDigest, "--activate", "--runner", "codex"], machineHasKey);
+    assert.equal(guided.code, 0);
+    assert.equal(guided.result.trustAnchorGuidanceAction.kind, "collect-input");
+    assert.equal(guided.result.trustAnchorGuidanceAction.mutation, false);
+    assert.match(guided.result.trustAnchorGuidanceAction.guidance, new RegExp(publicKeySha256, "u"));
+    assert.match(guided.result.trustAnchorGuidanceAction.guidance, /po-key-1/u);
+    assert.match(guided.result.trustAnchorGuidanceAction.guidance, /André/u);
+    assert.match(guided.result.trustAnchorGuidanceAction.guidance, /trustAnchors/u);
+    assert.match(guided.result.trustAnchorGuidanceAction.guidance, /guard-gate-strength\.mjs/u,
+      "must disclose that GS-2 forbids any agent write to this file");
+
+    // (c) That same repository once the matching anchor is on record: no
+    // proposal, silence is correct.
+    writeFileSync(
+      join(preexisting, "project", "critical-human-proof.json"),
       `${JSON.stringify({ schema: "pipeline.critical-human-proof-policy.v3", requiredKinds: ["push"], waivedKinds: [], trustAnchors: [{ keyReference: "po-key-1", publicKeySha256 }] }, null, 2)}\n`,
     );
-    const quietApplied = invoke(["apply-portable-seed", "--root", matched, "--plan-sha256", quietDigest, "--activate", "--runner", "codex"], machineHasKey);
+    const quietApplied = invoke(["apply-portable-seed", "--root", preexisting, "--plan-sha256", quietDigest, "--activate", "--runner", "codex"], machineHasKey);
     assert.equal(quietApplied.code, 0);
     assert.equal(Object.prototype.hasOwnProperty.call(quietApplied.result, "trustAnchorGuidanceAction"), false,
       "a repository that already committed the matching anchor must not be asked again");
-  } finally { dispose(unmatched); dispose(matched); dispose(keyDir); }
+  } finally { dispose(seeded); dispose(preexisting); dispose(keyDir); }
 });
 
 test("shared command renderer derives one copy-safe line from exact argv in a spaced root", () => {
