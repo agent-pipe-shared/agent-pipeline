@@ -15,8 +15,9 @@ import { applyInstall } from "./pre-push-hook-install.mjs";
 import {
   installedPipelineIdentity, installedPipelineVersion, observePipelineStartPreflight,
   normalBootstrapPayloadReceipt, pipelineStartPreflightExitCode, freshnessHostActionForPreflight, SCHEMA,
-  STATUS_SCOPE, CONCURRENT_SESSION_WARNING_SCHEMA,
+  STATUS_SCOPE, CONCURRENT_SESSION_WARNING_SCHEMA, resolveActiveRunner,
 } from "./pipeline-start-preflight.mjs";
+import { formatOnboardingRerunCommand } from "./project-onboarding-v3.mjs";
 import { BOOTSTRAP_PAYLOAD_MAX_BYTES } from "../lib/bootstrap-payload-budget.mjs";
 
 const manifest = JSON.stringify({ version: "0.4.5+test" });
@@ -204,6 +205,83 @@ test("preflight keeps the Codex runner default for any non-Claude-Code session",
     });
     assert.deepEqual(result.nextAction.argv.slice(-2), ["--runner", "codex"], JSON.stringify(env));
   }
+});
+
+// Backlog: a-po-ceremony-in-the-po-s-own-terminal-resolves-the-wrong-runner.md.
+// resolveActiveRunner is the ONE shared implementation both project-onboarding-v3.mjs
+// and pipeline-start-preflight.mjs route through -- these pin its own contract
+// directly, independent of either call site's own wiring choices.
+const CLAUDE_DEFAULT_SOURCE = 'schema: "pipeline.user.v3"\nrunners:\n  default: "claude"\n';
+const CODEX_DEFAULT_SOURCE = 'schema: "pipeline.user.v3"\nrunners:\n  default: "codex"\n';
+
+test("resolveActiveRunner: a genuine Codex session resolves codex even in a claude-default repository", () => {
+  const runner = resolveActiveRunner({
+    env: { CODEX_SESSION_ID: "codex-session-1" },
+    rootDir: "/repo",
+    read: () => CLAUDE_DEFAULT_SOURCE,
+  });
+  assert.equal(runner, "codex");
+  const viaThread = resolveActiveRunner({
+    env: { CODEX_THREAD_ID: "codex-thread-1" },
+    rootDir: "/repo",
+    read: () => CLAUDE_DEFAULT_SOURCE,
+  });
+  assert.equal(viaThread, "codex");
+});
+
+test("resolveActiveRunner: a signal-less shell in a claude-default repository resolves claude", () => {
+  const runner = resolveActiveRunner({
+    env: {},
+    rootDir: "/repo",
+    read: () => CLAUDE_DEFAULT_SOURCE,
+  });
+  assert.equal(runner, "claude");
+});
+
+test("resolveActiveRunner: a signal-less shell in a repository declaring nothing resolves codex", () => {
+  const noRootDir = resolveActiveRunner({ env: {} });
+  assert.equal(noRootDir, "codex");
+  const unreadableSource = resolveActiveRunner({
+    env: {},
+    rootDir: "/repo",
+    read: () => { throw new Error("ENOENT: pipeline.user.yaml"); },
+  });
+  assert.equal(unreadableSource, "codex");
+  const noDeclaredDefault = resolveActiveRunner({
+    env: {},
+    rootDir: "/repo",
+    read: () => 'schema: "pipeline.user.v3"\n',
+  });
+  assert.equal(noDeclaredDefault, "codex");
+});
+
+test("resolveActiveRunner: an actual CLAUDECODE/Antigravity signal is never overridden by a declared default", () => {
+  assert.equal(resolveActiveRunner({
+    env: { CLAUDECODE: "1" },
+    rootDir: "/repo",
+    read: () => CODEX_DEFAULT_SOURCE,
+  }), "claude");
+  assert.equal(resolveActiveRunner({
+    env: { ANTIGRAVITY_AGENT: "1" },
+    rootDir: "/repo",
+    read: () => CODEX_DEFAULT_SOURCE,
+  }), "antigravity");
+});
+
+test("a rendered PO-facing re-run command always carries --runner explicitly", () => {
+  // The under-specified shape: the agent's own original invocation never spelled
+  // out --runner (it was resolved implicitly via resolveOnboardingCliRunner), so
+  // the byte-faithful echo of argv would otherwise hand a human an ambiguous
+  // command to type into their own, possibly signal-less, attended terminal.
+  const argsWithoutRunner = ["kickoff-plan", "--root", "/repo", "--goal", "ship it", "--language", "en"];
+  const rendered = formatOnboardingRerunCommand(argsWithoutRunner, "claude");
+  assert.match(rendered, /--runner"\s*"claude"$/u);
+  assert.ok(!argsWithoutRunner.includes("--runner"), "the original argv is never mutated");
+
+  // Already-explicit --runner is preserved verbatim, never duplicated.
+  const argsWithRunner = ["kickoff-plan", "--root", "/repo", "--runner", "codex", "--goal", "g", "--language", "en"];
+  const renderedExplicit = formatOnboardingRerunCommand(argsWithRunner, "codex");
+  assert.equal((renderedExplicit.match(/--runner/gu) ?? []).length, 1);
 });
 
 test("normal bootstrap receipt retains exact envelope measurement and over-budget state", () => {
