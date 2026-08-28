@@ -150,7 +150,7 @@
 | pipeline.every-gate-binds-the-whole-tree-so-any-later-commit-voids-it | open | workflow-improvement | pipeline | 2026-08-16 | — |
 | pipeline.evidence-bound-review-retry-economics | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.evidence-gitignore-left-dozens-of-durable-artifacts-untracked | closed | defect | pipeline | 2026-08-17 | — |
-| pipeline.execution-model-switchback | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
+| pipeline.execution-model-switchback | closed | workflow-improvement | pipeline | 2026-07-19 | Closed 2026-08-28 by PO scope narrowing; candidate-binding out of scope. |
 | pipeline.existing-repos-drift-on-agy-pipeline-user-yaml-update-no-migration | open | defect | pipeline | 2026-08-26 | — |
 | pipeline.expires-at-rejects-a-non-round-trip-timestamp-and-the-doc-says-otherwise | open | defect | pipeline | 2026-08-27 | — |
 | pipeline.explicit-final-acceptance-gate | closed | workflow-improvement | pipeline | 2026-08-18 | — |
@@ -260,7 +260,7 @@
 | pipeline.managed-onboarding-repair-item-sha256-pin-blocks-its-own-triage-edits | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.managed-onboarding-success-contract | deferred | workflow-improvement | pipeline | 2026-07-25 | — |
 | pipeline.manifest-repair-paths-are-hardcoded-to-runners-default-codex | closed | defect | pipeline | 2026-08-17 | — |
-| pipeline.marketplace-install-topology-unattested | in_progress | defect | pipeline | 2026-08-07 | — |
+| pipeline.marketplace-install-topology-unattested | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.material-intake-bootstrap-bind-has-no-sanctioned-path-to-a-passing-plan-gate | closed | defect | pipeline | 2026-08-19 | — |
 | pipeline.merged-into-frontmatter-key-documented-but-unsupported | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.mixed-authority-migration-requires-a-vendored-plugin-copy-marketplace-installs-never-have | closed | defect | pipeline | 2026-08-17 | — |
@@ -472,7 +472,7 @@
 ## Counts
 
 - open: 56
-- in_progress: 5
-- closed: 380
+- in_progress: 3
+- closed: 382
 - rejected: 3
 - deferred: 11

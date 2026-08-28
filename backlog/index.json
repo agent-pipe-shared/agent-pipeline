@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "6533bff50f8cce8957763d92dad98ea112343ffd81916b3c54b0331d4bc318a1"
+    "transitionHead": "e6124bcbcf59d696d5a573070ce1d1bbda3b0a39374dea230c1094fb55ef17ad"
   },
   "counts": {
     "open": 56,
-    "in_progress": 5,
-    "closed": 380,
+    "in_progress": 3,
+    "closed": 382,
     "rejected": 3,
     "deferred": 11
   },
@@ -1775,13 +1775,17 @@
     },
     {
       "id": "pipeline.execution-model-switchback",
-      "status": "in_progress",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-07-19",
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
       "deferred": false,
-      "tracking": "Sentinel recovery baseline; no completion claim."
+      "tracking": "Closed 2026-08-28 by PO scope narrowing; candidate-binding out of scope.",
+      "closedAt": "2026-08-28",
+      "closureRepository": "self",
+      "closureCommit": "42256fd63d80670303506cefba3a04c64df94260",
+      "closureEvidence": "backlog/items/2026-07-19-execution-model-switchback.md"
     },
     {
       "id": "pipeline.existing-repos-drift-on-agy-pipeline-user-yaml-update-no-migration",
@@ -3146,12 +3150,16 @@
     },
     {
       "id": "pipeline.marketplace-install-topology-unattested",
-      "status": "in_progress",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "Critic finding F1, delta re-review of the F-A/F-C/F-D/F-B rework (specs/sprint-phoenix-epic/evidence/wp2wp3-parta-rework-2-delta-critic-review-412d33d.md); the residual of *how* Critic finding F2 (WP2-WP3-partA-rework-1) was resolved. Recorded via the WP2-WP3-partA-rework-3 dispatch.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-28",
+      "closureRepository": "self",
+      "closureCommit": "2cff90a68b4fe9f8949a3e0c26bcadf2fb22d24c",
+      "closureEvidence": "backlog/items/2026-08-07-marketplace-install-topology-unattested.md"
     },
     {
       "id": "pipeline.material-intake-bootstrap-bind-has-no-sanctioned-path-to-a-passing-plan-gate",
