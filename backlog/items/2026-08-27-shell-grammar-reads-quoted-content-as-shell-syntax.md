@@ -3,12 +3,15 @@ schema: pipeline.backlog-item.v1
 id: pipeline.shell-grammar-reads-quoted-content-as-shell-syntax
 type: defect
 owner: pipeline
-status: resolved
+status: closed
 created: 2026-08-27
-sprint: nightwing
 sprint: nova
 tracking: "NOW / Nova A — PO decision 2026-08-28: admit `&&`, and secure it. This item is the prerequisite half; the admission is unsafe until the parser stops reading quoted content as syntax."
 source: "Three live refusals in one Elephant session, 2026-08-27, each on a read-only command whose only offending characters sat inside a quoted argument. Reproduced twice more on 2026-08-28, and independently by a dispatched Goldfish which overran its tool budget for this reason and said so in its own report."
+closed_at: "2026-08-28"
+closure_repository: "self"
+closure_commit: "c702d3ff76816e1961d09fa418d114f6fc342a2e"
+closure_evidence: "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs"
 ---
 
 # The closed shell grammar classifies characters inside quoted arguments as shell operators

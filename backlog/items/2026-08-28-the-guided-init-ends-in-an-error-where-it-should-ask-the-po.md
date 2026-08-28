@@ -3,11 +3,15 @@ schema: pipeline.backlog-item.v1
 id: pipeline.guided-init-ends-in-error-not-a-question
 type: defect
 owner: pipeline
-status: resolved
+status: closed
 created: 2026-08-28
 sprint: nova
 tracking: "NOW / Nova A — the last gap between the guided init and a usable end-to-end path, and the exact wall a consumer project hit independently the same day"
 source: "Measured 2026-08-28 by driving onboarding-init.mjs against a genuinely fresh repository at HEAD e9cc8d21, then reproducing the terminating step directly. Measured, not reported."
+closed_at: "2026-08-28"
+closure_repository: "self"
+closure_commit: "435063c5c49ceb332ab5348ada0e5eab9f9e5bcf"
+closure_evidence: "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs"
 ---
 
 # The guided init ends in a raw error where it should ask the PO one question

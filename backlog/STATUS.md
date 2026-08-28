@@ -34,6 +34,7 @@
 | pipeline.agent-tool-isolation-worktree-snapshots-stale-upstream-ref | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.agents-are-judged-by-rules-no-artifact-ever-tells-them | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.agents-read-the-source-because-nothing-describes-the-interface | open | workflow-improvement | pipeline | 2026-08-09 | — |
+| pipeline.agents-talk-the-po-out-of-the-signature | open | defect | pipeline | 2026-08-28 | NOW / Nova A — the one control in the model that is actual protection is the one agents routinely lobby the PO to abandon. Reported by the PO 2026-08-28 as recurring behaviour across agents, not a single incident. |
 | pipeline.all-three-runners-should-install-against-the-stable-branch | open | requirement | pipeline | 2026-08-27 | — |
 | pipeline.an-expired-override-is-armed-instead-of-refused | open | defect | pipeline | 2026-08-28 | — |
 | pipeline.an-orchestrator-write-into-a-running-dispatchs-tree-is-undetectable | open | defect | pipeline | 2026-08-28 | — |
@@ -66,6 +67,7 @@
 | pipeline.backlog-strip-for-dispatch-drops-every-section-after-triage | open | defect | pipeline | 2026-08-25 | — |
 | pipeline.bare-branch-name-in-git-push-fails-approval-with-a-misleading-code | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.benchmark-fixture-digest-binding-does-not-cover-executed-workload-code | closed | workflow-improvement | pipeline | 2026-08-11 | — |
+| pipeline.blind-session-zero-followable-steps-on-push-path | open | defect | pipeline | 2026-08-28 | NOW / Nova A — measured, not argued: a fresh session gets 15 chained commands on the onboarding path and 0 on the feature/push path. PO 2026-08-28: the paths must be tested without the Pipeline's context knowledge, because a greenfield session does not have it. |
 | pipeline.blocking-push-gate-has-no-terminal-exception-boundary | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.bootstrap-and-kickoff-teach-their-own-constraints-only-by-live-rejection | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.bootstrap-skill-grows-by-budget-raise-instead-of-by-module | open | workflow-improvement | pipeline | 2026-08-08 | — |
@@ -104,7 +106,7 @@
 | pipeline.compare-three-parallel-happy-path-tests-in-detail | closed | idea | pipeline | 2026-08-10 | — |
 | pipeline.concurrent-dispatches-share-one-index | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.concurrent-session-prevention-supersedes-a-ac-01 | closed | requirement | pipeline | 2026-08-18 | — |
-| pipeline.consumer-must-allowlist-every-runner-lane | open | improvement | pipeline | 2026-08-28 | Nova B — onboarding should write the permission entries a consumer needs, instead of leaving a second blocking layer undocumented |
+| pipeline.consumer-must-allowlist-every-runner-lane | open | workflow-improvement | pipeline | 2026-08-28 | Nova B — onboarding should write the permission entries a consumer needs, instead of leaving a second blocking layer undocumented |
 | pipeline.consumer-projects-have-no-goldfish-dispatch-requirement-for-implementation | closed | idea | pipeline | 2026-08-09 | — |
 | pipeline.continuity-repair-has-no-case-for-an-established-project-missing-only-pipeline-state-json | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.contract-suite-borrows-its-fixture-by-importing-a-109-test-file | closed | workflow-improvement | pipeline | 2026-08-08 | — |
@@ -125,7 +127,8 @@
 | pipeline.cross-repository-override-ledger-binding | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.cross-repository-redirect-eligibility-does-not-consult-the-sensitive-path-boundary | closed | defect | pipeline | 2026-08-12 | — |
 | pipeline.decouple-hosted-project-document-language-from-operator-facing-language | closed | workflow-improvement | pipeline | 2026-08-09 | — |
-| pipeline.delivery-is-not-always-a-git-push | open | improvement | pipeline | 2026-08-28 | Backlog / someday — PO-raised 2026-08-28; not blocking the Nova candidate, but it decides whether the release model fits a whole class of the PO's repositories |
+| pipeline.delivery-is-not-always-a-git-push | open | workflow-improvement | pipeline | 2026-08-28 | Backlog / someday — PO-raised 2026-08-28; not blocking the Nova candidate, but it decides whether the release model fits a whole class of the PO's repositories |
+| pipeline.design-to-implementation-path-has-no-driver | open | workflow-improvement | pipeline | 2026-08-28 | Nova B — PO-raised 2026-08-28: the next path complex enough to need a driver. Ranked BEHIND the push driver, for the reason stated below. |
 | pipeline.discarded-feature-dead-end | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — delivered 2026-08-28, same session it was reported |
 | pipeline.dispatch-provenance | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.dispatch-record-contaminates-every-critic-review | deferred | defect | pipeline | 2026-08-09 | — |
@@ -163,7 +166,7 @@
 | pipeline.fresh-repo-onboarding-intake-first-transaction | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.fresh-repo-onboarding-never-asks-for-git-identity | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.full-push-preflight-before-signature | closed | workflow-improvement | pipeline | 2026-08-18 | — |
-| pipeline.gate-should-not-demand-a-human-name | open | improvement | pipeline | 2026-08-28 | Nova B — the encoding half is fixed; this is the design half that made the encoding fragile in the first place |
+| pipeline.gate-should-not-demand-a-human-name | open | workflow-improvement | pipeline | 2026-08-28 | Nova B — the encoding half is fixed; this is the design half that made the encoding fragile in the first place |
 | pipeline.gate-strength-override-route-advertised-not-offered | deferred | defect | pipeline | 2026-08-08 | — |
 | pipeline.gate-strength-shell-comment-understates-its-own-scope | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.gate-strength-shell-lane-refuses-any-command-containing-a-quoted-wildcard | closed | defect | pipeline | 2026-08-27 | — |
@@ -207,10 +210,13 @@
 | pipeline.guard-reclassification-changed-what-a-signature-can-lift | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.guard-refuses-documented-bounded-diagnostic | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.guard-refuses-the-prescribed-recovery | closed | defect | pipeline | 2026-08-08 | — |
+| pipeline.guard-root-admission-compares-typed-to-realpathed | open | defect | pipeline | 2026-08-28 | NOW / Nova A — the surviving candidate cause for a consumer session that lost both its lanes on Windows, and a platform-neutrality defect in the guard that decides whether any recovery command runs at all |
 | pipeline.guard-string-match-makes-a-file-uncommittable | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.guard-testpath-not-kernel-protected | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.guard-testpath-override-ot09-stale-literal-pattern | closed | defect | pipeline | 2026-08-19 | — |
-| pipeline.guided-init-ends-in-error-not-a-question | open | defect | pipeline | 2026-08-28 | NOW / Nova A — the last gap between the guided init and a usable end-to-end path, and the exact wall a consumer project hit independently the same day |
+| pipeline.guided-driver-neither-discoverable-nor-runnable | open | defect | pipeline | 2026-08-28 | NOW / Nova A — the guided driver is refused by the readiness guard in every state it exists to serve, and named by nothing an agent reads. Every chaining improvement built this session is inert in practice until this lands. |
+| pipeline.guided-init-ends-in-error-not-a-question | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — the last gap between the guided init and a usable end-to-end path, and the exact wall a consumer project hit independently the same day |
+| pipeline.guided-init-human-rounds-above-floor | open | workflow-improvement | pipeline | 2026-08-28 | NOW / Nova A — PO asked directly whether the four human rounds can be collapsed to one or two. Three is the floor; one of the four is removable, and it is the cheapest of the four to remove. |
 | pipeline.gwm-kernel-doc-enumeration-diverges-from-the-code-array | closed | defect | pipeline | 2026-08-25 | — |
 | pipeline.h-ac-11-restricted-profile-intake-record-is-design-increment-2 | closed | requirement | pipeline | 2026-08-18 | — |
 | pipeline.handover-file-exceeds-its-own-size-cap-after-the-phoenix-merge | closed | defect | pipeline | 2026-08-27 | — |
@@ -287,6 +293,7 @@
 | pipeline.no-sanctioned-way-to-start-over | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.no-test-pins-the-ungoverned-path-rule-stand-down | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.nonblocking-interaction-continuity | closed | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
+| pipeline.nothing-checks-that-a-capability-is-reachable | open | workflow-improvement | pipeline | 2026-08-28 | NOW / Nova A — three separate instances in one session, each found by the PO or by an end-to-end walk rather than by any check. This is the check that would have caught all three. |
 | pipeline.nothing-connects-an-acceptance-criterion-to-a-check-that-runs | closed | workflow-improvement | pipeline | 2026-08-16 | — |
 | pipeline.observation-governance-bootstrap-false-positives-on-vendor-synced-consumer-projects | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.observation-intake-document-governance | closed | workflow-improvement | pipeline | 2026-07-20 | — |
@@ -294,7 +301,7 @@
 | pipeline.onboarding-does-not-ignore-the-scratch-directory-it-mandates | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.onboarding-lifecycle-plan-hardcodes-the-codex-runner | closed | defect | pipeline | 2026-08-06 | — |
 | pipeline.onboarding-must-bootstrap-the-trust-anchor-once | open | defect | pipeline | 2026-08-28 | NOW / Nova A — happy-path blocking: its absence deadlocked the first human override in the Claude run and cost a live PO signature; PO asked for this explicitly |
-| pipeline.onboarding-must-elicit-the-real-verify-contract | open | defect | pipeline | 2026-08-28 | NOW / Nova A — happy-path blocking: without a real verify contract the push gate is unsatisfiable by construction, so the path cannot reach its last step |
+| pipeline.onboarding-must-elicit-the-real-verify-contract | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — happy-path blocking: without a real verify contract the push gate is unsatisfiable by construction, so the path cannot reach its last step |
 | pipeline.onboarding-needs-one-guided-init | open | requirement | pipeline | 2026-08-28 | NOW / Nova A — PO decision 2026-08-28: rebuild the flow, keep the binding core untouched; pulled forward because the happy path cannot go live without it |
 | pipeline.onboarding-produces-drift-it-then-has-to-repair | open | defect | pipeline | 2026-08-28 | NOW / Nova A — happy-path blocking: four repair commands sit in the middle of the onboarding step the PO wants to be simple |
 | pipeline.onboarding-ready-path-unconditional-restart-barrier-read | closed | defect | pipeline | 2026-08-07 | — |
@@ -318,14 +325,14 @@
 | pipeline.plan-approval-binds-a-staging-draft-as-project-authority | open | defect | pipeline | 2026-08-27 | — |
 | pipeline.plan-partial-authority-guard-allowlist-does-not-admit-its-own-profile-source-flags | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.plan-path-guidance-attached-to-unlike-causes | closed | defect | pipeline | 2026-08-08 | — |
-| pipeline.plan-result-publishes-no-next-action | open | defect | pipeline | 2026-08-28 | NOW / Nova A — the last measured gap between the guided init and a full drive to ready; found by smoke-testing the driver against a genuinely fresh repository |
+| pipeline.plan-result-publishes-no-next-action | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — five of seven builders fixed 2026-08-28 (NVA-D-PLANACTION, NVA-F-PROMOTIONACTION) and the guided init now reaches ready; NOT closed, because two builders still publish applyAction without nextAction |
 | pipeline.plugin-package-should-vendor-canon-references-via-build-step | closed | workflow-improvement | pipeline | 2026-08-10 | — |
 | pipeline.plugin-update-under-an-onboarded-project-derails-the-next-session-into-repair | open | workflow-improvement | pipeline | 2026-08-27 | — |
 | pipeline.po-approval-confirmation-missing-intent-digest | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.po-approval-request-verify-still-rejects-a-fresh-setup1-authority | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.po-authority-decision-prd-candidate-static | deferred | defect | pipeline | 2026-08-08 | — |
 | pipeline.po-authority-rebind-plan-checks-for-the-wrong-plan-approval-schema-version | closed | defect | pipeline | 2026-08-19 | — |
-| pipeline.po-ceremony-resolves-the-wrong-runner | open | defect | pipeline | 2026-08-28 | NOW / Nova A — a gate that forces the PO into their own terminal must not land them on a different runner there; reported by a consumer project and confirmed in the code |
+| pipeline.po-ceremony-resolves-the-wrong-runner | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — a gate that forces the PO into their own terminal must not land them on a different runner there; reported by a consumer project and confirmed in the code |
 | pipeline.po-decision-bs26-unsatisfiable-under-the-phoenix-ledger-split | closed | requirement | pipeline | 2026-08-27 | — |
 | pipeline.po-decision-claude-start-time-item-closed-on-a-rejected-approach | closed | requirement | pipeline | 2026-08-27 | — |
 | pipeline.po-facing-commands-are-not-uniformly-rendered-break-safe | open | defect | pipeline | 2026-08-28 | — |
@@ -365,13 +372,16 @@
 | pipeline.push-approval-skill-reference-predates-adr-0061 | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.push-gate-is-silent-in-every-consumer-project | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.push-gate-reads-evidence-from-a-location-the-prescribed-verify-run-never-writes-to | closed | defect | pipeline | 2026-08-09 | — |
+| pipeline.push-gate-unsatisfiable-in-consumer-deployment | open | defect | pipeline | 2026-08-28 | NOW / Nova A — happy-path blocking, and the most severe finding of the day: a correctly-signed push cannot land in ANY consumer deployment. Also blocks the security-gate-ON decision, whose measurement was taken in the one environment where this defect does not fire. |
 | pipeline.push-guard-worktree-target | closed | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
+| pipeline.push-path-has-no-driver | open | workflow-improvement | pipeline | 2026-08-28 | Nova B — PO-raised 2026-08-28 on seeing the guided onboarding reach ready: 'dann braucht der push pfad auch so was weil der kostet auch mega viel'. Deliberately NOT Nova A: the candidate must not grow a second driver before its first one is reviewed. |
 | pipeline.push-release-flow-unusable-for-third-party-adopters | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.raw-apply_patch-is-unconditionally-admitted-by-the-outer-lifecycle-gate | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.readiness-guard-blocks-its-own-recovery | open | defect | pipeline | 2026-08-28 | NOW / Nova A — a guard that refuses the exact command its own refusal prescribes is a deadlock, and it fired twice in one consumer session |
 | pipeline.readonly-and-chain-grep-pipe-trailing-stage-not-implemented | closed | requirement | pipeline | 2026-08-19 | — |
 | pipeline.readonly-command-guard-classification | closed | workflow-improvement | pipeline | 2026-07-26 | — |
 | pipeline.ready-gate-env-var-runner-authority | closed | defect | pipeline | 2026-08-05 | — |
+| pipeline.ready-gate-hand-maintained-shape-mirror | open | defect | pipeline | 2026-08-28 | NOW / Nova A — the second instance blocked every governed write in a ready project and was invisible until the candidate was actually installed. NVA-T-READYKEYS fixes that instance; this item is about the third one. |
 | pipeline.rebind-rollback-names-no-predicate | open | defect | pipeline | 2026-08-28 | NOW / Nova A — the only sanctioned route to a PO acknowledgement marker is unusable, and the refusal is undiagnosable from outside |
 | pipeline.reconcile-backlog-ledger-evidence-commit-predates-referenced-file | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.reconcile-lock-reuse-lexical-path-comparison | closed | defect | pipeline | 2026-08-11 | — |
@@ -380,7 +390,7 @@
 | pipeline.recovery-preview-callback-attestation | closed | defect | pipeline | 2026-07-20 | — |
 | pipeline.registering-a-verify-suite-silently-invalidates-the-capability-inventory | open | defect | pipeline | 2026-08-27 | — |
 | pipeline.regulated-document-hooks | deferred | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; deferred per PO triage 2026-08-23. |
-| pipeline.relative-commit-message-file-unreadable-from-a-worktree | open | defect | pipeline | 2026-08-28 | NOW / Nova A — blocks the Pipeline's own worktree-isolated dispatch pattern; fix dispatched as NVA-B-GUARDF in the same session it was found |
+| pipeline.relative-commit-message-file-unreadable-from-a-worktree | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — blocks the Pipeline's own worktree-isolated dispatch pattern; fix dispatched as NVA-B-GUARDF in the same session it was found |
 | pipeline.release-preflight-cli-base-commit-not-peeled | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.release-preflight-has-a-builder-but-no-cli | closed | defect | pipeline | 2026-08-06 | — |
 | pipeline.remote-side-enforcement-is-the-last-instance | open | requirement | pipeline | 2026-08-28 | — |
@@ -405,6 +415,7 @@
 | pipeline.security-scan-cross-branch-gitleaks-findings | closed | defect | pipeline | 2026-07-25 | — |
 | pipeline.security-scan-license-allowlist-assumes-the-pipeline-repository | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.sed-regex-address-is-misread-as-an-absolute-path | open | defect | pipeline | 2026-08-27 | — |
+| pipeline.seed-security-gate-on | open | workflow-improvement | pipeline | 2026-08-28 | NOW / Nova A — PO decision 2026-08-28 stands, but BLOCKED: the measurement below was taken in this repository's own checkout, the one place the consumer-side defect does not fire. See 'Correction' before implementing. |
 | pipeline.seeded-verify-contract-is-always-green | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.self-application-integrity-check-absent | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.self-healing-local-cleanup-recovery | closed | workflow-improvement | pipeline | 2026-08-18 | — |
@@ -420,7 +431,7 @@
 | pipeline.seven-unregistered-suites-are-red | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.shared-external-po-signing-directory-lets-an-unrelated-project-overwrite-a-proof | closed | defect | pipeline | 2026-08-11 | — |
 | pipeline.shared-verify-evidence-slot-corrupted-by-concurrent-dispatches | open | defect | pipeline | 2026-08-12 | — |
-| pipeline.shell-grammar-reads-quoted-content-as-shell-syntax | open | defect | pipeline | 2026-08-27 | — |
+| pipeline.shell-grammar-reads-quoted-content-as-shell-syntax | closed | defect | pipeline | 2026-08-27 | NOW / Nova A — PO decision 2026-08-28: admit `&&`, and secure it. This item is the prerequisite half; the admission is unsafe until the parser stops reading quoted content as syntax. |
 | pipeline.shipped-artifacts-assume-the-pipelines-own-repository | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.shipped-guidance-sends-agents-to-a-directory-a-gate-refuses | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.signed-authority-binding-durability | closed | defect | pipeline | 2026-08-06 | — |
@@ -465,6 +476,7 @@
 | pipeline.unified-human-authorization-ux | closed | workflow-improvement | pipeline | 2026-08-02 | Current CYB-4 helper is a compatible first adapter only; no programme-wide migration or closure is claimed. |
 | pipeline.universal-human-command-renderer | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.unregistered-suite-is-red-and-invisible-to-verify | closed | defect | pipeline | 2026-08-07 | — |
+| pipeline.v1-trust-anchor-makes-signature-push-functionless | open | defect | pipeline | 2026-08-28 | NOW / Nova A — critical: it makes gates.push_approval 'signature', the documented default and this repository's own setting, functionless. Stacks with the push-gate item; a consumer hits both. |
 | pipeline.vendored-dispatch-templates-drift-from-canon | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.verify-authorship-defaults-to-source-markers-not-behavior | closed | workflow-improvement | pipeline | 2026-08-10 | — |
 | pipeline.verify-evidence-has-no-producer | closed | defect | pipeline | 2026-08-08 | — |
@@ -495,8 +507,8 @@
 
 ## Counts
 
-- open: 86
+- open: 92
 - in_progress: 3
-- closed: 384
+- closed: 390
 - rejected: 3
 - deferred: 11

@@ -3,11 +3,15 @@ schema: pipeline.backlog-item.v1
 id: pipeline.relative-commit-message-file-unreadable-from-a-worktree
 type: defect
 owner: pipeline
-status: resolved
+status: closed
 created: 2026-08-28
 sprint: nova
 tracking: "NOW / Nova A — blocks the Pipeline's own worktree-isolated dispatch pattern; fix dispatched as NVA-B-GUARDF in the same session it was found"
 source: "Observed live during the NVA-GF-* Workflow round, 2026-08-28, run wf_b6a26661-b19. Not relayed and not inferred: two sibling dispatches in the same run hit the identical denial, one recovered and one did not."
+closed_at: "2026-08-28"
+closure_repository: "self"
+closure_commit: "0c979a2722c7a29bf96ed3a02d3f6b9a861a1c21"
+closure_evidence: "plugins/pipeline-core/hooks/guard-git.mjs"
 ---
 
 # `git commit -F <relative-path>` cannot succeed from inside a worktree, and the refusal blames the wrong thing
