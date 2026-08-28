@@ -41,16 +41,20 @@ A1/A2's measured enforcement; accepted cost is calendar visibility).
 
 **Next: PRD §5 wave 0, in this order.**
 
-1. **Rebase precondition first.** Nova lands on `origin/main`; this branch
-   rebases onto that state. **No Alfred implementation dispatch before it** —
-   design-time file inheritance from the Nova clone base ends at that rebase
-   (PRD §8 A-1). Push target afterwards:
-   `git push -u origin feat/sprint-alfred:sprint_alfred`, never to a Nova ref.
-2. **E1 contract freeze** as the first implementation act, then the **A1
-   probe** and **C1 receipts** — the C1 dogfood clock is the calendar-critical
-   path, since it calibrates B1 and D2 thresholds.
-3. Wave 0 also **re-verifies the A1/A5 assumptions against the post-rebase
-   base** before further work (PRD §8 A-1 risk).
+**AK status.** AK-9/10/11 met (full green run; both manifests + `VERSION` at
+0.6.0; every declared hook *wired* and byte-identical to the installed copy).
+AK-14 filed for Nova B. **AK-5 is closed — this paragraph previously said the
+opposite and was stale (corrected 2026-08-28).** It read: "the one true inert
+guard — `guard-dispatch-budget.mjs` is built, 15/15, Verify-registered, but
+`hooks/hooks.json` is on `NEVER_LIFTABLE_KERNEL_PATHS`, so no maintenance window
+can wire it." It IS wired: `731ff1b8` added it to the PreToolUse manifest and
+`1b45d6f9` then replaced a matcher that matched nothing. The installed manifest
+carries three `guard-dispatch-budget.mjs` entries, byte-identical to the repo
+copy. Left as a correction rather than a deletion because the false claim was
+load-bearing — it named a blocker that no longer exists. **AK-6** is ready to re-dispatch
+against `pipeline-user-v3.schema.json` (the first attempt used the pre-v3 schema
+and would have flagged a correct calibration as drifted; withdrawn in `1d6dec55`,
+scaffolding kept at `8316dbd8`).
 
 **Live blockers and debts carried into implementation:**
 
