@@ -27,9 +27,10 @@ deliberately disjoint from the WP ids (`A1`–`A5`, `B1`–`B3`, `C1`–`C3`,
 | AC-10 | Model-judged evaluator output can never be `pass` (deterministic-pass rule) — attempted prompt-only compliance yields `finding`/`unknown` in fixtures | D3 fixture "prompt-only claimed compliance" |
 | AC-11 | The eight B2 routes exist; each refusal message names its route; the B2-i authorization satisfies its four ⚖ constraints | B2 per-route fixtures |
 | AC-12 | Rules-as-code sweep landed: GG-22 defined where cited; SendMessage relay rule homed; push-flow doc corrected; strip tool bounded to the Triage section | B3 doc-consistency suites + strip fixture |
-| AC-13 | All 24 in-scope backlog items closed with closure evidence or PO-visibly re-triaged; ledger reconciled; member issues closed with candidate-bound comments; sprint close comment written | backlog ledger + GitHub issue trail |
+| AC-13 | Every open `sprint: alfred` backlog item is closed with closure evidence or PO-visibly re-triaged; ledger reconciled; member issues closed with candidate-bound comments; sprint close comment written. The set is **27 as of 2026-08-28**: the 24 read in full by the design intake, minus the two moved to Nightwing at the design gate (PRD §9 decision 1), plus the five this design phase itself filed. The live set, not this number, is authoritative at close — re-count with `check-backlog-sprint-assignment.mjs` | backlog ledger + GitHub issue trail |
 | AC-14 | Every wave's deliverables passed ≥1 independent Critic round (fresh context, paths-only dispatch); fail-then-fix cycles documented — and the same bar held for every design document of this epic before PO review (spec §12 design-phase review duty) | Critic evidence under `evidence/critic/` |
 | AC-15 | Documentation acceptance per member issue against the exact accepted candidate | per-issue doc evidence links |
+| AC-16 | Every host-layout onboarding test this sprint adds or touches asserts the success contract of §D; a rejection-only test appears solely for an explicitly unsupported layout. The affected-artifact set is **re-derived after the Nova rebase** (PO constraint, 2026-08-28) rather than carried from this clone base | §D review lens; A-track Critic evidence; the wave-0 post-rebase re-derivation note |
 
 ## B. Incident-derived regression criteria (live-measured classes)
 
@@ -49,11 +50,28 @@ enumeration; B2's per-route sets; C1's four seeds. `verify-suite-registration`
 entries for each carry `invariantPinned` (C2 consolidation rule) — a fixture
 that cannot name its invariant does not register.
 
-## D. Review-lens rule (conditional on PRD §9.2)
+## D. Review-lens rule (PO-accepted 2026-08-28 — PRD §9 decision 2)
 
-If the PO accepts `managed-onboarding-success-contract` into Alfred: every
-host-layout onboarding test added or touched by this sprint asserts the
-end-to-end success contract (inspect/plan/apply/readback, exact allowed write
-set, host-control preservation); rejection-only tests are acceptable solely
-for explicitly unsupported layouts. Applied as a Critic review lens on
-A-track diffs touching onboarding tests.
+`managed-onboarding-success-contract` is accepted into Alfred as a rule, not
+as a work package: every host-layout onboarding test added or touched by this
+sprint asserts the end-to-end success contract (inspect/plan/apply/readback,
+exact allowed write set, host-control preservation); rejection-only tests are
+acceptable solely for explicitly unsupported layouts. Applied as a Critic
+review lens on A-track diffs touching onboarding tests, and bound as AC-16.
+
+Two properties of this rule are deliberate and must survive later editing:
+
+- **The target set is provisional until the Nova rebase.** The PO's
+  acceptance carries the constraint that the onboarding surface changed in
+  the Nova line, so the item's own affected-artifact list
+  (`project-onboarding-v3.test.mjs`, `project-onboarding-e2e.test.mjs`, the
+  onboarding acceptance guidance) is re-derived in wave 0 against the
+  post-rebase base. A rule applied to a file list inherited from this clone
+  base would silently miss whatever Nova moved.
+- **The item's own `sprint:` field stays undeclared, by mechanism, not by
+  oversight.** Ledger event 41's rescoped byte-pin binds that item's
+  pre-Triage bytes; adding `sprint: alfred` there fails the backlog gate
+  (`item-hash-rescope-amendment itemSha256 does not bind the current item's
+  pre-Triage bytes`), measured live on 2026-08-28. The item therefore stays
+  `status: deferred` and outside AC-13's closure set; this section is where
+  its Alfred membership is recorded.
