@@ -58,3 +58,25 @@ for that mechanism and its fix.
   revisit: the next session doing onboarding/front-door work.
   **Assignment (if accepted):** Nova / general pipeline backlog — out of
   Phoenix's own epic scope. **Date:** 2026-08-18
+
+- **PO decision (2026-08-28, Alfred design gate):** accepted into Sprint
+  Alfred as an **acceptance-review rule, not a work package** — the rule this
+  item states (every supported host-owned layout gets a disposable-root test
+  asserting the public inspect/plan/apply/readback transaction, the exact
+  allowed write set, and preservation of all host controls; a rejection-only
+  test is valid solely for an explicitly unsupported layout) binds wherever
+  Alfred touches onboarding tests. Recorded as `AC-16` in
+  `specs/sprint-alfred-epic/acceptance.md`. The two prior triages disagreed
+  (this line: Alfred; the Phoenix line: Nova/general) — the PO resolved it
+  along the line "test- and evidence-discipline belongs to Alfred, product
+  and onboarding *experience* belongs to Nightwing". `sprint: alfred` is
+  therefore declared; `status:` stays `deferred` because the transition
+  ledger admits no move out of `deferred`
+  (`plugins/pipeline-core/lib/backlog-state.mjs` `FORWARD_TRANSITIONS`), so
+  the item is not part of Alfred's closure-obligation set.
+  **PO constraint, same decision:** the rule's concrete target set is
+  re-derived **after** the Nova rebase, not from this clone base — the
+  onboarding surface changed in the Nova line, so the affected-artifact list
+  above (`project-onboarding-v3.test.mjs`,
+  `project-onboarding-e2e.test.mjs`, the onboarding acceptance guidance) is
+  provisional until the rebase in Wave 0 establishes the real one.

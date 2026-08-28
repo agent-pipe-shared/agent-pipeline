@@ -5,7 +5,7 @@ type: workflow-improvement
 owner: pipeline
 status: open
 created: 2026-08-08
-sprint: alfred
+sprint: nightwing
 due: 2026-09-05
 source: "PO, 2026-08-08, on raising the pipeline-start byte budget 15,000 -> 18,000: optimisation is worth doing, but as an efficiency pass later, when more files still need to become modules — not as a detour inside the 0.5.4 hardening block."
 ---
@@ -65,3 +65,13 @@ has not arrived yet would guess at the seams.
   any other bootstrap-skill-text work landing in that window (e.g. the
   sibling item on live-rejection-only constraints).
 - **Date:** 2026-08-17
+
+- **PO decision (2026-08-28, Alfred design gate):** this Triage is honored and
+  the `sprint:` field is corrected to `nightwing`. The field said `alfred`
+  only because the 2026-08-27 mass sprint assignment (`6d81b33b`,
+  NVA-SPRINTASSIGN-1) set it without reconciling against existing Triage
+  prose; the conflict was surfaced to the PO as PRD §9 decision 1. The
+  deciding argument beyond the triage itself: this item's entry condition
+  (SETUP-3's bootstrap questions landing in the same file first) lies outside
+  Alfred, so inside Alfred it would have been the only work package whose
+  start condition the epic does not control.

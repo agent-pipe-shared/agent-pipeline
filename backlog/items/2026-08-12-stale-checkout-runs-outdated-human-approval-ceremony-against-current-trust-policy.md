@@ -5,7 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-08-12
-sprint: alfred
+sprint: nightwing
 source: "Cross-repo observation from a sibling Phoenix session, relayed by the PO into this Nova session for filing."
 due: 2026-09-12
 expires: 2026-09-12
@@ -98,3 +98,13 @@ capacity:
   not currently blocking any active work in this repository.
 - **Assignment (if accepted):** next available Nightwing slot, unassigned.
 - **Date:** 2026-08-17
+
+- **PO decision (2026-08-28, Alfred design gate):** this Triage is honored and
+  the `sprint:` field is corrected to `nightwing`. The field said `alfred`
+  only because the 2026-08-27 mass sprint assignment (`6d81b33b`,
+  NVA-SPRINTASSIGN-1) set it without reconciling against existing Triage
+  prose; the conflict was surfaced to the PO as PRD §9 decision 1 and decided
+  in favor of the item's own triage. No Alfred work package depends on this
+  item; Alfred's B2(v) touches `po-human-approval.mjs`'s exported command
+  table, not the diagnostic message this item is about, so the two do not
+  collide.
