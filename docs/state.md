@@ -90,6 +90,42 @@ scanners were measured rather than assumed: with none reachable the run reports
 blocks is the v2 verdict's three offending required capabilities plus a license
 allowlist that resolves only inside this repository.
 
+**The PO's acceptance bar for the happy path, stated 2026-08-28 and kept verbatim
+because it is what "done" means for this candidate.** Five human touches, and no
+others, when nothing needs asking back:
+
+> *"1. ich bestätige, dass die pipeline installiert werden soll 2. ich beantworte
+> eine reihe anfragen fürs onboarding (modus, author, etc.) 3. ich gebe PRD frei
+> 4. ich verlange den push 5. ich signiere den push"*
+
+Measured against a live blind walk at `60ab3d46`, touches 1+2 are already one
+bundled ask and 4+5 are already right. Two gaps remain, both confirmed by
+measurement rather than reading:
+
+- **The PRD is signalled twice.** Onboarding has the PO acknowledge the staging
+  PRD by writing a marker into it; `approve-plan` then asks the PO to read and
+  approve *the same file* — verified identical path in one run. One judgement,
+  two acts.
+- **`submit-plan` stops for values the project already holds.** The `draft` gate
+  asks for `--by` and `--profile`. Its own comment defends this as "cannot derive
+  from `project/pipeline-state.json`", which is true of that file and beside the
+  point: onboarding asked the PO for both and persisted them — `values.profile`
+  in the intake checkpoint, the git author in this repository's local Git config
+  (both read back live in a freshly onboarded project). Being fixed as
+  NVA-Q2-DRAFTDERIVE.
+
+The transition itself is otherwise clean: after approval, `set-phase` chains
+automatically and implementation is reached with no further human involvement.
+
+**Codex restarts where a resume would do.** The restart barrier's own contract
+requires "a ticket proving a fresh *Codex* process re-read those bytes"
+(`lib/codex-onboarding-runtime.mjs`) — a new process that re-read `.codex/*`,
+not a new conversation. By that contract a resume clears it exactly as a cold
+start does, and keeps the session's context; the code already contemplates the
+word ("a Claude-native restart/resume launcher still needs to be built"). What is
+NOT yet established is the one empirical fact it turns on: whether `codex resume`
+re-reads `.codex/*`. Measure that before changing any instruction.
+
 **One defect class runs through all of this, and it is the reason for Round L.**
 Three capabilities shipped in one session passing their own tests while being
 unusable: the driver (refused by the readiness guard, named by nothing), the
