@@ -8,10 +8,14 @@
  * candidate's actual changed-path set.
  */
 import { spawnSync } from "node:child_process";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import {
   classifyInput,
   evaluateChangeIntegrity,
   evaluateCiAuthority,
+  evaluateSelfExcludedCheck,
   routeSecurityReview,
   validateEvidenceHygiene,
   validateTaskAuthority,
@@ -79,12 +83,56 @@ export function changedPathsForCandidate(repoRoot, base, head) {
   return normalizePaths(git(repoRoot, ["diff", "--name-only", "--diff-filter=ACMR", base, head]).split("\n"));
 }
 
-/** Run only fixed, separate checks for classes present in this candidate diff. */
-export function runIndependentChecks(repoRoot, changedPaths) {
+/**
+ * A self-excluded, root-pointable check cannot certify itself, but it can be
+ * re-run at its BASE (pre-candidate) revision, pointed at the candidate root
+ * via `--root`. This never trusts the candidate's own copy of the checker;
+ * it materialises the checker's tree as it stood at `base` in a detached
+ * worktree, runs THAT copy, and discards the worktree. Any failure along the
+ * way (no base, worktree add fails, the base copy itself rejects) resolves
+ * to "not counted" -- fail-closed, never a thrown exception that could be
+ * mistaken for something else.
+ */
+function verifySelfExcludedAtBase(repoRoot, base, kind, file) {
+  const decision = evaluateSelfExcludedCheck({ kind, baseRevisionExitCode: null });
+  if (!decision.rootPointable || typeof base !== "string" || base.length === 0) return false;
+  let worktreeDir;
+  try {
+    worktreeDir = mkdtempSync(path.join(tmpdir(), "vtp-self-excluded-"));
+  } catch {
+    return false;
+  }
+  try {
+    const add = spawnSync("git", ["worktree", "add", "--detach", "--force", worktreeDir, base], {
+      cwd: repoRoot,
+      stdio: "ignore",
+    });
+    if (add.status !== 0) return false;
+    const run = spawnSync(process.execPath, [path.join(worktreeDir, file), "--root", repoRoot], {
+      cwd: worktreeDir,
+      stdio: "ignore",
+    });
+    return evaluateSelfExcludedCheck({ kind, baseRevisionExitCode: run.status }).counted;
+  } catch {
+    return false;
+  } finally {
+    spawnSync("git", ["worktree", "remove", "--force", worktreeDir], { cwd: repoRoot, stdio: "ignore" });
+    try { rmSync(worktreeDir, { recursive: true, force: true }); } catch { /* best-effort cleanup */ }
+  }
+}
+
+/**
+ * Run only fixed, separate checks for classes present in this candidate diff.
+ * `base` is the delivery base (see `verify-topology-preflight.mjs`); it is
+ * used ONLY to materialise a self-excluded, root-pointable check's own base
+ * revision -- never to widen or narrow which classes are required.
+ */
+export function runIndependentChecks(repoRoot, changedPaths, base = null) {
   const required = evaluateChangeIntegrity({ paths: changedPaths, independentChecks: [] }).changed;
   return required.filter((kind) => {
     const file = INDEPENDENT_CHECK_COMMANDS[kind];
-    if (!file || changedPaths.includes(file)) return false;
+    if (!file) return false;
+    if (changedPaths.includes(file)) return verifySelfExcludedAtBase(repoRoot, base, kind, file);
     return spawnSync(process.execPath, [file], { cwd: repoRoot, stdio: "ignore" }).status === 0;
   });
 }
@@ -102,7 +150,7 @@ function main() {
     validated: bool(argument("--validated", "false")),
     authorId: argument("--author-id", git(repoRoot, ["log", "-1", "--format=%ae", head])),
     reviewerId: argument("--reviewer-id", process.env.PIPELINE_SECURITY_REVIEWER_ID ?? null),
-    independentChecks: runIndependentChecks(repoRoot, changedPaths),
+    independentChecks: runIndependentChecks(repoRoot, changedPaths, base),
   });
   process.stdout.write(`${JSON.stringify(result)}\n`);
   process.exitCode = result.allowed ? 0 : 1;

@@ -124,8 +124,37 @@ export function evaluateChangeIntegrity({ paths = [], independentChecks = [] } =
 
 export function routeSecurityReview({ changedPaths = [], authorId, reviewerId } = {}) {
   const sensitive = changedPaths.some((path) => /(^|\/)(hooks|\.claude|project|workflows|security|pipeline-core\/scripts\/(?:ai-assisted-hardening-gate|verify-topology-preflight))|\.test\.[cm]?js$/u.test(path));
-  const allowed = !sensitive || (typeof reviewerId === "string" && reviewerId !== authorId);
+  // A blank or whitespace-only reviewerId is not a reviewer: it is exactly the
+  // unset/unconfigured shape `PIPELINE_SECURITY_REVIEWER_ID=""` takes when a
+  // workflow forwards the variable before anyone has set it. `typeof "" ===
+  // "string"` and `"" !== authorId`, so the naive check admitted it -- an
+  // unset reviewer must never satisfy a required review.
+  const namedReviewer = typeof reviewerId === "string" && reviewerId.trim().length > 0;
+  const allowed = !sensitive || (namedReviewer && reviewerId !== authorId);
   return Object.freeze({ schema: AI_HARDENING_SCHEMA, required: sensitive, allowed, code: allowed ? "AIH-REVIEW-ROUTED" : "AIH-INDEPENDENT-REVIEW-REQUIRED" });
+}
+
+/** Root-pointable independent checks can be re-run against a foreign tree via `--root`. */
+export const ROOT_POINTABLE_CHECK_KINDS = Object.freeze(["scope", "dependency"]);
+
+/**
+ * When a required check's own command file is inside the candidate diff, it
+ * cannot certify itself. A root-pointable check may still be counted, but
+ * only by re-running its BASE (pre-change) revision against the candidate
+ * root and observing that base revision actually exit 0 -- never by trusting
+ * the claim that it would. A non-root-pointable check (a test suite tests
+ * the tree it lives in) always stays missing; there is nowhere else to point it.
+ */
+export function evaluateSelfExcludedCheck({ kind, baseRevisionExitCode = null } = {}) {
+  const rootPointable = ROOT_POINTABLE_CHECK_KINDS.includes(kind);
+  const counted = rootPointable && baseRevisionExitCode === 0;
+  return Object.freeze({
+    schema: AI_HARDENING_SCHEMA,
+    kind,
+    rootPointable,
+    counted,
+    code: counted ? "AIH-SELF-EXCLUDED-BASE-VERIFIED" : "AIH-SELF-EXCLUDED-MISSING",
+  });
 }
 
 /** A forwarded message retains its least-trusted origin; relays cannot upgrade it. */
