@@ -26,6 +26,7 @@ import { basename, dirname, isAbsolute, join, posix as posixPath, resolve, win32
 import { fileURLToPath } from "node:url";
 
 import { approvalRequestFromExternalJson, observeCleanCandidate, run as runApprovalRequest } from "./po-approval-request.mjs";
+import { decodeTypedLine } from "../lib/chat-gate-ceremony.mjs";
 import { readPublicRepositoryFile, verifyThreatModelApprovalRequest } from "../lib/threat-model-approval-request.mjs";
 import { criticalActionSubjectSha256, createCriticalActionApprovalRequest, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
 import { describeGuardMaintenanceWindowRequest } from "../lib/guard-maintenance-window.mjs";
@@ -667,7 +668,11 @@ function defaultReadConfirmation(prompt) {
     if (read === 0 || buffer[0] === 10) break;
     bytes.push(buffer[0]);
   }
-  return Buffer.from(bytes).toString("utf8").replace(/\r$/u, "").trim();
+  // Shared with `lib/chat-gate-ceremony.mjs`'s `readAttendedLine()`, imported
+  // rather than repeated: the comment there records why a legacy Windows
+  // console's non-UTF-8 bytes must still decode to what the human typed, and
+  // two copies of that reasoning would drift.
+  return decodeTypedLine(bytes);
 }
 
 /**
