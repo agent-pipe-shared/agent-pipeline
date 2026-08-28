@@ -86,3 +86,20 @@ which is the gap all three instances fell into.
   instance 3, and the harness that found it.
 - `2026-08-27-registering-a-verify-suite-silently-invalidates-the-capability-inventory.md` —
   why the enumeration must be derived rather than declared.
+
+## Closing note (reconciliation, 2026-08-28)
+
+Partially resolved. `roles/critic.md` line 103 now names "reachability and effect" as a
+mandatory Critic search-surface dimension, using this item's exact three-shape vocabulary
+(*named but not admitted*, *admitted but not named*, *published but not consumed*) — so a
+human/agent review now has a contractual prompt to check this pattern per diff.
+
+The item's actual acceptance criteria are NOT met: it asks for a Verify-REGISTERED,
+DERIVED (not hand-maintained) mechanical check enumerating agent-facing entry points and
+failing on named-but-refused/admitted-but-unnamed. Checked: `harness/scripts/verify.mjs`
+has no such suite (grepped for the three shape-phrases, no match);
+`harness/scripts/check-product-capability-inventory.mjs` still only asserts every
+discovered surface belongs to exactly one capability (categorization), not reachability —
+grepped for "named"/"admitted"/"reachab" in that file, no match beyond the unrelated
+`SURFACE_KINDS` set name. The landed half is a review-time prompt, not the mechanical gate
+the acceptance criteria require. Status left `open`.

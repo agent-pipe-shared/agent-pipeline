@@ -48,3 +48,27 @@ If any answer is no, name which one and refuse to request the signature.
   specific unmet precondition named.
 - The preflight is read-only and cannot itself mutate the preimage it inspects.
 - A test covers the expired-window case specifically.
+
+## Closing note (reconciliation, 2026-08-28)
+
+Partially resolved. `plugins/pipeline-core/scripts/push-prepare.mjs` (`pushPrepareReport()`,
+lines 348-425) is exactly the described read-only preflight: it checks working-tree
+cleanliness, verify-evidence freshness bound to HEAD (`checkEvidenceFreshness`), the
+security-evidence gate when active, `push-threat-model.md` presence
+(`checkPushThreatModel`), and the critical-human-proof trust-anchor posture
+(`checkCriticalHumanProofPolicy`) — each unmet check returns `ok:false` with a named
+`remedy`, and `report.ready` only turns true once every check passes. The header comment
+(lines 3-21) states its own read-only contract explicitly ("Never writes a file, never
+mutates pipeline state, never touches the network"). This covers three of the item's five
+Direction bullets: verify contract + evidence, trust anchor, threat model.
+
+NOT covered: "does the time window leave enough room to complete the ceremony" — the
+function only generates a fresh `expiresAt` (line 409), it never checks a caller-supplied
+window against elapsed/remaining time. Checked `plugins/pipeline-core/scripts/push-prepare.test.mjs`
+for an expired-window test case (acceptance criterion 3) — grepped for "expir"/"window",
+only an unrelated literal `--expires-at` fixture value at line 390, no assertion that an
+expired or too-short window is refused. The item this one's source section points at
+(`2026-08-28-an-expired-override-is-armed-instead-of-refused.md`, a different mechanism —
+`authorize-by-signature` in `human-guard-override.mjs`) is the pointer for that gap, and per
+this dispatch's briefing that item's own fix is still in flight elsewhere, not in this
+checkout. Status left `open`.
