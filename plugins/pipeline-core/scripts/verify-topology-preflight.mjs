@@ -53,7 +53,10 @@ function resolveObject(runGit, revision, kind) {
 }
 
 export function declaredEvidenceBaselines(document) {
-  if (!document || document.schema !== "pipeline.product-capability-inventory.v2") {
+  // v3 (NVA-INVDERIVE-1): the schema name moved when the derived `surfaces` array was
+  // removed. This consumer only ever read `sourceBaseline`, which v3 keeps unchanged --
+  // the pin is updated rather than widened, so an actual v2 document still fails closed.
+  if (!document || document.schema !== "pipeline.product-capability-inventory.v3") {
     throw new Error("unsupported evidence baseline declaration");
   }
   const source = document.sourceBaseline;

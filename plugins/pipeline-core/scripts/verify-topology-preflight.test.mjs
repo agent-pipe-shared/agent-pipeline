@@ -20,7 +20,7 @@ const parentTree = "4".repeat(40);
 const baseline = "5".repeat(40);
 const baselineTree = "6".repeat(40);
 const inventory = {
-  schema: "pipeline.product-capability-inventory.v2",
+  schema: "pipeline.product-capability-inventory.v3",
   sourceBaseline: { commit: baseline, tree: baselineTree },
 };
 

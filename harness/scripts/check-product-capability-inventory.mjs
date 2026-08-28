@@ -14,7 +14,28 @@ import { dirname, isAbsolute, join, normalize, relative, resolve, sep } from "no
 import { fileURLToPath } from "node:url";
 import { parseYaml } from "../../plugins/pipeline-core/lib/yaml-lite.mjs";
 
-const SCHEMA = "pipeline.product-capability-inventory.v2";
+// v3 (NVA-INVDERIVE-1, 2026-08-28): the `surfaces` array was removed from the
+// inventory and is now DERIVED from `discoverSurfaces()` on every run.
+//
+// WHY. In v2 the inventory declared all ~570 surfaces as `{surfaceId, kind, path,
+// member}` objects and the check then required that declared set to equal the
+// discovered set exactly -- the four fields were literally the four fields discovery
+// already computes, so the array was pure duplication of code output, hand-maintained.
+// Registering ONE new verify suite therefore required two separate hand edits in two
+// different places of this file, with no signal at registration time and a failure
+// that surfaced later as a red Verify entry naming neither verify.mjs nor the suite.
+// That happened four times (twice on 2026-08-19, twice more in one evening on
+// 2026-08-27, the second by the session that had just repaired the first), and each
+// previous fix added the missing entries without removing the reason they go missing.
+// See backlog item
+// pipeline.registering-a-verify-suite-silently-invalidates-the-capability-inventory.
+//
+// WHAT SURVIVES. Categorization stays declared, because it is a judgement the code
+// cannot derive: every discovered surface must still belong to exactly one capability
+// (see the two assertions at the end of validate()). So adding a suite is now one
+// hand edit -- put its surfaceId in a capability -- and the check names the exact
+// missing id instead of a coverage mismatch.
+const SCHEMA = "pipeline.product-capability-inventory.v3";
 const INVENTORY_PATH = "docs/product-capability-inventory.json";
 const SHA256_RE = /^[a-f0-9]{64}$/;
 const GIT_OID_RE = /^[a-f0-9]{40,64}$/;
@@ -269,7 +290,7 @@ export function validateInventory({
     catch (error) { return { ok: false, findings: [`inventory is not valid JSON: ${error.message}`] }; }
   }
 
-  const rootKeys = ["schema", "sourceBaseline", "criticReview", "surfaces", "capabilities"];
+  const rootKeys = ["schema", "sourceBaseline", "criticReview", "capabilities"];
   if (!hasExactKeys(inventory, rootKeys)) fail(findings, `inventory root must have exactly ${rootKeys.join(", ")}`);
   if (inventory.schema !== SCHEMA) fail(findings, `inventory schema must equal ${SCHEMA}`);
   if (!hasExactKeys(inventory.sourceBaseline, ["commit", "tree"]) || !GIT_OID_RE.test(inventory.sourceBaseline?.commit ?? "") || !GIT_OID_RE.test(inventory.sourceBaseline?.tree ?? "")) {
@@ -298,30 +319,23 @@ export function validateInventory({
     if (typeof inventory.criticReview.reason !== "string" || inventory.criticReview.reason.length < 20) fail(findings, "pending criticReview requires a concrete reason");
     if (phase === "final") fail(findings, "final inventory requires an attested Critic receipt");
   }
-  if (!Array.isArray(inventory.surfaces)) fail(findings, "surfaces must be an array");
   if (!Array.isArray(inventory.capabilities)) fail(findings, "capabilities must be an array");
 
+  // The product surface is DISCOVERED, never declared (see SCHEMA's note above).
+  // `discoverSurfaces()` already guarantees uniqueness by surfaceId and by the
+  // kind/path/member composite -- it throws otherwise -- so the duplicate checks the
+  // declared block used to perform have no counterpart here: there is nothing left to
+  // contradict. Path existence is likewise a property of discovery (it walks real
+  // files) rather than of a hand-written record. The kind check survives, because
+  // SURFACE_KINDS is this file's own contract with the capability schema and a future
+  // discovery rule could emit a kind nobody added to that set.
   const surfaceById = new Map();
-  const compositeKeys = new Set();
-  for (const [index, surface] of (Array.isArray(inventory.surfaces) ? inventory.surfaces : []).entries()) {
-    const label = `surfaces[${index}]`;
-    if (!hasExactKeys(surface, ["surfaceId", "kind", "path", "member"])) { fail(findings, `${label} has unexpected shape`); continue; }
-    if (![surface.surfaceId, surface.kind, surface.path, surface.member].every((value) => typeof value === "string" && value !== "")) fail(findings, `${label} fields must be nonempty strings`);
-    if (!SURFACE_KINDS.has(surface.kind)) fail(findings, `${label}.kind is invalid: ${surface.kind}`);
-    existingRepoPath(root, surface.path, findings, `${label}.path`);
-    const composite = `${surface.kind}\u0000${surface.path}\u0000${surface.member}`;
-    if (surfaceById.has(surface.surfaceId)) fail(findings, `duplicate surfaceId: ${surface.surfaceId}`);
-    if (compositeKeys.has(composite)) fail(findings, `duplicate surface composite key: ${surface.kind}/${surface.path}/${surface.member}`);
-    surfaceById.set(surface.surfaceId, surface); compositeKeys.add(composite);
-  }
-
   let discovered = [];
   try { discovered = discoverSurfaces(root); }
   catch (error) { fail(findings, `surface discovery failed: ${error.message}`); }
-  const expectedSurfaceIds = discovered.map((surface) => surface.surfaceId);
-  const inventorySurfaceIds = [...surfaceById.keys()].sort(utf8Compare);
-  if (expectedSurfaceIds.length !== inventorySurfaceIds.length || expectedSurfaceIds.some((id, index) => id !== inventorySurfaceIds[index])) {
-    fail(findings, "inventory surfaces do not exactly cover the discovered current product surface");
+  for (const surface of discovered) {
+    if (!SURFACE_KINDS.has(surface.kind)) fail(findings, `discovered surface has an invalid kind: ${surface.surfaceId}`);
+    surfaceById.set(surface.surfaceId, surface);
   }
 
   const capabilityIds = new Set();
