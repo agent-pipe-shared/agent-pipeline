@@ -21,9 +21,69 @@ Work-package (WP) identifiers reference `../spec.md`.
 | #108 | Assemble and qualify the Alfred governance core | XL | OPEN | E1/E2 |
 | #109 | Architecture-baseline adoption demand for existing repos | M | OPEN | D4 |
 
-Entry condition named by #108 and verified live: **#100 (P0, fail-closed on an
-absent push-approval record) is still OPEN** — it is a prerequisite hotfix
-*outside* Alfred; ordering is a PO call recorded in the PRD.
+Entry condition named by #108: **#100** (P0, fail-closed on an absent
+push-approval record) — a prerequisite hotfix *outside* Alfred, required
+"accepted on `main`" before an Alfred implementation branch is cut.
+
+**Re-verified 2026-08-28, and the earlier reading corrected.** The issue is
+still `state: open` on GitHub with all seven acceptance checkboxes unticked
+and its last comment dated 2026-08-08 — but its substance is already on
+`main`:
+
+- `2ae06d91` *"fix(guard-push): fail closed when the blocking evaluation
+  itself faults"* is an ancestor of `origin/main`
+  (`git merge-base --is-ancestor` exits 0). It implements scope item 3, the
+  terminal exception boundary, which the 2026-08-08 verification comment
+  named as the one thing still missing.
+- The fixtures for scope item 4 are on `origin/main`: `PG11c` (state lacks
+  `lastApproved`), `PG11e` (no `pushApproval` key at all, pinned equal to
+  PG11c), `PG28` (injected fault in the blocking evaluation fails closed),
+  `PG29` (the same fault under mode `warn` stays non-blocking — AC-4),
+  `PG30` (the fault sentinel is inert without its exact value).
+- The suite is registered in the shared Verify gate on `origin/main`:
+  `harness/scripts/verify.mjs:233`, `guard-push-tests` (AC-6).
+- The residual backlog item is already `status: closed` with
+  `closure_commit: 2ae06d9133beed3859f8e0a5ca1b61b1d97a4771`.
+
+What is genuinely outstanding is AC-7 alone — a closing comment naming the
+merged commit and its test evidence — plus the administrative close. The
+entry condition is therefore materially satisfied and **does not depend on
+Nova's release**; the Nova rebase gate stays in force for its own reasons
+(PRD A-1). The reading boundary is stated honestly: fixture presence and
+Verify registration were verified by reading `origin/main` blobs; the suite
+was not executed against `main` in this pass.
+
+**PO decision 2026-08-28 (PRD §9.3):** neither "land it with Nova" nor
+"waive" — the issue gets an evidence comment from this session and the PO
+performs the close itself. The comment is posted
+(`#issuecomment-5448916870`); the issue is deliberately left `open` and
+`sprint:NONE`.
+
+### `sprint:NONE` portfolio, decided at the same gate (PRD §9.4)
+
+No `sprint:NONE` issue is an Alfred prerequisite beyond #100. Enumerated live
+on 2026-08-28: #100, #107, #92, #72, #52, #13. #92 and #13 carry their own
+unmet entry gates, #72 is blocked on hardware, #52 is an evaluation with no
+code dependency, and #107 is an explicit #108 non-goal.
+
+The PO used the same reading to clean the portfolio: the four
+adapter/extension issues moved to Sprint Batman, whose label scope is exactly
+*"optional capabilities: governed adapters, built-in tools, recommendations,
+and safe pilots"* — **#107** (IAM identity vs. decision authority; its scope
+item 5 is a provider-adapter boundary), **#92** (third-party runner-adapter
+extension path), **#52** (additional Git forge adapters), **#13** (external
+execution-plane adapter pilot). Each edit was previewed and read back through
+`github-issue-operations.mjs`. **#72 was deliberately left `sprint:NONE`** —
+a native Apple-Silicon acceptance follow-up for Nova is not an optional
+capability and does not match Batman's scope; **#100** likewise stays
+`sprint:NONE` as a P0 hotfix.
+
+One boundary this creates for Alfred, recorded in `spec.md` §10: Alfred's
+B2(i) briefed test-change authorization and B2(iv) per-key trust anchors add
+new *human* authority surfaces. They stay inside the existing exact-scope
+signature-or-chat model and introduce no identity provider, so they do not
+pre-empt #107's invariant that authentication is identity evidence and never
+decision authority.
 
 ## Cross-issue architecture: one shared contract set
 
