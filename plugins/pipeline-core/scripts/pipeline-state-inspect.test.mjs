@@ -9,11 +9,13 @@
  * structured-JSON pattern (a `schema` field plus nested detail) and performs
  * ZERO writes: no lock, no state mutation, no `docs/state.md` touch.
  *
- * The `nextAction` field is asserted against `nextActionSection()` directly
- * (the same pure renderer `syncStateMdNextAction` calls before writing
- * `docs/state.md`'s "## Next action" section) rather than against a hardcoded
- * body string, so this test tracks that renderer's real contract instead of
- * duplicating its prose.
+ * NVA-I-ONEROUTE: `nextAction` is now the STRUCTURAL protocol action
+ * (`{kind, executable, argv}` or `{kind: "collect-input", ...}`); the
+ * rendered prose moved to `nextActionText`, asserted against
+ * `nextActionSection()` directly (the same pure renderer `syncStateMdNextAction`
+ * calls before writing `docs/state.md`'s "## Next action" section) rather than
+ * against a hardcoded body string, so this test tracks that renderer's real
+ * contract instead of duplicating its prose.
  */
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
@@ -53,7 +55,9 @@ test("inspect on a project with no active feature reports an inactive lifecycle 
   assert.equal(payload.planApproved, false);
   assert.equal(payload.lifecycle.code, "PLAN-LIFECYCLE-INACTIVE");
   assert.equal(payload.lifecycle.status, null);
-  assert.equal(payload.nextAction, nextActionSection({ schema: SCHEMA_ID }));
+  assert.equal(payload.status, null);
+  assert.equal(payload.nextAction, null);
+  assert.equal(payload.nextActionText, nextActionSection({ schema: SCHEMA_ID }));
 
   // Zero mutation: `inspect` on a project with no state file yet must not
   // create one -- it is read-only, unlike every writer subcommand above it.
@@ -78,11 +82,19 @@ test("inspect after set-feature surfaces phase, draft lifecycle, and the live Ne
   assert.equal(payload.planApproved, false);
   assert.equal(payload.lifecycle.ok, true);
   assert.equal(payload.lifecycle.status, "draft");
+  assert.equal(payload.status, "draft");
   assert.equal(payload.closedFeaturesCount, 0);
 
+  // Structural nextAction: no plan has been submitted yet, and this command
+  // cannot derive who is submitting it or which delivery profile applies --
+  // a collect-input, never an invented/placeholder-laden command.
+  assert.equal(payload.nextAction.kind, "collect-input");
+  assert.deepEqual(payload.nextAction.inputs.map((input) => input.name), ["by", "profile"]);
+  assert.equal(payload.nextAction.input, undefined);
+
   const persistedState = JSON.parse(readFileSync(statePathValue, "utf8"));
-  assert.equal(payload.nextAction, nextActionSection(persistedState),
-    "nextAction must be byte-identical to the same pure renderer syncStateMdNextAction uses");
+  assert.equal(payload.nextActionText, nextActionSection(persistedState),
+    "nextActionText must be byte-identical to the same pure renderer syncStateMdNextAction uses");
 
   // Zero mutation: the state file bytes must be unchanged by `inspect`.
   const afterBytes = readFileSync(statePathValue, "utf8");
