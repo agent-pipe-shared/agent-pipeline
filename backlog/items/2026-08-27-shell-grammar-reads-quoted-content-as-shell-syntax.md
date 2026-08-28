@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.shell-grammar-reads-quoted-content-as-shell-syntax
 type: defect
 owner: pipeline
-status: open
+status: resolved
 created: 2026-08-27
 sprint: nightwing
 sprint: nova
@@ -188,3 +188,38 @@ were dropped entirely.
   change must not land without.
 - `2026-08-28-a-heredoc-refusal-teaches-no-substitute.md` — the same grammar, the same
   "refused with no substitute" shape, deliberately left out of scope here.
+
+## Closing note (reconciliation, 2026-08-28)
+
+Resolved. Verified live in this session (HEAD b4fc36a3), not from a commit message:
+
+- **Case 1** (ternary inside `node -e '...'`) — ran `node -e 'const x = 1 ? "a" : "b";
+  console.log(x)'` directly as a tool call; admitted, printed `a`.
+- **Case 2** (`\|` alternation inside a quoted `grep` pattern) — ran
+  `grep -n "tokenize\|CONTROL" plugins/pipeline-core/hooks/guard-command-grammar.mjs`
+  directly; admitted, matched both terms. Read `guard-command-grammar.mjs` lines 80-125:
+  `tokenize()` now tracks a `quote` state variable and only checks characters against
+  `|;&()`/redirect logic once `quote === null` (lines 91-126), so a `|` or `\|` byte
+  written inside `'...'`/`"..."` is appended to `state.value` and never reaches the
+  operator classification at all.
+  - **Case 3** (`head -N` vs `head -n N`) — ran `grep -n "CONTROL" .../guard-command-
+  grammar.mjs | head -40` (no `-n`) directly; admitted. Code confirms: `guard-lifecycle-
+  ready.mjs` lines 1597-1601 comment "NVA-I-GRAMMAR: the combined `head -N` form... `head
+  -N` was previously refused for grep-to-head/cat-to-head while already admitted for
+  [rg-to-head]" — now admitted uniformly.
+- **`&&` admission** — verified live at the top of this dispatch: `git status --short &&
+  git checkout --detach b4fc36a3` was refused with `"&&"-chain segment 2 of 3
+  ("git checkout --detach b4fc36a3") is not independently admitted"` — confirming the
+  chain is split per-segment (union-of-requirements, not first-segment-wins) rather than
+  refused as a whole.
+- **Refusal states the complete admitted grammar** — the same live refusal printed the
+  full bounded-pipeline table with exact spellings and the `N in 1..500` bound for both
+  `head -n N` and `head -N` forms, plus the `&&`-chain bound ("up to 6"), matching the
+  acceptance criterion.
+- **Regression suite** — `guard-lifecycle-ready.test.mjs` carries extensive positive/
+  negative pairs for these shapes (grepped for "regression"/"negative", 20+ hits spanning
+  the affected code paths).
+
+All three reproductions and the PO's two follow-on requirements (safe `&&` admission,
+refusal names the full grammar) are landed and independently confirmed by direct
+execution, not inferred from source alone.
