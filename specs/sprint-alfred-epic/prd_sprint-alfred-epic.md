@@ -535,8 +535,9 @@ named in `spec.md` §12 and `acceptance.md`:
 
 ## 9. PO decisions (decided 2026-08-28 at the gate)
 
-All five were answered by the PO; they are recorded here as binding and are
-executed in the backlog, on GitHub, and in `acceptance.md`.
+All six were answered by the PO; they are recorded here as binding and are
+executed in the backlog, on GitHub, in `acceptance.md`, and — for decision 6
+— in §5's sequencing.
 
 1. **Sprint-assignment conflicts — moved to Nightwing.** Both
    `2026-08-12-stale-checkout…` and `2026-08-08-bootstrap-skill-grows…`
@@ -559,29 +560,28 @@ executed in the backlog, on GitHub, and in `acceptance.md`.
 5. **Scope trims — none.** C2's range-mode check and B2(viii) gitleaks
    diagnostics both stay in scope; both are small.
 
-### Still open — one decision this rework owes the PO
-
-6. **Should D-track work be pulled earlier than Wave 2?** The design's
-   recommendation is **no**: keep the current wave order and carry the
-   architecture emphasis through the reweighted story instead. The reason is
-   §1.2 — A1/A2 measure whether the enforcement layer actually executes, and
-   D3's conformance claims are only honest on top of that measurement; a D
-   pulled ahead of it would ship an architecture gate whose enforcement is
-   itself unverified. What the recommendation costs is calendar: the epic's
-   headline capability starts in Wave 2 rather than Wave 0, so the first
-   visible architecture artifact arrives later than the emphasis might
-   suggest. Pulling D earlier buys that visibility at the price of running it
-   on unmeasured enforcement, with D3 report-only for longer and its
-   promotion still gated on the A-track evidence — so the trade is *when the
-   work is visible*, not *whether it is trustworthy*.
-   **This decision was promised explicitly in
+6. **D-track sequencing — the wave order stands.** The PO followed the
+   recommendation: D-track work is *not* pulled earlier than Wave 2. The
+   reason is §1.2 — A1/A2 measure whether the enforcement layer actually
+   executes, and D3's conformance claims are only honest on top of that
+   measurement; a D pulled ahead of it would ship an architecture gate whose
+   own enforcement is unverified. The accepted cost is calendar visibility:
+   the epic's headline capability starts in Wave 2, so the first visible
+   architecture artifact arrives later than the emphasis alone would suggest.
+   The trade that was declined was *when the work is visible*, never *whether
+   it is trustworthy* — pulling D earlier would have left D3 report-only for
+   longer with its promotion still gated on the same A-track evidence.
+   Consequence for the plan: §5's wave order and the §5 declared sequencing
+   deviation stand unchanged, and D-track substance stays off every
+   droppable-tail list (§8 A-5).
+   *Provenance:* this decision was promised in
    [`design/gap-analysis-2026-08-28.md`](design/gap-analysis-2026-08-28.md)
-   §E and was omitted from the first graduation of this section; it is
-   restored here rather than silently defaulted to the recommendation** (found
-   by the graduation Critic round, F1).
+   §E, omitted from the first graduation of this section, restored by the
+   graduation Critic round (F1) rather than silently defaulted, and then
+   answered by the PO.
 
-**Open at this gate:** decision 6 above. The remaining gate acts are that
-answer and then the PO's `approve-plan` on the resubmitted plan.
+**Open at this gate:** none. The remaining gate act is the PO's
+`approve-plan` on the resubmitted plan.
 
 ## 10. Traceability
 
