@@ -370,3 +370,5 @@ named in `spec.md` §12 and `acceptance.md`:
 | 24 backlog items | `design/backlog-intake.md` → cluster tables, ⚖ PO-decided directions |
 | External research | `design/external-research.md` → D2 representation pin, D3 deterministic-pass rule, A1 rationale, positioning |
 | 2026-08-27 incidents | `docs/state.md` current section; the two filed items → A4/A5, C1 seed codes |
+
+<!-- po-plan-acknowledged: content-sound-and-spec-consistent -->
