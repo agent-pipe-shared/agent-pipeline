@@ -93,6 +93,31 @@ try {
     assert.equal(plan.status, "provenance-rejected");
     assert.equal(plan.code, "PA-PROVENANCE-MISMATCH");
   });
+  ok("classification reports a diverging twin calibration pair and names the authoritative file", () => {
+    const base = root();
+    neutral(base, { schema: "pipeline.state.v0" });
+    legacy(base);
+    // Simulate exactly the greenfield-run defect: `project/pipeline.json` was
+    // corrected while `.claude/pipeline.json` still holds the original bytes.
+    write(base, NEUTRAL_CALIBRATION, "{\"project\":\"fixture\",\"verify\":\"npm test\"}\n");
+    const classification = classifyProjectAuthority({ rootDir: base });
+    assert.equal(classification.source, "neutral");
+    assert.deepEqual(classification.diagnostics, [{
+      path: NEUTRAL_CALIBRATION,
+      legacyPath: LEGACY_CALIBRATION,
+      code: "PA-CALIBRATION-DRIFT",
+      message: `${NEUTRAL_CALIBRATION} and ${LEGACY_CALIBRATION} disagree`,
+      authoritative: NEUTRAL_CALIBRATION,
+    }]);
+  });
+  ok("classification reports no drift for a matching twin calibration pair", () => {
+    const base = root();
+    neutral(base, { schema: "pipeline.state.v0" });
+    legacy(base);
+    const classification = classifyProjectAuthority({ rootDir: base });
+    assert.equal(classification.source, "neutral");
+    assert.deepEqual(classification.diagnostics, []);
+  });
   ok("adoption provenance rejects malformed downstream receipts before mutation", () => {
     const base = root(); legacy(base); write(base, NEUTRAL_MANIFEST, "provisional\n");
     const plan = planProjectAuthorityMigration({ rootDir: base, provenance: {

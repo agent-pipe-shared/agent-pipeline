@@ -336,13 +336,48 @@ function classifyLayer(layer, source, legacyLayer = null) {
   }));
 }
 
+// The twin calibration pair (`project/pipeline.json` and `.claude/pipeline.json`)
+// is legitimately seeded byte-identical on day one (see the "byte-identical
+// across tiers" comment on TARGETS above), but nothing re-verifies they STAY
+// identical afterward: each tier is writable independently, and neither
+// `authority()` nor `classifyLayer()` above ever compares their bytes once
+// both are present. A project whose neutral `project/pipeline.json` is edited
+// (e.g. a corrected verify contract) without the legacy compatibility copy
+// following along drifts silently -- the answer to "what is the verify
+// contract" then depends on which file the reader happens to load
+// (backlog: 2026-08-28-the-twin-manifest-files-can-drift-without-detection.md).
+// This reports that divergence the same way `classifyProjectAuthority()`
+// already reports everything else about the twin pair: as part of its typed
+// result, naming which file is authoritative (the tier `authority()` resolved
+// as the current source; neutral whenever the resolver could not determine a
+// source at all, since neutral is always preferred once both exist).
+function calibrationDriftDiagnostics(layer, legacyLayer, source) {
+  if (layer.calibration.status !== "present" || legacyLayer.calibration.status !== "present") return [];
+  if (layer.calibration.sha256 === legacyLayer.calibration.sha256) return [];
+  return [{
+    path: NEUTRAL_CALIBRATION,
+    legacyPath: LEGACY_CALIBRATION,
+    code: "PA-CALIBRATION-DRIFT",
+    message: `${NEUTRAL_CALIBRATION} and ${LEGACY_CALIBRATION} disagree`,
+    authoritative: source === "legacy" ? LEGACY_CALIBRATION : NEUTRAL_CALIBRATION,
+  }];
+}
+
 export function classifyProjectAuthority({ rootDir = process.cwd() } = {}) {
   try {
     const root = realRoot(rootDir);
     const current = authority(root);
     const layer = readLayer(root, NEUTRAL_MANIFEST, NEUTRAL_STATE, NEUTRAL_CALIBRATION, NEUTRAL_GUARD_CONFIG, NEUTRAL_GUARD_AUDIT, "neutral");
     const legacyLayer = readLayer(root, LEGACY_MANIFEST, LEGACY_STATE, LEGACY_CALIBRATION, LEGACY_GUARD_CONFIG, LEGACY_GUARD_AUDIT, "legacy");
-    return { schema: PROJECT_AUTHORITY_CLASSIFICATION_SCHEMA, version: PROJECT_AUTHORITY_CONTRACT_VERSION, status: current.status, source: current.source ?? null, files: classifyLayer(layer, current.source, legacyLayer), git: gitEvidence(root) };
+    return {
+      schema: PROJECT_AUTHORITY_CLASSIFICATION_SCHEMA,
+      version: PROJECT_AUTHORITY_CONTRACT_VERSION,
+      status: current.status,
+      source: current.source ?? null,
+      files: classifyLayer(layer, current.source, legacyLayer),
+      diagnostics: calibrationDriftDiagnostics(layer, legacyLayer, current.source),
+      git: gitEvidence(root),
+    };
   } catch {
     return { schema: PROJECT_AUTHORITY_CLASSIFICATION_SCHEMA, version: PROJECT_AUTHORITY_CONTRACT_VERSION, status: "invalid", reason: "project authority classification unavailable" };
   }
