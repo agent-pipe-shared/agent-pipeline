@@ -45,6 +45,7 @@
 | pipeline.approve-push-rejects-any-fresh-post-setup1-authority-file | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.approved-not-implementing-is-a-silent-trap | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.atomic-prd-approval-without-mutation | closed | workflow-improvement | pipeline | 2026-08-18 | — |
+| pipeline.attended-po-acknowledge-gate-defaults-to-an-unsatisfiable-runner | open | defect | pipeline | 2026-08-28 | — |
 | pipeline.attestation-git-presence-gate-not-gs8-protected | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.authority-decision-apply-defaults-to-codex | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.authority-decision-candidate-is-a-literal | open | defect | pipeline | 2026-08-08 | — |
@@ -458,7 +459,7 @@
 
 ## Counts
 
-- open: 54
+- open: 55
 - in_progress: 5
 - closed: 377
 - rejected: 3

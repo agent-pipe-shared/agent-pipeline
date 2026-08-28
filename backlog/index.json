@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "87f0d275e7b0b591af459f259e11f2b227c6530c68a216242a6d30ace6467260"
+    "transitionHead": "2f70060e47c48971c7858689457cb0f0de232052c024805b0dd39f77db1131fe"
   },
   "counts": {
-    "open": 54,
+    "open": 55,
     "in_progress": 5,
     "closed": 377,
     "rejected": 3,
@@ -493,6 +493,15 @@
       "closureRepository": "self",
       "closureCommit": "8d3fd44f6f30e3c022f4ffecf67974c68482c022",
       "closureEvidence": "backlog/items/2026-08-18-atomic-prd-approval-without-mutation.md"
+    },
+    {
+      "id": "pipeline.attended-po-acknowledge-gate-defaults-to-an-unsatisfiable-runner",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "Measured live 2026-08-28 in the Alfred clone: two attended PO acknowledge ceremonies, the first failing its postimage readback and rolling back, the second succeeding with an explicit --runner flag.",
+      "deferred": false
     },
     {
       "id": "pipeline.attestation-git-presence-gate-not-gs8-protected",
