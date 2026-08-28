@@ -135,7 +135,15 @@ check("HAW-A02 accepts an attested receipt and an honest inventory-phase pending
 });
 
 for (const [name, mutate, pattern] of [
-  ["missing discovered surface", (document) => { document.surfaces.pop(); }, /exactly cover/],
+  // v3 (NVA-INVDERIVE-1): "the inventory omitted a discovered surface" is no longer
+  // expressible -- the surface set IS the discovered set. The equivalent failure, and
+  // the one this whole change exists to make legible, is a discovered surface that no
+  // capability categorizes: exactly the state registering a new verify suite produces.
+  ["a discovered surface no capability categorizes", (document) => {
+    const capability = document.capabilities.find((candidate) => candidate.surfaceIds.length > 1);
+    capability.surfaceIds = capability.surfaceIds.slice(1);
+  }, /absent from every capability/],
+  ["a re-declared surfaces array", (document) => { document.surfaces = []; }, /inventory root must have exactly/],
   ["duplicate capability ID", (document) => { document.capabilities.push(structuredClone(document.capabilities[0])); }, /duplicate capability id/],
   ["unmapped surface", (document) => { document.capabilities[0].surfaceIds = []; }, /surfaceIds must be nonempty|absent from every capability/],
   ["available capability without test evidence", (document) => { document.capabilities[0].testEvidence = []; }, /has no testEvidence/],
@@ -162,15 +170,19 @@ check("HAW-A04 final phase rejects pending front-door claims before documentatio
   assert.match(result.findings.join("\n"), /must be active during final phase/);
 });
 
-check("HAW-A05 accepts an ancestor baseline and still requires the exact discovered surface", () => {
+check("HAW-A05 accepts an ancestor baseline and still requires every discovered surface to be categorized", () => {
   const document = inventory();
   document.sourceBaseline = revision("HEAD^");
   assert.equal(validated(document).ok, true);
 
-  document.surfaces.pop();
+  // v3: an older baseline does not relax the surface contract. The surface set is
+  // derived from the CURRENT checkout either way, so dropping a categorization is
+  // still caught with the baseline moved back.
+  const capability = document.capabilities.find((candidate) => candidate.surfaceIds.length > 1);
+  capability.surfaceIds = capability.surfaceIds.slice(1);
   const result = validated(document);
   assert.equal(result.ok, false);
-  assert.match(result.findings.join("\n"), /exactly cover the discovered current product surface/);
+  assert.match(result.findings.join("\n"), /discovered surface is absent from every capability/);
 });
 
 for (const [name, fixture, pattern] of [
