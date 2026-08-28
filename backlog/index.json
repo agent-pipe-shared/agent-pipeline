@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "c4f6874b36ae34dcfac9d0a95bc27f04df1b138cdd250830ff42b378a9c5990a"
+    "transitionHead": "3a698d5081d95ee26465afc6bbbd8e57990927c3ee476e0d96fb74cd626d21f3"
   },
   "counts": {
-    "open": 94,
+    "open": 88,
     "in_progress": 3,
-    "closed": 390,
+    "closed": 396,
     "rejected": 3,
     "deferred": 11
   },
@@ -403,12 +403,16 @@
     },
     {
       "id": "pipeline.an-expired-override-is-armed-instead-of-refused",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-28",
       "source": "Hit live, 2026-08-28, consuming a PO signature for a TP-3 guard override; then located in plugins/pipeline-core/lib/human-guard-override.mjs by reading the arming and consuming paths against each other.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "621a19c68649787b20886bbcfd998a7516afb75f",
+      "closureEvidence": "backlog/items/2026-08-28-an-expired-override-is-armed-instead-of-refused.md"
     },
     {
       "id": "pipeline.an-orchestrator-write-into-a-running-dispatchs-tree-is-undetectable",
@@ -1527,13 +1531,17 @@
     },
     {
       "id": "pipeline.dead-key-directory-pointer-is-permanent-and-silent",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-28",
       "source": "Measured 2026-08-28 on the development machine itself, while reconciling the trust-anchor item: freshCriticalHumanProofPolicyBytes(fs) returned a bare v1 document on a machine whose key directory exists and is complete. Probed step by step (scratch/probe-machine-plane.mjs) rather than inferred.",
       "deferred": false,
-      "tracking": "NOW / Nova A — happy-path blocking at the last touch: on a machine that HAS a valid PO key, a freshly onboarded project still gets no trust anchor, so the signature push the PO is asked to perform is functionless."
+      "tracking": "NOW / Nova A — happy-path blocking at the last touch: on a machine that HAS a valid PO key, a freshly onboarded project still gets no trust anchor, so the signature push the PO is asked to perform is functionless.",
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "f3dfd5097752402664f6bb3df292a741c68069bf",
+      "closureEvidence": "backlog/items/2026-08-28-a-dead-key-directory-pointer-is-permanent-and-silent.md"
     },
     {
       "id": "pipeline.decouple-hosted-project-document-language-from-operator-facing-language",
@@ -2617,13 +2625,17 @@
     },
     {
       "id": "pipeline.guided-driver-neither-discoverable-nor-runnable",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-28",
       "source": "PO question 2026-08-28: 'ist sichergestellt, dass die agenten überhaupt diesen driver jeweils sofort finden und ihn nutzen müssen?' Measured by scratch/verify-driver-reachable.mjs against a governed fixture with an injected readiness denial.",
       "deferred": false,
-      "tracking": "NOW / Nova A — the guided driver is refused by the readiness guard in every state it exists to serve, and named by nothing an agent reads. Every chaining improvement built this session is inert in practice until this lands."
+      "tracking": "NOW / Nova A — the guided driver is refused by the readiness guard in every state it exists to serve, and named by nothing an agent reads. Every chaining improvement built this session is inert in practice until this lands.",
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "7b2487b272a800f6981da025c7e593a7dddbdd60",
+      "closureEvidence": "backlog/items/2026-08-28-the-guided-driver-is-neither-discoverable-nor-runnable.md"
     },
     {
       "id": "pipeline.guided-init-ends-in-error-not-a-question",
@@ -3543,13 +3555,17 @@
     },
     {
       "id": "pipeline.no-push-preflight-before-requesting-a-signature",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-28",
       "source": "Claude/Windows greenfield run, 2026-08-28, sections 7 and 11 of its own analysis (docs/pipeline-haertungstest-und-analyse.md).",
       "deferred": false,
-      "tracking": "NOW / Nova A — happy-path blocking: a burned or expired signature stops the path at its last step and costs a live PO interaction to retry"
+      "tracking": "NOW / Nova A — happy-path blocking: a burned or expired signature stops the path at its last step and costs a live PO interaction to retry",
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "c5c143541b155ac749b2db9323fa58c588d39fcd",
+      "closureEvidence": "backlog/items/2026-08-28-no-preflight-checks-whether-the-push-gate-is-satisfiable-before-a-signature-is-requested.md"
     },
     {
       "id": "pipeline.no-rename-path-for-a-feature-id-continuity-already-fixed",
@@ -3664,13 +3680,17 @@
     },
     {
       "id": "pipeline.onboarding-asks-published-in-one-window-only",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-28",
       "source": "Found by NVA-V3-PENDINGASKS while wiring the guided driver to consume nextAction.pendingAsks, measured against a real fresh repository; the two call sites were then read directly (project-onboarding-v3.mjs lines 5447 and 5449) rather than inferred from the measurement.",
       "deferred": false,
-      "tracking": "NOW / Nova A — happy-path blocking at the PO's second touch: the onboarding questions reach the human through exactly one command's response, so a run that passes that point never asks them again."
+      "tracking": "NOW / Nova A — happy-path blocking at the PO's second touch: the onboarding questions reach the human through exactly one command's response, so a run that passes that point never asks them again.",
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "cceafb06a68e8b0e0154da180021c2561c1ec1c4",
+      "closureEvidence": "backlog/items/2026-08-28-the-onboarding-asks-are-published-in-one-window-and-never-again.md"
     },
     {
       "id": "pipeline.onboarding-continuity-assumes-calibration-handover-is-always-a-plain-string",
@@ -5051,12 +5071,16 @@
     },
     {
       "id": "pipeline.scratch-write-refused-during-intake-against-documented-exemption",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-28",
       "source": "Claude/Windows greenfield run, 2026-08-28, sections 7 and 11 of its own analysis (docs/pipeline-haertungstest-und-analyse.md).",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "53693c3dac13a361a0ed6aa7f62421f4c67758c7",
+      "closureEvidence": "backlog/items/2026-08-28-a-scratch-write-is-refused-during-intake-against-the-documented-exemption.md"
     },
     {
       "id": "pipeline.securedirectory-only-acl-hardens-the-leaf-of-a-recursive-mkdir-not-shared-intermediates",
