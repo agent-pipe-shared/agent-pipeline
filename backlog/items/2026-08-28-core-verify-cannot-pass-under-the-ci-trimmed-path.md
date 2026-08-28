@@ -64,6 +64,55 @@ run is direct evidence that it is what actually reddens CI today. **Step 8 has
 therefore never executed on a runner.** These five failures are not a
 regression — they are the first time anything has looked.
 
+## Fixed the same day — four suites repaired, the fifth was a measurement artifact
+
+Implemented in `09f9a971` (+ `d35ec3ff` removing the helper it orphaned), each at
+its own cause rather than by widening the PATH:
+
+- **`ruleset-freshness`** — the SIGTERM fixture spawns `process.execPath` instead
+  of `bash -c "trap '' TERM; sleep 3"`. `node` is in the trimmed PATH by
+  construction. 16/16 under both PATHs, and the run still takes ~235ms against a
+  200ms `timeoutMs`, so the timeout path is genuinely exercised.
+- **`signing-ceremony` / `po-human-approval`** — fixture keypairs come from
+  `node:crypto` in the identical encodings (unencrypted PKCS#8, SPKI, and with a
+  passphrase the same aes-256-cbc `ENCRYPTED PRIVATE KEY` armor
+  `isPrivateKeyPassphraseProtected` reads). `fakeSetupSpawn` additionally
+  intercepts the `pkey -pubout` call it used to let through.
+- **The 37 tests that drive a REAL signature are gated, not rewritten.** The
+  production path shells out to `openssl pkeyutl -sign` on purpose — the
+  operator's private key goes to openssl and is never read into the process —
+  so reimplementing it against node crypto would test something other than what
+  ships. They now report a typed skip naming the missing binary.
+- **`codex-isolation`** — same gating, for a sharper reason. The check already
+  injects a fake spawn and never executes Codex; it failed only because
+  `runControlDecomposition` resolves the binary for real. Threading a
+  test-supplied `pathEnv` through was deliberately declined: `sameBinary` and
+  `binarySha256` are the attestation this control exists to make, and an
+  attestation whose binary the caller chooses attests to less than one that
+  resolves its own.
+
+Measured both ways, no assertion weakened and no test deleted — on a host with
+openssl and Codex: po-human-approval 97/97, signing-ceremony 5/5,
+codex-isolation 5/5, ruleset-freshness 16/16. Under the trimmed PATH the same
+suites give 62+35 skipped, 3+2, 4+1 and 16/16, all exit 0.
+
+### `security-scan` needed no fix — the open question below is answered
+
+The uncertainty recorded under Scope is resolved by measurement, in CI's favour.
+With no scanner reachable (trimmed PATH **and** a HOME holding nothing), the run
+reports `SKIPPED [binary_missing]` for gitleaks, osv-scanner and semgrep,
+`license-check: OK`, and a **CLEAN verdict, exit 0**.
+
+The local failure was an artifact of this host: semgrep IS installed here and is
+found through `resolveSystemExec`'s PATH-independent HOME fallback
+(`security-scan.mjs:821`), then dies inside its own TLS setup on `uname`, which
+the trimmed PATH hides. A GitHub runner never reaches that state.
+
+One narrow observation is left standing rather than fixed, because CI does not
+hit it: a scanner that is installed but cannot run in a reduced environment is
+classified `scanner_error` and blocks, where the file already has an
+`execution_environment` classification for exactly that kind of cause.
+
 ## Scope: which of the five will actually break the first PR
 
 Stated separately from the measurement, because confidence differs:
