@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.an-expired-override-is-armed-instead-of-refused
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-28
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: 621a19c68649787b20886bbcfd998a7516afb75f
+closure_evidence: backlog/items/2026-08-28-an-expired-override-is-armed-instead-of-refused.md
 sprint: nightwing
 source: "Hit live, 2026-08-28, consuming a PO signature for a TP-3 guard override; then located in plugins/pipeline-core/lib/human-guard-override.mjs by reading the arming and consuming paths against each other."
 ---
@@ -116,3 +120,25 @@ Not designed here, but the shape is narrow.
   to the dispatcher, not the signer: consume a signature immediately, and do not
   interleave other work between seeding a ceremony and the PO signing it.
 - **Date:** 2026-08-28
+
+## Closing note (reconciliation, 2026-08-29)
+
+Landed ahead of its `nightwing` scheduling. Commit
+`87a9400745f66bb185b39ce3234de6e99918716f` adds `assertPlanNotExpired()`
+(mirroring `assertRequestNotExpired()`'s HGO-EXPIRED shape) and calls it in both
+arming routes (`authorize-by-signature` and the chat-mode activate path) before
+`capabilityCore` is ever built, confirmed at lines 1929/2935/3155 of
+`plugins/pipeline-core/lib/human-guard-override.mjs`; the pre-existing
+consumption-side distinction between an armed-but-expired capability
+(`status:"replan"`, `code:"HGO-EXPIRED"`) and a first denial (`status:"absent"`)
+is unchanged and now has its own dedicated test. Commit
+`621a19c68649787b20886bbcfd998a7516afb75f` then corrected the three copies of
+the now-stale `CLAUDE.md` Cause-2 paragraph (`CLAUDE.md`,
+`push-gate-satisfiability.mjs`'s header comment, `checkSignatureWindow`'s own
+runtime message) that still described the fixed defect as current. All three
+acceptance criteria confirmed: `node --test
+plugins/pipeline-core/lib/human-guard-override.test.mjs` (94/94) exits 0,
+including `NVA-G-EXPIREDARM: authorize-by-signature refuses to arm...`,
+`NVA-G-EXPIREDARM: authorizeHumanGuardOverride (chat mode) refuses to arm...`,
+and `NVA-G-EXPIREDARM: a consumption denial that rejected an existing (but
+now-expired) armed capability is distinguishable from a first denial`.

@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.dead-key-directory-pointer-is-permanent-and-silent
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-28
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: f3dfd5097752402664f6bb3df292a741c68069bf
+closure_evidence: backlog/items/2026-08-28-a-dead-key-directory-pointer-is-permanent-and-silent.md
 sprint: nova
 tracking: "NOW / Nova A — happy-path blocking at the last touch: on a machine that HAS a valid PO key, a freshly onboarded project still gets no trust anchor, so the signature push the PO is asked to perform is functionless."
 source: "Measured 2026-08-28 on the development machine itself, while reconciling the trust-anchor item: freshCriticalHumanProofPolicyBytes(fs) returned a bare v1 document on a machine whose key directory exists and is complete. Probed step by step (scratch/probe-machine-plane.mjs) rather than inferred."
@@ -100,3 +104,25 @@ find out.
   bare v1 seed then costs at the push.
 - `2026-08-28-nothing-checks-that-a-shipped-capability-is-reachable.md` — the class: the
   mechanism was measured, the deployed path to it was not.
+
+## Closing note (reconciliation, 2026-08-29)
+
+Both halves landed. Commit `357be12932e8cb4f243584f48cd90e93235e8d60` narrows
+`recordPoKeyDirectory`'s first-write-wins predicate to protect a recorded
+directory only while it still resolves, and adds `observeLocalTrustAnchorPointer`,
+a typed-status reader distinguishing "no key yet" from "broken pointer" (the old
+anchor-or-null reader stays a thin wrapper, so every existing caller is
+unaffected). That commit's own message disclosed the reporting half was not yet
+reachable end to end; commit `f3dfd5097752402664f6bb3df292a741c68069bf` (~18
+minutes later) closed exactly that, making `withPendingTrustAnchorGuidanceAsk()`
+read the typed status directly and raise a distinct, informational ask for each
+dead-pointer case. All three acceptance criteria confirmed: `NVA-V6-ANCHORREPORT:
+a broken pointer and a malformed policy each raise their own distinct,
+informational ask...`, `NVA-V1-KEYDIRPTR: a recorded poKeyDirectory that DOES
+exist on disk is never replaced -- the property this change must not break`
+(the pin), and `NVA-V1-KEYDIRPTR: observeLocalTrustAnchorPointer distinguishes a
+broken pointer from a genuine no-key machine...`, which reproduces the dangling
+pointer against a real filesystem temp directory (`mkdtempSync`), not only an
+in-memory fixture. `node --test
+plugins/pipeline-core/lib/project-onboarding-v3.test.mjs` (144/144) and `node
+--test plugins/pipeline-core/scripts/po-human-approval.test.mjs` both exit 0.
