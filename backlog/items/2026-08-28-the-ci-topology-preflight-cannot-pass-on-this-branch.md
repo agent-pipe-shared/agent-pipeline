@@ -104,6 +104,47 @@ release path; that claim was wrong and is corrected here. The regeneration is
 worth keeping only because it removes one confounding layer from whoever fixes
 the other two — it buys no green.
 
+### Update 2026-08-28, later the same day — two of the three layers moved
+
+The sentence above ("Layers 2 and 3 still reject") is no longer true and is
+superseded here rather than edited away. Measured at `03c6e1e4` with the CI's
+own invocation shape
+(`PIPELINE_CANDIDATE_BASE=2eb4466c…`, `PIPELINE_SECURITY_REVIEWER_ID` set):
+`status: ready`, `VTP-READY`, `AIH-CANDIDATE-ADMITTED`, `integrity.missing: []`,
+exit 0.
+
+- **Layer 3 — CLOSED.** The workflow step now declares the `env:` block this
+  item reported missing (`.github/workflows/verify.yml:41` and `:71`), the
+  repository variable is set, and the rule was hardened so the identity counts
+  only from that variable and never from `--reviewer-id`
+  (`03c6e1e4`; contract in
+  `backlog/evidence/2026-08-28-self-excluded-review-path-design.md` section G).
+  The emitted result now records `reviewerIdentity: {id, source}`, so which
+  source cleared the check is visible in the artifact.
+- **Layer 2 — symptom closed, root NOT closed.** `missing` is now `[]` over the
+  same wide window, but not because the window was sized for the gate. A
+  self-excluded check gained a second admission path — its own suite passing at
+  the candidate revision AND a named reviewer distinct from the author, from a
+  trusted source (PO decision "Suite + named reviewer", 2026-08-28). The
+  Proposal's option 2 below — moving `sourceBaseline` forward, or computing the
+  candidate diff against a bounded reference — remains untaken, and the window
+  still drifts. `deliveryBase: {commit, source}` is now recorded, so a narrowed
+  window is at least visible rather than silent.
+- **Layer 1 — UNCHANGED, still open.** The record is regenerated, but the
+  question this item insists must be answered first — is the stored definition
+  record a **tripwire** or a **cache**? — has not been answered, and no producer
+  exists. Nothing about today's work touched it.
+
+**This item stays open.** Its second acceptance criterion ("each of the three
+layers is closed by a decision that is written down") is not met while Layer 1's
+question is unanswered and Layer 2 is closed at the symptom. The first criterion
+is met for the CI invocation shape.
+
+A companion item covers a different gap in the same gate:
+`pipeline.the-ai-hardening-gate-has-no-home-in-any-approved-feature-package`
+(the control has no work package or acceptance criterion in the approved epic
+package). The two do not overlap and neither closes the other.
+
 ## Proposal
 
 Not designed here. The three layers need different answers:
