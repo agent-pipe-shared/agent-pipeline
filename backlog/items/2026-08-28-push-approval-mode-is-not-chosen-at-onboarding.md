@@ -81,3 +81,34 @@ question can be published on — and whichever is chosen must cover
 - An unanswered or malformed value still resolves to `signature`.
 - The active mode is printed at every bootstrap, so a mistaken belief about it is
   immediately falsifiable.
+
+## Closing note (reconciliation, 2026-08-28) — partially resolved
+
+Checked `plugins/pipeline-core/lib/project-onboarding-v3.mjs`. The library-side half of the
+defect this item describes ("present in the data and absent from the flow") landed:
+`withPendingAsksSurfacedOnNextAction()` (~line 5293) explicitly says "Closes backlog
+2026-08-28-push-approval-mode-is-not-chosen-at-onboarding.md" and merges the pending
+`pushApprovalSetupAction` (and the sibling author-identity/verify-contract/trust-anchor/
+project-ignore-gap asks) onto `nextAction.pendingAsks`, wired into the inspect chain at
+lines 5416/5418. A test at `project-onboarding-v3.test.mjs:2324-2325` confirms this merge
+mechanism for the sibling verify-contract ask (`nextAction.pendingAsks` carries it); no test
+found asserting `pushApprovalPreference` specifically appears in `nextAction.pendingAsks`
+(only the older side-channel field is asserted, line 2250).
+
+**Not landed:** `plugins/pipeline-core/scripts/onboarding-init.mjs`, the actual guided
+driver named throughout this item, only branches on `nextAction.kind` (`"command"` /
+`"collect-input"`, lines ~278-314) and never reads `nextAction.pendingAsks`. So when
+`nextAction.kind === "command"` (the common case), any pending push-approval ask attached
+as a sibling field is silently never surfaced to the human by this driver — the guided
+init still does not, in practice, ask the push-approval question. This matches the item's
+own "Consequence beyond this item" paragraph, which flagged this exact gap as a
+prerequisite. Also did not verify "the active mode is printed at every bootstrap" (no
+occurrence of `pushApproval`/`push_approval` found under a quick grep of
+`onboarding-init.mjs`; not exhaustively checked against `session-bootstrap.md`/the
+bootstrap confirmation line for time-budget reasons).
+
+Left `status: open`: the library-level plumbing is done, but the acceptance criterion "init
+asks once" is not met for a driver-run guided init, since the driver never reads
+`pendingAsks`. Whoever picks this up next should wire `onboarding-init.mjs` to surface
+`nextAction.pendingAsks` to the human (or promote push-approval to `nextAction` itself)
+before closing this item.

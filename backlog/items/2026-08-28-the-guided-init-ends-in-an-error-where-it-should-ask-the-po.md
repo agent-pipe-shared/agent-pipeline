@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.guided-init-ends-in-error-not-a-question
 type: defect
 owner: pipeline
-status: open
+status: resolved
 created: 2026-08-28
 sprint: nova
 tracking: "NOW / Nova A — the last gap between the guided init and a usable end-to-end path, and the exact wall a consumer project hit independently the same day"
@@ -94,3 +94,20 @@ thing a guided flow ever sees.
   the route past this step, currently unusable in at least one consumer project.
 - `2026-08-28-a-plan-result-publishes-no-next-action-so-the-guided-chain-stalls.md` — the
   same class, one step earlier; partially delivered.
+
+## Closing note (reconciliation, 2026-08-28)
+
+Verified against `plugins/pipeline-core/lib/project-onboarding-v3.mjs`: the
+`bootstrap-binding-required` branch (transactionState `"generated"`, ~line 2576-2606) now
+calls `observeBootstrapBindAcknowledgement()` and, when the marker is absent, returns
+`nextAction: collectPrdAcknowledgementAction(...)` (defined ~line 2168, tagged
+`NVA-D-ACKASK`) — a `collect-input` action naming the PRD/spec paths and sha256 digests and
+the sanctioned manual step, exactly as this item's Direction requested — instead of
+`bootstrapBindPlanAction()`, which is only offered once the marker is present. Confirmed a
+dedicated regression test exists:
+`plugins/pipeline-core/lib/project-onboarding-v3.test.mjs:6563` — "NVA-D-ACKASK: bootstrap-
+binding-required asks the PO for the acknowledgement instead of naming a command that can
+only fail, then names bootstrap-bind-plan again once it is present and the bind succeeds".
+Did not re-run the full smoke measurement end-to-end myself (out of tool budget for this
+slice); resolved on the strength of the wired code path plus its dedicated test, not a
+commit message.
