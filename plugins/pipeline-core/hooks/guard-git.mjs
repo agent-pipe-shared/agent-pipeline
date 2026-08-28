@@ -1135,14 +1135,31 @@ let inspection;
   const markerMode = markerPolicyMode(projectConfig);
   inspection = commitMessageFindings(cmd, {
     readFile: (path) => {
-      // Message files are read from inside the project only. A `-F ../../elsewhere` is not
-      // followed: this check exists to read what is about to be committed here. A refusal
-      // here is not a pass -- commitMessageFindings reports it as GIT-03-UNREADABLE-MESSAGE-FILE,
-      // a blocking finding, precisely because "outside the project" is where an agent's own
-      // scratch directory usually lives (2026-08-06 Critic round, F3).
-      const projectRoot = resolve(projectDir);
-      const absolute = resolve(projectDir, path);
-      if (!absolute.startsWith(`${projectRoot}${sep}`) && absolute !== projectRoot) {
+      // Message files are resolved against the invoking PROCESS cwd, not CLAUDE_PROJECT_DIR.
+      // In a worktree-isolated subagent, CLAUDE_PROJECT_DIR (== projectDir above) is the MAIN
+      // checkout while the process cwd is the worktree -- a `-F scratch/msg.txt` written inside
+      // the worktree was looked for in the main checkout and refused as
+      // GIT-03-UNREADABLE-MESSAGE-FILE even though the file existed (2026-08-28, backlog/items/
+      // 2026-08-28-a-relative-commit-message-file-is-unreadable-from-a-worktree.md). The
+      // containment boundary is likewise derived from the cwd's OWN repository root (`git
+      // rev-parse --show-toplevel`, which inside a worktree yields the worktree itself, never
+      // the main checkout) rather than projectDir -- deliberately narrower than "anything under
+      // the main root", which would admit a sibling worktree's files. A cwd that is not inside a
+      // git repository at all (e.g. a hermetic test fixture) falls back to the cwd itself. A `-F
+      // ../../elsewhere` is still not followed: this check exists to read what is about to be
+      // committed here. A refusal here is not a pass -- commitMessageFindings reports it as
+      // GIT-03-UNREADABLE-MESSAGE-FILE, a blocking finding, precisely because "outside the
+      // project" is where an agent's own scratch directory usually lives (2026-08-06 Critic
+      // round, F3).
+      const commitCwd = process.cwd();
+      let commitRoot = resolve(commitCwd);
+      const toplevel = spawnSync("git", ["-C", commitCwd, "rev-parse", "--show-toplevel"], { encoding: "utf8", shell: false, timeout: 5000 });
+      if (!toplevel.error && toplevel.status === 0) {
+        const out = String(toplevel.stdout ?? "").trim();
+        if (out) commitRoot = resolve(out);
+      }
+      const absolute = resolve(commitCwd, path);
+      if (!absolute.startsWith(`${commitRoot}${sep}`) && absolute !== commitRoot) {
         throw new Error("outside the project");
       }
       return readFileSync(absolute, "utf8");

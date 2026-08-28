@@ -20,6 +20,22 @@
  *      measured 2026-08-27). That is why Verify needed two runs: it dirtied its own
  *      working tree mid-flight and failed security-scan and candidate-binding on the
  *      result. Verified green via `--preview` before being offered here.
+ *   D. `plugins/pipeline-core/hooks/guard-git.test.mjs` (TP-1) -- GIT03-1/2/5's `-F`
+ *      fixtures broke once guard-git.mjs itself was fixed (2026-08-28,
+ *      backlog/items/2026-08-28-a-relative-commit-message-file-is-unreadable-from-a
+ *      -worktree.md) to resolve a `-F` message file against the invoking process cwd
+ *      instead of CLAUDE_PROJECT_DIR: `runGuard()` sets CLAUDE_PROJECT_DIR to its temp
+ *      fixture dir but never sets the spawned guard's cwd, so the three fixtures were
+ *      passing only because the guard used to ignore cwd -- fixture blindness, not a
+ *      fix regression. Verified green via `--preview` before being offered here.
+ *   E. `harness/scripts/verify.mjs` (TP-3, again) -- four more suites written this
+ *      block (copy-safe-command, project-onboarding-v3-pre-push-hook-offer,
+ *      onboarding-init, push-gate-satisfiability) sit outside the Verify gate for the
+ *      same reason step A's did. Kept as its own previewable step rather than folded
+ *      into step A's VERIFY_REGISTRATIONS list: step A's own `--check` never actually
+ *      runs a suite (only lists pending names), so it cannot stand in for the
+ *      sibling-copy green-preview proof this batch needs before an operator applies it
+ *      sight-unseen. Verified green via `--preview` before being offered here.
  *
  * `guard-testpath` refuses both from inside a session, and for (B) there is no
  * override at all: the target is Pipeline plugin source in a source checkout, so
@@ -36,15 +52,17 @@
  *     suite. If the suite does not reach its expected result, the original bytes
  *     are restored and the step reports failure. You are never left with a
  *     half-applied protected file.
- *   - It is scoped. It touches exactly the two files named above and nothing
+ *   - It is scoped. It touches exactly the files named above and nothing
  *     else, and it does not commit -- reviewing and committing stays yours.
  *
  * USAGE
  *   node harness/scripts/apply-pending-protected-edits.mjs --check   # dry run, writes nothing
- *   node harness/scripts/apply-pending-protected-edits.mjs           # apply both steps
+ *   node harness/scripts/apply-pending-protected-edits.mjs           # apply every pending step
  *   node harness/scripts/apply-pending-protected-edits.mjs --only=verify
  *   node harness/scripts/apply-pending-protected-edits.mjs --only=gate-strength
  *   node harness/scripts/apply-pending-protected-edits.mjs --only=entrypoint
+ *   node harness/scripts/apply-pending-protected-edits.mjs --only=guard-git-cwd
+ *   node harness/scripts/apply-pending-protected-edits.mjs --only=verify-nva-c-protected
  *
  * Exit code 0 = every requested step is applied and verified (or was already
  * applied). Any other exit code means nothing was left changed by the failing
@@ -60,6 +78,7 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const VERIFY_PATH = join(REPO_ROOT, "harness", "scripts", "verify.mjs");
 const GATE_STRENGTH_PATH = join(REPO_ROOT, "plugins", "pipeline-core", "hooks", "guard-gate-strength.test.mjs");
 const ENTRYPOINT_PATH = join(REPO_ROOT, "plugins", "pipeline-core", "lib", "entrypoint.test.mjs");
+const GUARD_GIT_TEST_PATH = join(REPO_ROOT, "plugins", "pipeline-core", "hooks", "guard-git.test.mjs");
 
 /* ------------------------------------------------------------------ helpers */
 
@@ -632,6 +651,178 @@ function stepEntrypoint({ dryRun, preview }) {
   return { status: "applied", detail };
 }
 
+/* ---------------------------------------- D. guard-git.test.mjs (TP-1) fixture cwd */
+
+// WHY. guard-git.mjs's GIT-03 message-file check now resolves a `-F <path>` against
+// the invoking process cwd instead of CLAUDE_PROJECT_DIR (see this file's own edit to
+// plugins/pipeline-core/hooks/guard-git.mjs, 2026-08-28) -- a worktree-isolated
+// subagent has CLAUDE_PROJECT_DIR pointed at the MAIN checkout while its process cwd
+// IS the worktree, so a relative `-F` path written inside the worktree used to be
+// looked for in the main checkout and refused as GIT-03-UNREADABLE-MESSAGE-FILE even
+// though the file existed. `runGuard()` (the suite's own spawn helper) sets
+// CLAUDE_PROJECT_DIR to a temp fixture directory but never sets the spawned guard's
+// cwd, so GIT03-1/GIT03-2/GIT03-5 (all of which pass a RELATIVE `-F` path) went from
+// passing to failing the moment the fix above landed -- they were passing only
+// because the guard used to ignore cwd entirely, which is fixture blindness, not a
+// fix regression. GIT03-7 (an ABSOLUTE `-F` path outside the project root) is
+// unaffected either way and keeps passing. Setting `cwd: projectDir` mirrors the real
+// harness contract, where a hook runs with cwd set to the session's execution
+// directory (the same directory Claude Code/Codex/Antigravity set CLAUDE_PROJECT_DIR
+// to for an in-repo session).
+
+const GG_CWD_ANCHOR = `  const res = spawnSync(process.execPath, [GUARD], {
+    input: JSON.stringify({ tool_input: { command } }),
+    encoding: "utf8",
+    env: { ...baseEnv, CLAUDE_PROJECT_DIR: projectDir, ...envOverride },
+  });`;
+const GG_CWD_REPLACEMENT = `  const res = spawnSync(process.execPath, [GUARD], {
+    input: JSON.stringify({ tool_input: { command } }),
+    encoding: "utf8",
+    cwd: projectDir,
+    env: { ...baseEnv, CLAUDE_PROJECT_DIR: projectDir, ...envOverride },
+  });`;
+
+const GUARD_GIT_EXPECTED = /230\/230 cases passed\./u;
+
+// A sibling of the real suite so `GUARD = fileURLToPath(new URL("./guard-git.mjs", ...))`
+// resolves identically to the real, already-fixed guard. Never a protected path: TP-1
+// matches `guard-git\.test\.mjs$` and this name does not.
+const GUARD_GIT_PREVIEW_PATH = join(dirname(GUARD_GIT_TEST_PATH), "guard-git.preview-check.mjs");
+
+function stepGuardGitCwd({ dryRun, preview }) {
+  const original = readFileSync(GUARD_GIT_TEST_PATH, "utf8");
+  if (original.includes("cwd: projectDir,")) {
+    return { status: "already-applied", detail: "runGuard() already sets the spawned guard's cwd to projectDir" };
+  }
+
+  const next = anchoredReplace(original, GG_CWD_ANCHOR, GG_CWD_REPLACEMENT, "runGuard() spawnSync options");
+
+  if (preview) {
+    try {
+      writeFileSync(GUARD_GIT_PREVIEW_PATH, next, "utf8");
+      const suite = run([GUARD_GIT_PREVIEW_PATH]);
+      const summary = suite.output.split("\n").filter((line) => /^(FAIL|\d+\/\d+ cases passed\.)/u.test(line)).join("\n");
+      if (suite.code !== 0 || !GUARD_GIT_EXPECTED.test(suite.output)) {
+        throw new Error(`preview run did not reach "230/230 cases passed." (exit ${suite.code}):\n${summary || suite.output.slice(-2000)}`);
+      }
+      return { status: "preview-green", detail: `${summary} -- run from a removed sibling; ${rel(GUARD_GIT_TEST_PATH)} was not touched` };
+    } finally {
+      rmSync(GUARD_GIT_PREVIEW_PATH, { force: true });
+    }
+  }
+
+  if (dryRun) {
+    return { status: "would-apply", detail: "1 anchored edit: runGuard() spawnSync cwd" };
+  }
+
+  const detail = writeThenVerifyOrRevert(GUARD_GIT_TEST_PATH, original, next, () => {
+    const suite = run([GUARD_GIT_TEST_PATH]);
+    if (suite.code !== 0 || !GUARD_GIT_EXPECTED.test(suite.output)) {
+      const summary = suite.output.split("\n").filter((line) => /^(FAIL|\d+\/\d+ cases passed\.)/u.test(line)).join("\n");
+      return { ok: false, detail: `expected "230/230 cases passed.", got exit ${suite.code}:\n${summary || suite.output.slice(-2000)}` };
+    }
+    return { ok: true, detail: "guard-git: 230/230 cases passed." };
+  });
+
+  return { status: "applied", detail };
+}
+
+/* --------------------------------------- E. verify.mjs (TP-3, NVA-C-PROTECTED batch) */
+
+// Four suites written this block, currently unregistered. Kept as its own step (not
+// folded into VERIFY_REGISTRATIONS in step A above) because step A's own `--check`
+// never runs a suite -- it only lists pending names -- so it cannot stand in for the
+// sibling-copy green-preview proof this batch needs before an operator applies it
+// sight-unseen, the same reason steps B/C/D above are previewable and step A is not.
+const VERIFY_REGISTRATIONS_NVA_C_PROTECTED = [
+  {
+    name: "copy-safe-command-tests",
+    line: '  { name: "copy-safe-command-tests", file: join(libDir, "copy-safe-command.test.mjs") },',
+    file: join(REPO_ROOT, "plugins", "pipeline-core", "lib", "copy-safe-command.test.mjs"),
+  },
+  {
+    name: "project-onboarding-v3-pre-push-hook-offer-tests",
+    line: '  { name: "project-onboarding-v3-pre-push-hook-offer-tests", file: join(pluginScriptsDir, "project-onboarding-v3-pre-push-hook-offer.test.mjs") },',
+    file: join(REPO_ROOT, "plugins", "pipeline-core", "scripts", "project-onboarding-v3-pre-push-hook-offer.test.mjs"),
+  },
+  {
+    name: "onboarding-init-tests",
+    line: '  { name: "onboarding-init-tests", file: join(pluginScriptsDir, "onboarding-init.test.mjs") },',
+    file: join(REPO_ROOT, "plugins", "pipeline-core", "scripts", "onboarding-init.test.mjs"),
+  },
+  {
+    name: "push-gate-satisfiability-tests",
+    line: '  { name: "push-gate-satisfiability-tests", file: join(pluginScriptsDir, "push-gate-satisfiability.test.mjs") },',
+    file: join(REPO_ROOT, "plugins", "pipeline-core", "scripts", "push-gate-satisfiability.test.mjs"),
+  },
+];
+
+// A sibling of the real verify.mjs, same reasoning as GATE_STRENGTH_PREVIEW_PATH /
+// ENTRYPOINT_PREVIEW_PATH / GUARD_GIT_PREVIEW_PATH above. Never a protected path: TP-3
+// matches `harness/scripts/verify\.mjs$` and this name does not.
+const VERIFY_NVA_C_PREVIEW_PATH = join(dirname(VERIFY_PATH), "verify.preview-check.mjs");
+
+function stepVerifyNvaCProtected({ dryRun, preview }) {
+  const original = readFileSync(VERIFY_PATH, "utf8");
+
+  const pending = VERIFY_REGISTRATIONS_NVA_C_PROTECTED.filter((entry) => !original.includes(`name: "${entry.name}"`));
+  if (pending.length === 0) return { status: "already-applied", detail: `all ${VERIFY_REGISTRATIONS_NVA_C_PROTECTED.length} suites are already registered` };
+
+  const missing = pending.filter((entry) => !existsSync(entry.file));
+  if (missing.length > 0) {
+    throw new Error(`these suite files do not exist, refusing to register them:\n${missing.map((entry) => `  - ${rel(entry.file)}`).join("\n")}`);
+  }
+
+  const at = verifyInsertionPoint(original);
+  const next = `${original.slice(0, at)}\n${pending.map((entry) => entry.line).join("\n")}${original.slice(at)}`;
+
+  if (preview) {
+    try {
+      writeFileSync(VERIFY_NVA_C_PREVIEW_PATH, next, "utf8");
+      // Syntax-only, same reasoning as step A's own `--check` call: it never runs the
+      // gate, which would need approvals this script has no business touching.
+      const parsed = run(["--check", VERIFY_NVA_C_PREVIEW_PATH]);
+      if (parsed.code !== 0) {
+        throw new Error(`verify.mjs (preview copy) no longer parses:\n${parsed.output}`);
+      }
+      const failures = [];
+      for (const entry of pending) {
+        const suite = run([entry.file]);
+        if (suite.code !== 0) failures.push(`  - ${entry.name} (${rel(entry.file)}) exited ${suite.code}`);
+      }
+      if (failures.length > 0) {
+        throw new Error(`newly registered suites did not pass:\n${failures.join("\n")}`);
+      }
+      return {
+        status: "preview-green",
+        detail: `${pending.length} suite(s) would register and each run green:\n${pending.map((entry) => `  + ${entry.name}`).join("\n")} -- run from a removed sibling; ${rel(VERIFY_PATH)} was not touched`,
+      };
+    } finally {
+      rmSync(VERIFY_NVA_C_PREVIEW_PATH, { force: true });
+    }
+  }
+
+  if (dryRun) {
+    return { status: "would-apply", detail: `${pending.length} registration(s):\n${pending.map((entry) => `  + ${entry.name}`).join("\n")}` };
+  }
+
+  const detail = writeThenVerifyOrRevert(VERIFY_PATH, original, next, () => {
+    const parsed = run(["--check", VERIFY_PATH]);
+    if (parsed.code !== 0) return { ok: false, detail: `verify.mjs no longer parses:\n${parsed.output}` };
+
+    const failures = [];
+    for (const entry of pending) {
+      const suite = run([entry.file]);
+      if (suite.code !== 0) failures.push(`  - ${entry.name} (${rel(entry.file)}) exited ${suite.code}`);
+    }
+    if (failures.length > 0) return { ok: false, detail: `newly registered suites did not pass:\n${failures.join("\n")}` };
+
+    return { ok: true, detail: `${pending.length} suite(s) registered and each run green:\n${pending.map((entry) => `  + ${entry.name}`).join("\n")}` };
+  });
+
+  return { status: "applied", detail };
+}
+
 /* ---------------------------------------------------------------- driver */
 
 const argv = process.argv.slice(2);
@@ -644,9 +835,11 @@ const STEPS = [
   { key: "verify", label: `A. register pending suites in ${rel(VERIFY_PATH)} (TP-3)`, fn: stepVerify },
   { key: "gate-strength", label: `B. apply GST33-GST36 + GST14 rename to ${rel(GATE_STRENGTH_PATH)} (TP-6)`, fn: stepGateStrength },
   { key: "entrypoint", label: `C. stop EP07 recording real guard denials against this repo in ${rel(ENTRYPOINT_PATH)} (TP-8)`, fn: stepEntrypoint },
+  { key: "guard-git-cwd", label: `D. set runGuard()'s spawned guard cwd to its own fixture dir in ${rel(GUARD_GIT_TEST_PATH)} (TP-1)`, fn: stepGuardGitCwd },
+  { key: "verify-nva-c-protected", label: `E. register 4 more pending suites (NVA-C-PROTECTED) in ${rel(VERIFY_PATH)} (TP-3)`, fn: stepVerifyNvaCProtected },
 ];
 
-const PREVIEWABLE = new Set(["gate-strength", "entrypoint"]);
+const PREVIEWABLE = new Set(["gate-strength", "entrypoint", "guard-git-cwd", "verify-nva-c-protected"]);
 
 if (only !== null && !STEPS.some((step) => step.key === only)) {
   process.stderr.write(`unknown --only value: ${only}\nExpected one of: ${STEPS.map((step) => step.key).join(", ")}\n`);
