@@ -2553,6 +2553,97 @@ test("NVA-V1-KEYDIRPTR: observeLocalTrustAnchorPointer distinguishes a broken po
   }
 });
 
+// NVA-V6-ANCHORREPORT (backlog: 2026-08-28-a-dead-key-directory-pointer-is-
+// permanent-and-silent.md, Direction #1): the two dead-pointer statuses
+// `observeLocalTrustAnchorPointer()` already distinguishes ("broken-pointer",
+// "malformed-policy") must each raise their OWN ask through the real
+// apply-portable-seed CLI flow -- not just be typed correctly in isolation
+// (the test above), but actually reach `trustAnchorGuidanceAction` instead of
+// being swallowed by the `anchor === null` branch a genuine no-key machine
+// also takes. The genuine-absence statuses ("no-plane" is exercised directly
+// against `observeLocalTrustAnchorPointer()` above; "no-directory" is pinned
+// here at the ask level, the level this bug actually lived at) must keep
+// producing no ask at all, byte for byte.
+test("NVA-V6-ANCHORREPORT: a broken pointer and a malformed policy each raise their own distinct, informational ask; a genuine no-key machine still raises none", () => {
+  const brokenRoot = root();
+  const malformedRoot = root();
+  const noDirRoot = root();
+  const brokenKeyDir = mkdtempSync(join(tmpdir(), "nva-v6-anchorreport-broken-"));
+  rmSync(brokenKeyDir, { recursive: true, force: true }); // recorded, but vanished -- broken-pointer
+  const malformedKeyDir = mkdtempSync(join(tmpdir(), "nva-v6-anchorreport-malformed-"));
+  writeFileSync(join(malformedKeyDir, "trust-policy.json"), `${JSON.stringify({ notAKeyReference: true }, null, 2)}\n`);
+  const invoke = (args, deps) => {
+    let output = "";
+    const code = onboardingCli(args, { deps, write: (chunk) => { output += chunk; } });
+    return { code, result: JSON.parse(output) };
+  };
+  const depsWithKeyDir = (poKeyDirectory) => ({
+    ...fakeDeps,
+    readMachinePlane() {
+      return {
+        status: "valid",
+        plane: {
+          schema: "pipeline.machine-plane.v1", poKeyDirectory, pushApprovalDefault: "signature",
+          routing: null, language: null, session: null, usage: null, updatedAt: "2026-08-08T00:00:00.000Z",
+        },
+      };
+    },
+  });
+  const applyFresh = (rootDir, deps) => {
+    const planned = invoke(["plan", "--root", rootDir, "--runner", "codex"], deps);
+    const digest = planned.result.nextAction.argv[planned.result.nextAction.argv.indexOf("--plan-sha256") + 1];
+    return invoke(["apply-portable-seed", "--root", rootDir, "--plan-sha256", digest, "--activate", "--runner", "codex"], deps);
+  };
+  try {
+    // (a) broken-pointer: the directory is recorded but does not resolve.
+    const broken = applyFresh(brokenRoot, depsWithKeyDir(brokenKeyDir));
+    assert.equal(broken.code, 0);
+    const brokenAction = broken.result.trustAnchorGuidanceAction;
+    assert.equal(brokenAction.kind, "collect-input");
+    assert.equal(brokenAction.mutation, false);
+    assert.equal(Object.prototype.hasOwnProperty.call(brokenAction, "executable"), false,
+      "informational only -- nothing agent-runnable to repair the pointer");
+    assert.equal(Object.prototype.hasOwnProperty.call(brokenAction, "argv"), false,
+      "informational only -- nothing agent-runnable to repair the pointer");
+    assert.equal(brokenAction.guidance.includes(brokenKeyDir), true, "must name the recorded directory");
+    assert.match(brokenAction.guidance, /no readable trust-policy\.json resolves there/u);
+    assert.match(brokenAction.guidance, /PO repairs it themselves|repair it themselves/u);
+
+    // (b) malformed-policy: the directory resolves and the file parses, but
+    // its shape is invalid -- a DIFFERENT repair from (a), and the message
+    // must say so distinctly rather than merging the two.
+    const malformed = applyFresh(malformedRoot, depsWithKeyDir(malformedKeyDir));
+    assert.equal(malformed.code, 0);
+    const malformedAction = malformed.result.trustAnchorGuidanceAction;
+    assert.equal(malformedAction.kind, "collect-input");
+    assert.equal(malformedAction.mutation, false);
+    assert.equal(Object.prototype.hasOwnProperty.call(malformedAction, "executable"), false,
+      "informational only -- nothing agent-runnable to repair the policy");
+    assert.equal(Object.prototype.hasOwnProperty.call(malformedAction, "argv"), false,
+      "informational only -- nothing agent-runnable to repair the policy");
+    assert.equal(malformedAction.guidance.includes(malformedKeyDir), true, "must name the recorded directory");
+    assert.match(malformedAction.guidance, /do not parse into a valid trust anchor|malformed/u);
+
+    // The two asks must not read as the same message, and must not share
+    // their `collect-input` field name either.
+    assert.notEqual(brokenAction.guidance, malformedAction.guidance,
+      "a missing file and a broken file are different repairs and must not be merged into one message");
+    assert.notEqual(brokenAction.input.name, malformedAction.input.name);
+
+    // (c) no-directory: the genuine no-key case (pinned at the ASK level,
+    // where the original bug actually lived -- observeLocalTrustAnchorPointer
+    // was already typed correctly, this is the caller that used to collapse
+    // it back into silence). Must raise no ask at all, exactly as before.
+    const noDir = applyFresh(noDirRoot, depsWithKeyDir(null));
+    assert.equal(noDir.code, 0);
+    assert.equal(Object.prototype.hasOwnProperty.call(noDir.result, "trustAnchorGuidanceAction"), false,
+      "a genuine no-key machine must still raise no ask at all");
+  } finally {
+    dispose(brokenRoot); dispose(malformedRoot); dispose(noDirRoot);
+    rmSync(malformedKeyDir, { recursive: true, force: true });
+  }
+});
+
 test("shared command renderer derives one copy-safe line from exact argv in a spaced root", () => {
   const path = root();
   try {

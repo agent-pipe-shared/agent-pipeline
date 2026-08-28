@@ -5415,20 +5415,100 @@ function proposeTrustAnchorMaterializationAction(anchor) {
   };
 }
 
+// NVA-V6-ANCHORREPORT (backlog: 2026-08-28-a-dead-key-directory-pointer-is-
+// permanent-and-silent.md, Direction #1): a recorded `poKeyDirectory` that no
+// longer resolves to a readable, well-formed `trust-policy.json` used to
+// collapse into the SAME null `detectExistingLocalTrustAnchor()` returns for
+// a genuine no-key machine -- so `withPendingTrustAnchorGuidanceAsk()` below
+// stayed silent about it exactly as it does for the machine that never had a
+// key at all. A dead pointer is a repairable fault, not an absence, and the
+// PO cannot repair what they are never told about. Sibling of
+// `proposeTrustAnchorMaterializationAction()` above -- same shape
+// (informational `collect-input`, `mutation: false`, no `executable`/`argv`,
+// nothing this library or an agent could run to repair the pointer itself:
+// the PO repairs it themselves, or the existing signed HGO Edit ceremony
+// does), distinct guidance text and distinct `input.name` so the two never
+// read as the same message.
+function proposeTrustAnchorPointerRepairAction(directory) {
+  return {
+    kind: "collect-input",
+    input: {
+      name: "trustAnchorPointerRepairAcknowledged",
+      encoding: "utf8",
+      trim: true,
+      minBytes: 1,
+      maxBytes: TRUST_ANCHOR_ACK_MAX_BYTES,
+      singleLine: true,
+      rejectNul: true,
+    },
+    mutation: false,
+    requiresConfirmation: false,
+    guidance: `this machine has a signing-key directory recorded (${directory}), but no readable trust-policy.json resolves there -- the directory may no longer exist, or the file inside it may be missing. This is a dead pointer, not the absence of a key: tell the PO exactly this (name the recorded directory) and let them repair it themselves -- recreate the key directory or its trust-policy.json, or re-run \`po-human-approval.mjs setup\` pointing at the correct location; this library never writes to the key directory or to the machine plane's poKeyDirectory on anyone's behalf. Reply with a short acknowledgment ("done" or "skip") once the PO has seen this, whether or not they acted on it now.`,
+    expected: { schema: SCHEMA, statuses: PORTABLE_APPLY_IDENTITY_ASK_STATUSES },
+  };
+}
+
+// Sibling of `proposeTrustAnchorPointerRepairAction()` immediately above --
+// same "dead pointer, PO repairs it" framing, but for the OTHER of the two
+// fault statuses `observeLocalTrustAnchorPointer()` distinguishes: here the
+// directory resolves and `trust-policy.json` parses, but its shape
+// (`keyReference`/`publicKeySha256`) is invalid. Kept as a distinct message
+// (distinct `input.name`, distinct guidance) rather than folded into the
+// broken-pointer text above -- "the file is not there" and "the file is
+// there but broken" are different repairs, and merging them would leave the
+// PO diagnosing which one applies from a message that no longer says.
+function proposeTrustAnchorPolicyRepairAction(directory) {
+  return {
+    kind: "collect-input",
+    input: {
+      name: "trustAnchorPolicyRepairAcknowledged",
+      encoding: "utf8",
+      trim: true,
+      minBytes: 1,
+      maxBytes: TRUST_ANCHOR_ACK_MAX_BYTES,
+      singleLine: true,
+      rejectNul: true,
+    },
+    mutation: false,
+    requiresConfirmation: false,
+    guidance: `this machine has a signing-key directory recorded (${directory}), and a trust-policy.json file resolves there, but its contents do not parse into a valid trust anchor (a missing or malformed keyReference/publicKeySha256) -- the file exists but is broken, which is a different repair from the file not being there at all. Tell the PO exactly this (name the recorded directory) and let them repair it themselves -- inspect and fix the file, or re-run \`po-human-approval.mjs setup\` to regenerate it; this library never writes to the key directory or to the machine plane's poKeyDirectory on anyone's behalf. Reply with a short acknowledgment ("done" or "skip") once the PO has seen this, whether or not they acted on it now.`,
+    expected: { schema: SCHEMA, statuses: PORTABLE_APPLY_IDENTITY_ASK_STATUSES },
+  };
+}
+
 // Sibling of `withPendingPushApprovalSetupAsk()` immediately above -- unlike
 // that ask (which now fires unconditionally, every repository), this one
 // keeps its own gate and fires ONLY once the machine HAS already answered
 // (`unresolvedMachinePushApprovalSetup()` false), proposing
 // a repository-scoped materialization snippet instead of the machine-scoped
 // question.
+//
+// NVA-V6-ANCHORREPORT: reads `observeLocalTrustAnchorPointer()` directly
+// (not the thin `detectExistingLocalTrustAnchor()` wrapper other callers
+// still use unchanged -- see that function's own comment) so the two dead-
+// pointer statuses ("broken-pointer", "malformed-policy") can each raise
+// their own distinct ask instead of silently matching the `anchor === null`
+// branch a genuine no-key machine ("no-plane", "no-directory") also takes.
+// Those two genuine-absence statuses fall through to that same branch
+// UNCHANGED -- `pointer.anchor` is `null` for them exactly as it always was,
+// so this closes only the two repairable-fault statuses, byte-for-byte
+// preserving every other status's existing behaviour (including "found",
+// still routed through `proposeTrustAnchorMaterializationAction()` exactly
+// as before).
 function withPendingTrustAnchorGuidanceAsk(observed, fs) {
   if (observed.repository?.mode !== "local") return observed;
   if (!PORTABLE_APPLY_IDENTITY_ASK_STATUSES.includes(observed.status)) return observed;
   if (unresolvedMachinePushApprovalSetup(fs)) return observed;
-  const anchor = detectExistingLocalTrustAnchor(fs);
-  if (anchor === null) return observed;
-  if (repositoryAlreadyHasTrustAnchor(observed.root, fs, anchor.publicKeySha256)) return observed;
-  return { ...observed, trustAnchorGuidanceAction: proposeTrustAnchorMaterializationAction(anchor) };
+  const pointer = observeLocalTrustAnchorPointer(fs);
+  if (pointer.status === "broken-pointer") {
+    return { ...observed, trustAnchorGuidanceAction: proposeTrustAnchorPointerRepairAction(pointer.directory) };
+  }
+  if (pointer.status === "malformed-policy") {
+    return { ...observed, trustAnchorGuidanceAction: proposeTrustAnchorPolicyRepairAction(pointer.directory) };
+  }
+  if (pointer.anchor === null) return observed;
+  if (repositoryAlreadyHasTrustAnchor(observed.root, fs, pointer.anchor.publicKeySha256)) return observed;
+  return { ...observed, trustAnchorGuidanceAction: proposeTrustAnchorMaterializationAction(pointer.anchor) };
 }
 
 // Sibling of `withPendingAuthorIdentityAsk()` above -- same gating shape,
