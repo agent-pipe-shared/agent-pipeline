@@ -92,6 +92,44 @@ nothing indicating which is first, which is reachable now, or which belong to th
 ceremony. The onboarding CLI has roughly half that and was given a driver because walking
 it by hand was too expensive. This one has had no equivalent.
 
+## Progress and the next wall (2026-08-28, HEAD 292dd3ec)
+
+`inspect` now publishes a real `status` (`draft`) and a real `collect-input` instead of
+prose with placeholders, and the two human gates are published as stops carrying no
+`input` a driver could use to satisfy them. The first stop is honest about why it must
+ask: neither the submitter's name nor the delivery profile is recorded anywhere the
+command can read.
+
+Re-measured with the harness now ANSWERING the answerable questions from their own
+guidance rather than stopping at the first one — and the answer is refused:
+
+```
+step 1: inspect -> status=draft, nextAction=collect-input
+    HUMAN: submit-plan --by "Blind Walk" --profile mini -> exit 2
+           Error: submit-plan blocked by PO-PROFILE-RECEIPT-INVALID.
+```
+
+Fifteen rounds, same state, no progress. **This is the same defect one layer in:** the ask
+names a command, the command is run exactly as named, and it is blocked by a precondition
+the ask never mentions. A published next step that is not runnable as given is what this
+whole item is about; publishing it in the right SHAPE did not make it runnable.
+
+The precondition itself is diagnosable — `po-gate-authority.mjs` pairs the code with a
+repair, "Run `node setup.mjs --publish-po-profile` from the canonical primary checkout,
+then retry." Two readings, both worth checking before fixing, and this item does not
+choose between them:
+
+1. **Onboarding gap.** The project reached `ready` and its very next action fails.
+   Onboarding does collect a profile answer (`--profile mini`, at intake consent), so the
+   answer exists while the receipt does not — the two mechanisms are not connected.
+2. **The check is wrong for a consumer.** The receipt binds a "canonical primary checkout"
+   and a repository fingerprint, which is a multi-checkout topology concept. A standalone
+   consumer project may legitimately have no such thing, in which case the gate is
+   importing a Pipeline-internal precondition into a consumer path.
+
+Either way, a state reported as `ready` whose next published action cannot run is not
+ready, and the ask must name every precondition it depends on.
+
 ## Scope: the happy path, not all 59 commands
 
 Making every one of the 59 speak the protocol is not this item. The bounded piece is the
