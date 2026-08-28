@@ -8,7 +8,10 @@ created: 2026-08-28
 sprint: nova
 tracking: "NOW / Nova A — delivered 2026-08-28, same session it was reported"
 source: "Consumer project HA, incident report S56 finding B6 (2026-08-28). The reported diagnosis named the validator; re-reading the code here located the real asymmetry at the call site."
-closure_evidence: "plugins/pipeline-core/lib/onboarding-continuity.test.mjs, 233/233, including a new check driving both discard shapes through the cleanup reader"
+closed_at: "2026-08-28"
+closure_repository: "self"
+closure_commit: "d13bbc2d2d8151e3c3f90c8abcd6e7f11645aaa1"
+closure_evidence: "plugins/pipeline-core/lib/onboarding-continuity.test.mjs"
 ---
 
 # A discarded feature made a repository permanently unobservable
