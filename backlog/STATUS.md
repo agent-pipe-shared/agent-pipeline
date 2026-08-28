@@ -622,7 +622,7 @@
 
 ## Counts
 
-- open: 111
+- open: 112
 - in_progress: 0
 - closed: 488
 - rejected: 3
