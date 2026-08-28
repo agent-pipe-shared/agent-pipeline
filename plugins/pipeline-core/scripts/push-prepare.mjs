@@ -33,6 +33,7 @@ import { dirname, join, resolve, sep } from "node:path";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
+import { gateConfig, loadManifestSafe } from "../lib/manifest.mjs";
 import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
 import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
 import { authorizeCriticalPushCommand, parseHumanArgs } from "./po-human-approval.mjs";
@@ -100,6 +101,13 @@ function readJson(path, deps) {
  * additionally runs for `evidence/security-latest.json` when a security gate
  * is configured, so a green result here is necessary, not sufficient, for
  * that file -- the same freshness floor both evidence files share.
+ *
+ * NVA-J-PUSHPREPGATE: `pushPrepareReport()` below calls this for
+ * `evidence/security-latest.json` ONLY when `isSecurityGateActive()` says the
+ * gate is actually configured and not `"off"` -- mirroring guard-push.mjs's
+ * own `securityGate && securityGate.mode !== "off"` condition, so
+ * `gates.security: "off"` genuinely removes the requirement here too, rather
+ * than being demanded unconditionally regardless of the setting.
  */
 /**
  * Resolves the remedy for a stale/missing evidence file to the PROJECT'S OWN
@@ -139,6 +147,24 @@ export function checkEvidenceFreshness(id, relPath, dir, headCommit, deps = {}) 
     return { id, ok: false, message: `${relPath}: commit=${JSON.stringify(data.commit)} is stale (HEAD is ${JSON.stringify(headCommit)}).`, remedy };
   }
   return { id, ok: true, message: `${relPath} is fresh and green at HEAD.` };
+}
+
+/**
+ * NVA-J-PUSHPREPGATE: reads the effective `gates.security` mode via the shared
+ * `gateConfig()` reader (`../lib/manifest.mjs`) -- never a second, hand-rolled
+ * manifest reader -- and applies the exact same activation rule
+ * `guard-push.mjs` already enforces at push time (`securityGate &&
+ * securityGate.mode !== "off"`, see that file's `(b) security evidence`
+ * comment). No `security` gate configured at all, or configured with mode
+ * `"off"`, both mean the gate is inactive; anything else (e.g. `"blocking"`)
+ * means it is active.
+ */
+export function isSecurityGateActive(dir, deps = {}) {
+  const loadManifest = deps.loadManifestSafe ?? loadManifestSafe;
+  const readGateConfig = deps.gateConfig ?? gateConfig;
+  const manifest = loadManifest(dir);
+  const securityGate = readGateConfig(manifest, "security");
+  return Boolean(securityGate) && securityGate.mode !== "off";
 }
 
 export function checkPushThreatModel(dir, deps = {}) {
@@ -304,13 +330,18 @@ export function pushPrepareReport(argv, deps = {}) {
   const headCommit = resolveHeadCommit(dir, deps);
   const checks = [];
   checks.push(checkWorkingTreeClean(dir, deps));
+  const securityGateActive = isSecurityGateActive(dir, deps);
   if (headCommit) {
     checks.push(checkEvidenceFreshness("verify-evidence", VERIFY_EVIDENCE_DEFAULT_PATH, dir, headCommit, deps));
-    checks.push(checkEvidenceFreshness("security-evidence", "evidence/security-latest.json", dir, headCommit, deps));
+    if (securityGateActive) {
+      checks.push(checkEvidenceFreshness("security-evidence", "evidence/security-latest.json", dir, headCommit, deps));
+    }
   } else {
     const message = "HEAD commit could not be determined (git rev-parse HEAD failed).";
     checks.push({ id: "verify-evidence", ok: false, message, remedy: "git rev-parse HEAD" });
-    checks.push({ id: "security-evidence", ok: false, message, remedy: "git rev-parse HEAD" });
+    if (securityGateActive) {
+      checks.push({ id: "security-evidence", ok: false, message, remedy: "git rev-parse HEAD" });
+    }
   }
   checks.push(checkPushThreatModel(dir, deps));
   checks.push(checkCriticalHumanProofPolicy(dir, deps));
