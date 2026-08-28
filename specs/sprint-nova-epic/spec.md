@@ -520,7 +520,7 @@ task concurrency is computed only from values expressed in
 The required non-empty baseline matrix covers synthetic, Claude-native where
 available, Codex-native where available, and explicit unsupported cells.
 Runner self-report is evidence input, never certification. The existing
-`pipeline.product-capability-inventory.v3` remains product authority; the Nova
+`pipeline.product-capability-inventory.v2` remains product authority; the Nova
 report projects only validated cells into it at integration.
 
 `pipeline.selected-sandbox-disposition.v1` binds:
