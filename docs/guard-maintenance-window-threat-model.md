@@ -144,7 +144,28 @@ below assumes it holds and is written to catch a change that would break it.
   and `scripts/push-prepare.mjs` (both already kernel) directly, and its own
   code constructs the `signatureCommand` object handed to the PO as the exact
   text of the human-attended push-authorization signature command — the same
-  class of artifact `scripts/po-human-approval.mjs` produces.
+  class of artifact `scripts/po-human-approval.mjs` produces. An eighth gap
+  (NVA-V26-SIGNINGIMPORTERS, 2026-08-29), the same importer-not-import-target
+  shape as the seventh: `scripts/signing-ceremony.mjs` and
+  `scripts/po-approval-gate.mjs` both statically import and directly invoke
+  `scripts/po-human-approval.mjs`'s `runHumanApproval` (already kernel above)
+  — signing-ceremony.mjs's own header states its passphrase prompt "behave[s]
+  identically to running po-human-approval.mjs sign-intent directly". A
+  corrupted copy of either could substitute or alter what the human is asked
+  to confirm/sign, or misreport the outcome, without any other kernel file
+  needing to change. Closing this pulled in one further edge —
+  `scripts/guard-maintenance-window.mjs`, the CLI wrapper
+  signing-ceremony.mjs imports to orchestrate the maintenance-window ceremony
+  end to end, whose own first-party imports were already all kernel. A class
+  sweep for the same shape elsewhere in the plugin found one more:
+  `scripts/guard-human-override.mjs`, the CLI wrapper around
+  `lib/human-guard-override.mjs` (already kernel above) that statically
+  imports and directly invokes that library's authorize/authorize-by-signature/
+  plan functions to arm a Human Guard Override capability — the same
+  relationship applied to the HGO ceremony instead of the GMW/push ceremony.
+  Added: `scripts/guard-human-override.mjs`,
+  `scripts/guard-maintenance-window.mjs`, `scripts/po-approval-gate.mjs`, and
+  `scripts/signing-ceremony.mjs`.
 - The window record's cryptographic integrity and its TTL.
 - The audit visibility of an open or recently-closed window (the bootstrap
   warning).
