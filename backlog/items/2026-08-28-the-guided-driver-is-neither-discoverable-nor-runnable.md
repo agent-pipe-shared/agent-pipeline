@@ -99,3 +99,26 @@ tells it that is the slower path.
   the same "one published route, not a menu" property, on the other path.
 - `2026-08-28-the-readiness-guard-blocks-the-recovery-command-it-names.md` — the precedent
   for the divergence this item's third acceptance criterion closes mechanically.
+
+## Closing note (reconciliation, 2026-08-28)
+
+Partially resolved. Checked in this checkout (HEAD b4fc36a3):
+
+- **Landed:** `plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs` now defines
+  `DRIVER_SCRIPT` (line ~184, `scripts/onboarding-init.mjs`) alongside
+  `ONBOARDING_SCRIPT` and admits it with a bounded argv shape (NVA-driver-admit
+  comment at line ~2757, dispatch handling at line ~3150). A refused-control test
+  exists in `guard-lifecycle-ready.test.mjs` (line ~1927, comment references
+  "Measured before this dispatch: `onboarding-init.mjs` was refused").
+  `plugins/pipeline-core/scripts/pipeline-start-preflight.mjs` (line ~994-1015,
+  tagged `NVA-K-DRIVERREACH`) now points a not-ready project's `nextAction` at
+  `onboarding-init.mjs --root <root> --runner <runner>` instead of the raw
+  `inspect` call.
+- **Not landed:** `plugins/pipeline-core/skills/pipeline-start/SKILL.md` Step 0
+  (line 111-116) still hardcodes the literal `project-onboarding-v3.mjs inspect
+  --root "$PWD" --intent bootstrap` action text and does not mention
+  `onboarding-init.mjs`/the driver anywhere (`grep -rl onboarding-init
+  plugins/pipeline-core/skills` returns no match). Acceptance criterion "the
+  `pipeline-start` skill describes the driver as the route" is unmet — a session
+  following the skill's own written instructions still reads the old inspect
+  wording rather than being told a driver exists.
