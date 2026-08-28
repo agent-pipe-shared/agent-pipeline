@@ -57,6 +57,10 @@ import { GATE_STRENGTH_PATHS } from "./guard-gate-strength.mjs";
 // through the guard's own re-export, so this test cannot pass merely because both
 // names happen to reference the identical function object.
 import { MACHINE_PLANE_SCHEMA, machinePlaneFilePath as libMachinePlaneFilePath, writeMachinePlane } from "../lib/machine-plane.mjs";
+// NVA-GF-COPYSAFE: imported straight from the shared renderer module the guard now defers
+// to (never through the guard's own re-export), so the byte-identity test below cannot pass
+// merely because both names happen to reference the identical function object.
+import { boundedOpaqueCopyCommand } from "../lib/copy-safe-command.mjs";
 import {
   isBoundedReadOnlyPipeline,
   parseGuardCommand,
@@ -3932,6 +3936,40 @@ test("NVA-W4-01B: the denial also carries a bounded copy-safe rendering of the c
       "chat mode has no signing step; nothing to bound-render for it");
     assert.doesNotMatch(chatResult.stderr, /Bounded copy-safe rendering of the emit-signature-digest step/u);
   } finally { for (const entry of roots) rmSync(entry, { recursive: true, force: true }); }
+});
+
+// NVA-GF-COPYSAFE: guard-lifecycle-ready.mjs's bounded rendering is the known-good reference
+// this backlog item cites (2026-08-28-po-facing-commands-are-not-uniformly-rendered-break-
+// safe.md) -- boundedOpaqueCopyCommand() moved to no new implementation here, only its import
+// path changed (from lib/project-onboarding-v3.mjs to the new lib/copy-safe-command.mjs), so
+// this is a wiring regression test: the actual denial's bounded "plan" block must be exactly
+// what independently recomputing it from the SAME shared function, on the SAME flat command
+// line the denial itself prints, produces -- proving the extraction changed nothing.
+test("NVA-GF-COPYSAFE: the bounded 'plan' rendering is byte-identical to recomputing it via the shared copy-safe-command.mjs function from the same flat command line", () => {
+  const sigRoot = hgoGitFixture("signature");
+  try {
+    const command = "rg -n lifecycle . && touch output.txt";
+    const sigResult = evaluateLifecycleReadyGuard(bash(command), { projectDir: sigRoot });
+    assert.equal(sigResult.exitCode, 2);
+    const lines = sigResult.stderr.split("\n");
+    const headerIndex = lines.findIndex((line) => /^Human override available for this exact/u.test(line));
+    assert.ok(headerIndex !== -1, "expected the human override header line");
+    const flatPlanLine = lines[headerIndex + 1];
+    assert.match(flatPlanLine, /\bplan --repo\b/u, flatPlanLine);
+    const recomputed = boundedOpaqueCopyCommand(flatPlanLine);
+    assert.equal(recomputed.maxColumns, 72);
+    assert.ok(recomputed.posix, "posix rendering must succeed for a real plan command");
+    assert.ok(
+      sigResult.stderr.includes(`  posix:\n${recomputed.posix}`),
+      "the actual posix bounded block must byte-match the shared function's independent recomputation",
+    );
+    if (recomputed.powershell) {
+      assert.ok(
+        sigResult.stderr.includes(`  powershell:\n${recomputed.powershell}`),
+        "the actual powershell bounded block must byte-match the shared function's independent recomputation",
+      );
+    }
+  } finally { rmSync(sigRoot, { recursive: true, force: true }); }
 });
 
 test("NOVA-LCR-HGO-1: an unusable override store leaves the plain grammar refusal exactly as it was", () => {
