@@ -224,15 +224,16 @@ Hunt systematically, in this order; collect every suspicion as a CANDIDATE (`fil
 2. **Scope** — diff files vs. the spec's enumeration: unlisted files touched,
    listed files untouched, and silent deviations inside the hard review
    boundary. Do not turn unrelated repository defects into findings.
-3. **Trajectory (mandatory)** — were the claimed checks actually run? Match evidence against claims: machine-written output? command = the project's verify gate? exit code matches? timestamps/paths plausible? A fluent report with skipped verification is more dangerous than a visible failure.
-4. **Test integrity** — tests/checks of the implementation weakened, deleted, skipped, newly tolerant? (Tests are the contract.)
-5. **Edge cases & failure paths** — boundaries, empty/huge inputs, concurrency, error handling, rollback/idempotency where relevant.
-6. **Guardrail/constraint violations** — against the guardrail paths from the dispatch, project denies, risk zones.
-7. **Security surface** — secrets in code/logs, injection, authz gaps, unsafe defaults, exposure of live systems.
-8. **Documented-instead-of-fixed risks** — known gaps "mitigated" only by a TODO/comment/doc note without owner and expiry date; a documented risk without a due date is a finding, not a mitigation (AP7/QG-06).
-9. **Dependency reality check** — every NEW dependency (package, action, container image, plugin) exists in the official registry under EXACTLY that name and is the intended, maintained project; the report must carry registry evidence (URL + pinned version). Hallucinated near-miss names are a supply-chain attack vector (SEC-04 slopsquatting).
-10. **Language assignment (pipeline-deliverable reviews only)** — new artifacts follow ADR-0011: agent-facing English, human-facing German, primary-reader rule for mixed cases; misassigned language is a candidate.
-11. **Governance conformance (projects with a `.claude/pipeline.yaml` `governance` block only)** — check the plan and diff explicitly against every guideline in `guidelines_path`: a deviation is allowed, but ONLY if named with justification in the plan artifact; an undocumented deviation is a candidate. Separately, walk `policies_path/checklist.md` item by item against plan+diff evidence and tick each MET/NOT MET; any item ticked NOT MET is a blocking finding by definition (a policy-checklist failure, unlike a guideline deviation, is never a judgment call).
+3. **Reachability and effect** — for anything the diff adds or changes that an agent, a human, or another program is meant to use: is there a path to it from where that user actually starts, and does taking that path produce the intended effect? Measure from the user's position, not the repository's — a capability verified only inside this checkout is not verified for its consumer. Three shapes, each a candidate: **named but not admitted** (something points at it, a guard refuses it); **admitted but not named** (it would run, nothing tells its user it exists); **published but not consumed** (emitted correctly, read by no caller). Passing its own tests is not delivery.
+4. **Trajectory (mandatory)** — were the claimed checks actually run? Match evidence against claims: machine-written output? command = the project's verify gate? exit code matches? timestamps/paths plausible? A fluent report with skipped verification is more dangerous than a visible failure.
+5. **Test integrity** — tests/checks of the implementation weakened, deleted, skipped, newly tolerant? (Tests are the contract.)
+6. **Edge cases & failure paths** — boundaries, empty/huge inputs, concurrency, error handling, rollback/idempotency where relevant.
+7. **Guardrail/constraint violations** — against the guardrail paths from the dispatch, project denies, risk zones.
+8. **Security surface** — secrets in code/logs, injection, authz gaps, unsafe defaults, exposure of live systems.
+9. **Documented-instead-of-fixed risks** — known gaps "mitigated" only by a TODO/comment/doc note without owner and expiry date; a documented risk without a due date is a finding, not a mitigation (AP7/QG-06).
+10. **Dependency reality check** — every NEW dependency (package, action, container image, plugin) exists in the official registry under EXACTLY that name and is the intended, maintained project; the report must carry registry evidence (URL + pinned version). Hallucinated near-miss names are a supply-chain attack vector (SEC-04 slopsquatting).
+11. **Language assignment (pipeline-deliverable reviews only)** — new artifacts follow ADR-0011: agent-facing English, human-facing German, primary-reader rule for mixed cases; misassigned language is a candidate.
+12. **Governance conformance (projects with a `.claude/pipeline.yaml` `governance` block only)** — check the plan and diff explicitly against every guideline in `guidelines_path`: a deviation is allowed, but ONLY if named with justification in the plan artifact; an undocumented deviation is a candidate. Separately, walk `policies_path/checklist.md` item by item against plan+diff evidence and tick each MET/NOT MET; any item ticked NOT MET is a blocking finding by definition (a policy-checklist failure, unlike a guideline deviation, is never a judgment call).
 
 ## 5. Phase B — evidence gate (be honest; report only what survives)
 
@@ -249,7 +250,7 @@ Skip rules (drop even with evidence): anything CI/`verify` already enforces dete
 ## 6. Report format (mandatory, English; findings most severe first)
 
 1. **Findings** — each exactly: `Gap` (what deviates/is missing vs. spec, 1–2 sentences) · `Risk` (consequence + severity `blocker|major|minor`) · `Evidence` (`file:line` / diff hunk / artifact quote) · `Spec reference` (criterion ID or guardrail rule). Empty list = state plainly "No findings."
-2. **Deliberately not flagged** (mandatory rubric): what you explicitly examined and found in order, including dropped Phase-A candidates and the hunt categories 1–10 you cleared. Makes review depth visible; distinguishes "checked, ok" from "not looked at".
+2. **Deliberately not flagged** (mandatory rubric): what you explicitly examined and found in order, including dropped Phase-A candidates and the hunt categories 1–12 you cleared. Makes review depth visible; distinguishes "checked, ok" from "not looked at".
 3. **Trajectory check** (mandatory verdict): claims vs. evidence — `consistent` / `inconsistent` (+ evidence) / `not verifiable` (+ what is missing).
 4. **Briefing violations observed** (contaminated dispatch, missing artifacts) — or "none".
 5. **Out-of-scope observations** — omit unless the hard scope rule permits one
