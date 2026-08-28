@@ -3253,6 +3253,80 @@ test("NVA-LCREADONLY-2: partial denial names the diagnosis lane; other statuses 
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
+// NVA-GF-SCRATCH (backlog: 2026-08-28-a-scratch-write-is-refused-during-intake-against-the-
+// documented-exemption.md): a fresh, not-yet-onboarded session sitting at `intake-required` or
+// `intake-design-questions-required` could write nothing at all, including its own scratch/
+// throwaway notes -- contradicting the pipeline-start skill's own claim that scratch/ is always
+// safe. Unlike the `partial` lane's single fixed file, this admits ANY path resolving inside
+// scratch/ (matching guard-devplan.mjs's own scratch/ prefix exemption). Proves the admission is
+// exact by construction (resolve + pathInside, never a substring/prefix-string match) and scoped
+// to the two intake statuses only.
+test("NVA-GF-SCRATCH: intake statuses admit any resolved scratch/ write and matching mkdir, nothing wider", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+
+    for (const status of ["intake-required", "intake-design-questions-required"]) {
+      const intakeDeps = { projectDir: path, requireProjectOnboardingReadyFn() { deny(status); } };
+
+      // AC-1: any Edit/Write/NotebookEdit write whose resolved path is inside scratch/,
+      // including nested paths -- unlike the `partial` lane, this is not one fixed filename.
+      for (const input of [
+        write("scratch/design.md"),
+        edit("scratch/design.md"),
+        write("scratch/nested/deep/notes.md"),
+        notebookEdit("scratch/analysis.ipynb"),
+      ]) {
+        assert.equal(evaluateLifecycleReadyGuard(input, intakeDeps).exitCode, 0, `${status}/${input.tool_name}`);
+      }
+
+      // AC-2: both admitted mkdir shapes, including a nested target (unlike the `partial`
+      // lane's mkdir admission, which refuses a nested target).
+      for (const command of ["mkdir scratch", "mkdir -p scratch", "mkdir -p scratch/nested"]) {
+        assert.equal(evaluateLifecycleReadyGuard(bash(command), intakeDeps).exitCode, 0, `${status}/${command}`);
+      }
+
+      // AC-3: exact by construction -- resolve + pathInside, never a substring/prefix-string
+      // match. A sibling directory merely starting with "scratch", a lexical escape back out of
+      // scratch/, the bare scratch/ directory itself as a write target, and any other path all
+      // still refuse.
+      for (const input of [
+        write("scratch-evil/file.md"),
+        write("scratch/../secret.md"),
+        write("scratch"),
+        write("src/other-file.mjs"),
+        edit("docs/other-file.md"),
+      ]) {
+        const result = evaluateLifecycleReadyGuard(input, intakeDeps);
+        assert.equal(result.exitCode, 2, `${status}/${input.tool_input.file_path}`);
+        assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u, `${status}/${input.tool_input.file_path}`);
+      }
+      for (const command of ["mkdir somethingelse", "mkdir -p /etc/scratch"]) {
+        const result = evaluateLifecycleReadyGuard(bash(command), intakeDeps);
+        assert.equal(result.exitCode, 2, `${status}/${command}`);
+      }
+
+      // AC-4: the refusal for a non-scratch write names the sanctioned scratch/ alternative.
+      const refused = evaluateLifecycleReadyGuard(edit("src/other-file.mjs"), intakeDeps);
+      assert.match(refused.stderr, new RegExp(`Pipeline session readiness is ${status}\\.`, "u"));
+      assert.match(refused.stderr, /A scratch write stays admitted during intake/u);
+    }
+
+    // AC-5: the lane is intake-only, not a general readiness bypass -- the identical admitted
+    // nested-scratch shape stays refused under a different PORG-NOT-READY status this file
+    // already fixtures (restart-required, and partial's own narrower lane).
+    const restartDeps = { projectDir: path, requireProjectOnboardingReadyFn() { deny("restart-required"); } };
+    for (const input of [write("scratch/design.md"), write("scratch/nested/deep/notes.md")]) {
+      const result = evaluateLifecycleReadyGuard(input, restartDeps);
+      assert.equal(result.exitCode, 2, `restart-required/${input.tool_input.file_path}`);
+      assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u);
+    }
+    const partialDeps = { projectDir: path, requireProjectOnboardingReadyFn() { deny("partial"); } };
+    const partialNested = evaluateLifecycleReadyGuard(write("scratch/nested/deep/notes.md"), partialDeps);
+    assert.equal(partialNested.exitCode, 2, "partial/scratch/nested/deep/notes.md");
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
 // NVA-BL-INTAKEBIND-1 (backlog: 2026-08-19-material-intake-bootstrap-bind-has-no-sanctioned-
 // path-to-a-passing-plan-gate.md): the narrow bootstrap-binding-required staging-authoring
 // admission -- proves it admits EXACTLY the two staging targets meant for hand-authored
