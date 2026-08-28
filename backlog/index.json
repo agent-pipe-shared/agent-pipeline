@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "f6207f945e20a084e670b96abb15c0d68b46669ac239428ebb799d9fcc75f412"
+    "transitionHead": "c4f6874b36ae34dcfac9d0a95bc27f04df1b138cdd250830ff42b378a9c5990a"
   },
   "counts": {
-    "open": 93,
+    "open": 94,
     "in_progress": 3,
     "closed": 390,
     "rejected": 3,
@@ -3616,6 +3616,16 @@
       "closureRepository": "self",
       "closureCommit": "81cc5f1a6cb384057fd49dd1a340e93c3aec3efb",
       "closureEvidence": "backlog/evidence/2026-07-24-completed-companion-deliveries.md"
+    },
+    {
+      "id": "pipeline.onboarding-asks-published-in-one-window-only",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "Found by NVA-V3-PENDINGASKS while wiring the guided driver to consume nextAction.pendingAsks, measured against a real fresh repository; the two call sites were then read directly (project-onboarding-v3.mjs lines 5447 and 5449) rather than inferred from the measurement.",
+      "deferred": false,
+      "tracking": "NOW / Nova A — happy-path blocking at the PO's second touch: the onboarding questions reach the human through exactly one command's response, so a run that passes that point never asks them again."
     },
     {
       "id": "pipeline.onboarding-continuity-assumes-calibration-handover-is-always-a-plain-string",

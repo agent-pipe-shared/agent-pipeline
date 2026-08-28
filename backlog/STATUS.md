@@ -298,6 +298,7 @@
 | pipeline.nothing-connects-an-acceptance-criterion-to-a-check-that-runs | closed | workflow-improvement | pipeline | 2026-08-16 | — |
 | pipeline.observation-governance-bootstrap-false-positives-on-vendor-synced-consumer-projects | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.observation-intake-document-governance | closed | workflow-improvement | pipeline | 2026-07-20 | — |
+| pipeline.onboarding-asks-published-in-one-window-only | open | defect | pipeline | 2026-08-28 | NOW / Nova A — happy-path blocking at the PO's second touch: the onboarding questions reach the human through exactly one command's response, so a run that passes that point never asks them again. |
 | pipeline.onboarding-continuity-assumes-calibration-handover-is-always-a-plain-string | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.onboarding-does-not-ignore-the-scratch-directory-it-mandates | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.onboarding-lifecycle-plan-hardcodes-the-codex-runner | closed | defect | pipeline | 2026-08-06 | — |
@@ -508,7 +509,7 @@
 
 ## Counts
 
-- open: 93
+- open: 94
 - in_progress: 3
 - closed: 390
 - rejected: 3
