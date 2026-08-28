@@ -705,6 +705,11 @@ const TEST_SUITES = [
   // script against the real backlog/items/ tree. Running the script here is what makes that
   // claim true; the suite alone is shape evidence, not result evidence.
   { name: "backlog-sprint-assignment-check", file: join(pluginScriptsDir, "check-backlog-sprint-assignment.mjs") },
+  { name: "copy-safe-command-tests", file: join(libDir, "copy-safe-command.test.mjs") },
+  { name: "project-onboarding-v3-pre-push-hook-offer-tests", file: join(pluginScriptsDir, "project-onboarding-v3-pre-push-hook-offer.test.mjs") },
+  { name: "onboarding-init-tests", file: join(pluginScriptsDir, "onboarding-init.test.mjs") },
+  { name: "push-gate-satisfiability-tests", file: join(pluginScriptsDir, "push-gate-satisfiability.test.mjs") },
+  { name: "chat-gate-ceremony-tests", file: join(libDir, "chat-gate-ceremony.test.mjs") },
 ];
 
 // Manifest-gated phase steps: see header — only projects that carry a manifest at
