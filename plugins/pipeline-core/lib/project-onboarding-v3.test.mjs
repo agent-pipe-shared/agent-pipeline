@@ -3767,7 +3767,13 @@ test("onboarding seeds ignore rules for the paths it writes into, and never touc
     // have caught an unanchored rule reaching a nested directory.
     hostGit(fresh, ["init", "--initial-branch=main"]);
     const plan = planProjectOnboardingV3({ runner: "codex", rootDir: fresh, deps: fakeDeps });
-    assert.equal(applyProjectOnboardingV3(plan, { rootDir: fresh, activate: true, deps: fakeDeps }).status, "applied");
+    const freshApplied = applyProjectOnboardingV3(plan, { rootDir: fresh, activate: true, deps: fakeDeps });
+    assert.equal(freshApplied.status, "applied");
+    // DoD 3: a project with no .gitignore behaves exactly as today -- the
+    // from-scratch seed already covers every required pattern, so the
+    // owned-.gitignore ask below must never also fire here.
+    assert.equal(Object.prototype.hasOwnProperty.call(freshApplied, "projectIgnoreGapAction"), false,
+      "a freshly seeded .gitignore already satisfies every required pattern; no ask is needed");
     const seeded = readFileSync(join(fresh, ".gitignore"), "utf8");
     assert.match(seeded, /^\/scratch\/$/mu, "the directory the bootstrap skill sends every agent to");
     assert.match(seeded, /^\/evidence\/$/mu, "the directory the shipped evidence producers write to");
@@ -3812,10 +3818,101 @@ test("onboarding seeds ignore rules for the paths it writes into, and never touc
     const ownedPlan = planProjectOnboardingV3({ runner: "codex", rootDir: owned, deps: fakeDeps });
     assert.equal(ownedPlan.targets.some((target) => target.path === ".gitignore"), false,
       "a project-owned .gitignore is never a target");
-    assert.equal(applyProjectOnboardingV3(ownedPlan, { rootDir: owned, activate: true, deps: fakeDeps }).status, "applied");
+    const ownedApplied = applyProjectOnboardingV3(ownedPlan, { rootDir: owned, activate: true, deps: fakeDeps });
+    assert.equal(ownedApplied.status, "applied");
     assert.equal(readFileSync(join(owned, ".gitignore"), "utf8"), ownedBytes,
       "the project's own ignore file is untouched");
+
+    // The boundary is never "rewrite the file", but it must not be silence
+    // either (2026-08-28 backlog:
+    // the-push-gate-is-unsatisfiable-in-any-installed-plugin-deployment.md):
+    // an owned .gitignore missing these exact anchored entries gets a real
+    // ask-step, additive alongside "applied" -- never a passive diagnostic
+    // (that pattern was already tried once, for author identity, and found
+    // insufficient) and never a mutation of the file it is asking about.
+    assert.equal(ownedApplied.diagnostics.length, 0, "the ask-step replaces any passive diagnostic entirely");
+    assert.equal(ownedApplied.projectIgnoreGapAction.kind, "collect-input");
+    assert.equal(ownedApplied.projectIgnoreGapAction.mutation, false);
+    assert.match(ownedApplied.projectIgnoreGapAction.guidance, /\/scratch\//u);
+    assert.match(ownedApplied.projectIgnoreGapAction.guidance, /\/evidence\//u);
+    assert.match(ownedApplied.projectIgnoreGapAction.guidance, /\/project\/pipeline-state\.json/u);
+    assert.equal(readFileSync(join(owned, ".gitignore"), "utf8"), ownedBytes,
+      "the ask-step itself must never mutate the file it is asking about");
+
+    // A project whose owned .gitignore already carries every required entry
+    // (just interleaved with its own rules, never in the exact seed layout)
+    // gets no ask at all -- the check is content-based, not byte-identity.
+    const complete = root();
+    try {
+      const completeBytes = "# mine\nnode_modules/\n/scratch/\n/evidence/\n/project/pipeline-state.json\n";
+      writeFileSync(join(complete, ".gitignore"), completeBytes);
+      const completeApplied = applyProjectOnboardingV3(
+        planProjectOnboardingV3({ runner: "codex", rootDir: complete, deps: fakeDeps }),
+        { rootDir: complete, activate: true, deps: fakeDeps },
+      );
+      assert.equal(completeApplied.status, "applied");
+      assert.equal(Object.prototype.hasOwnProperty.call(completeApplied, "projectIgnoreGapAction"), false,
+        "an owned .gitignore that already covers every required pattern is never asked about");
+      assert.equal(readFileSync(join(complete, ".gitignore"), "utf8"), completeBytes,
+        "an already-complete owned .gitignore is untouched too");
+    } finally { dispose(complete); }
   } finally { dispose(fresh); dispose(owned); }
+});
+
+// IGNORESEED-2 (2026-08-28 backlog:
+// the-push-gate-is-unsatisfiable-in-any-installed-plugin-deployment.md,
+// consumer HA). The ask-step above only NAMES the gap; this drives the
+// actual state a push signature needs. HA's dead end happened in two acts:
+// first `evidence/verify-latest.json` dirtied the tree, which was still
+// escapable by a commit (the entry was missing, so it got added and
+// committed BEFORE signing); then the security scan wrote three more
+// artifacts AFTER the signature already existed, where no commit was
+// permitted and there was no way back. This test fulfills the ask exactly as
+// its own guidance says to (ordinary tools, onto the project's own file,
+// never onboarding itself) and then drives the second act directly: the
+// shipped producers' output shape, written as if a signature already
+// existed, must never need a commit to become clean.
+test("once an owned .gitignore's ask is fulfilled with ordinary tools, the evidence-circle can never reopen", () => {
+  const path = root();
+  try {
+    hostGit(path, ["init", "--initial-branch=main"]);
+    writeFileSync(join(path, ".gitignore"), "# mine\nnode_modules/\n");
+    const plan = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
+    const applied = applyProjectOnboardingV3(plan, { rootDir: path, activate: true, deps: fakeDeps });
+    assert.equal(applied.status, "applied");
+    assert.equal(applied.projectIgnoreGapAction.kind, "collect-input");
+
+    // Fulfilling the ask: append, with ordinary tools, exactly the anchored
+    // lines the ask's own guidance names (already pinned by the assertions
+    // above) -- never a rewrite, an append onto the project's own bytes.
+    const gitignorePath = join(path, ".gitignore");
+    const beforeAppend = readFileSync(gitignorePath, "utf8");
+    writeFileSync(gitignorePath, `${beforeAppend}\n/scratch/\n/evidence/\n/project/pipeline-state.json\n`);
+
+    // A first commit -- the onboarding scaffold plus the now-repaired
+    // .gitignore -- stands in for the candidate a push signature would bind.
+    hostGit(path, ["add", "-A"]);
+    hostGit(path, ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", "onboarding scaffold"]);
+
+    // Act two: the shipped evidence/security producers' output shape,
+    // written as if that commit were already signed.
+    mkdirSync(join(path, "scratch"), { recursive: true });
+    writeFileSync(join(path, "scratch", "note.md"), "agent scratch\n");
+    mkdirSync(join(path, "evidence"), { recursive: true });
+    writeFileSync(join(path, "evidence", "verify-latest.json"), "{}\n");
+    writeFileSync(join(path, "evidence", "security-latest.json"), "{}\n");
+    writeFileSync(join(path, "project", "pipeline-state.json"), "{}\n");
+
+    const checkIgnore = (candidate) => spawnSync("git", ["check-ignore", "-q", candidate],
+      { cwd: path, encoding: "utf8" }).status;
+    for (const candidate of ["scratch/note.md", "evidence/verify-latest.json", "evidence/security-latest.json", "project/pipeline-state.json"]) {
+      assert.equal(checkIgnore(candidate), 0, `git must ignore ${candidate} once the ask is fulfilled`);
+    }
+    hostGit(path, ["add", "-A"]);
+    const status = spawnSync("git", ["status", "--porcelain"], { cwd: path, encoding: "utf8" }).stdout;
+    assert.equal(status, "", "the tree must never need a commit to become clean once the ask is fulfilled -- "
+      + "this is the exact state that was a dead end after HA's signature already existed");
+  } finally { dispose(path); }
 });
 
 // AUTHORID-1. Both 2026-08-09 greenfield runs lost a PO turn to `Author identity
