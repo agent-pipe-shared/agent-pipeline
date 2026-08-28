@@ -32,6 +32,19 @@ function readyResult(rootDir, intent, runner = "codex") {
   };
 }
 
+// NVA-T-READYKEYS: a real ready V4 observation carries two more fields than the base
+// eleven -- project-onboarding-v3.mjs attaches pushApprovalMode/trustAnchorAvailability
+// only to a `status: "ready"` result. readyResult() above stays the eleven-key base shape
+// (reused by the non-ready-status tests, where those two fields must NOT be present); this
+// is the thirteen-key ready shape a real inspection actually returns.
+function readyResultWithPushApprovalKeys(rootDir, intent, runner = "codex") {
+  return {
+    ...readyResult(rootDir, intent, runner),
+    pushApprovalMode: "signature",
+    trustAnchorAvailability: "present",
+  };
+}
+
 function withClaudecode(value, run) {
   const had = Object.prototype.hasOwnProperty.call(process.env, "CLAUDECODE");
   const previous = process.env.CLAUDECODE;
@@ -55,7 +68,7 @@ test("exact V4 ready is bound to the requested intent and returns one sanitized 
       runner: "codex",
       inspect(options) {
         calls.push(options);
-        return readyResult(path, "dispatch");
+        return readyResultWithPushApprovalKeys(path, "dispatch");
       },
     });
     assert.deepEqual(calls, [{ rootDir: path, intent: "dispatch", runner: "codex" }]);
@@ -130,12 +143,64 @@ test("the gate accepts \"claude\" and \"codex\" explicitly and threads the exact
         runner,
         inspect(options) {
           seenRunner = options.runner;
-          return readyResult(path, "dispatch", runner);
+          return readyResultWithPushApprovalKeys(path, "dispatch", runner);
         },
       });
       assert.equal(seenRunner, runner);
       assert.equal(result.status, "ready");
     }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// NVA-T-READYKEYS DoD 1: this is the shape a real ready inspection produces (thirteen keys,
+// including pushApprovalMode and trustAnchorAvailability). Before the fix, RESULT_KEYS
+// listed exactly the eleven base names, so exactKeys() rejected precisely this shape --
+// the only case the gate should otherwise pass -- as PORG-INVALID-OBSERVATION. This test
+// fails before the fix and must pass after it.
+test("a real V4 ready observation carrying pushApprovalMode/trustAnchorAvailability (thirteen keys) is accepted", () => {
+  const path = root();
+  try {
+    const result = requireProjectOnboardingReady({
+      rootDir: path,
+      intent: "session",
+      runner: "codex",
+      inspect: () => readyResultWithPushApprovalKeys(path, "session"),
+    });
+    assert.deepEqual(result, {
+      schema: PROJECT_ONBOARDING_READY_GATE_SCHEMA,
+      status: "ready",
+      intent: "session",
+    });
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// NVA-T-READYKEYS DoD 2: a genuinely unexpected extra key beyond the thirteen still fails
+// closed -- proving the fix is a second, ready-only key LIST, never a switch to a subset
+// check. exactKeys() stays exact either way.
+test("a ready observation with an unexpected extra key beyond the thirteen is still rejected (not a subset check)", () => {
+  const path = root();
+  try {
+    assert.throws(() => requireProjectOnboardingReady({
+      rootDir: path,
+      intent: "session",
+      runner: "codex",
+      inspect: () => ({ ...readyResultWithPushApprovalKeys(path, "session"), somethingUnexpected: true }),
+    }), (error) => error instanceof ProjectOnboardingReadyError && error.code === "PORG-INVALID-OBSERVATION");
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// NVA-T-READYKEYS DoD 3: the two ready-only fields showing up on a NON-ready observation
+// must still fail closed -- the accepted shape is status-specific, not "eleven keys plus
+// optionally two more no matter what status says".
+test("a non-ready observation carrying the two ready-only fields is rejected (the shape stays status-specific)", () => {
+  const path = root();
+  try {
+    assert.throws(() => requireProjectOnboardingReady({
+      rootDir: path,
+      intent: "session",
+      runner: "codex",
+      inspect: () => ({ ...readyResultWithPushApprovalKeys(path, "session"), status: "restart-required" }),
+    }), (error) => error instanceof ProjectOnboardingReadyError && error.code === "PORG-INVALID-OBSERVATION");
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 

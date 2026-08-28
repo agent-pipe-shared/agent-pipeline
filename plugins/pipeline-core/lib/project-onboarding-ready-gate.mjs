@@ -50,7 +50,11 @@ export const PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES = Object.freeze([
 const INTENTS = new Set(["onboarding", "bootstrap", "session", "dispatch"]);
 const RUNNERS = new Set(["claude", "codex", "antigravity"]);
 const NON_READY_STATUSES = new Set(PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES);
-const RESULT_KEYS = [
+// NVA-T-READYKEYS: the base envelope every V4 observation carries, ready or not. Kept as
+// its own list (rather than folded into READY_RESULT_KEYS below) because it is also the
+// exact, closed shape a NON-ready observation must have -- the two ready-only fields below
+// are rejected on a non-ready observation precisely because they are absent from this list.
+const BASE_RESULT_KEYS = [
   "appServer",
   "continuity",
   "diagnostics",
@@ -63,6 +67,15 @@ const RESULT_KEYS = [
   "schema",
   "status",
 ];
+// project-onboarding-v3.mjs attaches these two fields ONLY to a `status: "ready"` result --
+// they describe machine-level push-approval/trust-anchor state that only makes sense once a
+// repository is fully ready. A ready observation is therefore validated against the base
+// keys PLUS these two; a non-ready observation is validated against the base keys alone, so
+// the same two fields showing up on a non-ready observation are rejected as invalid rather
+// than silently accepted. Neither list is a subset check: exactKeys() below still demands
+// the closed set match exactly, so a genuinely unexpected extra key is refused either way.
+const READY_ONLY_RESULT_KEYS = ["pushApprovalMode", "trustAnchorAvailability"];
+const READY_RESULT_KEYS = [...BASE_RESULT_KEYS, ...READY_ONLY_RESULT_KEYS];
 const SAFE_STATUS = /^[a-z][a-z0-9-]{0,79}$/u;
 
 export class ProjectOnboardingReadyError extends Error {
@@ -147,7 +160,13 @@ export function requireProjectOnboardingReady({
     );
   }
 
-  if (!exactKeys(observed, RESULT_KEYS)
+  // Which exact key set applies depends on the observation's OWN declared status: a plain
+  // read of a field the closed-set check below will itself re-verify, never a second trust
+  // decision. `plainObject` guards the property read so a malformed (null/array/scalar)
+  // observed value falls through to the base list and is then rejected by exactKeys() below,
+  // exactly as before this change.
+  const expectedKeys = plainObject(observed) && observed.status === "ready" ? READY_RESULT_KEYS : BASE_RESULT_KEYS;
+  if (!exactKeys(observed, expectedKeys)
     || observed.schema !== "pipeline.project-onboarding.v4"
     || observed.intent !== intent
     || observed.root !== physicalRoot) {

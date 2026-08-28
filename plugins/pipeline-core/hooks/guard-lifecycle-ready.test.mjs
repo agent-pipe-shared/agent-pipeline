@@ -1011,6 +1011,51 @@ test("non-ready write denials surface only the typed lifecycle status and recove
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
+// NVA-T-READYKEYS DoD 4: PORG-INVALID-OBSERVATION (the ready-gate could not validate the
+// shape of what project-onboarding-v3 returned -- e.g. RESULT_KEYS mismatch) and a genuinely
+// unresolved cause used to render as the exact same generic "not ready" message. This pins
+// that the two now read differently: the invalid-observation denial names its own cause and
+// explicitly says it is NOT a not-ready report, while the truly-unresolved case (an
+// untyped exception, pinned above) keeps the original generic wording unchanged.
+test("PORG-INVALID-OBSERVATION is named as an invalid observation, distinct from both a typed not-ready status and the generic unresolved-cause denial", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const invalid = evaluateLifecycleReadyGuard(edit(), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() {
+        throw new ProjectOnboardingReadyError(
+          "PORG-INVALID-OBSERVATION",
+          "Project onboarding readiness returned an invalid result for intent session.",
+          { intent: "session" },
+        );
+      },
+    });
+    assert.equal(invalid.exitCode, 2);
+    assert.match(invalid.stderr, /PORG-INVALID-OBSERVATION/u);
+    assert.match(invalid.stderr, /not a report that the lifecycle is not ready/u);
+    assert.doesNotMatch(invalid.stderr, /session readiness is/u);
+    assert.match(invalid.stderr, /project-onboarding-v3 session inspection/u);
+
+    // A PORG-INVALID-OBSERVATION for a DIFFERENT intent than "session" is out of this
+    // gate's own scope (it always inspects intent "session") and must keep the generic
+    // wording, exactly like any other unresolved cause -- never widened.
+    const otherIntent = evaluateLifecycleReadyGuard(edit(), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() {
+        throw new ProjectOnboardingReadyError(
+          "PORG-INVALID-OBSERVATION",
+          "invalid",
+          { intent: "bootstrap" },
+        );
+      },
+    });
+    assert.equal(otherIntent.exitCode, 2);
+    assert.doesNotMatch(otherIntent.stderr, /PORG-INVALID-OBSERVATION/u);
+    assert.doesNotMatch(otherIntent.stderr, /not a report that the lifecycle is not ready/u);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
 test("closed command grammar preserves native Windows paths and direct node.exe identity", () => {
   const windowsRoot = "C:\\Users\\Pipeline User\\consumer";
   const script = "C:\\Pipeline Plugin\\scripts\\project-onboarding-v3.mjs";
