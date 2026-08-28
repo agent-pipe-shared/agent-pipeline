@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 created: {{YYYY-MM-DD}}
 source: {{origin — retro question / radar run / critic finding / manual observation, with a concrete reference (file, ADR, session date)}}
+sprint: {{alfred|batman|nightwing|nova|phoenix|none — MANDATORY while status is open; `none` explicitly declares that this item belongs to no planning window, which is NOT the same as leaving the line out}}
 due: {{OPTIONAL — YYYY-MM-DD, only for time-triggered items such as ADR resubmissions; delete this line entirely if not applicable}}
 ---
 
@@ -23,7 +24,12 @@ USAGE
 1. Copy this file to backlog/items/YYYY-MM-DD-short-english-slug.md
    (date = created, not a due date).
 2. Fill every {{PLACEHOLDER}} in the frontmatter above and the sections below.
-   Delete the `due:` line entirely if the item has no time trigger.
+   Delete the `due:` line entirely if the item has no time trigger. The
+   `sprint:` line is NOT optional while the item is `open`:
+   check-backlog-sprint-assignment.mjs fails on an open item that declares
+   none. If the item belongs to no planning window, write `sprint: none` —
+   deleting the line means "forgotten", and the gate exists to tell those two
+   apart.
 3. Leave `status: open` and the Triage section empty — active work is moved to
    `in_progress` only through the sanctioned ledger writer; the
    Elephant of the next Pipeline session (backlog/README.md, triage rules).
