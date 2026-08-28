@@ -2,10 +2,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  classifyInput, createDefinitionInventory, evaluateChangeIntegrity, evaluateCiAuthority,
+  AI_HARDENING_SCHEMA, classifyInput, createDefinitionInventory, evaluateChangeIntegrity, evaluateCiAuthority,
   evaluateContextExport, evaluateHostFallback, evaluateRunnerNeutralConformance,
   evaluateSelfExcludedCheck, preserveMessageOrigin, rejectAuthorityFromContent, requalifyForDrift,
-  routeSecurityReview, validateEvidenceHygiene, validateTaskAuthority,
+  resolveReviewerIdentity, routeSecurityReview, validateEvidenceHygiene, validateTaskAuthority,
 } from "./ai-assisted-hardening.mjs";
 
 const digest = "a".repeat(64);
@@ -51,8 +51,8 @@ test("AC20: the base-revision path still counts when only baseRevisionExitCode i
   assert.equal(counted.basis, "base-revision");
   assert.equal(counted.code, "AIH-SELF-EXCLUDED-BASE-VERIFIED");
 });
-test("AC21: a self-excluded check counts through the candidate suite when a named reviewer differs from the author", () => {
-  const result = evaluateSelfExcludedCheck({ kind: "test", candidateRevisionExitCode: 0, reviewerId: "reviewer-b", authorId: "author-a" });
+test("AC21: a self-excluded check counts through the candidate suite when a named reviewer differs from the author AND the source is the repository variable", () => {
+  const result = evaluateSelfExcludedCheck({ kind: "test", candidateRevisionExitCode: 0, reviewerId: "reviewer-b", authorId: "author-a", reviewerSource: "repository-variable" });
   assert.equal(result.counted, true);
   assert.equal(result.basis, "candidate-suite-and-review");
   assert.equal(result.code, "AIH-SELF-EXCLUDED-REVIEWED");
@@ -68,7 +68,7 @@ test("AC24: the candidate-suite path stays missing when the candidate-revision s
   assert.equal(evaluateSelfExcludedCheck({ kind: "test", candidateRevisionExitCode: 1, reviewerId: "reviewer-b", authorId: "author-a" }).counted, false);
 });
 test("AC25: a non-root-pointable kind is counted through the candidate-suite-and-review path", () => {
-  const result = evaluateSelfExcludedCheck({ kind: "guard", candidateRevisionExitCode: 0, reviewerId: "reviewer-b", authorId: "author-a" });
+  const result = evaluateSelfExcludedCheck({ kind: "guard", candidateRevisionExitCode: 0, reviewerId: "reviewer-b", authorId: "author-a", reviewerSource: "repository-variable" });
   assert.equal(result.rootPointable, false);
   assert.equal(result.counted, true);
   assert.equal(result.basis, "candidate-suite-and-review");
@@ -76,4 +76,57 @@ test("AC25: a non-root-pointable kind is counted through the candidate-suite-and
 test("AC26: the deciding library and the verify gate both route to independent review when touched", () => {
   assert.equal(routeSecurityReview({ changedPaths: ["plugins/pipeline-core/lib/ai-assisted-hardening.mjs"], authorId: "a", reviewerId: "a" }).required, true);
   assert.equal(routeSecurityReview({ changedPaths: ["harness/scripts/verify.mjs"], authorId: "a", reviewerId: "a" }).required, true);
+});
+
+// --- Round 2 (NVA-VTPGATE-3): the reviewer identity is settable by the party
+// it constrains. `resolveReviewerIdentity` resolves ONE trusted value + source
+// (environment outranks the flag), and `evaluateSelfExcludedCheck` requires
+// `reviewerSource === "repository-variable"` for the candidate-suite path --
+// never satisfiable by `--reviewer-id` alone.
+test("AC27: resolveReviewerIdentity: the repository variable (environment) outranks the CLI flag", () => {
+  const result = resolveReviewerIdentity({ environmentReviewerId: "reviewer-env", cliReviewerId: "reviewer-cli" });
+  assert.equal(result.schema, AI_HARDENING_SCHEMA);
+  assert.equal(result.id, "reviewer-env");
+  assert.equal(result.source, "repository-variable");
+});
+test("AC28: resolveReviewerIdentity: a CLI-only value yields the cli-argument source", () => {
+  const result = resolveReviewerIdentity({ environmentReviewerId: null, cliReviewerId: "reviewer-cli" });
+  assert.equal(result.id, "reviewer-cli");
+  assert.equal(result.source, "cli-argument");
+});
+test("AC29: resolveReviewerIdentity: a blank or whitespace-only environment value falls through to the flag", () => {
+  assert.equal(resolveReviewerIdentity({ environmentReviewerId: "", cliReviewerId: "reviewer-cli" }).source, "cli-argument");
+  assert.equal(resolveReviewerIdentity({ environmentReviewerId: "   ", cliReviewerId: "reviewer-cli" }).source, "cli-argument");
+});
+test("AC30: resolveReviewerIdentity: neither present yields a null identity and a null source", () => {
+  assert.deepEqual(resolveReviewerIdentity({}), { schema: AI_HARDENING_SCHEMA, id: null, source: null });
+  assert.deepEqual(resolveReviewerIdentity({ environmentReviewerId: "  ", cliReviewerId: "  " }), { schema: AI_HARDENING_SCHEMA, id: null, source: null });
+});
+test("AC31: the candidate-suite path counts only when the reviewer source is the repository variable", () => {
+  const result = evaluateSelfExcludedCheck({ kind: "test", candidateRevisionExitCode: 0, reviewerId: "reviewer-b", authorId: "author-a", reviewerSource: "repository-variable" });
+  assert.equal(result.counted, true);
+  assert.equal(result.basis, "candidate-suite-and-review");
+  assert.equal(result.code, "AIH-SELF-EXCLUDED-REVIEWED");
+});
+// BUGFIX repro (Re-Critic vtpgate2-368458af F1): a `--reviewer-id` identity
+// used to clear this same control that only the admin-controlled repository
+// variable should clear. This case pins that it no longer does, with a code
+// distinguishable from the generic "missing" refusal (never rendering the
+// same as a suite failure -- CLAUDE.md's guard-testpath two-cause note).
+test("AC32: a cli-argument source never satisfies the candidate-suite path, and reports the untrusted-source code (not the generic missing code)", () => {
+  const result = evaluateSelfExcludedCheck({ kind: "test", candidateRevisionExitCode: 0, reviewerId: "reviewer-b", authorId: "author-a", reviewerSource: "cli-argument" });
+  assert.equal(result.counted, false);
+  assert.equal(result.basis, null);
+  assert.equal(result.code, "AIH-SELF-EXCLUDED-REVIEWER-UNTRUSTED-SOURCE");
+  assert.notEqual(result.code, "AIH-SELF-EXCLUDED-MISSING");
+});
+test("AC33: omitting the reviewer source entirely fails closed, not open (the default counts nothing)", () => {
+  const result = evaluateSelfExcludedCheck({ kind: "test", candidateRevisionExitCode: 0, reviewerId: "reviewer-b", authorId: "author-a" });
+  assert.equal(result.counted, false);
+  assert.equal(result.code, "AIH-SELF-EXCLUDED-REVIEWER-UNTRUSTED-SOURCE");
+});
+test("AC34: a suite failure still reports the generic missing code even without a trusted source (the two refusals stay distinguishable)", () => {
+  const result = evaluateSelfExcludedCheck({ kind: "test", candidateRevisionExitCode: 1, reviewerId: "reviewer-b", authorId: "author-a", reviewerSource: "cli-argument" });
+  assert.equal(result.counted, false);
+  assert.equal(result.code, "AIH-SELF-EXCLUDED-MISSING");
 });

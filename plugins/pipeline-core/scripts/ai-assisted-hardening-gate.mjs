@@ -16,6 +16,7 @@ import {
   evaluateChangeIntegrity,
   evaluateCiAuthority,
   evaluateSelfExcludedCheck,
+  resolveReviewerIdentity,
   routeSecurityReview,
   validateEvidenceHygiene,
   validateTaskAuthority,
@@ -124,18 +125,21 @@ function verifySelfExcludedAtBase(repoRoot, base, kind, file) {
 /**
  * The candidate-suite-and-review path: run the check's own CANDIDATE-revision
  * copy (the same spawn shape the non-excluded branch already uses) and feed
- * its exit code, together with the reviewer/author identity, into
- * `evaluateSelfExcludedCheck`. This is never self-certification -- the suite
- * passing is mechanical evidence, the authority is the named human distinct
- * from the author, and both halves are required by that function.
+ * its exit code, together with the reviewer/author identity and the SOURCE
+ * that identity came from, into `evaluateSelfExcludedCheck`. This is never
+ * self-certification -- the suite passing is mechanical evidence, the
+ * authority is the named human distinct from the author whose identity the
+ * author cannot themselves supply (`reviewerSource === "repository-variable"`,
+ * round 2 NVA-VTPGATE-3), and all three are required by that function.
  */
-function verifySelfExcludedAtCandidate(repoRoot, kind, file, reviewerId, authorId) {
+function verifySelfExcludedAtCandidate(repoRoot, kind, file, reviewerId, authorId, reviewerSource) {
   const run = spawnSync(process.execPath, [file], { cwd: repoRoot, stdio: "ignore" });
   return evaluateSelfExcludedCheck({
     kind,
     candidateRevisionExitCode: run.status,
     reviewerId,
     authorId,
+    reviewerSource,
   }).counted;
 }
 
@@ -144,17 +148,19 @@ function verifySelfExcludedAtCandidate(repoRoot, kind, file, reviewerId, authorI
  * `base` is the delivery base (see `verify-topology-preflight.mjs`); it is
  * used ONLY to materialise a self-excluded, root-pointable check's own base
  * revision -- never to widen or narrow which classes are required.
- * `reviewerId`/`authorId` feed the candidate-suite-and-review fallback path
- * only; a caller that omits them keeps the exact previous base-only behaviour.
+ * `reviewerId`/`authorId`/`reviewerSource` feed the candidate-suite-and-review
+ * fallback path only; a caller that omits them keeps the exact previous
+ * base-only behaviour (and `reviewerSource` defaults to `null`, which
+ * `evaluateSelfExcludedCheck` treats as untrusted -- fail closed).
  */
-export function runIndependentChecks(repoRoot, changedPaths, base = null, { reviewerId = null, authorId = null } = {}) {
+export function runIndependentChecks(repoRoot, changedPaths, base = null, { reviewerId = null, authorId = null, reviewerSource = null } = {}) {
   const required = evaluateChangeIntegrity({ paths: changedPaths, independentChecks: [] }).changed;
   return required.filter((kind) => {
     const file = INDEPENDENT_CHECK_COMMANDS[kind];
     if (!file) return false;
     if (changedPaths.includes(file)) {
       return verifySelfExcludedAtBase(repoRoot, base, kind, file)
-        || verifySelfExcludedAtCandidate(repoRoot, kind, file, reviewerId, authorId);
+        || verifySelfExcludedAtCandidate(repoRoot, kind, file, reviewerId, authorId, reviewerSource);
     }
     return spawnSync(process.execPath, [file], { cwd: repoRoot, stdio: "ignore" }).status === 0;
   });
@@ -166,7 +172,16 @@ function main() {
   const base = argument("--base") ?? git(repoRoot, ["rev-parse", `${head}^`]);
   const changedPaths = changedPathsForCandidate(repoRoot, base, head);
   const authorId = argument("--author-id", git(repoRoot, ["log", "-1", "--format=%ae", head]));
-  const reviewerId = argument("--reviewer-id", process.env.PIPELINE_SECURITY_REVIEWER_ID ?? null);
+  // Resolved ONCE: the environment (the admin-controlled GitHub repository
+  // variable) outranks `--reviewer-id`, never the reverse -- the party a
+  // self-excluded check's review constrains is exactly the candidate's own
+  // author, who controls the flag but not the repository variable (round 2,
+  // NVA-VTPGATE-3; was `argument("--reviewer-id", process.env... ?? null)`,
+  // which let the flag mask the trusted variable).
+  const reviewerIdentity = resolveReviewerIdentity({
+    environmentReviewerId: process.env.PIPELINE_SECURITY_REVIEWER_ID ?? null,
+    cliReviewerId: argument("--reviewer-id"),
+  });
   const result = evaluateAiHardeningGate({
     changedPaths,
     event: argument("--event", process.env.GITHUB_EVENT_NAME ?? "local"),
@@ -174,10 +189,14 @@ function main() {
     isolated: bool(argument("--isolated", "false")),
     validated: bool(argument("--validated", "false")),
     authorId,
-    reviewerId,
-    independentChecks: runIndependentChecks(repoRoot, changedPaths, base, { reviewerId, authorId }),
+    reviewerId: reviewerIdentity.id,
+    independentChecks: runIndependentChecks(repoRoot, changedPaths, base, {
+      reviewerId: reviewerIdentity.id,
+      authorId,
+      reviewerSource: reviewerIdentity.source,
+    }),
   });
-  process.stdout.write(`${JSON.stringify(result)}\n`);
+  process.stdout.write(`${JSON.stringify({ ...result, reviewerIdentity })}\n`);
   process.exitCode = result.allowed ? 0 : 1;
 }
 

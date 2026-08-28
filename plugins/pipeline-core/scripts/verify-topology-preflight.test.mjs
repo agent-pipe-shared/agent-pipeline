@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -12,7 +14,9 @@ import {
   preflightVerifyTopology,
   resolveCandidateChangeWindow,
   resolveDeliveryBase,
+  runVerifyTopologyCli,
 } from "./verify-topology-preflight.mjs";
+import { definitionInventoryRecord } from "../lib/ai-definition-inventory.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const candidate = "1".repeat(40);
@@ -227,6 +231,71 @@ check("GitHub Verify uses full credential-free history and runs topology before 
 check("generic topology implementation contains no productive runner resolution", () => {
   const source = readFileSync(path.join(root, "plugins", "pipeline-core", "scripts", "verify-topology-preflight.mjs"), "utf8");
   assert.doesNotMatch(source, /resolveCodexBinary|process\.env\.PATH|command -v (?:codex|claude)/u);
+});
+
+// --- F3 (Re-Critic vtpgate2-368458af) + round 2 (NVA-VTPGATE-3): no test
+// previously named `runVerifyTopologyCli`, so its reviewer-identity
+// resolution and recording were unverified. This exercises it against a
+// real, tiny temporary git-repository fixture pointed at via the ALREADY
+// EXISTING `--root` flag (never a new flag or export added only for tests --
+// Forbidden), never the real repository. The fixture's own tiny definition
+// roots (empty of matching files) are self-consistent with a definitions
+// file generated from the SAME `definitionInventoryRecord` call this script
+// itself uses, so `VTP-DEFINITION-REQUALIFICATION-REQUIRED` never fires here.
+function reviewerIdentityFixtureRoot() {
+  const dir = mkdtempSync(path.join(tmpdir(), "vtp-cli-fixture-"));
+  const env = { ...process.env, GIT_AUTHOR_NAME: "fixture", GIT_AUTHOR_EMAIL: "author@example.test", GIT_COMMITTER_NAME: "fixture", GIT_COMMITTER_EMAIL: "author@example.test" };
+  const run = (args) => spawnSync("git", args, { cwd: dir, encoding: "utf8", env });
+  for (const sub of ["skills", "agents", "hooks", "scripts"]) mkdirSync(path.join(dir, "plugins", "pipeline-core", sub), { recursive: true });
+  writeFileSync(path.join(dir, "README.md"), "before\n");
+  run(["init", "--quiet", "--initial-branch=main"]);
+  run(["add", "-A"]);
+  run(["commit", "--quiet", "-m", "base"]);
+  const baseCommit = run(["rev-parse", "HEAD"]).stdout.trim();
+  const baseTree = run(["rev-parse", "HEAD^{tree}"]).stdout.trim();
+  writeFileSync(path.join(dir, "README.md"), "after\n");
+  run(["add", "-A"]);
+  run(["commit", "--quiet", "-m", "candidate"]);
+  mkdirSync(path.join(dir, "docs"), { recursive: true });
+  writeFileSync(path.join(dir, "docs", "product-capability-inventory.json"), JSON.stringify({
+    schema: "pipeline.product-capability-inventory.v3",
+    sourceBaseline: { commit: baseCommit, tree: baseTree },
+  }));
+  mkdirSync(path.join(dir, "plugins", "pipeline-core", "config"), { recursive: true });
+  writeFileSync(
+    path.join(dir, "plugins", "pipeline-core", "config", "ai-assisted-definition-inventory.json"),
+    JSON.stringify(definitionInventoryRecord(dir)),
+  );
+  return dir;
+}
+
+check("runVerifyTopologyCli resolves the reviewer identity from the repository variable and records it in the emitted result", () => {
+  const repoRoot = reviewerIdentityFixtureRoot();
+  const saved = process.env.PIPELINE_SECURITY_REVIEWER_ID;
+  try {
+    process.env.PIPELINE_SECURITY_REVIEWER_ID = "trusted-reviewer";
+    const result = runVerifyTopologyCli(["--root", repoRoot]);
+    assert.equal(result.status, "ready");
+    assert.deepEqual(result.reviewerIdentity, { schema: "pipeline.ai-assisted-hardening.v1", id: "trusted-reviewer", source: "repository-variable" });
+    assert.equal(result.deliveryBase.source, "source-baseline");
+  } finally {
+    if (saved === undefined) delete process.env.PIPELINE_SECURITY_REVIEWER_ID; else process.env.PIPELINE_SECURITY_REVIEWER_ID = saved;
+    rmSync(repoRoot, { recursive: true, force: true });
+  }
+});
+
+check("runVerifyTopologyCli records a null reviewer identity when no repository variable is present", () => {
+  const repoRoot = reviewerIdentityFixtureRoot();
+  const saved = process.env.PIPELINE_SECURITY_REVIEWER_ID;
+  try {
+    delete process.env.PIPELINE_SECURITY_REVIEWER_ID;
+    const result = runVerifyTopologyCli(["--root", repoRoot]);
+    assert.equal(result.status, "ready");
+    assert.deepEqual(result.reviewerIdentity, { schema: "pipeline.ai-assisted-hardening.v1", id: null, source: null });
+  } finally {
+    if (saved === undefined) delete process.env.PIPELINE_SECURITY_REVIEWER_ID; else process.env.PIPELINE_SECURITY_REVIEWER_ID = saved;
+    rmSync(repoRoot, { recursive: true, force: true });
+  }
 });
 
 process.stdout.write(`verify-topology-preflight: ${checks} checks passed\n`);

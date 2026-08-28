@@ -12,7 +12,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { evaluateAiHardeningGate, runIndependentChecks } from "./ai-assisted-hardening-gate.mjs";
 import { definitionInventoryRecord } from "../lib/ai-definition-inventory.mjs";
-import { requalifyForDrift } from "../lib/ai-assisted-hardening.mjs";
+import { requalifyForDrift, resolveReviewerIdentity } from "../lib/ai-assisted-hardening.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 export const VERIFY_TOPOLOGY_SCHEMA = "pipeline.verify-topology-preflight.v1";
@@ -198,8 +198,9 @@ export function resolveDeliveryBase({ explicitBase, ciEventBase, sourceBaselineC
 /**
  * Resolve the actual delivery window (base..candidate) and its changed-path
  * set, failing closed at every step instead of silently admitting an empty
- * or unresolvable window (F1/F2, `scratch/DESIGN-self-excluded-review-path.md`
- * sections B/C). `runGit` is the same `(args) => {status, stdout}` shape
+ * or unresolvable window (F1/F2,
+ * `backlog/evidence/2026-08-28-self-excluded-review-path-design.md` sections
+ * B/C). `runGit` is the same `(args) => {status, stdout}` shape
  * `preflightVerifyTopology` already takes, so this is unit-testable with the
  * same fixture pattern.
  */
@@ -267,7 +268,11 @@ export function runVerifyTopologyCli(argv = process.argv.slice(2)) {
   const runGit = (args) => defaultGit(parsed.root, args);
   const candidateCommit = runGit(["rev-parse", "--verify", `${parsed.candidateRevision}^{commit}`]).stdout;
   const authorId = runGit(["log", "-1", "--format=%ae", parsed.candidateRevision]).stdout;
-  const reviewerId = process.env.PIPELINE_SECURITY_REVIEWER_ID ?? null;
+  // There is no `--reviewer-id` flag here (unlike ai-assisted-hardening-
+  // gate.mjs's CLI): only the environment (the admin-controlled GitHub
+  // repository variable) is ever consulted, so `cliReviewerId` is absent by
+  // construction, never a widened surface added for testability.
+  const reviewerIdentity = resolveReviewerIdentity({ environmentReviewerId: process.env.PIPELINE_SECURITY_REVIEWER_ID ?? null });
 
   let changedPaths = [];
   let deliveryBase = null;
@@ -290,11 +295,16 @@ export function runVerifyTopologyCli(argv = process.argv.slice(2)) {
     runGit,
     changedPaths,
     event: process.env.GITHUB_EVENT_NAME ?? "local",
-    independentChecks: runIndependentChecks(parsed.root, changedPaths, deliveryBase?.commit ?? null, { reviewerId, authorId }),
+    independentChecks: runIndependentChecks(parsed.root, changedPaths, deliveryBase?.commit ?? null, {
+      reviewerId: reviewerIdentity.id,
+      authorId,
+      reviewerSource: reviewerIdentity.source,
+    }),
     authorId,
-    reviewerId,
+    reviewerId: reviewerIdentity.id,
   });
-  return deliveryBase ? Object.freeze({ ...result, deliveryBase }) : result;
+  const withDeliveryBase = deliveryBase ? { ...result, deliveryBase } : result;
+  return Object.freeze({ ...withDeliveryBase, reviewerIdentity });
 }
 
 if (isDirectInvocation(import.meta.url)) {
