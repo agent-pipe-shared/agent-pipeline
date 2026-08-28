@@ -3048,6 +3048,33 @@ check("planOnboardingIntakeGenerate / applyOnboardingIntakeGenerate: happy path 
   }
 });
 
+check("planOnboardingIntakeGenerate: publishes a nextAction naming intake-generate-apply with the plan's own digest, so the generic guided driver (onboarding-init.mjs, which reads ONLY nextAction) does not stall here", () => {
+  const root = readyToGenerateRoot("intake-generate-next-action");
+  const plan = planOnboardingIntakeGenerate({ rootDir: root });
+  assert.equal(plan.nextAction.kind, "command");
+  assert.equal(plan.nextAction.executable, "node");
+  assert.ok(Array.isArray(plan.nextAction.argv));
+  assert.ok(plan.nextAction.argv.every((part) => typeof part === "string"));
+  assert.equal(plan.nextAction.argv.includes("intake-generate-apply"), true);
+  assert.equal(plan.nextAction.argv.includes("--activate"), true);
+  // No digest binding is weakened: the published nextAction carries the SAME
+  // planSha256 the caller would otherwise have copied by hand -- assert the
+  // two actually agree, not merely that a --plan-sha256 flag is present.
+  const flagIndex = plan.nextAction.argv.indexOf("--plan-sha256");
+  assert.ok(flagIndex >= 0, "nextAction argv must carry --plan-sha256");
+  assert.equal(plan.nextAction.argv[flagIndex + 1], plan.planSha256);
+
+  // The published command actually works when run for real, with no field on
+  // it invented beyond what applyOnboardingIntakeGenerate itself requires.
+  const applied = applyOnboardingIntakeGenerate({
+    rootDir: root,
+    expectedPlanSha256: plan.nextAction.argv[flagIndex + 1],
+    activate: true,
+  });
+  assert.equal(applied.schema, INTAKE_GENERATE_APPLY_SCHEMA);
+  assert.equal(applied.mutated, true);
+});
+
 check("applyOnboardingIntakeGenerate: activation is required", () => {
   const root = readyToGenerateRoot("intake-generate-activation");
   const plan = planOnboardingIntakeGenerate({ rootDir: root });

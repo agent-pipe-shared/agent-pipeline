@@ -5682,6 +5682,26 @@ function buildIntakeSpecContent(checkpoint, featureId, chunks) {
  * produce the identical plan (and therefore the identical planSha256),
  * whether across a plan/apply pair or a full regeneration replay.
  */
+// NVA-D-PLANACTION: the generic guided driver (onboarding-init.mjs) is
+// deliberately generic over the `nextAction` protocol and holds no domain
+// knowledge -- it reads ONLY `nextAction`, never `applyAction` (the field
+// name most other builders in this file already use). Without this, a plan
+// carrying a real `planSha256` and a real apply command still stalled the
+// driver dead, because nothing published it under the name the driver reads.
+// Same shape as the existing `plan` -> `apply-portable-seed` convention
+// (`commandAction()` in project-onboarding-v3.mjs): `kind: "command"` with a
+// ready-to-run `{ executable, argv }`, the `--plan-sha256` already filled in
+// from the SAME value the caller would otherwise have copied by hand.
+function intakeGenerateApplyAction(root, planSha256) {
+  return {
+    kind: "command",
+    executable: "node",
+    argv: [DEFAULT_ONBOARDING_SCRIPT, "intake-generate-apply", "--root", root, "--plan-sha256", planSha256, "--activate"],
+    mutation: true,
+    requiresConfirmation: true,
+  };
+}
+
 function buildOnboardingIntakeGeneratePlan({
   rootDir, repositoryCapability = "local", spawn = defaultGitSpawn,
 } = {}) {
@@ -5730,7 +5750,7 @@ function buildOnboardingIntakeGeneratePlan({
     targets,
   };
   const planSha256 = canonicalSha256(binding);
-  return { ...binding, planSha256 };
+  return { ...binding, planSha256, nextAction: intakeGenerateApplyAction(binding.root, planSha256) };
 }
 
 export function planOnboardingIntakeGenerate(options = {}) {
