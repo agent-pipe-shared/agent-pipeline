@@ -755,6 +755,11 @@ const VERIFY_REGISTRATIONS_NVA_C_PROTECTED = [
     line: '  { name: "push-gate-satisfiability-tests", file: join(pluginScriptsDir, "push-gate-satisfiability.test.mjs") },',
     file: join(REPO_ROOT, "plugins", "pipeline-core", "scripts", "push-gate-satisfiability.test.mjs"),
   },
+  {
+    name: "chat-gate-ceremony-tests",
+    line: '  { name: "chat-gate-ceremony-tests", file: join(libDir, "chat-gate-ceremony.test.mjs") },',
+    file: join(REPO_ROOT, "plugins", "pipeline-core", "lib", "chat-gate-ceremony.test.mjs"),
+  },
 ];
 
 // A sibling of the real verify.mjs, same reasoning as GATE_STRENGTH_PREVIEW_PATH /
@@ -836,7 +841,7 @@ const STEPS = [
   { key: "gate-strength", label: `B. apply GST33-GST36 + GST14 rename to ${rel(GATE_STRENGTH_PATH)} (TP-6)`, fn: stepGateStrength },
   { key: "entrypoint", label: `C. stop EP07 recording real guard denials against this repo in ${rel(ENTRYPOINT_PATH)} (TP-8)`, fn: stepEntrypoint },
   { key: "guard-git-cwd", label: `D. set runGuard()'s spawned guard cwd to its own fixture dir in ${rel(GUARD_GIT_TEST_PATH)} (TP-1)`, fn: stepGuardGitCwd },
-  { key: "verify-nva-c-protected", label: `E. register 4 more pending suites (NVA-C-PROTECTED) in ${rel(VERIFY_PATH)} (TP-3)`, fn: stepVerifyNvaCProtected },
+  { key: "verify-nva-c-protected", label: `E. register ${VERIFY_REGISTRATIONS_NVA_C_PROTECTED.length} more pending suites (NVA-C-PROTECTED) in ${rel(VERIFY_PATH)} (TP-3)`, fn: stepVerifyNvaCProtected },
 ];
 
 const PREVIEWABLE = new Set(["gate-strength", "entrypoint", "guard-git-cwd", "verify-nva-c-protected"]);

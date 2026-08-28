@@ -52,11 +52,52 @@ export function isAttendedTerminal(dependencies = {}) {
 }
 
 /**
+ * Turns the raw bytes a human typed into the string they typed.
+ *
+ * UTF-8 first, because that is what a POSIX terminal and a UTF-8 Windows
+ * console both send. But a Windows console running a legacy Western code
+ * page (cp1252/cp850, still the default in many PowerShell and cmd.exe
+ * windows) sends `é` as the single byte 0xE9, which is not valid UTF-8:
+ * decoding it as UTF-8 yields U+FFFD, and the comparison against the value
+ * the gate just PRINTED correctly can then never succeed. Measured live
+ * 2026-08-28 on Windows, `pipeline-state.mjs po-authority-acknowledge-apply
+ * --by "André"`: the prompt displayed the name correctly, and no way of
+ * typing it was accepted -- a PO whose name carries an umlaut or accent was
+ * locked out of every chat-mode gate on that platform
+ * (backlog/items/2026-08-28-a-chat-gate-is-unusable-with-a-non-ascii-name-
+ * on-windows.md).
+ *
+ * So: strict UTF-8, and only when the bytes are NOT valid UTF-8 -- a
+ * deterministic property of the bytes themselves, not a guess or a
+ * second-chance retry -- they are read as latin1, the correct reading of
+ * that console's high bytes for every accented LETTER (cp1252 and latin1
+ * agree across 0xC0-0xFF; they differ only in the 0x80-0x9F punctuation
+ * range, which no name needs and which stays a mismatch).
+ *
+ * This widens no security boundary. The gate's proof of a live human is
+ * `isAttendedTerminal()` -- a real TTY on fd 0 -- and the typed value is a
+ * confirmation, never a secret. Reading the same keystrokes under the
+ * encoding the terminal actually used admits no input a human did not type.
+ */
+export function decodeTypedLine(bytes) {
+  const raw = Buffer.from(bytes);
+  let text;
+  try {
+    text = new TextDecoder("utf-8", { fatal: true }).decode(raw);
+  } catch {
+    text = raw.toString("latin1");
+  }
+  return text.replace(/\r$/u, "").trim();
+}
+
+/**
  * Reads one line of plain-text input from the real controlling terminal
  * (fd 0). Mirrors `po-human-approval.mjs`'s own `defaultReadConfirmation()`
  * byte for byte -- same blocking `readSync(0, ...)` loop, same EAGAIN/EOF
- * handling, same trailing-CR strip -- so this primitive inherits a property
- * already proven safe there rather than defining a second, divergent one.
+ * handling, and the same shared `decodeTypedLine()` above (imported there,
+ * not copied, so the two can no longer drift) -- so this primitive inherits
+ * a property already proven safe there rather than defining a second,
+ * divergent one.
  *
  * Callers MUST check `isAttendedTerminal()` first; this function does not
  * re-check it, so calling it against a non-TTY fd 0 would read whatever is
@@ -82,7 +123,7 @@ export function readAttendedLine(prompt, dependencies = {}) {
     if (read === 0 || buffer[0] === 10) break;
     bytes.push(buffer[0]);
   }
-  return Buffer.from(bytes).toString("utf8").replace(/\r$/u, "").trim();
+  return decodeTypedLine(bytes);
 }
 
 /**
