@@ -650,6 +650,14 @@ check("the exact runner value prepareNativeCritic sends the gate is accepted by 
         appServer: {},
         nextAction: null,
         diagnostics: [],
+        // A real `status: "ready"` observation carries these two extra keys
+        // (project-onboarding-v3.mjs); the gate's own exactKeys() check picks
+        // its expected shape from the observation's declared status, so a
+        // ready fixture must match the ready shape exactly. Kept in step
+        // with plugins/pipeline-core/lib/project-onboarding-ready-gate.mjs's
+        // READY_ONLY_RESULT_KEYS (not exported; no shared list to import).
+        pushApprovalMode: "signature",
+        trustAnchorAvailability: "present",
       };
     },
   });
