@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "b4773cfa6286c83e617919ca3658c077c67a7c30389e9d506560daa46943fcdf"
+    "transitionHead": "87f0d275e7b0b591af459f259e11f2b227c6530c68a216242a6d30ace6467260"
   },
   "counts": {
-    "open": 53,
+    "open": 54,
     "in_progress": 5,
     "closed": 377,
     "rejected": 3,
@@ -1428,6 +1428,15 @@
       "closureRepository": "self",
       "closureCommit": "695cd8e59aa7131c5c9595c1d713f6a1951d9620",
       "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
+    },
+    {
+      "id": "pipeline.design-phase-prd-and-spec-are-frozen-by-their-own-continuity-binding",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "Measured live 2026-08-28 in the Alfred clone, applying the PO's own PRD-gate decisions to the PRD and Spec the gate is about.",
+      "deferred": false
     },
     {
       "id": "pipeline.discard-feature-writes-a-state-the-cleanup-observer-rejects-and-strands-the-session",

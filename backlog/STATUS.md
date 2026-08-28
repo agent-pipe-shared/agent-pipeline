@@ -120,6 +120,7 @@
 | pipeline.cross-repository-override-ledger-binding | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.cross-repository-redirect-eligibility-does-not-consult-the-sensitive-path-boundary | closed | defect | pipeline | 2026-08-12 | — |
 | pipeline.decouple-hosted-project-document-language-from-operator-facing-language | closed | workflow-improvement | pipeline | 2026-08-09 | — |
+| pipeline.design-phase-prd-and-spec-are-frozen-by-their-own-continuity-binding | open | defect | pipeline | 2026-08-28 | — |
 | pipeline.discard-feature-writes-a-state-the-cleanup-observer-rejects-and-strands-the-session | open | defect | pipeline | 2026-08-27 | — |
 | pipeline.dispatch-provenance | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.dispatch-record-contaminates-every-critic-review | deferred | defect | pipeline | 2026-08-09 | — |
@@ -457,7 +458,7 @@
 
 ## Counts
 
-- open: 53
+- open: 54
 - in_progress: 5
 - closed: 377
 - rejected: 3
