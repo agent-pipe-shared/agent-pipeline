@@ -5,7 +5,8 @@ type: workflow-improvement
 owner: pipeline
 status: open
 created: 2026-08-27
-sprint: phoenix
+sprint: nova
+tracking: "Reassigned from phoenix to nova on 2026-08-28 by PO decision, after the Phoenix line was intaked into Nova"
 source: "Re-Critic (delta) on the Phoenix-merge rework diff 290bd599..eeebeed5, PASS with three minor findings, 2026-08-27"
 ---
 
