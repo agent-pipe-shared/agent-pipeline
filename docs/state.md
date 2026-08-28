@@ -188,10 +188,25 @@ user-facing representation, greenfield/brownfield paths). **The morning's
 must NOT be run** — the PO must never acknowledge content-soundness of
 rejected bytes.
 
-**Next:** (1) Critic round on the rework documents (MP-07 ARCHITECTURE →
-design-tier at max, tool-layer model param per MP-29); fix-then-fix cycle as
-needed. (2) Re-present to the PO. (3) On the PO's word, the verified
-bound-document route — PO attended acknowledge (`po-authority-acknowledge-plan`/
+**Rework review cycle CLOSED (2026-08-28):** round 1 full review
+(claude-opus-5 at max, candidate `2c867ea9`) **FAIL** — F1/F2 major
+(a "verbatim" field list dropping a field; the eleven contract-sufficiency
+signals audited missing but not absorbed), F3–F5 minor; fixed in
+`e3613ffe`, F4 dispositioned (stage-0 trailer would be a false fast-path
+claim; canon-gap item carries it). Round 2 bounded delta **PASS** (scoped),
+two minor residue findings fixed post-PASS in `361d6dc6` with an honest
+reviewed-surface statement. Evidence: `evidence/critic/rework-round-*`
+(`86d9e70f`, `d59c5a3b`). Fresh live evidence recorded there for two filed
+defects: Critic scratch persistence is structurally unsatisfiable in the
+lane (no Write tool, `>` refused, `node -e` refused even for exempt
+`scratch/`), and 4/16 round-2 tool uses were guard-refusal tax. Owned
+dispatch defect + corrected rule: a delta dispatch's bound base is always
+the enumerated head's parent.
+
+**Next:** (1) Re-present the reworked package to the PO (EL-19) — review
+objects: `design/agent-first-architecture.md` (tip `361d6dc6`),
+`design/gap-analysis-2026-08-28.md`, `design/po-input-2026-08-28.md`.
+(2) On the PO's word, the verified bound-document route — PO attended acknowledge (`po-authority-acknowledge-plan`/
 `-apply`, agent calls refused `CHAT-GATE-NOT-ATTENDED` by design; the marker
 carries no digest, later edits do not stale it) → `submit-plan --by Elephant
 --profile epic` → `reopen-design` (now effective; a submission exists to
