@@ -51,7 +51,8 @@ import {
 } from "./codex-onboarding-runtime.mjs";
 import { observeOnboardingAppServer } from "./codex-onboarding-app-server.mjs";
 import {
-  applyOnboardingIntakeGenerate, planOnboardingIntakeGenerate, readOnboardingSessionCleanupBinding,
+  applyOnboardingBootstrapBind, applyOnboardingIntakeGenerate, observeBootstrapBindAcknowledgement,
+  planOnboardingBootstrapBind, planOnboardingIntakeGenerate, readOnboardingSessionCleanupBinding,
 } from "./onboarding-continuity.mjs";
 import {
   cleanupSession, listActiveSessionDescriptors, retireSessionDescriptor, startSessionDescriptor,
@@ -6459,6 +6460,89 @@ test("v4Inspection routes a genuinely fresh repository through the full intake c
     assert.equal(afterGenerate.continuity.status, "absent-pristine");
     assert.equal(afterGenerate.nextAction.kind, "command");
     assert.equal(afterGenerate.nextAction.argv[1], "bootstrap-bind-plan");
+  } finally { dispose(path); }
+});
+
+test("NVA-D-ACKASK: bootstrap-binding-required asks the PO for the acknowledgement instead of naming a command that can only fail, then names bootstrap-bind-plan again once it is present and the bind succeeds", () => {
+  const path = root();
+  let stderr = "";
+  const intakeDeps = { ...fakeDeps, spawn: fakeGit };
+  const invoke = (args) => {
+    let output = "";
+    stderr = "";
+    const code = onboardingCli(args, {
+      deps: intakeDeps,
+      write: (chunk) => { output += chunk; },
+      writeError: (chunk) => { stderr += chunk; },
+    });
+    return { code, result: output ? JSON.parse(output) : null };
+  };
+  try {
+    const barrier = initializeRestartRequiredRoot(path);
+    clearRuntimeBarrier(path, barrier);
+    // Unlike the lifecycle-routing test above, this fixture supplies a
+    // --profile so a real bootstrap-bind-plan/apply can actually be
+    // exercised below -- reproducing the exact "generated" state the
+    // backlog measured, not merely a nextAction label.
+    const consented = invoke(["intake-consent-apply", "--root", path, "--granted", "--profile", "feature", "--language", "en", "--activate", "--runner", "codex"]);
+    assert.equal(consented.code, 0, stderr);
+    const captured = invoke(["intake-capture-apply", "--root", path, "--text", "Ship a safe project.", "--activate", "--runner", "codex"]);
+    assert.equal(captured.code, 0, stderr);
+    const answers = JSON.stringify([{ question: "What is the primary goal?", answer: "Ship safely." }]);
+    const answered = invoke(["intake-design-questions-apply", "--root", path, "--answers-json", answers, "--activate", "--runner", "codex"]);
+    assert.equal(answered.code, 0, stderr);
+    const genPlan = planOnboardingIntakeGenerate({ rootDir: path, repositoryCapability: "local", spawn: fakeGit });
+    const genApplied = applyOnboardingIntakeGenerate({
+      rootDir: path, repositoryCapability: "local", expectedPlanSha256: genPlan.planSha256, activate: true,
+      deps: { spawn: fakeGit },
+    });
+    assert.equal(genApplied.checkpoint.transactionState, "generated");
+
+    // DoD 1: while the marker is missing, nextAction is the ask, never the
+    // command that bootstrap-bind-plan's own refusal proves cannot succeed.
+    const before = observeBootstrapBindAcknowledgement({ rootDir: path, repositoryCapability: "local", spawn: fakeGit });
+    assert.equal(before.acknowledged, false);
+    const beforeAck = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
+    assert.equal(beforeAck.status, "bootstrap-binding-required");
+    assert.equal(beforeAck.nextAction.kind, "collect-input");
+    // DoD 3: the ask names the artifacts by repository-relative path and by digest.
+    assert.ok(beforeAck.nextAction.guidance.includes(before.prd.path));
+    assert.ok(beforeAck.nextAction.guidance.includes(before.prd.sha256));
+    assert.ok(beforeAck.nextAction.guidance.includes(before.spec.path));
+    assert.ok(beforeAck.nextAction.guidance.includes(before.spec.sha256));
+    // DoD 4: the ask states the exact marker line and that the PO adds it
+    // themselves; this diff writes it nowhere.
+    assert.ok(beforeAck.nextAction.guidance.includes(PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER));
+    assert.ok(/PO (adds|themselves)/u.test(beforeAck.nextAction.guidance));
+
+    // DoD 5: bootstrap-bind-plan's own direct refusal for a caller that
+    // skips the ask is unchanged -- still a hard exit 2, still the exact
+    // KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING code.
+    assert.throws(
+      () => planOnboardingBootstrapBind({ rootDir: path, repositoryCapability: "local", spawn: fakeGit }),
+      (error) => error?.code === "KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING",
+    );
+
+    // The PO's own act: append the marker line to the staging PRD directly
+    // (never through a code path this diff adds).
+    const prdAbsolutePath = join(path, before.prd.path);
+    const prdBytes = readFileSync(prdAbsolutePath, "utf8");
+    writeFileSync(prdAbsolutePath, `${prdBytes}\n${PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER}\n`, "utf8");
+
+    // DoD 2: once the marker is present, nextAction is bootstrap-bind-plan
+    // exactly as today, and the bind succeeds.
+    const after = observeBootstrapBindAcknowledgement({ rootDir: path, repositoryCapability: "local", spawn: fakeGit });
+    assert.equal(after.acknowledged, true);
+    const afterAck = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
+    assert.equal(afterAck.status, "bootstrap-binding-required");
+    assert.equal(afterAck.nextAction.kind, "command");
+    assert.equal(afterAck.nextAction.argv[1], "bootstrap-bind-plan");
+    const bindPlan = planOnboardingBootstrapBind({ rootDir: path, repositoryCapability: "local", spawn: fakeGit });
+    const bindApplied = applyOnboardingBootstrapBind({
+      rootDir: path, repositoryCapability: "local", expectedPlanSha256: bindPlan.planSha256, activate: true,
+      deps: { spawn: fakeGit },
+    });
+    assert.equal(bindApplied.status, "applied");
   } finally { dispose(path); }
 });
 

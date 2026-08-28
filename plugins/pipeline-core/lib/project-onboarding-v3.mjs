@@ -43,6 +43,7 @@ import {
   INTAKE_GENERATE_PLAN_SCHEMA,
   KICKOFF_GOAL_MAX_BYTES,
   KICKOFF_PROMOTION_PLAN_SCHEMA,
+  observeBootstrapBindAcknowledgement,
   planOnboardingContinuityRepair,
   planOnboardingKickoff,
   planOnboardingKickoffPromotion,
@@ -2139,6 +2140,38 @@ function bootstrapBindPlanAction(root, runner, intent) {
   );
 }
 
+// NVA-D-ACKASK: sibling of bootstrapBindPlanAction() above, offered INSTEAD of it
+// while the staging PRD does not yet carry the PO's own plan-acknowledgement marker
+// (backlog: 2026-08-28-the-guided-init-ends-in-an-error-where-it-should-ask-the-po.md).
+// bootstrap-bind-plan refuses this exact state with a raw
+// KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING exit and no interpretable
+// next step -- correct as the fail-closed floor for a direct caller, wrong as the
+// only thing a guided driver following nextAction ever sees, since the driver
+// (onboarding-init.mjs) holds no domain knowledge and cannot turn "exit 2" into
+// "ask a human". Deliberately carries no `input`/`inputs`, unlike every other
+// collect-input action in this file: there is no apply command this library may
+// name back, because the staging PRD is not yet promotion-bound, so the sanctioned
+// rebind ceremony (po-authority-acknowledge-plan/apply) does not apply to it either
+// -- po-gate-authority.mjs's own ACKNOWLEDGEMENT_REPAIR text draws exactly this line
+// for the still-freely-editable, pre-bind case: the PO adds the single marker line
+// to the PRD themselves, directly, once satisfied. This function -- and this file's
+// diff as a whole -- must never grow a writer for that line.
+function collectPrdAcknowledgementAction(prd, spec) {
+  return {
+    kind: "collect-input",
+    mutation: false,
+    requiresConfirmation: false,
+    guidance: "binding requires the PO's own acknowledgement that the generated staging plan is content-sound and"
+      + " consistent with its neighboring specification -- an agent must never supply this on the PO's behalf."
+      + ` Ask the PO to read the staging PRD at ${prd.path} (sha256 ${prd.sha256}) and the staging specification at`
+      + ` ${spec.path} (sha256 ${spec.sha256}); if and only if satisfied, the PO adds the single line`
+      + " <!-- po-plan-acknowledged: content-sound-and-spec-consistent --> on its own line to the PRD themselves --"
+      + " there is no command that writes this line on their behalf, and none should ever be offered."
+      + " Once that line is present, review the read-only bootstrap-bind-plan action, then apply it.",
+    expected: { schema: SCHEMA, statuses: ["bootstrap-binding-required"] },
+  };
+}
+
 const RESTART_EXPECTED_STATUSES = [
   "portable-seed-required", "runtime-initialization-required", "kickoff-required", "host-repository-init-required", "ready", "partial", "invalid", "unsafe",
   "migration-required", "adoption-required", "repository-mount-read-only", "repository-control-path-invalid", "git-capability-unavailable",
@@ -2530,15 +2563,37 @@ function readyLifecycleResult({ root, runner, intent, repository, runtime, conti
       });
     }
     if (transactionState === "generated") {
+      // NVA-D-ACKASK: read-only observation of whether the PO's own
+      // acknowledgement marker is present on the staging PRD yet -- decides
+      // whether nextAction may safely name bootstrap-bind-plan (it would
+      // refuse) or must ask the PO instead. Any failure here (a drifted
+      // state resolveBootstrapBindInputs()/observeBootstrapBindAcknowledgement()
+      // was never designed to see at this checkpoint stage) falls back to
+      // today's unchanged behaviour rather than crashing a read-only inspect.
+      let acknowledgement = null;
+      try {
+        acknowledgement = (fs.observeBootstrapBindAcknowledgement ?? observeBootstrapBindAcknowledgement)({
+          rootDir: root, repositoryCapability: repository.mode, spawn: fs.spawnSync,
+        });
+      } catch {
+        acknowledgement = null;
+      }
+      const needsAcknowledgement = acknowledgement !== null && acknowledgement.acknowledged === false;
       return lifecycleResult({
         status: "bootstrap-binding-required",
         root, runner, intent, repository, runtime, continuity, appServer,
-        nextAction: bootstrapBindPlanAction(root, runner, intent),
+        nextAction: needsAcknowledgement
+          ? collectPrdAcknowledgementAction(acknowledgement.prd, acknowledgement.spec)
+          : bootstrapBindPlanAction(root, runner, intent),
         diagnostics: [lifecycleDiagnostic(
           "$.continuity",
           "bootstrap_binding_required",
-          "staging PRD/spec/design-input are generated but not yet bound as authority",
-          "review the read-only bootstrap-bind-plan action, then apply it",
+          needsAcknowledgement
+            ? "staging PRD/spec/design-input are generated but the PO has not yet acknowledged the staging PRD"
+            : "staging PRD/spec/design-input are generated but not yet bound as authority",
+          needsAcknowledgement
+            ? "ask the PO to review the staging PRD and spec named in the collect-input action's guidance, then have the PO add the acknowledgement marker themselves"
+            : "review the read-only bootstrap-bind-plan action, then apply it",
         )],
       });
     }
