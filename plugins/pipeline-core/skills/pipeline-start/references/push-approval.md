@@ -42,6 +42,48 @@ this gate exists to prevent. A human may choose `chat` deliberately, for a
 project where an attribution record is the honest level of assurance. That is
 their decision to state, not a session's to suggest as a fix.
 
+## `gates.push_approval` has already decided the route — walk it, do not offer alternatives
+
+The setting is not a preference a session re-opens per push; it is a standing
+decision the human already made. When a push needs clearing, the job is to
+state which mode this repository runs, what that mode requires of the human,
+and the exact command — then wait. It is not to lay out a menu of ways past
+it. A session that offers alternatives is asking, in substance, to be let off
+the route the human configured, and a human who then has to name the plain
+route themselves ("I want to go the normal signature way — that's what it's
+for") is proof the session failed at its one job here, not proof the route was
+too heavy to state directly.
+
+**What `signature` mode actually costs the human, stated plainly: one command,
+the word `approve`, and the passphrase.** `authorize-critical` computes and
+fills in every dynamic value (the subject hash, the candidate binding, the
+expiry) before it ever reaches the human's terminal; the human's part is
+typing `approve` and then their passphrase at the prompt. That is the whole
+ceremony, and a session has no honest basis for describing it as complicated,
+burdensome, or something to route around — it isn't, on the numbers above.
+
+**Two evasions have already been observed, name them for what they are and
+why each is worse than the ceremony it dodges, not merely disallowed:**
+
+- **Proposing a mode change** (suggesting `chat` because `signature` felt
+  awkward) is covered above — it trades real proof for an attribution record
+  to make an inconvenience go away, which is exactly the habit the gate
+  exists to prevent.
+- **Offering to push it yourself, or having the human push instead of running
+  the ceremony,** is a second, distinct evasion and is not a lighter path: it
+  moves the actual work onto the human by hand, and it abandons the
+  commit-bound record the gate exists to produce in the first place. A push
+  made this way carries no proof and no attribution record — a worse outcome
+  than either mode of the ceremony it was offered as an alternative to.
+
+**An awkward or failed earlier ceremony is not evidence the route is wrong.**
+The live failures this reference documents below (a prepared approval dying
+under a fresh commit, a stale trust record, an unnamed proof file) each have a
+specific, diagnosable cause. The correct response to a confusing refusal is to
+diagnose it — read the refusal, check against the causes below, ask the
+`repair-map.mjs` planner — never to propose changing the mode or shifting the
+push onto the human because one attempt went badly.
+
 ## The classifier's refusal surface is wider than "push"
 
 Do not assume the harness auto-mode classifier only watches `git push` and
