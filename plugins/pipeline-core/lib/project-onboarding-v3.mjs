@@ -5486,12 +5486,48 @@ function proposeTrustAnchorPolicyRepairAction(directory) {
   };
 }
 
+// NVA-V17-NOKEYASK (backlog: 2026-08-28-onboarding-must-bootstrap-the-trust-
+// anchor-once.md and 2026-08-28-a-v1-trust-anchor-makes-the-signature-push-
+// route-functionless.md): the two genuine-absence statuses
+// `observeLocalTrustAnchorPointer()` distinguishes ("no-plane", "no-directory")
+// used to fall through to `pointer.anchor === null` below with no ask at all
+// -- a machine that has never had a PO signing key reached "ready" having
+// been told nothing about it, and the first person to discover the gap was
+// whoever later tried to sign a push. Third sibling of
+// `proposeTrustAnchorPointerRepairAction()`/`proposeTrustAnchorPolicyRepairAction()`
+// above -- same shape (informational `collect-input`, `mutation: false`, no
+// `executable`/`argv`; the PO creates the key themselves, this library never
+// writes to the key directory or the machine plane's poKeyDirectory on
+// anyone's behalf), its own distinct `input.name` and guidance so a "no key
+// at all" message never reads as either dead-pointer repair message: "no key
+// exists yet" and "a key's pointer is broken" are different situations with
+// different remedies.
+function proposeTrustAnchorAbsentGuidanceAction() {
+  return {
+    kind: "collect-input",
+    input: {
+      name: "trustAnchorAbsentAcknowledged",
+      encoding: "utf8",
+      trim: true,
+      minBytes: 1,
+      maxBytes: TRUST_ANCHOR_ACK_MAX_BYTES,
+      singleLine: true,
+      rejectNul: true,
+    },
+    mutation: false,
+    requiresConfirmation: false,
+    guidance: "this machine has no PO signing key recorded at all -- not a broken pointer, a genuine absence. The signature push route (pipeline.user.yaml's gates.push_approval: \"signature\") cannot work until one exists: tell the PO exactly this, and that they create it themselves, outside this session, by running `po-human-approval.mjs setup --repo-root <repo> --directory <external-dir> --human-name \"<the human this key's approvals will be attributed to>\"` (add `--key-reference <id>` for a non-default reference); this library never writes to a key directory or to the machine plane's poKeyDirectory on anyone's behalf, and a project with no signing key still reaches \"ready\" -- it simply cannot sign a push yet. Reply with a short acknowledgment (\"done\" or \"skip\") once the PO has seen this, whether or not they acted on it now.",
+    expected: { schema: SCHEMA, statuses: PORTABLE_APPLY_IDENTITY_ASK_STATUSES },
+  };
+}
+
 // Sibling of `withPendingPushApprovalSetupAsk()` immediately above -- unlike
 // that ask (which now fires unconditionally, every repository), this one
 // keeps its own gate and fires ONLY once the machine HAS already answered
 // (`unresolvedMachinePushApprovalSetup()` false), proposing
 // a repository-scoped materialization snippet instead of the machine-scoped
-// question.
+// question -- EXCEPT for the two genuine-absence statuses below, which fire
+// regardless of that gate (see their own paragraph).
 //
 // NVA-V6-ANCHORREPORT: reads `observeLocalTrustAnchorPointer()` directly
 // (not the thin `detectExistingLocalTrustAnchor()` wrapper other callers
@@ -5499,17 +5535,30 @@ function proposeTrustAnchorPolicyRepairAction(directory) {
 // pointer statuses ("broken-pointer", "malformed-policy") can each raise
 // their own distinct ask instead of silently matching the `anchor === null`
 // branch a genuine no-key machine ("no-plane", "no-directory") also takes.
-// Those two genuine-absence statuses fall through to that same branch
-// UNCHANGED -- `pointer.anchor` is `null` for them exactly as it always was,
-// so this closes only the two repairable-fault statuses, byte-for-byte
-// preserving every other status's existing behaviour (including "found",
-// still routed through `proposeTrustAnchorMaterializationAction()` exactly
-// as before).
+//
+// NVA-V17-NOKEYASK: those two genuine-absence statuses no longer fall
+// through to silence -- they raise `proposeTrustAnchorAbsentGuidanceAction()`
+// above, checked BEFORE `unresolvedMachinePushApprovalSetup()` deliberately:
+// `unresolvedMachinePushApprovalSetup(fs)` reads the exact same machine plane
+// `observeLocalTrustAnchorPointer()` does and is true under precisely the
+// same condition "no-plane" is (`plane.status !== "valid"`), so checking
+// pointer status first, ahead of that gate, changes behaviour ONLY for
+// "no-plane" -- every other status ("no-directory", "broken-pointer",
+// "malformed-policy", "found") requires a valid plane by construction, so
+// `unresolvedMachinePushApprovalSetup(fs)` is already false by the time any
+// of those branches below is reached and its later call is a no-op for them,
+// byte-for-byte preserving "broken-pointer"/"malformed-policy"/"found"'s
+// existing behaviour (including "found", still routed through
+// `proposeTrustAnchorMaterializationAction()` exactly as before, still
+// gated on push-approval-setup being resolved).
 function withPendingTrustAnchorGuidanceAsk(observed, fs) {
   if (observed.repository?.mode !== "local") return observed;
   if (!PORTABLE_APPLY_IDENTITY_ASK_STATUSES.includes(observed.status)) return observed;
-  if (unresolvedMachinePushApprovalSetup(fs)) return observed;
   const pointer = observeLocalTrustAnchorPointer(fs);
+  if (pointer.status === "no-plane" || pointer.status === "no-directory") {
+    return { ...observed, trustAnchorGuidanceAction: proposeTrustAnchorAbsentGuidanceAction() };
+  }
+  if (unresolvedMachinePushApprovalSetup(fs)) return observed;
   if (pointer.status === "broken-pointer") {
     return { ...observed, trustAnchorGuidanceAction: proposeTrustAnchorPointerRepairAction(pointer.directory) };
   }

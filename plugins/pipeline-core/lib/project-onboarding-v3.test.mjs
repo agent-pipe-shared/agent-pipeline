@@ -2697,11 +2697,16 @@ test("NVA-V1-KEYDIRPTR: observeLocalTrustAnchorPointer distinguishes a broken po
 // apply-portable-seed CLI flow -- not just be typed correctly in isolation
 // (the test above), but actually reach `trustAnchorGuidanceAction` instead of
 // being swallowed by the `anchor === null` branch a genuine no-key machine
-// also takes. The genuine-absence statuses ("no-plane" is exercised directly
-// against `observeLocalTrustAnchorPointer()` above; "no-directory" is pinned
-// here at the ask level, the level this bug actually lived at) must keep
-// producing no ask at all, byte for byte.
-test("NVA-V6-ANCHORREPORT: a broken pointer and a malformed policy each raise their own distinct, informational ask; a genuine no-key machine still raises none", () => {
+// also takes.
+//
+// Part (c) below originally pinned "no-directory raises no ask at all" --
+// NVA-V17-NOKEYASK (backlog: 2026-08-28-onboarding-must-bootstrap-the-trust-
+// anchor-once.md) deliberately supersedes exactly that: a genuine no-key
+// machine now raises its OWN distinct, informational ask too (see the
+// dedicated NVA-V17-NOKEYASK test below for the full assertion set on that
+// ask's shape and its "no-plane" sibling). Part (c) here is updated to match
+// -- the two dead-pointer asks (a)/(b) above are untouched by this dispatch.
+test("NVA-V6-ANCHORREPORT: a broken pointer and a malformed policy each raise their own distinct, informational ask; a genuine no-key machine now raises its own distinct ask too (NVA-V17-NOKEYASK)", () => {
   const brokenRoot = root();
   const malformedRoot = root();
   const noDirRoot = root();
@@ -2770,14 +2775,132 @@ test("NVA-V6-ANCHORREPORT: a broken pointer and a malformed policy each raise th
     // (c) no-directory: the genuine no-key case (pinned at the ASK level,
     // where the original bug actually lived -- observeLocalTrustAnchorPointer
     // was already typed correctly, this is the caller that used to collapse
-    // it back into silence). Must raise no ask at all, exactly as before.
+    // it back into silence). NVA-V17-NOKEYASK: now raises its own distinct
+    // ask, never the same message/input.name as (a)'s broken-pointer or
+    // (b)'s malformed-policy ask above.
     const noDir = applyFresh(noDirRoot, depsWithKeyDir(null));
     assert.equal(noDir.code, 0);
-    assert.equal(Object.prototype.hasOwnProperty.call(noDir.result, "trustAnchorGuidanceAction"), false,
-      "a genuine no-key machine must still raise no ask at all");
+    const noDirAction = noDir.result.trustAnchorGuidanceAction;
+    assert.equal(noDirAction.kind, "collect-input");
+    assert.equal(noDirAction.mutation, false);
+    assert.equal(Object.prototype.hasOwnProperty.call(noDirAction, "executable"), false,
+      "informational only -- nothing agent-runnable to create a key");
+    assert.equal(Object.prototype.hasOwnProperty.call(noDirAction, "argv"), false,
+      "informational only -- nothing agent-runnable to create a key");
+    assert.match(noDirAction.guidance, /no PO signing key recorded/u);
+    assert.notEqual(noDirAction.input.name, brokenAction.input.name);
+    assert.notEqual(noDirAction.input.name, malformedAction.input.name);
+    assert.notEqual(noDirAction.guidance, brokenAction.guidance);
+    assert.notEqual(noDirAction.guidance, malformedAction.guidance);
   } finally {
     dispose(brokenRoot); dispose(malformedRoot); dispose(noDirRoot);
     rmSync(malformedKeyDir, { recursive: true, force: true });
+  }
+});
+
+// NVA-V17-NOKEYASK (backlog: 2026-08-28-onboarding-must-bootstrap-the-trust-
+// anchor-once.md and 2026-08-28-a-v1-trust-anchor-makes-the-signature-push-
+// route-functionless.md): a machine with no PO signing key at all -- neither
+// status `observeLocalTrustAnchorPointer()` reports for a genuine absence
+// ("no-plane": no valid machine plane; "no-directory": a valid plane with no
+// poKeyDirectory recorded) -- used to reach `ready` having been told nothing
+// about it: `freshCriticalHumanProofPolicyBytes` seeds a bare v1 policy with
+// no trust anchor, `pushGateSatisfiable` stays false, and no ask fires. This
+// closes that silence with one new informational ask, reachable on BOTH
+// statuses and on both the apply-portable-seed and the ordinary inspect
+// composition path.
+test("NVA-V17-NOKEYASK: a machine with no PO signing key at all is told so, once, informationally, on both no-plane and no-directory, and on both composition paths", () => {
+  const noPlaneRoot = root();
+  const noDirRoot = root();
+  const readyRoot = root();
+  const invoke = (args, deps) => {
+    let output = "";
+    const code = onboardingCli(args, { deps, write: (chunk) => { output += chunk; } });
+    return { code, result: JSON.parse(output) };
+  };
+  const applyFresh = (rootDir, deps) => {
+    const planned = invoke(["plan", "--root", rootDir, "--runner", "codex"], deps);
+    const digest = planned.result.nextAction.argv[planned.result.nextAction.argv.indexOf("--plan-sha256") + 1];
+    return invoke(["apply-portable-seed", "--root", rootDir, "--plan-sha256", digest, "--activate", "--runner", "codex"], deps);
+  };
+  const noPlaneDeps = { ...fakeDeps, readMachinePlane() { return { status: "absent", plane: null }; } };
+  try {
+    // (a) no-plane: no valid machine plane at all.
+    const noPlane = applyFresh(noPlaneRoot, noPlaneDeps);
+    assert.equal(noPlane.code, 0);
+    const noPlaneAction = noPlane.result.trustAnchorGuidanceAction;
+    assert.ok(noPlaneAction, "a no-plane machine must raise the new informational ask");
+    assert.equal(noPlaneAction.kind, "collect-input");
+    assert.equal(noPlaneAction.mutation, false, "informational only, per DoD");
+    assert.equal(Object.prototype.hasOwnProperty.call(noPlaneAction, "executable"), false,
+      "informational only -- nothing agent-runnable to create a key");
+    assert.equal(Object.prototype.hasOwnProperty.call(noPlaneAction, "argv"), false,
+      "informational only -- nothing agent-runnable to create a key");
+    assert.match(noPlaneAction.guidance, /no PO signing key recorded/u);
+    assert.match(noPlaneAction.guidance, /signature push route .* cannot work until one exists/u);
+    assert.match(noPlaneAction.guidance, /po-human-approval\.mjs setup/u);
+    assert.match(noPlaneAction.guidance, /--repo-root/u);
+    assert.match(noPlaneAction.guidance, /--directory/u);
+    assert.match(noPlaneAction.guidance, /--human-name/u);
+    assert.match(noPlaneAction.guidance, /PO .*themselves|themselves.*PO/u);
+
+    // (b) no-directory: a valid plane, but no poKeyDirectory recorded --
+    // fakeDeps's own default shape. The same "genuine absence" message, not
+    // a distinct one per status: there is nothing status-specific to say.
+    const noDir = applyFresh(noDirRoot, fakeDeps);
+    assert.equal(noDir.code, 0);
+    const noDirAction = noDir.result.trustAnchorGuidanceAction;
+    assert.ok(noDirAction, "a no-directory machine must raise the new informational ask");
+    assert.deepEqual(noDirAction, noPlaneAction,
+      "no-plane and no-directory are both a genuine absence and must raise the identical informational ask");
+
+    // Distinguishable from the two dead-pointer asks (own input.name).
+    assert.notEqual(noDirAction.input.name, "trustAnchorPointerRepairAcknowledged");
+    assert.notEqual(noDirAction.input.name, "trustAnchorPolicyRepairAcknowledged");
+
+    // The ask reaches the ORDINARY inspect path too (NVA-V13-ASKWINDOW's
+    // nextAction.pendingAsks channel), not only apply-portable-seed --
+    // the path a re-entrant session actually uses, broken until cceafb06.
+    const inspected = invoke(["inspect", "--root", noDirRoot, "--runner", "codex"], fakeDeps);
+    assert.equal(inspected.code, 0);
+    assert.equal(inspected.result.status, noDir.result.status);
+    const pendingNames = (inspected.result.nextAction?.pendingAsks ?? []).map((ask) => ask.input?.name);
+    assert.ok(pendingNames.includes("trustAnchorAbsentAcknowledged"),
+      "an ordinary inspect must surface the same no-key ask apply-portable-seed already published");
+    const pendingAsk = inspected.result.nextAction.pendingAsks.find((ask) => ask.input?.name === "trustAnchorAbsentAcknowledged");
+    assert.equal(pendingAsk.mutation, false);
+    assert.equal(Object.prototype.hasOwnProperty.call(pendingAsk, "executable"), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(pendingAsk, "argv"), false);
+
+    // The `ready` status is unaffected -- checked against the REAL,
+    // unliftable, fail-closed ready gate, not a hand-typed shape assumption.
+    // fakeDeps's own default machine plane (poKeyDirectory: null) is exactly
+    // the "no-directory" case this dispatch adds an ask for, so this also
+    // proves a project with no signing key still reaches "ready".
+    const barrier = initializeRestartRequiredRoot(readyRoot);
+    clearRuntimeBarrier(readyRoot, barrier);
+    completeKickoff(readyRoot);
+    const readyObserved = inspectProjectOnboardingV3({ rootDir: readyRoot, intent: "onboarding", runner: "codex", deps: fakeDeps });
+    assert.equal(readyObserved.status, "ready");
+    assert.equal(readyObserved.nextAction, null,
+      "a ready observation must still carry a null nextAction, never a pendingAsks-bearing object");
+    const readyReceipt = requireProjectOnboardingReady({
+      rootDir: readyRoot,
+      intent: "onboarding",
+      runner: "codex",
+      inspect: ({ rootDir: r, intent: i, runner: rn }) => inspectProjectOnboardingV3({ rootDir: r, intent: i, runner: rn, deps: fakeDeps }),
+    });
+    assert.equal(readyReceipt.status, "ready");
+    assert.equal(readyReceipt.schema, "pipeline.project-onboarding-ready-gate.v1");
+
+    // freshCriticalHumanProofPolicyBytes must keep seeding exactly the bare
+    // v1 fallback for the genuine no-key case -- this dispatch adds a
+    // message, it does not change what is seeded (pinned already by
+    // NVA-V1-KEYDIRPTR; re-asserted here at this test's own fixtures too).
+    assert.equal(JSON.parse(freshCriticalHumanProofPolicyBytes(noPlaneDeps)).schema, "pipeline.critical-human-proof-policy.v1");
+    assert.equal(JSON.parse(freshCriticalHumanProofPolicyBytes(fakeDeps)).schema, "pipeline.critical-human-proof-policy.v1");
+  } finally {
+    dispose(noPlaneRoot); dispose(noDirRoot); dispose(readyRoot);
   }
 });
 
