@@ -7,6 +7,7 @@
 
 | Date range | Summary | Archive |
 |---|---|---|
+| 2026-08-28 | Phoenix-line handover pointer stub; its body was rotated earlier and lives in the archive already | [docs/state-archive/2026-08-28--phoenix-line-history-superseded-by-the-nova-line-above-prese.md](state-archive/2026-08-28--phoenix-line-history-superseded-by-the-nova-line-above-prese.md) |
 | 2026-08-28 | 0.6.0 local candidate green in one run (EP07 root cause fixed); AK status incl. the unwireable AK-5 guard; open combined-release decision carried forward into the current handover | [docs/state-archive/2026-08-28--prior-handover-verify-is-green-in-one-run-candidate-0-6-0-lo.md](state-archive/2026-08-28--prior-handover-verify-is-green-in-one-run-candidate-0-6-0-lo.md) |
 | 2026-08-28 | Nova line: backlog-ledger merge semantics (ADR-0068), ADR renumbering (ADR-0069) and the first handover rotation | [docs/state-archive/2026-08-28--prior-handover-ledger-merge-capability-adr-renumbering-hando.md](state-archive/2026-08-28--prior-handover-ledger-merge-capability-adr-renumbering-hando.md) |
 | 2026-08-27 | sprint_agy fetch, fast-forward, and the 2026-08-26 clean local candidate | [docs/state-archive/2026-08-27--prior-handover-sprint-agy-fetch-fast-forward-and-clean-local.md](state-archive/2026-08-27--prior-handover-sprint-agy-fetch-fast-forward-and-clean-local.md) |
@@ -251,11 +252,28 @@ approved the reworked package. The bound-document route then ran end to end:
    PRD, spec and acceptance; `technical-spec-sha256` recomputed to
    `fc653b72…`.
 
-**Next:** (1) The graduated bytes owe the spec §12 design-phase review duty a
-round: an independent Critic review of `eba804e6` (+ the two doctrine
-amendments `2b0ee8c7`, `9c9d9819`) against the doctrine and gap-analysis as
-contract, ARCHITECTURE route at max per MP-07. Fix findings, then
-(2) `submit-plan --by Elephant --profile epic` again (sanctioned
+**Graduation Critic round 1 — FAIL (scoped), fixed** (`2da2d609`,
+`6dd2e8cd`). ARCHITECTURE route, fable at max, enumerated SHAs `2b0ee8c7`,
+`9c9d9819`, `eba804e6`. F1 (major) is the one that matters: the gap analysis
+§E had explicitly promised the PRD §9 rework would put a sequencing choice to
+the PO, and the graduation instead defaulted it to the design's own
+recommendation and wrote "Open at this gate: none". Restored as PRD §9
+decision 6 with its cost stated. F2 (major, unfixed by design): no
+`Dispatch:` trailer form exists for direct Elephant design commits — stamping
+`stage-0 (elephant)` on a 474-line authority rework would be a false
+classification, worse than the honest `UNVERIFIABLE`; the canon gap item
+carries it. F3–F5 minor: duplicate list number and dangling `(§2.9)` fixed;
+the spec's re-entry reading order replaced with doctrine §3.2's own six steps
+under the conflict rule; the integration map corrected to the executed
+deviations. Third live measurement of the Critic scratch-persistence defect
+(no write lane at all — report persisted by the Elephant). Owned dispatch
+defect: a commit-adjacency claim asserted from memory instead of read from
+`git log`.
+
+**Next:** (1) **PO decision 6** (PRD §9) — pull D-track work earlier than
+Wave 2, or keep the current order? Recommendation: keep it. This is the only
+open gate item; the plan is not approved before it is answered.
+(2) Then `submit-plan --by Elephant --profile epic` again (sanctioned
 reopen→submit→approve path) → PO `approve-plan`. Implementation stays gated
 on Nova landing on `main` + rebase. Standing gate-visible items: the
 Dispatch-trailer canon gap (`evidence/critic/round-1-response.md`) and the
@@ -410,20 +428,6 @@ line's own checkpoint 71, see the history section below).
 - specs/2026-07-19-sprint-sentinel-epic/RECOVERY.md
 - specs/2026-07-19-sprint-sentinel-epic/platform-support-contract.md
 - specs/2026-07-19-sprint-sentinel-epic/windows-blockers-scope.md
-
----
-
-## Phoenix-line history (superseded by the Nova line above — preserved in full, not deleted)
-
-> **Nova is the active state.** Below is `sprint_phoenix`'s own handover
-> exactly as it stood at that branch's last checkpoint (71, 2026-08-23)
-> before this merge — kept in full per PO instruction, as HISTORY. Any
-> "(READ THIS FIRST)"/"Next step" text inside it was live only on the
-> Phoenix line; the "Current handover" section above is the live one now.
-> Phoenix's own "Archived history" table and Sentinel-links list are
-> already folded into the sections above, not repeated here.
-
-**Last updated (Phoenix line):** 2026-08-23 (checkpoint 71)
 
 ---
 
