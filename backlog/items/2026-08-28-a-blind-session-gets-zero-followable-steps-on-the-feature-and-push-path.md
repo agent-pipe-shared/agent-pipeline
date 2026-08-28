@@ -57,6 +57,34 @@ run. This is that same defect, still live, on the first step of the path.
 done. The onboarding CLI's driver distinguishes `ready` from everything else on exactly
 that field.
 
+## The failure mode is not a dead end. It is a fork with no marker.
+
+The blind walk stops, because it is built to. **A real agent does not stop — it
+chooses.** That is the actual damage, and it is worse than a stall (PO, 2026-08-28: *"das
+ist ja das Ding, dass er immer mehrere Routen zur Wahl hat und oft die falsche geht"*).
+
+The prose above even names a command, so an agent reads it, finds the placeholders
+unfilled, and improvises the rest from a menu of 59 equally-reachable siblings. Nothing in
+the output says which is correct, and nothing says *do not choose*.
+
+This is already recorded happening, at the worst possible step:
+
+- `2026-08-27-a-runner-improvised-the-po-signature-instructions.md` — an agent handed the
+  PO a repository-relative path for a command to be run in a *different* repository, then,
+  having no working command, **invented a `sign-digest` subcommand that does not exist**
+  and told the PO it might not exist. A signing ceremony is precisely where the human
+  cannot check the agent's work, because the whole point is that the human contributes a
+  secret the agent must not see.
+- `2026-08-28-the-codex-runner-needed-three-sessions-for-one-small-feature.md` and
+  `2026-08-09-two-minor-happy-path-retries-in-the-final-codex-run.md` — the same class,
+  measured as wasted sessions rather than as a wrong command.
+
+So "publish a `nextAction`" is necessary but not sufficient. The property that actually
+closes this is **exactly one published next step per reachable state, runnable as given**
+— so that choosing is not a thing the agent is invited to do at all. A menu with a
+recommendation still leaves an agent free to take the wrong item; a single published
+action does not.
+
 ## The surface a fresh session actually faces
 
 `pipeline-state.mjs --help` lists **59 commands** in one flat, unordered line, with
@@ -90,8 +118,12 @@ way it goes, a blind driver must never receive a string where it expects an acti
 
 - `scratch/smoke-blind-push.mjs` reports a chained-command count greater than zero, and
   every stop it reaches is a genuine human decision rather than a missing field.
+- **Exactly one** next step is published per reachable state on the happy path — not a
+  ranked menu, not a recommendation among alternatives. A test asserts singularity, since
+  that is the property that removes the choice rather than merely informing it.
 - No command a blind session is handed contains a placeholder. Every published action is
-  runnable as given.
+  runnable as given. A test asserts no published argv element matches a `<...>` placeholder
+  shape — the improvised-`sign-digest` incident began with exactly such a gap.
 - `nextAction` has exactly one meaning wherever a driver can read it, and a test asserts
   no result publishes a non-action value under that name.
 - The push signature remains a stop no driver-executable action can satisfy, asserted by
