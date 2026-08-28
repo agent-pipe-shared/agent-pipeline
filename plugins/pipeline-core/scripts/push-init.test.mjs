@@ -314,17 +314,48 @@ test("drivePushInit: re-entrant -- two consecutive calls from unchanged state pr
 // ---------------------------------------------------------------------------
 // Real-repo integration: the one genuinely spawned step (check-doc-reconciliation.mjs),
 // run for real, against this repository's own real HEAD -- mirrors push-prepare.test.mjs's
-// own D3 exception. Loose assertions only (shape, not exact finding text), since this
-// repository's own reconciliation state can legitimately change over time.
+// own D3 exception. This repository's own reconciliation state can legitimately change over
+// time (it did: commit b84fd343 turned a real finding this check used to fail into a pass),
+// so this test asserts the INVARIANT that holds either way rather than one fixed shape:
+// step 1 is always the real spawn, argv[0] always names the real script, and the driver's
+// own continue-or-stop decision must follow THAT spawn's own `ok`, never a guess -- it stops
+// at exactly one step with the failure named when the real verdict is a fail, and it must
+// have continued past layer 1b (never re-reporting doc-reconciliation as a failing check)
+// when the real verdict is a pass. A fixed `steps.length === 1` expectation would (and did)
+// silently re-encode "the repository currently has an outstanding finding" as if it were a
+// property of the driver -- it is not; only the follow-verdict behavior is.
 // ---------------------------------------------------------------------------
 
 test("drivePushInit: real repo -- layer 1b actually spawns check-doc-reconciliation.mjs and surfaces ITS real verdict, never a guess", () => {
   const result = drivePushInit({ rootDir: REPO_ROOT, by: "tester", remote: "origin", destination: "refs/heads/main", base: "HEAD~1" });
-  assert.equal(result.steps.length, 1, "must stop at step 1 either way -- ready or precondition-unmet, never proceed on a guess");
-  assert.equal(result.steps[0].id, "doc-reconciliation");
-  assert.equal(result.steps[0].argv[0], join(REPO_ROOT, RECONCILIATION_SCRIPT_RELATIVE_PATH));
-  assert.ok(["precondition-unmet", "signature-required"].includes(result.outcome), result.outcome);
-  if (result.outcome === "precondition-unmet") {
+  // Layer 1b is always step 1, and it is a real spawn against the real script, not a guess --
+  // true regardless of the reconciliation outcome.
+  assert.ok(result.steps.length >= 1, "layer 1b must always run and be recorded as step 1");
+  const reconciliationStep = result.steps[0];
+  assert.equal(reconciliationStep.id, "doc-reconciliation");
+  assert.equal(reconciliationStep.executable, "node");
+  assert.equal(reconciliationStep.argv[0], join(REPO_ROOT, RECONCILIATION_SCRIPT_RELATIVE_PATH));
+  assert.equal(typeof reconciliationStep.exitCode, "number", "a real subprocess always reports a numeric exit code");
+
+  if (reconciliationStep.ok === false) {
+    // The real script's own real failure: the driver must stop immediately on it, never
+    // proceed on a guess, and surface that script's own verdict (not an invented one).
+    assert.equal(result.outcome, "precondition-unmet", JSON.stringify(result, null, 2));
+    assert.equal(result.steps.length, 1, "a failing real verdict must stop the driver at step 1, never proceed");
+    assert.equal(result.checks.length, 1);
     assert.equal(result.checks[0].id, "doc-reconciliation");
+    assert.equal(result.checks[0].ok, false);
+    assert.equal(typeof result.checks[0].message, "string");
+    assert.ok(result.checks[0].message.length > 0, "the surfaced verdict must carry the real script's own message, not a placeholder");
+  } else {
+    // The real script's own real pass: the driver must have continued past layer 1b on the
+    // strength of THAT verdict -- never stopping at step 1 as though it failed, and never
+    // re-reporting doc-reconciliation as a failing check further down.
+    assert.equal(reconciliationStep.exitCode, 0);
+    assert.ok(result.steps.length > 1, "a passing real verdict must let the driver continue past layer 1b, never stop as if it failed");
+    assert.ok(["precondition-unmet", "error", "signature-required"].includes(result.outcome), result.outcome);
+    if (result.outcome === "precondition-unmet") {
+      assert.equal(result.checks.some((check) => check.id === "doc-reconciliation"), false, "layer 1b already passed; it must not resurface as a failing check");
+    }
   }
 });
