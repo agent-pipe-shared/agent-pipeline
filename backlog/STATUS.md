@@ -125,6 +125,7 @@
 | pipeline.cross-repository-override-ledger-binding | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.cross-repository-redirect-eligibility-does-not-consult-the-sensitive-path-boundary | closed | defect | pipeline | 2026-08-12 | — |
 | pipeline.decouple-hosted-project-document-language-from-operator-facing-language | closed | workflow-improvement | pipeline | 2026-08-09 | — |
+| pipeline.delivery-is-not-always-a-git-push | open | improvement | pipeline | 2026-08-28 | Backlog / someday — PO-raised 2026-08-28; not blocking the Nova candidate, but it decides whether the release model fits a whole class of the PO's repositories |
 | pipeline.discarded-feature-dead-end | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — delivered 2026-08-28, same session it was reported |
 | pipeline.dispatch-provenance | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.dispatch-record-contaminates-every-critic-review | deferred | defect | pipeline | 2026-08-09 | — |
@@ -209,6 +210,7 @@
 | pipeline.guard-string-match-makes-a-file-uncommittable | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.guard-testpath-not-kernel-protected | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.guard-testpath-override-ot09-stale-literal-pattern | closed | defect | pipeline | 2026-08-19 | — |
+| pipeline.guided-init-ends-in-error-not-a-question | open | defect | pipeline | 2026-08-28 | NOW / Nova A — the last gap between the guided init and a usable end-to-end path, and the exact wall a consumer project hit independently the same day |
 | pipeline.gwm-kernel-doc-enumeration-diverges-from-the-code-array | closed | defect | pipeline | 2026-08-25 | — |
 | pipeline.h-ac-11-restricted-profile-intake-record-is-design-increment-2 | closed | requirement | pipeline | 2026-08-18 | — |
 | pipeline.handover-file-exceeds-its-own-size-cap-after-the-phoenix-merge | closed | defect | pipeline | 2026-08-27 | — |
@@ -493,7 +495,7 @@
 
 ## Counts
 
-- open: 84
+- open: 86
 - in_progress: 3
 - closed: 384
 - rejected: 3
