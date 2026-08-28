@@ -16,13 +16,18 @@
  * against an already-closed window
  * (backlog/items/2026-08-28-an-expired-override-is-armed-instead-of-refused.md):
  * `authorizeHumanGuardOverrideBySignature()` (`lib/human-guard-override.mjs`)
- * copies a plan's `expiresAt` into the capability WITHOUT comparing it to
- * now, so it reports `{"status":"armed"}` for a window that has already
- * closed; only `consumeHumanGuardOverride()` checks, at retry time, and the
- * retry then fails looking exactly like a first denial. This tool's
- * `signature-window` check independently re-derives that same comparison,
- * advisory-only and read-only, so the hazard is visible BEFORE a human is
- * asked to sign anything, not discovered by burning a signature on it.
+ * used to copy a plan's `expiresAt` into the capability WITHOUT comparing it
+ * to now, so it reported `{"status":"armed"}` for a window that had already
+ * closed; only `consumeHumanGuardOverride()` checked, at retry time, and the
+ * retry then failed looking exactly like a first denial. Commit `87a94007`
+ * fixed this at both arming routes (`authorizeHumanGuardOverride()` and
+ * `authorizeHumanGuardOverrideBySignature()`) by refusing to arm a capability
+ * past its own plan window in the first place. Capabilities armed BEFORE
+ * that fix can still exist on disk, still self-reporting `"armed"` with a
+ * closed window -- this tool's `signature-window` check independently
+ * re-derives the same expiry comparison, advisory-only and read-only, so
+ * such a legacy hazard is visible BEFORE a human is asked to sign anything,
+ * not discovered by burning a signature on it.
  *
  * FAMILY, NOT DUPLICATION. `push-prepare.mjs` (NVA-PUSH-PREPARE) already
  * answers a similar-shaped question, but it requires `--by/--remote
@@ -193,14 +198,17 @@ export function resolveGitCommonDir(dir, deps = {}) {
 }
 
 /**
- * Advisory-only, read-only re-derivation of the ONE comparison `authorizeHumanGuardOverrideBySignature()`
- * skips and `consumeHumanGuardOverride()` alone performs (`lib/human-guard-override.mjs`,
- * confirmed live 2026-08-28): whether an armed capability's `expiresAt` has already passed, or
- * is about to. Reads the capability store directly (no MAC verification -- that is the
- * authoritative system's own integrity concern at consumption time, not this preflight's; a
- * record this function cannot parse or that carries no armed/expiresAt shape is skipped, never
- * treated as a hazard it cannot support). Never the deciding word on whether a capability is
- * valid -- only on whether spending a fresh signature into this store right now is safe.
+ * Advisory-only, read-only re-derivation of the expiry comparison `consumeHumanGuardOverride()`
+ * performs at retry time (`lib/human-guard-override.mjs`): whether an armed capability's
+ * `expiresAt` has already passed, or is about to. Both arming routes now refuse to arm a
+ * capability past its own plan window in the first place (commit `87a94007`), but a capability
+ * armed BEFORE that fix can still exist on disk, still self-reporting `"armed"` with a closed
+ * window (confirmed live 2026-08-28) -- this check catches exactly that legacy case. Reads the
+ * capability store directly (no MAC verification -- that is the authoritative system's own
+ * integrity concern at consumption time, not this preflight's; a record this function cannot
+ * parse or that carries no armed/expiresAt shape is skipped, never treated as a hazard it
+ * cannot support). Never the deciding word on whether a capability is valid -- only on whether
+ * spending a fresh signature into this store right now is safe.
  */
 export function checkSignatureWindow(dir, deps = {}) {
   const id = "signature-window";
@@ -240,8 +248,9 @@ export function checkSignatureWindow(dir, deps = {}) {
         severity: 3, status: "expired-armed-capability", ok: false,
         message: `${name} self-reports status "armed" but its window closed at ${capability.expiresAt} `
           + `(now ${new Date(nowMs).toISOString()}); consuming or signing against it would burn a human signature for nothing -- `
-          + "authorizeHumanGuardOverrideBySignature() does not compare expiresAt to now when arming, only consumeHumanGuardOverride() "
-          + "does, at retry time (plugins/pipeline-core/lib/human-guard-override.mjs). Re-plan and re-sign with a fresh window instead.",
+          + "this is a capability armed before commit 87a94007 fixed arming to refuse past its own plan window; only "
+          + "consumeHumanGuardOverride() still checks such a legacy capability, at retry time (plugins/pipeline-core/lib/"
+          + "human-guard-override.mjs). Re-plan and re-sign with a fresh window instead.",
       };
     } else if (remainingMs <= SIGNATURE_WINDOW_NEAR_EXPIRY_MS) {
       candidate = {
