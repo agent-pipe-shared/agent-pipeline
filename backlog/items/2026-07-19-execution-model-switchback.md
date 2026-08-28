@@ -3,10 +3,14 @@ schema: "pipeline.backlog-item.v1"
 id: "pipeline.execution-model-switchback"
 type: "workflow-improvement"
 owner: "pipeline"
-status: "in_progress"
+status: "closed"
 created: "2026-07-19"
+closed_at: "2026-08-28"
+closure_repository: "self"
+closure_commit: "42256fd63d80670303506cefba3a04c64df94260"
+closure_evidence: "backlog/items/2026-07-19-execution-model-switchback.md"
 source: "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md"
-tracking: "Sentinel recovery baseline; no completion claim."
+tracking: "Closed 2026-08-28 by PO scope narrowing; candidate-binding out of scope."
 ---
 
 # pipeline.execution-model-switchback
@@ -349,3 +353,44 @@ was assessed but not built this pass, given the hot-path cost above.
 `plugins/pipeline-core/lib/route-receipt.mjs`. No status/Closure change;
 `status:` left exactly as found (`in_progress`) per this dispatch's own
 briefing constraints. **Date:** 2026-08-25
+
+## Closure — PO decision, 2026-08-28: candidate-binding narrowed out of scope
+
+The one remaining gate was the "candidate-binding gate": source **and validate**
+a repository commit/tree binding for the main-session identity evidence. The
+2026-08-25 investigation established why that cannot be met as written, and the
+finding is structural, not a missing implementation:
+
+> `route-receipt.mjs` — the only existing precedent for this kind of binding in
+> this codebase — validates a dispatched child's `candidateCommit`/`candidateTree`
+> against a **dispatcher-held** `dispatchBinding` supplied by the caller who
+> dispatched that exact task; the ground truth to validate against always comes
+> from outside the receipt itself. A main/coordinator session has no dispatcher
+> and no single fixed candidate commit the way a dispatched task does; its HEAD
+> moves as commits land throughout the session.
+
+Recording HEAD at observation time is a bounded addition, but "validating" it has
+no defined ground truth for a main session. An item cannot stay open against a
+criterion nothing can satisfy — that is precisely the failure
+`pipeline.a-resolved-backlog-item-can-keep-status-open-indefinitely` describes.
+
+**Decision (PO, 2026-08-28): narrow the scope, exactly as `effort` was narrowed
+on 2026-08-19.** Candidate-binding is explicitly **out of scope** for this item.
+No fabricated binding, no unvalidated field presented as validated evidence, and
+no `git` spawn added to `statusline-context.mjs`'s fail-open hot path. A future
+item may revisit it if a real ground truth for a main session ever exists.
+
+**What this item delivered, and what it honestly claims.** Model-identity-only
+attestation is implemented and live: `statusline-context.mjs` writes a
+session-bound `pipeline.main-session-model-identity.v1` snapshot from the real
+host statusLine tick, and `post-compact-reground.mjs` consumes it when the
+session ids match. TP-4 is satisfied — confirmed 2026-08-25 from a real host
+tick, not a fixture. The evidence is local-caller-trusted and
+non-cryptographic; it is **not** provider attestation, and the module's own
+header says so.
+
+**Deliberately still not claimed:** full route reconciliation
+(`reconcileMainSessionRoute` with a complete `observed` object) still requires a
+real `effort` signal, which no runner exposes — unchanged and out of scope since
+2026-08-19. `MSR-UNVERIFIED` therefore remains the correct live outcome for the
+full-route path, and that is the accurate state, not a defect.
