@@ -1,7 +1,7 @@
 # Sprint Alfred Epic — Product Requirements
 
 <!-- po-language: en -->
-<!-- technical-spec-sha256: 6a373d93c5c054384098e10f932e3c544f785a6784c67152291a911e7520cad4 -->
+<!-- technical-spec-sha256: fc653b7252aa9b6dd6fa6235e7a9d30b794eaa7c06425cd889e876584d347ec9 -->
 
 **Feature ID:** `sprint-alfred-epic`
 **Profile / rigor / risk:** Epic / 2 / high (guard, canon, and authority
@@ -487,7 +487,7 @@ named in `spec.md` §12 and `acceptance.md`:
    #103) are reproducible as C1 fixtures.
 4. Every in-scope backlog item is closed with closure evidence, or explicitly
    re-triaged with a PO-visible rationale, by sprint close. The set is the
-   **live** open `sprint: alfred` assignment — 27 as of 2026-08-28, grown
+   **live** open `sprint: alfred` assignment — 28 as of 2026-08-28, grown
    from 24 by this design phase's own filed defects — and the live set, read
    via `check-backlog-sprint-assignment.mjs`, is authoritative over any count
    written here.

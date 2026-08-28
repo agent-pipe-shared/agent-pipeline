@@ -10,7 +10,7 @@ this document fixes the contracts those plans implement. PRD:
 - Scope authority: ADR-0043 (2026-08-17 amendment); membership authority:
   GitHub #108. Issues #99, #101–#106, #109 plus the open `sprint: alfred`
   backlog items per [`design/backlog-intake.md`](design/backlog-intake.md)
-  (27 as of 2026-08-28; the live assignment read via
+  (28 as of 2026-08-28; the live assignment read via
   `check-backlog-sprint-assignment.mjs` is authoritative over this count).
 - **Normative architecture basis:**
   [`design/agent-first-architecture.md`](design/agent-first-architecture.md).
