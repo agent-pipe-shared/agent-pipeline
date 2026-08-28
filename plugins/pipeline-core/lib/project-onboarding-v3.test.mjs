@@ -6670,10 +6670,33 @@ test("NVA-D-ACKASK: bootstrap-binding-required asks the PO for the acknowledgeme
     });
     assert.equal(genApplied.checkpoint.transactionState, "generated");
 
-    // DoD 1: while the marker is missing, nextAction is the ask, never the
-    // command that bootstrap-bind-plan's own refusal proves cannot succeed.
+    // NVA-V5-ACKEXEMPTASK: this fixture -- a freshly generated, unmodified staging
+    // PRD with recorded consent -- is exactly what NVA-R-STAGINGACK exempts from the
+    // marker. So the marker is absent AND not required, and the flow must NOT stop to
+    // ask for it: asking would cost the PO a human round to certify a judgement nobody
+    // is asking them to make, on bytes nobody authored. It names bootstrap-bind-plan,
+    // and that plan succeeds rather than refusing.
+    const exemptObservation = observeBootstrapBindAcknowledgement({ rootDir: path, repositoryCapability: "local", spawn: fakeGit });
+    assert.equal(exemptObservation.acknowledged, false, "the marker is genuinely absent");
+    assert.equal(exemptObservation.exempt, true, "and, on unmodified generator bytes, not required");
+    const exemptInspect = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
+    assert.equal(exemptInspect.status, "bootstrap-binding-required");
+    assert.equal(exemptInspect.nextAction.kind, "command", "an exempt draft must not stop the PO for a marker it does not need");
+    assert.equal(exemptInspect.nextAction.argv[1], "bootstrap-bind-plan");
+    assert.doesNotThrow(() => planOnboardingBootstrapBind({ rootDir: path, repositoryCapability: "local", spawn: fakeGit }));
+
+    // The exemption is narrow, and the ask is what must come back the moment it stops
+    // holding. One appended line of prose nobody reviewed is enough: the bytes are no
+    // longer the generator's own playback, so there IS now a human judgement to
+    // certify, and every original DoD of this test applies again from here.
+    const prdAbsolutePath = join(path, exemptObservation.prd.path);
+    writeFileSync(prdAbsolutePath, `${readFileSync(prdAbsolutePath, "utf8")}\nOne line of prose nobody reviewed.\n`, "utf8");
+
+    // DoD 1: while the marker is missing AND required, nextAction is the ask, never
+    // the command that bootstrap-bind-plan's own refusal proves cannot succeed.
     const before = observeBootstrapBindAcknowledgement({ rootDir: path, repositoryCapability: "local", spawn: fakeGit });
     assert.equal(before.acknowledged, false);
+    assert.equal(before.exempt, false, "a hand-edited draft is no longer exempt");
     const beforeAck = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
     assert.equal(beforeAck.status, "bootstrap-binding-required");
     assert.equal(beforeAck.nextAction.kind, "collect-input");
@@ -6697,7 +6720,6 @@ test("NVA-D-ACKASK: bootstrap-binding-required asks the PO for the acknowledgeme
 
     // The PO's own act: append the marker line to the staging PRD directly
     // (never through a code path this diff adds).
-    const prdAbsolutePath = join(path, before.prd.path);
     const prdBytes = readFileSync(prdAbsolutePath, "utf8");
     writeFileSync(prdAbsolutePath, `${prdBytes}\n${PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER}\n`, "utf8");
 

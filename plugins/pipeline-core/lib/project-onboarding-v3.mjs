@@ -2589,7 +2589,16 @@ function readyLifecycleResult({ root, runner, intent, repository, runtime, conti
       } catch {
         acknowledgement = null;
       }
-      const needsAcknowledgement = acknowledgement !== null && acknowledgement.acknowledged === false;
+      // NVA-V5-ACKEXEMPTASK: ask only when the marker is BOTH absent and actually
+      // required. `exempt` is true exactly when the staging PRD's current bytes are
+      // still what the generator would produce from the recorded intake consent --
+      // the case NVA-R-STAGINGACK exempts from the marker at the bind. Asking there
+      // anyway would stop the PO to certify a judgement nobody is being asked to
+      // make, on bytes nobody authored. `exempt` is read defensively (`=== true`)
+      // so an older observation shape without the field asks exactly as before.
+      const needsAcknowledgement = acknowledgement !== null
+        && acknowledgement.acknowledged === false
+        && acknowledgement.exempt !== true;
       return lifecycleResult({
         status: "bootstrap-binding-required",
         root, runner, intent, repository, runtime, continuity, appServer,
