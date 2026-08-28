@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "f50cc7091927583e869ef1a215d2ad91d97b00124541866c71de4ecc0dab3d5f"
+    "transitionHead": "d4e3e820464c5d003650e5baaffd3ebf90b7b4b26571e24d75d2da78f9d59376"
   },
   "counts": {
-    "open": 50,
+    "open": 51,
     "in_progress": 5,
     "closed": 380,
     "rejected": 3,
@@ -874,6 +874,15 @@
       "closureRepository": "self",
       "closureCommit": "589278edd930b14a9070d0f66481e2c5915a3b37",
       "closureEvidence": "backlog/items/2026-08-25-chat-mode-push-approval-has-no-enforced-human-turn-boundary.md"
+    },
+    {
+      "id": "pipeline.ci-topology-preflight-cannot-pass-on-this-branch",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "Measured live, 2026-08-28, by running verify-topology-preflight.mjs at HEAD after an unrelated change and then isolating each rejecting sub-check with a controlled probe.",
+      "deferred": false
     },
     {
       "id": "pipeline.citation-coordinate-checker-bare-basename",

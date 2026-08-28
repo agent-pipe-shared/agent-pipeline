@@ -76,6 +76,7 @@
 | pipeline.canonical-worktree-lifecycle | closed | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.capability-first-advisor-critic-dispatch | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.chat-mode-push-approval-has-no-enforced-human-turn-boundary | closed | defect | pipeline | 2026-08-25 | — |
+| pipeline.ci-topology-preflight-cannot-pass-on-this-branch | open | defect | pipeline | 2026-08-28 | — |
 | pipeline.citation-coordinate-checker-bare-basename | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.claude-dir-leftovers-defeat-runner-neutral-project-migration | closed | defect | pipeline | 2026-08-05 | — |
 | pipeline.claude-greenfield-run-happy-path-findings | closed | defect | pipeline | 2026-08-09 | — |
@@ -465,7 +466,7 @@
 
 ## Counts
 
-- open: 50
+- open: 51
 - in_progress: 5
 - closed: 380
 - rejected: 3
