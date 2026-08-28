@@ -313,6 +313,25 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/scripts/push-prepare.mjs",
   "plugins/pipeline-core/scripts/ruleset-freshness.mjs",
   "plugins/pipeline-core/scripts/ruleset-update-policy.mjs",
+  // NVA-V25-DRIVERKERNEL (2026-08-29): a seventh gap, but a different SHAPE than the six
+  // above -- GMWKC01's closure walk only follows edges FROM a kernel file outward
+  // (kernel -> imported), so a module that instead IMPORTS a kernel module is structurally
+  // invisible to it; GMWKC01 could never surface this on its own. push-init.mjs directly
+  // imports push-gate-satisfiability.mjs and push-prepare.mjs (both kernel above), and its
+  // own code constructs the `signatureCommand` object -- its own `note` text plus
+  // push-prepare.mjs's `lines.authorize` -- handed to the PO as the exact text of the
+  // human-attended push-authorization signature command (docs/push-release-flow.md). That
+  // is the same class of artifact `po-human-approval.mjs` (already kernel above, "the
+  // script the human uses to sign") produces; a corrupted push-init.mjs could substitute or
+  // alter what the PO is shown before they ever run po-human-approval.mjs, without any
+  // other kernel file needing to change. onboarding-init.mjs (the sibling driver, also
+  // guard-admitted by name as DRIVER_SCRIPT) was considered and NOT added -- see the commit
+  // message for the full reasoning; in short, it reaches project-onboarding-v3.mjs (already
+  // kernel) only through a spawned subprocess, holds no domain knowledge of onboarding
+  // semantics by design, and passes every collect-input/command payload through opaquely
+  // rather than constructing any of the content itself, so it never sits upstream of a
+  // human-signed approval ceremony the way push-init.mjs does.
+  "plugins/pipeline-core/scripts/push-init.mjs",
 ]);
 
 // The "plugins/pipeline-core/..." entries above are written against whatever
