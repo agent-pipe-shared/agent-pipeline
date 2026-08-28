@@ -439,7 +439,7 @@ function rejectedGrammarElement(code, command, parsed, root) {
 
 function blocked(
   code = "GUARD-LIFECYCLE-NOT-READY", lifecycleStatus = null, retryActions = [], overrideGuidance = "", rejectedElement = null,
-  remediation = null, nearMissHint = null,
+  remediation = null, nearMissHint = null, observationInvalid = false,
 ) {
   const typedLifecycleStatus = code === "GUARD-LIFECYCLE-NOT-READY"
     && CONTROLLING_NON_READY_STATUSES.has(lifecycleStatus)
@@ -464,11 +464,22 @@ function blocked(
         + overrideGuidance,
     );
   }
+  // NVA-T-READYKEYS: PORG-INVALID-OBSERVATION (the ready-gate could not validate the shape
+  // of what project-onboarding-v3 returned) and a genuinely unresolved cause (no typed
+  // lifecycle status at all, e.g. this guard's own root/governance resolution failing) used
+  // to render as the SAME generic "not ready" message -- an operator whose project actually
+  // IS ready read that as "the project is broken" and diagnosed the wrong thing. This names
+  // which of the two occurred; it deliberately does not say how to bypass either.
   const guidance = typedLifecycleStatus === null
-    ? [
-      "Pipeline-governed project writes require an exact V4 ready result for session intent.",
-      "Re-run the typed project-onboarding-v3 session inspection and use only its returned nextAction.",
-    ]
+    ? (observationInvalid
+      ? [
+        "Pipeline session onboarding readiness was OBSERVED, but the observation failed the ready-gate's own shape validation (PORG-INVALID-OBSERVATION) -- this is not a report that the lifecycle is not ready.",
+        "Re-run the typed project-onboarding-v3 session inspection and use only its returned nextAction.",
+      ]
+      : [
+        "Pipeline-governed project writes require an exact V4 ready result for session intent.",
+        "Re-run the typed project-onboarding-v3 session inspection and use only its returned nextAction.",
+      ])
     : typedLifecycleStatus === "partial"
       ? [
         `Pipeline session readiness is ${typedLifecycleStatus}.`,
@@ -3643,6 +3654,12 @@ function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
         + `restart, but the path is wrong. The only path admitted is exactly `
         + `${RESTART_RESUME_HINT_INPUT_PATH} (relative to the project root).`
       : null;
+    // NVA-T-READYKEYS: named separately from the "not ready" branch above -- an observation
+    // that failed the ready-gate's own shape validation is a different cause from the
+    // lifecycle genuinely reporting not-ready, and the two must not render identically.
+    const invalidObservation = error instanceof ProjectOnboardingReadyError
+      && error.code === "PORG-INVALID-OBSERVATION"
+      && error.intent === "session";
     return toolName === "Bash"
       && (isSanctionedLifecycleCommand((input.tool_input.command ?? input.tool_input.CommandLine), root)
         || isSanctionedGhReadOnlyDiagnostic((input.tool_input.command ?? input.tool_input.CommandLine), root))
@@ -3659,6 +3676,7 @@ function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
         null,
         null,
         restartResumeHintNearMissHint,
+        invalidObservation,
       );
   }
   return exactReadyReceipt(receipt) ? verdict(0) : blocked();
