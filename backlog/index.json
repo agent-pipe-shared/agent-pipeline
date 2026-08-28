@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "1d6027869d504930d8dce13bcde36c03830e821aa9fc245fbe15fc1294ef855a"
+    "transitionHead": "dc592ba9ea4e852de41cb8db13da83c73942535e154565148eaba4b47cdefbf9"
   },
   "counts": {
-    "open": 52,
+    "open": 53,
     "in_progress": 5,
     "closed": 380,
     "rejected": 3,
@@ -379,6 +379,15 @@
       "owner": "pipeline",
       "created": "2026-08-27",
       "source": "PO decision 2026-08-27, confirmed in session; distribution mapping performed the same day against the live installers and the update-channel resolver",
+      "deferred": false
+    },
+    {
+      "id": "pipeline.an-expired-override-is-armed-instead-of-refused",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "Hit live, 2026-08-28, consuming a PO signature for a TP-3 guard override; then located in plugins/pipeline-core/lib/human-guard-override.mjs by reading the arming and consuming paths against each other.",
       "deferred": false
     },
     {

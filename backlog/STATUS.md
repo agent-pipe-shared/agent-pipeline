@@ -36,6 +36,7 @@
 | pipeline.agents-are-judged-by-rules-no-artifact-ever-tells-them | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.agents-read-the-source-because-nothing-describes-the-interface | open | workflow-improvement | pipeline | 2026-08-09 | — |
 | pipeline.all-three-runners-should-install-against-the-stable-branch | open | requirement | pipeline | 2026-08-27 | — |
+| pipeline.an-expired-override-is-armed-instead-of-refused | open | defect | pipeline | 2026-08-28 | — |
 | pipeline.anchor-check-passes-on-wrong-language-content | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.antigravity-hard-enforcement-layer-has-two-fail-open-paths | closed | defect | pipeline | 2026-08-23 | — |
 | pipeline.antigravity-plugin-registration-points-one-level-above-the-plugin-root | closed | defect | pipeline | 2026-08-23 | — |
@@ -467,7 +468,7 @@
 
 ## Counts
 
-- open: 52
+- open: 53
 - in_progress: 5
 - closed: 380
 - rejected: 3
