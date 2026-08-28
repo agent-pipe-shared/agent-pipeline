@@ -182,6 +182,14 @@ const ONBOARDING_SCRIPT = fileURLToPath(new URL("../scripts/project-onboarding-v
 // step it chains is a separately-admitted command this same guard evaluates on its own
 // terms when the driver spawns it, exactly as if an agent had typed that command by hand.
 const DRIVER_SCRIPT = fileURLToPath(new URL("../scripts/onboarding-init.mjs", import.meta.url));
+// NVA-V4-PUSHDRIVER: the push-path equivalent of DRIVER_SCRIPT above -- same reasoning,
+// same admission shape (sanctionedPushInitArgs() below, next to sanctionedDriverArgs()).
+// push-init.mjs is itself strictly read-only (it spawns/imports only check-doc-
+// reconciliation.mjs, push-gate-satisfiability.mjs and push-prepare.mjs, never
+// po-human-approval.mjs -- see that file's own header comment "THE SIGNATURE BOUNDARY"),
+// so admitting it grants no authority beyond what a session could already do by hand-typing
+// the same three commands one at a time.
+const PUSH_INIT_SCRIPT = fileURLToPath(new URL("../scripts/push-init.mjs", import.meta.url));
 const ONBOARDING_CONSENT_MARK_SCRIPT = fileURLToPath(new URL("../scripts/onboarding-consent-mark.mjs", import.meta.url));
 const MIGRATION_SCRIPT = fileURLToPath(new URL("../scripts/runner-profile-migration-v3.mjs", import.meta.url));
 const V3_BOOTSTRAP_AUTHORITY_SCRIPT = fileURLToPath(new URL("../scripts/v3-bootstrap-authority.mjs", import.meta.url));
@@ -2788,6 +2796,36 @@ function sanctionedDriverArgs(args, root) {
   });
 }
 
+/**
+ * NVA-V4-PUSHDRIVER: push-init.mjs's own exact argv surface (`parseArgs()` in
+ * scripts/push-init.mjs) and nothing wider than it -- `--root <root>` required and pinned to
+ * the observed root (same discipline as sanctionedDriverArgs() above), `--by`/`--remote`/
+ * `--destination` required, `--base` optional. Validators mirror the target script's OWN
+ * argv handling exactly rather than being invented here: `--destination` matches push-
+ * prepare.mjs's `DESTINATION_RE` (`^refs\/heads\/[A-Za-z0-9._/-]{1,200}$`), `--remote`
+ * matches its `REMOTE_RE` (`^[A-Za-z0-9._-]{1,80}$`) -- push-init.mjs forwards both
+ * unchanged into `pushPrepareReport()`, so a value this guard admitted but that script would
+ * refuse could never actually happen. `--by` and `--base` accept any non-empty, non-flag
+ * string: `--by` is free-form attribution text (push-prepare.mjs itself does not further
+ * constrain it beyond non-blank), and `--base` is any git revision expression check-doc-
+ * reconciliation.mjs's own `--base <ref>` accepts (a branch name, a SHA, `HEAD~N`, a tag --
+ * never just hex, so this deliberately does NOT reuse isHexDigest).
+ */
+function sanctionedPushInitArgs(args, root) {
+  const isDestinationValue = (value) => typeof value === "string" && /^refs\/heads\/[A-Za-z0-9._/-]{1,200}$/u.test(value);
+  const isRemoteValue = (value) => typeof value === "string" && /^[A-Za-z0-9._-]{1,80}$/u.test(value);
+  const nonEmptyNotFlagValue = (value) => typeof value === "string" && value.trim() !== "" && !value.startsWith("--");
+  return matchFlagSpec(args, {
+    requiredValue: {
+      "--root": (value) => value === root,
+      "--by": nonEmptyNotFlagValue,
+      "--remote": isRemoteValue,
+      "--destination": isDestinationValue,
+    },
+    optionalValue: { "--base": nonEmptyNotFlagValue },
+  });
+}
+
 function sanctionedMigrationArgs(args, root) {
   // NVA-BOOTADMIT-2: both branches route through matchFlagSpec() so the flag SET stays exact
   // while its ORDER no longer matters, same rationale as sanctionedOnboardingArgs() above.
@@ -3164,6 +3202,10 @@ export function isSanctionedLifecycleCommand(command, root, options = {}) {
   // mutating step this driver spawns is itself re-checked against this same guard when it
   // runs, on its own terms, exactly as if an agent had typed it directly.
   if (script === DRIVER_SCRIPT) return sanctionedDriverArgs(args, root);
+  // NVA-V4-PUSHDRIVER: same admission discipline as DRIVER_SCRIPT immediately above --
+  // exact argv shape only (sanctionedPushInitArgs() above), grants no authority beyond what
+  // push-init.mjs's own three read-only steps could already do if hand-typed one at a time.
+  if (script === PUSH_INIT_SCRIPT) return sanctionedPushInitArgs(args, root);
   if (script === MIGRATION_SCRIPT) return sanctionedMigrationArgs(args, root);
   if (script === V3_BOOTSTRAP_AUTHORITY_SCRIPT) {
     return exactRoot(args, root, 0) && args.length === 2;
