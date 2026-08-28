@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.po-ceremony-resolves-the-wrong-runner
 type: defect
 owner: pipeline
-status: open
+status: resolved
 created: 2026-08-28
 sprint: nova
 tracking: "NOW / Nova A — a gate that forces the PO into their own terminal must not land them on a different runner there; reported by a consumer project and confirmed in the code"
@@ -91,3 +91,15 @@ Two candidates, not mutually exclusive:
 - `2026-08-28-a-chat-gate-is-unusable-with-a-non-ascii-name-on-windows.md` — the gate that
   forces the PO into that terminal in the first place. Fixed; this is what they meet once
   they get there.
+
+## Closing note (NVA-U-RECONCILE reconciliation, 2026-08-28)
+
+Verified against current code, not against the commit message. `resolveOnboardingCliRunner`
+(`plugins/pipeline-core/scripts/project-onboarding-v3.mjs` line 243) now delegates to the
+single shared `resolveActiveRunner` in `pipeline-start-preflight.mjs` (line 779), which
+consults the project's own declared `runners.default` from `pipeline.user.yaml` (line 788-789)
+when no CLI/env signal is present — closing Direction (1). `formatOnboardingRerunCommand`
+(line 407-408) always appends `--runner <resolved>` when the caller's args did not already
+spell it out, and is exercised by `plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs`
+— closing Direction (2), the safe half that alone closes the reported harm. Both acceptance
+criteria are met in code.
