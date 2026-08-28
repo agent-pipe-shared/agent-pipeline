@@ -150,3 +150,64 @@ design-first treatment (MP-22/23) when accepting the companion item
   `specs/sprint-phoenix-epic/design/part-a-residuals-and-dispatch-template-drift.md` §0.5, §I.2.3,
   §I.2.4 and §I.2.10 item 1.
 - **Date:** 2026-08-07
+
+## OBS-1 measured, 2026-08-28
+
+The design gates every R2 implementation dispatch on OBS-1 (§I.2.5; `AC-R2-0`),
+"one observation on a real marketplace install", and estimated its cost as "one
+session on a machine with a real marketplace install". That machine was already
+the one running this session. Measured directly against the host's own plugin
+cache, using the exact predicates from `public-core-observation.mjs` rather than
+an approximation of them — `realpathSync(path) !== path`
+(`SNT-A2-PLUGIN-PATH-UNSAFE`), `!isFile() || nlink !== 1n` and the walk's
+neither-file-nor-directory branch (both `SNT-A2-PLUGIN-NONREGULAR`).
+
+Two topologies were available and both were measured, including the
+github-sourced one that is the real end-user shape:
+
+| topology | entries | files | dirs | violations | U4 |
+|---|---|---|---|---|---|
+| directory-sourced marketplace, the live install | 1104 | 1059 | 45 | **0** | **TRUE** |
+| github-sourced marketplace, `pipeline-core/0.5.4` | 852 | 816 | 36 | **0** | **TRUE** |
+
+- **U4 — TRUE for both.** `snapshotPluginRoot` would complete. This was named in
+  §I.2.5 as "the single most likely way R2-min-A fails in practice: a
+  hardlinking installer turns the check into a permanent false failure for every
+  user — the same shape as Critic finding F2, which this feature already paid
+  for once." It does not occur here, in either topology.
+- **U2 — TRUE for both.** `.codex-plugin/plugin.json` is present in the
+  installed tree, so `parseManifest` is satisfied. `.claude-plugin/plugin.json`
+  is present as well.
+- **U3 — measured, and the design's premise is wrong in SHAPE, not in
+  substance.** §I.2.6 asks whether the host plugin record carries the
+  marketplace URL in `entry.marketplaceSource.source`. On the Claude host it
+  does not, and cannot: the installed-plugin record carries exactly
+  `scope`, `installPath`, `version`, `installedAt`, `lastUpdated` — no
+  provenance field of any kind. This is not a gap, it is the documented Claude
+  shape, and `pipeline-start-preflight.mjs`'s own comment already says so
+  ("unlike Claude's, which has no such fields and needs the host's separate
+  `known_marketplaces.json` registry instead"). The provenance signal R2-min-B
+  wants **does exist** for Claude, outside the attested subtree, but it is
+  reached differently: the plugin key (`pipeline-core@<marketplace>`) names the
+  marketplace, and the separate registry maps that name to
+  `{source: "github", repo: "<owner>/<name>"}` for a git-sourced marketplace, or
+  `{source: "directory", path: …}` for a local one.
+
+**Consequences for the design, stated rather than assumed.**
+
+1. `AC-R2-0`'s measurement half is satisfied. What still gates an
+   implementation dispatch is only §I.2.10 items 1–2, which are PO decisions.
+2. R2-min-A's biggest disqualifying risk (U4) did not materialise, so "build
+   nothing" can no longer be justified by *that* argument — only by the
+   marginal-value argument of §I.2.10 item 2.
+3. R2-min-B is available on the Claude host, but **not in the shape §I.2.6
+   describes**: it needs a two-step lookup (plugin key → marketplace name →
+   registry entry) and it compares an owner/repo slug, not a URL, against
+   `PUBLIC_SELF_APPLICATION_ORIGINS`. The design already anticipated needing
+   "its own small pass for the Claude-host record"; this measurement says what
+   that pass has to handle. The Codex-shaped question (`marketplaceSource.source`)
+   remains unobserved — no Codex host plugin list was available here either.
+
+Machine-readable artifact: `evidence/OBS-1-marketplace-install-measurement.json`
+(regenerable via `scratch/obs-1-marketplace-install.mjs`). No production code
+changed; this pass is measurement only.
