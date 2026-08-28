@@ -3124,6 +3124,107 @@ function resolvePushThreatModelArtifact(dir) {
   return boundRepositoryArtifact(dir, PUSH_THREAT_MODEL_DEFAULT_PATH);
 }
 
+// NVA-I-ONEROUTE: the STRUCTURAL `nextAction` `inspect` publishes for the
+// feature/push happy path (draft -> awaiting-approval -> approved ->
+// implementing), in the SAME two shapes already established elsewhere in
+// this plugin: `kind: "command"` with a ready-to-run `{ executable, argv }`
+// (`intakeGenerateApplyAction()`, lib/onboarding-continuity.mjs) and
+// `kind: "collect-input"` for a genuine human decision, carrying NO
+// `input`/`inputs` when there is nothing an agent may fill in on the
+// human's behalf (`collectPrdAcknowledgementAction()`,
+// lib/project-onboarding-v3.mjs). A driver that only reads `nextAction`
+// (onboarding-init.mjs's own contract) gets exactly one such step here,
+// never the rendered prose `nextActionSection()` still returns under
+// `nextActionText` below (see `case "inspect"`).
+//
+// Two of the four statuses are genuine human decisions and MUST NEVER gain
+// a driver-executable satisfying action (backlog:
+// 2026-08-28-a-blind-session-gets-zero-followable-steps-on-the-feature-and-push-path.md):
+//   - `awaiting-approval` -- plan approval is a judgement about a document;
+//     the plan/spec are named by path and sha256, exactly
+//     `collectPrdAcknowledgementAction()`'s own shape.
+//   - `implementing` -- the push signature is a detached Ed25519 proof made
+//     with a key kept outside this repository. Until the threat-model
+//     artifact exists there is nothing yet to review, so this state first
+//     offers the ordinary, agent-runnable `materialize-push-threat-model`
+//     command; once the artifact exists, the collect-input names it and
+//     points at the real ceremony (docs/push-release-flow.md), again with
+//     no fillable input.
+// `draft` needs two values this command genuinely cannot derive from
+// `project/pipeline-state.json` -- who is submitting (`--by`) and which
+// delivery profile applies (`--profile`, `epic|feature|mini`); neither is
+// invented (onboarding-init.mjs's own "NEVER INVENTS A VALUE" contract),
+// matching `intakeConsentAction()`'s "ask once, then call the apply command
+// with the answers" shape.
+function buildInspectNextAction(dir, state, lifecycle) {
+  if (!lifecycle.ok || lifecycle.status === null) return null;
+  if (lifecycle.status === "draft") {
+    return {
+      kind: "collect-input",
+      inputs: [
+        { name: "by", encoding: "utf8", trim: true, minBytes: 1, maxBytes: 128, singleLine: true, rejectNul: true },
+        { name: "profile", encoding: "utf8", trim: true, minBytes: 4, maxBytes: 7, singleLine: true, rejectNul: true },
+      ],
+      mutation: false,
+      requiresConfirmation: false,
+      guidance: "no plan has been submitted yet. Neither the submitter's name nor the delivery profile is"
+        + " recorded anywhere this command can read -- ask who is submitting the plan and which delivery"
+        + " profile applies (epic, feature, or mini), then call pipeline-state submit-plan with --by and"
+        + " --profile set to those exact answers.",
+      expected: { schema: INSPECT_SCHEMA, statuses: ["draft"] },
+    };
+  }
+  if (lifecycle.status === "awaiting-approval") {
+    const submission = state.planSubmission && typeof state.planSubmission === "object" ? state.planSubmission : {};
+    return {
+      kind: "collect-input",
+      mutation: false,
+      requiresConfirmation: false,
+      guidance: "binding requires the PO's own judgement about the submitted plan and specification -- an"
+        + " agent must never supply this on the PO's behalf. Ask the PO to read the plan at"
+        + ` ${submission.planPath} (sha256 ${submission.planSha256}) and the specification at`
+        + ` ${submission.specPath} (sha256 ${submission.specSha256}); if and only if satisfied, the PO`
+        + " approves it themselves by running pipeline-state approve-plan with their own name as --by."
+        + " There is no command that records this approval on their behalf, and none should ever be offered.",
+      expected: { schema: INSPECT_SCHEMA, statuses: ["awaiting-approval"] },
+    };
+  }
+  if (lifecycle.status === "approved") {
+    return {
+      kind: "command",
+      executable: process.execPath,
+      argv: [fileURLToPath(import.meta.url), "set-phase", "--phase", "implementation"],
+      mutation: true,
+      requiresConfirmation: true,
+    };
+  }
+  if (lifecycle.status === "implementing") {
+    const threatModel = resolvePushThreatModelArtifact(dir);
+    if (!threatModel.ok) {
+      return {
+        kind: "command",
+        executable: process.execPath,
+        argv: [fileURLToPath(import.meta.url), "materialize-push-threat-model"],
+        mutation: true,
+        requiresConfirmation: false,
+      };
+    }
+    return {
+      kind: "collect-input",
+      mutation: false,
+      requiresConfirmation: false,
+      guidance: "the push signature is a detached Ed25519 proof made with a key kept outside this repository"
+        + " -- an agent must never produce or supply it. Ask the human to review the push threat-model at"
+        + ` ${threatModel.path} (sha256 ${threatModel.sha256}), then follow the signing ceremony in`
+        + " docs/push-release-flow.md (guard-human-override.mjs plan / prepare-authorization /"
+        + " emit-signature-digest, signed outside this session, then authorize-by-signature). There is no"
+        + " command that produces this signature on the human's behalf, and none should ever be offered.",
+      expected: { schema: INSPECT_SCHEMA, statuses: ["implementing"] },
+    };
+  }
+  return null;
+}
+
 /**
  * NVA-WINPATH-3 (backlog/items/2026-08-17-external-public-json-cross-drive-windows-paths-are-
  * not-recognized-as-outside-the-project-root.md): platform-aware containment check for
@@ -8529,6 +8630,16 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       const payload = {
         schema: INSPECT_SCHEMA,
         generatedAt: now(),
+        // NVA-I-ONEROUTE: `status` and the STRUCTURAL `nextAction` are the fix for
+        // backlog/items/2026-08-28-a-blind-session-gets-zero-followable-steps-on-the-feature-and-push-path.md
+        // -- a blind session following only `nextAction` (onboarding-init.mjs's own
+        // contract) previously received the rendered markdown prose here, which is
+        // neither a `command` nor a `collect-input` action and carries unfilled
+        // placeholders. `nextAction` is now RESERVED for that one protocol meaning;
+        // the prose keeps its own field, `nextActionText`, byte-identical to what it
+        // always was (`syncStateMdNextAction` writes the SAME prose into the
+        // handover -- unchanged).
+        status: lifecycle.status,
         activeFeature: base.activeFeature ?? null,
         phase: base.activeFeature?.phase ?? null,
         planApproved: base.planApproved === true,
@@ -8536,7 +8647,8 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         pushApproval: base.pushApproval ?? null,
         closedFeaturesCount: Array.isArray(base.closedFeatures) ? base.closedFeatures.length : 0,
         phoenixEpicHistory: summarizePhoenixEpicHistory(base.phoenixEpicHistory ?? null),
-        nextAction: nextActionSection(base),
+        nextAction: buildInspectNextAction(dir, base, lifecycle),
+        nextActionText: nextActionSection(base),
       };
       console.log(JSON.stringify(payload, null, 2));
       return 0;
