@@ -5,7 +5,7 @@ type: workflow-improvement
 owner: pipeline
 status: open
 created: 2026-08-27
-sprint: nova
+sprint: nightwing
 source: "Windows Claude Code greenfield happy-path run, 2026-08-27 (D--Dev-Rune-Test1-Claude-060-70). PO report: the session 'ran into a repair unnecessarily'. Transcript read directly."
 ---
 
@@ -77,7 +77,23 @@ Not designed here. Candidate directions, in rough order of value:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted
+- **Rationale:** The guard is correct and stays correct — what is accepted here
+  is that an ordinary, expected event (updating the plugin) silently converts
+  every already-onboarded project into a repair-required state, discovered only
+  by being refused mid-work. It has already cost real measurement: one of the
+  three runner happy-path runs measured the repair path instead of the path
+  under test. Proposal 1 (announced self-heal, since the bytes are a pure
+  function of the source) and proposal 2 (name the cause in the diagnostic) are
+  both accepted in principle; which one lands is a design call for the
+  implementing window, not settled here.
+- **Assignment (if accepted):** Sprint Nightwing — ADR-0043's scope statement
+  for that window is "onboarding, configuration, documentation and low-friction
+  adoption", which is this item almost word for word. Not Alfred: closed to new
+  scope (PO, 2026-08-28).
+  **Proposal 3 (test discipline) is split off and needs no window:** it is a
+  procedure note, costs nothing, and is already being applied by hand — a
+  greenfield happy-path run is only meaningful against a plugin version that
+  does not change under it. It should be written into the runner-test procedure
+  by whichever session next touches it, independently of this item's fix.
+- **Date:** 2026-08-28

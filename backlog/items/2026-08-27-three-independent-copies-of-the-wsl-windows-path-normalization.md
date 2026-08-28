@@ -5,7 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-08-27
-sprint: alfred
+sprint: none
 source: "Noted while fixing the third instance of the WSL/Windows path-identity defect, commit d96e14c5, 2026-08-27."
 ---
 
@@ -67,7 +67,23 @@ Option 2 is the cheap floor and should be done even if option 1 is chosen later.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted
+- **Rationale:** Three copies of a predicate whose entire purpose is deciding
+  that two things are equal, where a disagreement between them fires or fails to
+  fire a guard, and where the failure mode is silent. The defect class has been
+  fixed three times in three places — that repetition is the finding. Option 2
+  (one shared test table over all three implementations) is accepted as the
+  floor regardless of whether option 1 (single module, three importers) is
+  chosen later, because it converts a silent divergence into a loud one for
+  roughly an hour of work.
+- **Assignment (if accepted):** `sprint: none` — reassigned off Alfred. By scope
+  this is Alfred's ("mechanical governance, control integrity", ADR-0043
+  Amendment), but Alfred is in flight and closed to new scope (PO, 2026-08-28),
+  and neither Nightwing (product experience) nor Batman (optional capabilities)
+  describes it. Forcing it into a window whose scope statement does not cover it
+  would make the assignment field lie, so it carries the explicit "belongs to no
+  planning window" declaration instead of a mis-assignment or a silent omission.
+  **Condition for picking it up:** the next window that touches
+  `guard-maintenance-window.mjs` or the path-identity code takes it along, or it
+  moves into Alfred's successor whenever control-integrity scope reopens.
+- **Date:** 2026-08-28

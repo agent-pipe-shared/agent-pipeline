@@ -5,7 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-08-27
-sprint: nova
+sprint: nightwing
 source: "Three live refusals in one Elephant session, 2026-08-27, each on a read-only command whose only offending characters sat inside a quoted argument."
 ---
 
@@ -72,7 +72,22 @@ independently cheap and can be fixed alone: accept `head -N` alongside
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted
+- **Rationale:** Reproduced three times in one session on read-only commands,
+  each with a passing control that differs only in phrasing — the classification
+  is demonstrably wrong, not merely strict. Two of the three have no override
+  route at all (`HGO-EXTERNAL-ADAPTER-BOUNDARY`), so the cost is a dead end per
+  occurrence, not a ceremony. Same root class as
+  `pipeline.sed-regex-address-is-misread-as-an-absolute-path`: a matcher reading
+  raw command text where parsed argv is already available. Fix the two together;
+  a shared regression table over both symptom sets is the cheaper shape.
+- **Assignment (if accepted):** Sprint Nightwing (ADR-0043 Amendment scope:
+  low-friction adoption — this is friction an agent meets every session).
+  Deliberately NOT Nova: the 0.6.0 candidate is stamped and under live PO test,
+  and `guard-lifecycle-ready.mjs` is exactly the file a change would invalidate
+  it through. Deliberately NOT Alfred, whose control-integrity scope it would
+  otherwise fit — Alfred is in flight and closed to new scope (PO, 2026-08-28),
+  the same rule ADR-0043 already applied to Phoenix.
+  **Splittable:** case 3 (`head -N` alongside `head -n N`) is independent of the
+  argv rework and can land alone in an hour if the window is tight.
+- **Date:** 2026-08-28
