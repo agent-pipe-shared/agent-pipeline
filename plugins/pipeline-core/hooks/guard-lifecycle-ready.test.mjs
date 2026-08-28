@@ -103,9 +103,18 @@ import {
 // lanes can never independently decide a path's dev-plan-gate fate differently from
 // each other.
 import { DEFAULT_EXEMPT_PREFIXES, DEVPLAN_SHELL_DENIAL_CODE } from "../lib/guard-devplan-policy.mjs";
+// NVA-V4-PUSHDRIVER: the driver's own real argv-emission function, never a hand-typed copy
+// (same discipline as automatedMutatingApplyArgv() above, NVA-CODEXARGV-1's own pattern).
+import { buildPushInitArgv } from "../scripts/push-init.mjs";
+// NVA-V4-PUSHDRIVER: the real command builder the signature step is rendered from
+// (push-prepare.mjs's own `authorize` line calls this with no override) -- used to prove the
+// exact command push-init.mjs would present to a human is refused for an agent's own Bash
+// tool call, never reconstructed by hand.
+import { authorizeCriticalPushCommand } from "../scripts/po-human-approval.mjs";
 
 const ONBOARDING_SCRIPT = fileURLToPath(new URL("../scripts/project-onboarding-v3.mjs", import.meta.url));
 const DRIVER_SCRIPT = fileURLToPath(new URL("../scripts/onboarding-init.mjs", import.meta.url));
+const PUSH_INIT_SCRIPT = fileURLToPath(new URL("../scripts/push-init.mjs", import.meta.url));
 const ONBOARDING_LAUNCH_SCRIPT = fileURLToPath(new URL("../scripts/codex-onboarding-launch.mjs", import.meta.url));
 const V3_BOOTSTRAP_AUTHORITY_SCRIPT = fileURLToPath(new URL("../scripts/v3-bootstrap-authority.mjs", import.meta.url));
 const START_PREFLIGHT_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-start-preflight.mjs", import.meta.url));
@@ -2812,6 +2821,120 @@ test("NVA-CODEXARGV-1 (AC-4): the same emitted mutating-apply argv, with --activ
       const command = `node '${ONBOARDING_SCRIPT}' ${argv.map((token) => `'${token}'`).join(" ")}`;
       assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
     }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// NVA-V4-PUSHDRIVER: push-init.mjs's own admission, mirroring DRIVER_SCRIPT's admit/refuse
+// pairs above exactly (isSanctionedLifecycleCommand() plus the full evaluateLifecycleReadyGuard()
+// path for a NOT-READY status, plus the fail-open control at the end).
+test("NVA-V4-PUSHDRIVER: push-init.mjs is admitted in exactly its own argv shape and nothing wider", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    for (const status of [
+      "portable-seed-required", "kickoff-required", "intake-required",
+      "migration-required", "partial",
+    ]) {
+      const nonReady = {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny(status); },
+      };
+      const admit = (command) => {
+        assert.equal(isSanctionedLifecycleCommand(command, path), true, `${status}: ${command}`);
+        assert.deepEqual(
+          evaluateLifecycleReadyGuard(bash(command), nonReady),
+          { exitCode: 0, stderr: "" },
+          `${status}: ${command}`,
+        );
+      };
+      const refuse = (command) => {
+        assert.equal(isSanctionedLifecycleCommand(command, path), false, `${status}: ${command}`);
+        const result = evaluateLifecycleReadyGuard(bash(command), nonReady);
+        assert.equal(result.exitCode, 2, `${status}: ${command}`);
+        assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u, `${status}: ${command}`);
+      };
+
+      admit(`node '${PUSH_INIT_SCRIPT}' --root '${path}' --by 'tester' --remote 'origin' --destination 'refs/heads/main'`);
+      admit(`node '${PUSH_INIT_SCRIPT}' --root '${path}' --by 'tester' --remote 'origin' --destination 'refs/heads/main' --base 'HEAD~5'`);
+      // Flag-order-insensitive, same discipline as DRIVER_SCRIPT's own admit() pairs above.
+      admit(`node '${PUSH_INIT_SCRIPT}' --destination 'refs/heads/main' --by 'tester' --root '${path}' --remote 'origin'`);
+
+      // Near misses: no argv, wrong root, an empty/flag-shaped value, an unsafe --remote, a
+      // --destination outside refs/heads/*, a flag push-init.mjs's own parseArgs() does not
+      // accept at all, and a duplicated --root.
+      refuse(`node '${PUSH_INIT_SCRIPT}'`);
+      refuse(`node '${PUSH_INIT_SCRIPT}' --root '${join(path, "other")}' --by 'tester' --remote 'origin' --destination 'refs/heads/main'`);
+      refuse(`node '${PUSH_INIT_SCRIPT}' --root '${path}' --by '--remote' --remote 'origin' --destination 'refs/heads/main'`);
+      refuse(`node '${PUSH_INIT_SCRIPT}' --root '${path}' --by 'tester' --remote 'origin/nested' --destination 'refs/heads/main'`);
+      refuse(`node '${PUSH_INIT_SCRIPT}' --root '${path}' --by 'tester' --remote 'origin' --destination 'refs/tags/v1'`);
+      refuse(`node '${PUSH_INIT_SCRIPT}' --root '${path}' --by 'tester' --remote 'origin' --destination 'main'`);
+      refuse(`node '${PUSH_INIT_SCRIPT}' --root '${path}' --by 'tester' --remote 'origin' --destination 'refs/heads/main' --step-cap 5`);
+      refuse(`node '${PUSH_INIT_SCRIPT}' --root '${path}' --root '${path}' --by 'tester' --remote 'origin' --destination 'refs/heads/main'`);
+
+      refuse("touch output.txt");
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// NVA-V4-PUSHDRIVER: the closure proof for push-init.mjs's admission -- buildPushInitArgv()'s
+// OWN emitted argv (never a hand-typed copy) fed straight into the guard's real admission
+// function, mirroring NVA-CODEXARGV-1 (AC-3) above exactly.
+test("NVA-V4-PUSHDRIVER: buildPushInitArgv's own emitted argv is admitted by the guard's real admission function", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    for (const base of [null, "HEAD~3"]) {
+      const argv = buildPushInitArgv({ root: path, by: "tester", remote: "origin", destination: "refs/heads/main", base });
+      const command = `node '${PUSH_INIT_SCRIPT}' ${argv.map((token) => `'${token}'`).join(" ")}`;
+      assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// NVA-V4-PUSHDRIVER: the single most important test in this package. The exact signature
+// command push-init.mjs presents (built from po-human-approval.mjs's OWN real
+// authorizeCriticalPushCommand(), the identical function push-prepare.mjs's `lines.authorize`
+// is rendered from with no override -- never hand-reconstructed here) is refused for an
+// agent's own Bash tool call, by this guard's dedicated human-signing lane
+// (isHumanPoSigningCommand -> externalPoSigningOnly()), REGARDLESS of lifecycle readiness --
+// this check runs before the ready/not-ready branch is even reached (evaluateLifecycleReadyGuard,
+// guard-lifecycle-ready.mjs). This is the guard-level backstop behind push-init.mjs's own
+// "THE SIGNATURE BOUNDARY" header comment and its absolute "never driver-satisfiable" property.
+test("NVA-V4-PUSHDRIVER: the presented authorize-critical signature command is refused for a Bash tool call, real argv from po-human-approval.mjs", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const authorize = authorizeCriticalPushCommand({
+      repoRoot: path,
+      directory: "/external/po-approval-dir",
+      featureId: "nva-v4-pushdriver",
+      plan: "specs/sprint-nova-epic/plans/nva-v4-pushdriver.md",
+      spec: "specs/sprint-nova-epic/spec.md",
+      subjectSha256: "a".repeat(64),
+      expiresAt: new Date("2026-08-29T00:00:00.000Z").toISOString(),
+    });
+    assert.equal(authorize.argv[0], PO_HUMAN_APPROVAL_SCRIPT, "must be the REAL script path, not a stand-in, or this test would prove nothing");
+    assert.equal(authorize.argv[1], "authorize-critical");
+    const command = `node '${authorize.argv[0]}' ${authorize.argv.slice(1).map((token) => `'${token}'`).join(" ")}`;
+
+    // Refused identically whether the session is ready or not -- the human-signing lane is
+    // checked before the readiness branch, so both dependency shapes below must agree.
+    for (const dependencies of [
+      { projectDir: path, requireProjectOnboardingReadyFn() { return { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" }; } },
+      { projectDir: path, requireProjectOnboardingReadyFn() { deny("partial"); } },
+    ]) {
+      const result = evaluateLifecycleReadyGuard(bash(command), dependencies);
+      assert.equal(result.exitCode, 2, command);
+      assert.match(result.stderr, /EXTERNAL ACTION REQUIRED/u, command);
+      assert.match(result.stderr, /human-terminal actions/u, command);
+      // Never the not-ready refusal -- this is a DIFFERENT, dedicated refusal reached before
+      // that branch, and the two must never be conflated.
+      assert.doesNotMatch(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u, command);
+    }
+
+    // Also refused by the narrower isSanctionedLifecycleCommand() lane on its own -- this
+    // command must never appear admitted there either, under any lifecycle status.
+    assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
