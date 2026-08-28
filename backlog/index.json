@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "0987f105de3eb4c410673d96b7bc88747f6db4e217e00eba10a8472eb0e6b0d0"
+    "transitionHead": "10813c24324b65917b9c7c79dde42d6bfc6d4f47bc96ece7959ad1e6fadb848e"
   },
   "counts": {
-    "open": 75,
+    "open": 76,
     "in_progress": 3,
     "closed": 382,
     "rejected": 3,
@@ -4589,6 +4589,16 @@
       "tracking": "Sentinel recovery baseline; deferred per PO triage 2026-08-23."
     },
     {
+      "id": "pipeline.relative-commit-message-file-unreadable-from-a-worktree",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "Observed live during the NVA-GF-* Workflow round, 2026-08-28, run wf_b6a26661-b19. Not relayed and not inferred: two sibling dispatches in the same run hit the identical denial, one recovered and one did not.",
+      "deferred": false,
+      "tracking": "NOW / Nova A — blocks the Pipeline's own worktree-isolated dispatch pattern; fix dispatched as NVA-B-GUARDF in the same session it was found"
+    },
+    {
       "id": "pipeline.release-preflight-cli-base-commit-not-peeled",
       "status": "closed",
       "type": "defect",
@@ -4788,7 +4798,7 @@
       "created": "2026-08-28",
       "source": "Codex/WSL greenfield run, 2026-08-28 (docs/pipeline-session-analysis-2026-08-28.md), plus the PO's own observation that this runner needed three sessions and the most detours.",
       "deferred": false,
-      "tracking": "Nova B — part of the rebuilt guided init"
+      "tracking": "NOW / Nova A — PO decision 2026-08-28: security is default ON and its prerequisites are made ready in init ('das ist echt basis für diese pipeline'). Pulled forward from Nova B because turning the gate on is what this item unblocks."
     },
     {
       "id": "pipeline.scratch-cleanup-mechanism-not-wired-to-any-event",
