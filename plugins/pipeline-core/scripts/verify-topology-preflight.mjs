@@ -151,7 +151,7 @@ export function preflightVerifyTopology({
 }
 
 export function parseVerifyTopologyArgs(argv) {
-  const parsed = { root: DEFAULT_ROOT, candidateRevision: "HEAD", inventoryPath: DEFAULT_INVENTORY };
+  const parsed = { root: DEFAULT_ROOT, candidateRevision: "HEAD", inventoryPath: DEFAULT_INVENTORY, base: null };
   for (let index = 0; index < argv.length; index += 2) {
     const flag = argv[index];
     const value = argv[index + 1];
@@ -159,12 +159,35 @@ export function parseVerifyTopologyArgs(argv) {
     if (flag === "--root") parsed.root = path.resolve(value);
     else if (flag === "--candidate") parsed.candidateRevision = value;
     else if (flag === "--inventory") parsed.inventoryPath = value;
+    else if (flag === "--base") parsed.base = value;
     else throw new Error("unknown topology option");
   }
   if (path.isAbsolute(parsed.inventoryPath) || parsed.inventoryPath.split(/[\\/]/u).includes("..")) {
     throw new Error("inventory must be repository-relative");
   }
   return Object.freeze(parsed);
+}
+
+/**
+ * The delivery base bounds the candidate diff that drives every downstream
+ * hardening check (`evaluateChangeIntegrity`, `routeSecurityReview`,
+ * `runIndependentChecks`). It is resolved in strict priority order, never
+ * merged or widened:
+ *   1. `--base` (explicit, caller-supplied -- CI or a human can always be exact)
+ *   2. `PIPELINE_CANDIDATE_BASE` (the CI event's own before/base SHA, forwarded
+ *      by the workflow -- e.g. `github.event.before` for a push, or
+ *      `github.event.pull_request.base.sha` for a PR)
+ *   3. `inventory.sourceBaseline.commit` (last resort only -- an
+ *      inventory-derivation fact, not a delivery boundary; using it widens the
+ *      window to everything since the inventory was last regenerated).
+ * A blank or whitespace-only candidate at any tier is treated as absent, not
+ * as an explicit empty base.
+ */
+export function resolveDeliveryBase({ explicitBase, ciEventBase, sourceBaselineCommit } = {}) {
+  for (const candidate of [explicitBase, ciEventBase, sourceBaselineCommit]) {
+    if (typeof candidate === "string" && candidate.trim().length > 0) return candidate;
+  }
+  return null;
 }
 
 export function runVerifyTopologyCli(argv = process.argv.slice(2)) {
@@ -196,7 +219,11 @@ export function runVerifyTopologyCli(argv = process.argv.slice(2)) {
     return failure("VTP-DEFINITION-REQUALIFICATION-REQUIRED");
   }
   const candidateCommit = defaultGit(parsed.root, ["rev-parse", "--verify", `${parsed.candidateRevision}^{commit}`]).stdout;
-  const deliveryBase = inventory?.sourceBaseline?.commit;
+  const deliveryBase = resolveDeliveryBase({
+    explicitBase: parsed.base,
+    ciEventBase: process.env.PIPELINE_CANDIDATE_BASE,
+    sourceBaselineCommit: inventory?.sourceBaseline?.commit,
+  });
   const changedPaths = candidateCommit && typeof deliveryBase === "string"
     ? defaultGit(parsed.root, ["diff", "--name-only", "--diff-filter=ACMR", deliveryBase, candidateCommit]).stdout.split("\n")
     : [];
@@ -206,7 +233,7 @@ export function runVerifyTopologyCli(argv = process.argv.slice(2)) {
     runGit: (args) => defaultGit(parsed.root, args),
     changedPaths,
     event: process.env.GITHUB_EVENT_NAME ?? "local",
-    independentChecks: runIndependentChecks(parsed.root, changedPaths),
+    independentChecks: runIndependentChecks(parsed.root, changedPaths, deliveryBase),
     authorId: defaultGit(parsed.root, ["log", "-1", "--format=%ae", parsed.candidateRevision]).stdout,
     reviewerId: process.env.PIPELINE_SECURITY_REVIEWER_ID ?? null,
   });
