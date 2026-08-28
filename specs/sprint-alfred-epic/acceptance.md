@@ -31,6 +31,13 @@ deliberately disjoint from the WP ids (`A1`–`A5`, `B1`–`B3`, `C1`–`C3`,
 | AC-14 | Every wave's deliverables passed ≥1 independent Critic round (fresh context, paths-only dispatch); fail-then-fix cycles documented — and the same bar held for every design document of this epic before PO review (spec §12 design-phase review duty) | Critic evidence under `evidence/critic/` |
 | AC-15 | Documentation acceptance per member issue against the exact accepted candidate | per-issue doc evidence links |
 | AC-16 | Every host-layout onboarding test this sprint adds or touches asserts the success contract of §D; a rejection-only test appears solely for an explicitly unsupported layout. The affected-artifact set is **re-derived after the Nova rebase** (PO constraint, 2026-08-28) rather than carried from this clone base | §D review lens; A-track Critic evidence; the wave-0 post-rebase re-derivation note |
+| AC-17 | **Disposition before authority:** no work package reaches implementation authority in a governed area whose architecture disposition is unresolved; an `adoption-deferred` decision satisfies this, an absent one does not | D4 adoption-state fixtures; planning-boundary evaluator run |
+| AC-18 | **Map currency fails closed:** an accepted candidate never leaves its navigation map stale against contracts it touched; a checkpoint push instead records typed staleness debt, and the next planning boundary consumes that debt rather than discarding it | D3 class-7 fixtures (fresh/stale map); push-boundary debt fixture |
+| AC-19 | **Decision parity across runners:** two fresh sessions on different supported runners resolve the same effective architecture constraints and active exceptions for the same governed area, or emit a typed divergence finding | D1 parity fixture (two-runner replay) |
+| AC-20 | **Semantic conformance, not file presence:** the Critic review catches a token ADR that does not match its implementation | D1 token-ADR fixture (#99 §7) |
+| AC-21 | **Anti-fragmentation:** a change that improves a metric by shredding topology into tiny modules is rejected rather than rewarded | #104 "misleading tiny-module optimization" fixture |
+| AC-22 | **Active optimization exists at planning:** a finding at the planning boundary carries proposed conformant remedy options with their comparison, not only the violation | D2 remedy-comparison generator fixture |
+| AC-23 | **AGENTS.md linkage:** a governed repository's AGENTS.md references the map bundle entry point, and the declared re-entry reading order resolves end to end from it | D2 estate fixture; re-entry walkthrough evidence |
 
 ## B. Incident-derived regression criteria (live-measured classes)
 
