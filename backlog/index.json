@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "5c3cbe14a2b2410f3322e17ea79dccc7d5acefdfc875cfb0c0dd6b9c0a7bda81"
+    "transitionHead": "6533bff50f8cce8957763d92dad98ea112343ffd81916b3c54b0331d4bc318a1"
   },
   "counts": {
-    "open": 55,
+    "open": 56,
     "in_progress": 5,
     "closed": 380,
     "rejected": 3,
@@ -5117,6 +5117,16 @@
       "closureRepository": "self",
       "closureCommit": "ebc6ea4c238f12aa8e4b0050b0c0ec4829a9d18a",
       "closureEvidence": "backlog/items/2026-08-17-test-suites-use-host-tmp-instead-of-the-repos-own-scratch-convention.md"
+    },
+    {
+      "id": "pipeline.the-ai-hardening-gate-has-no-home-in-any-approved-feature-package",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "Re-Critic vtpgate2-368458af finding F5, re-measured and found wider than reported",
+      "deferred": false,
+      "tracking": "Scheduled for Nova B (PO decision 2026-08-28)"
     },
     {
       "id": "pipeline.the-ledger-reconciler-writes-before-the-items-are-validated",
