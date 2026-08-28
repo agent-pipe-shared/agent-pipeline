@@ -14,8 +14,8 @@
 | 2026-08-31 | The 2026-08-30 block: the 6a93fec2 candidate stamp at 501/503, the six closed retrospective follow-up items, ADR-0076, and the unapproved emergency push of both branches. Its two live carry-forwards -- retro items 7 and 8 deferred to Nova B, and the unresolved Critic FAIL on the sandbox quickfix -- were extracted into the 2026-08-31 handover first. | [docs/state-archive/2026-08-31--prior-current-handover-nova-0-6-0-local-candidate-stamped-re.md](state-archive/2026-08-31--prior-current-handover-nova-0-6-0-local-candidate-stamped-re.md) |
 | 2026-08-31 | The 2026-08-28 three-runner greenfield block: rounds A-U2, the ready-gate blocker T, the 2+2 Critic round, and the candidate's state on the night of 2026-08-28/29. Its still-live carry-forward items were extracted into the 2026-08-31 handover before rotation. | [docs/state-archive/2026-08-31--prior-current-handover-the-three-runner-greenfield-findings-.md](state-archive/2026-08-31--prior-current-handover-the-three-runner-greenfield-findings-.md) |
 | 2026-08-28 | Ledger merge across parallel sprints (ADR-0068), ADR renumbering at acceptance (ADR-0069), and the first handover rotation; its four live open items -- ADR collision 0063, the unregistered check-adr-consistency, BS25/BS26 durability, and the Nova A candidate list -- are carried forward to the current handover. | [docs/state-archive/2026-08-28--earlier-handover-ledger-merge-capability-adr-renumbering-han.md](state-archive/2026-08-28--earlier-handover-ledger-merge-capability-adr-renumbering-han.md) |
-| 2026-08-28 | Verify green 471/471 in one run at candidate 5fd963fc; EP07 tree-dirtying cause named and fixed; +build stamp convention restored; AK-5 closed, AK-6 ready to re-dispatch; the open 0.6.0 combined-release decision carried forward to the current handover. | [docs/state-archive/2026-08-28--prior-handover-verify-is-green-in-one-run-candidate-0-6-0-lo.md](state-archive/2026-08-28--prior-handover-verify-is-green-in-one-run-candidate-0-6-0-lo.md) |
 | 2026-08-28 | Nova line: backlog-ledger merge semantics (ADR-0068), ADR renumbering (ADR-0069) and the first handover rotation | [docs/state-archive/2026-08-28--prior-handover-ledger-merge-capability-adr-renumbering-hando.md](state-archive/2026-08-28--prior-handover-ledger-merge-capability-adr-renumbering-hando.md) |
+| 2026-08-28 | Verify green 471/471 in one run at candidate 5fd963fc; EP07 tree-dirtying cause named and fixed; +build stamp convention restored; AK-5 closed, AK-6 ready to re-dispatch; the open 0.6.0 combined-release decision carried forward to the current handover. | [docs/state-archive/2026-08-28--prior-handover-verify-is-green-in-one-run-candidate-0-6-0-lo.md](state-archive/2026-08-28--prior-handover-verify-is-green-in-one-run-candidate-0-6-0-lo.md) |
 | 2026-08-27 | sprint_agy fetch, fast-forward, and the 2026-08-26 clean local candidate | [docs/state-archive/2026-08-27--prior-handover-sprint-agy-fetch-fast-forward-and-clean-local.md](state-archive/2026-08-27--prior-handover-sprint-agy-fetch-fast-forward-and-clean-local.md) |
 | 2026-08-19 through 2026-08-23 | Phoenix-line checkpoints 61-71 (2026-08-19 through 2026-08-23), preserved verbatim as history after the Nova merge made the Nova line authoritative. | [docs/state-archive/2026-08-27--phoenix-checkpoints-61-71.md](state-archive/2026-08-27--phoenix-checkpoints-61-71.md) |
 | through 2026-08-19 | First real rotation: everything from the 2026-08-08 restart checkpoint through the inherited Nova/Cyborg-release history and every older era down to the open-items tail — extraction pass completed first (original pre-rotation line range 4977–19155; see the archive file's own provenance section and the ADR-0064 addendum dated 2026-08-19) | [state-archive/2026-08-19--pre-restart-and-nova-inherited-history.md](state-archive/2026-08-19--pre-restart-and-nova-inherited-history.md) |
@@ -189,10 +189,51 @@ user-facing representation, greenfield/brownfield paths). **The morning's
 must NOT be run** — the PO must never acknowledge content-soundness of
 rejected bytes.
 
-**Next:** (1) Critic round on the rework documents (MP-07 ARCHITECTURE →
-design-tier at max, tool-layer model param per MP-29); fix-then-fix cycle as
-needed. (2) Re-present to the PO. (3) On the PO's word, the verified
-bound-document route — PO attended acknowledge (`po-authority-acknowledge-plan`/
+**Rework review cycle CLOSED (2026-08-28):** round 1 full review
+(claude-opus-5 at max, candidate `2c867ea9`) **FAIL** — F1/F2 major
+(a "verbatim" field list dropping a field; the eleven contract-sufficiency
+signals audited missing but not absorbed), F3–F5 minor; fixed in
+`e3613ffe`, F4 dispositioned (stage-0 trailer would be a false fast-path
+claim; canon-gap item carries it). Round 2 bounded delta **PASS** (scoped),
+two minor residue findings fixed post-PASS in `361d6dc6` with an honest
+reviewed-surface statement. Evidence: `evidence/critic/rework-round-*`
+(`86d9e70f`, `d59c5a3b`). Fresh live evidence recorded there for two filed
+defects: Critic scratch persistence is structurally unsatisfiable in the
+lane (no Write tool, `>` refused, `node -e` refused even for exempt
+`scratch/`), and 4/16 round-2 tool uses were guard-refusal tax. Owned
+dispatch defect + corrected rule: a delta dispatch's bound base is always
+the enumerated head's parent.
+
+**PO re-review feedback (2026-08-28, gate in progress):** direction
+accepted — "deutlich besser, insbesondere mit dem neuen zusätzlichen
+Dokument". Two directives, both executed at the design level the same day:
+(1) the doctrine must enter the PRD as **mandatory normative basis** — it
+was mentioned nowhere in PRD or spec (verified zero-hit search);
+gap-analysis §D gained the preamble normative-basis anchor + §10
+traceability row (commit `2b0ee8c7`). (2) the **ADR concept must migrate
+explicitly in brownfield adoption**; doctrine §6 gained the rule
+(mechanism installs with the standard, baseline as first record, on-touch
+capture of inherited decisions, honestly dated) routed via §D into spec
+§7.1 (commit `9c9d9819`). The PRD/spec edits themselves stay queued behind
+the unfreeze route. Final PO word on the package: pending.
+
+**Carried forward from the rotated 0.6.0 prior-handover section
+(extraction pass 2026-08-28):** (a) OPEN PO release decision — 0.6.0 is a
+combined Nova+Phoenix number (PO 2026-08-26, ADR-0043): intake Phoenix and
+release combined, or release Nova alone under a different number; blocks
+calling a published artifact "0.6.0", not local `0.6.0+...` candidates.
+(b) AK-5 is closed: `guard-dispatch-budget.mjs` is wired by `731ff1b8` and
+its ineffective matcher was corrected by `1b45d6f9`; the installed manifest
+contains the three expected entries. (c) AK-6 ready
+to re-dispatch against `pipeline-user-v3.schema.json` (first attempt
+withdrawn `1d6dec55`, scaffolding kept `8316dbd8`). Details:
+`docs/state-archive/2026-08-28--prior-handover-verify-is-green-in-one-run-candidate-0-6-0-lo.md`.
+
+**Next:** (1) Re-present the reworked package to the PO (EL-19) — review
+objects: `design/agent-first-architecture.md` (now at `9c9d9819`),
+`design/gap-analysis-2026-08-28.md` (now at `9c9d9819`),
+`design/po-input-2026-08-28.md`.
+(2) On the PO's word, the verified bound-document route — PO attended acknowledge (`po-authority-acknowledge-plan`/
 `-apply`, agent calls refused `CHAT-GATE-NOT-ATTENDED` by design; the marker
 carries no digest, later edits do not stale it) → `submit-plan --by Elephant
 --profile epic` → `reopen-design` (now effective; a submission exists to
