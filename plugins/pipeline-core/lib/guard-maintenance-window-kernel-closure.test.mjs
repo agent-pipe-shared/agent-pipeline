@@ -62,6 +62,26 @@
  * (`\bimport\s*\(\s*[^)\s]`) so a *prose* mention of the `import()` operator in a comment
  * (no argument between the parens) is not miscounted as a real call site.
  *
+ * COMMENT-BLANKED SCAN (NVA-V19-VERIFYHONEST, 2026-08-28): every regex above (dynamic-import
+ * count, `import ... from`, side-effect `import "..."`, the spawn-edge family) runs against
+ * `stripCodeComments(source)`, not the raw file text. A line comment or a block comment can
+ * contain ordinary prose that happens to LOOK like code -- e.g. a docstring explaining a past
+ * bug via the exact phrase `` `await import(...)` `` inside a block comment, with no code
+ * behind it at all -- and a scanner reading raw source cannot tell that apart from a real
+ * unclassifiable call site. `stripCodeComments` is a small state machine (code / line-comment /
+ * block-comment / string), not a second independent regex pass over the same text: it walks
+ * the source once, tracking which of those four states each character falls in, and blanks
+ * comment characters (to spaces, preserving newlines so line-anchored regexes like
+ * `SIDE_EFFECT_IMPORT_RE`'s `^...$m` still line up) while leaving code and STRING CONTENTS
+ * untouched -- a literal import specifier between quotes must survive, or every downstream
+ * regex loses its own input. Tracking state explicitly (rather than, say, stripping strings
+ * first and comments second as two independent regex passes) is what keeps a comment
+ * containing a quote and a string containing a comment-start sequence from desynchronizing
+ * each other: while inside a block/line comment, a quote character is just a character (never
+ * opens a string); while inside a string, a comment-start sequence is just characters (never
+ * opens a comment). Only an ACTUAL dynamic import in real code -- never routed through this
+ * blanking because it was never inside a comment or string span to begin with -- still throws.
+ *
  * FAILS CLOSED on a shape it cannot classify: an UNDECLARED dynamic `import(` call in a
  * kernel file's source, a stale `DYNAMIC_IMPORT_EDGES` entry, an identifier passed to
  * `spawnSync(process.execPath, [...])` that cannot be statically traced to a script-path
@@ -100,6 +120,50 @@ const SIDE_EFFECT_IMPORT_RE = /^\s*import\s+["']([^"']+)["']\s*;?\s*$/gm;
 // operator in a comment (no argument) is never counted as a real dynamic-import call site
 // -- see the "DYNAMIC IMPORT EDGES" section of the file header.
 const DYNAMIC_IMPORT_RE = /\bimport\s*\(\s*[^)\s]/g;
+
+/**
+ * Blanks `//` line comments and `/* ... *\/` block comments out of `source`, replacing their
+ * characters with spaces (newlines preserved, so line-anchored regexes keep matching real
+ * code lines at the same positions) -- see the "COMMENT-BLANKED SCAN" section of the file
+ * header for why this exists and why it is a single character-by-character state machine
+ * rather than two independent regex passes. String and template-literal CONTENTS (single,
+ * double, and backtick-quoted, including `\`-escaped characters) are left completely
+ * untouched, because the specifier every downstream regex actually wants sits between a pair
+ * of quotes. The four states are mutually exclusive by construction: while scanning a
+ * comment, a quote character never opens a string; while scanning a string, `//`/`/*` never
+ * open a comment -- so neither an apostrophe/quote inside a comment nor a comment-start
+ * sequence inside a string can desynchronize the other.
+ */
+function stripCodeComments(source) {
+  let out = "";
+  let state = "code"; // "code" | "line-comment" | "block-comment" | "string"
+  let stringQuote = null;
+  for (let i = 0; i < source.length; i += 1) {
+    const ch = source[i];
+    const next = source[i + 1];
+    if (state === "code") {
+      if (ch === "/" && next === "/") { state = "line-comment"; i += 1; continue; }
+      if (ch === "/" && next === "*") { state = "block-comment"; i += 1; continue; }
+      if (ch === '"' || ch === "'" || ch === "`") { state = "string"; stringQuote = ch; out += ch; continue; }
+      out += ch;
+      continue;
+    }
+    if (state === "line-comment") {
+      if (ch === "\n") { state = "code"; out += "\n"; } else { out += " "; }
+      continue;
+    }
+    if (state === "block-comment") {
+      if (ch === "*" && next === "/") { state = "code"; out += "  "; i += 1; continue; }
+      out += ch === "\n" ? "\n" : " ";
+      continue;
+    }
+    // state === "string"
+    out += ch;
+    if (ch === "\\" && next !== undefined) { out += next; i += 1; continue; }
+    if (ch === stringQuote) { state = "code"; stringQuote = null; }
+  }
+  return out;
+}
 
 // Declared dynamic-import edges (see "DYNAMIC IMPORT EDGES" in the file header): one entry
 // per kernel file whose dynamic `import()` specifiers are built at runtime rather than
@@ -206,9 +270,13 @@ function countDynamicImports(source) {
 }
 
 /** Every first-party (relative-specifier) import/spawn-edge/declared-dynamic-import-edge
- * ONE kernel file's source declares. */
+ * ONE kernel file's source declares. Scans `stripCodeComments(source)`, never the raw file
+ * text, so prose inside a `//`/`/* *\/` comment can never be misread as a real import,
+ * export, dynamic-import, or spawn-edge call site -- see the "COMMENT-BLANKED SCAN" section
+ * of the file header. */
 function relativeImportSpecifiers(absPath, repoRelativePath) {
-  const source = readFileSync(absPath, "utf8");
+  const rawSource = readFileSync(absPath, "utf8");
+  const source = stripCodeComments(rawSource);
   const dynamicImportCount = countDynamicImports(source);
   const declaredDynamicTargets = DYNAMIC_IMPORT_EDGES[repoRelativePath];
   if (dynamicImportCount > 0 && !declaredDynamicTargets) {
@@ -347,6 +415,56 @@ check("GMWKC03 docs/guard-maintenance-window-threat-model.md's Protected-assets 
     0,
     `${missing.length} NEVER_LIFTABLE_KERNEL_PATHS entr${missing.length === 1 ? "y is" : "ies are"} not mentioned in ` +
     `docs/guard-maintenance-window-threat-model.md's "Protected assets" section:\n${missing.join("\n")}`,
+  );
+});
+
+check("GMWKC04 relativeImportSpecifiers still fails closed on a genuine unclassifiable dynamic import() in real code (positive control for GMWKC05's comment fix)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "gmwkc-dynimport-real-"));
+  const fixturePath = join(dir, "fixture.mjs");
+  writeFileSync(
+    fixturePath,
+    [
+      "// a genuinely runtime-computed dynamic import -- real code, not a comment, no",
+      "// DYNAMIC_IMPORT_EDGES entry declared for it below",
+      "const moduleName = computeModuleName();",
+      "export async function load() {",
+      "  return import(moduleName);",
+      "}",
+    ].join("\n"),
+  );
+  assert.throws(
+    () => relativeImportSpecifiers(fixturePath, "plugins/pipeline-core/lib/__gmwkc-fixture-not-a-real-kernel-path.mjs"),
+    /contains a dynamic import\(\) the static scanner cannot classify/,
+    "a real, undeclared dynamic import() must still throw -- this scanner guards which paths " +
+    "are never liftable by a maintenance window, so silently passing it would be a blind spot, " +
+    "not a fix",
+  );
+});
+
+check("GMWKC05 stripCodeComments blanks // and /* */ prose without ever corrupting or being corrupted by string contents", () => {
+  const dir = mkdtempSync(join(tmpdir(), "gmwkc-stripcomments-"));
+  const fixturePath = join(dir, "fixture.mjs");
+  writeFileSync(
+    fixturePath,
+    [
+      "// prose mentioning \"await import(...)\" and a lone ' apostrophe -- must not be read as code",
+      "/**",
+      " * a block comment containing a real-looking specifier: import { x } from \"./nonexistent.mjs\";",
+      " * and the exact phrase that broke this scanner once: `await import(...)` below -- a",
+      " * backtick-quoted phrase inside a block comment must not desynchronize string tracking.",
+      " */",
+      "import { firstReal } from \"./first-real-target.mjs\"; // trailing comment must not hide this import",
+      "const s = \"a string containing /* not a real comment */ and // not a real comment either\";",
+      "import { secondReal } from \"./second-real-target.mjs\";",
+    ].join("\n"),
+  );
+  const specs = relativeImportSpecifiers(fixturePath, "plugins/pipeline-core/lib/__gmwkc-fixture-not-a-real-kernel-path.mjs");
+  assert.deepEqual(
+    specs,
+    ["./first-real-target.mjs", "./second-real-target.mjs"],
+    "both real imports survive: comment prose contributes nothing, and the string literal's " +
+    "fake comment markers between them must not have desynchronized the scan of the second " +
+    "real import that follows it",
   );
 });
 
