@@ -5739,8 +5739,10 @@ function buildIntakePrdContent(checkpoint, featureId, chunks, specSha256) {
     "## Notes",
     "",
     "This is a deterministic staging draft: product framing (What/Why/Scope/",
-    "Non-goals/Risks/Alternatives/DoD) has not been synthesized and must be",
-    "authored and reviewed before binding (bootstrap-bind-apply, step 5).",
+    "Non-goals/Risks/Alternatives/DoD) has not been synthesized. Binding",
+    "(bootstrap-bind-apply, step 5) does not require this framing to exist",
+    "yet -- it must be authored and reviewed before the plan is submitted for",
+    "PO approval (pipeline-state submit-plan).",
     "",
   ].join("\n");
 }
@@ -5763,8 +5765,10 @@ function buildIntakeSpecContent(checkpoint, featureId, chunks) {
     "## Notes",
     "",
     "This is a deterministic staging draft: acceptance criteria (EARS),",
-    "detailed implementation, and alternatives have not been synthesized and",
-    "must be authored and reviewed before binding (bootstrap-bind-apply, step 5).",
+    "detailed implementation, and alternatives have not been synthesized.",
+    "Binding (bootstrap-bind-apply, step 5) does not require this to exist",
+    "yet -- it must be authored and reviewed before the plan is submitted for",
+    "PO approval (pipeline-state submit-plan).",
     "",
   ].join("\n");
 }
@@ -6025,11 +6029,12 @@ function resolveBootstrapBindInputs({ rootDir, repositoryCapability = "local", s
 // only route where the promoted PRD can be PROVABLY the generator's own
 // unmodified playback of already-durable intake data -- nobody has been asked
 // to write a single word of it (buildIntakePrdContent's own closing note:
-// "has not been synthesized and must be authored and reviewed before
-// binding"). Demanding the PO's plan-acknowledgement marker on THAT exact
-// byte sequence would certify a judgement nobody made; the real acceptance
-// gate for a document a human actually authors is `approve-plan`, later,
-// entirely untouched by this (PO decision, see the task this implements).
+// "has not been synthesized ... must be authored and reviewed before the
+// plan is submitted for PO approval"). Demanding the PO's plan-acknowledgement
+// marker on THAT exact byte sequence would certify a judgement nobody made;
+// the real acceptance gate for a document a human actually authors is
+// `approve-plan`, later, entirely untouched by this (PO decision, see the
+// task this implements).
 // This function NEVER writes the marker and must never be extended to -- it
 // only ever answers "would demanding it certify anything real right now".
 //
