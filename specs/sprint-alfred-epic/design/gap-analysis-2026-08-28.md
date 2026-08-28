@@ -17,10 +17,12 @@ recorded here): `gh issue list --repo agent-pipe-shared/agent-pipeline
 `2026-08-08T21:29:46Z` · #109 `2026-08-11T16:21:36Z`. Every value predates
 the 2026-08-27 capture; the snapshot is current for this audit.
 Label-only edits refresh `updatedAt` too, so this check is conservative in
-the right direction: no body can have changed without it showing here. Coverage classes used
-below: **absent** (nowhere in PRD or spec), **name-only** (the concept is
-named, its content is not stated), **mechanism-only** (schemas/plumbing
-present, the normative content by reference), **covered**.
+the right direction: no body can have changed without it showing here.
+
+Coverage classes used below: **absent** (nowhere in PRD or spec),
+**name-only** (the concept is named, its content is not stated),
+**mechanism-only** (schemas/plumbing present, the normative content by
+reference), **covered**.
 
 ## A. The diagnosis, in one paragraph
 
