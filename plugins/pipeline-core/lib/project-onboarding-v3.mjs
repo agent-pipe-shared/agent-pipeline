@@ -159,7 +159,12 @@ const USER_RESERVED_PATHS = new Set([".agents", ".claude", ".codex", "project"])
  * Written ONLY when the project has no `.gitignore` at all. Appending to a file
  * the project owns is a different decision with a different cost, and the seed
  * does not take it unasked: a project that already has one keeps it untouched and
- * is told what to add.
+ * is told what to add -- see `REQUIRED_PROJECT_IGNORE_PATTERNS` /
+ * `withPendingProjectIgnoreGapAsk()` below, which is exactly that ask-step
+ * (2026-08-28 backlog: the-push-gate-is-unsatisfiable-in-any-installed-plugin-
+ * deployment.md, consumer HA -- an owned `.gitignore` missing these entries left
+ * a signed push candidate with no exit once the evidence/security producers
+ * dirtied the tree AFTER the signature already existed).
  */
 const PROJECT_IGNORE_SEED = [
   "# Written by Agent-Pipeline onboarding because this repository had no .gitignore.",
@@ -180,6 +185,12 @@ const PROJECT_IGNORE_SEED = [
   "/project/pipeline-state.json",
   "",
 ].join("\n");
+// Derived, never a second hand-copied list: these are the exact anchored
+// lines `PROJECT_IGNORE_SEED` writes for a from-scratch project. Reusing the
+// single source of truth means the from-scratch seed and the owned-.gitignore
+// gap check (below) can never silently drift apart the way a duplicated
+// literal array would.
+const REQUIRED_PROJECT_IGNORE_PATTERNS = PROJECT_IGNORE_SEED.split("\n").filter((line) => line.startsWith("/"));
 const ONBOARDING_SCRIPT = fileURLToPath(new URL("../scripts/project-onboarding-v3.mjs", import.meta.url));
 const MIGRATION_SCRIPT = fileURLToPath(new URL("../scripts/runner-profile-migration-v3.mjs", import.meta.url));
 const HOST_REPOSITORY_INIT_SCRIPT = fileURLToPath(new URL("../scripts/codex-host-repository-init.mjs", import.meta.url));
@@ -4385,6 +4396,70 @@ function collectAuthorIdentityAction(missing) {
 }
 
 /**
+ * Content-based, not target-based: reads whatever `.gitignore` text a project
+ * actually has on disk right now (from-scratch seed already written, or a
+ * project's own pre-existing file, or empty if genuinely absent) and reports
+ * which of `REQUIRED_PROJECT_IGNORE_PATTERNS` are not present as an exact,
+ * trimmed line. A from-scratch seed always satisfies every pattern by
+ * construction, so this naturally returns `[]` for that case without needing
+ * to know whether onboarding itself wrote the file -- the only case this ever
+ * fires for in practice is a project that owns a `.gitignore` onboarding
+ * never touched.
+ */
+function missingProjectIgnorePatterns(gitignoreText) {
+  const present = new Set(String(gitignoreText ?? "").split(/\r?\n/u).map((line) => line.trim()));
+  return REQUIRED_PROJECT_IGNORE_PATTERNS.filter((pattern) => !present.has(pattern));
+}
+
+// Shared by both call sites that need `missingProjectIgnorePatterns()`'s
+// input: `applyProjectOnboardingV3()` itself (this function's direct return)
+// and `withPendingProjectIgnoreGapAsk()` (the lifecycle-composition re-probe,
+// GF-103's own reason a second call site exists at all for the sibling
+// author-identity ask). Unreadable or absent resolves to empty text -- never
+// a thrown error out of an ask-surfacing check.
+function readProjectIgnoreText(root, fs) {
+  try {
+    const path = safePath(root, ".gitignore", fs);
+    return fs.existsSync(path) ? fs.readFileSync(path, "utf8") : "";
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * The ask-step half of the three options the backlog names for an owned
+ * `.gitignore` missing these entries (appending with the PO's knowledge, an
+ * ask that surfaces the requirement, or having the producers write somewhere
+ * already ignored by construction). This module cannot silently rewrite a
+ * file the project owns -- same restraint `PROJECT_IGNORE_SEED` already
+ * documents -- and it cannot change where the shipped evidence/security
+ * producers write (out of this module's scope). So it asks: same
+ * `collect-input`, informational-acknowledgment shape
+ * `proposeTrustAnchorMaterializationAction()` below uses for a PO-facing
+ * proposal nothing here may apply unattended. `mutation: false` is literal --
+ * this library never writes to a `.gitignore` it did not just create itself.
+ */
+const PROJECT_IGNORE_GAP_ACK_MAX_BYTES = 16;
+function collectProjectIgnoreGapAction(missing) {
+  return {
+    kind: "collect-input",
+    input: {
+      name: "projectIgnoreGapAcknowledged",
+      encoding: "utf8",
+      trim: true,
+      minBytes: 1,
+      maxBytes: PROJECT_IGNORE_GAP_ACK_MAX_BYTES,
+      singleLine: true,
+      rejectNul: true,
+    },
+    mutation: false,
+    requiresConfirmation: false,
+    guidance: `this repository already owns a .gitignore, so onboarding never rewrote it -- but it is missing ${missing.join(" and ")}, exactly the paths the Pipeline's own evidence and security producers write into. Left out, their output can dirty the working tree AFTER a push signature already exists, with no way back: the signature is bound to the exact commit it was produced for, and committing the producers' output moves that commit. Ask the PO, then append these anchored lines to this repository's own .gitignore yourself, with ordinary tools -- onboarding will never write to a file the project owns: ${missing.join(" ")}. Reply with a short acknowledgment ("done" or "skip") once the PO has seen this, whether or not they acted on it now.`,
+    expected: { schema: SCHEMA, statuses: PORTABLE_APPLY_IDENTITY_ASK_STATUSES },
+  };
+}
+
+/**
  * Ask -- for EVERY repository, pre-filled from this machine's remembered
  * preference -- how a push approval is cleared, and (only the first time a
  * machine is ever asked) where the PO's signing key lives (backlog:
@@ -4689,10 +4764,19 @@ export function applyProjectOnboardingV3(plan, { rootDir = plan?.root ?? process
     // diagnostic entry the caller has to notice on its own (see
     // `unresolvedAuthorIdentityKeys()`'s doc comment for the full history).
     const missingIdentity = unresolvedAuthorIdentityKeys(root, state.hostManaged, fs);
+    // Same additive side-channel shape as `missingIdentity`'s `nextAction`
+    // above, kept as its own field rather than competing for that single
+    // slot: host-managed roots are out of scope (their `.git`/scaffold is
+    // Codex-owned, mirroring `unresolvedAuthorIdentityKeys()`'s own
+    // host-managed short-circuit), and a project that owns no `.gitignore`
+    // just got the full seed written above, so this always resolves empty
+    // for that case without needing to know which branch produced the file.
+    const missingIgnorePatterns = state.hostManaged ? [] : missingProjectIgnorePatterns(readProjectIgnoreText(root, fs));
+    const projectIgnoreGap = missingIgnorePatterns.length > 0 ? { projectIgnoreGapAction: collectProjectIgnoreGapAction(missingIgnorePatterns) } : {};
     if (missingIdentity.length > 0) {
-      return { schema: PLAN_SCHEMA, status: "applied", root, changes: plan.changes, git: gitResult, authority, nextAction: collectAuthorIdentityAction(missingIdentity), diagnostics: [] };
+      return { schema: PLAN_SCHEMA, status: "applied", root, changes: plan.changes, git: gitResult, authority, nextAction: collectAuthorIdentityAction(missingIdentity), diagnostics: [], ...projectIgnoreGap };
     }
-    return { schema: PLAN_SCHEMA, status: "applied", root, changes: plan.changes, git: gitResult, authority, diagnostics: [] };
+    return { schema: PLAN_SCHEMA, status: "applied", root, changes: plan.changes, git: gitResult, authority, diagnostics: [], ...projectIgnoreGap };
   } catch (error) {
     const rollbackFailures = root ? rollback(root, created, createdDirectories, gitIdentity, gitTree, gitWasExpectedAbsent, fs) : [];
     if (rollbackFailures.length) return { schema: PLAN_SCHEMA, status: "rollback-failed", root, diagnostics: [diagnostic("$.transaction", "rollback_failed", `${error.message}; rollback also failed: ${rollbackFailures[0].message}`, "repair generated paths manually before retrying")] };
@@ -5201,17 +5285,17 @@ function withPendingVerifyContractAsk(observed) {
 // command or ask `v4Inspection()` already decided is the real next step for
 // this status -- untouched, so an existing caller reading `nextAction.kind`/
 // `.command` sees no behavior change -- and every pending side-channel ask
-// (author identity, push approval, trust anchor guidance, in that fixed
-// priority order) is additionally attached to THAT SAME object as
-// `nextAction.pendingAsks`, so a caller that follows `nextAction` reaches the
-// push-approval question (and the author-identity one -- the SAME resolution
-// applied to both, closing the disagreement between the two conventions the
-// backlog names) without the real required step ever being masked. The
-// original per-field channels (`authorIdentityAction` etc.) are left in
-// place, unchanged, for the existing tests and any caller already reading
-// them directly.
+// (author identity, push approval, verify contract, trust anchor guidance,
+// project-ignore gap, in that fixed priority order) is additionally attached
+// to THAT SAME object as `nextAction.pendingAsks`, so a caller that follows
+// `nextAction` reaches the push-approval question (and the author-identity
+// one -- the SAME resolution applied to both, closing the disagreement
+// between the two conventions the backlog names) without the real required
+// step ever being masked. The original per-field channels
+// (`authorIdentityAction` etc.) are left in place, unchanged, for the
+// existing tests and any caller already reading them directly.
 function withPendingAsksSurfacedOnNextAction(observed) {
-  const pendingAsks = [observed.authorIdentityAction, observed.pushApprovalSetupAction, observed.verifyContractAction, observed.trustAnchorGuidanceAction].filter(Boolean);
+  const pendingAsks = [observed.authorIdentityAction, observed.pushApprovalSetupAction, observed.verifyContractAction, observed.trustAnchorGuidanceAction, observed.projectIgnoreGapAction].filter(Boolean);
   if (pendingAsks.length === 0 || observed.nextAction == null) return observed;
   return { ...observed, nextAction: { ...observed.nextAction, pendingAsks } };
 }
@@ -5307,6 +5391,21 @@ function withPendingTrustAnchorGuidanceAsk(observed, fs) {
   return { ...observed, trustAnchorGuidanceAction: proposeTrustAnchorMaterializationAction(anchor) };
 }
 
+// Sibling of `withPendingAuthorIdentityAsk()` above -- same gating shape,
+// content-based rather than a re-derived plan check: reads whatever
+// `.gitignore` this root actually has on disk right now (2026-08-28 backlog:
+// the-push-gate-is-unsatisfiable-in-any-installed-plugin-deployment.md).
+// Unreadable or absent resolves to empty text, which
+// `missingProjectIgnorePatterns()` then reports as everything missing --
+// never a false "nothing to ask" on a probe failure.
+function withPendingProjectIgnoreGapAsk(observed, fs) {
+  if (observed.repository?.mode !== "local") return observed;
+  if (!PORTABLE_APPLY_IDENTITY_ASK_STATUSES.includes(observed.status)) return observed;
+  const missing = missingProjectIgnorePatterns(readProjectIgnoreText(observed.root, fs));
+  if (missing.length === 0) return observed;
+  return { ...observed, projectIgnoreGapAction: collectProjectIgnoreGapAction(missing) };
+}
+
 function applyLifecycle(rootDir, fs, operation, planSha256, activate, intent = "onboarding", runner, operatorAuthority = null) {
   if (!activate || typeof planSha256 !== "string" || !/^[a-f0-9]{64}$/u.test(planSha256)) return v4Inspection(rootDir, fs, intent, runner);
   if (operation === "portable") {
@@ -5314,9 +5413,9 @@ function applyLifecycle(rootDir, fs, operation, planSha256, activate, intent = "
     // digest was produced with, or the digests never match and the apply is a
     // silent no-op that loops the caller back to adoption-required.
     const plan = planProjectOnboardingV3({ rootDir, deps: fs, runner: v4Inspection(rootDir, fs, intent, runner).runner });
-    if (plan.status !== "ready" || lifecyclePlanDigest(plan) !== planSha256) return withPendingAsksSurfacedOnNextAction(withPendingTrustAnchorGuidanceAsk(withPendingVerifyContractAsk(withPendingPushApprovalSetupAsk(withPendingAuthorIdentityAsk(v4Inspection(rootDir, fs, intent, runner), fs), fs)), fs));
+    if (plan.status !== "ready" || lifecyclePlanDigest(plan) !== planSha256) return withPendingAsksSurfacedOnNextAction(withPendingProjectIgnoreGapAsk(withPendingTrustAnchorGuidanceAsk(withPendingVerifyContractAsk(withPendingPushApprovalSetupAsk(withPendingAuthorIdentityAsk(v4Inspection(rootDir, fs, intent, runner), fs), fs)), fs), fs));
     applyProjectOnboardingV3(plan, { rootDir, activate: true, deps: fs });
-    return withPendingAsksSurfacedOnNextAction(withPendingTrustAnchorGuidanceAsk(withPendingVerifyContractAsk(withPendingPushApprovalSetupAsk(withPendingAuthorIdentityAsk(v4Inspection(rootDir, fs, intent, runner), fs), fs)), fs));
+    return withPendingAsksSurfacedOnNextAction(withPendingProjectIgnoreGapAsk(withPendingTrustAnchorGuidanceAsk(withPendingVerifyContractAsk(withPendingPushApprovalSetupAsk(withPendingAuthorIdentityAsk(v4Inspection(rootDir, fs, intent, runner), fs), fs)), fs), fs));
   }
   const beforeApply = v4Inspection(rootDir, fs, intent, runner);
   if (operation === "repair" && beforeApply.status === "continuity-damaged") {
