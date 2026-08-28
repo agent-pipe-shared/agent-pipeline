@@ -10,6 +10,8 @@ import {
   declaredEvidenceBaselines,
   parseVerifyTopologyArgs,
   preflightVerifyTopology,
+  resolveCandidateChangeWindow,
+  resolveDeliveryBase,
 } from "./verify-topology-preflight.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
@@ -129,6 +131,83 @@ check("invalid declarations and CLI traversal fail closed without private coordi
     baselines: [],
   });
   assert.throws(() => parseVerifyTopologyArgs(["--inventory", "../private.json"]));
+});
+
+const deliveryBaseCommit = "8".repeat(40);
+
+function changeWindowGit(overrides = {}) {
+  const responses = new Map([
+    [`rev-parse --verify ${deliveryBaseCommit}^{commit}`, { status: 0, stdout: deliveryBaseCommit }],
+    [`merge-base --is-ancestor ${deliveryBaseCommit} ${candidate}`, { status: 0, stdout: "" }],
+    [`diff --name-only --diff-filter=ACMR ${deliveryBaseCommit} ${candidate}`, { status: 0, stdout: "plugins/pipeline-core/lib/x.mjs\n" }],
+  ]);
+  for (const [command, response] of Object.entries(overrides)) responses.set(command, response);
+  return { runGit(args) { return responses.get(args.join(" ")) ?? { status: 128, stdout: "" }; } };
+}
+
+check("resolveDeliveryBase resolves in strict tier order and treats a blank candidate as absent", () => {
+  assert.deepEqual(resolveDeliveryBase({ explicitBase: "e", ciEventBase: "c", sourceBaselineCommit: "s" }), { commit: "e", source: "explicit" });
+  assert.deepEqual(resolveDeliveryBase({ explicitBase: "  ", ciEventBase: "c", sourceBaselineCommit: "s" }), { commit: "c", source: "ci-event" });
+  assert.deepEqual(resolveDeliveryBase({ explicitBase: null, ciEventBase: null, sourceBaselineCommit: "s" }), { commit: "s", source: "source-baseline" });
+  assert.equal(resolveDeliveryBase({ explicitBase: "", ciEventBase: "   ", sourceBaselineCommit: null }), null);
+});
+
+check("an unresolvable delivery window fails closed instead of admitting an empty candidate diff (F1)", () => {
+  const noTierResolved = changeWindowGit();
+  assert.deepEqual(
+    resolveCandidateChangeWindow({ runGit: noTierResolved.runGit, candidateCommit: candidate }),
+    { ok: false, code: "VTP-BASE-UNRESOLVABLE", subject: "delivery-base" },
+  );
+
+  // Reproduces the GitHub `event.before` all-zeros case: the base string is
+  // non-empty, so resolveDeliveryBase's blank check passes it through, but it
+  // never resolves to a real commit.
+  const allZeros = "0".repeat(40);
+  const allZerosBase = changeWindowGit({ [`rev-parse --verify ${allZeros}^{commit}`]: { status: 128, stdout: "" } });
+  assert.equal(
+    resolveCandidateChangeWindow({ runGit: allZerosBase.runGit, candidateCommit: candidate, ciEventBase: allZeros }).code,
+    "VTP-BASE-UNRESOLVABLE",
+  );
+});
+
+check("a non-ancestor or self-identical base fails closed instead of measuring the wrong window (F2)", () => {
+  const selfIdentical = changeWindowGit();
+  assert.equal(
+    resolveCandidateChangeWindow({ runGit: selfIdentical.runGit, candidateCommit: deliveryBaseCommit, ciEventBase: deliveryBaseCommit }).code,
+    "VTP-BASE-NOT-ANCESTOR",
+  );
+
+  const notAncestor = changeWindowGit({ [`merge-base --is-ancestor ${deliveryBaseCommit} ${candidate}`]: { status: 1, stdout: "" } });
+  assert.equal(
+    resolveCandidateChangeWindow({ runGit: notAncestor.runGit, candidateCommit: candidate, ciEventBase: deliveryBaseCommit }).code,
+    "VTP-BASE-NOT-ANCESTOR",
+  );
+});
+
+check("an unresolvable diff or an empty changed-path set both fail closed (F1)", () => {
+  const diffFails = changeWindowGit({ [`diff --name-only --diff-filter=ACMR ${deliveryBaseCommit} ${candidate}`]: { status: 128, stdout: "" } });
+  assert.equal(
+    resolveCandidateChangeWindow({ runGit: diffFails.runGit, candidateCommit: candidate, ciEventBase: deliveryBaseCommit }).code,
+    "VTP-DIFF-UNRESOLVABLE",
+  );
+
+  const emptyDiff = changeWindowGit({ [`diff --name-only --diff-filter=ACMR ${deliveryBaseCommit} ${candidate}`]: { status: 0, stdout: "" } });
+  assert.equal(
+    resolveCandidateChangeWindow({ runGit: emptyDiff.runGit, candidateCommit: candidate, ciEventBase: deliveryBaseCommit }).code,
+    "VTP-CANDIDATE-DIFF-EMPTY",
+  );
+});
+
+check("a resolvable, ancestor-bound, non-empty window is recorded with its resolution tier", () => {
+  const ready = changeWindowGit();
+  assert.deepEqual(
+    resolveCandidateChangeWindow({ runGit: ready.runGit, candidateCommit: candidate, ciEventBase: deliveryBaseCommit }),
+    {
+      ok: true,
+      changedPaths: ["plugins/pipeline-core/lib/x.mjs"],
+      deliveryBase: { commit: deliveryBaseCommit, source: "ci-event" },
+    },
+  );
 });
 
 check("GitHub Verify uses full credential-free history and runs topology before runner-free Core", () => {

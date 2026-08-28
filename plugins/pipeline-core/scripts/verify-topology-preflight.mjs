@@ -184,10 +184,56 @@ export function parseVerifyTopologyArgs(argv) {
  * as an explicit empty base.
  */
 export function resolveDeliveryBase({ explicitBase, ciEventBase, sourceBaselineCommit } = {}) {
-  for (const candidate of [explicitBase, ciEventBase, sourceBaselineCommit]) {
-    if (typeof candidate === "string" && candidate.trim().length > 0) return candidate;
+  const tiers = [
+    ["explicit", explicitBase],
+    ["ci-event", ciEventBase],
+    ["source-baseline", sourceBaselineCommit],
+  ];
+  for (const [source, candidate] of tiers) {
+    if (typeof candidate === "string" && candidate.trim().length > 0) return Object.freeze({ commit: candidate, source });
   }
   return null;
+}
+
+/**
+ * Resolve the actual delivery window (base..candidate) and its changed-path
+ * set, failing closed at every step instead of silently admitting an empty
+ * or unresolvable window (F1/F2, `scratch/DESIGN-self-excluded-review-path.md`
+ * sections B/C). `runGit` is the same `(args) => {status, stdout}` shape
+ * `preflightVerifyTopology` already takes, so this is unit-testable with the
+ * same fixture pattern.
+ */
+export function resolveCandidateChangeWindow({
+  runGit, candidateCommit, explicitBase, ciEventBase, sourceBaselineCommit,
+} = {}) {
+  const deliverySpec = resolveDeliveryBase({ explicitBase, ciEventBase, sourceBaselineCommit });
+  if (deliverySpec === null) {
+    return Object.freeze({ ok: false, code: "VTP-BASE-UNRESOLVABLE", subject: "delivery-base" });
+  }
+  const baseCommit = resolveObject(runGit, deliverySpec.commit, "commit");
+  if (baseCommit === null) {
+    return Object.freeze({ ok: false, code: "VTP-BASE-UNRESOLVABLE", subject: "delivery-base" });
+  }
+  if (baseCommit === candidateCommit) {
+    return Object.freeze({ ok: false, code: "VTP-BASE-NOT-ANCESTOR", subject: "delivery-base" });
+  }
+  const ancestry = runGit(["merge-base", "--is-ancestor", baseCommit, candidateCommit]);
+  if (ancestry?.status !== 0) {
+    return Object.freeze({ ok: false, code: "VTP-BASE-NOT-ANCESTOR", subject: "delivery-base" });
+  }
+  const diff = runGit(["diff", "--name-only", "--diff-filter=ACMR", baseCommit, candidateCommit]);
+  if (diff?.status !== 0) {
+    return Object.freeze({ ok: false, code: "VTP-DIFF-UNRESOLVABLE", subject: "candidate-diff" });
+  }
+  const changedPaths = diff.stdout.split("\n").map((entry) => entry.trim()).filter(Boolean);
+  if (changedPaths.length === 0) {
+    return Object.freeze({ ok: false, code: "VTP-CANDIDATE-DIFF-EMPTY", subject: "candidate-diff" });
+  }
+  return Object.freeze({
+    ok: true,
+    changedPaths: Object.freeze(changedPaths),
+    deliveryBase: Object.freeze({ commit: baseCommit, source: deliverySpec.source }),
+  });
 }
 
 export function runVerifyTopologyCli(argv = process.argv.slice(2)) {
@@ -218,25 +264,37 @@ export function runVerifyTopologyCli(argv = process.argv.slice(2)) {
   if (recordedDefinitions.schema !== "pipeline.ai-definition-inventory.v1" || recordedDefinitions.definitionCount !== currentDefinitions.definitionCount || requalification.status !== "current") {
     return failure("VTP-DEFINITION-REQUALIFICATION-REQUIRED");
   }
-  const candidateCommit = defaultGit(parsed.root, ["rev-parse", "--verify", `${parsed.candidateRevision}^{commit}`]).stdout;
-  const deliveryBase = resolveDeliveryBase({
-    explicitBase: parsed.base,
-    ciEventBase: process.env.PIPELINE_CANDIDATE_BASE,
-    sourceBaselineCommit: inventory?.sourceBaseline?.commit,
-  });
-  const changedPaths = candidateCommit && typeof deliveryBase === "string"
-    ? defaultGit(parsed.root, ["diff", "--name-only", "--diff-filter=ACMR", deliveryBase, candidateCommit]).stdout.split("\n")
-    : [];
-  return preflightVerifyTopology({
+  const runGit = (args) => defaultGit(parsed.root, args);
+  const candidateCommit = runGit(["rev-parse", "--verify", `${parsed.candidateRevision}^{commit}`]).stdout;
+  const authorId = runGit(["log", "-1", "--format=%ae", parsed.candidateRevision]).stdout;
+  const reviewerId = process.env.PIPELINE_SECURITY_REVIEWER_ID ?? null;
+
+  let changedPaths = [];
+  let deliveryBase = null;
+  if (candidateCommit) {
+    const window = resolveCandidateChangeWindow({
+      runGit,
+      candidateCommit,
+      explicitBase: parsed.base,
+      ciEventBase: process.env.PIPELINE_CANDIDATE_BASE,
+      sourceBaselineCommit: inventory?.sourceBaseline?.commit,
+    });
+    if (!window.ok) return failure(window.code, window.subject);
+    changedPaths = window.changedPaths;
+    deliveryBase = window.deliveryBase;
+  }
+
+  const result = preflightVerifyTopology({
     candidateRevision: parsed.candidateRevision,
     inventory,
-    runGit: (args) => defaultGit(parsed.root, args),
+    runGit,
     changedPaths,
     event: process.env.GITHUB_EVENT_NAME ?? "local",
-    independentChecks: runIndependentChecks(parsed.root, changedPaths, deliveryBase),
-    authorId: defaultGit(parsed.root, ["log", "-1", "--format=%ae", parsed.candidateRevision]).stdout,
-    reviewerId: process.env.PIPELINE_SECURITY_REVIEWER_ID ?? null,
+    independentChecks: runIndependentChecks(parsed.root, changedPaths, deliveryBase?.commit ?? null, { reviewerId, authorId }),
+    authorId,
+    reviewerId,
   });
+  return deliveryBase ? Object.freeze({ ...result, deliveryBase }) : result;
 }
 
 if (isDirectInvocation(import.meta.url)) {
