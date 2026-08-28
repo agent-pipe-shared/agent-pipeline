@@ -56,6 +56,7 @@ function runGuard(command, projectDir, envOverride = {}) {
   const res = spawnSync(process.execPath, [GUARD], {
     input: JSON.stringify({ tool_input: { command } }),
     encoding: "utf8",
+    cwd: projectDir,
     env: { ...baseEnv, CLAUDE_PROJECT_DIR: projectDir, ...envOverride },
   });
   return { code: res.status, stderr: res.stderr ?? "" };
