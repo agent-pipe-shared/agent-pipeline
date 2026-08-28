@@ -322,7 +322,17 @@ Hunt systematically, in this order:
 2. **Scope:** Compare the diff's file list against the spec's Detailed
    Implementation enumeration. Unlisted files touched, listed files untouched,
    silent deviations — candidates.
-3. **Trajectory (mandatory):** Were the claimed checks actually run? Match the
+3. **Reachability and effect:** For anything the diff adds or changes that an
+   agent, a human, or another program is meant to use — is there a path to it
+   from where that user actually starts, and does taking that path produce
+   the intended effect? Measure from the user's position, not the
+   repository's: a capability verified only inside this checkout is not
+   verified for its consumer. Three shapes, each a candidate: **named but not
+   admitted** (something points at it, a guard refuses it); **admitted but
+   not named** (it would run, nothing tells its user it exists); **published
+   but not consumed** (emitted correctly, read by no caller). A capability
+   that only passes its own tests is not yet delivered.
+4. **Trajectory (mandatory):** Were the claimed checks actually run? Match the
    evidence artifact against the claims: does the output look machine-written,
    does the command match the project's verify gate, does the exit code match
    the claim, are timestamps/paths plausible? A fluent report with skipped
@@ -346,24 +356,24 @@ Hunt systematically, in this order:
    records anonymous assistance only. Provider/model co-author data, session
    URLs/IDs, account identifiers, and other private correlation metadata are
    prohibited and a finding when present.
-4. **Test integrity:** Were tests/checks of the implementation weakened,
+5. **Test integrity:** Were tests/checks of the implementation weakened,
    deleted, skipped, or newly tolerant? (Tests are the contract.)
-5. **Edge cases & failure paths:** boundaries, empty/huge inputs, concurrency,
+6. **Edge cases & failure paths:** boundaries, empty/huge inputs, concurrency,
    error handling, rollback/idempotency where relevant.
-6. **Guardrail/constraint violations:** anything crossing the guardrails files
+7. **Guardrail/constraint violations:** anything crossing the guardrails files
    listed above, project denies, risk zones {{RISK_ZONES or "per calibration"}}.
-7. **Security surface (always, heightened for security-flagged diffs):**
+8. **Security surface (always, heightened for security-flagged diffs):**
    secrets in code/logs, injection, authz gaps, unsafe defaults, exposure of
    live systems.
-8. **Documented-instead-of-fixed risks** — known gaps "mitigated" only by a
+9. **Documented-instead-of-fixed risks** — known gaps "mitigated" only by a
    TODO/comment/doc note without owner and expiry date; a documented risk
    without a due date is a finding, not a mitigation (QG-06).
-9. **Dependency reality check** — every NEW dependency (package, action,
-   container image, plugin) exists in the official registry under EXACTLY that
-   name and is the intended, maintained project; the report must carry registry
-   evidence (URL + pinned version). Hallucinated near-miss names are a
-   supply-chain attack vector (SEC-04 slopsquatting).
-10. **Language assignment (pipeline-deliverable reviews only)** — new artifacts
+10. **Dependency reality check** — every NEW dependency (package, action,
+    container image, plugin) exists in the official registry under EXACTLY that
+    name and is the intended, maintained project; the report must carry registry
+    evidence (URL + pinned version). Hallucinated near-miss names are a
+    supply-chain attack vector (SEC-04 slopsquatting).
+11. **Language assignment (pipeline-deliverable reviews only)** — new artifacts
     follow ADR-0011: agent-facing English, human-facing German, primary-reader
     rule for mixed cases; misassigned language is a candidate.
 
@@ -454,7 +464,7 @@ work inside a dispatch.
 labelled as one. Use the mandatory report format below and make these four
 statements explicit:
 
-1. **Examined:** which of the Phase A categories 1–10, and which commits/paths
+1. **Examined:** which of the Phase A categories 1–11, and which commits/paths
    of the review object, you actually worked through.
 2. **Findings so far:** every candidate that already passed the Phase B evidence
    gate, in the normal finding shape, plus the `critic-notes.md` path. Anything
@@ -485,7 +495,7 @@ budget does not license it.
    - `Spec-ref`: EARS criterion ID or guardrail rule
 2. **Deliberately not flagged** (mandatory rubric): aspects you explicitly
    examined and found in order — distinguishes "checked, ok" from "not looked
-   at". List the hunt categories 1–10 you cleared.
+   at". List the hunt categories 1–11 you cleared.
 3. **Trajectory check** (mandatory verdict): are claims and evidence
    consistent? `consistent | inconsistent (+ evidence) | not verifiable (+ what is missing)`
 4. **Briefing violations observed** (contaminating input, missing artifacts) or "none".
