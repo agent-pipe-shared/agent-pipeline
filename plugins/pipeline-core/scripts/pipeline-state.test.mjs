@@ -785,4 +785,130 @@ function planAuthorityFixture({ featureId, planPath, specPath, now = "2026-08-27
     `the named promotion action "${PLAN_AUTHORITY_PROMOTION_SUBCOMMAND}" must be a real registered subcommand; got: ${names.join(", ")}`);
 }
 
+// NVA-V2-APPROVEREACH / NVA-V2B-APPROVERENDER: the `awaiting-approval` gate.
+//
+// The one durable fact worth keeping here: `--by` is deliberately NOT derived,
+// even though the local Git author is readable at this point and the `draft`
+// gate one step earlier derives exactly that. `--by` names the person asserting
+// the approval, so filling it in would produce a command a session could run to
+// approve the PO's plan for them -- and a gate an agent can satisfy for itself is
+// not a gate. The four artifact-identity fields (`planSubmission.{planPath,
+// planSha256,specPath,specSha256}`) are unconditionally present here, because
+// `submit-plan` writes all four before a feature can reach this status, so unlike
+// `draft` there is no not-yet-derivable case for them.
+//
+// Byte-shape coverage also lives in `pipeline-state-inspect.test.mjs`
+// (NVA-Q2-DRAFTDERIVE, "awaiting-approval stays collect-input with no
+// executable/argv"); these are additional, not a replacement.
+function capturedStdout(fn) {
+  const original = console.log;
+  const lines = [];
+  console.log = (...args) => { lines.push(args.join(" ")); };
+  try {
+    const result = fn();
+    return { result, lines };
+  } finally {
+    console.log = original;
+  }
+}
+
+function awaitingApprovalFixture() {
+  const featureId = "widget-approvereach";
+  const planPath = `specs/${featureId}/prd.md`;
+  const specPath = `specs/${featureId}/spec.md`;
+  const root = mktempProjectDir();
+  const localNow = "2026-08-28T12:00:00.000Z";
+  assert.equal(run(["set-feature", "--id", featureId, "--plan-path", planPath], { dir: root, now: () => localNow }), 0);
+  const state = JSON.parse(readFileSync(statePath(root), "utf8"));
+  state.planSubmission = {
+    schema: "pipeline.plan-submission.v1",
+    featureId, planPath,
+    planSha256: sha256Hex(`plan:${planPath}`),
+    specPath,
+    specSha256: sha256Hex(`spec:${specPath}`),
+    profile: "feature",
+    profileSha256: sha256Hex("profile"),
+    submittedBy: "coordinator", submittedAt: localNow,
+  };
+  writeFileSync(statePath(root), JSON.stringify(state, null, 2) + "\n");
+  return { root, deps: { dir: root, now: () => localNow }, planPath, specPath, planSha256: state.planSubmission.planSha256, specSha256: state.planSubmission.specSha256 };
+}
+
+// This is the test that matters most in this package: no `nextAction` the
+// `awaiting-approval` gate publishes may be an action an agent can execute
+// to satisfy the plan approval on the PO's behalf.
+{
+  const { root, deps } = awaitingApprovalFixture();
+  const inspected = capturedStdout(() => run(["inspect"], deps));
+  assert.equal(inspected.result, 0, inspected.lines.join(" "));
+  const payload = JSON.parse(inspected.lines.join("\n"));
+  assert.equal(payload.status, "awaiting-approval");
+  assert.equal(payload.nextAction.kind, "collect-input",
+    "awaiting-approval must never publish a runnable kind:\"command\" -- that would let a machine approve the PO's plan");
+  assert.equal(payload.nextAction.executable, undefined,
+    "the awaiting-approval gate must never carry an executable");
+  assert.equal(payload.nextAction.argv, undefined,
+    "the awaiting-approval gate must never carry an argv");
+  assert.equal(payload.nextAction.input, undefined);
+  assert.equal(payload.nextAction.inputs, undefined,
+    "there is nothing an agent may fill in on the PO's behalf for this gate");
+  void root;
+}
+
+// The command may PREPARE and PRESENT the artifacts (name them by path and
+// digest) for the human's own judgement -- it must not stop at a bare
+// refusal either.
+{
+  const { deps, planPath, specPath, planSha256, specSha256 } = awaitingApprovalFixture();
+  const inspected = capturedStdout(() => run(["inspect"], deps));
+  const payload = JSON.parse(inspected.lines.join("\n"));
+  assert.equal(typeof payload.nextAction.guidance, "string");
+  assert.ok(payload.nextAction.guidance.includes(planPath), "guidance must name the plan by path");
+  assert.ok(payload.nextAction.guidance.includes(planSha256), "guidance must name the plan's sha256");
+  assert.ok(payload.nextAction.guidance.includes(specPath), "guidance must name the spec by path");
+  assert.ok(payload.nextAction.guidance.includes(specSha256), "guidance must name the spec's sha256");
+  assert.ok(payload.nextAction.guidance.includes("approve-plan"),
+    "guidance must point the PO at approve-plan themselves");
+}
+
+// NVA-V2B-APPROVERENDER: the command the guidance renders is EXECUTED here, not
+// merely matched against an expected string. Naming a command the caller then
+// cannot run is a failure this repository has shipped before -- a runner once
+// handed the PO an invented `sign-digest` subcommand mid-ceremony -- and prose
+// that merely describes a command ("run approve-plan with their own name as
+// --by") leaves the reader to reconstruct the invocation, which is the same
+// defect one step removed. So: pull the rendered command out of the guidance,
+// substitute the placeholder the way a human would, run it, and require that it
+// reaches the gate's own logic rather than dying in argv parsing.
+{
+  const { root, deps } = awaitingApprovalFixture();
+  const inspected = capturedStdout(() => run(["inspect"], deps));
+  const { guidance } = JSON.parse(inspected.lines.join("\n")).nextAction;
+
+  const rendered = /running: (.+?) -- there is no command/s.exec(guidance)?.[1] ?? null;
+  assert.ok(rendered, `guidance must render a runnable command, got: ${guidance}`);
+  assert.ok(rendered.includes("approve-plan --by "),
+    `the rendered command must be the approve-plan invocation, got: ${rendered}`);
+
+  // Exactly the substitution a human performs: replace the placeholder, keep
+  // everything else byte for byte.
+  const parts = rendered.replace('"<the PO\'s own name>"', "Probe Person").split(" ");
+  const [executable, scriptPath, subcommand, byFlag] = parts;
+  assert.equal(executable, process.execPath, "the rendered executable must be this runtime");
+  assert.equal(scriptPath, fileURLToPath(new URL("./pipeline-state.mjs", import.meta.url)),
+    "the rendered script path must be pipeline-state.mjs itself, not a guessed path");
+  assert.equal(subcommand, "approve-plan");
+  assert.equal(byFlag, "--by");
+
+  const executed = spawnSync(executable, [scriptPath, subcommand, byFlag, "Probe Person", "--dir", root], { encoding: "utf8" });
+  const stderr = executed.stderr ?? "";
+  // The gate may legitimately refuse this fixture (missing PO-gate authority,
+  // staging refusal, ...). What it must NOT do is fail to understand the
+  // invocation -- that would mean the rendered command is not real.
+  assert.ok(!/unknown subcommand|Usage:|requires --by/i.test(stderr),
+    `the rendered command must parse; approve-plan rejected its own rendered argv: ${stderr}`);
+  assert.ok(executed.status === 0 || /approve-plan (requires|blocked by)/.test(stderr),
+    `the rendered command must reach approve-plan's own gate logic; got status ${executed.status}, stderr: ${stderr}`);
+}
+
 console.log("pipeline-state.test.mjs (CB-1a): all checks passed");
