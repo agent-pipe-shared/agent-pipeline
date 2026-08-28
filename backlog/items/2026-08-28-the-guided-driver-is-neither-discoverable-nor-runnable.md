@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.guided-driver-neither-discoverable-nor-runnable
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-28
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: 7b2487b272a800f6981da025c7e593a7dddbdd60
+closure_evidence: backlog/items/2026-08-28-the-guided-driver-is-neither-discoverable-nor-runnable.md
 sprint: nova
 tracking: "NOW / Nova A — the guided driver is refused by the readiness guard in every state it exists to serve, and named by nothing an agent reads. Every chaining improvement built this session is inert in practice until this lands."
 source: "PO question 2026-08-28: 'ist sichergestellt, dass die agenten überhaupt diesen driver jeweils sofort finden und ihn nutzen müssen?' Measured by scratch/verify-driver-reachable.mjs against a governed fixture with an injected readiness denial."
@@ -122,3 +126,22 @@ Partially resolved. Checked in this checkout (HEAD b4fc36a3):
   `pipeline-start` skill describes the driver as the route" is unmet — a session
   following the skill's own written instructions still reads the old inspect
   wording rather than being told a driver exists.
+
+## Closing note (reconciliation, 2026-08-29)
+
+The gap named above is closed. Commit `7b2487b272a800f6981da025c7e593a7dddbdd60`
+rewrote `plugins/pipeline-core/skills/pipeline-start/SKILL.md` Step 0 to name
+`onboarding-init.mjs --root <root> [--runner <runner>] [--step-cap <n>]` as the
+route for a not-ready project (`grep -n onboarding-init
+plugins/pipeline-core/skills/pipeline-start/SKILL.md` now matches at line
+115-116). All four acceptance criteria are confirmed against current code and a
+clean test run: the driver's admission
+(`guard-lifecycle-ready.test.mjs::NVA-K-DRIVERREACH: the guided driver is
+admitted...`), the bootstrap `nextAction` naming it
+(`pipeline-start-preflight.test.mjs::NVA-K-DRIVERREACH: a not-ready project's
+nextAction names the guided driver...`), the divergence-proof property test
+(`...whatever command a not-ready bootstrap's nextAction names, the readiness
+guard admits it...`), and the skill text change above. `node --test
+plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs` (54/54) and
+`node --test plugins/pipeline-core/scripts/pipeline-state.test.mjs` (1/1, CB-1a
+all checks passed) both exit 0.

@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.scratch-write-refused-during-intake-against-documented-exemption
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-28
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: 53693c3dac13a361a0ed6aa7f62421f4c67758c7
+closure_evidence: backlog/items/2026-08-28-a-scratch-write-is-refused-during-intake-against-the-documented-exemption.md
 sprint: nova
 source: "Claude/Windows greenfield run, 2026-08-28, sections 7 and 11 of its own analysis (docs/pipeline-haertungstest-und-analyse.md)."
 ---
@@ -58,3 +62,14 @@ enforcement disagree and the refusal teaches neither.
 
 - `2026-08-28-a-heredoc-refusal-teaches-no-substitute.md` — same family: a
   correct refusal that names no way forward.
+
+## Closing note (reconciliation, 2026-08-29)
+
+Both acceptance criteria are met. Commit `53693c3dac13a361a0ed6aa7f62421f4c67758c7`
+admits any Edit/Write/NotebookEdit and matching `mkdir` resolving inside the
+repository's own `scratch/` during `intake-required` and
+`intake-design-questions-required`, narrowed by `resolve()`+`pathInside()`, and
+updated the `pipeline-start` skill text to name the admission explicitly. `node
+--test plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs` (172/172,
+including `NVA-GF-SCRATCH: intake statuses admit any resolved scratch/ write and
+matching mkdir, nothing wider`) exits 0.

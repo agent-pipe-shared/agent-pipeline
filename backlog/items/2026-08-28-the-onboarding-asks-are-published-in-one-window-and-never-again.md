@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.onboarding-asks-published-in-one-window-only
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-28
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: cceafb06a68e8b0e0154da180021c2561c1ec1c4
+closure_evidence: backlog/items/2026-08-28-the-onboarding-asks-are-published-in-one-window-and-never-again.md
 sprint: nova
 tracking: "NOW / Nova A — happy-path blocking at the PO's second touch: the onboarding questions reach the human through exactly one command's response, so a run that passes that point never asks them again."
 source: "Found by NVA-V3-PENDINGASKS while wiring the guided driver to consume nextAction.pendingAsks, measured against a real fresh repository; the two call sites were then read directly (project-onboarding-v3.mjs lines 5447 and 5449) rather than inferred from the measurement."
@@ -86,3 +90,22 @@ of additive field.
   hazard the Direction's second paragraph names, twice realised already.
 - `2026-08-28-nothing-checks-that-a-shipped-capability-is-reachable.md` — the class:
   published by one builder, reachable from one path only.
+
+## Closing note (reconciliation, 2026-08-29)
+
+Commit `cceafb06a68e8b0e0154da180021c2561c1ec1c4` merges the same pending-ask
+computation into every ordinary `inspect` via a new shared helper
+(`withAllPendingOnboardingAsksAttached`, reused unchanged at both existing
+`apply-portable-seed` call sites) and a sibling
+(`withPendingOnboardingAsksOnNextActionOnly`) that attaches to
+`nextAction.pendingAsks` only, deliberately never the raw per-field side
+channels, because those are not in `project-onboarding-ready-gate.mjs`'s closed
+key sets and would otherwise fail every non-ready session closed. All four
+acceptance criteria confirmed:
+`an ordinary inspect surfaces every pending ask whose condition is still true,
+not only the apply-portable-seed call`, `an ask whose condition has been
+resolved stops appearing on the next ordinary inspect`, `the ready status
+observation is unaffected by the ask-window change, checked against the real
+ready gate`, and `the five-wrapper pending-asks composition is expressed
+exactly once in the library source`. `node --test
+plugins/pipeline-core/lib/project-onboarding-v3.test.mjs` (144/144) exits 0.
