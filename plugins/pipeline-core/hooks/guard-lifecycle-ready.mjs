@@ -2736,9 +2736,13 @@ function sanctionedOnboardingArgs(rawArgs, root) {
   //   --language/--profile -- the CLI's own closed enums, same idiom as the kickoff branches.
   // NVA-BOOTADMIT-2 (2026-08-27): intake-consent-apply's own function
   // (applyOnboardingIntakeConsent, onboarding-continuity.mjs) always requires --granted and
-  // --activate unconditionally; the other four value flags each default to null and merge as
-  // base.values.X ?? X, so a caller may supply any subset of them, including none -- reflected in
-  // MUTATING_ONBOARDING_ARGV_SHAPES's optionalValue list for this command.
+  // --activate unconditionally. Of the other six value flags, four (--git-author-name,
+  // --git-author-email, --language, --profile) each default to null and merge as
+  // base.values.X ?? X; the remaining two (--text, --text-file) do not merge into that values
+  // bag at all -- the CLI collapses whichever one is supplied into a single `text` value that,
+  // when present, routes through a separate applyOnboardingIntakeCapture call recording a
+  // material-input chunk instead. Any subset of all six, including none, may be supplied --
+  // reflected in MUTATING_ONBOARDING_ARGV_SHAPES's optionalValue list for this command.
   //
   // bootstrap-bind-apply's nextAction (promotionApplyAction(), onboarding-continuity.mjs) always
   // carries a trailing `--runner <runner>` pair too, but withoutRunnerFlag() at the top of this
