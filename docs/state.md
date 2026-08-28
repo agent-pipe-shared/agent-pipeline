@@ -13,7 +13,62 @@
 | 2026-08-11 to 2026-08-19 | Checkpoints 1-60 (2026-08-11 through 2026-08-19 checkpoint 60): superseded session narrative; durable decisions already live in ADRs/backlog/guardrails per this repo's own standing convention, not uniquely in this prose. | [docs/state-archive/2026-08-19--checkpoints-1-through-60.md](state-archive/2026-08-19--checkpoints-1-through-60.md) |
 | 2026-08-26 | 2026-08-25 Antigravity chat-gate-ceremony standardization, verify-tuner stage 2 acceptance, sprint-agy-runner delta4 Critic fix and candidate status | [docs/state-archive/2026-08-26--agy-runner-2026-08-25-handover.md](state-archive/2026-08-26--agy-runner-2026-08-25-handover.md) |
 
-## Current handover — Verify is green in one run; candidate 0.6.0 local (2026-08-27)
+## Current handover — the three-runner greenfield findings are being worked, happy path first (2026-08-28)
+
+**READ THIS FIRST.** The greenfield test ran candidate 0.6.0 across Claude/Windows,
+Agy/WSL and Codex/WSL against one design document. Eighteen backlog items came out
+of it (`9e4a59d6`, `f51f8f4e`), and the PO set the priority explicitly: the happy
+path ends at the push, so everything on that chain is NOW, not Nova B. Security is
+default ON with its prerequisites made ready during init.
+
+**The PO's own framing of the goal, kept verbatim because it is the acceptance
+bar:** *"das onboarding muss guided viel einfacher für die agenten werden"*. Onboarding
+today exposes ~31 subcommands with plan/apply digest pairs that an agent must
+sequence by hand; all three runs independently named this their largest friction.
+The decision (AskUserQuestion, 2026-08-28) is **"Flow neu, Kern behalten"** — rebuild
+the orchestration, leave the binding/crypto core untouched. Nothing in this work
+weakens a digest, a binding or a signature.
+
+**Work is running in rounds of parallel worktree-isolated Goldfish dispatches.**
+
+*Round A — landed and independently verified, not taken on report:*
+`53693c3d`/`3e6bfce4` scratch-during-intake admission (161/161) · `fffb0001`/`cb673ab1`
+absent pre-push hook reported as an unbacked gate (7/7) · `131a9901` twin-manifest
+drift detection (34/34) · `89f30758` shared copy-safe renderer (5/5, incl. a real
+`bash eval` round-trip). Merged guard suite: 162/162.
+
+*Round B — in flight (`wf_503c47db-c75`), based on `c67397d7`:* the guided init
+driver; the guard-git worktree fix; a push-gate satisfiability preflight; scanner
+bootstrap for security-on.
+
+*Round C — not yet dispatched:* verify-contract elicitation, push-approval mode
+choice, trust-anchor bootstrap, repair-cycle elimination. All four live in
+`lib/project-onboarding-v3.mjs`, so they run sequentially rather than in parallel.
+
+**A defect in the dispatch mechanism itself, found and filed mid-round**
+(`cb984294`, `8d403723`): `guard-git.mjs:542` resolves a `git commit -F` message
+file against `CLAUDE_PROJECT_DIR` rather than the invoking cwd, so inside a
+worktree the file is looked for in the main checkout and the commit is refused as
+`GIT-03-UNREADABLE-MESSAGE-FILE`. Two sibling dispatches hit it; one guessed the
+absolute-path workaround and landed its commits, the other returned an empty result
+with finished work stranded. Combined with the closed grammar's refusal of a newline
+in `-m`, a correct multi-line commit is unreachable from a worktree. Fix dispatched
+as `NVA-B-GUARDF`; until it lands, every worktree briefing must state the
+absolute-path rule. A second contradiction of the same kind is recorded in that
+item: `templates/prompts/goldfish-task.md` instructs `git add … && git commit …` as
+one call, which the grammar refuses.
+
+**Two of the four documented reasons for `security: off` are stale** (`c67397d7`).
+Onboarding now writes the `.gitignore` whose absence reason 1 describes, and missing
+scanners were measured rather than assumed: with none reachable the run reports
+`SKIPPED [binary_missing]` ×3, `license-check: OK`, **CLEAN, exit 0**. What actually
+blocks is the v2 verdict's three offending required capabilities plus a license
+allowlist that resolves only inside this repository.
+
+**Still true and unchanged:** the push gate is `approval: required` with
+`gates.push_approval: signature`. Nothing here unblocks a push.
+
+## Prior handover — Verify is green in one run; candidate 0.6.0 local (2026-08-27)
 
 **READ THIS FIRST.** Verify passes 471/471, exit 0, in a **single** run with a
 clean tree before and after — candidate `5fd963fc`. The two-run requirement is
@@ -74,7 +129,7 @@ in Verify" is **three**, not nine and not one — six are false positives from
 `check-suite-registration.mjs`, which is blind to `verify.mjs`'s scoped
 registration block. That is now its own item, alongside the three real gaps.
 
-## Prior handover — ledger-merge capability, ADR renumbering, handover rotation (2026-08-27)
+## Earlier handover — ledger-merge capability, ADR renumbering, handover rotation (2026-08-27)
 
 **READ THIS FIRST.** Three connected pieces of work, all committed, all on
 `feat/sprint-nova-codex-v046`.
