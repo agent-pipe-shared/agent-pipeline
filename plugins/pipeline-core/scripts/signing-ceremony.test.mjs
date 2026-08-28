@@ -20,7 +20,7 @@
  *     the produced proof cryptographically against the fixture's trust anchor.
  */
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, generateKeyPairSync } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
 import {
   mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync,
@@ -36,10 +36,48 @@ import { verifyPoApprovalProof } from "../lib/po-approval-proof.mjs";
 import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
 import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
 
-function openssl(args) {
-  const result = spawnSync("openssl", args, { stdio: "pipe" });
-  assert.equal(result.status, 0, `openssl ${args.join(" ")} failed: ${result.stderr?.toString() ?? ""}`);
+/**
+ * Writes a throwaway Ed25519 keypair in exactly the encodings `openssl genpkey
+ * -algorithm ED25519` and `openssl pkey -pubout` produce -- unencrypted PKCS#8
+ * for the private key, SPKI for the public one -- using node's own crypto
+ * instead of shelling out.
+ *
+ * This is FIXTURE generation only. The ceremony under test still signs through
+ * the real `openssl pkeyutl -sign` call in po-human-approval.mjs, and the
+ * happy-path test still verifies that signature cryptographically; nothing about
+ * what the production path executes changes here.
+ *
+ * The reason it no longer shells out: CI's "Runner-free offline Core Verify"
+ * step replaces PATH with a directory holding only node/git/bash/sh, so an
+ * `openssl` fixture call fails there with a bare assertion while the code it was
+ * meant to exercise is fine (backlog:
+ * pipeline.core-verify-cannot-pass-under-the-ci-trimmed-path).
+ */
+function writeEd25519KeyPair(privateKeyPath, publicKeyPath) {
+  const { privateKey, publicKey } = generateKeyPairSync("ed25519", {
+    privateKeyEncoding: { type: "pkcs8", format: "pem" },
+    publicKeyEncoding: { type: "spki", format: "pem" },
+  });
+  writeFileSync(privateKeyPath, privateKey);
+  writeFileSync(publicKeyPath, publicKey);
 }
+
+/**
+ * The ceremony's PRODUCTION signing path shells out to `openssl pkeyutl -sign`
+ * (po-human-approval.mjs:923), deliberately: the operator's private key is
+ * handed to openssl, never read into this process. That is a property worth
+ * keeping, so the tests exercising the real signature are gated on openssl
+ * being present rather than reimplemented against node crypto.
+ *
+ * Under CI's runner-free Core Verify the PATH holds only node/git/bash/sh, so
+ * those tests report a typed skip naming the missing tool instead of a bare
+ * assertion failure that reads like a broken ceremony. The fixture keypair
+ * itself no longer needs openssl at all -- see writeEd25519KeyPair above.
+ */
+const opensslProbe = spawnSync("openssl", ["version"], { stdio: "pipe" });
+const REQUIRES_OPENSSL = opensslProbe.error != null || opensslProbe.status !== 0
+  ? "requires the openssl binary, which is not on PATH (the ceremony's production signing path shells out to it)"
+  : false;
 
 const roots = [];
 
@@ -52,8 +90,7 @@ const roots = [];
 function keyFixture(directory) {
   const privateKey = join(directory, "po-private.pem");
   const publicKey = join(directory, "po-public.pem");
-  openssl(["genpkey", "-algorithm", "ED25519", "-out", privateKey]);
-  openssl(["pkey", "-in", privateKey, "-pubout", "-out", publicKey]);
+  writeEd25519KeyPair(privateKey, publicKey);
   const publicKeyPem = readFileSync(publicKey, "utf8");
   const authority = { keyReference: "signing-ceremony-test-key", publicKeySha256: createHash("sha256").update(publicKeyPem).digest("hex") };
   writeFileSync(join(directory, "trust-policy.json"), `${JSON.stringify({ ...authority, humanName: "Test Operator" }, null, 2)}\n`);
@@ -126,7 +163,7 @@ test.after(() => {
   for (const root of roots) rmSync(root, { recursive: true, force: true });
 });
 
-test("maintenance-window ceremony runs prepare, present+sign, install, verify end to end with exactly one confirmation, and the installed window reads back active", async () => {
+test("maintenance-window ceremony runs prepare, present+sign, install, verify end to end with exactly one confirmation, and the installed window reads back active", { skip: REQUIRES_OPENSSL }, async () => {
   const directory = externalDirFixture("signing-ceremony-external-");
   const { publicKeyPem, authority } = keyFixture(directory);
   const repoRoot = repoFixture("signing-ceremony-repo-", authority);
@@ -221,7 +258,7 @@ test("maintenance-window ceremony aborts before install when the human declines 
   assert.equal(JSON.parse(status.stdout).value.status, "absent", "a declined confirmation must never result in an installed window");
 });
 
-test("maintenance-window ceremony surfaces GMW-CANDIDATE-COMMIT-MISMATCH plainly when an unrelated commit lands between prepare and install", async () => {
+test("maintenance-window ceremony surfaces GMW-CANDIDATE-COMMIT-MISMATCH plainly when an unrelated commit lands between prepare and install", { skip: REQUIRES_OPENSSL }, async () => {
   const directory = externalDirFixture("signing-ceremony-external-drift-");
   const { authority } = keyFixture(directory);
   const repoRoot = repoFixture("signing-ceremony-repo-drift-", authority);
