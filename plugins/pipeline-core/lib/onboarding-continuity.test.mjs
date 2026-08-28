@@ -24,6 +24,7 @@ import {
   poGateProfileReceiptPath,
   serializePoGateProfileReceipt,
   validatePoGateAuthority,
+  validatePoGateProfileForRepository,
 } from "./po-gate-authority.mjs";
 import { sha256CanonicalJson } from "./plan-spec-state-v2.mjs";
 import { mkdtempTestScratch } from "./test-tmpdir.mjs";
@@ -2299,6 +2300,21 @@ function publishPoGateProfile(root) {
   };
 }
 
+// Seeds only the two source files `ensureLocalPromotionPoProfileReceipt`
+// reads (pipeline.user.yaml and the runtime manifest) -- deliberately NOT the
+// receipt itself, unlike `publishPoGateProfile` above. These two files are
+// what the real onboarding flow seeds early (apply-portable-seed), well
+// before any promotion runs; the receipt is what promotion apply is supposed
+// to publish on its own once they are present.
+function seedPoGateProfileFiles(root) {
+  writeFileSync(join(root, "pipeline.user.yaml"),
+    "schema: pipeline.user.v1\nlanguage:\n  human_facing: en\n  agent_facing: en\n");
+  const { manifest } = poGateProfileProjectionPaths(root);
+  const manifestAbsolute = join(root, manifest);
+  mkdirSync(dirname(manifestAbsolute), { recursive: true });
+  writeFileSync(manifestAbsolute, "schema: pipeline.manifest.v0\nlanguage:\n  human_facing: en\n");
+}
+
 check("a promoted feature satisfies the PO plan gate and its evidence names PRD and Spec alike", () => {
   const seed = promotionSeed("po-gate");
   const plan = promote(seed);
@@ -3545,6 +3561,61 @@ check("applyOnboardingKickoffPromotion: refuses a plan whose nextAction disagree
   expectKickoffError("KICKOFF-PROMOTION-PLAN", () => applyOnboardingKickoffPromotion({
     plan: tampered, expectedPlanSha256: tampered.planSha256, activate: true,
   }));
+});
+
+// NVA-P-RECEIPTPIN: `ensureLocalPromotionPoProfileReceipt()` (called from both
+// the applied and replayed exit paths of `applyOnboardingKickoffPromotion`)
+// is the only site that publishes a PO-gate profile receipt for a
+// coordinator-sourced ("bootstrap-bind") local project's promotion, and
+// previously there was none -- `submit-plan` refused PO-PROFILE-RECEIPT-INVALID
+// forever. Real enough fixture, deliberately: `fixture()` runs a genuine
+// `git init`, so `validatePoGateProfileForRepository()` below resolves real
+// Git topology and exercises the concrete `po-gate-profile-publisher.mjs`
+// writer end to end -- nothing about Git topology or the publisher itself is
+// stubbed. Only the two upstream profile *inputs* (pipeline.user.yaml, the
+// runtime manifest) are seeded fixture data, exactly as real onboarding seeds
+// them ahead of any promotion.
+check("promotion apply for a local repository publishes a PO-gate profile receipt that po-gate-authority.mjs's own validator accepts (NVA-P-RECEIPTPIN)", () => {
+  const seed = promotionSeed("receipt-pin-invariant");
+  seedPoGateProfileFiles(seed.root);
+  promote(seed);
+  // Assert acceptance through the authority's own validator -- never by
+  // checking the receipt file merely exists, and never by re-deriving what a
+  // valid receipt should contain. A file-existence check is precisely the gap
+  // that let the defect ship: a receipt could exist and still fail the
+  // authority's own fingerprint/projection binding.
+  const authority = validatePoGateProfileForRepository({ repoRoot: seed.root });
+  assert.equal(authority.ok, true, JSON.stringify(authority));
+  assert.equal(authority.code, "PO-PROFILE-AUTHORITY-VALID");
+});
+
+check("promotion apply replay leaves exactly one valid PO-gate profile receipt, untouched byte for byte (NVA-P-RECEIPTPIN)", () => {
+  const seed = promotionSeed("receipt-pin-idempotent");
+  seedPoGateProfileFiles(seed.root);
+  const plan = planOnboardingKickoffPromotion(seed.request);
+  const applied = applyOnboardingKickoffPromotion({ plan, expectedPlanSha256: plan.planSha256, activate: true });
+  assert.equal(applied.status, "applied");
+  const receiptPath = poGateProfileReceiptPath(join(seed.root, ".git"));
+  assert.equal(existsSync(receiptPath), true);
+  assert.deepEqual(readdirSync(dirname(receiptPath)), ["profile-receipt.json"],
+    "exactly one receipt, no leftover temporary publish artifact");
+  const beforeReplay = readFileSync(receiptPath);
+  // The replay path (`applyOnboardingKickoffPromotion`'s exact-postimage
+  // branch) is what a second, idempotent apply of the same already-committed
+  // promotion takes -- this is the call this test targets.
+  const replayed = applyOnboardingKickoffPromotion({ plan, expectedPlanSha256: plan.planSha256, activate: true });
+  assert.equal(replayed.status, "replayed");
+  assert.deepEqual(readdirSync(dirname(receiptPath)), ["profile-receipt.json"],
+    "still exactly one receipt after replay, not a second or renamed one");
+  const afterReplay = readFileSync(receiptPath);
+  // `initializePoGateProfileReceipt` is documented as leaving a currently-valid
+  // receipt completely untouched -- no write, no timestamp bump -- so the
+  // natural assertion is that the bytes on disk are unchanged by the replay,
+  // not merely that they still happen to validate.
+  assert.deepEqual(afterReplay, beforeReplay,
+    "a currently-valid receipt must not be rewritten by a promotion replay");
+  const authority = validatePoGateProfileForRepository({ repoRoot: seed.root });
+  assert.equal(authority.ok, true, JSON.stringify(authority));
 });
 
 console.log(`${passed} onboarding continuity/kickoff checks passed.`);
