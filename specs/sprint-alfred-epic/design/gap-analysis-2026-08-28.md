@@ -214,3 +214,7 @@ and the PRD's headline claim is the architecture outcome. If the PO wants
 D-work pulled even earlier at the cost of running it on unmeasured
 enforcement, that is a PO call the PRD §9 rework will offer explicitly —
 the design's recommendation is the current order with the reweighted story.
+
+**Closed 2026-08-28:** the offer was omitted from the first graduation,
+restored by the graduation Critic round (F1) as PRD §9 decision 6, and
+answered by the PO — the wave order stands, per the recommendation above.
