@@ -46,6 +46,31 @@ Measured at HA: 0 findings across all scanners, exit 2. Not a security finding �
 adapters that cannot start. `semgrep` is the second: it refuses `--config auto` because
 metrics are off.
 
+### Ruled out: "it was Windows, the scanner probably just was not installed"
+
+Raised as an alternative reading and checked rather than argued. It does not hold, and it
+is the error itself that rules it out, not an inference:
+
+- The classification is `config_missing`. The adapter has a separate path for an absent
+  binary (its own install probe, returning `{installed: …}`); this is not it.
+- The path in the message is `D:\Dev\agent-pipeline-local-marketplace\.gitleaks.toml` —
+  the marketplace root, which is exactly what the four-levels-up resolution computes from
+  the module's location.
+- The check runs before the spawn. The function's own doc comment: "returned by `run()`
+  **BEFORE it ever spawns gitleaks**".
+
+**But the objection exposes a real unknown, precisely because of that third point.** Since
+the config check short-circuits ahead of the spawn, HA's gitleaks *installation* status
+was never established — the config error masks it. So this item may claim the config was
+missing; it may not claim the scanners were present. That matters, because the
+security-gate decision rests on the promise that the scanners are "installed alongside",
+and this run is not evidence for it.
+
+One positive data point on the other side: **semgrep did run.** It exited 2 with a genuine
+semgrep message (`Cannot create auto config when metrics are off`), which only a started
+binary produces. At least one scanner was therefore installed on that Windows machine,
+which is evidence the toolchain install works there.
+
 ## (b) `push-prepare` ignores `gates.security` entirely
 
 HA's `pipeline.user.yaml` carries `gates.security: "off"`. The evidence was demanded
@@ -118,6 +143,10 @@ the setting is what governs it.
   output can require one.
 - Measured against an installed-plugin deployment, not against this checkout. The whole
   finding is that those two differ.
+- The config check no longer masks the installation probe: a run states, separately,
+  whether the binary is present and whether its config resolved. Today one answer hides
+  the other, which is why this session could not establish whether gitleaks was installed
+  on the consumer machine at all.
 
 ## Related
 
