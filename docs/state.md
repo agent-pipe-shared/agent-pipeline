@@ -7,6 +7,7 @@
 
 | Date range | Summary | Archive |
 |---|---|---|
+| 2026-08-28 | 0.6.0 local candidate green in one run (EP07 root cause fixed); AK status incl. the unwireable AK-5 guard; open combined-release decision carried forward into the current handover | [docs/state-archive/2026-08-28--prior-handover-verify-is-green-in-one-run-candidate-0-6-0-lo.md](state-archive/2026-08-28--prior-handover-verify-is-green-in-one-run-candidate-0-6-0-lo.md) |
 | 2026-08-28 | Nova line: backlog-ledger merge semantics (ADR-0068), ADR renumbering (ADR-0069) and the first handover rotation | [docs/state-archive/2026-08-28--prior-handover-ledger-merge-capability-adr-renumbering-hando.md](state-archive/2026-08-28--prior-handover-ledger-merge-capability-adr-renumbering-hando.md) |
 | 2026-08-27 | sprint_agy fetch, fast-forward, and the 2026-08-26 clean local candidate | [docs/state-archive/2026-08-27--prior-handover-sprint-agy-fetch-fast-forward-and-clean-local.md](state-archive/2026-08-27--prior-handover-sprint-agy-fetch-fast-forward-and-clean-local.md) |
 | 2026-08-19 through 2026-08-23 | Phoenix-line checkpoints 61-71 (2026-08-19 through 2026-08-23), preserved verbatim as history after the Nova merge made the Nova line authoritative. | [docs/state-archive/2026-08-27--phoenix-checkpoints-61-71.md](state-archive/2026-08-27--phoenix-checkpoints-61-71.md) |
@@ -203,9 +204,35 @@ lane (no Write tool, `>` refused, `node -e` refused even for exempt
 dispatch defect + corrected rule: a delta dispatch's bound base is always
 the enumerated head's parent.
 
+**PO re-review feedback (2026-08-28, gate in progress):** direction
+accepted — "deutlich besser, insbesondere mit dem neuen zusätzlichen
+Dokument". Two directives, both executed at the design level the same day:
+(1) the doctrine must enter the PRD as **mandatory normative basis** — it
+was mentioned nowhere in PRD or spec (verified zero-hit search);
+gap-analysis §D gained the preamble normative-basis anchor + §10
+traceability row (commit `2b0ee8c7`). (2) the **ADR concept must migrate
+explicitly in brownfield adoption**; doctrine §6 gained the rule
+(mechanism installs with the standard, baseline as first record, on-touch
+capture of inherited decisions, honestly dated) routed via §D into spec
+§7.1 (commit `9c9d9819`). The PRD/spec edits themselves stay queued behind
+the unfreeze route. Final PO word on the package: pending.
+
+**Carried forward from the rotated 0.6.0 prior-handover section
+(extraction pass 2026-08-28):** (a) OPEN PO release decision — 0.6.0 is a
+combined Nova+Phoenix number (PO 2026-08-26, ADR-0043): intake Phoenix and
+release combined, or release Nova alone under a different number; blocks
+calling a published artifact "0.6.0", not local `0.6.0+...` candidates.
+(b) AK-5: `guard-dispatch-budget.mjs` built but unwireable
+(`hooks/hooks.json` on `NEVER_LIFTABLE_KERNEL_PATHS`); prepared PO
+hand-edit at `scratch/AK-5-hooks-json-patch-for-the-PO.md`. (c) AK-6 ready
+to re-dispatch against `pipeline-user-v3.schema.json` (first attempt
+withdrawn `1d6dec55`, scaffolding kept `8316dbd8`). Details:
+`docs/state-archive/2026-08-28--prior-handover-verify-is-green-in-one-run-candidate-0-6-0-lo.md`.
+
 **Next:** (1) Re-present the reworked package to the PO (EL-19) — review
-objects: `design/agent-first-architecture.md` (tip `361d6dc6`),
-`design/gap-analysis-2026-08-28.md`, `design/po-input-2026-08-28.md`.
+objects: `design/agent-first-architecture.md` (now at `9c9d9819`),
+`design/gap-analysis-2026-08-28.md` (now at `9c9d9819`),
+`design/po-input-2026-08-28.md`.
 (2) On the PO's word, the verified bound-document route — PO attended acknowledge (`po-authority-acknowledge-plan`/
 `-apply`, agent calls refused `CHAT-GATE-NOT-ATTENDED` by design; the marker
 carries no digest, later edits do not stale it) → `submit-plan --by Elephant
@@ -218,63 +245,6 @@ reopen→submit→approve path) → PO `approve-plan`. Implementation stays gate
 on Nova landing on `main` + rebase. Standing gate-visible items: the
 Dispatch-trailer canon gap (`evidence/critic/round-1-response.md`) and the
 five defect items this design phase filed.
-
-## Prior handover — Verify is green in one run; candidate 0.6.0 local (2026-08-27)
-
-**READ THIS FIRST.** Verify passes 471/471, exit 0, in a **single** run with a
-clean tree before and after — candidate `5fd963fc`. The two-run requirement is
-gone, and its cause is named rather than worked around.
-
-**The cause.** `lib/entrypoint.test.mjs` case EP07 pointed `CLAUDE_PROJECT_DIR`
-at this repository while spawning the gate-strength guard twice, so the guard
-recorded two REAL denials against the checkout and appended four governance
-events plus an advanced `heads.json` on every run. That dirtied the tree
-mid-flight, which made `security-scan` (all four adapters ERROR, exit 2) and
-`candidate-binding` fail on an artifact rather than a defect. Identified with a
-temporary probe in `appendOverrideDeniedLedgerEvent`, the only writer of
-`governance/events/human/**` — two earlier attributions (`repair-map.test.mjs`,
-`guard-gate-strength.test.mjs`) were disproved by measurement first. Fixed in
-`a18cbafe` via `apply-pending-protected-edits.mjs` (TP-8), verified green in
-`--preview` before the operator applied it.
-
-**Stamp convention corrected.** The morning's `-prerelease` stamp was reverted
-to the documented `+build` form (`9e23430f`). The reasoning behind it was wrong
-about the mechanism: `docs/claude-local-plugin-development.md` states that
-`claude plugin install` names the cache directory after the version string with
-`+` replaced by `-`, so it is directory naming, not SemVer precedence. The same
-passage explains the six-day staleness measured that morning — pinning does not
-hold for a directory-sourced marketplace, the rsync had simply not been run.
-
-**AK status.** AK-9/10/11 met (full green run; both manifests + `VERSION` at
-0.6.0; every declared hook *wired* and byte-identical to the installed copy).
-AK-14 filed for Nova B. **AK-5 is the one true inert guard**:
-`guard-dispatch-budget.mjs` is built, 15/15, Verify-registered — but
-`hooks/hooks.json` is on `NEVER_LIFTABLE_KERNEL_PATHS`, so no maintenance window
-can wire it (the guard's own header wrongly claims one can). Prepared PO hand-edit:
-`scratch/AK-5-hooks-json-patch-for-the-PO.md`. **AK-6** is ready to re-dispatch
-against `pipeline-user-v3.schema.json` (the first attempt used the pre-v3 schema
-and would have flagged a correct calibration as drifted; withdrawn in `1d6dec55`,
-scaffolding kept at `8316dbd8`).
-
-**Open release decision, carried forward from the 2026-08-26 section rotated on
-2026-08-27** (surfaced by that rotation's extraction pass, and recorded here so
-it survives): the PO corrected on 2026-08-26 that **0.6.0 is a combined
-Nova+Phoenix release number, not a Nova-only one** — Phoenix
-([ADR-0043](adr/0043-post-go-live-sprint-model.md)) was intended to land
-alongside Nova under it. Undecided: intake Phoenix now and release combined, or
-release Nova alone under a different number. `0.5.7` is not a candidate —
-`VERSION` and every stamp already say 0.6.0. This does NOT block a local test
-candidate stamped `0.6.0+...`; it blocks calling a published artifact "0.6.0"
-without resolving it first. Nova B is confirmed NOT a blocker either way
-(`specs/sprint-nova-epic/plans/nova-b.md` slice B3-A scoped its Agy touchpoint
-as a deliberate non-functional stub, deferring the real work to the dedicated
-Agy sprint since fetched).
-
-**Backlog.** Five items filed, one closed (`0641d0d2`, ledger `6e20daa1`). One
-inherited claim was corrected twice before it was right: "nine suites never run
-in Verify" is **three**, not nine and not one — six are false positives from
-`check-suite-registration.mjs`, which is blind to `verify.mjs`'s scoped
-registration block. That is now its own item, alongside the three real gaps.
 
 ## Operational head
 
