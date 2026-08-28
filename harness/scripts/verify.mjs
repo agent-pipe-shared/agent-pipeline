@@ -696,9 +696,15 @@ const TEST_SUITES = [
   { name: "check-doc-reconciliation-tests", file: join(repoRoot, "harness", "scripts", "check-doc-reconciliation.test.mjs") },
   { name: "pipeline-start-preflight-pre-push-observation-tests", file: join(pluginScriptsDir, "pipeline-start-preflight-pre-push-observation.test.mjs") },
   { name: "pre-push-hook-install-tests", file: join(pluginScriptsDir, "pre-push-hook-install.test.mjs") },
-  // NVA-SPRINTFIELD-1: the sprint-assignment reporter's own suite. Registered here so the
-  // closed sprint value set is enforced by the gate rather than only by the script itself.
+  // NVA-SPRINTFIELD-1: the sprint-assignment reporter's own suite, over synthetic fixtures.
   { name: "check-backlog-sprint-assignment-tests", file: join(pluginScriptsDir, "check-backlog-sprint-assignment.test.mjs") },
+  // NVA-SPRINTGATE-2 (2026-08-28): the suite above exercises the reporter against fixture
+  // directories and proves nothing about this repository's own backlog. Until this line the
+  // registration comment claimed the value set was "enforced by the gate", and three further
+  // documents claimed an exit-1 rule for undeclared open items -- while nothing executed the
+  // script against the real backlog/items/ tree. Running the script here is what makes that
+  // claim true; the suite alone is shape evidence, not result evidence.
+  { name: "backlog-sprint-assignment-check", file: join(pluginScriptsDir, "check-backlog-sprint-assignment.mjs") },
 ];
 
 // Manifest-gated phase steps: see header — only projects that carry a manifest at

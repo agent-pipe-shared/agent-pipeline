@@ -211,6 +211,7 @@
         "verify-phase:harness/scripts/verify.mjs:backlog-dispatch-reference-tests",
         "verify-phase:harness/scripts/verify.mjs:backlog-item-strip-for-dispatch-tests",
         "verify-phase:harness/scripts/verify.mjs:backlog-ledger-reconciliation-tests",
+        "verify-phase:harness/scripts/verify.mjs:backlog-sprint-assignment-check",
         "verify-phase:harness/scripts/verify.mjs:backlog-state-check",
         "verify-phase:harness/scripts/verify.mjs:backlog-state-tests",
         "verify-phase:harness/scripts/verify.mjs:bootstrap-env-check-tests",
