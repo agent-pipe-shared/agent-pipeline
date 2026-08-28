@@ -55,7 +55,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
-import { authorizeCriticalPushCommand, outside, parseHumanArgs, runForkDispositionApproval, runHumanApproval } from "./po-human-approval.mjs";
+import { authorizeCriticalPushCommand, outside, parseHumanArgs, persistExplicitDirectoryIntoMachinePlane, runForkDispositionApproval, runHumanApproval } from "./po-human-approval.mjs";
 import { run as runApprovalGate } from "./po-approval-gate.mjs";
 import { createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA, verifyPoApprovalProof } from "../lib/po-approval-proof.mjs";
 import { CRITICAL_ACTION_KINDS, criticalActionSubjectSha256, createCriticalActionApprovalRequest, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
@@ -2399,6 +2399,58 @@ test("AC-11/AC-14: a full sign-intent ceremony resolved entirely from the machin
   } finally {
     cleanup(dirs);
     rmSync(home, { recursive: true, force: true });
+  }
+});
+
+/* ------------------------------------------------------------------ *
+ * NVA-V1-KEYDIRPTR (backlog: 2026-08-28-a-dead-key-directory-pointer-is-
+ * permanent-and-silent.md): `persistExplicitDirectoryIntoMachinePlane`'s own
+ * first-write-wins predicate, exercised directly. This function has no
+ * wired CLI call site today -- PO-KEYDIR-01(A) below moved `setup`'s
+ * auto-persist to the repo-scoped store instead -- but its logic is still
+ * what governs the machine plane's `poKeyDirectory` field, which
+ * `detectExistingLocalTrustAnchor()` (project-onboarding-v3.mjs) reads.
+ * ------------------------------------------------------------------ */
+
+test("NVA-V1-KEYDIRPTR: a recorded poKeyDirectory that no longer exists on disk IS replaced by a later call", () => {
+  const home = machinePlaneHomeFixture(null);
+  const dead = mkdtempSync(join(tmpdir(), "po-human-approval-dead-keydir-"));
+  const alive = mkdtempSync(join(tmpdir(), "po-human-approval-alive-keydir-"));
+  try {
+    // Seed the plane with a directory, then remove it from disk -- exactly
+    // the dangling-pointer shape measured live on the development machine
+    // (scratch/probe-machine-plane.mjs).
+    writeMachinePlane({
+      schema: MACHINE_PLANE_SCHEMA, poKeyDirectory: dead, pushApprovalDefault: "signature",
+      routing: null, language: null, session: null, usage: null, updatedAt: new Date().toISOString(),
+    }, { homedirFn: () => home });
+    rmSync(dead, { recursive: true, force: true });
+
+    persistExplicitDirectoryIntoMachinePlane({ directorySource: "flag" }, alive, { homedirFn: () => home });
+
+    const after = readMachinePlane({ homedirFn: () => home });
+    assert.equal(after.status, "valid");
+    assert.equal(after.plane.poKeyDirectory, alive, "a dangling pointer must be replaced by a later recordPoKeyDirectory call");
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+    rmSync(alive, { recursive: true, force: true });
+  }
+});
+
+test("NVA-V1-KEYDIRPTR: a recorded poKeyDirectory that DOES exist on disk is never replaced -- the property this change must not break", () => {
+  const existing = mkdtempSync(join(tmpdir(), "po-human-approval-existing-keydir-"));
+  const home = machinePlaneHomeFixture(existing);
+  const other = mkdtempSync(join(tmpdir(), "po-human-approval-other-keydir-"));
+  try {
+    persistExplicitDirectoryIntoMachinePlane({ directorySource: "flag" }, other, { homedirFn: () => home });
+
+    const after = readMachinePlane({ homedirFn: () => home });
+    assert.equal(after.status, "valid");
+    assert.equal(after.plane.poKeyDirectory, existing, "a directory that still exists must never be silently overwritten by a later call");
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+    rmSync(existing, { recursive: true, force: true });
+    rmSync(other, { recursive: true, force: true });
   }
 });
 

@@ -5316,22 +5316,53 @@ function withPendingAsksSurfacedOnNextAction(observed) {
 // where the private key lives -- and must not give po-gate-authority.mjs
 // (submit-plan/approve-plan) any new dependency on signature-key
 // infrastructure, which it has none of today and this change does not add.
-function detectExistingLocalTrustAnchor(fs) {
+// NVA-V1-KEYDIRPTR (backlog: 2026-08-28-a-dead-key-directory-pointer-is-
+// permanent-and-silent.md): the four stops below used to all fold into an
+// indistinguishable `null` -- a genuine "no machine key yet" (stops 1-2) was
+// impossible for any caller to tell apart from "this machine HAS a key but
+// the pointer to it is broken" (stops 3-4), a repairable fault. `status` is
+// one of:
+//   "no-plane"          -- no valid machine plane at all
+//   "no-directory"       -- valid plane, but no poKeyDirectory recorded
+//   "broken-pointer"     -- a directory IS recorded, but no readable
+//                           trust-policy.json resolves there (the directory
+//                           itself may no longer exist, or it exists but the
+//                           file inside it is missing)
+//   "malformed-policy"   -- the file resolves and parses, but its shape
+//                           (keyReference/publicKeySha256) is invalid
+//   "found"              -- a usable anchor was located; `anchor` is set
+// The first two are the genuine no-key case `freshCriticalHumanProofPolicyBytes`'s
+// bare v1 fallback exists for and must keep seeding exactly as before; the
+// latter two are a dead reference, not an absence -- Direction #1 of the
+// backlog item this closes.
+export function observeLocalTrustAnchorPointer(fs) {
   const readPlane = fs.readMachinePlane ?? readMachinePlane;
   const plane = readPlane();
-  if (plane.status !== "valid") return null;
+  if (plane.status !== "valid") return { status: "no-plane", anchor: null };
   const directory = plane.plane?.poKeyDirectory;
-  if (typeof directory !== "string" || directory.length === 0) return null;
+  if (typeof directory !== "string" || directory.length === 0) return { status: "no-directory", anchor: null };
   const path = join(directory, "trust-policy.json");
-  if (!fs.existsSync(path)) return null;
+  if (!fs.existsSync(path)) return { status: "broken-pointer", anchor: null, directory };
   let parsed;
-  try { parsed = JSON.parse(fs.readFileSync(path, "utf8")); } catch { return null; }
-  if (typeof parsed?.keyReference !== "string" || parsed.keyReference.length === 0) return null;
-  if (typeof parsed?.publicKeySha256 !== "string" || !/^[a-f0-9]{64}$/u.test(parsed.publicKeySha256)) return null;
+  try { parsed = JSON.parse(fs.readFileSync(path, "utf8")); } catch { return { status: "malformed-policy", anchor: null, directory }; }
+  if (typeof parsed?.keyReference !== "string" || parsed.keyReference.length === 0) return { status: "malformed-policy", anchor: null, directory };
+  if (typeof parsed?.publicKeySha256 !== "string" || !/^[a-f0-9]{64}$/u.test(parsed.publicKeySha256)) return { status: "malformed-policy", anchor: null, directory };
   return {
-    directory, keyReference: parsed.keyReference, publicKeySha256: parsed.publicKeySha256,
-    humanName: typeof parsed.humanName === "string" && parsed.humanName.length > 0 ? parsed.humanName : null,
+    status: "found",
+    anchor: {
+      directory, keyReference: parsed.keyReference, publicKeySha256: parsed.publicKeySha256,
+      humanName: typeof parsed.humanName === "string" && parsed.humanName.length > 0 ? parsed.humanName : null,
+    },
   };
+}
+
+// Thin, behavior-preserving wrapper: every pre-existing caller
+// (`freshCriticalHumanProofPolicyBytes`, `withPendingTrustAnchorGuidanceAsk`)
+// keeps reading a bare anchor-or-null exactly as before. A caller that needs
+// to tell a broken pointer apart from a genuine no-key machine calls
+// `observeLocalTrustAnchorPointer` directly instead.
+function detectExistingLocalTrustAnchor(fs) {
+  return observeLocalTrustAnchorPointer(fs).anchor;
 }
 
 // True when THIS repository's own committed trust-anchor policy already

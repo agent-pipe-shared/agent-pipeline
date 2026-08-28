@@ -35,6 +35,8 @@ import {
   planProjectRemoteAdoptionV4,
   applyProjectRemoteAdoptionV4,
   renderProjectOnboardingAction,
+  freshCriticalHumanProofPolicyBytes,
+  observeLocalTrustAnchorPointer,
 } from "./project-onboarding-v3.mjs";
 import { planRunnerProfileMigrationV3 } from "./runner-profile-migration-v3.mjs";
 import { validateV3BootstrapAuthority } from "../scripts/v3-bootstrap-authority.mjs";
@@ -2476,6 +2478,79 @@ test("apply-portable-seed --activate seeds the machine's trust anchor into a fre
     assert.equal(Object.prototype.hasOwnProperty.call(quietApplied.result, "trustAnchorGuidanceAction"), false,
       "a repository that already committed the matching anchor must not be asked again");
   } finally { dispose(seeded); dispose(preexisting); dispose(keyDir); }
+});
+
+// NVA-V1-KEYDIRPTR (backlog: 2026-08-28-a-dead-key-directory-pointer-is-
+// permanent-and-silent.md): observeLocalTrustAnchorPointer distinguishes a
+// broken pointer (a directory IS recorded, but trust-policy.json does not
+// resolve there -- the exact shape measured live on the development machine,
+// scratch/probe-machine-plane.mjs) from a genuine no-key machine (no plane,
+// or no directory recorded). These previously folded into ONE
+// indistinguishable detectExistingLocalTrustAnchor() null.
+// freshCriticalHumanProofPolicyBytes must keep seeding the bare v1 fallback
+// in the genuine no-key case either way -- narrowing detection must never
+// make an absent key look present.
+test("NVA-V1-KEYDIRPTR: observeLocalTrustAnchorPointer distinguishes a broken pointer from a genuine no-key machine, and freshCriticalHumanProofPolicyBytes still seeds bare v1 for the genuine no-key case", () => {
+  const deadDirectory = mkdtempSync(join(tmpdir(), "nva-v1-keydirptr-dead-"));
+  rmSync(deadDirectory, { recursive: true, force: true }); // simulate the vanished pointer
+  const liveDirectory = mkdtempSync(join(tmpdir(), "nva-v1-keydirptr-live-"));
+  try {
+    // Case 1: no machine plane at all -- genuine no-key.
+    const noPlaneFs = { readMachinePlane: () => ({ status: "absent", plane: null }), existsSync, readFileSync };
+    const noPlane = observeLocalTrustAnchorPointer(noPlaneFs);
+    assert.equal(noPlane.status, "no-plane");
+    assert.equal(noPlane.anchor, null);
+    assert.equal(JSON.parse(freshCriticalHumanProofPolicyBytes(noPlaneFs)).schema, "pipeline.critical-human-proof-policy.v1");
+
+    // Case 2: a valid plane, but no directory recorded -- also genuine no-key.
+    const noDirFs = {
+      readMachinePlane: () => ({
+        status: "valid",
+        plane: { schema: "pipeline.machine-plane.v1", poKeyDirectory: null, pushApprovalDefault: "signature", routing: null, language: null, session: null, usage: null, updatedAt: "2026-08-08T00:00:00.000Z" },
+      }),
+      existsSync, readFileSync,
+    };
+    const noDir = observeLocalTrustAnchorPointer(noDirFs);
+    assert.equal(noDir.status, "no-directory");
+    assert.equal(noDir.anchor, null);
+    assert.equal(JSON.parse(freshCriticalHumanProofPolicyBytes(noDirFs)).schema, "pipeline.critical-human-proof-policy.v1");
+
+    // Case 3: a directory IS recorded, but does not resolve -- a REPAIRABLE
+    // FAULT, and it must not read as the same status as cases 1/2 above.
+    const brokenFs = {
+      readMachinePlane: () => ({
+        status: "valid",
+        plane: { schema: "pipeline.machine-plane.v1", poKeyDirectory: deadDirectory, pushApprovalDefault: "signature", routing: null, language: null, session: null, usage: null, updatedAt: "2026-08-08T00:00:00.000Z" },
+      }),
+      existsSync, readFileSync,
+    };
+    const broken = observeLocalTrustAnchorPointer(brokenFs);
+    assert.equal(broken.status, "broken-pointer");
+    assert.equal(broken.anchor, null);
+    assert.notEqual(broken.status, noPlane.status, "a broken pointer must not read as the same status as a genuine no-key machine");
+    assert.notEqual(broken.status, noDir.status, "a broken pointer must not read as the same status as a genuine no-key machine");
+    // The seed itself is still the bare v1 fallback here too -- this task
+    // narrows DETECTION; it never makes an absent key look present.
+    assert.equal(JSON.parse(freshCriticalHumanProofPolicyBytes(brokenFs)).schema, "pipeline.critical-human-proof-policy.v1");
+
+    // Case 4 ("found"): a real anchor at a directory that DOES resolve --
+    // unchanged behaviour, still surfaced through the same function.
+    const publicKeySha256 = "b".repeat(64);
+    writeFileSync(join(liveDirectory, "trust-policy.json"), `${JSON.stringify({ keyReference: "po-key-live", publicKeySha256 }, null, 2)}\n`);
+    const liveFs = {
+      readMachinePlane: () => ({
+        status: "valid",
+        plane: { schema: "pipeline.machine-plane.v1", poKeyDirectory: liveDirectory, pushApprovalDefault: "signature", routing: null, language: null, session: null, usage: null, updatedAt: "2026-08-08T00:00:00.000Z" },
+      }),
+      existsSync, readFileSync,
+    };
+    const found = observeLocalTrustAnchorPointer(liveFs);
+    assert.equal(found.status, "found");
+    assert.equal(found.anchor.publicKeySha256, publicKeySha256);
+    assert.equal(JSON.parse(freshCriticalHumanProofPolicyBytes(liveFs)).trustAnchors[0].publicKeySha256, publicKeySha256);
+  } finally {
+    rmSync(liveDirectory, { recursive: true, force: true });
+  }
 });
 
 test("shared command renderer derives one copy-safe line from exact argv in a spaced root", () => {
