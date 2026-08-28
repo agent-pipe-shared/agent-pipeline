@@ -136,6 +136,38 @@ ergonomic, not permissive — and it is only true if every one of these holds:
 - The refusal for a rejected chain names **which segment** was refused and why. A chain
   refused as a whole teaches nothing, which is this item's own complaint one level up.
 
+### The refusal must state the grammar it is enforcing (PO, 2026-08-28)
+
+*"wichtig ist, dass der guard das erlaubte grammar immer auch sagt, also was beim pipen
+erlaubt ist wenn er was blockt"*.
+
+The refusal today does gesture at this — it ends with "Only bounded rg-to-rg, rg-to-head,
+grep-to-grep, and grep-to-head diagnostic pipelines are admitted as exceptions." That
+sentence is not wrong, and it is not enough: it names the shapes without their bounds, so
+it does not tell the reader the thing that actually costs the retry.
+
+Measured examples of what the current text leaves out, each one a real refusal:
+
+- `head -n 40` is admitted and `head -40` is refused — the same bounded read, and the
+  refused spelling is the one most agents type first (case 3 above). The text says
+  "grep-to-head" and stops.
+- A `|` inside a quoted pattern is refused as an operator. Nothing in the message hints
+  that the guard is reading quoted content at all, so the reader concludes their pipeline
+  was rejected and goes looking for a pipeline they never wrote.
+- The maximum `head -n` bound (1..500) appears in the message, but the equivalent bound
+  on the other admitted shapes does not.
+
+So: whenever the guard refuses on grammar, the refusal states the **complete** admitted
+grammar in a form the reader can copy — each admitted shape with its bounds and its exact
+required spelling — and, once segment splitting exists, **which segment** of the submitted
+command was refused and under which rule. A refusal that names the rule but not the
+satisfying form is the same defect as a gate that names no satisfying command, which this
+repository already treats as a defect elsewhere.
+
+This applies to every refusal path the guard has, not only the pipeline one, and it is
+worth stating separately because it is the half that pays off even if the `&&` admission
+were dropped entirely.
+
 ### Acceptance criteria (in addition to those above)
 
 - A negative regression suite drives every admitted-operator shape and asserts that no
@@ -144,6 +176,11 @@ ergonomic, not permissive — and it is only true if every one of these holds:
   deliverable — not the `&&` support itself.
 - A table-driven test pairs each historical refusal in this item with its now-admitted
   form and with a genuinely-composed control that stays refused.
+- Every grammar refusal the guard can emit carries the complete admitted grammar with
+  bounds and exact spellings. A test asserts the property rather than one example: for
+  each admitted shape in the guard's own table, the refusal text contains a form that,
+  when submitted, is actually admitted. That closes the loop mechanically — the message
+  cannot drift away from the grammar it describes, because the test runs what it prints.
 
 ## Related
 
