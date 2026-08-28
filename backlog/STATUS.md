@@ -319,6 +319,7 @@
 | pipeline.plan-approval-binds-a-staging-draft-as-project-authority | open | defect | pipeline | 2026-08-27 | — |
 | pipeline.plan-partial-authority-guard-allowlist-does-not-admit-its-own-profile-source-flags | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.plan-path-guidance-attached-to-unlike-causes | closed | defect | pipeline | 2026-08-08 | — |
+| pipeline.plan-result-publishes-no-next-action | open | defect | pipeline | 2026-08-28 | NOW / Nova A — the last measured gap between the guided init and a full drive to ready; found by smoke-testing the driver against a genuinely fresh repository |
 | pipeline.plugin-package-should-vendor-canon-references-via-build-step | closed | workflow-improvement | pipeline | 2026-08-10 | — |
 | pipeline.plugin-update-under-an-onboarded-project-derails-the-next-session-into-repair | open | workflow-improvement | pipeline | 2026-08-27 | — |
 | pipeline.po-approval-confirmation-missing-intent-digest | closed | defect | pipeline | 2026-08-10 | — |
@@ -491,7 +492,7 @@
 
 ## Counts
 
-- open: 76
+- open: 77
 - in_progress: 3
 - closed: 382
 - rejected: 3
