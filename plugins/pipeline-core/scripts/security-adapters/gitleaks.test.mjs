@@ -18,11 +18,12 @@
  */
 import assert from "node:assert/strict";
 import test from "node:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
-import { name, CAPABILITY_CONTRACT_V2, gitleaksContentAuthorityLine, gitleaksConfigMissingResult, run } from "./gitleaks.mjs";
+import { name, CAPABILITY_CONTRACT_V2, gitleaksContentAuthorityLine, gitleaksConfigMissingResult, resolveGitleaksConfigPath, run } from "./gitleaks.mjs";
 import { resolveTrustedSystemExecutable } from "../tool-identity.mjs";
 import { repairStaleIgnoreEntry } from "../gitleaks-repair-ignore.mjs";
 
@@ -165,6 +166,111 @@ test("run() short-circuits to gitleaksConfigMissingResult() BEFORE spawning gitl
     assert.equal(spawnCalled, true, "gitleaks must still be spawned when the config is present");
   } finally {
     rmSync(rootDir, { recursive: true, force: true });
+  }
+});
+
+// ===============================================================================================
+// NVA-J-GITLEAKSCONFIG -- rootDir must never be a config source; installed-plugin resolution
+// must be exercised via a real fixture directory tree, not asserted on an error string.
+// ===============================================================================================
+
+test("run() never resolves --config from rootDir, even when a candidate tree plants its own .gitleaks.toml (the config must not be attacker/candidate-controlled)", async () => {
+  const rootDir = mkdtempSync(join(tmpdir(), "gitleaks-candidate-config-plant-"));
+  try {
+    // A candidate commit could ship its own .gitleaks.toml trying to weaken the scan (e.g.
+    // `useDefault = false`) -- the config must never be sourced from rootDir.
+    writeFileSync(join(rootDir, ".gitleaks.toml"), "[extend]\nuseDefault = false\n");
+    let invokedConfigArg = null;
+    const spySpawn = (cmd, args) => {
+      invokedConfigArg = args[args.indexOf("--config") + 1];
+      writeFileSync(args[args.indexOf("--report-path") + 1], "[]");
+      return { status: 0, stdout: "", stderr: "", error: null };
+    };
+    const result = await run({ rootDir, config: { binaryPath: join(rootDir, "unused-fake-gitleaks") }, spawnFn: spySpawn, timeoutMs: 5000 });
+    assert.equal(result.status, "PASS", `expected PASS (real config still resolved), got ${result.status} (${result.reason ?? ""})`);
+    assert.ok(invokedConfigArg, "spy must have captured a --config argument");
+    assert.notEqual(invokedConfigArg, join(rootDir, ".gitleaks.toml"), "must never point --config at rootDir's own planted file");
+    assert.ok(!invokedConfigArg.startsWith(rootDir), `--config must not resolve from anywhere under rootDir, got: ${invokedConfigArg}`);
+  } finally {
+    rmSync(rootDir, { recursive: true, force: true });
+  }
+});
+
+test("resolveGitleaksConfigPath() in THIS checkout resolves to the repo-root config, not the plugin-shipped default (self-application priority)", () => {
+  // Same four-`..` climb GITLEAKS_CONFIG_PATH itself uses (gitleaks.mjs), applied from this test
+  // file's own location (the same directory as gitleaks.mjs).
+  const expectedRepoRootConfig = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..", ".gitleaks.toml");
+  const resolved = resolveGitleaksConfigPath();
+  assert.equal(resolved, expectedRepoRootConfig, "expected the repo-root config to win priority over the plugin-shipped default in this checkout");
+  assert.ok(!resolved.includes(join("config", "security", "gitleaks-default.toml")), `must not have fallen back to the plugin-shipped default, got: ${resolved}`);
+});
+
+test("run() resolves the plugin-shipped default config from an installed-plugin fixture with no repo root anywhere (real resolution algorithm via a copied module, not a mocked path)", async () => {
+  const fixtureRoot = mkdtempSync(join(tmpdir(), "gitleaks-installed-fixture-"));
+  const scanRootDir = mkdtempSync(join(tmpdir(), "gitleaks-installed-fixture-scanroot-"));
+  try {
+    const adapterDir = join(fixtureRoot, "plugins", "pipeline-core", "scripts", "security-adapters");
+    const configDir = join(fixtureRoot, "plugins", "pipeline-core", "config", "security");
+    mkdirSync(adapterDir, { recursive: true });
+    mkdirSync(configDir, { recursive: true });
+    // Copy the REAL adapter source verbatim -- this exercises the actual resolution algorithm
+    // (climbing from the copy's own on-disk location), not a reimplementation of it.
+    const realAdapterPath = fileURLToPath(new URL("./gitleaks.mjs", import.meta.url));
+    copyFileSync(realAdapterPath, join(adapterDir, "gitleaks.mjs"));
+    // Copy the REAL plugin-shipped default config (added by this task) into the same relative
+    // position -- proves the shipped file itself, not a synthetic stand-in.
+    const realDefaultConfigPath = fileURLToPath(new URL("../../config/security/gitleaks-default.toml", import.meta.url));
+    copyFileSync(realDefaultConfigPath, join(configDir, "gitleaks-default.toml"));
+    // fixtureRoot has no repo root at all above `plugins/` -- this models an installed-plugin
+    // (marketplace) deployment with no Pipeline checkout present anywhere.
+    assert.equal(existsSync(join(fixtureRoot, ".gitleaks.toml")), false, "sanity: fixture must carry no repo-root .gitleaks.toml");
+
+    const fixtureModuleUrl = pathToFileURL(join(adapterDir, "gitleaks.mjs")).href;
+    const fixtureAdapter = await import(fixtureModuleUrl);
+    assert.equal(fixtureAdapter.resolveGitleaksConfigPath(), join(configDir, "gitleaks-default.toml"), "fixture module must resolve to its own plugin-shipped default, not the (absent) repo-root path");
+
+    let invokedConfigArg = null;
+    const spySpawn = (cmd, args) => {
+      invokedConfigArg = args[args.indexOf("--config") + 1];
+      writeFileSync(args[args.indexOf("--report-path") + 1], "[]");
+      return { status: 0, stdout: "", stderr: "", error: null };
+    };
+    const result = await fixtureAdapter.run({ rootDir: scanRootDir, config: { binaryPath: join(scanRootDir, "unused-fake-gitleaks") }, spawnFn: spySpawn, timeoutMs: 5000 });
+    assert.equal(result.status, "PASS", `expected PASS (plugin-shipped default resolved and used), got ${result.status} (${result.reason ?? ""})`);
+    assert.equal(invokedConfigArg, join(configDir, "gitleaks-default.toml"), "gitleaks must be invoked with the plugin-shipped default config path");
+  } finally {
+    rmSync(fixtureRoot, { recursive: true, force: true });
+    rmSync(scanRootDir, { recursive: true, force: true });
+  }
+});
+
+test("run() degrades to SKIPPED/success (never ERROR) from an installed-plugin fixture where NEITHER the repo-root NOR the plugin-shipped config exists (fail-safe for a stripped/corrupted install)", async () => {
+  const fixtureRoot = mkdtempSync(join(tmpdir(), "gitleaks-installed-fixture-noconfig-"));
+  const scanRootDir = mkdtempSync(join(tmpdir(), "gitleaks-installed-fixture-noconfig-scanroot-"));
+  try {
+    const adapterDir = join(fixtureRoot, "plugins", "pipeline-core", "scripts", "security-adapters");
+    mkdirSync(adapterDir, { recursive: true });
+    // No `config/security/` directory created at all -- neither candidate config exists anywhere
+    // under fixtureRoot.
+    const realAdapterPath = fileURLToPath(new URL("./gitleaks.mjs", import.meta.url));
+    copyFileSync(realAdapterPath, join(adapterDir, "gitleaks.mjs"));
+
+    const fixtureModuleUrl = pathToFileURL(join(adapterDir, "gitleaks.mjs")).href;
+    const fixtureAdapter = await import(fixtureModuleUrl);
+    assert.equal(fixtureAdapter.resolveGitleaksConfigPath(), null, "sanity: fixture must resolve to no config at all");
+
+    const result = await fixtureAdapter.run({
+      rootDir: scanRootDir,
+      config: { binaryPath: join(scanRootDir, "unused-fake-gitleaks") },
+      spawnFn: () => { throw new Error("must not spawn gitleaks when no config resolved at all"); },
+      timeoutMs: 5000,
+    });
+    assert.equal(result.status, "SKIPPED");
+    assert.equal(result.classification, "success");
+    assert.deepEqual(result.findings, []);
+  } finally {
+    rmSync(fixtureRoot, { recursive: true, force: true });
+    rmSync(scanRootDir, { recursive: true, force: true });
   }
 });
 
