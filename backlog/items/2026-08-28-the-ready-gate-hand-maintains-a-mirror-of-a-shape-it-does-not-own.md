@@ -1,0 +1,92 @@
+---
+schema: pipeline.backlog-item.v1
+id: pipeline.ready-gate-hand-maintained-shape-mirror
+type: defect
+owner: pipeline
+status: open
+created: 2026-08-28
+sprint: nova
+tracking: "NOW / Nova A — the second instance blocked every governed write in a ready project and was invisible until the candidate was actually installed. NVA-T-READYKEYS fixes that instance; this item is about the third one."
+source: "Found live 2026-08-28 while the PO rsynced the candidate onto the local marketplace mid-session. The first instance is recorded in the file's own comment."
+---
+
+# The readiness gate hand-maintains a mirror of a shape it does not own, and has fallen behind twice
+
+## What happens
+
+`lib/project-onboarding-ready-gate.mjs` validates the observation it gets from
+`inspectProjectOnboardingV3()` against two hardcoded lists it maintains itself:
+
+- `RESULT_KEYS` — the exact key set the observation may carry, compared with
+  `exactKeys()` (no extra, no missing).
+- `PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES` — the statuses it accepts as a
+  legitimate not-ready lifecycle.
+
+Neither list is derived from the module that produces the shape. Both have now fallen
+behind it.
+
+**First instance**, recorded in the file's own comment at the status list: Wave 4 added
+three v4Inspection statuses (`intake-required`, `intake-design-questions-required`,
+`bootstrap-binding-required`) and the allowlist was not updated, so a repository genuinely
+sitting at one of them "failed closed with the wrong typed error
+(`PORG-INVALID-OBSERVATION` instead of `PORG-NOT-READY`)". Fixed by appending three
+strings.
+
+**Second instance**, found live today: `lib/project-onboarding-v3.mjs` attaches
+`pushApprovalMode` and `trustAnchorAvailability` to the `ready` result and to no other
+status — deliberately, per its own comment ("they only make sense once a repository is
+fully ready ... so they are attached here, and only here"). `RESULT_KEYS` was not updated,
+so `exactKeys()` fails **exactly when the project is ready** — the only case the gate can
+otherwise pass. Every governed write in every ready project is refused.
+
+## Why it stayed invisible
+
+The installed marketplace copy was an older build. The defect surfaced the moment the
+candidate source was actually installed — not in any test, not in Verify, not in review.
+This is the "measured in our own checkout" shape recorded in
+`2026-08-28-nothing-checks-that-a-shipped-capability-is-reachable.md`: the mechanism was
+measured, the deployed path to it was not.
+
+## The refusal names the wrong cause
+
+`hooks/guard-lifecycle-ready.mjs` branches specially on `PORG-NOT-READY` only.
+`PORG-INVALID-OBSERVATION` falls through to a generic refusal reading "Pipeline-governed
+project writes require an exact V4 ready result for session intent" — so an operator whose
+project IS ready is told it is not, and diagnoses the wrong thing. Both instances of this
+defect rendered identically, which is why the first one's comment describes the same
+confusion. Third instance this sprint of a refusal naming no usable cause (see the
+rollback-predicate and trust-anchor items).
+
+## Direction
+
+A third manual list update is not a fix; it only resets the clock. Options, in rough order
+of strength:
+
+1. Derive the accepted shape from the producer rather than restating it — the gate should
+   ask `project-onboarding-v3.mjs` what a result of a given status looks like, so the two
+   cannot drift.
+2. Failing that, a test that drives a REAL `inspectProjectOnboardingV3()` result for every
+   status through `requireProjectOnboardingReady()` and fails when a new key or status
+   appears that the gate does not know. The enumeration must be derived from the producer,
+   not typed into the test, or it becomes the third hand-maintained list.
+3. Either way, `PORG-INVALID-OBSERVATION` must stop rendering as "not ready".
+
+## Acceptance criteria
+
+- Adding a field to a status-specific result in `project-onboarding-v3.mjs`, or a new
+  lifecycle status, fails a check rather than silently blocking every governed write.
+- The check derives its expectation from the producer; a reviewer can see that no second
+  copy of the shape was introduced to satisfy it.
+- A refusal caused by an unvalidatable observation says so, distinctly from a refusal
+  caused by a not-ready lifecycle.
+- Verified against an INSTALLED plugin deployment, not only in this checkout — the
+  condition under which both instances hid.
+
+## Related
+
+- `2026-08-28-nothing-checks-that-a-shipped-capability-is-reachable.md` — the class; this
+  is an instance measured from the repository's position and invisible from the consumer's.
+- `2026-08-28-a-v1-trust-anchor-makes-the-signature-push-route-functionless.md` — two
+  readers of one file disagreeing, same family.
+- `2026-08-28-a-fail-closed-rollback-names-no-predicate-so-a-consumer-cannot-fix-it.md` —
+  the refusal-names-no-cause half.
