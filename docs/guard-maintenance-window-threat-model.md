@@ -136,7 +136,15 @@ below assumes it holds and is written to catch a change that would break it.
   `scripts/pipeline-update-channel.mjs`, `scripts/po-approval-request.mjs`,
   `scripts/po-human-approval.mjs` (the script the human uses to sign),
   `scripts/push-gate-satisfiability.mjs`, `scripts/push-prepare.mjs`,
-  `scripts/ruleset-freshness.mjs`, and `scripts/ruleset-update-policy.mjs`.
+  `scripts/ruleset-freshness.mjs`, and `scripts/ruleset-update-policy.mjs`. A
+  seventh gap (NVA-V25-DRIVERKERNEL, 2026-08-29) is a different shape than the
+  six above: the closure walk only follows edges FROM a kernel file outward,
+  so a module that instead IMPORTS a kernel module is structurally invisible
+  to it. `scripts/push-init.mjs` imports `scripts/push-gate-satisfiability.mjs`
+  and `scripts/push-prepare.mjs` (both already kernel) directly, and its own
+  code constructs the `signatureCommand` object handed to the PO as the exact
+  text of the human-attended push-authorization signature command — the same
+  class of artifact `scripts/po-human-approval.mjs` produces.
 - The window record's cryptographic integrity and its TTL.
 - The audit visibility of an open or recently-closed window (the bootstrap
   warning).
