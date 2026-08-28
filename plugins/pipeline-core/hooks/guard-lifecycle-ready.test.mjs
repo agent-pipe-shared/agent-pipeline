@@ -105,6 +105,7 @@ import {
 import { DEFAULT_EXEMPT_PREFIXES, DEVPLAN_SHELL_DENIAL_CODE } from "../lib/guard-devplan-policy.mjs";
 
 const ONBOARDING_SCRIPT = fileURLToPath(new URL("../scripts/project-onboarding-v3.mjs", import.meta.url));
+const DRIVER_SCRIPT = fileURLToPath(new URL("../scripts/onboarding-init.mjs", import.meta.url));
 const ONBOARDING_LAUNCH_SCRIPT = fileURLToPath(new URL("../scripts/codex-onboarding-launch.mjs", import.meta.url));
 const V3_BOOTSTRAP_AUTHORITY_SCRIPT = fileURLToPath(new URL("../scripts/v3-bootstrap-authority.mjs", import.meta.url));
 const START_PREFLIGHT_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-start-preflight.mjs", import.meta.url));
@@ -1918,6 +1919,70 @@ test("OBLIGROUTE-1: the non-ready lane admits the repair map by exact argv, and 
     const foreign = `node '${join(path, "plugins", "pipeline-core", "scripts", "repair-map.mjs")}'`;
     assert.equal(isSanctionedLifecycleCommand(foreign, path), false, foreign);
     assert.equal(evaluateLifecycleReadyGuard(bash(foreign), nonReady).exitCode, 2, foreign);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
+ * NVA-K-DRIVERREACH (backlog: 2026-08-28-the-guided-driver-is-neither-discoverable-nor-
+ * runnable.md). Measured before this dispatch: `onboarding-init.mjs` was refused
+ * (`GUARD-LIFECYCLE-NOT-READY`) at every one of these five statuses, so the driver's own
+ * chaining behaviour was unreachable regardless of how good it was. Both halves are pinned
+ * in the SAME governed, injected-denial fixture the OBLIGROUTE-1 test above uses -- the
+ * exact admitted shape, near-miss shapes still refused -- plus a refused control
+ * (`touch output.txt`) at every status, so a fixture that failed open by construction
+ * (no governance marker) could never pass this test the way an earlier run of the
+ * measurement harness silently did.
+ */
+test("NVA-K-DRIVERREACH: the guided driver is admitted at every non-ready readiness status, in its exact argv shape and no wider one", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    for (const status of [
+      "portable-seed-required", "kickoff-required", "intake-required",
+      "migration-required", "partial",
+    ]) {
+      const nonReady = {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny(status); },
+      };
+      const admit = (command) => {
+        assert.equal(isSanctionedLifecycleCommand(command, path), true, `${status}: ${command}`);
+        assert.deepEqual(
+          evaluateLifecycleReadyGuard(bash(command), nonReady),
+          { exitCode: 0, stderr: "" },
+          `${status}: ${command}`,
+        );
+      };
+      const refuse = (command) => {
+        assert.equal(isSanctionedLifecycleCommand(command, path), false, `${status}: ${command}`);
+        const result = evaluateLifecycleReadyGuard(bash(command), nonReady);
+        assert.equal(result.exitCode, 2, `${status}: ${command}`);
+        assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u, `${status}: ${command}`);
+      };
+
+      // The exact admitted shape, and its flag-order-insensitive equivalents.
+      admit(`node '${DRIVER_SCRIPT}' --root '${path}'`);
+      admit(`node '${DRIVER_SCRIPT}' --root '${path}' --runner claude`);
+      admit(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --step-cap 10`);
+      admit(`node '${DRIVER_SCRIPT}' --step-cap 5 --root '${path}' --runner antigravity`);
+
+      // Near misses: no argv at all, wrong root, an out-of-set runner, a step-cap
+      // parseArgs() itself would refuse (zero, negative, non-numeric), a flag the driver's
+      // own parser does not accept at all, and a duplicated --root.
+      refuse(`node '${DRIVER_SCRIPT}'`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${join(path, "other")}'`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --runner human`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --step-cap 0`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --step-cap -1`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --step-cap abc`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --profile mini`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --root '${path}'`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --intent bootstrap`);
+
+      // The control the backlog item's own measurement insists on: a fail-open fixture
+      // (no governance marker) would have admitted this too.
+      refuse("touch output.txt");
+    }
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
