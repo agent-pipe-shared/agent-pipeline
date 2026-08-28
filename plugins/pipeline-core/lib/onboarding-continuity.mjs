@@ -4179,7 +4179,15 @@ function promotionInput({ profile, featureId, planPath, prdPath, specPath, desig
 // this function (checkMarkers left at its true default) -- after the digest
 // comparison, so a caller cannot use reconstruction's skipped admission to
 // slip a marker-less PRD past this function altogether.
-function promotionArtifacts(root, input, { checkMarkers = true } = {}) {
+// NVA-R-STAGINGACK: `pureGeneratorPrdSha256`, when non-null, is the digest a
+// caller has already established (via pureGeneratorPromotionPrdSha256 below)
+// as what intake-generate-apply would currently derive for this exact
+// checkpoint -- ONLY ever supplied by the two coordinator-sourced call sites
+// (buildCoordinatorSourcedPromotionPlan, applyOnboardingKickoffPromotion's
+// own coordinator branch). Every other caller, including every kickoff-
+// sourced (`kickoff promote`) call, leaves it at its null default, so the
+// acknowledgement-marker gate is completely unchanged for them.
+function promotionArtifacts(root, input, { checkMarkers = true, pureGeneratorPrdSha256 = null } = {}) {
   const prd = observeOptionalProjectFile(root, input.prdPath, "promotion PRD");
   const spec = observeOptionalProjectFile(root, input.specPath, "promotion specification");
   const designInput = observeOptionalProjectFile(root, input.designInputPath, "promotion design input");
@@ -4239,7 +4247,20 @@ function promotionArtifacts(root, input, { checkMarkers = true } = {}) {
     // po-authority-acknowledge-plan/apply). Refusing here, before anything is
     // frozen, keeps that dead end from being reachable via promotion.
     const acknowledgementMarkers = [...prdText.matchAll(PRD_ACKNOWLEDGEMENT_MARKER)];
-    if (acknowledgementMarkers.length !== 1) {
+    // NVA-R-STAGINGACK: the ONE narrow exemption from the marker below -- never
+    // a second one, and never reachable for `kickoff promote` (pureGeneratorPrdSha256
+    // is only ever non-null from the two coordinator-sourced call sites). A digest
+    // match here means these exact CURRENT bytes (prd.sha256, read from disk just
+    // above, never the banner's own embedded digest) are indistinguishable from
+    // what intake-generate-apply would write today, straight from the intake
+    // checkpoint's own recorded consent -- nothing here is a human judgement the
+    // marker could be certifying, so demanding it would certify nothing. Any hand
+    // edit, any checkpoint drift since generation, or consent never having been
+    // recorded all fail this comparison (pureGeneratorPromotionPrdSha256 returns
+    // null, or returns a digest that no longer matches) and fall straight through
+    // to the unchanged refusal below.
+    const pureGeneratorExempt = pureGeneratorPrdSha256 !== null && pureGeneratorPrdSha256 === prd.sha256;
+    if (acknowledgementMarkers.length !== 1 && !pureGeneratorExempt) {
       fail(
         "KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING",
         "The promoted PRD must carry the PO's plan acknowledgement marker exactly once, as"
@@ -4490,6 +4511,7 @@ function validatePromotionPlan(plan) {
 // shape instead of the kickoff transaction's.
 function buildCoordinatorSourcedPromotionPlan({
   input, observed, profile, runner, repositoryCapability, onboardingScript, allowAppliedReplay,
+  spawn = defaultGitSpawn,
 }) {
   const replay = allowAppliedReplay && observed.continuity.status === "valid";
   if (observed.continuity.status !== "absent-pristine" && !replay) {
@@ -4530,7 +4552,18 @@ function buildCoordinatorSourcedPromotionPlan({
     validatePromotionPlan(plan);
     return plan;
   }
-  const authority = promotionArtifacts(observed.root, input, { checkMarkers: !allowAppliedReplay });
+  // NVA-R-STAGINGACK: computed only when admission is actually being decided
+  // (checkMarkers true, i.e. NOT allowAppliedReplay) -- the replay branch
+  // above never reaches here, and applyOnboardingBootstrapBind's own
+  // allowAppliedReplay: true reconstruction already skips marker admission
+  // entirely (checkMarkers false), exactly as before this change.
+  const checkMarkers = !allowAppliedReplay;
+  const authority = promotionArtifacts(observed.root, input, {
+    checkMarkers,
+    pureGeneratorPrdSha256: checkMarkers
+      ? pureGeneratorPromotionPrdSha256({ rootDir: observed.root, repositoryCapability, spawn })
+      : null,
+  });
   const featureId = input.featureId;
   const continuity = initialContinuity({
     featureId, prdPath: authority.prd.path, prdSha256: authority.prd.sha256,
@@ -4607,7 +4640,7 @@ function buildKickoffPromotionPlan({
   const observed = observeDetailed({ rootDir, repositoryCapability, spawn });
   if (coordinatorSourced) {
     return buildCoordinatorSourcedPromotionPlan({
-      input, observed, profile: input.profile, runner, repositoryCapability, onboardingScript, allowAppliedReplay,
+      input, observed, profile: input.profile, runner, repositoryCapability, onboardingScript, allowAppliedReplay, spawn,
     });
   }
   if (observed.continuity.status !== "valid") fail("KICKOFF-PROMOTION-STATE", "promotion requires valid continuity");
@@ -5962,6 +5995,40 @@ function resolveBootstrapBindInputs({ rootDir, repositoryCapability = "local", s
     root: observed.paths.root, profile: checkpoint.values.profile, featureId,
     planPath: prdPath, prdPath, specPath, designInputPath,
   };
+}
+
+// NVA-R-STAGINGACK: coordinator-sourced binding (bootstrap-bind-apply) is the
+// only route where the promoted PRD can be PROVABLY the generator's own
+// unmodified playback of already-durable intake data -- nobody has been asked
+// to write a single word of it (buildIntakePrdContent's own closing note:
+// "has not been synthesized and must be authored and reviewed before
+// binding"). Demanding the PO's plan-acknowledgement marker on THAT exact
+// byte sequence would certify a judgement nobody made; the real acceptance
+// gate for a document a human actually authors is `approve-plan`, later,
+// entirely untouched by this (PO decision, see the task this implements).
+// This function NEVER writes the marker and must never be extended to -- it
+// only ever answers "would demanding it certify anything real right now".
+//
+// "Provably unmodified" is machine-checked, never assumed from the banner's
+// own embedded provenance digest (an editor could leave that line intact
+// while changing the surrounding prose): this re-derives the exact bytes
+// intake-generate-apply would currently produce -- reusing its own single
+// derivation, buildOnboardingIntakeGeneratePlan, never a second one -- and
+// the caller (promotionArtifacts) compares the result against the PRD's
+// actual current bytes, read fresh from disk. Consent must already be
+// recorded -- the human act the PO actually performed
+// (applyOnboardingIntakeConsent's own `consent: {granted, at}`) -- so an
+// absent checkpoint or an unrecorded consent both return null (no exemption)
+// before any derivation is even attempted; any other read or derive failure
+// also returns null rather than risk a false positive.
+function pureGeneratorPromotionPrdSha256({ rootDir, repositoryCapability, spawn }) {
+  try {
+    const observed = readOnboardingIntakeCheckpoint({ rootDir, repositoryCapability, spawn });
+    if (observed.status !== "present" || observed.value.consent === null) return null;
+    return buildOnboardingIntakeGeneratePlan({ rootDir, repositoryCapability, spawn }).targets.prd.afterSha256;
+  } catch {
+    return null;
+  }
 }
 
 export function planOnboardingBootstrapBind({
