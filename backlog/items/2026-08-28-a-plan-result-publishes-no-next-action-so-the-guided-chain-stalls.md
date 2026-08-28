@@ -6,7 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-28
 sprint: nova
-tracking: "NOW / Nova A — the last measured gap between the guided init and a full drive to ready; found by smoke-testing the driver against a genuinely fresh repository"
+tracking: "NOW / Nova A — five of seven builders fixed 2026-08-28 (NVA-D-PLANACTION, NVA-F-PROMOTIONACTION) and the guided init now reaches ready; NOT closed, because two builders still publish applyAction without nextAction"
 source: "Smoke test of onboarding-init.mjs against a fresh temporary repository, 2026-08-28, at HEAD 92d1b711. Measured, not reported by any runner."
 ---
 
@@ -71,6 +71,40 @@ at once, not just this driver.
   rounds being only genuine decisions.
 - No digest binding is weakened: the published `nextAction` carries the same
   `planSha256` the caller would otherwise have copied by hand.
+
+## What has landed, and what is left (2026-08-28, HEAD c2e63ea2)
+
+Five of the seven builders now publish `nextAction`: the intake-generate plan
+(NVA-D-PLANACTION) and all four promotion-plan build sites (NVA-F-PROMOTIONACTION). The
+smoke measurement was re-run against a genuinely fresh repository and **reaches a
+terminal ready state** for the first time:
+
+```
+round 7: outcome=ready
+human rounds needed:            4
+commands the driver chained:    15
+repair subcommands on the path: 0
+```
+
+Two builders still publish `applyAction` without a `nextAction` sibling, so the first
+acceptance criterion ("every plan builder") is not yet met and this item stays open:
+
+- the goal-bound kickoff plan (`applyAction: applyAction(onboardingScript, …)`) — off the
+  coordinator route the smoke test takes, but on the kickoff route, where a driver would
+  stall exactly as it did here;
+- `planOnboardingKickoffPromotionCleanupRecovery` — a recovery plan rather than a
+  happy-path step, but a driver reaching it has the same nowhere to go.
+
+## The residual the measurement exposed, which this item did not predict
+
+Rounds 4 and 6 each end in `no-automatic-next-step` after a **successful apply**, and the
+harness only continues because it re-invokes the driver, which re-anchors on `inspect`.
+So the gap is one layer deeper than this item's title says: the *plan* results now chain,
+but `intake-generate-apply` and `bootstrap-bind-apply` publish no `nextAction` onto their
+own success, so each plan/apply pair costs a wasted driver round-trip. Seven of the
+fifteen chained commands are that re-anchoring `inspect`; the real work is eight
+commands in four digest-bound plan/apply pairs. Not a stall, but not free either — and
+the same convention fixes it.
 
 ## Related
 
