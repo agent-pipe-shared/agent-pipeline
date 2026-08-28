@@ -6584,10 +6584,35 @@ export function applyOnboardingKickoffPromotion({
       const seed = recognisedKickoff(observed, deps.spawn ?? defaultGitSpawn);
       if (seed === null) fail("KICKOFF-PROMOTION-CAS-DRIFT", "promotion kickoff seed drifted");
     }
+    // NVA-R3-STAGINGACKAPPLY: this re-admission runs on every first real apply, and
+    // it decides marker admission a second time -- so it must reach the same verdict
+    // the plan did, or the plan-time exemption is computed and then thrown away.
+    // Before this, it passed no options at all: `pureGeneratorPrdSha256` defaulted to
+    // null, `pureGeneratorExempt` was unconditionally false here, and a marker-less
+    // pure-generator PRD produced a plan that its own apply then always refused.
+    //
+    // The digest is RE-DERIVED here rather than carried across from the plan, and the
+    // difference is the whole safety of it: the derivation reads the checkpoint and
+    // the PRD's current bytes as they are NOW, so a hand edit or a checkpoint change
+    // between plan and apply revokes the exemption at exactly this point instead of
+    // being waved through by a value computed before the edit existed. Trusting a
+    // plan-carried digest would make the plan a bearer token for its own admission.
+    //
+    // Gated on `plan.kickoff === null`, the same coordinator-sourced predicate
+    // buildKickoffPromotionPlan uses: `kickoff promote` must not reach the exemption
+    // from here any more than it can from the plan side.
     const authority = promotionArtifacts(plan.root, {
       profile: plan.profile, featureId: plan.feature.id, planPath: plan.feature.planPath,
       prdPath: plan.authority.prd.path, specPath: plan.authority.spec.path,
       designInputPath: plan.authority.designInput.path,
+    }, {
+      pureGeneratorPrdSha256: plan.kickoff === null
+        ? pureGeneratorPromotionPrdSha256({
+          rootDir: plan.root,
+          repositoryCapability: plan.repositoryCapability,
+          spawn: deps.spawn ?? defaultGitSpawn,
+        })
+        : null,
     });
     if (authority.prd.sha256 !== plan.authority.prd.sha256 || authority.spec.sha256 !== plan.authority.spec.sha256
       || authority.designInput.sha256 !== plan.authority.designInput.sha256) {
