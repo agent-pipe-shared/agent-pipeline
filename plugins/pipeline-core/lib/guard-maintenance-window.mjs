@@ -332,6 +332,36 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   // rather than constructing any of the content itself, so it never sits upstream of a
   // human-signed approval ceremony the way push-init.mjs does.
   "plugins/pipeline-core/scripts/push-init.mjs",
+  // NVA-V26-SIGNINGIMPORTERS (2026-08-29): an eighth gap, the same shape as the seventh
+  // (importer, not import target -- the closure walk only follows edges FROM a kernel
+  // file outward, so a module that instead IMPORTS a kernel module is structurally
+  // invisible to it). signing-ceremony.mjs and po-approval-gate.mjs both statically
+  // import and invoke po-human-approval.mjs's `runHumanApproval` (already kernel above,
+  // "the script the human uses to sign") directly -- signing-ceremony.mjs's own header
+  // states its passphrase prompt "behave[s] identically to running po-human-approval.mjs
+  // sign-intent directly". A corrupted copy of either could substitute or alter what the
+  // human is asked to confirm/sign, or misreport the outcome, without any other kernel
+  // file needing to change -- the same class of risk push-init.mjs (seventh gap) already
+  // closed for the text a corrupted driver could show before a signature, applied here to
+  // the code that actually calls the signer. GMWKC01's own first run after this addition
+  // found one further edge: signing-ceremony.mjs also imports the scripts/ CLI wrapper
+  // `guard-maintenance-window.mjs` (distinct from the already-kernel lib/ module of the
+  // same basename) to orchestrate the maintenance-window ceremony end to end -- every
+  // first-party import that CLI itself makes was already kernel before this dispatch, so
+  // adding it closes the walk in one further round.
+  // NVA-V26-SIGNINGIMPORTERS class sweep: scripts/guard-human-override.mjs is the CLI
+  // wrapper around lib/human-guard-override.mjs (already kernel above) -- it statically
+  // imports and directly invokes that library's authorize/authorize-by-signature/plan
+  // functions to arm a Human Guard Override capability, the same relationship
+  // signing-ceremony.mjs and po-approval-gate.mjs have to po-human-approval.mjs, applied
+  // to the HGO ceremony instead of the GMW/push ceremony. A corrupted copy could
+  // misreport an authorization outcome or alter what is built for the human to sign. Its
+  // only first-party import is lib/human-guard-override.mjs itself (already kernel), so
+  // this addition closes in the same round it is added.
+  "plugins/pipeline-core/scripts/guard-human-override.mjs",
+  "plugins/pipeline-core/scripts/guard-maintenance-window.mjs",
+  "plugins/pipeline-core/scripts/po-approval-gate.mjs",
+  "plugins/pipeline-core/scripts/signing-ceremony.mjs",
 ]);
 
 // The "plugins/pipeline-core/..." entries above are written against whatever
