@@ -130,6 +130,7 @@
 | pipeline.cross-repository-boundary-guidance-still-omits-the-literal-command | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.cross-repository-override-ledger-binding | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.cross-repository-redirect-eligibility-does-not-consult-the-sensitive-path-boundary | closed | defect | pipeline | 2026-08-12 | — |
+| pipeline.dead-key-directory-pointer-is-permanent-and-silent | open | defect | pipeline | 2026-08-28 | NOW / Nova A — happy-path blocking at the last touch: on a machine that HAS a valid PO key, a freshly onboarded project still gets no trust anchor, so the signature push the PO is asked to perform is functionless. |
 | pipeline.decouple-hosted-project-document-language-from-operator-facing-language | closed | workflow-improvement | pipeline | 2026-08-09 | — |
 | pipeline.delivery-is-not-always-a-git-push | open | workflow-improvement | pipeline | 2026-08-28 | Backlog / someday — PO-raised 2026-08-28; not blocking the Nova candidate, but it decides whether the release model fits a whole class of the PO's repositories |
 | pipeline.design-to-implementation-path-has-no-driver | open | workflow-improvement | pipeline | 2026-08-28 | Nova B — PO-raised 2026-08-28: the next path complex enough to need a driver. Ranked BEHIND the push driver, for the reason stated below. |
@@ -513,7 +514,7 @@
 
 ## Counts
 
-- open: 92
+- open: 93
 - in_progress: 3
 - closed: 390
 - rejected: 3

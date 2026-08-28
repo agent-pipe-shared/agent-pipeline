@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "8a47af62c8a7aa3f7621f31e640e6fa52f963de6c8d553aa5fefb11a687929a9"
+    "transitionHead": "f6207f945e20a084e670b96abb15c0d68b46669ac239428ebb799d9fcc75f412"
   },
   "counts": {
-    "open": 92,
+    "open": 93,
     "in_progress": 3,
     "closed": 390,
     "rejected": 3,
@@ -1524,6 +1524,16 @@
       "closureRepository": "self",
       "closureCommit": "9ae28dad3f6c9c41833e7d629fa3d1d73872d2a2",
       "closureEvidence": "backlog/items/2026-08-12-cross-repository-redirect-eligibility-does-not-consult-the-sensitive-path-boundary.md"
+    },
+    {
+      "id": "pipeline.dead-key-directory-pointer-is-permanent-and-silent",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "Measured 2026-08-28 on the development machine itself, while reconciling the trust-anchor item: freshCriticalHumanProofPolicyBytes(fs) returned a bare v1 document on a machine whose key directory exists and is complete. Probed step by step (scratch/probe-machine-plane.mjs) rather than inferred.",
+      "deferred": false,
+      "tracking": "NOW / Nova A — happy-path blocking at the last touch: on a machine that HAS a valid PO key, a freshly onboarded project still gets no trust anchor, so the signature push the PO is asked to perform is functionless."
     },
     {
       "id": "pipeline.decouple-hosted-project-document-language-from-operator-facing-language",
