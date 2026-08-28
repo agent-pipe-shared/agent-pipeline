@@ -214,8 +214,8 @@ traceability row (commit `2b0ee8c7`). (2) the **ADR concept must migrate
 explicitly in brownfield adoption**; doctrine §6 gained the rule
 (mechanism installs with the standard, baseline as first record, on-touch
 capture of inherited decisions, honestly dated) routed via §D into spec
-§7.1 (commit `9c9d9819`). The PRD/spec edits themselves stay queued behind
-the unfreeze route. Final PO word on the package: pending.
+§7.1 (commit `9c9d9819`). Both were graduated into the PRD and spec in
+`eba804e6`; the PO approved the package the same day (below).
 
 **Carried forward from the rotated 0.6.0 prior-handover section
 (extraction pass 2026-08-28):** (a) OPEN PO release decision — 0.6.0 is a
@@ -229,22 +229,37 @@ to re-dispatch against `pipeline-user-v3.schema.json` (first attempt
 withdrawn `1d6dec55`, scaffolding kept `8316dbd8`). Details:
 `docs/state-archive/2026-08-28--prior-handover-verify-is-green-in-one-run-candidate-0-6-0-lo.md`.
 
-**Next:** (1) Re-present the reworked package to the PO (EL-19) — review
-objects: `design/agent-first-architecture.md` (now at `9c9d9819`),
-`design/gap-analysis-2026-08-28.md` (now at `9c9d9819`),
-`design/po-input-2026-08-28.md`.
-(2) On the PO's word, the verified bound-document route — PO attended acknowledge (`po-authority-acknowledge-plan`/
-`-apply`, agent calls refused `CHAT-GATE-NOT-ATTENDED` by design; the marker
-carries no digest, later edits do not stale it) → `submit-plan --by Elephant
---profile epic` → `reopen-design` (now effective; a submission exists to
-invalidate) → apply the doctrine graduation (gap-analysis §D) **plus** the
-§9-decision edits already queued (PRD §5 #100 correction, §6, §7 crit. 4,
-§9 as decided, spec §1 count, spec §10 #107 note) → recompute the
-`technical-spec-sha256` marker → `submit-plan` again (sanctioned
+**PO approval of the doctrine, and the route executed (2026-08-28).** The PO
+approved the reworked package. The bound-document route then ran end to end:
+
+1. **Attended acknowledge — two ceremonies, one defect found.** The first
+   (plan `2775affd`) failed its postimage readback and rolled back cleanly.
+   Root cause, isolated read-only by eliminating the other four predicates:
+   `resolvePoRebindRunner` defaults to `codex` whenever `CLAUDECODE` is
+   unset — which is exactly the attended non-Claude-Code terminal the gate
+   demands — and the codex V4 inspection is `runtime-attestation-required`
+   on this host, so `v4Intents` can never pass. Retried with an explicit
+   `--runner claude` on a fresh plan (`980f6bd2`): `PO-ACK-APPLIED`,
+   continuity revision 1 (`010c21f4`). Filed as
+   `backlog/items/2026-08-28-the-attended-po-acknowledge-gate-defaults-to-a-runner-that-cannot-satisfy-it.md`
+   (`8df61e7a`, ledger `e4f25146`) — the sixth defect this design phase
+   filed, taking the live Alfred set to 28.
+2. **`submit-plan` → `reopen-design`** (`f8998d9a`) released
+   `GUARD-LIFECYCLE-AUTHORITY-BOUND` as designed.
+3. **Graduation applied** (`eba804e6`, count correction `c1a57c44`): the
+   gap-analysis §D integration map plus the queued §9-decision edits, across
+   PRD, spec and acceptance; `technical-spec-sha256` recomputed to
+   `fc653b72…`.
+
+**Next:** (1) The graduated bytes owe the spec §12 design-phase review duty a
+round: an independent Critic review of `eba804e6` (+ the two doctrine
+amendments `2b0ee8c7`, `9c9d9819`) against the doctrine and gap-analysis as
+contract, ARCHITECTURE route at max per MP-07. Fix findings, then
+(2) `submit-plan --by Elephant --profile epic` again (sanctioned
 reopen→submit→approve path) → PO `approve-plan`. Implementation stays gated
 on Nova landing on `main` + rebase. Standing gate-visible items: the
 Dispatch-trailer canon gap (`evidence/critic/round-1-response.md`) and the
-five defect items this design phase filed.
+six defect items this design phase filed.
 
 ## Prior handover — 2026-09-01/02: the autonomous Nova B block
 
