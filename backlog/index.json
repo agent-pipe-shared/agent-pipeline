@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "73adffffdee14a11981979370d659a1e2c1dcb74b831d96ae119bd9c363d233e"
+    "transitionHead": "5c3cbe14a2b2410f3322e17ea79dccc7d5acefdfc875cfb0c0dd6b9c0a7bda81"
   },
   "counts": {
-    "open": 54,
+    "open": 55,
     "in_progress": 5,
     "closed": 380,
     "rejected": 3,
@@ -397,6 +397,15 @@
       "owner": "pipeline",
       "created": "2026-08-28",
       "source": "Hit live, 2026-08-28, consuming a PO signature for a TP-3 guard override; then located in plugins/pipeline-core/lib/human-guard-override.mjs by reading the arming and consuming paths against each other.",
+      "deferred": false
+    },
+    {
+      "id": "pipeline.an-orchestrator-write-into-a-running-dispatchs-tree-is-undetectable",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "Re-Critic vtpgate2-368458af finding F2; incident during NVA-VTPGATE-2, 2026-08-28",
       "deferred": false
     },
     {
