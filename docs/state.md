@@ -7,6 +7,7 @@
 
 | Date range | Summary | Archive |
 |---|---|---|
+| 2026-08-28 | Nova line: backlog-ledger merge semantics (ADR-0068), ADR renumbering (ADR-0069) and the first handover rotation | [docs/state-archive/2026-08-28--prior-handover-ledger-merge-capability-adr-renumbering-hando.md](state-archive/2026-08-28--prior-handover-ledger-merge-capability-adr-renumbering-hando.md) |
 | 2026-08-27 | sprint_agy fetch, fast-forward, and the 2026-08-26 clean local candidate | [docs/state-archive/2026-08-27--prior-handover-sprint-agy-fetch-fast-forward-and-clean-local.md](state-archive/2026-08-27--prior-handover-sprint-agy-fetch-fast-forward-and-clean-local.md) |
 | 2026-08-19 through 2026-08-23 | Phoenix-line checkpoints 61-71 (2026-08-19 through 2026-08-23), preserved verbatim as history after the Nova merge made the Nova line authoritative. | [docs/state-archive/2026-08-27--phoenix-checkpoints-61-71.md](state-archive/2026-08-27--phoenix-checkpoints-61-71.md) |
 | through 2026-08-19 | First real rotation: everything from the 2026-08-08 restart checkpoint through the inherited Nova/Cyborg-release history and every older era down to the open-items tail — extraction pass completed first (original pre-rotation line range 4977–19155; see the archive file's own provenance section and the ADR-0064 addendum dated 2026-08-19) | [state-archive/2026-08-19--pre-restart-and-nova-inherited-history.md](state-archive/2026-08-19--pre-restart-and-nova-inherited-history.md) |
@@ -41,9 +42,12 @@ Base `a50c8093`; state transition committed as `0d0031ea`.
    `plan-human-recovery` offers only non-mutating candidates. Escape: the PO
    ran `set-feature` in their own shell. Line-verified root cause in the item.
 
-**Session facts:** pipeline 0.6.0+claude.20260827181725.5071b04
-(local-development), onboarding `ready`/continuity `valid` re-verified after
-the switch. Pre-push hook installed in this clone (untracked, `.git/hooks`).
+**Session facts:** pipeline 0.6.0+claude.20260827211222.562aadb
+(local-development; the 2026-08-28 `/reload-plugins` moved it off
+`…181725.5071b04`), onboarding `ready`/continuity `valid` re-verified after
+the switch. Verify is present but currently refuses with
+`VERIFY-CLEANUP-REGISTRATION-REQUIRED` (no session identity to bind a cleanup
+descriptor) — irrelevant to design work, unresolved. Pre-push hook installed in this clone (untracked, `.git/hooks`).
 PO trust anchor verified byte-identical to the configured
 `local-po-key` (`2de20a39…`) — nothing to add. Push target later:
 `git push -u origin feat/sprint-alfred:sprint_alfred`; rebase onto
@@ -60,16 +64,12 @@ context) at effort `xhigh`; Fable 5 is off. Everything from the PRD gate
 onward (PO decisions, implementation dispatches) runs under that
 configuration. Deliverable under construction:
 `specs/sprint-alfred-epic/` (PRD, spec, acceptance, design analyses) from the 9
-`sprint:alfred` GitHub issues (#99 #101–#106 #108 #109), 24 open
-`sprint: alfred` backlog items, and external research — ≥1 independent Critic
-round per design document before the PO gate. Known intake conflicts needing a
-PO word at the gate: two items whose frontmatter says `alfred` but whose own
-Triage prose says Nightwing (`2026-08-12-stale-checkout…`,
-`2026-08-08-the-bootstrap-skill-grows…`), and
-`2026-07-25-managed-onboarding-success-contract` (deferred, Alfred per this
-branch's triage, Nova/general per the Phoenix-line cross-triage).
-`#108`'s entry condition `#100` (P0, fail-closed push-approval absence) is
-still OPEN on GitHub — tracked as an entry condition, outside Alfred.
+`sprint:alfred` GitHub issues (#99 #101–#106 #108 #109), the open
+`sprint: alfred` backlog items (24 at intake, **27 today** — composition in
+`acceptance.md` AC-13), and external research — ≥1 independent Critic round
+per design document before the PO gate. The intake conflicts and #108's #100
+entry condition were all decided at the gate: see the PO decision register
+below.
 
 **Design package + review round 1 (2026-08-27, late evening):** package
 committed — intake analyses `74e5a4d4` (po-input, issue-intake,
@@ -133,15 +133,75 @@ acknowledgement marker `<!-- po-plan-acknowledged:
 content-sound-and-spec-consistent -->` exactly once, a PO judgment no agent
 may fabricate.
 
-**Next (Haltepunkt presented, awaiting the PO):** 1. PO reviews the PRD
-(EL-19) and answers PRD §9's five decisions; 2. on the PO's word, the
-acknowledgement marker line is added to the PRD and committed; 3.
-`pipeline-state.mjs submit-plan --by Elephant --profile epic` (rebinds
-continuity authority to the acknowledged bytes itself); 4. PO approval
-(`approve-plan`) and the MP-01 gate switch away from Fable-max. Standing
-gate-visible items: the Dispatch-trailer canon gap (disposition in
-`evidence/critic/round-1-response.md`) and the four defect items filed
-today.
+**PO gate answered (2026-08-28).** All five PRD §9 decisions are decided and
+applied; the model switch is done (see above). Register:
+
+1. **Sprint-assignment conflicts → moved.** `2026-08-12-stale-checkout…` and
+   `2026-08-08-the-bootstrap-skill-grows…` now declare `sprint: nightwing`,
+   following their own 2026-08-17 Triage (`e4c3f2db`). The line the PO
+   applied, reusable at the next triage: *test- and evidence-discipline is
+   Alfred; product and onboarding experience is Nightwing.*
+2. **`managed-onboarding-success-contract` → accepted**, as an
+   acceptance-review rule (`acceptance.md` AC-16/§D), not a work package,
+   with the PO's constraint that its target set is re-derived **after the
+   Nova rebase** because the onboarding surface changed in the Nova line. Two
+   mechanical findings recorded with it: ledger event 41's rescoped byte-pin
+   refuses a `sprint:` line in that item's frontmatter, and `deferred` has no
+   forward transition — so it stays outside AC-13's closure set by mechanism.
+3. **#100 → verified and commented; the PO closes it.** The premise of both
+   offered options was stale: `2ae06d91` is an ancestor of `origin/main`, the
+   scope-4 fixtures (`PG11c`, `PG11e`, `PG28`, `PG29`, `PG30`) are on `main`,
+   and `guard-push-tests` is registered in `harness/scripts/verify.mjs`
+   there. Only AC-7 (closing comment) was outstanding; the evidence comment
+   is posted (`#issuecomment-5448916870`), the issue deliberately left open.
+   Read-verified, not run-verified — stated as such in the comment itself.
+4. **`sprint:NONE` prerequisites → none beyond #100**, and the portfolio was
+   cleaned at the same time: #107, #92, #52, #13 moved to `sprint:batman`
+   (each previewed and read back through `github-issue-operations.mjs`); #72
+   (hardware-blocked Nova follow-up) and #100 (P0 hotfix) deliberately left
+   `sprint:NONE`.
+5. **Scope trims → none.** C2's range-mode tail and B2(viii) stay in; the
+   tail remains the first drop candidate at a wave boundary, with a
+   re-triage note, not now.
+
+**The answers cannot yet reach the PRD/spec — a sixth measured gap.**
+`GUARD-LIFECYCLE-AUTHORITY-BOUND` refuses direct edits to the bound PRD and
+Spec, and the release route that refusal names (`reopen-design`) is a
+zero-write replay in a never-submitted design phase: `planInvalidation` has
+exactly one writer and its only reaching branch needs a `planSubmission`,
+while continuity must bind PRD/Spec before the first `submit-plan`. Filed as
+`backlog/items/2026-08-28-a-design-phase-prd-and-spec-are-frozen-by-their-own-continuity-binding.md`
+(`9e436147`, ledger `50ce3f89`). Everything not bound is already updated
+(`bfa7cac8`).
+
+**Next — the corrected sequence, read out of the writers before being written
+down here:**
+1. **PO, in their own attended terminal:**
+   `node plugins/pipeline-core/scripts/pipeline-state.mjs po-authority-acknowledge-plan --by "<name>"`,
+   then the `applyAction` it prints (`po-authority-acknowledge-apply
+   --plan-sha256 <from the plan> --updated-at <from the plan> --by "<name>"
+   --activate`), typing `<name>` when prompted. An agent tool call is refused
+   here with `CHAT-GATE-NOT-ATTENDED` by design. This writes the
+   acknowledgement marker into the PRD through the sanctioned transactional
+   writer; the marker carries no digest or timestamp, so later PRD edits do
+   not stale it (`po-gate-authority.mjs`).
+2. Agent: `submit-plan --by Elephant --profile epic` — creates the submission
+   and rebinds continuity authority.
+3. Agent: `reopen-design --by Elephant` — now effective, which releases the
+   authority-bound write refusal.
+4. Agent: apply decisions 1–5 to the PRD and `spec.md` (§5 entry conditions
+   incl. the corrected #100 line, §6 non-goals, §7 criterion 4's set, §9
+   rewritten as recorded decisions, spec §1's item count, spec §10's #107
+   boundary note), recompute the `technical-spec-sha256` marker, commit.
+5. Agent: `submit-plan --by Elephant --profile epic` again on the corrected
+   bytes — `approveSubmittedPlan` tolerates the retained invalidation; this
+   is the sanctioned reopen → submit → approve path, not a workaround.
+6. **PO:** `approve-plan --by "<name>"`. Then the phase transition;
+   implementation still gated on Nova landing on `main` and the rebase.
+
+Standing gate-visible items: the Dispatch-trailer canon gap (disposition in
+`evidence/critic/round-1-response.md`) and the five defect items this design
+phase filed.
 
 ## Prior handover — Verify is green in one run; candidate 0.6.0 local (2026-08-27)
 
@@ -199,85 +259,6 @@ inherited claim was corrected twice before it was right: "nine suites never run
 in Verify" is **three**, not nine and not one — six are false positives from
 `check-suite-registration.mjs`, which is blind to `verify.mjs`'s scoped
 registration block. That is now its own item, alongside the three real gaps.
-
-## Prior handover — ledger-merge capability, ADR renumbering, handover rotation (2026-08-27)
-
-**READ THIS FIRST.** Three connected pieces of work, all committed, all on
-`feat/sprint-nova-codex-v046`.
-
-**1. The backlog ledger can now be merged across parallel sprints** — the
-capability the Phoenix merge proved missing. [ADR-0068](adr/0068-backlog-ledger-merge-semantics.md)
-records the decision; the defect it fixes was a contradiction sitting unnoticed
-in one module, because it is invisible while nothing moves: chain validation
-demanded an amendment's `from`/`to` equal the item's CURRENT status, while
-supersession recognition and the planners demanded the status frozen in a
-registry. Both readings coincide until a second line advances the item, and then
-they are mutually unsatisfiable. An amendment is now status-neutral and binds
-its target by `entryHash` rather than physical position. All 38 Phoenix
-reachability amendments migrated; the measurement that matters is that the same
-append took `check-backlog-state.mjs` from 13 findings to 73 before the change
-and leaves it unchanged after. `backlog-state.test.mjs` 55/55 including BS26,
-which can finally exercise what it was written for. Commits `87203a08`,
-`e8e65eb4`, `14f028bb`, `72c1c48d`, `086c3430`.
-
-**2. The six duplicate ADR numbers the merge produced are being resolved.**
-[ADR-0069](adr/0069-adr-numbers-are-allocated-at-acceptance.md): numbers are
-allocated at ACCEPTANCE, never at drafting, and carry no sprint prefix. Five of
-six done — 0062→0071, 0064→0073, 0065→0074, 0066→0075, 0061→0070. **0063 is
-still open** and is the largest (97 files, ~185 ambiguous bare references);
-expect `repository-directory-contract` to keep the number on reference load.
-
-**3. `docs/state.md` is editable again** — it was 48,825 bytes against its own
-30,000-byte cap, which blocked every session that follows the bootstrap
-protocol. Checkpoints 61–71 rotated to `docs/state-archive/2026-08-27--phoenix-checkpoints-61-71.md` (`da70d0df`).
-
-### Still open, in order
-
-1. **Collision 0063 → 0072.** The only remaining `DUPLICATE-NUMBER` finding.
-2. **Register `check-adr-consistency.mjs` in `verify.mjs`** (ADR-0069 D3). The
-   checker already existed and already worked; `verify.mjs` simply never ran it,
-   which is why six collisions could land unreported. Do this AFTER 0063, or
-   Verify goes red by design.
-3. **BS25/BS26 durability** (ADR-0068 D6, not yet written): three positional
-   lookups remain (`backlog-state.mjs:1326`, `:1504`, and the test's fixture).
-   Two can bind by `entryHash`; `amendsSequence` has no hash in its event shape
-   and needs an additive `amendsEntryHash`. The test fixture must stay
-   positional — it needs a contiguous valid chain — so the prefix invariant
-   becomes a NAMED check instead of a silent assumption.
-4. **Full `verify.mjs` run** once the above land.
-
-### Recommended for this candidate (Nova A), everything else Nova B
-
-- `handover-file-exceeds-its-own-size-cap` — **done above**, close it.
-- `long-dispatches-truncate-before-emitting-their-report` — hit **five times**
-  in the 2026-08-27 session alone; two dispatches lost their report entirely and
-  one nearly lost its work. The closing-allowance fix is already designed.
-- `existing-repos-drift-on-agy-pipeline-user-yaml-update` — adoption blocker for
-  every existing repo once 0.6.0 ships.
-- `gitleaks-content-fingerprint-breaks-on-any-line-insertion` — presents as an
-  unexplained blocking secret scan.
-- `antigravity-hard-enforcement-layer-has-two-fail-open-paths` — **PO
-  instruction 2026-08-27: the agy security items belong in the candidate.** The
-  residual path is not small: the entire Antigravity hard-enforcement layer
-  (PreToolUse guards, mandatory-bootstrap hard block) is inert whenever the
-  daemon cannot resolve `node`, and it fails SILENTLY because the hook that
-  would report it is the one that does not run. Its own QG-06 review horizon
-  (`due: 2026-08-30`) is three days out.
-
-Five further items are finished but not closed (ledger-merge, BS26,
-claude-start-time, tp-guard-restore, intake-generate-coordinator — the last is a
-status/Triage contradiction). Closing them is bookkeeping, but until it happens
-every backlog overview is wrong.
-
-### Ledger discipline — extracted 2026-08-27, applies to the closures above
-
-Both rules existed ONLY in the rotated checkpoints and are now filed
-(`f5a77841`): a `reconcile-backlog-ledger.mjs --activate` result is committed
-ALONE, because GG-22 inspects the whole staged index rather than the commit's
-pathspec; and `check-backlog-state.mjs` runs BEFORE committing a ledger change,
-since an uncommitted bad reconciliation is undone with `git checkout --` on the
-three projection files while a committed one needs the heavy evidence-amendment
-machinery. `closure_commit` needs a FULL lowercase OID.
 
 ## Operational head
 
