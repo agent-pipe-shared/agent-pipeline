@@ -199,6 +199,143 @@ test("driveOnboardingInit: the step cap fires on a chain that never converges", 
   }
 });
 
+// The four tests below use a synthetic responder, same idiom as the non-converging
+// step-cap test above: the re-anchor path needs an executed step to settle with no
+// `nextAction` and a non-"ready" status, which is not a real onboarding-cli shape any
+// still-supported subcommand currently produces on its own (the backlog item this task
+// closes describes the gap being fixed, not a reproducible live example), so mocking the
+// two resting responses is the honest choice, exactly as it already is for the
+// non-converging chain.
+function respond(body) {
+  return { status: 0, stdout: JSON.stringify(body), stderr: "" };
+}
+
+test("driveOnboardingInit: re-anchors after an executed step settles with no nextAction, and completes", () => {
+  const root = freshRoot();
+  try {
+    let inspectCalls = 0;
+    const run = (executable, argv) => {
+      const subcommand = argv[1];
+      if (subcommand === "inspect") {
+        inspectCalls += 1;
+        if (inspectCalls === 1) {
+          return respond({
+            schema: "pipeline.synthetic.v1",
+            status: "in-progress",
+            nextAction: { kind: "command", executable: "node", argv: ["--eval", "0"] },
+          });
+        }
+        // The re-anchor: a different, terminal state -- proves the driver actually
+        // re-read the state rather than repeating the anchor blindly.
+        return respond({ schema: "pipeline.synthetic.v1", status: "ready", nextAction: null });
+      }
+      // The one executed ("command") step: settles with no nextAction, not ready --
+      // exactly the silent-success shape this task fixes.
+      return respond({ schema: "pipeline.synthetic.v1", status: "in-progress", nextAction: null });
+    };
+    const result = driveOnboardingInit({ rootDir: root, run });
+    assert.equal(result.outcome, "ready", JSON.stringify(result));
+    assert.equal(inspectCalls, 2, "expected exactly one re-anchor inspect on top of the initial one");
+    assert.equal(result.stepsExecuted, 3);
+    assert.equal(result.steps[0].argv[1], "inspect");
+    assert.notEqual(result.steps[1].argv[1], "inspect", "the middle step is the executed command, not another anchor");
+    assert.equal(result.steps[2].argv[1], "inspect", "the driver re-anchored on inspect after the silent success");
+  } finally {
+    dispose(root);
+  }
+});
+
+test("driveOnboardingInit: a nextAction-less result from the anchoring inspect itself does not re-anchor again", () => {
+  const root = freshRoot();
+  try {
+    const run = () => respond({ schema: "pipeline.synthetic.v1", status: "in-progress", nextAction: null });
+    const result = driveOnboardingInit({ rootDir: root, run });
+    // No step was executed before this resting response -- it IS the (only) anchor call --
+    // so re-anchoring must not fire, or this would spin forever on the identical command.
+    assert.equal(result.outcome, "no-automatic-next-step");
+    assert.equal(result.stepsExecuted, 1);
+  } finally {
+    dispose(root);
+  }
+});
+
+test("driveOnboardingInit: a genuinely non-converging chain stops with its own outcome, not the step cap", () => {
+  const root = freshRoot();
+  try {
+    let inspectCalls = 0;
+    const run = (executable, argv) => {
+      const subcommand = argv[1];
+      if (subcommand === "inspect") {
+        inspectCalls += 1;
+        // Every inspect reports the identical state -- the executed step never actually
+        // changes anything, the exact shape of the earlier `inspect` -> `bootstrap-bind-plan`
+        // -> `inspect` -> ... defect this re-anchor must not reintroduce.
+        return respond({
+          schema: "pipeline.synthetic.v1",
+          status: "in-progress",
+          nextAction: { kind: "command", executable: "node", argv: ["--eval", "0"] },
+        });
+      }
+      return respond({ schema: "pipeline.synthetic.v1", status: "in-progress", nextAction: null });
+    };
+    const stepCap = 50;
+    const result = driveOnboardingInit({ rootDir: root, stepCap, run });
+    assert.equal(result.outcome, "no-progress");
+    // Caught after the first repeat (anchor, executed step, re-anchor) rather than after
+    // burning the whole step cap.
+    assert.equal(result.stepsExecuted, 3);
+    assert.equal(inspectCalls, 2);
+    assert.ok(result.stepsExecuted < stepCap);
+  } finally {
+    dispose(root);
+  }
+});
+
+test("driveOnboardingInit: collect-input, ready, unsupported-next-action and error outcomes reached directly are unchanged", () => {
+  const collectInputRoot = freshRoot();
+  try {
+    const collectInputAction = { kind: "collect-input", input: { name: "example" } };
+    const collectInputRun = () => respond({ schema: "pipeline.synthetic.v1", status: "in-progress", nextAction: collectInputAction });
+    const collectInputResult = driveOnboardingInit({ rootDir: collectInputRoot, run: collectInputRun });
+    assert.equal(collectInputResult.outcome, "collect-input");
+    assert.deepEqual(collectInputResult.collectInput, collectInputAction);
+  } finally {
+    dispose(collectInputRoot);
+  }
+
+  const readyRoot = freshRoot();
+  try {
+    const readyRun = () => respond({ schema: "pipeline.synthetic.v1", status: "ready", nextAction: null });
+    const readyResult = driveOnboardingInit({ rootDir: readyRoot, run: readyRun });
+    assert.equal(readyResult.outcome, "ready");
+    assert.equal(readyResult.stepsExecuted, 1);
+  } finally {
+    dispose(readyRoot);
+  }
+
+  const unsupportedRoot = freshRoot();
+  try {
+    const unsupportedRun = () => respond({
+      schema: "pipeline.synthetic.v1",
+      status: "in-progress",
+      nextAction: { kind: "restart-process" },
+    });
+    const unsupportedResult = driveOnboardingInit({ rootDir: unsupportedRoot, run: unsupportedRun });
+    assert.equal(unsupportedResult.outcome, "unsupported-next-action");
+  } finally {
+    dispose(unsupportedRoot);
+  }
+
+  const errorRoot = freshRoot();
+  try {
+    const errorRun = () => ({ status: 1, stdout: "not json", stderr: "boom" });
+    const errorResult = driveOnboardingInit({ rootDir: errorRoot, run: errorRun });
+    assert.equal(errorResult.outcome, "error");
+  } finally {
+    dispose(errorRoot);
+  }
+});
+
 test("DEFAULT_STEP_CAP is a small, positive constant", () => {
   assert.ok(Number.isInteger(DEFAULT_STEP_CAP));
   assert.ok(DEFAULT_STEP_CAP > 0);

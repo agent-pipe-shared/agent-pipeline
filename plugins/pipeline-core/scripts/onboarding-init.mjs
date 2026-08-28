@@ -22,9 +22,33 @@
  *   - `kind: "collect-input"` -- a genuine human question. The driver stops here and
  *     returns that action's own `inputs`/`input`/`guidance` fields VERBATIM (via the raw
  *     final onboarding-cli response, never re-worded or summarized).
+ *
+ * RE-ANCHORS AFTER A SILENT SUCCESS, INSTEAD OF STOPPING THERE: a step this driver just
+ * EXECUTED (a `command` action it ran, not the bootstrap `inspect` itself) can come back
+ * successful with no `nextAction` and a `status` other than `"ready"` -- some plan/apply
+ * builders settle without naming what comes next. Rather than stopping there, the driver
+ * re-runs the same bare `inspect --root <root>` it starts every invocation with, and
+ * continues the loop from whatever that reveals. This holds no domain knowledge either:
+ * "after acting, re-read the state" is generic control flow, not a routing table over
+ * onboarding statuses -- the driver still never names one.
+ *
+ * Two things bound the re-anchor so it cannot become the very loop it exists to shortcut:
+ *   - It only fires once per executed step. If the anchoring `inspect` ITSELF is the one
+ *     that rests with no `nextAction`, that is the standalone-response case below, not
+ *     another re-anchor -- re-anchoring an anchor would spin on the identical command
+ *     forever without ever executing anything new.
+ *   - Progress is verified, not assumed. Each re-anchor's `inspect` response is compared,
+ *     full canonical (key-sorted) equality, against the immediately preceding anchor's
+ *     response. Equivalent means the executed step in between changed nothing the CLI's
+ *     own state reports, so the driver stops with its own `"no-progress"` outcome instead
+ *     of retrying toward the step cap -- this is exactly the shape of an earlier defect
+ *     (`inspect` -> `bootstrap-bind-plan` -> `inspect` -> ... forever), caught after the
+ *     first repeat rather than after fifty wasted commands.
+ *
  * Anything else it cannot safely act on, so it also stops rather than guessing:
- *   - `nextAction` absent/null while `status` is not `"ready"` -- e.g. a standalone
- *     recovery command's own plan response (`plan-partial-authority`'s
+ *   - `nextAction` absent/null while `status` is not `"ready"`, reached from the
+ *     anchoring `inspect` itself with no executed step since the last anchor -- e.g. a
+ *     standalone recovery command's own plan response (`plan-partial-authority`'s
  *     `"selection-required"`, which uses a `selection` field instead of `nextAction` and
  *     is never reached by a fresh repository's own `inspect` walk in the first place).
  *   - any `nextAction.kind` other than `"command"`/`"collect-input"` (e.g.
@@ -150,6 +174,29 @@ function runOnboardingStep({ executable, argv, run }) {
   return { ok: true, exitCode, output: parsed };
 }
 
+function buildInspectArgv(root, runner) {
+  return runner === null
+    ? [ONBOARDING_SCRIPT_PATH, "inspect", "--root", root]
+    : [ONBOARDING_SCRIPT_PATH, "inspect", "--root", root, "--runner", runner];
+}
+
+/**
+ * Deterministic, key-sorted JSON serialization used only to compare two `inspect`
+ * responses for equivalence (the re-anchor progress check in `driveOnboardingInit`). Plain
+ * `JSON.stringify` equality would already hold for two same-shaped objects produced by the
+ * same code path, but sorting keys first removes any dependence on insertion order, which
+ * is not part of the onboarding CLI's contract -- so this cannot flag a false "no progress"
+ * over a harmless key-ordering difference.
+ */
+function canonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map((entry) => canonicalJson(entry)).join(",")}]`;
+  if (value && typeof value === "object") {
+    const keys = Object.keys(value).sort();
+    return `{${keys.map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
 /**
  * The driver loop itself. `run` (spawnSync-shaped: `(executable, argv, options) =>
  * { status, stdout, stderr, error }`) is the sole injection seam, so tests can either
@@ -160,9 +207,17 @@ export function driveOnboardingInit({ rootDir, runner = null, stepCap = DEFAULT_
   const root = resolve(rootDir);
   const steps = [];
   let executable = "node";
-  let argv = runner === null
-    ? [ONBOARDING_SCRIPT_PATH, "inspect", "--root", root]
-    : [ONBOARDING_SCRIPT_PATH, "inspect", "--root", root, "--runner", runner];
+  let argv = buildInspectArgv(root, runner);
+
+  // `isAnchorStep` marks the step about to run as the bootstrap/re-anchor `inspect` call,
+  // as opposed to a `command` action being executed from a previous result. `lastAnchorOutput`
+  // holds the most recent anchor's own response (null before the first one completes), for
+  // the progress comparison below. `executedSinceAnchor` becomes true once at least one
+  // non-anchor step has run since the last anchor -- re-anchoring requires it, so an anchor
+  // can never immediately re-anchor itself (see header comment).
+  let isAnchorStep = true;
+  let lastAnchorOutput = null;
+  let executedSinceAnchor = false;
 
   for (let stepIndex = 0; stepIndex < stepCap; stepIndex += 1) {
     const stepResult = runOnboardingStep({ executable, argv, run });
@@ -194,6 +249,31 @@ export function driveOnboardingInit({ rootDir, runner = null, stepCap = DEFAULT_
 
     const output = stepResult.output;
     const nextAction = output && typeof output === "object" ? output.nextAction : undefined;
+
+    const wasAnchorStep = isAnchorStep;
+    isAnchorStep = false;
+    if (wasAnchorStep) {
+      const previousAnchorOutput = lastAnchorOutput;
+      lastAnchorOutput = output;
+      executedSinceAnchor = false;
+      if (previousAnchorOutput !== null && canonicalJson(output) === canonicalJson(previousAnchorOutput)) {
+        // The step(s) executed since the previous anchor changed nothing the CLI's own
+        // state reports -- stop and say so explicitly rather than spending the remaining
+        // step cap re-anchoring at the same non-converging state (see header comment).
+        return {
+          schema: SCHEMA,
+          runner,
+          root,
+          outcome: "no-progress",
+          stepCap,
+          stepsExecuted: steps.length,
+          steps,
+          final: output,
+        };
+      }
+    } else {
+      executedSinceAnchor = true;
+    }
 
     if (nextAction && typeof nextAction === "object" && nextAction.kind === "command") {
       const argvValid = typeof nextAction.executable === "string"
@@ -236,9 +316,24 @@ export function driveOnboardingInit({ rootDir, runner = null, stepCap = DEFAULT_
     }
 
     if (nextAction === null || nextAction === undefined) {
-      // A resting response with no `nextAction` and a `status` other than `"ready"` -- e.g.
-      // a standalone recovery command's own plan response. Not reachable by a fresh
-      // repository's own chain, but never guessed at if it somehow is: report and stop.
+      if (executedSinceAnchor) {
+        // A step this driver EXECUTED settled with no `nextAction` and a non-"ready"
+        // status -- re-anchor on a fresh `inspect` rather than stopping (see header
+        // comment). This is the only place `isAnchorStep`/`argv` are reset outside the
+        // initial setup above.
+        executable = "node";
+        argv = buildInspectArgv(root, runner);
+        isAnchorStep = true;
+        continue;
+      }
+      // Reached with no executed step since the last anchor -- the anchoring `inspect`
+      // itself rested here (its own resting response, or a re-anchor that already passed
+      // the progress check above). Never re-anchor from here: that would re-run the
+      // identical anchor command with nothing having executed in between. E.g. a
+      // standalone recovery command's own plan response (`plan-partial-authority`'s
+      // `"selection-required"`, which uses a `selection` field instead of `nextAction`) --
+      // not reachable by a fresh repository's own `inspect` walk, but never guessed at if
+      // it somehow is: report and stop.
       return {
         schema: SCHEMA,
         runner,
