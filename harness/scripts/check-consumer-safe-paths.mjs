@@ -288,6 +288,16 @@ export const ALLOWLIST = Object.freeze([
     reason: "Class B (coordinator-confirmed): deliberately requires harness/scripts/verify.mjs as a source-root marker -- correct self-application logic, not a consumer-facing path assumption.",
   },
   {
+    file: "plugins/pipeline-core/lib/ai-assisted-hardening.mjs",
+    match: "harness/scripts/verify.mjs",
+    reason: "Class B: SENSITIVE_EXACT_PATHS names this repository's own verify gate so that touching it routes to independent review under self-application (ADR-0015). In a consumer tree the path simply never matches a changed path, so the entry is inert there -- same reasoning as the human-guard-override.mjs entry above, and the alternative (threading the literal in as a parameter) would break routeSecurityReview's own no-extra-argument call shape.",
+  },
+  {
+    file: "plugins/pipeline-core/lib/ai-assisted-hardening.mjs",
+    match: "harness/scripts/verify.mjs",
+    reason: "Class B (same reasoning as human-guard-override.mjs above): SENSITIVE_EXACT_PATHS names this repository's own verify gate as a control that must route to independent review when touched -- internal path-classification data for THIS repo's own AI-hardening gate (self-application-only, ADR-0015), not a consumer-facing path assumption.",
+  },
+  {
     filePattern: /^plugins\/pipeline-core\/lib\/machine-plane\.mjs$/u,
     reason: "Class B: source comment citing this repository's own Nova-sprint planning document, not an operator-facing message.",
   },
