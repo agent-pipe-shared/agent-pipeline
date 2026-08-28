@@ -10,7 +10,7 @@ in future, and this should become a general rule).
 **Sibling of** [ADR-0068](0068-backlog-ledger-merge-semantics.md) — same root cause, a different
 shared namespace: two parallel lines allocating from one sequential counter with no merge story.
 
-**Governs:** docs/adr/, harness/scripts/check-adr-consistency.mjs, harness/scripts/verify.mjs
+**Governs:** docs/adr/**, harness/scripts/check-adr-consistency.mjs, harness/scripts/verify.mjs
 
 ## Context
 
