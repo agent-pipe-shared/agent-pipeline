@@ -94,18 +94,17 @@ export const ENUMERATION_ROOTS = Object.freeze([join(REPO_ROOT, "plugins", "pipe
  * suite is DELIBERATELY excluded from Verify registration. A bare path with no reason is a
  * script usage error, not a silent pass -- see LIMITS above.
  *
- * NVA-B-GUIDEDINIT: `onboarding-init.test.mjs` runs green standalone (`node --test
- * plugins/pipeline-core/scripts/onboarding-init.test.mjs`, this task's own DoD) but is not
- * folded into `harness/scripts/verify.mjs`'s `TEST_SUITES` here -- that file is TP-3
- * protected (`templates/prompts/agent-obligations.md` SS2) and this repo's push-approval mode
- * offers no in-session override for it (goldfish obligation: "Needing one of these is a stop
- * condition -- report it, do not hunt for a route"). Registering it into the actual gate is
- * candidate 3 of the same class this script's own top-of-file doc comment already names:
- * a signed TP-3 maintenance-window ceremony, out of scope for this additive dispatch.
+ * Two Round-B dispatches (NVA-B-GUIDEDINIT, NVA-B-PUSHPREFLIGHT) independently reached this
+ * same wall and both stopped rather than hunting for a route, which is the briefed behaviour:
+ * `harness/scripts/verify.mjs` is TP-3 protected (`templates/prompts/agent-obligations.md`
+ * SS2) and this repository's push-approval mode offers no in-session override for it, so
+ * folding a new suite into `TEST_SUITES` needs a signed maintenance-window ceremony. Both
+ * suites pass standalone; neither is behind the Verify gate yet.
  *
- * Left untouched: `project-onboarding-v3-pre-push-hook-offer.test.mjs` is ALSO unaccounted
- * (see this script's own output before this entry was added), but that gap predates and is
- * unrelated to this dispatch -- not added here, not this task's to decide.
+ * `project-onboarding-v3-pre-push-hook-offer.test.mjs` is ALSO unaccounted and predates both
+ * dispatches. Three unregistered suites is no longer a per-dispatch footnote -- a new suite
+ * cannot reach the gate at all without a human ceremony, which is worth deciding rather than
+ * accumulating.
  */
 export const DELIBERATELY_UNREGISTERED = Object.freeze([
   {
@@ -113,6 +112,14 @@ export const DELIBERATELY_UNREGISTERED = Object.freeze([
     reason: "NVA-B-GUIDEDINIT: passes standalone (node --test), registration into verify.mjs's "
       + "TEST_SUITES needs a TP-3-protected signed maintenance-window ceremony -- out of scope "
       + "for this additive dispatch; see the comment on this constant.",
+  },
+  {
+    path: "plugins/pipeline-core/scripts/push-gate-satisfiability.test.mjs",
+    reason: "NVA-B-PUSHPREFLIGHT: registering it in TEST_SUITES means editing harness/scripts/verify.mjs, "
+      + "which is TP-3-protected and needs its own signed maintenance-window ceremony -- out of scope for the "
+      + "dispatch that authored this suite. Run directly: `node --test plugins/pipeline-core/scripts/"
+      + "push-gate-satisfiability.test.mjs`. A follow-up carrying the TP-3 ceremony should fold this suite into "
+      + "TEST_SUITES and remove this entry.",
   },
 ]);
 
