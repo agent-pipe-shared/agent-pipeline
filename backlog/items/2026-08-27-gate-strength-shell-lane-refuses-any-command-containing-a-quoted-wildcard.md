@@ -3,9 +3,13 @@ schema: pipeline.backlog-item.v1
 id: pipeline.gate-strength-shell-lane-refuses-any-command-containing-a-quoted-wildcard
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-27
 sprint: nova
+closed_at: "2026-08-28"
+closure_repository: "self"
+closure_commit: "a80236d874b214f14593f1504ba9c4e7c3171234"
+closure_evidence: "backlog/items/2026-08-27-gate-strength-shell-lane-refuses-any-command-containing-a-quoted-wildcard.md"
 source: "Live observation, 2026-08-27: a cat >> heredoc appending to a gitignored scratch note was refused with GUARD-GATE-STRENGTH-SHELL. Independently reproduced in the same session by a diagnostic command whose text happened to contain a quoted asterisk."
 ---
 
@@ -95,7 +99,27 @@ one.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** closed — already fixed, and the item outlived its own defect
+- **Rationale:** `a80236d8` ("fix(guard): stop the gate-strength shell lane
+  matching a bare wildcard needle") is exactly this defect's fix, landed the same
+  day this item was filed and never linked back to it. The claim was re-verified
+  live at triage rather than taken from the commit subject, per the
+  re-verify-an-inherited-claim rule:
+  1. `gateStrengthShellRefusal()` now derives needles via
+     `gateStrengthShellNeedleFor()` (glob-aware) and filters them through
+     `isMeaningfulGateStrengthShellNeedle`, so a needle carrying no alphanumeric
+     character can no longer be produced at all — the guard's own header names
+     this NVA-STARNEEDLE-1 and states it is deliberately conditioned on the
+     needle's shape, not on GS-15's id, so a future glob-suffixed entry cannot
+     reintroduce the class.
+  2. Executed live at triage: an `rg` command whose pattern contains a literal
+     quoted `*` was admitted (exit 0). That is the exact reproduction this item
+     recorded as refused.
+  The item's own "Not proposed here" section framed the fix as an open design
+  trade-off; the shipped fix took the third option it left unnamed — drop
+  degenerate needles from the match set — which keeps the classifier's simplicity
+  and removes the false-positive surface rather than trading between them.
+- **Assignment (if accepted):** n/a — no work remains. Closed against `a80236d8`
+  with the regression coverage that commit added to
+  `guard-lifecycle-ready.test.mjs`.
+- **Date:** 2026-08-28

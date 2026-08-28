@@ -81,7 +81,32 @@ the INSTALLED definition, never from the repository copy.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted; both open questions decided here so the implementing
+  window does not have to reopen them
+- **Rationale:** The cost is already measured — four truncated dispatches, one
+  after roughly 238k tokens, against a `maxTurns` the repository had raised six
+  days earlier. What makes it worth real work rather than a habit is that the
+  divergence is invisible in every place a session would look: `git log` shows
+  the change landed, the checkout shows the new value, and nothing compares them.
+  **Question 1 (fail-closed or observation): observation, not a blocking gate.**
+  A hard failure during active plugin development would fire on every commit
+  touching `plugins/pipeline-core/**` — which is exactly what caused
+  `AGY-MKTATTEST-1` to be downgraded to a warning, and that downgrade is why this
+  defect went unnoticed. Repeating the same shape would earn the same outcome. A
+  session-start observation that NAMES the diverging files is what was missing;
+  a red gate is not.
+  **Question 2 (whole files or declared fields): whole files, reported per file.**
+  The item's own strongest evidence is a guard absent from the installed copy
+  entirely, which a frontmatter-field comparison cannot see. Noise is handled by
+  reporting which files differ rather than by narrowing what counts as a
+  difference.
+  `localPluginInstallSourceObservation()` already produces the comparison; the
+  work is surfacing it at session start rather than only in verify and at push
+  time.
+- **Assignment (if accepted):** Sprint Nightwing (unchanged), scoped together
+  with `pipeline.a-stale-version-stamp-makes-a-plugin-reload-a-silent-no-op` —
+  same failure shape, and one session-start readback can answer both "is the
+  installed copy this checkout's" and "does the stamp name this HEAD".
+  The interim measure stays in force meanwhile: derive a dispatch's tool budget
+  from the INSTALLED definition, never from the repository copy.
+- **Date:** 2026-08-28
