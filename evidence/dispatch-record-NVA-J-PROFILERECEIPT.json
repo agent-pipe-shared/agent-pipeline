@@ -1,0 +1,27 @@
+{
+  "taskId": "NVA-J-PROFILERECEIPT",
+  "agentType": "goldfish-deep",
+  "model": "claude-sonnet-5",
+  "effort": "high",
+  "rulesetSha": "0.6.0+claude.20260828131316.03c6e1e",
+  "dispatcher": "elephant",
+  "outcome": "completed",
+  "log": [
+    {
+      "phase": "diagnosis",
+      "toolUseCount": 25,
+      "note": "Cause established by static trace of plugins/pipeline-core/lib/project-onboarding-v3.mjs, symbol by symbol: only two call sites (initializeKickoffPoProfile, correctPromotedLanguage) publish the PO-gate profile receipt; the first fires only from the legacy applyProjectOnboardingKickoffV4 kickoff-apply path, which the file's own comment (near planProjectOnboardingKickoffV4) says a genuinely fresh session no longer reaches (it takes the new intake-*/bootstrap-binding-required flow instead, which never calls either publisher). Separately, readyLifecycleResult's own gate (observePoAuthorityRebind) short-circuits to {status:'not-needed'} whenever persisted.status==='absent' (true pre-first-plan), never even calling validatePoGateAuthorityForRepository; and even when that IS called and returns PO-PROFILE-RECEIPT-INVALID, only PO-GATE-PRD-SPEC-MISMATCH is escalated to a routed repair -- every other code, including this one, falls to {status:'not-applicable'}, which readyLifecycleResult silently ignores rather than routing to the existing observePoProfileRepair() handler. CAUSE 1 (onboarding gap) confirmed; CAUSE 2 (check wrong for a consumer) ruled out -- po-gate-profile-repair.mjs is an existing, tested consumer-project repair route (po-gate-authority.test.mjs case 'profile repair guidance names a route a consumer project can actually run', currently passing), and the worktree-topology binding degrades correctly to a single-entry list for a standalone checkout."
+    },
+    {
+      "phase": "verification",
+      "toolUseCount": 26,
+      "note": "node --test plugins/pipeline-core/lib/po-gate-authority.test.mjs: 70/70 checks passed, suite exit 0, unmodified by this dispatch (baseline confirms the check itself is sound and already covers the consumer-repair-route case)."
+    },
+    {
+      "phase": "no-op-by-design",
+      "toolUseCount": 27,
+      "note": "No production change made to po-gate-authority.mjs or its test: the check is correctly fail-closed for a genuinely unpublished receipt, and the defect (onboarding never publishing the receipt on the current fresh-session code path) lives entirely in project-onboarding-v3.mjs, out of this dispatch's scope. scratch/smoke-blind-push.mjs (gitignored, did not exist in this fresh worktree -- confirmed empty scratch/ before writing) rewritten to record the exact symbol-level trace rather than being executed, since the original harness file was not present to run."
+    }
+  ],
+  "report": null
+}
