@@ -47,6 +47,21 @@ This is the "measured in our own checkout" shape recorded in
 `2026-08-28-nothing-checks-that-a-shipped-capability-is-reachable.md`: the mechanism was
 measured, the deployed path to it was not.
 
+But the deeper reason no test caught it is worth stating exactly, because it decides what
+the fix has to be. There are **three** copies of this shape, not two:
+
+| where | keys on a ready result |
+|---|---|
+| `lib/project-onboarding-v3.mjs` — the producer | 13 |
+| `RESULT_KEYS` in the gate | 11 |
+| `readyResult()` in `project-onboarding-ready-gate.test.mjs` | 11 |
+
+Every test in that file injects a stubbed `inspect` returning the test's own
+`readyResult()`. So the test agrees with the gate, both disagree with the producer, and the
+suite is green **precisely because it never asks the real producer what a ready result
+looks like.** A fourth hand-written copy in a new test would reproduce this exactly; that
+is why the direction below insists the enumeration be derived rather than typed.
+
 ## The refusal names the wrong cause
 
 `hooks/guard-lifecycle-ready.mjs` branches specially on `PORG-NOT-READY` only.
