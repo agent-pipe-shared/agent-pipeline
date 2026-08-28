@@ -617,6 +617,48 @@ function invokeCaptured(argv, deps) {
   assert.equal(applied.status, 0, applied.err);
 }
 
+// NVA-G-ROLLBACKPREDICATE (backlog/items/2026-08-28-a-fail-closed-rollback-
+// names-no-predicate-so-a-consumer-cannot-fix-it.md): a postimage readback
+// failure must name WHICH predicate failed, with expected/observed values,
+// not just "rollback verified" -- and must never leak an absolute host path.
+// deps.v4Inspection is used ONLY inside the postimage readback (never during
+// plan build/preimage), so failing exactly one intent there deterministically
+// fails only the v4Intents predicate without disturbing anything else.
+{
+  const { root, deps, planPath } = acknowledgeFixture("postimage-predicate-named");
+  const planned = invokeCaptured(["po-authority-acknowledge-plan", "--by", "PO"], deps);
+  assert.equal(planned.status, 0, planned.err);
+  const plan = JSON.parse(planned.out);
+  const before = readFileSync(join(root, planPath), "utf8");
+  const beforeState = readFileSync(statePath(root), "utf8");
+  const observed = [];
+  const failingDeps = {
+    ...deps,
+    isattyFn: () => true, readLineFn: () => plan.by,
+    v4Inspection: (request) => request.intent === "dispatch"
+      ? { status: "blocked", diagnostics: [{ code: "TEST-INJECTED-NOT-READY" }] }
+      : { status: "ready" },
+    observeRebindPostimageEvidence: (evidence) => { observed.push(evidence); },
+  };
+  const applied = invokeCaptured(plan.applyAction.argv.slice(1), failingDeps);
+  assert.equal(applied.status, 2);
+  assert.ok(applied.err.includes("postimage readback failed"), applied.err);
+  assert.ok(applied.err.includes("v4Intents.dispatch"), applied.err);
+  assert.ok(applied.err.includes("observed=blocked"), applied.err);
+  assert.ok(applied.err.includes("diagnostics=TEST-INJECTED-NOT-READY"), applied.err);
+  assert.ok(applied.err.includes("rollback verified"), applied.err);
+  assert.ok(!applied.err.includes(root), "the message must not leak an absolute host path");
+  assert.ok(!/[A-Za-z]:\\|\/home\/|\/Users\//u.test(applied.err), "the message must not leak an absolute host path");
+  // The observation hook the fix reads from really did carry the failing
+  // predicate -- the fix surfaces information already computed, it does not
+  // invent it.
+  assert.equal(observed.length, 1);
+  assert.equal(observed[0].predicates.v4Intents.find((r) => r.intent === "dispatch").ok, false);
+  // Fail-closed behaviour itself is unchanged: rollback actually happened.
+  assert.equal(readFileSync(join(root, planPath), "utf8"), before, "a failed postimage readback must leave the PRD untouched");
+  assert.equal(readFileSync(statePath(root), "utf8"), beforeState, "a failed postimage readback must leave State untouched");
+}
+
 // NVA-STAGINGBOLT-1: a plan submission or approval whose plan or spec path
 // resolves inside the onboarding staging directory must be refused -- the
 // generated staging files' own banner says they are NOT yet bound as project
