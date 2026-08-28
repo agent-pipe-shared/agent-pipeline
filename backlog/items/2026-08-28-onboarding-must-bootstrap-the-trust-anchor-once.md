@@ -31,6 +31,41 @@ established**. It becomes visible only as an unexplained circularity at the
 moment a human override is first needed — which is exactly the worst moment,
 because a PO signature is usually already in flight.
 
+## Mechanism, measured 2026-08-28 — the report's framing was imprecise
+
+The run described this as "the `setup` step never ran". The code says something
+sharper, and the difference matters for the fix:
+
+- The file **is** materialized at onboarding.
+  `freshCriticalHumanProofPolicyBytes()` (`lib/project-onboarding-v3.mjs`, just
+  below the comment at line 1067) writes it unconditionally of
+  `gates.push_approval`. It is not missing.
+- The seed **deliberately omits the anchor.** Its own comment: *"`.v1` only,
+  `requiredKinds: ["push"]` only: no waiver, no trust anchor, no kind beyond the
+  one gate this seed already turns on. A project that wants more … edits this
+  file itself — gate-strength protected (GS-2), by design."*
+- The override route **requires** one. `lib/human-guard-override.mjs:3157-3168`
+  resolves the anchors and calls `fail("HGO-TRUST-ANCHOR-MISSING", "project/
+  critical-human-proof.json carries no trustAnchor")` when neither a non-empty
+  v3 `trustAnchors` set nor a legacy singular `trustAnchor` is present, with a
+  second belt-and-suspenders check immediately after.
+- That fail-closed posture is **correct and must not be relaxed.** The same
+  comment block argues it directly: unlike `verifyAgainstTrustAnchors()`'s own
+  posture for the four `CRITICAL_ACTION_KINDS` ceremonies, this call site is a
+  general override of an arbitrary guard denial (ADR-0059), so treating an empty
+  anchor set as "any key" would make the whole override ceremony
+  self-serviceable by an agent. Do not touch it.
+
+So the circle is exact: the one field the signature route requires is the one the
+seed leaves out, and the file that would carry it is gate-strength protected — so
+adding it afterwards needs the very override it gates. **The only moment writing
+the anchor does not require an override is the transaction that creates the file.**
+That is what fixes this, and it is the one place the fix can go.
+
+Note for whoever implements it: the anchor must be discovered or asked for, never
+a path written into the repository. Machine-specific absolute paths do not belong
+in committed artifacts (CLAUDE.md), and this repository runs on two machines.
+
 ## Direction — the PO's explicit ask
 
 Bootstrap the anchor once, during init:
