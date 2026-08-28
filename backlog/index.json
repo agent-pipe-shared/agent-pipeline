@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "d4e3e820464c5d003650e5baaffd3ebf90b7b4b26571e24d75d2da78f9d59376"
+    "transitionHead": "1d6027869d504930d8dce13bcde36c03830e821aa9fc245fbe15fc1294ef855a"
   },
   "counts": {
-    "open": 51,
+    "open": 52,
     "in_progress": 5,
     "closed": 380,
     "rejected": 3,
@@ -5321,6 +5321,15 @@
       "closureRepository": "self",
       "closureCommit": "d5e5fed754098037f7142d786a122128880c2459",
       "closureEvidence": "backlog/items/2026-08-12-four-critic-preimage-pins-drifted-or-never-valid.md"
+    },
+    {
+      "id": "pipeline.two-signature-ceremonies-overwrite-each-others-proof",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "Hit live, 2026-08-28, running two HGO signature ceremonies (TP-3 verify.mjs and TP-5 guard-push.test.mjs) back to back in one session; then isolated in the code by reading both --proof readers.",
+      "deferred": false
     },
     {
       "id": "pipeline.unified-human-authorization-ux",
