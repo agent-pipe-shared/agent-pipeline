@@ -88,8 +88,7 @@ content-v1:c7fd9a9af55669aa1d94ad41d161c31c30981ca5db7671bc114a1534e44501d4:spec
 content-v1:c876696e50e6161b403250790f19ea0d07c957fb279e721589725cf1cd6db309:backlog/transitions.ndjson:generic-api-key:73:870
 content-v1:c8ebaf6daf4957777ff3388a98d41b3564b9822b1dd2a622ef975ac5f6bb96a7:backlog/transitions.ndjson:generic-api-key:73:869
 content-v1:d70126230e844c446f92529399917fca3550484aeb0911d3cc1c6a14d9d0d59c:specs/sprint-nova-epic/evidence/backlog/event-40-delivery-intent.json:generic-api-key:1:86
-content-v1:7fb7576eab2931c14762838065727eff8b0acbebeeec72ecd1965a656571c173:plugins/pipeline-core/hooks/guard-git.test.mjs:generic-api-key:1219:6
-content-v1:107e81d7be985a68156a777e45c5eef003732ae3262d1228553711c9d3ee28af:plugins/pipeline-core/hooks/guard-git.test.mjs:generic-api-key:1231:6
+content-v1:18b8eff2cad6cdaba8bddf159ac70aaacd7dfc560af36d0c7d0e1aa31a169a67:plugins/pipeline-core/hooks/guard-git.test.mjs:generic-api-key:1232:6
 content-v1:1f62ab4c3d1a5dcd3629a744abb2944837e024973a69c8a9d167c7d4332a3d94:plugins/pipeline-core/lib/resume-hint.test.mjs:generic-api-key:155:7
 content-v1:f921867f82ea4583567f52d001f0ce9ec86eff14adb79e0975a888663f1045f5:plugins/pipeline-core/lib/resume-hint.test.mjs:generic-api-key:160:7
 content-v1:6317f02bf6b52b17ab2de165fd16ed4dbe91e857d2c52f7ae77c30dd8820b00e:backlog/transitions.ndjson:sentry-access-token:182:535
@@ -133,7 +132,7 @@ content-v1:7f4a6eb6eb7abcb42eb8f728c8c5cad714173f4fb84a4759615b42506a551c7a:back
 # PHX-WP-GITLEAKS-FALSEPOS-IGNORE (2026-08-19): 4 confirmed false positives from the clean-
 # candidate run at commit 7fc34e0baeade3244f43158e7b2d5cdc57703204, each verified by direct
 # content inspection (not by rule/pattern alone) before being added.
-content-v1:0bc710a9b34b2b7bf9fa91316f2a9f6e28c9e8c7fb06f9b10c5211a8bb27d4c0:plugins/pipeline-core/scripts/security-adapters/gitleaks.test.mjs:sentry-access-token:379:10
+content-v1:3018307914693573b1aad697185ae61229b3bf4c44470e25934e50f764c8b61d:plugins/pipeline-core/scripts/security-adapters/gitleaks.test.mjs:sentry-access-token:486:10
 # ^ deliberate, already-commented test fixture (see the file's own comment above this line):
 # "the literal that trips gitleaks' sentry-access-token rule (empirically confirmed while
 # designing this fix)" -- a bare 64-hex-character digest used to exercise gitleaks' own
