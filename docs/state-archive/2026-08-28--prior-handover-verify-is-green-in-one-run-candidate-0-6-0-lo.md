@@ -2,7 +2,7 @@
 
 > Rotated from `docs/state.md` on 2026-08-28 by `plugins/pipeline-core/scripts/handover-rotate.mjs` (ADR-0066).
 > Section(s) archived: Prior handover — Verify is green in one run; candidate 0.6.0 local (2026-08-27).
-> Summary: 0.6.0 local candidate green in one run (EP07 root cause fixed); AK status incl. the unwireable AK-5 guard; open combined-release decision carried forward into the current handover
+> Summary: Verify green 471/471 in one run at candidate 5fd963fc; EP07 tree-dirtying cause named and fixed; +build stamp convention restored; AK-5 closed, AK-6 ready to re-dispatch; the open 0.6.0 combined-release decision carried forward to the current handover.
 > Append-only once written; never edited by hand.
 > Content below is verbatim except that relative markdown link target(s) were rewritten to keep resolving correctly at this file's directory depth (link text and all other content are untouched).
 
@@ -34,11 +34,15 @@ hold for a directory-sourced marketplace, the rsync had simply not been run.
 
 **AK status.** AK-9/10/11 met (full green run; both manifests + `VERSION` at
 0.6.0; every declared hook *wired* and byte-identical to the installed copy).
-AK-14 filed for Nova B. **AK-5 is the one true inert guard**:
-`guard-dispatch-budget.mjs` is built, 15/15, Verify-registered — but
+AK-14 filed for Nova B. **AK-5 is closed — this paragraph previously said the
+opposite and was stale (corrected 2026-08-28).** It read: "the one true inert
+guard — `guard-dispatch-budget.mjs` is built, 15/15, Verify-registered, but
 `hooks/hooks.json` is on `NEVER_LIFTABLE_KERNEL_PATHS`, so no maintenance window
-can wire it (the guard's own header wrongly claims one can). Prepared PO hand-edit:
-`scratch/AK-5-hooks-json-patch-for-the-PO.md`. **AK-6** is ready to re-dispatch
+can wire it." It IS wired: `731ff1b8` added it to the PreToolUse manifest and
+`1b45d6f9` then replaced a matcher that matched nothing. The installed manifest
+carries three `guard-dispatch-budget.mjs` entries, byte-identical to the repo
+copy. Left as a correction rather than a deletion because the false claim was
+load-bearing — it named a blocker that no longer exists. **AK-6** is ready to re-dispatch
 against `pipeline-user-v3.schema.json` (the first attempt used the pre-v3 schema
 and would have flagged a correct calibration as drifted; withdrawn in `1d6dec55`,
 scaffolding kept at `8316dbd8`).

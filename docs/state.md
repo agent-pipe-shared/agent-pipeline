@@ -7,10 +7,7 @@
 
 | Date range | Summary | Archive |
 |---|---|---|
-| 2026-08-28 | The complete sprint-alfred-epic design phase: epic switch, six measured lifecycle gaps, two Critic cycles plus the gate-1 rejection and rework, the six PO decisions, the doctrine graduation and the PO plan approval | [docs/state-archive/2026-08-28--current-handover-alfred-clone-sprint-alfred-epic-opened-in-d.md](state-archive/2026-08-28--current-handover-alfred-clone-sprint-alfred-epic-opened-in-d.md) |
-| 2026-08-28 | Phoenix-line handover pointer stub; its body was rotated earlier and lives in the archive already | [docs/state-archive/2026-08-28--phoenix-line-history-superseded-by-the-nova-line-above-prese.md](state-archive/2026-08-28--phoenix-line-history-superseded-by-the-nova-line-above-prese.md) |
-| 2026-08-28 | 0.6.0 local candidate green in one run (EP07 root cause fixed); AK status incl. the unwireable AK-5 guard; open combined-release decision carried forward into the current handover | [docs/state-archive/2026-08-28--prior-handover-verify-is-green-in-one-run-candidate-0-6-0-lo.md](state-archive/2026-08-28--prior-handover-verify-is-green-in-one-run-candidate-0-6-0-lo.md) |
-| 2026-08-28 | Nova line: backlog-ledger merge semantics (ADR-0068), ADR renumbering (ADR-0069) and the first handover rotation | [docs/state-archive/2026-08-28--prior-handover-ledger-merge-capability-adr-renumbering-hando.md](state-archive/2026-08-28--prior-handover-ledger-merge-capability-adr-renumbering-hando.md) |
+| 2026-08-28 | Verify green 471/471 in one run at candidate 5fd963fc; EP07 tree-dirtying cause named and fixed; +build stamp convention restored; AK-5 closed, AK-6 ready to re-dispatch; the open 0.6.0 combined-release decision carried forward to the current handover. | [docs/state-archive/2026-08-28--prior-handover-verify-is-green-in-one-run-candidate-0-6-0-lo.md](state-archive/2026-08-28--prior-handover-verify-is-green-in-one-run-candidate-0-6-0-lo.md) |
 | 2026-08-27 | sprint_agy fetch, fast-forward, and the 2026-08-26 clean local candidate | [docs/state-archive/2026-08-27--prior-handover-sprint-agy-fetch-fast-forward-and-clean-local.md](state-archive/2026-08-27--prior-handover-sprint-agy-fetch-fast-forward-and-clean-local.md) |
 | 2026-08-19 through 2026-08-23 | Phoenix-line checkpoints 61-71 (2026-08-19 through 2026-08-23), preserved verbatim as history after the Nova merge made the Nova line authoritative. | [docs/state-archive/2026-08-27--phoenix-checkpoints-61-71.md](state-archive/2026-08-27--phoenix-checkpoints-61-71.md) |
 | through 2026-08-19 | First real rotation: everything from the 2026-08-08 restart checkpoint through the inherited Nova/Cyborg-release history and every older era down to the open-items tail — extraction pass completed first (original pre-rotation line range 4977–19155; see the archive file's own provenance section and the ADR-0064 addendum dated 2026-08-19) | [state-archive/2026-08-19--pre-restart-and-nova-inherited-history.md](state-archive/2026-08-19--pre-restart-and-nova-inherited-history.md) |
@@ -53,10 +50,66 @@ to SKIPPED; `push-prepare` respects `gates.security` (J). The Critic contract
 gained **reachability and effect** as a seventh mandatory search dimension, and
 that addition is carried into the vendored plugin copies (L, `1f51ddc4`/`fa6309b5`).
 
-*Rounds M and N — in flight, both worktree-isolated, based on `fa6309b5`.*
-M (`wf_92f3619d-88c`) fixes the PO profile receipt; N (`wf_9630b671-b19`) makes
-a refused signature push name its cause and makes the two readers of the
-trust-anchor policy agree. Their file scopes are disjoint by construction.
+*Rounds M through U2 — landed, every one collected by worktree inspection
+rather than from its report.* M/P fixed the PO profile receipt at the apply
+BOTH promotion callers share (suite 247). N made a refused signature push name
+its typed predicate and made the two trust-anchor-policy readers agree. O put
+the "walk the signature, never offer alternatives" rule where an agent is bound
+by it. Q2 made the `draft` gate derive `--by`/`--profile` from what onboarding
+already persisted — the design→implementation walk went from two human stops to
+one. U/U2 reconciled twelve of the 27 NOW-tracked items against the code, each
+closing note naming the file and lines read; **thirteen of the nineteen still
+open have NOT been re-measured** and may be stale in either direction (Round O
+already partly satisfies `agents-talk-the-po-out-of-the-signature`, which does
+not know it).
+
+**The ready-gate blocker (T, `b317f139`) — the session's most consequential
+finding.** `lib/project-onboarding-ready-gate.mjs` validated every observation
+against a hand-maintained eleven-name `RESULT_KEYS`, while
+`project-onboarding-v3.mjs` attaches `pushApprovalMode` and
+`trustAnchorAvailability` to a `ready` result and to no other status. `exactKeys()`
+therefore failed **exactly when a project is ready** — the only case the gate can
+otherwise pass — refusing every governed write in every ready project. Invisible
+because the installed marketplace copy was an older build; it surfaced the moment
+the PO rsynced the candidate. The accepted shape is now status-specific and still
+exact in both directions, with three pinning tests, measured against the real
+producer through the real gate (13 keys, all three intents accepted) rather than a
+stub. The **pattern** stays open: three hand-maintained mirrors of a shape this
+module does not own, a suite green because it never asks the real producer, and
+T's own tests are a fourth copy — its item requires the enumeration to be derived.
+
+**Carried forward from the rotated 2026-08-27 handover, because neither has
+another home.** (1) The **open release decision**: the PO corrected on 2026-08-26
+that 0.6.0 is a combined Nova+Phoenix number, not Nova-only. Undecided — intake
+Phoenix now and release combined, or release Nova alone under a different number.
+`0.5.7` is not a candidate; `VERSION` and every stamp already say 0.6.0. This does
+NOT block a local candidate stamped `0.6.0+…`; it blocks calling a *published*
+artifact 0.6.0. (2) **AK-6** is ready to re-dispatch against
+`pipeline-user-v3.schema.json` (the first attempt used the pre-v3 schema and would
+have flagged a correct calibration as drifted; withdrawn `1d6dec55`, scaffolding
+kept at `8316dbd8`).
+
+### What still blocks a stamped candidate, in order
+
+1. **The PO rsyncs again.** The installed copy still carries the PO's local `sed`
+   provisional at line 150; only the rsync replaces it with T's real fix.
+2. **Collect R2's pinning tests, then R (`55caf20f`).** R exempts a provably
+   unauthored staging draft from the acknowledgement marker — the PO's *"die
+   initiale PRD ist wertlos"* fix. It is an untested relaxation of a PO gate until
+   R2 lands and must not be collected before.
+3. **Full Verify on a quiesced tree** — after the last dispatch returns.
+4. **1+1 Critic** (opus/max, `routing.duties.critic_high_risk.claude`), with
+   `55caf20f` explicitly in scope because it relaxes a PO gate.
+5. **Manifest version bump, then stamp both runner manifests.**
+6. **rsync.**
+
+Shipping knowingly open, all measured and filed: the trust-anchor bootstrap (B8)
+still seeds a bare v1 document when no machine key exists, so the signature route
+is functionless there until the PO adds an anchor; the push gate is unsatisfiable
+in an installed-plugin deployment; `onboarding-init.mjs` never reads
+`nextAction.pendingAsks`, so the guided run never asks the push-approval question;
+`pipeline-start` SKILL.md still names the raw `inspect` action instead of the
+driver; reachability is a review-time Critic prompt with no mechanical check.
 
 **The receipt defect, measured rather than inferred.** A fresh local project
 driven to `ready` has no `.git/agent-pipeline/po-gate/profile-receipt.json` at
@@ -147,77 +200,6 @@ and left standing in its sibling reader.
 **Still true and unchanged:** the push gate is `approval: required` with
 `gates.push_approval: signature`. Nothing here unblocks a push, and no
 outstanding item may be reported as done while its Critic round is pending.
-
-## Prior handover — Verify is green in one run; candidate 0.6.0 local (2026-08-27)
-
-**READ THIS FIRST on `feat/sprint-alfred`.** The design phase is closed. The
-PO approved the plan on 2026-08-28 (`approve-plan --by "PO"`, 11:29:48Z),
-scope bound to `specs/sprint-alfred-epic/prd_sprint-alfred-epic.md`
-(`aa730465…`) + `spec.md` (`6e6c8713…`), profile `epic`; phase then set to
-`implementation` (lifecycle `implementing`, `f54770ce`). The full design
-narrative — epic switch, six measured lifecycle gaps, three Critic cycles,
-the gate-1 rejection and rework — is in
-[`docs/state-archive/2026-08-28--current-handover-alfred-clone-sprint-alfred-epic-opened-in-d.md`](state-archive/2026-08-28--current-handover-alfred-clone-sprint-alfred-epic-opened-in-d.md).
-
-**The approved shape.** The epic's center of gravity is agent-first
-architecture; Tracks A/B/C are the substructure that makes Track D's claims
-true, not a parallel mandate. The binding doctrine is
-`specs/sprint-alfred-epic/design/agent-first-architecture.md`, named as the
-PRD's **normative architecture basis**: every work package is designed,
-implemented and reviewed against it, and a deviation needs a recorded
-decision, never silent drift. All six PRD §9 decisions are answered
-(decision 6, 2026-08-28: **the wave order stands** — D-track is not pulled
-ahead of Wave 2, because D3's conformance claims are only honest on top of
-A1/A2's measured enforcement; accepted cost is calendar visibility).
-
-**Next: PRD §5 wave 0, in this order.**
-
-**AK status.** AK-9/10/11 met (full green run; both manifests + `VERSION` at
-0.6.0; every declared hook *wired* and byte-identical to the installed copy).
-AK-14 filed for Nova B. **AK-5 is closed — this paragraph previously said the
-opposite and was stale (corrected 2026-08-28).** It read: "the one true inert
-guard — `guard-dispatch-budget.mjs` is built, 15/15, Verify-registered, but
-`hooks/hooks.json` is on `NEVER_LIFTABLE_KERNEL_PATHS`, so no maintenance window
-can wire it." It IS wired: `731ff1b8` added it to the PreToolUse manifest and
-`1b45d6f9` then replaced a matcher that matched nothing. The installed manifest
-carries three `guard-dispatch-budget.mjs` entries, byte-identical to the repo
-copy. Left as a correction rather than a deletion because the false claim was
-load-bearing — it named a blocker that no longer exists. **AK-6** is ready to re-dispatch
-against `pipeline-user-v3.schema.json` (the first attempt used the pre-v3 schema
-and would have flagged a correct calibration as drifted; withdrawn in `1d6dec55`,
-scaffolding kept at `8316dbd8`).
-
-**Live blockers and debts carried into implementation:**
-
-- **Verify currently refuses** with `VERIFY-CLEANUP-REGISTRATION-REQUIRED`
-  (no session identity to bind a cleanup descriptor). Irrelevant to design,
-  **blocking for implementation** — resolve before the first candidate needs
-  a green gate.
-- **OPEN PO release decision:** 0.6.0 is a combined Nova+Phoenix number (PO
-  2026-08-26, ADR-0043) — intake Phoenix and release combined, or release
-  Nova alone under a different number. Blocks calling a *published* artifact
-  "0.6.0"; local `0.6.0+…` candidates are unaffected.
-- **AK-5:** `guard-dispatch-budget.mjs` is built and Verify-registered but
-  unwireable — `hooks/hooks.json` is on `NEVER_LIFTABLE_KERNEL_PATHS`.
-  Prepared PO hand-edit: `scratch/AK-5-hooks-json-patch-for-the-PO.md`.
-- **AK-6** is ready to re-dispatch against `pipeline-user-v3.schema.json`
-  (first attempt withdrawn `1d6dec55`, scaffolding kept `8316dbd8`).
-- **Homeless durable content:** the 0.4.7-hotfix Result amendment text (owner
-  + 2026-08-31 review date for the #21 worker-pool gap) survives only in
-  `d545ae4a` and still needs a legitimate home in that backlog item — the
-  review date is imminent.
-- **Fold at next legitimate touch:** the post-compact reground observation
-  (`PCR-CONTINUITY-MISSING` / `workResumptionAllowed: false` against a state
-  the live observers accept) belongs in the `discard-feature` observer item;
-  kept here to avoid ledger DRIFT noise.
-- **Canon gap, unresolved by design:** no sanctioned `Dispatch:` trailer form
-  exists for direct Elephant design commits. `stage-0 (elephant)` is bound to
-  the operating-model §3.3 fast path, so stamping it on large authority work
-  would be a false classification — worse than the honest `UNVERIFIABLE`
-  `dispatch-authorship-verify` reports today. Item filed 2026-08-27.
-- **Seven `sprint: alfred` defect items** filed by this design phase are part
-  of the epic's own closure set (AC-13). The live count is **28**; read it
-  with `check-backlog-sprint-assignment.mjs`, never from a written number.
 
 ## Earlier handover — ledger-merge capability, ADR renumbering, handover rotation (2026-08-27)
 
