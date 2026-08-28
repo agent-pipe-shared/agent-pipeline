@@ -6071,8 +6071,19 @@ export function observeBootstrapBindAcknowledgement({
     fail("BOOTSTRAP-BIND-PRECONDITION", "coordinator-sourced binding requires an existing staging specification");
   }
   const acknowledged = [...prd.raw.toString("utf8").matchAll(PRD_ACKNOWLEDGEMENT_MARKER)].length === 1;
+  // NVA-V5-ACKEXEMPTASK: `acknowledged` states whether the marker is on the page and
+  // nothing more, which is the right shape for a factual observation -- but a caller
+  // deciding whether to STOP AND ASK the PO for it needs the other half too, because
+  // NVA-R-STAGINGACK made the marker unnecessary for a provably unauthored generator
+  // draft. Without this, the bind accepts those bytes while the observation still
+  // reports "not acknowledged", so the flow asks the PO to certify a judgement that is
+  // no longer required of them -- a human stop that buys nothing, on the path whose
+  // whole point is to have as few as possible. Same single derivation the admission
+  // itself uses, and the same fail-closed direction: any failure yields false.
+  const exempt = pureGeneratorPromotionPrdSha256({ rootDir: resolved.root, repositoryCapability, spawn }) === prd.sha256;
   return {
     acknowledged,
+    exempt,
     prd: { path: resolved.prdPath, sha256: prd.sha256 },
     spec: { path: resolved.specPath, sha256: spec.sha256 },
   };
