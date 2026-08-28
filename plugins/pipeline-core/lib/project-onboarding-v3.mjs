@@ -472,7 +472,7 @@ export function planProjectPartialAuthorityAdoption({ rootDir = process.cwd(), p
     if (!validatePipelineUserV3(intent).ok) throw new Error("canonical V3 source is invalid");
     // This path holds an explicit PO profile selection, so the seeded gate
     // chapter is the one that profile asks for.
-    const baselines = freshBaselines(intent, { profile });
+    const baselines = freshBaselines(intent, { profile, fs });
     // Same three portable targets the primary onboarding flow writes for the
     // seeded blocking `push` gate, PLUS the matching proof policy
     // (CRITICAL_HUMAN_PROOF_POLICY_PATH) -- this route seeds the identical
@@ -503,7 +503,7 @@ export function applyProjectPartialAuthorityAdoption({ rootDir = process.cwd(), 
   if (plan.status !== "ready" || plan.planSha256 !== planSha256) return { schema: PARTIAL_AUTHORITY_PLAN_SCHEMA, status: "invalid-plan", root: plan.root, diagnostics: [diagnostic("$.planSha256", "plan_digest_mismatch", "the supplied plan digest is not current", "run the read-only partial-authority plan again")] };
   const root = plan.root; const created = []; const createdDirectories = [];
   try {
-    const intent = freshIntent(runner, fs); const baselines = freshBaselines(intent);
+    const intent = freshIntent(runner, fs); const baselines = freshBaselines(intent, { fs });
     const bytes = new Map([[SOURCE, renderYaml(intent)], [".claude/pipeline.yaml", baselines[".claude/pipeline.yaml"].bytes], [NEUTRAL_MANIFEST, baselines[NEUTRAL_MANIFEST].bytes], [CRITICAL_HUMAN_PROOF_POLICY_PATH, baselines[CRITICAL_HUMAN_PROOF_POLICY_PATH].bytes]]);
     for (const target of plan.targets) {
       const path = safePath(root, target.path, fs);
@@ -1081,15 +1081,41 @@ export function freshCalibrationBytes() {
 // blocking; this is the matching declaration the proof-policy reader needs to
 // reach its own next real gate instead of refusing outright.
 //
-// `.v1` only, `requiredKinds: ["push"]` only: no waiver, no trust anchor, no
-// kind beyond the one gate this seed already turns on. A project that wants
-// more (a waiver, a trust anchor, `deploy`/`publication`) edits this file
-// itself -- gate-strength protected (GS-2), by design, same as every other
-// change to its own strength.
-export function freshCriticalHumanProofPolicyBytes() {
+// `.v1`, `requiredKinds: ["push"]` only, no trust anchor -- UNLESS `fs` is
+// supplied and THIS MACHINE already has a signing key
+// (`detectExistingLocalTrustAnchor()` below, read-only: the machine plane's
+// `poKeyDirectory` and its `trust-policy.json`). When one is found, the
+// anchor is seeded into the SAME transaction as the rest of this file's
+// bytes -- `.v3`'s `trustAnchors`, carrying only the key's public digest and
+// its own `keyReference`, never a filesystem path -- so the first human
+// override this project ever needs does not discover the anchor's absence as
+// an unexplained circularity (backlog: 2026-08-28-onboarding-must-bootstrap-
+// the-trust-anchor-once.md). This REUSES an already-existing key; it never
+// creates one (only the PO ever runs `po-human-approval.mjs setup`,
+// `collectPushApprovalPreferenceAction()`'s guidance above) and every write
+// site for this file's bytes uses `flag: "wx"` (create-only), so an existing
+// `project/critical-human-proof.json` is never silently replaced either way.
+// No `fs` (a caller that predates this parameter, or a context with no
+// filesystem access) falls back to exactly the original no-anchor seed.
+//
+// When no anchor is found -- no machine key yet, or `fs` withheld -- the
+// seed stays `.v1`, `requiredKinds: ["push"]` only: no waiver, no trust
+// anchor, no kind beyond the one gate this seed already turns on. A project
+// that wants more (a waiver, a kind beyond `push`) edits this file itself --
+// gate-strength protected (GS-2), by design, same as every other change to
+// its own strength.
+export function freshCriticalHumanProofPolicyBytes(fs = null) {
+  const anchor = fs ? detectExistingLocalTrustAnchor(fs) : null;
+  if (anchor) {
+    return `${JSON.stringify({
+      schema: CRITICAL_HUMAN_PROOF_POLICY_V3,
+      requiredKinds: ["push"],
+      trustAnchors: [{ keyReference: anchor.keyReference, publicKeySha256: anchor.publicKeySha256 }],
+    }, null, 2)}\n`;
+  }
   return `${JSON.stringify({ schema: CRITICAL_HUMAN_PROOF_POLICY_V1, requiredKinds: ["push"] }, null, 2)}\n`;
 }
-function freshBaselines(intent, { hostManaged = false, profile = null } = {}) {
+function freshBaselines(intent, { hostManaged = false, profile = null, fs = null } = {}) {
   const baselines = {
     ".claude/settings.json": { status: "present", bytes: "{}\n" },
     // The seeded verify command FAILS until a human configures it. The previous
@@ -1127,7 +1153,7 @@ function freshBaselines(intent, { hostManaged = false, profile = null } = {}) {
   };
   baselines[CRITICAL_HUMAN_PROOF_POLICY_PATH] = {
     status: "present",
-    bytes: freshCriticalHumanProofPolicyBytes(),
+    bytes: freshCriticalHumanProofPolicyBytes(fs),
   };
   return baselines;
 }
@@ -2677,18 +2703,29 @@ function readyLifecycleResult({ root, runner, intent, repository, runtime, conti
       )],
     });
   }
-  return lifecycleResult({
-    status: "ready",
-    root,
-    runner,
-    intent,
-    repository,
-    runtime,
-    continuity,
-    appServer,
-    nextAction: designToImplementationHandoverAction(root, fs),
-    diagnostics: [],
-  });
+  // Additive-only (spread AFTER the shared builder, never a change to
+  // `lifecycleResult()`'s own shape): dozens of other statuses return through
+  // that shared, low-level builder, and widening its signature would put a
+  // new key on every one of them. `pushApprovalMode` and
+  // `trustAnchorAvailability` only make sense once a repository is fully
+  // "ready" -- that is the exact moment a session bootstrap inspects and
+  // reports on -- so they are attached here, and only here.
+  return {
+    ...lifecycleResult({
+      status: "ready",
+      root,
+      runner,
+      intent,
+      repository,
+      runtime,
+      continuity,
+      appServer,
+      nextAction: designToImplementationHandoverAction(root, fs),
+      diagnostics: [],
+    }),
+    pushApprovalMode: activePushApprovalMode(root, fs),
+    trustAnchorAvailability: trustAnchorAvailability(root, fs),
+  };
 }
 
 function afterRuntimeLifecycleResult({ root, intent, repository, runtime, runner }, fs) {
@@ -3109,7 +3146,7 @@ function manifestRepairResult({
 }
 
 function currentRuntimeBaselines(root, intent, fs) {
-  const baselines = freshBaselines(intent);
+  const baselines = freshBaselines(intent, { fs });
   for (const relative of runtimePaths()) {
     const target = safePath(root, relative, fs);
     if (!fs.existsSync(target)) continue;
@@ -4185,7 +4222,7 @@ export function planProjectOnboardingV3({ rootDir = process.cwd(), deps: overrid
   if (!git.ok) return { schema: PLAN_SCHEMA, status: "unsupported", root: inspected.root, diagnostics: [diagnostic("$.git", "git_initial_branch_unsupported", git.reason, "install Git 2.28 or newer before activation")], targets: [], requiresExplicitActivation: true };
   const intent = freshIntent(runner, fs); const validation = validatePipelineUserV3(intent);
   if (!validation.ok) return { schema: PLAN_SCHEMA, status: "invalid-authority", root: inspected.root, diagnostics: validation.errors, targets: [], requiresExplicitActivation: true };
-  const baselines = freshBaselines(intent, { hostManaged });
+  const baselines = freshBaselines(intent, { hostManaged, fs });
   const manifest = validateManifest(parseYaml(baselines[NEUTRAL_MANIFEST].bytes), { rootDir: inspected.root });
   if (manifest.status !== "ok") return { schema: PLAN_SCHEMA, status: "invalid-projection", root: inspected.root, diagnostics: manifest.errors, targets: [], requiresExplicitActivation: true };
   // Only when the project has none. The apply below is create-only (`flag: "wx"`,
@@ -4401,6 +4438,60 @@ function machinePushApprovalPreference(fs) {
   if (result.status !== "valid") return null;
   const value = result.plane?.pushApprovalDefault;
   return value === "chat" || value === "signature" ? value : null;
+}
+
+/**
+ * The LIVE value of THIS repository's own `gates.push_approval`, read
+ * straight from its committed `pipeline.user.yaml` -- distinct from
+ * `machinePushApprovalPreference()` above, which is only the MACHINE's
+ * remembered default, not necessarily what this particular repository has
+ * on record today (a human may edit it, or override the pre-fill, at any
+ * point after onboarding). Surfaced on the "ready" envelope (backlog:
+ * 2026-08-28-push-approval-mode-is-not-chosen-at-onboarding.md, "make the
+ * active mode visible in the bootstrap confirmation") so a runner that
+ * believes it switched modes has a record to be contradicted by, rather
+ * than a belief nothing else in the session can check. Absent, unreadable
+ * or malformed resolves to `"signature"` -- ADR-0056's own fail-closed
+ * default, never a silent downgrade to the weaker mode.
+ */
+function activePushApprovalMode(root, fs) {
+  try {
+    const path = safePath(root, SOURCE, fs);
+    if (!fs.existsSync(path)) return "signature";
+    const parsed = parseYaml(fs.readFileSync(path, "utf8"));
+    const value = parsed?.gates?.push_approval;
+    return value === "chat" || value === "signature" ? value : "signature";
+  } catch {
+    return "signature";
+  }
+}
+
+/**
+ * Named, typed surfacing of whether THIS repository's own
+ * `project/critical-human-proof.json` currently carries a usable trust
+ * anchor -- `"present"` or `"absent"`, never a boolean the caller has to
+ * reinterpret. Closes the second half of backlog 2026-08-28-onboarding-
+ * must-bootstrap-the-trust-anchor-once.md's acceptance criteria: when a
+ * human declines the key-creation walkthrough (or none has run yet), the
+ * absence is now a state visible at every "ready" inspection, not something
+ * only discovered later as the human-override ceremony's own unexplained
+ * `HGO-TRUST-ANCHOR-MISSING` circularity (human-guard-override.mjs).
+ * Read-only; never writes or repairs the policy file itself -- GS-2
+ * (guard-gate-strength.mjs) reserves that to the PO or the signed HGO Edit
+ * ceremony, same boundary `detectExistingLocalTrustAnchor()` /
+ * `repositoryAlreadyHasTrustAnchor()` above already respect.
+ */
+function trustAnchorAvailability(root, fs) {
+  try {
+    const path = safePath(root, CRITICAL_HUMAN_PROOF_POLICY_PATH, fs);
+    if (!fs.existsSync(path)) return "absent";
+    const parsed = JSON.parse(fs.readFileSync(path, "utf8"));
+    if (parsed?.schema === CRITICAL_HUMAN_PROOF_POLICY_V3 && Array.isArray(parsed.trustAnchors) && parsed.trustAnchors.length > 0) return "present";
+    if (parsed?.trustAnchor && typeof parsed.trustAnchor === "object" && typeof parsed.trustAnchor.publicKeySha256 === "string") return "present";
+    return "absent";
+  } catch {
+    return "absent";
+  }
 }
 
 function ensurePreimage(root, expectedState, fs) {
@@ -4918,6 +5009,47 @@ function withPendingPushApprovalSetupAsk(observed, fs) {
   return { ...observed, pushApprovalSetupAction: collectPushApprovalPreferenceAction(defaultPoKeyDirectoryHint(fs), machinePushApprovalPreference(fs)) };
 }
 
+// Closes backlog 2026-08-28-push-approval-mode-is-not-chosen-at-onboarding.md:
+// `withPendingAuthorIdentityAsk()`/`withPendingPushApprovalSetupAsk()`/
+// `withPendingTrustAnchorGuidanceAsk()` above each publish their own question
+// ONLY as a named side-channel envelope field (`authorIdentityAction` etc.),
+// never as `nextAction` -- the one field a caller that "follows nextAction"
+// (this library's own documented driver contract) actually reads. Two
+// resolutions were possible (either promote one of these asks to replace
+// `nextAction` outright, or leave the side channel as-is and document it as
+// part of the contract); this file picks neither in isolation, because both
+// have a real cost here: replacing `nextAction` outright would bury whatever
+// real next step `v4Inspection()` already computed for these resting
+// statuses (a `collect-input` ask of its own for "kickoff-required", e.g.
+// `collectGoalAction()`, or a real blocking command for
+// "runtime-initialization-required") -- and `pushApprovalSetupAction`/
+// `trustAnchorGuidanceAction` are unconditional, per-repository
+// CONFIRMATIONS with no resolved/consumed state this library can observe
+// (unlike `authorIdentityAction`, which disappears once `git config` is
+// set), so replacing `nextAction` with either of them would never fall away
+// and would permanently hide the real step underneath it. Leaving them
+// side-channel-only, unchanged, would keep them exactly as unreachable as
+// the backlog found them.
+//
+// The resolution actually applied: MERGE. `nextAction` keeps whatever
+// command or ask `v4Inspection()` already decided is the real next step for
+// this status -- untouched, so an existing caller reading `nextAction.kind`/
+// `.command` sees no behavior change -- and every pending side-channel ask
+// (author identity, push approval, trust anchor guidance, in that fixed
+// priority order) is additionally attached to THAT SAME object as
+// `nextAction.pendingAsks`, so a caller that follows `nextAction` reaches the
+// push-approval question (and the author-identity one -- the SAME resolution
+// applied to both, closing the disagreement between the two conventions the
+// backlog names) without the real required step ever being masked. The
+// original per-field channels (`authorIdentityAction` etc.) are left in
+// place, unchanged, for the existing tests and any caller already reading
+// them directly.
+function withPendingAsksSurfacedOnNextAction(observed) {
+  const pendingAsks = [observed.authorIdentityAction, observed.pushApprovalSetupAction, observed.trustAnchorGuidanceAction].filter(Boolean);
+  if (pendingAsks.length === 0 || observed.nextAction == null) return observed;
+  return { ...observed, nextAction: { ...observed.nextAction, pendingAsks } };
+}
+
 // PO decision 2026-08-19 (backlog: 2026-08-18-po-key-trust-anchor-onboarding.md,
 // Option A): a machine that already answered the push-approval question above
 // (a signing key already exists somewhere on this machine) still leaves EVERY
@@ -5016,9 +5148,9 @@ function applyLifecycle(rootDir, fs, operation, planSha256, activate, intent = "
     // digest was produced with, or the digests never match and the apply is a
     // silent no-op that loops the caller back to adoption-required.
     const plan = planProjectOnboardingV3({ rootDir, deps: fs, runner: v4Inspection(rootDir, fs, intent, runner).runner });
-    if (plan.status !== "ready" || lifecyclePlanDigest(plan) !== planSha256) return withPendingTrustAnchorGuidanceAsk(withPendingPushApprovalSetupAsk(withPendingAuthorIdentityAsk(v4Inspection(rootDir, fs, intent, runner), fs), fs), fs);
+    if (plan.status !== "ready" || lifecyclePlanDigest(plan) !== planSha256) return withPendingAsksSurfacedOnNextAction(withPendingTrustAnchorGuidanceAsk(withPendingPushApprovalSetupAsk(withPendingAuthorIdentityAsk(v4Inspection(rootDir, fs, intent, runner), fs), fs), fs));
     applyProjectOnboardingV3(plan, { rootDir, activate: true, deps: fs });
-    return withPendingTrustAnchorGuidanceAsk(withPendingPushApprovalSetupAsk(withPendingAuthorIdentityAsk(v4Inspection(rootDir, fs, intent, runner), fs), fs), fs);
+    return withPendingAsksSurfacedOnNextAction(withPendingTrustAnchorGuidanceAsk(withPendingPushApprovalSetupAsk(withPendingAuthorIdentityAsk(v4Inspection(rootDir, fs, intent, runner), fs), fs), fs));
   }
   const beforeApply = v4Inspection(rootDir, fs, intent, runner);
   if (operation === "repair" && beforeApply.status === "continuity-damaged") {
