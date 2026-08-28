@@ -126,8 +126,8 @@ export function evaluateChangeIntegrity({ paths = [], independentChecks = [] } =
 // controls (the library holding every hardening decision, and the verify
 // gate itself) must route to independent review whenever touched, even
 // though neither matches the general pattern below. Adding the next such
-// path is a list entry here, not a regex edit (F4, `scratch/DESIGN-self-
-// excluded-review-path.md` section D).
+// path is a list entry here, not a regex edit (F4,
+// `backlog/evidence/2026-08-28-self-excluded-review-path-design.md` section D).
 export const SENSITIVE_EXACT_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/ai-assisted-hardening.mjs",
   "harness/scripts/verify.mjs",
@@ -149,6 +149,38 @@ export function routeSecurityReview({ changedPaths = [], authorId, reviewerId } 
 /** Root-pointable independent checks can be re-run against a foreign tree via `--root`. */
 export const ROOT_POINTABLE_CHECK_KINDS = Object.freeze(["scope", "dependency"]);
 
+// Only this source counts as authority for the candidate-suite-and-review
+// path (round 2, NVA-VTPGATE-3): the GitHub repository variable, injected by
+// the workflow that owns `vars.PIPELINE_SECURITY_REVIEWER_ID` -- never a
+// `--reviewer-id` flag, which the party the control constrains can set on
+// their own candidate. See `resolveReviewerIdentity` below and
+// `backlog/evidence/2026-08-28-self-excluded-review-path-design.md` section G.
+const TRUSTED_REVIEWER_SOURCE = "repository-variable";
+
+/**
+ * Resolve the reviewer identity ONCE, into a value and the source it came
+ * from. The environment outranks the flag -- the reverse of the precedence
+ * `ai-assisted-hardening-gate.mjs` used before this round -- so a flag can
+ * never mask the admin-controlled repository variable. A blank or
+ * whitespace-only value at either tier is treated as absent, not as an
+ * explicit empty identity.
+ *
+ * Locally, nothing distinguishes the repository variable from an
+ * author-exported environment variable of the same name -- the control is
+ * real only in CI, where the value is injected by GitHub from `vars.*` and
+ * the workflow that injects it is itself a protected path (honest limit,
+ * `backlog/evidence/2026-08-28-self-excluded-review-path-design.md` section G).
+ */
+export function resolveReviewerIdentity({ environmentReviewerId = null, cliReviewerId = null } = {}) {
+  if (typeof environmentReviewerId === "string" && environmentReviewerId.trim().length > 0) {
+    return Object.freeze({ schema: AI_HARDENING_SCHEMA, id: environmentReviewerId, source: TRUSTED_REVIEWER_SOURCE });
+  }
+  if (typeof cliReviewerId === "string" && cliReviewerId.trim().length > 0) {
+    return Object.freeze({ schema: AI_HARDENING_SCHEMA, id: cliReviewerId, source: "cli-argument" });
+  }
+  return Object.freeze({ schema: AI_HARDENING_SCHEMA, id: null, source: null });
+}
+
 /**
  * When a required check's own command file is inside the candidate diff, it
  * cannot certify itself on its own say-so. It counts when EITHER of two
@@ -162,13 +194,25 @@ export const ROOT_POINTABLE_CHECK_KINDS = Object.freeze(["scope", "dependency"])
  * 2. candidate-suite-and-review path (any kind): the check's own command, run
  *    at the CANDIDATE revision, actually exits 0, AND a named reviewer
  *    distinct from the author is present -- the same test `routeSecurityReview`
- *    already applies (non-blank after trim, `!== authorId`). The candidate
- *    suite passing is mechanical evidence, not authority; the authority is the
- *    named human who is not the author. Both halves are required -- either
- *    alone leaves the check missing.
+ *    already applies (non-blank after trim, `!== authorId`) -- AND that
+ *    reviewer's identity came from `reviewerSource === "repository-variable"`
+ *    (round 2, NVA-VTPGATE-3): the candidate suite passing is mechanical
+ *    evidence, not authority; the authority is the named human who is not the
+ *    author AND whose identity the author cannot themselves supply. All three
+ *    are required -- any one alone leaves the check missing.
  *
  * The base-revision path is evaluated first, so a caller that passes only
- * `baseRevisionExitCode` keeps its exact previous behaviour and code.
+ * `baseRevisionExitCode` keeps its exact previous behaviour and code. The
+ * default `reviewerSource` is `null`, so this fails CLOSED for any caller not
+ * yet updated to pass it -- never a permissive default that would count.
+ *
+ * When the candidate suite passed and the reviewer is named and distinct but
+ * the source is untrusted, the result carries its own code
+ * `AIH-SELF-EXCLUDED-REVIEWER-UNTRUSTED-SOURCE` -- never the generic
+ * `AIH-SELF-EXCLUDED-MISSING` used when the suite itself failed or no
+ * qualifying reviewer was named at all. Two different refusals that render
+ * identically is exactly the diagnosis trap this repository has already paid
+ * for once (CLAUDE.md, the `guard-testpath` two-cause note).
  */
 export function evaluateSelfExcludedCheck({
   kind,
@@ -176,16 +220,22 @@ export function evaluateSelfExcludedCheck({
   candidateRevisionExitCode = null,
   reviewerId = null,
   authorId = null,
+  reviewerSource = null,
 } = {}) {
   const rootPointable = ROOT_POINTABLE_CHECK_KINDS.includes(kind);
   const baseVerified = rootPointable && baseRevisionExitCode === 0;
   const namedReviewer = typeof reviewerId === "string" && reviewerId.trim().length > 0;
-  const candidateReviewed = !baseVerified && candidateRevisionExitCode === 0 && namedReviewer && reviewerId !== authorId;
+  const suitePassedAndReviewed = !baseVerified && candidateRevisionExitCode === 0 && namedReviewer && reviewerId !== authorId;
+  const trustedSource = reviewerSource === TRUSTED_REVIEWER_SOURCE;
+  const candidateReviewed = suitePassedAndReviewed && trustedSource;
+  const untrustedSource = suitePassedAndReviewed && !trustedSource;
   const counted = baseVerified || candidateReviewed;
   const basis = baseVerified ? "base-revision" : (candidateReviewed ? "candidate-suite-and-review" : null);
   const code = baseVerified
     ? "AIH-SELF-EXCLUDED-BASE-VERIFIED"
-    : (candidateReviewed ? "AIH-SELF-EXCLUDED-REVIEWED" : "AIH-SELF-EXCLUDED-MISSING");
+    : (candidateReviewed
+      ? "AIH-SELF-EXCLUDED-REVIEWED"
+      : (untrustedSource ? "AIH-SELF-EXCLUDED-REVIEWER-UNTRUSTED-SOURCE" : "AIH-SELF-EXCLUDED-MISSING"));
   return Object.freeze({ schema: AI_HARDENING_SCHEMA, kind, rootPointable, counted, basis, code });
 }
 
