@@ -1,5 +1,21 @@
 # Backlog intake — the 24 open `sprint: alfred` items (read in full, 2026-08-27)
 
+> **Set update, 2026-08-28 (PO design-gate decisions).** This document's
+> analysis covers the 24 items as read on 2026-08-27. Two of them moved to
+> Sprint Nightwing at the gate (§A below), and this design phase itself filed
+> five further `sprint: alfred` items after the intake was written. The live
+> in-scope set is therefore **27 open items**, not the 24 analysed here;
+> `acceptance.md` AC-13 is the binding statement and
+> `check-backlog-sprint-assignment.mjs` the live count. The five
+> self-filed items —
+> `2026-08-27-critic-dispatches-cannot-persist-their-scratch-notes`,
+> `2026-08-27-no-sanctioned-dispatch-trailer-form-exists-for-direct-elephant-design-commits`,
+> `2026-08-27-set-feature-to-submit-plan-is-not-closed-without-a-coordinator-only-continuity-init`,
+> `2026-08-27-a-fresh-clone-loses-all-machine-local-pipeline-state-with-no-provisioning-readback`,
+> `2026-08-28-a-design-phase-prd-and-spec-are-frozen-by-their-own-continuity-binding`
+> — are measured process defects of this sprint's own subject matter and are
+> dispositioned at wave boundaries, not re-analysed here.
+
 Every open item carrying `sprint: alfred` was read completely on 2026-08-27,
 its "still open" status re-verified against the live file and recent `git log`
 (per the CLAUDE.md re-verification rule), and mapped to a work package.
@@ -10,7 +26,16 @@ Prior PO decisions recorded inside items are **binding design input** and are
 marked ⚖. Where an item was partially delivered already, the remaining scope
 is stated — not the item's history.
 
-## A. Assignment conflicts found by this intake (PO word needed at the gate)
+## A. Assignment conflicts found by this intake (PO-decided 2026-08-28)
+
+**Decision:** both recommendations below were accepted — the two items follow
+their own Triage to Sprint Nightwing (`e4c3f2db`). The deciding line the PO
+applied, and which the next triage should reuse: *test- and
+evidence-discipline belongs to Alfred; product and onboarding experience
+belongs to Nightwing.* For the bootstrap-skill item a second argument carried
+weight: its entry condition (SETUP-3's content landing in the same file
+first) lies outside Alfred, so inside Alfred it would have been the only work
+package whose start condition the epic does not control.
 
 | Item | Frontmatter | Its own Triage prose | Recommendation |
 |---|---|---|---|
@@ -28,7 +53,15 @@ diagnostics) and a small B3 addendum (bootstrap modularisation) respectively.
 branch's triage says Alfred, the Phoenix-line cross-triage says Nova/general.
 Recommendation: accept into Alfred as an A5 acceptance constraint (host-layout
 onboarding tests assert the success contract, not rejection) — one review-lens
-rule, not a work package. `2026-07-19-regulated-document-hooks` — Phoenix-owned
+rule, not a work package. **PO-decided 2026-08-28: accepted**, bound as
+`acceptance.md` AC-16/§D, with the PO's constraint that the rule's target set
+is re-derived after the Nova rebase because the onboarding surface changed in
+the Nova line. Two mechanical facts measured while recording it: the item's
+own `sprint:` field cannot be set (ledger event 41's rescoped byte-pin binds
+its pre-Triage bytes and the backlog gate refuses the edit), and `deferred`
+has no forward transition in the ledger
+(`backlog-state.mjs` `FORWARD_TRANSITIONS`), so the item stays outside
+AC-13's closure set by mechanism rather than by choice. `2026-07-19-regulated-document-hooks` — Phoenix-owned
 per standing 2026-07-24 assignment; **not** Alfred; no action.
 
 ## B. Item-by-item disposition
@@ -86,7 +119,7 @@ re-verification result on 2026-08-27.
 
 | Item | T | Disposition |
 |---|---|---|
-| `2026-07-25-managed-onboarding-success-contract` (deferred) | W | If PO accepts into Alfred: an acceptance-review rule for host-layout onboarding tests (success-contract test required; rejection-only tests only for unsupported layouts) applied wherever Alfred touches onboarding tests — recorded in acceptance.md, not a WP. |
+| `2026-07-25-managed-onboarding-success-contract` (deferred) | W | **PO-accepted 2026-08-28.** An acceptance-review rule for host-layout onboarding tests (success-contract test required; rejection-only tests only for unsupported layouts) applied wherever Alfred touches onboarding tests — `acceptance.md` AC-16/§D, not a WP. Target set re-derived post-Nova-rebase per the PO's constraint. |
 | `2026-08-25-backlog-strip-for-dispatch-drops-every-section-after-triage` | D | ⚖ its own triage: deferred, workaround stands (cite raw paths in briefings). Alfred *uses* the workaround in every dispatch of this sprint; the one-line fix (strip only the Triage section's own body) rides in B3 as a mechanical fix since Alfred's own dispatches depend on correct stripping. |
 
 ## C. Verification notes (the re-checks behind "Fresh?")
