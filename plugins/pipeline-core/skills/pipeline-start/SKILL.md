@@ -42,9 +42,13 @@ For any temporary file (probe script, held note, throwaway fixture) use the
 repository's own `scratch/` directory: inside the project root, permitted by
 the containment guard without an exception, and exempt from the dev-plan gate
 in every phase — including `draft`, which is the phase a fresh project starts
-in and where a write there used to be refused. Never a host-temp path — the
-guard refuses a write outside the project root; do not fall back to guessing
-one when a write is refused. Never `.git/` either:
+in and where a write there used to be refused. The onboarding-readiness check
+(`GUARD-LIFECYCLE-NOT-READY`) admits it too while a session sits at
+`intake-required` or `intake-design-questions-required` — the two statuses a
+fresh project passes through before onboarding completes, where a scratch
+write used to be refused with no route named forward. Never a host-temp path —
+the guard refuses a write outside the project root; do not fall back to
+guessing one when a write is refused. Never `.git/` either:
 `.git/agent-pipeline/**` is pipeline-owned private state, not agent scratch.
 A session needing disciplined cleanup (bind at start, release at close,
 retire a crashed session's orphan on a later bootstrap) uses

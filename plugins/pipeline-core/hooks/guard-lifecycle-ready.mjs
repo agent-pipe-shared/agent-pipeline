@@ -195,6 +195,17 @@ const RESTART_RESUME_HINT_INPUT_PATH = "project/.resume-hint-input.json";
 // Deliberately a single fixed relative path, never a directory prefix or a glob.
 const PARTIAL_LIFECYCLE_SCRATCH_DIR = "scratch";
 const PARTIAL_LIFECYCLE_INCIDENT_REPORT_PATH = join(PARTIAL_LIFECYCLE_SCRATCH_DIR, "incident-report.md");
+// NVA-GF-SCRATCH (backlog: 2026-08-28-a-scratch-write-is-refused-during-intake-against-the-
+// documented-exemption.md): the two onboarding-readiness statuses a fresh, not-yet-onboarded
+// project sits at before any dev-plan-gated write is even reachable -- see
+// isIntakeLifecycleScratchWrite() / isIntakeLifecycleScratchMkdir() below. Unlike the `partial`
+// diagnosis lane above (one fixed file), this admits ANY path resolving inside the repository's
+// own scratch/ directory, matching guard-devplan.mjs's own scratch/ prefix exemption
+// (lib/guard-devplan-policy.mjs DEFAULT_EXEMPT_PREFIXES) -- which already admits any path under
+// scratch/, in every dev-plan phase -- so this gate's readiness check stops disagreeing with the
+// dev-plan gate about the one directory the pipeline-start skill tells every agent is always
+// safe.
+const INTAKE_LIFECYCLE_STATUSES = new Set(["intake-required", "intake-design-questions-required"]);
 const HEX = /^[a-f0-9]{64}$/u;
 // GUARDDERIVE-1: resolved once at module load from the onboarding CLI's own registered
 // subcommand table (ONBOARDING_SUBCOMMANDS in scripts/project-onboarding-v3.mjs), not
@@ -395,10 +406,22 @@ function blocked(
           + `repository's own ${PARTIAL_LIFECYCLE_SCRATCH_DIR} directory and writing exactly `
           + `${PARTIAL_LIFECYCLE_INCIDENT_REPORT_PATH} via Write or Edit.`,
       ]
-      : [
-        `Pipeline session readiness is ${typedLifecycleStatus}.`,
-        "Re-run the typed project-onboarding-v3 inspection with intent session and use only its returned nextAction.",
-      ];
+      : INTAKE_LIFECYCLE_STATUSES.has(typedLifecycleStatus)
+        ? [
+          `Pipeline session readiness is ${typedLifecycleStatus}.`,
+          "Re-run the typed project-onboarding-v3 inspection with intent session and use only its returned nextAction.",
+          // NVA-GF-SCRATCH: named here so a session stuck at an intake status can discover the
+          // lane without reading this guard's own source -- the same discoverability fix
+          // NVA-LCREADONLY-2 already made for the `partial` lane above.
+          `A scratch write stays admitted during intake: creating the repository's own `
+            + `${PARTIAL_LIFECYCLE_SCRATCH_DIR} directory (mkdir or mkdir -p, including a nested `
+            + `path inside it) and any Edit/Write/NotebookEdit write whose resolved path is `
+            + `inside it.`,
+        ]
+        : [
+          `Pipeline session readiness is ${typedLifecycleStatus}.`,
+          "Re-run the typed project-onboarding-v3 inspection with intent session and use only its returned nextAction.",
+        ];
   // NVA-MICRO-1: a near-miss resume-hint-input write (same file basename, wrong directory)
   // names the one correct path directly, before this falls through to the generic message
   // above -- a self-correctable agent error, not a case that needs the external-operator
@@ -3120,6 +3143,52 @@ function isPartialLifecycleIncidentReportWrite(input, root) {
 }
 
 /**
+ * NVA-GF-SCRATCH: the write-side twin of the `partial` diagnosis lane above, but scoped to the
+ * two onboarding-readiness statuses named in INTAKE_LIFECYCLE_STATUSES rather than to one fixed
+ * filename -- matching guard-devplan.mjs's own scratch/ prefix exemption
+ * (lib/guard-devplan-policy.mjs DEFAULT_EXEMPT_PREFIXES), which already admits any path under
+ * scratch/ in every dev-plan phase. Resolved and compared via pathInside(), never a substring or
+ * prefix-string match: the target must resolve, relative to root, to a path strictly INSIDE
+ * <root>/scratch -- `scratch` itself (the bare directory, a Write/Edit target can never
+ * legitimately name anyway) does not qualify, nor does a sibling whose name merely starts with
+ * "scratch" (e.g. `scratch-evil/file`, which pathInside's relative()-based check correctly
+ * rejects because its own relative path does not start with `scratch${sep}`). The caller
+ * (evaluateAfterGrammarAdmission() below) is the one that gates this on lifecycleStatus being a
+ * member of INTAKE_LIFECYCLE_STATUSES.
+ */
+function isIntakeLifecycleScratchWrite(input, root) {
+  const toolName = String(input?.tool_name ?? "");
+  if (!WRITE_TOOLS.includes(toolName)) return false;
+  const filePath = writeTargetPath(input?.tool_input, toolName);
+  if (filePath === "") return false;
+  const scratchRoot = join(root, PARTIAL_LIFECYCLE_SCRATCH_DIR);
+  const resolved = resolve(root, filePath);
+  return resolved !== scratchRoot && pathInside(scratchRoot, resolved);
+}
+
+/**
+ * NVA-GF-SCRATCH: the Bash-side twin -- `mkdir scratch`, `mkdir -p scratch`, and (unlike the
+ * `partial` lane's isPartialLifecycleScratchDirCreate(), which admits only the bare directory
+ * itself) `mkdir -p scratch/<nested>`, since a genuine scratch write may need a nested holding
+ * directory first. Exact by construction via the identical resolve()+pathInside() comparison as
+ * the write-side twin above; any other target, or any extra/reordered flag simpleWords() cannot
+ * parse into this shape, still falls through to the ordinary GUARD-LIFECYCLE-NOT-READY refusal.
+ */
+function isIntakeLifecycleScratchMkdir(command, root) {
+  const words = simpleWords(command, root);
+  if (!words || words.length === 0) return false;
+  if (basename(words[0]).toLowerCase() !== "mkdir") return false;
+  const args = words.slice(1);
+  const target = args.length === 1 ? args[0]
+    : args.length === 2 && args[0] === "-p" ? args[1]
+      : null;
+  if (target === null) return false;
+  const scratchRoot = join(root, PARTIAL_LIFECYCLE_SCRATCH_DIR);
+  const resolved = resolve(root, target);
+  return resolved === scratchRoot || pathInside(scratchRoot, resolved);
+}
+
+/**
  * NVA-BL-INTAKEBIND-1 (backlog: 2026-08-19-material-intake-bootstrap-bind-has-
  * no-sanctioned-path-to-a-passing-plan-gate.md; design.md SSa.4/SSc.3): the
  * design's own intended review step for a session observed at
@@ -3411,6 +3480,20 @@ function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
       && ((toolName === "Bash" && isPartialLifecycleScratchDirCreate((input.tool_input.command ?? input.tool_input.CommandLine), root))
         || isPartialLifecycleIncidentReportWrite(input, root));
     if (partialLifecycleDiagnosisWrite) return verdict(0);
+    // NVA-GF-SCRATCH (backlog: 2026-08-28-a-scratch-write-is-refused-during-intake-against-the-
+    // documented-exemption.md): a fresh, not-yet-onboarded session sitting at `intake-required`
+    // or `intake-design-questions-required` could write NOTHING at all, including its own
+    // scratch/ throwaway notes -- contradicting the pipeline-start skill's own claim that
+    // scratch/ is always safe, and giving a consumer project (no plugin source to read) no
+    // route forward at all. Scoped to INTAKE_LIFECYCLE_STATUSES only -- every other
+    // PORG-NOT-READY status is unaffected and keeps refusing both operations exactly as before.
+    const intakeLifecycleScratchWrite = error instanceof ProjectOnboardingReadyError
+      && error.code === "PORG-NOT-READY"
+      && error.intent === "session"
+      && INTAKE_LIFECYCLE_STATUSES.has(error.lifecycleStatus)
+      && (isIntakeLifecycleScratchWrite(input, root)
+        || (toolName === "Bash" && isIntakeLifecycleScratchMkdir((input.tool_input.command ?? input.tool_input.CommandLine), root)));
+    if (intakeLifecycleScratchWrite) return verdict(0);
     // NVA-MICRO-1 (backlog: 2026-08-09-restart-resume-hint-write-misses-the-project-
     // prefix.md): a restart-required write that already missed the exact admission above
     // (isRestartResumeHintInputWrite) but names the same basename gets the correct path
