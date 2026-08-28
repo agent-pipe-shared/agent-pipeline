@@ -36,6 +36,27 @@ Five authorization layers, plus one preparatory step (1b) that authorizes
 nothing and gates nothing at the push itself — it exists so that the range being
 signed for has been compared against the decisions that govern it.
 
+**One command drives layers 1b through the readiness check ahead of the
+signature (NVA-V4-PUSHDRIVER):**
+
+```
+node plugins/pipeline-core/scripts/push-init.mjs --root <repo> --by <name> --remote <remote> --destination refs/heads/<branch> [--base <ref>]
+```
+
+`push-init.mjs` chains Layer 1b (when `harness/scripts/check-doc-reconciliation.mjs`
+exists in the target project; `--base` becomes required the moment it does),
+the cheap satisfiability preflight, and the full `push-prepare.mjs` readiness
+report, in that fixed order, and reports the first precondition that is not
+green. This is the fast path over the per-layer commands below, not a
+replacement for them — every step it runs is one of the same read-only
+scripts documented layer by layer in this file, still runnable and still
+documented individually for anyone who needs to run just one of them. **The
+driver stops the instant every precondition is green: it prints the
+`authorize-critical` command already filled in, and never executes it, signs
+it, or clears any gate itself** — the human signature described under Layers
+2+3 below is unchanged and is not something this driver can satisfy on a
+human's behalf.
+
 ### Layer 1 — decide a push needs a signature at all
 
 Governed by `gates.push_approval` in `pipeline.user.yaml`. In `signature`
@@ -413,6 +434,7 @@ because it structurally isn't one.
 
 | Layer | Step | Runs as |
 |---|---|---|
+| — | `push-init.mjs --root … --by … --remote … --destination … [--base …]` — fast path chaining 1b through the readiness check; stops at the signature | Agent |
 | 1 | Policy already set in `pipeline.user.yaml` | n/a (config, not a per-push action) |
 | 1b | `check-doc-reconciliation.mjs --base … --candidate …` | Agent |
 | 2+3 | `authorize-critical` (prepare + sign, one invocation) | **PO only** — one command, `approve`, passphrase. The agent constructs the command and computes `--subject-sha256`. |
