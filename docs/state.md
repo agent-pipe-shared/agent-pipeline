@@ -270,11 +270,15 @@ deviations. Third live measurement of the Critic scratch-persistence defect
 defect: a commit-adjacency claim asserted from memory instead of read from
 `git log`.
 
-**Next:** (1) **PO decision 6** (PRD §9) — pull D-track work earlier than
-Wave 2, or keep the current order? Recommendation: keep it. This is the only
-open gate item; the plan is not approved before it is answered.
-(2) Then `submit-plan --by Elephant --profile epic` again (sanctioned
-reopen→submit→approve path) → PO `approve-plan`. Implementation stays gated
+**PO decision 6 answered (2026-08-28): the wave order stands** — D-track is
+not pulled ahead of Wave 2 (recommendation followed; recorded in PRD §9 and
+closed in gap-analysis §E, commit `18777c84`). §9 now carries no open item.
+Plan resubmitted (`9ddd118d`), lifecycle `awaiting-approval`, scope bound to
+PRD `aa730465` + spec `6e6c8713`.
+
+**Next:** (1) PO `approve-plan --by "<name>"` — the last gate act; the agent
+never runs it, the `--by` attribution is the PO's own. (2) Then the phase
+transition to `implementation`. Implementation stays gated
 on Nova landing on `main` + rebase. Standing gate-visible items: the
 Dispatch-trailer canon gap (`evidence/critic/round-1-response.md`) and the
 six defect items this design phase filed.
