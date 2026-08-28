@@ -17,7 +17,62 @@
 | 2026-08-11 to 2026-08-19 | Checkpoints 1-60 (2026-08-11 through 2026-08-19 checkpoint 60): superseded session narrative; durable decisions already live in ADRs/backlog/guardrails per this repo's own standing convention, not uniquely in this prose. | [docs/state-archive/2026-08-19--checkpoints-1-through-60.md](state-archive/2026-08-19--checkpoints-1-through-60.md) |
 | 2026-08-26 | 2026-08-25 Antigravity chat-gate-ceremony standardization, verify-tuner stage 2 acceptance, sprint-agy-runner delta4 Critic fix and candidate status | [docs/state-archive/2026-08-26--agy-runner-2026-08-25-handover.md](state-archive/2026-08-26--agy-runner-2026-08-25-handover.md) |
 
-## Current handover — sprint-alfred-epic: plan APPROVED, phase implementation (2026-08-28)
+## Current handover — the three-runner greenfield findings are being worked, happy path first (2026-08-28)
+
+**READ THIS FIRST.** The greenfield test ran candidate 0.6.0 across Claude/Windows,
+Agy/WSL and Codex/WSL against one design document. Eighteen backlog items came out
+of it (`9e4a59d6`, `f51f8f4e`), and the PO set the priority explicitly: the happy
+path ends at the push, so everything on that chain is NOW, not Nova B. Security is
+default ON with its prerequisites made ready during init.
+
+**The PO's own framing of the goal, kept verbatim because it is the acceptance
+bar:** *"das onboarding muss guided viel einfacher für die agenten werden"*. Onboarding
+today exposes ~31 subcommands with plan/apply digest pairs that an agent must
+sequence by hand; all three runs independently named this their largest friction.
+The decision (AskUserQuestion, 2026-08-28) is **"Flow neu, Kern behalten"** — rebuild
+the orchestration, leave the binding/crypto core untouched. Nothing in this work
+weakens a digest, a binding or a signature.
+
+**Work is running in rounds of parallel worktree-isolated Goldfish dispatches.**
+
+*Round A — landed and independently verified, not taken on report:*
+`53693c3d`/`3e6bfce4` scratch-during-intake admission (161/161) · `fffb0001`/`cb673ab1`
+absent pre-push hook reported as an unbacked gate (7/7) · `131a9901` twin-manifest
+drift detection (34/34) · `89f30758` shared copy-safe renderer (5/5, incl. a real
+`bash eval` round-trip). Merged guard suite: 162/162.
+
+*Round B — in flight (`wf_503c47db-c75`), based on `c67397d7`:* the guided init
+driver; the guard-git worktree fix; a push-gate satisfiability preflight; scanner
+bootstrap for security-on.
+
+*Round C — not yet dispatched:* verify-contract elicitation, push-approval mode
+choice, trust-anchor bootstrap, repair-cycle elimination. All four live in
+`lib/project-onboarding-v3.mjs`, so they run sequentially rather than in parallel.
+
+**A defect in the dispatch mechanism itself, found and filed mid-round**
+(`cb984294`, `8d403723`): `guard-git.mjs:542` resolves a `git commit -F` message
+file against `CLAUDE_PROJECT_DIR` rather than the invoking cwd, so inside a
+worktree the file is looked for in the main checkout and the commit is refused as
+`GIT-03-UNREADABLE-MESSAGE-FILE`. Two sibling dispatches hit it; one guessed the
+absolute-path workaround and landed its commits, the other returned an empty result
+with finished work stranded. Combined with the closed grammar's refusal of a newline
+in `-m`, a correct multi-line commit is unreachable from a worktree. Fix dispatched
+as `NVA-B-GUARDF`; until it lands, every worktree briefing must state the
+absolute-path rule. A second contradiction of the same kind is recorded in that
+item: `templates/prompts/goldfish-task.md` instructs `git add … && git commit …` as
+one call, which the grammar refuses.
+
+**Two of the four documented reasons for `security: off` are stale** (`c67397d7`).
+Onboarding now writes the `.gitignore` whose absence reason 1 describes, and missing
+scanners were measured rather than assumed: with none reachable the run reports
+`SKIPPED [binary_missing]` ×3, `license-check: OK`, **CLEAN, exit 0**. What actually
+blocks is the v2 verdict's three offending required capabilities plus a license
+allowlist that resolves only inside this repository.
+
+**Still true and unchanged:** the push gate is `approval: required` with
+`gates.push_approval: signature`. Nothing here unblocks a push.
+
+## Prior handover — Verify is green in one run; candidate 0.6.0 local (2026-08-27)
 
 **READ THIS FIRST on `feat/sprint-alfred`.** The design phase is closed. The
 PO approved the plan on 2026-08-28 (`approve-plan --by "PO"`, 11:29:48Z),
@@ -88,12 +143,84 @@ scaffolding kept at `8316dbd8`).
   of the epic's own closure set (AC-13). The live count is **28**; read it
   with `check-backlog-sprint-assignment.mjs`, never from a written number.
 
-**Session/machine facts.** Pipeline `0.6.0+claude.20260827211222.562aadb`
-(local development). Session model Fable 5 at `max`, PO-set (MP-01 named
-exception); the cheap-configuration switch moves to the next gate
-presentation. PO trust anchor verified byte-identical to the configured
-`local-po-key` (`2de20a39…`). Pre-push hook installed in this clone
-(untracked, `.git/hooks`). Continuity revision 1.
+## Earlier handover — ledger-merge capability, ADR renumbering, handover rotation (2026-08-27)
+
+**READ THIS FIRST.** Three connected pieces of work, all committed, all on
+`feat/sprint-nova-codex-v046`.
+
+**1. The backlog ledger can now be merged across parallel sprints** — the
+capability the Phoenix merge proved missing. [ADR-0068](adr/0068-backlog-ledger-merge-semantics.md)
+records the decision; the defect it fixes was a contradiction sitting unnoticed
+in one module, because it is invisible while nothing moves: chain validation
+demanded an amendment's `from`/`to` equal the item's CURRENT status, while
+supersession recognition and the planners demanded the status frozen in a
+registry. Both readings coincide until a second line advances the item, and then
+they are mutually unsatisfiable. An amendment is now status-neutral and binds
+its target by `entryHash` rather than physical position. All 38 Phoenix
+reachability amendments migrated; the measurement that matters is that the same
+append took `check-backlog-state.mjs` from 13 findings to 73 before the change
+and leaves it unchanged after. `backlog-state.test.mjs` 55/55 including BS26,
+which can finally exercise what it was written for. Commits `87203a08`,
+`e8e65eb4`, `14f028bb`, `72c1c48d`, `086c3430`.
+
+**2. The six duplicate ADR numbers the merge produced are being resolved.**
+[ADR-0069](adr/0069-adr-numbers-are-allocated-at-acceptance.md): numbers are
+allocated at ACCEPTANCE, never at drafting, and carry no sprint prefix. Five of
+six done — 0062→0071, 0064→0073, 0065→0074, 0066→0075, 0061→0070. **0063 is
+still open** and is the largest (97 files, ~185 ambiguous bare references);
+expect `repository-directory-contract` to keep the number on reference load.
+
+**3. `docs/state.md` is editable again** — it was 48,825 bytes against its own
+30,000-byte cap, which blocked every session that follows the bootstrap
+protocol. Checkpoints 61–71 rotated to `docs/state-archive/2026-08-27--phoenix-checkpoints-61-71.md` (`da70d0df`).
+
+### Still open, in order
+
+1. **Collision 0063 → 0072.** The only remaining `DUPLICATE-NUMBER` finding.
+2. **Register `check-adr-consistency.mjs` in `verify.mjs`** (ADR-0069 D3). The
+   checker already existed and already worked; `verify.mjs` simply never ran it,
+   which is why six collisions could land unreported. Do this AFTER 0063, or
+   Verify goes red by design.
+3. **BS25/BS26 durability** (ADR-0068 D6, not yet written): three positional
+   lookups remain (`backlog-state.mjs:1326`, `:1504`, and the test's fixture).
+   Two can bind by `entryHash`; `amendsSequence` has no hash in its event shape
+   and needs an additive `amendsEntryHash`. The test fixture must stay
+   positional — it needs a contiguous valid chain — so the prefix invariant
+   becomes a NAMED check instead of a silent assumption.
+4. **Full `verify.mjs` run** once the above land.
+
+### Recommended for this candidate (Nova A), everything else Nova B
+
+- `handover-file-exceeds-its-own-size-cap` — **done above**, close it.
+- `long-dispatches-truncate-before-emitting-their-report` — hit **five times**
+  in the 2026-08-27 session alone; two dispatches lost their report entirely and
+  one nearly lost its work. The closing-allowance fix is already designed.
+- `existing-repos-drift-on-agy-pipeline-user-yaml-update` — adoption blocker for
+  every existing repo once 0.6.0 ships.
+- `gitleaks-content-fingerprint-breaks-on-any-line-insertion` — presents as an
+  unexplained blocking secret scan.
+- `antigravity-hard-enforcement-layer-has-two-fail-open-paths` — **PO
+  instruction 2026-08-27: the agy security items belong in the candidate.** The
+  residual path is not small: the entire Antigravity hard-enforcement layer
+  (PreToolUse guards, mandatory-bootstrap hard block) is inert whenever the
+  daemon cannot resolve `node`, and it fails SILENTLY because the hook that
+  would report it is the one that does not run. Its own QG-06 review horizon
+  (`due: 2026-08-30`) is three days out.
+
+Five further items are finished but not closed (ledger-merge, BS26,
+claude-start-time, tp-guard-restore, intake-generate-coordinator — the last is a
+status/Triage contradiction). Closing them is bookkeeping, but until it happens
+every backlog overview is wrong.
+
+### Ledger discipline — extracted 2026-08-27, applies to the closures above
+
+Both rules existed ONLY in the rotated checkpoints and are now filed
+(`f5a77841`): a `reconcile-backlog-ledger.mjs --activate` result is committed
+ALONE, because GG-22 inspects the whole staged index rather than the commit's
+pathspec; and `check-backlog-state.mjs` runs BEFORE committing a ledger change,
+since an uncommitted bad reconciliation is undone with `git checkout --` on the
+three projection files while a committed one needs the heavy evidence-amendment
+machinery. `closure_commit` needs a FULL lowercase OID.
 
 ## Operational head
 
