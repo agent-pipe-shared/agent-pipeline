@@ -6,7 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-28
 sprint: nova
-tracking: "NOW / Nova A — PO decision 2026-08-28: a fresh project starts with security on, and the scanners are installed alongside. The three reasons it was seeded off have all been closed; the remaining work is the manifest half."
+tracking: "NOW / Nova A — PO decision 2026-08-28 stands, but BLOCKED: the measurement below was taken in this repository's own checkout, the one place the consumer-side defect does not fire. See 'Correction' before implementing."
 source: "Measured 2026-08-28 against a genuinely fresh onboarded project at HEAD a304195d. Measured, not assumed — the same standard the original `off` decision was held to."
 ---
 
@@ -71,6 +71,31 @@ the measuring machine the scanners resolve from trusted locations even with them
 this should establish it properly — a fresh project on a machine with no scanners is the
 case that decides whether "installed alongside" is a prerequisite or a promise.
 
+## Correction (2026-08-28, same day): reason 2 is not closed for a consumer
+
+The table above records reason 2 as closed because "the scanner falls back to
+plugin-shipped defaults resolved from its own on-disk location, never `rootDir`".
+**Resolving from the adapter's own on-disk location is precisely the mechanism that
+fails** for any project that installed the plugin rather than running from this
+repository's checkout: `GITLEAKS_CONFIG_PATH` walks four directories up to a repo root
+that does not exist there, and the adapter's own `coverageLimitations` says so and calls
+the fix "an open item, not solved here".
+
+Consumer project HA hit exactly this: 0 findings across all scanners, exit 2, because two
+adapters could not start. Full analysis, with the two further defects that came with it,
+in `2026-08-28-the-push-gate-is-unsatisfiable-in-any-installed-plugin-deployment.md`.
+
+The measurement in this item is not wrong — it is not evidence about a consumer. It was
+run inside this checkout, where `.gitleaks.toml` exists. This item's own "Not claimed"
+section already flagged that the missing-scanner case had not been isolated; this is the
+same blind spot one step further out, and the honest reading is that the satisfying path
+was verified in the one environment where it is open.
+
+**Ordering consequence, which changes what this item may do:** the gitleaks resolution
+and `push-prepare`'s disregard for `gates.security` must both land BEFORE the gate is
+seeded on. Seeding `security: "blocking"` first would be honest about intent and still
+leave every consumer unable to push.
+
 ## Acceptance criteria
 
 - `freshBaselines()` seeds `security: "blocking"` AND the generated manifest carries a
@@ -80,6 +105,9 @@ case that decides whether "installed alongside" is a prerequisite or a promise.
 - A test measures the satisfying path end to end on a freshly onboarded project, the way
   the push gate's own satisfying path is measured today.
 - The behaviour on a machine without the scanners is established and stated, not assumed.
+- The satisfying path is measured against an INSTALLED-PLUGIN deployment, not against this
+  repository's own checkout. The correction above exists because those two differ, and only
+  the second was ever measured.
 
 ## Related
 
