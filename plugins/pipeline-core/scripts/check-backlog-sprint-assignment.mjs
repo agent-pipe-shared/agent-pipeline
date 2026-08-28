@@ -21,15 +21,26 @@
  * -- see that constant's own comment for the exact ADR lines and why "Cyborg" is deliberately
  * excluded.
  *
- * EXIT CODES (revised NVA-SPRINTGATE-1): 0 = every declared `sprint` value (if any) is in the
- * closed set, and every `open` item declares one. A `closed`/`in_progress`/`rejected`/`deferred`
- * item with no `sprint` is still counted and reported, never a failure -- that stays the human
- * triage pass this comment used to describe as "not happened yet". It has now happened for the
- * one status that matters mechanically: commit 6d81b33b (2026-08-27) declared a sprint for all
- * 47 items that were `open` at the time, so the rule for `open` items graduates from reported to
- * enforced. 1 = at least one `open` item declares no `sprint`, at least one item declares a
- * `sprint` value outside the closed set, or the items directory itself could not be
- * enumerated/read.
+ * THREE OUTCOMES, NOT TWO (PO decision, 2026-08-27). A `sprint` field can be a planning-window
+ * slug, the literal `none`, or absent, and this script keeps all three apart:
+ *   - a slug from BACKLOG_SPRINTS         -> counted in `counts[<slug>]`
+ *   - `none` (BACKLOG_SPRINT_NONE)        -> counted in `none`/`noneItems`, never in `counts`
+ *   - absent                              -> counted in `undeclared`, and a FAILURE while `open`
+ * `none` is an explicit statement that the item belongs to no planning window; it is neither a
+ * sprint (so it never inflates a window's count) nor an omission (so it never fails the gate).
+ * Collapsing `none` into either of the other two buckets is what this separation exists to
+ * prevent: merged with "absent", the mandatory-declaration rule below could no longer tell a
+ * decision from a forgotten field, which is its entire purpose.
+ *
+ * EXIT CODES (revised NVA-SPRINTGATE-1): 0 = every declared `sprint` value (if any) is an
+ * admissible declaration (a BACKLOG_SPRINTS slug or `none`), and every `open` item declares one.
+ * A `closed`/`in_progress`/`rejected`/`deferred` item with no `sprint` is still counted and
+ * reported, never a failure -- that stays the human triage pass this comment used to describe as
+ * "not happened yet". It has now happened for the one status that matters mechanically: commit
+ * 6d81b33b (2026-08-27) declared a sprint for all 47 items that were `open` at the time, so the
+ * rule for `open` items graduates from reported to enforced. 1 = at least one `open` item
+ * declares no `sprint`, at least one item declares a `sprint` value outside the admissible set,
+ * or the items directory itself could not be enumerated/read.
  *
  * Usage:
  *   node plugins/pipeline-core/scripts/check-backlog-sprint-assignment.mjs
@@ -39,7 +50,9 @@ import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { BACKLOG_SPRINTS, parseBacklogItem } from "../lib/backlog-state.mjs";
+import {
+  BACKLOG_SPRINTS, BACKLOG_SPRINT_DECLARATIONS, BACKLOG_SPRINT_NONE, parseBacklogItem,
+} from "../lib/backlog-state.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 export const DEFAULT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
@@ -55,6 +68,8 @@ export function checkBacklogSprintAssignment(root = DEFAULT_ROOT) {
   const counts = Object.fromEntries(BACKLOG_SPRINTS.map((sprint) => [sprint, 0]));
   const undeclaredItems = [];
   const openUndeclaredItems = [];
+  // `none` is kept out of `counts` on purpose -- see THREE OUTCOMES above.
+  const noneItems = [];
   let itemNames = [];
   try {
     itemNames = readdirSync(join(root, ITEMS_DIR), { withFileTypes: true })
@@ -62,7 +77,7 @@ export function checkBacklogSprintAssignment(root = DEFAULT_ROOT) {
       .map((entry) => entry.name)
       .sort((left, right) => left.localeCompare(right));
   } catch (error) {
-    return { ok: false, findings: [`${ITEMS_DIR} is missing or unreadable: ${error.message}`], counts, undeclared: 0, undeclaredItems, openUndeclared: 0, openUndeclaredItems, total: 0 };
+    return { ok: false, findings: [`${ITEMS_DIR} is missing or unreadable: ${error.message}`], counts, none: 0, noneItems, undeclared: 0, undeclaredItems, openUndeclared: 0, openUndeclaredItems, total: 0 };
   }
   for (const name of itemNames) {
     const repoPath = `${ITEMS_DIR}/${name}`;
@@ -85,8 +100,14 @@ export function checkBacklogSprintAssignment(root = DEFAULT_ROOT) {
       }
       continue;
     }
-    if (!BACKLOG_SPRINTS.includes(sprint)) {
-      findings.push(`${repoPath}: sprint ${JSON.stringify(sprint)} is not in the closed set (${BACKLOG_SPRINTS.join(", ")})`);
+    if (!BACKLOG_SPRINT_DECLARATIONS.includes(sprint)) {
+      findings.push(`${repoPath}: sprint ${JSON.stringify(sprint)} is not in the closed set (${BACKLOG_SPRINT_DECLARATIONS.join(", ")})`);
+      continue;
+    }
+    // An explicit "no planning window": admissible, reported on its own line, and
+    // never folded into a sprint's count or into `undeclared`.
+    if (sprint === BACKLOG_SPRINT_NONE) {
+      noneItems.push(repoPath);
       continue;
     }
     counts[sprint] += 1;
@@ -95,6 +116,8 @@ export function checkBacklogSprintAssignment(root = DEFAULT_ROOT) {
     ok: findings.length === 0,
     findings,
     counts,
+    none: noneItems.length,
+    noneItems,
     undeclared: undeclaredItems.length,
     undeclaredItems,
     openUndeclared: openUndeclaredItems.length,
@@ -113,6 +136,7 @@ function main(argv) {
   const lines = [
     `backlog items enumerated: ${result.total}`,
     ...BACKLOG_SPRINTS.map((sprint) => `- ${sprint}: ${result.counts[sprint]}`),
+    `- ${BACKLOG_SPRINT_NONE} (declared as belonging to no planning window): ${result.none}`,
     `- undeclared: ${result.undeclared}`,
     `- undeclared and open (failing): ${result.openUndeclared}`,
   ];

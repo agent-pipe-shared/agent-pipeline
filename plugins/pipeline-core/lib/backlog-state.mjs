@@ -30,6 +30,21 @@ export const BACKLOG_TYPES = Object.freeze(["workflow-improvement", "tooling-rad
 // not one this ADR reserves a machine value for, so it is deliberately absent
 // here.
 export const BACKLOG_SPRINTS = Object.freeze(["alfred", "batman", "nightwing", "nova", "phoenix"]);
+// `none` is an admissible `sprint` DECLARATION, deliberately NOT a sixth entry
+// in BACKLOG_SPRINTS above: that constant is the closed slug set ADR-0043
+// reserves, and the absence of a planning window is not one of the windows it
+// reserves. An item carrying `none` states, explicitly, that it belongs to no
+// sprint (PO decision, 2026-08-27).
+//
+// Why the two must stay apart rather than merge into one six-value set: if
+// `none` and a MISSING field meant the same thing, the mandatory-declaration
+// rule for `open` items (NVA-SPRINTGATE-1) would have nothing left to enforce —
+// it could no longer tell a deliberate "no window" from a forgotten field, and
+// that distinction is its only purpose. Consumers that mean "which planning
+// window" read BACKLOG_SPRINTS; consumers that mean "is this field's value
+// admissible" read BACKLOG_SPRINT_DECLARATIONS.
+export const BACKLOG_SPRINT_NONE = "none";
+export const BACKLOG_SPRINT_DECLARATIONS = Object.freeze([...BACKLOG_SPRINTS, BACKLOG_SPRINT_NONE]);
 // `open` branches three ways (backlog/README.md Triage rules: accept moves work
 // into `in_progress`; reject/defer are the two other triage outcomes, applied
 // only to `open` items "at a natural session/phase boundary, not mid-execution" —

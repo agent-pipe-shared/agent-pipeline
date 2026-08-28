@@ -92,6 +92,39 @@ test("checkBacklogSprintAssignment: an open item with a valid declared sprint pr
   assert.deepEqual(result.openUndeclaredItems, []);
 });
 
+// PO decision 2026-08-27: `none` is an admissible declaration meaning "belongs to no planning
+// window". These three tests pin the distinction the whole change exists for -- `none` satisfies
+// the mandatory-declaration rule, an absent field still does not, and the two never merge.
+test("checkBacklogSprintAssignment: an open item declaring sprint none is ok and is not a failure", () => {
+  const root = fixture([ITEM("open-none-sprint-item", { sprint: "none" })]);
+  const result = checkBacklogSprintAssignment(root);
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.findings, []);
+  assert.equal(result.none, 1);
+  assert.deepEqual(result.noneItems, ["backlog/items/2026-08-27-open-none-sprint-item.md"]);
+  assert.equal(result.openUndeclared, 0, "an explicit none is a declaration, so the open-item rule is satisfied");
+  assert.equal(result.undeclared, 0, "an explicit none is never counted as a missing declaration");
+});
+
+test("checkBacklogSprintAssignment: sprint none is counted apart from every planning window", () => {
+  const root = fixture([ITEM("none-vs-window", { sprint: "none" }), ITEM("real-window", { sprint: "nova" })]);
+  const result = checkBacklogSprintAssignment(root);
+  assert.equal(result.ok, true);
+  assert.equal(result.counts.nova, 1);
+  assert.equal(result.none, 1);
+  // The regression this guards: adding `none` as a sixth BACKLOG_SPRINTS entry would make it
+  // appear in `counts` and read as a planning window in every consumer of that constant.
+  assert.equal(Object.hasOwn(result.counts, "none"), false, "none must never appear as a sprint bucket");
+});
+
+test("checkBacklogSprintAssignment: a closed item declaring sprint none is ok", () => {
+  const root = fixture([ITEM("closed-none-sprint-item", { status: "closed", sprint: "none" })]);
+  const result = checkBacklogSprintAssignment(root);
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.findings, []);
+  assert.equal(result.none, 1);
+});
+
 test("checkBacklogSprintAssignment: a mix of declared/undeclared/invalid items counts each bucket independently", () => {
   const root = fixture([
     ITEM("mix-a", { sprint: "alfred" }),
