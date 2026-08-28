@@ -258,9 +258,15 @@ try {
     // OPEN because that is what the design specifies. The live-plugin rule is evaluated first
     // and independently of the path table, so for the installed copy -- and in a self-hosted
     // local-development install for the source copy too, since there they are the same file --
-    // these two modules are GS-6 files. That matters because GS-6 is the one window-liftable
-    // gate-strength rule while GS-8/GS-9 are not liftable at all: a signed GS-6 maintenance
-    // window opened for any reason also unlocks these two in the enforcing copy.
+    // these two modules are GS-6 files. That still holds after 92fd818c (NVA-V22-KERNELCLOSURE,
+    // closing the transitive-import gap guard-maintenance-window-kernel-closure.test.mjs
+    // asserts): both modules were ALSO added to NEVER_LIFTABLE_KERNEL_PATHS
+    // (guard-maintenance-window.mjs) there, so the protection got STRICTLY STRONGER, not
+    // weaker -- a signed GS-6 maintenance window no longer unlocks either module in the
+    // enforcing copy at all, where before it would have. The "no in-session override" wording
+    // this case pinned before that commit was the general non-kernel GS-6 phrasing; these two
+    // modules now take the hardcoded-kernel branch instead, which says there is no route to
+    // lift the refusal at all, ever -- checked below in place of the older phrase.
     const root = governed();
     for (const rule of SUBJECTS) {
       const target = join(PLUGIN_ROOT, "lib", basename(rule.path));
@@ -268,7 +274,7 @@ try {
       assert.equal(blocked, true, `${target} inside the live plugin must be refused`);
       assert.match(stderr, /Rule ID: GS-6\b/u, `${rule.id}: the live-plugin copy did not match GS-6`);
       assert.doesNotMatch(stderr, new RegExp(`Rule ID: ${rule.id}\\b`, "u"));
-      assert.match(stderr, /no in-session override/u);
+      assert.match(stderr, /There is no route to lift this refusal/u);
     }
   });
 
