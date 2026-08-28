@@ -8,7 +8,10 @@ created: 2026-08-28
 sprint: nova
 tracking: "NOW / Nova A — delivered 2026-08-28, same session it was reported"
 source: "Consumer project HA, incident report S56 finding B1 (2026-08-28, Windows, PowerShell). Reproduced from the reported bytes in a test before fixing."
-closure_evidence: "plugins/pipeline-core/lib/chat-gate-ceremony.test.mjs, 6/6; po-human-approval.test.mjs 97/97 after the shared-decoder import"
+closed_at: "2026-08-28"
+closure_repository: "self"
+closure_commit: "e2b357117f32e3229587b50b4a7fa715b5499f0e"
+closure_evidence: "plugins/pipeline-core/lib/chat-gate-ceremony.test.mjs"
 ---
 
 # A chat-mode gate was unusable for a PO whose name is not pure ASCII, on Windows

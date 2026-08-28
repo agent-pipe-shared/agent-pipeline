@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "ea79b08e01e743f62dcd4a942cf020c98203b1fb34d4cd1e8a938e23bde45b47"
+    "transitionHead": "01d66a3720b203fdbc7efe89b6a0fb8504dc88eb4553ceed7590ee772ec568d1"
   },
   "counts": {
-    "open": 77,
+    "open": 83,
     "in_progress": 3,
-    "closed": 382,
+    "closed": 384,
     "rejected": 3,
     "deferred": 11
   },
@@ -891,6 +891,20 @@
       "closureEvidence": "backlog/items/2026-08-18-capability-first-advisor-critic-dispatch.md"
     },
     {
+      "id": "pipeline.chat-gate-non-ascii-name-windows",
+      "status": "closed",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "Consumer project HA, incident report S56 finding B1 (2026-08-28, Windows, PowerShell). Reproduced from the reported bytes in a test before fixing.",
+      "deferred": false,
+      "tracking": "NOW / Nova A — delivered 2026-08-28, same session it was reported",
+      "closedAt": "2026-08-28",
+      "closureRepository": "self",
+      "closureCommit": "e2b357117f32e3229587b50b4a7fa715b5499f0e",
+      "closureEvidence": "plugins/pipeline-core/lib/chat-gate-ceremony.test.mjs"
+    },
+    {
       "id": "pipeline.chat-mode-push-approval-has-no-enforced-human-turn-boundary",
       "status": "closed",
       "type": "defect",
@@ -1242,6 +1256,16 @@
       "closureEvidence": "backlog/items/2026-08-18-concurrent-session-prevention-supersedes-a-ac-01s-remaining-gap.md"
     },
     {
+      "id": "pipeline.consumer-must-allowlist-every-runner-lane",
+      "status": "open",
+      "type": "improvement",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "Consumer project HA, incident report S56 finding B4 (2026-08-28, Windows, Claude runner).",
+      "deferred": false,
+      "tracking": "Nova B — onboarding should write the permission entries a consumer needs, instead of leaving a second blocking layer undocumented"
+    },
+    {
       "id": "pipeline.consumer-projects-have-no-goldfish-dispatch-requirement-for-implementation",
       "status": "closed",
       "type": "idea",
@@ -1495,22 +1519,18 @@
       "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
     },
     {
-      "id": "pipeline.design-phase-prd-and-spec-are-frozen-by-their-own-continuity-binding",
-      "status": "open",
+      "id": "pipeline.discarded-feature-dead-end",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-28",
-      "source": "Measured live 2026-08-28 in the Alfred clone, applying the PO's own PRD-gate decisions to the PRD and Spec the gate is about.",
-      "deferred": false
-    },
-    {
-      "id": "pipeline.discard-feature-writes-a-state-the-cleanup-observer-rejects-and-strands-the-session",
-      "status": "open",
-      "type": "defect",
-      "owner": "pipeline",
-      "created": "2026-08-27",
-      "source": "Hit live, 2026-08-27, in the Alfred clone, executing the epic switch the tool itself directs (discard-feature then set-feature). Reproduced against the source the same session; line references verified.",
-      "deferred": false
+      "source": "Consumer project HA, incident report S56 finding B6 (2026-08-28). The reported diagnosis named the validator; re-reading the code here located the real asymmetry at the call site.",
+      "deferred": false,
+      "tracking": "NOW / Nova A — delivered 2026-08-28, same session it was reported",
+      "closedAt": "2026-08-28",
+      "closureRepository": "self",
+      "closureCommit": "d13bbc2d2d8151e3c3f90c8abcd6e7f11645aaa1",
+      "closureEvidence": "plugins/pipeline-core/lib/onboarding-continuity.test.mjs"
     },
     {
       "id": "pipeline.dispatch-provenance",
@@ -1950,6 +1970,16 @@
       "closureRepository": "self",
       "closureCommit": "0f8bdafcd7b7b4ea42fbdbfb9085aafa8aa75a15",
       "closureEvidence": "backlog/items/2026-08-18-full-push-preflight-before-signature.md"
+    },
+    {
+      "id": "pipeline.gate-should-not-demand-a-human-name",
+      "status": "open",
+      "type": "improvement",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "Follow-up from 2026-08-28-a-chat-gate-is-unusable-with-a-non-ascii-name-on-windows.md, consumer incident report S56 finding B1's own second suggestion.",
+      "deferred": false,
+      "tracking": "Nova B — the encoding half is fixed; this is the design half that made the encoding fragile in the first place"
     },
     {
       "id": "pipeline.gate-strength-override-route-advertised-not-offered",
@@ -3950,6 +3980,16 @@
       "closureEvidence": "backlog/items/2026-08-19-po-authority-rebind-plan-checks-for-the-wrong-plan-approval-schema-version.md"
     },
     {
+      "id": "pipeline.po-ceremony-resolves-the-wrong-runner",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "Consumer project HA, incident report S56 finding B5 (2026-08-28, Windows, pipeline-core 0.6.0+claude.20260828131316.03c6e1e). Mechanism re-verified in this repository's own code before filing, and the reported diagnosis sharpened.",
+      "deferred": false,
+      "tracking": "NOW / Nova A — a gate that forces the PO into their own terminal must not land them on a different runner there; reported by a consumer project and confirmed in the code"
+    },
+    {
       "id": "pipeline.po-decision-bs26-unsatisfiable-under-the-phoenix-ledger-split",
       "status": "closed",
       "type": "requirement",
@@ -4476,6 +4516,16 @@
       "closureEvidence": "backlog/evidence/2026-08-10-apply-patch-invariant-closure.md"
     },
     {
+      "id": "pipeline.readiness-guard-blocks-its-own-recovery",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "Consumer project HA, incident report S56 finding B3 (2026-08-28, Windows, Claude runner). The denial text is quoted from the report; the guard's own admission logic has not yet been re-read against it here.",
+      "deferred": false,
+      "tracking": "NOW / Nova A — a guard that refuses the exact command its own refusal prescribes is a deadlock, and it fired twice in one consumer session"
+    },
+    {
       "id": "pipeline.readonly-and-chain-grep-pipe-trailing-stage-not-implemented",
       "status": "closed",
       "type": "requirement",
@@ -4513,6 +4563,16 @@
       "closureRepository": "self",
       "closureCommit": "f5e41744edfcc0f8cb76e36036cde90fa989582f",
       "closureEvidence": "backlog/evidence/2026-08-06-second-reconciliation-pass.md"
+    },
+    {
+      "id": "pipeline.rebind-rollback-names-no-predicate",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "Consumer project HA, incident report S56 finding B2 (2026-08-28, Windows). The consumer independently re-derived every input digest and found all of them correct.",
+      "deferred": false,
+      "tracking": "NOW / Nova A — the only sanctioned route to a PO acknowledgement marker is unusable, and the refusal is undiagnosable from outside"
     },
     {
       "id": "pipeline.reconcile-backlog-ledger-evidence-commit-predates-referenced-file",
@@ -4799,6 +4859,16 @@
       "closureRepository": "self",
       "closureCommit": "456b7beb2cb16a567fd4602525d1c6b17c9b0f89",
       "closureEvidence": "plugins/pipeline-core/lib/runtime-projection-v2.test.mjs"
+    },
+    {
+      "id": "pipeline.runtime-projections-drift-after-v3-refresh",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "Consumer project HA, incident report S56 side finding (2026-08-28). Observed, not diagnosed: neither the consumer nor this item has established which value is correct.",
+      "deferred": false,
+      "tracking": "Nova B — a silent divergence between two files that are meant to project the same authority; a consumer cannot judge it, and neither can this report"
     },
     {
       "id": "pipeline.scanner-bootstrap-is-not-self-sufficient",
