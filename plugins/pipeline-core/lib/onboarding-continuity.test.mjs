@@ -688,7 +688,7 @@ check("kickoff plan is deterministic, closed, valid, and read-only", () => {
   assert.deepEqual(after, before);
   assert.equal(existsSync(join(root, "nope")), false);
   assert.deepEqual(Object.keys(first).sort(), [
-    "applyAction", "calibration", "goal", "goalSha256", "language", "onboardingScript",
+    "applyAction", "calibration", "goal", "goalSha256", "language", "nextAction", "onboardingScript",
     "planSha256", "repositoryCapability", "root", "runner", "schema", "targets",
     "transactionSha256",
   ]);
@@ -700,6 +700,10 @@ check("kickoff plan is deterministic, closed, valid, and read-only", () => {
   ]);
   assert.equal(first.applyAction.mutation, true);
   assert.equal(first.applyAction.requiresConfirmation, true);
+  // NVA-H-LASTBUILDERS: the generic guided driver reads ONLY `nextAction`,
+  // never `applyAction` -- same sibling convention as the promotion plans
+  // (NVA-F-PROMOTIONACTION) and the intake-generate plan (NVA-D-PLANACTION).
+  assert.deepEqual(first.nextAction, first.applyAction);
   assert.deepEqual(first.applyAction.expected, {
     schema: "pipeline.project-onboarding.v4",
     statuses: ["ready"],
@@ -767,6 +771,95 @@ check("apply rejects apply-metadata drift even when the top-level digest field i
     activate: true,
   }));
   assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "absent-pristine");
+});
+
+// NVA-H-LASTBUILDERS: the goal-bound kickoff plan is the first of the last
+// two `planSha256 = canonicalSha256(...)` sites in this module to gain a
+// `nextAction` sibling -- same convention already covered above (the
+// "kickoff plan is deterministic..." check's key-list and nextAction
+// assertions) and by NVA-F-PROMOTIONACTION for the promotion plans.
+check("apply rejects a plan whose nextAction disagrees with its own re-derived apply action, exactly as a mismatched applyAction is refused (NVA-H-LASTBUILDERS)", () => {
+  const root = fixture("kickoff-nextaction-drift");
+  const plan = planOnboardingKickoff({ rootDir: root, goal: "Create a product" });
+  const tampered = structuredClone(plan);
+  tampered.nextAction.argv.push("--bogus");
+  expectKickoffError("KICKOFF-PLAN-INVALID", () => applyOnboardingKickoff({
+    plan: tampered,
+    expectedPlanSha256: plan.planSha256,
+    activate: true,
+  }));
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "absent-pristine");
+});
+
+check("reconstructOnboardingKickoffPlan (replay): the reconstructed goal-bound plan also publishes nextAction identical to applyAction (NVA-H-LASTBUILDERS)", () => {
+  const root = fixture("kickoff-nextaction-replay");
+  const plan = planOnboardingKickoff({ rootDir: root, goal: "Create a product" });
+  applyOnboardingKickoff({ plan, expectedPlanSha256: plan.planSha256, activate: true });
+  const replayed = reconstructOnboardingKickoffPlan({ rootDir: root, goal: "Create a product" });
+  assert.deepEqual(replayed.nextAction, replayed.applyAction);
+  assert.deepEqual(replayed, plan);
+});
+
+check("planOnboardingKickoff: planSha256 is bound to the transaction alone -- publishing nextAction changes no plan digest (NVA-H-LASTBUILDERS)", () => {
+  const root = fixture("kickoff-nextaction-digest-stability");
+  const plan = planOnboardingKickoff({ rootDir: root, goal: "Create a product" });
+  // Same key set `planBinding()` (onboarding-continuity.mjs, private) projects
+  // out of the plan -- deliberately neither `planSha256` nor
+  // `applyAction`/`nextAction`. Recomputing the digest from exactly this
+  // projection proves planSha256 does not depend on nextAction's presence or value.
+  const binding = {
+    schema: plan.schema, root: plan.root, repositoryCapability: plan.repositoryCapability,
+    goal: plan.goal, goalSha256: plan.goalSha256, language: plan.language, calibration: plan.calibration,
+    targets: plan.targets, transactionSha256: plan.transactionSha256, onboardingScript: plan.onboardingScript,
+    runner: plan.runner,
+  };
+  assert.equal(sha256CanonicalJson(binding), plan.planSha256,
+    "planSha256 must be derivable from the transaction-bound fields alone -- applyAction and nextAction are excluded from the digest");
+});
+
+// NVA-H-LASTBUILDERS: the kickoff-promotion cleanup recovery plan is the
+// second and last of the seven `planSha256 = canonicalSha256(...)` sites to
+// gain a `nextAction` sibling. Unlike the kickoff and promotion plans above,
+// `applyOnboardingKickoffPromotionCleanupRecovery` never accepts a
+// caller-supplied plan object -- it takes only `rootDir` and
+// `expectedPlanSha256` and always re-derives its own plan internally, the
+// same "self-re-deriving apply" shape `applyOnboardingIntakeGenerate`
+// already has (NVA-D-PLANACTION). There is therefore no dedicated
+// exact-key-set validator for this plan's shape to extend, and no
+// caller-supplied `nextAction` for a mismatch-refusal test to exercise --
+// both are architecturally absent for this builder exactly as they already
+// are for the intake-generate builder. The non-ready branches keep their own
+// coverage above (extended "legacy promotion cleanup mismatch ... fails
+// closed" loop) and below ("not-applicable").
+check("planOnboardingKickoffPromotionCleanupRecovery: a ready recovery plan publishes nextAction identical to applyAction, carrying the plan's own digest (NVA-H-LASTBUILDERS)", () => {
+  const seed = promotionSeed("lastbuilders-recovery-fresh", { privatized: true, bumpRevision: false });
+  const promotion = planOnboardingKickoffPromotion(seed.request);
+  applyOnboardingKickoffPromotion({ plan: promotion, expectedPlanSha256: promotion.planSha256, activate: true });
+  const plan = planOnboardingKickoffPromotionCleanupRecovery({ rootDir: seed.root });
+  assert.equal(plan.status, "ready");
+  assert.deepEqual(plan.nextAction, plan.applyAction);
+  assert.equal(plan.nextAction.kind, "command");
+  assert.equal(plan.nextAction.executable, "node");
+  const flagIndex = plan.nextAction.argv.indexOf("--plan-sha256");
+  assert.ok(flagIndex >= 0, "nextAction argv must carry --plan-sha256");
+  assert.equal(plan.nextAction.argv[flagIndex + 1], plan.planSha256);
+  // Same key set `kickoffPromotionCleanupRecoveryPlanCore` (private) returns
+  // as `core` -- deliberately neither `planSha256` nor `applyAction`/`nextAction`/`status`.
+  const core = {
+    schema: plan.schema, root: plan.root, stateSha256: plan.stateSha256, historySha256: plan.historySha256,
+    revision: plan.revision, feature: plan.feature, binding: plan.binding, sessionCleanupScript: plan.sessionCleanupScript,
+  };
+  assert.equal(sha256CanonicalJson(core), plan.planSha256,
+    "planSha256 must be derivable from the core fields alone -- applyAction and nextAction are excluded from the digest");
+});
+
+check("planOnboardingKickoffPromotionCleanupRecovery: a not-applicable result carries neither applyAction nor nextAction nor planSha256 (NVA-H-LASTBUILDERS)", () => {
+  const root = fixture("lastbuilders-recovery-not-applicable");
+  const result = planOnboardingKickoffPromotionCleanupRecovery({ rootDir: root });
+  assert.equal(result.status, "not-applicable");
+  assert.equal("applyAction" in result, false);
+  assert.equal("nextAction" in result, false);
+  assert.equal("planSha256" in result, false);
 });
 
 check("pre-existing initial authority artifact blocks plan without overwriting it", () => {
@@ -1790,7 +1883,14 @@ for (const [name, mutate] of [
   check(`legacy promotion cleanup mismatch ${name} fails closed`, () => {
     const seed = legacyPromotionCleanupMismatch(name);
     mutate(seed);
-    assert.equal(planOnboardingKickoffPromotionCleanupRecovery({ rootDir: seed.root }).status, "recovery-unavailable");
+    const result = planOnboardingKickoffPromotionCleanupRecovery({ rootDir: seed.root });
+    assert.equal(result.status, "recovery-unavailable");
+    // NVA-H-LASTBUILDERS: the non-ready branches return before nextAction is
+    // attached and must stay exactly as they were -- only the "ready" return
+    // gains applyAction/nextAction/planSha256.
+    assert.equal("applyAction" in result, false);
+    assert.equal("nextAction" in result, false);
+    assert.equal("planSha256" in result, false);
   });
 }
 

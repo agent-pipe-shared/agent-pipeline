@@ -111,9 +111,17 @@ const SESSION_CLEANUP_RELEASE_RECEIPT_BASENAME = "session-cleanup-release-receip
 const SESSION_CLEANUP_PRIVATIZATION_AUDIT_BASENAME = "session-cleanup-privatization-audit";
 const SESSION_CLEANUP_PRIVATIZATION_CONFIRMATION_BASENAME = "session-cleanup-privatization-confirmation";
 const SHA256_RE = /^[a-f0-9]{64}$/u;
+// NVA-H-LASTBUILDERS: same `applyAction`/`nextAction` sibling convention as
+// `PROMOTION_PLAN_KEYS` above and `intakeGenerateApplyAction` below -- the
+// generic guided driver reads ONLY `nextAction`, never `applyAction`, so a
+// goal-bound kickoff plan that carries a real apply command under the wrong
+// name still stalls the driver dead. `nextAction` is attached AFTER
+// `planSha256` is computed and is deliberately NOT part of `planBinding()`,
+// so publishing it changes no plan digest.
 const PLAN_KEYS = new Set([
   "schema", "root", "repositoryCapability", "goal", "goalSha256", "language", "calibration",
   "targets", "transactionSha256", "onboardingScript", "runner", "planSha256", "applyAction",
+  "nextAction",
 ]);
 const TARGET_KEYS = {
   state: new Set(["path", "beforeSha256", "afterSha256", "value"]),
@@ -3791,9 +3799,15 @@ function validatePlan(plan) {
     || canonicalSha256(planBinding(plan)) !== plan.planSha256) {
     fail("KICKOFF-PLAN-INVALID", "kickoff transaction binding is invalid");
   }
-  if (canonicalJson(plan.applyAction) !== canonicalJson(
-    applyAction(plan.onboardingScript, plan.root, plan.goal, plan.language, plan.planSha256, plan.runner),
-  )) {
+  const expectedKickoffApplyAction = applyAction(
+    plan.onboardingScript, plan.root, plan.goal, plan.language, plan.planSha256, plan.runner,
+  );
+  if (canonicalJson(plan.applyAction) !== canonicalJson(expectedKickoffApplyAction)
+    // `nextAction` is the same command object, published under the name the
+    // generic guided driver reads (NVA-H-LASTBUILDERS) -- validated the same
+    // way `applyAction` already is: a plan whose `nextAction` disagrees with
+    // its own re-derived apply action is refused.
+    || canonicalJson(plan.nextAction) !== canonicalJson(expectedKickoffApplyAction)) {
     fail("KICKOFF-PLAN-INVALID", "kickoff apply action is invalid");
   }
   return {
@@ -3951,10 +3965,14 @@ function buildOnboardingKickoffPlan({
     runner,
   };
   const planSha256 = canonicalSha256(binding);
+  const kickoffApplyAction = applyAction(
+    onboardingScript, observed.root, normalizedGoal, resolvedLanguage, planSha256, runner,
+  );
   const plan = {
     ...binding,
     planSha256,
-    applyAction: applyAction(onboardingScript, observed.root, normalizedGoal, resolvedLanguage, planSha256, runner),
+    applyAction: kickoffApplyAction,
+    nextAction: kickoffApplyAction,
   };
   validatePlan(plan);
   if (replay) {
@@ -6570,11 +6588,22 @@ export function planOnboardingKickoffPromotionCleanupRecovery({
       : "not-applicable",
   };
   const planSha256 = canonicalSha256(core);
+  // NVA-H-LASTBUILDERS: same `applyAction`/`nextAction` sibling convention as
+  // the kickoff and promotion plans above -- the generic guided driver reads
+  // ONLY `nextAction`, never `applyAction`, so a recovery plan reaching
+  // status "ready" with a real apply command under the wrong name still
+  // stalls the driver dead. Computed once and published under both names;
+  // attached AFTER `planSha256` is computed and deliberately not part of
+  // `core`, so publishing it changes no plan digest. The non-ready branches
+  // above (`recovery-unavailable`/`not-applicable`) return before this point
+  // and stay untouched -- they carry neither `applyAction` nor `nextAction`.
+  const recoveryApplyAction = kickoffPromotionCleanupRecoveryAction(sessionCleanupScript, observed.root, planSha256);
   return {
     ...core,
     status: "ready",
     planSha256,
-    applyAction: kickoffPromotionCleanupRecoveryAction(sessionCleanupScript, observed.root, planSha256),
+    applyAction: recoveryApplyAction,
+    nextAction: recoveryApplyAction,
   };
 }
 
