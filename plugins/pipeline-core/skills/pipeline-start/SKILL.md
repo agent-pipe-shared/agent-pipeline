@@ -109,11 +109,18 @@ that call is the human's — if asked, state cost/benefit neutrally, not a
 recommendation.
 
 1. **Step 0 / V4 onboarding:** `nextAction.kind: "advisory"` runs nothing --
-   go to Step 2, surfaced. Otherwise execute the exact read-only
-   `project-onboarding-v3.mjs inspect --root "$PWD" --intent bootstrap` action
-   returned by preflight. Accept only ready `pipeline.project-onboarding.v4`
-   native-local or receipt-bound plugin-managed forms, including CAS-READY
-   App-Server readback where required. Empty `.codex` is not authority.
+   go to Step 2, surfaced. Otherwise execute the exact action returned by
+   preflight, verbatim, never hand-constructed from memory. For a project
+   that is not yet ready, that action names the guided driver,
+   `onboarding-init.mjs --root <root> [--runner <runner>] [--step-cap <n>]`
+   (`scripts/onboarding-init.mjs`) -- it walks the whole onboarding chain
+   step by step and re-anchors after each apply, replacing what used to be a
+   manual turn-by-turn `inspect`/apply loop. For an already-ready project the
+   returned action is the read-only
+   `project-onboarding-v3.mjs inspect --root "$PWD" --intent bootstrap`.
+   Accept only ready `pipeline.project-onboarding.v4` native-local or
+   receipt-bound plugin-managed forms, including CAS-READY App-Server
+   readback where required. Empty `.codex` is not authority.
 2. **Loaded authority:** read ruleset presence, V3 source/runtime authority,
    profile, model/effort, Advisor model-free preflight, calibration, role
    prohibitions, freshness/update availability, handover/state and Verify

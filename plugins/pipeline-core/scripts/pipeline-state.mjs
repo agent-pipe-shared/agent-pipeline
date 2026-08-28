@@ -3239,6 +3239,18 @@ function buildInspectNextAction(dir, state, lifecycle) {
   }
   if (lifecycle.status === "awaiting-approval") {
     const submission = state.planSubmission && typeof state.planSubmission === "object" ? state.planSubmission : {};
+    // NVA-V2B-APPROVERENDER: the command is RENDERED, exactly as the draft branch above
+    // renders its own, and for the same reason -- naming a command without spelling it
+    // leaves the caller to reconstruct an invocation from prose, which is how this
+    // repository has previously handed a PO a subcommand that did not exist. Rendering
+    // it is not a step toward making it agent-runnable: this stays `collect-input`, and
+    // deliberately carries NO `executable` and NO `argv`, which are the two fields a
+    // driver executes. `--by` stays a placeholder rather than a derived value even
+    // though the local Git author is readable here (the draft gate derives exactly that,
+    // one step earlier) -- filling it in would let a session run this on the PO's
+    // behalf, and this is the approval the whole gate exists to reserve for them.
+    const scriptPath = fileURLToPath(import.meta.url);
+    const command = `${process.execPath} ${scriptPath} approve-plan --by "<the PO's own name>"`;
     return {
       kind: "collect-input",
       mutation: false,
@@ -3247,8 +3259,9 @@ function buildInspectNextAction(dir, state, lifecycle) {
         + " agent must never supply this on the PO's behalf. Ask the PO to read the plan at"
         + ` ${submission.planPath} (sha256 ${submission.planSha256}) and the specification at`
         + ` ${submission.specPath} (sha256 ${submission.specSha256}); if and only if satisfied, the PO`
-        + " approves it themselves by running pipeline-state approve-plan with their own name as --by."
-        + " There is no command that records this approval on their behalf, and none should ever be offered.",
+        + ` approves it themselves by replacing the placeholder and running: ${command}`
+        + " -- there is no command that records this approval on their behalf, and none should ever"
+        + " be offered.",
       expected: { schema: INSPECT_SCHEMA, statuses: ["awaiting-approval"] },
     };
   }
