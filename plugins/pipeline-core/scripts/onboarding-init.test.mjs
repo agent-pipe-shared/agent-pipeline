@@ -15,13 +15,10 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import test from "node:test";
 
 import { DEFAULT_STEP_CAP, SCHEMA, driveOnboardingInit } from "./onboarding-init.mjs";
-
-const ONBOARDING_SCRIPT_PATH = join(dirname(fileURLToPath(import.meta.url)), "project-onboarding-v3.mjs");
 
 function freshRoot() {
   return mkdtempSync(join(tmpdir(), "onboarding-init-test-"));
@@ -42,21 +39,35 @@ function dispose(path) {
 test("driveOnboardingInit: the runner lane is the caller's, not the ambient environment's", () => {
   const root = freshRoot();
   try {
-    // Pinned claude: a fresh repository reaches a genuine human question.
+    // Pinned claude: a fresh repository reaches a genuine published question. Since
+    // NVA-V3-PENDINGASKS, that is the pendingAsks stop published on the `apply-portable-seed`
+    // command step (author identity/push-approval/verify-contract), reached before the
+    // later intake-consent collect-input this test pinned pre-fix -- surfacing it earlier is
+    // exactly this task's fix, not a regression here.
     const claude = driveOnboardingInit({ rootDir: root, runner: "claude" });
     assert.equal(claude.runner, "claude", "the resolved lane is reported, not left for the caller to assume");
-    assert.equal(claude.outcome, "collect-input");
+    assert.equal(claude.outcome, "pending-asks");
     assert.equal(claude.steps[0].argv.includes("--runner"), true, "the pinned lane reaches the first inspect");
 
-    // Pinned codex on the SAME fresh repository shape: the Codex restart barrier is a
-    // nextAction kind this driver cannot execute, and it says so honestly rather than
-    // guessing. This is correct behaviour, pinned here so the two lanes stay distinguishable.
+    // Pinned codex on the SAME fresh repository shape: pendingAsks itself is not
+    // runner-specific (both lanes reach it here), but the pinned lane is still what decides
+    // WHICH runner value is threaded through every constructed step -- reported and
+    // asserted below rather than assumed. (The Codex restart barrier this test previously
+    // distinguished the lanes by is reached LATER in the chain, past where pendingAsks now
+    // stops the driver first -- NVA-V3-PENDINGASKS moved the first stop earlier.)
     const other = freshRoot();
     try {
       const codex = driveOnboardingInit({ rootDir: other, runner: "codex" });
       assert.equal(codex.runner, "codex");
-      assert.notEqual(codex.outcome, "collect-input",
-        "the codex lane does not reach the same question, which is exactly why the lane must be pinned rather than inherited");
+      // The load-bearing assertion, and deliberately not `codex.runner !== claude.runner`,
+      // which is true by construction of the two calls and would prove nothing: the pinned
+      // lane must actually be THREADED into every step this driver constructs. Read the
+      // value that follows `--runner` in each step's argv and require it to be this lane's,
+      // on both sides -- so a driver that accepted the parameter and then inherited an
+      // ambient runner anyway would fail here.
+      const runnerValues = (result) => result.steps.map((step) => step.argv[step.argv.indexOf("--runner") + 1]);
+      assert.deepEqual(new Set(runnerValues(codex)), new Set(["codex"]), "every codex-lane step carries the codex runner");
+      assert.deepEqual(new Set(runnerValues(claude)), new Set(["claude"]), "every claude-lane step carries the claude runner");
     } finally {
       dispose(other);
     }
@@ -76,22 +87,25 @@ test("driveOnboardingInit: the runner lane is the caller's, not the ambient envi
   }
 });
 
-test("driveOnboardingInit: stops at the first collect-input action without inventing any of its values", () => {
+test("driveOnboardingInit: stops at the first published ask (pendingAsks or collect-input) without inventing any of its values", () => {
   const root = freshRoot();
   try {
     const result = driveOnboardingInit({ rootDir: root, runner: "claude" });
     assert.equal(result.schema, SCHEMA);
-    assert.equal(result.outcome, "collect-input");
+    // A fresh repository's first stop is now the pendingAsks published on the
+    // `apply-portable-seed` command step (author identity/push-approval/verify-contract) --
+    // this is the earlier stop NVA-V3-PENDINGASKS introduces, reached before the later
+    // intake-consent collect-input a pre-fix driver reached instead.
+    assert.equal(result.outcome, "pending-asks");
     assert.equal(result.root, root);
-    assert.equal(result.collectInput.kind, "collect-input");
-    // The collect-input action is carried through VERBATIM from the underlying onboarding
+    assert.ok(Array.isArray(result.pendingAsks) && result.pendingAsks.length > 0);
+    // The pendingAsks array is carried through VERBATIM from the underlying onboarding
     // CLI's own final response -- never re-derived, never re-worded.
-    assert.deepEqual(result.collectInput, result.final.nextAction);
+    assert.deepEqual(result.pendingAsks, result.final.nextAction.pendingAsks);
     // Never invented: this driver holds no field anywhere in its result that could carry a
-    // fabricated answer for any of the asked inputs (gitAuthorName/gitAuthorEmail/language/
-    // profile, for a fresh repository's first intake-consent ask).
-    const askedNames = (result.collectInput.inputs ?? [result.collectInput.input]).map((input) => input.name);
-    assert.ok(askedNames.length > 0, "a collect-input action must name at least one input");
+    // fabricated answer for any of the asked inputs across all published asks.
+    const askedNames = result.pendingAsks.flatMap((ask) => (ask.inputs ?? [ask.input]).map((input) => input.name));
+    assert.ok(askedNames.length > 0, "at least one pending ask must name at least one input");
     for (const name of askedNames) {
       assert.equal(Object.prototype.hasOwnProperty.call(result, name), false, `must not have invented a top-level ${name}`);
     }
@@ -123,40 +137,30 @@ test("driveOnboardingInit: executes a run of consecutive command actions before 
   }
 });
 
-test("driveOnboardingInit: is re-entrant -- a second run continues from the checkpoint instead of restarting or double-applying", () => {
+test("driveOnboardingInit: is re-entrant -- a second run never repeats the already-executed command that published the ask", () => {
   const root = freshRoot();
   try {
     const first = driveOnboardingInit({ rootDir: root, runner: "claude" });
-    assert.equal(first.outcome, "collect-input");
-    const firstAsk = (first.collectInput.inputs ?? [first.collectInput.input]).map((input) => input.name).sort();
+    assert.equal(first.outcome, "pending-asks");
+    assert.ok(first.steps.some((step) => step.argv[1] === "apply-portable-seed"),
+      "the pendingAsks are published as a side effect of this exact command's own response");
 
-    // Simulate the human answering, OUTSIDE this driver, exactly once -- the same
-    // intake-consent-apply call the first run's own guidance names, with concrete answers
-    // this test supplies (never the driver).
-    const answered = spawnSync("node", [
-      ONBOARDING_SCRIPT_PATH,
-      "intake-consent-apply",
-      "--root", root,
-      "--git-author-name", "Onboarding Init Test",
-      "--git-author-email", "onboarding-init-test@example.invalid",
-      "--language", "en",
-      "--profile", "mini",
-      "--granted",
-      "--activate",
-    ], { encoding: "utf8", shell: false });
-    assert.equal(answered.status, 0, answered.stderr);
-
+    // KNOWN LIMITATION, library-side and out of this driver's scope (confirmed by direct
+    // measurement, 2026-08-28): `withPendingAsksSurfacedOnNextAction()`
+    // (lib/project-onboarding-v3.mjs ~lines 5416/5418) is wired ONLY into the
+    // apply-portable-seed activation call's own response, not into a later bare `inspect`
+    // read of the same on-disk state. So a re-entrant run that neither answered nor
+    // re-triggers that exact command does not see the SAME pendingAsks again -- it silently
+    // continues past where they were, reaching whatever the chain's next genuine stop is.
+    // This driver cannot close that gap without knowing WHICH command re-surfaces which
+    // ask, which is exactly the domain knowledge it is built to hold none of; it is
+    // reported here, not special-cased around. What IS guaranteed, and what this test pins,
+    // is the property this driver actually owns: it never re-executes the already-applied
+    // command a second time.
     const second = driveOnboardingInit({ rootDir: root, runner: "claude" });
-    // Re-running must not repeat the already-answered consent question: whatever it stops
-    // on next must be a DIFFERENT ask than the first run's.
-    const secondAsk = second.outcome === "collect-input"
-      ? (second.collectInput.inputs ?? [second.collectInput.input]).map((input) => input.name).sort()
-      : null;
-    assert.notDeepEqual(secondAsk, firstAsk, "must have progressed past the already-answered consent question");
-    // No double-apply: the second run must not re-run intake-consent-apply itself -- it
-    // already resolved that from the disk state the spawned call above wrote.
     const secondSubcommands = second.steps.map((step) => step.argv[1]);
-    assert.equal(secondSubcommands.filter((name) => name === "intake-consent-apply").length, 0);
+    assert.equal(secondSubcommands.filter((name) => name === "apply-portable-seed").length, 0,
+      "must not double-apply the already-applied command");
   } finally {
     dispose(root);
   }
@@ -333,6 +337,101 @@ test("driveOnboardingInit: collect-input, ready, unsupported-next-action and err
     assert.equal(errorResult.outcome, "error");
   } finally {
     dispose(errorRoot);
+  }
+});
+
+// NVA-V3-PENDINGASKS: the library publishes side-channel `nextAction.pendingAsks` (author
+// identity, push-approval mode, verify-contract, trust-anchor, project-ignore-gap --
+// `withPendingAsksSurfacedOnNextAction()`, lib/project-onboarding-v3.mjs) and this driver
+// previously branched only on `nextAction.kind`, dropping every one of them silently on the
+// common `kind: "command"` path (backlog: 2026-08-28-push-approval-mode-is-not-chosen-at-
+// onboarding.md). The four tests below pin the fix, generically -- no individual ask's
+// meaning is ever asserted here, only that the protocol channel itself is surfaced.
+
+test("driveOnboardingInit: a command nextAction carrying pendingAsks stops and surfaces them instead of executing straight past them", () => {
+  const root = freshRoot();
+  try {
+    let calls = 0;
+    const askEntry = { kind: "collect-input", input: { name: "examplePendingAsk" }, guidance: "example" };
+    const run = () => {
+      calls += 1;
+      return respond({
+        schema: "pipeline.synthetic.v1",
+        status: "in-progress",
+        nextAction: { kind: "command", executable: "node", argv: ["--eval", "0"], pendingAsks: [askEntry] },
+      });
+    };
+    const result = driveOnboardingInit({ rootDir: root, run });
+    assert.equal(result.outcome, "pending-asks", JSON.stringify(result));
+    assert.deepEqual(result.pendingAsks, [askEntry]);
+    assert.equal(calls, 1, "the command must not have been executed once a pending ask surfaced");
+  } finally {
+    dispose(root);
+  }
+});
+
+test("driveOnboardingInit: a command nextAction with no pendingAsks (absent or empty) is unaffected", () => {
+  for (const pendingAsks of [undefined, []]) {
+    const root = freshRoot();
+    try {
+      let step = 0;
+      const run = () => {
+        step += 1;
+        if (step === 1) {
+          const nextAction = { kind: "command", executable: "node", argv: ["--eval", "0"] };
+          if (pendingAsks !== undefined) nextAction.pendingAsks = pendingAsks;
+          return respond({ schema: "pipeline.synthetic.v1", status: "in-progress", nextAction });
+        }
+        return respond({ schema: "pipeline.synthetic.v1", status: "ready", nextAction: null });
+      };
+      const result = driveOnboardingInit({ rootDir: root, run });
+      assert.equal(result.outcome, "ready", JSON.stringify(result));
+      assert.equal(step, 2, "the command must have been executed, exactly as before this change");
+    } finally {
+      dispose(root);
+    }
+  }
+});
+
+test("driveOnboardingInit: a collect-input nextAction that also carries pendingAsks surfaces both, neither lost", () => {
+  const root = freshRoot();
+  try {
+    const askEntry = { kind: "collect-input", input: { name: "sideChannelAsk" } };
+    const collectInputAction = { kind: "collect-input", input: { name: "primaryAsk" }, pendingAsks: [askEntry] };
+    const run = () => respond({ schema: "pipeline.synthetic.v1", status: "in-progress", nextAction: collectInputAction });
+    const result = driveOnboardingInit({ rootDir: root, run });
+    assert.equal(result.outcome, "collect-input");
+    assert.deepEqual(result.collectInput, collectInputAction, "the primary question must still be carried through verbatim");
+    assert.deepEqual(result.pendingAsks, [askEntry], "the sibling ask must also be surfaced, not dropped");
+  } finally {
+    dispose(root);
+  }
+});
+
+test("driveOnboardingInit: malformed pendingAsks does not crash the driver and is not silently swallowed", () => {
+  for (const malformed of ["not-an-array", ["a string entry, not an object"], [{ noKindField: true }]]) {
+    const root = freshRoot();
+    try {
+      let step = 0;
+      const run = () => {
+        step += 1;
+        if (step === 1) {
+          return respond({
+            schema: "pipeline.synthetic.v1",
+            status: "in-progress",
+            nextAction: { kind: "command", executable: "node", argv: ["--eval", "0"], pendingAsks: malformed },
+          });
+        }
+        return respond({ schema: "pipeline.synthetic.v1", status: "ready", nextAction: null });
+      };
+      const result = driveOnboardingInit({ rootDir: root, run });
+      assert.equal(result.outcome, "ready", JSON.stringify(result));
+      assert.equal(step, 2, "malformed metadata is not treated as a valid stop-worthy ask -- the command must still execute");
+      assert.equal(result.steps[0].pendingAsksFault, "malformed-pending-asks-ignored",
+        "the malformed field must be visible on the step record, not silently dropped");
+    } finally {
+      dispose(root);
+    }
   }
 });
 

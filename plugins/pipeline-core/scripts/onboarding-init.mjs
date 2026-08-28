@@ -23,6 +23,17 @@
  *     returns that action's own `inputs`/`input`/`guidance` fields VERBATIM (via the raw
  *     final onboarding-cli response, never re-worded or summarized).
  *
+ * SURFACES PUBLISHED PENDING ASKS, NEVER ANSWERS THEM: any `nextAction` (of either kind
+ * above) can additionally carry a `pendingAsks` array (the library's own
+ * `withPendingAsksSurfacedOnNextAction()` side-channel merge). The driver reads it
+ * generically -- a well-formed entry is any object with a string `kind`, the same shape a
+ * `collect-input` action already has -- and on a `command` step with a non-empty
+ * `pendingAsks`, stops and reports `outcome: "pending-asks"` INSTEAD OF executing the
+ * command, so a published ask is never silently stepped past. On a `collect-input` step, any
+ * sibling `pendingAsks` is surfaced alongside the primary question, not dropped. It still
+ * never resolves, characterizes, or answers any individual ask -- that would be exactly the
+ * domain knowledge this driver is built to hold none of.
+ *
  * RE-ANCHORS AFTER A SILENT SUCCESS, INSTEAD OF STOPPING THERE: a step this driver just
  * EXECUTED (a `command` action it ran, not the bootstrap `inspect` itself) can come back
  * successful with no `nextAction` and a `status` other than `"ready"` -- some plan/apply
@@ -198,6 +209,26 @@ function canonicalJson(value) {
 }
 
 /**
+ * Reads `nextAction.pendingAsks` (the library's own sibling-ask channel;
+ * lib/project-onboarding-v3.mjs `withPendingAsksSurfacedOnNextAction()`) generically: this
+ * driver holds no knowledge of what any individual ask MEANS, only that a well-formed
+ * pending ask is an object carrying a string `kind` -- the same shape every `collect-input`
+ * action already uses elsewhere in this protocol, so recognizing it is protocol handling,
+ * not domain knowledge. Absent is not malformed -- most `nextAction`s carry none.
+ * Present-but-not-an-array, or an array with any entry that is not itself an object with a
+ * string `kind`, is malformed: reported rather than either crashed on or silently treated
+ * as "no pending asks" (NVA-V3-PENDINGASKS DoD 4).
+ */
+function extractPendingAsks(nextAction) {
+  const raw = nextAction && typeof nextAction === "object" ? nextAction.pendingAsks : undefined;
+  if (raw === undefined) return { present: false, malformed: false, asks: [] };
+  if (!Array.isArray(raw)) return { present: true, malformed: true, asks: [] };
+  const wellShaped = raw.every((entry) => entry !== null && typeof entry === "object" && typeof entry.kind === "string");
+  if (!wellShaped) return { present: true, malformed: true, asks: [] };
+  return { present: true, malformed: false, asks: raw };
+}
+
+/**
  * The driver loop itself. `run` (spawnSync-shaped: `(executable, argv, options) =>
  * { status, stdout, stderr, error }`) is the sole injection seam, so tests can either
  * spawn the real onboarding CLI against a real temporary directory, or supply a synthetic
@@ -276,6 +307,30 @@ export function driveOnboardingInit({ rootDir, runner = null, stepCap = DEFAULT_
     }
 
     if (nextAction && typeof nextAction === "object" && nextAction.kind === "command") {
+      const pendingAsksInfo = extractPendingAsks(nextAction);
+      if (pendingAsksInfo.malformed) {
+        // Not stop-worthy -- malformed metadata cannot honestly be presented to a human as
+        // a question -- but not silently swallowed either: visible on the step record that
+        // is already carried in every terminal return below.
+        steps[steps.length - 1].pendingAsksFault = "malformed-pending-asks-ignored";
+      } else if (pendingAsksInfo.asks.length > 0) {
+        // A published pending ask exists on this exact step -- stop and surface it rather
+        // than executing straight past it (NVA-V3-PENDINGASKS). The command itself is left
+        // untouched on disk; a re-entrant run continues once the human (or the CLI command
+        // the ask names) resolves whatever made it pending.
+        return {
+          schema: SCHEMA,
+          runner,
+          root,
+          outcome: "pending-asks",
+          stepCap,
+          stepsExecuted: steps.length,
+          steps,
+          pendingAsks: pendingAsksInfo.asks,
+          final: output,
+        };
+      }
+
       const argvValid = typeof nextAction.executable === "string"
         && Array.isArray(nextAction.argv)
         && nextAction.argv.every((part) => typeof part === "string");
@@ -298,6 +353,10 @@ export function driveOnboardingInit({ rootDir, runner = null, stepCap = DEFAULT_
     }
 
     if (nextAction && typeof nextAction === "object" && nextAction.kind === "collect-input") {
+      const pendingAsksInfo = extractPendingAsks(nextAction);
+      if (pendingAsksInfo.malformed) {
+        steps[steps.length - 1].pendingAsksFault = "malformed-pending-asks-ignored";
+      }
       return {
         schema: SCHEMA,
         runner,
@@ -307,6 +366,10 @@ export function driveOnboardingInit({ rootDir, runner = null, stepCap = DEFAULT_
         stepsExecuted: steps.length,
         steps,
         collectInput: nextAction,
+        // A collect-input action can ALSO carry sibling pendingAsks (a genuine question of
+        // its own, plus an unrelated pending ask on the same step) -- both are surfaced,
+        // neither lost (NVA-V3-PENDINGASKS DoD 3).
+        pendingAsks: pendingAsksInfo.asks,
         final: output,
       };
     }
@@ -378,7 +441,7 @@ export function main(args = process.argv.slice(2), {
   }
   const result = driveOnboardingInit({ rootDir: options.root, runner: options.runner ?? null, stepCap: options.stepCap });
   write(`${JSON.stringify(result, null, 2)}\n`);
-  return result.outcome === "ready" || result.outcome === "collect-input" ? 0 : 1;
+  return result.outcome === "ready" || result.outcome === "collect-input" || result.outcome === "pending-asks" ? 0 : 1;
 }
 
 if (isDirectInvocation(import.meta.url)) process.exit(main());
