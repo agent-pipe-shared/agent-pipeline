@@ -52,10 +52,13 @@ PO trust anchor verified byte-identical to the configured
 **Design phase is running under an explicit PO go** (2026-08-27, ahead of
 Nova/Phoenix go-live — a deliberate PO decision deviating from ADR-0043's
 "once Phoenix and Nova are live" ordering for the *design* work only; the
-implementation start stays gated on the Nova rebase). Session model: Fable 5 at
-effort `max`, PO-set for the design phase — the MP-01 named session exception;
-the PO announced the one sanctioned gate switch to a cheaper configuration at
-the PRD gate ("Haltepunkt"). Deliverable under construction:
+implementation start stays gated on the Nova rebase). Session model for the
+design-authoring phase up to the Haltepunkt: Fable 5 at effort `max`, PO-set —
+the MP-01 named session exception. **The announced gate switch was executed by
+the PO at the PRD gate on 2026-08-28:** the session model is now Opus 5 (1M
+context) at effort `xhigh`; Fable 5 is off. Everything from the PRD gate
+onward (PO decisions, implementation dispatches) runs under that
+configuration. Deliverable under construction:
 `specs/sprint-alfred-epic/` (PRD, spec, acceptance, design analyses) from the 9
 `sprint:alfred` GitHub issues (#99 #101–#106 #108 #109), 24 open
 `sprint: alfred` backlog items, and external research — ≥1 independent Critic
