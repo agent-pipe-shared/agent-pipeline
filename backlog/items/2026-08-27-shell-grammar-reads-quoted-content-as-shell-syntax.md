@@ -6,7 +6,9 @@ owner: pipeline
 status: open
 created: 2026-08-27
 sprint: nightwing
-source: "Three live refusals in one Elephant session, 2026-08-27, each on a read-only command whose only offending characters sat inside a quoted argument."
+sprint: nova
+tracking: "NOW / Nova A — PO decision 2026-08-28: admit `&&`, and secure it. This item is the prerequisite half; the admission is unsafe until the parser stops reading quoted content as syntax."
+source: "Three live refusals in one Elephant session, 2026-08-27, each on a read-only command whose only offending characters sat inside a quoted argument. Reproduced twice more on 2026-08-28, and independently by a dispatched Goldfish which overran its tool budget for this reason and said so in its own report."
 ---
 
 # The closed shell grammar classifies characters inside quoted arguments as shell operators
@@ -91,3 +93,61 @@ independently cheap and can be fixed alone: accept `head -N` alongside
   **Splittable:** case 3 (`head -N` alongside `head -n N`) is independent of the
   argv rework and can land alone in an hour if the window is tight.
 - **Date:** 2026-08-28
+
+## PO decision 2026-08-28: admit `&&`, and the order that makes it safe
+
+The PO asked directly: *"lassen wir jetzt && zu und sichern das irgendwie ab? das würde
+echt viele turns sparen"*. Accepted, and pulled into Nova A.
+
+**The Nightwing assignment above is superseded, and its stated rationale no longer
+holds.** It deferred this because "the 0.6.0 candidate is stamped and under live PO test,
+and `guard-lifecycle-ready.mjs` is exactly the file a change would invalidate it
+through." That candidate is no longer the target — a new one is being built, is not
+stamped, and `guard-lifecycle-ready.mjs` is already being changed inside it
+(`2026-08-28-the-readiness-guard-blocks-the-recovery-command-it-names.md`). Landing this
+change before the candidate's Critic review puts it *inside* the review rather than
+sneaking it in afterwards, which is the safer of the two orders.
+
+### The two halves, and why this one comes first
+
+Admitting `&&` requires splitting a command into segments. A splitter that reads quoted
+content as syntax — the exact defect this item describes — would split
+`git commit -m "fix: a && b"` into two segments and classify garbage. **So this item is
+not merely related to the `&&` admission; it is its precondition.** Fix the tokenizer
+first; the admission is a small change on top of a correct one.
+
+### What admitting `&&` may and may not be
+
+The admission grants **no new authority**, and that property is what makes it securable
+rather than merely convenient: anything expressible as `a && b` is already expressible as
+two tool calls, each classified exactly as it would be inside the chain. The change is
+ergonomic, not permissive — and it is only true if every one of these holds:
+
+- Segments are split by a **quote-aware** tokenizer. A segment the tokenizer cannot parse
+  with confidence fails closed, as today.
+- Each segment is classified by the **existing** classifier, unchanged. The command is
+  admitted only if **every** segment is independently admitted — union of requirements,
+  never a verdict inherited from the first segment.
+- `&&` only. Not `;`, not `||`, not `&`, not redirects, not newlines, not command
+  substitution. `&&` is the one operator whose fail-fast semantics mean a later segment
+  cannot run past a failed earlier one, so the union rule is exactly right for it.
+- A bounded segment count, so a pathological command cannot be used to exhaust the
+  parser.
+- The refusal for a rejected chain names **which segment** was refused and why. A chain
+  refused as a whole teaches nothing, which is this item's own complaint one level up.
+
+### Acceptance criteria (in addition to those above)
+
+- A negative regression suite drives every admitted-operator shape and asserts that no
+  mutating, protected-path, or cross-repo-mutating segment becomes admitted by being
+  placed after an admitted one. This is the safeguard the PO asked for, and it is the
+  deliverable — not the `&&` support itself.
+- A table-driven test pairs each historical refusal in this item with its now-admitted
+  form and with a genuinely-composed control that stays refused.
+
+## Related
+
+- `2026-08-28-guard-bypass-paths-have-no-negative-regression-suite.md` — the suite this
+  change must not land without.
+- `2026-08-28-a-heredoc-refusal-teaches-no-substitute.md` — the same grammar, the same
+  "refused with no substitute" shape, deliberately left out of scope here.
