@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "05c8a78e0cad7fb8b50143e591a140e90564478ab1d098984fa01c5fccff5dae"
+    "transitionHead": "7d973b6e23f252c028e84908fd97e06923e1300cff0e2f25d56ac38bee6019ce"
   },
   "counts": {
-    "open": 110,
+    "open": 111,
     "in_progress": 0,
     "closed": 488,
     "rejected": 3,
@@ -1919,6 +1919,15 @@
       "source": "PO, 2026-08-28: some repositories barely push at all — live deployment runs by other routes, e.g. a Visual Studio build process, or SSH deployment straight onto the Home Assistant server.",
       "deferred": false,
       "tracking": "Batman (PO decision 2026-08-29) — gate model extension to cover non-agent-invoked deploys, scheduled for Batman, not blocking the Nova/0.6.0 candidate"
+    },
+    {
+      "id": "pipeline.design-phase-prd-and-spec-are-frozen-by-their-own-continuity-binding",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "Measured live 2026-08-28 in the Alfred clone, applying the PO's own PRD-gate decisions to the PRD and Spec the gate is about.",
+      "deferred": false
     },
     {
       "id": "pipeline.design-to-implementation-path-has-no-driver",

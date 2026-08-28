@@ -163,6 +163,7 @@
 | pipeline.dead-key-directory-pointer-is-permanent-and-silent | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — happy-path blocking at the last touch: on a machine that HAS a valid PO key, a freshly onboarded project still gets no trust anchor, so the signature push the PO is asked to perform is functionless. |
 | pipeline.decouple-hosted-project-document-language-from-operator-facing-language | closed | workflow-improvement | pipeline | 2026-08-09 | — |
 | pipeline.delivery-is-not-always-a-git-push | open | workflow-improvement | pipeline | 2026-08-28 | Batman (PO decision 2026-08-29) — gate model extension to cover non-agent-invoked deploys, scheduled for Batman, not blocking the Nova/0.6.0 candidate |
+| pipeline.design-phase-prd-and-spec-are-frozen-by-their-own-continuity-binding | open | defect | pipeline | 2026-08-28 | — |
 | pipeline.design-to-implementation-path-has-no-driver | closed | workflow-improvement | pipeline | 2026-08-28 | Nova A — re-prioritized 2026-08-30, retrospective-analysis follow-up item #4 ('ja das brauchen wir') |
 | pipeline.discard-feature-writes-a-state-the-cleanup-observer-rejects-and-strands-the-session | open | defect | pipeline | 2026-08-27 | — |
 | pipeline.discarded-feature-dead-end | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — delivered 2026-08-28, same session it was reported |
@@ -621,7 +622,7 @@
 
 ## Counts
 
-- open: 110
+- open: 111
 - in_progress: 0
 - closed: 488
 - rejected: 3
