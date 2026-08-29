@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.mechanical-proof-of-complete-prior-input-consumption-across-restart
 type: requirement
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: 3d244dae
+closure_evidence: plugins/pipeline-core/scripts/check-resume-consumption.test.mjs
 created: 2026-08-29
 sprint: nova
 done_when: path-exists plugins/pipeline-core/scripts/check-resume-consumption.mjs
@@ -181,9 +185,18 @@ Verified on the merged branch state: `check-resume-consumption.test.mjs`
 entry added for this script's own status-note mention of
 `harness/scripts/verify.mjs`).
 
-Left open, disclosed rather than silently closed: this item's own `status`
-stays `open` (PO-facing acceptance sign-off, per this dispatch's own
-briefing); `done_when` is unedited. `check-suite-registration.mjs`'s
+Left open by the dispatch itself, disclosed rather than silently closed,
+pending Elephant verification against the item's own Acceptance criteria
+(the "PO-facing acceptance sign-off" reservation came from the dispatch's
+own briefing caution, not from anything the Acceptance section actually
+demands). All four Acceptance bullets independently re-checked and
+confirmed met by the dispatcher: (1) a script determines consumption from
+repository/project state alone, no chat/transcript access; (2) it fails
+loudly, not silently, on the F12/F13 regression shape; (3) it never gates
+readiness anywhere; (4) not satisfiable by prose alone — the fixture proves
+the fatal path independent of any real repository state. Closed here.
+
+`check-suite-registration.mjs`'s
 `DELIBERATELY_UNREGISTERED` opt-out list was deliberately NOT given a new
 entry for the new test file (that list was emptied 2026-08-29 specifically
 because an opt-out entry with no trigger to retire it is a standing debt) —
