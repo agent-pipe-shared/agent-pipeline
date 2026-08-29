@@ -5,6 +5,10 @@ type: workflow-improvement
 owner: pipeline
 status: closed
 created: 2026-08-29
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: 00f14c1916e308778519fdeb1a805bed2156ad64
+closure_evidence: backlog/items/2026-08-29-guard-dispatch-budget-does-not-distinguish-invalid-identity-from-unresolved.md
 sprint: nova
 done_when: manual
 source: "Dispatch NVA-R6-GUARDSWEEP, executing backlog/items/2026-08-29-sweep-remaining-guards-for-fail-open-identity-and-pipe-unpiped-scope-asymmetry.md"

@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.push-approval-mode-is-not-chosen-at-onboarding
 type: requirement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-28
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: 5e4b4d76
+closure_evidence: plugins/pipeline-core/scripts/onboarding-init.test.mjs
 sprint: nova
 done_when: contains plugins/pipeline-core/scripts/onboarding-init.mjs pendingAsks
 tracking: "NOW / Nova A — happy-path blocking: the push approval is the last step of the path the PO named"

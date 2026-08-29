@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.guided-init-human-rounds-above-floor
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-28
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: 9de5e42a
+closure_evidence: plugins/pipeline-core/lib/onboarding-continuity.test.mjs
 sprint: nova
 done_when: "contains plugins/pipeline-core/lib/onboarding-continuity.mjs profile = null, text = null, activate = false, deps = {}"
 tracking: "NOW / Nova A — PO asked directly whether the four human rounds can be collapsed to one or two. Three is the floor; one of the four is removable, and it is the cheapest of the four to remove."
@@ -92,3 +96,32 @@ the PO asked about has to be the number the harness reports.
   — the parent item; this is the last measured distance to its floor.
 - `2026-08-28-the-guided-init-ends-in-an-error-where-it-should-ask-the-po.md` — round 4,
   which this item deliberately leaves alone.
+
+## Closure, 2026-08-29
+
+`applyOnboardingIntakeConsent` (`plugins/pipeline-core/lib/onboarding-continuity.mjs`
+~5419-5458) now accepts the PO's first message as `text` and merges the capture
+into the same call, removing the round this item identified as the removable
+one. Landed in `9de5e42a`.
+
+Pinned by tests the dispatcher ran directly on the merged branch state
+(`node --test plugins/pipeline-core/lib/onboarding-continuity.test.mjs`, 260/260,
+exit 0), including the two that matter here by name:
+
+- "on a FRESH project (no checkpoint yet), supplying text records consent AND
+  captures that material in one call -- proving consent is recorded before
+  capture runs"
+- "a merged call produces the identical checkpoint (minus timestamps) as two
+  separate consent-apply then capture-apply calls"
+- "a merged call that fails at the capture step leaves consent durably
+  recorded, and a retry converges"
+
+**One acceptance criterion was not re-measured**, and the closure does not
+claim it was: this item's own source line records 4 human rounds measured by
+driving `scratch/smoke-guided-init-full.mjs` against a fresh repository, and
+that end-to-end count was not re-run to observe 3. `scratch/` is gitignored, so
+the script from that measurement is not in the tree. The behavioural change and
+its equivalence proof are pinned by the tests above; the round count itself
+rests on the dependency analysis in this item rather than on a fresh
+measurement. If the next live greenfield run still shows four rounds, reopen
+rather than assume the tests were wrong.
