@@ -85,7 +85,8 @@ correctly.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment:** `sprint: nova` — Nova B work, not a 0.6.0 candidate blocker.
-- **Date:**
+- **Decision:** deferred — PO confirmed Nova B, 2026-08-29.
+- **Rationale:** real architecture work (Critic-review contract, close-block
+  flow, DoD mechanism), no concrete 0.6.0-blocking incident behind it.
+- **Assignment:** `sprint: nova` — Nova B, not a 0.6.0 candidate blocker.
+- **Date:** 2026-08-29

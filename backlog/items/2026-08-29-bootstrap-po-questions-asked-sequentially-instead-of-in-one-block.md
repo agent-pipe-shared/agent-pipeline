@@ -76,7 +76,24 @@ uses for its printed confirmation lines elsewhere.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment:** `sprint: nova` — Nova B work, not a 0.6.0 candidate blocker.
-- **Date:**
+- **Decision:** accepted — fixed now by analogy to the PO's same-session
+  decision on the closely related
+  `2026-08-29-a-runner-proposed-abandoning-pipeline-setup-as-too-laborious.md`
+  (same category: small instruction-text strengthening, not architecture).
+- **Rationale:** option (b) (instruction-strengthening) chosen over option
+  (a) (mechanical `--answers-json` CLI boundary) — cheap, matches the
+  `manual` done_when the item itself allows, and the mechanical option would
+  be real design/API work out of proportion to the finding.
+- **Assignment:** `sprint: nova`, done now.
+- **Date:** 2026-08-29
+
+## Fixed, 2026-08-29 (dispatch NVA-R29-BOOTQBATCH, commit `7a0702dd`)
+
+Added an explicit MUST-do self-check paragraph to `kickoff-design.md`'s
+bootstrap-question passage, requiring the agent to enumerate the full
+bootstrap-question list and confirm completeness before composing the first
+question message — matching `SKILL.md`'s existing printed-confirmation-line
+style. `check-consumer-safe-paths.test.mjs` 9/9 green. Independent Critic
+review and PO acceptance still pending; closure evidence is necessarily
+`manual` (a future session's transcript), per the item's own Acceptance
+criteria.
