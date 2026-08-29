@@ -34,10 +34,17 @@ const NOW = "2026-08-18T12:00:00.000Z";
 const PIPELINE_STATE_SCRIPT_PATH = fileURLToPath(new URL("./pipeline-state.mjs", import.meta.url));
 afterEach(() => { while (roots.length) rmSync(roots.pop(), { recursive: true, force: true }); });
 
-function invoke(root, argv) {
+// NVA-R34-BLINDPUSHPATH: `buildInspectNextAction`'s `draft` branch now checks
+// the PO profile receipt (`validatePoGateProfileForRepository`) before
+// deriving submit-plan's own argv -- unrelated machinery this suite's
+// fixtures were never built to satisfy (none of them are real, registered
+// Git worktree topologies with a published receipt). Stub it `ok: true` by
+// default so every existing assertion here keeps exercising exactly what it
+// always tested; the receipt check itself is covered separately.
+function invoke(root, argv, deps = {}) {
   const out = []; const err = []; const log = console.log; const error = console.error;
   console.log = (...value) => out.push(value.join(" ")); console.error = (...value) => err.push(value.join(" "));
-  try { return { status: run(argv, { dir: root, now: () => NOW }), out: out.join("\n"), err: err.join("\n") }; }
+  try { return { status: run(argv, { dir: root, now: () => NOW, poGateProfile: () => ({ ok: true }), ...deps }), out: out.join("\n"), err: err.join("\n") }; }
   finally { console.log = log; console.error = error; }
 }
 
@@ -227,6 +234,63 @@ test("draft next-action stays collect-input asking only for the missing submitte
     `guidance must name the resolved absolute script path: ${payload.nextAction.guidance}`);
   assert.ok(payload.nextAction.guidance.includes("mini"),
     `guidance must fill in the value it DID resolve rather than placeholder it too: ${payload.nextAction.guidance}`);
+});
+
+// NVA-R34-BLINDPUSHPATH: the `PO-PROFILE-RECEIPT-INVALID` precondition
+// (backlog/items/2026-08-28-a-blind-session-gets-zero-followable-steps-on-the-feature-and-push-path.md,
+// "Progress and the next wall") is now checked BEFORE submit-plan's argv is
+// derived, and named honestly rather than left for submit-plan itself to
+// fail on undiscoverably. Both outcomes are asserted with a controlled
+// `deps.spawn` stub -- real Git worktree/receipt topology is exercised by
+// po-gate-authority.test.mjs, not duplicated here.
+test("draft next-action offers the profile-receipt repair as a real command when the receipt is not ready and the repair plans cleanly", () => {
+  const root = freshRoot("profile-repair-plans");
+  gitInitRoot(root);
+  setLocalGitUserName(root, "Jordan Example");
+  applyOnboardingIntakeConsent({ rootDir: root, granted: true, profile: "feature", activate: true });
+  assert.equal(run(["set-feature", "--id", "widget", "--plan-path", "specs/widget/prd.md"], { dir: root, now: () => NOW }), 0);
+
+  const repairApplyAction = {
+    executable: process.execPath,
+    argv: ["/repair/po-gate-profile-repair.mjs", "apply", "--root", root, "--plan-sha256", "a".repeat(64), "--activate"],
+    mutation: true, requiresConfirmation: true, requiresHostBoundary: true,
+  };
+  const result = invoke(root, ["inspect"], {
+    poGateProfile: () => ({ ok: false, code: "PO-PROFILE-RECEIPT-INVALID", reason: "missing", repair: "run the repair" }),
+    spawn: () => ({ status: 0, error: null, stdout: JSON.stringify({ applyAction: repairApplyAction }) }),
+  });
+  assert.equal(result.status, 0, result.err);
+  const payload = JSON.parse(result.out);
+  assert.equal(payload.status, "draft");
+  // The precondition wins over an otherwise-derivable submit-plan: the
+  // published command is the repair, never a submit-plan argv the caller
+  // has not been told will fail.
+  assert.equal(payload.nextAction.kind, "command");
+  assert.deepEqual(payload.nextAction, { kind: "command", ...repairApplyAction });
+  assert.ok(!payload.nextAction.argv.some((element) => /^<.*>$/.test(element)),
+    "no published argv element may be an unfilled placeholder");
+});
+
+test("draft next-action names the profile-receipt precondition explicitly when the repair itself cannot be planned", () => {
+  const root = freshRoot("profile-repair-unplannable");
+  gitInitRoot(root);
+  setLocalGitUserName(root, "Jordan Example");
+  applyOnboardingIntakeConsent({ rootDir: root, granted: true, profile: "feature", activate: true });
+  assert.equal(run(["set-feature", "--id", "widget", "--plan-path", "specs/widget/prd.md"], { dir: root, now: () => NOW }), 0);
+
+  const result = invoke(root, ["inspect"], {
+    poGateProfile: () => ({ ok: false, code: "PO-PROFILE-RECEIPT-INVALID", reason: "the receipt is missing", repair: "Run node .../po-gate-profile-repair.mjs plan --root <root>, then retry." }),
+    spawn: () => ({ status: 2, error: null, stdout: "" }),
+  });
+  assert.equal(result.status, 0, result.err);
+  const payload = JSON.parse(result.out);
+  assert.equal(payload.nextAction.kind, "collect-input",
+    "an unplannable repair is a genuine stop, never a guessed command");
+  assert.equal(payload.nextAction.executable, undefined);
+  assert.equal(payload.nextAction.argv, undefined);
+  assert.ok(payload.nextAction.guidance.includes("PO-PROFILE-RECEIPT-INVALID"),
+    "the precondition's own code must be named, not left for submit-plan to fail on undiscoverably");
+  assert.ok(payload.nextAction.guidance.includes("the receipt is missing"));
 });
 
 test("inspect reports phoenixEpicHistory as null when the field is absent", () => {
