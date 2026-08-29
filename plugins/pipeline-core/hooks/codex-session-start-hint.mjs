@@ -6,7 +6,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
-import { inspectResumeHint } from "../lib/resume-hint.mjs";
+import { inspectResumeHint, recordResumeHintConsumption } from "../lib/resume-hint.mjs";
 import { decideOutput, loadStateSafe, shouldActivate } from "./post-compact-reground.mjs";
 import { LEGACY_STATE, NEUTRAL_STATE, resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
 
@@ -67,7 +67,7 @@ const PRIOR_ROLLOUT_TRANSCRIPT_LINE =
   "no prior transcript can be found or read, say so honestly rather than claiming this step was " +
   "done.";
 
-function resumeHintContextLines(root) {
+function resumeHintContextLines(root, sessionId) {
   let observed;
   try {
     observed = inspectResumeHint({ rootDir: root });
@@ -75,6 +75,18 @@ function resumeHintContextLines(root) {
     return [];
   }
   if (observed?.status !== "available" || !observed.hint?.context) return [];
+  // NVA-R11-RESUMECONSUME: this is the actual bootstrap consumption step -- the card's
+  // content is about to be surfaced into the session's own context below, unbidden, on
+  // every startup|resume|clear. Record a consumption receipt for it now, best-effort and
+  // never blocking: the receipt's DIGEST is always re-derived by recordResumeHintConsumption
+  // itself from the card's own recorded bytes (readResumeHintCardDigest), never asserted
+  // here, so this call can never attest to a reading that did not happen. A missing/invalid
+  // sessionId, an absent digest record (a card captured outside the CLI path), or any I/O
+  // failure must never prevent the card's content from still reaching the session below --
+  // observation-only, mirroring inspectResumeHint's own "Passive observation only" contract.
+  if (typeof sessionId === "string" && sessionId.trim().length > 0) {
+    try { recordResumeHintConsumption({ rootDir: root, sessionId }); } catch { /* best-effort, never blocking */ }
+  }
   const { intent, scope, constraints, questions, progress } = observed.hint.context;
   const lines = [
     "A resume-hint card from a prior session is available and MUST be read now: incorporate it into this session's understanding before continuing -- noting its availability without reading its content does not satisfy this step.",
@@ -87,7 +99,7 @@ function resumeHintContextLines(root) {
   return lines;
 }
 
-export function sessionStartDecision(projectDir = process.cwd(), exists = existsSync) {
+export function sessionStartDecision(projectDir = process.cwd(), exists = existsSync, sessionId = null) {
   let governed = false;
   let root = null;
   try {
@@ -109,7 +121,7 @@ export function sessionStartDecision(projectDir = process.cwd(), exists = exists
         "Do not invent a human checkpoint for routine work. Request the PO only for a configured decision gate, required final acceptance, an irreversible/external consequence, or a typed hard block with no safe returned recovery action.",
         "A guard denial is not by itself a human gate: first execute its exact typed read-only or lifecycle recovery action when one is supplied.",
         PRIOR_ROLLOUT_TRANSCRIPT_LINE,
-        ...resumeHintContextLines(root),
+        ...resumeHintContextLines(root, sessionId),
       ].join(" "),
     };
   }
@@ -168,7 +180,11 @@ export function main({ projectDir, exists, input } = {}) {
     process.stdout.write(compact);
     return;
   }
-  const decision = sessionStartDecision(projectDir, exists);
+  // NVA-R11-RESUMECONSUME: the real session identity a Claude/Codex SessionStart hook
+  // payload carries, same field post-compact-reground.mjs already reads for the same
+  // purpose one hook over -- never re-derived, never asserted by this hook itself.
+  const sessionId = typeof input?.session_id === "string" ? input.session_id : null;
+  const decision = sessionStartDecision(projectDir, exists, sessionId);
   process.stdout.write(`${JSON.stringify({
     systemMessage: decision.message,
     hookSpecificOutput: {

@@ -9,7 +9,9 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { main, sessionStartDecision, sessionStartMessage } from "./codex-session-start-hint.mjs";
-import { buildResumeHint } from "../lib/resume-hint.mjs";
+import {
+  buildResumeHint, captureResumeHint, queryResumeHintConsumption, recordResumeHintCardDigest,
+} from "../lib/resume-hint.mjs";
 
 const root = mkdtempSync(join(tmpdir(), "codex-session-start-hint-"));
 const script = fileURLToPath(new URL("./codex-session-start-hint.mjs", import.meta.url));
@@ -186,7 +188,83 @@ try {
     rmSync(compactRoot, { recursive: true, force: true });
   }
 
-  console.log("codex-session-start-hint: 27 passed");
+  // NVA-R11-RESUMECONSUME: this hook's own resumeHintContextLines() is the real bootstrap
+  // consumption step -- Stage 2's other half. A separate, git-initialized root is required
+  // here (recordResumeHintConsumption's private-state resolver needs a usable `.git`, which
+  // `root` above deliberately never has, and its own tests above rely on that).
+  const consumptionRoot = mkdtempSync(join(tmpdir(), "codex-session-start-hint-consume-"));
+  try {
+    mkdirSync(join(consumptionRoot, "project"), { recursive: true });
+    writeFileSync(join(consumptionRoot, "project", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+    const git = spawnSync("git", ["init", "-q"], { cwd: consumptionRoot, encoding: "utf8", shell: false });
+    assert.equal(git.status, 0, git.stderr);
+
+    const context = {
+      intent: "Resume the resume-consumption wiring work.",
+      scope: ["SessionStart consumption wiring only"],
+      constraints: ["No transcript reading"],
+      questions: ["Any remaining gap?"],
+    };
+    captureResumeHint({ rootDir: consumptionRoot, context });
+    const { cardDigest } = recordResumeHintCardDigest({ rootDir: consumptionRoot, card: context });
+
+    // No sessionId at all: the card content still reaches context (unchanged behaviour),
+    // and nothing is recorded -- best-effort, observation-only, never a silent requirement.
+    const noSession = sessionStartDecision(consumptionRoot);
+    assert.match(noSession.context, /Resume-hint intent: Resume the resume-consumption wiring work\./u);
+    assert.equal(
+      queryResumeHintConsumption({ rootDir: consumptionRoot, sessionId: "session-none" }).outcome,
+      "not-consumed",
+      "no receipt should exist yet for any session",
+    );
+
+    // A real sessionId: the SAME call that surfaces the card's content into context must
+    // also record a matching consumption receipt for that exact session.
+    const withSession = sessionStartDecision(consumptionRoot, undefined, "session-real");
+    assert.match(withSession.context, /Resume-hint intent: Resume the resume-consumption wiring work\./u);
+    const queried = queryResumeHintConsumption({ rootDir: consumptionRoot, sessionId: "session-real" });
+    assert.equal(queried.outcome, "consumed");
+    assert.equal(queried.cardDigest, cardDigest);
+
+    // A DIFFERENT session never having been surfaced this card must still show not-consumed --
+    // consumption is per-session, never a blanket "someone read it" flag.
+    assert.equal(
+      queryResumeHintConsumption({ rootDir: consumptionRoot, sessionId: "session-other" }).outcome,
+      "not-consumed",
+    );
+
+    // Full CLI path: main({ input: { session_id } }) must thread the real hook payload's
+    // session_id through to the same recording call, exercising the exact wiring a live
+    // Claude/Codex SessionStart event drives.
+    const cliRoot = mkdtempSync(join(tmpdir(), "codex-session-start-hint-consume-cli-"));
+    try {
+      mkdirSync(join(cliRoot, "project"), { recursive: true });
+      writeFileSync(join(cliRoot, "project", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+      const cliGit = spawnSync("git", ["init", "-q"], { cwd: cliRoot, encoding: "utf8", shell: false });
+      assert.equal(cliGit.status, 0, cliGit.stderr);
+      captureResumeHint({ rootDir: cliRoot, context });
+      recordResumeHintCardDigest({ rootDir: cliRoot, card: context });
+
+      const cliResult = spawnSync(process.execPath, [script], {
+        cwd: cliRoot,
+        encoding: "utf8",
+        input: JSON.stringify({ session_id: "session-cli" }),
+      });
+      assert.equal(cliResult.status, 0, cliResult.stderr);
+      assert.match(JSON.parse(cliResult.stdout).hookSpecificOutput.additionalContext, /Resume-hint intent: Resume the resume-consumption wiring work\./u);
+      assert.equal(
+        queryResumeHintConsumption({ rootDir: cliRoot, sessionId: "session-cli" }).outcome,
+        "consumed",
+        "the real hook payload's session_id must have been recorded as a consumption receipt",
+      );
+    } finally {
+      rmSync(cliRoot, { recursive: true, force: true });
+    }
+  } finally {
+    rmSync(consumptionRoot, { recursive: true, force: true });
+  }
+
+  console.log("codex-session-start-hint: 33 passed");
 } finally {
   rmSync(root, { recursive: true, force: true });
 }
