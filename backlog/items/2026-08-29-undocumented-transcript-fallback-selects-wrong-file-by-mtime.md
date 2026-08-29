@@ -3,8 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.undocumented-transcript-fallback-selects-wrong-file-by-mtime
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-29
+closed_at: 2026-08-29
+closure_commit: adb60c64
+closure_evidence: "node --test plugins/pipeline-core/hooks/codex-session-start-hint.test.mjs -> 40 passed, exit 0; node --test harness/scripts/check-consumer-safe-paths.test.mjs -> 9 passed, exit 0; grep -n pipeline.deterministic-transcript-selection plugins/pipeline-core/hooks/codex-session-start-hint.mjs matches."
 sprint: nova
 done_when: contains plugins/pipeline-core/hooks/codex-session-start-hint.mjs pipeline.deterministic-transcript-selection
 source: "Claude/Windows self-audit report (docs/pipeline-audit-claude-session.md §3.2), cited by scratch/greenfield-triage-2026-08-29.md finding F13, observed during the 2026-08-29 three-runner greenfield test."
@@ -161,3 +164,48 @@ PO is trying to fix.
   asserts the line is present at all, which is why this defect survived it.
 - `references/onboarding-recovery.md` may point at the mechanism, but must
   not claim none exists.
+
+## Closure, 2026-08-29 (Goldfish dispatch NVA-W6-TRANSCRIPTFB)
+
+`PRIOR_ROLLOUT_TRANSCRIPT_LINE` in
+`plugins/pipeline-core/hooks/codex-session-start-hint.mjs` was rewritten so
+selection is scoped by project identity first: the restarting session is
+instructed to read each candidate rollout file's own recorded session
+metadata (cwd/workspace field) and discard outright any transcript whose
+recorded project does not match this repository's own root, before applying
+modification time — and only then as a tiebreaker within the already
+project-matching set, never as the primary ranking across the whole
+machine. The instruction also states explicitly that when no transcript
+matches this project's identity, the session must say so honestly and
+continue rather than widening the search back to "most recent overall". The
+marker string `pipeline.deterministic-transcript-selection` is present both
+in a code comment and inline inside the instruction text itself.
+
+`codex-session-start-hint.test.mjs` gained assertions on the emitted
+`additionalContext` proving the project-scoping clause, the
+"never...selected over an older one belonging to THIS project" language, the
+tiebreaker phrasing, and the "no match -> say so, don't widen" clause are
+all present — this is the mechanism by which a differently-scoped
+(different-project, newer-mtime) transcript is proven not preferred over an
+older, correctly-scoped one, since this hook only emits an instruction
+string rather than performing file selection itself (there is no runtime
+Codex-session-transcript corpus available inside this repository to drive an
+end-to-end selection test against).
+
+`references/onboarding-recovery.md` was read and does not describe any
+transcript-mtime fallback (confirmed by grep for
+"deterministic-transcript-selection", "rollout transcript", "CODEX_HOME" —
+no matches); per this backlog item's own revised acceptance ("may point at
+the mechanism, but must not claim none exists") no edit to that file was
+required and none was made, since it makes no claim to correct.
+
+**Evidence:**
+- `node --test plugins/pipeline-core/hooks/codex-session-start-hint.test.mjs`
+  → `codex-session-start-hint: 40 passed`, exit 0.
+- `node --test harness/scripts/check-consumer-safe-paths.test.mjs` (required
+  because `plugins/pipeline-core/` was touched) → 9/9 passed, exit 0.
+- Commit `adb60c64` on branch `feat/sprint-nova-codex-v046`.
+
+**Status:** closed — `done_when` predicate (marker string present in the
+named file) satisfied; both Acceptance-section requirements from the
+"Revised acceptance" block are met by the above.
