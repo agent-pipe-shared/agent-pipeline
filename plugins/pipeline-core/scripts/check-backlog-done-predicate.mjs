@@ -234,6 +234,18 @@ export function checkBacklogDonePredicate(root = DEFAULT_ROOT) {
     const isOpenLike = OPEN_LIKE_STATUSES.includes(status);
 
     if (doneWhenRaw === undefined) {
+      // pipeline.unparseable-declaration-is-malformed (NVA-R8-PARSEBLIND): `parseBacklogItem`
+      // silently DROPS a `done_when` key whose value it could not parse (an unquoted comma or
+      // brace -- see backlog-state.mjs's parseScalar), leaving `metadata.done_when` undefined --
+      // indistinguishable from "no done_when: line at all" unless the checker also reads the
+      // parser's own errors. React only to a parse error naming the `done_when` key specifically;
+      // every other frontmatter parse error is out of scope for this checker.
+      const doneWhenParseError = parsedFile.errors.find((error) => error.startsWith(`${repoPath}: done_when `));
+      if (doneWhenParseError !== undefined) {
+        malformedItems.push(repoPath);
+        findings.push(`MALFORMED ${repoPath}: expected a well-formed done_when declaration; observed a done_when: line that failed to parse (${doneWhenParseError}) -- quote the value as a JSON string (e.g. done_when: "contains path a, b") to fix`);
+        continue;
+      }
       undeclaredItems.push(repoPath);
       if (isOpenLike) {
         openUndeclaredItems.push(repoPath);

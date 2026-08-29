@@ -51,6 +51,21 @@ const ITEM = (id, extra = {}) => ({
   metadata: { id: `pipeline.${id}`, type: "defect", owner: "pipeline", status: "open", created: "2026-08-29", source: "fixture", ...extra },
 });
 
+/**
+ * Like fixture(), but appends a `done_when:` line VERBATIM instead of through JSON.stringify --
+ * fixture()'s own stringification can only ever emit a validly quoted scalar, so it can never
+ * construct the bare-comma/brace case this suite needs to cover (NVA-R8-PARSEBLIND).
+ */
+function fixtureWithRawDoneWhen(id, rawDoneWhenLine, extra = {}) {
+  const base = mkdtempSync(join(tmpdir(), "check-backlog-done-predicate-raw-"));
+  mkdirSync(join(base, "backlog", "items"), { recursive: true });
+  const meta = { schema: "pipeline.backlog-item.v1", id: `pipeline.${id}`, type: "defect", owner: "pipeline", status: "open", created: "2026-08-29", source: "fixture", ...extra };
+  const lines = Object.entries(meta).map(([key, value]) => `${key}: ${JSON.stringify(value)}`);
+  lines.push(`done_when: ${rawDoneWhenLine}`);
+  writeFileSync(join(base, "backlog", "items", `2026-08-29-${id}.md`), `---\n${lines.join("\n")}\n---\n\n# ${meta.id}\n\nFixture body.\n`);
+  return base;
+}
+
 const EXIT_ZERO_SCRIPT = "process.exit(0);\n";
 const EXIT_ONE_SCRIPT = "process.exit(1);\n";
 const SLEEP_SCRIPT = "setTimeout(() => {}, 60000);\n"; // keeps the event loop alive past a short injected timeout
@@ -381,6 +396,49 @@ test("checkBacklogDonePredicate: a mix of classes counts each bucket independent
   assert.equal(result.undeclared, 1);
   assert.equal(result.openUndeclared, 1);
   assert.equal(result.findings.length, 4, "manual and the correctly-declared-but-unsatisfied-open item contribute no finding");
+});
+
+// --- checkBacklogDonePredicate: a present-but-unparseable done_when is MALFORMED, never
+// UNDECLARED (NVA-R8-PARSEBLIND) ------------------------------------------------------------
+
+test("checkBacklogDonePredicate: a done_when value containing a bare comma is MALFORMED, and the finding names JSON quoting", () => {
+  const root = fixtureWithRawDoneWhen("bare-comma", "contains backlog/README.md a, b");
+  const result = checkBacklogDonePredicate(root);
+  assert.equal(result.ok, false);
+  assert.equal(result.malformed, 1);
+  assert.deepEqual(result.malformedItems, ["backlog/items/2026-08-29-bare-comma.md"]);
+  assert.equal(result.undeclared, 0, "a present-but-unparseable declaration must never be counted as undeclared");
+  assert.equal(result.openUndeclared, 0);
+  assert.match(result.findings[0], /^MALFORMED backlog\/items\/2026-08-29-bare-comma\.md:/);
+  assert.match(result.findings[0], /JSON/, "the remedy must name JSON quoting");
+});
+
+test("checkBacklogDonePredicate: a done_when value containing a bare brace is MALFORMED, not UNDECLARED", () => {
+  const root = fixtureWithRawDoneWhen("bare-brace", "contains backlog/README.md {needle}");
+  const result = checkBacklogDonePredicate(root);
+  assert.equal(result.ok, false);
+  assert.equal(result.malformed, 1);
+  assert.equal(result.undeclared, 0);
+  assert.match(result.findings[0], /^MALFORMED backlog\/items\/2026-08-29-bare-brace\.md:/);
+});
+
+test("checkBacklogDonePredicate: an item with no done_when line at all is still UNDECLARED (contrast with the two cases above)", () => {
+  const root = fixture([ITEM("no-done-when-at-all")]);
+  const result = checkBacklogDonePredicate(root);
+  assert.equal(result.ok, true);
+  assert.equal(result.malformed, 0);
+  assert.equal(result.undeclared, 1);
+  assert.equal(result.openUndeclared, 1);
+  assert.deepEqual(result.openUndeclaredItems, ["backlog/items/2026-08-29-no-done-when-at-all.md"]);
+});
+
+test("checkBacklogDonePredicate: a correctly JSON-quoted done_when value containing a comma evaluates normally -- neither MALFORMED nor UNDECLARED", () => {
+  const root = fixtureWithRawDoneWhen("quoted-comma", JSON.stringify("contains backlog/README.md a, b"));
+  const result = checkBacklogDonePredicate(root);
+  assert.equal(result.ok, true);
+  assert.equal(result.malformed, 0);
+  assert.equal(result.undeclared, 0);
+  assert.deepEqual(result.findings, []);
 });
 
 // --- exitCodeFor / usage error --------------------------------------------------------------
