@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.signing-fails-without-a-tty-and-the-error-reads-as-a-wrong-passphrase
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-29
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: dac74b61
+closure_evidence: plugins/pipeline-core/scripts/po-human-approval.test.mjs
 sprint: nova
 done_when: contains plugins/pipeline-core/scripts/po-human-approval.mjs pipeline.signing-requires-attended-terminal
 source: "Live PO signature ceremony, 2026-08-29: sign-intent invoked through the session's `!` command route failed with an OpenSSL 'while reading strings' error that reads as a rejected passphrase; the PO re-ran the identical command in a separate terminal and it succeeded on the first try."
