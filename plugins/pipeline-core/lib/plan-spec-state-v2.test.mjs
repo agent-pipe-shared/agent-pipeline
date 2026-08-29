@@ -773,3 +773,57 @@ test("NVA-W4-02B: phase transitions accumulate phaseHistory, and an activeFeatur
   };
   assert.equal(derivePlanLifecycle(malformedShape).ok, false);
 });
+
+// NVA-R3-PRDBIND (backlog:
+// 2026-08-29-prd-binding-precedes-framing-with-no-reopen-path-back.md):
+// `draft()` is exactly the shape `buildCoordinatorSourcedPromotionPlan()`
+// (onboarding-continuity.mjs) writes for a fresh `applyOnboardingBootstrapBind()`
+// bind -- an authority-bound feature, phase "design", `planApproved: false`, with
+// no `planSubmission`/`planApproval`/`planInvalidation` key at all, because
+// binding a PRD is not itself a submission. Before this fix, `reopenPlanDesign()`
+// treated this shape as "already open, nothing to do" and returned the state
+// byte-identical with `invalidation: null` -- but the write-time guard's only
+// release condition (guard-lifecycle-ready.mjs `boundAuthorityDocumentPath()`) is
+// a real `planInvalidation` object, so a session landing here from a session order
+// that bound before framing had no sanctioned way back to an editable document.
+test("NVA-R3-PRDBIND: reopen-design releases a bootstrap-bind-apply feature that was bound before it was ever submitted", () => {
+  const bound = draft();
+  assert.equal(derivePlanLifecycle(bound).status, "draft");
+
+  const reopened = reopenPlanDesign({
+    state: bound,
+    expectedStateSha256: sha256CanonicalJson(bound),
+    by: "PO",
+    at: REOPENED,
+  });
+  assert.equal(reopened.ok, true, JSON.stringify(reopened));
+  assert.equal(reopened.replay, false);
+  assert.notEqual(reopened.invalidation, null);
+  assert.equal(reopened.invalidation.reason, "pipeline.reopen-bound-unsubmitted-prd");
+  assert.equal(reopened.invalidation.invalidatedSubmissionSha256, null);
+  assert.equal(reopened.invalidation.invalidatedApprovalSha256, null);
+  assert.equal(reopened.invalidation.featureId, bound.activeFeature.id);
+  assert.notEqual(reopened.state, bound);
+  assert.equal(reopened.state.planInvalidation, reopened.invalidation);
+  assert.equal(reopened.state.activeFeature.phase, "design");
+  assert.equal(reopened.state.planApproved, false);
+  assert.equal(derivePlanLifecycle(reopened.state).status, "draft");
+
+  // Idempotent: calling reopen-design again on the already-released state
+  // replays rather than manufacturing a second invalidation record.
+  const replay = reopenPlanDesign({
+    state: reopened.state,
+    expectedStateSha256: sha256CanonicalJson(reopened.state),
+    by: "PO",
+    at: "2026-07-30T20:12:00.000Z",
+  });
+  assert.equal(replay.ok, true, JSON.stringify(replay));
+  assert.equal(replay.replay, true);
+  assert.equal(replay.state, reopened.state);
+
+  // The released document is now genuinely editable through the ordinary
+  // sanctioned route: submit-plan works against it exactly as it would
+  // against any other freshly reopened draft.
+  const resubmitted = submitted(reopened.state, AUTHORITY, RESUBMITTED);
+  assert.equal(derivePlanLifecycle(resubmitted).status, "awaiting-approval");
+});
