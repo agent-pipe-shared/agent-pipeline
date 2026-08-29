@@ -179,8 +179,8 @@ test("read-only plan returns one complete digest-bound confirmed apply action", 
   assert.equal(planned.schema, "pipeline.continuity-result-close-plan.v1");
   assert.equal(planned.featureId, "feature");
   assert.equal(planned.expectedRevision, f.revision);
-  assert.equal(planned.preimage.nextAction, "review");
-  assert.equal(planned.postimage.nextAction, "close");
+  assert.equal(planned.preimage.queueAction, "review");
+  assert.equal(planned.postimage.queueAction, "close");
   assert.equal(planned.result.path, f.resultPath);
   assert.equal(planned.result.sha256, f.resultSha256);
   assert.equal(planned.applyAction.mutation, true);
@@ -197,7 +197,7 @@ test("confirmed apply changes only the bounded continuity fields and exact repla
   const appliedReceipt = JSON.parse(applied.stdout);
   assert.equal(appliedReceipt.status, "applied");
   assert.deepEqual(appliedReceipt.completion, {
-    scope: "feature-closure", state: "in-progress", nextAction: "close", workflowTerminal: false,
+    scope: "feature-closure", state: "in-progress", queueAction: "close", workflowTerminal: false,
   });
   const after = JSON.parse(readFileSync(f.statePath, "utf8"));
   const expected = structuredClone(f.state);
@@ -223,7 +223,7 @@ test("Result-close finalizes an exact Result previously bound by bootstrap", () 
   writeFileSync(f.statePath, JSON.stringify(bootstrap, null, 2) + "\n");
   f.revision += 1;
   const planned = plan(f);
-  assert.equal(planned.preimage.nextAction, "review");
+  assert.equal(planned.preimage.queueAction, "review");
   const applied = invoke(f.root, planned.applyAction.argv.slice(1));
   assert.equal(applied.status, 0, applied.stderr);
   const after = JSON.parse(readFileSync(f.statePath, "utf8"));
