@@ -177,6 +177,10 @@ function projectCalibrationRelPath(rootDir) {
 }
 import { checkSecurityCompleteness } from "../lib/security-completeness-gate.mjs";
 import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
+// NVA-W1-SCRATCHBIND (backlog: 2026-08-08-the-scratch-cleanup-mechanism-exists-but-no-event-
+// calls-it.md, Point 3): read-only observer, no mkdirSync/physicalScratchRoot call -- see
+// buildScratchOrphanAdvisory below for the full rationale.
+import { planOrphanScratchRetirement } from "../lib/session-cleanup-recovery.mjs";
 
 // The plugin root this guard is itself running from -- same self-location resolution
 // guard-lifecycle-ready.mjs / guard-human-override.mjs already use (`resolve(dirname(
@@ -1772,6 +1776,47 @@ function checkMarketplaceAttestation() {
   return [];
 }
 
+/**
+ * NVA-W1-SCRATCHBIND (backlog: 2026-08-08-the-scratch-cleanup-mechanism-exists-but-no-event-
+ * calls-it.md, Point 3): a READ-ONLY, non-blocking advisory surfaced only on the all-green
+ * push path -- never a new finding pushed into `failures`/`securityFailures`, and never able
+ * to make a push block. Reuses `planOrphanScratchRetirement` exactly as it was already built
+ * for this purpose (no `mkdirSync`, no `physicalScratchRoot` call -- read-only by construction,
+ * mirroring this file's own `{ create: false }` discipline for other evidence reads).
+ *
+ * Operates on `fallbackProjectDir()` (the governed session root), not `projectDir` (the pushed
+ * repository): scratch/ descriptors are bound to the session's own working repo -- the same
+ * root every other piece of push-gate evidence in this file already resolves from (see the
+ * ADR-0056 waiver / external-push-ledger comments above for the identical projectDir-vs-
+ * fallbackProjectDir() distinction).
+ *
+ * Fails open unconditionally: any fault in the observer itself (not a git repo, no descriptor
+ * directory yet, a malformed descriptor) is swallowed and yields no advisory, never a block --
+ * this function can only ever return `null` or an advisory string, never throw.
+ *
+ * Surfaces only `sessionId` and the already-relative `scratchRelativePath` (e.g.
+ * "scratch/abc-1234") -- never the absolute `descriptorPath` the observer also returns, which
+ * would leak a machine-local directory layout into a message that travels into the session
+ * transcript (SEC-01, the same discipline this file already applies to operand text elsewhere).
+ */
+function buildScratchOrphanAdvisory(rootDir) {
+  let entries;
+  try {
+    entries = planOrphanScratchRetirement({ rootDir });
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(entries)) return null;
+  const orphans = entries.filter((entry) => entry?.status === "orphan");
+  if (orphans.length === 0) return null;
+  const summary = orphans
+    .map((entry) => `${entry.sessionId} (${entry.scratchRelativePath ?? "path unavailable"})`)
+    .join(", ");
+  return `[guard-push] ADVISORY (non-blocking): ${orphans.length} orphaned scratch descriptor(s) `
+    + `found: ${summary}. These are swept automatically on a future pipeline-start bootstrap; `
+    + "no action is required to push.";
+}
+
 const failures = [];
 // PUSHWARN-1 (backlog: a warn security gate hard-blocks every push): security findings
 // -- (b)/(b.2) below -- are collected separately so they can be dispatched under
@@ -2101,7 +2146,15 @@ try {
 }
 
 const allFailures = [...failures, ...securityFailures];
-if (allFailures.length === 0) process.exit(0); // all-green -- allow
+if (allFailures.length === 0) {
+  // NVA-W1-SCRATCHBIND: advisory only -- see buildScratchOrphanAdvisory's own doc comment.
+  // emit(1, ...) still ALLOWS the push (hooks.json's own exit-code contract: 1 = allow +
+  // config warning, shown to the user); the process.exit(0) below is reached only when there
+  // is nothing to advise.
+  const scratchAdvisory = buildScratchOrphanAdvisory(fallbackProjectDir());
+  if (scratchAdvisory !== null) emit(1, [scratchAdvisory]);
+  process.exit(0); // all-green -- allow
+}
 
 // PUSHWARN-1: each bucket's severity follows its OWN gate's mode, never the other
 // gate's. `failures` (verify evidence, anonymous-public-push, approval) follows
