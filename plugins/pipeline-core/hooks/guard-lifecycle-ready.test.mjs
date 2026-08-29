@@ -3427,14 +3427,67 @@ test("restart-required admits only the consumed bounded resume-hint input and ca
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
+// RESTART_LIFECYCLE_SCRATCH_WRITE (backlog: 2026-08-29-scratch-write-exemption-does-not-cover-
+// restart-required.md): before this fix, a session stuck at restart-required had no route at
+// all to persist its own scratch/ throwaway notes -- contradicting the pipeline-start skill's
+// own claim that scratch/ is always safe, unlike every other PORG-NOT-READY status this file
+// already fixtures a scratch lane for (partial's narrower fixed-file lane above; the intake
+// statuses' general scratch/ lane in NVA-GF-SCRATCH below). Reuses
+// isIntakeLifecycleScratchWrite()/isIntakeLifecycleScratchMkdir() unmodified -- the shape of an
+// admitted scratch write does not differ by status, only which statuses reach it.
+test("RESTART_LIFECYCLE_SCRATCH_WRITE: restart-required admits any resolved scratch/ write and matching mkdir, nothing wider", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const restartDeps = { projectDir: path, requireProjectOnboardingReadyFn() { deny("restart-required"); } };
+
+    // AC-1: any Edit/Write/NotebookEdit write whose resolved path is inside scratch/, including
+    // a nested path -- matching the intake lane's own general scratch/ admission below.
+    for (const input of [
+      write("scratch/design.md"),
+      edit("scratch/design.md"),
+      write("scratch/nested/deep/notes.md"),
+      notebookEdit("scratch/analysis.ipynb"),
+    ]) {
+      assert.equal(evaluateLifecycleReadyGuard(input, restartDeps).exitCode, 0, input.tool_name);
+    }
+
+    // AC-2: both admitted mkdir shapes, including a nested target.
+    for (const command of ["mkdir scratch", "mkdir -p scratch", "mkdir -p scratch/nested"]) {
+      assert.equal(evaluateLifecycleReadyGuard(bash(command), restartDeps).exitCode, 0, command);
+    }
+
+    // AC-3: a write outside scratch/, and a sibling directory merely starting with "scratch",
+    // still refuse -- this is not a general readiness bypass.
+    for (const input of [write("src/other-file.mjs"), edit("docs/other-file.md"), write("scratch-evil/file.md")]) {
+      const result = evaluateLifecycleReadyGuard(input, restartDeps);
+      assert.equal(result.exitCode, 2, input.tool_input.file_path);
+      assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u, input.tool_input.file_path);
+    }
+
+    // AC-4 (conflict B1 safety net): the resume-hint near-miss diagnostic (NVA-MICRO-1, below)
+    // is not silently swallowed by this wider, generic scratch lane -- a write to
+    // scratch/.resume-hint-input.json must still surface the specific near-miss hint naming the
+    // correct path, not a bare verdict(0) that would make the operator believe the write landed
+    // somewhere it is actually read from.
+    const nearMiss = evaluateLifecycleReadyGuard(write("scratch/.resume-hint-input.json"), restartDeps);
+    assert.equal(nearMiss.exitCode, 2);
+    assert.match(nearMiss.stderr, /The only path admitted is exactly project\/\.resume-hint-input\.json/u);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
 // NVA-LCREADONLY-1 (backlog: 2026-08-17-partial-lifecycle-blocks-read-only-diagnosis-and-
 // tmp-fallback.md): the write-side twin of isReadOnlyDiagnosticCommand()'s narrow read-only
 // lane -- a session stuck at `partial` today has no route at all to persist a report of its
 // own stuck state, not inside the project root (GUARD-LIFECYCLE-NOT-READY) and not outside
 // it (GUARD-CROSS-REPO-MUTATION). This proves the admission is exact by construction (no
 // other mkdir target, no other filename, no directory write) and scoped to
-// `lifecycleStatus === "partial"` only -- every other PORG-NOT-READY status, restart-required
-// among them (already fixtured immediately above), keeps refusing both operations unchanged.
+// `lifecycleStatus === "partial"` only -- every OTHER PORG-NOT-READY status keeps refusing
+// both operations through THIS lane unchanged. (restart-required no longer belongs in that
+// "every other status" set as of RESTART_LIFECYCLE_SCRATCH_WRITE, below: both `mkdir scratch`
+// and a `scratch/incident-report.md` write are now ALSO admitted at restart-required, via that
+// separate, more general scratch lane -- not via this partial-only one. AC-6 below therefore
+// uses `continuity-damaged` as its unrelated-status comparator instead.)
 test("NVA-LCREADONLY-1: partial lifecycle admits exactly mkdir scratch and the fixed incident-report write, nothing wider", () => {
   const path = root();
   try {
@@ -3481,17 +3534,23 @@ test("NVA-LCREADONLY-1: partial lifecycle admits exactly mkdir scratch and the f
 
     // AC-6: the lane is `partial`-only, not a general readiness bypass -- the identical
     // admitted shapes stay refused under a different PORG-NOT-READY status this file already
-    // fixtures (restart-required, proven immediately above).
-    const restartDeps = { projectDir: path, requireProjectOnboardingReadyFn() { deny("restart-required"); } };
+    // fixtures. Comparator is `continuity-damaged`, not `restart-required`: since
+    // RESTART_LIFECYCLE_SCRATCH_WRITE (backlog: 2026-08-29-scratch-write-exemption-does-not-
+    // cover-restart-required.md), all four of these ARE admitted at restart-required via that
+    // separate, more general scratch lane -- restart-required stopped being an "unrelated
+    // status" for this comparison and would no longer prove lane scoping.
+    // `continuity-damaged` carries no scratch admission anywhere in this file, so it still
+    // proves the invariant these lines exist to pin.
+    const continuityDamagedDeps = { projectDir: path, requireProjectOnboardingReadyFn() { deny("continuity-damaged"); } };
     for (const input of [
       bash("mkdir scratch"),
       bash("mkdir -p scratch"),
       write("scratch/incident-report.md"),
       edit("scratch/incident-report.md"),
     ]) {
-      const result = evaluateLifecycleReadyGuard(input, restartDeps);
-      assert.equal(result.exitCode, 2, `restart-required/${input.tool_name}`);
-      assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u, `restart-required/${input.tool_name}`);
+      const result = evaluateLifecycleReadyGuard(input, continuityDamagedDeps);
+      assert.equal(result.exitCode, 2, `continuity-damaged/${input.tool_name}`);
+      assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u, `continuity-damaged/${input.tool_name}`);
     }
 
     // AC-7: an exactly-ready session's behaviour for both operations is unchanged -- the new
@@ -3622,11 +3681,16 @@ test("NVA-GF-SCRATCH: intake statuses admit any resolved scratch/ write and matc
 
     // AC-5: the lane is intake-only, not a general readiness bypass -- the identical admitted
     // nested-scratch shape stays refused under a different PORG-NOT-READY status this file
-    // already fixtures (restart-required, and partial's own narrower lane).
-    const restartDeps = { projectDir: path, requireProjectOnboardingReadyFn() { deny("restart-required"); } };
+    // already fixtures (continuity-damaged, and partial's own narrower lane below).
+    // Comparator is `continuity-damaged`, not `restart-required`: since
+    // RESTART_LIFECYCLE_SCRATCH_WRITE (backlog: 2026-08-29-scratch-write-exemption-does-not-
+    // cover-restart-required.md), both of these ARE admitted at restart-required via that
+    // separate, more general scratch lane -- restart-required stopped being an "unrelated
+    // status" for this comparison and would no longer prove lane scoping.
+    const continuityDamagedDeps = { projectDir: path, requireProjectOnboardingReadyFn() { deny("continuity-damaged"); } };
     for (const input of [write("scratch/design.md"), write("scratch/nested/deep/notes.md")]) {
-      const result = evaluateLifecycleReadyGuard(input, restartDeps);
-      assert.equal(result.exitCode, 2, `restart-required/${input.tool_input.file_path}`);
+      const result = evaluateLifecycleReadyGuard(input, continuityDamagedDeps);
+      assert.equal(result.exitCode, 2, `continuity-damaged/${input.tool_input.file_path}`);
       assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u);
     }
     const partialDeps = { projectDir: path, requireProjectOnboardingReadyFn() { deny("partial"); } };
@@ -5739,12 +5803,18 @@ test("NVA-BL-76: the new remedy is true -- each line is executed, not merely mat
     assert.equal(readScopeRun("rg -n 'Overall' verify-latest.json | head -n 5", projectDir).exitCode, 0,
       "the remedy claims the in-root pipeline is admitted; it was not");
 
-    // Line 3 claims one simple, un-piped read is admitted for any path. Run it, on the very
-    // path just refused -- this is the operator's real way out, and the old text never said it.
-    assert.match(refused.stderr, /issue it as ONE simple, un-piped read command \(rg, grep, cat, head, tail, wc, stat, file\), a shape this guard admits without a path-location restriction\./u);
+    // Line 3 (as of pipeline.read-scope-single-command-root-check) no longer claims a single,
+    // un-piped read is admitted "without a path-location restriction" for any path -- that
+    // claim is now false, since the single-command shape is root-checked identically to the
+    // piped one. It claims re-targeting inside the project root is the way out for BOTH
+    // shapes; run the un-piped shape on the very path just refused and confirm it stays
+    // refused under the identical read-scope code, not silently exempted.
+    assert.match(refused.stderr, /Re-target the read inside the project root: the identical bounded pipeline AND the identical single, un-piped read are both admitted once every read target resolves inside the project root\./u);
     for (const command of [`rg -n 'Overall' ${outsideFile}`, `cat ${outsideFile}`, `head -n 5 ${outsideFile}`]) {
-      assert.equal(readScopeRun(command, projectDir).exitCode, 0,
-        `the remedy claims this un-piped read is admitted; it was not: ${command}`);
+      const stillRefused = readScopeRun(command, projectDir);
+      assert.equal(stillRefused.exitCode, 2,
+        `the un-piped read of an outside-root path is refused, exactly like the piped shape: ${command}`);
+      assert.match(stillRefused.stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u, command);
     }
 
     // Line 2 warns that recomposition cannot help -- pinned as stated, and as measured:
@@ -5856,6 +5926,90 @@ test("NVA-BL-76: a real signed capability reaches the read-scope denial end to e
       /\[pipeline-human-override\] guard-lifecycle-ready GUARD-READ-SCOPE-OUTSIDE-ROOT: exact one-time capability consumed/u,
       "the read-scope denial measured as liftable-by-signature did not consume a genuine signed capability",
     );
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------------
+// pipeline.read-scope-single-command-root-check (backlog: 2026-08-29-read-scope-guard-
+// admits-single-command-but-blocks-the-piped-form.md). The bounded rg-to-head/rg-to-rg
+// pipeline was already root-checked (NVA-BL-76, above); the IDENTICAL read issued as a
+// single, un-piped command was not -- protection against reading outside the project root
+// depended on the shell shape of the command, not on the actual filesystem target being
+// read. This pins the single-command sibling of that same containment check.
+// ---------------------------------------------------------------------------------
+
+test("pipeline.read-scope-single-command-root-check: a single un-piped read outside the project root is refused under the same code as the piped shape", () => {
+  const { projectDir, outside, outsideFile } = readScopeFixture();
+  try {
+    for (const command of [`rg -n 'Overall' ${outsideFile}`, `cat ${outsideFile}`, `head -n 5 ${outsideFile}`]) {
+      const refused = readScopeRun(command, projectDir);
+      assert.equal(refused.exitCode, 2, command);
+      assert.match(refused.stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u, command);
+      assert.doesNotMatch(refused.stderr, /GUARD-LIFECYCLE-NOT-READY/u, command);
+    }
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("pipeline.read-scope-single-command-root-check: an in-root single un-piped read is unaffected, and so is the piped shape", () => {
+  const { projectDir, outside, outsideFile } = readScopeFixture();
+  try {
+    // The read-only working pattern most of a session's diagnostic activity depends on.
+    for (const command of ["rg -n 'Overall' verify-latest.json", "cat verify-latest.json", "head -n 5 verify-latest.json"]) {
+      assert.equal(readScopeRun(command, projectDir).exitCode, 0, command);
+    }
+    // The piped shape (NVA-BL-76) is unaffected by this single-command sibling check.
+    const pipedRefused = readScopeRun(`rg -n 'Overall' ${outsideFile} | head -n 5`, projectDir);
+    assert.equal(pipedRefused.exitCode, 2);
+    assert.match(pipedRefused.stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u);
+    assert.equal(readScopeRun("rg -n 'Overall' verify-latest.json | head -n 5", projectDir).exitCode, 0);
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("pipeline.read-scope-single-command-root-check: BOUNDED_PIPELINE_ADDITIONAL_ROOTS is honoured identically by the single-command check", () => {
+  const { projectDir, outside, outsideFile } = readScopeFixture();
+  try {
+    // A single un-piped read of this plugin's own installed root stays admitted, matching the
+    // piped shape's own allowance (the "bounded rg pipeline admits self-inspection reads of
+    // the plugin's own installed root" test above, single-command sibling of it).
+    const pluginFile = fileURLToPath(new URL("./guard-lifecycle-ready.mjs", import.meta.url));
+    assert.equal(readScopeRun(`cat ${pluginFile}`, projectDir).exitCode, 0);
+    // A genuinely foreign path is still refused -- BOUNDED_PIPELINE_ADDITIONAL_ROOTS did not
+    // become a blanket bypass.
+    assert.equal(readScopeRun(`cat ${outsideFile}`, projectDir).exitCode, 2);
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("pipeline.read-scope-single-command-root-check: a shape that is not solely a root-scope issue is not reclassified as one", () => {
+  const { projectDir, outside, outsideFile } = readScopeFixture();
+  try {
+    // grep --files-with-matches fails isReadOnlySimpleWords' own exclusion (checked before the
+    // new containment check, both in-root and out-of-root), so it is never the single-command
+    // read-only shape at all and isOutsideRootSingleCommandRead() must not reclassify it as a
+    // root-scope issue. It is not otherwise a recognized admission, so on a NOT-ready root it
+    // falls through to the generic not-ready refusal, never GUARD-READ-SCOPE-OUTSIDE-ROOT.
+    const refused = evaluateLifecycleReadyGuard(bash(`grep --files-with-matches Overall ${outsideFile}`), {
+      projectDir, requireProjectOnboardingReadyFn() { deny("partial"); },
+    });
+    assert.equal(refused.exitCode, 2);
+    assert.match(refused.stderr, /GUARD-LIFECYCLE-NOT-READY/u);
+    assert.doesNotMatch(refused.stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u);
+    // A mutating command outside root (never a read-only shape at all) keeps its own,
+    // pre-existing cross-repository-mutation classification -- untouched by this fix.
+    const mutating = readScopeRun(`cp ${outsideFile} ${join(outside, "copy.json")}`, projectDir);
+    assert.equal(mutating.exitCode, 2);
+    assert.match(mutating.stderr, /GUARD-CROSS-REPO-MUTATION/u);
   } finally {
     rmSync(projectDir, { recursive: true, force: true });
     rmSync(outside, { recursive: true, force: true });
