@@ -3296,9 +3296,66 @@ function resolveDraftPlanSubmissionDefaults(dir, deps = {}) {
   return { by, profile };
 }
 
-function buildInspectNextAction(dir, state, lifecycle) {
+/**
+ * NVA-R34-BLINDPUSHPATH: `submit-plan` also requires a valid, current PO
+ * profile receipt (`validatePoGateProfileForRepository`,
+ * lib/po-gate-authority.mjs) -- a precondition the `draft` branch below
+ * never checked before this fix, so a derived-looking `submit-plan` command
+ * could still exit 2 on an undiscoverable `PO-PROFILE-RECEIPT-*` code (see
+ * backlog/items/2026-08-28-a-blind-session-gets-zero-followable-steps-on-the-feature-and-push-path.md,
+ * "Progress and the next wall"). Diagnosis, with file/line references: the
+ * receipt check itself lives at lib/po-gate-authority.mjs (`loadReceipt`,
+ * `validatePoGateProfileSnapshot`, PO-PROFILE-RECEIPT-INVALID/-STALE); the
+ * ONLY writer of that receipt is `po-gate-profile-repair.mjs` (sibling of
+ * this file, `apply --activate` -> `publishPoGateProfileReceipt`), and
+ * nothing in the deterministic onboarding chain
+ * (`ONBOARDING_SUBCOMMANDS`, scripts/project-onboarding-v3.mjs:140-199)
+ * ever invokes it -- confirmed empirically: a freshly onboarded ("ready")
+ * consumer project has no receipt and no automated way to have produced
+ * one. This is reading 1 from the item (an onboarding gap), refined: the
+ * repair mechanism already exists as a script, it is simply never wired in.
+ * `po-gate-profile-repair.mjs apply --activate` is a MECHANICAL republish of
+ * bytes already on disk (no new human judgement -- unlike the two genuine
+ * human gates this same function guards below), so surfacing it here as a
+ * real, driver-executable `command` -- never a silent, unnamed failure --
+ * is in scope for this fix; wiring it into onboarding's own apply chain, or
+ * into `po-gate-profile-repair.mjs` itself, is not (both files are outside
+ * this fix's briefed scope).
+ */
+function resolveDraftProfileReceiptAction(dir, deps = {}) {
+  const check = (deps.poGateProfile ?? ((request) => validatePoGateProfileForRepository(request)))({ repoRoot: dir });
+  if (check?.ok) return null;
+  const repairScript = join(PLUGIN_ROOT, "scripts", "po-gate-profile-repair.mjs");
+  const spawn = deps.spawn ?? spawnSync;
+  let planned = null;
+  try {
+    const result = spawn(process.execPath, [repairScript, "plan", "--root", dir], { encoding: "utf8" });
+    if (!result.error && result.status === 0 && typeof result.stdout === "string") planned = JSON.parse(result.stdout);
+  } catch {
+    planned = null;
+  }
+  const applyAction = planned?.applyAction;
+  if (applyAction && typeof applyAction.executable === "string" && Array.isArray(applyAction.argv)) {
+    return { kind: "command", ...applyAction };
+  }
+  // The repair script itself could not be planned (missing, malformed
+  // pipeline.user.yaml/runtime pair, or a topology it refuses) -- name the
+  // exact precondition and its own repair text rather than inventing one.
+  return {
+    kind: "collect-input",
+    mutation: false,
+    requiresConfirmation: false,
+    guidance: `no plan can be submitted yet: submit-plan is blocked by ${check?.code ?? "PO-PROFILE-AUTHORITY-UNAVAILABLE"}`
+      + ` (${check?.reason ?? "the PO profile receipt is unavailable"}). ${check?.repair ?? `Run: ${process.execPath} ${repairScript} plan --root "${dir}"`}`,
+    expected: { schema: INSPECT_SCHEMA, statuses: ["draft"] },
+  };
+}
+
+function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
   if (!lifecycle.ok || lifecycle.status === null) return null;
   if (lifecycle.status === "draft") {
+    const profileAction = resolveDraftProfileReceiptAction(dir, deps);
+    if (profileAction !== null) return profileAction;
     const derived = resolveDraftPlanSubmissionDefaults(dir);
     const scriptPath = fileURLToPath(import.meta.url);
     if (derived.by !== null && derived.profile !== null) {
@@ -4779,11 +4836,18 @@ function parseResultBootstrapApply(argv) {
   return { featureId: argv[1], expectedRevision: parseExpectedRevision(argv[3]).value, expectedStateSha256: argv[5], expectedPostStateSha256: argv[7], updatedAt: argv[9], planSha256: argv[11] };
 }
 
-function featureClosureProgress(nextAction) {
+// NVA-R34-BLINDPUSHPATH: `queueAction` (not `nextAction`) -- this is the bare
+// "review"/"close" queue-state label the item's own "Three separate
+// defects" section named as one of the two non-protocol meanings the field
+// `nextAction` used to carry in this file. `nextAction` is reserved
+// (`buildInspectNextAction`'s doc comment above) for the ONE structural
+// `{kind, executable, argv}`/`{kind: "collect-input", ...}` protocol shape a
+// blind driver may follow; this is neither.
+function featureClosureProgress(queueAction) {
   return {
     scope: "feature-closure",
     state: "in-progress",
-    nextAction,
+    queueAction,
     workflowTerminal: false,
   };
 }
@@ -4924,7 +4988,7 @@ function resultClosePlanPayload(root, request, resultFile, expectedStateSha256,
     preimage: {
       stateSha256: expectedStateSha256,
       authorityResult: null,
-      nextAction: "review",
+      queueAction: "review",
     },
     result: {
       path: request.result.path,
@@ -4935,7 +4999,7 @@ function resultClosePlanPayload(root, request, resultFile, expectedStateSha256,
       stateSha256: expectedPostStateSha256,
       revision: request.expectedRevision + 1,
       authorityResult: request.result,
-      nextAction: "close",
+      queueAction: "close",
       resume: {
         mode: "immediate",
         sourceRevision: request.expectedRevision + 1,
@@ -5103,7 +5167,7 @@ function runResultCloseCommand(sub, rest, deps) {
         revision: current.state.continuity.revision,
         stateSha256: currentSha256,
         result: request.result,
-        nextAction: "close",
+        queueAction: "close",
         completion: featureClosureProgress("close"),
       }));
       return 0;
@@ -5146,7 +5210,7 @@ function runResultCloseCommand(sub, rest, deps) {
       revision: persisted.state.continuity.revision,
       stateSha256: apply.expectedPostStateSha256,
       result: request.result,
-      nextAction: "close",
+      queueAction: "close",
       completion: featureClosureProgress("close"),
     }));
     return 0;
@@ -8933,7 +8997,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         pushApproval: base.pushApproval ?? null,
         closedFeaturesCount: Array.isArray(base.closedFeatures) ? base.closedFeatures.length : 0,
         phoenixEpicHistory: summarizePhoenixEpicHistory(base.phoenixEpicHistory ?? null),
-        nextAction: buildInspectNextAction(dir, base, lifecycle),
+        nextAction: buildInspectNextAction(dir, base, lifecycle, deps),
         nextActionText: nextActionSection(base),
       };
       console.log(JSON.stringify(payload, null, 2));
