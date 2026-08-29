@@ -10,13 +10,22 @@
  * non-converging step-cap scenario below uses a synthetic `run` responder: constructing a
  * genuinely infinite real onboarding chain is not a real repository shape, so mocking is
  * the more honest choice there.
+ *
+ * NVA-W3-ONBOARDENV: every test below that spawns the real onboarding CLI (i.e. omits its
+ * own synthetic `run`) threads `env: FIXTURE_ENV` -- `PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE`
+ * pointed at a disposable fixture home this suite owns, honoured by
+ * `project-onboarding-v3.mjs`'s own `main()`. Before this, the same suite spawned that CLI
+ * with no env override at all, so it read the REAL operator's `$HOME` machine-plane state
+ * (`readMachinePlane()`/`detectExistingLocalTrustAnchor()`) -- a suite gating verify with two
+ * legitimate outcomes depending on who ran it (backlog:
+ * 2026-08-28-a-verify-gate-suite-reads-real-machine-state-through-a-subprocess.md).
  */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import test from "node:test";
+import test, { after } from "node:test";
 
 import { DEFAULT_STEP_CAP, SCHEMA, driveOnboardingInit } from "./onboarding-init.mjs";
 
@@ -24,9 +33,22 @@ function freshRoot() {
   return mkdtempSync(join(tmpdir(), "onboarding-init-test-"));
 }
 
+function freshHome() {
+  return mkdtempSync(join(tmpdir(), "onboarding-init-test-home-"));
+}
+
 function dispose(path) {
   rmSync(path, { recursive: true, force: true });
 }
+
+// One disposable fixture home for the whole suite: none of the "real subprocess" tests
+// below assert anything ABOUT the machine plane, they only need to never read the
+// operator's real one. A single fresh, empty home (no `.agent-pipeline/machine.json`, no
+// signing key) makes every one of them resolve the same "never been asked" onboarding path
+// regardless of which machine or PO key state the suite happens to run under.
+const FIXTURE_HOME = freshHome();
+const FIXTURE_ENV = { ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: FIXTURE_HOME };
+after(() => dispose(FIXTURE_HOME));
 
 // Every driver test below pins `runner` explicitly, and that is load-bearing rather than
 // tidy. Without it the onboarding CLI resolves the lane from the ENVIRONMENT, so this suite
@@ -44,7 +66,7 @@ test("driveOnboardingInit: the runner lane is the caller's, not the ambient envi
     // command step (author identity/push-approval/verify-contract), reached before the
     // later intake-consent collect-input this test pinned pre-fix -- surfacing it earlier is
     // exactly this task's fix, not a regression here.
-    const claude = driveOnboardingInit({ rootDir: root, runner: "claude" });
+    const claude = driveOnboardingInit({ rootDir: root, runner: "claude", env: FIXTURE_ENV });
     assert.equal(claude.runner, "claude", "the resolved lane is reported, not left for the caller to assume");
     assert.equal(claude.outcome, "pending-asks");
     assert.equal(claude.steps[0].argv.includes("--runner"), true, "the pinned lane reaches the first inspect");
@@ -57,7 +79,7 @@ test("driveOnboardingInit: the runner lane is the caller's, not the ambient envi
     // stops the driver first -- NVA-V3-PENDINGASKS moved the first stop earlier.)
     const other = freshRoot();
     try {
-      const codex = driveOnboardingInit({ rootDir: other, runner: "codex" });
+      const codex = driveOnboardingInit({ rootDir: other, runner: "codex", env: FIXTURE_ENV });
       assert.equal(codex.runner, "codex");
       // The load-bearing assertion, and deliberately not `codex.runner !== claude.runner`,
       // which is true by construction of the two calls and would prove nothing: the pinned
@@ -78,7 +100,7 @@ test("driveOnboardingInit: the runner lane is the caller's, not the ambient envi
     // construction, which is the very thing this test exists to keep out of the others.
     const ambient = freshRoot();
     try {
-      assert.equal(driveOnboardingInit({ rootDir: ambient, runner: null }).runner, null);
+      assert.equal(driveOnboardingInit({ rootDir: ambient, runner: null, env: FIXTURE_ENV }).runner, null);
     } finally {
       dispose(ambient);
     }
