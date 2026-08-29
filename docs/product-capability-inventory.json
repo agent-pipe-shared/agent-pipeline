@@ -416,6 +416,7 @@
         "verify-phase:harness/scripts/verify.mjs:local-worker-supervisor-core-tests",
         "verify-phase:harness/scripts/verify.mjs:machine-plane-tests",
         "verify-phase:harness/scripts/verify.mjs:main-session-route-tests",
+        "verify-phase:harness/scripts/verify.mjs:manual-check-logic-tests",
         "verify-phase:harness/scripts/verify.mjs:migrate-backlog-state-tests",
         "verify-phase:harness/scripts/verify.mjs:native-plugin-readback-tests",
         "verify-phase:harness/scripts/verify.mjs:network-lockdown-tests",
