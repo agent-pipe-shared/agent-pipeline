@@ -359,3 +359,37 @@ onboarding wiring, and update the 2 named tests' `commit()` helper calls
 for the later, already-tracked-file admin edit to use `--no-verify`
 (documented inline as the sanctioned escape for this case, distinct from
 the genesis-commit exemption above it).
+
+## Landed, 2026-08-29 (dispatch NVA-R39-GENESISWIRE-RETRY, commit `b4908639`)
+
+The onboarding wiring is landed: `applyProjectOnboardingV3` now calls
+`applyInstall` from `pre-commit-hook-install.mjs` unconditionally
+(best-effort, never fatal), mirroring `prePushHookInstall`'s own call
+site and both of its `status: "applied"` return branches exactly.
+`preCommitHookInstall` is now a field on both.
+
+The two tests this wiring regresses (per the Progress note above) are
+updated per the PO's decision immediately above: their
+`commit("configure verify and push approval")` call — the SECOND
+onboarding-root commit, re-writing already-tracked `project/pipeline.json`
+(GS-10) and `pipeline.user.yaml` (GS-1) — now passes `--no-verify`,
+documented inline in both tests as the sanctioned escape for this narrow
+case, distinct from the genesis-commit first-appearance exemption their
+FIRST commit (`commit("seeded consumer")`) still relies on unaided
+(unchanged, no `--no-verify`).
+
+Full `project-onboarding-v3.test.mjs` suite: 153/153 passing, zero
+regressions elsewhere (`node --test
+plugins/pipeline-core/lib/project-onboarding-v3.test.mjs`, exit 0).
+`node --test harness/scripts/check-consumer-safe-paths.test.mjs` also
+passes (mandatory, this dispatch touched `plugins/pipeline-core/`).
+
+This closes the acceptance criteria's Layer 2 requirement for the
+onboarding-scaffold genesis case specifically: a fresh onboarding's own
+first commit is no longer blocked (first-appearance exemption, already
+landed by NVA-R36-GENESISEXEMPT), and the pre-commit hook is now
+actually wired into the onboarding flow by default rather than sitting
+unused — closing the gap the "Progress" note above flagged as
+"correctly NOT landed" pending this PO decision. The hook's refusal of
+an already-tracked-file rewrite with no `--no-verify` and no consumed
+capability is unchanged and unweakened everywhere else in the suite.
