@@ -5071,6 +5071,9 @@ runFeaturePackageReconcileTests();
     JSON.stringify(resubmittedState.planApprovalBriefing.change),
   );
 
+  const presented2 = run(["present-plan", "--by", "coordinator"], changedDeps);
+  ok("HL-13a present-plan exit 0 (resubmitted content)", presented2 === 0, `got ${presented2}`);
+
   // Reviewer reconstruction on a TAMPERED persisted briefing (excludes narrowed after the
   // fact, still within the closed vocabulary shape) must fail, not silently trust the bytes.
   const reapproved = run(["approve-plan", "--by", "po-test"], changedDeps);
