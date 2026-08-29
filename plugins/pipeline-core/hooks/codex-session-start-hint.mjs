@@ -56,16 +56,31 @@ const GOVERNANCE_MARKERS = [
  * is phrased as a best-effort recovery step, never a blocking precondition, mirroring the
  * resume-hint MUST-read step's own "never a gate" discipline one line below it.
  */
+// pipeline.deterministic-transcript-selection (backlog:
+// 2026-08-29-undocumented-transcript-fallback-selects-wrong-file-by-mtime): a plain
+// most-recent-by-mtime rule can select a transcript belonging to a DIFFERENT project/repo --
+// confirmed live when a sibling guardian/review transcript, merely newer, was picked over the
+// session's own actual prior transcript. Selection must scope to THIS project's identity
+// first (the rollout file's own recorded session metadata, e.g. its cwd/workspace field, must
+// match this repository's root) and use modification time only as a tiebreaker WITHIN that
+// already-matching set -- never as the primary ranking across every session on the machine.
 const PRIOR_ROLLOUT_TRANSCRIPT_LINE =
   "On a startup, resume, clear or compact restart, also locate and read your own most recent " +
   "PRIOR Codex rollout transcript for operational-context recovery (already-hit guard errors, " +
   "established workarounds, in-progress diagnostic state) that the resume-hint card alone may " +
-  "not carry: look under $CODEX_HOME/sessions (or ~/.codex/sessions when CODEX_HOME is unset), " +
-  "most recent by modification time and excluding the file this session is itself writing to, " +
-  "and bound the read to the most recent handful of tool-call, tool-result and error entries " +
-  "rather than the full file; never quote large raw excerpts into any git-tracked file, and if " +
-  "no prior transcript can be found or read, say so honestly rather than claiming this step was " +
-  "done.";
+  "not carry: look under $CODEX_HOME/sessions (or ~/.codex/sessions when CODEX_HOME is unset); " +
+  "first scope by PROJECT IDENTITY, not recency (pipeline.deterministic-transcript-selection): " +
+  "read each candidate file's own recorded session metadata (e.g. its cwd/workspace field) and " +
+  "discard outright any transcript whose recorded project does not match this repository's own " +
+  "root -- a more-recently-modified transcript from a DIFFERENT project must never be selected " +
+  "over an older one belonging to THIS project; only after that identity scoping, and always " +
+  "excluding the file this session is itself writing to, use modification time as a tiebreaker " +
+  "within the remaining project-matching set, most recent first; if no transcript matches this " +
+  "project's identity, say so honestly and continue -- never widen the search back to the most " +
+  "recent transcript overall; and bound the read to the most recent handful of tool-call, " +
+  "tool-result and error entries rather than the full file; never quote large raw excerpts into " +
+  "any git-tracked file, and if no prior transcript can be found or read, say so honestly " +
+  "rather than claiming this step was done.";
 
 function resumeHintContextLines(root, sessionId) {
   let observed;
