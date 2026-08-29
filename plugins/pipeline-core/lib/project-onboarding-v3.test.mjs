@@ -38,6 +38,7 @@ import {
   freshCriticalHumanProofPolicyBytes,
   freshSettingsJsonBytes,
   observeLocalTrustAnchorPointer,
+  pipelineScriptsRunnerAllowlistEntries,
 } from "./project-onboarding-v3.mjs";
 import { readCriticalHumanProofPolicy } from "./critical-human-proof-policy.mjs";
 import { planRunnerProfileMigrationV3 } from "./runner-profile-migration-v3.mjs";
@@ -7932,6 +7933,51 @@ test("regression: a repository already at ready (kickoff-apply's provisional aut
     assert.equal(observed.status, "ready");
     assert.equal(observed.continuity.status, "valid");
   } finally { dispose(path); }
+});
+
+test("pipelineScriptsRunnerAllowlistEntries() covers both runner lanes, and both path spellings whenever the two conversions actually differ", () => {
+  // Windows-style input: contains a backslash, so both the forward-slash and
+  // backslash spellings must appear, once per lane (Bash, PowerShell) --
+  // exactly the gap disclosed in commit 5f5bbfac's own commit body.
+  const windowsEntries = pipelineScriptsRunnerAllowlistEntries("D:\\Dev\\proj\\plugins\\pipeline-core\\scripts");
+  assert.deepEqual(windowsEntries, [
+    'Bash(node "D:/Dev/proj/plugins/pipeline-core/scripts/*")',
+    'Bash(node "D:\\Dev\\proj\\plugins\\pipeline-core\\scripts\\*")',
+    'PowerShell(node "D:/Dev/proj/plugins/pipeline-core/scripts/*")',
+    'PowerShell(node "D:\\Dev\\proj\\plugins\\pipeline-core\\scripts\\*")',
+  ]);
+  assert.equal(windowsEntries.filter((entry) => entry.startsWith("Bash(")).length, 2);
+  assert.equal(windowsEntries.filter((entry) => entry.startsWith("PowerShell(")).length, 2);
+  assert.equal(windowsEntries.filter((entry) => entry.includes("/")).length, 2);
+  assert.equal(windowsEntries.filter((entry) => entry.includes("\\")).length, 2);
+
+  // No-separator input: neither "/" nor "\" appears anywhere, so the
+  // forward-slash and backslash conversions are byte-identical and the
+  // function collapses to exactly one spelling per lane (the only case the
+  // real `forwardSlash === backslash` dedup check in
+  // pipelineScriptsRunnerAllowlistEntries() actually fires on -- a plain
+  // POSIX path such as "/home/dev/.../scripts" still yields BOTH spellings,
+  // since converting its forward slashes to backslashes produces a distinct
+  // string).
+  const noSeparatorEntries = pipelineScriptsRunnerAllowlistEntries("scripts");
+  assert.deepEqual(noSeparatorEntries, [
+    'Bash(node "scripts/*")',
+    'PowerShell(node "scripts/*")',
+  ]);
+  assert.equal(noSeparatorEntries.length, 2);
+  assert.equal(noSeparatorEntries.filter((entry) => entry.startsWith("Bash(")).length, 1);
+  assert.equal(noSeparatorEntries.filter((entry) => entry.startsWith("PowerShell(")).length, 1);
+
+  // A plain POSIX absolute path (forward slashes, no backslash) is NOT the
+  // dedup case: forwardSlash === trimmed but backslash is a distinct,
+  // fully-backslashed string, so both spellings are still emitted.
+  const posixEntries = pipelineScriptsRunnerAllowlistEntries("/home/dev/proj/plugins/pipeline-core/scripts");
+  assert.deepEqual(posixEntries, [
+    'Bash(node "/home/dev/proj/plugins/pipeline-core/scripts/*")',
+    'Bash(node "\\home\\dev\\proj\\plugins\\pipeline-core\\scripts\\*")',
+    'PowerShell(node "/home/dev/proj/plugins/pipeline-core/scripts/*")',
+    'PowerShell(node "\\home\\dev\\proj\\plugins\\pipeline-core\\scripts\\*")',
+  ]);
 });
 
 if (RUNNING_AS_SUITE) {
