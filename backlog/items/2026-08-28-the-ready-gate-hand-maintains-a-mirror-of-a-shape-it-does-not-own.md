@@ -6,7 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-28
 sprint: nova
-done_when: contains plugins/pipeline-core/lib/project-onboarding-ready-gate.mjs trustAnchorAvailability
+done_when: contains plugins/pipeline-core/lib/project-onboarding-ready-gate.mjs pipeline.ready-gate-keys-derived-from-producer
 tracking: "NOW / Nova A — the second instance blocked every governed write in a ready project and was invisible until the candidate was actually installed. NVA-T-READYKEYS fixes that instance; this item is about the third one."
 source: "Found live 2026-08-28 while the PO rsynced the candidate onto the local marketplace mid-session. The first instance is recorded in the file's own comment."
 ---
@@ -106,3 +106,28 @@ of strength:
   readers of one file disagreeing, same family.
 - `2026-08-28-a-fail-closed-rollback-names-no-predicate-so-a-consumer-cannot-fix-it.md` —
   the refusal-names-no-cause half.
+
+## Predicate note, 2026-08-29 — the instance is fixed, the pattern is not
+
+A predicate of `contains … trustAnchorAvailability` was declared here and
+immediately reported satisfied, which would have argued for closing this item.
+It measured the wrong thing, and the commit that satisfies it says so itself.
+
+`b317f139` ("fix(ready-gate): accept the two fields a ready observation
+actually carries") added `pushApprovalMode` and `trustAnchorAvailability` to the
+gate's accepted key set, fixing the live failure where every governed write in
+every *ready* project was refused. Its own message then states, unprompted:
+
+> This fixes the instance. The pattern — three hand-maintained mirrors of a
+> shape this module does not own, and a test suite that is green because it
+> never asks the real producer — remains open in [this item], whose acceptance
+> criteria require the enumeration to be derived rather than typed again.
+
+So the field's presence proves only that the mirror was hand-corrected once
+more, which is precisely the behaviour this item exists to end. The next field
+`project-onboarding-v3.mjs` attaches will break the gate the same way.
+
+The predicate now names the actual remedy — the enumeration being derived from
+its producer rather than typed — via a marker
+`pipeline.ready-gate-keys-derived-from-producer`. It is deliberately not
+satisfied today.
