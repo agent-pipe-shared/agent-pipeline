@@ -140,3 +140,31 @@ that does not currently exist. (2) The controlled reproduction — onboarding a
 genuinely test-less static project through the real greenfield flow and
 confirming the first verify run does not silently pass — was not performed
 this session. Status left `open` pending both.
+
+## Automated test landed, 2026-08-29 (NVA-CF-ITEM25EXTRACT, commits `3e55365d`, `33fdb827`)
+
+Closes acceptance-criterion gap (1) above. The pure logic (no file I/O, no
+console output) was extracted out of the TP-3-protected `verify.mjs` into a
+new, unprotected sibling module, `harness/scripts/manual-check-logic.mjs`,
+exporting `UNREPLACED_MANUAL_CHECK_PLACEHOLDER`,
+`containsUnreplacedManualCheckPlaceholder(text)`, `VERIFY_NOT_CONFIGURED_YET`
+and the pure `computeManualVerifyStep(calibration)` (commit `3e55365d`, with
+its own `harness/scripts/manual-check-logic.test.mjs`, 7/7 green,
+independently confirming this item's Acceptance criteria 1 and 2 — the
+placeholder-rejected and honest-not-configured-yet cases are each asserted
+directly). `verify.mjs` itself was then edited via the established
+non-protected mechanism (`apply-pending-protected-edits.mjs`'s new step G,
+`stepVerifyManualCheckExtract`), verified `--preview`-green from a removed
+sibling before the real apply, then applied for real (commit `33fdb827`):
+it now imports `computeManualVerifyStep`/`UNREPLACED_MANUAL_CHECK_PLACEHOLDER`
+from the new module, reads+parses the calibration file itself, and preserves
+the original `console.error(...)` side effect for the placeholder-rejected
+case byte-for-byte (structurally confirmed by the applier's own verifier,
+`verifyManualCheckWiring()`, plus `node --check verify.mjs`).
+
+**Still not closing.** Acceptance criterion 3 — the controlled reproduction
+(onboarding a genuinely test-less static project through the real greenfield
+flow and confirming the first verify run does not silently pass) — remains
+unperformed; this dispatch's own briefing scoped it out explicitly ("this
+dispatch closes the remaining 'no dedicated automated test' gap" only).
+Status left `open` pending that one remaining criterion.
