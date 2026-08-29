@@ -523,6 +523,39 @@ export const ALLOWLIST = Object.freeze([
     reason:
       "Class B: this sentence exists specifically to tell the reader Layer 1b is conditional on harness/scripts/check-doc-reconciliation.mjs and is skipped when that file is absent -- naming the path precisely is the point, not an oversight. This file is GENERATED (harness/scripts/generate-vendored-canon.mjs writes it from docs/push-release-flow.md); a future occurrence must be fixed at the origin doc, never edited here directly, or generate-vendored-canon-tests will report drift.",
   },
+
+  // --- NVA-DONEWHEN-3: check-backlog-done-predicate.mjs's three harness/
+  // mentions, classified individually below.
+  {
+    file: "plugins/pipeline-core/scripts/check-backlog-done-predicate.mjs",
+    match: "or `harness/scripts/`;",
+    reason:
+      "Class B: module-doc-comment prose stating the `script-exit-zero` predicate's script path must " +
+      "resolve inside `plugins/pipeline-core/scripts/` or `harness/scripts/`. This documents a real " +
+      "constraint the code enforces (see ALLOWED_SCRIPT_PREFIXES below); naming the actual second " +
+      "admissible prefix is what makes the comment useful to a reader of THIS repository's own source, " +
+      "not an instruction telling a consumer to look there.",
+  },
+  {
+    file: "plugins/pipeline-core/scripts/check-backlog-done-predicate.mjs",
+    match: "registered in `harness/scripts/verify.mjs`",
+    reason:
+      "Class B: module-doc-comment prose noting this script's `.test.mjs` sibling is not yet registered " +
+      "in `harness/scripts/verify.mjs`, TP-3-protected in this repository's own checkout. This is a " +
+      "self-application status note about THIS repository's own Verify gate wiring, not a path a " +
+      "consumer is told to visit.",
+  },
+  {
+    file: "plugins/pipeline-core/scripts/check-backlog-done-predicate.mjs",
+    match: '"harness/scripts/"]);',
+    reason:
+      "Class B, functional (not documentation): `harness/scripts/` is one of two admissible prefixes in " +
+      "ALLOWED_SCRIPT_PREFIXES for the `script-exit-zero` predicate. Removing it would break this " +
+      "repository's own self-application (ADR-0015) -- an item in THIS repository must be able to point " +
+      "a predicate at a harness script. In a consumer deployment the prefix is simply inert: a path that " +
+      "does not exist there can never satisfy the predicate, so admitting the prefix is a safe no-op, " +
+      "never a leak.",
+  },
 ]);
 
 function posixPath(value) {
