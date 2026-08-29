@@ -369,6 +369,7 @@ import {
 } from "../lib/external-push-ledger.mjs";
 import { dualEvaluateDecisionReference } from "../lib/decision-reference-dual-evaluation.mjs";
 import { inspectProjectOnboardingV3 } from "../lib/project-onboarding-v3.mjs";
+import { boundedCopySafeCommand, placeholder } from "../lib/copy-safe-command.mjs";
 import {
   applyLegacyV2RevocationRecovery,
   approveSubmittedPlan,
@@ -3341,12 +3342,30 @@ function resolveDraftProfileReceiptAction(dir, deps = {}) {
   // The repair script itself could not be planned (missing, malformed
   // pipeline.user.yaml/runtime pair, or a topology it refuses) -- name the
   // exact precondition and its own repair text rather than inventing one.
+  // NVA-CF-MINORPUSH-RETRY: when `check.repair` itself is absent, the
+  // fallback command below used to be a hand-assembled, naively-quoted
+  // template string that also echoed the resolved absolute `dir` (the
+  // project root) straight into this machine-consumed JSON `guidance`
+  // field -- describeFailedPostimagePredicates() above already states the
+  // "never absolute host paths" contract for this file's human-facing
+  // output; this fallback now matches it. The command is rendered through
+  // copy-safe-command.mjs's own quoting (the same renderer this plugin uses
+  // for every other human-facing command line), with the project root
+  // carried as a genuine unresolved template slot (`<project-root>`)
+  // rather than the real path -- exactly the shape `check.repair` itself
+  // already uses (see PROFILE_REPAIR in lib/po-gate-authority.mjs and the
+  // "draft next-action names the profile-receipt precondition explicitly"
+  // test, which asserts an unfilled `<root>` placeholder).
+  const fallbackCommand = boundedCopySafeCommand({
+    executable: process.execPath,
+    argv: [repairScript, "plan", "--root", placeholder("<project-root>")],
+  }).command;
   return {
     kind: "collect-input",
     mutation: false,
     requiresConfirmation: false,
     guidance: `no plan can be submitted yet: submit-plan is blocked by ${check?.code ?? "PO-PROFILE-AUTHORITY-UNAVAILABLE"}`
-      + ` (${check?.reason ?? "the PO profile receipt is unavailable"}). ${check?.repair ?? `Run: ${process.execPath} ${repairScript} plan --root "${dir}"`}`,
+      + ` (${check?.reason ?? "the PO profile receipt is unavailable"}). ${check?.repair ?? `Run: ${fallbackCommand}`}`,
     expected: { schema: INSPECT_SCHEMA, statuses: ["draft"] },
   };
 }
