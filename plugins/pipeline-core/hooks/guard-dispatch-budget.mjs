@@ -437,6 +437,56 @@ export function evaluateDispatchBudgetGuard(input, options = {}) {
     return verdict(0);
   }
 
+  if (identity.kind === "invalid-identity") {
+    // pipeline.dispatch-budget-invalid-identity-fails-closed (2026-08-29,
+    // NVA-R7-INVALIDIDENTITY): before this branch existed, a present-but-
+    // unusable transcript_path fell through to resolveMaxTurns() with the
+    // FIXED sentinel agentType (INVALID_TRANSCRIPT_PATH_SENTINEL_AGENT_TYPE),
+    // which never resolves (no agent definition file is ever named
+    // "unattested-invalid-transcript-path"), routing into the SAME
+    // recordUnresolved(...) call as a genuinely ambiguous identity -- kind
+    // "unresolved", branch "max-turns-unresolved", reason
+    // "max-turns-unresolvable". That reason is actively misleading: it reads
+    // exactly like "we resolved a real subagent identity but its agentType
+    // has no definition file", when what actually happened is the identity
+    // itself was never resolved at all. This is the concrete shape of
+    // "discards information" from the backlog finding -- not merely that the
+    // call was admitted, but that the record of it actively obscured what
+    // was detected.
+    //
+    // Chosen behaviour: keep admitting the call (exitCode 0, unchanged) but
+    // record it under its OWN branch and the identity's TRUE reason, never
+    // silently merged into -- or made to look like -- a resolved-but-
+    // undefined agent type. "Fails closed" here closes the OBSERVABILITY
+    // gap, not the gate: a budget/turn-counting guard blocking every tool
+    // call outright (Read included) on an unreadable identity is a much
+    // heavier, disproportionate act for a mechanism whose entire job is
+    // counting turns, not gating authority -- and it would directly
+    // contradict this file's own "Fail-open-but-visible" design (a guard
+    // that fails closed on its own confusion halts every dispatch in the
+    // repository), a design this specific identity shape does not
+    // invalidate: a present-but-not-absolute transcript_path is still, from
+    // THIS guard's narrow budget-counting purpose, an identity it cannot
+    // attribute a working cap to, however positively detected the
+    // malformation is. Unconditional denial was rejected for a second,
+    // independent reason: it would strand a flagged dispatch with no route
+    // left to even write its own evidence/dispatch-record-*.json, unlike the
+    // sibling guard-lifecycle-ready.mjs receipt gate's unconditional
+    // "deny-no-receipt" (which this guard deliberately does NOT copy) --
+    // that gate's job is a binary readiness attestation with no notion of a
+    // "closing act" to protect, so full denial costs it nothing equivalent.
+    // Never touches the real per-agentId counter file for this identity: the
+    // sentinel agentId is FIXED and shared across every invalid-identity
+    // occurrence session-wide, so loading/saving a counter keyed on it would
+    // create one shared, racy file across unrelated dispatches instead of
+    // the one-counter-file-per-real-dispatch invariant the rest of this
+    // guard relies on.
+    recordUnresolved(commonDir, {
+      ...identity, branch: "invalid-identity", root: rootDir, commonDir, transcriptPath: rawTranscriptPath, at: nowFn(),
+    }, options);
+    return verdict(0);
+  }
+
   const maxTurns = (options.resolveMaxTurnsFn ?? resolveMaxTurns)(identity.agentType, rootDir, options);
   if (maxTurns === null) {
     recordUnresolved(commonDir, {
