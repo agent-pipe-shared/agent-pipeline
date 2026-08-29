@@ -33,7 +33,10 @@ import * as licenseCheckAdapter from "./security-adapters/license-check.mjs";
 import { runSecurityScan } from "./security-scan.mjs";
 // NVA-SECGATE-1: security-scan.mjs's own gate-mode resolution now delegates to this exact
 // shared function -- see the pinning test below.
-import { resolveSecurityGateMode } from "../lib/security-completeness-gate.mjs";
+// NVA-R18-SCANBOOT: also imports checkSecurityCompleteness -- the SAME function guard-push.mjs
+// consults for the v2 policy-complete gate -- so the fresh-consumer test below proves the
+// actual gate a push goes through, not merely the v1 exit code.
+import { resolveSecurityGateMode, checkSecurityCompleteness } from "../lib/security-completeness-gate.mjs";
 
 const SCRIPT = fileURLToPath(new URL("./security-scan.mjs", import.meta.url));
 const REPO_ROOT = join(dirname(SCRIPT), "..", "..", "..");
@@ -1669,6 +1672,125 @@ security:
   const { evidence, exitCode } = await runSecurityScan({ rootDir, env: { HOME: fakeHome, PATH: `${dirname(process.execPath)}:/usr/bin:/bin` }, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
   assertEqual("runner: standard user-local Semgrep is discovered outside arbitrary PATH", evidence.scanners.map((entry) => [entry.tool, entry.status]), [["semgrep", "PASS"]]);
   assertEqual("runner: standard user-local Semgrep keeps a clean scan non-blocking", exitCode, 0);
+}
+
+// ===============================================================================================
+// NVA-R18-SCANBOOT -- fresh-consumer gate satisfiability + reportStatus five-way distinction
+// (backlog: scanner-bootstrap-is-not-self-sufficient-for-a-fresh-project)
+// ===============================================================================================
+
+{
+  // The DoD this proves: a genuinely bare fresh consumer -- no governance/ directory at all
+  // (so no governance/security-controls/catalog.json, no hand-authored scanner config, no
+  // gate-strength override) -- can turn gates.security ON and pass BOTH the v1 exit-code gate
+  // AND the v2 policy-complete completeness gate guard-push.mjs actually consults
+  // (checkSecurityCompleteness, ../lib/security-completeness-gate.mjs). The backlog item's own
+  // "BLOCKING (3 offending required capabilities)" measurement was taken against THIS
+  // repository's own catalog.json, which activates mod.cli-lib because one of its controls
+  // needs cap.sast -- a capability this four-scanner suite provides -- via
+  // sourceCapabilityPlan()'s module-activation heuristic (security-scan.mjs). A fresh consumer
+  // ships no catalog.json at all, so sourceCapabilityPlan() degrades to an EMPTY
+  // required-capability plan (source: "catalog-unavailable") and the v2 verdict can never be
+  // blocking -- proven here end to end rather than merely asserted.
+  const rootDir = makeRootDir("fresh-consumer-no-catalog-root");
+  writeManifest(
+    rootDir,
+    `schema: pipeline.manifest.v0
+
+gates:
+  security:
+    mode: blocking
+    type: automated
+`,
+  );
+  commitFixture(rootDir);
+  const { evidence, exitCode, evidenceV2, verdictV2 } = await runSecurityScan({ rootDir, env: {}, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
+  assertEqual("fresh consumer (no catalog): v1 exit 0 -- missing scanners are SKIPPED, never ERROR", exitCode, 0);
+  assertTrue("fresh consumer (no catalog): v2 envelope emitted", Boolean(evidenceV2), "no v2 envelope");
+  assertEqual("fresh consumer (no catalog): v2 required-capability plan is empty (catalog-unavailable)", verdictV2?.plan?.required, []);
+  assertEqual("fresh consumer (no catalog): v2 verdict is non-blocking", verdictV2?.verdict?.blocking, false);
+  assertEqual(
+    "fresh consumer (no catalog): every attempted scanner reads tool-unavailable/not-configured, never an unlabeled success",
+    evidence.scanners.map((s) => s.reportStatus),
+    ["tool-unavailable", "tool-unavailable", "tool-unavailable", "not-configured"],
+  );
+
+  const commit = git(rootDir, "rev-parse", "HEAD");
+  const tree = git(rootDir, "rev-parse", "HEAD^{tree}");
+  const completenessFailures = checkSecurityCompleteness({ projectDir: rootDir, commit, tree });
+  assertEqual(
+    "fresh consumer (no catalog): checkSecurityCompleteness (the ACTUAL guard-push v2 gate) passes with zero failures",
+    completenessFailures,
+    [],
+  );
+}
+
+{
+  // reportStatus, three more of the five named states in one run: passed / findings / error,
+  // plus license-check's own not-configured shown again for cross-check.
+  const rootDir = makeRootDir("report-status-mixed-root");
+  writeManifest(
+    rootDir,
+    `schema: pipeline.manifest.v0
+
+security:
+  scanners:
+    gitleaks:
+      enabled: true
+    osv-scanner:
+      enabled: true
+    semgrep:
+      enabled: true
+    license-check:
+      enabled: true
+`,
+  );
+  const env = {
+    PIPELINE_GITLEAKS_PATH: gitleaksClean,
+    PIPELINE_OSV_SCANNER_PATH: osvFindings,
+    PIPELINE_SEMGREP_PATH: semgrepCrash,
+  };
+  const { evidence } = await runSecurityScan({ rootDir, env, spawnFn: fixtureSpawnFn, timeoutMs: 5000, assessTrustedExecutablePath: mockAssessFixtureBinary });
+  assertEqual(
+    "reportStatus: passed / findings / error / not-configured are each distinguishable",
+    evidence.scanners.map((s) => [s.tool, s.reportStatus]),
+    [
+      ["gitleaks", "passed"],
+      ["osv-scanner", "findings"],
+      ["semgrep", "error"],
+      ["license-check", "not-configured"],
+    ],
+  );
+}
+
+{
+  // reportStatus: the fifth named state, "not-applicable" -- osv-scanner's own honest "no
+  // package sources in this project" signal, a project state rather than a broken tool. Every
+  // OTHER scanner is disabled so this is the only entry to read.
+  const rootDir = makeRootDir("report-status-not-applicable-root");
+  writeManifest(
+    rootDir,
+    `schema: pipeline.manifest.v0
+
+security:
+  scanners:
+    gitleaks:
+      enabled: false
+    osv-scanner:
+      enabled: true
+    semgrep:
+      enabled: false
+    license-check:
+      enabled: false
+`,
+  );
+  const env = { PIPELINE_OSV_SCANNER_PATH: osvNoPackageSources };
+  const { evidence } = await runSecurityScan({ rootDir, env, spawnFn: fixtureSpawnFn, timeoutMs: 5000, assessTrustedExecutablePath: mockAssessFixtureBinary });
+  assertEqual(
+    "reportStatus: osv-scanner with no package sources reads not-applicable, not tool-unavailable",
+    evidence.scanners.map((s) => [s.tool, s.reportStatus]),
+    [["osv-scanner", "not-applicable"]],
+  );
 }
 
 // ===============================================================================================
