@@ -110,6 +110,41 @@ leave every consumer unable to push.
   repository's own checkout. The correction above exists because those two differ, and only
   the second was ever measured.
 
+## Landed, 2026-08-29 (dispatch NVA-R33-SECGATEON, commit `bb2b9ed7`)
+
+`freshIntent()` seeds `security: "blocking"` (never `"warn"`, per the item's
+own "Not to be done"). The manifest's `DEV_PLAN_BLOCKING_GATE` chapter
+carries a matching `security` section, `type: "automated"` (no separate
+human approval — the scan itself produces the evidence), naming
+`security-scan --root .` as its own satisfying command out of its own
+refusal, mirroring the push chapter's existing discipline. New test
+`SECGATE-1` measures the satisfying path end to end: refuses a push with
+missing security evidence, admits it after the shipped scan command runs.
+The two prerequisite fixes this depends on (gitleaks config resolution for
+installed-plugin deployments, `push-prepare` respecting `gates.security`)
+were independently confirmed already landed before this dispatch started.
+
+Re-verified independently by the Elephant (this dispatch hit its 80-turn
+limit mid-task and never wrote its own final report, so this note is from
+direct code/test inspection, not a trusted self-report):
+`project-onboarding-v3.test.mjs` 152/152 (was 151), including SECGATE-1;
+`check-consumer-safe-paths.test.mjs` 9/9.
+
+**Acceptance criteria status:**
+- Seed + matching manifest chapter: done.
+- Two existing tests updated to assert the new world: done (part of the
+  152/152 diff, not individually re-confirmed line-by-line).
+- Satisfying-path-end-to-end test: done (SECGATE-1).
+- Behavior on a machine without scanners: stated via code comment and
+  covered by the existing `deriveReportStatus()` SKIPPED-status mechanism,
+  not by a fresh isolated measurement in this dispatch (the item's own
+  "Not claimed" section already noted this is hard to truly isolate on the
+  measuring machine).
+- Measured against an INSTALLED-PLUGIN deployment specifically: **not
+  done** — the new test runs against this repository's own checkout, the
+  same limitation the item's own "Correction" section flagged for the
+  original measurement. Left `status: open` for this reason.
+
 ## Related
 
 - `2026-08-28-scanner-bootstrap-is-not-self-sufficient-for-a-fresh-project.md` — the work
