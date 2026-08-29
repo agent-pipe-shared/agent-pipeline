@@ -224,7 +224,9 @@ function stateOf(dir) {
 const DISAGREEMENT = "DECISION-REFERENCE-DISAGREEMENT";
 
 // ---- PSDR01: approve-push WITHOUT --decision-reference -> prior behavior, byte-for-byte ------
-// (regression witness: the recorded approval must not merely succeed, it must carry no new key).
+// (regression witness: the recorded approval must not merely succeed, it must carry no new key
+// beyond the pre-existing shape plus NVA-PUSHFOLD-1's unconditional `pendingAuditWrite` hint --
+// in particular, no `decisionReference` key).
 check("PSDR01 approve-push without --decision-reference records exactly the pre-existing record", () => {
   const { dir, argv } = pushFixture("push-absent");
   const { code, output } = call(dir, argv);
@@ -232,7 +234,7 @@ check("PSDR01 approve-push without --decision-reference records exactly the pre-
   const approval = stateOf(dir).pushApproval.lastApproved;
   assert.equal(Object.hasOwn(approval, "decisionReference"), false);
   assert.deepEqual(Object.keys(approval).sort(),
-    ["approvedAt", "approvedBy", "criticalProof", "destination", "forCommit", "remote", "threatModel"]);
+    ["approvedAt", "approvedBy", "criticalProof", "destination", "forCommit", "pendingAuditWrite", "remote", "threatModel"]);
 });
 
 // ---- PSDR02: present and agreeing -> the transition proceeds and the reference is recorded ----
