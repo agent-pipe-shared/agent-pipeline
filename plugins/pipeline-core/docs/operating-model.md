@@ -1,0 +1,746 @@
+# Agent-Pipeline Operating Model (V3)
+
+> _A German reader copy follows below. English is the normative text._
+
+Agent-Pipeline is a versioned operating model for building software with AI
+agents. It gives a project one repeatable way to turn an intent into a
+reviewed, evidenced and traceable change. It is deliberately a method and a
+set of repo-local controls—not a claim that an AI system is safe, correct, or
+autonomous by itself.
+
+This document is the normative process contract. [README](../README.md) is the
+product entry point, [PIPELINE_FLOW](../PIPELINE_FLOW.md) is the maintained
+user journey, and [SETUP](../SETUP.md) is the task guide. When they disagree,
+this document and the applicable ADRs take precedence.
+
+## 1. What the model protects
+
+Agent work often fails in mundane ways: the goal lives only in chat, the agent
+checks its own work, a test was never run, a second person cannot reconstruct
+why a change happened, or every repository invents a different process. The
+model addresses those failure modes with five rules:
+
+1. **The document outlives the chat.** A spec, decision, evidence artifact and
+   handover carry the working state; a session is only a cache.
+2. **Separate creation from evaluation.** An implementor and a Critic receive
+   fresh contexts. A Critic sees the candidate, constraints and evidence—not
+   the implementor's reasoning.
+3. **Prefer deterministic checks.** Format, lint, types, tests, build and
+   configured security checks run before semantic review.
+4. **Match ceremony to stakes.** Rigor determines the needed specification;
+   risk determines the review depth. Small does not make a security or
+   guardrail change low risk.
+5. **Keep human judgment explicit.** A human decision role owns priority,
+   ambiguous trade-offs, irreversible or externally consequential actions and
+   required acceptance. The default display name is `PO`; it is a role, not an
+   identity or access-control system.
+
+## 2. Roles and boundaries
+
+| Role | Owns | Does not own |
+| --- | --- | --- |
+| Human decision role (`PO`) | Intent, priority, scope decisions, plan approval where required, acceptance and exceptions. | Rubber-stamping agent claims or acting as an implementation relay. |
+| Elephant | Triage, specification, decomposition, dispatch, finding disposition, continuity and close. | Quiet policy decisions or ordinary production implementation. |
+| Goldfish | One bounded, independently briefed task and its evidence. | Chat-history inheritance, open-ended scope expansion or weakening its own examiner. |
+| Critic | Independent, read-only assessment of a finished candidate and its evidence. | Implementation, access to implementor reasoning, or an unsupported finding. |
+
+“EGM” means the Elephants & Goldfish model: durable written context is more
+reliable than a long conversation. In Agent-Pipeline, **Goldfish** is the
+fresh-context executor; a separate fresh read-only duty performs spec
+readiness, and the **Critic** evaluates the result.
+
+The concrete runner integration differs by host. Claude has the richer native
+plugin/hook surface. Codex has its own plugin manifest and pre-tool guard
+adapter. Antigravity acts as a headless execution host through the CLI, mapped equivalently to Claude's hook surface via `.agents/hooks.json`. Other runtimes can use the methodology, but must not claim equivalent
+hook, tool, isolation or model-routing enforcement without their own evidence.
+
+### Dispatch briefing fields
+
+A Goldfish or Critic dispatch is built from a fixed six-field briefing, never
+freehand, whether issued directly (Agent tool) or fanned out through the
+Workflow tool's `agent()` call: **Goal** (one observable outcome, not a step
+list), **Context files** (the explicit, exhaustive input — nothing else is
+assumed known), **DoD checks** (the fixed, non-negotiable acceptance
+contract), **Forbidden** (scope boundaries and no-go paths), **Stop
+conditions** (when to halt and report instead of guessing or iterating past a
+failure), and **Dispatch metadata** (ruleset SHA, model/effort and
+justification, worktree, profile, tool budget). The concrete
+fill-in-the-blank shape lives in
+[`templates/prompts/goldfish-task.md`](../templates/prompts/goldfish-task.md)
+and
+[`templates/prompts/critic-review.md`](../templates/prompts/critic-review.md);
+this list is the field contract those templates instantiate, and a
+hand-written briefing that skips the template — including one hand-built
+inside a Workflow `agent()` prompt string — is the freehand failure mode
+CLAUDE.md's "Dispatch from the template, never freehand" rule exists to
+prevent.
+
+## 3. V3 routing: profiles, duties and phases
+
+`pipeline.user.v3` is the routing authority. Generated runtime projections are
+derived from it; they are not a second source of truth. A requested model route
+is not proof of the model that actually answered.
+
+### 3.1 Profiles
+
+Profiles describe the size and lifecycle shape of the current topic, not a
+person or model:
+
+| Profile | Use it for | Process effect |
+| --- | --- | --- |
+| `mini` | A genuinely small, bounded, reversible change. | Light process; advisory is disabled. Deterministic checks still apply. |
+| `feature` | One coherent product or engineering change. | Full feature lifecycle; model-free Advisor capability preflight is required and consultation is on demand. |
+| `epic` | Multi-block, architectural or cross-cutting work. | Full lifecycle; model-free Advisor capability preflight is required, consultation is on demand, and plan work is decomposed into smaller deliverable blocks. |
+
+Every profile has a `design_phase` and an `execution_phase`. A **phase** is a
+lifecycle state; it is not a profile. A **Sprint** is a planning window that
+groups work. Neither term changes a runner or authorizes a shortcut.
+
+### 3.2 Duties
+
+The route registry distinguishes duties such as `implement`, `mechanic`,
+`deep`, `test_author`, `readiness`, `critic_normal`, `critic_high_risk` and
+`advisory`. Optional duties are opt-in. Advisor capability preflight is
+model-free for `feature` and `epic` and disabled for `mini`. Actual Advisory is
+on demand: one concrete question, reason and digest-bound evidence produce a
+sanitized receipt rather than an implementation decision.
+
+### 3.3 Stage-0 fast path
+
+The stage-0 fast path is a narrow, self-contained exception (EL-01) letting an
+interactive Elephant session execute a fix itself instead of dispatching a
+Goldfish. It applies only when a task meets ALL of the following criteria:
+
+1. Touches at most 2 files.
+2. Is at most roughly 25 diff lines.
+3. Makes no architecture, schema, public-API, test, guardrail-hook-CI,
+   dependency, or security-surface change.
+4. Is trivially `git revert`-able.
+5. Has no risk flag set.
+
+If ALL five criteria hold, the interactive Elephant session MAY execute the
+fix itself. `verify` and the evidence artifact remain mandatory regardless. A
+Critic run is required only if the risk flag is set. This exception is scoped
+exclusively to this definition — it is not extended by local judgment;
+anything outside these criteria still requires a Goldfish dispatch.
+
+## 4. The lifecycle
+
+The maintained visual version is in [PIPELINE_FLOW](../PIPELINE_FLOW.md). The
+normative shape is:
+
+1. **Bootstrap.** Confirm the loaded ruleset, V3 authority, calibration,
+   current state and verify command before writable work.
+2. **Intent and triage.** Classify profile, rigor and risk. An optional design
+   pre-stage may clarify a large idea; it never pre-approves a design.
+3. **Spec and readiness.** For work above the light path, record outcome,
+   non-goals and checkable acceptance criteria. A fresh read-only readiness
+   duty tests whether the material is implementable without chat context.
+4. **Human plan gate.** Where the project/risk/rigor requires it, present a
+   readable PRD and wait for explicit approval before implementation.
+   Approval is recorded before the first implementation dispatch; it is never
+   inferred from chat, an old plan, or an implementor's confidence. The
+   marker mechanism that records it is now mechanically enforced, not
+   prose-only: `po-authority-acknowledge-apply` (the command that writes the
+   acknowledgement marker) is wired through the same attended chat-gate
+   ceremony every other human gate uses ([ADR-0021](adr/0021-prd-po-gate.md)
+   2026-08-25 addendum; [ADR-0061](adr/0061-uniform-human-approval-ceremony.md)
+   Decision 2) — an agent's own tool call cannot complete it, no signature/
+   chat mode branch exists for it, and it applies unconditionally.
+   **Post-approval continuation.** Once that required plan gate is recorded,
+   internal implementation slices and packages within its approved scope
+   continue autonomously. Dispatch, required evidence gates, Critic review and
+   finding disposition are delivery work, not repeated PO pauses. Do not ask
+   for a new PO gate merely because a slice completes. A PO gate is required
+   only for a typed blocker, a material scope or authority change, a push or
+   other remote action not already admitted by the PHX-2 Human Governance
+   Decision Ledger and Authority Resolver contract below, or final feature/epic
+   acceptance. This preserves
+   the initial plan gate; it does not weaken any required evidence gate.
+   **PHX-2 Human Governance Decision Ledger and Authority Resolver transition
+   (policy and rollback plan).** The sole possible exception for a remote
+   action is a secure Ledger/Resolver proof of one valid, unconsumed,
+   unrevoked, unexpired and integrity-bound PO decision. The Resolver must bind
+   that decision exactly to one action, remote, ref, candidate and named work
+   package; it authorizes no action variant, other remote action, remote, ref,
+   candidate or work package. The decision record must not originate from an
+   agent, Git history, state, cache, agent journal, lifecycle event, readback,
+   runner or AGY. Until this PHX-2 path exists, or whenever its Resolver or
+   proof is unavailable, missing or ambiguous, this Pipeline has no executable
+   remote-action exception: every remote action remains an explicit PO gate,
+   while a PO decision is only proposed Ledger input, never executable
+   authority. It must not be promoted, copied or inferred from mutable
+   `pushApproval` or other state, CLI input, Git history or metadata, cache,
+   journal, lifecycle/readback record, agent record, runner or AGY value.
+   Before execution, also stop if the decision is expired,
+   revoked, consumed or changed. Its sole lifetime ends at successful exact
+   remote readback, or at an explicit revocation or authority change. This
+   semantics is platform- and runner-neutral: it applies equally on macOS,
+   Windows and Linux and to Claude, Codex and AGY, without making AGY a
+   prerequisite. After the action, compare the exact remote ref with the bound
+   candidate and update the local public evidence/audit path with the binding
+   and observed ref; never include private data or claim success without that
+   readback.
+   **Authorization/trust-boundary threat-model assessment.** An unbound,
+   stale, ambiguous or changed remote action is denied: only the PHX-2
+   Ledger/Resolver proof is authority. Remote readback is observation, never
+   authority; the audit trail is public-safe and contains no private data.
+   **Rollback.** Before the readback, abort the action. After publication,
+   never force-push or automatically reverse it: a compensating remote action
+   needs new explicit PO authority that names that action, remote and ref.
+5. **Dispatch.** Give a Goldfish one outcome, exact context paths, DoD checks,
+   prohibitions, stop conditions and route metadata. Independent tasks may run
+   in parallel when their files and state do not conflict.
+
+   The Elephant SHALL treat an absent early progress message as neutral, not as
+   a worker failure. Before interrupting a dispatched worker, it SHALL allow a
+   reasonable bounded execution window and inspect the worker's status plus the
+   emerging owned-file diff. An interrupt requires a concrete error,
+   scope/prohibition breach, conflicting mutation, or explicit stop request;
+   impatience alone is not evidence. This is orchestration discipline, not a
+   claim that a worker has passed its DoD.
+6. **Verify.** Run the project's single configured verify command. The result
+   is machine evidence containing the command and result, not “looks good”.
+7. **Critic.** Review the delta only after the applicable deterministic chain
+   is green. High-risk, architecture, guardrail and security changes receive
+   the required stronger review path. Findings need evidence and a disposition.
+
+   **Collection-block batching (2026-08-25, backlog item
+   `pipeline.critic-and-verify-cadence-may-be-too-fine-grained`).** Verify
+   and Critic gate a deliverable unit, not necessarily one individual
+   Goldfish dispatch. Where several independently-scoped Goldfish dispatches
+   run within the same session — none of them individually
+   guardrail/security/architecture-classified (MP-07) and each already Rigor
+   0/1 — the Elephant MAY collect their green, committed results into one
+   stated collection block and run ONE Verify pass plus ONE Critic review
+   against the combined diff, instead of a separate Verify+Critic pass per
+   dispatch. The block size is a bound the Elephant states before
+   dispatching (e.g. "this sweep's N items"), so a regression cannot ride
+   along unreviewed indefinitely. This does NOT loosen a single package's
+   OWN correction-wave re-Critic cadence (the round-budget rule: one delta
+   re-Critic after each fresh local correction commit, up to three, per
+   `templates/prompts/critic-review.md` item 4) — a 2026-08-24/25 correction
+   range showed that per-commit cadence catching a regression introduced by
+   the immediately preceding correction wave (documented in the same
+   backlog item's Description); a coarser correction-wave cadence risks
+   missing or burying exactly that class of regression, so it stays
+   unchanged.
+8. **Close.** Synchronize handover and history, preserve evidence, perform the
+   required retro and run close extensions. A feature lifecycle is closed only
+   after its tracked work is actually complete.
+
+## 5. Rigor, risk and gates
+
+**Rigor** answers “how much written definition does this change earn?”
+
+| Rigor | Minimum shape |
+| --- | --- |
+| 0 | Small bounded change: short brief and evidence. It never waives verify. |
+| 1 | Delta specification with checkable criteria. |
+| 2 | Full maintained specification for consequential or broad work. |
+
+**Risk** answers “how independently must it be checked?” A path classified as
+architecture, security or guardrail remains high risk even if the diff is one
+line. Project calibration and governance rules can raise risk; they do not
+silently lower it.
+
+The core gates are: V3/bootstrap authority, required plan approval, the one
+verify command, applicable security checks, and Critic review. A skipped
+optional security tool is reported as `SKIPPED`, never as `PASS`. A typed
+unavailable runner capability stops that capability honestly; it is not an
+invitation to weaken permissions, invent evidence or change runner/model.
+
+### Gate discipline and autonomous happy path
+
+The compiled repository manifest is the sole source for the number and kind of
+human gates. A calibrated two-gate workflow has exactly those two configured
+human decision points; it does not acquire additional chat confirmations while
+work is in progress. Once the applicable plan gate is recorded, ordinary
+implementation is autonomous: bounded edits, focused checks, state readback,
+one-line commits, Verify, Critic preparation and the next approved block are
+agent work.
+
+**Plan approval is an execution mandate, not a per-step conversation.** A
+recorded PRD/Spec approval covers every implementation choice and recovery
+needed to meet its accepted scope: normal design details, task ordering, test
+fixes, internal refactors, evidence collection and Critic follow-up. The agent
+must decide those matters, record material decisions in governed artifacts, and
+return outcomes for acceptance. It must not turn ordinary alternatives or
+uncertainty into repeated PO questions. A question is permitted only when
+alternatives materially change approved scope, acceptance criteria, priority,
+risk, cost, an external or irreversible consequence, or a configured gate.
+Present such alternatives together at that boundary; do not serialise them into
+implementation-time approval prompts.
+
+**Pipeline-use consent is likewise one bounded bootstrap consent.** When the
+human agrees to use the Pipeline in a repository, that authorises its disclosed
+local happy path through the first usable kickoff: plans/readbacks, portable
+seed, any plan-disclosed local Git initialization, runtime initialization,
+restart preparation and kickoff artifacts. The agent reports the bounded effect
+once and then executes the digest-bound steps autonomously; it does not ask the
+same human to approve every internal plan digest. A restart resumes this local
+onboarding from its sanctioned state. This consent never covers remote/adoption
+work, publication, deployment, destructive operations, a scope change, or an
+actual configured plan/acceptance gate.
+
+Do not ask the PO to re-approve routine progress, a guard's first denial, a
+test retry, a bounded recovery already returned by the system, or a normal
+commit. Ask only for a configured decision or acceptance gate, an explicit
+scope/priority trade-off, an irreversible or externally consequential action,
+or a typed hard block for which the supplied safe recovery actions cannot make
+progress. A guard denial is not itself a human gate: execute its exact typed
+read-only or lifecycle recovery first. This discipline preserves human
+judgment without turning the PO into an implementation relay.
+
+## 6. Evidence, review and recovery
+
+Evidence binds a result to its candidate and records what was actually
+observed. It is intentionally narrower than a transcript and should not expose
+credentials, private coordinates or unnecessary prompts.
+
+The Critic works from paths/refs, the candidate, constraints and evidence. It
+first hunts for defects, then reports only findings it can support. “No
+findings” is valid. The Elephant decides whether each finding is fixed,
+accepted with a reason, or escalated; it must not silently discard one.
+
+A Critic round that ends in a blocking finding gets at most one re-review
+round after rework; a further blocking finding on the same package is
+self-verified directly rather than dispatched a third time
+(`guardrails/quality-gates.md` QG-13).
+
+If a duty is unavailable, a precondition drifts, evidence is stale, a stop
+condition fires or the same attempt repeatedly fails, stop the affected work.
+Recover from the named artifact or start a newly briefed task; do not continue
+by relying on remembered chat context. Destructive Git operations remain
+guarded even when a model or prompt asks for them.
+
+## 7. Project calibration and extensions
+
+The portable core is shared; each repository supplies a small committed
+calibration and, where used, a declarative manifest, both at the project's
+resolved authority tier (`project/*`, else the legacy `.claude/*`; ADR-0046/ADR-0054). The V3 source selects language, routing, profiles,
+duties and policy defaults. Use the templates rather than copying an existing
+repo's private details.
+
+Typical repository dials are:
+
+- the single `verify` command;
+- autonomy, branch and worktree model;
+- stakes, constraints and risk zones;
+- plan, push and security gate modes;
+- human-facing language;
+- project-owned guidelines and machine-checkable policies;
+- protected test paths and approved ritual extensions.
+
+Extensions are optional and bounded: custom PRD/spec/ADR/handover templates,
+governance guidelines, policy checks, release/deploy adapters, UI/security
+phases and organization-private adapters. They must be configured through the
+documented extension points, tested in the adopting repository and kept out of
+the public core when they contain private coordinates, credentials or
+organization-specific data.
+
+`roles.po.display_label` is an optional V3 presentation setting for the human
+decision role. It is plain display text—not an authority mechanism, personal
+identity, or non-repudiation claim. The machine role key, approvals, receipts,
+and evidence remain exactly `po`; omitted configuration renders the default
+`PO`.
+
+`language.human_facing` is the single human-facing language authority in the
+compiled runtime. The PO-gate language projection is checked with
+`node harness/scripts/check-po-gate-authority.mjs`; user-facing copies must not
+invent a competing language or approval form.
+
+## 8. Operating shapes
+
+| Shape | Practical use | Boundary |
+| --- | --- | --- |
+| Solo developer | One person can hold the human decision and maintainer responsibilities while fresh execution/review contexts retain useful separation. | The model does not create independent human oversight. |
+| Small team | Split decision, implementation and review responsibilities; share calibration, WIP limits, branch policy and push gates. | It does not replace code review, employment responsibilities or access controls. |
+| Multi-team organization | Reuse central guidelines, policies and templates; let each repository calibrate local phases, gates and adapters. | It is not IAM, authenticated identity, a legal control framework or a central control plane. |
+
+## 9. Authority precedence
+
+1. The applicable security/host constraints and project configuration.
+2. The approved spec/PRD and recorded PO decisions for the active feature.
+3. This Operating Model and applicable ADRs.
+4. Templates, examples, prompts and user documentation.
+5. Chat instructions, memory and unrecorded assumptions.
+
+An exception is valid only when it is explicit, scoped and recorded in the
+project's durable state. It does not silently change the underlying rule.
+
+The error register remains the **sole public concrete form authority** for its
+bounded triage content; it is not briefing context for a Goldfish or Critic.
+
+## 10. Glossary
+
+- **Acceptance criteria / DoD:** observable checks that define completion.
+- **Advisory:** an on-demand, fresh, bounded second opinion for one concrete
+  Feature/Epic question; not bootstrap and not approval.
+- **Calibration:** the repo-local configuration that adapts the shared model.
+- **Critic:** independent fresh-context read-only reviewer.
+- **Duty:** a routed unit of work, such as implement or readiness.
+- **EGM:** Elephants & Goldfish model; durable documents over conversational
+  memory.
+- **Evidence:** a machine or receipt-bound record of an observed check/result.
+- **Goldfish:** fresh-context executor for one bounded dispatch.
+- **Elephant:** long-lived orchestrator for the project lifecycle.
+- **Implementation complete:** the Goldfish/Elephant-visible DoD and verify
+  checks passed; independent (Critic) review, manual/browser checks, and PO
+  acceptance may still be open. Never reported as a bare "done" — see
+  PO-accepted, and the hard rule in `CLAUDE.md` ("Hard rules").
+- **Phase:** lifecycle state such as design or execution.
+- **PO-accepted:** the PO has given explicit sign-off on the delivered work.
+  Only PO-accepted work may be described as fully "done" in a completion
+  report or handover status.
+- **Profile:** `mini`, `feature` or `epic` process shape.
+- **Rigor:** required depth of written definition (0, 1 or 2).
+- **Risk:** required review depth; independent of diff size.
+- **Sprint:** a planning window, not a routing profile or permission.
+
+---
+
+<!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a complete German reader copy. English above is normative. -->
+
+# Agent-Pipeline Operating Model (V3)
+
+> _Oben steht die normative englische Fassung. Dieser Abschnitt ist die vollständige deutsche Lesefassung._
+
+Agent-Pipeline ist ein versioniertes Operating Model für Softwareentwicklung
+mit KI-Agenten. Es gibt einem Projekt einen wiederholbaren Weg von einer
+Absicht zu einer geprüften, belegten und nachvollziehbaren Änderung. Es ist
+bewusst eine Methode mit repo-lokalen Kontrollen—keine Behauptung, dass ein
+KI-System von allein sicher, korrekt oder autonom ist.
+
+Dieses Dokument ist der normative Prozessvertrag. Das [README](../README.md)
+ist der Produkteinstieg, der [PIPELINE_FLOW](../PIPELINE_FLOW.md) die gepflegte
+Nutzerreise und [SETUP](../SETUP.md) der Aufgabenleitfaden. Bei Widerspruch
+gehen dieses Dokument und die passenden ADRs vor.
+
+## 1. Was das Modell schützt
+
+Agentenarbeit scheitert oft banal: Das Ziel lebt nur im Chat, ein Agent prüft
+sich selbst, ein Test lief nie, eine zweite Person kann die Änderung nicht
+nachvollziehen oder jedes Repository erfindet einen anderen Ablauf. Das Modell
+begegnet diesen Fehlern mit fünf Regeln:
+
+1. **Das Dokument überlebt den Chat.** Spec, Entscheidung, Evidenz und
+   Handover tragen den Arbeitsstand; eine Session ist nur ein Cache.
+2. **Erzeugung und Bewertung bleiben getrennt.** Implementierung und Critic
+   erhalten frischen Kontext. Der Critic sieht Kandidat, Grenzen und Evidenz,
+   nicht die Begründung des Implementierenden.
+3. **Deterministische Checks gehen vor.** Format, Lint, Typen, Tests, Build
+   und konfigurierte Security-Checks laufen vor der semantischen Prüfung.
+4. **Der Einsatz bestimmt die Zeremonie.** Rigor bestimmt die notwendige Spec;
+   Risiko bestimmt die Reviewtiefe. Klein macht einen Security- oder
+   Guardrail-Change nicht risikoarm.
+5. **Menschliches Urteil bleibt sichtbar.** Eine menschliche Entscheidungsrolle
+   verantwortet Priorität, mehrdeutige Abwägungen, irreversible oder externe
+   Folgen und notwendige Abnahme. Die Standardanzeige ist `PO`; das ist eine
+   Rolle, kein Identitäts- oder Zugriffssystem.
+
+## 2. Rollen und Grenzen
+
+| Rolle | Verantwortet | Verantwortet nicht |
+| --- | --- | --- |
+| Menschliche Entscheidungsrolle (`PO`) | Absicht, Priorität, Scope-Entscheidungen, nötige Planfreigabe, Abnahme und Ausnahmen. | Agentenbehauptungen abzunicken oder als Implementierungs-Relay zu dienen. |
+| Elephant | Triage, Spezifikation, Zerlegung, Dispatch, Befunddisposition, Kontinuität und Close. | Stille Policy-Entscheidungen oder normale Produktionsimplementierung. |
+| Goldfish | Eine klar begrenzte, unabhängig gebriefte Aufgabe samt Evidenz. | Chat-Historie zu erben, Scope offen auszuweiten oder den eigenen Prüfer zu schwächen. |
+| Critic | Unabhängige Read-only-Bewertung eines fertigen Kandidaten und seiner Evidenz. | Implementierung, Zugriff auf Implementierungsbegründungen oder unbelegte Befunde. |
+
+„EGM“ bedeutet Elephants-&-Goldfish-Modell: dauerhafte schriftliche Kontexte
+sind verlässlicher als ein langes Gespräch. Bei Agent-Pipeline ist der
+**Goldfish** der Ausführer mit frischem Kontext; eine getrennte frische
+Read-only-Duty prüft die Readiness einer Spec und der **Critic** bewertet das
+Ergebnis.
+
+Die konkrete Runner-Integration hängt vom Host ab. Claude besitzt die
+umfangreichere native Plugin-/Hook-Oberfläche. Codex besitzt ein eigenes
+Plugin-Manifest und einen PreTool-Guard-Adapter. Antigravity fungiert als headless Execution-Host über die CLI und bildet Claudes Hook-Oberfläche via `.agents/hooks.json` äquivalent ab. Andere Runtimes können die
+Methode nutzen, dürfen aber ohne eigene Evidenz keine gleichwertige Hook-,
+Tool-, Isolations- oder Model-Routing-Durchsetzung behaupten.
+
+## 3. V3-Routing: Profile, Duties und Phasen
+
+`pipeline.user.v3` ist die Routing-Autorität. Generierte Runtime-Projektionen
+werden daraus abgeleitet; sie sind keine zweite Wahrheitsquelle. Eine
+angeforderte Modellroute beweist nicht, welches Modell tatsächlich geantwortet
+hat.
+
+### Profile
+
+Profile beschreiben Größe und Lifecycle-Form des aktuellen Themas, keine Person
+und kein Modell:
+
+| Profil | Verwende es für | Prozesseffekt |
+| --- | --- | --- |
+| `mini` | Eine wirklich kleine, begrenzte und reversible Änderung. | Leichter Prozess; Advisory ist deaktiviert. Deterministische Checks bleiben Pflicht. |
+| `feature` | Eine zusammenhängende Produkt- oder Engineering-Änderung. | Voller Feature-Lifecycle; modellfreier Advisor-Capability-Preflight ist erforderlich, Consultation läuft on demand. |
+| `epic` | Mehrblock-, Architektur- oder querschnittliche Arbeit. | Voller Lifecycle; modellfreier Advisor-Capability-Preflight ist erforderlich, Consultation läuft on demand, der Plan wird in kleinere lieferbare Blöcke zerlegt. |
+
+Jedes Profil hat eine `design_phase` und eine `execution_phase`. Eine **Phase**
+ist ein Lifecycle-Zustand, kein Profil. Ein **Sprint** ist ein
+Planungszeitraum. Keiner der Begriffe ändert einen Runner oder erlaubt eine
+Abkürzung.
+
+### Duties
+
+Die Route Registry unterscheidet Duties wie `implement`, `mechanic`, `deep`,
+`test_author`, `readiness`, `critic_normal`, `critic_high_risk` und
+`advisory`. Optionale Duties sind Opt-in. Der Advisor-Capability-Preflight ist
+für `feature` und `epic` modellfrei und für `mini` deaktiviert. Echte Advisory
+läuft on demand: Eine konkrete Frage, ein Grund und digest-gebundene Evidenz
+erzeugen eine sanitierte Receipt statt einer Implementierungsentscheidung.
+
+## 4. Der Lifecycle
+
+Die gepflegte visuelle Fassung steht im [PIPELINE_FLOW](../PIPELINE_FLOW.md).
+Die normative Form lautet:
+
+1. **Bootstrap.** Vor schreibender Arbeit Ruleset, V3-Autorität,
+   Kalibrierung, aktuellen Stand und Verify-Befehl bestätigen.
+2. **Absicht und Triage.** Profil, Rigor und Risiko klassifizieren. Eine
+   optionale Design-Vorstufe darf eine große Idee klären, aber nie ein Design
+   vorab freigeben.
+3. **Spec und Readiness.** Oberhalb des leichten Pfads Outcome, Nicht-Ziele
+   und prüfbare Akzeptanzkriterien festhalten. Eine frische Read-only-Duty
+   prüft, ob das Material ohne Chat-Kontext implementierbar ist.
+4. **Menschliches Plan-Gate.** Wo Projekt, Risiko oder Rigor es verlangen,
+   eine lesbare PRD präsentieren und vor Implementierung auf ausdrückliche
+   Freigabe warten.
+   Die Freigabe wird vor dem ersten Implementierungs-Dispatch aufgezeichnet;
+   sie wird nie aus Chat, einem alten Plan oder Zuversicht der implementierenden
+   Person abgeleitet.
+   **Fortsetzung nach Freigabe.** Sobald dieses nötige Plan-Gate aufgezeichnet
+   ist, laufen interne Implementierungs-Slices und -Pakete innerhalb seines
+   freigegebenen Scopes autonom weiter. Dispatch, nötige Evidenz-Gates,
+   Critic-Review und Befund-Disposition sind Auslieferungsarbeit, keine
+   wiederholten PO-Pausen. Nicht allein wegen des Abschlusses eines Slices ein
+   neues PO-Gate einholen. Ein PO-Gate ist nur bei einem typisierten Blocker,
+   einer materiellen Scope- oder Autoritätsänderung, einem Push oder einer
+   anderen Remote-Aktion, die nicht bereits durch den unten stehenden PHX-2
+   Human Governance Decision Ledger und Authority Resolver zugelassen ist,
+   oder der finalen Feature-/Epic-Abnahme erforderlich. Das erhält das anfängliche Plan-Gate
+   und schwächt kein nötiges Evidenz-Gate.
+   **PHX-2 Human Governance Decision Ledger und Authority-Resolver-Übergang
+   (Policy und Rollback-Plan).** Die einzige mögliche Ausnahme für eine
+   Remote-Aktion ist ein sicherer Ledger-/Resolver-Nachweis einer gültigen,
+   unverbrauchten, nicht widerrufenen, nicht abgelaufenen und
+   integritätsgebundenen PO-Decision. Der Resolver muss diese Decision genau
+   an eine Aktion, ein Remote, einen Ref, einen Kandidaten und ein benanntes
+   Arbeitspaket binden; sie autorisiert keine Aktionsvariante, andere
+   Remote-Aktion, kein anderes Remote, keinen anderen Ref, Kandidaten oder
+   kein anderes Arbeitspaket. Der Decision-Record darf nicht aus einem Agent,
+   Git-History, State, Cache, Agent-Journal, Lifecycle-Event, Readback, Runner
+   oder AGY stammen. Solange dieser PHX-2-Pfad nicht existiert oder sein
+   Resolver bzw. Nachweis nicht verfügbar, fehlend oder mehrdeutig ist,
+   existiert für diese Pipeline keine ausführbare Remote-Aktionsausnahme:
+   Jede Remote-Aktion bleibt ein ausdrückliches PO-Gate, während eine
+   PO-Decision nur vorgeschlagener Ledger-Eingang und nie ausführbare
+   Authority ist. Sie darf nicht aus mutablem `pushApproval` oder anderem
+   State, CLI-Input, Git-History oder -Metadaten, Cache, Journal,
+   Lifecycle-/Readback-Record, Agent-Record, Runner oder AGY heraufgestuft,
+   kopiert oder abgeleitet werden. Vor der Ausführung auch bei
+   abgelaufener, widerrufener, verbrauchter oder geänderter Decision stoppen.
+   Ihre einzige Laufzeit endet mit erfolgreichem exaktem Remote-Readback oder
+   einem ausdrücklichen Widerruf bzw. einer Authority-Änderung. Diese Semantik
+   ist plattform- und runnerneutral: Sie gilt gleich für macOS, Windows und
+   Linux sowie Claude, Codex und AGY, ohne AGY vorauszusetzen. Nach der Aktion
+   den exakten Remote-Ref mit dem gebundenen Kandidaten vergleichen und den
+   lokalen, öffentlichen Evidenz-/Auditpfad mit Bindung und beobachtetem Ref
+   aktualisieren; niemals private Daten aufnehmen oder ohne diesen Readback
+   Erfolg behaupten. **Authorization-/Trust-Boundary-Threat-Model-Bewertung.**
+   Eine ungebundene, veraltete, mehrdeutige oder geänderte Remote-Aktion wird
+   verweigert: Nur der PHX-2-Ledger-/Resolver-Nachweis ist Authority.
+   Remote-Readback ist Beobachtung, nie Authority; der Auditpfad ist public-safe und enthält
+   keine privaten Daten. **Rollback.** Vor dem Readback die Aktion abbrechen. Nach
+   der Veröffentlichung niemals force-pushen oder automatisch zurückbauen:
+   Eine gegensteuernde Remote-Aktion benötigt neue ausdrückliche PO-Autorität,
+   die Aktion, Remote und Ref benennt.
+5. **Dispatch.** Einem Goldfish genau ein Outcome, Kontextpfade, DoD-Checks,
+   Verbote, Stop-Bedingungen und Route-Metadaten geben. Unabhängige Aufgaben
+   dürfen parallel laufen, wenn Dateien und Zustand nicht kollidieren.
+6. **Verify.** Den einen konfigurierten Verify-Befehl ausführen. Das Ergebnis
+   ist maschinelle Evidenz mit Befehl und Resultat, nicht „sieht gut aus“.
+7. **Critic.** Den Delta erst nach grüner deterministischer Kette prüfen.
+   High-Risk-, Architektur-, Guardrail- und Security-Änderungen erhalten den
+   vorgeschriebenen stärkeren Reviewpfad. Jeder Befund braucht Evidenz und
+   Disposition.
+8. **Close.** Handover und Historie synchronisieren, Evidenz bewahren, die
+   nötige Retro durchführen und Close-Erweiterungen ausführen. Ein Feature
+   endet erst, wenn seine verfolgte Arbeit wirklich abgeschlossen ist.
+
+## 5. Rigor, Risiko und Gates
+
+**Rigor** beantwortet: „Wie viel schriftliche Definition verdient diese
+Änderung?“
+
+| Rigor | Mindestform |
+| --- | --- |
+| 0 | Kleine begrenzte Änderung: kurzer Brief plus Evidenz. Verify entfällt nie. |
+| 1 | Delta-Spezifikation mit prüfbaren Kriterien. |
+| 2 | Vollständig gepflegte Spezifikation für folgenreiche oder breite Arbeit. |
+
+**Risiko** beantwortet: „Wie unabhängig muss dies geprüft werden?“ Ein als
+Architektur, Security oder Guardrail klassifizierter Pfad bleibt High Risk,
+auch wenn der Diff nur eine Zeile hat. Projektkalibrierung und Governance-Regeln
+können Risiko anheben, aber nicht still absenken.
+
+Die Kerngates sind: V3-/Bootstrap-Autorität, nötige Planfreigabe, der eine
+Verify-Befehl, passende Security-Checks und Critic-Review. Ein übersprungenes
+optionales Security-Tool erscheint als `SKIPPED`, nie als `PASS`. Eine typisierte
+nicht verfügbare Runner-Fähigkeit stoppt diese Fähigkeit ehrlich; sie ist keine
+Einladung, Berechtigungen zu lockern, Evidenz zu erfinden oder Runner/Modell zu
+wechseln.
+
+### Gate-Disziplin und autonomer Happy Path
+
+Das kompilierte Repository-Manifest ist die einzige Autorität für Anzahl und
+Art menschlicher Gates. Ein auf zwei Gates kalibrierter Ablauf hat genau diese
+beiden konfigurierten menschlichen Entscheidungspunkte; während der Arbeit
+entstehen keine zusätzlichen Chat-Bestätigungen. Sobald das nötige Plan-Gate
+aufgezeichnet ist, läuft die gewöhnliche Implementierung autonom: begrenzte
+Änderungen, fokussierte Checks, State-Readback, einzeilige Commits, Verify,
+Critic-Vorbereitung und der nächste freigegebene Block sind Agentenarbeit.
+
+**Eine Planfreigabe ist ein Ausführungsmandat, kein Gespräch für jeden
+Einzelschritt.** Eine aufgezeichnete PRD-/Spec-Freigabe deckt jede
+Umsetzungsentscheidung und Recovery ab, die nötig ist, um den akzeptierten
+Scope zu erfüllen: normale Designdetails, Reihenfolge der Arbeit, Test-Fixes,
+interne Refactors, Evidenzsammlung und Critic-Nacharbeit. Der Agent entscheidet
+diese Punkte, hält materielle Entscheidungen in den governeden Artefakten fest
+und legt Ergebnisse zur Abnahme vor. Er darf gewöhnliche Alternativen oder
+Unsicherheit nicht in wiederholte PO-Fragen verwandeln. Eine Frage ist nur
+zulässig, wenn Alternativen den freigegebenen Scope, Akzeptanzkriterien,
+Priorität, Risiko, Kosten, eine externe oder irreversible Folge oder ein
+konfiguriertes Gate materiell verändern. Solche Alternativen werden an dieser
+Grenze gemeinsam vorgelegt, nicht als Folge von Freigabeaufforderungen während
+der Umsetzung.
+
+**Die Zustimmung zur Pipeline-Nutzung ist ebenso eine einmalige, begrenzte
+Bootstrap-Zustimmung.** Wenn der Mensch der Pipeline-Nutzung in einem
+Repository zustimmt, autorisiert das den offengelegten lokalen Happy Path bis
+zum ersten nutzbaren Kickoff: Pläne/Readbacks, portablen Seed, eine im Plan
+offengelegte lokale Git-Initialisierung, Runtime-Initialisierung,
+Restart-Vorbereitung und Kickoff-Artefakte. Der Agent benennt die begrenzte
+Wirkung einmal und führt die digest-gebundenen Schritte dann autonom aus; er
+fragt nicht nach jeder internen Plan-Prüfsumme erneut. Ein Neustart setzt dieses
+lokale Onboarding aus seinem sanktionierten Zustand fort. Diese Zustimmung
+deckt niemals Remote-/Adoption-Arbeit, Veröffentlichung, Deployment,
+destruktive Operationen, Scope-Änderungen oder ein tatsächlich konfiguriertes
+Plan-/Abnahme-Gate ab.
+
+Den PO nicht erneut für normalen Fortschritt, die erste Guard-Ablehnung, einen
+Test-Repeat, eine bereits zurückgegebene begrenzte Recovery oder einen normalen
+Commit fragen. Fragen nur bei einem konfigurierten Entscheidungs- oder
+Abnahme-Gate, einem expliziten Scope-/Prioritäts-Trade-off, einer irreversiblen
+oder extern wirksamen Aktion oder einem typisierten harten Block, für den die
+gelieferten sicheren Recovery-Aktionen nicht weiterführen. Eine Guard-Ablehnung
+ist kein menschliches Gate: zuerst ihre exakte typisierte Read-only- oder
+Lifecycle-Recovery ausführen. So bleibt menschliches Urteil sichtbar, ohne den
+PO zum Implementierungs-Relay zu machen.
+
+## 6. Evidenz, Review und Recovery
+
+Evidenz bindet ein Ergebnis an seinen Kandidaten und hält fest, was wirklich
+beobachtet wurde. Sie ist absichtlich schmaler als ein Transkript und soll
+keine Credentials, privaten Koordinaten oder unnötige Prompts offenlegen.
+
+Der Critic arbeitet aus Pfaden/Refs, Kandidat, Grenzen und Evidenz. Zuerst
+sucht er nach Fehlern, dann meldet er nur belegbare Befunde. „Keine Befunde“
+ist gültig. Der Elephant entscheidet, ob jeder Befund behoben, mit Begründung
+akzeptiert oder eskaliert wird; er darf keinen still verwerfen.
+
+Ist eine Duty nicht verfügbar, driftet eine Vorbedingung, ist Evidenz veraltet,
+tritt eine Stop-Bedingung auf oder scheitert derselbe Versuch wiederholt, wird
+die betroffene Arbeit gestoppt. Recovery erfolgt aus dem benannten Artefakt
+oder über einen neu gebrief­ten Task, nicht aus erinnerter Chat-Historie.
+Destruktive Git-Operationen bleiben geschützt, auch wenn ein Modell oder Prompt
+sie verlangt.
+
+## 7. Projektkalibrierung und Erweiterungen
+
+Der portable Kern ist gemeinsam; jedes Repository liefert eine kleine
+committete Kalibrierung in `.claude/pipeline.json` und, wo genutzt, ein
+deklaratives `.claude/pipeline.yaml`. Die V3-Quelle wählt Sprache, Routing,
+Profile, Duties und Policy-Defaults. Nutze die Templates, statt private Details
+eines anderen Repos zu kopieren.
+
+Typische Repository-Stellschrauben sind:
+
+- der eine `verify`-Befehl;
+- Autonomie-, Branch- und Worktree-Modell;
+- Stakes, Constraints und Risk Zones;
+- Modi für Plan-, Push- und Security-Gates;
+- menschlich lesbare Sprache;
+- projektspezifische Guidelines und maschinenprüfbare Policies;
+- geschützte Testpfade und freigegebene Ritual-Erweiterungen.
+
+Erweiterungen sind optional und begrenzt: eigene PRD-/Spec-/ADR-/Handover-
+Templates, Governance-Guidelines, Policy-Checks, Release-/Deploy-Adapter,
+UI-/Security-Phasen und organisationsprivate Adapter. Sie müssen über die
+dokumentierten Erweiterungspunkte konfiguriert, im übernehmenden Repository
+getestet und bei privaten Koordinaten, Credentials oder Organisationsdaten aus
+dem öffentlichen Kern herausgehalten werden.
+
+`roles.po.display_label` ist eine optionale V3-Präsentationseinstellung für die
+menschliche Entscheidungsrolle. Sie ist sichtbarer Klartext—kein
+Autoritätsmechanismus, keine persönliche Identität und keine
+Nichtabstreitbarkeitsbehauptung. Maschinen-Rollenschlüssel, Freigaben, Receipts
+und Evidenz bleiben exakt `po`; ohne Konfiguration erscheint standardmäßig
+`PO`.
+
+`language.human_facing` ist die alleinige öffentliche konkrete Formautorität
+für die menschlich sichtbare Sprache der kompilierten Laufzeit. Die
+PO-Gate-Sprachprojektion prüft
+`node harness/scripts/check-po-gate-authority.mjs`; Nutzertexte dürfen keine
+zweite Sprache oder Freigabeform erfinden.
+
+## 8. Betriebsformen
+
+| Form | Praktische Nutzung | Grenze |
+| --- | --- | --- |
+| Solo-Entwicklung | Eine Person kann Entscheidungs- und Maintainer-Verantwortung tragen; frische Ausführungs-/Review-Kontexte schaffen trotzdem Trennung. | Das Modell erzeugt keine unabhängige menschliche Aufsicht. |
+| Kleines Team | Entscheidung, Implementierung und Review aufteilen; Kalibrierung, WIP-Limits, Branch-Policy und Push-Gates gemeinsam nutzen. | Es ersetzt weder Code Review noch Arbeitsverantwortung oder Zugriffskontrollen. |
+| Multi-Team-Organisation | Zentrale Guidelines, Policies und Templates wiederverwenden; jedes Repo kalibriert lokale Phasen, Gates und Adapter. | Es ist kein IAM, keine authentifizierte Identität, kein Rechtskontrollrahmen und keine zentrale Control Plane. |
+
+## 9. Autoritätsreihenfolge
+
+1. Geltende Sicherheits-/Host-Grenzen und Projektkonfiguration.
+2. Freigegebene Spec/PRD und aufgezeichnete PO-Entscheidungen des aktiven Features.
+3. Dieses Operating Model und passende ADRs.
+4. Templates, Beispiele, Prompts und Nutzerdokumentation.
+5. Chat-Anweisungen, Memory und nicht dokumentierte Annahmen.
+
+Eine Ausnahme ist nur gültig, wenn sie explizit, begrenzt und im dauerhaften
+Projektstand aufgezeichnet ist. Sie ändert die zugrunde liegende Regel nicht
+still.
+
+Das Error Register bleibt die **alleinige öffentliche konkrete Formautorität**
+für seine begrenzten Triage-Inhalte; Goldfish und Critic erhalten es nicht als
+Briefing-Kontext.
+
+## 10. Glossar
+
+### H5 Close-Koordinator
+
+Feature-Schließen folgt einer einzigen, wiederaufnahmefähigen Zustandsmaschine
+mit Checkpoint, getrackten Abschlussmutationen, Kandidaten-Freeze und exakt
+gebundener Verifikation. Lokales Schließen (`closed-local`) benötigt keinen
+Push; Veröffentlichung und Readback sind getrennte, autorisierte Übergänge.
+
+- **Acceptance Criteria / DoD:** Beobachtbare Checks, die Abschluss definieren.
+- **Advisory:** On-demand, frische und begrenzte zweite Meinung zu genau einer
+  konkreten Feature-/Epic-Frage; weder Bootstrap noch Freigabe.
+- **Calibration:** Repo-lokale Konfiguration zur Anpassung des gemeinsamen Modells.
+- **Critic:** Unabhängiger Read-only-Reviewer mit frischem Kontext.
+- **Duty:** Geroutete Arbeitseinheit, etwa Implementierung oder Readiness.
+- **EGM:** Elephants-&-Goldfish-Modell; dauerhafte Dokumente statt Gesprächsmemory.
+- **Evidence:** Maschinen- oder Receipt-gebundener Nachweis eines beobachteten Ergebnisses.
+- **Goldfish:** Ausführer mit frischem Kontext für einen begrenzten Dispatch.
+- **Elephant:** Langlebiger Orchestrator des Projekt-Lifecycles.
+- **Phase:** Lifecycle-Zustand wie Design oder Execution.
+- **Profile:** Prozessform `mini`, `feature` oder `epic`.
+- **Rigor:** Tiefe der nötigen schriftlichen Definition (0, 1 oder 2).
+- **Risk:** Nötige Reviewtiefe, unabhängig von der Diffgröße.
+- **Sprint:** Planungszeitraum, kein Routingprofil und keine Berechtigung.
