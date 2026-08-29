@@ -293,6 +293,41 @@ test("draft next-action names the profile-receipt precondition explicitly when t
   assert.ok(payload.nextAction.guidance.includes("the receipt is missing"));
 });
 
+// NVA-CF-MINORPUSH-RETRY: when `poGateProfile()` itself supplies no `repair`
+// text at all (its own repair advice unavailable), resolveDraftProfileReceiptAction()
+// used to fall back to a hand-assembled template string that echoed the
+// resolved absolute project root straight into this machine-consumed JSON --
+// describeFailedPostimagePredicates()'s own "never absolute host paths"
+// contract, violated. This asserts the fallback now renders through
+// copy-safe-command.mjs and never leaks `root` (this test's own absolute
+// fixture path) into the guidance text, using an unresolved
+// `<project-root>` template slot instead -- exactly the shape `check.repair`
+// itself already uses elsewhere (PROFILE_REPAIR in lib/po-gate-authority.mjs).
+test("draft next-action's unplannable-repair fallback never leaks the absolute project root, even when the precondition itself supplies no repair text", () => {
+  const root = freshRoot("profile-repair-unplannable-no-repair-text");
+  gitInitRoot(root);
+  setLocalGitUserName(root, "Jordan Example");
+  applyOnboardingIntakeConsent({ rootDir: root, granted: true, profile: "feature", activate: true });
+  assert.equal(run(["set-feature", "--id", "widget", "--plan-path", "specs/widget/prd.md"], { dir: root, now: () => NOW }), 0);
+
+  const result = invoke(root, ["inspect"], {
+    poGateProfile: () => ({ ok: false, code: "PO-PROFILE-AUTHORITY-UNAVAILABLE", reason: "topology is unavailable" }),
+    spawn: () => ({ status: 2, error: null, stdout: "" }),
+  });
+  assert.equal(result.status, 0, result.err);
+  const payload = JSON.parse(result.out);
+  assert.equal(payload.nextAction.kind, "collect-input");
+  assert.equal(payload.nextAction.executable, undefined);
+  assert.equal(payload.nextAction.argv, undefined);
+  assert.ok(payload.nextAction.guidance.includes("PO-PROFILE-AUTHORITY-UNAVAILABLE"));
+  assert.ok(!payload.nextAction.guidance.includes(root),
+    `guidance must never echo the absolute project root: ${payload.nextAction.guidance}`);
+  assert.ok(payload.nextAction.guidance.includes("<project-root>"),
+    "the rendered fallback command must carry an unresolved template slot, never the real path");
+  assert.ok(payload.nextAction.guidance.includes("po-gate-profile-repair.mjs"),
+    "the fallback must still name the real repair script, just without the leaked root");
+});
+
 test("inspect reports phoenixEpicHistory as null when the field is absent", () => {
   const root = freshRoot("no-phoenix");
   assert.equal(run(["set-feature", "--id", "widget", "--plan-path", "specs/widget/prd.md"], { dir: root, now: () => NOW }), 0);
