@@ -3960,6 +3960,84 @@ test("a kickoff language switch that also finds a drifted runtime target repairs
   } finally { dispose(path); }
 });
 
+// Regression for backlog: onboarding-produces-drift-it-then-has-to-repair,
+// 2026-08-29 re-investigation's one genuinely untried combination
+// (NVA-CF-BL18-COORDINATORPATH). The two tests above already prove the
+// legacy kickoff-time and promotion-time language-switch cases reach a
+// consistent authority; this is the third, coordinator-sourced route:
+// intake-consent-apply -> intake-capture-apply -> intake-design-questions-
+// apply -> intake-generate -> bootstrap-bind-plan/apply. The generated PRD's
+// own po-language marker (set from intake-consent's --language answer) is
+// deliberately overwritten to differ from it, mirroring NVA-BL-70's exact
+// technique on the legacy promotion path -- proving whether
+// applyOnboardingBootstrapBind's own correctPromotedLanguage call (added for
+// NVA-R5-LANGWIRE, onboarding-continuity.mjs) republishes the real,
+// non-injectable PO-gate profile receipt after a coordinator-sourced
+// mismatch exactly as the legacy path already does.
+test("a coordinator-sourced bind whose generated PRD's po-language marker is edited to differ from intake consent's own language reaches a consistent authority at bind (NVA-CF-BL18-COORDINATORPATH)", () => {
+  const path = root();
+  let stderr = "";
+  const localDeps = { ...fakeDeps, initializePoGateProfileReceipt: initializeActualPoGateProfileReceipt };
+  const invoke = (args) => {
+    let output = "";
+    stderr = "";
+    const code = onboardingCli(args, {
+      deps: localDeps,
+      write: (chunk) => { output += chunk; },
+      writeError: (chunk) => { stderr += chunk; },
+    });
+    return { code, result: output ? JSON.parse(output) : null };
+  };
+  try {
+    hostGit(path, ["init", "--initial-branch=main"]);
+    const barrier = initializeRestartRequiredRoot(path, localDeps);
+    clearRuntimeBarrier(path, barrier);
+
+    const consented = invoke(["intake-consent-apply", "--root", path, "--granted", "--profile", "feature", "--language", "en", "--activate", "--runner", "codex"]);
+    assert.equal(consented.code, 0, stderr);
+    const captured = invoke(["intake-capture-apply", "--root", path, "--text", "Ship a safe project.", "--activate", "--runner", "codex"]);
+    assert.equal(captured.code, 0, stderr);
+    const answers = JSON.stringify([{ question: "What is the primary goal?", answer: "Ship safely." }]);
+    const answered = invoke(["intake-design-questions-apply", "--root", path, "--answers-json", answers, "--activate", "--runner", "codex"]);
+    assert.equal(answered.code, 0, stderr);
+
+    const genPlan = planOnboardingIntakeGenerate({ rootDir: path, repositoryCapability: "local" });
+    const genApplied = applyOnboardingIntakeGenerate({
+      rootDir: path, repositoryCapability: "local", expectedPlanSha256: genPlan.planSha256, activate: true,
+    });
+    assert.equal(genApplied.checkpoint.transactionState, "generated");
+
+    // Deliberately mismatch: the generated PRD's own po-language marker
+    // (set from intake-consent's --language en above) is overwritten to
+    // "de" -- NVA-BL-70's identical technique, applied to the
+    // coordinator-sourced generated PRD instead of a hand-authored one.
+    // Editing the bytes also means this draft is no longer the generator's
+    // own unmodified playback, so the plan-acknowledgement marker is
+    // appended too -- the same combination the NVA-D-ACKASK sibling test
+    // above exercises once its own drift-probe edit lands.
+    const observation = observeBootstrapBindAcknowledgement({ rootDir: path, repositoryCapability: "local" });
+    const prdAbsolutePath = join(path, observation.prd.path);
+    const prdBefore = readFileSync(prdAbsolutePath, "utf8");
+    assert.match(prdBefore, /<!-- po-language: en -->/u);
+    const prdMismatched = `${prdBefore.replace("<!-- po-language: en -->", "<!-- po-language: de -->")}\n${PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER}\n`;
+    writeFileSync(prdAbsolutePath, prdMismatched);
+
+    const bindPlan = planOnboardingBootstrapBind({ rootDir: path, repositoryCapability: "local" });
+    const bindApplied = applyOnboardingBootstrapBind({
+      rootDir: path, repositoryCapability: "local", expectedPlanSha256: bindPlan.planSha256, activate: true,
+    });
+    assert.equal(bindApplied.status, "applied");
+
+    const correctedSource = parseYaml(readFileSync(join(path, "pipeline.user.yaml"), "utf8"));
+    assert.equal(correctedSource.language.human_facing, "de");
+    assert.match(readFileSync(join(path, ".claude/pipeline.yaml"), "utf8"), /language:\n {2}human_facing: de\n/u);
+    assert.match(readFileSync(join(path, "project/pipeline.yaml"), "utf8"), /language:\n {2}human_facing: de\n/u);
+
+    const authority = validatePoGateAuthorityForRepository({ repoRoot: path });
+    assert.equal(authority.ok, true, JSON.stringify(authority));
+  } finally { dispose(path); }
+});
+
 // Regression for NVA-CF-ONBOARDKICKOFF: the test above only proves the
 // repair happens when a language SWITCH occurs (seed "en" -> requested "de"),
 // because that is the one branch that reaches
