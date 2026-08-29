@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-28
 sprint: nova
+done_when: contains plugins/pipeline-core/scripts/onboarding-init.mjs pendingAsks
 tracking: "NOW / Nova A — happy-path blocking: the push approval is the last step of the path the PO named"
 source: "Agy/WSL greenfield run, 2026-08-28, its own hardening self-analysis (pipeline-analysis.md), corroborated by the Codex/WSL run's independent script-indirection probe."
 ---

@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-28
 sprint: none
+done_when: script-exit-zero plugins/pipeline-core/scripts/verify-topology-preflight.mjs
 source: "Measured live, 2026-08-28, by running verify-topology-preflight.mjs at HEAD after an unrelated change and then isolating each rejecting sub-check with a controlled probe."
 ---
 

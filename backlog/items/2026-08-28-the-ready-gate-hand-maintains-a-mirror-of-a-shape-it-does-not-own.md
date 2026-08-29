@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-28
 sprint: nova
+done_when: contains plugins/pipeline-core/lib/project-onboarding-ready-gate.mjs trustAnchorAvailability
 tracking: "NOW / Nova A — the second instance blocked every governed write in a ready project and was invisible until the candidate was actually installed. NVA-T-READYKEYS fixes that instance; this item is about the third one."
 source: "Found live 2026-08-28 while the PO rsynced the candidate onto the local marketplace mid-session. The first instance is recorded in the file's own comment."
 ---

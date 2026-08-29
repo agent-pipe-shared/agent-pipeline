@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-28
 sprint: nova
+done_when: contains plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs realpathSync(resolve(value))
 tracking: "NOW / Nova A — the surviving candidate cause for a consumer session that lost both its lanes on Windows, and a platform-neutrality defect in the guard that decides whether any recovery command runs at all"
 source: "Found 2026-08-28 while independently verifying dispatch NVA-G-GUARDDEADLOCK's negative result against guard-lifecycle-ready.mjs. The dispatch refuted the reported cause of HA incident report S56 finding B3 and named this as the most plausible remaining one; the code was then re-read here to confirm the mechanism exists."
 ---

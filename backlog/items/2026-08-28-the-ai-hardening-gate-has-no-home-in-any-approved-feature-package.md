@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-28
 sprint: nova
+done_when: contains specs/sprint-nova-epic/spec.md ai-assisted-hardening
 tracking: "Scheduled for Nova B (PO decision 2026-08-28)"
 source: "Re-Critic vtpgate2-368458af finding F5, re-measured and found wider than reported"
 ---

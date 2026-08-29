@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-28
 sprint: nova
+done_when: "contains plugins/pipeline-core/lib/onboarding-continuity.mjs profile = null, text = null, activate = false, deps = {}"
 tracking: "NOW / Nova A — PO asked directly whether the four human rounds can be collapsed to one or two. Three is the floor; one of the four is removable, and it is the cheapest of the four to remove."
 source: "Measured 2026-08-28 by driving scratch/smoke-guided-init-full.mjs against a genuinely fresh repository at HEAD 435063c5: 4 human rounds, 25 chained driver commands, 0 repair subcommands. Dependency analysis done against the intake state machine in onboarding-continuity.mjs, not from the measurement alone."
 ---

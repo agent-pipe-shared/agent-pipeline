@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-28
 sprint: nova
+done_when: manual
 tracking: "Nova B — PO-raised 2026-08-28 on seeing the guided onboarding reach ready: 'dann braucht der push pfad auch so was weil der kostet auch mega viel'. Deliberately NOT Nova A: the candidate must not grow a second driver before its first one is reviewed."
 source: "PO request 2026-08-28. Scope established by reading what onboarding-init.mjs actually drives (project-onboarding-v3.mjs's own subcommand table, nothing else) and docs/push-release-flow.md's five authorization layers."
 ---
