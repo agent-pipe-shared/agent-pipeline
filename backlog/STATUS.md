@@ -325,7 +325,7 @@
 | pipeline.onboarding-asks-published-in-one-window-only | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — happy-path blocking at the PO's second touch: the onboarding questions reach the human through exactly one command's response, so a run that passes that point never asks them again. |
 | pipeline.onboarding-continuity-assumes-calibration-handover-is-always-a-plain-string | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.onboarding-does-not-ignore-the-scratch-directory-it-mandates | closed | defect | pipeline | 2026-08-09 | — |
-| pipeline.onboarding-has-no-happy-path-for-an-existing-signing-key | open | defect | pipeline | 2026-08-29 | NOW / Nova A -- happy-path blocker, PO's own words: 'einen bestehenden Key zu nutzen ist auch zu umständlich im happy pfad da eine merkwürdige reperatur nötig ist und der driver hier nicht hilft und die agents kreise drehen'. |
+| pipeline.onboarding-has-no-happy-path-for-an-existing-signing-key | closed | defect | pipeline | 2026-08-29 | NOW / Nova A -- happy-path blocker, PO's own words: 'einen bestehenden Key zu nutzen ist auch zu umständlich im happy pfad da eine merkwürdige reperatur nötig ist und der driver hier nicht hilft und die agents kreise drehen'. |
 | pipeline.onboarding-lifecycle-plan-hardcodes-the-codex-runner | closed | defect | pipeline | 2026-08-06 | — |
 | pipeline.onboarding-must-bootstrap-the-trust-anchor-once | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — happy-path blocking: its absence deadlocked the first human override in the Claude run and cost a live PO signature; PO asked for this explicitly |
 | pipeline.onboarding-must-elicit-the-real-verify-contract | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — happy-path blocking: without a real verify contract the push gate is unsatisfiable by construction, so the path cannot reach its last step |
@@ -557,8 +557,8 @@
 
 ## Counts
 
-- open: 80
+- open: 79
 - in_progress: 3
-- closed: 452
+- closed: 453
 - rejected: 3
 - deferred: 11
