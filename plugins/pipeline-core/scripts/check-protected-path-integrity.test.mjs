@@ -443,6 +443,61 @@ test("defaultHasConsumedCapabilityForPath: true only for an exact-path match aga
   rmSync(root, { recursive: true, force: true });
 });
 
+test("defaultHasConsumedCapabilityForPath: a consumed capability whose expiresAt is in the past does NOT authorize a later write to its eligiblePaths entry", () => {
+  const root = makeFixtureRoot();
+  execFileSync("git", ["init", "--quiet", root], { encoding: "utf8" });
+  const commonDir = resolveGitCommonDir(root);
+  const capsDir = join(commonDir, "agent-pipeline", "human-guard-overrides", "capabilities");
+  mkdirSync(capsDir, { recursive: true });
+  writeFileSync(
+    join(capsDir, "cap-expired.json"),
+    JSON.stringify({
+      status: "consumed",
+      eligiblePaths: ["pipeline.user.yaml"],
+      expiresAt: "2020-01-01T00:00:00.000Z",
+      consumedAt: "2020-01-01T00:05:00.000Z",
+    }),
+    "utf8",
+  );
+  writeFileSync(
+    join(capsDir, "cap-still-valid.json"),
+    JSON.stringify({
+      status: "consumed",
+      eligiblePaths: ["still-valid.json"],
+      expiresAt: "2999-01-01T00:00:00.000Z",
+      consumedAt: "2020-01-01T00:05:00.000Z",
+    }),
+    "utf8",
+  );
+  writeFileSync(
+    join(capsDir, "cap-no-expiry.json"),
+    JSON.stringify({ status: "consumed", eligiblePaths: ["no-expiry.json"] }),
+    "utf8",
+  );
+
+  assert.equal(
+    defaultHasConsumedCapabilityForPath(root, "pipeline.user.yaml"),
+    false,
+    "an expired-but-consumed capability must not authorize a later write, using the real current time",
+  );
+  assert.equal(
+    defaultHasConsumedCapabilityForPath(root, "pipeline.user.yaml", { now: Date.parse("2019-06-01T00:00:00.000Z") }),
+    true,
+    "the same capability still authorizes when checked before its own expiresAt",
+  );
+  assert.equal(
+    defaultHasConsumedCapabilityForPath(root, "still-valid.json"),
+    true,
+    "a consumed capability with a future expiresAt still authorizes",
+  );
+  assert.equal(
+    defaultHasConsumedCapabilityForPath(root, "no-expiry.json"),
+    true,
+    "a consumed capability with no expiresAt at all keeps its prior (permanent) behavior",
+  );
+  rmSync(root, { recursive: true, force: true });
+});
+
 test("defaultHasConsumedCapabilityForPath: false (never throws) when no capabilities directory exists", () => {
   const root = makeFixtureRoot();
   execFileSync("git", ["init", "--quiet", root], { encoding: "utf8" });

@@ -51,10 +51,18 @@
  *   same storage layout `human-guard-override.mjs` writes, read here rather than imported from
  *   there because that module exports no query-by-path helper and reworking its own internals is
  *   out of this dispatch's scope) and treats a path as authorized only when some capability file
- *   has `status: "consumed"` and an `eligiblePaths` entry matching it exactly. Any read failure
- *   (missing directory, corrupt JSON, unresolved git-common-dir) is treated as NOT consumed --
- *   fail toward reporting the finding, never toward silently swallowing a real change, matching
- *   this guard family's own asymmetric fail posture on the side that actually matters here.
+ *   has `status: "consumed"`, an `eligiblePaths` entry matching it exactly, AND -- when the
+ *   capability record carries an `expiresAt` (it does, per `human-guard-override.mjs`'s
+ *   `CAPABILITY_KEYS`/consumption path) -- that `expiresAt` has not already passed relative to
+ *   the current check time. A `status: "consumed"` record is otherwise permanent: the ceremony
+ *   consumes it once, but nothing previously re-checked its own recorded expiry afterward, so one
+ *   legitimate ceremony would silently authorize every later write to that same path forever. This
+ *   narrows only that "forever" part of the gap -- it is NOT full per-change binding (tying an
+ *   override to one specific diff/hash), which stays a separate, harder design question. Any read
+ *   failure (missing directory, corrupt JSON, unresolved git-common-dir) is treated as NOT
+ *   consumed -- fail toward reporting the finding, never toward silently swallowing a real change,
+ *   matching this guard family's own asymmetric fail posture on the side that actually matters
+ *   here.
  *
  * PERSISTENCE
  *   A baseline is NOT committed tracked state (ADR-0063 would put durable, gate-cited evidence
@@ -271,7 +279,7 @@ export function recordBaseline({
 // Consumed human-guard-override capability lookup (see file header)
 // ---------------------------------------------------------------------------------
 
-export function defaultHasConsumedCapabilityForPath(rootDir, targetPath) {
+export function defaultHasConsumedCapabilityForPath(rootDir, targetPath, { now = Date.now() } = {}) {
   const commonDir = resolveGitCommonDir(rootDir);
   if (!commonDir) return false;
   const capsDir = join(commonDir, "agent-pipeline", "human-guard-overrides", "capabilities");
@@ -291,7 +299,19 @@ export function defaultHasConsumedCapabilityForPath(rootDir, targetPath) {
       continue; // unreadable/corrupt capability file -- not a match
     }
     if (capability?.status !== "consumed" || !Array.isArray(capability?.eligiblePaths)) continue;
-    if (capability.eligiblePaths.some((entry) => String(entry).replace(/\\/gu, "/") === normalizedTarget)) return true;
+    if (!capability.eligiblePaths.some((entry) => String(entry).replace(/\\/gu, "/") === normalizedTarget)) continue;
+    // A recorded expiresAt that has already passed does NOT authorize a later write, even though
+    // the ceremony itself was legitimately consumed -- see file header, "CONSUMED-CAPABILITY
+    // CHECK". A capability with no expiresAt at all (absent/unparseable) is not narrowed by this
+    // check and keeps its prior (permanent) behavior, matching this function's existing
+    // fail-toward-reporting posture: an unparseable date fails the `<=` comparison and the
+    // capability is treated as never expiring, exactly like today. Only a well-formed, PAST
+    // expiresAt now excludes the match.
+    if (typeof capability.expiresAt === "string") {
+      const expiresAtMs = Date.parse(capability.expiresAt);
+      if (!Number.isNaN(expiresAtMs) && expiresAtMs <= now) continue;
+    }
+    return true;
   }
   return false;
 }
