@@ -5000,6 +5000,9 @@ runFeaturePackageReconcileTests();
   ok("HL-2 submit-plan exit 0", submitted.value === 0, `got ${submitted.value}`);
   ok("HL-3 submit-plan prints the human-legible briefing (not just digests)", submitted.text.includes("Briefing:") && submitted.text.includes("scope=") && submitted.text.includes("authorizes=") && submitted.text.includes("excludes="), submitted.text);
 
+  const presented = run(["present-plan", "--by", "coordinator"], deps);
+  ok("HL-3a present-plan exit 0", presented === 0, `got ${presented}`);
+
   const approved = captureConsole(() => run(["approve-plan", "--by", "po-test"], deps));
   ok("HL-4 approve-plan exit 0", approved.value === 0, `got ${approved.value}`);
   ok("HL-5 approve-plan's gate presentation shows the briefing too", approved.text.includes("Briefing:") && approved.text.includes("authorizes=") && approved.text.includes("excludes="), approved.text);
