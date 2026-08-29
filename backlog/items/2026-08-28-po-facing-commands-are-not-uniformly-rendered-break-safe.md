@@ -147,3 +147,26 @@ Also surfaced: `plugins/pipeline-core/hooks/human-guard-override.mjs` is a
 THIRD direct importer of `boundedOpaqueCopyCommand`, not previously named by
 this item's own investigation — noted here for a future audit pass, not yet
 actioned.
+
+## Progress note (2026-08-29, NVA-CF-FORCEDQUOTE)
+
+PO decision resolved option (b) above: opt-in forced-quoting mode, not a
+test relaxation. Delivered (commits `8f7f4575`, `456cde30`):
+`copy-safe-command.mjs` gained `forcedQuote(text)` — forces double-quoting
+for its own argv entry via a genuine shell-safe escaper (escapes `\`, `"`,
+`$`, backtick; NOT a raw `JSON.stringify()` pass-through, so it does not
+reintroduce the shell-injection class `placeholder()`'s own fix closed),
+byte-identical to the pre-existing convention for ordinary paths with no
+special characters. `codex-pretool-guard.mjs` now composes all 6 of its
+hand-assembled override/Pipeline-Author-Repair guidance lines through
+`boundedCopySafeCommand()` with `forcedQuote()` for path values and
+`placeholder()` for human fill-in hints — its own `codex-pretool-guard.test.mjs`
+left byte-for-byte untouched, all 38 assertions (including the 3 originally-
+pinned exact-quoting ones) pass unmodified. Independently re-verified by the
+Elephant: `copy-safe-command.test.mjs` 21/21, `codex-pretool-guard.test.mjs`
+38/38. **Critic review required** before this candidate ships (guardrail/hook
+file) — folded into the session's single final Critic 1+1 round.
+
+This item still stays `status: open`: the "every emitter" repository-wide
+audit acceptance criterion remains unperformed, and the surfaced
+`human-guard-override.mjs` third-importer note above is still unactioned.
