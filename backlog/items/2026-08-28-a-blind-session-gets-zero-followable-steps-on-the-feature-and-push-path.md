@@ -207,6 +207,62 @@ committing (`pipeline-state-inspect.test.mjs` 11/11,
 Left `status: open` — real progress on the diagnosed blocker, but the
 item's own Acceptance criteria are not fully met.
 
+## Re-verification, 2026-08-29 (dispatch NVA-CF-ITEM32RELEVANCE)
+
+Phase 1 of this dispatch's own briefing required re-checking all four "Left open"
+sub-items above LIVE against current HEAD before touching anything, rather than
+trusting them at face value (heavy same-day churn). Result: **all four are still
+genuinely open**, but (b)'s re-measurement surfaced a new, more severe blocker.
+
+- **(a) profile-receipt repair wired into onboarding's apply chain — still open.**
+  Confirmed by grep: `po-gate-profile-repair.mjs apply --activate` is invoked nowhere
+  in `onboarding-init.mjs`'s automated chain or `project-onboarding-v3.mjs`'s
+  subcommand table. Not attempted by this dispatch either, per its own explicit
+  exclusion (larger onboarding-chain change).
+- **(b) re-run of the smoke test confirming a greater-than-zero chained-command
+  count — still open, finding changed.** `scratch/smoke-blind-push.mjs` could not
+  even complete its own Phase 1 (onboarding) on first re-run: `onboarding stopped:
+  pending-asks`. Since `NVA-V3-PENDINGASKS` (unrelated 2026-08-29 work) the
+  onboarding driver can stop at a new `outcome: "pending-asks"` result
+  (`pushApprovalPreference`/`verifyCommand`/`trustAnchorPointerRepairAcknowledged`)
+  the smoke script's own hand-rolled onboarding loop had no case for — a harness
+  regression, not evidence this item was fixed. Repaired the smoke script in place
+  to reuse the already-tested `measureFreshRepoOnboardingTurns()`
+  (`plugins/pipeline-core/scripts/measure-fresh-repo-onboarding-turns.mjs`, its own
+  `chainPastPendingAsks()`) instead of reimplementing pending-asks handling a
+  second time (the fix lives only on disk — `scratch/` is gitignored, so nothing to
+  commit for it). With that repair, Phase 1 now reaches `ready`, and Phase 2 (the
+  actual blind walk of `pipeline-state.mjs`) now runs — but stops on its SECOND
+  step: `inspect`'s `nextAction` chains straight into `submit-plan --by "Blind
+  Walk" --profile mini`, which now fails with a **different** precondition than the
+  one this item diagnosed: `PO-GATE-PRD-ACKNOWLEDGEMENT-MISSING` (exit 2, raw
+  stderr, non-JSON) instead of `PO-PROFILE-RECEIPT-INVALID`. The walk's own
+  step counter nominally reads `chained commands (kind=command): 1` (step 1's
+  `nextAction` WAS correctly a structural command object, so the count is
+  technically >0), but the chain still breaks one step later on an unstructured
+  stderr crash rather than a discoverable `collect-input` stop — this item's own
+  core complaint, on a newly-surfaced precondition. This looks like the
+  plan-approval/`collectPrdAcknowledgementAction()` gate the Acceptance criteria
+  already anticipate, surfacing as a raw error instead of the structured ask the
+  criteria call for — but its root cause was not diagnosed by this dispatch.
+- **(c) singularity test across the whole happy path — still open.** `grep -c
+  singular` on both `pipeline-state.test.mjs` and `pipeline-state-inspect.test.mjs`
+  returns 0 in each.
+- **(d) blanket placeholder-argv test across the whole happy path — still open.**
+  `grep -c placeholder` returns 4/5 hits in the two suites respectively, but every
+  hit is unrelated (docs/state.md fixture text, PRD-acknowledgement substitution
+  prose, the two existing profile-receipt-specific cases already named in the
+  2026-08-29 note above) — no blanket check exists.
+
+Given (b)'s re-measurement surfaced a new, undiagnosed blocker
+(`PO-GATE-PRD-ACKNOWLEDGEMENT-MISSING`) one step earlier than the diagnosed
+profile-receipt gap, and neither this new gate's root cause nor a fix for it were
+in this dispatch's briefed scope, this dispatch stopped here rather than attempting
+(c)/(d) against a happy path that does not yet reach past step 2 — building the
+fixtures those tests would need first requires diagnosing/working around this new
+gate, itself a larger, undiagnosed piece of work outside this dispatch's budget and
+briefed scope. Left `status: open`.
+
 ## Related
 
 - `2026-08-28-the-push-path-has-no-driver-so-its-five-layers-are-walked-by-hand.md` — the
