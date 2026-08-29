@@ -120,3 +120,12 @@ reads as success at the exact moment it means the trap has closed.
 - **Assignment:** `sprint: nova`. Not a candidate blocker — the trap is
   escapable once understood — but it will cost every session that meets it.
 - **Date:** 2026-08-29
+
+Fixed, 2026-08-29 (dispatch NVA-R16-GG22FIX): printed remediation text and
+marker corrected in `guard-git.mjs` (commit `01c02971`); all 230 existing
+`guard-git.test.mjs` cases pass unmodified. The two required fixture tests
+(drafted as GG22-7/GG22-8, see dispatch record) could NOT be committed by
+this dispatch — `guard-git.test.mjs` is TP-1 protected (`guard-testpath.mjs`)
+with no override route available to a Goldfish (`status:
+author-repair-required`). Left `status: open` for the Elephant to add the
+tests (author-repair route or an Elephant-run stage-0 edit) and close.
