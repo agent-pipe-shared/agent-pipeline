@@ -243,14 +243,25 @@ function approvePushAttempt(root, deps, pushTarget = { remote: "origin", destina
   const missingArtifact = approvePushAttempt(root, deps);
   assert.ok(missingArtifact.lines.every((line) => !line.includes("--dir")),
     `the artifact-unavailable refusal must not name a nonexistent flag: ${missingArtifact.lines.join(" ")}`);
-  // And the signature-mode refusal has to name the alternative, or `signature`
-  // reads as the only route -- which is how a session ends up in the source. This
-  // is the FLAG-SET refusal, so it is reached by omitting the proof flags, which
-  // is exactly what the 2026-08-09 Claude session did before it pushed anyway.
+  // NVA-R37-SIGWALKIT (backlog/items/2026-08-28-agents-talk-the-po-out-of-the-signature-
+  // instead-of-walking-it.md): this refusal used to name `chat` as an alternative
+  // ("or switch to chat mode"), which is exactly the fork-with-no-marker defect that
+  // let agents lobby the PO to abandon the one real protection in the model. The
+  // corrected contract is the opposite: exactly ONE route (sign it), the true PO cost
+  // stated (one command, one passphrase), and no chat mention, no self-push
+  // suggestion. This is the FLAG-SET refusal, reached by omitting the proof flags,
+  // exactly what the 2026-08-09 Claude session did before it pushed anyway.
   const sixFlags = capturedStderr(() => run(["approve-push", "--by", "PO", "--remote", "origin", "--destination", "refs/heads/main"], deps));
   assert.equal(sixFlags.result, 2);
-  assert.ok(sixFlags.lines.some((line) => line.includes("gates.push_approval: chat")),
-    `the signature-mode refusal must name the chat alternative: ${sixFlags.lines.join(" ")}`);
+  const sixFlagsText = sixFlags.lines.join(" ");
+  assert.ok(!/gates\.push_approval:\s*chat|switch(?:ing)? to chat|chat mode instead|to let a human clear.*instead/i.test(sixFlagsText),
+    `the signature-mode refusal must offer no chat alternative: ${sixFlagsText}`);
+  assert.ok(!/push it yourself|you could push instead|push it .* instead of running|po push the commit/i.test(sixFlagsText),
+    `the signature-mode refusal must offer no self-push suggestion: ${sixFlagsText}`);
+  assert.ok(/one command/i.test(sixFlagsText) && /passphrase/i.test(sixFlagsText),
+    `the signature-mode refusal must state the true PO cost (one command, one passphrase): ${sixFlagsText}`);
+  assert.ok(/pure digest computation/i.test(sixFlagsText) && /needing no key/i.test(sixFlagsText),
+    `the signature-mode refusal must state which steps the agent performs itself, needing no key: ${sixFlagsText}`);
 }
 
 // HELP-1. `--help` is a question, not an error. Both 2026-08-09 greenfield runs
