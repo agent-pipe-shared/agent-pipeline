@@ -3,7 +3,7 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,6 +12,9 @@ import { main, sessionStartDecision, sessionStartMessage } from "./codex-session
 import {
   buildResumeHint, captureResumeHint, queryResumeHintConsumption, recordResumeHintCardDigest,
 } from "../lib/resume-hint.mjs";
+import {
+  applyOnboardingIntakeCapture, applyOnboardingIntakeConsent, resolveIntakeCheckpointPaths,
+} from "../lib/onboarding-continuity.mjs";
 
 const root = mkdtempSync(join(tmpdir(), "codex-session-start-hint-"));
 const script = fileURLToPath(new URL("./codex-session-start-hint.mjs", import.meta.url));
@@ -279,7 +282,86 @@ try {
     rmSync(consumptionRoot, { recursive: true, force: true });
   }
 
-  console.log("codex-session-start-hint: 40 passed");
+  // NVA-CF-RESUMEVERBATIM-HOOK: the onboarding intake checkpoint's own verbatim
+  // materialInput (the user's own design-input chunks) and answered values must also reach
+  // this hook's additionalContext, in addition to the existing distilled-card lines above --
+  // mirroring what scripts/resume-hint.mjs's `inspect` CLI (NVA-RESUMEVERBATIM-1) already
+  // does on a different, manual path. A real git root is required (readOnboardingIntake*'s
+  // private-state resolver needs a usable `.git`, same reason the NVA-R11-RESUMECONSUME
+  // block above uses its own separate root).
+  const verbatimRoot = mkdtempSync(join(tmpdir(), "codex-session-start-hint-verbatim-"));
+  try {
+    mkdirSync(join(verbatimRoot, "project"), { recursive: true });
+    writeFileSync(join(verbatimRoot, "project", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+    const verbatimGit = spawnSync("git", ["init", "-q"], { cwd: verbatimRoot, encoding: "utf8", shell: false });
+    assert.equal(verbatimGit.status, 0, verbatimGit.stderr);
+
+    const verbatimContext = {
+      intent: "Resume the resume-hint verbatim surfacing work.",
+      scope: ["SessionStart hook only"],
+      constraints: ["No transcript reading"],
+      questions: ["Any remaining gap?"],
+    };
+    captureResumeHint({ rootDir: verbatimRoot, context: verbatimContext });
+
+    // Card available, but no intake checkpoint at all yet -- unchanged: no new lines.
+    const noCheckpoint = sessionStartDecision(verbatimRoot);
+    assert.match(noCheckpoint.context, /Resume-hint intent: Resume the resume-hint verbatim surfacing work\./u);
+    assert.doesNotMatch(noCheckpoint.context, /Resume-hint answered onboarding values/u);
+    assert.doesNotMatch(noCheckpoint.context, /Resume-hint material input chunk/u);
+
+    // Consent granted but nothing answered/captured yet -- an empty checkpoint is still
+    // "unchanged" output, never a bare label with no content.
+    applyOnboardingIntakeConsent({ rootDir: verbatimRoot, granted: true, activate: true });
+    const emptyCheckpoint = sessionStartDecision(verbatimRoot);
+    assert.doesNotMatch(emptyCheckpoint.context, /Resume-hint answered onboarding values/u);
+    assert.doesNotMatch(emptyCheckpoint.context, /Resume-hint material input chunk/u);
+
+    // Now seed real answered values and two verbatim material-input chunks.
+    applyOnboardingIntakeConsent({
+      rootDir: verbatimRoot, granted: true, activate: true,
+      gitAuthor: { name: "Jane PO", email: "jane@example.com" },
+      language: "en", profile: "feature",
+    });
+    const first = "Line one of a verbatim design brief.\nLine two, multi-line, unbounded by short-string caps.";
+    const second = "A second, later chunk of user input -- unicode: café, 日本語.";
+    applyOnboardingIntakeCapture({ rootDir: verbatimRoot, text: first, activate: true });
+    applyOnboardingIntakeCapture({ rootDir: verbatimRoot, text: second, activate: true });
+
+    const withVerbatim = sessionStartDecision(verbatimRoot);
+    // Existing distilled-card lines stay present, unchanged, only extended.
+    assert.match(withVerbatim.context, /Resume-hint intent: Resume the resume-hint verbatim surfacing work\./u);
+    // New: answered onboarding values.
+    assert.match(
+      withVerbatim.context,
+      /Resume-hint answered onboarding values \(already answered, do not re-ask\): commit author Jane PO <jane@example\.com>; operator language en; PO profile feature\./u,
+    );
+    // New: verbatim material input, byte-identical, in capture order, MUST-read framing.
+    assert.match(withVerbatim.context, /MUST be read in full now, not treated as already condensed by the summary above \(2 chunk\(s\)\)/u);
+    assert.match(
+      withVerbatim.context,
+      /Resume-hint material input chunk 1 of 2: Line one of a verbatim design brief\.\nLine two, multi-line, unbounded by short-string caps\./u,
+    );
+    assert.match(
+      withVerbatim.context,
+      /Resume-hint material input chunk 2 of 2: A second, later chunk of user input -- unicode: café, 日本語\./u,
+    );
+
+    // A read failure (malformed checkpoint bytes) must degrade to exactly the distilled-card
+    // output -- never a throw, never a crash, never a partial/garbled new line.
+    const { checkpoint: checkpointPath } = resolveIntakeCheckpointPaths({ rootDir: verbatimRoot });
+    const validBytes = readFileSync(checkpointPath);
+    writeFileSync(checkpointPath, "{ not valid json");
+    const withMalformed = sessionStartDecision(verbatimRoot);
+    assert.match(withMalformed.context, /Resume-hint intent: Resume the resume-hint verbatim surfacing work\./u);
+    assert.doesNotMatch(withMalformed.context, /Resume-hint answered onboarding values/u);
+    assert.doesNotMatch(withMalformed.context, /Resume-hint material input chunk/u);
+    writeFileSync(checkpointPath, validBytes);
+  } finally {
+    rmSync(verbatimRoot, { recursive: true, force: true });
+  }
+
+  console.log("codex-session-start-hint: 48 passed");
 } finally {
   rmSync(root, { recursive: true, force: true });
 }
