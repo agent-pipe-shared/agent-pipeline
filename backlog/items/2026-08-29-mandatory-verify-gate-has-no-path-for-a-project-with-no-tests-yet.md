@@ -90,3 +90,28 @@ Two related but separable fixes:
   (F10) — both are "verify's mandatory posture vs. a brand-new project's
   actual starting state" instances.
 - **Date:** 2026-08-29
+
+## Investigation update (NVA-R26-VERIFYPREP, 2026-08-29)
+
+Traced `harness/scripts/verify.mjs` in full (all 863 lines, this dispatch's
+own read). Confirmed: this file's own step/suite computation never reads or
+interprets a `verify.log` or any other free-text log content at all — it
+runs `TEST_SUITES`/`SCOPED_VERIFY_SUITES`/`WINDOWS_ASSURANCE_VERIFY_SUITES`
+entries as real child-process suites via `runVerifyJournal` and aggregates
+their exit codes (verify.mjs:786-820), plus a small number of synthetic
+preflight steps (`candidate-preflight`, `candidate-binding`,
+`verify-suite-registration-duplicates` — verify.mjs:757-834). There is no
+branch anywhere in this file that reads `verifyManualStatus`, a
+project-level "no verify configured" declaration, or any free-text
+manual-check note — the "no verify command configured yet" state this item
+asks for genuinely does not exist yet, confirming the proposal's premise
+rather than only failing to find it within budget.
+
+A complete, ready-to-paste drafted diff for `harness/scripts/verify.mjs`
+adding this state (marker `pipeline.verify-manual-check-placeholder-detection`)
+was produced and proven against a scratch fixture
+(`scratch/nva-r26-verifyprep/manual-check-logic.test.mjs`, 7/7 passing) but
+NOT landed — `verify.mjs` is TP-3 protected and needs a signed
+human-guard-override ceremony (see
+`evidence/dispatch-record-NVA-R26-VERIFYPREP.json` for the full drafted
+text).
