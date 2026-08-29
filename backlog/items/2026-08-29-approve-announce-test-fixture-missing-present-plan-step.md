@@ -6,7 +6,7 @@ owner: pipeline
 status: closed
 closed_at: 2026-08-29
 closure_repository: self
-closure_commit: dc53bd79
+closure_commit: dc53bd7922bf0492d1710fa812fcaa5e5c5b4a62
 closure_evidence: plugins/pipeline-core/scripts/pipeline-state-approve-announce.test.mjs
 created: 2026-08-29
 sprint: nova

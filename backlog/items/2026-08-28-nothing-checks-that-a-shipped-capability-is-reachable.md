@@ -6,7 +6,7 @@ owner: pipeline
 status: closed
 closed_at: 2026-08-29
 closure_repository: self
-closure_commit: e7a3f5a4
+closure_commit: e7a3f5a468cbd95b1366bef1fc60187a689d99f7
 closure_evidence: harness/scripts/check-product-capability-inventory.test.mjs
 created: 2026-08-28
 sprint: nova

@@ -6,7 +6,7 @@ owner: pipeline
 status: closed
 closed_at: 2026-08-29
 closure_repository: self
-closure_commit: 4fa77b40
+closure_commit: 4fa77b40f67526c71680305ac987d20851f05186
 closure_evidence: plugins/pipeline-core/lib/project-onboarding-ready-gate.test.mjs
 created: 2026-08-28
 sprint: nova

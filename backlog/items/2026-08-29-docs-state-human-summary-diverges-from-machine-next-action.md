@@ -5,7 +5,7 @@ type: defect
 owner: pipeline
 status: closed
 closed_at: 2026-08-29
-closure_commit: 0e9019bf
+closure_commit: 0e9019bf5b5e5aafe681c83b0bd4cd6c35debc8b
 closure_repository: "self"
 closure_evidence: plugins/pipeline-core/scripts/check-state-phase-consistency.test.mjs
 created: 2026-08-29

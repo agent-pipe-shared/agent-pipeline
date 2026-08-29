@@ -6,7 +6,7 @@ owner: pipeline
 status: closed
 closed_at: 2026-08-29
 closure_repository: self
-closure_commit: 3d244dae
+closure_commit: 3d244dae4daa4a9603b3b7062947de4e729960dd
 closure_evidence: plugins/pipeline-core/scripts/check-resume-consumption.test.mjs
 created: 2026-08-29
 sprint: nova

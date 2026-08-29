@@ -5,7 +5,7 @@ type: defect
 owner: pipeline
 status: closed
 closed_at: 2026-08-29
-closure_commit: d76db9a2
+closure_commit: d76db9a26692ebcfe81dd1791bebfef0709dcae0
 closure_repository: "self"
 closure_evidence: docs/claude-local-plugin-development.md
 created: 2026-08-29

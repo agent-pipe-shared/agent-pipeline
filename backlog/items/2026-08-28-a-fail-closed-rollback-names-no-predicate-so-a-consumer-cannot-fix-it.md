@@ -8,7 +8,7 @@ sprint: nova
 status: closed
 closed_at: 2026-08-29
 closure_repository: self
-closure_commit: c16e40e1
+closure_commit: c16e40e16febcb01a56c482267acec6cf767c033
 closure_evidence: plugins/pipeline-core/scripts/pipeline-state.test.mjs
 tracking: "NOW / Nova A — the only sanctioned route to a PO acknowledgement marker is unusable, and the refusal is undiagnosable from outside"
 source: "Consumer project HA, incident report S56 finding B2 (2026-08-28, Windows). The consumer independently re-derived every input digest and found all of them correct."

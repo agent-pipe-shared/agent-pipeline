@@ -6,7 +6,7 @@ owner: pipeline
 status: closed
 closed_at: 2026-08-29
 closure_repository: self
-closure_commit: 193e4dc0
+closure_commit: 193e4dc062763832b5d0d2aad00462ddc8b5cbea
 closure_evidence: plugins/pipeline-core/scripts/security-scan.test.mjs
 created: 2026-08-28
 sprint: nova

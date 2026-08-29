@@ -6,7 +6,7 @@ owner: pipeline
 status: closed
 closed_at: 2026-08-29
 closure_repository: self
-closure_commit: 09f9a971
+closure_commit: 09f9a971f2b157c7ae09965a7c3bd1d41d5e4dcf
 closure_evidence: plugins/pipeline-core/scripts/ruleset-freshness.test.mjs
 created: 2026-08-28
 sprint: nova

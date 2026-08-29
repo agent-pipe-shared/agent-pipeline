@@ -7,7 +7,7 @@ status: closed
 created: 2026-08-29
 closed_at: 2026-08-29
 closure_repository: self
-closure_commit: e62b1dc7
+closure_commit: e62b1dc7df556cc55fa8ba63da932ef1e5f6dfed
 closure_evidence: plugins/pipeline-core/skills/pipeline-start/references/onboarding-recovery.md
 sprint: nova
 tracking: "NOW / Nova A — found by NVA-W8-VERIFYREG2's own new reachability check running against this repository"

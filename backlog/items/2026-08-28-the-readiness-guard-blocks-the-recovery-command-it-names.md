@@ -7,7 +7,7 @@ status: closed
 created: 2026-08-28
 closed_at: 2026-08-29
 closure_repository: self
-closure_commit: 8c9146d3
+closure_commit: 8c9146d3d7219870df4ca5b75b4ed37752e8587a
 closure_evidence: plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
 sprint: nova
 done_when: manual

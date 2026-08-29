@@ -7,7 +7,7 @@ status: closed
 created: 2026-08-29
 closed_at: 2026-08-29
 closure_repository: self
-closure_commit: 39454abc
+closure_commit: 39454abc446f4b8d0e578598f4536d272305c987
 closure_evidence: harness/scripts/generate-vendored-canon.test.mjs
 sprint: nova
 done_when: path-exists plugins/pipeline-core/docs/operating-model.md

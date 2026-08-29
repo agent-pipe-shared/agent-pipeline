@@ -6,7 +6,7 @@ owner: pipeline
 status: closed
 closed_at: 2026-08-29
 closure_repository: self
-closure_commit: 19937961
+closure_commit: 19937961b68c5387fd4d32dd80e03f37bdd7513b
 closure_evidence: harness/scripts/pipeline-state.test.mjs
 created: 2026-08-29
 sprint: nova
