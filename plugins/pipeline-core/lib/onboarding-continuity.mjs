@@ -4565,11 +4565,30 @@ function buildCoordinatorSourcedPromotionPlan({
       : null,
   });
   const featureId = input.featureId;
+  // NVA-R1-LANGWIRE: a coordinator-sourced binding has no kickoff predecessor to
+  // inherit an operator-facing default from (plan.kickoff === null; unlike the
+  // kickoff-sourced sibling branch's `{...next.continuity.runtime, ...}` merge
+  // below), so the humanFacingLanguage seed here mirrors the standalone kickoff
+  // planner's own documented fallback (kickoffLanguage(): "no configured PO
+  // language to preserve yet -- retain the historical canonical English seed").
+  // The identical {de,en}-vs-else split the sibling branch already applies is
+  // then layered on top, so a non-{de,en} PRD po-language marker lands in
+  // documentLanguage instead of forcing an invalid humanFacingLanguage value.
+  // Before this, initialContinuity's `language: authority.poLanguage` wrote a
+  // non-{de,en} marker (e.g. "fr") straight into humanFacingLanguage, which
+  // validateContinuityState rejects -- making the coordinator-sourced PLAN
+  // itself unbuildable (KICKOFF-PROMOTION-PLAN) for a content-language-only PRD,
+  // confirmed live with a repro before this fix.
   const continuity = initialContinuity({
     featureId, prdPath: authority.prd.path, prdSha256: authority.prd.sha256,
     specPath: authority.spec.path, specSha256: authority.spec.sha256,
-    language: authority.poLanguage,
+    language: kickoffLanguage(observed.root),
   });
+  if (new Set(["de", "en"]).has(authority.poLanguage)) {
+    continuity.runtime = { ...continuity.runtime, humanFacingLanguage: authority.poLanguage };
+  } else if (authority.poLanguage !== null) {
+    continuity.runtime = { ...continuity.runtime, documentLanguage: authority.poLanguage };
+  }
   const next = {
     schema: "pipeline.state.v0",
     activeFeature: { id: featureId, planPath: input.planPath, phase: "design" },
