@@ -151,6 +151,8 @@ test("approve-plan success output announces the required set-phase --phase imple
     assert.equal(continuityInit, 0);
     const submitted = run(["submit-plan", "--by", "coordinator", "--profile", "feature"], lifecycleDeps(dir, planPath));
     assert.equal(submitted, 0);
+    const presented = run(["present-plan", "--by", "coordinator"], lifecycleDeps(dir, planPath));
+    assert.equal(presented, 0);
 
     const approved = captureConsole(() => run(["approve-plan", "--by", "po-test"], lifecycleDeps(dir, planPath)));
     assert.equal(approved.value, 0);
