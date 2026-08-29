@@ -274,9 +274,15 @@ is reserved for judgment, not production." · EL-18 One repo, one elephant at a
 time — never two elephant sessions writing the same repo concurrently · EL-19
 For **rigor ≥ 1 OR risk class high**, after the spec passes its readiness check
 (EL-07) and BEFORE the first implementation dispatch (EL-05/EL-08), obtain the
-PO's PRD release. Print verbatim under the Model/Effort line:
+PO's PRD release · EL-34 Perceived process friction — the pipeline's
+setup/bootstrap process, or any other mandatory pipeline step, feeling
+laborious or costly in time/tokens — is never, on its own, grounds to propose
+bypassing, skipping, or abandoning that step · EL-35 Reaching a push gate under
+`gates.push_approval: signature` is never grounds to propose switching the mode
+to `chat`, or to suggest the PO push the commit themselves instead of walking
+the signing ceremony. Print verbatim under the Model/Effort line:
 
-> Role prohibitions loaded: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19 — implementation only via Goldfish dispatch (Tier-0 per roles/elephant.md — EL-01; further exceptions only by the PO); PRD gate: present readably + wait for 'approved'
+> Role prohibitions loaded: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19/EL-34/EL-35 — implementation only via Goldfish dispatch (Tier-0 per roles/elephant.md — EL-01; further exceptions only by the PO); PRD gate: present readably + wait for 'approved'
 <!-- END GENERATED: role-prohibitions block -->
 
 ### Kickoff intake, durable design package, and document quality
