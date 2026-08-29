@@ -99,6 +99,32 @@ test("evaluateDispatchBudgetGuard: an invalid-identity (present-but-relative tra
   assert.equal(result.exitCode, 0);
 });
 
+// pipeline.dispatch-budget-invalid-identity-fails-closed (2026-08-29,
+// NVA-R7-INVALIDIDENTITY): the call itself still admits (exitCode 0,
+// unchanged -- see the neighboring "still fails open" test above and this
+// guard's own documented Fail-open-but-visible posture: a rate-limiting
+// budget gate blocking every tool call outright on an unreadable identity is
+// a much heavier act than refusing a write). What must change is the
+// RECORD: an invalid-identity call must be recorded under its own distinct
+// branch and its TRUE reason, never silently merged into -- or made to look
+// like -- a resolved-but-undefined agent type's "max-turns-unresolvable"
+// shape, which is what it fell through to before this fix and which
+// actively discarded the distinction the F02 sentinel exists to preserve.
+test("evaluateDispatchBudgetGuard: an invalid-identity call is recorded under its own distinct branch and TRUE reason, never the misleading max-turns-unresolvable shape", () => {
+  const store = makeStore();
+  const input = { transcript_path: "relative/session/subagents/agent-x.jsonl", tool_name: "Read", tool_input: { file_path: "/x" } };
+  const result = evaluateDispatchBudgetGuard(input, baseOptions(store));
+  assert.equal(result.exitCode, 0);
+  const unresolvedRaw = store.files.get(`${COMMON_DIR}/agent-pipeline/dispatch-budget/unresolved.jsonl`);
+  assert.ok(unresolvedRaw, "an invalid-identity call must still be recorded for visibility");
+  const record = JSON.parse(unresolvedRaw.trim());
+  assert.equal(record.kind, "invalid-identity");
+  assert.equal(record.branch, "invalid-identity");
+  assert.equal(record.reason, "transcript-path-present-but-not-absolute");
+  assert.notEqual(record.reason, "max-turns-unresolvable");
+  assert.notEqual(record.branch, "max-turns-unresolved");
+});
+
 test("subagentIdentity: missing sibling meta.json is unresolved", () => {
   const identity = subagentIdentity({ transcript_path: SUBAGENT_TRANSCRIPT }, makeStore());
   assert.equal(identity.kind, "unresolved");
