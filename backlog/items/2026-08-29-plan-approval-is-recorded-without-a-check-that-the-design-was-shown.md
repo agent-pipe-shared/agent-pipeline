@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.plan-approval-is-recorded-without-a-check-that-the-design-was-shown
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: 19937961
+closure_evidence: harness/scripts/pipeline-state.test.mjs
 created: 2026-08-29
 sprint: nova
 done_when: manual
@@ -78,15 +82,22 @@ establishes the gap and the acceptance bar, not the implementation.
   submission; `approve-plan` hard-refuses (no override) when no matching
   record exists, checked last so a request invalid for another reason still
   reports that reason. Additive only — existing `--by`/lifecycle-match checks
-  unchanged. Known consequence: `harness/scripts/pipeline-state.test.mjs`
-  (TP-5 protected, out of this dispatch's edit scope) has ~10 pre-existing
-  `approve-plan`-success fixtures that never call `present-plan` and now fail
-  (PS06a/c/d + a downstream crash) — needs a dedicated author-repair follow-up
-  to insert `present-plan --by <name>` calls before those `approve-plan`
-  calls; not yet done.
+  unchanged.
 - **Assignment:** `sprint: nova`, and it blocks the 0.6.0 release candidate —
   per the triage's own Sprint column, F28 is one of only two Friction-group
   findings marked NOW (with F23): a PO approving unseen content is a
   quality-gate integrity failure on the single most consequential human
   decision point in the flow, not merely friction.
 - **Date:** 2026-08-29
+
+## Closure, 2026-08-29
+
+The disclosed consequence is resolved. `harness/scripts/pipeline-state.test.mjs`
+is TP-5 protected, so the fix required 8 separate PO-signed human-guard-
+override ceremonies (`NVA-R27-HARNESSFIX`, commits `931a2f9c`, `9a7156ef`,
+`637bf494`, `94b38def`, `36802bfa`, `dc3071c7`, `997dc502`, `19937961`), each
+inserting a `present-plan --by <name>` call before the corresponding
+`approve-plan` call site. Verified directly: `node --test harness/scripts/
+pipeline-state.test.mjs` → 542/542 cases pass, exit 0 (no crash, no
+failures). `node --test harness/scripts/check-consumer-safe-paths.test.mjs`
+→ 9/9, exit 0. All three of the item's own Acceptance criteria are met.
