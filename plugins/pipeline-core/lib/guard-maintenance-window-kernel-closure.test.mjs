@@ -183,6 +183,15 @@ const DYNAMIC_IMPORT_EDGES = {
     "../lib/security-completeness-gate.mjs",
     "../lib/project-authority.mjs",
   ],
+  // NVA-CF-GMWKC-RETRY: pre-commit-hook-install.mjs's renderImpl() template-string
+  // generator dynamically imports these three via `pathToFileURL(resolve(<dir>, "<name>")).href`
+  // -- PLUGIN_HOOKS_DIR/PLUGIN_LIB_DIR/PLUGIN_SCRIPTS_DIR are install-time-bound absolute
+  // paths, not literal specifiers the static scanner can read.
+  "plugins/pipeline-core/scripts/pre-commit-hook-install.mjs": [
+    "../hooks/guard-gate-strength.mjs",
+    "../lib/protected-test-paths.mjs",
+    "./check-protected-path-integrity.mjs",
+  ],
 };
 
 // Spawn-edge scanner (pipeline.gmw-kernel-closure-test-does-not-model-spawn-edges): see
