@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.push-path-has-no-driver
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-28
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: 6d0c95eeb830f7876e131cb747c76366be0e0900
+closure_evidence: backlog/items/2026-08-28-the-push-path-has-no-driver-so-its-five-layers-are-walked-by-hand.md
 sprint: nova
 done_when: manual
 tracking: "Nova B — PO-raised 2026-08-28 on seeing the guided onboarding reach ready: 'dann braucht der push pfad auch so was weil der kostet auch mega viel'. Deliberately NOT Nova A: the candidate must not grow a second driver before its first one is reviewed."
@@ -92,3 +96,17 @@ not mis-order steps, and it does not interleave other work between seeding and c
   that cost a live signature; fixed, but the class is what a driver removes.
 - `2026-08-28-onboarding-needs-one-guided-init-instead-of-a-turn-by-turn-state-machine.md`
   — the pattern this follows.
+
+## Triage (filled in by the Elephant of the next Pipeline session)
+
+- **Decision:** close
+- **Rationale:** re-verified 2026-08-29: commit `6d0c95ee` ("feat(push): drive
+  the push path to the signature in one command") is present in the current
+  tree and `plugins/pipeline-core/scripts/push-init.mjs` +
+  `push-init.test.mjs` exist, hardened further by `6111c13d` ("real-repo
+  layer-1b check asserts a state-independent invariant"); `push-init.test.mjs`
+  16/16 pass. The item's own body text was not updated with a "Landed" note
+  by the original dispatches, but the code artifacts and commits independently
+  confirm the driver exists and matches this item's Direction/Acceptance
+  criteria.
+- **Date:** 2026-08-29

@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.push-gate-unsatisfiable-in-consumer-deployment
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-28
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: af9ce953240cc3f224cf2c1b3f5bea4ac6d9711a
+closure_evidence: backlog/items/2026-08-28-the-push-gate-is-unsatisfiable-in-any-installed-plugin-deployment.md
 sprint: nova
 done_when: manual
 tracking: "NOW / Nova A — happy-path blocking, and the most severe finding of the day: a correctly-signed push cannot land in ANY consumer deployment. Also blocks the security-gate-ON decision, whose measurement was taken in the one environment where this defect does not fire."
@@ -199,3 +203,17 @@ for that reason alone.
   that closed the earlier half of this; this is the part it did not reach.
 - `2026-08-28-agents-talk-the-po-out-of-the-signature-instead-of-walking-it.md` — the same
   session, where the agent twice offered a bypass menu instead of this path.
+
+## Triage (filled in by the Elephant of the next Pipeline session)
+
+- **Decision:** close
+- **Rationale:** re-verified 2026-08-29: commits `867d287a` (gitleaks config
+  resolves in an installed-plugin deployment), `37443e91` (`push-prepare`
+  gates security-evidence on `gates.security` mode), `e3bf10e8` (scanner
+  shipped under `plugins/pipeline-core`), `92d1b711` (scanner defaults ship so
+  a fresh project can scan at all), and `af9ce953` (onboarding asks about an
+  owned `.gitignore` missing evidence-circle entries, closing part (c)'s
+  dirty-tree-after-signing dead end) are all present in the current tree.
+  `project-onboarding-v3.test.mjs` passes 154/154 including the owned-
+  `.gitignore` evidence-circle coverage.
+- **Date:** 2026-08-29

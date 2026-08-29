@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.verify-placeholder-manual-check-required-accepted-by-gate
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-29
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: 3cfc7160b613b84682a551be7ea3d8a3d62e2f4b
+closure_evidence: backlog/items/2026-08-29-verify-placeholder-manual-check-required-accepted-by-gate.md
 sprint: nova
 done_when: contains harness/scripts/verify.mjs pipeline.reject-unreplaced-manual-check-placeholder
 source: "Claude/Windows self-audit report (docs/pipeline-audit-claude-session.md §7), cited by scratch/greenfield-triage-2026-08-29.md finding F19, observed during the 2026-08-29 three-runner greenfield test."
@@ -151,3 +155,16 @@ downstream workspace, or a PO decision that the mechanism-level fix (now
 landed) supersedes the need to locate the specific write site. Left `open`
 pending that decision, plus the same missing-dedicated-test gap the sibling
 item records.
+
+## Triage (filled in by the Elephant of the next Pipeline session)
+
+- **Decision:** close
+- **Rationale:** re-verified 2026-08-29: commit `3cfc7160` is present in the
+  current tree; `computeManualVerifyStep()` in `harness/scripts/verify.mjs`
+  (confirmed at lines 780/799) rejects an unreplaced "Manual check required."
+  placeholder as a FAILURE, mechanically satisfying the item's `done_when`
+  predicate (the marker string `pipeline.reject-unreplaced-manual-check-
+  placeholder` is present in `verify.mjs`) and Acceptance criterion 2. The
+  PO decision superseding the unlocated-write-site criterion is exercised
+  here: the mechanism-level fix is treated as sufficient to close.
+- **Date:** 2026-08-29

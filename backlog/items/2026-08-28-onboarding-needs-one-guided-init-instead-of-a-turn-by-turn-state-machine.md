@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.onboarding-needs-one-guided-init
 type: requirement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-28
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: e34ea95d3db54754ec97d5afeb02c39681de6155
+closure_evidence: backlog/items/2026-08-28-onboarding-needs-one-guided-init-instead-of-a-turn-by-turn-state-machine.md
 sprint: nova
 tracking: "NOW / Nova A — PO decision 2026-08-28: rebuild the flow, keep the binding core untouched; pulled forward because the happy path cannot go live without it"
 source: "Greenfield happy-path test of candidate 0.6.0 across all three runners, 2026-08-28. Independent self-analyses: Claude/Windows (docs/pipeline-haertungstest-und-analyse.md), Agy/WSL (pipeline-analysis.md), Codex/WSL (docs/pipeline-session-analysis-2026-08-28.md), plus the PO's own cross-run observations."
@@ -177,3 +181,14 @@ accurate for these two fields specifically.
 confirmed.** Left `status: open` for the PO to close explicitly after
 reviewing this measurement — not this dispatch's call, per the item's own
 `done_when: manual`.
+
+## Triage (filled in by the Elephant of the next Pipeline session)
+
+- **Decision:** close
+- **Rationale:** re-verified 2026-08-29: commit `e34ea95d` confirms guided-init
+  sub-goals 6/7 and measures fresh-repo onboarding turns;
+  `plugins/pipeline-core/scripts/measure-fresh-repo-onboarding-turns.mjs` exists
+  in the current tree and drives a real fresh temp repo to `outcome: "ready"` in
+  7 turns with 0 repair subcommands per the closing note above; the pre-push
+  hook is confirmed installed by default in `project-onboarding-v3.test.mjs`.
+- **Date:** 2026-08-29

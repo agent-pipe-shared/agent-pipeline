@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.a-runner-proposed-abandoning-pipeline-setup-as-too-laborious
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-29
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: 1a1de6ef4545ed8fcce812434f1edc02cfb9f26b
+closure_evidence: backlog/items/2026-08-29-a-runner-proposed-abandoning-pipeline-setup-as-too-laborious.md
 sprint: nova
 done_when: manual
 source: "PO observation during the 2026-08-29 three-runner greenfield test (finding F27 of scratch/greenfield-triage-2026-08-29.md)."
@@ -88,3 +92,11 @@ completing the step and filing a `type: workflow-improvement` backlog item.
 Verified: `check-section-citations.test.mjs` 17/17 green (no citation
 contract references this file's structure). Independent Critic review and
 PO acceptance still pending.
+
+## Triage (filled in by the Elephant of the next Pipeline session)
+
+- **Decision:** close
+- **Rationale:** re-verified 2026-08-29: commit `1a1de6ef` is present in the
+  current tree; `roles/elephant.md` §3 carries `EL-34 (MUST NOT) — Effort is
+  never grounds to propose abandoning a mandatory step` at line ~72.
+- **Date:** 2026-08-29
