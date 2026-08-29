@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "a33b142c605a97bb4aaad9af5639aaf6d37a0c75faf64028b08d1d6864cde786"
+    "transitionHead": "35d3a65ce08e7a549bca730a15b9b346986902ec0a07c5c2f0ae0f80cb96ebf6"
   },
   "counts": {
-    "open": 110,
+    "open": 109,
     "in_progress": 3,
-    "closed": 410,
+    "closed": 411,
     "rejected": 3,
     "deferred": 11
   },
@@ -443,12 +443,16 @@
     },
     {
       "id": "pipeline.an-unparseable-done-when-is-counted-as-undeclared-not-malformed",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-29",
       "source": "Dispatch NVA-BLDECL-4, 2026-08-29: two of fifteen first-draft predicates contained a comma or brace, were silently dropped by the frontmatter parser, and were reported as UNDECLARED rather than MALFORMED. Confirmed against the source by the dispatcher.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "8230cd8efb998d527a84c220044be18145862fb0",
+      "closureEvidence": "plugins/pipeline-core/scripts/check-backlog-done-predicate.test.mjs"
     },
     {
       "id": "pipeline.anchor-check-passes-on-wrong-language-content",

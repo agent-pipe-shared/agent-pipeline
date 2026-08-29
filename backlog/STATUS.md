@@ -42,7 +42,7 @@
 | pipeline.all-three-runners-should-install-against-the-stable-branch | open | requirement | pipeline | 2026-08-27 | — |
 | pipeline.an-expired-override-is-armed-instead-of-refused | closed | defect | pipeline | 2026-08-28 | — |
 | pipeline.an-orchestrator-write-into-a-running-dispatchs-tree-is-undetectable | open | defect | pipeline | 2026-08-28 | — |
-| pipeline.an-unparseable-done-when-is-counted-as-undeclared-not-malformed | open | defect | pipeline | 2026-08-29 | — |
+| pipeline.an-unparseable-done-when-is-counted-as-undeclared-not-malformed | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.anchor-check-passes-on-wrong-language-content | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.antigravity-hard-enforcement-layer-has-two-fail-open-paths | closed | defect | pipeline | 2026-08-23 | — |
 | pipeline.antigravity-plugin-registration-points-one-level-above-the-plugin-root | closed | defect | pipeline | 2026-08-23 | — |
@@ -549,8 +549,8 @@
 
 ## Counts
 
-- open: 110
+- open: 109
 - in_progress: 3
-- closed: 410
+- closed: 411
 - rejected: 3
 - deferred: 11
