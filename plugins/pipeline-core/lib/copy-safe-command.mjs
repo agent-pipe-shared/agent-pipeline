@@ -150,6 +150,21 @@ function resolvePlaceholderValue(text) {
  * still goes through renderProjectOnboardingAction() unchanged, never the
  * new per-argv-entry path.
  *
+ * NVA-CF-BL24-DENIALBOILERPLATE (backlog/items/2026-08-29-guard-denial-
+ * messages-repeat-70-lines-of-boilerplate.md, Part 1): the wrapped
+ * posix/powershell/cmd renderings only earn their keep when the inline
+ * `command` line would not fit within the shared column bound. When the
+ * inline form already fits, `copyCommand.posix`/`powershell`/`cmd` are all
+ * `null` -- the human copies the one inline `command` line instead of three
+ * near-duplicated wrapped blocks for a line that never needed wrapping.
+ * `copyCommand.maxColumns` is always present regardless, so a caller can
+ * still tell the bound was checked. This is a value-nulling decision made
+ * HERE, in the one caller `boundedOpaqueCopyCommand()` (project-onboarding-
+ * v3.mjs) has -- that function itself, and its OTHER direct callers
+ * (human-guard-override.mjs, guard-testpath.mjs, antigravity/codex
+ * pretool guards, restartCopyCommands()), are unchanged and still always
+ * receive their unconditional bounded rendering.
+ *
  * @param {{ executable: string, argv: (string|ReturnType<typeof placeholder>)[] }} action
  * @returns {{ executable: string, argv: string[], command: string, copyCommand: { maxColumns: number, posix: string|null, powershell: string|null, cmd: string|null } }}
  */
@@ -165,5 +180,9 @@ export function boundedCopySafeCommand({ executable, argv } = {}) {
     ? [executable, ...argv].map((part) => (isPlaceholder(part) ? renderPlaceholderValue(part.text) : shellWord(part))).join(" ")
     : renderProjectOnboardingAction({ kind: "command", executable, argv });
   const resolvedArgv = hasPlaceholder ? argv.map((part) => (isPlaceholder(part) ? resolvePlaceholderValue(part.text) : part)) : argv;
-  return { executable, argv: resolvedArgv, command, copyCommand: boundedOpaqueCopyCommand(command) };
+  const bounded = boundedOpaqueCopyCommand(command);
+  const copyCommand = command.length <= bounded.maxColumns
+    ? { maxColumns: bounded.maxColumns, posix: null, powershell: null, cmd: null }
+    : bounded;
+  return { executable, argv: resolvedArgv, command, copyCommand };
 }
