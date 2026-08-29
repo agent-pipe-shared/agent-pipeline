@@ -3800,10 +3800,12 @@ function runAuthorityRevisionTests() {
   const { fx, request } = preparedRevision("ar03-decision-scope");
   const lifecycleDepsForFx = lifecycleDeps(fx.dir, fx.prdRel);
   const submitted = run(["submit-plan", "--by", "coordinator", "--profile", "feature"], lifecycleDepsForFx);
+  const presented = run(["present-plan", "--by", "coordinator"], lifecycleDepsForFx);
   const approved = run(["approve-plan", "--by", "po-test"], lifecycleDepsForFx);
   const phased = run(["set-phase", "--phase", "implementation"], lifecycleDepsForFx);
   ok("AR03h-setup a real plan-approval lifecycle moves the active feature to implementation phase after the AR plan was already built",
     submitted === 0 && approved === 0 && phased === 0, `submit=${submitted} approve=${approved} phase=${phased}`);
+  ok("AR03h-setup-1 present-plan exit 0", presented === 0, `got ${presented}`);
   const preBytes = stateBytes(fx.dir);
   const applied = arApplyCmd(fx, request.name, request.sha256);
   ok("AR03h PX0-AC-03: apply refuses (AR-DECISION-SCOPE) when the active feature's phase has moved away from design between plan and apply",
