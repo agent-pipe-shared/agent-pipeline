@@ -7601,6 +7601,60 @@ function summarizePhoenixEpicHistory(value) {
   };
 }
 
+// pipeline.prd-framing-precondition-check (backlog:
+// 2026-08-29-prd-framing-precondition-is-prose-not-a-check.md): the generated
+// PRD template (templates/prd.md) itself carries prose telling the author
+// that a section's framing "must be authored and reviewed before the plan is
+// submitted" -- but nothing previously read that document back and enforced
+// it. A generated PRD may still contain this verbatim precondition prose, or
+// one of the template's own unmodified bracket placeholders, after a human
+// approves it without noticing the section was never actually written. This
+// list is intentionally an exact-phrase match, not a keyword/substring match
+// on words like "framing" or "reviewed": genuinely authored prose that happens
+// to reuse some of that vocabulary (e.g. "the framing here was reviewed
+// before this rewrite") must NOT trip a false refusal -- only the literal,
+// unedited placeholder text does.
+export const PLAN_AUTHORITY_PRD_FRAMING_CODE = "PRD-FRAMING-NOT-AUTHORED";
+const PRD_FRAMING_PLACEHOLDER_MARKERS = Object.freeze([
+  "framing must be authored and reviewed before the plan is submitted",
+  "<One paragraph: what is being built/changed",
+  "<Problem/benefit/trigger; how success is measured.>",
+]);
+
+/**
+ * Returns the first unmodified placeholder marker still present verbatim in
+ * `prdText`, or null if none is found. Deliberately exact-substring, not
+ * fuzzy/keyword: see the comment above PRD_FRAMING_PLACEHOLDER_MARKERS.
+ */
+export function findPrdFramingPlaceholder(prdText) {
+  if (typeof prdText !== "string" || prdText.length === 0) return null;
+  for (const marker of PRD_FRAMING_PLACEHOLDER_MARKERS) {
+    if (prdText.includes(marker)) return marker;
+  }
+  return null;
+}
+
+/**
+ * Reads the PRD document at `planPath` (repository-relative, resolved against
+ * `dir`) and checks it for an unmodified framing placeholder. A PRD that
+ * cannot be read (missing, unreadable) is not refused here -- this is a
+ * content check on a document that exists, not an existence check; a missing
+ * plan file is caught elsewhere in the submit-plan path. Returns
+ * `{ ok: true }` or `{ ok: false, code, marker, planPath }`.
+ */
+function checkPrdFramingPrecondition({ dir, planPath, readFileFn = readFileSync }) {
+  if (typeof planPath !== "string" || planPath.length === 0) return { ok: true };
+  let prdText;
+  try {
+    prdText = readFileFn(join(dir, planPath), "utf8");
+  } catch {
+    return { ok: true };
+  }
+  const marker = findPrdFramingPlaceholder(prdText);
+  if (marker === null) return { ok: true };
+  return { ok: false, code: PLAN_AUTHORITY_PRD_FRAMING_CODE, marker, planPath };
+}
+
 /**
  * Runs the CLI logic. Never calls process.exit itself (testable); returns the exit
  * code. `deps` allows tests to inject `dir`, `now`, `gitHead`, and `env` without
@@ -7777,6 +7831,15 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       const submitStagingRefusal = refusePlanAuthorityStagingPath({ rootDir: dir, planPath: authority.value.planPath, specPath: authority.value.specPath });
       if (!submitStagingRefusal.ok) {
         console.error(`Error: submit-plan blocked by ${submitStagingRefusal.code}: ${submitStagingRefusal.message}`);
+        return 2;
+      }
+      // pipeline.prd-framing-precondition-check: refuse while the PRD document
+      // itself still contains its own unmodified framing placeholder text.
+      const framingRefusal = checkPrdFramingPrecondition({
+        dir, planPath: authority.value.planPath, readFileFn: deps.readFile ?? readFileSync,
+      });
+      if (!framingRefusal.ok) {
+        console.error(`Error: submit-plan blocked by ${framingRefusal.code}: the PRD at ${framingRefusal.planPath} still contains its own unmodified framing placeholder text ("${framingRefusal.marker}"). Author the framing section before submitting.`);
         return 2;
       }
       const profileSha256 = sha256CanonicalJson(profile.value);
