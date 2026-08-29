@@ -8,6 +8,7 @@ created: 2026-08-08
 sprint: nightwing
 due: 2026-09-05
 source: "PO, 2026-08-08, on raising the pipeline-start byte budget 15,000 -> 18,000: optimisation is worth doing, but as an efficiency pass later, when more files still need to become modules — not as a detour inside the 0.5.4 hardening block."
+done_when: manual
 ---
 
 # The bootstrap skill grows by raising its budget, when it should grow by moving content into references

@@ -8,6 +8,7 @@ created: 2026-08-08
 sprint: alfred
 due: 2026-08-22
 source: "Observed by the Phoenix session of 2026-08-08, which caught it in its own work; generalised and verified against the source here."
+done_when: manual
 ---
 
 # The authority gate reads the worktree, so a green verdict need not survive a checkout
