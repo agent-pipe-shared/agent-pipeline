@@ -727,6 +727,17 @@ const TEST_SUITES = [
   // mechanically checks. check-suite-registration.mjs named it as the last
   // genuine opt-out; its two sibling entries were already stale.
   { name: "backlog-done-predicate-tests", file: join(pluginScriptsDir, "check-backlog-done-predicate.test.mjs") },
+  // NVA-CF-VERIFYREG: 8 suites existed on disk but were never registered here (found by
+  // Critic round-1, verified live via check-suite-registration.mjs), so the gate reported
+  // green while none of them ever ran.
+  { name: "generate-elephant-role-prohibitions-tests", file: join(scriptDir, "generate-elephant-role-prohibitions.test.mjs") },
+  { name: "guard-push-scratch-advisory-tests", file: join(hooksDir, "guard-push-scratch-advisory.test.mjs") },
+  { name: "critic-skip-decision-tests", file: join(libDir, "critic-skip-decision.test.mjs") },
+  { name: "worktree-count-check-tests", file: join(libDir, "worktree-count-check.test.mjs") },
+  { name: "check-protected-path-integrity-tests", file: join(pluginScriptsDir, "check-protected-path-integrity.test.mjs") },
+  { name: "check-resume-consumption-tests", file: join(pluginScriptsDir, "check-resume-consumption.test.mjs") },
+  { name: "check-state-phase-consistency-tests", file: join(pluginScriptsDir, "check-state-phase-consistency.test.mjs") },
+  { name: "pre-commit-hook-install-tests", file: join(pluginScriptsDir, "pre-commit-hook-install.test.mjs") },
 ];
 
 // Manifest-gated phase steps: see header — only projects that carry a manifest at
