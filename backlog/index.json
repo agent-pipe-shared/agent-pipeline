@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "222b1e7e22e8cf909d002aff4391ff87d296355e1d0061d6a0ff89e5a8c4144e"
+    "transitionHead": "38d046f90d77d7da7a7678371cc0f8c69400edbc1a79b57fa4939f4803d9df98"
   },
   "counts": {
-    "open": 108,
+    "open": 107,
     "in_progress": 3,
-    "closed": 412,
+    "closed": 413,
     "rejected": 3,
     "deferred": 11
   },
@@ -121,12 +121,16 @@
     },
     {
       "id": "pipeline.a-stale-verify-opt-out-entry-costs-a-po-signature-for-work-already-done",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-29",
       "source": "Observed while registering the done_when predicate suite in verify.mjs, 2026-08-29: two of the three DELIBERATELY_UNREGISTERED entries described suites that were in fact already registered, and clearing them was part of the work that consumed a live PO signature ceremony.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "37b35524872ec575cf351a174e6dc4f92745c109",
+      "closureEvidence": "plugins/pipeline-core/scripts/check-suite-registration.test.mjs"
     },
     {
       "id": "pipeline.a-stale-version-stamp-makes-a-plugin-reload-a-silent-no-op",
