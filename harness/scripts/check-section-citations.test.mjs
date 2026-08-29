@@ -240,6 +240,32 @@ test("checkSectionCitations: absolute repo root and relative markdownPaths toget
   assert.equal(result.stats.citationsChecked, 1);
 });
 
+test("checkSectionCitations: a vendored roles/guardrails file citing operating-model.md fails when the vendored copy itself is missing", () => {
+  const root = fixture({
+    "plugins/pipeline-core/roles/example.md": "See `docs/operating-model.md` §1 (What the model protects).",
+  });
+  const result = checkSectionCitations(root, {
+    markdownPaths: ["docs/operating-model.md", "plugins/pipeline-core/roles/example.md"],
+    fileExists: () => false,
+  });
+  assert.equal(result.failures.length, 1);
+  assert.match(
+    result.failures[0],
+    /plugins\/pipeline-core\/roles\/example\.md:1 -> cites docs\/operating-model\.md but plugins\/pipeline-core\/docs\/operating-model\.md does not exist/,
+  );
+});
+
+test("checkSectionCitations: a vendored roles/guardrails file citing operating-model.md passes when the vendored copy exists", () => {
+  const root = fixture({
+    "plugins/pipeline-core/roles/example.md": "See `docs/operating-model.md` §1 (What the model protects).",
+  });
+  const result = checkSectionCitations(root, {
+    markdownPaths: ["docs/operating-model.md", "plugins/pipeline-core/roles/example.md"],
+    fileExists: () => true,
+  });
+  assert.equal(result.failures.length, 0);
+});
+
 test("real repository: docs/operating-model.md's live heading structure resolves at least sections 1-3 with the documented subsections", () => {
   const sections = parseOperatingModelHeadings(readFileSync(resolve(REPO, "docs/operating-model.md"), "utf8"));
   assert.ok(sections.length >= 3);
