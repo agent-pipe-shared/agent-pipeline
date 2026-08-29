@@ -182,6 +182,7 @@
 | pipeline.gate-strength-override-route-advertised-not-offered | deferred | defect | pipeline | 2026-08-08 | — |
 | pipeline.gate-strength-shell-comment-understates-its-own-scope | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.gate-strength-shell-lane-refuses-any-command-containing-a-quoted-wildcard | closed | defect | pipeline | 2026-08-27 | — |
+| pipeline.gg-22s-own-remediation-order-creates-unclearable-ledger-debt | open | defect | pipeline | 2026-08-29 | — |
 | pipeline.git-appears-despite-initializes-git-false | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.git-identity-ask-step-unreachable-through-live-cli-path | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.git-identity-must-be-set-immediately-before-first-commit-not-at-setup-time | closed | defect | pipeline | 2026-08-17 | — |
@@ -210,7 +211,7 @@
 | pipeline.guard-denial-escalates-benign-commands-to-human-in-terminal | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.guard-denial-messages-repeat-70-lines-of-boilerplate | open | workflow-improvement | pipeline | 2026-08-29 | — |
 | pipeline.guard-devplan-and-guard-testpath-have-no-bash-write-lane | closed | defect | pipeline | 2026-08-18 | — |
-| pipeline.guard-dispatch-budget-does-not-distinguish-invalid-identity-from-unresolved | open | defect | pipeline | 2026-08-29 | — |
+| pipeline.guard-dispatch-budget-does-not-distinguish-invalid-identity-from-unresolved | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.guard-dispatch-fails-open-on-the-antigravity-subagents-payload-shape | closed | defect | pipeline | 2026-08-25 | — |
 | pipeline.guard-dispatch-has-no-workflow-tool-awareness | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.guard-human-override-cli-and-a-second-site-still-normalize-backslashes-unconditionally | closed | defect | pipeline | 2026-08-17 | — |
@@ -550,6 +551,6 @@
 
 - open: 110
 - in_progress: 3
-- closed: 409
+- closed: 410
 - rejected: 3
 - deferred: 11
