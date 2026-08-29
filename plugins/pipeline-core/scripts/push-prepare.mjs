@@ -11,8 +11,12 @@
  * correct `--subject-sha256`) plus the two agent-side commands that follow it.
  *
  * Never writes a file, never mutates pipeline state, never touches the
- * network. Everything it prints is a report or a command for a HUMAN or a
- * LATER agent call to run; this script itself runs none of them.
+ * network -- with exactly ONE narrow exception (NVA-PUSHFOLD-1):
+ * `foldPendingPushApprovalWrite()`, run at the very start of `pushPrepareReport()`,
+ * commits a prior `approve-push` run's still-uncommitted trailing state-file write when (and
+ * only when) that file is the SOLE dirty path in the tree. Every other check below still only
+ * prints a report or a command for a HUMAN or a LATER agent call to run; this script runs none
+ * of those itself.
  *
  * WHY THIS EXISTS: on 2026-08-12 a valid, already-consumed signature was
  * refused anyway because `evidence/verify-latest.json` carried a non-zero
@@ -28,8 +32,8 @@
  * file.
  */
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync, realpathSync } from "node:fs";
-import { dirname, join, resolve, sep } from "node:path";
+import { existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { dirname, join, relative, resolve, sep } from "node:path";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
@@ -37,7 +41,7 @@ import { gateConfig, loadManifestSafe } from "../lib/manifest.mjs";
 import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
 import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
 import { authorizeCriticalPushCommand, parseHumanArgs } from "./po-human-approval.mjs";
-import { projectDir, readState, run as pipelineStateRun } from "./pipeline-state.mjs";
+import { projectDir, readState, run as pipelineStateRun, statePath } from "./pipeline-state.mjs";
 import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
 
 export const USAGE = "Usage: push-prepare.mjs --by <name> --remote <remote> --destination refs/heads/<branch>";
@@ -66,6 +70,14 @@ function gitOutput(dir, args, deps) {
   const result = spawn("git", ["-C", dir, ...args], { encoding: "utf8" });
   if (result.error || result.status !== 0 || typeof result.stdout !== "string") return null;
   return result.stdout.trim();
+}
+
+/** Untrimmed `git status --porcelain` output (see `foldPendingPushApprovalWrite`'s use). */
+function rawGitStatus(dir, deps) {
+  const spawn = deps.spawn ?? spawnSync;
+  const result = spawn("git", ["-C", dir, "status", "--porcelain"], { encoding: "utf8" });
+  if (result.error || result.status !== 0 || typeof result.stdout !== "string") return null;
+  return result.stdout;
 }
 
 export function resolveHeadCommit(dir, deps = {}) {
@@ -345,11 +357,85 @@ export function segmentsForNodeCommand(executable, argv) {
   return segments;
 }
 
+/**
+ * NVA-PUSHFOLD-1: `approve-push` (`pipeline-state.mjs`) writes `pushApproval.lastApproved`
+ * to the project's state file strictly AFTER the signed subject was computed, so that write
+ * structurally can never be part of the commit it records
+ * (backlog/items/2026-08-26-push-approval-record-always-trails-the-signed-commit.md) --
+ * every successful `approve-push` leaves exactly that one file dirty. This folds it in
+ * automatically at the START of the next `push-prepare` run (PO decision, 2026-08-29), so a
+ * human/session no longer has to notice and commit it by hand.
+ *
+ * Deliberately narrow, to keep this script's "never mutates" contract true for every OTHER
+ * case: it commits ONLY when the resolved state file is the SOLE dirty path in the working
+ * tree. Any other dirty file alongside it (or a dirty tree that is NOT this exact file) is not
+ * the shape this fold exists for -- it is left completely alone, and the pre-existing
+ * `checkWorkingTreeClean` check below reports it exactly as before (no behavior change for
+ * that case).
+ *
+ * Also clears the `pendingAuditWrite` hint (see `pipeline-state.mjs`'s `approve-push` case)
+ * from `true` to `false` before staging the commit: that flag is the upfront,
+ * immediately-visible local marker that the record has not yet been committed, so committing
+ * it here without clearing it would leave a permanently stale `true` in history the moment it
+ * lands.
+ */
+export function foldPendingPushApprovalWrite(dir, deps = {}) {
+  // Deliberately NOT `gitOutput()` (used by `checkWorkingTreeClean` below): that helper
+  // `.trim()`s the whole string, which silently eats porcelain's leading status-code column
+  // (" M path" -> "M path") and shifts every fixed-offset slice below by one. Harmless for
+  // `checkWorkingTreeClean`'s own dirty/clean check, but this function parses per-line column
+  // positions, so it needs the raw, untrimmed output.
+  const status = typeof deps.gitStatus === "function" ? deps.gitStatus(dir) : rawGitStatus(dir, deps);
+  if (status === null) return { folded: false, reason: "status-unavailable" };
+  const lines = status.split("\n").filter((line) => line !== "");
+  if (lines.length === 0) return { folded: false, reason: "clean" };
+  if (lines.length !== 1) return { folded: false, reason: "other-dirty-paths" };
+  const relPath = lines[0].slice(3);
+  const resolveStatePath = deps.statePath ?? statePath;
+  const stateRelPath = relative(dir, resolveStatePath(dir)).split(sep).join("/");
+  if (relPath !== stateRelPath) return { folded: false, reason: "other-dirty-paths" };
+
+  const readFile = deps.readFile ?? readFileSync;
+  const writeFile = deps.writeFile ?? writeFileSync;
+  const absPath = join(dir, relPath);
+  let parsedState;
+  try {
+    parsedState = JSON.parse(readFile(absPath, "utf8"));
+  } catch {
+    return { folded: false, reason: "unreadable" };
+  }
+  if (parsedState?.pushApproval?.lastApproved?.pendingAuditWrite === true) {
+    parsedState.pushApproval.lastApproved.pendingAuditWrite = false;
+    try {
+      writeFile(absPath, `${JSON.stringify(parsedState, null, 2)}\n`);
+    } catch {
+      return { folded: false, reason: "rewrite-failed" };
+    }
+  }
+
+  const spawn = deps.spawn ?? spawnSync;
+  const add = spawn("git", ["-C", dir, "add", "--", relPath], { encoding: "utf8" });
+  if (add.error || add.status !== 0) return { folded: false, reason: "add-failed" };
+  const message = "chore(pipeline-state): fold pending push-approval record\n\n"
+    + "Auto-folded by push-prepare.mjs at the start of its own run (NVA-PUSHFOLD-1): a prior\n"
+    + "approve-push run's trailing state-file write was still uncommitted when this run\n"
+    + "started. See backlog/items/2026-08-26-push-approval-record-always-trails-the-signed-\n"
+    + "commit.md.\n";
+  const commit = spawn("git", ["-C", dir, "commit", "-m", message, "--", relPath], { encoding: "utf8" });
+  if (commit.error || commit.status !== 0) return { folded: false, reason: "commit-failed" };
+  return { folded: true };
+}
+
 export function pushPrepareReport(argv, deps = {}) {
   const dir = deps.dir ?? projectDir();
   const parsed = parseArgs(argv);
   if (parsed.error) return { ok: false, error: parsed.error };
   const { by, remote, destination } = parsed;
+
+  // Runs BEFORE anything below that assumes a clean tree (NVA-PUSHFOLD-1): a pending trailing
+  // write from a prior `approve-push` is folded in here first, so `checkWorkingTreeClean`
+  // never has to be manually chased by a human/session noticing the dirty state file.
+  foldPendingPushApprovalWrite(dir, deps);
 
   const headCommit = resolveHeadCommit(dir, deps);
   const checks = [];

@@ -21,7 +21,7 @@
  */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -32,6 +32,7 @@ import {
   checkPushThreatModel,
   checkWorkingTreeClean,
   criticalArtifactPaths,
+  foldPendingPushApprovalWrite,
   isSecurityGateActive,
   parseArgs,
   preparePushSubject,
@@ -42,6 +43,7 @@ import {
   segmentsForNodeCommand,
 } from "./push-prepare.mjs";
 import { authorizeRecordedPush } from "../lib/critical-action-authorization.mjs";
+import { run as runPipelineState } from "./pipeline-state.mjs";
 import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
@@ -578,4 +580,135 @@ test("D3: preparePushSubject() matches the real `pipeline-state.mjs prepare-push
 
   assert.equal(inProcess.value.subjectSha256, cliValue.subjectSha256);
   assert.match(inProcess.value.subjectSha256, /^[0-9a-f]{64,}$/);
+});
+
+// ---------------------------------------------------------------------------
+// NVA-PUSHFOLD-1 -- `approve-push` (pipeline-state.mjs) writes its trailing
+// `pushApproval.lastApproved` record strictly AFTER the signed subject was
+// computed, so that write can never be part of the commit it records
+// (backlog/items/2026-08-26-push-approval-record-always-trails-the-signed-commit.md).
+// This section proves (1) the upfront `pendingAuditWrite` hint is present the
+// moment approve-push succeeds, on a REAL repo, via a REAL (chat-mode, no key
+// ceremony) approve-push call -- not a reproduction of pipeline-state.mjs's own
+// logic -- and (2) `foldPendingPushApprovalWrite()` folds that trailing write
+// into a commit at the start of the next push-prepare run and clears the hint,
+// never leaving it stale. `pipeline-state.test.mjs` is TP-protected (no
+// in-session edit route), so this is the only place this repo can add coverage
+// for `approve-push`'s new `pendingAuditWrite` field.
+// ---------------------------------------------------------------------------
+
+function gitAtFold(root, ...args) {
+  return spawnSync("git", ["-C", root, ...args], { encoding: "utf8" });
+}
+
+/** A real git repo with a committed baseline state file and threat model, chat-mode gate. */
+function foldFixtureRepo() {
+  const root = mkdtempSync(join(SCRATCH, "push-prepare-fold-"));
+  after(() => rmSync(root, { recursive: true, force: true }));
+  gitAtFold(root, "init", "-q", "-b", "main");
+  gitAtFold(root, "config", "user.email", "po@example.invalid");
+  gitAtFold(root, "config", "user.name", "PO");
+  mkdirSync(join(root, "project"), { recursive: true });
+  writeFileSync(join(root, "project", "pipeline-state.json"), JSON.stringify({
+    schema: "pipeline.state.v0", planApproved: true,
+    activeFeature: { id: "sprint-nova-epic", planPath: "specs/sprint-nova-epic/prd.md", phase: "implementation" },
+  }, null, 2));
+  writeFileSync(join(root, "pipeline.user.yaml"), "schema: pipeline.user.v3\ngates:\n  push_approval: chat\n");
+  assert.equal(runPipelineState(["materialize-push-threat-model"], { dir: root }), 0, "fixture setup: materialize-push-threat-model must succeed");
+  gitAtFold(root, "add", "-A");
+  gitAtFold(root, "commit", "-q", "-m", "initial");
+  return root;
+}
+
+test("NVA-PUSHFOLD-1: bugfix discipline -- the CURRENT gap (red) demonstrated on a real repo, then fixed (green)", () => {
+  const root = foldFixtureRepo();
+  const deps = { dir: root };
+  const target = ["--by", "PO", "--remote", "origin", "--destination", "refs/heads/main"];
+
+  // A real, in-process chat-mode approve-push: first call only issues the challenge.
+  const challengeCall = runPipelineState(["approve-push", ...target], deps);
+  assert.equal(challengeCall, 1, "first chat-mode call must only issue a PO-CHALLENGE");
+  const pendingState = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"));
+  const code = pendingState.pendingPushChallenge.code;
+
+  // The confirming (attended) call actually records the approval.
+  const confirmedCall = runPipelineState(["approve-push", ...target], { ...deps, isattyFn: () => true, readLineFn: () => code });
+  assert.equal(confirmedCall, 0, "an attended confirming call must succeed");
+
+  // Part 2 (upfront hint): present and readable in immediately-visible (uncommitted) state,
+  // the moment approve-push succeeds -- before anything folds it into a commit.
+  const trailing = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"));
+  assert.equal(trailing.pushApproval.lastApproved.pendingAuditWrite, true,
+    "approve-push must stamp the upfront pendingAuditWrite hint onto its own write");
+
+  // RED: this is the exact structural gap the backlog item names -- the trailing write
+  // leaves push-prepare's own precondition failing, with nothing folding it in yet.
+  const beforeFold = checkWorkingTreeClean(root);
+  assert.equal(beforeFold.ok, false, "before the fix runs, the trailing write leaves the tree dirty");
+
+  // GREEN: foldPendingPushApprovalWrite() (this fix) folds it in and clears the hint.
+  const fold = foldPendingPushApprovalWrite(root);
+  assert.equal(fold.folded, true, `expected a successful fold: ${JSON.stringify(fold)}`);
+  const afterFold = checkWorkingTreeClean(root);
+  assert.equal(afterFold.ok, true, "after the fix runs, the tree is clean again");
+
+  const commitSubject = gitAtFold(root, "log", "-1", "--pretty=%s");
+  assert.match(commitSubject.stdout, /fold pending push-approval record/);
+  const committedState = JSON.parse(gitAtFold(root, "show", "HEAD:project/pipeline-state.json").stdout);
+  assert.equal(committedState.pushApproval.lastApproved.pendingAuditWrite, false,
+    "the hint must be cleared to false the moment it is actually committed -- never stale once folded");
+  assert.equal(committedState.pushApproval.lastApproved.criticalProofWaiver.mode, "chat",
+    "the rest of the approval record must survive the fold unchanged");
+});
+
+test("NVA-PUSHFOLD-1: pushPrepareReport folds the pending write in at the START, before working-tree-clean is evaluated", () => {
+  const root = foldFixtureRepo();
+  const headCommit = gitAtFold(root, "rev-parse", "HEAD").stdout.trim();
+  const baseline = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"));
+  // Simulate the exact post-approve-push dirty shape directly, without re-running the
+  // whole chat-mode ceremony (already covered by the test above) -- an uncommitted
+  // pushApproval.lastApproved write with the hint still true.
+  writeFileSync(join(root, "project", "pipeline-state.json"), JSON.stringify({
+    ...baseline,
+    pushApproval: { lastApproved: { approvedBy: "PO", forCommit: headCommit, remote: "origin", destination: "refs/heads/main", pendingAuditWrite: true } },
+  }, null, 2));
+  assert.equal(checkWorkingTreeClean(root).ok, false, "fixture must start dirty");
+
+  const result = pushPrepareReport(["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"], { dir: root });
+  const workingTreeCheck = result.report.checks.find((check) => check.id === "working-tree-clean");
+  assert.equal(workingTreeCheck.ok, true, "the fold must run before this check, so it never sees the trailing write as dirty");
+  assert.equal(checkWorkingTreeClean(root).ok, true, "the fold must have actually committed the pending write");
+});
+
+test("foldPendingPushApprovalWrite: leaves the tree alone when another file is ALSO dirty (never silently absorbs unrelated WIP)", () => {
+  const calls = [];
+  const result = foldPendingPushApprovalWrite(FIXTURE_DIR, {
+    gitStatus: () => " M project/pipeline-state.json\n M some/other/file.mjs\n",
+    spawn: (...args) => { calls.push(args); return { status: 0 }; },
+  });
+  assert.equal(result.folded, false);
+  assert.equal(result.reason, "other-dirty-paths");
+  assert.equal(calls.length, 0, "must never shell out to git add/commit when other files are also dirty");
+});
+
+test("foldPendingPushApprovalWrite: no-op on a clean tree (ordinary case unchanged)", () => {
+  const calls = [];
+  const result = foldPendingPushApprovalWrite(FIXTURE_DIR, {
+    gitStatus: () => "",
+    spawn: (...args) => { calls.push(args); return { status: 0 }; },
+  });
+  assert.equal(result.folded, false);
+  assert.equal(result.reason, "clean");
+  assert.equal(calls.length, 0, "must never shell out to git when there is nothing to fold");
+});
+
+test("foldPendingPushApprovalWrite: a dirty path that is NOT the state file is left alone", () => {
+  const calls = [];
+  const result = foldPendingPushApprovalWrite(FIXTURE_DIR, {
+    gitStatus: () => " M some/unrelated/file.mjs\n",
+    spawn: (...args) => { calls.push(args); return { status: 0 }; },
+  });
+  assert.equal(result.folded, false);
+  assert.equal(result.reason, "other-dirty-paths");
+  assert.equal(calls.length, 0);
 });

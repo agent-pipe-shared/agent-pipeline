@@ -8275,6 +8275,16 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       // opt-in dual-evaluation (its check (c)) has the reference to re-validate at read time.
       // Absent, the record is byte-identical to what this command wrote before.
       if (decisionReference !== undefined) approvalRecord.decisionReference = decisionReference;
+      // NVA-PUSHFOLD-1: this record is written strictly AFTER the signed subject was computed,
+      // so it structurally can never be part of the commit it records (backlog/items/2026-08-26-
+      // push-approval-record-always-trails-the-signed-commit.md). `pendingAuditWrite: true` is
+      // the upfront, immediately-visible hint the PO decision (2026-08-29) asked for: a session
+      // reading this file locally -- on the SAME machine, before anything folds this write into
+      // a commit -- can tell a push was approved and this exact record has not yet been
+      // committed. `push-prepare.mjs`'s `foldPendingPushApprovalWrite()` clears it to `false`
+      // the moment it actually commits the record, so the flag is only ever `true` while
+      // genuinely uncommitted -- never stale once folded.
+      approvalRecord.pendingAuditWrite = true;
       const next = {
         ...base,
         schema: SCHEMA_ID,
