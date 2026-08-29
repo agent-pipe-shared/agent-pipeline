@@ -4181,7 +4181,7 @@ test("the seeded dev-plan gate refuses implementation before approval and admits
     assert.equal(presented.code, 0, presented.stderr);
     const approved = state(["approve-plan", "--by", "po"]);
     assert.equal(approved.code, 0, approved.stderr);
-    const phased = state(["set-phase", "--phase", "implementation"]);
+    const phased = state(["set-phase", "--phase", "implementation", "--verify-command", `${process.execPath} -e "process.exit(0)"`]);
     assert.equal(phased.code, 0, phased.stderr);
 
     const admitted = attemptWrite("src/index.html");
@@ -4286,7 +4286,7 @@ test("V4 inspection proposes set-phase --phase implementation once the plan is a
     );
     assert.equal(attemptWrite("src/index.html").status, 2, "the proposal alone must not admit implementation writes");
 
-    const phased = state(["set-phase", "--phase", "implementation"]);
+    const phased = state(["set-phase", "--phase", "implementation", "--verify-command", `${process.execPath} -e "process.exit(0)"`]);
     assert.equal(phased.code, 0, phased.stderr);
 
     // Implementing: the handover is done, the proposal is gone again.
@@ -4377,7 +4377,7 @@ test("NVA-R40-PROJDRIFT: set-phase --phase implementation does not itself cause 
     // 1. CLEAN transition: refute the literal "the transition is the trigger"
     // hypothesis directly.
     assert.equal(inspect().status, "ready");
-    assert.equal(state(["set-phase", "--phase", "implementation"]).code, 0);
+    assert.equal(state(["set-phase", "--phase", "implementation", "--verify-command", `${process.execPath} -e "process.exit(0)"`]).code, 0);
     assert.equal(inspect().status, "ready", "a clean design->implementation transition must not itself produce projection-drift");
 
     // 2. The ACTUAL mechanism: an untracked edit to pipeline.user.yaml (the
