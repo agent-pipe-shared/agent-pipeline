@@ -130,6 +130,40 @@ test("stagedPaths: nothing staged yields an empty array, not null", async () => 
   assert.deepEqual(stagedPaths(dir), []);
 });
 
+// ---- pathAlreadyTrackedInHistory (pure helper, first-appearance exemption mechanism) -------
+
+test("pathAlreadyTrackedInHistory: unborn HEAD (no commit exists yet) -> false, nothing can be already tracked", async () => {
+  const { pathAlreadyTrackedInHistory } = await implModule();
+  const { dir } = freshRepo("history-unborn-head", { commitInitial: false });
+  assert.equal(pathAlreadyTrackedInHistory(dir, "any/path.txt"), false);
+});
+
+test("pathAlreadyTrackedInHistory: HEAD exists but the path was never committed -> false (first appearance)", async () => {
+  const { pathAlreadyTrackedInHistory } = await implModule();
+  const { dir } = freshRepo("history-never-committed");
+  assert.equal(pathAlreadyTrackedInHistory(dir, "never/seen.txt"), false);
+});
+
+test("pathAlreadyTrackedInHistory: a committed path -> true (already tracked)", async () => {
+  const { pathAlreadyTrackedInHistory } = await implModule();
+  const { dir, git } = freshRepo("history-committed");
+  writeFileSync(join(dir, "tracked.txt"), "v1\n");
+  git("add", "tracked.txt");
+  git("commit", "-q", "-m", "add tracked.txt");
+  assert.equal(pathAlreadyTrackedInHistory(dir, "tracked.txt"), true);
+});
+
+test("pathAlreadyTrackedInHistory: a path committed then deleted -> still true (currently absent is not first appearance)", async () => {
+  const { pathAlreadyTrackedInHistory } = await implModule();
+  const { dir, git } = freshRepo("history-deleted");
+  writeFileSync(join(dir, "gone.txt"), "v1\n");
+  git("add", "gone.txt");
+  git("commit", "-q", "-m", "add gone.txt");
+  git("rm", "-q", "gone.txt");
+  git("commit", "-q", "-m", "remove gone.txt");
+  assert.equal(pathAlreadyTrackedInHistory(dir, "gone.txt"), true);
+});
+
 // ---- end-to-end: fail-closed branch -----------------------------------------------------
 
 test("installed hook impl: repository root unresolvable (invoked outside any git repo) -> BLOCK", () => {
@@ -143,13 +177,26 @@ test("installed hook impl: repository root unresolvable (invoked outside any git
 });
 
 // ---- end-to-end: a real `git commit` staging a protected path -----------------------------
+//
+// First-appearance exemption (PO decision, 2026-08-29, candidate (b) of the backlog item):
+// a protected path's VERY FIRST appearance anywhere in git history is exempt from this
+// hook's block, even with no consumed capability -- because onboarding's own scaffold
+// authoring writes gate-strength-protected files directly to disk via trusted code, and the
+// first real commit capturing that scaffold would otherwise be indistinguishable from an
+// untrusted bypass. Every "still blocked" test below therefore first commits the protected
+// path with SOME prior content (before the hook is installed, so the seed commit itself is
+// never gated) so the later re-write is genuinely a re-write of ALREADY-TRACKED history --
+// the exact property that must stay blocked.
 
-test("installed hook: staged gate-strength-protected path (pipeline.user.yaml, GS-1), no consumed capability -> commit refused", () => {
+test("installed hook: gate-strength-protected path (pipeline.user.yaml, GS-1) ALREADY tracked, re-write with no consumed capability -> commit refused", () => {
   const { dir, git } = freshRepo("e2e-gate-strength-block");
+  writeFileSync(join(dir, "pipeline.user.yaml"), "gates:\n  push_approval: signature\n");
+  git("add", "pipeline.user.yaml");
+  git("commit", "-q", "-m", "seed pipeline.user.yaml (no hook installed yet)");
   installHook(dir);
   writeFileSync(join(dir, "pipeline.user.yaml"), "gates:\n  push_approval: chat\n");
   git("add", "pipeline.user.yaml");
-  const { code, stderr } = commit(dir, "attempt gate-strength change");
+  const { code, stderr } = commit(dir, "attempt gate-strength re-write");
   assert.notEqual(code, 0);
   assert.match(stderr, /BLOCKED \(agent-pipeline pre-commit hook\)/);
   assert.match(stderr, /GS-1/);
@@ -159,34 +206,78 @@ test("installed hook: staged gate-strength-protected path (pipeline.user.yaml, G
   assert.match(stderr, /agent MUST NOT/);
 });
 
-test("installed hook: staged testpath-protected path, no consumed capability -> commit refused", () => {
+test("installed hook: gate-strength-protected path's FIRST appearance in git history, no consumed capability -> commit ALLOWED (first-appearance exemption)", () => {
+  const { dir, git } = freshRepo("e2e-gate-strength-first-appearance");
+  installHook(dir);
+  writeFileSync(join(dir, "pipeline.user.yaml"), "gates:\n  push_approval: chat\n");
+  git("add", "pipeline.user.yaml");
+  const { code, stderr } = commit(dir, "genesis write of pipeline.user.yaml");
+  assert.equal(code, 0, stderr);
+});
+
+test("installed hook: testpath-protected path ALREADY tracked, re-write with no consumed capability -> commit refused", () => {
   const { dir, git } = freshRepo("e2e-testpath-block");
   writeTestPathConfig(dir, [{ pattern: "protected-suite\\.test\\.mjs$", reason: "fixture protected suite", id: "TP-1" }]);
-  git("add", ".claude/guard-config.json");
-  git("commit", "-q", "-m", "seed guard-config");
+  writeFileSync(join(dir, "protected-suite.test.mjs"), "// original\n");
+  git("add", ".claude/guard-config.json", "protected-suite.test.mjs");
+  git("commit", "-q", "-m", "seed guard-config and protected suite (no hook installed yet)");
   installHook(dir);
   writeFileSync(join(dir, "protected-suite.test.mjs"), "// tampered\n");
   git("add", "protected-suite.test.mjs");
-  const { code, stderr } = commit(dir, "attempt test-path change");
+  const { code, stderr } = commit(dir, "attempt test-path re-write");
   assert.notEqual(code, 0);
   assert.match(stderr, /TP-1/);
   assert.match(stderr, /protected-suite\.test\.mjs/);
   assert.match(stderr, /fixture protected suite/);
 });
 
-test("installed hook: a spawned Node process writing directly to a protected path (never crossing any PreToolUse hook) is still refused at commit", () => {
-  // This is the backlog item's own reported gap, reproduced without any Edit/Write tool call:
-  // fs.writeFileSync from a plain spawned `node -e` process, exactly the shape the item names.
-  const { dir, git } = freshRepo("e2e-spawned-bypass");
+test("installed hook: testpath-protected path's FIRST appearance in git history, no consumed capability -> commit ALLOWED (first-appearance exemption)", () => {
+  const { dir, git } = freshRepo("e2e-testpath-first-appearance");
+  writeTestPathConfig(dir, [{ pattern: "protected-suite\\.test\\.mjs$", reason: "fixture protected suite", id: "TP-1" }]);
+  git("add", ".claude/guard-config.json");
+  git("commit", "-q", "-m", "seed guard-config");
+  installHook(dir);
+  writeFileSync(join(dir, "protected-suite.test.mjs"), "// genesis\n");
+  git("add", "protected-suite.test.mjs");
+  const { code, stderr } = commit(dir, "genesis write of protected-suite.test.mjs");
+  assert.equal(code, 0, stderr);
+});
+
+test("installed hook: a spawned Node process re-writing an ALREADY-COMMITTED protected path (never crossing any PreToolUse hook) is still refused at commit", () => {
+  // This is the backlog item's own reported repro shape verbatim: "an already-committed
+  // project/pipeline.json being bypass-written" -- the exact case the first-appearance
+  // exemption must NOT reopen. Reproduced without any Edit/Write tool call: fs.writeFileSync
+  // from a plain spawned `node -e` process, exactly the shape the item names.
+  const { dir, git } = freshRepo("e2e-spawned-bypass-already-tracked");
+  const target = join(dir, "project", "pipeline.json");
+  mkdirSync(join(dir, "project"), { recursive: true });
+  writeFileSync(target, "{}\n");
+  git("add", "project/pipeline.json");
+  git("commit", "-q", "-m", "seed project/pipeline.json (no hook installed yet)");
+  installHook(dir);
+  const bypass = spawnSync(process.execPath, ["-e", `require("fs").writeFileSync(${JSON.stringify(target)}, "{\\"tampered\\":true}\\n")`], { encoding: "utf8" });
+  assert.equal(bypass.status, 0, "the bypass write itself must succeed -- it never crosses any PreToolUse hook");
+  git("add", "project/pipeline.json");
+  const { code, stderr } = commit(dir, "attempt via spawned bypass against already-tracked content");
+  assert.notEqual(code, 0);
+  assert.match(stderr, /GS-10/);
+});
+
+test("installed hook: a spawned Node process CREATING a brand-new protected path (first appearance, never committed before) is exempt -- commit ALLOWED", () => {
+  // Documents the deliberate residual scope of the PO's chosen candidate: the first-appearance
+  // exemption is drawn on git history, not on the write mechanism, so a spawned-process bypass
+  // that creates a never-before-tracked protected path is exempt exactly like a normal
+  // Edit/Write-tool genesis write would be -- this is the accepted tradeoff (backlog item, "PO
+  // decision, 2026-08-29"), not an unnoticed gap.
+  const { dir, git } = freshRepo("e2e-spawned-bypass-first-appearance");
   installHook(dir);
   const target = join(dir, "project", "pipeline.json");
   mkdirSync(join(dir, "project"), { recursive: true });
   const bypass = spawnSync(process.execPath, ["-e", `require("fs").writeFileSync(${JSON.stringify(target)}, "{}\\n")`], { encoding: "utf8" });
-  assert.equal(bypass.status, 0, "the bypass write itself must succeed -- it never crosses any PreToolUse hook");
+  assert.equal(bypass.status, 0);
   git("add", "project/pipeline.json");
-  const { code, stderr } = commit(dir, "attempt via spawned bypass");
-  assert.notEqual(code, 0);
-  assert.match(stderr, /GS-10/);
+  const { code, stderr } = commit(dir, "genesis write via spawned bypass");
+  assert.equal(code, 0, stderr);
 });
 
 test("installed hook: staged path with a matching CONSUMED capability -> commit ALLOWED", () => {
