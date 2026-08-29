@@ -338,11 +338,18 @@ export function validPlanInvalidation(value) {
   return hasExactKeys(value, INVALIDATION_KEYS)
     && value.schema === PLAN_INVALIDATION_SCHEMA
     && isNonBlankString(value.featureId)
-    // NVA-R3-PRDBIND: nullable like invalidatedApprovalSha256 below -- the
-    // bound-unsubmitted-binding reason has no real submission to hash either.
-    // Purely additive: every existing writer (a real prior submission) still
-    // supplies a real hash, so this never accepts a previously-rejected value.
-    && (value.invalidatedSubmissionSha256 === null || SHA256.test(value.invalidatedSubmissionSha256))
+    // NVA-R3-PRDBIND: invalidatedSubmissionSha256 is nullable ONLY for the
+    // bound-unsubmitted-binding reason (reopenPlanDesign()'s fifth path),
+    // which has no real submission to hash. Every other writer (a real prior
+    // submission, reopenPlanDesign()'s main path) always supplies a real
+    // hash for this field -- coupling the null acceptance to the reason is
+    // what keeps this predicate from accepting a null submission hash under
+    // "reopen-design"/"document-drift", where a real submission always
+    // exists and a null would be a forged/incomplete record, not a
+    // legitimate one.
+    && (value.invalidatedSubmissionSha256 === null
+      ? value.reason === REOPEN_UNSUBMITTED_BINDING_REASON
+      : SHA256.test(value.invalidatedSubmissionSha256))
     && (value.invalidatedApprovalSha256 === null || SHA256.test(value.invalidatedApprovalSha256))
     && isNonBlankString(value.invalidatedBy)
     && isCanonicalIso(value.invalidatedAt)
