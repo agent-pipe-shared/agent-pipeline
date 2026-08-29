@@ -145,6 +145,14 @@ contains the materialInput/values text for a fixture card), which is real
 mechanical proof of the injection but not a substitute for an actual live
 Codex restart. That gap is recorded on the PO decisions list.
 
+**Landed, 2026-08-29:** commit `567be680`, independently re-verified by the
+Elephant (`codex-session-start-hint.test.mjs` 48/48 pass). **Item stays
+OPEN** -- per this item's own history (2 prior wrong closures on
+code-reading/unit-test evidence alone), do not close this until an actual
+live Codex CLI restart against this fix confirms the materialInput/values
+text really arrives in a real Codex session's context, not only in the
+hook's own unit-test harness.
+
 ## Triage
 
 - **Decision:** accepted, Nova A, PO-elevated priority ("riesen Thema")
