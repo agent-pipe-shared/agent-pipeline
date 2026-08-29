@@ -77,6 +77,28 @@ which is the gap all three instances fell into.
   The security-gate instance was invisible precisely because everything was measured in
   this repository's own checkout.
 
+## Progress, 2026-08-29 (dispatch NVA-W8-VERIFYREG2, landed by the Elephant, commit `e7a3f5a4`)
+
+`harness/scripts/check-product-capability-inventory.mjs` gained `discoverEntryPoints()`
+(derived from the established `Usage: node <path> ...` convention) and
+`checkEntryPointReachability()`, asserting both failure shapes mechanically. A
+consumer-shaped fixture (HAW-B02) degrades to zero findings, satisfying AC4. The three named
+instances (AC3) are each covered by a dedicated fixture test (HAW-B03/B04/B05).
+`check-product-capability-inventory.test.mjs`: 23/23 pass.
+
+Running the new check against this live repo surfaced two real, previously-unknown
+admitted-but-unnamed entry points (`runner-profile-migration-v3.mjs`,
+`v3-bootstrap-authority.mjs`) — filed separately as
+`2026-08-29-two-v3-scripts-are-admitted-but-unnamed.md` rather than guessed at inline, since
+naming them correctly needs real usage-scenario knowledge, not a mechanical fix. Tracked as
+an explicit, commented exception in the checker itself so the check stays load-bearing for
+every other entry point.
+
+**Not yet closing this item**: AC1 requires the check to be **Verify-registered**. It exists
+and passes standalone but is not yet wired into `harness/scripts/verify.mjs` — that
+registration is the remaining gap (tracked as part of NVA-R26, `harness/scripts/verify.mjs`
+TP-3 insertion work, not yet landed this session).
+
 ## Related
 
 - `2026-08-28-the-guided-driver-is-neither-discoverable-nor-runnable.md` — instance 1, and
