@@ -349,7 +349,7 @@
 | pipeline.pipeline-state-scripts-test-file-never-runs-in-full-verify | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.pipeline-user-yaml-file-level-protection-forces-signature-ceremony | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.plan-approval-binds-a-staging-draft-as-project-authority | open | defect | pipeline | 2026-08-27 | — |
-| pipeline.plan-approval-is-recorded-without-a-check-that-the-design-was-shown | open | defect | pipeline | 2026-08-29 | — |
+| pipeline.plan-approval-is-recorded-without-a-check-that-the-design-was-shown | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.plan-partial-authority-guard-allowlist-does-not-admit-its-own-profile-source-flags | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.plan-path-guidance-attached-to-unlike-causes | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.plan-result-publishes-no-next-action | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — five of seven builders fixed 2026-08-28 (NVA-D-PLANACTION, NVA-F-PROMOTIONACTION) and the guided init now reaches ready; NOT closed, because two builders still publish applyAction without nextAction |
@@ -549,8 +549,8 @@
 
 ## Counts
 
-- open: 93
+- open: 92
 - in_progress: 3
-- closed: 427
+- closed: 428
 - rejected: 3
 - deferred: 11
