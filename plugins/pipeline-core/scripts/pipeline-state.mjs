@@ -325,6 +325,7 @@ import {
   renameSync,
   statSync,
   unlinkSync,
+  writeFileSync,
   writeSync,
 } from "node:fs";
 import { createHash, createHmac, randomBytes, randomUUID } from "node:crypto";
@@ -825,6 +826,78 @@ function stateWriteSucceeded(result) {
 }
 
 /**
+ * Fixed, single-line marker embedding the machine's own current lifecycle
+ * phase (`project/pipeline-state.json`'s `activeFeature.phase`), mirroring
+ * `check-release-state-consistency.mjs`'s pattern: a machine-computed fact
+ * rendered as literal text a checker can find verbatim in `docs/state.md`,
+ * rather than a checker re-deriving prose from the state file itself.
+ *
+ * pipeline.state-phase-projection-atomicity
+ * (backlog/items/2026-08-29-docs-state-human-summary-diverges-from-machine-next-action.md):
+ * this marker is kept in sync by `syncStatePhaseMarker` below, called from
+ * `syncNextActionDocs` at every phase-affecting command's existing
+ * best-effort docs-resync point -- the same call sites that already resync
+ * "## Next action" -- so the marker cannot outlive the state write that
+ * produced it.
+ */
+export function statePhaseProjectionMarker(state) {
+  const feature = state?.activeFeature;
+  if (feature === null || feature === undefined || typeof feature.id !== "string" || typeof feature.phase !== "string") {
+    return "**Lifecycle phase:** no active feature";
+  }
+  return `**Lifecycle phase:** feature \`${feature.id}\` · phase \`${feature.phase}\``;
+}
+
+const STATE_PHASE_MARKER_PREFIX = "**Lifecycle phase:**";
+
+/**
+ * Insert-or-replace `markerLine` inside `markdown`. Replaces an existing
+ * marker line in place (found by its fixed prefix, wherever it sits); with
+ * none present, anchors a first insertion to the "## Next action" heading
+ * `syncStateMdNextAction` already maintains (the one section this repo's
+ * onboarding template guarantees exists in a project's `docs/state.md`).
+ * Returns `null` -- never guesses -- when neither an existing marker line
+ * nor that heading is found, so a caller can fail closed exactly like
+ * `replaceNextActionSection` does for the section it owns.
+ */
+function upsertStatePhaseMarkerLine(markdown, markerLine) {
+  const lines = markdown.split("\n");
+  const existingIndex = lines.findIndex((line) => line.startsWith(STATE_PHASE_MARKER_PREFIX));
+  if (existingIndex !== -1) {
+    if (lines[existingIndex] === markerLine) return markdown;
+    lines[existingIndex] = markerLine;
+    return lines.join("\n");
+  }
+  const headingIndex = lines.findIndex((line) => line.trim() === "## Next action");
+  if (headingIndex === -1) return null;
+  const insertAt = lines[headingIndex + 1] === "" ? headingIndex + 2 : headingIndex + 1;
+  lines.splice(insertAt, 0, markerLine, "");
+  return lines.join("\n");
+}
+
+/**
+ * Best-effort resync of the `statePhaseProjectionMarker` line in
+ * `docs/state.md`, called alongside `syncStateMdNextAction` below. Never
+ * throws itself (wrapped by its caller, `syncNextActionDocs`); reads the
+ * fixed `docs/state.md` path directly rather than resolving a project's
+ * configured handover path (see `syncStateMdNextAction`'s calibration
+ * lookup) -- a deliberate, disclosed simplification: this sync targets the
+ * common case, not every possible handover-path override.
+ */
+function syncStatePhaseMarker(dir, state) {
+  const path = join(dir, "docs/state.md");
+  let markdown;
+  try {
+    markdown = readFileSync(path, "utf8");
+  } catch {
+    return;
+  }
+  const updated = upsertStatePhaseMarkerLine(markdown, statePhaseProjectionMarker(state));
+  if (updated === null || updated === markdown) return;
+  writeFileSync(path, updated, "utf8");
+}
+
+/**
  * Best-effort resync of `docs/state.md`'s "## Next action" section after a
  * command has ALREADY committed its own State write (GF-090). This is
  * advisory, never authoritative: `syncStateMdNextAction` itself never
@@ -838,6 +911,11 @@ function syncNextActionDocs(dir, state) {
   } catch {
     // Docs sync is best-effort; the State write above is what already
     // succeeded and is what this command reports.
+  }
+  try {
+    syncStatePhaseMarker(dir, state);
+  } catch {
+    // Same best-effort contract as the "## Next action" resync above.
   }
 }
 

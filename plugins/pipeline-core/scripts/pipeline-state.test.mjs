@@ -22,7 +22,7 @@ import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 
 import { createCriticalActionApprovalRequest, criticalActionSubjectSha256 } from "../lib/critical-action-approval-request.mjs";
-import { SCHEMA_ID, continuityLockPath, externalPathIsOutsideRoot, run, statePath } from "./pipeline-state.mjs";
+import { SCHEMA_ID, continuityLockPath, externalPathIsOutsideRoot, run, statePath, statePhaseProjectionMarker } from "./pipeline-state.mjs";
 import { INTAKE_STAGING_DIRNAME } from "../lib/onboarding-continuity.mjs";
 import {
   PLAN_AUTHORITY_PROMOTION_SUBCOMMAND,
@@ -1017,6 +1017,24 @@ function awaitingApprovalFixture() {
   const blankBy = `'${process.execPath}' '${fileURLToPath(new URL("./pipeline-state.mjs", import.meta.url))}' approve-plan --by ''`;
   assert.equal(isSanctionedLifecycleCommand(blankBy, root), false,
     "an unattributed approve-plan must stay refused by the same guard");
+}
+
+// NVA-R31-STATEPHASEDRIFT (pipeline.state-phase-projection-atomicity):
+// set-feature's existing best-effort docs resync must also write the
+// statePhaseProjectionMarker() line into docs/state.md, atomically with the
+// state file it derives from -- not leave the marker for a separate manual
+// step that can lag behind. check-state-phase-consistency.test.mjs covers
+// the checker end to end; this pins the emission point in pipeline-state.mjs
+// itself, at the smallest single transition (set-feature, phase="design").
+{
+  const root = mktempProjectDir();
+  mkdirSync(join(root, "docs"), { recursive: true });
+  writeFileSync(join(root, "docs/state.md"), "# Project state\n\n## Next action\n\nplaceholder\n");
+  const code = run(["set-feature", "--id", "marker-check", "--plan-path", "specs/marker-check/prd.md"], { dir: root, now: () => now });
+  assert.equal(code, 0);
+  const handover = readFileSync(join(root, "docs/state.md"), "utf8");
+  const expectedMarker = statePhaseProjectionMarker({ activeFeature: { id: "marker-check", phase: "design" } });
+  assert.ok(handover.includes(expectedMarker), `docs/state.md must carry the marker verbatim; got:\n${handover}`);
 }
 
 console.log("pipeline-state.test.mjs (CB-1a): all checks passed");
