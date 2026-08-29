@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "d78871b46fbc507ab576ae268cba7b78ff9824870ebd799738b201df549ca3b8"
+    "transitionHead": "db082534e65df7d37c9e499c092c3861f1ee1ae1b1379e2b75d43a2807480ce7"
   },
   "counts": {
-    "open": 91,
+    "open": 90,
     "in_progress": 3,
-    "closed": 430,
+    "closed": 431,
     "rejected": 3,
     "deferred": 11
   },
@@ -3701,7 +3701,7 @@
       "owner": "pipeline",
       "created": "2026-08-29",
       "source": "PO judgment plus Claude/Windows audit section 3.1 from the 2026-08-29 three-runner greenfield test (finding F30 of scratch/greenfield-triage-2026-08-29.md), Antigravity/WSL run.",
-      "deferred": false
+      "deferred": true
     },
     {
       "id": "pipeline.no-gate-is-tested-end-to-end-for-satisfiability",
@@ -3926,13 +3926,17 @@
     },
     {
       "id": "pipeline.onboarding-must-bootstrap-the-trust-anchor-once",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-28",
       "source": "Greenfield happy-path test of candidate 0.6.0 across all three runners, 2026-08-28. Independent self-analyses: Claude/Windows (docs/pipeline-haertungstest-und-analyse.md), Agy/WSL (pipeline-analysis.md), Codex/WSL (docs/pipeline-session-analysis-2026-08-28.md), plus the PO's own cross-run observations.",
       "deferred": false,
-      "tracking": "NOW / Nova A — happy-path blocking: its absence deadlocked the first human override in the Claude run and cost a live PO signature; PO asked for this explicitly"
+      "tracking": "NOW / Nova A — happy-path blocking: its absence deadlocked the first human override in the Claude run and cost a live PO signature; PO asked for this explicitly",
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "180d427a",
+      "closureEvidence": "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs"
     },
     {
       "id": "pipeline.onboarding-must-elicit-the-real-verify-contract",
