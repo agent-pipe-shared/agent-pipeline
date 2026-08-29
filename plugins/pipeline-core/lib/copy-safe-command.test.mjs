@@ -17,7 +17,7 @@ import { spawnSync } from "node:child_process";
 import test from "node:test";
 
 import { boundedOpaqueCopyCommand as libBoundedOpaqueCopyCommand, renderProjectOnboardingAction } from "./project-onboarding-v3.mjs";
-import { boundedCopySafeCommand, boundedOpaqueCopyCommand, placeholder } from "./copy-safe-command.mjs";
+import { boundedCopySafeCommand, boundedOpaqueCopyCommand, forcedQuote, placeholder } from "./copy-safe-command.mjs";
 
 test("boundedOpaqueCopyCommand is re-exported unchanged -- the same function object project-onboarding-v3.mjs already exported, not a reimplementation", () => {
   assert.strictEqual(boundedOpaqueCopyCommand, libBoundedOpaqueCopyCommand);
@@ -258,4 +258,84 @@ test("NVA-CF-COPYSAFE: a JSON.stringify()'d path containing $, a backtick, or $(
   assert.equal(tokens.pop(), "");
   assert.deepEqual(tokens, built.argv,
     "the dangerous path must round-trip through the bounded copy-safe rendering unexpanded/unsubstituted");
+});
+
+/**
+ * NVA-CF-FORCEDQUOTE: the opt-in forced-quoting mode. codex-pretool-guard.mjs's
+ * own test suite hard-pins `--repo "<path>"`-shaped exact double-quoted text,
+ * which shellWord()'s conditional bare/single-quote choice cannot reproduce
+ * for an ordinary path (shellWord() renders it bare). forcedQuote() forces the
+ * double-quote character for that one argv entry without touching any other
+ * entry's rendering, and without touching the default (no-forcedQuote) path.
+ */
+test("forcedQuote() requires a non-empty string", () => {
+  assert.throws(() => forcedQuote(""), /non-empty string/u);
+  assert.throws(() => forcedQuote(42), /non-empty string/u);
+  assert.throws(() => forcedQuote(), /non-empty string/u);
+});
+
+test("forcedQuote() forces double-quoting for its own argv entry while ordinary entries render exactly as shellWord() would", () => {
+  const built = boundedCopySafeCommand({
+    executable: "node",
+    argv: ["script.mjs", "--repo", forcedQuote("/some/root"), "--request-sha256", "a".repeat(64)],
+  });
+  // Byte-identical to the pre-NVA-CF-COPYSAFE convention this mode restores for its
+  // one forced entry: `JSON.stringify("/some/root")` === '"/some/root"'.
+  assert.ok(built.command.includes('--repo "/some/root"'), built.command);
+  // The unforced request-sha256 value still renders bare, exactly as shellWord() alone would.
+  assert.ok(built.command.includes(`--request-sha256 ${"a".repeat(64)}`), built.command);
+  assert.ok(!built.command.includes(`'${"a".repeat(64)}'`), built.command);
+  // The returned argv resolves forcedQuote() entries to their plain (unquoted) text.
+  assert.deepEqual(built.argv, ["script.mjs", "--repo", "/some/root", "--request-sha256", "a".repeat(64)]);
+});
+
+test("forcedQuote() differs from shellWord()'s own choice for the same ordinary value -- proving the mode actually forces the quote character", () => {
+  const asForced = boundedCopySafeCommand({ executable: "node", argv: ["script.mjs", "--repo", forcedQuote("/some/root")] });
+  const asOrdinary = boundedCopySafeCommand({ executable: "node", argv: ["script.mjs", "--repo", "/some/root"] });
+  assert.ok(asForced.command.includes('--repo "/some/root"'), asForced.command);
+  assert.ok(asOrdinary.command.includes("--repo /some/root"), asOrdinary.command);
+  assert.notEqual(asForced.command, asOrdinary.command);
+});
+
+test("boundedCopySafeCommand with no placeholder() and no forcedQuote() entries stays byte-identical to before either mode existed", () => {
+  const argvWithForcedElsewhere = boundedCopySafeCommand({ executable: "node", argv: fixtureArgv() });
+  assert.equal(argvWithForcedElsewhere.command, renderProjectOnboardingAction({ kind: "command", executable: "node", argv: fixtureArgv() }));
+});
+
+test("forcedQuote() and placeholder() may be combined in the same command, each rendering through its own rule", () => {
+  const built = boundedCopySafeCommand({
+    executable: "node",
+    argv: ["script.mjs", "--repo", forcedQuote("/some/root"), "--plan-sha256", placeholder("<plan-sha256>")],
+  });
+  assert.ok(built.command.includes('--repo "/some/root"'), built.command);
+  assert.ok(built.command.includes("--plan-sha256 <plan-sha256>"), built.command);
+  assert.deepEqual(built.argv, ["script.mjs", "--repo", "/some/root", "--plan-sha256", "<plan-sha256>"]);
+});
+
+test("forcedQuote() escapes $, a backtick and a double quote inside its forced quoting -- it never reintroduces the verbatim-JSON.stringify() shell-injection class placeholder()'s own fix closed", () => {
+  const dangerousPath = "/repo/$HOME/`id`/\"quoted\"/end";
+  const built = boundedCopySafeCommand({
+    executable: "node",
+    argv: ["/plugin/scripts/guard-human-override.mjs", "plan", "--repo", forcedQuote(dangerousPath), "--request-sha256", "a".repeat(64)],
+  });
+  assert.deepEqual(built.argv, ["/plugin/scripts/guard-human-override.mjs", "plan", "--repo", dangerousPath, "--request-sha256", "a".repeat(64)]);
+  // The rendered command must never contain the dangerous path with its "$"/backtick/quote live and unescaped.
+  assert.ok(!built.command.includes(`"${dangerousPath}"`), built.command);
+  if (process.platform === "win32") return;
+  assert.ok(built.copyCommand.posix, "posix rendering must succeed for this input");
+  const lines = built.copyCommand.posix.split("\n");
+  assert.equal(lines.at(-1), 'eval "$CMD"');
+  const assignments = lines.slice(0, -1).join("\n");
+  const script = `node() { printf '%s\\0' "$@"; }\n${assignments}\neval "$CMD"`;
+  const probe = spawnSync("bash", ["-c", script], { encoding: "utf8" });
+  assert.equal(probe.status, 0, probe.stderr);
+  const tokens = probe.stdout.split("\0");
+  assert.equal(tokens.pop(), "");
+  assert.deepEqual(tokens, built.argv,
+    "the dangerous path must round-trip through the forced-quote rendering unexpanded/unsubstituted");
+});
+
+test("boundedCopySafeCommand refuses an argv entry that is neither a string, a placeholder(), nor a forcedQuote() value", () => {
+  assert.throws(() => boundedCopySafeCommand({ executable: "node", argv: ["a", {}] }), /non-empty argv/u);
+  assert.throws(() => boundedCopySafeCommand({ executable: "node", argv: ["a", null] }), /non-empty argv/u);
 });
