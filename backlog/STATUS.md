@@ -137,7 +137,7 @@
 | pipeline.cross-repository-redirect-eligibility-does-not-consult-the-sensitive-path-boundary | closed | defect | pipeline | 2026-08-12 | — |
 | pipeline.dead-key-directory-pointer-is-permanent-and-silent | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — happy-path blocking at the last touch: on a machine that HAS a valid PO key, a freshly onboarded project still gets no trust anchor, so the signature push the PO is asked to perform is functionless. |
 | pipeline.decouple-hosted-project-document-language-from-operator-facing-language | closed | workflow-improvement | pipeline | 2026-08-09 | — |
-| pipeline.delivery-is-not-always-a-git-push | open | workflow-improvement | pipeline | 2026-08-28 | Backlog / someday — PO-raised 2026-08-28; not blocking the Nova candidate, but it decides whether the release model fits a whole class of the PO's repositories |
+| pipeline.delivery-is-not-always-a-git-push | open | workflow-improvement | pipeline | 2026-08-28 | Batman (PO decision 2026-08-29) — gate model extension to cover non-agent-invoked deploys, scheduled for Batman, not blocking the Nova/0.6.0 candidate |
 | pipeline.design-to-implementation-path-has-no-driver | open | workflow-improvement | pipeline | 2026-08-28 | Nova B — PO-raised 2026-08-28: the next path complex enough to need a driver. Ranked BEHIND the push driver, for the reason stated below. |
 | pipeline.discarded-feature-dead-end | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — delivered 2026-08-28, same session it was reported |
 | pipeline.dispatch-evidence-record-shape-not-enforced-beyond-taskid-and-outcome | closed | workflow-improvement | pipeline | 2026-08-29 | — |
@@ -288,7 +288,7 @@
 | pipeline.managed-onboarding-repair-item-sha256-pin-blocks-its-own-triage-edits | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.managed-onboarding-success-contract | deferred | workflow-improvement | pipeline | 2026-07-25 | — |
 | pipeline.mandatory-verify-gate-has-no-path-for-a-project-with-no-tests-yet | open | defect | pipeline | 2026-08-29 | — |
-| pipeline.manifest-language-repair-demands-a-full-process-restart | open | defect | pipeline | 2026-08-29 | — |
+| pipeline.manifest-language-repair-demands-a-full-process-restart | open | defect | pipeline | 2026-08-29 | Nova B (PO decision 2026-08-29) — low-severity UX friction, current restart-on-repair behavior is safe; investigate later, not a 0.6.0 blocker |
 | pipeline.manifest-repair-paths-are-hardcoded-to-runners-default-codex | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.marketplace-install-topology-unattested | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.material-intake-bootstrap-bind-has-no-sanctioned-path-to-a-passing-plan-gate | closed | defect | pipeline | 2026-08-19 | — |
@@ -411,7 +411,7 @@
 | pipeline.quote-style-fragility-in-shell-command-admission | open | defect | pipeline | 2026-08-29 | — |
 | pipeline.raw-apply_patch-is-unconditionally-admitted-by-the-outer-lifecycle-gate | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.read-scope-guard-admits-single-command-but-blocks-the-piped-form | closed | defect | pipeline | 2026-08-29 | — |
-| pipeline.readiness-guard-blocks-its-own-recovery | open | defect | pipeline | 2026-08-28 | NOW / Nova A — a guard that refuses the exact command its own refusal prescribes is a deadlock, and it fired twice in one consumer session |
+| pipeline.readiness-guard-blocks-its-own-recovery | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — a guard that refuses the exact command its own refusal prescribes is a deadlock, and it fired twice in one consumer session |
 | pipeline.readonly-and-chain-grep-pipe-trailing-stage-not-implemented | closed | requirement | pipeline | 2026-08-19 | — |
 | pipeline.readonly-command-guard-classification | closed | workflow-improvement | pipeline | 2026-07-26 | — |
 | pipeline.ready-gate-env-var-runner-authority | closed | defect | pipeline | 2026-08-05 | — |
@@ -512,7 +512,7 @@
 | pipeline.two-minor-happy-path-retries-in-the-final-codex-run | open | workflow-improvement | pipeline | 2026-08-09 | — |
 | pipeline.two-more-critic-preimage-pins-surfaced-by-the-accumulate-fix | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.two-signature-ceremonies-overwrite-each-others-proof | open | defect | pipeline | 2026-08-28 | — |
-| pipeline.undocumented-transcript-fallback-selects-wrong-file-by-mtime | open | defect | pipeline | 2026-08-29 | — |
+| pipeline.undocumented-transcript-fallback-selects-wrong-file-by-mtime | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.unenforced-process-rules-vary-by-runner | open | defect | pipeline | 2026-08-28 | Nova B |
 | pipeline.unified-human-authorization-ux | closed | workflow-improvement | pipeline | 2026-08-02 | Current CYB-4 helper is a compatible first adapter only; no programme-wide migration or closure is claimed. |
 | pipeline.universal-human-command-renderer | closed | workflow-improvement | pipeline | 2026-08-18 | — |
@@ -549,8 +549,8 @@
 
 ## Counts
 
-- open: 97
+- open: 95
 - in_progress: 3
-- closed: 423
+- closed: 425
 - rejected: 3
 - deferred: 11
