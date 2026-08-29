@@ -3,12 +3,16 @@ schema: pipeline.backlog-item.v1
 id: pipeline.phoenix-merge-re-critic-minor-findings
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-27
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: b774f74b
+closure_evidence: plugins/pipeline-core/hooks/guard-push.test.mjs, plugins/pipeline-core/scripts/check-backlog-state.test.mjs
 sprint: nova
 tracking: "Reassigned from phoenix to nova on 2026-08-28 by PO decision, after the Phoenix line was intaked into Nova"
 source: "Re-Critic (delta) on the Phoenix-merge rework diff 290bd599..eeebeed5, PASS with three minor findings, 2026-08-27"
-done_when: contains plugins/pipeline-core/hooks/guard-push.test.mjs resolveImplicitPushDestination
+done_when: contains plugins/pipeline-core/hooks/guard-push.test.mjs PG12s16
 ---
 
 # Three minor findings from the Phoenix-merge re-Critic, recorded rather than fixed in-cycle
@@ -72,3 +76,36 @@ neither the new refusals nor the widened admission is pinned.
 - **Decision:** open, unassigned. F1 first — it is a wording fix to a security
   contract and the cheapest of the three. F2 and F3 are test-coverage gaps on
   behaviour verified to fail closed as written.
+
+## Closure, 2026-08-29
+
+All three findings were already fixed by an earlier, differently-named
+dispatch (`NVA-PHXMINOR-1`, 2026-08-27/28) before this item was ever
+re-triaged this session — this item's own `status`/Triage were simply never
+updated to reflect it. Found by dispatch `NVA-R14-PHOENIXCRITIC`, which
+stopped and reported honestly instead of re-doing already-green work, then
+independently confirmed by the dispatcher against `git log`:
+
+- **F1** (`.gitleaks.toml`/`backlog/README.md` wording): fixed in `c478c648`
+  ("correct overstated pin scope in the Phoenix-history exemption comments").
+- **F2** (`checkPhoenixHistoryImmutable` fixture coverage): fixed in
+  `7c4c5fc6`; `check-backlog-state.test.mjs` carries `CBS11`/`CBS12`/`CBS13`,
+  covering the absent-path stand-down, the drift-detected block, and the
+  matching-bytes hold — confirmed present by name.
+- **F3** (`resolveImplicitPushDestination` behavior coverage): fixed in
+  `b774f74b`; `guard-push.test.mjs` carries `PG12s16`–`PG12s20`, covering the
+  attested bare-push admission, the tag-collision refusal, the no-local-
+  branch refusal, the configured-refspec refusal, and the unattested-
+  resolution control — confirmed present by name, 168/168 passing.
+
+The original `done_when` predicate (`contains guard-push.test.mjs
+resolveImplicitPushDestination`) never matched, because the real coverage
+tests the behavior through `evaluateGuardPush`'s argv-shape scenarios rather
+than naming the function literally in a comment or string — a measurement
+gap, not a substance gap. Repointed to `PG12s16`, the actual first test name
+of the F3 coverage block, which is genuinely present.
+
+**Lesson for future dispatches on this backlog:** re-verify a "still open"
+claim against `git log` for the affected files before dispatching work on
+it, not only against the item's own `status:` field — this item's `status`
+had drifted stale relative to the code for at least a day.
