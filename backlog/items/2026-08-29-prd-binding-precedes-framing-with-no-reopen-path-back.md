@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.prd-binding-precedes-framing-with-no-reopen-path-back
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-29
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: eb157d2c859e4d22bbb847742e58ceaa4fe10f92
+closure_evidence: plugins/pipeline-core/lib/plan-spec-state-v2.test.mjs
 sprint: nova
 done_when: contains plugins/pipeline-core/lib/plan-spec-state-v2.mjs pipeline.reopen-bound-unsubmitted-prd
 source: "Claude/Windows self-audit report (docs/pipeline-audit-claude-session.md, sections 2 and 3.2), observed during the 2026-08-29 three-runner greenfield test. Claude had no way back from this state; Codex succeeded only because it happened to author framing before binding occurred."

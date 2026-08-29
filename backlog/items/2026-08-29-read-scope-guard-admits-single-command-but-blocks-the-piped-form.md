@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.read-scope-guard-admits-single-command-but-blocks-the-piped-form
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-29
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: 9639d91ee78f42ca0fbe6c3a424321a9d3c492d8
+closure_evidence: plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
 sprint: nova
 done_when: contains plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs pipeline.read-scope-single-command-root-check
 source: "Codex hardening test during the 2026-08-29 three-runner greenfield test, reported inline in chat by the PO (Codex could not persist its own report — see the separate F21/F23 findings)."
