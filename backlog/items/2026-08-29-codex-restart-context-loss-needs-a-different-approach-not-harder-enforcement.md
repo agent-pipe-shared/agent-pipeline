@@ -78,6 +78,73 @@ its implementation.
 - The fix, once verified, becomes permanent regression coverage exercising
   the ACTUAL Codex restart path, not a generic runner-neutral stand-in.
 
+## Root cause found, 2026-08-29 (Elephant, live code tracing -- not closing the item)
+
+Traced the actual invocation graph rather than re-reading the same files that
+produced the two prior (still-wrong) closures. Findings, each confirmed by
+reading the exact line, not inferred:
+
+1. **The mechanical delivery point exists and does fire for Codex.**
+   `hooks/codex-session-start-hint.mjs` is wired into `codex-hooks.json`'s
+   `SessionStart` matcher (`startup|resume|clear`) and injects text into the
+   session's context UNBIDDEN via `hookSpecificOutput.additionalContext` --
+   confirmed by its own NVA-BL-72 comment: "the one place in this codebase
+   that delivers text INTO a session's context unbidden... the strongest
+   available meaning of 'mandatory' here, since no code can force an LLM to
+   attend to a field it was merely permitted to fetch." So question 1 from
+   this item's own Direction section is answered: yes, the bootstrap path
+   invokes it, on every startup/resume/clear, mechanically.
+2. **But it only surfaces the DISTILLED resume-hint card, never the verbatim
+   `materialInput`/answered `values`.** Its `resumeHintContextLines()` calls
+   `lib/resume-hint.mjs`'s `inspectResumeHint()` directly and destructures
+   only `{ intent, scope, constraints, questions, progress }` from
+   `hint.context`. `materialInput` (the user's own verbatim design input,
+   captured specifically to survive a restart per SKILL.md step 6) and
+   `values` (already-answered onboarding input) are never read or emitted --
+   confirmed by `grep -rln materialInput plugins/pipeline-core/hooks` finding
+   ZERO hook files, including this one.
+3. **A fix for exactly this gap already exists -- on a DIFFERENT code path
+   that the mechanical hook never reuses.** `scripts/resume-hint.mjs`'s CLI
+   `inspect` command (NOT the library function of the same underlying data)
+   was already extended (marker `NVA-RESUMEVERBATIM-1`) to read
+   `readOnboardingIntakeCheckpoint()`/`readOnboardingIntakeMaterialInput()`
+   from `lib/onboarding-continuity.mjs` and merge `intakeCheckpoint.values`/
+   `intakeCheckpoint.materialInput` into its JSON output, with the explicit
+   stated intent "surfaced here so the ONE existing MUST-DO consumption step
+   (SKILL.md step 6) reads both in the same turn, instead of the runner
+   re-asking a value the checkpoint already answered." That fix landed for
+   the MANUAL path (an agent choosing to run `resume-hint.mjs inspect` and
+   read its JSON) but was never propagated to `codex-session-start-hint.mjs`,
+   the one path that does not depend on the agent choosing to do anything.
+4. **This precisely explains the PO's own symptom description** ("Der
+   Resume-Hinweis war gegenüber dem früheren Designinput deutlich
+   verdichtet" -- the resume hint was noticeably condensed vs. the earlier
+   design input): the mechanically-injected context structurally CANNOT
+   contain the verbatim design input, because the one hook that injects
+   content unbidden was never wired to the storage location that fix
+   NVA-RESUMEVERBATIM-1 added.
+5. **Claude Code has no equivalent mechanical hook at all** --
+   `hooks.json` wires no session-start-hint-shaped hook comparable to
+   `codex-session-start-hint.mjs`; `post-compact-reground.mjs` is `compact`-
+   matcher only, not `startup|resume|clear`. Whether Claude Code's own
+   restart flow needs the same mechanical treatment is a SEPARATE, larger
+   question (a new TP-4-protected `hooks.json` entry) -- filed as its own
+   item, not bundled into this fix, since the PO's own escalation was
+   Codex-specific ("das kann codex so einfach nie sauber verarbeiten").
+
+This is a scoped, mechanically-verified defect with a narrow, testable fix
+shape (extend `resumeHintContextLines()` in `codex-session-start-hint.mjs`
+to also read and surface `readOnboardingIntakeCheckpoint()`/
+`readOnboardingIntakeMaterialInput()`, mirroring what NVA-RESUMEVERBATIM-1
+already did for the CLI path) -- dispatched as NVA-CF-RESUMEVERBATIM-HOOK.
+**This does NOT by itself satisfy this item's acceptance criteria** -- a
+literal live Codex-CLI-restart reproduction is still outside what a
+Claude-Code-hosted session can execute directly; the fix is proven via the
+hook's own unit-test contract (its stdout `additionalContext` actually
+contains the materialInput/values text for a fixture card), which is real
+mechanical proof of the injection but not a substitute for an actual live
+Codex restart. That gap is recorded on the PO decisions list.
+
 ## Triage
 
 - **Decision:** accepted, Nova A, PO-elevated priority ("riesen Thema")
