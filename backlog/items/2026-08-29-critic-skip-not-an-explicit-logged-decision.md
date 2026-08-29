@@ -62,6 +62,16 @@ never an unlabeled blank. Add a marker
   light-profile work) are not retroactively flagged once this lands; the
   requirement is forward-looking.
 
+## Progress note
+
+Fixed, 2026-08-29 (dispatch NVA-R21-CRITICSKIP): added an optional
+`criticSkip` field to the dispatch-record shape, the marker
+`pipeline.critic-skip-decision-logged` in `harness/review-protocol.md`
+§2.1, and `plugins/pipeline-core/lib/critic-skip-decision.mjs` (pure,
+tested coverage-evaluation functions, not wired into a Verify suite —
+that wiring is disclosed as a smaller follow-up). Left `status: open`
+and `done_when` untouched for the Elephant to verify and close.
+
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
 - **Decision:** accepted
