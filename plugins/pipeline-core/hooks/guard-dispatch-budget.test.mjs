@@ -87,9 +87,23 @@ test("subagentIdentity: a present but relative transcript_path is a distinct kin
   assert.equal(identity.reason, "transcript-path-present-but-not-absolute");
 });
 
-test("subagentIdentity: a present but non-string transcript_path is also invalid-identity, not unresolved", () => {
+test("subagentIdentity: a present but non-string, non-null transcript_path is invalid-identity, not unresolved", () => {
   assert.equal(subagentIdentity({ transcript_path: 12345 }, {}).kind, "invalid-identity");
-  assert.equal(subagentIdentity({ transcript_path: null }, {}).kind, "invalid-identity");
+});
+
+// NVA-CF-NULLTID (2026-08-29): a JSON-serialized `transcript_path: null` (a
+// host that emits null rather than omitting the key) is a legitimate
+// "absent" encoding -- it must route the same as undefined/blank-string
+// into the fail-OPEN "unresolved" lane, never the fail-CLOSED
+// "invalid-identity" lane. Before this fix it landed in "invalid-identity"
+// with the fixed sentinel agentId, which guard-lifecycle-ready.mjs's
+// bootstrap-receipt gate can never clear (no receipt is ever written for a
+// non-"subagent" kind), permanently blocking every Edit/Write/NotebookEdit
+// for that session with no recovery route.
+test("subagentIdentity: a null transcript_path is unresolved (treated as absent), not invalid-identity", () => {
+  const identity = subagentIdentity({ transcript_path: null }, {});
+  assert.equal(identity.kind, "unresolved");
+  assert.equal(identity.reason, "transcript-path-missing-or-relative");
 });
 
 test("evaluateDispatchBudgetGuard: an invalid-identity (present-but-relative transcript_path) call still fails open here, unaffected -- this guard's own documented fail-open-but-visible posture is unchanged by the new kind", () => {
