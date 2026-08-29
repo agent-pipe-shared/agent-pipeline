@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.gg-22s-own-remediation-order-creates-unclearable-ledger-debt
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-29
 sprint: nova
 done_when: contains plugins/pipeline-core/hooks/guard-git.test.mjs GG22-7
@@ -150,3 +150,13 @@ text fix was real — the same graduation pattern seen elsewhere this
 session. Repointed to `contains guard-git.test.mjs GG22-7`, the drafted
 test's own name, which will genuinely go from absent to present once the
 ceremony clears and the tests land.
+
+Landed, 2026-08-29 (dispatch NVA-CF-GG22APPLY): the GG22-7/GG22-8 fixture
+tests are committed (`794fa619`), via the same sanctioned operator route
+already established for other TP-1/TP-3/TP-6/TP-8 protected-path edits —
+`harness/scripts/apply-pending-protected-edits.mjs`, extended with a new
+step F (`stepGuardGit22`, `--only=guard-git-22`) mirroring the existing
+`stepGuardGitCwd`'s anchored-replace/preview/dry-run/writeThenVerifyOrRevert
+scaffolding. `node plugins/pipeline-core/hooks/guard-git.test.mjs` confirms
+232/232 cases passed (230 existing + GG22-7 + GG22-8). `done_when` is now
+satisfied. Status closed.
