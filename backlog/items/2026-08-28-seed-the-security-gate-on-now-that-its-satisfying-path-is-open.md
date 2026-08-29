@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-28
 sprint: nova
+done_when: "contains plugins/pipeline-core/lib/project-onboarding-v3.mjs security: \"blocking\", claude_md_max_lines: 200"
 tracking: "NOW / Nova A — PO decision 2026-08-28 stands, but BLOCKED: the measurement below was taken in this repository's own checkout, the one place the consumer-side defect does not fire. See 'Correction' before implementing."
 source: "Measured 2026-08-28 against a genuinely fresh onboarded project at HEAD a304195d. Measured, not assumed — the same standard the original `off` decision was held to."
 ---

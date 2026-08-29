@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-28
 sprint: nova
+done_when: manual
 tracking: "NOW / Nova A — happy-path blocking, and the most severe finding of the day: a correctly-signed push cannot land in ANY consumer deployment. Also blocks the security-gate-ON decision, whose measurement was taken in the one environment where this defect does not fire."
 source: "Consumer project HA, session 56 (2026-08-28, Windows). The PO explicitly chose the signature route, the ceremony ran correctly end to end, the PO signed -- and the push still could not land. All three mechanisms below were then verified in this repository's own code before filing."
 ---

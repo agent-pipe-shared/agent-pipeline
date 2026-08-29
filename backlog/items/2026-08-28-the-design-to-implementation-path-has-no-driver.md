@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-28
 sprint: nova
+done_when: manual
 tracking: "Nova B — PO-raised 2026-08-28: the next path complex enough to need a driver. Ranked BEHIND the push driver, for the reason stated below."
 source: "PO request 2026-08-28. Scope established by reading what onboarding-init.mjs drives (project-onboarding-v3.mjs's subcommand table only) against where the design-to-implementation transition actually lives (pipeline-state.mjs)."
 ---

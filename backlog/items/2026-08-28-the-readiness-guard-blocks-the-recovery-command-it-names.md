@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-28
 sprint: nova
+done_when: manual
 tracking: "NOW / Nova A — a guard that refuses the exact command its own refusal prescribes is a deadlock, and it fired twice in one consumer session"
 source: "Consumer project HA, incident report S56 finding B3 (2026-08-28, Windows, Claude runner). The denial text is quoted from the report; the guard's own admission logic has not yet been re-read against it here."
 ---

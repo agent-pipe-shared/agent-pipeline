@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-28
 sprint: nova
+done_when: manual
 tracking: "Nova B — a silent divergence between two files that are meant to project the same authority; a consumer cannot judge it, and neither can this report"
 source: "Consumer project HA, incident report S56 side finding (2026-08-28). Observed, not diagnosed: neither the consumer nor this item has established which value is correct."
 ---
