@@ -217,6 +217,143 @@ export function discoverSurfaces(root) {
   return ordered;
 }
 
+// ---------------------------------------------------------------------------
+// NVA-W8-VERIFYREG2 (backlog pipeline.nothing-checks-that-a-capability-is-reachable):
+// entry-point reachability. Two properties, checked mechanically for every DERIVED
+// agent-facing entry point:
+//   - named: something an agent actually reads (a skill body, or a guard's own
+//     source -- where refusal text and sanctioned-invocation lists live) mentions it.
+//   - admitted: guard-lifecycle-ready.mjs's OWN source -- the file that decides whether
+//     a Bash invocation is refused before the session reaches "ready" -- mentions it,
+//     i.e. it has an explicit admission rule rather than falling through to the generic
+//     not-ready refusal every other command gets.
+// The enumeration is DERIVED, never a hand-maintained list of "the three known
+// instances": every entry point in ENTRY_POINT_DIRS that documents its own invocation
+// with this codebase's own established `Usage: node <path> ...` convention (already
+// used by 20+ scripts, e.g. onboarding-init.mjs, push-gate-satisfiability.mjs,
+// pipeline-state.mjs) enters the check automatically. A script that adopts the same
+// convention later needs no second edit anywhere else -- the exact failure mode the v3
+// note above documents for the surface array this file used to hand-maintain.
+const ENTRY_POINT_DIRS = ["plugins/pipeline-core/scripts", "harness/scripts"];
+
+// Tracked, not silent: these two entry points are real admitted-but-unnamed findings this
+// check surfaced against the live repo on first landing (2026-08-29). Naming them correctly
+// needs a real understanding of when an agent should invoke each directly, which is design
+// work, not a mechanical fix -- filed as
+// backlog/items/2026-08-29-two-v3-scripts-are-admitted-but-unnamed.md. This allowlist covers
+// only these two exact basenames; it does not exempt any future entry point, so the check
+// stays load-bearing for everything else.
+const KNOWN_UNREACHABLE_ENTRY_POINTS = new Set(["runner-profile-migration-v3", "v3-bootstrap-authority"]);
+const USAGE_MARKER = "Usage: node ";
+const LIFECYCLE_GUARD_PATH = "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs";
+
+/** Every non-test .mjs entry point under ENTRY_POINT_DIRS that documents its own CLI
+ * invocation with the established `Usage: node ...` convention. */
+export function discoverEntryPoints(root) {
+  const found = [];
+  for (const dir of ENTRY_POINT_DIRS) {
+    for (const path of walkFiles(root, dir, (item) => item.endsWith(".mjs") && !item.endsWith(".test.mjs"))) {
+      const source = readFileSync(join(root, path), "utf8");
+      if (!source.includes(USAGE_MARKER)) continue;
+      const usageIndex = source.indexOf(USAGE_MARKER);
+      const lineEnd = source.indexOf("\n", usageIndex);
+      const usageLine = source.slice(usageIndex, lineEnd < 0 ? source.length : lineEnd).replace(/["'`;]+\s*$/, "").trim();
+      found.push({ path, basename: safeStem(path), usage: usageLine });
+    }
+  }
+  return found.sort((left, right) => utf8Compare(left.path, right.path));
+}
+
+/**
+ * Concatenated text of every surface an agent actually reads to learn what exists: skill
+ * bodies (loaded into context), the typed lazy-loading reference files those bodies point
+ * at (loaded under the stated condition -- pipeline-start's own "Typed lazy loading"
+ * section names this as the mechanism, not a fallback), and guard source (refusal text).
+ * Deliberately EXCLUDES `LIFECYCLE_GUARD_PATH`: that file is the dedicated "admitted"
+ * oracle below, and folding it into "named" too would make admitted-but-unnamed
+ * structurally unreachable -- an internal admission-dispatch reference (an argv-shape
+ * branch keyed on a script constant) is not the same thing as an agent-visible naming,
+ * even though both happen to live in guard source. Every OTHER guard's refusal text still
+ * counts, per the acceptance criteria's own wording.
+ */
+function agentReadableCorpus(root) {
+  const skillBodies = walkFiles(root, "plugins", (item) => /^plugins\/[^/]+\/skills\/[^/]+\/SKILL\.md$/.test(item))
+    .map((path) => readFileSync(join(root, path), "utf8"));
+  const skillReferences = walkFiles(root, "plugins", (item) => /^plugins\/[^/]+\/skills\/[^/]+\/references\/.+\.md$/.test(item))
+    .map((path) => readFileSync(join(root, path), "utf8"));
+  const guardSources = walkFiles(root, "plugins/pipeline-core/hooks", (item) =>
+    /\/guard-[^/]+\.mjs$/.test(item) && !item.endsWith(".test.mjs") && item !== LIFECYCLE_GUARD_PATH)
+    .map((path) => readFileSync(join(root, path), "utf8"));
+  return [...skillBodies, ...skillReferences, ...guardSources].join("\n \n");
+}
+
+/**
+ * For each discovered entry point, asserts it is never named-but-refused nor
+ * admitted-but-unnamed -- the two failure shapes the backlog item names. "Admitted" is
+ * read off guard-lifecycle-ready.mjs's OWN source: that file's `isSanctionedLifecycleCommand()`
+ * dispatch is the guard union's real, already-curated pre-readiness allowlist -- this reads
+ * it rather than reimplementing it, so a script the guard does not yet know how to admit is
+ * never mistaken for one it does.
+ *
+ * A consumer-shaped root (no `plugins/pipeline-core` source tree, e.g. an installed-plugin
+ * layout) simply discovers zero entry points and zero corpus text -- `ok: true`, no
+ * findings, never a false failure from a self-checkout-only path. This mirrors the
+ * consumer-shaped-fixture requirement for the security-gate instance this item cites: every
+ * path this function reads is root-relative, so it degrades to "nothing found" rather than
+ * a fixed self-checkout resolution.
+ */
+export function checkEntryPointReachability({ root }) {
+  const findings = [];
+  let entryPoints;
+  let corpus;
+  let bootstrapCorpus;
+  let guardSource;
+  try {
+    entryPoints = discoverEntryPoints(root);
+    corpus = agentReadableCorpus(root);
+    bootstrapCorpus = bootstrapReadableCorpus(root);
+  } catch (error) {
+    return { ok: false, findings: [`entry-point reachability discovery failed: ${error.message}`] };
+  }
+  try {
+    guardSource = readFileSync(join(root, LIFECYCLE_GUARD_PATH), "utf8");
+  } catch {
+    guardSource = "";
+  }
+  for (const entryPoint of entryPoints) {
+    const namedInBootstrap = bootstrapCorpus.includes(entryPoint.basename);
+    const named = corpus.includes(entryPoint.basename);
+    const admitted = guardSource.includes(entryPoint.basename);
+    // named-but-refused: an entry point the bootstrap docs themselves point an agent at,
+    // for the exact non-ready phase those docs govern, yet the guard that decides
+    // pre-readiness admission has never heard of it -- instance 1 of the backlog item,
+    // exactly.
+    if (namedInBootstrap && !admitted) fail(findings, `entry point named by the bootstrap docs but not admitted by ${LIFECYCLE_GUARD_PATH}: ${entryPoint.path} (${entryPoint.usage})`);
+    // admitted-but-unnamed: the guard already has an explicit pre-readiness admission rule
+    // for this script, yet no skill or guard body anywhere tells an agent it exists -- the
+    // guard's authority is real but undiscoverable.
+    if (admitted && !named && !KNOWN_UNREACHABLE_ENTRY_POINTS.has(entryPoint.basename)) fail(findings, `entry point admitted by ${LIFECYCLE_GUARD_PATH} but named by no skill or guard: ${entryPoint.path} (${entryPoint.usage})`);
+  }
+  return { ok: findings.length === 0, findings };
+}
+
+/**
+ * The narrower corpus an agent actually reads DURING the exact non-ready phase where
+ * pre-readiness admission matters: the bootstrap skill and its full spec. Scoping the
+ * named-but-refused direction to this corpus (rather than every skill in the product) is
+ * what keeps a ready-only script -- e.g. a backlog reconciliation tool nobody would try to
+ * run before the session is ready -- from false-positiving just because some unrelated,
+ * ready-phase skill happens to mention it: its own guard admission is legitimately absent,
+ * and no bootstrap doc claims otherwise.
+ */
+function bootstrapReadableCorpus(root) {
+  const paths = ["plugins/pipeline-core/skills/pipeline-start/SKILL.md", "harness/session-bootstrap.md"];
+  return paths
+    .filter((path) => existsSync(join(root, path)))
+    .map((path) => readFileSync(join(root, path), "utf8"))
+    .join("\n \n");
+}
+
 function gitRevision(root, argument) {
   try {
     return execFileSync("git", ["rev-parse", argument], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
@@ -440,29 +577,37 @@ function parseArgs(argv) {
   let root = null;
   let inventoryPath = INVENTORY_PATH;
   let printDiscovered = false;
+  let checkReachability = false;
   for (let index = 0; index < argv.length; index++) {
     const value = argv[index];
     if (value === "--phase") phase = argv[++index];
     else if (value === "--root") root = argv[++index];
     else if (value === "--inventory") inventoryPath = argv[++index];
     else if (value === "--print-discovered") printDiscovered = true;
+    else if (value === "--check-reachability") checkReachability = true;
     else if (value === "--help") return { help: true };
     else return { error: `unknown argument: ${value}` };
   }
   if (!root) root = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
-  return { phase, root: resolve(root), inventoryPath, printDiscovered };
+  return { phase, root: resolve(root), inventoryPath, printDiscovered, checkReachability };
 }
 
 function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help) {
-    console.log("Usage: node harness/scripts/check-product-capability-inventory.mjs [--phase inventory|final] [--root PATH] [--inventory PATH] [--print-discovered]");
+    console.log("Usage: node harness/scripts/check-product-capability-inventory.mjs [--phase inventory|final] [--root PATH] [--inventory PATH] [--print-discovered] [--check-reachability]");
     return 0;
   }
   if (args.error) { console.error(args.error); return 2; }
   if (args.printDiscovered) {
     try { console.log(JSON.stringify(discoverSurfaces(args.root), null, 2)); return 0; }
     catch (error) { console.error(`FAIL: ${error.message}`); return 1; }
+  }
+  if (args.checkReachability) {
+    const result = checkEntryPointReachability({ root: args.root });
+    if (result.ok) { console.log("PASS: entry-point reachability"); return 0; }
+    for (const finding of result.findings) console.error(`FAIL: ${finding}`);
+    return 1;
   }
   const result = validateInventory(args);
   if (result.ok) { console.log(`PASS: product capability inventory (${args.phase})`); return 0; }
