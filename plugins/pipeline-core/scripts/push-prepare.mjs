@@ -494,7 +494,7 @@ export function foldPendingPushApprovalWrite(dir, deps = {}) {
     + "started. See backlog/items/2026-08-26-push-approval-record-always-trails-the-signed-\n"
     + "commit.md.\n\n"
     + "AI-Assisted: true\n"
-    + "Dispatch: NVA-CF-PUSHFOLD (goldfish)\n";
+    + "Dispatch: stage-0 (elephant)\n";
   const commit = spawn("git", ["-C", dir, "commit", "-m", message, "--", relPath], { encoding: "utf8" });
   if (commit.error || commit.status !== 0) return { folded: false, reason: "commit-failed" };
   return { folded: true };

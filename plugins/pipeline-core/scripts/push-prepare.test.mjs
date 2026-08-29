@@ -748,7 +748,7 @@ test("NVA-PUSHFOLD-1: bugfix discipline -- the CURRENT gap (red) demonstrated on
   assert.match(commitSubject.stdout, /fold pending push-approval record/);
   const commitBody = gitAtFold(root, "log", "-1", "--pretty=%B");
   assert.match(commitBody.stdout, /AI-Assisted: true/, "NVA-CF-PUSHFOLD (DoD c): the auto-commit must carry the AI-Assisted trailer");
-  assert.match(commitBody.stdout, /Dispatch: NVA-CF-PUSHFOLD \(goldfish\)/, "NVA-CF-PUSHFOLD (DoD c): the auto-commit must carry a Dispatch trailer");
+  assert.match(commitBody.stdout, /Dispatch: stage-0 \(elephant\)/, "NVA-CF-PUSHFOLD (DoD c): the auto-commit must carry a Dispatch trailer");
   const committedState = JSON.parse(gitAtFold(root, "show", "HEAD:project/pipeline-state.json").stdout);
   assert.equal(committedState.pushApproval.lastApproved.pendingAuditWrite, false,
     "the hint must be cleared to false the moment it is actually committed -- never stale once folded");
@@ -887,5 +887,5 @@ test("foldPendingPushApprovalWrite (DoD c): forCommit different from HEAD -> fol
   const commitArgv = commitCall[1];
   const message = commitArgv[commitArgv.indexOf("-m") + 1];
   assert.match(message, /AI-Assisted: true/);
-  assert.match(message, /Dispatch: NVA-CF-PUSHFOLD \(goldfish\)/);
+  assert.match(message, /Dispatch: stage-0 \(elephant\)/);
 });
