@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "ad0e54ff149a0633043a4f5d516ec25fd7651dc593267dc0dfa9a0bffc357278"
+    "transitionHead": "9d03a3acaebe68f377da7bc19ca51b45410e7afbbec25771c57e8694aea0284d"
   },
   "counts": {
-    "open": 106,
+    "open": 105,
     "in_progress": 3,
-    "closed": 414,
+    "closed": 415,
     "rejected": 3,
     "deferred": 11
   },
@@ -3975,12 +3975,16 @@
     },
     {
       "id": "pipeline.operating-model-not-shipped-with-the-plugin",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-29",
       "source": "Claude/Windows self-audit report (docs/pipeline-audit-claude-session.md §5.6), cited by scratch/greenfield-triage-2026-08-29.md finding F21, observed during the 2026-08-29 three-runner greenfield test.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "39454abc",
+      "closureEvidence": "harness/scripts/generate-vendored-canon.test.mjs"
     },
     {
       "id": "pipeline.orchestrator-authored-production-commits-have-no-deterministic-control",

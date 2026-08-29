@@ -329,7 +329,7 @@
 | pipeline.onboarding-produces-drift-it-then-has-to-repair | open | defect | pipeline | 2026-08-28 | NOW / Nova A — happy-path blocking: four repair commands sit in the middle of the onboarding step the PO wants to be simple |
 | pipeline.onboarding-ready-path-unconditional-restart-barrier-read | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.onboarding-restart-flow-is-codex-only-not-runner-aware | closed | defect | pipeline | 2026-08-07 | — |
-| pipeline.operating-model-not-shipped-with-the-plugin | open | defect | pipeline | 2026-08-29 | — |
+| pipeline.operating-model-not-shipped-with-the-plugin | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.orchestrator-authored-production-commits-have-no-deterministic-control | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.over-broad-ignore-rule-swallows-closure-evidence | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.p-ac-11-four-dimensions-declared-but-inert | closed | defect | pipeline | 2026-08-16 | — |
@@ -549,8 +549,8 @@
 
 ## Counts
 
-- open: 106
+- open: 105
 - in_progress: 3
-- closed: 414
+- closed: 415
 - rejected: 3
 - deferred: 11
