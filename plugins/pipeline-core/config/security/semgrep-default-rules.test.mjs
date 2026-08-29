@@ -63,6 +63,25 @@ if (!binary) {
     JSON.stringify(dirtyParsed?.results?.map((r) => r.check_id)),
   );
 
+  // Case 1b: a PKCS#8 header (openssl genpkey default output / GCP service-account JSON key
+  // format) has no key-type token for $KEYTYPE to bind to -- a separate no-metavariable
+  // alternative in the rule's pattern-either must still catch it.
+  const pkcs8Dir = join(scratch, "pkcs8");
+  mkdirSync(pkcs8Dir, { recursive: true });
+  writeFileSync(
+    join(pkcs8Dir, "leaked-key.txt"),
+    "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQ...\n-----END PRIVATE KEY-----\n",
+  );
+  const pkcs8Run = spawnSync(binary, ["scan", "--json", "--config", RULES_PATH, pkcs8Dir], { encoding: "utf8", env, shell: false });
+  let pkcs8Parsed = null;
+  try { pkcs8Parsed = JSON.parse(pkcs8Run.stdout ?? ""); } catch { /* asserted below */ }
+  record("shipped ruleset produces parseable JSON (PKCS#8 fixture)", pkcs8Parsed !== null, pkcs8Run.stdout?.slice(0, 300));
+  record(
+    "shipped ruleset's private-key rule fires on a bare PKCS#8 header (no metavariable to bind)",
+    Array.isArray(pkcs8Parsed?.results) && pkcs8Parsed.results.some((r) => r.check_id?.includes("hardcoded-private-key")),
+    JSON.stringify(pkcs8Parsed?.results?.map((r) => r.check_id)),
+  );
+
   // Case 2: a clean fixture -- no findings, and no error payload.
   const cleanDir = join(scratch, "clean");
   mkdirSync(cleanDir, { recursive: true });

@@ -29,8 +29,12 @@ rules:
     metadata:
       category: security
       confidence: HIGH
-    pattern: |
-      -----BEGIN $KEYTYPE PRIVATE KEY-----
+    patterns:
+      - pattern-either:
+          - pattern: |
+              -----BEGIN $KEYTYPE PRIVATE KEY-----
+          - pattern: |
+              -----BEGIN PRIVATE KEY-----
   - id: pipeline-default-dynamic-code-eval
     languages: [javascript, typescript, python]
     severity: WARNING

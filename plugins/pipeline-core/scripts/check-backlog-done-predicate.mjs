@@ -56,10 +56,8 @@
  * EXIT CODES: 0 = no fatal finding. 1 = at least one fatal finding (MALFORMED, STALE-OPEN, or
  * REGRESSION). 3 = usage/environment error (the items directory could not be enumerated/read).
  *
- * SUITE REGISTRATION: this script's own `.test.mjs` sibling passes standalone but is NOT yet
- * registered in `harness/scripts/verify.mjs` -- that file is TP-3-protected and this repository's
- * push-approval mode offers no in-session override (see the opt-out entry this dispatch adds to
- * check-suite-registration.mjs's DELIBERATELY_UNREGISTERED array).
+ * SUITE REGISTRATION: this script's own `.test.mjs` sibling is registered in
+ * `harness/scripts/verify.mjs` as the "backlog-done-predicate-tests" suite.
  *
  * Usage:
  *   node plugins/pipeline-core/scripts/check-backlog-done-predicate.mjs
