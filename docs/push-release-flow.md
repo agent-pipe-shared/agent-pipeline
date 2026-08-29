@@ -474,9 +474,28 @@ narrowing.
   tree is dirty from that moment on. **Commit nothing between `approve-push` and
   the push**: every commit moves `HEAD` past the `forCommit` the signature
   names and voids the approval. Verify has to run *before* the approval, and the
-  state record is committed *after* the push. This is finding 7c of
-  `backlog/items/2026-08-07-push-release-flow-unusable-for-third-party-adopters.md`,
-  not a workaround anyone should be happy with.
+  state record's write is committed *after* the push -- not by this push
+  itself (which only ever pushes the already-signed `HEAD`, unchanged), but by
+  the **next** `push-prepare.mjs` run, automatically. This is finding 7c of
+  `backlog/items/2026-08-07-push-release-flow-unusable-for-third-party-adopters.md`;
+  as of NVA-PUSHFOLD-1
+  (`backlog/items/2026-08-26-push-approval-record-always-trails-the-signed-commit.md`,
+  PO decision 2026-08-29) it is a self-limiting lag, not a manual chore:
+  `pushPrepareReport()` now runs `foldPendingPushApprovalWrite()` at the very
+  start of its own run, BEFORE evaluating any precondition (including
+  `checkWorkingTreeClean`) that assumes a clean tree. When the resolved state
+  file is the SOLE dirty path in the working tree, it clears the upfront hint
+  below and commits the file; any other dirty path alongside it, or a dirty
+  tree that isn't this exact file, is left completely untouched, and every
+  precondition below behaves exactly as before. Until that next run happens,
+  a session on a different machine that only pulled the pushed commit has no
+  way to see this pending record yet (nothing about it can be part of the
+  push itself -- see the backlog item for why); the record itself carries the
+  upfront, immediately-visible hint that closes that gap locally in the
+  meantime: `pushApproval.lastApproved.pendingAuditWrite: true` is stamped by
+  `approve-push` onto its own write, and is only ever `true` while genuinely
+  uncommitted -- the fold clears it to `false` the moment it actually lands
+  in a commit, so it is never stale.
 
 Whatever replaces this flow is bound by
 [ADR-0061](adr/0061-uniform-human-approval-ceremony.md): three human acts, the
