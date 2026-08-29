@@ -341,3 +341,21 @@ The dispatch's exact attempted diff and the two failing tests' full
 output are preserved at
 `scratch/attempted-onboarding-wiring-NVA-R36-GENESISEXEMPT.md`, ready to
 resume once a decision lands. Left `status: open`.
+
+## PO decision, 2026-08-29
+
+**Decision:** candidate 1 — `git commit --no-verify` is the sanctioned
+escape for this specific, narrow post-setup admin-edit case (NOT a
+general reintroduction of the original candidate (c), which would have
+covered the whole genesis case this item already resolved via
+first-appearance exemption instead).
+**Rationale:** matches this repository's accidental-breakout threat model
+and the PO's standing preference for minimal HGO ceremony; a routine,
+known, immediately-post-setup configuration edit by a trusted human at
+their own keyboard does not need capability-ceremony friction.
+**How to apply:** resume from the saved diff in
+`scratch/attempted-onboarding-wiring-NVA-R36-GENESISEXEMPT.md`, land the
+onboarding wiring, and update the 2 named tests' `commit()` helper calls
+for the later, already-tracked-file admin edit to use `--no-verify`
+(documented inline as the sanctioned escape for this case, distinct from
+the genesis-commit exemption above it).
