@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "dabee466c105cecf8a71cd29fe3d4bc61f0822687b66083dc0dae8ca9087aa58"
+    "transitionHead": "f563c7c39fa79a4e6e330de77983042a14df792ba2e0358b8ac78e2c1545220a"
   },
   "counts": {
-    "open": 78,
+    "open": 77,
     "in_progress": 3,
-    "closed": 446,
+    "closed": 447,
     "rejected": 3,
     "deferred": 11
   },
@@ -2196,12 +2196,16 @@
     },
     {
       "id": "pipeline.gg-22s-own-remediation-order-creates-unclearable-ledger-debt",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-29",
       "source": "Hit live by the Elephant on 2026-08-29 while closing candidate backlog items: following GG-22's printed remediation literally produced a debt state no further reconciliation could clear, costing roughly ten tool calls to escape.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "794fa61970ebaac3eb5969a4b38b67134dd98c65",
+      "closureEvidence": "backlog/items/2026-08-29-gg-22s-own-remediation-order-creates-unclearable-ledger-debt.md"
     },
     {
       "id": "pipeline.git-appears-despite-initializes-git-false",
