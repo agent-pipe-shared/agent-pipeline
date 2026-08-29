@@ -845,25 +845,25 @@ function freshIntent(runner, fs) {
     // how a human clears a push, and with the key omitted the only way to
     // learn that "chat" exists at all was to read the plugin's source, which
     // is exactly what the 2026-08-09 greenfield runs did.
-    // `security` is seeded OFF, and that is the honest value rather than a
-    // weakening. It read `warn` while the manifest carried no security gate at
-    // all, so a consumer was promised a gate nothing enforced -- the same defect
-    // as `push`, found in the same 2026-08-09 runs.
+    // `security` is seeded BLOCKING (NVA-R33-SECGATEON, backlog:
+    // 2026-08-28-seed-the-security-gate-on-now-that-its-satisfying-path-is-open.md).
+    // It used to be seeded OFF, on grounds that are worth keeping rather than
+    // erasing, because they explain WHY this is now safe rather than merely
+    // asserting it is:
     //
     // NVA-R18-SCANBOOT (backlog: scanner-bootstrap-is-not-self-sufficient-for-a-
-    // fresh-project, 2026-08-29): two of the original four reasons below were
-    // re-measured and found STALE, and are corrected here rather than left
-    // standing as an out-of-date premise:
-    //   - The original reason 1 ("onboarding writes no `.gitignore`, so the
-    //     push-gate evidence itself dirties a fresh consumer's tree") no longer
-    //     holds: onboarding now seeds one (`PROJECT_IGNORE_SEED`, this file,
-    //     covering `/scratch/`, `/evidence/`, `/project/pipeline-state.json`).
-    //   - The original reason 2 ("needs three external scanners a consumer
-    //     machine need not have") is stale AS A BLOCKER: measured with no
-    //     scanner reachable, every scanner reads `SKIPPED [binary_missing]`, the
-    //     license check reads `SKIPPED [not-configured]`, and the verdict is
-    //     CLEAN -> exit 0. A missing scanner does not fail the gate; each
-    //     scanner's status is separately distinguishable in evidence as one of
+    // fresh-project, 2026-08-29) closed the two reasons `off` originally rested
+    // on:
+    //   - Reason 1 ("onboarding writes no `.gitignore`, so the push-gate
+    //     evidence itself dirties a fresh consumer's tree") no longer holds:
+    //     onboarding now seeds one (`PROJECT_IGNORE_SEED`, this file, covering
+    //     `/scratch/`, `/evidence/`, `/project/pipeline-state.json`).
+    //   - Reason 2 ("needs three external scanners a consumer machine need not
+    //     have") is closed AS A BLOCKER: measured with no scanner reachable,
+    //     every scanner reads `SKIPPED [binary_missing]`, the license check
+    //     reads `SKIPPED [not-configured]`, and the verdict is CLEAN -> exit 0.
+    //     A missing scanner does not fail the gate; each scanner's status is
+    //     separately distinguishable in evidence as one of
     //     `passed`/`findings`/`not-configured`/`tool-unavailable`/
     //     `not-applicable` (`deriveReportStatus()`, security-scan.mjs).
     //     Semgrep's and license-check's own fallback configuration also now
@@ -872,27 +872,31 @@ function freshIntent(runner, fs) {
     //     existing in the Pipeline's own repository, so a consumer that
     //     configures nothing of its own still gets a working, offline scan
     //     instead of a guaranteed ERROR.
+    //   - A genuinely bare fresh consumer ships no
+    //     `governance/security-controls/catalog.json`, so the real remaining
+    //     "required capabilities" blocker (live only for a project that DOES
+    //     ship its own catalog, this repository included per ADR-0015) does not
+    //     apply to it either: an absent/unreadable catalog resolves to an empty
+    //     required-capability plan, never a blocking verdict (proven in
+    //     security-scan.test.mjs, "fresh consumer (no catalog)").
     //
-    // What remains true, narrowed and re-measured rather than assumed:
-    //   1. The real remaining blocker for a project that DOES define its own
-    //      `governance/security-controls/catalog.json` and required-capability
-    //      set is that set becoming unsatisfiable -- REQUIRED CAPABILITIES, not
-    //      scanner absence. A genuinely bare fresh consumer ships no catalog at
-    //      all, so this does not block IT (an absent/unreadable catalog
-    //      resolves to an empty required-capability plan, never a blocking
-    //      verdict -- proven in security-scan.test.mjs, "fresh consumer (no
-    //      catalog)"); it is a live constraint only for a project (this
-    //      repository included, per ADR-0015 self-application) that ships its
-    //      own catalog and required set.
-    //   2. `warn` would still not have meant "warn": guard-push evaluates the
-    //      security findings into the SAME failure list it evaluates under the
-    //      PUSH gate's mode, which is `blocking`. A `warn` security gate
-    //      therefore hard-blocks every consumer push. Filed as its own defect;
-    //      seeding `off` does not depend on it.
+    // The remaining, TRUE blocker the seeding item's own "Correction" section
+    // found the same day -- reason 2's "own on-disk location" fallback resolves
+    // fine from THIS repository's checkout but fails for an installed-plugin
+    // consumer (`GITLEAKS_CONFIG_PATH` walks four directories up looking for a
+    // repo root that does not exist there) -- is now ALSO closed: commit
+    // `867d287a` fixed gitleaks config resolution for installed-plugin
+    // deployments, and NVA-J-PUSHPREPGATE made `push-prepare.mjs` respect
+    // `gates.security` (`isSecurityGateActive()`) instead of demanding evidence
+    // unconditionally. Both are prerequisites this seed change depends on, not
+    // reasoning original to it.
     //
-    // Turning it on is a deliberate act with prerequisites, so it is named as one
-    // rather than defaulted into.
-    gates: { dev_plan: "blocking", push: "blocking", push_approval: machinePushApprovalPreference(fs) ?? "signature", security: "off", claude_md_max_lines: 200 },
+    // `warn` is never the seeded value, and never will be by accident: guard-push
+    // evaluates security findings into the SAME failure list it evaluates under
+    // the PUSH gate's mode, which is `blocking`. A `warn` security gate would
+    // therefore hard-block every consumer push while claiming to warn -- worse
+    // than either `off` or `blocking`, and never a fallback to reach for here.
+    gates: { dev_plan: "blocking", push: "blocking", push_approval: machinePushApprovalPreference(fs) ?? "signature", security: "blocking", claude_md_max_lines: 200 },
     critic_export: clone(registry.criticExportPolicy),
     roles: { po: { display_label: "Human" } },
     session: { keep_awake: true },
@@ -972,9 +976,12 @@ const KICKOFF_PROFILES = Object.freeze(["epic", "feature", "mini"]);
 // scripts/pipeline-state.mjs (`verifyCriticalHumanProof`); without that fix this
 // seed WOULD be the unsatisfiable gate this chapter must not create.
 //
-// `security` is still deliberately NOT seeded: its satisfying path in a brand-new
-// project has not been established, and seeding an unsatisfiable gate is exactly
-// what this chapter must not do.
+// `security` is seeded `blocking` too (NVA-R33-SECGATEON, 2026-08-29), now that
+// its satisfying path in a brand-new project has actually been established --
+// see the seeding comment on `freshIntent()`'s `gates` literal above for the
+// full chain of prerequisites this depends on. It is `automated`, never
+// `human`: the same command that satisfies it also produces the evidence
+// guard-push.mjs reads, with no separate approval step.
 const DEV_PLAN_BLOCKING_GATE = "gates:\n"
   // The refusal itself reports the lifecycle state but not the whole command
   // sequence out of it, so the enforcing artifact carries it.
@@ -994,7 +1001,19 @@ const DEV_PLAN_BLOCKING_GATE = "gates:\n"
   + "  # How a human clears it is one setting, gates.push_approval in pipeline.user.yaml:\n"
   + "  # \"signature\" (default) also demands --proof-request/--proof-authority/--proof;\n"
   + "  # \"chat\" lets them clear it in-session. Set it to \"off\" here to disable the gate.\n"
-  + "  push:\n    mode: blocking\n    type: human\n";
+  + "  push:\n    mode: blocking\n    type: human\n"
+  // Same shape again: the refusal reports which finding is missing or stale but
+  // not the command that regenerates it, so the enforcing artifact carries it.
+  // This gate is AUTOMATED, not human: there is no separate approval step, only
+  // the scan itself.
+  + "  # Automated security scan. `git push` is REFUSED (same guard-push.mjs check as\n"
+  + "  # the push gate above) until this commit carries fresh, candidate-bound security\n"
+  + "  # evidence -- run this from a clean, committed working tree:\n"
+  + "  #   security-scan --root .\n"
+  + "  # A machine missing the external scanners (gitleaks/semgrep/osv-scanner/license-\n"
+  + "  # check) still reaches a CLEAN, non-blocking verdict: each scanner reports SKIPPED\n"
+  + "  # rather than failing the gate (deriveReportStatus(), security-scan.mjs).\n"
+  + "  security:\n    mode: blocking\n    type: automated\n";
 // Per PO profile. All three resolve to the same live chapter -- the
 // differentiation surface exists (the profile is a real input on the
 // partial-authority path), and the satisfying path above was measured
