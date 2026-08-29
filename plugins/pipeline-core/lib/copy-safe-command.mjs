@@ -88,6 +88,60 @@ function isPlaceholder(value) {
   return value !== null && typeof value === "object" && value[PLACEHOLDER] === true;
 }
 
+const FORCED_QUOTE = Symbol("copySafeCommandForcedQuote");
+
+/**
+ * NVA-CF-FORCEDQUOTE: opt-in forced double-quoting for an argv entry that is
+ * real, literal data (never a template slot) but whose caller needs it ALWAYS
+ * rendered double-quoted -- e.g. `--repo "<path>"`-shaped guidance text a
+ * caller's own test suite already hard-pins -- rather than shellWord()'s
+ * conditional bare/single-quote choice. Purely additive: a caller that never
+ * uses forcedQuote() sees byte-identical output to before this mode existed
+ * (boundedCopySafeCommand()'s no-placeholder-and-no-forced-quote fast path,
+ * `renderProjectOnboardingAction()`, is untouched).
+ *
+ * This does NOT reintroduce the vulnerability class placeholder()'s own fix
+ * closed (a raw `JSON.stringify()`'d value rendered verbatim, letting "$", a
+ * backtick, or "$(" survive into a real shell unescaped): forcedQuote() runs
+ * its own shell-safe double-quote escaper (see shellDoubleQuoted() below,
+ * which escapes \\, ", $, ` inside the quotes) -- it forces the QUOTE
+ * CHARACTER shellWord() would have chosen not to use, never the escaping.
+ *
+ * @param {string} text the literal value to render always double-quoted, e.g. an absolute path.
+ */
+export function forcedQuote(text) {
+  if (typeof text !== "string" || text.length === 0) {
+    throw new TypeError("forcedQuote requires a non-empty string");
+  }
+  return { [FORCED_QUOTE]: true, text };
+}
+
+function isForcedQuote(value) {
+  return value !== null && typeof value === "object" && value[FORCED_QUOTE] === true;
+}
+
+/**
+ * A shell-safe POSIX double-quoted rendering of a literal value -- escapes
+ * the four characters that stay "live" (retain special meaning) inside
+ * double quotes in POSIX shell: backslash, the double quote itself, "$"
+ * (parameter/command expansion), and a backtick (legacy command
+ * substitution). For ordinary text containing none of these (the common
+ * case -- an absolute path with no shell metacharacters), this renders
+ * byte-identical to `JSON.stringify(text)`, which is exactly why adopting it
+ * does not change any existing caller's pinned expected text.
+ */
+function shellDoubleQuoted(text) {
+  if (/[\r\n]/u.test(text)) {
+    throw new TypeError("forcedQuote() values cannot contain line breaks");
+  }
+  const escaped = text
+    .replaceAll("\\", "\\\\")
+    .replaceAll('"', '\\"')
+    .replaceAll("$", "\\$")
+    .replaceAll("`", "\\`");
+  return `"${escaped}"`;
+}
+
 /**
  * NVA-CF-COPYSAFE: the ONLY gate deciding whether a placeholder() value is a
  * genuine unresolved template slot -- never fed real path/command data,
@@ -165,21 +219,38 @@ function resolvePlaceholderValue(text) {
  * pretool guards, restartCopyCommands()), are unchanged and still always
  * receive their unconditional bounded rendering.
  *
- * @param {{ executable: string, argv: (string|ReturnType<typeof placeholder>)[] }} action
+ * A caller may also wrap a literal argv entry with forcedQuote() to force it
+ * always double-quoted (see forcedQuote()'s own header). A no-placeholder-
+ * and-no-forced-quote call is byte-identical to before either mode existed:
+ * it still goes through renderProjectOnboardingAction() unchanged, never the
+ * new per-argv-entry path.
+ *
+ * @param {{ executable: string, argv: (string|ReturnType<typeof placeholder>|ReturnType<typeof forcedQuote>)[] }} action
  * @returns {{ executable: string, argv: string[], command: string, copyCommand: { maxColumns: number, posix: string|null, powershell: string|null, cmd: string|null } }}
  */
 export function boundedCopySafeCommand({ executable, argv } = {}) {
   if (typeof executable !== "string" || executable.length === 0) {
     throw new TypeError("boundedCopySafeCommand requires a non-empty executable");
   }
-  if (!Array.isArray(argv) || argv.length === 0 || !argv.every((part) => typeof part === "string" || isPlaceholder(part))) {
-    throw new TypeError("boundedCopySafeCommand requires a non-empty argv of strings or placeholder() values");
+  if (!Array.isArray(argv) || argv.length === 0
+    || !argv.every((part) => typeof part === "string" || isPlaceholder(part) || isForcedQuote(part))) {
+    throw new TypeError("boundedCopySafeCommand requires a non-empty argv of strings, placeholder() or forcedQuote() values");
   }
-  const hasPlaceholder = argv.some(isPlaceholder);
-  const command = hasPlaceholder
-    ? [executable, ...argv].map((part) => (isPlaceholder(part) ? renderPlaceholderValue(part.text) : shellWord(part))).join(" ")
+  const hasSpecialEntry = argv.some((part) => isPlaceholder(part) || isForcedQuote(part));
+  const renderEntry = (part) => {
+    if (isPlaceholder(part)) return renderPlaceholderValue(part.text);
+    if (isForcedQuote(part)) return shellDoubleQuoted(part.text);
+    return shellWord(part);
+  };
+  const resolveEntry = (part) => {
+    if (isPlaceholder(part)) return resolvePlaceholderValue(part.text);
+    if (isForcedQuote(part)) return part.text;
+    return part;
+  };
+  const command = hasSpecialEntry
+    ? [executable, ...argv].map(renderEntry).join(" ")
     : renderProjectOnboardingAction({ kind: "command", executable, argv });
-  const resolvedArgv = hasPlaceholder ? argv.map((part) => (isPlaceholder(part) ? resolvePlaceholderValue(part.text) : part)) : argv;
+  const resolvedArgv = hasSpecialEntry ? argv.map(resolveEntry) : argv;
   const bounded = boundedOpaqueCopyCommand(command);
   const copyCommand = command.length <= bounded.maxColumns
     ? { maxColumns: bounded.maxColumns, posix: null, powershell: null, cmd: null }
