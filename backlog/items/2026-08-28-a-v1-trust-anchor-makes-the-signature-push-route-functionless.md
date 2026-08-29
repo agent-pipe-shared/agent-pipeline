@@ -245,6 +245,41 @@ more step (drive a real `git push` to a local/fake remote through
 make an explicit PO call that the currently-measured scope is sufficient
 evidence to close this item.
 
+## Critic review, 2026-08-29 (task `wdnfwnx1t`) — two further gaps, one an overclaim already in git history
+
+An independent A/G/S Critic review of the highest-risk backlog-sweep
+commits (opus/max, `templates/prompts/critic-review.md`) found two further
+issues with this measurement, both independently re-verified by the
+Elephant before being recorded here:
+
+1. **A second, previously undisclosed measurement-scope gap.** Acceptance
+   criterion 1's own text requires the push to be "measured against an
+   **installed-plugin deployment**", not this repository's own checkout.
+   `measure-tofu-push-e2e.mjs` resolves every CLI it drives
+   (`PIPELINE_STATE_SCRIPT`, `PO_HUMAN_APPROVAL_SCRIPT`) from its own
+   module URL inside this checkout (`resolve(fileURLToPath(new URL(...,
+   import.meta.url)))`) — it never exercises an installed-plugin
+   deployment shape. The "What remains genuinely unmeasured" paragraph
+   above named only the `trustAnchorPinned` gap; this is a second, equally
+   real gap in the same acceptance criterion that was missed when that
+   paragraph was written.
+2. **Commit `4b32ec65`'s own message overclaims.** Its body states
+   *"Closes acceptance criterion 1 ... live run now reports
+   outcome=signed-push-recorded, exit code 0"* — written before the two
+   scope gaps above (trust-anchor pinning, installed-plugin deployment)
+   were discovered. This repository's own rules forbid rewriting commit
+   history, so this cannot be corrected retroactively; recorded here as a
+   known, disclosed contradiction between that commit's own claim and this
+   item's actual, more carefully assessed state. A reader of `git log`
+   alone for this commit would be misled; this item file is the
+   authoritative status.
+
+Net effect: **three** things must all be true before Acceptance criterion 1
+can honestly be called measured, not one: trust-anchor pinning exercised
+via a real `git push` through `guard-push.mjs`, an installed-plugin
+deployment shape (not this checkout), and neither is currently true. Left
+`status: open`.
+
 ## Related
 
 - `2026-08-28-the-push-gate-is-unsatisfiable-in-any-installed-plugin-deployment.md` — the
