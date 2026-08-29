@@ -105,3 +105,6 @@ check is the part that actually enforces anything.
   empty, so no stale entry exists today — but it belongs in the same pass as
   the sibling ceremony-ergonomics item filed the same day.
 - **Date:** 2026-08-29
+
+Fixed, 2026-08-29 (dispatch NVA-R12-OPTOUTSTALE, commit `37b35524`). Left
+`status: open` for the Elephant to independently verify and close.
