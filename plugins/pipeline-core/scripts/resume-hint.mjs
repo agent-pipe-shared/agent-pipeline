@@ -95,19 +95,29 @@ function main() {
   const cardFile = value(args, "--card-file");
   if (!cardFile) throw new Error("capture requires --card-file");
   const consumeCard = args.includes("--consume-card");
-  try {
-    const fullCard = contextCard(cardFile);
-    const { materialInput, values, ...distilled } = fullCard;
-    if (!validMaterialInput(materialInput)) throw new Error("RH-CARD-SCHEMA: materialInput must be a non-empty ARRAY of strings");
-    if (!validValues(values)) throw new Error("RH-CARD-SCHEMA: values must be an object of gitAuthor/language/profile");
-    if (materialInput !== undefined) {
-      for (const text of materialInput) {
-        const rejection = verbatimMaterialRejection(text);
-        if (rejection) throw new Error(rejection);
-      }
+  // pipeline.resume-hint-validate-before-consume: the card is unlinked only AFTER a
+  // fully successful capture, never on a validation failure. This used to be a
+  // `try { ... } finally { unlink }` -- but `finally` runs on the throw path too, so
+  // a card that failed RH-CARD-SCHEMA (or any later validation) was deleted by the
+  // very call that rejected it, destroying the caller's only surviving copy of the
+  // material input that triggered the restart barrier in the first place (backlog
+  // item 2026-08-29-resume-hint-capture-consumes-card-that-failed-schema-validation).
+  // Every throw below must propagate before `cardFile` is ever touched, so the
+  // delete is now a plain statement reached only once every step above it returned
+  // normally, not a cleanup handler.
+  const fullCard = contextCard(cardFile);
+  const { materialInput, values, ...distilled } = fullCard;
+  if (!validMaterialInput(materialInput)) throw new Error("RH-CARD-SCHEMA: materialInput must be a non-empty ARRAY of strings");
+  if (!validValues(values)) throw new Error("RH-CARD-SCHEMA: values must be an object of gitAuthor/language/profile");
+  if (materialInput !== undefined) {
+    for (const text of materialInput) {
+      const rejection = verbatimMaterialRejection(text);
+      if (rejection) throw new Error(rejection);
     }
-    const captured = captureResumeHint({ rootDir, context: distilled, basis: observedBasis });
-    if (materialInput === undefined && values === undefined) return captured;
+  }
+  const captured = captureResumeHint({ rootDir, context: distilled, basis: observedBasis });
+  let result = captured;
+  if (materialInput !== undefined || values !== undefined) {
     // Feed the ALREADY-idempotent base.values.X ?? X merge (applyOnboardingIntakeConsent)
     // rather than adding a second merge path -- a value already answered in an earlier
     // capture is never overwritten by a later one. `granted: true` mirrors this
@@ -122,12 +132,12 @@ function main() {
     if (materialInput !== undefined) {
       intake.captures = materialInput.map((text) => applyOnboardingIntakeCapture({ rootDir, text, activate: true }));
     }
-    return { ...captured, intake };
-  } finally {
-    if (consumeCard) {
-      try { unlinkSync(resolve(cardFile)); }
-      catch (error) { if (error?.code !== "ENOENT") throw error; }
-    }
+    result = { ...captured, intake };
   }
+  if (consumeCard) {
+    try { unlinkSync(resolve(cardFile)); }
+    catch (error) { if (error?.code !== "ENOENT") throw error; }
+  }
+  return result;
 }
 try { process.stdout.write(`${JSON.stringify(main())}\n`); } catch (error) { process.stderr.write(`${error.message}\n`); process.exitCode = 2; }
