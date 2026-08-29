@@ -113,3 +113,12 @@ re-run the applier check) rather than closing on a partial match.
 
 - `2026-08-28-onboarding-must-bootstrap-the-trust-anchor-once.md` — the change that turned
   a latent coupling into a behavioural one.
+
+## Progress note (2026-08-29, backlog sweep)
+
+Commit a8c11b5a added a with-key fixture home to onboarding-init.test.mjs
+proving Acceptance criterion 1 (both the with-key and no-key branches
+converge to the same outcome shape, provably from fixtures). Acceptance
+criterion 3 (all five suites register green under
+--only=verify-nva-c-protected) re-confirmed directly by re-running each
+suite.

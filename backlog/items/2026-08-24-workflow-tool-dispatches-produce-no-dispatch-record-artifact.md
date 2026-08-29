@@ -138,3 +138,15 @@ the process fix proves insufficient).
   section above.
 - **Commit:** see this repo's history for the commit landing this Triage
   update and the `workflow-dispatch.md` edit together.
+
+## Progress note (2026-08-29, backlog sweep)
+
+Re-investigated 2026-08-29 (NVA-CF-BL12-AUTHVERIFY). dispatch-authorship-verify.mjs
+already correctly FAILs (record-missing), not UNVERIFIABLE, on a Dispatch: trailer
+with no matching evidence/dispatch-record-<ID>.json for the goldfish role --
+confirmed live against dispatch-authorship-verify.mjs's verifyCommit() and its
+existing passing test case (b). The remaining gap is narrower than previously
+stated: the Workflow tool itself still does not automatically write the
+dispatch-record artifact for every dispatch, and this checker is not yet wired
+into harness/scripts/verify.mjs as a hard registered gate (TP-3 protected, not
+attempted).

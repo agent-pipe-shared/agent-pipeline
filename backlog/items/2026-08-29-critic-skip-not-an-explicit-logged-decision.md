@@ -88,3 +88,11 @@ remain genuinely unmet — the record is not yet produced automatically for
 every real dispatch decision (opt-in field only), and no real repository
 scan exists yet (pure functions only, disclosed follow-up in R21's own
 report). Repointed to a marker naming the real remaining wiring work.
+
+## Progress note (2026-08-29, backlog sweep)
+
+Commit 007d4276 added a dispatcher instruction (roles/goldfish.md,
+templates/prompts/goldfish-task.md) plus a new check-critic-skip-coverage.mjs
+script (tested standalone against fixtures, 9/9 passing). Registering this
+checker into harness/scripts/verify.mjs as a real, running gate needs a TP-3
+ceremony -- not yet done.
