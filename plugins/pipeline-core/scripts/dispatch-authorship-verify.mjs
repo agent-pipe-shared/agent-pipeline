@@ -331,6 +331,35 @@ function result(sha, verdict, classification, reason, extra = {}) {
   return { sha, verdict, classification, reason, ...extra };
 }
 
+function isNonEmptyString(value) {
+  return typeof value === "string" && value.trim() !== "";
+}
+
+/** Truthy AND not merely an empty container (`""`, `[]`, `{}`) -- the "non-empty" half of the minimum shape. */
+export function isNonEmptyValue(value) {
+  if (value === null || value === undefined) return false;
+  if (typeof value === "string") return value.trim() !== "";
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === "object") return Object.keys(value).length > 0;
+  return Boolean(value);
+}
+
+/**
+ * The minimum shape a genuine dispatch record should carry, per this repository's own
+ * template (`templates/prompts/goldfish-task.md`, "Dispatch record (standard evidence)"):
+ * `model`, `rulesetSha`, and a non-empty `report`. Deliberately narrow -- only these three,
+ * nothing stricter (e.g. `agentType`/`commits` are NOT required here even though a
+ * fully-shaped record would carry them too); see
+ * `backlog/items/2026-08-29-dispatch-evidence-record-shape-not-enforced-beyond-taskid-and-outcome.md`.
+ */
+export function missingBriefingFields(record) {
+  const missing = [];
+  if (!isNonEmptyString(record?.model)) missing.push("model");
+  if (!isNonEmptyString(record?.rulesetSha)) missing.push("rulesetSha");
+  if (!isNonEmptyValue(record?.report)) missing.push("report");
+  return missing;
+}
+
 /**
  * The pure core. All I/O arrives through `deps` so the regression suite can drive synthetic
  * commits without building a git fixture repository.
@@ -536,6 +565,23 @@ export function verifyCommit(sha, deps) {
       { taskId, modelCheck },
     );
   }
+  // pipeline.dispatch-record-briefing-fields-enforced -- checked LAST, only once every other
+  // dimension already agrees, so this gates the PASS itself rather than pre-empting a more
+  // specific FAIL/UNVERIFIABLE classification earlier in this function. A record missing
+  // `model`, `rulesetSha`, or a non-empty `report` does not evidence that a real six-field
+  // briefing (goldfish-task.md) actually existed for this dispatch, even if the SHA/outcome/
+  // path-coverage dimensions above all check out.
+  const missingFields = missingBriefingFields(record);
+  if (missingFields.length > 0) {
+    return result(
+      sha,
+      VERDICT.unverifiable,
+      "record-missing-briefing-fields",
+      `record for \`${taskId}\` is missing the minimum dispatch-record shape (\`${missingFields.join("`, `")}\`); it does not evidence that a real six-field briefing existed`,
+      { taskId, missingFields },
+    );
+  }
+
   return result(sha, VERDICT.pass, "bound", `bound to \`${taskId}\` (outcome \`${record.outcome}\`, ${changed.length} path(s) covered)`, {
     taskId,
     modelCheck,
