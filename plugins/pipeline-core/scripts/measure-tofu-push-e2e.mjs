@@ -39,12 +39,14 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { createPrivateKey, createPublicKey, generateKeyPairSync } from "node:crypto";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { measureFreshRepoOnboardingTurns } from "./measure-fresh-repo-onboarding-turns.mjs";
+import { runHumanApproval } from "./po-human-approval.mjs";
 
 export const SCHEMA = "pipeline.measure-tofu-push-e2e.v1";
 
@@ -66,6 +68,41 @@ function parseJsonStdout(result) {
 }
 
 /**
+ * NVA-CF-BL16-PRECISEFIX: verbatim copy of `po-human-approval.test.mjs`'s own
+ * `fakeSetupSpawn` fixture (that file, ~line 277) -- the exact interception this
+ * codebase already relies on to exercise `setup`'s fresh-key-creation branch
+ * without blocking on a real, interactive `openssl genpkey -aes-256-cbc`
+ * passphrase prompt. Not imported because the source is a local, unexported test
+ * helper; copied rather than reproduced from memory, per source pattern. It
+ * intercepts `genpkey` (an unencrypted Ed25519 key, fine for this disposable,
+ * throwaway fixture) and the following `pkey -pubout` (deriving the public key
+ * in-process via the same key material) -- every other openssl invocation this
+ * script relies on (the real `authorize-critical` sign step, unencrypted so no
+ * passphrase prompt) falls through to real `spawnSync` untouched.
+ */
+function fakeSetupSpawn(executable, args) {
+  if (executable === "openssl" && args[0] === "genpkey") {
+    const outIndex = args.indexOf("-out");
+    const { privateKey } = generateKeyPairSync("ed25519", {
+      privateKeyEncoding: { type: "pkcs8", format: "pem" },
+      publicKeyEncoding: { type: "spki", format: "pem" },
+    });
+    writeFileSync(args[outIndex + 1], privateKey);
+    return { status: 0 };
+  }
+  if (executable === "openssl" && args[0] === "pkey" && args.includes("-pubout")) {
+    const inPath = args[args.indexOf("-in") + 1];
+    const outPath = args[args.indexOf("-out") + 1];
+    const publicKey = createPublicKey(createPrivateKey(readFileSync(inPath, "utf8")))
+      .export({ type: "spki", format: "pem" });
+    writeFileSync(outPath, publicKey);
+    return { status: 0 };
+  }
+  const result = spawnSync(executable, args, { stdio: "pipe" });
+  return { status: result.status };
+}
+
+/**
  * Drives a genuinely fresh, already-`git init`-ed repository at `rootDir` through
  * onboarding and then the real trust-on-first-use signature-push ceremony. Every step is a
  * real subprocess call against the installed CLI surface; `keyDir` is a fresh, disposable
@@ -82,18 +119,40 @@ export function measureTofuPushEndToEnd({ rootDir, keyDir, env } = {}) {
     return { schema: SCHEMA, outcome: "onboarding-not-ready", steps, onboarding };
   }
 
-  // Step 1: the real PO key ceremony -- generates a real Ed25519 key (openssl encrypts the
-  // PEM with a passphrase, prompting Enter/Verify in that order) and persists
-  // poKeyDirectory into the machine plane automatically.
-  const PEM_PASSPHRASE = "turn-measurement-tofu-e2e";
-  // Setup prompts the passphrase THREE times: Enter, Verify (key generation), then Enter
-  // again immediately afterward (setup reads the private key back once, e.g. to derive/
-  // confirm the public key) -- confirmed empirically, not assumed.
-  const setup = run([process.execPath, PO_HUMAN_APPROVAL_SCRIPT, "setup",
-    "--repo-root", dir, "--directory", keyDir, "--human-name", "Turn Measurement"], REPO_ROOT, env,
-    `${PEM_PASSPHRASE}\n${PEM_PASSPHRASE}\n${PEM_PASSPHRASE}\n`);
-  steps.push({ step: "setup", exitCode: setup.status, stderr: setup.stderr?.slice(0, 2000) });
-  if (setup.status !== 0) return { schema: SCHEMA, outcome: "setup-failed", steps };
+  // Step 0b: `measureFreshRepoOnboardingTurns` never commits what onboarding writes --
+  // this repository is `git init`-ed but has no commit yet, and `prepare-push-subject`/
+  // `approve-push` both bind the candidate to `git rev-parse HEAD` (`defaultGitCandidate`,
+  // pipeline-state.mjs), which fails closed with no commit at all. A genuine gap in this
+  // measurement harness (this script), not in the mechanism under test -- committing
+  // onboarding's own output is exactly what a real fresh onboarding session would do
+  // next, before ever reaching a push ceremony.
+  const add = run(["git", "add", "-A"], dir, env);
+  steps.push({ step: "commit-onboarding-output", subStep: "add", exitCode: add.status, stderr: add.stderr?.slice(0, 2000) });
+  if (add.status !== 0) return { schema: SCHEMA, outcome: "commit-onboarding-output-failed", steps };
+  const commit = run(["git", "commit", "--quiet", "-m", "chore: onboard fresh repository (tofu-push-e2e measurement fixture)"], dir, env);
+  steps.push({ step: "commit-onboarding-output", subStep: "commit", exitCode: commit.status, stderr: commit.stderr?.slice(0, 2000) });
+  if (commit.status !== 0) return { schema: SCHEMA, outcome: "commit-onboarding-output-failed", steps };
+
+  // Step 1: the real PO key ceremony -- driven IN-PROCESS via `runHumanApproval`'s own
+  // `dependencies.spawn` injection seam (NVA-CF-BL16-PRECISEFIX; the same seam
+  // `po-human-approval.test.mjs` already uses), never an external subprocess. A real,
+  // interactive `openssl genpkey -aes-256-cbc` cannot be driven reliably through piped
+  // stdin from an unrelated grandparent process -- two prior attempts at this exact
+  // measurement burned their full budget on that dead end. `fakeSetupSpawn` intercepts
+  // only the two `openssl` calls fresh-key creation makes, producing a real, unencrypted
+  // (test-appropriate, disposable) Ed25519 key; every other step below stays a real
+  // external subprocess against the installed CLI surface, unchanged.
+  let setup;
+  try {
+    setup = runHumanApproval(["setup",
+      "--repo-root", dir, "--directory", keyDir, "--human-name", "Turn Measurement"],
+      { spawn: fakeSetupSpawn });
+  } catch (error) {
+    steps.push({ step: "setup", ok: false, error: error?.message ?? String(error) });
+    return { schema: SCHEMA, outcome: "setup-failed", steps };
+  }
+  steps.push({ step: "setup", ok: setup?.ok === true, code: setup?.code });
+  if (setup?.ok !== true) return { schema: SCHEMA, outcome: "setup-failed", steps };
 
   const trustPolicyPath = join(keyDir, "trust-policy.json");
   if (!existsSync(trustPolicyPath)) return { schema: SCHEMA, outcome: "setup-no-trust-policy", steps };
@@ -103,6 +162,19 @@ export function measureTofuPushEndToEnd({ rootDir, keyDir, env } = {}) {
   const threatModel = run([process.execPath, PIPELINE_STATE_SCRIPT, "materialize-push-threat-model"], dir, env);
   steps.push({ step: "materialize-push-threat-model", exitCode: threatModel.status, stderr: threatModel.stderr?.slice(0, 2000) });
   if (threatModel.status !== 0) return { schema: SCHEMA, outcome: "threat-model-failed", steps };
+
+  // Step 2b: `authorize-critical` refuses to run against a dirty working tree
+  // ("repository must be clean before preparing a PO approval request"), and the
+  // materialized threat-model artifact above is written but not committed. Commit it
+  // now, BEFORE the candidate commit/tree is captured for the subject digest below, so
+  // the candidate `prepare-push-subject` signs and the one `authorize-critical`/
+  // `approve-push` later observe are the same commit throughout.
+  const addThreatModel = run(["git", "add", "-A"], dir, env);
+  steps.push({ step: "commit-threat-model", subStep: "add", exitCode: addThreatModel.status, stderr: addThreatModel.stderr?.slice(0, 2000) });
+  if (addThreatModel.status !== 0) return { schema: SCHEMA, outcome: "commit-threat-model-failed", steps };
+  const commitThreatModel = run(["git", "commit", "--quiet", "-m", "chore: materialize push threat-model artifact (tofu-push-e2e measurement fixture)"], dir, env);
+  steps.push({ step: "commit-threat-model", subStep: "commit", exitCode: commitThreatModel.status, stderr: commitThreatModel.stderr?.slice(0, 2000) });
+  if (commitThreatModel.status !== 0) return { schema: SCHEMA, outcome: "commit-threat-model-failed", steps };
 
   // Step 3: the real subject digest for this exact candidate/target.
   const subject = run([process.execPath, PIPELINE_STATE_SCRIPT, "prepare-push-subject",
@@ -134,12 +206,16 @@ export function measureTofuPushEndToEnd({ rootDir, keyDir, env } = {}) {
 
   // Step 4: the human's real signing ceremony -- real OpenSSL, answered via stdin exactly
   // as a human operator would type it. This is the call whose verifying signature
-  // `pinTrustAnchorOnFirstUse` pins once step 5 actually authorizes.
+  // `pinTrustAnchorOnFirstUse` pins once step 5 actually authorizes. Unchanged as an
+  // external subprocess: `fakeSetupSpawn` produced an UNENCRYPTED private key, so
+  // `isPrivateKeyPassphraseProtected()` routes this real `openssl pkeyutl -sign` call
+  // down the no-passphrase-needed path -- only the explicit "approve" confirmation
+  // token is piped, no PEM passphrase line is needed (verified empirically below).
   const authorize = run([process.execPath, PO_HUMAN_APPROVAL_SCRIPT, "authorize-critical",
     "--repo-root", dir, "--directory", keyDir,
     "--feature-id", featureId, "--plan", planPath, "--spec", specPath,
     "--kind", "push", "--subject-sha256", subjectSha256, "--expires-at", expiresAt,
-  ], dir, env, `approve\n${PEM_PASSPHRASE}\n`);
+  ], dir, env, "approve\n");
   steps.push({ step: "authorize-critical", exitCode: authorize.status, stderr: authorize.stderr?.slice(0, 2000) });
   if (authorize.status !== 0) {
     return { schema: SCHEMA, outcome: "authorize-critical-failed", steps, stdout: authorize.stdout?.slice(0, 2000) };
