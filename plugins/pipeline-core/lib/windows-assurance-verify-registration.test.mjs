@@ -150,6 +150,7 @@ check("WAVR18 detects a tampered authority matrix from the validator fixture roo
  *  modules into the list for a function this fixture proves is never called. */
 const FIXTURE_MODULES = Object.freeze([
   "harness/scripts/check-verify-suite-registration.mjs", // duplicateSuiteIds
+  "harness/scripts/manual-check-logic.mjs", // imported by verify.mjs for the manual-check step
   "plugins/pipeline-core/lib/project-authority.mjs", // resolveAuthorityArtifactPath (ADR-0054)
   "plugins/pipeline-core/lib/scoped-verify-registration.mjs",
   "plugins/pipeline-core/lib/verify-resume.mjs",
