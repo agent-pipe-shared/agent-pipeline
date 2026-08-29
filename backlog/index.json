@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "bb382df436111ddb403dd8c1ea509a3db0a0abfedbe4d70d721a5815bb45f1b2"
+    "transitionHead": "db9c73572f5de9b5b53513a357b8115d66f5104a097f53c4d38f8dca92114610"
   },
   "counts": {
-    "open": 75,
+    "open": 74,
     "in_progress": 3,
-    "closed": 449,
+    "closed": 450,
     "rejected": 3,
     "deferred": 11
   },
@@ -4594,12 +4594,16 @@
     },
     {
       "id": "pipeline.po-signing-key-pointer-does-not-cross-wsl-windows-boundary",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-29",
       "source": "Claude/Windows self-audit report (docs/pipeline-audit-claude-session.md §3.2) and the PO's own observation, cited by scratch/greenfield-triage-2026-08-29.md finding F15, observed during the 2026-08-29 three-runner greenfield test.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "09696633932428f93c5a9c097a715730f01f994a",
+      "closureEvidence": "backlog/items/2026-08-29-po-signing-key-pointer-does-not-cross-wsl-windows-boundary.md"
     },
     {
       "id": "pipeline.post-compact-reground-carries-no-state-md-narrative",

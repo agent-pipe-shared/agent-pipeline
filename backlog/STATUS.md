@@ -373,7 +373,7 @@
 | pipeline.po-key-directory-default-should-be-repo-scoped-not-machine-wide | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.po-key-trust-anchor-onboarding | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.po-language-is-set-without-asking-and-cannot-be-changed | closed | defect | pipeline | 2026-08-08 | — |
-| pipeline.po-signing-key-pointer-does-not-cross-wsl-windows-boundary | open | defect | pipeline | 2026-08-29 | — |
+| pipeline.po-signing-key-pointer-does-not-cross-wsl-windows-boundary | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.post-compact-reground-carries-no-state-md-narrative | closed | defect | pipeline | 2026-08-19 | — |
 | pipeline.prd-binding-precedes-framing-with-no-reopen-path-back | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.prd-framing-precondition-is-prose-not-a-check | open | workflow-improvement | pipeline | 2026-08-29 | — |
@@ -553,8 +553,8 @@
 
 ## Counts
 
-- open: 75
+- open: 74
 - in_progress: 3
-- closed: 449
+- closed: 450
 - rejected: 3
 - deferred: 11
