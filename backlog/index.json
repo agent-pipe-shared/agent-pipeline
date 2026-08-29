@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "ed599345f6777d388189b7b358a505e270cea4d8c27c0e4767bb9d27f0bd5699"
+    "transitionHead": "98ca67147d3cabafc840701fdf2f77fd5e666b841d98d97baef31a904d4b93c5"
   },
   "counts": {
-    "open": 90,
+    "open": 89,
     "in_progress": 3,
-    "closed": 433,
+    "closed": 434,
     "rejected": 3,
     "deferred": 11
   },
@@ -1792,12 +1792,16 @@
     },
     {
       "id": "pipeline.docs-state-human-summary-diverges-from-machine-next-action",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-29",
       "source": "Codex/WSL report, cited by scratch/greenfield-triage-2026-08-29.md finding F20, observed during the 2026-08-29 three-runner greenfield test.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "0e9019bf",
+      "closureEvidence": "plugins/pipeline-core/scripts/check-state-phase-consistency.test.mjs"
     },
     {
       "id": "pipeline.docs-state-md-next-action-text-is-a-static-snapshot-with-no-live-sync",
