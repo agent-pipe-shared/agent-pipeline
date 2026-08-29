@@ -149,6 +149,48 @@ the setting is what governs it.
   the other, which is why this session could not establish whether gitleaks was installed
   on the consumer machine at all.
 
+## Progress, 2026-08-29 (dispatch NVA-R25-PUSHGATESAT)
+
+Parts (a), (b), and (d) of Direction were found ALREADY FIXED by prior dispatches
+earlier in this same session, before this dispatch's briefing was written --
+re-verified fresh here rather than re-implemented (CLAUDE.md's re-verify-before-
+dispatching-on-an-inherited-claim rule, applied on discovery):
+
+- **(a) gitleaks config resolution:** `resolveGitleaksConfigPath()` (`gitleaks.mjs`)
+  now tries the repo-root `.gitleaks.toml` first, then falls back to a
+  plugin-shipped default (`plugins/pipeline-core/config/security/gitleaks-default.toml`),
+  degrading to `SKIPPED`/`classification: "success"` only if neither resolves --
+  committed `867d287a` (`fix(security): resolve gitleaks config in an installed-plugin
+  deployment`, NVA-J-GITLEAKSCONFIG). The binary-presence check (`resolveBinary`) now
+  runs BEFORE the config-path check in `run()`, so `binary_missing` and a missing
+  config are already two distinguishable signals -- closing this item's own "config
+  check masks the install probe" gap without further rework. `gitleaks.test.mjs`:
+  23/23 pass, including an explicit "installed-plugin fixture with no repo root
+  anywhere" case.
+- **(b) push-prepare respects `gates.security`:** `isSecurityGateActive()`
+  (`push-prepare.mjs`) reads the effective `gates.security` mode via the shared
+  `gateConfig()` reader and mirrors `guard-push.mjs`'s own activation rule;
+  `checkEvidenceFreshness("security-evidence", ...)` is pushed onto the checks list
+  only when the gate is active. The header comment already states this accurately.
+  Committed `37443e91` (`fix(push-prepare): gate the security-evidence check on
+  gates.security mode`, NVA-J-PUSHPREPGATE). `push-prepare.test.mjs`: 43/43 pass,
+  including both `gates.security: "off"` and `"blocking"` asserted directly.
+- **(d) semgrep `--config auto` metrics dependency:** `buildAdapterConfig()`
+  (`security-scan.mjs`) now always supplies a real `rulesDir` for semgrep -- the
+  project's own `security.scanners.semgrep.rules_dir` when configured, else a
+  plugin-shipped default ruleset (`plugins/pipeline-core/security/semgrep/pipeline.yml`)
+  -- so the real push path never falls through to semgrep.mjs's own `"auto"` literal.
+  `semgrep-default-rules.test.mjs`: 7/7 pass, a genuine live invocation of the real
+  `semgrep` binary present in this environment against exactly that shipped ruleset,
+  with `SEMGREP_SEND_METRICS: "off"` in its env -- no metrics-off failure.
+
+This dispatch made no code changes to the adapters or `push-prepare.mjs`; it re-ran
+the tests above fresh (all green) plus this item's own required verify command
+(`check-consumer-safe-paths.test.mjs`, 9/9) against the current tree, then recorded
+this note. **Part (c) remains OPEN**, blocked on a concurrent dispatch
+(NVA-R24-TRUSTANCHOR) owning `lib/project-onboarding-v3.mjs` -- `status` stays `open`
+for that reason alone.
+
 ## Related
 
 - `2026-08-28-seed-the-security-gate-on-now-that-its-satisfying-path-is-open.md` — whose
