@@ -193,6 +193,26 @@ an agent session may not write into the plugin root that is enforcing its own
 guards, and `guard-lifecycle-ready.mjs` refuses cross-repository mutation
 (`GUARD-CROSS-REPO-MUTATION`) for the same reason.
 
+### Mid-session drift between the checkout and the installed copy is accepted
+
+**PO decision, 2026-08-29** (`backlog/items/2026-08-29-installed-marketplace-
+guard-copy-drifts-silently-from-repo-source.md`): a guard/hook fix landing in
+this checkout does not protect anything until this refresh runs — a session
+enforcing via the installed copy keeps the OLD guard behavior in the
+meantime, silently (the denial looks like an ordinary refusal, not a
+staleness warning). This is accepted as an inherent property of the
+directory-copy model above, not a defect to build detection or auto-sync
+for. No pre-flight staleness check is planned.
+
+**What this means in practice, for whoever refreshes the copy:** the regular
+practice during active development is to take a fresh local copy repeatedly,
+not only once — choose a **good checkpoint** to do it at (a coherent unit of
+work just landed and verified, not mid-edit or mid-dispatch), and every such
+refresh needs BOTH steps together, never the `cp -a`/`robocopy` alone: the
+copy AND the version-string bump in the local marketplace's own manifest
+(see "The cachebuster mechanism" below) — a copy with no version bump is a
+silent no-op, `claude plugin update` has nothing to detect as changed.
+
 ## The cachebuster mechanism and version convention
 
 `claude plugin install` materializes the build into a cache directory named

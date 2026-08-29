@@ -3,12 +3,16 @@ schema: pipeline.backlog-item.v1
 id: pipeline.installed-marketplace-guard-copy-drifts-silently-from-repo-source
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-29
+closure_commit: d76db9a2
+closure_repository: "self"
+closure_evidence: docs/claude-local-plugin-development.md
 created: 2026-08-29
 sprint: nova
-tracking: "PO gate/signature topic — collect for later per the 0.6.0 candidate mandate, not attempted as a fix this session. No PO decision requested yet on whether the remedy is a checker, a documented pre-flight step, or accepted as an inherent property of the local-marketplace-copy model (ADR-0052)."
+tracking: "PO decision 2026-08-29: candidate 3 (accept as inherent), documented permanently."
 source: "Found live by the Elephant on 2026-08-29 while landing GG-22 shared-index-deadlock work-arounds during the 0.6.0 candidate build: the installed marketplace copy of guard-git.mjs still printed the pre-fix GG-22 remediation text hours after the matching repo-source fix (commit 01c02971) had already landed."
-done_when: contains docs/state.md installed-marketplace-guard-copy-drifts-silently-from-repo-source
+done_when: contains docs/claude-local-plugin-development.md Mid-session drift between the checkout and the installed copy is accepted
 ---
 
 # The installed marketplace guard copy drifts silently from the repo source
@@ -71,6 +75,26 @@ Left open pending a PO decision on which of the directions above (or a
 different one) is wanted, and whether it is Nova A (0.6.0 candidate) or
 Nova B scope. No commit under this item should implement a specific
 remedy before that decision is recorded here.
+
+## PO decision and closure, 2026-08-29
+
+**Decision:** candidate 3 — accept as inherent to the local-marketplace-copy
+model (ADR-0052), documented permanently rather than built as a checker.
+**Rationale (PO):** "darum machen wir regelmäßig während Dev eine lokale
+neue Kopie, da muss man dann einen guten Haltepunkt wählen und das braucht
+auch immer den Stempel" — the practice is already to refresh the local copy
+repeatedly during active development, choosing a good checkpoint each time,
+and every refresh already requires the version-bump step (the "stamp");
+staleness between refreshes is accepted as a property of that cadence, not
+a gap needing detection tooling.
+**How applied:** a new subsection, "Mid-session drift between the checkout
+and the installed copy is accepted", added to
+`docs/claude-local-plugin-development.md` immediately after the existing
+"Refresh the local build after a change" section — states the acceptance
+explicitly, names the checkpoint-choice practice, and reiterates that a
+refresh is always the copy PLUS the version bump together (standing
+lesson: candidate-stamp-needs-manifest-version-bump-too), never the copy
+alone. `done_when` repointed to that new section's own heading text.
 
 ## Related
 
