@@ -70,6 +70,18 @@
  * testpath-protected paths are checked. A staged change to any other path is unaffected —
  * proven by a test, not by inspection (see this file's own test suite).
  *
+ * FIRST-APPEARANCE EXEMPTION (PO decision, 2026-08-29, candidate (b) of the backlog item's
+ * three candidates): a protected path's VERY FIRST appearance anywhere in this repository's
+ * git history is exempt from the block below, even with no consumed capability — see
+ * `pathAlreadyTrackedInHistory()` in the generated `renderImpl()` output for the exact
+ * mechanism and its fail-closed default. This is what makes wiring this installer into
+ * onboarding-by-default safe: onboarding's own scaffold-authoring step writes
+ * gate-strength-protected files directly to disk via trusted, privileged code, and without
+ * this exemption the first real commit capturing that scaffold would be indistinguishable
+ * from an untrusted bypass. A LATER re-write of already-tracked content at that same path
+ * stays exactly as blocked as before — this is the property the item's own reported repro
+ * (an already-committed `project/pipeline.json` being bypass-written) depends on.
+ *
  * FAIL-CLOSED, DELIBERATELY UNLIKE THE PLUGIN GUARD FAMILY'S FAIL-OPEN CONVENTION (mirrors
  * pre-push-hook-install.mjs's own doctrine exactly): an unresolved repository root, an
  * un-enumerable staged diff, or any other unexpected exception all BLOCK the commit — this hook
@@ -240,6 +252,33 @@ export function stagedPaths(projectRoot) {
   return raw.length === 0 ? [] : raw.split("\\0").filter((entry) => entry.length > 0);
 }
 
+/** First-appearance exemption (PO decision, 2026-08-29, backlog/items/
+ * 2026-08-29-a-node-script-defeats-every-file-protection-guard.md, candidate (b)): a
+ * protected path's VERY FIRST appearance in this repository's git history is exempt from
+ * this hook's block, because onboarding's own scaffold-authoring step writes
+ * gate-strength-protected files directly to disk via trusted, privileged code, and the
+ * first real commit that captures that scaffold is otherwise indistinguishable, from this
+ * hook's point of view, from an untrusted bypass writing the same path. A LATER re-write of
+ * content that some PRIOR commit already tracked at that exact path is NOT exempt -- that is
+ * exactly the item's own reported repro shape (an already-committed \`project/pipeline.json\`
+ * being bypass-written) and must stay blocked.
+ *
+ * Returns \`true\` (already tracked -- NOT exempt) whenever the answer cannot be established
+ * with confidence, matching this hook's own fail-closed doctrine: an unborn HEAD (no commit
+ * exists yet in this repository) is the one case that can be established as "never tracked"
+ * with certainty, so it alone returns \`false\`. \`git log -- <path>\` (default, HEAD-reachable
+ * history; never \`--all\`, which would also credit an unrelated branch's history) reports
+ * every commit that ever added, modified, or removed content at \`relPath\` -- so a path that
+ * was tracked and later deleted still counts as "already tracked", never re-exempted merely
+ * because it is currently absent. */
+export function pathAlreadyTrackedInHistory(projectRoot, relPath) {
+  const head = git(["rev-parse", "--verify", "-q", "HEAD"], projectRoot);
+  if (head.status !== 0) return false; // unborn HEAD: no commit exists yet -- nothing can be already tracked
+  const result = git(["log", "--format=%H", "-1", "--", relPath], projectRoot);
+  if (result.status !== 0) return true; // cannot tell -- fail closed toward "already tracked" (still blocked)
+  return (result.stdout ?? "").trim().length > 0;
+}
+
 function block(lines) {
   process.stderr.write(
     [
@@ -296,6 +335,9 @@ async function main() {
     let consumed = false;
     try { consumed = defaultHasConsumedCapabilityForPath(projectRoot, relPath); } catch { consumed = false; }
     if (consumed) continue;
+    let alreadyTracked = true;
+    try { alreadyTracked = pathAlreadyTrackedInHistory(projectRoot, relPath); } catch { alreadyTracked = true; }
+    if (!alreadyTracked) continue; // first appearance in git history -- exempt (PO decision, candidate (b))
     findings.push({ path: relPath, id: rule.id, reason: rule.reason });
   }
 
