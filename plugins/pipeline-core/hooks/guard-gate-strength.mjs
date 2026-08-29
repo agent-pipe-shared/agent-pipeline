@@ -84,6 +84,11 @@ import {
   queryHumanGovernanceDecisions,
 } from "../lib/human-governance-ledger.mjs";
 import { buildAppendIntent, buildOverrideDecisions, requestDecisionId } from "../lib/guard-authority-ledger-intake.mjs";
+// NVA-CF-BL19-COPYSAFEADOPT: ceremony command lines built through the shared
+// renderer instead of hand-assembled `${JSON.stringify(...)}` templates,
+// mirroring the identical adoption already landed in guard-lifecycle-ready.mjs
+// and guard-testpath.mjs (NVA-W12-COPYSAFE).
+import { boundedCopySafeCommand, placeholder } from "../lib/copy-safe-command.mjs";
 
 const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -668,26 +673,51 @@ if (process.argv[1] && resolve(process.argv[1]).endsWith("guard-gate-strength.mj
             });
           } catch { /* fail-open (§8.1 narrowing/informational): never changes this already-decided denial */ }
           const script = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+          // NVA-CF-BL19-COPYSAFEADOPT: every ceremony command line built through the
+          // shared renderer instead of a hand-assembled `${JSON.stringify(...)}`
+          // template. A human fill-in slot like "<plan-sha256>" passes through
+          // placeholder() verbatim -- never shellWord()-quoted like a literal
+          // value. script/projectDir are ALSO passed through placeholder() here,
+          // pre-rendered with JSON.stringify(); request-sha256 is the one real
+          // value that goes through ordinary shellWord() quoting. Mirrors
+          // guard-testpath.mjs's own ceremonyCommand() exactly.
+          const ceremonyCommand = (subcommand, ...extraArgv) =>
+            boundedCopySafeCommand({
+              executable: process.execPath,
+              argv: [
+                placeholder(JSON.stringify(script)), subcommand, "--repo", placeholder(JSON.stringify(projectDir)),
+                "--request-sha256", planned.requestSha256, ...extraArgv,
+              ],
+            }).command;
           const continuation = approvalMode === "chat"
             ? [
               `Then (the human confirms in-session; this is attribution, not proof):`,
-              `${process.execPath} ${JSON.stringify(script)} prepare-authorization --repo ${JSON.stringify(projectDir)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256-from-plan> --reason "<human-reason>"`,
-              `${process.execPath} ${JSON.stringify(script)} authorize --repo ${JSON.stringify(projectDir)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256> --selection-sha256 <selection-sha256> --reason "<human-reason>" --reason-sha256 <reason-sha256> --activate`,
+              ceremonyCommand(
+                "prepare-authorization", "--plan-sha256", placeholder("<plan-sha256-from-plan>"), "--reason", placeholder('"<human-reason>"'),
+              ),
+              ceremonyCommand(
+                "authorize", "--plan-sha256", placeholder("<plan-sha256>"), "--selection-sha256", placeholder("<selection-sha256>"),
+                "--reason", placeholder('"<human-reason>"'), "--reason-sha256", placeholder("<reason-sha256>"), "--activate",
+              ),
             ].join("\n")
             : [
               `Then, in this session (pure digest computation against data already in the ` +
                 `repository -- neither step needs the external key, ADR-0059 Decision 1):`,
-              `${process.execPath} ${JSON.stringify(script)} prepare-authorization --repo ${JSON.stringify(projectDir)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256-from-plan> --reason "<fixed HGO_SIGNATURE_REASON text>"`,
-              `${process.execPath} ${JSON.stringify(script)} emit-signature-digest --repo ${JSON.stringify(projectDir)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256>`,
+              ceremonyCommand(
+                "prepare-authorization", "--plan-sha256", placeholder("<plan-sha256-from-plan>"), "--reason", placeholder('"<fixed HGO_SIGNATURE_REASON text>"'),
+              ),
+              ceremonyCommand("emit-signature-digest", "--plan-sha256", placeholder("<plan-sha256>")),
               `Then, outside this session (only the signature itself needs the external Ed25519 ` +
                 `key; presence of a valid, correctly-bound signature IS the authorization -- ` +
                 `there is no in-session activate step for this mode):`,
-              `${process.execPath} ${JSON.stringify(script)} authorize-by-signature --repo ${JSON.stringify(projectDir)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256> --proof <external-proof.json>`,
+              ceremonyCommand(
+                "authorize-by-signature", "--plan-sha256", placeholder("<plan-sha256>"), "--proof", placeholder("<external-proof.json>"),
+              ),
             ].join("\n");
           overrideGuidance = [
             "",
             "Human override available for this exact edit (one use; audited; the human confirms):",
-            `${process.execPath} ${JSON.stringify(script)} plan --repo ${JSON.stringify(projectDir)} --request-sha256 ${planned.requestSha256}`,
+            ceremonyCommand("plan"),
             continuation,
           ].join("\n");
         } else {
