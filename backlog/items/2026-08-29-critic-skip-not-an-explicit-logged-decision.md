@@ -6,7 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-29
 sprint: nova
-done_when: contains harness/review-protocol.md pipeline.critic-skip-decision-logged
+done_when: contains plugins/pipeline-core/lib/critic-skip-decision.mjs pipeline.critic-skip-wired-into-real-dispatch
 source: "Claude/Windows self-audit report (docs/pipeline-audit-claude-session.md §3.1, §10.6), cited by scratch/greenfield-triage-2026-08-29.md finding F16, observed during the 2026-08-29 three-runner greenfield test."
 ---
 
@@ -81,3 +81,10 @@ and `done_when` untouched for the Elephant to verify and close.
 - **Assignment:** `sprint: nova`, Nova B — a quality-gate hardening, not a
   happy-path blocker; does not block the 0.6.0 candidate.
 - **Date:** 2026-08-29
+
+`done_when` repointed, 2026-08-29 (Elephant): the old marker was satisfied
+the moment R21 built the mechanism, but two of three Acceptance criteria
+remain genuinely unmet — the record is not yet produced automatically for
+every real dispatch decision (opt-in field only), and no real repository
+scan exists yet (pure functions only, disclosed follow-up in R21's own
+report). Repointed to a marker naming the real remaining wiring work.
