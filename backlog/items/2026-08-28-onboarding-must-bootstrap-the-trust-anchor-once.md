@@ -3,11 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.onboarding-must-bootstrap-the-trust-anchor-once
 type: defect
 owner: pipeline
-status: closed
-closed_at: 2026-08-29
-closure_repository: self
-closure_commit: 180d427a91a74af08649e40a70b7617185df19ea
-closure_evidence: plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
+status: open
 created: 2026-08-28
 sprint: nova
 tracking: "NOW / Nova A — happy-path blocking: its absence deadlocked the first human override in the Claude run and cost a live PO signature; PO asked for this explicitly"
@@ -128,3 +124,33 @@ Re-verified independently: `project-onboarding-v3.test.mjs` 151/151 (incl.
 `critical-action-authorization.test.mjs` 39/39,
 `check-consumer-safe-paths.test.mjs` 9/9. No code changed by this dispatch
 — nothing to commit.
+
+## Reopened, 2026-08-29 (later same day) — the "found already satisfied" closure was code-reading-only, not live-verified
+
+The candidate the PO used for the 2026-08-29 3-runner greenfield test (built
+from commit `ab0906d`, 16:43 CEST; stamped as the "final candidate" at
+18:44 CEST, commit `0bf246d1`) already contained commit `180d427a` (12:12
+CEST), the exact commit this closure cites as satisfying Direction 4. Yet
+BOTH the Codex/WSL and Claude/Windows greenfield sessions, run against
+that candidate, independently hit the identical circularity this item's
+own "What happened" section describes -- neither could set the first
+trust anchor through any sanctioned path and both required a human
+`git commit --no-verify` bypass. Confirmed by the PO directly (2026-08-29):
+"das ist auch mein Eindruck ... die fixes gingen eindeutig nicht weit
+genug und die Runner haben die berichteten Probleme wirklich [gehabt]."
+
+This means the closure's own unit-test-based verification did not exercise
+the actual live path a genuinely fresh, no-prior-key environment walks --
+same class of gap as `2026-08-09-codex-restart-cannot-recover-operational-
+context-from-its-own-prior-transcript.md` (also closed on code evidence,
+also independently reported as still-broken live). Reopening; needs a live
+reproduction against a genuinely fresh onboarding fixture (no pre-existing
+machine-plane key pointer, `signature` mode) before any further fix, to
+determine exactly which of Direction 1-4 fails live despite passing its
+own unit tests.
+
+Sources: `scratch/greenfield-reports/pipeline-retrospective-codex-060-77.md`
+("Zirkel bei Trust Anchor und erster Signatur"),
+`scratch/greenfield-reports/pipeline-retrospective-claude-060-78.md`
+(Defekt #4, section 8) -- two independent physical-machine data points,
+per Claude's own report's explicit independence argument (section 10).
