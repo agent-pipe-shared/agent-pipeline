@@ -71,11 +71,22 @@ establishes the gap and the acceptance bar, not the implementation.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
+- **Decision:** accepted
+- **Rationale:** Implemented as NVA-R22-PLANSHOWN: new `present-plan --by <name>`
+  CLI step records `planPresentation` (a session-side attestation, matching
+  `--by`'s own claim style) bound by `submissionSha256` to the exact current
+  submission; `approve-plan` hard-refuses (no override) when no matching
+  record exists, checked last so a request invalid for another reason still
+  reports that reason. Additive only — existing `--by`/lifecycle-match checks
+  unchanged. Known consequence: `harness/scripts/pipeline-state.test.mjs`
+  (TP-5 protected, out of this dispatch's edit scope) has ~10 pre-existing
+  `approve-plan`-success fixtures that never call `present-plan` and now fail
+  (PS06a/c/d + a downstream crash) — needs a dedicated author-repair follow-up
+  to insert `present-plan --by <name>` calls before those `approve-plan`
+  calls; not yet done.
 - **Assignment:** `sprint: nova`, and it blocks the 0.6.0 release candidate —
   per the triage's own Sprint column, F28 is one of only two Friction-group
   findings marked NOW (with F23): a PO approving unseen content is a
   quality-gate integrity failure on the single most consequential human
   decision point in the flow, not merely friction.
-- **Date:**
+- **Date:** 2026-08-29
