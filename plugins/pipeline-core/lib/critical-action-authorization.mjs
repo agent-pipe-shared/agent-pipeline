@@ -53,12 +53,18 @@
  * attribution rather than a proof. Publication keeps its own external-verification route
  * through the fixed executor and is untouched here.
  */
-import { createHash } from "node:crypto";
-import { lstatSync, readFileSync } from "node:fs";
-import { isAbsolute, relative, resolve, sep } from "node:path";
+import { createHash, randomBytes } from "node:crypto";
+import {
+  closeSync, fsyncSync, ftruncateSync, lstatSync, mkdirSync, openSync,
+  readFileSync, renameSync, unlinkSync, writeSync,
+} from "node:fs";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { criticalActionSha256, criticalActionSubjectSha256 } from "./critical-action-approval-request.mjs";
-import { readCriticalHumanProofPolicy, verifyAgainstTrustAnchors } from "./critical-human-proof-policy.mjs";
+import {
+  CRITICAL_HUMAN_PROOF_POLICY_PATH, CRITICAL_HUMAN_PROOF_POLICY_V3,
+  readCriticalHumanProofPolicy, verifyAgainstTrustAnchors,
+} from "./critical-human-proof-policy.mjs";
 import { createPoApprovalIntent } from "./po-approval-proof.mjs";
 
 const OID = /^[a-f0-9]{40,64}$/u;
@@ -131,16 +137,84 @@ function boundArtifactDigest(projectDir, relativePath) {
  * one — identical behaviour to before, since membership in a one-element set is exactly
  * the equality check this used to do directly. A v3 document's `trustAnchors` is used as
  * written, EMPTY INCLUDED: an explicit empty v3 set is not "missing", it is the "any
- * well-formed key" posture, and only a v3 reader can say so — a v1/v2 document with no
- * `trustAnchor` at all still means "this route is unavailable", exactly as it always has.
+ * well-formed key" posture, and only a v3 reader can say so.
+ *
+ * TRUST-ON-FIRST-USE (PO decision, 2026-08-29; backlog:
+ * 2026-08-28-a-v1-trust-anchor-makes-the-signature-push-route-functionless.md). A v1/v2
+ * document with no `trustAnchor` at all — or no policy file at all — used to mean "this
+ * route is unavailable" permanently. It now means "no key has ever been pinned YET": this
+ * one call is verified against any well-formed key, same as the v3 any-key posture, but the
+ * caller is told (`pinOnSuccess`) to record the verifying key once the proof actually checks
+ * out, so every later call is pinned to that key rather than staying open forever. A v3
+ * document's explicit empty `trustAnchors: []` never sets `pinOnSuccess` — that posture is a
+ * deliberate, permanent "any well-formed key, every time" and must never be narrowed by this
+ * mechanism.
  */
 function trustAnchorsFor(anchorDir, prefix) {
   const policy = readCriticalHumanProofPolicy(anchorDir);
   if (!policy.ok) return { ok: false, code: policy.code };
   if (policy.trustAnchors !== null) return { ok: true, anchors: policy.trustAnchors, policy };
-  return policy.trustAnchor === null
-    ? { ok: false, code: `${prefix}-TRUST-ANCHOR-MISSING` }
-    : { ok: true, anchors: [policy.trustAnchor], policy };
+  if (policy.trustAnchor !== null) return { ok: true, anchors: [policy.trustAnchor], policy };
+  return { ok: true, anchors: [], policy, pinOnSuccess: true };
+}
+
+/**
+ * Trust-on-first-use write-back. Reached ONLY when `trustAnchorsFor` set `pinOnSuccess` and
+ * the action this call authorizes has now fully verified — never on a proof that merely
+ * checked cryptographically but was then refused for an unrelated reason (unconsumed ledger
+ * entry, single-use replay, etc.): only a call that is actually going to return
+ * `authorized: true` gets to pin a key.
+ *
+ * Re-reads the policy immediately before writing and refuses to touch it unless it STILL has
+ * no anchor at all: a concurrent write — a human editing one in, or a racing call pinning a
+ * different key first — must win over this one, never be silently clobbered by it.
+ *
+ * Same-directory temp file, fsync, atomic rename, directory fsync — the identical durable-write
+ * shape `atomicWriteContinuityState` (scripts/pipeline-state.mjs) already established for this
+ * codebase's other state writers, copied rather than reinvented. Best-effort and silent on
+ * failure BY DESIGN: the proof that reached this point already verified cryptographically
+ * against the open posture, so a write error here must not retroactively unauthorize an action
+ * that has already been decided — it only means the pin did not take, and the NEXT call gets
+ * the identical chance to record it.
+ */
+function pinTrustAnchorOnFirstUse(anchorDir, policy, kind, signer) {
+  try {
+    const path = resolve(anchorDir, CRITICAL_HUMAN_PROOF_POLICY_PATH);
+    const fresh = readCriticalHumanProofPolicy(anchorDir);
+    if (!fresh.ok || fresh.trustAnchors !== null || fresh.trustAnchor !== null) return;
+    const document = {
+      schema: CRITICAL_HUMAN_PROOF_POLICY_V3,
+      requiredKinds: Array.from(new Set([...policy.requiredKinds, kind])),
+      waivedKinds: Array.from(policy.waivers, ([waivedKind, reason]) => ({ kind: waivedKind, reason })),
+      trustAnchors: [{ keyReference: signer.keyReference, publicKeySha256: signer.publicKeySha256 }],
+    };
+    const text = `${JSON.stringify(document, null, 2)}\n`;
+    const bytes = Buffer.from(text, "utf8");
+    const parent = dirname(path);
+    mkdirSync(parent, { recursive: true, mode: 0o700 });
+    const tmp = join(parent, `.critical-human-proof-policy-${randomBytes(12).toString("hex")}.tmp`);
+    const fd = openSync(tmp, "wx", 0o600);
+    try {
+      ftruncateSync(fd, 0);
+      let offset = 0;
+      while (offset < bytes.length) offset += writeSync(fd, bytes, offset, bytes.length - offset, offset);
+      fsyncSync(fd);
+    } finally {
+      closeSync(fd);
+    }
+    try {
+      renameSync(tmp, path);
+    } catch (error) {
+      try { unlinkSync(tmp); } catch { /* best effort cleanup */ }
+      throw error;
+    }
+    try {
+      const dirFd = openSync(parent, "r");
+      try { fsyncSync(dirFd); } finally { closeSync(dirFd); }
+    } catch { /* directory fsync is best-effort durability, not correctness */ }
+  } catch {
+    // Best-effort by design — see doc comment above.
+  }
 }
 
 /**
@@ -292,6 +366,10 @@ export function authorizeRecordedPush({ projectDir, anchorDir = projectDir, stat
     return { authorized: false, code: `${prefix}-NOT-CONSUMED` };
   }
 
+  // Trust-on-first-use: only pin once every other check has already passed and this call
+  // is actually going to authorize the push — see `pinTrustAnchorOnFirstUse`.
+  if (trust.pinOnSuccess) pinTrustAnchorOnFirstUse(anchorDir, trust.policy, "push", verified.signer);
+
   return {
     authorized: true, code: `${prefix}-VERIFIED`,
     keyReference: verified.signer.keyReference, publicKeySha256: verified.signer.publicKeySha256,
@@ -339,6 +417,7 @@ export function authorizeRecordedDeploy({ projectDir, anchorDir = projectDir, st
       anchors: trust.anchors, now, subject: { artifact, environment },
     });
     if (verified.ok) {
+      if (trust.pinOnSuccess) pinTrustAnchorOnFirstUse(anchorDir, trust.policy, "deploy", verified.signer);
       return {
         authorized: true, code: `${prefix}-VERIFIED`,
         keyReference: verified.signer.keyReference, publicKeySha256: verified.signer.publicKeySha256,

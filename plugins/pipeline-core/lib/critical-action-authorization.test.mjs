@@ -8,7 +8,7 @@
  */
 import assert from "node:assert/strict";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -134,13 +134,37 @@ try {
     assert.equal(result.authorized, true);
   });
 
-  // PPA2 -- no committed anchor means no verifiable key, and an unverifiable proof is
-  // not a proof. This is what keeps the decision out of the mutable state file.
-  check("PPA2 a policy without a trust anchor cannot authorize a raw push", () => {
+  // PPA2 -- trust-on-first-use (PO decision, 2026-08-29; backlog:
+  // 2026-08-28-a-v1-trust-anchor-makes-the-signature-push-route-functionless.md). A policy
+  // with genuinely no trust anchor recorded no longer means "this route is unavailable
+  // forever" -- the first verifying signature is accepted (same as the v3 any-key posture)
+  // AND the verifying key is written back as a v3 trust anchor, so later calls are pinned.
+  check("PPA2 a first use against a policy without any trust anchor authorizes and pins the verifying key", () => {
     const key = keypair();
     const { root, threatModel } = fixture({ anchor: null });
     const record = approvalRecord({ key, threatModel });
-    assert.equal(call(root, stateFor(record)).code, "PUSH-PROOF-TRUST-ANCHOR-MISSING");
+    const result = call(root, stateFor(record));
+    assert.equal(result.code, "PUSH-PROOF-VERIFIED");
+    assert.equal(result.authorized, true);
+    const written = JSON.parse(readFileSync(join(root, "project", "critical-human-proof.json"), "utf8"));
+    assert.equal(written.schema, "pipeline.critical-human-proof-policy.v3");
+    assert.deepEqual(written.requiredKinds, ["push", "deploy", "publication"]);
+    assert.deepEqual(written.waivedKinds, []);
+    assert.deepEqual(written.trustAnchors, [{ keyReference: "po-key-1", publicKeySha256: key.publicKeySha256 }]);
+  });
+
+  // PPA2A -- the pin actually restricts: once the first call has recorded a key, a second,
+  // genuinely different key is refused rather than being accepted under the same open
+  // posture PPA2 relied on for the first call.
+  check("PPA2A trust-on-first-use pins: a second call under a different key is refused after the first pins", () => {
+    const first = keypair();
+    const second = keypair();
+    const { root, threatModel } = fixture({ anchor: null });
+    const firstResult = call(root, stateFor(approvalRecord({ key: first, threatModel })));
+    assert.equal(firstResult.authorized, true);
+    const secondResult = call(root, stateFor(approvalRecord({ key: second, threatModel })));
+    assert.equal(secondResult.authorized, false);
+    assert.equal(secondResult.code, "PUSH-PROOF-TRUST-MISMATCH");
   });
 
   // PPA3 -- the attack the anchor exists for: a forged record signed by a key the
@@ -521,11 +545,30 @@ try {
     assert.equal(callDeploy(root, deployState([deployRecord({ key })]), { now: "2026-08-08T00:00:00.000Z" }).code, "DEPLOY-PROOF-EXPIRED");
   });
 
-  // DPA10 -- no anchor, no verifiable key, on this route as on the other.
-  check("DPA10 a policy without a trust anchor cannot authorize a deploy", () => {
+  // DPA10 -- trust-on-first-use, mirroring PPA2 on the release route: no anchor at all
+  // means the first verifying deploy proof authorizes and pins the verifying key.
+  check("DPA10 a first deploy against a policy without any trust anchor authorizes and pins the verifying key", () => {
     const key = keypair();
     const { root } = fixture({ anchor: null });
-    assert.equal(callDeploy(root, deployState([deployRecord({ key })])).code, "DEPLOY-PROOF-TRUST-ANCHOR-MISSING");
+    const result = callDeploy(root, deployState([deployRecord({ key })]));
+    assert.equal(result.code, "DEPLOY-PROOF-VERIFIED");
+    assert.equal(result.authorized, true);
+    const written = JSON.parse(readFileSync(join(root, "project", "critical-human-proof.json"), "utf8"));
+    assert.equal(written.schema, "pipeline.critical-human-proof-policy.v3");
+    assert.deepEqual(written.trustAnchors, [{ keyReference: "po-key-1", publicKeySha256: key.publicKeySha256 }]);
+  });
+
+  // DPA10A -- the pin restricts here too: a second, different key is refused once the
+  // first deploy call has recorded one.
+  check("DPA10A trust-on-first-use pins on the deploy route: a second call under a different key is refused after the first pins", () => {
+    const first = keypair();
+    const second = keypair();
+    const { root } = fixture({ anchor: null });
+    const firstResult = callDeploy(root, deployState([deployRecord({ key: first })]));
+    assert.equal(firstResult.authorized, true);
+    const secondResult = callDeploy(root, deployState([deployRecord({ key: second })]));
+    assert.equal(secondResult.authorized, false);
+    assert.equal(secondResult.code, "DEPLOY-PROOF-TRUST-MISMATCH");
   });
 
   // DPA11 -- a push proof must not be spendable as a deploy proof.
@@ -535,6 +578,20 @@ try {
     const pushed = approvalRecord({ key, threatModel });
     const entry = { forArtifact: ARTIFACT, forEnvironment: ENVIRONMENT, criticalProof: pushed.criticalProof };
     assert.equal(callDeploy(root, deployState([entry])).code, "DEPLOY-PROOF-KIND");
+  });
+
+  // DPA12 -- the two routes share one policy file: a key pinned by a push authorization
+  // also governs the deploy route, so a different key is refused there too. This is the
+  // design decision that trust-on-first-use is one shared mechanism, not a per-kind one.
+  check("DPA12 a key pinned by the push route also governs the deploy route (shared policy file)", () => {
+    const pushed = keypair();
+    const attacker = keypair();
+    const { root, threatModel } = fixture({ anchor: null });
+    const pushResult = call(root, stateFor(approvalRecord({ key: pushed, threatModel })));
+    assert.equal(pushResult.authorized, true);
+    const deployResult = callDeploy(root, deployState([deployRecord({ key: attacker })]));
+    assert.equal(deployResult.authorized, false);
+    assert.equal(deployResult.code, "DEPLOY-PROOF-TRUST-MISMATCH");
   });
 
   process.stdout.write(`\n${checks}/${checks} critical-action authorization checks passed\n`);
