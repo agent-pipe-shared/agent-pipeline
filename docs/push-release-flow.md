@@ -150,6 +150,16 @@ candidate commit/tree, subject digest, feature id and expiry, and explicitly
 what the approval does *not* cover, before asking for the passphrase — ADR-0061
 Decision 4), and enters the OpenSSL passphrase. That is the entire human part.
 
+**This signing step needs a real, attended terminal window — never an
+in-session `!` route.** OpenSSL runs its own interactive passphrase prompt on
+whatever process spawns it; a route with no controlling terminal (such as an
+agent session's `!` command) has nowhere for that prompt to go, and the
+failure it produces reads exactly like a rejected passphrase even though
+nothing was mistyped (`pipeline.signing-requires-attended-terminal`,
+`po-human-approval.mjs`). When handing over a command that reaches
+`signIntentIntoProof` (`sign-intent`, `authorize-critical`), say explicitly
+that it must run in a terminal window, not through the session.
+
 **`--directory` has an optional environment fallback.** Every
 `po-human-approval.mjs` subcommand accepts the approval directory from
 `$PIPELINE_PO_APPROVAL_DIRECTORY` when `--directory` is not passed explicitly;

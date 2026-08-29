@@ -766,6 +766,11 @@ test("NVA-SIGNONCE-1: sign-intent skips the typed confirmation for a passphrase-
       // branch ever regresses into still reading a confirmation, this test fails
       // loudly instead of quietly passing on an unread stub answer.
       readConfirmation: () => { throw new Error("readConfirmation must not be called for a passphrase-protected key"); },
+      // NVA-W5-TTYSIGN: this test's `spawn` stub simulates a real, attended OpenSSL
+      // round trip against a passphrase-protected key, so it must simulate an
+      // attended terminal too -- the test process running this suite has none of its
+      // own (`process.stdin.isTTY` is `undefined` under `node --test`).
+      isTTY: true,
     };
     let result;
     const output = captureStdout(() => {
@@ -786,6 +791,47 @@ test("NVA-SIGNONCE-1: sign-intent skips the typed confirmation for a passphrase-
     assert.equal(proof.intentSha256, intentSha256);
     const verified = verifyPoApprovalProof({ intent: { sha256: intentSha256 }, trustPolicy: authority, proof });
     assert.equal(verified.verified, true, "the signature produced without a typed confirmation must still be a genuine, verifying one");
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("NVA-W5-TTYSIGN: sign-intent for a passphrase-protected key fails closed with an attended-terminal message, and never spawns OpenSSL, when no TTY is attached", () => {
+  const dirs = fixtureDirs();
+  try {
+    const passphrase = "sign-intent-fixture-passphrase";
+    encryptedKeyFixture(dirs.directory, passphrase);
+    const intentSha256 = createHash("sha256").update("pipeline.tty-sign-no-terminal-fixture").digest("hex");
+    let spawnCalled = false;
+    const dependencies = {
+      isTTY: false,
+      spawn: () => { spawnCalled = true; return { status: 0 }; },
+      readConfirmation: () => { throw new Error("readConfirmation must not be called before the TTY precondition"); },
+    };
+    const error = thrown(() => runHumanApproval(
+      ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", intentSha256],
+      dependencies,
+    ));
+    assert.ok(error, "signing must refuse before ever spawning OpenSSL when there is no controlling terminal");
+    assert.match(error.message, /pipeline\.signing-requires-attended-terminal/u, "the message must carry the greppable marker");
+    assert.match(error.message, /no controlling terminal/u, "the message must explicitly name the real cause");
+    assert.doesNotMatch(error.message, /passphrase/u, "the message must never mention a passphrase -- that is the exact confusion this item is filed about");
+    assert.equal(spawnCalled, false, "OpenSSL must never be invoked once the TTY precondition has failed");
+    assert.equal(existsSync(join(dirs.directory, "proof-manual.json")), false);
+    assert.equal(existsSync(join(dirs.directory, "intent-manual.txt")), false, "the intent file must never be written before the TTY precondition passes");
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("NVA-W5-TTYSIGN: sign-intent for an UNPROTECTED key is unaffected by a missing TTY -- OpenSSL never prompts, so no terminal is required", { skip: REQUIRES_OPENSSL }, () => {
+  const dirs = fixtureDirs();
+  try {
+    keyFixture(dirs.directory);
+    const intentSha256 = createHash("sha256").update("pipeline.tty-sign-unprotected-key-fixture").digest("hex");
+    const dependencies = { isTTY: false, readConfirmation: () => "approve" };
+    const result = runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", intentSha256], dependencies);
+    assert.equal(result.ok, true, "an unprotected key never makes OpenSSL prompt, so signing must succeed with no TTY attached");
   } finally {
     cleanup(dirs);
   }
