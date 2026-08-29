@@ -257,7 +257,7 @@
 | pipeline.identity-attestation-fails-open-on-unresolved-transcript-path | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.immutable-manifest-entries-can-be-rebound-with-no-amendment-record | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.inherited-still-open-claims-need-a-re-check-before-dispatch-no-durable-home | closed | workflow-improvement | pipeline | 2026-08-18 | — |
-| pipeline.installed-marketplace-guard-copy-drifts-silently-from-repo-source | open | defect | pipeline | 2026-08-29 | PO gate/signature topic — collect for later per the 0.6.0 candidate mandate, not attempted as a fix this session. No PO decision requested yet on whether the remedy is a checker, a documented pre-flight step, or accepted as an inherent property of the local-marketplace-copy model (ADR-0052). |
+| pipeline.installed-marketplace-guard-copy-drifts-silently-from-repo-source | closed | defect | pipeline | 2026-08-29 | PO decision 2026-08-29: candidate 3 (accept as inherent), documented permanently. |
 | pipeline.installed-plugin-gmw-hgo-v3-anchor-gap-blocks-all-protected-edits | closed | defect | pipeline | 2026-08-16 | — |
 | pipeline.installing-consumer-is-never-asked-any-setup-decision | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.intake-generate-coordinator-path-undocumented-in-skill-references | closed | defect | pipeline | 2026-08-24 | — |
@@ -510,7 +510,7 @@
 | pipeline.two-minor-happy-path-retries-in-the-final-codex-run | open | workflow-improvement | pipeline | 2026-08-09 | — |
 | pipeline.two-more-critic-preimage-pins-surfaced-by-the-accumulate-fix | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.two-signature-ceremonies-overwrite-each-others-proof | open | defect | pipeline | 2026-08-28 | — |
-| pipeline.two-v3-scripts-admitted-but-unnamed | open | defect | pipeline | 2026-08-29 | NOW / Nova A — found by NVA-W8-VERIFYREG2's own new reachability check running against this repository |
+| pipeline.two-v3-scripts-admitted-but-unnamed | closed | defect | pipeline | 2026-08-29 | NOW / Nova A — found by NVA-W8-VERIFYREG2's own new reachability check running against this repository |
 | pipeline.undocumented-transcript-fallback-selects-wrong-file-by-mtime | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.unenforced-process-rules-vary-by-runner | open | defect | pipeline | 2026-08-28 | Nova B |
 | pipeline.unified-human-authorization-ux | closed | workflow-improvement | pipeline | 2026-08-02 | Current CYB-4 helper is a compatible first adapter only; no programme-wide migration or closure is claimed. |
@@ -548,8 +548,8 @@
 
 ## Counts
 
-- open: 89
+- open: 87
 - in_progress: 3
-- closed: 434
+- closed: 436
 - rejected: 3
 - deferred: 11
