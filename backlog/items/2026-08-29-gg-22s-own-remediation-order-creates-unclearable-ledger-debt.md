@@ -6,7 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-29
 sprint: nova
-done_when: contains plugins/pipeline-core/hooks/guard-git.mjs pipeline.gg-22-remediation-order-is-reconcile-last
+done_when: contains plugins/pipeline-core/hooks/guard-git.test.mjs GG22-7
 source: "Hit live by the Elephant on 2026-08-29 while closing candidate backlog items: following GG-22's printed remediation literally produced a debt state no further reconciliation could clear, costing roughly ten tool calls to escape."
 ---
 
@@ -142,3 +142,11 @@ line once a ceremony clears the path. The source fix itself (commit
 `01c02971`) is real, verified, and shipped independent of this remaining
 test-coverage gap — the guard's behavior is correct today, just not yet
 pinned by a dedicated regression test for this exact case.
+
+`done_when` repointed, 2026-08-29 (Elephant): the old marker
+(`pipeline.gg-22-remediation-order-is-reconcile-last`) was satisfied the
+moment the source fix landed, so it stopped measuring anything once the
+text fix was real — the same graduation pattern seen elsewhere this
+session. Repointed to `contains guard-git.test.mjs GG22-7`, the drafted
+test's own name, which will genuinely go from absent to present once the
+ceremony clears and the tests land.
