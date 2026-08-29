@@ -4166,6 +4166,14 @@ test("the seeded push gate refuses an unapproved push and admits it after the sh
     hostGit(path, ["init", "--initial-branch=main"]);
     hostGit(path, ["config", "user.email", "po@example.invalid"]);
     hostGit(path, ["config", "user.name", "PO"]);
+    // NVA-R33-SECGATEON: a real remote is required so security-scan.mjs (below) can
+    // compute `candidate.repositorySha256` -- without one it stays null and the
+    // security bucket refuses with "candidate repository identity is invalid" even
+    // after a clean scan. This test's own concern is the PUSH bucket; the security
+    // bucket now has to be driven green too since it is a second, independent
+    // blocker on the same seeded gate chapter (see SECGATE-1 below for its own
+    // dedicated satisfying-path proof).
+    hostGit(path, ["remote", "add", "origin", "https://example.invalid/pipeline/fixture.git"]);
     const seed = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
     assert.equal(applyProjectOnboardingV3(seed, { rootDir: path, activate: true, deps: fakeDeps }).status, "applied");
 
@@ -4181,6 +4189,12 @@ test("the seeded push gate refuses an unapproved push and admits it after the sh
     );
     const producer = fileURLToPath(new URL("../scripts/verify-evidence-producer.mjs", import.meta.url));
     const produceEvidence = () => spawnSync(process.execPath, [producer, "--root", path, "--out", "evidence/verify-latest.json"], {
+      cwd: path, encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: path },
+    });
+    // NVA-R33-SECGATEON: the second, independent bucket the seeded gate chapter now
+    // also demands -- see SECGATE-1 below for its own dedicated satisfying-path proof.
+    const securityScanScript = fileURLToPath(new URL("../scripts/security-scan.mjs", import.meta.url));
+    const produceSecurityEvidence = () => spawnSync(process.execPath, [securityScanScript, "--root", path], {
       cwd: path, encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: path },
     });
     // `approve-push`'s chat-mode challenge is written with `console.error`
@@ -4231,6 +4245,7 @@ test("the seeded push gate refuses an unapproved push and admits it after the sh
     assert.equal(state(["materialize-push-threat-model"]).code, 0);
     commit("push threat model");
     assert.equal(produceEvidence().status, 0, "a configured, passing verify command must yield evidence");
+    assert.equal(produceSecurityEvidence().status, 0, "a fresh consumer with no catalog must yield a clean, non-blocking security scan");
 
     // (5) The approval itself -- the human step the whole gate exists for.
     // Chat mode's first call issues a challenge rather than completing the
@@ -4257,6 +4272,118 @@ test("the seeded push gate refuses an unapproved push and admits it after the sh
     writeFileSync(join(path, "README.md"), "moved on\n");
     commit("a later commit");
     assert.equal(attemptPush().status, 2, "an approval must not travel to a commit nobody approved");
+  } finally { dispose(path); }
+});
+
+// SECGATE-1 (NVA-R33-SECGATEON, backlog:
+// 2026-08-28-seed-the-security-gate-on-now-that-its-satisfying-path-is-open.md): the
+// security gate's own satisfying path, measured end to end in a real onboarded root,
+// to the same standard PUSHSEED-2 above measures the push gate's. The push bucket is
+// driven fully green FIRST so that whatever still refuses afterward can only be the
+// SECURITY bucket -- proving it is a real, independent blocker rather than one that
+// merely rides along on the push gate's own refusal. The scan itself is then run with
+// an EMPTY environment (no PATH at all, so no external scanner binary is reachable --
+// the same isolation shape security-scan.test.mjs's own NVA-R18-SCANBOOT fixture uses),
+// establishing the no-external-scanner case by real subprocess measurement rather than
+// by assuming the fixture-level proof generalizes to an actual onboarded root's layout.
+//
+// NOT measured here (disclosed rather than assumed): a true INSTALLED-PLUGIN-style
+// deployment (no repo root above the plugin's own scripts/lib directories) for this
+// specific push+onboarding flow -- that would need copying the whole onboarding/push/
+// security-scan call graph into a rootless fixture tree, out of reach in this dispatch's
+// budget. The narrower mechanism this satisfying path actually depends on -- gitleaks
+// config resolution from an installed-plugin layout with no repo root at all -- IS
+// already measured that way, in security-adapters/gitleaks.test.mjs ("run() resolves
+// the plugin-shipped default config from an installed-plugin fixture with no repo root
+// anywhere").
+test("the seeded security gate refuses a push with missing security evidence and admits it after the shipped scan command runs (SECGATE-1)", () => {
+  const path = root();
+  try {
+    hostGit(path, ["init", "--initial-branch=main"]);
+    hostGit(path, ["config", "user.email", "po@example.invalid"]);
+    hostGit(path, ["config", "user.name", "PO"]);
+    // A real remote is required so security-scan.mjs can compute
+    // `candidate.repositorySha256` -- without one it stays null and the gate
+    // refuses with "candidate repository identity is invalid" even after a clean
+    // scan (same reason PUSHSEED-2 above now needs one too).
+    hostGit(path, ["remote", "add", "origin", "https://example.invalid/pipeline/fixture.git"]);
+    const seed = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
+    assert.equal(applyProjectOnboardingV3(seed, { rootDir: path, activate: true, deps: fakeDeps }).status, "applied");
+
+    const attemptPush = () => spawnSync(
+      process.execPath,
+      [fileURLToPath(new URL("../hooks/guard-push.mjs", import.meta.url))],
+      {
+        cwd: path,
+        encoding: "utf8",
+        input: JSON.stringify({ tool_name: "Bash", tool_input: { command: "git push origin HEAD:refs/heads/feat/x" } }),
+        env: { ...process.env, CLAUDE_PROJECT_DIR: path },
+      },
+    );
+    const verifyProducer = fileURLToPath(new URL("../scripts/verify-evidence-producer.mjs", import.meta.url));
+    const produceVerifyEvidence = () => spawnSync(process.execPath, [verifyProducer, "--root", path, "--out", "evidence/verify-latest.json"], {
+      cwd: path, encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: path },
+    });
+    const securityScanScript = fileURLToPath(new URL("../scripts/security-scan.mjs", import.meta.url));
+    const produceSecurityEvidenceNoScanners = () => spawnSync(process.execPath, [securityScanScript, "--root", path], {
+      cwd: path, encoding: "utf8", env: {},
+    });
+    const state = (argv, deps = {}) => {
+      const stderr = [];
+      const originalError = console.error;
+      console.error = (...values) => { stderr.push(values.join(" ")); };
+      let code;
+      try {
+        code = pipelineStateRun(argv, { dir: path, writeError: (value) => stderr.push(String(value)), ...deps });
+      } finally {
+        console.error = originalError;
+      }
+      return { code, stderr: stderr.join("") };
+    };
+    const commit = (message) => { hostGit(path, ["add", "-A"]); hostGit(path, ["commit", "-q", "-m", message]); };
+
+    commit("seeded consumer");
+    const refused = attemptPush();
+    assert.equal(refused.status, 2, `the seeded gate must refuse: ${refused.stderr}`);
+    assert.match(String(refused.stderr), /evidence\/security-latest\.json missing/u,
+      "the security gate's own missing-evidence finding is in the refusal");
+
+    // Drive the PUSH bucket (verify evidence + approval) fully green first.
+    const calibrationPath = join(path, "project", "pipeline.json");
+    const calibration = JSON.parse(readFileSync(calibrationPath, "utf8"));
+    calibration.verify = `${JSON.stringify(process.execPath)} -e "process.exit(0)"`;
+    writeFileSync(calibrationPath, `${JSON.stringify(calibration, null, 2)}\n`);
+    const userPath = join(path, "pipeline.user.yaml");
+    writeFileSync(userPath, readFileSync(userPath, "utf8").replace(/push_approval: "?signature"?/u, 'push_approval: "chat"'));
+    commit("configure verify and push approval");
+    assert.equal(state(["materialize-push-threat-model"]).code, 0);
+    commit("push threat model");
+    assert.equal(produceVerifyEvidence().status, 0, "a configured, passing verify command must yield evidence");
+    const challengeAttempt = state(["approve-push", "--by", "po", "--remote", "origin", "--destination", "refs/heads/feat/x"]);
+    assert.equal(challengeAttempt.code, 1, challengeAttempt.stderr);
+    const challengeCode = JSON.parse(readFileSync(join(path, "project", "pipeline-state.json"), "utf8")).pendingPushChallenge.code;
+    const approved = state(["approve-push", "--by", "po", "--remote", "origin", "--destination", "refs/heads/feat/x"],
+      { isattyFn: () => true, readLineFn: () => challengeCode });
+    assert.equal(approved.code, 0, approved.stderr);
+
+    // The push bucket is fully satisfied now. Only the security bucket can still refuse.
+    const stillRefused = attemptPush();
+    assert.equal(stillRefused.status, 2, "the push gate is satisfied, but the security gate alone must still refuse");
+    assert.match(String(stillRefused.stderr), /evidence\/security-latest\.json missing/u);
+    assert.doesNotMatch(String(stillRefused.stderr), /Push approval missing/u, "only the security bucket should still be complaining");
+
+    // The shipped command the manifest chapter names, run with NO scanner binary
+    // reachable at all: a fresh consumer ships no governance/security-controls/
+    // catalog.json, so the required-capability plan is empty and the verdict is
+    // CLEAN regardless of which scanners are actually present.
+    const scanResult = produceSecurityEvidenceNoScanners();
+    assert.equal(scanResult.status, 0, `security-scan must exit 0 with no scanners reachable: ${scanResult.stderr}`);
+    assert.equal(existsSync(join(path, "evidence", "security-latest.json")), true);
+    assert.equal(existsSync(join(path, "evidence", "security-latest.v2.json")), true);
+    assert.equal(existsSync(join(path, "evidence", "security-latest.v2.verdict.json")), true);
+
+    const admitted = attemptPush();
+    assert.equal(admitted.status, 0, `the fully-satisfied push must be admitted: ${admitted.stderr}`);
   } finally { dispose(path); }
 });
 
@@ -5696,12 +5823,14 @@ test("portable seed is manifest-valid, then onboarding owns the runtime initiali
     assert.equal(source.advisor_export.consent, "approved");
     assert.equal(source.autonomy.push_policy, "gated");
     assert.equal(source.autonomy.branch_model, "feature-branch");
-    // Same correction as the verify placeholder below: this pin encoded the defect
-    // it was meant to guard. `warn` promised a security gate that the manifest never
-    // carried and that a fresh consumer cannot satisfy -- measured, not assumed
-    // (dirty-tree refusal caused by the push gate's own evidence, three external
-    // scanners, a license allowlist at a Pipeline-only path). `off` is what is true.
-    assert.equal(source.gates.security, "off");
+    // NVA-R33-SECGATEON (2026-08-29): `blocking` is now what is true, and the manifest
+    // carries a matching chapter (see the dedicated gate-agreement test below) -- the
+    // prerequisites that used to make a seeded security gate unsatisfiable (dirty-tree
+    // refusal caused by the push gate's own evidence, three external scanners, a
+    // license allowlist at a Pipeline-only path, gitleaks config resolution in an
+    // installed-plugin deployment) are all closed; see the seeding comment on
+    // freshIntent()'s gates literal in project-onboarding-v3.mjs for the full chain.
+    assert.equal(source.gates.security, "blocking");
     const calibration = JSON.parse(readFileSync(join(path, "project/pipeline.json"), "utf8"));
     // Contract correction: this pin used to assert the always-green placeholder
     // `git diff --check`. That value made a brand-new project report a satisfied
@@ -7092,6 +7221,12 @@ test("a freshly seeded project is honest about its authority tier, its verify co
       // the satisfying path was measured end to end -- see the chapter comment in
       // project-onboarding-v3.mjs and PUSHSEED-2 below.
       push: { mode: "blocking", type: "human" },
+      // NVA-R33-SECGATEON (2026-08-29): same reasoning, same standard -- seeded only
+      // once the satisfying path was measured end to end (see the dedicated
+      // satisfying-path test below and the chapter comment in
+      // project-onboarding-v3.mjs). `automated`, not `human`: there is no separate
+      // approval step, only the scan itself.
+      security: { mode: "blocking", type: "automated" },
     });
     for (const profile of ["epic", "feature", "mini"]) {
       for (const name of ["dev-plan", "push"]) {
@@ -7100,12 +7235,17 @@ test("a freshly seeded project is honest about its authority tier, its verify co
         assert.equal(gate.mode, "blocking", `${profile} seeds an ENFORCING ${name} gate`);
         assert.equal(gate.type, "human");
       }
+      const securityGate = gateConfig(parseYaml(freshManifestBytes(profile)), "security");
+      assert.notEqual(securityGate, null, `${profile} seeds a security gate`);
+      assert.equal(securityGate.mode, "blocking", `${profile} seeds an ENFORCING security gate`);
+      assert.equal(securityGate.type, "automated", `${profile} seeds an AUTOMATED security gate, not a human approval step`);
     }
     // The enforcing artifact names the command sequence out of its own refusal,
     // because the refusal reports the lifecycle state but not the whole path.
     const chapter = freshManifestBytes("feature");
     for (const command of ["submit-plan", "approve-plan", "set-phase --phase implementation",
-      "verify-evidence-producer", "materialize-push-threat-model", "approve-push", "gates.push_approval"]) {
+      "verify-evidence-producer", "materialize-push-threat-model", "approve-push", "gates.push_approval",
+      "security-scan"]) {
       assert.equal(chapter.includes(command), true, `the seeded gate names ${command}`);
     }
     // The calibration and the manifest must not disagree about the push gate:
@@ -7114,20 +7254,19 @@ test("a freshly seeded project is honest about its authority tier, its verify co
     assert.match(userIntent, /push: "?blocking"?/, "the calibration declares the push gate");
     assert.match(userIntent, /push_approval: "?signature"?/,
       "the calibration states how a human clears a push, so `chat` is discoverable without reading plugin source");
-    // The calibration must not promise a gate nothing enforces. `security` read
-    // `warn` while the manifest carried no security chapter. Seeding that chapter
-    // alone is not the fix, but the closed-path reasoning that used to justify `off`
-    // here is now partly stale (NVA-R18-SCANBOOT, 2026-08-29): a fresh consumer's
-    // dirty-tree circle was broken by the seeded `.gitignore`, and a missing scanner
-    // no longer fails the gate (SKIPPED, CLEAN verdict) now that scanner defaults
-    // ship with the plugin -- see the seeding comment in project-onboarding-v3.mjs
-    // for the current, re-measured reasoning. `off` is still what is true: turning
-    // it on is a deliberate act with prerequisites (see that same comment), not
-    // something onboarding defaults a fresh consumer into.
-    assert.match(userIntent, /security: "?off"?/,
-      "the calibration must not declare a security gate whose default remains a deliberate act, not a default-on");
-    assert.equal(gateConfig(parseYaml(freshManifestBytes()), "security"), null,
-      "and the manifest must not carry one either -- the two must agree");
+    // NVA-R33-SECGATEON: the calibration must not promise a gate nothing enforces, in
+    // EITHER direction -- `warn` while the manifest carried none was the original
+    // defect, and a calibration/manifest disagreement of any shape is the same defect
+    // by construction. The prerequisites that used to make `blocking` unsatisfiable
+    // (dirty-tree self-poisoning, three external scanners, a Pipeline-only license
+    // allowlist path, gitleaks config resolution in an installed-plugin deployment)
+    // are all closed -- see the seeding comment in project-onboarding-v3.mjs for the
+    // full chain and the dedicated satisfying-path test below for the end-to-end proof.
+    assert.match(userIntent, /security: "?blocking"?/,
+      "the calibration declares the security gate live, matching the manifest chapter it now carries");
+    const seededSecurityGate = gateConfig(parseYaml(freshManifestBytes()), "security");
+    assert.notEqual(seededSecurityGate, null, "and the manifest must carry one too -- the two must agree");
+    assert.equal(seededSecurityGate.mode, "blocking");
 
     // (e) guard-devplan.mjs no longer exits 0 by default, and no longer merely
     // reports: with the seeded gate chapter and an active feature whose design
