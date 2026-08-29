@@ -939,12 +939,43 @@ export function authorizeCriticalPushCommand({
 }
 
 /**
+ * NVA-W5-TTYSIGN (backlog/items/2026-08-29-signing-fails-without-a-tty-and-the-
+ * error-reads-as-a-wrong-passphrase.md): OpenSSL needs a controlling terminal to
+ * run its own interactive prompt during signing. Without one it fails with noise
+ * that a human reads as a rejected key rather than as "no terminal was attached" --
+ * a real ceremony failure observed live. `dependencies.isTTY` is the injectable
+ * seam for tests (a boolean or a zero-arg function); with neither supplied this
+ * falls back to the real `process.stdin.isTTY`.
+ */
+function isAttendedTerminal(dependencies = {}) {
+  if (typeof dependencies.isTTY === "function") return Boolean(dependencies.isTTY());
+  if (typeof dependencies.isTTY === "boolean") return dependencies.isTTY;
+  return Boolean(process.stdin.isTTY);
+}
+
+/**
  * The single signing step: hand the digest to the external OpenSSL prompt and
  * record the resulting detached proof. No signer of this program's own, no key
  * material read into this process, and the temporary intent/signature files are
  * removed on every path.
  */
 function signIntentIntoProof({ intentSha256, keys, artifacts, io, dependencies }) {
+  // pipeline.signing-requires-attended-terminal: fail closed BEFORE ever writing the
+  // intent file or spawning OpenSSL when the key about to sign will make OpenSSL run
+  // its own interactive prompt (NVA-SIGNONCE-1: exactly the passphrase-protected
+  // case) and this process has no controlling terminal to run that prompt on. An
+  // unprotected key never prompts, so it never needed a terminal and this check
+  // stays byte-for-byte inert for it -- unaffected, not merely unlikely to fire.
+  // Deliberately silent on what OpenSSL would have prompted for -- the point of this
+  // check is that the human never sees OpenSSL's own noise, which is what reads as a
+  // rejected key on a correct entry.
+  if (isPrivateKeyPassphraseProtected(keys.privateKey, dependencies) && !isAttendedTerminal(dependencies)) {
+    fail(
+      "sign-intent needs an attended terminal to complete: this process has no controlling terminal " +
+      "(pipeline.signing-requires-attended-terminal). Run the identical command in a terminal window " +
+      "you can type into directly.",
+    );
+  }
   io.write(artifacts.intent, intentSha256, { mode: 0o600 });
   try { command("openssl", ["pkeyutl", "-sign", "-rawin", "-inkey", keys.privateKey, "-in", artifacts.intent, "-out", artifacts.signature], dependencies); }
   finally { rmSync(artifacts.intent, { force: true }); }
