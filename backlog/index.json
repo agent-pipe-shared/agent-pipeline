@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "deffe8b3d09494567ca37c75190d921b26f5d4c6c2ecfcb60b50cb14722be064"
+    "transitionHead": "4ede23d450b7c90051579f10161945c64c6716a839160bce8804de8f357f8ff1"
   },
   "counts": {
-    "open": 101,
+    "open": 100,
     "in_progress": 3,
-    "closed": 419,
+    "closed": 420,
     "rejected": 3,
     "deferred": 11
   },
@@ -1645,12 +1645,16 @@
     },
     {
       "id": "pipeline.dispatch-evidence-record-shape-not-enforced-beyond-taskid-and-outcome",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-29",
       "source": "Claude/Windows self-audit report (docs/pipeline-audit-claude-session.md §3.1), cited by scratch/greenfield-triage-2026-08-29.md finding F18, observed during the 2026-08-29 three-runner greenfield test.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "01062acb",
+      "closureEvidence": "plugins/pipeline-core/scripts/dispatch-authorship-verify.test.mjs"
     },
     {
       "id": "pipeline.dispatch-provenance",
