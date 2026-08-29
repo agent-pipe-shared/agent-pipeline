@@ -65,15 +65,21 @@
  *   - THE OPT-OUT LIST IS A DECISION ON THE RECORD, NOT A DECISION THIS SCRIPT MAKES. A
  *     `DELIBERATELY_UNREGISTERED` entry without a non-empty `reason` is rejected as a usage
  *     error (and the underlying file still reports as unaccounted) -- silence is never treated
- *     as consent to exclude.
+ *     as consent to exclude. Nor is staleness: an entry whose named path `verify.mjs` in fact
+ *     already registers is a fatal `staleOptOut` finding (`pipeline.opt-out-staleness-is-fatal`)
+ *     rather than a silent no-op suppressing a finding that no longer exists -- see
+ *     `compareSuiteRegistration` and backlog
+ *     `2026-08-29-a-stale-verify-opt-out-entry-costs-a-po-signature-for-work-already-done.md`.
  *   - REGISTERING THE ACTUAL GAPS THIS SCRIPT FINDS IS OUT OF SCOPE HERE. That is candidate 3
  *     of the same backlog pair: editing `harness/scripts/verify.mjs` is TP-3-protected and
  *     needs its own signed maintenance-window ceremony.
  *
- * EXIT CODES: 0 = every enumerated suite is registered or opted out with a reason.
- * 1 = at least one unaccounted suite file or invalid opt-out entry. 3 = usage/environment
- * error (verify.mjs unreadable, or any of its three registration arrays -- `TEST_SUITES`,
- * `SCOPED_VERIFY_SUITES`, `WINDOWS_ASSURANCE_VERIFY_SUITES` -- could not be parsed).
+ * EXIT CODES: 0 = every enumerated suite is registered or opted out with a reason, and no
+ * opt-out entry is stale. 1 = at least one unaccounted suite file, invalid opt-out entry, or
+ * stale opt-out entry (a `DELIBERATELY_UNREGISTERED` path that `verify.mjs` in fact already
+ * registers). 3 = usage/environment error (verify.mjs unreadable, or any of its three
+ * registration arrays -- `TEST_SUITES`, `SCOPED_VERIFY_SUITES`, `WINDOWS_ASSURANCE_VERIFY_SUITES`
+ * -- could not be parsed).
  *
  * Usage:
  *   node plugins/pipeline-core/scripts/check-suite-registration.mjs
@@ -532,6 +538,19 @@ export function compareSuiteRegistration({ enumeratedPaths, registeredPaths, opt
   const registeredSet = new Set((registeredPaths ?? []).map(normalizeRepoRelativePath));
   const unaccounted = [];
   const suppressed = [];
+  // pipeline.opt-out-staleness-is-fatal (backlog
+  // 2026-08-29-a-stale-verify-opt-out-entry-costs-a-po-signature-for-work-already-done.md):
+  // an opt-out entry's whole claim is "verify.mjs does NOT register this suite" -- if
+  // registeredPaths shows it does, that claim has quietly become false. This is the same
+  // shape check-backlog-done-predicate.mjs's STALE-OPEN treats as fatal: a declaration that
+  // no longer matches reality, discoverable only by someone paying to check by hand (which is
+  // exactly what happened here -- see the backlog item). Checked directly against
+  // optOutMap/registeredSet, independent of enumeratedPaths, so a stale entry is caught even
+  // for a suite file that no longer exists on disk at all.
+  const staleOptOut = [];
+  for (const [path, reason] of optOutMap) {
+    if (registeredSet.has(path)) staleOptOut.push({ path, reason });
+  }
   for (const rawPath of enumeratedPaths ?? []) {
     const normalized = normalizeRepoRelativePath(rawPath);
     if (registeredSet.has(normalized)) continue;
@@ -541,7 +560,13 @@ export function compareSuiteRegistration({ enumeratedPaths, registeredPaths, opt
     }
     unaccounted.push(rawPath);
   }
-  return { ok: unaccounted.length === 0 && invalidOptOut.length === 0, unaccounted, suppressed, invalidOptOut };
+  return {
+    ok: unaccounted.length === 0 && invalidOptOut.length === 0 && staleOptOut.length === 0,
+    unaccounted,
+    suppressed,
+    invalidOptOut,
+    staleOptOut,
+  };
 }
 
 function main(argv) {
@@ -573,6 +598,10 @@ function main(argv) {
     if (result.unaccounted.length > 0) {
       process.stdout.write(`Unregistered test suites (${result.unaccounted.length}):\n`);
       for (const path of result.unaccounted) process.stdout.write(`  - ${path}\n`);
+    }
+    if (result.staleOptOut.length > 0) {
+      process.stdout.write(`Stale opt-out entries (${result.staleOptOut.length}) -- verify.mjs already registers these; the fix is to DELETE the entry, never to unregister the suite:\n`);
+      for (const entry of result.staleOptOut) process.stdout.write(`  - ${entry.path} (reason on record: ${JSON.stringify(entry.reason)}) -- this suite IS registered in verify.mjs; delete this DELIBERATELY_UNREGISTERED entry\n`);
     }
     if (result.ok) {
       process.stdout.write(`OK: ${enumeratedPaths.length} suite file(s) enumerated against ${registeredPaths.length} TEST_SUITES/SCOPED_VERIFY_SUITES/WINDOWS_ASSURANCE_VERIFY_SUITES entries; all registered or opted out with a reason.\n`);
