@@ -374,6 +374,19 @@ const TIER_B_DECLARATIONS = Object.freeze({
       "plugins/pipeline-core/lib/critic-packet-governance.test.mjs",
     ]),
   }),
+  // ADR-0065 candidate (c), continuation (NVA-W2-TIERBDECL). Same shape, one of the two
+  // remaining named candidates from the 2026-08-25 progress note that were audited but not yet
+  // live-permission-tested. Confirmed live before this dispatch: parallel-dispatch-planner.mjs
+  // has zero imports of its own, and its test file imports only "node:assert/strict" plus this
+  // one module -- no fs, no child_process, no os.tmpdir -- so its entire real input is these two
+  // files; confirmed by a real `node --permission --allow-fs-read=<src> --allow-fs-read=<test>
+  // <test>` run (10/10 checks passed, no other grant).
+  "parallel-dispatch-planner-tests": Object.freeze({
+    reads: Object.freeze([
+      "plugins/pipeline-core/lib/parallel-dispatch-planner.mjs",
+      "plugins/pipeline-core/lib/parallel-dispatch-planner.test.mjs",
+    ]),
+  }),
 });
 
 function tierBDeclaredFiles({ suite, rel, implementationSha256, repoRoot, declaration }) {
