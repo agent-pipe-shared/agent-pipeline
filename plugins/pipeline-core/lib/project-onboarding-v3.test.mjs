@@ -4150,6 +4150,120 @@ test("V4 inspection proposes set-phase --phase implementation once the plan is a
   } finally { dispose(path); }
 });
 
+// NVA-R40-PROJDRIFT (backlog/items/2026-08-29-projection-drift-fault-after-
+// design-implementation-transition-forces-restart.md): a real design->
+// implementation phase transition (`set-phase --phase implementation`), via
+// the REAL code path in a genuine temp repo, does NOT by itself produce
+// `projection-drift` -- this test reproduces the transition cleanly and
+// asserts the status stays "ready" throughout, REFUTING the literal
+// hypothesis that the transition itself is the trigger. It then reproduces
+// the mechanism that actually DOES produce `projection-drift`: an untracked
+// edit to `pipeline.user.yaml` (the V3 runtime-projection source) made
+// without going through the regeneration/repair tool. The producing
+// comparison is `legacyInspection()`'s `legacy.status === "partial"` handler
+// in project-onboarding-v3.mjs, specifically the `runtimePlan.status ===
+// "ready"` branch that assigns `status: initialize ? "runtime-
+// initialization-required" : "projection-drift"` (project-onboarding-
+// v3.mjs:3985, runtime built at :3960, diagnostic at :3993) -- reached when
+// `planRunnerProfileMigrationV3()` (runner-profile-migration-v3.mjs) finds
+// every runtime-projection target already present on disk (`missing` is
+// false) but with bytes that no longer match a fresh render from the
+// CURRENT `pipeline.user.yaml`. The real-world timing match (drift
+// "immediately after" set-phase) is best explained by set-phase being the
+// next natural readiness check after such an edit, not by set-phase causing
+// it: this test shows the SAME untracked edit produces the identical
+// "projection-drift"/"generated runtime bytes differ from the V3
+// projection" diagnostic whether performed before or after set-phase.
+// Finally, it exercises the documented narrower repair (`plan-repair`/
+// `apply-repair`, closed by the 2026-08-09 kickoff-design item) for a
+// runner requiring native runtime readback (Codex): even that repair still
+// resolves to `restart-required`, not `ready` -- for this runner, "the only
+// recovery is effectively a restart" is accurate downstream of the correct
+// tool too, because Codex has no way to re-read its own runtime target
+// bytes (AGENTS.md/config.toml-equivalent) without a fresh process (ADR-0057
+// decision 2a); a narrower non-restart recovery is not available at this
+// layer without changing that structural constraint, which is out of scope
+// for this item.
+test("NVA-R40-PROJDRIFT: set-phase --phase implementation does not itself cause projection-drift; an untracked pipeline.user.yaml edit does, at the very next inspection", () => {
+  const path = root();
+  try {
+    hostGit(path, ["init", "--initial-branch=main"]);
+    const runner = "codex";
+    const localDeps = { ...fakeDeps, initializePoGateProfileReceipt: initializeActualPoGateProfileReceipt };
+    const barrier = initializeRestartRequiredRoot(path, localDeps, runner);
+    clearRuntimeBarrier(path, barrier);
+    completeKickoff(path, "Ship one probe feature", localDeps, "ready", runner);
+
+    mkdirSync(join(path, "specs", "projdrift"), { recursive: true });
+    const prdPath = "specs/projdrift/prd_projdrift.md";
+    const specPath = "specs/projdrift/spec.md";
+    const designInputPath = "specs/projdrift/design-input.md";
+    writeFileSync(join(path, specPath), "# Projdrift technical specification\n");
+    const specSha256 = sha256(readFileSync(join(path, specPath)));
+    writeFileSync(join(path, prdPath), [
+      "<!-- po-language: en -->",
+      `<!-- technical-spec-sha256: ${specSha256} -->`,
+      PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER,
+      "",
+      "# Projdrift product requirements",
+      "",
+    ].join("\n"));
+    writeFileSync(join(path, designInputPath), "# Projdrift design input\n");
+    const promotion = {
+      rootDir: path, profile: "feature", featureId: "projdrift-work", planPath: prdPath,
+      prdPath, specPath, designInputPath, runner, deps: localDeps,
+    };
+    const planned = planProjectOnboardingKickoffPromotionV4(promotion);
+    const promoted = applyProjectOnboardingKickoffPromotionV4({ runner, ...promotion, planSha256: planned.planSha256, activate: true });
+    assert.equal(promoted.status, "ready");
+
+    const state = (argv) => {
+      const stderr = [];
+      const code = pipelineStateRun(argv, { dir: path, now: () => "2026-08-01T12:00:00.000Z", writeError: (v) => stderr.push(String(v)) });
+      return { code, stderr: stderr.join("") };
+    };
+    assert.equal(state(["submit-plan", "--by", "po", "--profile", "feature"]).code, 0);
+    assert.equal(state(["present-plan", "--by", "po"]).code, 0);
+    assert.equal(state(["approve-plan", "--by", "po"]).code, 0);
+
+    const inspect = () => inspectProjectOnboardingV3({ runner, rootDir: path, intent: "bootstrap", deps: localDeps });
+
+    // 1. CLEAN transition: refute the literal "the transition is the trigger"
+    // hypothesis directly.
+    assert.equal(inspect().status, "ready");
+    assert.equal(state(["set-phase", "--phase", "implementation"]).code, 0);
+    assert.equal(inspect().status, "ready", "a clean design->implementation transition must not itself produce projection-drift");
+
+    // 2. The ACTUAL mechanism: an untracked edit to pipeline.user.yaml (the
+    // runtime-projection source), performed without the regeneration tool,
+    // reproduces the exact reported status and diagnostic.
+    const sourcePath = join(path, "pipeline.user.yaml");
+    const beforeEdit = readFileSync(sourcePath, "utf8");
+    assert.match(beforeEdit, /human_facing: "en"/u, "fixture assumption: kickoff seeds an explicit quoted human_facing language");
+    writeFileSync(sourcePath, beforeEdit.replace('human_facing: "en"', 'human_facing: "de"'));
+    const drifted = inspect();
+    assert.equal(drifted.status, "projection-drift");
+    assert.deepEqual(drifted.diagnostics, [{
+      path: "$.runtime",
+      code: "projection_drift",
+      message: "generated runtime bytes differ from the V3 projection",
+      guidance: "review the lifecycle runtime plan",
+    }]);
+
+    // 3. The documented narrower repair for this runner still resolves to
+    // restart-required, not ready -- Codex has no way to re-read its own
+    // runtime targets without a fresh process.
+    const repairPlan = planProjectOnboardingLifecycleV4({ rootDir: path, deps: localDeps, operation: "repair", runner });
+    assert.equal(repairPlan.status, "projection-drift");
+    const digestIndex = repairPlan.nextAction.argv.indexOf("--plan-sha256");
+    const repairApplied = applyProjectOnboardingLifecycleV4({
+      rootDir: path, deps: localDeps, operation: "repair",
+      planSha256: repairPlan.nextAction.argv[digestIndex + 1], activate: true, runner,
+    });
+    assert.equal(repairApplied.status, "restart-required");
+  } finally { dispose(path); }
+});
+
 // PUSHSEED-2. The same standard as the dev-plan test above, for the gate the
 // 2026-08-09 seed switches on: the push the guard refuses must be admitted once
 // the shipped commands have been run, and every one of those commands must be
