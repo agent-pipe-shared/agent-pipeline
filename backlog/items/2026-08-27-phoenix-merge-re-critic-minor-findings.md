@@ -7,7 +7,7 @@ status: closed
 created: 2026-08-27
 closed_at: 2026-08-29
 closure_repository: self
-closure_commit: b774f74b
+closure_commit: b774f74b724a18060d565a1f307fbb82eef5e6be
 closure_evidence: plugins/pipeline-core/hooks/guard-push.test.mjs
 sprint: nova
 tracking: "Reassigned from phoenix to nova on 2026-08-28 by PO decision, after the Phoenix line was intaked into Nova"

@@ -6,7 +6,7 @@ owner: pipeline
 status: closed
 closed_at: 2026-08-29
 closure_repository: self
-closure_commit: 180d427a
+closure_commit: 180d427a91a74af08649e40a70b7617185df19ea
 closure_evidence: plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
 created: 2026-08-28
 sprint: nova

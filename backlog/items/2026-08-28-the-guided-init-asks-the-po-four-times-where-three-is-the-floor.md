@@ -7,7 +7,7 @@ status: closed
 created: 2026-08-28
 closed_at: 2026-08-29
 closure_repository: self
-closure_commit: 9de5e42a
+closure_commit: 9de5e42a4558cb14bf304718f4ee385fdd948338
 closure_evidence: plugins/pipeline-core/lib/onboarding-continuity.test.mjs
 sprint: nova
 done_when: "contains plugins/pipeline-core/lib/onboarding-continuity.mjs profile = null, text = null, activate = false, deps = {}"

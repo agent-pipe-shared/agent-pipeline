@@ -7,7 +7,7 @@ status: closed
 created: 2026-08-29
 closed_at: 2026-08-29
 closure_repository: self
-closure_commit: adb60c64
+closure_commit: adb60c64a9c270c639c55034b3d70160f634c99f
 closure_evidence: plugins/pipeline-core/hooks/codex-session-start-hint.test.mjs
 sprint: nova
 done_when: contains plugins/pipeline-core/hooks/codex-session-start-hint.mjs pipeline.deterministic-transcript-selection

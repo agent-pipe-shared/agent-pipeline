@@ -5,7 +5,7 @@ type: defect
 owner: pipeline
 status: closed
 closed_at: 2026-08-29
-closure_commit: 03c6e1e4
+closure_commit: 03c6e1e4839ee5e53a1fce76c32569ea8fd0335c
 closure_repository: "self"
 closure_evidence: plugins/pipeline-core/scripts/verify-topology-preflight.test.mjs
 created: 2026-08-28

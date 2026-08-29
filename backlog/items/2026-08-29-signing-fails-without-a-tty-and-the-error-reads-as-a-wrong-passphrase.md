@@ -7,7 +7,7 @@ status: closed
 created: 2026-08-29
 closed_at: 2026-08-29
 closure_repository: self
-closure_commit: dac74b61
+closure_commit: dac74b61a4b9c59a13e1c1866b1cca01571ab8bd
 closure_evidence: plugins/pipeline-core/scripts/po-human-approval.test.mjs
 sprint: nova
 done_when: contains plugins/pipeline-core/scripts/po-human-approval.mjs pipeline.signing-requires-attended-terminal

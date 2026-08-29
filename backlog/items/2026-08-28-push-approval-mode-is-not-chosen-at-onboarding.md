@@ -7,7 +7,7 @@ status: closed
 created: 2026-08-28
 closed_at: 2026-08-29
 closure_repository: self
-closure_commit: 5e4b4d76
+closure_commit: 5e4b4d768f29768eb5104274de94c3b9784cfa09
 closure_evidence: plugins/pipeline-core/scripts/onboarding-init.test.mjs
 sprint: nova
 done_when: contains plugins/pipeline-core/scripts/onboarding-init.mjs pendingAsks

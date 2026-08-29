@@ -7,7 +7,7 @@ status: closed
 created: 2026-08-29
 closed_at: 2026-08-29
 closure_repository: self
-closure_commit: 865d8d9d
+closure_commit: 865d8d9d32e732d4576c0177b64aca25c2cf39db
 closure_evidence: plugins/pipeline-core/hooks/guard-dispatch-budget.test.mjs
 sprint: nova
 done_when: contains plugins/pipeline-core/hooks/guard-dispatch-budget.mjs pipeline.dispatch-budget-invalid-identity-fails-closed

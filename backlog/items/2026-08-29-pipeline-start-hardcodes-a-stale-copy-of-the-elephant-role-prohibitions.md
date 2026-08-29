@@ -6,7 +6,7 @@ owner: pipeline
 status: closed
 closed_at: 2026-08-29
 closure_repository: self
-closure_commit: 81cde83e
+closure_commit: 81cde83ea1b2ed586f9b15d86b175731e6d24076
 closure_evidence: harness/scripts/generate-elephant-role-prohibitions.test.mjs
 created: 2026-08-29
 sprint: nova

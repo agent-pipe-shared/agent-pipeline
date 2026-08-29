@@ -6,7 +6,7 @@ owner: pipeline
 status: closed
 closed_at: 2026-08-29
 closure_repository: self
-closure_commit: 01062acb
+closure_commit: 01062acb163f01c592922009a4af8e1b5d5c951e
 closure_evidence: plugins/pipeline-core/scripts/dispatch-authorship-verify.test.mjs
 created: 2026-08-29
 sprint: nova

@@ -6,7 +6,7 @@ owner: pipeline
 status: closed
 closed_at: 2026-08-29
 closure_repository: self
-closure_commit: 3ede9d0d
+closure_commit: 3ede9d0dec4d506b06bb1825826785fd57bd717a
 closure_evidence: plugins/pipeline-core/hooks/staleness-check.test.mjs
 created: 2026-08-08
 sprint: nova

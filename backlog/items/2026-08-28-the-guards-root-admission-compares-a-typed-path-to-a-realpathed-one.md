@@ -7,7 +7,7 @@ status: closed
 created: 2026-08-28
 closed_at: 2026-08-29
 closure_repository: self
-closure_commit: fdc02abc
+closure_commit: fdc02abcdf4d05f299ccd32ee210cba76283f801
 closure_evidence: plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
 sprint: nova
 done_when: contains plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs rootValueIdentityMatcher
