@@ -343,6 +343,7 @@
 | pipeline.phase-aware-bootstrap-readiness | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.phoenix-merge-re-critic-minor-findings | closed | workflow-improvement | pipeline | 2026-08-27 | Reassigned from phoenix to nova on 2026-08-28 by PO decision, after the Phoenix line was intaked into Nova |
 | pipeline.pipeline-author-repair-signature-mode-never-actually-admits-the-edit | closed | defect | pipeline | 2026-08-18 | — |
+| pipeline.pipeline-defaults-to-sequential-work-with-no-enforced-task-slicing | open | workflow-improvement | pipeline | 2026-08-29 | Nova B — PO request, 2026-08-29 (German verbatim): 'es stört mich das die Pipeline immer nur sequentiell von sich aus arbeitet. ich möchte ein durchgesetztes system per Maschine haben was für Standardmäßiges slicen von Aufgaben ohne Überschneidungen sorgt die dann mit workflow tool oder vergleichbaren subagenten arbeiten. wir müssen designen wie wir das in die Durchsetzungsschicht bekommen da die vergangenen Versuche dafür zu sorgen gescheitert sind'. Deliberately NOT Nova A: this needs a real design pass, not a same-session patch, and the candidate must not grow new enforcement surface before its current diff is reviewed. |
 | pipeline.pipeline-start-hardcodes-a-stale-copy-of-the-elephant-role-prohibitions | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.pipeline-state-rebind-codex-default-runner | closed | defect | pipeline | 2026-08-05 | — |
 | pipeline.pipeline-state-scripts-test-file-never-runs-in-full-verify | closed | defect | pipeline | 2026-08-09 | — |
@@ -548,7 +549,7 @@
 
 ## Counts
 
-- open: 87
+- open: 88
 - in_progress: 3
 - closed: 436
 - rejected: 3
