@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.onboarding-must-bootstrap-the-trust-anchor-once
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: 180d427a91a74af08649e40a70b7617185df19ea
+closure_evidence: plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
 created: 2026-08-28
 sprint: nova
 tracking: "NOW / Nova A — happy-path blocking: its absence deadlocked the first human override in the Claude run and cost a live PO signature; PO asked for this explicitly"
@@ -125,7 +129,14 @@ Re-verified independently: `project-onboarding-v3.test.mjs` 151/151 (incl.
 `check-consumer-safe-paths.test.mjs` 9/9. No code changed by this dispatch
 — nothing to commit.
 
-## Reopened, 2026-08-29 (later same day) — the "found already satisfied" closure was code-reading-only, not live-verified
+## Superseded, 2026-08-29 (later same day) — the "found already satisfied" closure was code-reading-only, not live-verified
+
+This item's ledger entry stays `closed` (the ledger is append-only and never
+rewound — `reconcile-backlog-ledger.mjs` refuses a closed→open transition by
+design). The live-evidence correction below is tracked as a NEW item,
+`2026-08-29-trust-anchor-bootstrap-confirmed-still-circular-live.md`, which
+supersedes this closure's "found already satisfied" verdict — read that item
+for the current, accurate status.
 
 The candidate the PO used for the 2026-08-29 3-runner greenfield test (built
 from commit `ab0906d`, 16:43 CEST; stamped as the "final candidate" at
