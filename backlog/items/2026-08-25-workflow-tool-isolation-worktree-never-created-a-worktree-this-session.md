@@ -7,7 +7,7 @@ status: open
 created: 2026-08-25
 sprint: nova
 source: "Elephant, 2026-08-25, live incident this session: three parallel Agent-tool dispatches with isolation: \"worktree\" all wrote into the SAME shared checkout, causing zero-commit truncations and a detached-HEAD incident; root-caused and recovered same session"
-done_when: contains CLAUDE.md containment check performed BEFORE
+done_when: manual
 ---
 
 # `isolation: "worktree"` (Agent tool) did not create separate worktrees this session — three parallel dispatches raced on one shared checkout
@@ -110,3 +110,30 @@ not a disposable one.
 - **Assignment (if accepted):** next available slot — this affects any
   future parallel dispatch in this repository, not scoped to one sprint.
 - **Date:** 2026-08-25
+
+### Predicate note, 2026-08-29 — a paragraph in CLAUDE.md is not the remedy
+
+A predicate of the form `contains CLAUDE.md "containment check performed
+BEFORE"` was briefly declared here and reported satisfied. It has been
+replaced with `manual`, because it measured the wrong thing.
+
+That CLAUDE.md text is real and it is useful: it tells a dispatch to compare
+its own `git rev-parse --show-toplevel` against the briefed worktree path
+before running any `checkout --detach`, and it tells the dispatcher to run
+`git worktree list` immediately after launching. Both were written after a
+worktree-isolated dispatch detached a live session HEAD. But it is instruction
+text, and this repository's own operating principle is that a rule agents keep
+violating needs a guard, not another paragraph of prompt. Nothing mechanically
+checks that the instruction was followed, and nothing at all detects the
+original defect — that `isolation: "worktree"` was requested and silently not
+granted.
+
+Treating the paragraph as the remedy would have closed this item while the
+failure mode remained fully live, which is the precise drift the `done_when`
+field exists to catch. It is `manual` until a mechanical detection step exists
+— the honest candidate being a post-launch check that compares the worktree
+count against its own pre-launch baseline, since an unchanged count is the
+observable signal that isolation was not granted. Presence alone is not that
+signal: roughly two dozen abandoned worktrees from earlier runs are already
+registered in this repository, so "a worktree exists" is true whether or not
+this dispatch got one.

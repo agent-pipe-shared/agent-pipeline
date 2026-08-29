@@ -8,7 +8,7 @@ created: 2026-08-28
 sprint: nova
 tracking: "NOW / Nova A — the only sanctioned route to a PO acknowledgement marker is unusable, and the refusal is undiagnosable from outside"
 source: "Consumer project HA, incident report S56 finding B2 (2026-08-28, Windows). The consumer independently re-derived every input digest and found all of them correct."
-done_when: contains plugins/pipeline-core/scripts/pipeline-state.mjs describeFailedPostimagePredicates
+done_when: contains plugins/pipeline-core/scripts/pipeline-state.test.mjs describeFailedPostimagePredicates
 ---
 
 # A fail-closed rollback that names no predicate cannot be fixed by the consumer
@@ -74,3 +74,25 @@ turn out to be its own defect; that is a follow-up this item's fix makes possibl
 
 - `2026-08-28-a-chat-gate-is-unusable-with-a-non-ascii-name-on-windows.md` — the gate the
   consumer had to pass before reaching this failure.
+
+## Status, 2026-08-29 — the code fix landed; the acceptance test did not
+
+`describeFailedPostimagePredicates()` exists at
+`plugins/pipeline-core/scripts/pipeline-state.mjs:6107` and its output is
+interpolated into the postimage-readback failure message at `:6261`, naming
+the failing predicate with expected and observed values. That is exactly the
+direction this item asked for, and it landed in `c16e40e1`
+("fix(pipeline-state): name the failing predicate on a rebind postimage
+readback failure").
+
+The item stays open anyway, because its own Acceptance asks for more than the
+code: a test that drives a deliberately failing predicate and asserts the
+message identifies it. `pipeline-state.test.mjs` contains no reference to
+`describeFailedPostimagePredicates` or `predicateSummary`, so nothing pins the
+message shape. A consumer-facing diagnostic with no test is one refactor away
+from silently reverting to the unhelpful message this item was filed about.
+
+The predicate has therefore been repointed from the source file to the test
+file. It was previously satisfied on the day it was declared, which would have
+argued for closing an item whose acceptance was half met. Writing that test is
+small, well-defined work and is the only thing left here.

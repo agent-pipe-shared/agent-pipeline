@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.guard-maintenance-window-repofingerprint-shares-the-fixed-path-bound-defect
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: d96e14c5efa51d4f4a0b1e9060a158077cfdd007
+closure_evidence: plugins/pipeline-core/lib/guard-maintenance-window.test.mjs
 created: 2026-08-27
 sprint: nova
 source: "NVA-BLRECONCILE-1, 2026-08-27 — residual-scope re-check while closing backlog/items/2026-08-27-path-bound-fingerprints-break-across-windows-wsl-access.md"
