@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -17,8 +19,23 @@ import {
   inspectSessionStartUpdateAvailability,
   isExactSecurityPolicyBlock,
   normalizePipelineUpdateAvailability,
+  resolveSessionIdFromInput,
   run,
+  runScratchLifecycleForSessionStart,
 } from "./staleness-check.mjs";
+
+/**
+ * NVA-W1-SCRATCHBIND fixture: a descriptor directory lives under the git common dir, so
+ * exercising the real bind path needs a real repo -- mirrors
+ * pipeline-start-scratch-lifecycle.test.mjs's own `freshRepo()`.
+ */
+function freshScratchRepo() {
+  const root = mkdtempSync(join(tmpdir(), "staleness-scratchbind-"));
+  const init = spawnSync("git", ["init", "--quiet"], { cwd: root, encoding: "utf8" });
+  assert.equal(init.status, 0, "fixture repository could not be initialised");
+  mkdirSync(join(root, "scratch"), { recursive: true });
+  return root;
+}
 
 function availability(status, channel, ref, fields = {}) {
   return {
@@ -190,4 +207,77 @@ test("NVA-STALENESSTLA-1: no SessionStart hook carries a top-level await", () =>
     assert.ok(!/\bawait\b/u.test(entryPoint),
       `${script}: the SessionStart entry point awaits, which is a top-level await:\n${entryPoint.trim()}`);
   }
+});
+
+// ---- NVA-W1-SCRATCHBIND (backlog: 2026-08-08-the-scratch-cleanup-mechanism-exists-but-no-
+// event-calls-it.md, Point 1) -----------------------------------------------------------------
+
+test("NVA-W1-SCRATCHBIND: resolveSessionIdFromInput is pure and never throws", () => {
+  assert.equal(resolveSessionIdFromInput({ session_id: "sess-1" }), "sess-1");
+  assert.equal(resolveSessionIdFromInput(null), null);
+  assert.equal(resolveSessionIdFromInput({}), null);
+  assert.equal(resolveSessionIdFromInput({ session_id: "" }), null);
+  assert.equal(resolveSessionIdFromInput({ session_id: 123 }), null);
+});
+
+test("NVA-W1-SCRATCHBIND: a real session_id from this hook's stdin binds a scratch descriptor, no longer unbound-no-session-identity", () => {
+  const root = freshScratchRepo();
+  const result = runScratchLifecycleForSessionStart({
+    projectDir: root,
+    stdinPayload: { session_id: "nva-w1-fixture-session" },
+  });
+  assert.notEqual(result?.binding?.status, "unbound-no-session-identity");
+  assert.equal(result.binding.status, "bound");
+  assert.match(result.binding.scratchRelativePath, /^scratch\/nva-w1-fixture-session-/u);
+});
+
+test("NVA-W1-SCRATCHBIND: the bound descriptor records process.ppid, never this one-shot invocation's own process.pid", () => {
+  const root = freshScratchRepo();
+  runScratchLifecycleForSessionStart({
+    projectDir: root,
+    stdinPayload: { session_id: "nva-w1-pid-fixture" },
+  });
+  const descriptorPath = join(root, ".git", "agent-pipeline", "scratch-descriptors", "nva-w1-pid-fixture.json");
+  const descriptor = JSON.parse(readFileSync(descriptorPath, "utf8"));
+  assert.equal(descriptor.pid, process.ppid,
+    "the descriptor must record process.ppid (the long-running host that outlives this hook's own invocation)");
+  assert.notEqual(descriptor.pid, process.pid,
+    "recording this one-shot hook's own pid would read back as orphaned on the very next sweep");
+});
+
+test("NVA-W1-SCRATCHBIND: absent stdin/session_id sweeps but binds nothing, and never throws (fail-open)", () => {
+  const root = freshScratchRepo();
+  const result = runScratchLifecycleForSessionStart({ projectDir: root, stdinPayload: null });
+  assert.equal(result.binding.status, "unbound-no-session-identity");
+});
+
+test("NVA-W1-SCRATCHBIND: an unusable root is a typed fault, never a throw (runBootstrapScratchLifecycle's own fail-open contract, unchanged by this wiring)", () => {
+  const result = runScratchLifecycleForSessionStart({
+    projectDir: join(tmpdir(), "staleness-scratchbind-does-not-exist", `${process.pid}`),
+    stdinPayload: { session_id: "nva-w1-unusable-root" },
+  });
+  assert.notEqual(result, null);
+  assert.equal(result.binding.status, "unavailable");
+  assert.ok(result.faults.length > 0);
+});
+
+test("NVA-W1-SCRATCHBIND: runSync/run wires the housekeeping through on stderr, never affecting exitCode or the stdout decision", async () => {
+  const root = freshScratchRepo();
+  const writes = [];
+  const errWrites = [];
+  const execution = await run({
+    projectDir: root,
+    stdout: { write(value) { writes.push(value); } },
+    stderr: { write(value) { errWrites.push(value); } },
+    stdinPayload: { session_id: "nva-w1-runsync-session" },
+    inspect() {
+      return availability("current", "stable", "refs/tags/v1.1.0");
+    },
+  });
+  assert.equal(execution.exitCode, 0);
+  assert.equal(execution.scratchLifecycle.binding.status, "bound");
+  assert.ok(writes.join("").includes("pipelineUpdateAvailability=current"),
+    "the ordinary stdout decision must be unaffected by the housekeeping addition");
+  assert.ok(errWrites.join("").includes("\"status\":\"bound\""),
+    "the scratch lifecycle receipt travels on stderr, matching pipeline-start-preflight.mjs's own convention");
 });

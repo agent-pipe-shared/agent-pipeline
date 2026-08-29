@@ -16,6 +16,12 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
 // NVA-STALENESSTLA-1: statically imported so this session-start hook needs no top-level
 // await at all -- see inspectSessionStartUpdateAvailabilitySync below for why that matters.
 import { inspectPipelineUpdateAvailability } from "../scripts/ruleset-freshness.mjs";
+// NVA-W1-SCRATCHBIND: the scratch-descriptor bind/sweep bootstrap already exists
+// (pipeline-start-preflight.mjs) but nothing in production ever supplied it a session
+// identity -- see runScratchLifecycleForSessionStart below for the full wiring rationale.
+// Static import, matching NVA-STALENESSTLA-1's discipline above: this call is synchronous
+// end to end (spawnSync throughout), so no dynamic import is needed here either.
+import { runBootstrapScratchLifecycle } from "../scripts/pipeline-start-preflight.mjs";
 
 export const PLUGIN_ID = "pipeline-core@agent-pipeline";
 export const BOOTSTRAP_LINE = "Agent-Pipeline: run /pipeline-core:pipeline-start before any work";
@@ -219,12 +225,97 @@ export async function inspectSessionStartUpdateAvailability(projectDir, deps = {
   return inspectSessionStartUpdateAvailabilitySync(projectDir, deps);
 }
 
+/**
+ * NVA-W1-SCRATCHBIND: session_id resolution from this hook's own SessionStart stdin. Same
+ * pure, never-throws shape as stop-suggest.mjs's own resolveSessionIdFromInput (a different
+ * module, so the identical name does not collide) -- takes the already-JSON.parsed value, or
+ * `null` if parsing failed.
+ * @param {object|null} parsedInput
+ * @returns {string|null}
+ */
+export function resolveSessionIdFromInput(parsedInput) {
+  if (!parsedInput || typeof parsedInput !== "object") return null;
+  const sid = parsedInput.session_id;
+  return typeof sid === "string" && sid !== "" ? sid : null;
+}
+
+/**
+ * NVA-W1-SCRATCHBIND (backlog: 2026-08-08-the-scratch-cleanup-mechanism-exists-but-no-event-
+ * calls-it.md, Point 1). The scratch-descriptor bind/sweep bootstrap
+ * (`runBootstrapScratchLifecycle`) has existed since NVA-BL-82, but nothing in production ever
+ * supplied it `PIPELINE_SCRATCH_SESSION_ID`, so binding always fell back to
+ * `unbound-no-session-identity`. This SessionStart hook already receives a real per-session
+ * `session_id` on its own stdin (Claude Code's standard hook input, delivered to every hook
+ * type) and already runs at exactly the bootstrap moment the backlog item's Direction names
+ * ("bind on session start; sweep on the NEXT session's bootstrap") -- extending THIS hook,
+ * rather than adding a new hooks.json entry, keeps hooks.json (TP-4, edited only under explicit
+ * PO approval) untouched, and is the "lowest-risk wiring route" the backlog item's own
+ * 2026-08-25 re-triage named and left unimplemented.
+ *
+ * PID-vs-PPID DECISION (stated, not left a TODO): `bindScratchDescriptor` records a `pid` used
+ * later to judge whether the binding session is still alive (`defaultProcessAlive` plus a
+ * boot_id/start-ticks fingerprint, session-cleanup-recovery.mjs). This hook process itself is a
+ * one-shot `node staleness-check.mjs` invocation that exits within milliseconds of writing its
+ * output -- recording `process.pid` (what a naive per-invocation bind would do) would make
+ * every binding read back as "orphan" on the very next sweep, regardless of whether the actual
+ * agent session is still running, which is the exact unbounded-growth failure this whole
+ * mechanism exists to prevent. `process.ppid` is used instead: Claude Code invokes this hook's
+ * command as a child of the long-running per-session host process, so the parent pid persists
+ * for the session's whole lifetime and is the correct liveness anchor. This is exactly the
+ * semantics the backlog item's own investigation named as the intended fix ("i.e. process.ppid
+ * ... rather than process.pid, a semantics decision not made anywhere in the code today"). A
+ * PID can be reused by an unrelated process after the original one exits; that risk is already
+ * covered by the existing boot_id+start-ticks fingerprint check in
+ * session-cleanup-recovery.mjs, unchanged by this hook.
+ *
+ * FAIL-OPEN, ALWAYS -- identical discipline to pipeline-start-preflight.mjs's own scratch-
+ * lifecycle call in `main()`: this never affects the hook's stdout decision or exit code, and
+ * any fault (including a malformed/absent stdin payload) is swallowed and yields `null`.
+ *
+ * Testability, and the reason NOTHING here calls `readFileSync(0, ...)`: measured live
+ * (2026-08-29) that an unconditional fd-0 read inside a function `node --test` calls directly
+ * hangs the whole suite -- real hook invocations pipe a JSON payload and close the descriptor,
+ * but a test harness's own stdin is not guaranteed closed the same way. This function therefore
+ * NEVER reads stdin itself; it only ever consumes an already-resolved `deps.stdinPayload`
+ * (`null` when absent). The one real stdin read lives solely at the direct-invocation entry
+ * point below, exactly mirroring stop-suggest.mjs's own "read stdin once, only in `run()`"
+ * discipline -- never inside a function a test calls.
+ */
+export function runScratchLifecycleForSessionStart(deps = {}) {
+  const rootDir = deps.projectDir ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd();
+  const parsedInput = deps.stdinPayload ?? null;
+  const sessionId = resolveSessionIdFromInput(parsedInput);
+  const lifecycle = deps.scratchLifecycleFn ?? runBootstrapScratchLifecycle;
+  const pidFn = deps.pidFn ?? (() => process.ppid);
+  try {
+    return lifecycle({
+      rootDir,
+      env: sessionId !== null ? { PIPELINE_SCRATCH_SESSION_ID: sessionId } : {},
+      deps: { pidFn },
+    });
+  } catch {
+    return null;
+  }
+}
+
 export function runSync(deps = {}) {
   const projectDir = deps.projectDir ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd();
   const observed = inspectSessionStartUpdateAvailabilitySync(projectDir, deps);
   const decision = decideOutput(observed);
   (deps.stdout ?? process.stdout).write(decision.stdout);
-  return { exitCode: 0, decision };
+  // NVA-W1-SCRATCHBIND: housekeeping only -- deliberately on stderr and deliberately never
+  // allowed to influence this hook's own stdout decision or exit code, matching
+  // pipeline-start-preflight.mjs's own convention for the identical call.
+  let scratchLifecycle = null;
+  try {
+    scratchLifecycle = runScratchLifecycleForSessionStart({ ...deps, projectDir });
+    if (scratchLifecycle !== null) {
+      (deps.stderr ?? process.stderr).write(`${JSON.stringify(scratchLifecycle)}\n`);
+    }
+  } catch {
+    // Housekeeping never decides a bootstrap's exit code.
+  }
+  return { exitCode: 0, decision, scratchLifecycle };
 }
 
 export async function run(deps = {}) {
@@ -232,5 +323,15 @@ export async function run(deps = {}) {
 }
 
 if (isDirectInvocation(import.meta.url)) {
-  runSync();
+  // NVA-W1-SCRATCHBIND: the one real stdin read for this hook, matching stop-suggest.mjs's
+  // own "read once, only at the real entry point" discipline -- see
+  // runScratchLifecycleForSessionStart's doc comment above for why this must never move into
+  // a function a test calls directly.
+  let stdinPayload = null;
+  try {
+    stdinPayload = JSON.parse(readFileSync(0, "utf8"));
+  } catch {
+    stdinPayload = null;
+  }
+  runSync({ stdinPayload });
 }
