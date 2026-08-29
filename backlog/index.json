@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "cb2445f4f8e06702f75169ade599eec48839e90d779d6f77dbf1fd0df4814419"
+    "transitionHead": "302ea220b483b4e7d7e2966da0a280489fa5e49c706a527977358e5352baab36"
   },
   "counts": {
-    "open": 78,
+    "open": 77,
     "in_progress": 3,
-    "closed": 454,
+    "closed": 455,
     "rejected": 3,
     "deferred": 11
   },
@@ -6659,13 +6659,17 @@
     },
     {
       "id": "pipeline.verify-suite-reads-real-machine-state",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-28",
       "source": "onboarding-init.test.mjs failed once (exit 1) during an operator run of apply-pending-protected-edits.mjs --only=verify-nva-c-protected, 2026-08-28. Not reproduced in five subsequent runs, three of them concurrent. The coupling below was found while looking for the cause and is verifiable independently of it.",
       "deferred": false,
-      "tracking": "NOW / Nova A — a suite about to enter the verify gate whose outcome depends on unrelated per-machine state; found while diagnosing a one-off failure of exactly that suite"
+      "tracking": "NOW / Nova A — a suite about to enter the verify gate whose outcome depends on unrelated per-machine state; found while diagnosing a one-off failure of exactly that suite",
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "a8c11b5ae31e8cb848d71ee75e834052319dea7d",
+      "closureEvidence": "plugins/pipeline-core/scripts/onboarding-init.test.mjs"
     },
     {
       "id": "pipeline.warn-security-gate-hard-blocks-every-push",
