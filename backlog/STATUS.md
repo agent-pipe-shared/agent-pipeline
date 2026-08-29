@@ -292,7 +292,7 @@
 | pipeline.manifest-repair-paths-are-hardcoded-to-runners-default-codex | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.marketplace-install-topology-unattested | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.material-intake-bootstrap-bind-has-no-sanctioned-path-to-a-passing-plan-gate | closed | defect | pipeline | 2026-08-19 | — |
-| pipeline.mechanical-proof-of-complete-prior-input-consumption-across-restart | open | requirement | pipeline | 2026-08-29 | — |
+| pipeline.mechanical-proof-of-complete-prior-input-consumption-across-restart | closed | requirement | pipeline | 2026-08-29 | — |
 | pipeline.merged-into-frontmatter-key-documented-but-unsupported | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.mixed-authority-migration-requires-a-vendored-plugin-copy-marketplace-installs-never-have | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.module-scope-manifest-read-rearms-the-disarm-by-config-fault | closed | defect | pipeline | 2026-08-07 | — |
@@ -549,8 +549,8 @@
 
 ## Counts
 
-- open: 104
+- open: 103
 - in_progress: 3
-- closed: 416
+- closed: 417
 - rejected: 3
 - deferred: 11
