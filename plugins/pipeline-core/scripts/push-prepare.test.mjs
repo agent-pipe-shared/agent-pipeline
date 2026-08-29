@@ -251,14 +251,13 @@ test("checkCriticalHumanProofPolicy: unreadable policy file -> ok:false", () => 
 // into the same `[]` and report green for both.
 // ---------------------------------------------------------------------------
 
-test("checkCriticalHumanProofPolicy: v1/v2 document with no trustAnchor -> ok:false, unavailable (NOT unrestricted)", () => {
+test("checkCriticalHumanProofPolicy: v1/v2 document with no trustAnchor -> ok:true, unrestricted-once (trust-on-first-use, NVA-TOFU-1)", () => {
   const result = checkCriticalHumanProofPolicy(FIXTURE_DIR, {
     readCriticalHumanProofPolicy: () => ({ ok: true, trustAnchor: null, trustAnchors: null }),
   });
-  assert.equal(result.ok, false);
-  assert.match(result.message, /unavailable/);
-  assert.doesNotMatch(result.message, /unrestricted/);
-  assert.ok(result.remedy);
+  assert.equal(result.ok, true);
+  assert.match(result.message, /unrestricted, once/);
+  assert.match(result.message, /trust-on-first-use/);
 });
 
 // ---------------------------------------------------------------------------
@@ -285,7 +284,7 @@ function agreementAuthorize(dir) {
   });
 }
 
-test("agreement: v1 document, no trustAnchor field -> BOTH readers refuse the route as unavailable", () => {
+test("agreement: v1 document, no trustAnchor field -> BOTH readers call the route open, trust-on-first-use (NVA-TOFU-1)", () => {
   const dir = agreementFixtureDir("v1-no-anchor");
   writeFileSync(
     join(dir, "project", "critical-human-proof.json"),
@@ -293,10 +292,14 @@ test("agreement: v1 document, no trustAnchor field -> BOTH readers refuse the ro
   );
   const prepared = checkCriticalHumanProofPolicy(dir);
   const authorized = agreementAuthorize(dir);
-  assert.equal(prepared.ok, false, "push-prepare must refuse a v1 document with no trustAnchor");
-  assert.equal(authorized.authorized, false, "the authorization path must refuse the identical document");
-  assert.equal(authorized.code, "PUSH-PROOF-TRUST-ANCHOR-MISSING");
-  assert.match(prepared.message, /unavailable/);
+  assert.equal(prepared.ok, true, "push-prepare must call a v1 document with no trustAnchor open (trust-on-first-use)");
+  assert.match(prepared.message, /unrestricted, once/);
+  // No proof is recorded at all in this fixture (agreementAuthorize's own state: {}), so the
+  // trust-anchor step no longer being what blocks this push -- confirmed by the DIFFERENT
+  // failure code below -- proves the two readers now agree the route is open, without this
+  // specific unconfigured push becoming an automatic pass.
+  assert.equal(authorized.authorized, false, "an unconfigured push (no recorded proof at all) must still fail closed");
+  assert.notEqual(authorized.code, "PUSH-PROOF-TRUST-ANCHOR-MISSING", "the trust-anchor step itself must NOT be what blocks this push anymore");
 });
 
 test("agreement: v3 document, explicit EMPTY trustAnchors -> BOTH readers call it unrestricted, but the push still fails closed", () => {

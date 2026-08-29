@@ -205,14 +205,18 @@ export function checkPushThreatModel(dir, deps = {}) {
  * NVA-N-PUSHDIAG: this must resolve every shape of the document EXACTLY the
  * way `trustAnchorsFor()` (`../lib/critical-action-authorization.mjs`) does --
  * that function is the reference; this one used to disagree with it. A v1/v2
- * document with no `trustAnchor` at all means "this route is unavailable"
- * there (`PUSH-PROOF-TRUST-ANCHOR-MISSING`), never "any well-formed key may
- * sign" -- only a v3 document's `trustAnchors` (empty INCLUDED) is that
- * posture. The old computation here folded both "no set concept" (v1/v2,
- * `trustAnchors: null`, `trustAnchor: null`) and "explicit empty v3 set" into
- * the same `[]`, so a freshly onboarded project's v1 document (no
- * `trustAnchor` field at all) reported green here and refused at push time
- * with no visible relationship between the two.
+ * document with no `trustAnchor` at all used to mean "this route is
+ * unavailable" there (`PUSH-PROOF-TRUST-ANCHOR-MISSING`); as of
+ * TRUST-ON-FIRST-USE (backlog:
+ * 2026-08-28-a-v1-trust-anchor-makes-the-signature-push-route-functionless.md,
+ * PO decision 2026-08-29) it instead means "no key pinned YET" -- the first
+ * successful push authorizes with any well-formed key and pins it, exactly
+ * like a v3 document's explicit empty `trustAnchors: []` for that one call,
+ * except the anchor-less case is a ONE-TIME open window (it self-closes the
+ * moment a key is pinned) where the v3 empty-array posture stays permanently
+ * open. This diagnostic mirrors that: both report `ok: true`, distinguished
+ * only in message text, since neither can be refused by a local-key
+ * membership check that does not yet apply.
  */
 export function checkCriticalHumanProofPolicy(dir, deps = {}) {
   const readPolicy = deps.readCriticalHumanProofPolicy ?? readCriticalHumanProofPolicy;
@@ -223,14 +227,12 @@ export function checkCriticalHumanProofPolicy(dir, deps = {}) {
   }
   // Mirrors `trustAnchorsFor()`'s own branching exactly (see the comment above): a v1/v2
   // document carries no set concept at all (`trustAnchors` stays `null`), so its `trustAnchor`
-  // is the only signal -- `null` there means the signature-push route is unavailable, full
-  // stop, never "unrestricted". Only `policy.trustAnchors !== null` (a v3 document) reaches
-  // the "any well-formed key" posture, and it reaches it even when the array is empty.
+  // is the only signal -- `null` there means no key has been pinned yet, and the first
+  // successful push pins whichever well-formed key signs it (trust-on-first-use).
   if (policy.trustAnchors === null && policy.trustAnchor === null) {
     return {
-      id, ok: false,
-      message: "posture: unavailable; project/critical-human-proof.json declares no trustAnchor and no trustAnchors, so the signature-push route cannot authorize any key (matches PUSH-PROOF-TRUST-ANCHOR-MISSING at push time).",
-      remedy: "add a trustAnchor to project/critical-human-proof.json (v1/v2), or migrate it to schema v3 with an explicit trustAnchors set (empty for any well-formed key, or populated to pin specific keys)",
+      id, ok: true,
+      message: "posture: unrestricted, once (trust-on-first-use); project/critical-human-proof.json declares no trustAnchor and no trustAnchors, so the next successful signature push authorizes with any well-formed key and pins it as this project's trust anchor for every later push.",
     };
   }
   const anchors = policy.trustAnchors !== null ? policy.trustAnchors : [policy.trustAnchor];
