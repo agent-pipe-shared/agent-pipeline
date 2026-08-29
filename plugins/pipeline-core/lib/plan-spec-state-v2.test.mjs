@@ -827,3 +827,42 @@ test("NVA-R3-PRDBIND: reopen-design releases a bootstrap-bind-apply feature that
   const resubmitted = submitted(reopened.state, AUTHORITY, RESUBMITTED);
   assert.equal(derivePlanLifecycle(resubmitted).status, "awaiting-approval");
 });
+
+// NVA-CF-MINORPUSH: a null invalidatedSubmissionSha256 is only truthful for
+// reopenPlanDesign()'s bound-unsubmitted-binding path
+// (reason === REOPEN_UNSUBMITTED_BINDING_REASON, "pipeline.reopen-bound-unsubmitted-prd"),
+// which never had a real submission to hash. Every other reason
+// ("reopen-design", "document-drift") always writes over a real prior
+// submission, so a null hash there is a forged/incomplete record, not a
+// legitimate one -- validPlanInvalidation() must reject it even though the
+// reason itself is otherwise a member of the allowed set.
+test("NVA-CF-MINORPUSH: a null invalidatedSubmissionSha256 is rejected for reasons other than the unsubmitted-binding one", () => {
+  const state = submitted();
+  const forged = {
+    ...state,
+    planInvalidation: {
+      schema: "pipeline.plan-invalidation.v1",
+      featureId: state.activeFeature.id,
+      invalidatedSubmissionSha256: null,
+      invalidatedApprovalSha256: null,
+      invalidatedBy: "PO",
+      invalidatedAt: REOPENED,
+      reason: "reopen-design",
+    },
+  };
+  const lifecycle = derivePlanLifecycle(forged);
+  assert.equal(lifecycle.ok, false);
+  assert.equal(lifecycle.code, "PLAN-LIFECYCLE-INVALIDATION-INVALID");
+
+  // The exact same shape IS accepted when the reason is the genuine
+  // bound-unsubmitted-binding one -- proving the rejection above is about
+  // the reason coupling, not about null in general.
+  const legitimate = {
+    ...state,
+    planInvalidation: {
+      ...forged.planInvalidation,
+      reason: "pipeline.reopen-bound-unsubmitted-prd",
+    },
+  };
+  assert.notEqual(derivePlanLifecycle(legitimate).code, "PLAN-LIFECYCLE-INVALIDATION-INVALID");
+});
