@@ -7,6 +7,7 @@ status: closed
 created: 2026-08-29
 closed_at: 2026-08-29
 closure_repository: self
+closure_commit: 2f3940b63a3009822c6d4b109337c6dfd0ea3ac4
 closure_evidence: backlog/items/2026-08-29-quote-style-fragility-in-shell-command-admission.md
 sprint: nova
 done_when: manual
