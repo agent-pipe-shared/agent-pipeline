@@ -47,6 +47,21 @@ try {
   assert.match(governed.context, /never quote large raw excerpts into any git-tracked file/u);
   assert.match(governed.context, /say so honestly rather than claiming this step was done/u);
 
+  // 2026-08-29-undocumented-transcript-fallback-selects-wrong-file-by-mtime: selection must be
+  // scoped by project identity FIRST, mtime only a tiebreaker within that matching set -- never
+  // a plain most-recent-overall ranking that can pick a DIFFERENT project's newer transcript
+  // over this project's own older one.
+  assert.match(governed.context, /pipeline\.deterministic-transcript-selection/u);
+  assert.match(governed.context, /first scope by PROJECT IDENTITY, not recency/u);
+  assert.match(governed.context, /discard outright any transcript whose recorded project does not match this repository's own root/u);
+  assert.match(
+    governed.context,
+    /a more-recently-modified transcript from a DIFFERENT project must never be selected over an older one belonging to THIS project/u,
+  );
+  assert.match(governed.context, /use modification time as a tiebreaker within the remaining project-matching set/u);
+  assert.match(governed.context, /if no transcript matches this project's identity, say so honestly and continue/u);
+  assert.match(governed.context, /never widen the search back to the most recent transcript overall/u);
+
   let stdout = "";
   const originalWrite = process.stdout.write;
   process.stdout.write = (chunk) => { stdout += chunk; return true; };
@@ -264,7 +279,7 @@ try {
     rmSync(consumptionRoot, { recursive: true, force: true });
   }
 
-  console.log("codex-session-start-hint: 33 passed");
+  console.log("codex-session-start-hint: 40 passed");
 } finally {
   rmSync(root, { recursive: true, force: true });
 }
