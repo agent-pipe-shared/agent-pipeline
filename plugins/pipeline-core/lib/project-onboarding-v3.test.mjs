@@ -39,6 +39,7 @@ import {
   observeLocalTrustAnchorPointer,
 } from "./project-onboarding-v3.mjs";
 import { planRunnerProfileMigrationV3 } from "./runner-profile-migration-v3.mjs";
+import { planInstall as planPrePushHookInstall } from "../scripts/pre-push-hook-install.mjs";
 import { validateV3BootstrapAuthority } from "../scripts/v3-bootstrap-authority.mjs";
 import { parseYaml } from "./yaml-lite.mjs";
 import { validatePipelineUserV3 } from "./runner-profiles-v3.mjs";
@@ -4300,6 +4301,93 @@ test("onboarding seeds ignore rules for the paths it writes into, and never touc
         "an already-complete owned .gitignore is untouched too");
     } finally { dispose(complete); }
   } finally { dispose(fresh); dispose(owned); }
+});
+
+// NVA-R9-PREPUSHHOOK (backlog:
+// 2026-08-28-the-pre-push-hook-is-offered-not-installed-so-the-git-backstop-can-be-absent.md).
+// The git-porcelain pre-push backstop gets the SAME treatment `.gitignore` seeding
+// gets immediately above: installed unconditionally during the first real onboarding
+// apply, never behind a separate confirmation step. Proven against a real repository
+// (real `.git`, real `execFileSync("git", ...)` inside pre-push-hook-install.mjs's own
+// `resolveGitPaths` -- that call is never routed through the injected `fakeDeps`), so a
+// pass here means git itself, not just this suite's fixture, agrees the hook exists.
+test("onboarding installs the pre-push git hook by default -- no confirmation, no separate offer step", () => {
+  const path = root();
+  try {
+    hostGit(path, ["init", "--initial-branch=main"]);
+    const plan = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
+    const applied = applyProjectOnboardingV3(plan, { rootDir: path, activate: true, deps: fakeDeps });
+    assert.equal(applied.status, "applied");
+    // Never asked: `applyProjectOnboardingV3` above took no confirmation input at all,
+    // yet the installer's OWN planner now reports a hook it wrote and can upgrade --
+    // "ready-to-upgrade" is only reachable when a hook is present AND its content
+    // hashes match this installer's own marker (pre-push-hook-install.mjs's
+    // `planInstall`), so this is never satisfied by an unrelated file merely existing
+    // at that path.
+    const postInstallPlan = planPrePushHookInstall({ rootDir: path });
+    assert.equal(postInstallPlan.status, "ready-to-upgrade", JSON.stringify(postInstallPlan));
+    assert.equal(existsSync(join(path, ".git", "hooks", "pre-push")), true);
+  } finally { dispose(path); }
+});
+
+test("a project that already owns a pre-push hook is never overwritten by onboarding", () => {
+  const path = root();
+  try {
+    hostGit(path, ["init", "--initial-branch=main"]);
+    const hooksDir = join(path, ".git", "hooks");
+    mkdirSync(hooksDir, { recursive: true });
+    const foreignHookPath = join(hooksDir, "pre-push");
+    const foreignBytes = "#!/bin/sh\necho 'a human already owns this hook'\nexit 0\n";
+    writeFileSync(foreignHookPath, foreignBytes, { mode: 0o755 });
+    chmodSync(foreignHookPath, 0o755);
+    const plan = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
+    const applied = applyProjectOnboardingV3(plan, { rootDir: path, activate: true, deps: fakeDeps });
+    // Onboarding itself must never fail just because a foreign hook already exists --
+    // this is a best-effort backstop install, not a precondition for onboarding.
+    assert.equal(applied.status, "applied");
+    assert.equal(readFileSync(foreignHookPath, "utf8"), foreignBytes,
+      "a project-owned pre-push hook must be byte-for-byte untouched by onboarding");
+    const postPlan = planPrePushHookInstall({ rootDir: path });
+    assert.equal(postPlan.status, "foreign-hook-present", JSON.stringify(postPlan));
+  } finally { dispose(path); }
+});
+
+// DoD: "the hook, once installed, actually refuses a push that the gate would refuse,
+// and admits one it would admit. A hook that installs but never fires is the same
+// defect wearing a different hat." This spawns the EXACT hook file onboarding itself
+// wrote -- never re-installed by the test -- with a real git pre-push stdin payload,
+// exactly as git would invoke it, matching the technique
+// pre-push-hook-install.test.mjs's own `runInstalledHook` already uses to prove this
+// same generated hook fires correctly in isolation.
+test("the hook onboarding installs actually fires: blocks a push the gate would refuse, allows one it would admit", () => {
+  const path = root();
+  try {
+    hostGit(path, ["init", "--initial-branch=main"]);
+    const plan = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
+    const applied = applyProjectOnboardingV3(plan, { rootDir: path, activate: true, deps: fakeDeps });
+    assert.equal(applied.status, "applied");
+    const installed = planPrePushHookInstall({ rootDir: path });
+    assert.equal(installed.status, "ready-to-upgrade");
+    const hookPath = installed.hookPath;
+    assert.equal(existsSync(hookPath), true);
+
+    // gates.push: blocking, no verify evidence at all -- the gate would refuse this.
+    mkdirSync(join(path, "project"), { recursive: true });
+    writeFileSync(join(path, "project", "pipeline.yaml"), "schema: pipeline.manifest.v0\ngates:\n  push:\n    mode: blocking\n    type: human\n    approval: standing-approved\n");
+    hostGit(path, ["add", "-A"]);
+    hostGit(path, ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", "manifest"]);
+    const commit = hostGit(path, ["rev-parse", "HEAD"]);
+    const stdin = `refs/heads/main ${commit} refs/heads/main ${"0".repeat(40)}\n`;
+    const blocked = spawnSync(hookPath, ["origin", "https://example.invalid/repo.git"], { cwd: path, input: stdin, encoding: "utf8", timeout: 15000 });
+    assert.notEqual(blocked.status, 0, `expected the installed hook to block; stderr=${blocked.stderr}`);
+    assert.match(blocked.stderr, /BLOCKED/u);
+
+    // Now satisfy the gate -- fresh verify evidence bound to this exact commit.
+    mkdirSync(join(path, "evidence"), { recursive: true });
+    writeFileSync(join(path, "evidence", "verify-latest.json"), JSON.stringify({ exitCode: 0, commit }));
+    const allowed = spawnSync(hookPath, ["origin", "https://example.invalid/repo.git"], { cwd: path, input: stdin, encoding: "utf8", timeout: 15000 });
+    assert.equal(allowed.status, 0, `expected the installed hook to allow; stderr=${allowed.stderr}`);
+  } finally { dispose(path); }
 });
 
 // IGNORESEED-2 (2026-08-28 backlog:

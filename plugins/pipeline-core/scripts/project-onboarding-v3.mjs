@@ -468,6 +468,15 @@ function resolvePrePushHookOfferLanguage(rootDir) {
   }
 }
 
+// NVA-R9-PREPUSHHOOK (backlog: pipeline.pre-push-hook-is-offered-not-installed): the
+// pre-push git hook is now installed-by-default at the FIRST real onboarding apply
+// (lib/project-onboarding-v3.mjs's `applyProjectOnboardingV3`, the same "portable"
+// transaction that auto-seeds `.gitignore`, called unconditionally with no confirmation
+// step) -- not merely offered here anymore. This function stays as the RECOVERY surface:
+// a project onboarded before this change shipped, or whose hook is otherwise still
+// absent/declined/foreign, is still surfaced through `inspect`/`continuity-inspect` below
+// so a human can act on it later. It is never the primary path for a fresh onboarding.
+//
 // Read-only: never installs, removes, or declines anything itself (DoD (g)) --
 // `planPrePushHookInstall` (pre-push-hook-install.mjs's `planInstall`) only
 // inspects. Three outcomes:

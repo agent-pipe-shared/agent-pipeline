@@ -71,7 +71,13 @@ function sha256(text) {
  * rather than guess (fail-closed, matching the generated hook's own doctrine).
  */
 function resolveGitPaths(rootDir) {
-  const run = (args) => execFileSync("git", args, { cwd: rootDir, encoding: "utf8", timeout: 10000 }).trim();
+  // NVA-R9-PREPUSHHOOK: `stdio` pins stdin/stderr to "ignore" -- stdout stays piped
+  // (captured into the returned string) unchanged. Onboarding now calls this
+  // unconditionally on every apply (install-by-default), including against fixtures
+  // whose `.git` is not a real repository; without this, git's own "fatal: not a git
+  // repository" diagnostic leaked to the parent process's stderr on every such call,
+  // even though it was already caught and handled as a plain resolution failure below.
+  const run = (args) => execFileSync("git", args, { cwd: rootDir, encoding: "utf8", timeout: 10000, stdio: ["ignore", "pipe", "ignore"] }).trim();
   let commonDir;
   let hookPath;
   try {
