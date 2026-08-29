@@ -73,6 +73,7 @@ import {
 import { validateV3BootstrapAuthority } from "../scripts/v3-bootstrap-authority.mjs";
 import { checkVerifyContractConfigured } from "../scripts/push-gate-satisfiability.mjs";
 import { applyInstall as applyPrePushHookInstallOnboarding } from "../scripts/pre-push-hook-install.mjs";
+import { applyInstall as applyPreCommitHookInstallOnboarding } from "../scripts/pre-commit-hook-install.mjs";
 import { applySessionCleanupRecovery, planSessionCleanupRecovery, SessionCleanupRecoveryError } from "./session-cleanup-recovery.mjs";
 import {
   LEGACY_CALIBRATION,
@@ -4857,6 +4858,20 @@ export function applyProjectOnboardingV3(plan, { rootDir = plan?.root ?? process
           try { return applyPrePushHookInstallOnboarding({ rootDir: root }); }
           catch (error) { return { status: "install-error", detail: String(error?.message ?? error) }; }
         })();
+    // NVA-R39-GENESISWIRE (backlog: 2026-08-29-a-node-script-defeats-every-file-protection-
+    // guard.md, "Stage 2 partially landed" / "PO decision, 2026-08-29", candidate (b)): mirrors
+    // `prePushHookInstall` immediately above, exactly -- install-by-default, unconditional,
+    // best-effort, never a reason to roll back a scaffold that already durably landed. Safe to
+    // wire in now (an earlier attempt was reverted because it broke this scaffold's own FIRST
+    // commit) because `pre-commit-hook-install.mjs`'s installed hook now exempts a protected
+    // path's very first appearance in git history -- exactly what onboarding's own
+    // scaffold-authoring step above produces.
+    const preCommitHookInstall = state.hostManaged
+      ? { status: "host-managed-skip" }
+      : (() => {
+          try { return applyPreCommitHookInstallOnboarding({ rootDir: root }); }
+          catch (error) { return { status: "install-error", detail: String(error?.message ?? error) }; }
+        })();
     const gitResult = state.hostManaged ? { mode: "host-managed", initialized: false, initialBranch: null, committed: false } : { mode: "local", initialized: gitIdentity !== null, initialBranch: "main", committed: false };
     const authority = { status: "portable-seed", runtimeProjection: "missing" };
     // The transaction (Git init + scaffold writes) is unconditionally done by
@@ -4876,9 +4891,9 @@ export function applyProjectOnboardingV3(plan, { rootDir = plan?.root ?? process
     const missingIgnorePatterns = state.hostManaged ? [] : missingProjectIgnorePatterns(readProjectIgnoreText(root, fs));
     const projectIgnoreGap = missingIgnorePatterns.length > 0 ? { projectIgnoreGapAction: collectProjectIgnoreGapAction(missingIgnorePatterns) } : {};
     if (missingIdentity.length > 0) {
-      return { schema: PLAN_SCHEMA, status: "applied", root, changes: plan.changes, git: gitResult, authority, prePushHookInstall, nextAction: collectAuthorIdentityAction(missingIdentity), diagnostics: [], ...projectIgnoreGap };
+      return { schema: PLAN_SCHEMA, status: "applied", root, changes: plan.changes, git: gitResult, authority, prePushHookInstall, preCommitHookInstall, nextAction: collectAuthorIdentityAction(missingIdentity), diagnostics: [], ...projectIgnoreGap };
     }
-    return { schema: PLAN_SCHEMA, status: "applied", root, changes: plan.changes, git: gitResult, authority, prePushHookInstall, diagnostics: [], ...projectIgnoreGap };
+    return { schema: PLAN_SCHEMA, status: "applied", root, changes: plan.changes, git: gitResult, authority, prePushHookInstall, preCommitHookInstall, diagnostics: [], ...projectIgnoreGap };
   } catch (error) {
     const rollbackFailures = root ? rollback(root, created, createdDirectories, gitIdentity, gitTree, gitWasExpectedAbsent, fs) : [];
     if (rollbackFailures.length) return { schema: PLAN_SCHEMA, status: "rollback-failed", root, diagnostics: [diagnostic("$.transaction", "rollback_failed", `${error.message}; rollback also failed: ${rollbackFailures[0].message}`, "repair generated paths manually before retrying")] };

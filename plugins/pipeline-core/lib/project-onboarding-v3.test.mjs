@@ -4329,7 +4329,15 @@ test("the seeded push gate refuses an unapproved push and admits it after the sh
     };
     // `gates.push_approval` is read from the COMMITTED bytes, so every step that
     // changes a tracked file has to be committed before the next one observes it.
-    const commit = (message) => { hostGit(path, ["add", "-A"]); hostGit(path, ["commit", "-q", "-m", message]); };
+    // NVA-R39-GENESISWIRE-RETRY (PO decision, 2026-08-29, backlog:
+    // 2026-08-29-a-node-script-defeats-every-file-protection-guard.md): `--no-verify`
+    // is the sanctioned escape ONLY for a later, already-tracked-file admin edit --
+    // distinct from the genesis-commit first-appearance exemption above it, which the
+    // FIRST `commit("seeded consumer")` call below still relies on unaided.
+    const commit = (message, { noVerify = false } = {}) => {
+      hostGit(path, ["add", "-A"]);
+      hostGit(path, noVerify ? ["commit", "-q", "--no-verify", "-m", message] : ["commit", "-q", "-m", message]);
+    };
 
     commit("seeded consumer");
     const refused = attemptPush();
@@ -4353,7 +4361,7 @@ test("the seeded push gate refuses an unapproved push and admits it after the sh
     // operator without key management (ADR-0056); `signature` stays the default.
     const userPath = join(path, "pipeline.user.yaml");
     writeFileSync(userPath, readFileSync(userPath, "utf8").replace(/push_approval: "?signature"?/u, 'push_approval: "chat"'));
-    commit("configure verify and push approval");
+    commit("configure verify and push approval", { noVerify: true });
 
     // (4) The artifact the approval binds, from the plugin's shipped template.
     assert.equal(state(["materialize-push-threat-model"]).code, 0);
@@ -4454,7 +4462,15 @@ test("the seeded security gate refuses a push with missing security evidence and
       }
       return { code, stderr: stderr.join("") };
     };
-    const commit = (message) => { hostGit(path, ["add", "-A"]); hostGit(path, ["commit", "-q", "-m", message]); };
+    // NVA-R39-GENESISWIRE-RETRY (PO decision, 2026-08-29, backlog:
+    // 2026-08-29-a-node-script-defeats-every-file-protection-guard.md): `--no-verify`
+    // is the sanctioned escape ONLY for a later, already-tracked-file admin edit --
+    // distinct from the genesis-commit first-appearance exemption above it, which the
+    // FIRST `commit("seeded consumer")` call below still relies on unaided.
+    const commit = (message, { noVerify = false } = {}) => {
+      hostGit(path, ["add", "-A"]);
+      hostGit(path, noVerify ? ["commit", "-q", "--no-verify", "-m", message] : ["commit", "-q", "-m", message]);
+    };
 
     commit("seeded consumer");
     const refused = attemptPush();
@@ -4469,7 +4485,7 @@ test("the seeded security gate refuses a push with missing security evidence and
     writeFileSync(calibrationPath, `${JSON.stringify(calibration, null, 2)}\n`);
     const userPath = join(path, "pipeline.user.yaml");
     writeFileSync(userPath, readFileSync(userPath, "utf8").replace(/push_approval: "?signature"?/u, 'push_approval: "chat"'));
-    commit("configure verify and push approval");
+    commit("configure verify and push approval", { noVerify: true });
     assert.equal(state(["materialize-push-threat-model"]).code, 0);
     commit("push threat model");
     assert.equal(produceVerifyEvidence().status, 0, "a configured, passing verify command must yield evidence");
