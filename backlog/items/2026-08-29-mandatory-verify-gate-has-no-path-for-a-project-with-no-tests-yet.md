@@ -115,3 +115,28 @@ NOT landed — `verify.mjs` is TP-3 protected and needs a signed
 human-guard-override ceremony (see
 `evidence/dispatch-record-NVA-R26-VERIFYPREP.json` for the full drafted
 text).
+
+## Landed, 2026-08-29 (Elephant, PO-signed ceremonies, commit `3cfc7160`)
+
+The drafted mechanism above is now live in `harness/scripts/verify.mjs`:
+`computeManualVerifyStep()` reads `verifyManualStatus` from the resolved
+calibration file and reports `not-configured-yet` (proposal 1, honest
+absence), a real declared note (pass), or the unfilled scaffold placeholder
+`"Manual check required."` (FAILURE, `exitCode: 1`, logged as
+`VERIFY-MANUAL-CHECK-PLACEHOLDER`) as three genuinely distinguishable
+outcomes — the mechanism this item's Acceptance criteria 1/2 describe.
+Confirmed no-op for this repository's own calibration (`rg` against both
+`project/pipeline.json` and `.claude/pipeline.json` for `verifyManualStatus`
+found neither), matching the promised absent-field behavior. Mechanism named
+with file/line reference (Acceptance criterion 4): `computeManualVerifyStep()`,
+`harness/scripts/verify.mjs` ~line 754 onward.
+
+**Not yet closing.** Two acceptance criteria remain unmet: (1) no dedicated,
+checked-in automated test exercises the new logic directly — only the
+now-superseded scratch fixture did, and `verify.mjs` has no sibling
+`.test.mjs` of its own to extend (confirmed: none exists); a real test would
+need its own TP-3 ceremony or a project-level calibration fixture harness
+that does not currently exist. (2) The controlled reproduction — onboarding a
+genuinely test-less static project through the real greenfield flow and
+confirming the first verify run does not silently pass — was not performed
+this session. Status left `open` pending both.
