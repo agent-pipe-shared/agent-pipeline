@@ -832,26 +832,47 @@ function freshIntent(runner, fs) {
     // `security` is seeded OFF, and that is the honest value rather than a
     // weakening. It read `warn` while the manifest carried no security gate at
     // all, so a consumer was promised a gate nothing enforced -- the same defect
-    // as `push`, found in the same 2026-08-09 runs. Unlike `push`, it cannot be
-    // fixed by seeding the manifest chapter, and the satisfying path was MEASURED
-    // to establish that rather than assumed:
+    // as `push`, found in the same 2026-08-09 runs.
     //
-    //   1. `security-scan.mjs` refuses a dirty working tree, and the evidence the
-    //      push gate demands (`evidence/verify-latest.json`) is itself what makes
-    //      a fresh consumer's tree dirty -- onboarding writes no `.gitignore`. The
-    //      gate cannot be satisfied without breaking that circle first.
-    //   2. Even with a clean tree it needs three external scanners (gitleaks,
-    //      osv-scanner, semgrep) that a consumer machine need not have, and a
-    //      license allowlist at `governance/examples/policies/license-allowlist.json`
-    //      -- a path that exists in the PIPELINE's own repository, not in a
-    //      consumer's.
-    //   3. The measured verdict on a clean, empty consumer was WARNING -> exit 1,
-    //      and guard-push demands exit 0. `repositorySha256` was also invalid.
+    // NVA-R18-SCANBOOT (backlog: scanner-bootstrap-is-not-self-sufficient-for-a-
+    // fresh-project, 2026-08-29): two of the original four reasons below were
+    // re-measured and found STALE, and are corrected here rather than left
+    // standing as an out-of-date premise:
+    //   - The original reason 1 ("onboarding writes no `.gitignore`, so the
+    //     push-gate evidence itself dirties a fresh consumer's tree") no longer
+    //     holds: onboarding now seeds one (`PROJECT_IGNORE_SEED`, this file,
+    //     covering `/scratch/`, `/evidence/`, `/project/pipeline-state.json`).
+    //   - The original reason 2 ("needs three external scanners a consumer
+    //     machine need not have") is stale AS A BLOCKER: measured with no
+    //     scanner reachable, every scanner reads `SKIPPED [binary_missing]`, the
+    //     license check reads `SKIPPED [not-configured]`, and the verdict is
+    //     CLEAN -> exit 0. A missing scanner does not fail the gate; each
+    //     scanner's status is separately distinguishable in evidence as one of
+    //     `passed`/`findings`/`not-configured`/`tool-unavailable`/
+    //     `not-applicable` (`deriveReportStatus()`, security-scan.mjs).
+    //     Semgrep's and license-check's own fallback configuration also now
+    //     ships with the plugin (`config/security/semgrep-default-rules.yml`,
+    //     `config/security/license-allowlist.default.json`) rather than only
+    //     existing in the Pipeline's own repository, so a consumer that
+    //     configures nothing of its own still gets a working, offline scan
+    //     instead of a guaranteed ERROR.
     //
-    // And `warn` would not have meant "warn": guard-push evaluates the security
-    // findings into the SAME failure list it evaluates under the PUSH gate's mode,
-    // which is `blocking`. A `warn` security gate therefore hard-blocks every
-    // consumer push. Filed as its own defect; seeding `off` does not depend on it.
+    // What remains true, narrowed and re-measured rather than assumed:
+    //   1. The real remaining blocker for a project that DOES define its own
+    //      `governance/security-controls/catalog.json` and required-capability
+    //      set is that set becoming unsatisfiable -- REQUIRED CAPABILITIES, not
+    //      scanner absence. A genuinely bare fresh consumer ships no catalog at
+    //      all, so this does not block IT (an absent/unreadable catalog
+    //      resolves to an empty required-capability plan, never a blocking
+    //      verdict -- proven in security-scan.test.mjs, "fresh consumer (no
+    //      catalog)"); it is a live constraint only for a project (this
+    //      repository included, per ADR-0015 self-application) that ships its
+    //      own catalog and required set.
+    //   2. `warn` would still not have meant "warn": guard-push evaluates the
+    //      security findings into the SAME failure list it evaluates under the
+    //      PUSH gate's mode, which is `blocking`. A `warn` security gate
+    //      therefore hard-blocks every consumer push. Filed as its own defect;
+    //      seeding `off` does not depend on it.
     //
     // Turning it on is a deliberate act with prerequisites, so it is named as one
     // rather than defaulted into.
