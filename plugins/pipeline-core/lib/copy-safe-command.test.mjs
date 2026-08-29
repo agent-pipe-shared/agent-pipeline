@@ -162,3 +162,65 @@ test("a short argv (no chunking needed) still round-trips through a real bash ev
   assert.equal(tokens.pop(), "");
   assert.deepEqual(tokens, built.argv);
 });
+
+/**
+ * NVA-CF-COPYSAFE: the placeholder() bug this task fixes. Both real callers
+ * (guard-lifecycle-ready.mjs, guard-testpath.mjs) wrap LIVE data through
+ * placeholder(JSON.stringify(<absolute path>)) -- never a genuine unresolved
+ * template slot -- so it must never render verbatim: a path containing "$",
+ * a backtick, or "$(" would otherwise be shell-expanded/command-substituted
+ * the moment a human pastes the emitted command.
+ */
+test("boundedCopySafeCommand renders a placeholder()-wrapped JSON.stringify()'d path as a quoted literal, not verbatim -- a genuine template slot in the SAME command still renders verbatim", () => {
+  const path = "/repo/root";
+  const built = boundedCopySafeCommand({
+    executable: "node",
+    argv: ["script.mjs", "--repo", placeholder(JSON.stringify(path)), "--plan-sha256", placeholder("<plan-sha256>")],
+  });
+  // The live-data placeholder is recovered to its raw value in argv -- not the
+  // JSON.stringify() wrapper, and not the shellWord()-quoted rendered text.
+  assert.deepEqual(built.argv, ["script.mjs", "--repo", path, "--plan-sha256", "<plan-sha256>"]);
+  // A safe path with no shell-special characters renders through shellWord() --
+  // here that means bare/unquoted, since shellWord() only adds quotes when needed.
+  assert.ok(built.command.includes(`--repo ${path} `), built.command);
+  assert.ok(!built.command.includes(`"${path}"`), "the old verbatim JSON.stringify() quoting must be gone");
+  // The genuine template slot in the SAME command still renders verbatim, unchanged.
+  assert.ok(built.command.includes("--plan-sha256 <plan-sha256>"), built.command);
+});
+
+test("NVA-CF-COPYSAFE: a JSON.stringify()'d path containing $, a backtick, or $( survives a real bash -c round-trip through placeholder() unexpanded/unsubstituted", () => {
+  const dangerousPath = "/repo/$HOME/`id`/$(id)/end";
+  const built = boundedCopySafeCommand({
+    executable: "node",
+    argv: [
+      "/plugin/scripts/guard-human-override.mjs",
+      "plan",
+      "--repo", placeholder(JSON.stringify(dangerousPath)),
+      "--request-sha256", "a".repeat(64),
+    ],
+  });
+  // argv recovers the raw dangerous path, not the JSON.stringify() wrapper.
+  assert.deepEqual(built.argv, [
+    "/plugin/scripts/guard-human-override.mjs", "plan", "--repo", dangerousPath, "--request-sha256", "a".repeat(64),
+  ]);
+  // The rendered command line must never contain the old verbatim (double-quoted,
+  // shell-unsafe) JSON.stringify() form of the dangerous path.
+  assert.ok(!built.command.includes(`"${dangerousPath}"`), built.command);
+  if (process.platform === "win32") return;
+  assert.ok(built.copyCommand.posix, "posix rendering must succeed for this input");
+  const lines = built.copyCommand.posix.split("\n");
+  assert.equal(lines.at(-1), 'eval "$CMD"');
+  const assignments = lines.slice(0, -1).join("\n");
+  // Same real-bash round-trip technique as the other tests in this file: a shell
+  // function named "node" captures the exact argv a real shell reconstructs from
+  // the bounded copy-safe rendering, WITHOUT ever invoking anything for real. If
+  // "$HOME", the backtick command substitution, or "$(id)" were still live, the
+  // captured tokens would differ from dangerousPath (or a subshell would run).
+  const script = `node() { printf '%s\\0' "$@"; }\n${assignments}\neval "$CMD"`;
+  const probe = spawnSync("bash", ["-c", script], { encoding: "utf8" });
+  assert.equal(probe.status, 0, probe.stderr);
+  const tokens = probe.stdout.split("\0");
+  assert.equal(tokens.pop(), "");
+  assert.deepEqual(tokens, built.argv,
+    "the dangerous path must round-trip through the bounded copy-safe rendering unexpanded/unsubstituted");
+});
