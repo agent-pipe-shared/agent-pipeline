@@ -43,6 +43,12 @@ Formalization status provisional — confirmation/revision after practical exper
 
 Implemented in: `plugins/pipeline-core/scripts/pipeline-state.mjs` (`po-authority-acknowledge-apply` case), `plugins/pipeline-core/lib/po-gate-authority.mjs` (`ACKNOWLEDGEMENT_REPAIR` guidance text updated to describe the mechanical enforcement, not only the moral prohibition), `docs/operating-model.md` (§4 "Human plan gate" item).
 
+## Addendum (2026-08-29, AGY-CF-BL15): the confirmed value is no longer `--by`
+
+**Supersedes one specific claim in the addendum above, not the mechanism it describes.** The 2026-08-25 addendum said the PO "must retype the `--by` value shown back to them" and that `--by` "is the confirmed value." That was true at the time and is no longer: `--by` is a person's name — arbitrary Unicode, arbitrary length, and, as a Windows lockout later showed (`backlog/items/2026-08-28-a-chat-gate-is-unusable-with-a-non-ascii-name-on-windows.md`), not reliably reproducible through every terminal's input path. `requireAttendedChatGateConfirmation()`'s actual security property is TTY-ness of file descriptor 0 (an attended human is present), never secrecy of the compared string, so a short fixed ASCII literal proves the identical attendance without a name's encoding/normalization/homoglyph baggage (`backlog/items/2026-08-28-a-gate-should-not-demand-a-human-name-typed-byte-exactly.md`).
+
+The compared value is now `PO_ACK_APPLY_CONFIRMATION_TOKEN` (`plugins/pipeline-core/scripts/pipeline-state.mjs`, literal `"CONFIRM"`) — a fixed literal baked into the code, never generated or persisted between calls, so it needs no exception to ADR-0061 Decision 1's "hash pasted from one output into another input" prohibition (nothing is pasted between calls; it is typed back within the same attended call that displays it). `--by` stays fully disclosed, unchanged, in the confirmation summary the human reads and in the durable `poGateAcknowledgement` record — only the COMPARED value changed. This converges `po-authority-acknowledge-apply` on the same short-bounded-ASCII-token shape kickoff's `--language`/`--profile` gate and `human-guard-override.mjs`'s activation gate already used, so it is no longer the odd one out among `requireAttendedChatGateConfirmation()` callers.
+
 <!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
 
 # ADR-0021: PRD-PO-Gate vor dem ersten Implementierungs-Dispatch
