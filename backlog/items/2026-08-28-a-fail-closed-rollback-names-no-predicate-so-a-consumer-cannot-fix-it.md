@@ -12,7 +12,7 @@ closure_commit: c16e40e1
 closure_evidence: plugins/pipeline-core/scripts/pipeline-state.test.mjs
 tracking: "NOW / Nova A — the only sanctioned route to a PO acknowledgement marker is unusable, and the refusal is undiagnosable from outside"
 source: "Consumer project HA, incident report S56 finding B2 (2026-08-28, Windows). The consumer independently re-derived every input digest and found all of them correct."
-done_when: contains plugins/pipeline-core/scripts/pipeline-state.test.mjs describeFailedPostimagePredicates
+done_when: contains plugins/pipeline-core/scripts/pipeline-state.test.mjs NVA-G-ROLLBACKPREDICATE
 ---
 
 # A fail-closed rollback that names no predicate cannot be fixed by the consumer

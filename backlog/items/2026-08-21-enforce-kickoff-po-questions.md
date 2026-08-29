@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-21
 sprint: nightwing
+done_when: contains plugins/pipeline-core/scripts/pipeline-state.mjs requireAttendedChatGateConfirmation
 source: Manual observation during sprint_agy kickoff testing (Rune_Test1_Agy_060_59)
 ---
 

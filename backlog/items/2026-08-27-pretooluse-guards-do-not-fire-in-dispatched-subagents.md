@@ -7,6 +7,7 @@ status: open
 created: 2026-08-27
 sprint: nightwing
 source: "Measured live, 2026-08-27, while investigating why the dispatch-budget counter never moved: plugin PreToolUse hooks fire in the main session and never inside a dispatched subagent. Four independent measurements, listed below."
+done_when: contains plugins/pipeline-core/hooks/hooks.json do not fire inside a dispatched subagent
 ---
 
 # In Claude Code, plugin PreToolUse guards do not fire inside dispatched subagents — the enforcement layer is inert for dispatched work

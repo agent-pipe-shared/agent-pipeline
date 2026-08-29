@@ -7,6 +7,7 @@ status: open
 created: 2026-08-28
 sprint: nightwing
 source: "Codex/WSL greenfield run, 2026-08-28 (docs/pipeline-session-analysis-2026-08-28.md), plus the PO's own observation that this runner needed three sessions and the most detours."
+done_when: contains docs/push-release-flow.md NVA-LOCAL-VS-REMOTE-1
 ---
 
 # Remote-side enforcement is the only push boundary a local bypass cannot reach, and it is not part of the model

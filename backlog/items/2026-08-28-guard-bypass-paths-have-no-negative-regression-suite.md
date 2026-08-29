@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-28
 sprint: nightwing
+done_when: contains plugins/pipeline-core/hooks/guard-bypass-negative.test.mjs GUARD-BYPASS-NEGATIVE-SUITE
 source: "Codex/WSL greenfield run, 2026-08-28 (docs/pipeline-session-analysis-2026-08-28.md), plus the PO's own observation that this runner needed three sessions and the most detours."
 ---
 

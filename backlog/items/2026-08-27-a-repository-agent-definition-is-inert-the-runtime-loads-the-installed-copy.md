@@ -7,6 +7,7 @@ status: open
 created: 2026-08-27
 sprint: nightwing
 source: "Directly measured during the 2026-08-27 Nova-A candidate session: four deep-tier dispatches truncated at a maxTurns the repository had already raised"
+done_when: contains plugins/pipeline-core/scripts/pipeline-start-preflight.mjs localPluginInstallSourceObservation
 ---
 
 # A changed agent definition in the repository has no effect — the runtime loads the installed copy

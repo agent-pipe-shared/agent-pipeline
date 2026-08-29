@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-28
 sprint: nightwing
+done_when: contains plugins/pipeline-core/scripts/po-human-approval.mjs manualArtifactsForIntent
 source: "Hit live, 2026-08-28, running two HGO signature ceremonies (TP-3 verify.mjs and TP-5 guard-push.test.mjs) back to back in one session; then isolated in the code by reading both --proof readers."
 ---
 

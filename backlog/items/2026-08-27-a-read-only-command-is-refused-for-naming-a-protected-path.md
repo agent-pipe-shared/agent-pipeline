@@ -7,6 +7,7 @@ status: open
 created: 2026-08-27
 sprint: nightwing
 source: "Measured live, 2026-08-27 session: a read-only node -e command that only printed a sorted-insertion index over docs/product-capability-inventory.json was refused as a write because the string \"verify.mjs\" appeared inside its interpreter code text."
+done_when: contains plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs read-only retryAction for the opaque-interpreter-code and write-command lanes (pipeline.a-read-only-command-is-refused-for-naming-a-protected-path)
 ---
 
 # A read-only command is refused for naming a protected path, and the only route offered is a PO signature

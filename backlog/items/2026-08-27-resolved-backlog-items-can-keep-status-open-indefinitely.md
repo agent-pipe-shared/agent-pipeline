@@ -106,3 +106,19 @@ item can no longer stay silently open, and it is reachable only once the open
 backlog actually carries predicates — which is the work in progress now.
 Making UNDECLARED fatal today would simply break the gate for 81 items nobody
 has assessed yet.
+
+## PO decision, 2026-08-29
+
+**Decision:** run the campaign now — assign a real, judged `done_when`
+predicate to all 81 currently-undeclared open items, then place the
+`pipeline.undeclared-is-fatal` marker in `check-backlog-done-predicate.mjs`
+and flip UNDECLARED to fatal for open items.
+**Rationale:** PO chose "campaign now" over deferring or scoping to
+nova/none-only, explicitly preferring to close the gap fully rather than
+partially.
+**How to apply:** dispatch a survey pass (same shape as the 27-item 0.6.0
+survey this session) across all 81 items to determine, per item, whether it
+is already resolved (close it) or genuinely open (assign a real, falsifiable
+`done_when`) — then land the marker once every item carries one. This is a
+large parallel campaign; scope it as its own dedicated Workflow wave, not
+folded into the current 0.6.0 fix wave.

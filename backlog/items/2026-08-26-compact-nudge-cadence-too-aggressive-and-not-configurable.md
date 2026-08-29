@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-26
 sprint: nightwing
+done_when: contains plugins/pipeline-core/hooks/stop-suggest.mjs resolveCompactNudgeThresholds
 source: "PO observation (chat), 2026-08-26, during a long Phoenix-merge session"
 ---
 

@@ -6,8 +6,9 @@ owner: pipeline
 status: closed
 created: 2026-08-29
 closed_at: 2026-08-29
+closure_repository: self
 closure_commit: adb60c64
-closure_evidence: "node --test plugins/pipeline-core/hooks/codex-session-start-hint.test.mjs -> 40 passed, exit 0; node --test harness/scripts/check-consumer-safe-paths.test.mjs -> 9 passed, exit 0; grep -n pipeline.deterministic-transcript-selection plugins/pipeline-core/hooks/codex-session-start-hint.mjs matches."
+closure_evidence: plugins/pipeline-core/hooks/codex-session-start-hint.test.mjs
 sprint: nova
 done_when: contains plugins/pipeline-core/hooks/codex-session-start-hint.mjs pipeline.deterministic-transcript-selection
 source: "Claude/Windows self-audit report (docs/pipeline-audit-claude-session.md §3.2), cited by scratch/greenfield-triage-2026-08-29.md finding F13, observed during the 2026-08-29 three-runner greenfield test."

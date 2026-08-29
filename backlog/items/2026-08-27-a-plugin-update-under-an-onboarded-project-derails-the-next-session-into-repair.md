@@ -7,6 +7,7 @@ status: open
 created: 2026-08-27
 sprint: nightwing
 source: "Windows Claude Code greenfield happy-path run, 2026-08-27 (D--Dev-Rune-Test1-Claude-060-70). PO report: the session 'ran into a repair unnecessarily'. Transcript read directly."
+done_when: contains plugins/pipeline-core/lib/project-onboarding-v3.mjs plugin was updated
 ---
 
 # A plugin-source update under an already-onboarded project turns the next session into a two-step repair

@@ -62,3 +62,28 @@ tolerance.
 
 - **Decision:** open, unassigned. Low severity, cross-cutting (push-release
   flow, not any one sprint) — pick up when convenient.
+
+## PO decision, 2026-08-29
+
+**Decision:** direction 3 (auto-fold the trailing `pipeline-state.json`
+write into the START of the next `push-prepare` run), augmented with an
+upfront hint: at the moment `approve-push` succeeds — before the trailing
+write can land — record a visible, human-readable marker (e.g. in
+`docs/state.md`'s narration or the push-approval record itself) stating that
+a push was approved and its audit-trail write is still pending, so a session
+that resumes on a DIFFERENT machine (one that only pulled `origin/<branch>`)
+can see "a push was planned/completed elsewhere; the trailing proof record
+will arrive with the next push" instead of silently missing context.
+**Rationale:** PO explicitly wants the cross-machine visibility gap closed,
+not just the mechanical fold — the scenario that prompted this item was
+exactly a different-machine session missing this information.
+**How to apply:** dispatch an implementor/deep task targeting
+`plugins/pipeline-core/scripts/pipeline-state.mjs` (`approve-push`) and
+`plugins/pipeline-core/scripts/push-prepare.mjs`: (1) have `approve-push`
+write a lightweight, immediately-visible marker as part of its own commit
+context (not the trailing write itself — that still structurally can't be
+part of the signed commit) that a later session/machine can read; (2) have
+the next `push-prepare` run automatically fold the trailing
+`pipeline-state.json` write in, rather than requiring a human/session to
+notice. `pipeline-state.mjs` is a file other dispatches have touched this
+session — re-check its live state before editing.

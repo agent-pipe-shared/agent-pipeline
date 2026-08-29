@@ -8,6 +8,7 @@ created: 2026-08-09
 sprint: nightwing
 source: "Independent read-only analysis of the PO's private Codex+Pipeline 0.5.4 happy-path re-test (fifth local candidate, final successful session), 2026-08-09."
 due: 2026-08-16
+done_when: manual
 ---
 
 # Two proactive checks would have removed the only two retries in an otherwise clean run

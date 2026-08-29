@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-28
 sprint: nightwing
+done_when: contains plugins/pipeline-core/lib/session-cleanup-recovery.mjs planRegisteredWorktreeRetirement
 source: "NVA-VTPGATE-1 stopped on it live, 2026-08-28"
 ---
 

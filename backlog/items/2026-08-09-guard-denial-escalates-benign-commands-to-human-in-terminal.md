@@ -8,6 +8,7 @@ created: 2026-08-09
 sprint: nightwing
 source: "Live observation of the PO's private Codex+Pipeline 0.5.4 happy-path test run (fifth local candidate), 2026-08-09 (sanitized, no PO-identifying data)."
 due: 2026-08-16
+done_when: contains plugins/pipeline-core/hooks/codex-pretool-guard.mjs pipeline.guard-denial-skip-override-when-agent-executable-recovery
 ---
 
 # Every `guard-lifecycle-ready.mjs` denial escalates to a full human-in-terminal ceremony on this host, even for read-only or explicitly mandated commands

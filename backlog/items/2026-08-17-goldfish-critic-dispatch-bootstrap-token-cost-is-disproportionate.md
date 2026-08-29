@@ -7,6 +7,7 @@ status: open
 created: 2026-08-17
 sprint: alfred
 source: "PO observation, 2026-08-17, live during a session dispatching several goldfish-deep and Critic subagents back-to-back for Nova A Windows bugfix work."
+done_when: manual
 ---
 
 # Goldfish-deep/Critic dispatch bootstrap alone regularly costs 50k-150k tokens

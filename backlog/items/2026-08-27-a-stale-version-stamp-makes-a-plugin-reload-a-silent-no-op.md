@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-27
 sprint: nightwing
+done_when: contains harness/scripts/verify.mjs pipeline.plugin-manifest-stamp-matches-head
 source: "Live observation, 2026-08-27: the PO caught a stale cachebuster in plugin.json after a block of work that included wiring a new PreToolUse hook; nothing in Verify compares the stamp against HEAD. Corrected in ruleset a49cd41a."
 ---
 

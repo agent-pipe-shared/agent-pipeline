@@ -193,3 +193,20 @@ Not designed here. The three layers need different answers:
   Alfred's successor, whichever comes first. Third item on `none`; that queue is
   now a visible signal, not a parking lot.
 - **Date:** 2026-08-28
+
+## PO decision, 2026-08-29 — Layer 1 (definition-inventory record)
+
+**Decision:** delete the stored `ai-assisted-definition-inventory.json`
+record as a derivable cache, not a tripwire.
+**Rationale:** PO chose this over building an attested writer, preferring
+the simpler fix that unblocks the CI gate directly with lower risk than new
+code shortly before the candidate ships.
+**How to apply:** dispatch a small implementor task to remove
+`plugins/pipeline-core/config/ai-assisted-definition-inventory.json` (or
+whichever exact path the script reads) and change
+`verify-topology-preflight.mjs` to compute `definitionInventoryRecord()`
+fresh at check time instead of comparing against a stored file — closing
+Layer 1 without a writer/tripwire mechanism. Verify
+`node plugins/pipeline-core/scripts/verify-topology-preflight.mjs` exits 0
+afterward. This closes this item's Layer 1; Layer 2's root (candidate-window
+sizing) remains separately open per the note above.
