@@ -87,3 +87,40 @@ Bootstrap the anchor once, during init:
 - An existing key directory is detected and reused, never overwritten.
 - The first human override in a fresh project does not require an out-of-session
   manual edit.
+
+## Closed, 2026-08-29 (found already satisfied — dispatch NVA-R32-TRUSTANCHORBOOT)
+
+The `status: open` was stale relative to the code. Two prior commits, both
+predating this session, already fully implement the Direction and
+Acceptance criteria: `5aba0485` (NVA-C-ANCHORASK, 2026-08-28, "seed the
+machine's trust anchor instead of explaining it") and `180d427a`
+(NVA-R24-TRUSTANCHOR, 2026-08-29, "make the freshly seeded trust anchor
+actually valid").
+
+- Direction 1 (reuse, never overwrite): `detectExistingLocalTrustAnchor()`/
+  `observeLocalTrustAnchorPointer()` read the machine-plane key pointer;
+  `freshCriticalHumanProofPolicyBytes(fs)` seeds `trustAnchors` from it when
+  found; every write site is create-only (`flag: "wx"`).
+- Direction 2 (offer to create): `proposeTrustAnchorAbsentGuidanceAction()`
+  (NVA-V17-NOKEYASK) fires via the existing `collect-input` pattern when no
+  key exists, naming the `po-human-approval.mjs setup` command.
+- Direction 3 (same transaction): `freshBaselines()` composes the
+  critical-human-proof-policy bytes inside the same baseline object as the
+  rest of the gate-seeding bytes.
+- Direction 4 (named absence): `trustAnchorAvailability` on the ready
+  envelope resolves fail-closed to "absent"; the guidance text states
+  explicitly that the signature push route cannot work until one exists.
+- No machine-specific path is written into any committed artifact (pinned
+  by a dedicated test).
+- The human-override route's fail-closed posture for an empty/absent
+  trust-anchor set is unchanged (confirmed: `human-guard-override.test.mjs`
+  94/94, all three `NVA-HGOFIX-1` cases pass unmodified) — this item never
+  touched that route, consistent with NVA-TOFU-1's separate, explicit
+  scoping decision to exclude it.
+
+Re-verified independently: `project-onboarding-v3.test.mjs` 151/151 (incl.
+`NVA-V1-KEYDIRPTR`, `NVA-V6-ANCHORREPORT`, `NVA-V17-NOKEYASK`,
+`NVA-R24-TRUSTANCHOR`), `human-guard-override.test.mjs` 94/94,
+`critical-action-authorization.test.mjs` 39/39,
+`check-consumer-safe-paths.test.mjs` 9/9. No code changed by this dispatch
+— nothing to commit.
