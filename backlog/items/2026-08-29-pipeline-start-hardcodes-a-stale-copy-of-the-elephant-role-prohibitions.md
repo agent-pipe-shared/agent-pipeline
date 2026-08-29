@@ -94,3 +94,12 @@ regenerating the skill text fails a test instead of silently drifting.
 - **Assignment:** `sprint: nova` — Nova B work, not a 0.6.0 candidate
   blocker, but in scope for this sprint's backlog sweep.
 - **Date:** 2026-08-29
+
+Fixed, 2026-08-29 (dispatch NVA-R17-SKILLGEN): `harness/scripts/generate-elephant-role-prohibitions.mjs`
++ `.test.mjs` added; `plugins/pipeline-core/skills/pipeline-start/SKILL.md`'s
+role-prohibitions block regenerated from it, commit `81cde83e`. The generated
+per-id text now differs in wording from the old hand-typed paraphrase (it is
+mechanically extracted from each included id's own `Rule:` sentence, not a
+free-hand summary) — see the dispatch report for the full deviation
+disclosure. `status` and `done_when` left untouched for the Elephant to
+verify and close.
