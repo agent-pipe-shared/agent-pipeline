@@ -440,7 +440,7 @@
 | pipeline.runner-neutrality-before-third-runner | closed | workflow-improvement | pipeline | 2026-08-08 | — |
 | pipeline.runtime-projection-v2-eager-manifest-load | closed | defect | pipeline | 2026-07-27 | — |
 | pipeline.runtime-projections-drift-after-v3-refresh | open | defect | pipeline | 2026-08-28 | Nova B — a silent divergence between two files that are meant to project the same authority; a consumer cannot judge it, and neither can this report |
-| pipeline.scanner-bootstrap-is-not-self-sufficient | open | defect | pipeline | 2026-08-28 | NOW / Nova A — PO decision 2026-08-28: security is default ON and its prerequisites are made ready in init ('das ist echt basis für diese pipeline'). Pulled forward from Nova B because turning the gate on is what this item unblocks. |
+| pipeline.scanner-bootstrap-is-not-self-sufficient | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — PO decision 2026-08-28: security is default ON and its prerequisites are made ready in init ('das ist echt basis für diese pipeline'). Pulled forward from Nova B because turning the gate on is what this item unblocks. |
 | pipeline.scratch-cleanup-mechanism-not-wired-to-any-event | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.scratch-write-exemption-does-not-cover-restart-required | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.scratch-write-refused-during-intake-against-documented-exemption | closed | defect | pipeline | 2026-08-28 | — |
@@ -545,8 +545,8 @@
 
 ## Counts
 
-- open: 102
+- open: 101
 - in_progress: 3
-- closed: 418
+- closed: 419
 - rejected: 3
 - deferred: 11
