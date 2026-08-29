@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "98ca67147d3cabafc840701fdf2f77fd5e666b841d98d97baef31a904d4b93c5"
+    "transitionHead": "bc3c835602eea6e46d92db8df911ff83c668c5be3b7a0e25353fd9c785fd34e7"
   },
   "counts": {
-    "open": 89,
+    "open": 87,
     "in_progress": 3,
-    "closed": 434,
+    "closed": 436,
     "rejected": 3,
     "deferred": 11
   },
@@ -3136,13 +3136,17 @@
     },
     {
       "id": "pipeline.installed-marketplace-guard-copy-drifts-silently-from-repo-source",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-29",
       "source": "Found live by the Elephant on 2026-08-29 while landing GG-22 shared-index-deadlock work-arounds during the 0.6.0 candidate build: the installed marketplace copy of guard-git.mjs still printed the pre-fix GG-22 remediation text hours after the matching repo-source fix (commit 01c02971) had already landed.",
       "deferred": false,
-      "tracking": "PO gate/signature topic — collect for later per the 0.6.0 candidate mandate, not attempted as a fix this session. No PO decision requested yet on whether the remedy is a checker, a documented pre-flight step, or accepted as an inherent property of the local-marketplace-copy model (ADR-0052)."
+      "tracking": "PO decision 2026-08-29: candidate 3 (accept as inherent), documented permanently.",
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "d76db9a2",
+      "closureEvidence": "docs/claude-local-plugin-development.md"
     },
     {
       "id": "pipeline.installed-plugin-gmw-hgo-v3-anchor-gap-blocks-all-protected-edits",
@@ -6288,13 +6292,17 @@
     },
     {
       "id": "pipeline.two-v3-scripts-admitted-but-unnamed",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-29",
       "source": "harness/scripts/check-product-capability-inventory.mjs's checkEntryPointReachability(), landed 2026-08-29 for backlog/items/2026-08-28-nothing-checks-that-a-shipped-capability-is-reachable.md, discovered these two real instances against the live repo.",
       "deferred": false,
-      "tracking": "NOW / Nova A — found by NVA-W8-VERIFYREG2's own new reachability check running against this repository"
+      "tracking": "NOW / Nova A — found by NVA-W8-VERIFYREG2's own new reachability check running against this repository",
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "e62b1dc7",
+      "closureEvidence": "plugins/pipeline-core/skills/pipeline-start/references/onboarding-recovery.md"
     },
     {
       "id": "pipeline.undocumented-transcript-fallback-selects-wrong-file-by-mtime",
