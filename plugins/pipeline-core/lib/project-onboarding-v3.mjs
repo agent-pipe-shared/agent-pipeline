@@ -1059,9 +1059,20 @@ export function freshCalibrationBytes() {
 export function freshCriticalHumanProofPolicyBytes(fs = null) {
   const anchor = fs ? detectExistingLocalTrustAnchor(fs) : null;
   if (anchor) {
+    // `waivedKinds` is REQUIRED on every v2/v3 document by
+    // readCriticalHumanProofPolicy()'s own exactKeys() shape check
+    // (critical-human-proof-policy.mjs) -- an absent field there is not "no
+    // waivers", it is `!Array.isArray(value.waivedKinds)`, which fails the
+    // whole document as CRITICAL-PROOF-POLICY-INVALID. Omitting it here once
+    // seeded a v3 anchor that this repository's OWN consumer refused to read
+    // -- authorizeHumanGuardOverrideBySignature() then still fell through to
+    // HGO-TRUST-ANCHOR-MISSING, reproducing the exact deadlock this function
+    // exists to prevent (measured live: scratch/probe-trust-anchor-shape.mjs,
+    // backlog 2026-08-28-onboarding-must-bootstrap-the-trust-anchor-once.md).
     return `${JSON.stringify({
       schema: CRITICAL_HUMAN_PROOF_POLICY_V3,
       requiredKinds: ["push"],
+      waivedKinds: [],
       trustAnchors: [{ keyReference: anchor.keyReference, publicKeySha256: anchor.publicKeySha256 }],
     }, null, 2)}\n`;
   }
