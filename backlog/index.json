@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "3b5d61c45d61e1533833c6fa92deb0773687d46892b19050941546d20ddbd8f1"
+    "transitionHead": "a68a4151d0511baecc11fa9371813cb754a6d388491e0e4cc19ff27260aae4b3"
   },
   "counts": {
-    "open": 76,
+    "open": 78,
     "in_progress": 3,
     "closed": 452,
     "rejected": 3,
@@ -6266,6 +6266,16 @@
       "closureEvidence": "backlog/items/2026-08-18-triage-verdict-text-can-contaminate-a-backlog-item-as-a-later-spec-reference.md"
     },
     {
+      "id": "pipeline.trust-anchor-bootstrap-confirmed-still-circular-live",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-29",
+      "source": "Codex 060-77 and Claude/Windows 060-78 greenfield retrospectives (scratch/greenfield-reports/), plus direct PO confirmation 2026-08-29: 'das ist auch mein Eindruck ... die fixes gingen eindeutig nicht weit genug und die Runner haben die berichteten Probleme wirklich [gehabt]'.",
+      "deferred": false,
+      "tracking": "NOW / Nova A -- happy-path blocker, confirmed live by 2 of 3 independent runners against the exact candidate the PO tested with."
+    },
+    {
       "id": "pipeline.trust-mismatch-names-neither-key-nor-directory",
       "status": "closed",
       "type": "defect",
@@ -6512,6 +6522,16 @@
       "closureRepository": "self",
       "closureCommit": "a655437ce8dbb785173b65961c60f1599670e92c",
       "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
+    },
+    {
+      "id": "pipeline.verify-contract-fails-until-configured-but-gs-10-blocks-configuring-it",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-29",
+      "source": "Agy 060-76 greenfield retrospective, section 4.2 point 1 (UNCONFIGURED_VERIFY conflict with GS-10); Codex 060-77 greenfield retrospective, section 'Verify war als defer fachlich verständlich, technisch aber nicht produktiv verwertbar'.",
+      "deferred": false,
+      "tracking": "NOW / Nova A -- happy-path deadlock, confirmed independently by 2 of 3 runners against the 2026-08-29 candidate (built ab0906d, stamped 0bf246d1) which already contained the 2026-08-11 verify-contract fix (674b1c0c)."
     },
     {
       "id": "pipeline.verify-evidence-has-no-producer",
