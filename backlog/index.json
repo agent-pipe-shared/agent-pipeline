@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "58d3cb8be95dec2feba3c5c5add28e90e6a96e14e5af2f41686bbd9c59da8282"
+    "transitionHead": "8ad21c34fffb50589cc29d78cd929e961e44f0700a8025c52e7a73eb75cb6be2"
   },
   "counts": {
-    "open": 95,
+    "open": 94,
     "in_progress": 3,
-    "closed": 425,
+    "closed": 426,
     "rejected": 3,
     "deferred": 11
   },
@@ -5780,12 +5780,16 @@
     },
     {
       "id": "pipeline.signing-fails-without-a-tty-and-the-error-reads-as-a-wrong-passphrase",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-29",
       "source": "Live PO signature ceremony, 2026-08-29: sign-intent invoked through the session's `!` command route failed with an OpenSSL 'while reading strings' error that reads as a rejected passphrase; the PO re-ran the identical command in a separate terminal and it succeeded on the first try.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "dac74b61",
+      "closureEvidence": "plugins/pipeline-core/scripts/po-human-approval.test.mjs"
     },
     {
       "id": "pipeline.single-trust-anchor-excludes-key-rotation-and-teams",
