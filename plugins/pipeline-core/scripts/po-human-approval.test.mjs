@@ -358,6 +358,87 @@ test("setup's recovered branch (private+public key exist, no authority yet) does
   }
 });
 
+// NVA-CF-KEYBOOTSTRAP (backlog: pipeline.onboarding-has-no-happy-path-for-an-
+// existing-signing-key.md): --existing-key registers an already-existing key file
+// (not yet known to this machine's --directory) as the trust anchor in ONE call --
+// no separate manual repair step, no agent loop reconciling a half-registered
+// state. `fakeSetupSpawn` already fakes the exact `pkey -in ... -pubout -out ...`
+// shape this branch shells out to (the same interception the fresh-generation
+// tests above already rely on), so this needs no new spawn fake.
+test("NVA-CF-KEYBOOTSTRAP: setup --existing-key registers a pre-existing key file as the trust anchor with zero repair-command detours", () => {
+  const dirs = fixtureDirs();
+  const existingKeyDir = mkdtempSync(join(tmpdir(), "po-existing-key-source-"));
+  try {
+    // Simulate a key the PO already has on their machine, from before this
+    // repository (or this --directory) ever existed -- generated independently of
+    // po-human-approval.mjs's own genpkey call.
+    const { privateKey } = generateKeyPairSync("ed25519", {
+      privateKeyEncoding: { type: "pkcs8", format: "pem" },
+      publicKeyEncoding: { type: "spki", format: "pem" },
+    });
+    const existingKeyPath = join(existingKeyDir, "already-had-this.pem");
+    writeFileSync(existingKeyPath, privateKey);
+
+    const result = runHumanApproval([
+      "setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory,
+      "--existing-key", existingKeyPath, "--human-name", "Test Operator",
+    ], { spawn: fakeSetupSpawn });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.code, "PO-HUMAN-AUTHORITY-READY");
+    assert.equal(result.imported, true);
+    assert.equal(result.authority.humanName, "Test Operator");
+    assert.equal(result.authority.keyReference, "local-po-key");
+    // The registered public key material actually matches the imported private key
+    // -- not merely "some key got written somewhere".
+    const registeredPublicKey = readFileSync(result.paths.publicKey, "utf8");
+    const expectedPublicKey = createPublicKey(createPrivateKey(privateKey)).export({ type: "spki", format: "pem" });
+    assert.equal(registeredPublicKey, expectedPublicKey);
+    // No leftover repair step: the trust-policy authority file is immediately
+    // usable, exactly like the fresh-generation branch's own output shape.
+    const authorityOnDisk = JSON.parse(readFileSync(result.paths.authority, "utf8"));
+    assert.equal(authorityOnDisk.publicKeySha256, result.authority.publicKeySha256);
+  } finally {
+    cleanup(dirs);
+    rmSync(existingKeyDir, { recursive: true, force: true });
+  }
+});
+
+test("NVA-CF-KEYBOOTSTRAP: setup --existing-key refuses to overwrite key material already present at --directory", () => {
+  const dirs = fixtureDirs();
+  const existingKeyDir = mkdtempSync(join(tmpdir(), "po-existing-key-source-"));
+  try {
+    runHumanApproval(["setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--human-name", "Test Operator"], { spawn: fakeSetupSpawn });
+    const { privateKey } = generateKeyPairSync("ed25519", {
+      privateKeyEncoding: { type: "pkcs8", format: "pem" },
+      publicKeyEncoding: { type: "spki", format: "pem" },
+    });
+    const existingKeyPath = join(existingKeyDir, "already-had-this.pem");
+    writeFileSync(existingKeyPath, privateKey);
+    const error = thrown(() => runHumanApproval([
+      "setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory,
+      "--existing-key", existingKeyPath, "--human-name", "Test Operator",
+    ], { spawn: fakeSetupSpawn }));
+    assert.match(error.message, /already carries key material/u);
+  } finally {
+    cleanup(dirs);
+    rmSync(existingKeyDir, { recursive: true, force: true });
+  }
+});
+
+test("NVA-CF-KEYBOOTSTRAP: setup --existing-key refuses cleanly when the named path does not exist", () => {
+  const dirs = fixtureDirs();
+  try {
+    const error = thrown(() => runHumanApproval([
+      "setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory,
+      "--existing-key", join(dirs.directory, "nope.pem"), "--human-name", "Test Operator",
+    ], { spawn: fakeSetupSpawn }));
+    assert.match(error.message, /--existing-key path does not exist/u);
+  } finally {
+    cleanup(dirs);
+  }
+});
+
 test("setup's already-exists branch (matching trust policy already present) does not print the nudge even with a custom --key-reference", () => {
   const dirs = fixtureDirs();
   try {
