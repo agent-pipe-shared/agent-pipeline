@@ -693,6 +693,13 @@ function submitFixturePlan(primary, authority, profile) {
     poGateProfile: () => profile,
   });
   assert.equal(status, 0);
+  // NVA-R22-PLANSHOWN: approve-plan now refuses an approval of unseen content
+  // -- a prior present-plan record bound to this exact submission is required.
+  const presented = runPipelineState(["present-plan", "--by", "coordinator"], {
+    dir: primary,
+    now: () => NOW,
+  });
+  assert.equal(presented, 0);
 }
 
 check("approve-plan binds the validated PO authority and revalidates it inside the writer lock", () => {
