@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "864bf0ba4c6951ec7ee643c7251b9d0776f0cca1ed780ed04bf77355cd788a12"
+    "transitionHead": "742468aba62c50b0beb3303f16f36335c754b1b799e0ebab2fed9c11ac3e0a4b"
   },
   "counts": {
-    "open": 80,
+    "open": 79,
     "in_progress": 3,
-    "closed": 452,
+    "closed": 453,
     "rejected": 3,
     "deferred": 11
   },
@@ -4016,13 +4016,17 @@
     },
     {
       "id": "pipeline.onboarding-has-no-happy-path-for-an-existing-signing-key",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-29",
       "source": "PO inline observation (2026-08-29, 3-runner greenfield test synthesis) plus the Codex and Claude/Windows retrospectives' independent trust-anchor-bootstrap-circularity findings (see 2026-08-28-onboarding-must-bootstrap-the-trust-anchor-once.md and 2026-08-09-critical-human-proof-not-materialized-for-signature-mode.md, both closed 2026-08-29 -- this item covers a DIFFERENT, narrower gap those did not: the missing THIRD onboarding option).",
       "deferred": false,
-      "tracking": "NOW / Nova A -- happy-path blocker, PO's own words: 'einen bestehenden Key zu nutzen ist auch zu umständlich im happy pfad da eine merkwürdige reperatur nötig ist und der driver hier nicht hilft und die agents kreise drehen'."
+      "tracking": "NOW / Nova A -- happy-path blocker, PO's own words: 'einen bestehenden Key zu nutzen ist auch zu umständlich im happy pfad da eine merkwürdige reperatur nötig ist und der driver hier nicht hilft und die agents kreise drehen'.",
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "7ac3ee73b7681403cf9b8ee3fceccca47edc3ab6",
+      "closureEvidence": "plugins/pipeline-core/scripts/po-human-approval.test.mjs"
     },
     {
       "id": "pipeline.onboarding-lifecycle-plan-hardcodes-the-codex-runner",
