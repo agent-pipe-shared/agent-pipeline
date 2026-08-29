@@ -85,6 +85,30 @@ deterministic suite makes the question moot.
 - The applier's `--only=verify-nva-c-protected` step registers all five suites green on a
   quiesced tree.
 
+## Progress, 2026-08-29 (dispatch NVA-W3-ONBOARDENV, landed by the Elephant, commit `7098e6a7`)
+
+`onboarding-init.mjs` gained an opt-in `env` seam threaded through
+`runOnboardingStep()`'s spawn; `project-onboarding-v3.mjs`'s `main()` honours
+a new `PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE` env var by injecting a
+`deps.homedir` override (mirroring `lib/machine-plane.mjs`'s existing
+`homedirFn` seam), opt-in and additive only. `onboarding-init.test.mjs` now
+threads a single disposable fixture home into every real-subprocess test.
+Verified: `node --test plugins/pipeline-core/scripts/onboarding-init.test.mjs`
+-> 14/14 pass, exit 0.
+
+**Not yet fully closing this item**, two gaps against the stated Acceptance:
+1. AC-1 says "produces the same result on a machine with a PO key and on one
+   without, **provably** — e.g. runs both cases explicitly from fixtures."
+   The landed fix always points at one fresh, empty fixture home (never a
+   with-key case) — it eliminates the variable rather than proving both
+   branches converge. A stronger fix would add a second fixture WITH a
+   seeded signing key and assert both produce the same driver outcome shape.
+2. AC-3 ("the applier's `--only=verify-nva-c-protected` step registers all
+   five suites green on a quiesced tree") was not re-verified this session.
+
+Leaving `status: open` for a small follow-up (add the with-key fixture case,
+re-run the applier check) rather than closing on a partial match.
+
 ## Related
 
 - `2026-08-28-onboarding-must-bootstrap-the-trust-anchor-once.md` — the change that turned
