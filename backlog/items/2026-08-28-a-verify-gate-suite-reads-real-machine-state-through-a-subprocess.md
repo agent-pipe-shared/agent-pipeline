@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.verify-suite-reads-real-machine-state
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: a8c11b5ae31e8cb848d71ee75e834052319dea7d
+closure_evidence: plugins/pipeline-core/scripts/onboarding-init.test.mjs
 created: 2026-08-28
 sprint: nova
 tracking: "NOW / Nova A — a suite about to enter the verify gate whose outcome depends on unrelated per-machine state; found while diagnosing a one-off failure of exactly that suite"
@@ -114,11 +118,16 @@ re-run the applier check) rather than closing on a partial match.
 - `2026-08-28-onboarding-must-bootstrap-the-trust-anchor-once.md` — the change that turned
   a latent coupling into a behavioural one.
 
-## Progress note (2026-08-29, backlog sweep)
+## Closed, 2026-08-29 (backlog sweep)
 
-Commit a8c11b5a added a with-key fixture home to onboarding-init.test.mjs
+Commit `a8c11b5a` added a with-key fixture home to onboarding-init.test.mjs
 proving Acceptance criterion 1 (both the with-key and no-key branches
 converge to the same outcome shape, provably from fixtures). Acceptance
 criterion 3 (all five suites register green under
 --only=verify-nva-c-protected) re-confirmed directly by re-running each
-suite.
+suite. Acceptance criterion 2 (no verify-gate suite reads real `$HOME`
+through a spawned child) is satisfied for the one suite this item's own
+"What is verifiable" section scoped to (`onboarding-init.test.mjs`) via the
+`PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE` seam. Independently re-verified by
+the Elephant: `node --test plugins/pipeline-core/scripts/onboarding-init.test.mjs`
+-> 15/15 pass (the new with-key fixture test included).

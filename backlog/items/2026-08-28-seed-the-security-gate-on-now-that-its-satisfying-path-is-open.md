@@ -149,3 +149,12 @@ direct code/test inspection, not a trusted self-report):
 
 - `2026-08-28-scanner-bootstrap-is-not-self-sufficient-for-a-fresh-project.md` — the work
   that closed reasons 1 and 2.
+- `2026-08-28-the-push-gate-is-unsatisfiable-in-any-installed-plugin-deployment.md` (closed
+  2026-08-29) — fixed both prerequisites this item's own "Ordering consequence" section
+  named as required first: gitleaks config resolution for installed-plugin deployments
+  (commit `867d287a`) and `push-prepare` respecting `gates.security` (commit `37443e91`),
+  measured at a real installed-plugin consumer (HA). This item's own remaining gap
+  ("measured against an INSTALLED-PLUGIN deployment specifically") is now more tractable
+  given that fix, but has not itself been re-measured for the SECURITY gate's own
+  satisfying path specifically (only for the push-prepare wiring) — still not done, noted
+  here so a follow-up dispatch does not have to re-discover this cross-reference.
