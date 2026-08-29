@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.ready-gate-hand-maintained-shape-mirror
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: 4fa77b40
+closure_evidence: plugins/pipeline-core/lib/project-onboarding-ready-gate.test.mjs
 created: 2026-08-28
 sprint: nova
 done_when: contains plugins/pipeline-core/lib/project-onboarding-ready-gate.mjs pipeline.ready-gate-keys-derived-from-producer
@@ -131,3 +135,33 @@ The predicate now names the actual remedy — the enumeration being derived from
 its producer rather than typed — via a marker
 `pipeline.ready-gate-keys-derived-from-producer`. It is deliberately not
 satisfied today.
+
+## Closure, 2026-08-29 (dispatch NVA-R19-READYGATE)
+
+All four Acceptance criteria met, verified by the dispatcher directly:
+`project-onboarding-ready-gate.test.mjs` 12/12, `guard-lifecycle-ready.test.mjs`
+182/182, `project-onboarding-v3.test.mjs` 147/0, `check-consumer-safe-paths.test.mjs`
+9/9.
+
+- **Key set:** `PROJECT_ONBOARDING_BASE_RESULT_KEYS`/`READY_ONLY_RESULT_KEYS`
+  now exported from `project-onboarding-v3.mjs` (the real producer) and
+  imported by the gate — Direction option 1, as preferred.
+- **Status set:** a genuine, documented obstacle blocks option 1 (a `status`
+  shorthand bound to a computed ternary at one construction site, not a
+  literal — full static derivation would need an AST pass or a ~40-site
+  producer rewrite). Falls back to Direction option 2 exactly as specified:
+  a new test drives a REAL, non-stubbed `inspectProjectOnboardingV3()`
+  result through `requireProjectOnboardingReady()` and confirms an unknown
+  status is rejected as `PORG-INVALID-OBSERVATION`, not silently passed.
+  This is a disclosed hybrid resolution, not the literal example the item
+  gave (an import cycle) — the underlying escape-hatch condition ("a
+  genuine obstacle blocks option 1") is met and named in-code.
+- **Third copy fixed too:** the test file's own `readyResult()`/
+  `readyResultWithPushApprovalKeys()` stubs now derive field names from the
+  same imported key lists and throw loudly on any unmapped key, closing the
+  exact "green because it never asks the real producer" failure mode the
+  item's analysis named.
+- **Refusal-text distinction:** found ALREADY correctly wired — no code
+  change was needed; `guard-lifecycle-ready.mjs` already names
+  `PORG-INVALID-OBSERVATION` distinctly from `PORG-NOT-READY`, confirmed by
+  an existing, still-passing test.
