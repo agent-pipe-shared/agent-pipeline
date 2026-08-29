@@ -1020,6 +1020,33 @@ test("non-ready write denials surface only the typed lifecycle status and recove
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
+// NVA-W4-READYGUARDTEST (backlog: 2026-08-28-the-readiness-guard-blocks-the-recovery-command-
+// it-names.md, AC-2). Every controlling status blocked() can render names the SAME recovery
+// line ("Re-run the typed project-onboarding-v3 inspection with intent session and use only
+// its returned nextAction."). This sweeps EVERY status PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES
+// can hold -- not one hard-coded example -- and asserts the guard admits the exact command that
+// recovery line names (`inspect --root <root> --intent session`) at every single one, so a
+// refusal can never again name a command it goes on to refuse itself.
+test("NVA-W4-READYGUARDTEST: the recovery inspection named by a non-ready denial is admitted at every controlling status", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const command = `node '${ONBOARDING_SCRIPT}' inspect --root '${path}' --intent session`;
+    assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
+    for (const status of PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES) {
+      const nonReady = {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny(status); },
+      };
+      assert.deepEqual(
+        evaluateLifecycleReadyGuard(bash(command), nonReady),
+        { exitCode: 0, stderr: "" },
+        `${status}: ${command}`,
+      );
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
 // NVA-T-READYKEYS DoD 4: PORG-INVALID-OBSERVATION (the ready-gate could not validate the
 // shape of what project-onboarding-v3 returned -- e.g. RESULT_KEYS mismatch) and a genuinely
 // unresolved cause used to render as the exact same generic "not ready" message. This pins
