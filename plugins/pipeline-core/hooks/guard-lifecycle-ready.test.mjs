@@ -6401,6 +6401,29 @@ test("NVA-BOOTRECEIPT-1: a subagent's first Edit/Write/NotebookEdit with no rece
   }
 });
 
+// pipeline.identity-attestation-fail-closed-fallback (2026-08-29): a
+// transcript_path that IS PRESENT but not a usable absolute path (the shape
+// observed 17 times in one audited run, docs/pipeline-audit-claude-session.md
+// §3.1) must fail CLOSED here (GL-09), never share "unresolved"'s ambiguous
+// fail-open fate -- exercised through the real, unmodified
+// evaluateLifecycleReadyGuard/evaluateBootstrapReceiptGate chain, not a mock.
+test("NVA-BOOTRECEIPT-1 / pipeline.identity-attestation-fail-closed-fallback: a transcript_path that is present but relative is denied, never fail-open", () => {
+  const path = bootstrapGovernedRoot();
+  const commonDir = bootstrapCommonDirFixture();
+  const relativeTranscriptPath = "relative/session/subagents/agent-x.jsonl";
+  try {
+    const result = evaluateLifecycleReadyGuard(
+      subagentInput("Edit", relativeTranscriptPath, { file_path: "src/implementation.mjs" }),
+      { projectDir: path, resolveGitCommonDirFn: () => commonDir },
+    );
+    assert.equal(result.exitCode, 2, "a present-but-relative transcript_path must fail closed, not open");
+    assert.match(result.stderr, /GUARD-BOOTSTRAP-RECEIPT-MISSING/u);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(commonDir, { recursive: true, force: true });
+  }
+});
+
 test("NVA-BOOTRECEIPT-1: a subagent's Edit WITH a receipt is allowed", () => {
   const path = bootstrapGovernedRoot();
   const commonDir = bootstrapCommonDirFixture();

@@ -75,6 +75,30 @@ test("subagentIdentity: missing transcript_path is unresolved (ambiguous), not o
   assert.equal(subagentIdentity({ transcript_path: "" }, {}).kind, "unresolved");
 });
 
+// pipeline.identity-attestation-fail-closed-fallback (2026-08-29): a
+// transcript_path that IS present but not a usable absolute path must never
+// share "unresolved"'s ambiguous, fail-open-tolerant kind -- it is never a
+// legitimate orchestrator shape, unlike a genuinely missing field.
+test("subagentIdentity: a present but relative transcript_path is a distinct kind, never merged into 'unresolved'", () => {
+  const identity = subagentIdentity({ transcript_path: "relative/session/subagents/agent-x.jsonl" }, {});
+  assert.notEqual(identity.kind, "unresolved");
+  assert.notEqual(identity.kind, "orchestrator");
+  assert.equal(identity.kind, "invalid-identity");
+  assert.equal(identity.reason, "transcript-path-present-but-not-absolute");
+});
+
+test("subagentIdentity: a present but non-string transcript_path is also invalid-identity, not unresolved", () => {
+  assert.equal(subagentIdentity({ transcript_path: 12345 }, {}).kind, "invalid-identity");
+  assert.equal(subagentIdentity({ transcript_path: null }, {}).kind, "invalid-identity");
+});
+
+test("evaluateDispatchBudgetGuard: an invalid-identity (present-but-relative transcript_path) call still fails open here, unaffected -- this guard's own documented fail-open-but-visible posture is unchanged by the new kind", () => {
+  const store = makeStore();
+  const input = { transcript_path: "relative/session/subagents/agent-x.jsonl", tool_name: "Read", tool_input: { file_path: "/x" } };
+  const result = evaluateDispatchBudgetGuard(input, baseOptions(store));
+  assert.equal(result.exitCode, 0);
+});
+
 test("subagentIdentity: missing sibling meta.json is unresolved", () => {
   const identity = subagentIdentity({ transcript_path: SUBAGENT_TRANSCRIPT }, makeStore());
   assert.equal(identity.kind, "unresolved");
