@@ -149,18 +149,53 @@ test("boundedCopySafeCommand with no placeholder() entries is byte-identical to 
   assert.equal(built.command, renderProjectOnboardingAction({ kind: "command", executable: "node", argv: fixtureArgv() }));
 });
 
-test("a short argv (no chunking needed) still round-trips through a real bash eval to the exact intended argv", () => {
+/**
+ * NVA-CF-BL24-DENIALBOILERPLATE: a short/fitting argv's inline `command`
+ * already fits within the shared column bound, so the wrapped
+ * posix/powershell/cmd renderings are all `null` -- only the one inline
+ * `command` line is rendered. `maxColumns` is still present.
+ */
+test("a short argv (inline command fits the column bound) renders WITHOUT the wrapped posix/powershell/cmd forms", () => {
+  const built = boundedCopySafeCommand({ executable: "node", argv: ["script.mjs", "--flag", "a value"] });
+  assert.ok(built.command.length <= built.copyCommand.maxColumns,
+    `test fixture must itself fit the bound: ${built.command}`);
+  assert.equal(built.copyCommand.maxColumns, 72);
+  assert.equal(built.copyCommand.posix, null);
+  assert.equal(built.copyCommand.powershell, null);
+  assert.equal(built.copyCommand.cmd, null);
+});
+
+/**
+ * NVA-CF-BL24-DENIALBOILERPLATE: the inline `command` line itself is what a
+ * caller with a short/fitting command is now expected to hand the human --
+ * this proves that line still round-trips through a real bash eval, even
+ * though no wrapped copyCommand rendering exists to prove it via.
+ */
+test("a short argv's bare inline command line still round-trips through a real bash eval to the exact intended argv", () => {
   const built = boundedCopySafeCommand({ executable: "node", argv: ["script.mjs", "--flag", "a value"] });
   if (process.platform === "win32") return;
-  assert.ok(built.copyCommand.posix);
-  const lines = built.copyCommand.posix.split("\n");
-  const assignments = lines.slice(0, -1).join("\n");
-  const script = `node() { printf '%s\\0' "$@"; }\n${assignments}\neval "$CMD"`;
+  const script = `node() { printf '%s\\0' "$@"; }\n${built.command}`;
   const probe = spawnSync("bash", ["-c", script], { encoding: "utf8" });
   assert.equal(probe.status, 0, probe.stderr);
   const tokens = probe.stdout.split("\0");
   assert.equal(tokens.pop(), "");
   assert.deepEqual(tokens, built.argv);
+});
+
+/**
+ * NVA-CF-BL24-DENIALBOILERPLATE: a genuinely-too-long inline command (the
+ * fixtureArgv() case used throughout this file, well over the 72-column
+ * bound) still gets the full wrapped posix/powershell/cmd renderings -- the
+ * conditional in boundedCopySafeCommand() only suppresses them when the
+ * inline form actually fits.
+ */
+test("a genuinely-too-long argv still gets the full wrapped posix/powershell/cmd renderings", () => {
+  const built = boundedCopySafeCommand({ executable: "node", argv: fixtureArgv() });
+  assert.ok(built.command.length > built.copyCommand.maxColumns,
+    `test fixture must itself exceed the bound: ${built.command}`);
+  assert.equal(typeof built.copyCommand.posix, "string");
+  assert.equal(typeof built.copyCommand.powershell, "string");
+  assert.equal(typeof built.copyCommand.cmd, "string");
 });
 
 /**
