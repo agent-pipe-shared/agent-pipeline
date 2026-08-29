@@ -194,6 +194,57 @@ Acceptance criterion 1 ("A freshly onboarded project completes a signature push 
 measured against an installed-plugin deployment") was NOT measured this session — only unit-
 and fixture-level tests. Status left `open` pending that end-to-end measurement.
 
+## End-to-end measurement, 2026-08-29 (NVA-CF-BL16-TOFUE2E / -RETRY / -PRECISEFIX / -PLANGATEFIX, commits `13e5e541`, `58812cc5`, `fc0561d1`, `4b32ec65`)
+
+Acceptance criterion 1 is now **substantially, but not completely, measured**
+by `plugins/pipeline-core/scripts/measure-tofu-push-e2e.mjs`, a real
+subprocess-driven walk of a genuinely fresh, disposable repository (no
+mocked dependencies except the key-generation step -- see below). Run
+independently by the Elephant after the dispatch chain landed, not only
+taken from a dispatch report:
+
+```
+node plugins/pipeline-core/scripts/measure-tofu-push-e2e.mjs
+```
+
+reaches `outcome: "signed-push-recorded"`, exit code 0: fresh onboarding
+(7 turns) → a real PO plan-gate approval (submit-plan/present-plan/
+approve-plan, including discovering and satisfying a previously-unknown
+second precondition, `PO-GATE-PRD-ACKNOWLEDGEMENT-MISSING`) → a real Ed25519
+key setup (generated via Node's own `crypto` module rather than shelling
+out to an interactive `openssl genpkey`, to avoid a real PEM-passphrase
+prompt no automated harness can drive reliably -- the key itself is real
+and used for real signing, only ITS OWN GENERATION step is not routed
+through interactive openssl) → a real `openssl pkeyutl -sign`-produced
+signature over the real subject digest → `approve-push` accepting that
+proof and recording `pushApproval.lastApproved.criticalProof` with a real
+signature.
+
+**What remains genuinely unmeasured:** the script's own final check reads
+`project/critical-human-proof.json` directly off disk after `approve-push`
+and reports `trustAnchorPinned: false` (schema stays
+`pipeline.critical-human-proof-policy.v1`, no `trustAnchors` written).
+Traced directly: `pinTrustAnchorOnFirstUse()` is called only from inside
+`authorizeRecordedPush()`, which is called only from
+`plugins/pipeline-core/hooks/guard-push.mjs` -- the PreToolUse hook that
+intercepts an actual `git push` command. `pipeline-state.mjs approve-push`
+(where this script's walk stops) only RECORDS the approval; it never itself
+invokes `authorizeRecordedPush()`. So this measurement proves the entire
+onboarding-through-signed-approval chain works for a fresh, anchor-less
+project, but does not yet prove the pin itself fires, because it never
+drives a real `git push` through the guard hook. The underlying pinning
+function is separately, thoroughly unit-tested
+(`critical-action-authorization.test.mjs`, 39/39 including TOFU-specific
+cases, confirmed passing this same session) -- this is a measurement-scope
+gap, not a known mechanism defect, but it is not the same thing as having
+measured it end to end as Acceptance criterion 1 literally asks.
+
+**Not yet closing.** A future session should either extend this script one
+more step (drive a real `git push` to a local/fake remote through
+`guard-push.mjs`'s real interception, then re-check `trustAnchorPinned`) or
+make an explicit PO call that the currently-measured scope is sufficient
+evidence to close this item.
+
 ## Related
 
 - `2026-08-28-the-push-gate-is-unsatisfiable-in-any-installed-plugin-deployment.md` — the
