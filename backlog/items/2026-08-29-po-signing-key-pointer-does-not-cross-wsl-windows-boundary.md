@@ -43,6 +43,86 @@ Per the briefing's sanitization constraint, this item deliberately does not
 name the key's directory, its OS-scoped storage plane, or any anchor value —
 only the PLANE/boundary distinction the runners observed.
 
+## Location (found 2026-08-29, dispatch NVA-R23-KEYPOINTER)
+
+The registration/lookup mechanism the prior investigation could not find:
+
+- `machinePlaneFilePath()` (`plugins/pipeline-core/lib/machine-plane.mjs`,
+  ~L48) is the SOLE derivation of the plane's one file: `join(realpathSync(
+  homedirFn()), ".agent-pipeline", "machine.json")`. `homedirFn` defaults to
+  Node's `os.homedir()` and is derived from nothing else — never
+  `process.env`, never repository config, never tool input.
+- `readMachinePlane()` (same file, ~L137) reads that file and returns the
+  `poKeyDirectory` field — the pointer itself.
+- Consumption side: `observeLocalTrustAnchorPointer()`
+  (`plugins/pipeline-core/lib/project-onboarding-v3.mjs`, ~L5360) calls
+  `readMachinePlane()` and returns `status: "no-plane"` / `"no-directory"`
+  when nothing resolves. That status feeds the literal "this machine has no
+  PO signing key recorded at all" guidance text
+  (`proposeTrustAnchorAbsentGuidanceAction()`, same file, ~L5522).
+- A second, independent tier sits ahead of the machine plane in
+  `po-human-approval.mjs`'s CLI (`parseHumanArgs()`, ~L504-553): an explicit
+  `--directory` flag, then a repo-scoped store keyed by `gitCommonDir`
+  (`resolveRepoScopedDirectory` ~L219, `readRepoKeyDirectory` ~L189), THEN
+  the machine plane, THEN the `PIPELINE_PO_APPROVAL_DIRECTORY` env-var
+  fallback. The repo-scoped tier is keyed to the exact checkout's
+  git-common-dir, not the machine plane — it crosses the WSL/Windows
+  boundary only when both environments happen to resolve the SAME
+  underlying `.git` (e.g. a shared bind mount), which is not the general
+  case.
+
+**Per-OS-environment vs. per-physical-machine, confirmed directly in code:**
+`machinePlaneFilePath()` is keyed exclusively by `os.homedir()`. This is a
+per-OS-environment resolution, not a per-physical-machine one: on one
+physical machine running both a WSL shell and a native Windows shell,
+`os.homedir()` returns two genuinely disjoint filesystem roots that are not
+bridged anywhere in this code path. No physical-machine identifier
+(hostname, hardware ID, or similar) is consulted anywhere in
+`machine-plane.mjs`. This exactly reproduces the observed symptom: a pointer
+registered from one shell is invisible from the other on the same box, even
+though the underlying key material may itself be reachable from both
+environments once a session knows where to look.
+
+**Design-intent read (technical judgment, not a product decision):** the
+surrounding code and spec (`specs/sprint-nova-epic/plans/
+nova-setup-bootstrap.md` §6a, decided 2026-08-08) both frame this plane as
+per-physical-machine — the module is named/documented as "the machine-scoped
+configuration plane", and the spec text describes it as "one named
+configuration file on the operator's machine" (singular). Neither the spec
+nor `machine-plane.test.mjs` mentions a WSL/native-Windows dual-environment
+scenario anywhere. This reads as an unconsidered gap between the stated
+per-machine intent and the actual per-`os.homedir()` mechanism, not a
+deliberate per-environment design choice recorded anywhere. On that basis,
+**Acceptance direction 1** (single registration works across both
+environments on one physical machine) is more consistent with the code's own
+apparent intent than direction 2. Building it needs a genuine
+physical-machine-identity or cross-boundary resolution mechanism — out of
+scope for the investigating dispatch (NVA-R23-KEYPOINTER field 4 forbade a
+"physical-machine-identity resolver") and a nontrivial platform-detection
+problem in its own right (no platform-portable physical-machine identity
+primitive exists in Node's standard library; correctly resolving "this WSL
+shell's corresponding Windows home" is a new mechanism, not a one-line
+change).
+
+**No fix built in this dispatch:** the literal "no PO signing key recorded
+at all" message that would carry the direction-2 interim wording
+(Acceptance's OR clause) lives in `project-onboarding-v3.mjs`
+(`proposeTrustAnchorAbsentGuidanceAction()`, ~L5522) — a file
+NVA-R23-KEYPOINTER's briefing explicitly forbade editing (another dispatch
+may be actively editing it concurrently). No implementation was attempted.
+
+## Recommended next step
+
+Once `project-onboarding-v3.mjs` is free of concurrent edits, a follow-up
+dispatch should add one sentence to
+`proposeTrustAnchorAbsentGuidanceAction()`'s guidance text naming that the
+machine plane is scoped to the CURRENT process's home directory (so a WSL
+shell and a native-Windows shell on the same box never share one) plus the
+exact registration command for the current environment. This satisfies
+Acceptance's OR clause as a low-risk interim step, independent of and prior
+to any larger decision about building the per-physical-machine resolution
+recommended above as the better long-term fit for the code's stated intent.
+
 ## Proposal
 
 Because the concrete registration/lookup mechanism was not located during
