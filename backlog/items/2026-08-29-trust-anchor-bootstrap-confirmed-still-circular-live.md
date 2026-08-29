@@ -60,6 +60,33 @@ time -- that is what produced the false closure. Required this time:
   session (see also the Codex-restart item) and needs a durable guard against
   recurring a third time.
 
+## Progress, 2026-08-29 (NVA-CF-KEYBOOTSTRAP dispatch)
+
+Direction steps 1-2 done, live, exactly as specified: a real git repo, the
+REAL installed pre-commit backstop, and a real key created via
+`po-human-approval.mjs setup` (not code-reading, not an assumption of
+composition). Step 3's hypothesis was refined by the live run: it is not that
+`setup`'s write path lacks a GS-2 exemption -- a fresh project's FIRST commit
+already succeeds via `pre-commit-hook-install.mjs`'s first-appearance
+exemption. The actual break is one step later: ADDING the trust anchor to
+that now-already-tracked `project/critical-human-proof.json` after a later
+key creation is blocked (no exemption applies to an already-tracked file),
+and the sanctioned GS-10/HGO ceremony itself refuses to run without an
+already-existing trust anchor (`HGO-TRUST-ANCHOR-MISSING`,
+`human-guard-override.mjs:3182-3197` -- NVA-HGOFIX-1's deliberate posture).
+Permanent regression coverage committed:
+`plugins/pipeline-core/lib/trust-anchor-bootstrap-circularity.repro.test.mjs`
+(commit `7c44e746`) -- satisfies the acceptance criteria's "committed as
+permanent regression coverage" clause; it currently PASSES because it
+correctly documents the still-blocked state, not because the deadlock is
+fixed. **The fix itself is not yet chosen or dispatched** -- it needs one of
+two file-scope decisions (widen `pre-commit-hook-install.mjs`'s exemption, or
+give `human-guard-override.mjs` a bootstrapping TOFU route) that touches
+security-sensitive/fail-closed code, so it is on the PO decisions list
+(`scratch/po-decisions-pending-2026-08-29-final.md`) rather than picked
+autonomously. This item stays open until that fix lands and the reproduction
+in the committed test flips from documenting-the-bug to proving-the-fix.
+
 ## Triage
 
 - **Decision:** accepted, Nova A, high priority
