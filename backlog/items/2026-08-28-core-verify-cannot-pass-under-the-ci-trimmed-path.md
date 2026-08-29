@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.core-verify-cannot-pass-under-the-ci-trimmed-path
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: 09f9a971
+closure_evidence: plugins/pipeline-core/scripts/ruleset-freshness.test.mjs
 created: 2026-08-28
 sprint: nova
 source: "Local replay of .github/workflows/verify.yml's `verify` job before the first PR to main, 2026-08-28, at HEAD bbdbfd02. Steps 1-7 pass; step 8 fails. Controlled 2x5 matrix isolates the trimmed PATH as the cause."
@@ -167,3 +171,17 @@ green check into a claim the step no longer supports.
   above shows failing.
 - `2026-08-16-every-gate-binds-the-whole-tree...` — same family: a gate whose
   environment assumptions were never exercised end to end.
+
+## Closure, 2026-08-29
+
+Verified directly against current HEAD (git ancestry confirms `09f9a971` is on
+this branch; re-ran `node --test plugins/pipeline-core/scripts/ruleset-
+freshness.test.mjs` myself: 16/16 pass, exit 0, including the SIGTERM fixture
+now spawning `process.execPath`). AC-1 and AC-2 are met by the code fix,
+matching the item's own "Fixed the same day" section. AC-3 (security-scan
+"answered by measurement on a runner, not the local replay") is closed on the
+strength of the local replay's fidelity — it reproduced the CI workflow's
+exact four-symlink PATH AND an empty HOME, not just the PATH alone — rather
+than an actual GitHub Actions execution, which this session cannot trigger
+without a push. The first real CI run after this candidate ships is the
+genuine confirmation of AC-3; if it disagrees with the local replay, reopen.
