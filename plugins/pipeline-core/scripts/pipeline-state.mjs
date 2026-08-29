@@ -5243,6 +5243,21 @@ function runResultCloseCommand(sub, rest, deps) {
 const PO_REBIND_PLAN_SCHEMA = "pipeline.po-authority-rebind-plan.v1";
 const PO_ACK_PLAN_SCHEMA = "pipeline.po-authority-acknowledge-plan.v1";
 const PO_ACK_APPLY_SCHEMA = "pipeline.po-authority-acknowledge-apply.v1";
+// AGY-CF-BL15 (backlog/items/2026-08-28-a-gate-should-not-demand-a-human-name-
+// typed-byte-exactly.md): the value po-authority-acknowledge-apply's chat gate
+// compares the typed answer against. Was `expected: apply.by` -- a person's
+// name: arbitrary Unicode, arbitrary length, and, as the Windows lockout fixed
+// by decodeTypedLine() showed, not reliably reproducible through every
+// terminal's input path. `requireAttendedChatGateConfirmation`'s security
+// property is TTY-ness of fd 0 (an attended human is present), not secrecy of
+// the expected string -- so a short, fixed, ASCII literal proves the same
+// attendance with none of a name's encoding/normalization/homoglyph baggage.
+// Converges on the shape kickoff's --language/--profile gate and
+// human-guard-override's activation gate already use: a short bounded ASCII
+// token, never free-form identity text. `by` stays fully disclosed, unchanged,
+// in the confirmation summary below -- only the COMPARED value changes; what
+// the approval is bound to (plan-sha256/updated-at) is untouched.
+export const PO_ACK_APPLY_CONFIRMATION_TOKEN = "CONFIRM";
 const PO_DECISION_PLAN_SCHEMA = "pipeline.po-authority-decision-plan.v1";
 const PO_DECISION_SELECTION_SCHEMA = "pipeline.po-authority-selection.v1";
 const PO_REBIND_LOCK_TOKEN = "pipeline-po-authority-rebind-v1";
@@ -6032,8 +6047,9 @@ function runPoAuthorityAcknowledgeCommand(sub, rest, deps) {
         `  by: ${apply.by}`,
         `  plan-sha256: ${apply.planSha256}`,
         `  updated-at: ${apply.plannedAt}`,
+        `  confirmation value: ${PO_ACK_APPLY_CONFIRMATION_TOKEN}`,
       ],
-      expected: apply.by,
+      expected: PO_ACK_APPLY_CONFIRMATION_TOKEN,
       dependencies: deps,
     });
     if (!confirmation.ok) {
@@ -6042,7 +6058,7 @@ function runPoAuthorityAcknowledgeCommand(sub, rest, deps) {
         console.error("Re-run this EXACT command yourself and type the value shown above when prompted:");
         console.error(`node plugins/pipeline-core/scripts/pipeline-state.mjs po-authority-acknowledge-apply --plan-sha256 ${apply.planSha256} --updated-at ${apply.plannedAt} --by ${JSON.stringify(apply.by)} --activate${apply.runner ? ` --runner ${apply.runner}` : ""}`);
       } else {
-        console.error(`Error: po-authority-acknowledge-apply refused (${confirmation.code}); the typed value did not match --by ${apply.by}.`);
+        console.error(`Error: po-authority-acknowledge-apply refused (${confirmation.code}); the typed value did not match the confirmation value shown above.`);
       }
       return 1;
     }

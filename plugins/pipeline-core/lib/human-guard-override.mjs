@@ -2940,8 +2940,9 @@ export function authorizeHumanGuardOverride({
   // already bound to requestSha256/planSha256/reasonSha256 by the HGO-SELECTION check
   // above) rather than a random persisted challenge (contrast pipeline-state.mjs's
   // `pendingPushChallenge`): the security property `requireAttendedChatGateConfirmation`
-  // provides is TTY-ness of fd 0, not secrecy of the expected string (mirrors
-  // po-authority-acknowledge-apply's `expected: apply.by`, also fully agent-known).
+  // provides is TTY-ness of fd 0, not secrecy of the expected string -- same
+  // property po-authority-acknowledge-apply's `PO_ACK_APPLY_CONFIRMATION_TOKEN`
+  // (pipeline-state.mjs, AGY-CF-BL15) relies on, also fully agent-known.
   // Placed AFTER the mode/reason/selection/plan checks above but BEFORE any capability
   // file is written or audit entry appended, so a failed attempt leaves the pending
   // request/plan/selection fully available for a genuine attended retry.
