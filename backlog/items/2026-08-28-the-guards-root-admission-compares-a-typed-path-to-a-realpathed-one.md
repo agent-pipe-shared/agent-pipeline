@@ -3,10 +3,14 @@ schema: pipeline.backlog-item.v1
 id: pipeline.guard-root-admission-compares-typed-to-realpathed
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-28
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: fdc02abc
+closure_evidence: plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
 sprint: nova
-done_when: contains plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs realpathSync(resolve(value))
+done_when: contains plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs rootValueIdentityMatcher
 tracking: "NOW / Nova A — the surviving candidate cause for a consumer session that lost both its lanes on Windows, and a platform-neutrality defect in the guard that decides whether any recovery command runs at all"
 source: "Found 2026-08-28 while independently verifying dispatch NVA-G-GUARDDEADLOCK's negative result against guard-lifecycle-ready.mjs. The dispatch refuted the reported cause of HA incident report S56 finding B3 and named this as the most plausible remaining one; the code was then re-read here to confirm the mechanism exists."
 ---
@@ -92,6 +96,42 @@ produce exactly the reported symptom.
 - A refusal caused by a root mismatch is distinguishable from a refusal caused by an
   unadmitted command shape.
 - No path that resolves outside the project root becomes admitted.
+
+## Closure, 2026-08-29 (dispatch NVA-R15-ROOTADMIT, commit fdc02abc)
+
+All four Acceptance criteria met, verified by the dispatcher directly:
+`node --test plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs` →
+182/182 (178 pre-existing + 4 new, all passing by name), `node --test
+harness/scripts/check-consumer-safe-paths.test.mjs` → 9/9.
+
+- **Resolved-vs-resolved:** `resolveRootComparisonValue()`/
+  `rootValueIdentityMatcher()` reuse `repository-path-identity.mjs`
+  (`repositoryPathIdentityOrSelf`) exactly as Direction #3 asked — no fourth
+  independent copy of WSL/Windows path-identity logic. A value that fails to
+  resolve at all stays refused, unchanged, proven by its own test.
+  `sanctionedOnboardingArgs()`/`isSanctionedLifecycleCommand()` thread an
+  injectable `resolveFn`/`realpathSyncFn` (mirroring this file's existing
+  `options.processExecPath` convention) so a win32 spelling can be exercised
+  on any host OS without a real filesystem behind it.
+- **Mismatch shapes tested:** differing separator, differing drive-letter
+  case, and a symlinked parent resolving to the same real root — each its
+  own test, none skipped.
+- **Distinguishable denial:** a root-identity mismatch is now named
+  distinctly from an unadmitted command shape, reusing the existing
+  `nearMissHint` mechanism rather than a parallel one.
+- **No widened admission:** a negative-control test with a second real tmp
+  directory proves a path resolving outside the project root is still
+  refused.
+
+The original `done_when` predicate quoted the OLD problematic expression
+(`realpathSync(resolve(value))`) rather than anything the fix would
+introduce, so it never matched the genuine fix — repointed to
+`rootValueIdentityMatcher`, the real function name.
+
+Scope note the dispatch correctly respected: sibling scripts' own root
+comparisons (`sanctionedDriverArgs`, `sanctionedPushInitArgs`,
+`sanctionedMigrationArgs`, `exactRoot()`) still compare byte-exact — out of
+this item's briefed scope, not claimed fixed here.
 
 ## Related
 
