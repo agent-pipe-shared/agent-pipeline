@@ -387,6 +387,18 @@ const TIER_B_DECLARATIONS = Object.freeze({
       "plugins/pipeline-core/lib/parallel-dispatch-planner.test.mjs",
     ]),
   }),
+  // ADR-0065 candidate (c), continuation (NVA-CF-BL11-TIERB). Same shape again. Confirmed live
+  // before this dispatch: backlog-dispatch-reference.mjs has zero imports of its own, and its
+  // test file imports only "node:assert/strict" and "node:test" plus this one module -- no fs,
+  // no child_process, no os.tmpdir -- so its entire real input is these two files; confirmed by
+  // a real `node --permission --allow-fs-read=<src> --allow-fs-read=<test> <test>` run (12/12
+  // checks passed, no other grant).
+  "backlog-dispatch-reference-tests": Object.freeze({
+    reads: Object.freeze([
+      "plugins/pipeline-core/lib/backlog-dispatch-reference.mjs",
+      "plugins/pipeline-core/lib/backlog-dispatch-reference.test.mjs",
+    ]),
+  }),
 });
 
 function tierBDeclaredFiles({ suite, rel, implementationSha256, repoRoot, declaration }) {
