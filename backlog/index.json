@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "8ad21c34fffb50589cc29d78cd929e961e44f0700a8025c52e7a73eb75cb6be2"
+    "transitionHead": "312d910a781af61fbdc0798e6611f5dee62deba15315d112650ddc884506e6d7"
   },
   "counts": {
-    "open": 94,
+    "open": 93,
     "in_progress": 3,
-    "closed": 426,
+    "closed": 427,
     "rejected": 3,
     "deferred": 11
   },
@@ -4196,12 +4196,16 @@
     },
     {
       "id": "pipeline.pipeline-user-yaml-file-level-protection-forces-signature-ceremony",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-29",
       "source": "Claude/Windows self-audit report (docs/pipeline-audit-claude-session.md, section 5.4), observed during the 2026-08-29 three-runner greenfield test.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "56f2116ac15862ed99e3f37656b296d8dfe822b3",
+      "closureEvidence": "plugins/pipeline-core/hooks/guard-gate-strength.mjs"
     },
     {
       "id": "pipeline.plan-approval-binds-a-staging-draft-as-project-authority",

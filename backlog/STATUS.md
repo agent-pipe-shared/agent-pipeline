@@ -344,7 +344,7 @@
 | pipeline.pipeline-start-hardcodes-a-stale-copy-of-the-elephant-role-prohibitions | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.pipeline-state-rebind-codex-default-runner | closed | defect | pipeline | 2026-08-05 | — |
 | pipeline.pipeline-state-scripts-test-file-never-runs-in-full-verify | closed | defect | pipeline | 2026-08-09 | — |
-| pipeline.pipeline-user-yaml-file-level-protection-forces-signature-ceremony | open | defect | pipeline | 2026-08-29 | — |
+| pipeline.pipeline-user-yaml-file-level-protection-forces-signature-ceremony | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.plan-approval-binds-a-staging-draft-as-project-authority | open | defect | pipeline | 2026-08-27 | — |
 | pipeline.plan-approval-is-recorded-without-a-check-that-the-design-was-shown | open | defect | pipeline | 2026-08-29 | — |
 | pipeline.plan-partial-authority-guard-allowlist-does-not-admit-its-own-profile-source-flags | closed | defect | pipeline | 2026-08-17 | — |
@@ -545,8 +545,8 @@
 
 ## Counts
 
-- open: 94
+- open: 93
 - in_progress: 3
-- closed: 426
+- closed: 427
 - rejected: 3
 - deferred: 11
