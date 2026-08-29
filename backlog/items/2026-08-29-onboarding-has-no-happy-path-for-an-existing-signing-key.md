@@ -7,7 +7,7 @@ status: closed
 closed_at: 2026-08-29
 closure_repository: self
 closure_commit: 7ac3ee73b7681403cf9b8ee3fceccca47edc3ab6
-closure_evidence: "NVA-CF-KEYBOOTSTRAP dispatch, commit 7ac3ee73: po-human-approval.mjs setup --existing-key <path> imports and registers a pre-existing key as the trust anchor in one call, refuses cleanly on an already-populated directory or a non-existent path. Independently re-verified by the Elephant (not just the dispatch's own report): node --test plugins/pipeline-core/scripts/po-human-approval.test.mjs -> 106/106 pass, including the 3 new NVA-CF-KEYBOOTSTRAP tests covering all 3 acceptance criteria."
+closure_evidence: plugins/pipeline-core/scripts/po-human-approval.test.mjs
 created: 2026-08-29
 sprint: nova
 tracking: "NOW / Nova A -- happy-path blocker, PO's own words: 'einen bestehenden Key zu nutzen ist auch zu umständlich im happy pfad da eine merkwürdige reperatur nötig ist und der driver hier nicht hilft und die agents kreise drehen'."
@@ -36,6 +36,19 @@ file in the first place.
   manual repair step or agent loop.
 - A test drives this path against a fresh onboarding fixture with a pre-existing key file on
   disk and confirms zero repair-command detours.
+
+## Closed, 2026-08-29 (NVA-CF-KEYBOOTSTRAP)
+
+`po-human-approval.mjs setup --existing-key <path>` (commit `7ac3ee73`)
+imports and registers a pre-existing key file as the trust anchor in one
+call: derives+validates the public half via the same openssl pkey step
+setup's own recovery branch already uses, refuses cleanly if the directory
+already carries key material or the named path does not exist, and writes
+an immediately-usable authority record with zero further repair commands.
+All 3 acceptance criteria satisfied. Independently re-verified by the
+Elephant (not just the dispatch's own report): `node --test
+plugins/pipeline-core/scripts/po-human-approval.test.mjs` -> 106/106 pass,
+including the 3 new tests this dispatch added.
 
 ## Triage
 
