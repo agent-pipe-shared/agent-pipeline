@@ -59,12 +59,20 @@ function run(argv, cwd, env, input) {
   return spawnSync(argv[0], argv.slice(1), { cwd, encoding: "utf8", timeout: 180000, env, input });
 }
 
+// `authorize-critical` (unlike `prepare-push-subject`) prints its human-readable
+// confirmation prompt to the SAME stdout stream as its trailing JSON result, with no
+// separating newline before the JSON's opening brace -- a bare `JSON.parse(stdout)`
+// then fails on the leading prompt text. Recover by trying every `{` occurrence, right
+// to left (the real result is the LAST top-level JSON object on the stream), and
+// returning the first one that parses cleanly to end-of-string.
 function parseJsonStdout(result) {
-  try {
-    return { ok: true, value: JSON.parse(result.stdout) };
-  } catch {
-    return { ok: false, error: result.stdout };
+  const stdout = result.stdout ?? "";
+  for (let i = stdout.lastIndexOf("{"); i !== -1; i = stdout.lastIndexOf("{", i - 1)) {
+    try {
+      return { ok: true, value: JSON.parse(stdout.slice(i)) };
+    } catch { /* keep searching further left */ }
   }
+  return { ok: false, error: stdout };
 }
 
 /**
