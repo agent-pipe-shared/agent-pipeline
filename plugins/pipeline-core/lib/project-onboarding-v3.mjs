@@ -2217,6 +2217,25 @@ function lifecycleResult({
   };
 }
 
+// pipeline.ready-gate-keys-derived-from-producer: exported so a consumer's
+// own accepted-key check (project-onboarding-ready-gate.mjs) can ask this
+// module what shape its one shared v4 envelope builder actually returns,
+// instead of hand-typing a duplicate list that silently drifts behind it --
+// twice, confirmed live (backlog:
+// pipeline.ready-gate-hand-maintained-shape-mirror). Calling the real
+// builder above with harmless placeholder arguments and reading its own key
+// set back is derivation, not restatement: any key added to or removed from
+// `lifecycleResult`'s object literal above changes this automatically, with
+// no second list to keep in sync.
+export const PROJECT_ONBOARDING_BASE_RESULT_KEYS = Object.freeze(Object.keys(lifecycleResult({
+  status: "shape-probe",
+  root: null,
+  runner: null,
+  intent: "onboarding",
+  repository: {},
+  runtime: {},
+})));
+
 function validAppServerComponent(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)
     || JSON.stringify(Object.keys(value).sort()) !== JSON.stringify(["code", "required", "status"])) {
@@ -2725,6 +2744,17 @@ function readyLifecycleResult({ root, runner, intent, repository, runtime, conti
   // `trustAnchorAvailability` only make sense once a repository is fully
   // "ready" -- that is the exact moment a session bootstrap inspects and
   // reports on -- so they are attached here, and only here.
+  //
+  // Built by iterating READY_ONLY_RESULT_FIELD_BUILDERS (declared just below
+  // this function) rather than as a second literal object: that map is the
+  // one place a ready-only field is ever added, and the exported
+  // PROJECT_ONBOARDING_READY_ONLY_RESULT_KEYS is its Object.keys() -- the two
+  // cannot drift apart because they are the same object (backlog:
+  // pipeline.ready-gate-hand-maintained-shape-mirror).
+  const readyOnlyFields = {};
+  for (const [key, build] of Object.entries(READY_ONLY_RESULT_FIELD_BUILDERS)) {
+    readyOnlyFields[key] = build(root, fs);
+  }
   return {
     ...lifecycleResult({
       status: "ready",
@@ -2738,10 +2768,23 @@ function readyLifecycleResult({ root, runner, intent, repository, runtime, conti
       nextAction: designToImplementationHandoverAction(root, fs),
       diagnostics: [],
     }),
-    pushApprovalMode: activePushApprovalMode(root, fs),
-    trustAnchorAvailability: trustAnchorAvailability(root, fs),
+    ...readyOnlyFields,
   };
 }
+
+// pipeline.ready-gate-keys-derived-from-producer: {name -> builder(root, fs)}
+// for every field readyLifecycleResult() above attaches ONLY to a ready
+// result. PROJECT_ONBOARDING_READY_ONLY_RESULT_KEYS is Object.keys() of this
+// exact map, so a field added here (the only place this ever happens) is
+// reflected there automatically -- never a second hand-typed list.
+const READY_ONLY_RESULT_FIELD_BUILDERS = {
+  pushApprovalMode: activePushApprovalMode,
+  trustAnchorAvailability,
+};
+
+export const PROJECT_ONBOARDING_READY_ONLY_RESULT_KEYS = Object.freeze(
+  Object.keys(READY_ONLY_RESULT_FIELD_BUILDERS),
+);
 
 function afterRuntimeLifecycleResult({ root, intent, repository, runtime, runner }, fs) {
   requireRunner(runner, "afterRuntimeLifecycleResult");
