@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "01135e0fd420d6f6a386163d8cc4b45591a4f6eeababadaf8dc67c2d826b361c"
+    "transitionHead": "9fc4387a0fbd8caff1ba7d57b040f2770e6edf63ac166b0370d31b171ffd80e0"
   },
   "counts": {
-    "open": 104,
+    "open": 103,
     "in_progress": 3,
-    "closed": 416,
+    "closed": 417,
     "rejected": 3,
     "deferred": 11
   },
@@ -3500,12 +3500,16 @@
     },
     {
       "id": "pipeline.mechanical-proof-of-complete-prior-input-consumption-across-restart",
-      "status": "open",
+      "status": "closed",
       "type": "requirement",
       "owner": "pipeline",
       "created": "2026-08-29",
       "source": "PO ruling, recorded by scratch/greenfield-triage-2026-08-29.md finding F14 as the durable form of F12+F13, observed during the 2026-08-29 three-runner greenfield test.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "3d244dae",
+      "closureEvidence": "plugins/pipeline-core/scripts/check-resume-consumption.test.mjs"
     },
     {
       "id": "pipeline.merged-into-frontmatter-key-documented-but-unsupported",
