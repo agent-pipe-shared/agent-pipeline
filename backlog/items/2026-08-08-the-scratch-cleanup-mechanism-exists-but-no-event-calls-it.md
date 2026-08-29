@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.scratch-cleanup-mechanism-not-wired-to-any-event
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: 3ede9d0d
+closure_evidence: plugins/pipeline-core/hooks/staleness-check.test.mjs
 created: 2026-08-08
 sprint: nova
 due: 2026-08-15
@@ -359,3 +363,12 @@ dispatch was authorized to touch). **Status left `open`** pending either
 a successful commit (see the dispatch's own completion report for the
 final outcome) or a follow-up session confirming the ledger is
 reconciled and re-attempting the commit.
+
+## Closure, 2026-08-29 (Elephant)
+
+Ledger reconciled, dispatch's diff landed clean at commit `3ede9d0d`.
+Verified directly: `node --test plugins/pipeline-core/hooks/
+staleness-check.test.mjs` -> 17/17 pass; `node --test plugins/
+pipeline-core/hooks/guard-push-scratch-advisory.test.mjs` -> 3/3 pass;
+`node --test harness/scripts/check-consumer-safe-paths.test.mjs` -> 9/9
+pass. All exit 0. Closing per the dispatch's own assessment above.
