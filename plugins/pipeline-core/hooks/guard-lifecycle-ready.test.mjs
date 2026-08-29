@@ -6305,7 +6305,7 @@ test("TPSHELL-4: the shell-lane refusal is liftable by a real chat- and signatur
       assert.match(first.stderr, new RegExp(TESTPATH_SHELL_DENIAL_CODE, "u"), mode);
       // ADR-0059 Decision 4: the denial names the CURRENTLY CONFIGURED mode's next command.
       if (mode === "chat") {
-        assert.match(first.stderr, /guard-human-override\.mjs" authorize --repo/u, "chat denial must name its own activate step");
+        assert.match(first.stderr, /guard-human-override\.mjs authorize --repo/u, "chat denial must name its own activate step");
         assert.doesNotMatch(first.stderr, /authorize-by-signature/u, "chat denial must not name signature's step");
       } else {
         assert.match(first.stderr, /authorize-by-signature/u, "signature denial must name the signed step");
