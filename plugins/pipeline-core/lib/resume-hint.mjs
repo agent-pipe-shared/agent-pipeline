@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: SUL-1.0
 /** Non-authoritative, discardable context for a brief session restart. */
 import { createHash } from "node:crypto";
-import { existsSync, lstatSync, openSync, renameSync, unlinkSync, writeFileSync, closeSync, readFileSync } from "node:fs";
+import { existsSync, lstatSync, openSync, renameSync, unlinkSync, writeFileSync, closeSync, readFileSync, mkdirSync, realpathSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 
 export const RESUME_HINT_SCHEMA = "pipeline.resume-hint.v1";
@@ -314,4 +315,169 @@ export function discardResumeHint({ rootDir, fs = { existsSync, lstatSync, unlin
   if (!fs.lstatSync(target).isFile()) return { status: "ignored-invalid", code: "RH-NONREGULAR" };
   fs.unlinkSync(target);
   return { status: "discarded" };
+}
+
+/**
+ * NVA-R4-RESUMERECEIPT: makes resume-card consumption observable across a restart.
+ * Observation only -- nothing below changes readiness, actions, authority, approval,
+ * close state, or any exit status. A receipt below proves the card's bytes were READ;
+ * it never proves they were understood or acted on -- do not present it as more than that.
+ *
+ * Root problem this closes: `inspect` reports a status (available/absent/challenged-stale/
+ * ignored-invalid) but nothing records whether the NEXT session actually consumed an
+ * `available` card -- ignoring one renders identically to never having had one. The pieces
+ * below are deliberately separate from `RESUME_HINT_SCHEMA` itself: they never add a key to
+ * the distilled-card schema `validateResumeHint()` checks (that schema's existing keys, caps
+ * and meaning stay exactly as they were), and they never touch onboarding-continuity.mjs's
+ * own storage -- capture already has the full, as-supplied card object in hand (including
+ * `materialInput`) the moment it is parsed, so the digest below is computed from THAT, not
+ * reconstructed later from disparate storage.
+ */
+export const CARD_DIGEST_RECORD_SCHEMA = "pipeline.resume-hint-card-digest.v1";
+export const CONSUMPTION_RECEIPT_SCHEMA = "pipeline.consumption-receipt.v1";
+
+/**
+ * Deterministic content digest of a full capture card -- the exact object `capture` parsed
+ * from `--card-file`, before it is split into the distilled `context` and the verbatim
+ * `materialInput`/`values` keys. Pure, no I/O: reuses `canonical()`/`digest()` above
+ * unchanged, so a differing `materialInput` chunk (or any other key) produces a different
+ * digest, the same discipline `contentSha256` already applies to the distilled fields alone.
+ */
+export function computeCardDigest(card) { return digest(card); }
+
+function receiptFileName(sessionId) { return `${createHash("sha256").update(String(sessionId), "utf8").digest("hex")}.json`; }
+
+/**
+ * `.git/agent-pipeline/resume-hint` -- pipeline-owned private state, never the tracked
+ * project tree, never `scratch/`. Resolved via the real git common directory so a receipt
+ * written from one worktree is visible from a sibling worktree sharing the same object
+ * database (the same reason `.git/agent-pipeline/human-guard-overrides/` uses this
+ * resolution elsewhere in this plugin). Returns null, never throws, when no usable git
+ * directory can be found -- every caller below treats that as "cannot persist here" rather
+ * than a fatal error, so a project with no `.git` yet does not lose its ability to capture
+ * or inspect a resume hint over this.
+ */
+function resolvePrivateStateDir(rootDir, { spawnSyncFn = spawnSync } = {}) {
+  let common = null;
+  try {
+    const result = spawnSyncFn("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], { cwd: rootDir, encoding: "utf8", shell: false, timeout: 5000 });
+    if (result && result.status === 0 && !result.error && String(result.stdout || "").trim()) common = String(result.stdout).trim();
+  } catch { /* fall through to the plain .git fallback below */ }
+  if (!common) {
+    const fallback = join(rootDir, ".git");
+    if (existsSync(fallback)) common = fallback;
+  }
+  if (!common) return null;
+  try {
+    const real = realpathSync(common);
+    const info = lstatSync(real);
+    if (!info.isDirectory() || info.isSymbolicLink()) return null;
+    return join(real, "agent-pipeline", "resume-hint");
+  } catch { return null; }
+}
+
+function readJsonRecord(path, fs) {
+  try {
+    if (!fs.existsSync(path)) return null;
+    if (!fs.lstatSync(path).isFile()) return null;
+    return JSON.parse(fs.readFileSync(path, "utf8"));
+  } catch { return null; }
+}
+
+function writeJsonRecord(dir, filename, value, fs) {
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  const target = join(dir, filename);
+  const temporary = `${target}.tmp`;
+  const fd = fs.openSync(temporary, "w", 0o600);
+  try { fs.writeFileSync(fd, `${JSON.stringify(value, null, 2)}\n`, "utf8"); }
+  finally { fs.closeSync(fd); }
+  fs.renameSync(temporary, target);
+}
+
+/**
+ * Called by `capture` immediately after a successful write -- never on a validation
+ * failure, the same validate-before-consume ordering `pipeline.resume-hint-validate-
+ * before-consume` already fixed for the card file itself (see scripts/resume-hint.mjs).
+ * Best-effort: capture's own success never depends on this write succeeding, so the
+ * returned `cardDigest` is always the computed value even when `persisted` is false
+ * (no usable `.git` directory yet).
+ */
+export function recordResumeHintCardDigest({
+  rootDir, card, now = new Date().toISOString(),
+  fs = { existsSync, lstatSync, mkdirSync, openSync, writeFileSync, closeSync, renameSync },
+  spawnSyncFn = spawnSync,
+} = {}) {
+  const cardDigest = computeCardDigest(card);
+  const dir = resolvePrivateStateDir(rootDir, { spawnSyncFn });
+  if (dir === null) return { cardDigest, persisted: false };
+  try {
+    writeJsonRecord(dir, "card-digest.json", { schema: CARD_DIGEST_RECORD_SCHEMA, cardDigest, recordedAt: now }, fs);
+    return { cardDigest, persisted: true };
+  } catch { return { cardDigest, persisted: false }; }
+}
+
+/** Reads back the digest `capture` recorded, or null when none is available. Never throws. */
+export function readResumeHintCardDigest({
+  rootDir, fs = { existsSync, lstatSync, readFileSync }, spawnSyncFn = spawnSync,
+} = {}) {
+  const dir = resolvePrivateStateDir(rootDir, { spawnSyncFn });
+  if (dir === null) return null;
+  const record = readJsonRecord(join(dir, "card-digest.json"), fs);
+  if (!record || record.schema !== CARD_DIGEST_RECORD_SCHEMA || typeof record.cardDigest !== "string") return null;
+  return record;
+}
+
+/**
+ * The consumption step. `sessionId` is the caller's own identity (opaque, caller-supplied --
+ * that part is expected); the DIGEST bound into the receipt is never a caller-supplied
+ * assertion -- it is always the value this function reads back itself, from the card's own
+ * recorded bytes, via readResumeHintCardDigest(). A caller cannot make this function attest
+ * to a reading that did not happen by simply passing a digest it likes; there is no such
+ * parameter. Proves only that the bytes were read, never that they were understood.
+ */
+export function recordResumeHintConsumption({
+  rootDir, sessionId, now = new Date().toISOString(),
+  fs = { existsSync, lstatSync, mkdirSync, openSync, writeFileSync, closeSync, renameSync, readFileSync },
+  spawnSyncFn = spawnSync,
+} = {}) {
+  if (typeof sessionId !== "string" || sessionId.trim().length === 0) throw new Error("RH-CONSUME-SESSION-ID");
+  const dir = resolvePrivateStateDir(rootDir, { spawnSyncFn });
+  if (dir === null) return { status: "unavailable" };
+  const recorded = readResumeHintCardDigest({ rootDir, fs, spawnSyncFn });
+  if (recorded === null) return { status: "no-card" };
+  const receipt = { schema: CONSUMPTION_RECEIPT_SCHEMA, sessionId, cardDigest: recorded.cardDigest, recordedAt: now };
+  try {
+    writeJsonRecord(join(dir, "consumption-receipts"), receiptFileName(sessionId), receipt, fs);
+    return { status: "recorded", cardDigest: recorded.cardDigest };
+  } catch { return { status: "unavailable" }; }
+}
+
+/**
+ * The query path (`resume-hint.mjs query`): from repository/project state alone -- no
+ * chat/transcript access -- answers whether `sessionId` produced a consumption receipt
+ * matching the currently recorded card digest. Exactly three outcomes:
+ *   - "no-card": no card was ever captured (or the capture-time digest record is gone).
+ *   - "consumed": a receipt for `sessionId` exists and its digest matches.
+ *   - "not-consumed": a card was captured, but no matching receipt exists for `sessionId`
+ *     -- absent, corrupt, or bound to a different digest. `code` distinguishes which.
+ * A corrupt or unreadable receipt is reported via this outcome, never thrown.
+ */
+export function queryResumeHintConsumption({
+  rootDir, sessionId, fs = { existsSync, lstatSync, readFileSync }, spawnSyncFn = spawnSync,
+} = {}) {
+  if (typeof sessionId !== "string" || sessionId.trim().length === 0) throw new Error("RH-CONSUME-SESSION-ID");
+  const cardRecord = readResumeHintCardDigest({ rootDir, fs, spawnSyncFn });
+  if (cardRecord === null) return { outcome: "no-card" };
+  const dir = resolvePrivateStateDir(rootDir, { spawnSyncFn });
+  const receiptPath = dir === null ? null : join(dir, "consumption-receipts", receiptFileName(sessionId));
+  const receipt = receiptPath === null ? null : readJsonRecord(receiptPath, fs);
+  if (!receipt || receipt.schema !== CONSUMPTION_RECEIPT_SCHEMA || typeof receipt.cardDigest !== "string") {
+    let exists = false;
+    try { exists = receiptPath !== null && fs.existsSync(receiptPath); } catch { exists = false; }
+    return { outcome: "not-consumed", cardDigest: cardRecord.cardDigest, code: exists ? "RH-RECEIPT-CORRUPT" : "RH-RECEIPT-ABSENT" };
+  }
+  if (receipt.cardDigest !== cardRecord.cardDigest) {
+    return { outcome: "not-consumed", cardDigest: cardRecord.cardDigest, receiptDigest: receipt.cardDigest, code: "RH-RECEIPT-DIGEST-MISMATCH" };
+  }
+  return { outcome: "consumed", cardDigest: cardRecord.cardDigest };
 }

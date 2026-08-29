@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: SUL-1.0
 import { readFileSync, unlinkSync } from "node:fs";
 import { resolve } from "node:path";
-import { captureResumeHint, discardResumeHint, inspectResumeHint, verbatimMaterialRejection } from "../lib/resume-hint.mjs";
+import {
+  captureResumeHint, discardResumeHint, inspectResumeHint, verbatimMaterialRejection,
+  recordResumeHintCardDigest, readResumeHintCardDigest, recordResumeHintConsumption, queryResumeHintConsumption,
+} from "../lib/resume-hint.mjs";
 import {
   applyOnboardingIntakeCapture, applyOnboardingIntakeConsent,
   readOnboardingIntakeCheckpoint, readOnboardingIntakeMaterialInput,
@@ -63,8 +66,22 @@ function validValues(values) {
 }
 function main() {
   const [command, ...args] = process.argv.slice(2); const root = value(args, "--root");
-  if (!root || !["inspect", "capture", "discard"].includes(command)) throw new Error("usage: resume-hint.mjs <inspect|capture|discard> --root <project> [--card-file <json>] [--feature-id <id> --plan-sha256 <sha256> --spec-sha256 <sha256>");
+  if (!root || !["inspect", "capture", "discard", "consume", "query"].includes(command)) {
+    throw new Error("usage: resume-hint.mjs <inspect|capture|discard|consume|query> --root <project> [--card-file <json>] [--session-id <id>] [--feature-id <id> --plan-sha256 <sha256> --spec-sha256 <sha256>");
+  }
   const rootDir = resolve(root); const observedBasis = basis(args);
+  // NVA-R4-RESUMERECEIPT: `consume`/`query` are the mechanical consumption-observability
+  // pair -- see lib/resume-hint.mjs's module doc above their exports. Observation only:
+  // neither reads nor changes readiness/actions/authority/approval/close state, and
+  // `sessionId`'s DIGEST is always derived inside lib/resume-hint.mjs from the card's own
+  // recorded bytes, never accepted here as a flag.
+  if (command === "consume" || command === "query") {
+    const sessionId = value(args, "--session-id");
+    if (!sessionId) throw new Error(`${command} requires --session-id`);
+    return command === "consume"
+      ? recordResumeHintConsumption({ rootDir, sessionId })
+      : queryResumeHintConsumption({ rootDir, sessionId });
+  }
   if (command === "inspect") {
     const hint = inspectResumeHint({ rootDir, basis: observedBasis });
     // NVA-RESUMEVERBATIM-1 AC-3/AC-4: the ANSWERED onboarding values (commit-author
@@ -89,7 +106,11 @@ function main() {
         materialInput: material.chunks,
       };
     } catch {}
-    return { ...hint, intakeCheckpoint };
+    // NVA-R4-RESUMERECEIPT: exposes the digest `capture` recorded (never recomputed here,
+    // so `inspect` can never drift from what capture actually persisted), or null when no
+    // digest record is available -- absent card, no git directory yet, or a corrupt record.
+    const digestRecord = readResumeHintCardDigest({ rootDir });
+    return { ...hint, intakeCheckpoint, cardDigest: digestRecord ? digestRecord.cardDigest : null };
   }
   if (command === "discard") return discardResumeHint({ rootDir });
   const cardFile = value(args, "--card-file");
@@ -134,6 +155,13 @@ function main() {
     }
     result = { ...captured, intake };
   }
+  // NVA-R4-RESUMERECEIPT: reached only after every validation and write above returned
+  // normally -- the same validate-before-consume ordering the card-file unlink below
+  // already honours, so a digest is never recorded for a card that failed validation.
+  // `fullCard` is the exact object this process parsed from `--card-file`, so the digest
+  // covers `materialInput`/`values` too, not just the distilled fields `captured` carries.
+  const { cardDigest } = recordResumeHintCardDigest({ rootDir, card: fullCard });
+  result = { ...result, cardDigest };
   if (consumeCard) {
     try { unlinkSync(resolve(cardFile)); }
     catch (error) { if (error?.code !== "ENOENT") throw error; }
