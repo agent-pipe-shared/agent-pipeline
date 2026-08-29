@@ -7,6 +7,7 @@ status: open
 created: 2026-08-28
 sprint: nightwing
 source: "Claude/Windows greenfield run, 2026-08-28, sections 7 and 11 of its own analysis (docs/pipeline-haertungstest-und-analyse.md)."
+done_when: contains plugins/pipeline-core/lib/project-authority.mjs PA-CALIBRATION-DRIFT
 ---
 
 # `.claude/pipeline.json` and `project/pipeline.json` drifted, and no check noticed

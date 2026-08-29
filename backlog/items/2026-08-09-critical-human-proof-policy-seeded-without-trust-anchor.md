@@ -4,6 +4,7 @@ id: pipeline.critical-human-proof-policy-seeded-without-trust-anchor
 type: idea
 owner: pipeline
 status: open
+done_when: contains plugins/pipeline-core/lib/human-guard-override.mjs HGO-TRUST-ANCHOR-NEW-KEY-CONFIRMATION-REQUIRED
 created: 2026-08-09
 sprint: alfred
 source: "Critic review (round 2, PASS) of GF-062/GF-065's critical-human-proof.json onboarding fix, scratch/critic-1f03ce024c82/critic-notes.md, deliberately not flagged as a finding of that diff."

@@ -92,3 +92,30 @@ OpenSSL prompt is never scripted, and that must not change.
   ceremony does work from an attended terminal — but it belongs in the same
   pass as the other ceremony-ergonomics item filed the same day.
 - **Date:** 2026-08-29
+
+Fixed, 2026-08-29 (dispatch NVA-W5-TTYSIGN).
+
+`signIntentIntoProof()` now checks `isPrivateKeyPassphraseProtected(keys.privateKey, dependencies)`
+before ever writing the intent file or spawning OpenSSL; when the key is
+passphrase-protected AND `isAttendedTerminal(dependencies)` is false (no
+`process.stdin.isTTY`, and no `dependencies.isTTY` override), it fails closed
+with a message carrying the `pipeline.signing-requires-attended-terminal`
+marker, naming "no controlling terminal" as the cause and never using the word
+"passphrase". An unprotected key (never prompts) is unaffected regardless of
+TTY state — verified by a dedicated fixture test.
+
+Verified directly by the dispatcher: `node --test
+plugins/pipeline-core/scripts/po-human-approval.test.mjs` — 101/101 pass, exit
+0, including the two new NVA-W5-TTYSIGN fixture tests (no-TTY refusal with
+marker/message assertions and no-spawn assertion; unprotected-key-unaffected).
+The one pre-existing test that exercises a real passphrase-protected sign
+through a stubbed `spawn` (`NVA-SIGNONCE-1: sign-intent skips the typed
+confirmation...`) now supplies `isTTY: true` to simulate the attended terminal
+its stub implies, since the real `node --test` process has no TTY of its own.
+
+`docs/push-release-flow.md` gained one clarifying paragraph after the
+`authorize-critical` human-part description, naming the attended-terminal
+requirement and pointing at the marker.
+
+`node --test harness/scripts/check-consumer-safe-paths.test.mjs` also run
+(this dispatch touches `plugins/pipeline-core/`) — pass, exit 0.

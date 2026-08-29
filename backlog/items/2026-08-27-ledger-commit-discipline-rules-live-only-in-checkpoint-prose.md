@@ -7,6 +7,7 @@ status: open
 created: 2026-08-27
 sprint: alfred
 source: "Handover-rotation extraction pass over Phoenix checkpoints 61-71, 2026-08-27 (ADR-0066 Decision 6/7)"
+done_when: contains guardrails/git.md GG-22
 ---
 
 # Two ledger-commit rules exist only in checkpoint prose, and both have already cost time

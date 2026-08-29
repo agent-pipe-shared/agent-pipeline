@@ -7,6 +7,7 @@ status: open
 created: 2026-08-27
 sprint: nightwing
 source: "Recorded 2026-08-27 from a PO-pasted transcript of an Antigravity session against a separate repository — a transcript the PO pasted, not something reproduced live in this session."
+done_when: contains plugins/pipeline-core/scripts/po-human-approval.mjs resolvedDirectory
 ---
 
 # A runner improvised the PO's signature instructions, and nothing constrains what an agent may print as a ceremony command

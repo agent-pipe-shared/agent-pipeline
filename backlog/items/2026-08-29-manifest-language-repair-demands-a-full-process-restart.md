@@ -7,6 +7,7 @@ status: open
 created: 2026-08-29
 sprint: nova
 done_when: manual
+tracking: "Nova B (PO decision 2026-08-29) — low-severity UX friction, current restart-on-repair behavior is safe; investigate later, not a 0.6.0 blocker"
 source: "Codex/WSL report, delivered inline in chat by the PO (priority 6 in that report), during the 2026-08-29 three-runner greenfield test."
 ---
 
@@ -85,3 +86,18 @@ unrelated.
   (F08) — both may share the same "restart over-used as default remedy" root
   cause.
 - **Date:** 2026-08-29
+
+## PO decision, 2026-08-29
+
+**Decision:** leave current behavior as-is (restart on every manifest/
+language repair); defer the actual investigation to Nova B.
+**Rationale:** PO chose the low-risk, no-action-now option — current
+behavior is safe even if possibly overcautious, and this is minor UX
+friction, not a defect with real consequences.
+**How to apply:** no code change now. Repoint `sprint: nova` to `sprint:
+nova` with a Nova-B tag (matching this repo's established "Nova B" text
+convention in `tracking`/Assignment, per other deferred items this session)
+rather than leaving it implying a 0.6.0 blocker — the triage's own
+"blocks the 0.6.0 candidate" line above is now superseded by this decision
+and should not be trusted by a future dispatch without re-reading this
+section.

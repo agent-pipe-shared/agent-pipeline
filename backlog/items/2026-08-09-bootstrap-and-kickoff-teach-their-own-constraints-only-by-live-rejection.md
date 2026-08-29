@@ -8,6 +8,7 @@ created: 2026-08-09
 sprint: nightwing
 source: "Turn-efficiency root-cause analysis of the PO's private Claude+Pipeline 0.5.4 happy-path test run, 2026-08-09 (sanitized, no PO-identifying data)."
 due: 2026-08-16
+done_when: contains harness/session-bootstrap.md closed shell grammar
 ---
 
 # Several bootstrap/kickoff constraints are learned only by hitting a live guard rejection, not from the loaded skill text

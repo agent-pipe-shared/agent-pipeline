@@ -137,3 +137,58 @@ observable signal that isolation was not granted. Presence alone is not that
 signal: roughly two dozen abandoned worktrees from earlier runs are already
 registered in this repository, so "a worktree exists" is true whether or not
 this dispatch got one.
+
+### Progress note, 2026-08-29 (NVA-W7-WORKTREECOUNT) — the count-comparison logic exists and is tested, wiring is drafted only
+
+The exact candidate the 2026-08-29 Predicate note above names is now real,
+standalone, committable code, not yet wired into a running hook:
+`plugins/pipeline-core/lib/worktree-count-check.mjs` (+ 33-case test suite,
+`worktree-count-check.test.mjs`, `node worktree-count-check.test.mjs` ->
+33/33 passed, including real-`git worktree add` cases, not just injected
+fakes). It implements exactly the mechanism this item's Predicate note asked
+for: a pre-launch baseline (`registerWorktreeIsolationLaunch`, fired when an
+Agent/Task `isolation: "worktree"` field or a Workflow-script-embedded
+`agent()`/`parallel()` call declaring `isolation: 'worktree'` is detected) and
+a post-launch resolution on the next tool call in the same orchestrator
+transcript (`resolveWorktreeIsolationLaunch`), with `delta <= 0` yielding the
+`not-isolated` verdict this item's whole proposal turns on. Also handles the
+`parallel()` multi-dispatch case (a `partial` verdict when the count increased
+but by fewer than the number of isolated dispatches declared in one Workflow
+call). Honest limits (documented in the module's own header): this is a COUNT
+delta, not a per-dispatch identity check, so it can be fooled by unrelated
+worktree churn in the same window; and only one pending baseline is tracked
+per orchestrator transcript, so two isolation-flagged dispatch calls fired
+back-to-back with zero intervening tool calls resolve the first one against
+the count observed right before the second one launches (tested, WTC22) —
+both are inherent to a count-based signal, not implementation gaps.
+
+**Not done**: actually wiring this into a running hook. `hooks/hooks.json` is
+TP-4 protected, so this dispatch could not add the PreToolUse stanza for
+real — a complete, ready-to-paste unified diff for that insertion, plus the
+full text of the small hook wrapper script it points at
+(`hooks/guard-worktree-isolation.mjs`, not yet created — a thin stdin-JSON
+adapter around the tested module above, advisory-only: warns on stderr,
+never blocks, since it observes a mismatch only after the dispatch already
+ran) are both recorded verbatim in
+`evidence/dispatch-record-NVA-W7-WORKTREECOUNT.json`'s
+`stopCondition.draftPatch` / `stopCondition.draftCompanionHookScript` fields
+for the next human-cleared TP-4 override ceremony (same pattern as this
+session's other R16/R26/R27 draft-only dispatches). Separately, and
+unrelated to this item's own content: this dispatch found that NO commit
+could land in this shared checkout at all — `guard-git` GG-22's backlog-ledger
+reconciliation precondition is itself blocked by three unrelated backlog
+items (2026-08-28-the-readiness-guard-blocks-the-recovery-command-it-names.md,
+2026-08-29-signing-fails-without-a-tty-and-the-error-reads-as-a-wrong-passphrase.md,
+2026-08-29-undocumented-transcript-fallback-selects-wrong-file-by-mtime.md)
+carrying malformed closure metadata (`closure_repository` missing / a
+`closure_commit` of `PENDING`). See the dispatch record's log for the exact
+guard output; this is out of scope for this dispatch to fix (different items,
+data this briefing does not carry) and is reported to the Elephant as a
+separate, repo-wide blocker.
+
+**Status stays `open`** (not `closed`): `done_when: manual` is unchanged
+because the mechanism is not yet mechanically enforcing anything — the
+detection LOGIC exists and is tested, but nothing calls it during a real
+session yet. Closing this item is appropriate only once the hooks.json
+wiring actually lands and at least one live run has been observed to
+surface (or correctly not surface) a mismatch.

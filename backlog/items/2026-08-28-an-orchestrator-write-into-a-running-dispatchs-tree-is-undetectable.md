@@ -7,6 +7,7 @@ status: open
 created: 2026-08-28
 sprint: nightwing
 source: "Re-Critic vtpgate2-368458af finding F2; incident during NVA-VTPGATE-2, 2026-08-28"
+done_when: contains plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs lease
 ---
 
 # A concurrent orchestrator write into a running dispatch's tree is neither prevented nor detected, and the authorship verifier passes it

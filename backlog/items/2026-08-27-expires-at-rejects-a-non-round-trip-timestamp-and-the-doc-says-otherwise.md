@@ -7,6 +7,7 @@ status: open
 created: 2026-08-27
 sprint: alfred
 source: "Handover-rotation extraction pass over Phoenix checkpoint 69, 2026-08-27; the defect itself was hit live during a push ceremony on 2026-08-19"
+done_when: contains plugins/pipeline-core/scripts/po-human-approval.test.mjs GF-080 Gap B: --expires-at accepts any parseable ISO-8601 timestamp and normalizes it to the exact Date#toISOString() form used everywhere downstream
 ---
 
 # `authorize-critical --expires-at` rejects any timestamp that is not an exact `toISOString()` round-trip, and the flow doc claims the opposite

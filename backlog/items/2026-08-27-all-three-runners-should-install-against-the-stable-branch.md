@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-27
 sprint: nightwing
+done_when: manual
 source: "PO decision 2026-08-27, confirmed in session; distribution mapping performed the same day against the live installers and the update-channel resolver"
 ---
 

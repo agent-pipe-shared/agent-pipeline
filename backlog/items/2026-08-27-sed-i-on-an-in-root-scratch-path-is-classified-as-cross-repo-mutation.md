@@ -7,6 +7,7 @@ status: open
 created: 2026-08-27
 sprint: nightwing
 source: "Live refusal in an Elephant session, 2026-08-27, isolated to a root cause by controlled probe in the same session."
+done_when: contains plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs sed -i '/^alpha/d' scratch/sedprobe.txt
 ---
 
 # A `sed` regex address is misread as an absolute path, refusing an in-root edit as a cross-repository mutation

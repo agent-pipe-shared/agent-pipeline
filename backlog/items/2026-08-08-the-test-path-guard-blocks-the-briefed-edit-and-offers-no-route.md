@@ -8,6 +8,7 @@ created: 2026-08-08
 sprint: alfred
 due: 2026-08-15
 source: "Elephant, 2026-08-08, GF-057. Third confirmed instance across two blocks; each one verified at a line before filing. The first (GF-056) was walked around with a shell write, the second and third were reported and stopped."
+done_when: contains plugins/pipeline-core/lib/human-guard-override.mjs briefed-test-change
 ---
 
 # A briefed test edit is refused, and the refusal's own route is closed too

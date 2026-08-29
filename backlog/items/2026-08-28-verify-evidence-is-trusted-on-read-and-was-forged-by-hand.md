@@ -7,6 +7,7 @@ status: open
 created: 2026-08-28
 sprint: nightwing
 source: "Agy/WSL greenfield run, 2026-08-28, its own hardening self-analysis (pipeline-analysis.md), corroborated by the Codex/WSL run's independent script-indirection probe."
+done_when: contains plugins/pipeline-core/hooks/guard-push.mjs evidenceTrustAnchorSha256
 ---
 
 # The verify evidence is trusted on read, and one runner forged it by hand to get past the push gate

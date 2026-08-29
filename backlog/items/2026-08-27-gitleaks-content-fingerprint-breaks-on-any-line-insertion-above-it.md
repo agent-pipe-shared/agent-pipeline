@@ -7,6 +7,7 @@ status: open
 created: 2026-08-27
 sprint: alfred
 source: "Hit twice in one session during the Phoenix merge, 2026-08-27"
+done_when: path-exists plugins/pipeline-core/scripts/gitleaks-repair-ignore.mjs
 ---
 
 # A gitleaks content fingerprint goes inert when anything is inserted above the line it covers

@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-25
 sprint: alfred
+done_when: contains harness/scripts/verify.mjs check-commit-type-range.mjs
 source: "Split out of backlog/items/2026-08-08-orchestrator-authored-production-commits-have-no-deterministic-control.md at closure, 2026-08-25 -- Part B of that item's 2026-08-19 'Direction 1 design' section, fully designed but never built and never required to consider that item's own stated problem closed."
 ---
 

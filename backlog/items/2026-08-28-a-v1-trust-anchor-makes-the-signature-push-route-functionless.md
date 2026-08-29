@@ -128,6 +128,26 @@ Left `status: open` because the onboarding-side gap is real and matches the
 item's own acceptance criteria; the guard-message and posture-agreement halves
 are done and should not be redone.
 
+## PO decision, 2026-08-29
+
+**Decision:** implement trust-on-first-use for the genuinely-first-ever-key
+case — the first `authorize-critical` call records the public key it used as
+a trusted v3 anchor, rather than requiring a manual out-of-band PO step.
+**Rationale:** PO explicitly chose this over keeping the current
+never-auto-trust posture, accepting the trade-off named in the item's own
+Direction 1 (a first-access actor could plant their own key) as acceptable
+given the accidental-breakout threat model this repository already runs
+under (not a determined-attacker model).
+**How to apply:** dispatch a goldfish-deep task targeting
+`lib/critical-action-authorization.mjs` (trustAnchorsFor's resolution logic)
+and `lib/project-onboarding-v3.mjs` (`freshCriticalHumanProofPolicyBytes`,
+the still-bare-v1-when-no-local-key branch, ~line 1079) to make the first
+`authorize-critical` call, when no trust anchor yet exists, record the public
+key it used as a v3 `trustAnchors` entry. Must not weaken the
+empty-`trustAnchors`-still-fails-closed case already pinned by
+`human-guard-override`'s own test (Acceptance criterion 4). This closes the
+Direction-1 gap this item's own closing note left open.
+
 ## Related
 
 - `2026-08-28-the-push-gate-is-unsatisfiable-in-any-installed-plugin-deployment.md` — the

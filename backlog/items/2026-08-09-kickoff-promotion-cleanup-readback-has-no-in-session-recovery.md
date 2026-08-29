@@ -8,6 +8,7 @@ created: 2026-08-09
 sprint: nightwing
 source: "Command-level analysis of the PO's private Codex + 0.5.4 greenfield test run, 2026-08-09 (Codex rollout, main thread), read from the rollout JSONL. The design/PRD/spec content itself was correct throughout; only the post-promotion pipeline state readback failed."
 due: 2026-08-16
+done_when: contains plugins/pipeline-core/scripts/session-cleanup.mjs id: "in-session-recovery"
 ---
 
 # `kickoff promote apply` can return `partial` with no agent-executable recovery, only an attended-host dead end

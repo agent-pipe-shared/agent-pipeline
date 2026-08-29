@@ -285,3 +285,77 @@ updated.
   session-identity route runs straight into the TP-4/kernel-protected
   `hooks.json`) combined with this dispatch's remaining budget. Status
   left `open`; not this dispatch's call to close or reassign.
+
+### Progress (NVA-W1-SCRATCHBIND, 2026-08-29) — Points 1 and 3 implemented and tested
+
+Both remaining real gaps from the 2026-08-25 sweep above are now implemented.
+
+**Point 1 (bind half), resolved without touching `hooks.json`.**
+`hooks/staleness-check.mjs` -- already a registered `startup|resume|clear`
+SessionStart hook, so no new `hooks.json` entry was needed (that file stays
+TP-4/PO-approval-only, untouched) -- now reads its own SessionStart stdin for
+`session_id` and calls the existing `runBootstrapScratchLifecycle` directly
+with `env: { PIPELINE_SCRATCH_SESSION_ID: session_id }`. This is exactly the
+"lowest-risk wiring route" the 2026-08-25 re-triage named and left
+unimplemented.
+
+**PID-vs-PPID decision, made and implemented (not left a TODO):**
+`bindScratchDescriptor` is now called with `deps.pidFn: () => process.ppid`,
+not `process.pid`. `staleness-check.mjs`'s own node process is a one-shot
+invocation that exits within milliseconds of writing its output; recording
+its own `pid` would make the binding read back as "orphan" on the very next
+sweep regardless of whether the actual agent session is still running.
+`process.ppid` is the long-running per-session host process that invoked this
+hook and persists for the session's whole lifetime -- the semantics the
+2026-08-25 note already named as the intended fix. A PID-reuse risk still
+exists in principle (an unrelated process later reusing the same numeric
+pid); that risk is unchanged from before this dispatch and is already
+covered by the existing boot_id+start-ticks fingerprint check in
+`session-cleanup-recovery.mjs`, not something this dispatch needed to touch.
+Proven by five new cases in `hooks/staleness-check.test.mjs` (session_id
+resolution, a real bind through a temp git repo asserting
+`binding.status !== "unbound-no-session-identity"`, a direct assertion that
+the written descriptor's `pid` equals `process.ppid` and NOT `process.pid`,
+the no-session-identity fail-open path, and the unusable-root fail-open
+path) plus the existing 11 cases, all passing (17/17).
+
+**Point 3 (push-gate soft warning), implemented.** `guard-push.mjs`'s
+all-green exit point (`if (allFailures.length === 0)`, formerly a bare
+`process.exit(0)`) now calls the already-existing read-only
+`planOrphanScratchRetirement` observer against `fallbackProjectDir()` (the
+governed session root, matching every other evidence read in that file) and,
+when any descriptor verifies as an orphan, emits a **non-blocking**
+advisory via `emit(1, ...)` — hooks.json's own documented exit-code
+contract (1 = allow + config warning to the user) — before still allowing
+the push. No new hard gate; nothing was added to `failures`/
+`securityFailures`. The advisory surfaces only `sessionId` and the
+already-relative `scratchRelativePath`, never the absolute
+`descriptorPath` (SEC-01: this file's existing discipline against leaking
+machine-local paths into a message that travels into the session
+transcript). `guard-push.test.mjs`/`guard-push-v2.test.mjs` are TP-5
+protected (no in-session override); a new sibling file,
+`hooks/guard-push-scratch-advisory.test.mjs`, exercises the real
+`guard-push.mjs` binary end to end (mirroring the established
+`guard-push-external-ledger.test.mjs` sibling-file precedent) with three
+cases: no descriptors -> plain allow, an orphaned descriptor -> advisory
+(exit 1, still allowed), a live descriptor -> plain allow, no advisory
+(3/3 passing). All five existing guard-push sibling suites (168 + 9 + 7 +
+3 + 6 = 193 cases) re-run and pass unchanged.
+
+**Not this dispatch's call: closing the item.** Point 2 (the `mkdir`
+regression) was already fixed before this dispatch, confirmed live again
+at `pipeline-start-preflight.mjs:1162`. Point 4 (manifest exemption)
+remains moot, as already noted above. That leaves every point from the
+2026-08-25 re-triage addressed in code and covered by a passing test —
+but this dispatch could not obtain a `closure_commit` to record here: a
+pre-existing, unrelated shared-checkout git-guard state (`guard-git.mjs`
+GG-22, a backlog-ledger reconciliation owed by OTHER concurrent
+dispatches' backlog edits since the loaded ruleset SHA) blocked every
+commit attempted during this session, and running the guard's own named
+remedy (`reconcile-backlog-ledger.mjs --activate`) was outside this
+dispatch's briefed file scope (it writes `backlog/STATUS.md` /
+`backlog/index.json` / `backlog/transitions.ndjson`, none of which this
+dispatch was authorized to touch). **Status left `open`** pending either
+a successful commit (see the dispatch's own completion report for the
+final outcome) or a follow-up session confirming the ledger is
+reconciled and re-attempting the commit.

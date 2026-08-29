@@ -5,8 +5,8 @@ type: workflow-improvement
 owner: pipeline
 status: open
 created: 2026-08-28
-sprint: nova
-tracking: "Backlog / someday — PO-raised 2026-08-28; not blocking the Nova candidate, but it decides whether the release model fits a whole class of the PO's repositories"
+sprint: batman
+tracking: "Batman (PO decision 2026-08-29) — gate model extension to cover non-agent-invoked deploys, scheduled for Batman, not blocking the Nova/0.6.0 candidate"
 source: "PO, 2026-08-28: some repositories barely push at all — live deployment runs by other routes, e.g. a Visual Studio build process, or SSH deployment straight onto the Home Assistant server."
 done_when: manual
 ---
@@ -65,3 +65,19 @@ Open questions worth answering before designing anything:
   delivery path.
 - Whatever is decided is written down as an ADR, because it changes what the push gate
   means rather than only how it is configured.
+
+## PO decision, 2026-08-29
+
+**Decision:** extend the gate model to cover non-agent-invoked deploys — but
+not now. Scheduled for the Batman sprint (optional capabilities), not Nova.
+**Rationale:** PO confirmed the governance gap is real and worth closing
+(not the "push-only, document the rest as ungoverned" alternative), but
+explicitly deferred the actual design/implementation work to a later sprint
+rather than doing it now.
+**How to apply:** repoint `sprint: nova` to `sprint: batman` (or leave `nova`
+with an explicit note if this repo's convention doesn't reassign sprint on a
+scheduling decision — check `backlog/README.md`'s convention before editing
+the frontmatter field). Write the ADR this item's own Acceptance criterion 3
+requires once Batman picks this up — not before, since the direction chosen
+here is "extend," not "document as ungoverned," so the ADR content itself
+depends on that future design work.

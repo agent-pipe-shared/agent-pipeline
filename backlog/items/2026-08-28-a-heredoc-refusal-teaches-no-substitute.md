@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-28
 sprint: nightwing
+done_when: contains plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs heredocFileRemediation
 source: "PO question, 2026-08-28: 'wäre es nicht sinnvoll heredoc gehärtet zuzulassen?' — asked after the Elephant hit the heredoc refusal twice in one session (a `cat >> … << 'CLOSURE'` append and a multi-line commit message), each time paying a detour through a scratch file or the Edit tool. Measured against guard-lifecycle-ready.mjs the same day."
 ---
 

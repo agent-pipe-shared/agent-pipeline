@@ -6,8 +6,9 @@ owner: pipeline
 status: closed
 created: 2026-08-28
 closed_at: 2026-08-29
+closure_repository: self
 closure_commit: 8c9146d3
-closure_evidence: "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs test 'NVA-W4-READYGUARDTEST: the recovery inspection named by a non-ready denial is admitted at every controlling status'; node --test plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs -> 183/183 pass, exit 0; node --test harness/scripts/check-consumer-safe-paths.test.mjs -> 9/9 pass, exit 0"
+closure_evidence: plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
 sprint: nova
 done_when: manual
 tracking: "NOW / Nova A — a guard that refuses the exact command its own refusal prescribes is a deadlock, and it fired twice in one consumer session"
