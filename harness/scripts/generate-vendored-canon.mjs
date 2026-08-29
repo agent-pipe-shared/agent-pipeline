@@ -130,6 +130,16 @@ export const UNIVERSAL_STANDALONE_FILES = Object.freeze([
       "it documents both supported gates.push_approval modes, using this repo's own config as the worked " +
       "example rather than as the only audience.",
   },
+  {
+    path: "docs/operating-model.md",
+    reason:
+      "Cited as the normative source by every vendored roles/*.md and guardrails/*.md file (e.g. " +
+      "roles/goldfish.md: \"Normative source: docs/operating-model.md\"). Re-verified 2026-08-29 " +
+      "(backlog/items/2026-08-29-operating-model-not-shipped-with-the-plugin.md): the prior SELF_ONLY " +
+      "classification's premise -- \"the vendored artifacts are self-sufficient\" -- does not hold, since " +
+      "the vendored artifacts themselves cite this file as their own normative source. Vendored as a " +
+      "single standalone doc rather than rewriting every citing role/guardrail file.",
+  },
 ]);
 
 /**
@@ -177,13 +187,6 @@ export const SELF_ONLY_EXCLUSIONS = Object.freeze([
       "the Pipeline's OWN relationship to its own ruleset (\"no separate meta-ruleset for building the " +
       "Pipeline vs. working under it\", ADR-0015) -- a decision about this repo, not a rule any hosted " +
       "project follows. Confirmed as a known dead link by check-doc-contracts.mjs's VENDORED_LINK_EXCLUSIONS.",
-  },
-  {
-    path: "docs/operating-model.md",
-    reason:
-      "The Pipeline's own normative core describing how IT governs the projects under it (roles, SDLC, " +
-      "review system) -- the artifacts actually handed to a hosted-project agent are guardrails/roles/" +
-      "templates themselves, not this meta-document about how the Pipeline assembled them.",
   },
   {
     path: "docs/state.md",
