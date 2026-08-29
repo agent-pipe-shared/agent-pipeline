@@ -58,7 +58,13 @@ const FORWARD_TRANSITIONS = Object.freeze({
 const STATUS_ENUM_TEXT = `${BACKLOG_STATUSES.slice(0, -1).join(", ")}, or ${BACKLOG_STATUSES.at(-1)}`;
 
 const ITEM_REQUIRED = Object.freeze(["schema", "id", "type", "owner", "status", "created", "source"]);
-const ITEM_OPTIONAL = Object.freeze(["tracking", "due", "expires", "sprint", "closed_at", "closure_repository", "closure_commit", "closure_evidence", "closure_readback"]);
+// `done_when` (NVA-DONEWHEN-2), like `sprint`, is a declaration checked against
+// something OUTSIDE the item's own bytes -- a predicate evaluated against the
+// working tree -- so deliberately has no inline value check here. Its grammar
+// is owned solely by check-backlog-done-predicate.mjs, which reports
+// MALFORMED itself; `sprint` is the precedent for this split (see
+// check-backlog-sprint-assignment.mjs).
+const ITEM_OPTIONAL = Object.freeze(["tracking", "due", "expires", "sprint", "done_when", "closed_at", "closure_repository", "closure_commit", "closure_evidence", "closure_readback"]);
 const ITEM_KEYS = new Set([...ITEM_REQUIRED, ...ITEM_OPTIONAL]);
 const ITEM_ID = /^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$/u;
 const OWNER = /^(?:pipeline|project:[a-z][a-z0-9]*(?:-[a-z0-9]+)*)$/u;
