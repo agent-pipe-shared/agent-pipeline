@@ -835,6 +835,7 @@ function submitAndApprove(dir, planPath) {
   const initialized = initializeLifecycleContinuity(dir, activeFeature.id, planPath);
   const deps = lifecycleDeps(dir, planPath);
   const submitted = run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps);
+  run(["present-plan", "--by", "coordinator"], deps);
   const approved = run(["approve-plan", "--by", "po-test"], deps);
   return { initialized, submitted, approved };
 }
