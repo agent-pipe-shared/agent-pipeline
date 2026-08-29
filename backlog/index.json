@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "4ede23d450b7c90051579f10161945c64c6716a839160bce8804de8f357f8ff1"
+    "transitionHead": "9abe05f21d4dbd94b22fb8399ad046c9dd8309d3b6b066d67079c61de6ff7abb"
   },
   "counts": {
-    "open": 100,
+    "open": 99,
     "in_progress": 3,
-    "closed": 420,
+    "closed": 421,
     "rejected": 3,
     "deferred": 11
   },
@@ -5047,13 +5047,17 @@
     },
     {
       "id": "pipeline.ready-gate-hand-maintained-shape-mirror",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-28",
       "source": "Found live 2026-08-28 while the PO rsynced the candidate onto the local marketplace mid-session. The first instance is recorded in the file's own comment.",
       "deferred": false,
-      "tracking": "NOW / Nova A — the second instance blocked every governed write in a ready project and was invisible until the candidate was actually installed. NVA-T-READYKEYS fixes that instance; this item is about the third one."
+      "tracking": "NOW / Nova A — the second instance blocked every governed write in a ready project and was invisible until the candidate was actually installed. NVA-T-READYKEYS fixes that instance; this item is about the third one.",
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "4fa77b40",
+      "closureEvidence": "plugins/pipeline-core/lib/project-onboarding-ready-gate.test.mjs"
     },
     {
       "id": "pipeline.rebind-rollback-names-no-predicate",

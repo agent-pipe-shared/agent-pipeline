@@ -415,7 +415,7 @@
 | pipeline.readonly-and-chain-grep-pipe-trailing-stage-not-implemented | closed | requirement | pipeline | 2026-08-19 | — |
 | pipeline.readonly-command-guard-classification | closed | workflow-improvement | pipeline | 2026-07-26 | — |
 | pipeline.ready-gate-env-var-runner-authority | closed | defect | pipeline | 2026-08-05 | — |
-| pipeline.ready-gate-hand-maintained-shape-mirror | open | defect | pipeline | 2026-08-28 | NOW / Nova A — the second instance blocked every governed write in a ready project and was invisible until the candidate was actually installed. NVA-T-READYKEYS fixes that instance; this item is about the third one. |
+| pipeline.ready-gate-hand-maintained-shape-mirror | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — the second instance blocked every governed write in a ready project and was invisible until the candidate was actually installed. NVA-T-READYKEYS fixes that instance; this item is about the third one. |
 | pipeline.rebind-rollback-names-no-predicate | open | defect | pipeline | 2026-08-28 | NOW / Nova A — the only sanctioned route to a PO acknowledgement marker is unusable, and the refusal is undiagnosable from outside |
 | pipeline.reconcile-backlog-ledger-evidence-commit-predates-referenced-file | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.reconcile-lock-reuse-lexical-path-comparison | closed | defect | pipeline | 2026-08-11 | — |
@@ -549,8 +549,8 @@
 
 ## Counts
 
-- open: 100
+- open: 99
 - in_progress: 3
-- closed: 420
+- closed: 421
 - rejected: 3
 - deferred: 11
