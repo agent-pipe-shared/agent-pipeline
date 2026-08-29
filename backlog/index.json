@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "a68a4151d0511baecc11fa9371813cb754a6d388491e0e4cc19ff27260aae4b3"
+    "transitionHead": "667cdffe30bff47d9ef194ef5a21b59811edd3d7a3bbc7b8c729637bc6ca8bf3"
   },
   "counts": {
-    "open": 78,
+    "open": 79,
     "in_progress": 3,
     "closed": 452,
     "rejected": 3,
@@ -1200,6 +1200,16 @@
       "closureRepository": "self",
       "closureCommit": "9ae28dad3f6c9c41833e7d629fa3d1d73872d2a2",
       "closureEvidence": "backlog/items/2026-08-09-codex-restart-cannot-recover-operational-context-from-its-own-prior-transcript.md"
+    },
+    {
+      "id": "pipeline.codex-restart-context-loss-needs-a-different-approach",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-29",
+      "source": "PO inline observation #2 (2026-08-29 greenfield synthesis: 'Codex STILL (5 fix rounds over 3 weeks!) doesn't carry inputs/data across a restart'); Codex 060-77 retrospective section 'Informationsverlust beim Wiederanlauf'; supersedes 2026-08-09-codex-restart-cannot-recover-operational-context-from-its-own-prior-transcript.md and 2026-08-29-mechanical-proof-of-complete-prior-input-consumption-across-restart.md (both closed, both via code-reading/unit-test verification only -- neither live-verified against a real Codex restart, per this session's own now-repeated 'closed via code-reading, still broken live' failure pattern).",
+      "deferred": false,
+      "tracking": "NOW / Nova A -- PO explicitly elevated this 2026-08-29, live: 'was echt ein riesen thema ist, sind die fehlenden codex übergaben. Da braucht es eine ganz andere idee mal als ansatz bzw. härtere durchsetzung mit dem hint - das kann codex so einfach nie sauber verarbeiten' (this is a genuinely huge topic; needs a completely different approach, or harder enforcement -- Codex apparently can never cleanly process the current mechanism this simply)."
     },
     {
       "id": "pipeline.codex-runner-has-no-real-support-on-native-windows",
