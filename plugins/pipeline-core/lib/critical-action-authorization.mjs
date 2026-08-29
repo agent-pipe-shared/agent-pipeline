@@ -66,6 +66,7 @@ import {
   readCriticalHumanProofPolicy, verifyAgainstTrustAnchors,
 } from "./critical-human-proof-policy.mjs";
 import { createPoApprovalIntent } from "./po-approval-proof.mjs";
+import { resolveLocalOperatorKeyAnchor } from "./machine-plane.mjs";
 
 const OID = /^[a-f0-9]{40,64}$/u;
 const SHA256 = /^[a-f0-9]{64}$/u;
@@ -149,6 +150,19 @@ function boundArtifactDigest(projectDir, relativePath) {
  * document's explicit empty `trustAnchors: []` never sets `pinOnSuccess` — that posture is a
  * deliberate, permanent "any well-formed key, every time" and must never be narrowed by this
  * mechanism.
+ *
+ * NARROWED (PO decision, 2026-08-29, "TOFU-Fix" -> "A: Provenienz verlangen" — the same-day
+ * follow-up to the decision above): `pinOnSuccess` alone is no longer sufficient to accept
+ * AND pin a verifying key. A self-fabricated key (no relationship to any machine the PO
+ * operates) and a nested repository's own committed key both cryptographically "verify" —
+ * that was always the point of TOFU — but neither is evidence the PO ever saw the action.
+ * `localOperatorAnchorFor` below is the added gate: only a signer that resolves to THIS
+ * machine's own registered operator key (`resolveLocalOperatorKeyAnchor`,
+ * `lib/machine-plane.mjs`) may consume the open-verification posture at all; every other
+ * signer is refused with `${prefix}-TRUST-ANCHOR-MISSING`, not merely left unpinned. The v3
+ * explicit-empty-set posture immediately above (`pinOnSuccess` unset) is untouched by this —
+ * it was never routed through the new gate, since the gate only fires where `pinOnSuccess`
+ * is set.
  */
 function trustAnchorsFor(anchorDir, prefix) {
   const policy = readCriticalHumanProofPolicy(anchorDir);
@@ -215,6 +229,25 @@ function pinTrustAnchorOnFirstUse(anchorDir, policy, kind, signer) {
   } catch {
     // Best-effort by design — see doc comment above.
   }
+}
+
+/**
+ * The provenance gate `trustAnchorsFor`'s NARROWED doc comment describes, resolved ONCE per
+ * call and used twice by each caller: first to refuse outright, before any record is even
+ * inspected, when this machine has no registered operator key at all (the route is simply
+ * unavailable — the same "no anchor set at all must never read as no check needed" posture
+ * the original, pre-trust-on-first-use code had, restored for the machine-key dimension);
+ * and again after verification, to confirm the key that actually verified IS that resolved
+ * key. `machinePlaneDeps` is the same dependency-injection shape
+ * `readMachinePlane`/`resolveLocalOperatorKeyAnchor` already accept (`homedirFn`,
+ * `realpathSyncFn`, `existsSyncFn`, `readFileSyncFn`) — production callers pass none of it
+ * and get the real machine; tests substitute a `homedirFn` pointing at a fixture home
+ * directory. The second check matches on `publicKeySha256` alone: that digest is the actual
+ * cryptographic identity — comparing `keyReference` too would only be comparing two
+ * independently-chosen labels, neither of which the signature itself binds.
+ */
+function localOperatorAnchorFor(trust, machinePlaneDeps) {
+  return trust.pinOnSuccess ? resolveLocalOperatorKeyAnchor(machinePlaneDeps) : null;
 }
 
 /**
@@ -306,11 +339,16 @@ const validNow = (now) => typeof now === "string" && Number.isFinite(Date.parse(
 
 /**
  * @param {{projectDir: string, state: object, candidate: {commit: string, tree: string},
- *          remote: string, destination: string, now: string}} input
+ *          remote: string, destination: string, now: string, machinePlaneDeps?: object}} input
+ *   `machinePlaneDeps` — dependency injection for the trust-on-first-use provenance gate
+ *   (`localOperatorKeyAuthorizes`/`resolveLocalOperatorKeyAnchor`); production callers omit
+ *   it and resolve the real machine, tests substitute `{ homedirFn }`.
  * @returns {{authorized: true, code: "PUSH-PROOF-VERIFIED", keyReference: string, publicKeySha256: string}
  *          | {authorized: false, code: string}}
  */
-export function authorizeRecordedPush({ projectDir, anchorDir = projectDir, state, candidate, remote, destination, now } = {}) {
+export function authorizeRecordedPush({
+  projectDir, anchorDir = projectDir, state, candidate, remote, destination, now, machinePlaneDeps = {},
+} = {}) {
   const prefix = "PUSH-PROOF";
   if (typeof projectDir !== "string" || typeof anchorDir !== "string" || !object(state) || !validCandidate(candidate)
     || typeof remote !== "string" || remote === ""
@@ -324,6 +362,16 @@ export function authorizeRecordedPush({ projectDir, anchorDir = projectDir, stat
   // repository -- see `trustAnchorsFor`.
   const trust = trustAnchorsFor(anchorDir, prefix);
   if (!trust.ok) return { authorized: false, code: trust.code };
+
+  // NARROWED (see `trustAnchorsFor`'s doc comment): resolved before any record is even
+  // inspected — a genuinely anchor-less policy whose machine has no registered operator key
+  // at all means the route is simply unavailable, independent of whatever record happens to
+  // be present. Deliberately mirrors the ORIGINAL pre-trust-on-first-use gate shape, which
+  // also refused here before ever reading the approval record.
+  const localAnchor = localOperatorAnchorFor(trust, machinePlaneDeps);
+  if (trust.pinOnSuccess && localAnchor === null) {
+    return { authorized: false, code: `${prefix}-TRUST-ANCHOR-MISSING` };
+  }
 
   const approval = state?.pushApproval?.lastApproved;
   const recorded = approval?.criticalProof;
@@ -367,8 +415,17 @@ export function authorizeRecordedPush({ projectDir, anchorDir = projectDir, stat
   }
 
   // Trust-on-first-use: only pin once every other check has already passed and this call
-  // is actually going to authorize the push — see `pinTrustAnchorOnFirstUse`.
-  if (trust.pinOnSuccess) pinTrustAnchorOnFirstUse(anchorDir, trust.policy, "push", verified.signer);
+  // is actually going to authorize the push — see `pinTrustAnchorOnFirstUse`. NARROWED: the
+  // open-verification posture itself is now also conditioned on independent, machine-local
+  // provenance (see `trustAnchorsFor`'s doc comment) — a verifying key that is not this
+  // machine's own registered operator key (`localAnchor`, resolved above) is refused
+  // outright, not merely left unpinned.
+  if (trust.pinOnSuccess) {
+    if (localAnchor.publicKeySha256 !== verified.signer.publicKeySha256) {
+      return { authorized: false, code: `${prefix}-TRUST-ANCHOR-MISSING` };
+    }
+    pinTrustAnchorOnFirstUse(anchorDir, trust.policy, "push", verified.signer);
+  }
 
   return {
     authorized: true, code: `${prefix}-VERIFIED`,
@@ -386,11 +443,14 @@ export function authorizeRecordedPush({ projectDir, anchorDir = projectDir, stat
  * writer has ever produced.
  *
  * @param {{projectDir: string, state: object, candidate: {commit: string, tree: string},
- *          artifact: string, environment: string, now: string}} input
+ *          artifact: string, environment: string, now: string, machinePlaneDeps?: object}} input
+ *   `machinePlaneDeps` — see `authorizeRecordedPush`'s identical parameter.
  * @returns {{authorized: true, code: "DEPLOY-PROOF-VERIFIED", keyReference: string, publicKeySha256: string}
  *          | {authorized: false, code: string}}
  */
-export function authorizeRecordedDeploy({ projectDir, anchorDir = projectDir, state, candidate, artifact, environment, now } = {}) {
+export function authorizeRecordedDeploy({
+  projectDir, anchorDir = projectDir, state, candidate, artifact, environment, now, machinePlaneDeps = {},
+} = {}) {
   const prefix = "DEPLOY-PROOF";
   if (typeof projectDir !== "string" || typeof anchorDir !== "string" || !object(state) || !validCandidate(candidate)
     || typeof artifact !== "string" || artifact === ""
@@ -400,6 +460,15 @@ export function authorizeRecordedDeploy({ projectDir, anchorDir = projectDir, st
 
   const trust = trustAnchorsFor(anchorDir, prefix);
   if (!trust.ok) return { authorized: false, code: trust.code };
+
+  // NARROWED (see `authorizeRecordedPush`): resolved before any deploy-approval entry is
+  // even inspected — a genuinely anchor-less policy whose machine has no registered
+  // operator key at all means the route is simply unavailable, independent of whatever
+  // entries happen to be present.
+  const localAnchor = localOperatorAnchorFor(trust, machinePlaneDeps);
+  if (trust.pinOnSuccess && localAnchor === null) {
+    return { authorized: false, code: `${prefix}-TRUST-ANCHOR-MISSING` };
+  }
 
   const approvals = Array.isArray(state?.deployApprovals) ? state.deployApprovals : [];
   const matching = approvals.filter((entry) => object(entry)
@@ -417,7 +486,17 @@ export function authorizeRecordedDeploy({ projectDir, anchorDir = projectDir, st
       anchors: trust.anchors, now, subject: { artifact, environment },
     });
     if (verified.ok) {
-      if (trust.pinOnSuccess) pinTrustAnchorOnFirstUse(anchorDir, trust.policy, "deploy", verified.signer);
+      // NARROWED (see `authorizeRecordedPush`): the open-verification posture is now also
+      // conditioned on independent, machine-local provenance. A verifying key that is not
+      // this machine's own registered operator key is treated as a failed candidate for
+      // THIS entry (falls through to `lastCode`/the next entry), not an authorized deploy.
+      if (trust.pinOnSuccess) {
+        if (localAnchor.publicKeySha256 !== verified.signer.publicKeySha256) {
+          lastCode = `${prefix}-TRUST-ANCHOR-MISSING`;
+          continue;
+        }
+        pinTrustAnchorOnFirstUse(anchorDir, trust.policy, "deploy", verified.signer);
+      }
       return {
         authorized: true, code: `${prefix}-VERIFIED`,
         keyReference: verified.signer.keyReference, publicKeySha256: verified.signer.publicKeySha256,

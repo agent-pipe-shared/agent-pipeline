@@ -21,6 +21,7 @@ import {
   MACHINE_PLANE_SCHEMA,
   machinePlaneFilePath,
   readMachinePlane,
+  resolveLocalOperatorKeyAnchor,
   validateMachinePlane,
   writeMachinePlane,
 } from "./machine-plane.mjs";
@@ -303,5 +304,95 @@ test("AC-8: an ordinary plane with no key-shaped strings writes cleanly", () => 
     assert.doesNotThrow(() => writeMachinePlane(validPlane({ language: "en-US" }), { homedirFn: () => home }));
   } finally {
     rmSync(home, { recursive: true, force: true });
+  }
+});
+
+/* -------------------------------------------------------------------- *
+ * resolveLocalOperatorKeyAnchor -- NVA-CF-TOFUFIX. The two-hop lookup
+ * (readMachinePlane's poKeyDirectory -> that directory's own
+ * trust-policy.json) `critical-action-authorization.mjs`'s trust-on-first-use
+ * gate resolves the operator's own machine-local key through. Every fault
+ * state collapses to null; only a fully valid two-hop chain returns a value.
+ * -------------------------------------------------------------------- */
+
+test("resolveLocalOperatorKeyAnchor: no plane at all resolves to null", () => {
+  const { home } = homeFixture();
+  try {
+    assert.equal(resolveLocalOperatorKeyAnchor({ homedirFn: () => home }), null);
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("resolveLocalOperatorKeyAnchor: a valid plane with no poKeyDirectory resolves to null", () => {
+  const { home, target } = homeFixture();
+  try {
+    mkdirSync(join(target, ".."), { recursive: true });
+    writeFileSync(target, `${JSON.stringify(validPlane({ poKeyDirectory: null }), null, 2)}\n`);
+    assert.equal(resolveLocalOperatorKeyAnchor({ homedirFn: () => home }), null);
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("resolveLocalOperatorKeyAnchor: a recorded poKeyDirectory whose trust-policy.json does not exist (dead pointer) resolves to null", () => {
+  const { home, target } = homeFixture();
+  const keyDirectory = mkdtempSync(join(SCRATCH_ROOT, "machine-plane-keydir-"));
+  try {
+    mkdirSync(join(target, ".."), { recursive: true });
+    writeFileSync(target, `${JSON.stringify(validPlane({ poKeyDirectory: keyDirectory }), null, 2)}\n`);
+    assert.equal(resolveLocalOperatorKeyAnchor({ homedirFn: () => home }), null);
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+    rmSync(keyDirectory, { recursive: true, force: true });
+  }
+});
+
+test("resolveLocalOperatorKeyAnchor: a trust-policy.json that does not parse as JSON resolves to null", () => {
+  const { home, target } = homeFixture();
+  const keyDirectory = mkdtempSync(join(SCRATCH_ROOT, "machine-plane-keydir-"));
+  try {
+    mkdirSync(join(target, ".."), { recursive: true });
+    writeFileSync(target, `${JSON.stringify(validPlane({ poKeyDirectory: keyDirectory }), null, 2)}\n`);
+    writeFileSync(join(keyDirectory, "trust-policy.json"), "{ not json");
+    assert.equal(resolveLocalOperatorKeyAnchor({ homedirFn: () => home }), null);
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+    rmSync(keyDirectory, { recursive: true, force: true });
+  }
+});
+
+test("resolveLocalOperatorKeyAnchor: a trust-policy.json missing keyReference or a malformed publicKeySha256 resolves to null", () => {
+  const { home, target } = homeFixture();
+  const keyDirectory = mkdtempSync(join(SCRATCH_ROOT, "machine-plane-keydir-"));
+  try {
+    mkdirSync(join(target, ".."), { recursive: true });
+    writeFileSync(target, `${JSON.stringify(validPlane({ poKeyDirectory: keyDirectory }), null, 2)}\n`);
+    for (const bad of [
+      { publicKeySha256: "a".repeat(64) }, // no keyReference
+      { keyReference: "po-key-1", publicKeySha256: "not-a-digest" },
+      { keyReference: "", publicKeySha256: "a".repeat(64) },
+    ]) {
+      writeFileSync(join(keyDirectory, "trust-policy.json"), `${JSON.stringify(bad)}\n`);
+      assert.equal(resolveLocalOperatorKeyAnchor({ homedirFn: () => home }), null, JSON.stringify(bad));
+    }
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+    rmSync(keyDirectory, { recursive: true, force: true });
+  }
+});
+
+test("resolveLocalOperatorKeyAnchor: a fully valid two-hop chain resolves the key identity", () => {
+  const { home, target } = homeFixture();
+  const keyDirectory = mkdtempSync(join(SCRATCH_ROOT, "machine-plane-keydir-"));
+  try {
+    mkdirSync(join(target, ".."), { recursive: true });
+    writeFileSync(target, `${JSON.stringify(validPlane({ poKeyDirectory: keyDirectory }), null, 2)}\n`);
+    const anchor = { keyReference: "po-key-1", publicKeySha256: "b".repeat(64) };
+    writeFileSync(join(keyDirectory, "trust-policy.json"), `${JSON.stringify(anchor, null, 2)}\n`);
+    assert.deepEqual(resolveLocalOperatorKeyAnchor({ homedirFn: () => home }), anchor);
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+    rmSync(keyDirectory, { recursive: true, force: true });
   }
 });
