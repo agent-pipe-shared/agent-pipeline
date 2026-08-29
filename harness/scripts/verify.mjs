@@ -52,6 +52,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { duplicateSuiteIds } from "./check-verify-suite-registration.mjs";
+import { UNREPLACED_MANUAL_CHECK_PLACEHOLDER, computeManualVerifyStep } from "./manual-check-logic.mjs";
 import {
   NOVA_APPROVAL_PENDING_BINDING,
   NOVA_APPROVAL_PENDING_STATUS,
@@ -764,39 +765,28 @@ const PHASE_STEPS =
 
 // pipeline.verify-manual-check-placeholder-detection / pipeline.reject-unreplaced-manual-check-placeholder
 // (NVA-R26-VERIFYPREP, backlog 2026-08-29-mandatory-verify-gate-has-no-path-for-a-project-with-no-tests-yet.md
-// and 2026-08-29-verify-placeholder-manual-check-required-accepted-by-gate.md): a project's
-// calibration (`project/pipeline.json`, or legacy `.claude/pipeline.json` -- ADR-0054) may
-// declare an optional `verifyManualStatus` string field distinguishing three cases that would
-// otherwise collapse into one indistinguishable "nothing to report" result: genuinely nothing
-// configured yet (honestly declared, never a silent pass and never an indefinite block), a real
-// filled-in manual-check note, or an unfilled scaffold placeholder that was never replaced
-// (rejected as a FAILURE, never accepted as a pass). Absent field: no step is added and behavior
-// is unchanged -- this repo's own calibration carries no such field.
-const UNREPLACED_MANUAL_CHECK_PLACEHOLDER = "Manual check required.";
-function containsUnreplacedManualCheckPlaceholder(text) {
-  return typeof text === "string" && text.includes(UNREPLACED_MANUAL_CHECK_PLACEHOLDER);
+// and 2026-08-29-verify-placeholder-manual-check-required-accepted-by-gate.md; pure logic
+// extracted to ./manual-check-logic.mjs by NVA-CF-ITEM25EXTRACT so it is independently unit-
+// testable -- this file has no isDirectInvocation guard, so importing verify.mjs itself for its
+// exports would trigger the entire suite run as a side effect): a project's calibration
+// (`project/pipeline.json`, or legacy `.claude/pipeline.json` -- ADR-0054) may declare an
+// optional `verifyManualStatus` string field distinguishing three cases that would otherwise
+// collapse into one indistinguishable "nothing to report" result: genuinely nothing configured
+// yet (honestly declared, never a silent pass and never an indefinite block), a real filled-in
+// manual-check note, or an unfilled scaffold placeholder that was never replaced (rejected as a
+// FAILURE, never accepted as a pass). Absent field: no step is added and behavior is unchanged --
+// this repo's own calibration carries no such field.
+let manualVerifyCalibration = null;
+try {
+  const manualVerifyCalibrationPath = resolveAuthorityArtifactPath("calibration", { rootDir: repoRoot }).path;
+  manualVerifyCalibration = JSON.parse(readFileSync(manualVerifyCalibrationPath, "utf8"));
+} catch {
+  // absent/unreadable calibration: no manual-verify field to read, no step added.
 }
-const VERIFY_NOT_CONFIGURED_YET = "not-configured-yet";
-function computeManualVerifyStep() {
-  const calibrationPath = resolveAuthorityArtifactPath("calibration", { rootDir: repoRoot }).path;
-  let calibration = null;
-  try {
-    calibration = JSON.parse(readFileSync(calibrationPath, "utf8"));
-  } catch {
-    // absent/unreadable calibration: no manual-verify field to read, no step added.
-  }
-  const declared = calibration && typeof calibration.verifyManualStatus === "string" ? calibration.verifyManualStatus : null;
-  if (declared === null) return { step: null, evidence: null };
-  if (declared === VERIFY_NOT_CONFIGURED_YET) {
-    return { step: { name: "verify-not-configured-yet", exitCode: 0 }, evidence: { status: VERIFY_NOT_CONFIGURED_YET } };
-  }
-  if (containsUnreplacedManualCheckPlaceholder(declared)) {
-    console.error(`VERIFY-MANUAL-CHECK-PLACEHOLDER: verifyManualStatus is the unreplaced scaffold placeholder ${JSON.stringify(UNREPLACED_MANUAL_CHECK_PLACEHOLDER)} -- replace it with a real result before Verify can pass.`);
-    return { step: { name: "verify-manual-check-placeholder-rejected", exitCode: 1 }, evidence: { status: "placeholder-rejected" } };
-  }
-  return { step: { name: "verify-manual-check-declared", exitCode: 0 }, evidence: { status: "declared", note: declared.slice(0, 256) } };
+const manualVerifyResult = computeManualVerifyStep(manualVerifyCalibration);
+if (manualVerifyResult.step && manualVerifyResult.step.name === "verify-manual-check-placeholder-rejected") {
+  console.error(`VERIFY-MANUAL-CHECK-PLACEHOLDER: verifyManualStatus is the unreplaced scaffold placeholder ${JSON.stringify(UNREPLACED_MANUAL_CHECK_PLACEHOLDER)} -- replace it with a real result before Verify can pass.`);
 }
-const manualVerifyResult = computeManualVerifyStep();
 
 const steps = [];
 let verifyRun = null;

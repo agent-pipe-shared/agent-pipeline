@@ -978,6 +978,156 @@ function stepVerifyNvaCProtected({ dryRun, preview }) {
   return { status: "applied", detail };
 }
 
+/* ---------------------------------------- G. verify.mjs (TP-3) manual-check-logic extraction */
+
+// WHY. backlog/items/2026-08-29-mandatory-verify-gate-has-no-path-for-a-project-with-no-tests-yet.md
+// -- computeManualVerifyStep() already landed inline in verify.mjs (commit 3cfc7160), but
+// verify.mjs is TP-3 protected AND has no isDirectInvocation guard (importing it for its exports
+// triggers the entire ~500-suite run as a side effect), so the inline function could never be
+// unit-tested directly. harness/scripts/manual-check-logic.mjs (new, unprotected, created
+// alongside this step -- NVA-CF-ITEM25EXTRACT) now holds the exact same pure logic (no file I/O,
+// no console output) with its own test file (harness/scripts/manual-check-logic.test.mjs, 7/7).
+// This step removes the inline copy from verify.mjs and replaces it with an import plus a call
+// site that reads+parses the calibration file itself (the exact resolveAuthorityArtifactPath/
+// readFileSync pattern verify.mjs already uses elsewhere) and preserves the original
+// console.error side effect byte-for-byte for the placeholder-rejected case.
+
+const MANUAL_CHECK_LOGIC_PATH = join(REPO_ROOT, "harness", "scripts", "manual-check-logic.mjs");
+const MANUAL_CHECK_LOGIC_TEST_PATH = join(REPO_ROOT, "harness", "scripts", "manual-check-logic.test.mjs");
+
+// Anchored by short, unambiguous start/end markers rather than the ~35-line block verbatim (the
+// same technique as TEST_SUITES_MARKER/TEST_SUITES_TERMINATOR above) -- safer than hand-
+// transcribing a multi-line block that itself contains nested template-literal/backtick/${}
+// escaping as one giant literal.
+const MC_START_ANCHOR = "// pipeline.verify-manual-check-placeholder-detection / pipeline.reject-unreplaced-manual-check-placeholder";
+const MC_END_ANCHOR = "const manualVerifyResult = computeManualVerifyStep();";
+
+const MC_IMPORT_ANCHOR = 'import { duplicateSuiteIds } from "./check-verify-suite-registration.mjs";';
+const MC_IMPORT_REPLACEMENT = `${MC_IMPORT_ANCHOR}
+import { UNREPLACED_MANUAL_CHECK_PLACEHOLDER, computeManualVerifyStep } from "./manual-check-logic.mjs";`;
+
+const MC_CALL_SITE = `// pipeline.verify-manual-check-placeholder-detection / pipeline.reject-unreplaced-manual-check-placeholder
+// (NVA-R26-VERIFYPREP, backlog 2026-08-29-mandatory-verify-gate-has-no-path-for-a-project-with-no-tests-yet.md
+// and 2026-08-29-verify-placeholder-manual-check-required-accepted-by-gate.md; pure logic
+// extracted to ./manual-check-logic.mjs by NVA-CF-ITEM25EXTRACT so it is independently unit-
+// testable -- this file has no isDirectInvocation guard, so importing verify.mjs itself for its
+// exports would trigger the entire suite run as a side effect): a project's calibration
+// (\`project/pipeline.json\`, or legacy \`.claude/pipeline.json\` -- ADR-0054) may declare an
+// optional \`verifyManualStatus\` string field distinguishing three cases that would otherwise
+// collapse into one indistinguishable "nothing to report" result: genuinely nothing configured
+// yet (honestly declared, never a silent pass and never an indefinite block), a real filled-in
+// manual-check note, or an unfilled scaffold placeholder that was never replaced (rejected as a
+// FAILURE, never accepted as a pass). Absent field: no step is added and behavior is unchanged --
+// this repo's own calibration carries no such field.
+let manualVerifyCalibration = null;
+try {
+  const manualVerifyCalibrationPath = resolveAuthorityArtifactPath("calibration", { rootDir: repoRoot }).path;
+  manualVerifyCalibration = JSON.parse(readFileSync(manualVerifyCalibrationPath, "utf8"));
+} catch {
+  // absent/unreadable calibration: no manual-verify field to read, no step added.
+}
+const manualVerifyResult = computeManualVerifyStep(manualVerifyCalibration);
+if (manualVerifyResult.step && manualVerifyResult.step.name === "verify-manual-check-placeholder-rejected") {
+  console.error(\`VERIFY-MANUAL-CHECK-PLACEHOLDER: verifyManualStatus is the unreplaced scaffold placeholder \${JSON.stringify(UNREPLACED_MANUAL_CHECK_PLACEHOLDER)} -- replace it with a real result before Verify can pass.\`);
+}`;
+
+/**
+ * Structural check of the transformed source: confirms the wiring (import present, call site
+ * passes a non-empty calibration argument rather than the old zero-arg signature, the old inline
+ * definition is gone, the console.error message is byte-identical to the pre-refactor original)
+ * without executing or importing verify.mjs itself (which has no isDirectInvocation guard).
+ */
+function verifyManualCheckWiring(source) {
+  if (!source.includes('import { UNREPLACED_MANUAL_CHECK_PLACEHOLDER, computeManualVerifyStep } from "./manual-check-logic.mjs";')) {
+    return { ok: false, detail: "manual-check-logic.mjs import not found in the transformed source" };
+  }
+  if (!source.includes("computeManualVerifyStep(manualVerifyCalibration)")) {
+    return { ok: false, detail: "call site does not pass the parsed calibration object to computeManualVerifyStep()" };
+  }
+  if (source.includes("function computeManualVerifyStep()")) {
+    return { ok: false, detail: "the old inline computeManualVerifyStep() definition is still present -- extraction did not remove it" };
+  }
+  if (!source.includes("VERIFY-MANUAL-CHECK-PLACEHOLDER: verifyManualStatus is the unreplaced scaffold placeholder ${JSON.stringify(UNREPLACED_MANUAL_CHECK_PLACEHOLDER)} -- replace it with a real result before Verify can pass.")) {
+    return { ok: false, detail: "the console.error message text is not byte-identical to the pre-refactor original" };
+  }
+  return { ok: true, detail: "import present, call site passes calibration, old inline definition removed, console.error message byte-identical" };
+}
+
+const MC_TEST_EXPECTED = /ℹ pass 7\b/u;
+const MC_TEST_NO_FAILURES = /ℹ fail 0\b/u;
+
+/** Byte offset span computation, thrown refusal on missing/ambiguous anchors. */
+function computeManualCheckExtractionNext(original) {
+  const startIdx = original.indexOf(MC_START_ANCHOR);
+  if (startIdx === -1) throw new Error("anchor not found (manual-check-logic start marker): the file does not contain the expected text. Nothing was written.");
+  if (original.indexOf(MC_START_ANCHOR, startIdx + MC_START_ANCHOR.length) !== -1) {
+    throw new Error("anchor is ambiguous (manual-check-logic start marker): occurs more than once. Nothing was written.");
+  }
+  const endMarkerIdx = original.indexOf(MC_END_ANCHOR, startIdx);
+  if (endMarkerIdx === -1) throw new Error("anchor not found (manual-check-logic end marker): the file does not contain the expected text after the start marker. Nothing was written.");
+  if (original.indexOf(MC_END_ANCHOR, endMarkerIdx + MC_END_ANCHOR.length) !== -1) {
+    throw new Error("anchor is ambiguous (manual-check-logic end marker): occurs more than once. Nothing was written.");
+  }
+  const blockEnd = endMarkerIdx + MC_END_ANCHOR.length;
+  const withCallSite = original.slice(0, startIdx) + MC_CALL_SITE + original.slice(blockEnd);
+  return anchoredReplace(withCallSite, MC_IMPORT_ANCHOR, MC_IMPORT_REPLACEMENT, "check-verify-suite-registration.mjs import");
+}
+
+// A sibling of the real verify.mjs, same reasoning as the other preview siblings above. Never a
+// protected path: TP-3 matches `harness/scripts/verify\.mjs$` and this name does not.
+const MANUAL_CHECK_EXTRACT_PREVIEW_PATH = join(dirname(VERIFY_PATH), "verify.manual-check-extract.preview-check.mjs");
+
+function stepVerifyManualCheckExtract({ dryRun, preview }) {
+  const original = readFileSync(VERIFY_PATH, "utf8");
+  if (original.includes('from "./manual-check-logic.mjs"')) {
+    return { status: "already-applied", detail: "verify.mjs already imports computeManualVerifyStep from manual-check-logic.mjs" };
+  }
+  if (!existsSync(MANUAL_CHECK_LOGIC_PATH) || !existsSync(MANUAL_CHECK_LOGIC_TEST_PATH)) {
+    throw new Error(`${rel(MANUAL_CHECK_LOGIC_PATH)} and ${rel(MANUAL_CHECK_LOGIC_TEST_PATH)} must exist before this step runs (this step never creates them). Nothing was written.`);
+  }
+
+  const next = computeManualCheckExtractionNext(original);
+
+  function checkWiringAndTests(source) {
+    const wiring = verifyManualCheckWiring(source);
+    if (!wiring.ok) return wiring;
+    const testSuite = run([MANUAL_CHECK_LOGIC_TEST_PATH]);
+    if (testSuite.code !== 0 || !MC_TEST_EXPECTED.test(testSuite.output) || !MC_TEST_NO_FAILURES.test(testSuite.output)) {
+      return { ok: false, detail: `manual-check-logic.test.mjs did not report 7 passed, 0 failed (exit ${testSuite.code}):\n${testSuite.output.slice(-2000)}` };
+    }
+    return { ok: true, detail: `${wiring.detail}; manual-check-logic.test.mjs: 7 passed, 0 failed` };
+  }
+
+  if (preview) {
+    try {
+      writeFileSync(MANUAL_CHECK_EXTRACT_PREVIEW_PATH, next, "utf8");
+      // Syntax-only, same reasoning as steps A/E's own `--check` calls: it never runs the gate,
+      // which would need approvals this script has no business touching.
+      const parsed = run(["--check", MANUAL_CHECK_EXTRACT_PREVIEW_PATH]);
+      if (parsed.code !== 0) {
+        throw new Error(`verify.mjs (preview copy) no longer parses:\n${parsed.output}`);
+      }
+      const verdict = checkWiringAndTests(next);
+      if (!verdict.ok) throw new Error(verdict.detail);
+      return { status: "preview-green", detail: `${verdict.detail} -- run from a removed sibling; ${rel(VERIFY_PATH)} was not touched` };
+    } finally {
+      rmSync(MANUAL_CHECK_EXTRACT_PREVIEW_PATH, { force: true });
+    }
+  }
+
+  if (dryRun) {
+    return { status: "would-apply", detail: "2 anchored edits: check-verify-suite-registration.mjs sibling import, inline block replaced by calibration-read + import call site (console.error preserved byte-identical)" };
+  }
+
+  const detail = writeThenVerifyOrRevert(VERIFY_PATH, original, next, () => {
+    const parsed = run(["--check", VERIFY_PATH]);
+    if (parsed.code !== 0) return { ok: false, detail: `verify.mjs no longer parses:\n${parsed.output}` };
+    return checkWiringAndTests(readFileSync(VERIFY_PATH, "utf8"));
+  });
+
+  return { status: "applied", detail };
+}
+
 /* ---------------------------------------------------------------- driver */
 
 const argv = process.argv.slice(2);
@@ -993,9 +1143,10 @@ const STEPS = [
   { key: "guard-git-cwd", label: `D. set runGuard()'s spawned guard cwd to its own fixture dir in ${rel(GUARD_GIT_TEST_PATH)} (TP-1)`, fn: stepGuardGitCwd },
   { key: "verify-nva-c-protected", label: `E. register ${VERIFY_REGISTRATIONS_NVA_C_PROTECTED.length} more pending suites (NVA-C-PROTECTED) in ${rel(VERIFY_PATH)} (TP-3)`, fn: stepVerifyNvaCProtected },
   { key: "guard-git-22", label: `F. add GG22-7/GG22-8 fixture tests to ${rel(GUARD_GIT_TEST_PATH)} (TP-1)`, fn: stepGuardGit22 },
+  { key: "verify-manual-check-extract", label: `G. extract the manual-check logic out of ${rel(VERIFY_PATH)} into a testable module (TP-3)`, fn: stepVerifyManualCheckExtract },
 ];
 
-const PREVIEWABLE = new Set(["gate-strength", "entrypoint", "guard-git-cwd", "verify-nva-c-protected", "guard-git-22"]);
+const PREVIEWABLE = new Set(["gate-strength", "entrypoint", "guard-git-cwd", "verify-nva-c-protected", "guard-git-22", "verify-manual-check-extract"]);
 
 if (only !== null && !STEPS.some((step) => step.key === only)) {
   process.stderr.write(`unknown --only value: ${only}\nExpected one of: ${STEPS.map((step) => step.key).join(", ")}\n`);
