@@ -200,6 +200,16 @@ export const EXCLUSIONS = Object.freeze({
     owner: "PO",
     expires: "2026-09-07",
   }),
+  "plugins/pipeline-core/scripts/check-critic-skip-coverage.test.mjs": Object.freeze({
+    reason: "GREEN, not red: 9/9 passing (NVA-CF-BL22-CRITICSKIPWIRE, 2026-08-29), distinguishing 'zero Critic artifacts because none were required' from 'zero despite N required' against fixture dispatch records. Parked solely because registering it edits verify.mjs, a protected test path whose maintenance window is closed and whose reopening needs a human signature. Register on the next window; this entry is a scheduling record, not a defect record.",
+    owner: "PO",
+    expires: "2026-09-07",
+  }),
+  "plugins/pipeline-core/scripts/measure-tofu-push-e2e.test.mjs": Object.freeze({
+    reason: "GREEN, not red: 8/8 passing (NVA-CF-CRITICFIX-F2F5F7, 2026-08-29), covering parseJsonStdout (including a Critic-round-2 regression case) and fakeSetupSpawn's genpkey/pkey interception for the BL16 TOFU e2e measurement script. Parked solely because registering it edits verify.mjs, a protected test path whose maintenance window is closed and whose reopening needs a human signature. Register on the next window; this entry is a scheduling record, not a defect record.",
+    owner: "PO",
+    expires: "2026-09-07",
+  }),
 });
 
 function toPosix(rawPath) { return rawPath.split(sep).join("/"); }
