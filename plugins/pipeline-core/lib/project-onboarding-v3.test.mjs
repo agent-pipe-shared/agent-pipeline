@@ -6902,13 +6902,17 @@ test("a freshly seeded project is honest about its authority tier, its verify co
     assert.match(userIntent, /push_approval: "?signature"?/,
       "the calibration states how a human clears a push, so `chat` is discoverable without reading plugin source");
     // The calibration must not promise a gate nothing enforces. `security` read
-    // `warn` while the manifest carried no security chapter -- and unlike `push`,
-    // seeding that chapter is not the fix: the satisfying path was measured and is
-    // CLOSED for a fresh consumer (dirty-tree refusal caused by the push gate's own
-    // evidence, three external scanners, a license allowlist at a path that exists
-    // only in the Pipeline's own repository). `off` is what is true.
+    // `warn` while the manifest carried no security chapter. Seeding that chapter
+    // alone is not the fix, but the closed-path reasoning that used to justify `off`
+    // here is now partly stale (NVA-R18-SCANBOOT, 2026-08-29): a fresh consumer's
+    // dirty-tree circle was broken by the seeded `.gitignore`, and a missing scanner
+    // no longer fails the gate (SKIPPED, CLEAN verdict) now that scanner defaults
+    // ship with the plugin -- see the seeding comment in project-onboarding-v3.mjs
+    // for the current, re-measured reasoning. `off` is still what is true: turning
+    // it on is a deliberate act with prerequisites (see that same comment), not
+    // something onboarding defaults a fresh consumer into.
     assert.match(userIntent, /security: "?off"?/,
-      "the calibration must not declare a security gate whose satisfying path is closed");
+      "the calibration must not declare a security gate whose default remains a deliberate act, not a default-on");
     assert.equal(gateConfig(parseYaml(freshManifestBytes()), "security"), null,
       "and the manifest must not carry one either -- the two must agree");
 
