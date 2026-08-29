@@ -101,7 +101,7 @@
 | pipeline.codex-read-only-steps-escalate-individually-instead-of-once | closed | idea | pipeline | 2026-08-09 | — |
 | pipeline.codex-restart-cannot-recover-operational-context-from-its-own-prior-transcript | closed | idea | pipeline | 2026-08-09 | — |
 | pipeline.codex-runner-has-no-real-support-on-native-windows | closed | defect | pipeline | 2026-08-19 | — |
-| pipeline.codex-runner-needed-three-sessions-for-one-small-feature | open | workflow-improvement | pipeline | 2026-08-28 | Nova B — PO asked for this to be examined in detail |
+| pipeline.codex-runner-needed-three-sessions-for-one-small-feature | closed | workflow-improvement | pipeline | 2026-08-28 | Nova B — PO asked for this to be examined in detail |
 | pipeline.codex-sandbox-critic-longterm | closed | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.codex-sandbox-runtime-deniedroots-proc-collides-with-proc-self-in-the-runtime-read-set | closed | defect | pipeline | 2026-08-19 | — |
 | pipeline.command-grammar-guesses-shell-dialect-from-host-os-not-the-actual-tool-shell | closed | defect | pipeline | 2026-08-17 | — |
@@ -408,7 +408,7 @@
 | pipeline.push-guard-worktree-target | closed | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.push-path-has-no-driver | closed | workflow-improvement | pipeline | 2026-08-28 | Nova B — PO-raised 2026-08-28 on seeing the guided onboarding reach ready: 'dann braucht der push pfad auch so was weil der kostet auch mega viel'. Deliberately NOT Nova A: the candidate must not grow a second driver before its first one is reviewed. |
 | pipeline.push-release-flow-unusable-for-third-party-adopters | closed | defect | pipeline | 2026-08-07 | — |
-| pipeline.quote-style-fragility-in-shell-command-admission | open | defect | pipeline | 2026-08-29 | — |
+| pipeline.quote-style-fragility-in-shell-command-admission | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.raw-apply_patch-is-unconditionally-admitted-by-the-outer-lifecycle-gate | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.read-scope-guard-admits-single-command-but-blocks-the-piped-form | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.readiness-guard-blocks-its-own-recovery | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — a guard that refuses the exact command its own refusal prescribes is a deadlock, and it fired twice in one consumer session |
@@ -549,8 +549,8 @@
 
 ## Counts
 
-- open: 74
+- open: 72
 - in_progress: 3
-- closed: 450
+- closed: 452
 - rejected: 3
 - deferred: 11
