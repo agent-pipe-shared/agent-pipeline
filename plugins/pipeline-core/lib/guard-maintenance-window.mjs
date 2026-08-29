@@ -362,6 +362,25 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/scripts/guard-maintenance-window.mjs",
   "plugins/pipeline-core/scripts/po-approval-gate.mjs",
   "plugins/pipeline-core/scripts/signing-ceremony.mjs",
+  // NVA-CF-GMWKC-RETRY (2026-08-29): a ninth gap, reached transitively --
+  // project-onboarding-v3.mjs (already kernel above) statically imports
+  // pre-commit-hook-install.mjs, which was not yet listed. That file's own
+  // dynamic `import()` edges (declared in DYNAMIC_IMPORT_EDGES,
+  // guard-maintenance-window-kernel-closure.test.mjs, since its target directories are
+  // install-time-bound paths, not literal specifiers the scanner can read) name
+  // check-protected-path-integrity.mjs, also not yet listed -- its own static imports
+  // (guard-gate-strength.mjs, protected-test-paths.mjs, entrypoint.mjs) are all already
+  // kernel above, so no further hops are needed.
+  "plugins/pipeline-core/scripts/pre-commit-hook-install.mjs",
+  "plugins/pipeline-core/scripts/check-protected-path-integrity.mjs",
+  // Unrelated pre-existing gap GMWKC01 found already open at this dispatch's base
+  // commit (see the "unrelated pre-existing gap" notes above for the same pattern):
+  // onboarding-continuity.mjs and project-onboarding-v3.mjs (both already kernel
+  // above) already imported this before this dispatch touched anything. Its own
+  // first-party imports (yaml-lite.mjs, runner-profiles-v3.mjs, po-gate-authority.mjs,
+  // project-authority.mjs, runner-profile-migration-v3.mjs) are all already kernel
+  // above, so no further hops are needed.
+  "plugins/pipeline-core/lib/onboarding-language-correction.mjs",
 ]);
 
 // The "plugins/pipeline-core/..." entries above are written against whatever

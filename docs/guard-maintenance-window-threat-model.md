@@ -165,7 +165,22 @@ below assumes it holds and is written to catch a change that would break it.
   relationship applied to the HGO ceremony instead of the GMW/push ceremony.
   Added: `scripts/guard-human-override.mjs`,
   `scripts/guard-maintenance-window.mjs`, `scripts/po-approval-gate.mjs`, and
-  `scripts/signing-ceremony.mjs`.
+  `scripts/signing-ceremony.mjs`. A ninth gap (NVA-CF-GMWKC-RETRY, 2026-08-29),
+  reached transitively: `scripts/project-onboarding-v3.mjs` (already kernel above)
+  statically imports `scripts/pre-commit-hook-install.mjs`, which was not yet
+  listed. That file's own dynamic `import()` edges (declared in
+  `DYNAMIC_IMPORT_EDGES`, since its target directories are install-time-bound
+  paths, not literal specifiers the static scanner can read) name
+  `scripts/check-protected-path-integrity.mjs`, also not yet listed -- its own
+  static imports (`guard-gate-strength.mjs`, `protected-test-paths.mjs`,
+  `entrypoint.mjs`) are all already kernel above, so no further hops are needed.
+  Added: `scripts/pre-commit-hook-install.mjs` and
+  `scripts/check-protected-path-integrity.mjs`. An unrelated pre-existing gap
+  GMWKC01 found already open at this dispatch's base commit --
+  `lib/onboarding-continuity.mjs` and `lib/project-onboarding-v3.mjs` (both
+  already kernel above) already imported `lib/onboarding-language-correction.mjs`
+  before this dispatch touched anything -- was closed alongside: added
+  `lib/onboarding-language-correction.mjs`.
 - The window record's cryptographic integrity and its TTL.
 - The audit visibility of an open or recently-closed window (the bootstrap
   warning).
