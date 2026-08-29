@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.an-unparseable-done-when-is-counted-as-undeclared-not-malformed
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-29
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: 8230cd8efb998d527a84c220044be18145862fb0
+closure_evidence: plugins/pipeline-core/scripts/check-backlog-done-predicate.test.mjs
 sprint: nova
 done_when: contains plugins/pipeline-core/scripts/check-backlog-done-predicate.mjs pipeline.unparseable-declaration-is-malformed
 source: "Dispatch NVA-BLDECL-4, 2026-08-29: two of fifteen first-draft predicates contained a comma or brace, were silently dropped by the frontmatter parser, and were reported as UNDECLARED rather than MALFORMED. Confirmed against the source by the dispatcher."
