@@ -106,31 +106,22 @@ export const ENUMERATION_ROOTS = Object.freeze([join(REPO_ROOT, "plugins", "pipe
  * cannot reach the gate at all without a human ceremony, which is worth deciding rather than
  * accumulating.
  */
-export const DELIBERATELY_UNREGISTERED = Object.freeze([
-  {
-    path: "plugins/pipeline-core/scripts/onboarding-init.test.mjs",
-    reason: "NVA-B-GUIDEDINIT: passes standalone (node --test), registration into verify.mjs's "
-      + "TEST_SUITES needs a TP-3-protected signed maintenance-window ceremony -- out of scope "
-      + "for this additive dispatch; see the comment on this constant.",
-  },
-  {
-    path: "plugins/pipeline-core/scripts/push-gate-satisfiability.test.mjs",
-    reason: "NVA-B-PUSHPREFLIGHT: registering it in TEST_SUITES means editing harness/scripts/verify.mjs, "
-      + "which is TP-3-protected and needs its own signed maintenance-window ceremony -- out of scope for the "
-      + "dispatch that authored this suite. Run directly: `node --test plugins/pipeline-core/scripts/"
-      + "push-gate-satisfiability.test.mjs`. A follow-up carrying the TP-3 ceremony should fold this suite into "
-      + "TEST_SUITES and remove this entry.",
-  },
-  {
-    path: "plugins/pipeline-core/scripts/check-backlog-done-predicate.test.mjs",
-    reason: "NVA-DONEWHEN-1: passes standalone (`node --test plugins/pipeline-core/scripts/"
-      + "check-backlog-done-predicate.test.mjs`); registering it in TEST_SUITES means editing "
-      + "harness/scripts/verify.mjs, which is TP-3-protected and this repository's `signature` "
-      + "push-approval mode offers no in-session activation step -- out of scope for this additive "
-      + "dispatch. The dispatcher will register it together with the done_when UNDECLARED-to-fatal "
-      + "enforcement graduation, in one signed maintenance-window ceremony, and remove this entry.",
-  },
-]);
+// EMPTIED 2026-08-29. All three entries are gone because all three suites are now
+// registered in verify.mjs's TEST_SUITES -- and two of them had ALREADY been registered
+// for some time while this list still claimed they were not, each with a reason text
+// demanding a human signature ceremony for work that was in fact already done.
+//
+// That is the failure this list is most prone to and the one worth naming here: an
+// opt-out entry is a claim about ANOTHER file's contents, and nothing re-checks it once
+// written. A stale entry does not fail loudly -- it quietly asks for a PO signature that
+// is not needed, which is the most expensive kind of wrong, because the signature is the
+// one irreducibly manual act in the whole model.
+//
+// So: an entry added here is a debt with an owner and a trigger, never a parking space.
+// Before adding one, confirm the suite is genuinely absent from TEST_SUITES rather than
+// assuming it; compareSuiteRegistration() below already reports an opt-out entry for a
+// suite that IS registered, so trust that output over any reason text found here.
+export const DELIBERATELY_UNREGISTERED = Object.freeze([]);
 
 /** The five directory constants `verify.mjs` itself defines, expressed as repo-relative segments. */
 export const DIRECTORY_CONSTANTS = Object.freeze({
