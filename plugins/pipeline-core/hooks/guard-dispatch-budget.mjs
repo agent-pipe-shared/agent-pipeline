@@ -194,7 +194,23 @@ export function subagentIdentity(input, dependencies = {}) {
   // observed on the Windows runner (the audited defect) carried no usable
   // transcript_path at all, so this shape alone stays "unresolved" and
   // every existing caller's fail-open-on-ambiguity behaviour is unchanged.
-  if (transcriptPath === undefined || (typeof transcriptPath === "string" && transcriptPath.trim() === "")) {
+  // `null` is included here (NVA-CF-NULLTID, 2026-08-29): a JSON-serialized
+  // `transcript_path: null` (a host that emits null rather than omitting the
+  // key entirely) is a legitimate "absent" encoding, not a malformed one --
+  // it must route the same as undefined/blank-string. Before this fix it
+  // fell through to the `typeof transcriptPath !== "string"` check below and
+  // landed in the fail-CLOSED "invalid-identity" lane with the fixed
+  // sentinel agentId, which guard-lifecycle-ready.mjs's bootstrap-receipt
+  // gate can never clear (no receipt is ever written for a non-"subagent"
+  // kind) -- permanently blocking every Edit/Write/NotebookEdit for that
+  // session with no recovery route. Genuinely malformed values (a non-null,
+  // non-string, or a non-absolute string) still fall through to the
+  // fail-closed "invalid-identity" branch below unchanged.
+  if (
+    transcriptPath === undefined
+    || transcriptPath === null
+    || (typeof transcriptPath === "string" && transcriptPath.trim() === "")
+  ) {
     return { kind: "unresolved", reason: "transcript-path-missing-or-relative" };
   }
   // PRESENT but not a usable absolute path (wrong type, or a relative
