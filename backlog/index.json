@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "a3503d919062e540841abc3430e4b749c908229c016b7a04b00e754456dfb831"
+    "transitionHead": "3b5d61c45d61e1533833c6fa92deb0773687d46892b19050941546d20ddbd8f1"
   },
   "counts": {
-    "open": 72,
+    "open": 76,
     "in_progress": 3,
     "closed": 452,
     "rejected": 3,
@@ -1254,6 +1254,16 @@
       "closureRepository": "self",
       "closureCommit": "ad68796a1ad39a022d17b1000add1ca53aecf7a6",
       "closureEvidence": "plugins/pipeline-core/scripts/codex-sandbox-runtime.mjs"
+    },
+    {
+      "id": "pipeline.codex-worker-subagent-dispatch-capability-is-broken",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-29",
+      "source": "Codex 060-77 greenfield retrospective (scratch/greenfield-reports/pipeline-retrospective-codex-060-77.md), section 'Root und Worker hatten unterschiedliche Funktionsfähigkeit'.",
+      "deferred": false,
+      "tracking": "Nova B -- needs deeper Codex-runner-side investigation, likely outside pure Pipeline-repo code; not a same-session fix."
     },
     {
       "id": "pipeline.command-grammar-guesses-shell-dialect-from-host-os-not-the-actual-tool-shell",
@@ -3855,6 +3865,16 @@
       "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
     },
     {
+      "id": "pipeline.no-technical-gate-enforces-critic-review-before-done",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-29",
+      "source": "Claude/Windows 060-78 greenfield retrospective (scratch/greenfield-reports/pipeline-retrospective-claude-060-78.md), section 5 point 8 and section 11: 'Kein technisches Gate erzwingt das Critic-Review selbst.'",
+      "deferred": false,
+      "tracking": "Nova B -- PO decision 2026-08-29: real design work needed (detecting when a Critic review was DUE and never ran is not trivial), too large for this candidate."
+    },
+    {
       "id": "pipeline.no-test-pins-the-ungoverned-path-rule-stand-down",
       "status": "closed",
       "type": "defect",
@@ -3973,6 +3993,16 @@
       "closureRepository": "self",
       "closureCommit": "d7a52fedbccb6fbce30492227b48c65059a1d1ef",
       "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
+    },
+    {
+      "id": "pipeline.onboarding-has-no-happy-path-for-an-existing-signing-key",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-29",
+      "source": "PO inline observation (2026-08-29, 3-runner greenfield test synthesis) plus the Codex and Claude/Windows retrospectives' independent trust-anchor-bootstrap-circularity findings (see 2026-08-28-onboarding-must-bootstrap-the-trust-anchor-once.md and 2026-08-09-critical-human-proof-not-materialized-for-signature-mode.md, both closed 2026-08-29 -- this item covers a DIFFERENT, narrower gap those did not: the missing THIRD onboarding option).",
+      "deferred": false,
+      "tracking": "NOW / Nova A -- happy-path blocker, PO's own words: 'einen bestehenden Key zu nutzen ist auch zu umständlich im happy pfad da eine merkwürdige reperatur nötig ist und der driver hier nicht hilft und die agents kreise drehen'."
     },
     {
       "id": "pipeline.onboarding-lifecycle-plan-hardcodes-the-codex-runner",
@@ -6061,6 +6091,16 @@
       "closureRepository": "self",
       "closureCommit": "1b6e6a606ffcd6f32c3993b73be1110d3eb299af",
       "closureEvidence": "backlog/items/2026-08-08-temp-directories-leak-until-the-filesystem-refuses-every-write.md"
+    },
+    {
+      "id": "pipeline.template-scripts-for-human-terminal-actions",
+      "status": "open",
+      "type": "idea",
+      "owner": "pipeline",
+      "created": "2026-08-29",
+      "source": "PO inline observation (2026-08-29, 3-runner greenfield synthesis): Antigravity was the only runner to move quickly through the first 2 phases, in part because it built its OWN scripts to confirm the PRD faster. PO suggests: pre-built template scripts (that runners lightly rewrite, with clear placeholders) for fixed gates/installs/anything the human must run in a terminal, so what needs filling in is always clear.",
+      "deferred": true,
+      "tracking": "Nova B -- design idea, not scoped."
     },
     {
       "id": "pipeline.test-path-guard-blocks-the-briefed-edit-and-offers-no-route",
