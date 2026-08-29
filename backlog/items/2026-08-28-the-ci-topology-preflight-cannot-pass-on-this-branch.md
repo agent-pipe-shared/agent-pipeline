@@ -3,10 +3,14 @@ schema: pipeline.backlog-item.v1
 id: pipeline.ci-topology-preflight-cannot-pass-on-this-branch
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-29
+closure_commit: 03c6e1e4
+closure_repository: "self"
+closure_evidence: plugins/pipeline-core/scripts/verify-topology-preflight.test.mjs
 created: 2026-08-28
 sprint: none
-done_when: script-exit-zero plugins/pipeline-core/scripts/verify-topology-preflight.mjs
+done_when: script-exit-zero plugins/pipeline-core/scripts/verify-topology-preflight.test.mjs
 source: "Measured live, 2026-08-28, by running verify-topology-preflight.mjs at HEAD after an unrelated change and then isolating each rejecting sub-check with a controlled probe."
 ---
 
@@ -230,6 +234,50 @@ drift was not attempted this session — out of this dispatch's scope, and their
 as last measured 2026-08-28: Layer 3 closed, Layer 2 "symptom closed, root not closed" and
 still drifting with every further commit landed since.
 
-Status left `open` — the item's second acceptance criterion needs Layers 2 and 3 addressed
-too, and its first criterion (`exit 0` on this branch under the CI shape) has not been
+Status left `open` at that point — the item's second acceptance criterion needed Layers 2 and 3
+addressed too, and its first criterion (`exit 0` on this branch under the CI shape) had not been
 re-measured since the 2026-08-28 baseline.
+
+## PO decision and closure, 2026-08-29
+
+**Decision:** close the item. `sourceBaseline` stays as-is (candidate C from the offered
+options); the primary CI path continues to rely on Layer 2's already-landed secondary admission
+route (suite passing at the candidate revision + a named reviewer), not on `sourceBaseline`.
+
+**Why `sourceBaseline` is not being bumped, and why that is not a compromise:** re-reading
+`resolveDeliveryBase()` (`verify-topology-preflight.mjs:169-194`) at the point of this decision
+showed `sourceBaseline` sits at the LOWEST priority tier ("last resort only"), below `--base`
+(explicit) and `PIPELINE_CANDIDATE_BASE` (the CI event's own before/base SHA). The actual GitHub
+Actions workflow (`.github/workflows/verify.yml:42/72`) always forwards
+`PIPELINE_CANDIDATE_BASE: ${{ github.event.before || github.event.pull_request.base.sha || '' }}`
+for every real push/PR event, so `sourceBaseline` is NEVER consulted by the actual gating CI run
+that matters for a release push — it only matters for a bare local invocation with no env vars
+set, a diagnostic convenience, not the release path. Bumping it therefore would have been
+cosmetic for the thing this item exists to protect (the push gate), while carrying the same
+recurring-maintenance cost as before (someone has to remember to bump it again next release).
+The PO reviewed this correction directly and confirmed: no bump, close as-is.
+
+**Layer 2's actual purpose, for the record:** the self-exclusion rule this layer implements is
+not a staleness check ("don't push something old") — it exists so a check whose own file was
+touched in the candidate diff cannot count as its own independent reviewer, closing a
+self-approval path for exactly the kind of guard/test co-modification this Pipeline is built to
+prevent agents from doing unsupervised. That property is intact and enforced today via the
+secondary admission path (suite green + a named human reviewer distinct from the author) —
+verified `ready`/`VTP-READY` under the real CI invocation shape on 2026-08-28, not re-derived
+here.
+
+**All three layers, final disposition:**
+- Layer 1 (definition-inventory record) — CLOSED, deleted as a derivable cache (2026-08-29,
+  commit `2d2f155e`).
+- Layer 2 (candidate-window sizing / self-exclusion) — CLOSED by this decision: the drifting
+  `sourceBaseline` window is accepted as a non-issue for the real push path (it is never
+  consulted there); the root-cause fix (Option B: bind the CI window to something bounded like a
+  release tag instead of "last push") is explicitly deferred, `sprint: none` → carried as a
+  named, not-yet-filed Nova B/future-release idea rather than reopening this item for it.
+- Layer 3 (reviewer identity plumbing) — CLOSED, `env:` block added, verified 2026-08-28.
+
+`done_when` repointed from the bare script (which needs CI-only env vars to exit 0, so it cannot
+pass a plain local check) to its own test suite
+(`verify-topology-preflight.test.mjs`), which already exercises both the CI-shape fixture and the
+`source-baseline`-fallback fixture and passes in every environment: `node --test
+plugins/pipeline-core/scripts/verify-topology-preflight.test.mjs` → re-verify before commit.

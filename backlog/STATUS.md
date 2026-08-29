@@ -86,7 +86,7 @@
 | pipeline.capability-first-advisor-critic-dispatch | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.chat-gate-non-ascii-name-windows | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — delivered 2026-08-28, same session it was reported |
 | pipeline.chat-mode-push-approval-has-no-enforced-human-turn-boundary | closed | defect | pipeline | 2026-08-25 | — |
-| pipeline.ci-topology-preflight-cannot-pass-on-this-branch | open | defect | pipeline | 2026-08-28 | — |
+| pipeline.ci-topology-preflight-cannot-pass-on-this-branch | closed | defect | pipeline | 2026-08-28 | — |
 | pipeline.citation-coordinate-checker-bare-basename | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.claude-dir-leftovers-defeat-runner-neutral-project-migration | closed | defect | pipeline | 2026-08-05 | — |
 | pipeline.claude-greenfield-run-happy-path-findings | closed | defect | pipeline | 2026-08-09 | — |
@@ -548,8 +548,8 @@
 
 ## Counts
 
-- open: 91
+- open: 90
 - in_progress: 3
-- closed: 432
+- closed: 433
 - rejected: 3
 - deferred: 11
