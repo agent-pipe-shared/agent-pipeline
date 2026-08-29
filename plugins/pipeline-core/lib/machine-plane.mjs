@@ -172,6 +172,41 @@ function carriesKeyMaterial(value) {
 }
 
 /**
+ * The operator's own machine-local signing-key identity, if one is registered on this
+ * machine -- resolving the same two-hop path `project-onboarding-v3.mjs`'s
+ * `observeLocalTrustAnchorPointer` already performs for onboarding guidance:
+ * `readMachinePlane()`'s `poKeyDirectory` names a directory, and that directory's own
+ * `trust-policy.json` names the key. This is the narrower, provenance-only reading a
+ * caller that only wants "do I have one, and what is it" needs (NVA-CF-TOFUFIX,
+ * `critical-action-authorization.mjs`'s trust-on-first-use gate) -- a caller that needs to
+ * tell the individual fault states apart (no plane vs. a dead pointer vs. a malformed file,
+ * for operator-facing guidance) still uses `readMachinePlane()`/`observeLocalTrustAnchorPointer`
+ * directly; this collapses all of them to `null` on purpose.
+ *
+ * Never throws: an absent plane, an absent `poKeyDirectory`, a directory whose
+ * `trust-policy.json` is missing, unreadable, unparseable, or shaped wrong all resolve to
+ * `null` -- the same fail-closed posture `readMachinePlane` itself already has.
+ */
+export function resolveLocalOperatorKeyAnchor(dependencies = {}) {
+  const exists = dependencies.existsSyncFn ?? existsSync;
+  const readFile = dependencies.readFileSyncFn ?? readFileSync;
+  const plane = readMachinePlane(dependencies);
+  if (plane.status !== "valid") return null;
+  const directory = plane.plane?.poKeyDirectory;
+  if (typeof directory !== "string" || directory.length === 0) return null;
+  const path = join(directory, "trust-policy.json");
+  try {
+    if (!exists(path)) return null;
+    const parsed = JSON.parse(readFile(path, "utf8"));
+    if (typeof parsed?.keyReference !== "string" || parsed.keyReference.length === 0) return null;
+    if (typeof parsed?.publicKeySha256 !== "string" || !/^[a-f0-9]{64}$/u.test(parsed.publicKeySha256)) return null;
+    return { keyReference: parsed.keyReference, publicKeySha256: parsed.publicKeySha256 };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * AC-7/AC-8: refuses a plane that fails its own validation, refuses a plane carrying
  * anything that looks like key material, creates the containing directory when absent,
  * refuses outright when the target already exists as a symlink, and writes atomically

@@ -62,6 +62,32 @@ function fixture({ anchor, trustAnchors, threatModelBody = "# threat model\n" } 
   };
 }
 
+/**
+ * A machine plane whose `poKeyDirectory` resolves to a real `trust-policy.json` naming
+ * `key` -- the fixture form of "this machine has its own registered operator key"
+ * (NVA-CF-TOFUFIX: `authorizeRecordedPush`/`authorizeRecordedDeploy`'s trust-on-first-use
+ * gate now requires exactly this before accepting+pinning an anchor-less policy's first
+ * verifying signature). Returns `{ homedirFn }`, the one override
+ * `resolveLocalOperatorKeyAnchor`'s dependency-injection shape needs -- the real
+ * `existsSync`/`readFileSync` do the rest against this fixture's own temp directories.
+ */
+function machinePlaneFixture(key, keyReference = "po-key-1") {
+  const home = mkdtempSync(join(tmpdir(), "machine-home-"));
+  roots.push(home);
+  const keyDirectory = mkdtempSync(join(tmpdir(), "po-key-dir-"));
+  roots.push(keyDirectory);
+  writeFileSync(join(keyDirectory, "trust-policy.json"), `${JSON.stringify({ keyReference, publicKeySha256: key.publicKeySha256 }, null, 2)}\n`);
+  mkdirSync(join(home, ".agent-pipeline"), { recursive: true });
+  writeFileSync(join(home, ".agent-pipeline", "machine.json"), `${JSON.stringify({
+    schema: "pipeline.machine-plane.v1",
+    poKeyDirectory: keyDirectory,
+    pushApprovalDefault: "signature",
+    routing: null, language: null, session: null, usage: null,
+    updatedAt: NOW,
+  }, null, 2)}\n`);
+  return { homedirFn: () => home };
+}
+
 /** The exact chain approve-push writes: subject -> action -> intent -> detached proof. */
 function approvalRecord({
   key, threatModel, candidate = { commit: COMMIT, tree: TREE },
@@ -135,15 +161,35 @@ try {
   });
 
   // PPA2 -- trust-on-first-use (PO decision, 2026-08-29; backlog:
-  // 2026-08-28-a-v1-trust-anchor-makes-the-signature-push-route-functionless.md). A policy
-  // with genuinely no trust anchor recorded no longer means "this route is unavailable
-  // forever" -- the first verifying signature is accepted (same as the v3 any-key posture)
-  // AND the verifying key is written back as a v3 trust anchor, so later calls are pinned.
-  check("PPA2 a first use against a policy without any trust anchor authorizes and pins the verifying key", () => {
+  // 2026-08-28-a-v1-trust-anchor-makes-the-signature-push-route-functionless.md), NARROWED
+  // the same day (NVA-CF-TOFUFIX, "TOFU-Fix" -> "A: Provenienz verlangen"): a policy with
+  // genuinely no trust anchor recorded no longer accepts+pins ANY well-formed key -- only a
+  // key that resolves to THIS machine's own registered operator key
+  // (`resolveLocalOperatorKeyAnchor`, `lib/machine-plane.mjs`). A throwaway key with no
+  // relationship to any machine the PO operates -- the exact shape a self-fabricated proof
+  // or a nested repository's own committed key takes (SIG-11/PG12s13/PG12s14) -- is refused
+  // outright, never pinned.
+  check("PPA2 a first use signed by a key with no local-machine provenance is refused, not pinned", () => {
     const key = keypair();
     const { root, threatModel } = fixture({ anchor: null });
     const record = approvalRecord({ key, threatModel });
     const result = call(root, stateFor(record));
+    assert.equal(result.authorized, false);
+    assert.equal(result.code, "PUSH-PROOF-TRUST-ANCHOR-MISSING");
+    const written = JSON.parse(readFileSync(join(root, "project", "critical-human-proof.json"), "utf8"));
+    assert.equal(written.schema, "pipeline.critical-human-proof-policy.v1", "an unauthorized signer must never be written back as a trust anchor");
+    assert.ok(!Object.hasOwn(written, "trustAnchor"), "no anchor is pinned when provenance was never established");
+  });
+
+  // PPA2B -- the real happy path this narrowing exists to keep working: a key that DOES
+  // resolve to this machine's own registered operator key still authorizes and pins on
+  // first use, exactly as PPA2 asserted before the narrowing.
+  check("PPA2B a first use signed by the machine's own resolvable operator key authorizes and pins it", () => {
+    const key = keypair();
+    const { root, threatModel } = fixture({ anchor: null });
+    const machinePlaneDeps = machinePlaneFixture(key);
+    const record = approvalRecord({ key, threatModel });
+    const result = call(root, stateFor(record), { machinePlaneDeps });
     assert.equal(result.code, "PUSH-PROOF-VERIFIED");
     assert.equal(result.authorized, true);
     const written = JSON.parse(readFileSync(join(root, "project", "critical-human-proof.json"), "utf8"));
@@ -155,14 +201,17 @@ try {
 
   // PPA2A -- the pin actually restricts: once the first call has recorded a key, a second,
   // genuinely different key is refused rather than being accepted under the same open
-  // posture PPA2 relied on for the first call.
+  // posture PPA2B relied on for the first call. The second key needs no local provenance of
+  // its own to demonstrate this -- membership against the now-populated set is what refuses
+  // it, the same TRUST-MISMATCH path PPA3/PPA23 already exercise, independent of this gate.
   check("PPA2A trust-on-first-use pins: a second call under a different key is refused after the first pins", () => {
     const first = keypair();
     const second = keypair();
     const { root, threatModel } = fixture({ anchor: null });
-    const firstResult = call(root, stateFor(approvalRecord({ key: first, threatModel })));
+    const machinePlaneDeps = machinePlaneFixture(first);
+    const firstResult = call(root, stateFor(approvalRecord({ key: first, threatModel })), { machinePlaneDeps });
     assert.equal(firstResult.authorized, true);
-    const secondResult = call(root, stateFor(approvalRecord({ key: second, threatModel })));
+    const secondResult = call(root, stateFor(approvalRecord({ key: second, threatModel })), { machinePlaneDeps });
     assert.equal(secondResult.authorized, false);
     assert.equal(secondResult.code, "PUSH-PROOF-TRUST-MISMATCH");
   });
@@ -545,12 +594,26 @@ try {
     assert.equal(callDeploy(root, deployState([deployRecord({ key })]), { now: "2026-08-08T00:00:00.000Z" }).code, "DEPLOY-PROOF-EXPIRED");
   });
 
-  // DPA10 -- trust-on-first-use, mirroring PPA2 on the release route: no anchor at all
-  // means the first verifying deploy proof authorizes and pins the verifying key.
-  check("DPA10 a first deploy against a policy without any trust anchor authorizes and pins the verifying key", () => {
+  // DPA10 -- NARROWED, mirroring PPA2 on the release route: no anchor at all no longer
+  // means "any verifying deploy proof authorizes and pins" -- only a key resolving to this
+  // machine's own registered operator key does.
+  check("DPA10 a first deploy signed by a key with no local-machine provenance is refused, not pinned", () => {
     const key = keypair();
     const { root } = fixture({ anchor: null });
     const result = callDeploy(root, deployState([deployRecord({ key })]));
+    assert.equal(result.authorized, false);
+    assert.equal(result.code, "DEPLOY-PROOF-TRUST-ANCHOR-MISSING");
+    const written = JSON.parse(readFileSync(join(root, "project", "critical-human-proof.json"), "utf8"));
+    assert.equal(written.schema, "pipeline.critical-human-proof-policy.v1", "an unauthorized signer must never be written back as a trust anchor");
+  });
+
+  // DPA10B -- the real happy path, mirroring PPA2B on the release route: the machine's own
+  // resolvable operator key still authorizes and pins a first deploy.
+  check("DPA10B a first deploy signed by the machine's own resolvable operator key authorizes and pins it", () => {
+    const key = keypair();
+    const { root } = fixture({ anchor: null });
+    const machinePlaneDeps = machinePlaneFixture(key);
+    const result = callDeploy(root, deployState([deployRecord({ key })]), { machinePlaneDeps });
     assert.equal(result.code, "DEPLOY-PROOF-VERIFIED");
     assert.equal(result.authorized, true);
     const written = JSON.parse(readFileSync(join(root, "project", "critical-human-proof.json"), "utf8"));
@@ -564,9 +627,10 @@ try {
     const first = keypair();
     const second = keypair();
     const { root } = fixture({ anchor: null });
-    const firstResult = callDeploy(root, deployState([deployRecord({ key: first })]));
+    const machinePlaneDeps = machinePlaneFixture(first);
+    const firstResult = callDeploy(root, deployState([deployRecord({ key: first })]), { machinePlaneDeps });
     assert.equal(firstResult.authorized, true);
-    const secondResult = callDeploy(root, deployState([deployRecord({ key: second })]));
+    const secondResult = callDeploy(root, deployState([deployRecord({ key: second })]), { machinePlaneDeps });
     assert.equal(secondResult.authorized, false);
     assert.equal(secondResult.code, "DEPLOY-PROOF-TRUST-MISMATCH");
   });
@@ -583,11 +647,14 @@ try {
   // DPA12 -- the two routes share one policy file: a key pinned by a push authorization
   // also governs the deploy route, so a different key is refused there too. This is the
   // design decision that trust-on-first-use is one shared mechanism, not a per-kind one.
+  // The provenance gate only matters for the FIRST (anchor-less) call that does the
+  // pinning; once pinned, membership governs regardless of the attacker key's provenance.
   check("DPA12 a key pinned by the push route also governs the deploy route (shared policy file)", () => {
     const pushed = keypair();
     const attacker = keypair();
     const { root, threatModel } = fixture({ anchor: null });
-    const pushResult = call(root, stateFor(approvalRecord({ key: pushed, threatModel })));
+    const machinePlaneDeps = machinePlaneFixture(pushed);
+    const pushResult = call(root, stateFor(approvalRecord({ key: pushed, threatModel })), { machinePlaneDeps });
     assert.equal(pushResult.authorized, true);
     const deployResult = callDeploy(root, deployState([deployRecord({ key: attacker })]));
     assert.equal(deployResult.authorized, false);
