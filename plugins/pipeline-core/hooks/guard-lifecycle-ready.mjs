@@ -31,10 +31,14 @@ import {
   inspectProjectOnboardingV3,
   PO_AUTHORITY_REBIND_UNAVAILABLE_DIAGNOSTICS,
 } from "../lib/project-onboarding-v3.mjs";
-// NVA-GF-COPYSAFE: sourced from the shared renderer module rather than
-// project-onboarding-v3.mjs directly -- same function (re-exported there,
-// unchanged), so this file's bounded-rendering output stays byte-identical.
-import { boundedOpaqueCopyCommand } from "../lib/copy-safe-command.mjs";
+// NVA-GF-COPYSAFE/NVA-W12-COPYSAFE: sourced from the shared renderer module
+// rather than project-onboarding-v3.mjs directly -- boundedOpaqueCopyCommand
+// is the same function (re-exported there, unchanged), so this file's
+// bounded-rendering output stays byte-identical. boundedCopySafeCommand/
+// placeholder build the flat per-step command lines below, replacing the
+// hand-assembled `${process.execPath} ${JSON.stringify(script)} ...`
+// templates the backlog item measured as one of the inconsistent emitters.
+import { boundedCopySafeCommand, boundedOpaqueCopyCommand, placeholder } from "../lib/copy-safe-command.mjs";
 import { automatedLifecycleArgvCommands, MUTATING_ONBOARDING_ARGV_SHAPES } from "../scripts/project-onboarding-v3.mjs";
 import { isBootstrapBindingStagingAuthoringWrite } from "../lib/onboarding-staging-authoring.mjs";
 import { loadRuntimeProjectionV3OwnedKeys } from "../lib/runtime-projection-v3.mjs";
@@ -625,44 +629,79 @@ function humanOverrideRoute(code, reason, subject, root, toolName, toolInput, de
       const planned = recordFn({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName, toolInput, denials });
       if (planned.status === "planned") {
         const script = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+        // NVA-W12-COPYSAFE: every ceremony command line built through the shared
+        // renderer instead of a hand-assembled `${JSON.stringify(...)}` template
+        // (the exact "hand-assembled from prose" failure mode the backlog item
+        // names). A human fill-in slot like "<plan-sha256>" passes through
+        // placeholder() verbatim -- never shellWord()-quoted like a literal
+        // value, which is what the backlog item's mode targets. script/root are
+        // ALSO passed through placeholder() here, but pre-rendered with
+        // JSON.stringify() -- the exact quoting this denial already used before
+        // this change (pinned by this file's own existing tests) -- rather than
+        // shellWord()'s conditional quoting, which would drop the surrounding
+        // quotes for an already-safe path and change this denial's exact text
+        // for no reason the backlog item asked for. request-sha256 is the one
+        // real value that goes through ordinary shellWord() quoting.
+        const ceremonyCommand = (subcommand, ...extraArgv) =>
+          boundedCopySafeCommand({
+            executable: process.execPath,
+            argv: [
+              placeholder(JSON.stringify(script)), subcommand, "--repo", placeholder(JSON.stringify(root)),
+              "--request-sha256", planned.requestSha256, ...extraArgv,
+            ],
+          }).command;
+        const planCommand = ceremonyCommand("plan");
+        const prepareAuthorizationChat = ceremonyCommand(
+          "prepare-authorization", "--plan-sha256", placeholder("<plan-sha256-from-plan>"), "--reason", placeholder('"<human-reason>"'),
+        );
+        const authorizeChat = ceremonyCommand(
+          "authorize", "--plan-sha256", placeholder("<plan-sha256>"), "--selection-sha256", placeholder("<selection-sha256>"),
+          "--reason", placeholder('"<human-reason>"'), "--reason-sha256", placeholder("<reason-sha256>"), "--activate",
+        );
+        const prepareAuthorizationSignature = ceremonyCommand(
+          "prepare-authorization", "--plan-sha256", placeholder("<plan-sha256-from-plan>"), "--reason", placeholder('"<fixed HGO_SIGNATURE_REASON text>"'),
+        );
+        const emitSignatureDigest = ceremonyCommand("emit-signature-digest", "--plan-sha256", placeholder("<plan-sha256>"));
+        const authorizeBySignature = ceremonyCommand(
+          "authorize-by-signature", "--plan-sha256", placeholder("<plan-sha256>"), "--proof", placeholder("<external-proof.json>"),
+        );
         // ADR-0059 Decision 4: name the exact next command for the CURRENTLY CONFIGURED
         // mode -- mirrors guard-testpath.mjs's own continuation exactly in shape.
         const continuation = approvalMode === "chat"
           ? [
             `Then (the human confirms in-session; this is attribution, not proof):`,
-            `${process.execPath} ${JSON.stringify(script)} prepare-authorization --repo ${JSON.stringify(root)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256-from-plan> --reason "<human-reason>"`,
-            `${process.execPath} ${JSON.stringify(script)} authorize --repo ${JSON.stringify(root)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256> --selection-sha256 <selection-sha256> --reason "<human-reason>" --reason-sha256 <reason-sha256> --activate`,
+            prepareAuthorizationChat,
+            authorizeChat,
           ].join("\n")
           : [
             `Then, in this session (pure digest computation against data already in the ` +
               `repository -- neither step needs the external key, ADR-0059 Decision 1):`,
-            `${process.execPath} ${JSON.stringify(script)} prepare-authorization --repo ${JSON.stringify(root)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256-from-plan> --reason "<fixed HGO_SIGNATURE_REASON text>"`,
-            `${process.execPath} ${JSON.stringify(script)} emit-signature-digest --repo ${JSON.stringify(root)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256>`,
+            prepareAuthorizationSignature,
+            emitSignatureDigest,
             `Then, outside this session (only the signature itself needs the external Ed25519 ` +
               `key; presence of a valid, correctly-bound signature IS the authorization -- ` +
               `there is no in-session activate step for this mode):`,
-            `${process.execPath} ${JSON.stringify(script)} authorize-by-signature --repo ${JSON.stringify(root)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256> --proof <external-proof.json>`,
+            authorizeBySignature,
           ].join("\n");
         // NVA-W4-01B: the same steps rendered again, bounded, appended AFTER the flat
         // chain above -- see boundedCeremonyRenderingBlock()'s own header.
-        const planCommand = `${process.execPath} ${JSON.stringify(script)} plan --repo ${JSON.stringify(root)} --request-sha256 ${planned.requestSha256}`;
         const ceremonySteps = approvalMode === "chat"
           ? [
             { label: "plan", command: planCommand },
-            { label: "prepare-authorization", command: `${process.execPath} ${JSON.stringify(script)} prepare-authorization --repo ${JSON.stringify(root)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256-from-plan> --reason "<human-reason>"` },
-            { label: "authorize", command: `${process.execPath} ${JSON.stringify(script)} authorize --repo ${JSON.stringify(root)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256> --selection-sha256 <selection-sha256> --reason "<human-reason>" --reason-sha256 <reason-sha256> --activate` },
+            { label: "prepare-authorization", command: prepareAuthorizationChat },
+            { label: "authorize", command: authorizeChat },
           ]
           : [
             { label: "plan", command: planCommand },
-            { label: "prepare-authorization", command: `${process.execPath} ${JSON.stringify(script)} prepare-authorization --repo ${JSON.stringify(root)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256-from-plan> --reason "<fixed HGO_SIGNATURE_REASON text>"` },
-            { label: "emit-signature-digest", command: `${process.execPath} ${JSON.stringify(script)} emit-signature-digest --repo ${JSON.stringify(root)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256>` },
-            { label: "authorize-by-signature", command: `${process.execPath} ${JSON.stringify(script)} authorize-by-signature --repo ${JSON.stringify(root)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256> --proof <external-proof.json>` },
+            { label: "prepare-authorization", command: prepareAuthorizationSignature },
+            { label: "emit-signature-digest", command: emitSignatureDigest },
+            { label: "authorize-by-signature", command: authorizeBySignature },
           ];
         const boundedBlock = boundedCeremonyRenderingBlock(ceremonySteps);
         overrideGuidance = [
           "",
           `Human override available for this exact ${subject} (one use; audited; the human confirms):`,
-          `${process.execPath} ${JSON.stringify(script)} plan --repo ${JSON.stringify(root)} --request-sha256 ${planned.requestSha256}`,
+          planCommand,
           continuation,
           "",
           ...(boundedBlock ? [boundedBlock, ""] : []),
