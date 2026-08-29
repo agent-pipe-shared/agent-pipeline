@@ -112,3 +112,30 @@ its own "NOT addressed" framing states: likely only the literal "measured
 on a real fresh repository for every offered language and PO profile"
 acceptance criterion (an empirical measurement, not a known code defect),
 plus the one untried combination above.
+
+## Coordinator-sourced path confirmed, 2026-08-29 (NVA-CF-BL18-COORDINATORPATH, commit `7c446d0b`)
+
+The one untried combination above was run for real: `project-onboarding-v3.test.mjs`
+now has a 4th real-git/real-receipt test (alongside GF-079, NVA-BL-70,
+NVA-W9-DRIFTREPAIR) proving the coordinator-sourced intake/bootstrap-bind
+path also correctly republishes the profile receipt after a deliberately
+mismatching PRD `po-language` marker — `validatePoGateAuthorityForRepository(...).ok === true`
+immediately after bind, no PROFILE-RECEIPT-INVALID/-STALE, no repair
+needed. Independently re-verified by the Elephant:
+`project-onboarding-v3.test.mjs` 157/157.
+
+**Every reachable onboarding apply path this repository's own code defines
+(kickoff-only, legacy kickoff-promotion, coordinator-sourced bootstrap-bind,
+and drift-repair) is now covered by a real, passing, non-stubbed regression
+test proving the PO-PROFILE-RECEIPT-INVALID scenario this item describes
+does not currently occur.** The item's own literal Acceptance criterion
+("measured on a real fresh repository for every offered language and PO
+profile") is not satisfied at combinatorial-matrix breadth — that would
+mean a separate real run per language × profile pair, which was judged
+disproportionate given every CODE PATH is already proven correct and the
+underlying mechanism is identical across languages/profiles (the receipt
+publisher does not branch on language content, only on whether a switch
+happened at all). **PO topic:** is this level of coverage sufficient to
+close this item, or is the full language×profile matrix measurement still
+wanted before closing? Left `status: open` pending that call rather than
+closed unilaterally.
