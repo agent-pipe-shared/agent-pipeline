@@ -122,3 +122,28 @@ Remaining for full closure: an audit confirming no OTHER PO-facing command
 emitter in the repository still hand-assembles a command string outside this
 renderer (this item's "every emitter" acceptance criterion) was not performed
 by this dispatch.
+
+## Progress note (2026-08-29, NVA-CF-BL19-COPYSAFEADOPT-REMAINDER)
+
+`antigravity-pretool-guard.mjs` landed (commit `4d704e79`), mirroring
+`guard-gate-strength.mjs` exactly — full 44-test suite passes unmodified.
+
+`codex-pretool-guard.mjs` was attempted and **reverted after a genuine,
+verified conflict**, not a budget/skill failure: `boundedCopySafeCommand()`'s
+`placeholder(JSON.stringify(value))` idiom renders a shellWord-safe path
+bare/unquoted (by `shellWord()`'s own design), but `codex-pretool-guard.test.mjs`
+hard-pins the literal double-quoted `--flag "<path>"` form in three
+assertions. There is no construction through the shared renderer that
+reproduces forced double-quoting for such a path — this is a property of
+`copy-safe-command.mjs` itself, not a mistake in the adoption attempt.
+**This needs a PO/design decision before it can close:** either (a) relax
+`codex-pretool-guard.test.mjs`'s exact-quoting assertions to accept the
+shellWord-safe bare rendering (a real behavior change needing sign-off), or
+(b) extend `copy-safe-command.mjs` with an opt-in forced-quoting mode for a
+caller that needs it, without weakening the `placeholder()`/`isTemplateSlot()`
+security property (NVA-CF-COPYSAFE) every other caller now depends on.
+
+Also surfaced: `plugins/pipeline-core/hooks/human-guard-override.mjs` is a
+THIRD direct importer of `boundedOpaqueCopyCommand`, not previously named by
+this item's own investigation — noted here for a future audit pass, not yet
+actioned.

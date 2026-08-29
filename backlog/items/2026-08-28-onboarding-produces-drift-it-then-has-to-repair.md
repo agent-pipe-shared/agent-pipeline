@@ -78,3 +78,37 @@ pending that half and a real fresh-repository measurement across every
 offered language/profile (this session's verification was suite-level, not
 the end-to-end "measured on a real fresh repository" the acceptance
 criteria ask for).
+
+## Re-investigation, 2026-08-29 (NVA-CF-BL18-PROFILEDRIFTTEST-RETRY) — the paragraph above is likely stale
+
+A dispatch tasked with adding a regression test for the still-open
+PO-PROFILE-RECEIPT-INVALID scenario could not reproduce it in current code,
+and traced why: `po-gate-authority.mjs`'s `validatePoGateProfileSnapshot`
+only raises `PO-PROFILE-RECEIPT-INVALID` when the receipt is missing/
+unsafe/malformed; a language-content mismatch alone raises the distinct
+`PO-PROFILE-RECEIPT-STALE`. Every reachable apply path traced (kickoff-only,
+legacy kickoff-promotion, coordinator-sourced bootstrap-bind) writes the
+profile receipt AFTER the language correction, via the real (non-injectable)
+`publishPoGateProfileReceipt`, in every one of the three flows checked.
+Three EXISTING passing tests in `project-onboarding-v3.test.mjs` already
+cover this end to end with real git and the real receipt publisher (not
+this item's own NVA-W9-DRIFTREPAIR track, which only covers `projection-
+drift`): line ~3808 (GF-079, kickoff language switch), line ~3857
+(NVA-BL-70, promotion language switch), line ~3920 (NVA-W9-DRIFTREPAIR
+itself). `git log --oneline --grep="PO-PROFILE-RECEIPT-INVALID"` shows the
+receipt-ordering bug class was already fixed by earlier commits (`0cadfd4d`/
+`8224d575`) predating this item's own 2026-08-29 progress note above.
+
+**So the paragraph directly above this one may itself be the stale claim**
+per this project's own "re-verify an inherited still-open claim" discipline
+— re-verified by the Elephant against the cited test/commit evidence, not
+just taken from the dispatch's report. One combination remains genuinely
+untried (the coordinator-sourced intake/bootstrap-bind path with a
+deliberately mismatching PRD `po-language` marker) and was not reached
+within that dispatch's budget; given it shares the identical, already-proven
+`correctPromotedLanguage` call, it is expected but not confirmed to also
+pass. Left `status: open` — the item's remaining live gap is narrower than
+its own "NOT addressed" framing states: likely only the literal "measured
+on a real fresh repository for every offered language and PO profile"
+acceptance criterion (an empirical measurement, not a known code defect),
+plus the one untried combination above.
