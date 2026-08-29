@@ -30,19 +30,80 @@ non-ready statuses including `restart-required` itself). Its presence in that
 array means the gate treats it as a controlling non-ready state — one that
 blocks a mutating entrypoint the same way `restart-required` does.
 
-**What I could NOT locate in this dispatch's budget:** the actual function in
-`plugins/pipeline-core/lib/project-onboarding-v3.mjs` (or a related
-observation module) that COMPUTES `projection-drift` — i.e., what comparison
-or staleness check produces this specific status, and specifically whether
-its computation is triggered by, or coupled to, the design→implementation
-phase-transition code path the PO names as the likely driver. This item
-records the status's existence and its treatment as a restart-requiring
-non-ready state, confirmed in code; it does NOT confirm the PO's causal
-hypothesis about the phase transition being the trigger — that connection is
-Codex's/the PO's own observation, not independently re-derived here, and is
-exactly the case the triage's "What this triage does NOT claim" section
-flags: this rests on a runner's own report, not a controlled reproduction in
-this repository.
+**UPDATE (NVA-R40-PROJDRIFT, 2026-08-29, follow-up dispatch):** the producer
+is now located, and the phase-transition hypothesis is REFUTED by a
+controlled reproduction in this repository.
+
+- **Producer, exact citation:** `plugins/pipeline-core/lib/project-onboarding-v3.mjs`,
+  `legacyInspection()`-driven `legacy.status === "partial"` handler (starting
+  ~line 3864), specifically the `runtimePlan.status === "ready"` branch —
+  status assigned at **line 3985** (`status: initialize ?
+  "runtime-initialization-required" : "projection-drift"`), the `runtime`
+  object built at **line 3960**, and the diagnostic emitted at **line 3993**
+  (`"projection_drift", "generated runtime bytes differ from the V3
+  projection"`). It is reached when `planRunnerProfileMigrationV3()`
+  (`runner-profile-migration-v3.mjs`) finds every V3 runtime-projection
+  target (`.claude/settings.json`, `.claude/pipeline.json`,
+  `.claude/pipeline.yaml`, `.codex/config.toml`, `.codex/agents/*.toml` —
+  the full list in
+  `plugins/pipeline-core/config/runtime-projection-v3-owned-keys.json`)
+  already present on disk (nothing `missing`), but with bytes that no longer
+  match a fresh render from the CURRENT `pipeline.user.yaml`.
+- **Reproduction method:** a real `mkdtemp` temp repo, driven through the
+  REAL code path — `initializeRestartRequiredRoot`/`clearRuntimeBarrier` →
+  `applyProjectOnboardingKickoffV4` → `applyProjectOnboardingKickoffPromotionV4`
+  → `pipeline-state.mjs submit-plan/present-plan/approve-plan/set-phase`,
+  runner `"codex"` throughout — never a hand-constructed state fixture. Ported
+  as permanent regression coverage:
+  `plugins/pipeline-core/lib/project-onboarding-v3.test.mjs`, test
+  `"NVA-R40-PROJDRIFT: set-phase --phase implementation does not itself cause
+  projection-drift; an untracked pipeline.user.yaml edit does, at the very
+  next inspection"` (153 passed, 0 failed in the full suite; 152 baseline + 1
+  new).
+- **Finding 1 (REFUTES the literal hypothesis):** a CLEAN
+  `set-phase --phase implementation` transition, via the real code path,
+  never produces `projection-drift`. Status stays `"ready"` throughout —
+  before, during, and immediately after the transition.
+- **Finding 2 (the actual mechanism):** an untracked edit to
+  `pipeline.user.yaml` (the V3 runtime-projection source) made WITHOUT going
+  through the regeneration/repair tool reliably reproduces the exact
+  reported status and diagnostic (`"generated runtime bytes differ from the
+  V3 projection"`) at the very next inspection — whether the edit happens
+  before or after `set-phase`. This is the best available explanation for
+  the "immediately after the transition" timing Codex/the PO observed: `set-
+  phase`'s own successful transition is the point where the runner next asks
+  "what now?" (its `nextAction` proposal is exactly what a runner calls
+  next), so it is the first inspection to SURFACE drift that was already
+  present from an earlier, unrelated edit to `pipeline.user.yaml` sometime
+  during design — not something the transition itself caused. What that
+  earlier edit specifically was in the real Codex/WSL session is not
+  determinable from this reproduction; the mechanism that WOULD explain the
+  reported timing is confirmed to exist and behave exactly as described.
+- **Finding 3 (recovery already exists, and its restart requirement is
+  structural for Codex, not a code defect):** the documented narrower repair
+  (`project-onboarding-v3.mjs plan-repair` → `apply-repair`, established by
+  the closed sibling item
+  `2026-08-09-kickoff-design-names-the-wrong-repair-for-projection-drift.md`)
+  is real and already ships — but for a runner requiring native runtime
+  readback (Codex), `apply-repair` on a `projection-drift` state still
+  resolves to `restart-required`, not `ready` (reproduced directly). Codex
+  has no way to re-read its own runtime target bytes
+  (`.codex/config.toml`/`.codex/agents/*.toml`) without a fresh process
+  (ADR-0057 decision 2a) — a narrower, non-restart recovery is not available
+  at this layer for Codex without changing that structural constraint, which
+  is out of this item's/this dispatch's scope (a broader redesign, not a
+  narrow mechanism-specific fix).
+
+**No code fix applied.** Per this item's own Acceptance criteria, the
+"causal link NOT confirmed" branch applies: the reported hypothesis (the
+design→implementation transition itself is the trigger) does not hold up
+under reproduction. The DoD is satisfied by the reproduction test (permanent
+coverage) plus this update. A residual, narrower question — "what specific
+tool or step in a design-phase session edits `pipeline.user.yaml` without
+regenerating the runtime projection, and should that be made auto-
+regenerating?" — is a new, distinct question outside this item's scope; not
+opened as a new backlog item here since no second source of evidence (beyond
+this reproduction's plausibility) currently supports it.
 
 ## Proposal
 
