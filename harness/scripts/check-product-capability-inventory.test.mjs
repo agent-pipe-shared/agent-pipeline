@@ -2,10 +2,11 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { discoverSurfaces, validateInventory } from "./check-product-capability-inventory.mjs";
+import { checkEntryPointReachability, discoverEntryPoints, discoverSurfaces, validateInventory } from "./check-product-capability-inventory.mjs";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const inventoryPath = join(repoRoot, "docs", "product-capability-inventory.json");
@@ -203,6 +204,93 @@ check("HAW-A07 rejects an open-ended test Git adapter", () => {
   const result = validated(inventory(), "inventory", { revision() {} });
   assert.equal(result.ok, false);
   assert.match(result.findings.join("\n"), /test Git operations must have exactly revision and isAncestor functions/);
+});
+
+// ---------------------------------------------------------------------------
+// NVA-W8-VERIFYREG2: entry-point reachability (named/admitted).
+
+/**
+ * A consumer-shaped root -- deliberately NOT this repo's own self-checkout, matching the
+ * acceptance criterion the backlog item names ("a consumer-shaped fixture is used wherever
+ * the entry point behaves differently there"): the security-gate instance this item cites
+ * was invisible precisely because everything was measured inside this checkout. `files` is a
+ * map of repo-relative path -> file contents; only the given files exist under the fixture.
+ */
+function withFixtureRoot(files, fn) {
+  const root = mkdtempSync(join(tmpdir(), "haw-entrypoint-fixture-"));
+  try {
+    for (const [path, contents] of Object.entries(files)) {
+      const full = join(root, path);
+      mkdirSync(dirname(full), { recursive: true });
+      writeFileSync(full, contents, "utf8");
+    }
+    fn(root);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+check("HAW-B00 discovers this repository's real entry points, including the bootstrap driver", () => {
+  const found = discoverEntryPoints(repoRoot);
+  assert.ok(Array.isArray(found) && found.length > 0);
+  assert.ok(found.some((entryPoint) => entryPoint.path === "plugins/pipeline-core/scripts/onboarding-init.mjs"));
+});
+
+check("HAW-B01 this repository's own entry points are reachable: never named-but-refused, never admitted-but-unnamed", () => {
+  const result = checkEntryPointReachability({ root: repoRoot });
+  assert.deepEqual(result.findings, []);
+  assert.equal(result.ok, true);
+});
+
+check("HAW-B02 a consumer-shaped root with no plugins/pipeline-core tree degrades to zero findings, never a crash", () => {
+  withFixtureRoot({ "README.md": "consumer project, no plugin source tree\n" }, (root) => {
+    const result = checkEntryPointReachability({ root });
+    assert.deepEqual(result, { ok: true, findings: [] });
+    assert.deepEqual(discoverEntryPoints(root), []);
+  });
+});
+
+check("HAW-B03 a driver the bootstrap docs name but the readiness guard never admits fails as named-but-refused", () => {
+  withFixtureRoot({
+    "plugins/pipeline-core/scripts/example-driver.mjs": "#!/usr/bin/env node\n// Usage: node plugins/pipeline-core/scripts/example-driver.mjs --root <dir>\n",
+    "plugins/pipeline-core/skills/pipeline-start/SKILL.md": "Run `example-driver.mjs` to walk the chain.\n",
+    "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs": "// this guard has never heard of the driver above\n",
+  }, (root) => {
+    const result = checkEntryPointReachability({ root });
+    assert.equal(result.ok, false);
+    assert.match(result.findings.join("\n"), /named by the bootstrap docs but not admitted/);
+  });
+});
+
+check("HAW-B04 a script the readiness guard admits but no skill or guard names fails as admitted-but-unnamed", () => {
+  withFixtureRoot({
+    "plugins/pipeline-core/scripts/example-driver.mjs": "#!/usr/bin/env node\n// Usage: node plugins/pipeline-core/scripts/example-driver.mjs --root <dir>\n",
+    "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs": "if (script === EXAMPLE_DRIVER) return sanctioned(args, root); // example-driver\n",
+  }, (root) => {
+    const result = checkEntryPointReachability({ root });
+    assert.equal(result.ok, false);
+    assert.match(result.findings.join("\n"), /admitted by .*guard-lifecycle-ready\.mjs but named by no skill or guard/);
+  });
+});
+
+check("HAW-B05 named in the bootstrap docs AND admitted by the guard passes -- removing either makes it fail (AC3)", () => {
+  const files = {
+    "plugins/pipeline-core/scripts/example-driver.mjs": "#!/usr/bin/env node\n// Usage: node plugins/pipeline-core/scripts/example-driver.mjs --root <dir>\n",
+    "plugins/pipeline-core/skills/pipeline-start/SKILL.md": "Run `example-driver.mjs` to walk the chain.\n",
+    "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs": "// admits example-driver explicitly\n",
+  };
+  withFixtureRoot(files, (root) => {
+    assert.deepEqual(checkEntryPointReachability({ root }), { ok: true, findings: [] });
+  });
+  // Removing the driver's admission (the guard no longer mentions it) makes it fail.
+  withFixtureRoot({ ...files, "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs": "// unrelated\n" }, (root) => {
+    assert.equal(checkEntryPointReachability({ root }).ok, false);
+  });
+  // Removing the bootstrap pointer (the skill no longer names it) makes it fail too, since an
+  // admitted-but-guard-known script with no skill naming it is still undiscoverable.
+  withFixtureRoot({ ...files, "plugins/pipeline-core/skills/pipeline-start/SKILL.md": "unrelated skill body\n" }, (root) => {
+    assert.equal(checkEntryPointReachability({ root }).ok, false);
+  });
 });
 
 process.stdout.write(`1..${passed}\n# pass ${passed}\n`);
