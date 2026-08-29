@@ -552,6 +552,21 @@ export function main(args = process.argv.slice(2), {
   if (options.error) { write(`${usage()}\n${options.error}\n`); return 2; }
   if (options.runner === undefined) options.runner = resolveOnboardingCliRunner(env, options.root, deps);
 
+  // NVA-W3-ONBOARDENV: the seam an in-process caller of this file's own exported
+  // functions already has (`deps: { homedir: () => ... }`, mirroring
+  // lib/machine-plane.mjs's `homedirFn` injection) extended across the process boundary
+  // for a caller that can only reach this CLI as a spawned subprocess
+  // (onboarding-init.mjs `driveOnboardingInit`'s `env` seam). Opt-in and additive only:
+  // an in-process caller that already supplies its own `deps` is never overridden here,
+  // and a caller that supplies neither `deps` nor this environment variable gets exactly
+  // the previous behaviour (the library's own default `os.homedir()`/real `$HOME`).
+  if (deps === undefined) {
+    const homedirOverride = env.PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE;
+    if (typeof homedirOverride === "string" && homedirOverride.length > 0) {
+      deps = { homedir: () => homedirOverride };
+    }
+  }
+
   // AGY-CHATADAPTER-2: an agent's own tool-calling harness has no TTY on file
   // descriptor 0 and can never complete this step, no matter what value it
   // already knows or pipes into stdin -- only a human running this EXACT

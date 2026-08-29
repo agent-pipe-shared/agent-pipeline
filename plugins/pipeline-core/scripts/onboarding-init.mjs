@@ -157,8 +157,18 @@ function parseArgs(argv) {
  * process exited non-zero) is folded into a typed `ok: false` result the caller reports
  * rather than crashes on.
  */
-function runOnboardingStep({ executable, argv, run }) {
-  const result = run(executable, argv, { encoding: "utf8", shell: false, maxBuffer: 8 * 1024 * 1024 });
+function runOnboardingStep({ executable, argv, run, env = null }) {
+  const options = { encoding: "utf8", shell: false, maxBuffer: 8 * 1024 * 1024 };
+  // Opt-in only: omitting `env` (the default) leaves `options` exactly as before this
+  // seam existed, so a caller that never supplies one gets byte-identical behaviour --
+  // the child inherits the real process environment via spawnSync's own default, same as
+  // it always did. Supplying `env` is the seam a caller uses to override what the spawned
+  // `project-onboarding-v3.mjs` CLI resolves its homedir against (see that script's own
+  // `PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE` handling), extending across the process
+  // boundary the same injected-dependency pattern the in-process library callers already
+  // have (lib/machine-plane.mjs `homedirFn`).
+  if (env) options.env = env;
+  const result = run(executable, argv, options);
   if (result?.error) {
     return { ok: false, faultCode: "spawn-failed", exitCode: result.status ?? null, stderr: String(result.error?.message ?? "") };
   }
@@ -233,8 +243,18 @@ function extractPendingAsks(nextAction) {
  * { status, stdout, stderr, error }`) is the sole injection seam, so tests can either
  * spawn the real onboarding CLI against a real temporary directory, or supply a synthetic
  * responder to exercise the step-cap path without a genuinely non-converging real chain.
+ *
+ * `env`, when supplied, is threaded into every spawned step's own `options.env`
+ * (`runOnboardingStep`) -- a caller-supplied override the default `spawnSync` respects
+ * exactly like any other spawn option. Left `null` (the default), a step's options carry
+ * no `env` key at all, so the child inherits the real process environment exactly as
+ * before this parameter existed. The intended use is threading a fixture `HOME` (via
+ * `PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE`, honoured by `project-onboarding-v3.mjs`'s own
+ * `main()`) across the process boundary, so this driver's result does not depend on
+ * whatever machine-plane state happens to live under the real caller's `$HOME`
+ * (backlog: 2026-08-28-a-verify-gate-suite-reads-real-machine-state-through-a-subprocess).
  */
-export function driveOnboardingInit({ rootDir, runner = null, stepCap = DEFAULT_STEP_CAP, run = spawnSync } = {}) {
+export function driveOnboardingInit({ rootDir, runner = null, stepCap = DEFAULT_STEP_CAP, run = spawnSync, env = null } = {}) {
   const root = resolve(rootDir);
   const steps = [];
   let executable = "node";
@@ -251,7 +271,7 @@ export function driveOnboardingInit({ rootDir, runner = null, stepCap = DEFAULT_
   let executedSinceAnchor = false;
 
   for (let stepIndex = 0; stepIndex < stepCap; stepIndex += 1) {
-    const stepResult = runOnboardingStep({ executable, argv, run });
+    const stepResult = runOnboardingStep({ executable, argv, run, env });
     steps.push({
       executable,
       argv,
