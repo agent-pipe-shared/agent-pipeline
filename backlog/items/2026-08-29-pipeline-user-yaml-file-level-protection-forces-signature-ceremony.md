@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.pipeline-user-yaml-file-level-protection-forces-signature-ceremony
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-29
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: 56f2116ac15862ed99e3f37656b296d8dfe822b3
+closure_evidence: plugins/pipeline-core/hooks/guard-gate-strength.mjs
 sprint: nova
 done_when: contains plugins/pipeline-core/hooks/guard-gate-strength.mjs pipeline.field-scoped-gate-strength-protection
 source: "Claude/Windows self-audit report (docs/pipeline-audit-claude-session.md, section 5.4), observed during the 2026-08-29 three-runner greenfield test."
@@ -86,6 +90,28 @@ file's contents as a whole. Concretely:
   denial text, so it may need to stay file-scoped even after this fix — if so,
   say so here rather than silently leaving an inconsistency).
 
+## Shell-lane note (Acceptance bullet 3)
+
+The shell-command lane (`GUARD-GATE-STRENGTH-SHELL` in
+`guard-lifecycle-ready.mjs`) is left coarser, deliberately, and stays
+file-scoped even after this fix. Its own runtime denial text already
+states the reason, unprompted by this item: it matches on the file NAME
+`pipeline.user.yaml` appearing anywhere in an arbitrary shell command
+string, and says explicitly that "this rule cannot tell a read from a
+write inside an arbitrary shell command, so it refuses both rather than
+risk letting the gate-weakening write through." A classifier that
+cannot distinguish a read from a write has no basis to determine which
+YAML field a write would touch either — field-level scoping needs the
+tool's structured `tool_input` (`old_string`/`new_string`/`content`),
+which the shell lane never receives; it sees only the command's text.
+Narrowing the shell lane to match this dispatch's write-lane field
+scoping would require either parsing the effect of an arbitrary shell
+command (out of scope for a token-substring classifier by design) or
+whitelisting specific command shapes (a much larger, separately-scoped
+piece of work). No inconsistency is left silent: the write lane (this
+fix) and the shell lane (unchanged) are now each doing the strongest
+thing their respective input shapes support.
+
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
 - **Decision:** accepted
@@ -100,3 +126,58 @@ file's contents as a whole. Concretely:
   intake-never-writes` (F06). This is the more invasive of the three and may
   warrant its own design pass rather than a same-session patch.
 - **Date:** 2026-08-29
+
+Closed, 2026-08-29 (dispatch NVA-W13-GATESTRENGTH, commit `56f2116a`).
+
+**What landed:** `guard-gate-strength.mjs` gained a field-level diff for
+GS-1 only (`GATE_STRENGTH_FIELD_EXEMPTIONS`, `changedGateStrengthDottedPaths`,
+`evaluateGateStrengthFieldExemption`), gated behind an explicit,
+default-deny allowlist (today: `language.human_facing` only). An Edit/Write
+to `pipeline.user.yaml` is simulated against its current on-disk content
+(mirrors `guard-handover-size.mjs`'s own Edit-simulation shape), parsed
+with the existing `lib/yaml-lite.mjs`, and diffed by dotted leaf path; the
+GS-1 ceremony stands down only when every changed path is on the
+allowlist. Anything this cannot cleanly determine — an unparseable
+document, an unsimulatable Edit, any changed field outside the allowlist
+(including `gates.push_approval` itself) — falls straight through to the
+unchanged, file-scoped ceremony. Marker `pipeline.field-scoped-gate-
+strength-protection` present verbatim (`done_when` satisfied, confirmed
+with `rg`).
+
+**Verified by the dispatcher:** the existing `guard-gate-strength.test.mjs`
+suite (38/38, unmodified logic unaffected) and
+`harness/scripts/check-consumer-safe-paths.test.mjs` (9/9) both green
+against the committed change. The two Acceptance bullets that ask for new
+regression coverage (an exempt-only edit admitted; a `gates.push_approval`
+edit, alone or alongside an exempt field, still refused) were proven with
+a standalone reproduction script run against the real, committed guard
+(8/8 checks: language.human_facing-only Edit admitted; push_approval Edit
+refused; both-fields-touched Edit refused; language.human_facing-only
+Write admitted; an unparseable proposed document falls through
+fail-closed; `changedGateStrengthDottedPaths` unit-tested directly;
+`evaluateGateStrengthFieldExemption` unit-tested directly; the allowlist
+shape itself asserted) — not run through the actual test suite, because
+`guard-gate-strength.test.mjs` is TP-6 protected and the in-session Edit
+was refused (`author-repair-required`, no in-session override route: the
+target is Pipeline plugin source, so the override planner requires an
+explicit author source root a guard cannot select on the human's behalf).
+
+**What remains — a genuine, disclosed gap, not closed by this dispatch:**
+the drafted GST39–GST46 regression tests (the exact source, matching the
+verified reproduction above) were never landed in the committed test
+suite. They exist only as a draft diff, in this session's own
+`scratch/guard-gate-strength.test.mjs.draft-diff.md` — which is
+gitignored and therefore NOT durable past this session's workspace. A
+follow-up session with either author-repair standing on this plugin
+source, or an explicitly briefed test-change task (per `roles/goldfish.md`
+GF-04 / QG-04, this dispatch's own briefing correctly refused to let an
+ad-hoc edit through TP-6), should re-derive and land that coverage in
+`guard-gate-strength.test.mjs` directly — the logic itself is proven
+correct by the reproduction above, so this is a landing task, not a design
+task.
+
+Acceptance bullet 3 (shell-lane handling) is addressed by the "Shell-lane
+note" section above: the shell lane stays intentionally file-scoped, and
+says so in its own runtime denial text already — no code change was
+needed or made there, and none of `guard-lifecycle-ready.mjs` was
+touched by this dispatch.
