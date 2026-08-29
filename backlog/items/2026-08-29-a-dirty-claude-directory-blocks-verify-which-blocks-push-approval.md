@@ -80,3 +80,29 @@ answer with the actual project template in hand.
   tests yet) — both are "verify's mandatory-gate posture does not yet handle a
   brand-new greenfield project's actual starting state" instances.
 - **Date:** 2026-08-29
+
+## Progress, 2026-08-29 (dispatch NVA-W10-DIRTYCLAUDE, landed by the Elephant, commit `562ea6bc`)
+
+Located and fixed in THIS repository's own scaffolding (proposal 1/2):
+`PROJECT_IGNORE_SEED` (`plugins/pipeline-core/lib/project-onboarding-v3.mjs`)
+now includes six anchored `.claude/` session-scratch entries —
+`/.claude/worktrees/`, `/.claude/settings.local.json`, and four glob markers
+for usage/consent/model-identity files this Pipeline's own scripts write —
+named individually rather than a blanket `.claude/` ignore, so tracked
+project configuration (`.claude/settings.json`, `.claude/pipeline.json`,
+`.claude/pipeline.yaml`) stays tracked. Verified against a REAL git
+repository (not a fixture assertion): `git check-ignore` against each new
+path in `project-onboarding-v3.test.mjs`'s "onboarding seeds ignore rules
+for the paths it writes into" test, plus a check that tracked `.claude/`
+config is NOT swallowed.
+
+**Not yet closing.** Acceptance criterion 1's exact repro — run the real
+greenfield onboarding flow, then run `verify.mjs` itself immediately after
+with no other manual changes, and confirm it does not fail on `.claude/`
+tree-dirtiness — was not performed; verification stopped at the unit-test
+level (real `git check-ignore`, not a real `verify.mjs` invocation).
+Acceptance criterion 3 (naming verify's own cleanliness check with a
+file/line reference) also remains open — this fix addresses the ignore-rule
+side (what gets tracked), not the specific check inside `verify.mjs` or
+`push-prepare.mjs` that reads tree cleanliness, which was not traced this
+session.

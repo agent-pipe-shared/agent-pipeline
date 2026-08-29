@@ -47,3 +47,34 @@ holds.
 - A fresh onboarding, including a language change, completes with zero repair
   subcommand invocations.
 - Measured on a real fresh repository for every offered language and PO profile.
+
+## Progress, 2026-08-29 (dispatch NVA-W9-DRIFTREPAIR / NVA-W9-DRIFTREPAIR-FIX, landed by the Elephant, commit `562ea6bc`)
+
+**The "projection-drift" half is closed.** `correctSeededKickoffLanguage()`
+(`plugins/pipeline-core/lib/onboarding-language-correction.mjs`) now also
+regenerates the complete runtime projection from the corrected source in the
+same correction transaction, via `regenerateRuntimeProjection()`. A first
+attempt at this landed uncommitted but never actually fired on the kickoff
+path — `applyProjectOnboardingKickoffV4`'s own gate refused any
+`observed.status` other than `KICKOFF_PLAN_ADMITTED_STATUSES` or `"ready"`,
+including `"projection-drift"`, and returned early before the correction
+ever ran. Fixed by widening that one gate (apply-only) to also admit
+`"projection-drift"`, and by giving `v4Inspection`'s projection-drift branch
+a real `classifyOnboardingContinuity()` result instead of `emptyContinuity()`
+so the gate's own `continuity.status` check still controls admission
+correctly. New regression test: `project-onboarding-v3.test.mjs`, "a kickoff
+language switch that also finds a drifted runtime target repairs it
+atomically, without a separate plan-repair/apply-repair (NVA-W9-DRIFTREPAIR)"
+— proves a genuinely unrelated drifted runtime target (not the language
+marker itself) is repaired atomically within the same kickoff-apply call, no
+separate `plan-repair`/`apply-repair` needed. Verified:
+`project-onboarding-v3.test.mjs` 151/151, `onboarding-continuity.test.mjs`
+260/260.
+
+**The "PO-PROFILE-RECEIPT-INVALID" / profile-repair half is NOT addressed**
+by this work — the Direction's first bullet ("write the profile receipt
+after the language is known, not before") remains open. Status left `open`
+pending that half and a real fresh-repository measurement across every
+offered language/profile (this session's verification was suite-level, not
+the end-to-end "measured on a real fresh repository" the acceptance
+criteria ask for).
