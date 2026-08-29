@@ -16,7 +16,6 @@ import {
   resolveDeliveryBase,
   runVerifyTopologyCli,
 } from "./verify-topology-preflight.mjs";
-import { definitionInventoryRecord } from "../lib/ai-definition-inventory.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const candidate = "1".repeat(40);
@@ -238,10 +237,10 @@ check("generic topology implementation contains no productive runner resolution"
 // resolution and recording were unverified. This exercises it against a
 // real, tiny temporary git-repository fixture pointed at via the ALREADY
 // EXISTING `--root` flag (never a new flag or export added only for tests --
-// Forbidden), never the real repository. The fixture's own tiny definition
-// roots (empty of matching files) are self-consistent with a definitions
-// file generated from the SAME `definitionInventoryRecord` call this script
-// itself uses, so `VTP-DEFINITION-REQUALIFICATION-REQUIRED` never fires here.
+// Forbidden), never the real repository. (NVA-CITOPO-L1DEL: the definition-
+// inventory comparison this fixture used to satisfy was deleted from
+// verify-topology-preflight.mjs, so no stored inventory file is needed here
+// anymore.)
 function reviewerIdentityFixtureRoot() {
   const dir = mkdtempSync(path.join(tmpdir(), "vtp-cli-fixture-"));
   const env = { ...process.env, GIT_AUTHOR_NAME: "fixture", GIT_AUTHOR_EMAIL: "author@example.test", GIT_COMMITTER_NAME: "fixture", GIT_COMMITTER_EMAIL: "author@example.test" };
@@ -261,11 +260,6 @@ function reviewerIdentityFixtureRoot() {
     schema: "pipeline.product-capability-inventory.v3",
     sourceBaseline: { commit: baseCommit, tree: baseTree },
   }));
-  mkdirSync(path.join(dir, "plugins", "pipeline-core", "config"), { recursive: true });
-  writeFileSync(
-    path.join(dir, "plugins", "pipeline-core", "config", "ai-assisted-definition-inventory.json"),
-    JSON.stringify(definitionInventoryRecord(dir)),
-  );
   return dir;
 }
 

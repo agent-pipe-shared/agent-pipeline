@@ -11,8 +11,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { evaluateAiHardeningGate, runIndependentChecks } from "./ai-assisted-hardening-gate.mjs";
-import { definitionInventoryRecord } from "../lib/ai-definition-inventory.mjs";
-import { requalifyForDrift, resolveReviewerIdentity } from "../lib/ai-assisted-hardening.mjs";
+import { resolveReviewerIdentity } from "../lib/ai-assisted-hardening.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 export const VERIFY_TOPOLOGY_SCHEMA = "pipeline.verify-topology-preflight.v1";
@@ -20,7 +19,6 @@ const OID = /^[0-9a-f]{40}$/u;
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_ROOT = path.resolve(SCRIPT_DIR, "..", "..", "..");
 const DEFAULT_INVENTORY = "docs/product-capability-inventory.json";
-const DEFINITION_INVENTORY = "plugins/pipeline-core/config/ai-assisted-definition-inventory.json";
 
 function failure(code, subject = null) {
   return Object.freeze({
@@ -249,21 +247,6 @@ export function runVerifyTopologyCli(argv = process.argv.slice(2)) {
     inventory = JSON.parse(readFileSync(path.join(parsed.root, parsed.inventoryPath), "utf8"));
   } catch {
     return failure("VTP-DECLARATION-UNAVAILABLE");
-  }
-  let recordedDefinitions;
-  try {
-    recordedDefinitions = JSON.parse(readFileSync(path.join(parsed.root, DEFINITION_INVENTORY), "utf8"));
-  } catch {
-    return failure("VTP-DEFINITION-INVENTORY-UNAVAILABLE");
-  }
-  const currentDefinitions = definitionInventoryRecord(parsed.root);
-  const requalification = requalifyForDrift({
-    recordedInventorySha256: recordedDefinitions.inventorySha256,
-    currentInventorySha256: currentDefinitions.inventorySha256,
-    runner: "verify-topology-preflight",
-  });
-  if (recordedDefinitions.schema !== "pipeline.ai-definition-inventory.v1" || recordedDefinitions.definitionCount !== currentDefinitions.definitionCount || requalification.status !== "current") {
-    return failure("VTP-DEFINITION-REQUALIFICATION-REQUIRED");
   }
   const runGit = (args) => defaultGit(parsed.root, args);
   const candidateCommit = runGit(["rev-parse", "--verify", `${parsed.candidateRevision}^{commit}`]).stdout;
