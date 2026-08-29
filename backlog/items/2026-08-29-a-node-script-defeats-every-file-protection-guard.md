@@ -299,3 +299,45 @@ the first-appearance check, plus the small onboarding wiring call into
 `lib/project-onboarding-v3.mjs` mirroring `applyPrePushHookInstallOnboarding`'s
 call site — sequenced AFTER any other in-flight dispatch on
 `project-onboarding-v3.mjs` completes, to avoid a shared-checkout collision.
+
+## Progress, 2026-08-29 (dispatch NVA-R36-GENESISEXEMPT, commit `faf283a7`)
+
+The first-appearance exemption itself is landed and self-committed by the
+dispatch: `pathAlreadyTrackedInHistory()` in `pre-commit-hook-install.mjs`
+(checks `git log -1 -- <path>` against HEAD-reachable history; an unborn
+HEAD or a `git log` failure both fail closed toward "already tracked" —
+still blocked). Re-verified against the item's own exact repro shape
+(already-committed `project/pipeline.json` bypass-write) — still blocked,
+as required. 29/29 tests pass (was 22/22), including a spawned-bypass
+first-appearance-allowed test documenting the residual scope.
+
+**Onboarding wiring correctly NOT landed — stopped on a genuine open
+design question, not a bug.** Wiring the installer into onboarding's apply
+chain (mirroring `applyPrePushHookInstallOnboarding`) fixes the genesis-
+scaffold-write problem this item exists to solve. But it then breaks 2
+pre-existing tests at a DIFFERENT, later point: an onboarded project's
+SECOND commit — an ordinary, legitimate operator edit re-writing an
+ALREADY-TRACKED protected file (`project/pipeline.json`/GS-10,
+`pipeline.user.yaml`/GS-1, e.g. "the human configures verify and push
+approval" right after setup) — is correctly still blocked by the
+first-appearance exemption (working as designed), but nothing yet tells a
+real operator how to make that entirely normal post-setup edit.
+
+**Queued PO decision (do not guess — genuinely security-relevant UX for
+every onboarded project's post-setup admin edits):** how should a later,
+legitimate admin edit to an already-tracked protected file be handled
+once this hook is wired in by default? Candidates, none chosen yet:
+1. `git commit --no-verify` as the sanctioned escape for this specific
+   case — but this directly echoes candidate (c) from this item's OWN
+   original three candidates, which the PO already passed over in favor
+   of (b) when this item was first decided; reintroducing it here for a
+   narrower case still needs an explicit fresh decision, not an inferred
+   yes.
+2. A consumed human-guard-override capability for legitimate post-setup
+   admin edits — heavier friction for a routine operation.
+3. Something else not yet proposed.
+
+The dispatch's exact attempted diff and the two failing tests' full
+output are preserved at
+`scratch/attempted-onboarding-wiring-NVA-R36-GENESISEXEMPT.md`, ready to
+resume once a decision lands. Left `status: open`.
