@@ -5,6 +5,10 @@ type: defect
 owner: pipeline
 status: closed
 created: 2026-08-29
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: 794fa61970ebaac3eb5969a4b38b67134dd98c65
+closure_evidence: backlog/items/2026-08-29-gg-22s-own-remediation-order-creates-unclearable-ledger-debt.md
 sprint: nova
 done_when: contains plugins/pipeline-core/hooks/guard-git.test.mjs GG22-7
 source: "Hit live by the Elephant on 2026-08-29 while closing candidate backlog items: following GG-22's printed remediation literally produced a debt state no further reconciliation could clear, costing roughly ten tool calls to escape."
