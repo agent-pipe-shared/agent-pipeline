@@ -1,4 +1,5 @@
-# Plugin-shipped DEFAULT semgrep ruleset (NVA-B-SCANNER).
+# Plugin-shipped DEFAULT semgrep ruleset (NVA-B-SCANNER; relocated here by
+# NVA-R18-SCANBOOT, 2026-08-29, to match the backlog item's own path).
 #
 # security-scan.mjs's buildAdapterConfig() passes this file's absolute path as
 # semgrep's `--config` ONLY when a hosted project configures no

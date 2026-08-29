@@ -851,7 +851,7 @@ function freshIntent(runner, fs) {
     //     `passed`/`findings`/`not-configured`/`tool-unavailable`/
     //     `not-applicable` (`deriveReportStatus()`, security-scan.mjs).
     //     Semgrep's and license-check's own fallback configuration also now
-    //     ships with the plugin (`config/security/semgrep-default-rules.yml`,
+    //     ships with the plugin (`security/semgrep/pipeline.yml`,
     //     `config/security/license-allowlist.default.json`) rather than only
     //     existing in the Pipeline's own repository, so a consumer that
     //     configures nothing of its own still gets a working, offline scan
