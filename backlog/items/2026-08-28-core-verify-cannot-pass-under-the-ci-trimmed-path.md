@@ -7,6 +7,7 @@ status: open
 created: 2026-08-28
 sprint: nova
 source: "Local replay of .github/workflows/verify.yml's `verify` job before the first PR to main, 2026-08-28, at HEAD bbdbfd02. Steps 1-7 pass; step 8 fails. Controlled 2x5 matrix isolates the trimmed PATH as the cause."
+done_when: manual
 ---
 
 # Core Verify cannot pass under the PATH the CI workflow gives it, and nothing has ever noticed because CI has never reached that step

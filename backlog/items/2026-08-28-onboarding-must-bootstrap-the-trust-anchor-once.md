@@ -8,6 +8,7 @@ created: 2026-08-28
 sprint: nova
 tracking: "NOW / Nova A — happy-path blocking: its absence deadlocked the first human override in the Claude run and cost a live PO signature; PO asked for this explicitly"
 source: "Greenfield happy-path test of candidate 0.6.0 across all three runners, 2026-08-28. Independent self-analyses: Claude/Windows (docs/pipeline-haertungstest-und-analyse.md), Agy/WSL (pipeline-analysis.md), Codex/WSL (docs/pipeline-session-analysis-2026-08-28.md), plus the PO's own cross-run observations."
+done_when: manual
 ---
 
 # The trust anchor is never bootstrapped, and its absence surfaces as a circular deadlock instead of a named prerequisite

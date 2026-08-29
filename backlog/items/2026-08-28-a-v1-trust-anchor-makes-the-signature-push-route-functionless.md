@@ -8,6 +8,7 @@ created: 2026-08-28
 sprint: nova
 tracking: "NOW / Nova A — critical: it makes gates.push_approval 'signature', the documented default and this repository's own setting, functionless. Stacks with the push-gate item; a consumer hits both."
 source: "Consumer project HA, incident report S56 finding B8 (2026-08-28, Windows), added after the first handover. Both mechanisms re-verified in this repository's own code before filing."
+done_when: manual
 ---
 
 # A v1 trust anchor makes the signature push route functionless, and two readers of the same file disagree

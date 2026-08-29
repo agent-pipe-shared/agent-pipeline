@@ -8,6 +8,7 @@ created: 2026-08-28
 sprint: nova
 tracking: "Nova B — onboarding should write the permission entries a consumer needs, instead of leaving a second blocking layer undocumented"
 source: "Consumer project HA, incident report S56 finding B4 (2026-08-28, Windows, Claude runner)."
+done_when: manual
 ---
 
 # Onboarding leaves the runner's own permission layer to the consumer

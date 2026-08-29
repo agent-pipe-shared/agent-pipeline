@@ -8,6 +8,7 @@ created: 2026-08-28
 sprint: nova
 tracking: "NOW / Nova A — a suite about to enter the verify gate whose outcome depends on unrelated per-machine state; found while diagnosing a one-off failure of exactly that suite"
 source: "onboarding-init.test.mjs failed once (exit 1) during an operator run of apply-pending-protected-edits.mjs --only=verify-nva-c-protected, 2026-08-28. Not reproduced in five subsequent runs, three of them concurrent. The coupling below was found while looking for the cause and is verifiable independently of it."
+done_when: manual
 ---
 
 # A verify-gate suite reads real per-machine state, because it drives a subprocess

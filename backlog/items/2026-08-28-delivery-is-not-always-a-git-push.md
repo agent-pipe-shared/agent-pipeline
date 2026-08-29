@@ -8,6 +8,7 @@ created: 2026-08-28
 sprint: nova
 tracking: "Backlog / someday — PO-raised 2026-08-28; not blocking the Nova candidate, but it decides whether the release model fits a whole class of the PO's repositories"
 source: "PO, 2026-08-28: some repositories barely push at all — live deployment runs by other routes, e.g. a Visual Studio build process, or SSH deployment straight onto the Home Assistant server."
+done_when: manual
 ---
 
 # The release model assumes delivery is a `git push`, and for several repositories it is not
