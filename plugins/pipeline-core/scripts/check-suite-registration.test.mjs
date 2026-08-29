@@ -86,6 +86,39 @@ test("compareSuiteRegistration: a missing path or a non-object opt-out entry is 
   assert.deepEqual(codes, ["OPT-OUT-ENTRY-NOT-AN-OBJECT", "OPT-OUT-ENTRY-NOT-AN-OBJECT", "OPT-OUT-PATH-MISSING", "OPT-OUT-PATH-MISSING"]);
 });
 
+test("compareSuiteRegistration: a stale opt-out entry (its named path IS registered) is a fatal finding, independent of the real repo's own list", () => {
+  const result = compareSuiteRegistration({
+    enumeratedPaths: ["plugins/pipeline-core/lib/a.test.mjs"],
+    registeredPaths: ["plugins/pipeline-core/lib/a.test.mjs"],
+    optOut: [{ path: "plugins/pipeline-core/lib/a.test.mjs", reason: "was unregistered once, no longer true" }],
+  });
+  assert.equal(result.ok, false, "a stale opt-out entry must fail the run even though the named suite is registered and every enumerated file is accounted for");
+  assert.deepEqual(result.unaccounted, [], "the suite is registered, so it must not also appear as unaccounted");
+  assert.equal(result.staleOptOut.length, 1);
+  assert.equal(result.staleOptOut[0].path, "plugins/pipeline-core/lib/a.test.mjs", "the finding must name the stale entry's path");
+  assert.equal(result.staleOptOut[0].reason, "was unregistered once, no longer true", "the finding must carry the entry's own reason text so a reader can see it is stale");
+});
+
+test("compareSuiteRegistration: a stale opt-out entry is detected even for a suite not present in enumeratedPaths at all", () => {
+  const result = compareSuiteRegistration({
+    enumeratedPaths: [],
+    registeredPaths: ["plugins/pipeline-core/lib/gone-from-disk.test.mjs"],
+    optOut: [{ path: "plugins/pipeline-core/lib/gone-from-disk.test.mjs", reason: "stale" }],
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.staleOptOut.length, 1, "detection must be independent of enumeratedPaths -- registeredPaths vs optOut alone is enough");
+});
+
+test("compareSuiteRegistration: a genuinely non-stale opt-out entry (its path is NOT registered) still passes, unaffected by the staleness check", () => {
+  const result = compareSuiteRegistration({
+    enumeratedPaths: ["plugins/pipeline-core/lib/still-unregistered.test.mjs"],
+    registeredPaths: ["plugins/pipeline-core/lib/a.test.mjs"],
+    optOut: [{ path: "plugins/pipeline-core/lib/still-unregistered.test.mjs", reason: "genuinely still excluded" }],
+  });
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.staleOptOut, []);
+});
+
 test("normalizeRepoRelativePath: strips a leading './' and normalizes backslashes", () => {
   assert.equal(normalizeRepoRelativePath("./plugins/pipeline-core/lib/a.test.mjs"), "plugins/pipeline-core/lib/a.test.mjs");
   assert.equal(normalizeRepoRelativePath("plugins\\pipeline-core\\lib\\a.test.mjs"), "plugins/pipeline-core/lib/a.test.mjs");
