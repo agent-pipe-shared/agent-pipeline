@@ -6095,10 +6095,15 @@ function runPoAuthorityDecisionCommand(sub, rest, deps) {
 
 // Renders the failing predicate(s) from a
 // pipeline.po-authority-postimage-readback.v1 evidence object for a stderr
-// diagnostic. Only predicate names, sha256 digests, status/diagnostic codes
-// and short fixed labels are emitted here -- never file contents and never
-// absolute host paths (backlog/items/2026-08-28-a-fail-closed-rollback-
-// names-no-predicate-so-a-consumer-cannot-fix-it.md).
+// diagnostic. Only predicate names, sha256 digests, status codes and short
+// fixed labels are emitted here -- never file contents, never absolute host
+// paths (backlog/items/2026-08-28-a-fail-closed-rollback-names-no-predicate-
+// so-a-consumer-cannot-fix-it.md), and never the readback's own diagnostic
+// codes: PS53j (harness/scripts/pipeline-state.test.mjs, standing since
+// 2026-08-01) forbids the readback payload from reaching the log. The
+// diagnostic codes remain available in the structured evidence object
+// (observeRebindPostimageEvidence) for machine consumers -- only this
+// human-facing stderr rendering omits them.
 function describeFailedPostimagePredicates(postimageEvidence) {
   const predicates = postimageEvidence?.predicates ?? {};
   const failures = [];
@@ -6116,10 +6121,7 @@ function describeFailedPostimagePredicates(postimageEvidence) {
   }
   for (const readback of predicates.v4Intents ?? []) {
     if (readback?.ok !== true) {
-      const diagnostics = Array.isArray(readback?.diagnostics) && readback.diagnostics.length > 0
-        ? ` diagnostics=${readback.diagnostics.join(",")}`
-        : "";
-      failures.push(`v4Intents.${readback?.intent ?? "unknown"} (expected=ready observed=${readback?.status ?? "unknown"}${diagnostics})`);
+      failures.push(`v4Intents.${readback?.intent ?? "unknown"} (expected=ready observed=${readback?.status ?? "unknown"})`);
     }
   }
   return failures.length > 0 ? failures.join("; ") : "no failing predicate identified";

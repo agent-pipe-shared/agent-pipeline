@@ -646,7 +646,14 @@ function invokeCaptured(argv, deps) {
   assert.ok(applied.err.includes("postimage readback failed"), applied.err);
   assert.ok(applied.err.includes("v4Intents.dispatch"), applied.err);
   assert.ok(applied.err.includes("observed=blocked"), applied.err);
-  assert.ok(applied.err.includes("diagnostics=TEST-INJECTED-NOT-READY"), applied.err);
+  // NVA-PS53J-1b: this assertion and the rendering it checks both arrived in
+  // commit c16e40e1 (2026-08-28), contradicting PS53j
+  // (harness/scripts/pipeline-state.test.mjs, standing since 2026-08-01),
+  // which forbids the readback's own diagnostic codes from reaching the log.
+  // PS53j is older and wins; the predicate naming above (v4Intents.dispatch,
+  // observed=blocked) is this block's actual documented purpose and is
+  // unaffected.
+  assert.ok(!applied.err.includes("TEST-INJECTED-NOT-READY"), "the readback payload's diagnostic codes must not reach the log (harness/scripts/pipeline-state.test.mjs PS53j)");
   assert.ok(applied.err.includes("rollback verified"), applied.err);
   assert.ok(!applied.err.includes(root), "the message must not leak an absolute host path");
   assert.ok(!/[A-Za-z]:\\|\/home\/|\/Users\//u.test(applied.err), "the message must not leak an absolute host path");
