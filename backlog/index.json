@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "312d910a781af61fbdc0798e6611f5dee62deba15315d112650ddc884506e6d7"
+    "transitionHead": "46cf18800bc37602010482dd326df4ecc3cc6cc113362c87d20bf37788f07ce4"
   },
   "counts": {
-    "open": 93,
+    "open": 92,
     "in_progress": 3,
-    "closed": 427,
+    "closed": 428,
     "rejected": 3,
     "deferred": 11
   },
@@ -4218,12 +4218,16 @@
     },
     {
       "id": "pipeline.plan-approval-is-recorded-without-a-check-that-the-design-was-shown",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-29",
       "source": "PO observation during the 2026-08-29 three-runner greenfield test (finding F28 of scratch/greenfield-triage-2026-08-29.md), Antigravity/WSL run.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "19937961",
+      "closureEvidence": "harness/scripts/pipeline-state.test.mjs"
     },
     {
       "id": "pipeline.plan-partial-authority-guard-allowlist-does-not-admit-its-own-profile-source-flags",
