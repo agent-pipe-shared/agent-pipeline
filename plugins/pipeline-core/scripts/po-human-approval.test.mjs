@@ -814,11 +814,69 @@ test("NVA-W5-TTYSIGN: sign-intent for a passphrase-protected key fails closed wi
     ));
     assert.ok(error, "signing must refuse before ever spawning OpenSSL when there is no controlling terminal");
     assert.match(error.message, /pipeline\.signing-requires-attended-terminal/u, "the message must carry the greppable marker");
-    assert.match(error.message, /no controlling terminal/u, "the message must explicitly name the real cause");
+    // NVA-CF-MINORPUSH-RETRY: the message names the ACTUAL condition
+    // isAttendedTerminal() checks -- opening /dev/tty, not the unrelated
+    // process.stdin.isTTY -- so a human reading it can tell what was really
+    // tested rather than a claim the code never checked.
+    assert.match(error.message, /could not open a controlling terminal \(\/dev\/tty\)/u, "the message must explicitly name the real cause it measured");
     assert.doesNotMatch(error.message, /passphrase/u, "the message must never mention a passphrase -- that is the exact confusion this item is filed about");
     assert.equal(spawnCalled, false, "OpenSSL must never be invoked once the TTY precondition has failed");
     assert.equal(existsSync(join(dirs.directory, "proof-manual.json")), false);
     assert.equal(existsSync(join(dirs.directory, "intent-manual.txt")), false, "the intent file must never be written before the TTY precondition passes");
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("NVA-CF-MINORPUSH-RETRY: sign-intent accepts a REAL controlling terminal even when stdin itself is redirected/piped", () => {
+  const dirs = fixtureDirs();
+  try {
+    const passphrase = "sign-intent-fixture-passphrase";
+    const { privateKeyPem, authority } = encryptedKeyFixture(dirs.directory, passphrase);
+    const intentSha256 = createHash("sha256").update("pipeline.tty-sign-redirected-stdin-fixture").digest("hex");
+    const dependencies = {
+      spawn: fakeSignSpawn(privateKeyPem, passphrase),
+      readConfirmation: () => { throw new Error("readConfirmation must not be called for a passphrase-protected key"); },
+      // Simulates exactly the bug this closes: `process.stdin.isTTY` would be
+      // false/undefined here (redirected/piped stdin, same as every other
+      // process in this suite) while a REAL controlling terminal is attached
+      // -- the actual condition OpenSSL's own interactive prompt depends on.
+      // No `isTTY` dependency is supplied at all, so isAttendedTerminal() must
+      // fall through to probing openControllingTty()/isatty() itself.
+      openControllingTty: () => 97,
+      isatty: (fd) => fd === 97,
+    };
+    let result;
+    captureStdout(() => {
+      result = runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", intentSha256], dependencies);
+    });
+    assert.equal(result.ok, true, "a genuinely attended controlling terminal must be accepted even though stdin itself is redirected");
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("NVA-CF-MINORPUSH-RETRY: sign-intent refuses when the controlling terminal cannot be opened at all (no isTTY dependency supplied)", () => {
+  const dirs = fixtureDirs();
+  try {
+    const passphrase = "sign-intent-fixture-passphrase";
+    encryptedKeyFixture(dirs.directory, passphrase);
+    const intentSha256 = createHash("sha256").update("pipeline.tty-sign-no-controlling-tty-fixture").digest("hex");
+    let spawnCalled = false;
+    const dependencies = {
+      spawn: () => { spawnCalled = true; return { status: 0 }; },
+      readConfirmation: () => { throw new Error("readConfirmation must not be called before the TTY precondition"); },
+      // /dev/tty is genuinely unavailable (e.g. a daemon or fully detached
+      // session) -- opening it throws, exactly like the real ENXIO/ENODEV.
+      openControllingTty: () => { throw new Error("ENXIO: no such device or address, open '/dev/tty'"); },
+    };
+    const error = thrown(() => runHumanApproval(
+      ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", intentSha256],
+      dependencies,
+    ));
+    assert.ok(error, "signing must refuse before ever spawning OpenSSL when the controlling terminal cannot be opened");
+    assert.match(error.message, /could not open a controlling terminal \(\/dev\/tty\)/u);
+    assert.equal(spawnCalled, false, "OpenSSL must never be invoked once the TTY precondition has failed");
   } finally {
     cleanup(dirs);
   }
