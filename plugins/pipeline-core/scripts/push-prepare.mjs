@@ -14,9 +14,13 @@
  * network -- with exactly ONE narrow exception (NVA-PUSHFOLD-1):
  * `foldPendingPushApprovalWrite()`, run at the very start of `pushPrepareReport()`,
  * commits a prior `approve-push` run's still-uncommitted trailing state-file write when (and
- * only when) that file is the SOLE dirty path in the tree. Every other check below still only
- * prints a report or a command for a HUMAN or a LATER agent call to run; this script runs none
- * of those itself.
+ * only when) that file is the SOLE dirty path in the tree, that dirtiness is actually
+ * `approve-push`'s own trailing write (`pendingAuditWrite === true`, NVA-CF-PUSHFOLD -- never
+ * an operator's own unrelated direct edit to the same file), and the recorded approval is not
+ * still outstanding for the current HEAD (NVA-CF-PUSHFOLD -- folding while it is would move
+ * HEAD past `forCommit` and void the approval). Every other check below still only prints a
+ * report or a command for a HUMAN or a LATER agent call to run; this script runs none of those
+ * itself.
  *
  * WHY THIS EXISTS: on 2026-08-12 a valid, already-consumed signature was
  * refused anyway because `evidence/verify-latest.json` carried a non-zero
@@ -369,11 +373,27 @@ export function segmentsForNodeCommand(executable, argv) {
  * human/session no longer has to notice and commit it by hand.
  *
  * Deliberately narrow, to keep this script's "never mutates" contract true for every OTHER
- * case: it commits ONLY when the resolved state file is the SOLE dirty path in the working
- * tree. Any other dirty file alongside it (or a dirty tree that is NOT this exact file) is not
- * the shape this fold exists for -- it is left completely alone, and the pre-existing
- * `checkWorkingTreeClean` check below reports it exactly as before (no behavior change for
- * that case).
+ * case. The resolved state file being the SOLE dirty path is NECESSARY but not sufficient --
+ * three further gates all have to hold before this ever shells out to `git`:
+ *
+ * 1. (NVA-CF-PUSHFOLD) `pushApproval.lastApproved.pendingAuditWrite` must be exactly `true`.
+ *    A state file that is dirty for some OTHER reason (an operator's own direct edit, a
+ *    concurrent unrelated write) happens to satisfy "sole dirty path" too, but is not the
+ *    shape this fold exists for -- it is left completely alone, never auto-committed.
+ * 2. (NVA-CF-PUSHFOLD) `pushApproval.lastApproved.forCommit` must NOT equal the CURRENT HEAD
+ *    commit. `forCommit` still equalling HEAD means the push this approval was signed for may
+ *    not have happened yet -- we are still between `approve-push` and the actual `git push`.
+ *    Folding (committing) in that window would move HEAD past `forCommit` and void the
+ *    approval before it is ever used (docs/push-release-flow.md: "Commit nothing between
+ *    approve-push and the push"). This becomes safe again once ordinary work moves HEAD on --
+ *    the shape a LATER, later-cycle `push-prepare` run actually finds.
+ * 3. HEAD itself must be resolvable at all -- if it cannot be determined, this refuses to
+ *    fold rather than guess whether gate 2 is satisfied.
+ *
+ * Any other dirty file alongside the state file (or a dirty tree that is NOT this exact file)
+ * is not the shape this fold exists for either -- it is left completely alone, and the
+ * pre-existing `checkWorkingTreeClean` check below reports it exactly as before (no behavior
+ * change for that case).
  *
  * Also clears the `pendingAuditWrite` hint (see `pipeline-state.mjs`'s `approve-push` case)
  * from `true` to `false` before staging the commit: that flag is the upfront,
@@ -406,13 +426,26 @@ export function foldPendingPushApprovalWrite(dir, deps = {}) {
   } catch {
     return { folded: false, reason: "unreadable" };
   }
-  if (parsedState?.pushApproval?.lastApproved?.pendingAuditWrite === true) {
-    parsedState.pushApproval.lastApproved.pendingAuditWrite = false;
-    try {
-      writeFile(absPath, `${JSON.stringify(parsedState, null, 2)}\n`);
-    } catch {
-      return { folded: false, reason: "rewrite-failed" };
-    }
+
+  // Gate 1 (NVA-CF-PUSHFOLD): only ever fold the exact shape approve-push's own trailing write
+  // leaves behind -- never an operator's own unrelated direct edit to this same file.
+  if (parsedState?.pushApproval?.lastApproved?.pendingAuditWrite !== true) {
+    return { folded: false, reason: "not-pending" };
+  }
+
+  // Gate 2+3 (NVA-CF-PUSHFOLD): refuse to fold while the recorded approval is still outstanding
+  // for the CURRENT HEAD -- see the function-level comment above for why.
+  const headCommit = resolveHeadCommit(dir, deps);
+  if (!headCommit) return { folded: false, reason: "head-unavailable" };
+  if (parsedState.pushApproval.lastApproved.forCommit === headCommit) {
+    return { folded: false, reason: "approval-outstanding" };
+  }
+
+  parsedState.pushApproval.lastApproved.pendingAuditWrite = false;
+  try {
+    writeFile(absPath, `${JSON.stringify(parsedState, null, 2)}\n`);
+  } catch {
+    return { folded: false, reason: "rewrite-failed" };
   }
 
   const spawn = deps.spawn ?? spawnSync;
@@ -422,7 +455,9 @@ export function foldPendingPushApprovalWrite(dir, deps = {}) {
     + "Auto-folded by push-prepare.mjs at the start of its own run (NVA-PUSHFOLD-1): a prior\n"
     + "approve-push run's trailing state-file write was still uncommitted when this run\n"
     + "started. See backlog/items/2026-08-26-push-approval-record-always-trails-the-signed-\n"
-    + "commit.md.\n";
+    + "commit.md.\n\n"
+    + "AI-Assisted: true\n"
+    + "Dispatch: NVA-CF-PUSHFOLD (goldfish)\n";
   const commit = spawn("git", ["-C", dir, "commit", "-m", message, "--", relPath], { encoding: "utf8" });
   if (commit.error || commit.status !== 0) return { folded: false, reason: "commit-failed" };
   return { folded: true };
