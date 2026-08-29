@@ -45,6 +45,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER } from "../lib/po-gate-authority.mjs";
 import { measureFreshRepoOnboardingTurns } from "./measure-fresh-repo-onboarding-turns.mjs";
 import { runHumanApproval } from "./po-human-approval.mjs";
 
@@ -65,12 +66,22 @@ function run(argv, cwd, env, input) {
 // then fails on the leading prompt text. Recover by trying every `{` occurrence, right
 // to left (the real result is the LAST top-level JSON object on the stream), and
 // returning the first one that parses cleanly to end-of-string.
-function parseJsonStdout(result) {
+export function parseJsonStdout(result) {
   const stdout = result.stdout ?? "";
-  for (let i = stdout.lastIndexOf("{"); i !== -1; i = stdout.lastIndexOf("{", i - 1)) {
+  // Track the search boundary explicitly rather than feeding the previous match's
+  // index straight back into `lastIndexOf`: when the leftmost "{" sits at index 0,
+  // `lastIndexOf("{", -1)` clamps its position argument to 0 per ECMA-262 and
+  // returns 0 again forever, so a self-referential loop never terminates. Decrementing
+  // an explicit `searchFrom` guarantees the search boundary strictly shrinks each
+  // iteration and the loop exits once it drops below 0.
+  let searchFrom = stdout.length - 1;
+  while (searchFrom >= 0) {
+    const i = stdout.lastIndexOf("{", searchFrom);
+    if (i === -1) break;
     try {
       return { ok: true, value: JSON.parse(stdout.slice(i)) };
     } catch { /* keep searching further left */ }
+    searchFrom = i - 1;
   }
   return { ok: false, error: stdout };
 }
@@ -88,7 +99,7 @@ function parseJsonStdout(result) {
  * script relies on (the real `authorize-critical` sign step, unencrypted so no
  * passphrase prompt) falls through to real `spawnSync` untouched.
  */
-function fakeSetupSpawn(executable, args) {
+export function fakeSetupSpawn(executable, args) {
   if (executable === "openssl" && args[0] === "genpkey") {
     const outIndex = args.indexOf("-out");
     const { privateKey } = generateKeyPairSync("ed25519", {
@@ -151,10 +162,10 @@ export function measureTofuPushEndToEnd({ rootDir, keyDir, env } = {}) {
   //
   // submit-plan's `beforeCommit` re-check runs with `requireAcknowledgement: true`
   // (`validatePoGateAuthority`, lib/po-gate-authority.mjs), which additionally requires
-  // the active PRD to carry the PO's plan acknowledgement marker exactly once
-  // (`PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER`) -- onboarding's own kickoff PRD never carries
-  // it, so it is appended here exactly as a PO reviewing and acknowledging the plan
-  // would do, before submit-plan is called.
+  // the active feature's plan file (`activeFeature.planPath`) to carry the PO's plan
+  // acknowledgement marker exactly once (`PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER`) --
+  // onboarding's own kickoff plan never carries it, so it is appended here exactly as a
+  // PO reviewing and acknowledging the plan would do, before submit-plan is called.
   const earlyStatePath = join(dir, "project", "pipeline-state.json");
   const earlyState = JSON.parse(readFileSync(earlyStatePath, "utf8"));
   const earlyPlanPath = earlyState?.activeFeature?.planPath;
@@ -163,8 +174,7 @@ export function measureTofuPushEndToEnd({ rootDir, keyDir, env } = {}) {
   }
   const planAbsPath = join(dir, earlyPlanPath);
   const planText = readFileSync(planAbsPath, "utf8");
-  const ackMarker = "<!-- po-plan-acknowledged: content-sound-and-spec-consistent -->";
-  writeFileSync(planAbsPath, `${planText.replace(/\n+$/u, "")}\n${ackMarker}\n`);
+  writeFileSync(planAbsPath, `${planText.replace(/\n+$/u, "")}\n${PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER}\n`);
   const addAck = run(["git", "add", "-A"], dir, env);
   steps.push({ step: "commit-plan-acknowledgement", subStep: "add", exitCode: addAck.status, stderr: addAck.stderr?.slice(0, 2000) });
   if (addAck.status !== 0) return { schema: SCHEMA, outcome: "commit-plan-acknowledgement-failed", steps };
