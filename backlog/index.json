@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "e175fed1612fd833253ec2c2260f6e9a84bd7c4187d123a51e0fe350dff2f84a"
+    "transitionHead": "d78871b46fbc507ab576ae268cba7b78ff9824870ebd799738b201df549ca3b8"
   },
   "counts": {
     "open": 91,
     "in_progress": 3,
-    "closed": 429,
+    "closed": 430,
     "rejected": 3,
     "deferred": 11
   },
@@ -3793,13 +3793,17 @@
     },
     {
       "id": "pipeline.nothing-checks-that-a-capability-is-reachable",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-28",
       "source": "Pattern identified 2026-08-28 after the PO asked whether agents can even find the guided driver. Each instance below was verified in code or by measurement in the same session.",
       "deferred": false,
-      "tracking": "NOW / Nova A — three separate instances in one session, each found by the PO or by an end-to-end walk rather than by any check. This is the check that would have caught all three."
+      "tracking": "NOW / Nova A — three separate instances in one session, each found by the PO or by an end-to-end walk rather than by any check. This is the check that would have caught all three.",
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "e7a3f5a4",
+      "closureEvidence": "harness/scripts/check-product-capability-inventory.test.mjs"
     },
     {
       "id": "pipeline.nothing-connects-an-acceptance-criterion-to-a-check-that-runs",
@@ -6210,6 +6214,16 @@
       "created": "2026-08-28",
       "source": "Hit live, 2026-08-28, running two HGO signature ceremonies (TP-3 verify.mjs and TP-5 guard-push.test.mjs) back to back in one session; then isolated in the code by reading both --proof readers.",
       "deferred": false
+    },
+    {
+      "id": "pipeline.two-v3-scripts-admitted-but-unnamed",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-29",
+      "source": "harness/scripts/check-product-capability-inventory.mjs's checkEntryPointReachability(), landed 2026-08-29 for backlog/items/2026-08-28-nothing-checks-that-a-shipped-capability-is-reachable.md, discovered these two real instances against the live repo.",
+      "deferred": false,
+      "tracking": "NOW / Nova A — found by NVA-W8-VERIFYREG2's own new reachability check running against this repository"
     },
     {
       "id": "pipeline.undocumented-transcript-fallback-selects-wrong-file-by-mtime",

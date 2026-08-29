@@ -312,7 +312,7 @@
 | pipeline.no-sanctioned-way-to-start-over | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.no-test-pins-the-ungoverned-path-rule-stand-down | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.nonblocking-interaction-continuity | closed | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
-| pipeline.nothing-checks-that-a-capability-is-reachable | open | workflow-improvement | pipeline | 2026-08-28 | NOW / Nova A — three separate instances in one session, each found by the PO or by an end-to-end walk rather than by any check. This is the check that would have caught all three. |
+| pipeline.nothing-checks-that-a-capability-is-reachable | closed | workflow-improvement | pipeline | 2026-08-28 | NOW / Nova A — three separate instances in one session, each found by the PO or by an end-to-end walk rather than by any check. This is the check that would have caught all three. |
 | pipeline.nothing-connects-an-acceptance-criterion-to-a-check-that-runs | closed | workflow-improvement | pipeline | 2026-08-16 | — |
 | pipeline.observation-governance-bootstrap-false-positives-on-vendor-synced-consumer-projects | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.observation-intake-document-governance | closed | workflow-improvement | pipeline | 2026-07-20 | — |
@@ -508,6 +508,7 @@
 | pipeline.two-minor-happy-path-retries-in-the-final-codex-run | open | workflow-improvement | pipeline | 2026-08-09 | — |
 | pipeline.two-more-critic-preimage-pins-surfaced-by-the-accumulate-fix | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.two-signature-ceremonies-overwrite-each-others-proof | open | defect | pipeline | 2026-08-28 | — |
+| pipeline.two-v3-scripts-admitted-but-unnamed | open | defect | pipeline | 2026-08-29 | NOW / Nova A — found by NVA-W8-VERIFYREG2's own new reachability check running against this repository |
 | pipeline.undocumented-transcript-fallback-selects-wrong-file-by-mtime | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.unenforced-process-rules-vary-by-runner | open | defect | pipeline | 2026-08-28 | Nova B |
 | pipeline.unified-human-authorization-ux | closed | workflow-improvement | pipeline | 2026-08-02 | Current CYB-4 helper is a compatible first adapter only; no programme-wide migration or closure is claimed. |
@@ -547,6 +548,6 @@
 
 - open: 91
 - in_progress: 3
-- closed: 429
+- closed: 430
 - rejected: 3
 - deferred: 11
