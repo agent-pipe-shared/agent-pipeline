@@ -711,6 +711,12 @@ const TEST_SUITES = [
   { name: "onboarding-init-tests", file: join(pluginScriptsDir, "onboarding-init.test.mjs") },
   { name: "push-gate-satisfiability-tests", file: join(pluginScriptsDir, "push-gate-satisfiability.test.mjs") },
   { name: "chat-gate-ceremony-tests", file: join(libDir, "chat-gate-ceremony.test.mjs") },
+  // NVA-A-060: both suites existed on disk but were never registered here, so the
+  // gate reported green while neither ever ran. push-init.test.mjs covers the
+  // push-path driver; semgrep-default-rules.test.mjs covers the shipped default
+  // rule set. check-suite-registration.mjs named exactly these two.
+  { name: "push-init-tests", file: join(pluginScriptsDir, "push-init.test.mjs") },
+  { name: "semgrep-default-rules-tests", file: join(repoRoot, "plugins", "pipeline-core", "config", "security", "semgrep-default-rules.test.mjs") },
 ];
 
 // Manifest-gated phase steps: see header — only projects that carry a manifest at
