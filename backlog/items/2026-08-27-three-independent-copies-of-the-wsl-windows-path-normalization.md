@@ -7,6 +7,7 @@ status: open
 created: 2026-08-27
 sprint: none
 source: "Noted while fixing the third instance of the WSL/Windows path-identity defect, commit d96e14c5, 2026-08-27."
+done_when: contains plugins/pipeline-core/lib/guard-maintenance-window.mjs repository-path-identity.mjs
 ---
 
 # The WSL/Windows path normalization exists as three independent copies

@@ -7,6 +7,7 @@ status: open
 created: 2026-08-27
 sprint: nova
 source: "NVA-BLRECONCILE-1, 2026-08-27 — residual-scope re-check while closing backlog/items/2026-08-27-path-bound-fingerprints-break-across-windows-wsl-access.md"
+done_when: contains plugins/pipeline-core/lib/guard-maintenance-window.mjs NVA-GMWFINGERPRINT-1
 ---
 
 # `guard-maintenance-window.mjs`'s own `repoFingerprint()` carries the same path-bound defect that `1858a21b` already fixed elsewhere
