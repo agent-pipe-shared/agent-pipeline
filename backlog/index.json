@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "ed1e8d08dd3ac7b6c69ed9542f74264cc71962a93961e62de94ec9f9122095cd"
+    "transitionHead": "79a85f7dc0dc4ac9482d9ca6c3f499bf5d389c543fef940a65ba8004a6f95c3e"
   },
   "counts": {
-    "open": 109,
+    "open": 110,
     "in_progress": 3,
     "closed": 409,
     "rejected": 3,
@@ -439,6 +439,15 @@
       "owner": "pipeline",
       "created": "2026-08-28",
       "source": "Re-Critic vtpgate2-368458af finding F2; incident during NVA-VTPGATE-2, 2026-08-28",
+      "deferred": false
+    },
+    {
+      "id": "pipeline.an-unparseable-done-when-is-counted-as-undeclared-not-malformed",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-29",
+      "source": "Dispatch NVA-BLDECL-4, 2026-08-29: two of fifteen first-draft predicates contained a comma or brace, were silently dropped by the frontmatter parser, and were reported as UNDECLARED rather than MALFORMED. Confirmed against the source by the dispatcher.",
       "deferred": false
     },
     {
