@@ -48,7 +48,7 @@ import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
 const SCRIPT = fileURLToPath(import.meta.url);
 const PLUGIN_ROOT = resolve(dirname(SCRIPT), "..");
 
-const USAGE = "Usage: po-human-approval.mjs setup --repo-root <repo> --directory <external-dir> [--key-reference <id>] | prepare --repo-root <repo> --directory <external-dir> [--feature-id <id> --plan <repo-path> --spec <repo-path> --model <repo-path>] | prepare-all --repo-root <repo> --directory <external-dir> | approve --repo-root <repo> --directory <external-dir> [--feature-id <id>] | approve-all --repo-root <repo> --directory <external-dir> | verify --repo-root <repo> --directory <external-dir> [--feature-id <id>] | verify-all --repo-root <repo> --directory <external-dir> | prepare-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication|release-preflight|feature-package-reconcile> --subject-sha256 <sha256> [--subject <repo-path>] --expires-at <ISO-8601> | approve-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication|release-preflight|feature-package-reconcile> | verify-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication|release-preflight|feature-package-reconcile> | sign-intent --repo-root <repo> --directory <external-dir> (--intent-sha256 <sha256> | --request <repo-scratch-relative-path>) | authorize-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication|release-preflight|feature-package-reconcile> --subject-sha256 <sha256> [--subject <repo-path>] --expires-at <ISO-8601> | prepare-fork-disposition --repo-root <repo> --directory <external-dir> --repository-fingerprint <sha256> --stream-id <id> --sequence <n> --expires-at <ISO-8601> | approve-fork-disposition --repo-root <repo> --directory <external-dir> --repository-fingerprint <sha256> --stream-id <id> --sequence <n> | verify-fork-disposition --repo-root <repo> --directory <external-dir> --repository-fingerprint <sha256> --stream-id <id> --sequence <n>";
+const USAGE = "Usage: po-human-approval.mjs setup --repo-root <repo> --directory <external-dir> [--key-reference <id>] [--existing-key <path-to-an-already-existing-private-key-pem>] | prepare --repo-root <repo> --directory <external-dir> [--feature-id <id> --plan <repo-path> --spec <repo-path> --model <repo-path>] | prepare-all --repo-root <repo> --directory <external-dir> | approve --repo-root <repo> --directory <external-dir> [--feature-id <id>] | approve-all --repo-root <repo> --directory <external-dir> | verify --repo-root <repo> --directory <external-dir> [--feature-id <id>] | verify-all --repo-root <repo> --directory <external-dir> | prepare-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication|release-preflight|feature-package-reconcile> --subject-sha256 <sha256> [--subject <repo-path>] --expires-at <ISO-8601> | approve-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication|release-preflight|feature-package-reconcile> | verify-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication|release-preflight|feature-package-reconcile> | sign-intent --repo-root <repo> --directory <external-dir> (--intent-sha256 <sha256> | --request <repo-scratch-relative-path>) | authorize-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication|release-preflight|feature-package-reconcile> --subject-sha256 <sha256> [--subject <repo-path>] --expires-at <ISO-8601> | prepare-fork-disposition --repo-root <repo> --directory <external-dir> --repository-fingerprint <sha256> --stream-id <id> --sequence <n> --expires-at <ISO-8601> | approve-fork-disposition --repo-root <repo> --directory <external-dir> --repository-fingerprint <sha256> --stream-id <id> --sequence <n> | verify-fork-disposition --repo-root <repo> --directory <external-dir> --repository-fingerprint <sha256> --stream-id <id> --sequence <n>";
 // This repo's own environment inputs are all named PIPELINE_<PURPOSE> (see
 // PIPELINE_GUARD_OVERRIDE, PIPELINE_LIVE_CERTIFICATION_AUTHORITY,
 // PIPELINE_SECURITY_REVIEWER_ID elsewhere in this plugin); PO_APPROVAL_DIRECTORY
@@ -487,7 +487,7 @@ export function parseHumanArgs(argv, dependencies = {}) {
     const key = tokens[index]; const value = tokens[index + 1];
     if (!key?.startsWith("--") || typeof value !== "string" || value.startsWith("--")) return { error: USAGE };
     const normalized = key.slice(2).replace(/-([a-z])/gu, (_, letter) => letter.toUpperCase());
-    if (!new Set(["directory", "repoRoot", "keyReference", "humanName", "featureId", "plan", "spec", "model", "kind", "subject", "subjectSha256", "expiresAt", "intentSha256", "request", "repositoryFingerprint", "streamId", "sequence"]).has(normalized) || supplied.has(normalized)) return { error: USAGE };
+    if (!new Set(["directory", "repoRoot", "keyReference", "humanName", "featureId", "plan", "spec", "model", "kind", "subject", "subjectSha256", "expiresAt", "intentSha256", "request", "repositoryFingerprint", "streamId", "sequence", "existingKey"]).has(normalized) || supplied.has(normalized)) return { error: USAGE };
     supplied.add(normalized); values[normalized] = value; index += 1;
   }
   // GF-104: keyReference always carries a default ("local-po-key") even when the
@@ -1122,6 +1122,46 @@ function executeHumanApproval(args, dependencies = {}) {
   const write = dependencies.writeFile ?? writeFileSync; const read = dependencies.readFile ?? readFileSync; const exists = dependencies.exists ?? existsSync;
   if (args.command === "setup") {
     const present = { privateKey: exists(paths.privateKey), publicKey: exists(paths.publicKey), authority: exists(paths.authority) };
+    // NVA-CF-KEYBOOTSTRAP (backlog: pipeline.onboarding-has-no-happy-path-for-an-
+    // existing-signing-key.md): a third setup route alongside "generate a brand-new
+    // key" (below) and "reuse/recover key material already sitting at this exact
+    // --directory" (present.privateKey/publicKey above) -- register an
+    // ALREADY-EXISTING key file that lives somewhere else entirely (not yet known to
+    // this machine's --directory at all) as this machine's trust anchor, in one call,
+    // with no separate manual repair step. Checked FIRST, before any of the
+    // present-material branches below, and refuses outright the moment ANY key
+    // material already sits at this --directory: --existing-key imports into a
+    // BRAND-NEW directory only, exactly like fresh generation just below it never
+    // overwrites partial material either.
+    if (text(args.existingKey)) {
+      if (present.privateKey || present.publicKey || present.authority) {
+        fail("--existing-key only registers a key into a directory that has none yet; this --directory already carries key material -- pass a fresh --directory, or omit --existing-key to reuse/recover what is already here.");
+      }
+      if (!exists(args.existingKey)) {
+        fail(`--existing-key path does not exist: ${args.existingKey}`);
+      }
+      if (!text(args.humanName)) fail(SETUP_NEW_AUTHORITY_NEEDS_NAME);
+      // Copy the private key bytes verbatim into the machine-plane directory (same
+      // final location fresh generation writes to) rather than leaving the original
+      // path as the source of truth -- every other command in this file (sign-intent,
+      // authorize-critical, ...) reads the key from `paths.privateKey` unconditionally,
+      // so a key that stayed only at its original path would silently stop working the
+      // moment that path moved or was cleaned up.
+      const importedKeyBytes = read(args.existingKey);
+      write(paths.privateKey, importedKeyBytes, { mode: 0o600 });
+      // Derive (and thereby VALIDATE -- an unparsable or corrupt key fails this
+      // command() call, exactly like every other openssl step in this file) the public
+      // key from the copy just written, mirroring the fresh-generation branch's own
+      // genpkey+pkey pair below.
+      command("openssl", ["pkey", "-in", paths.privateKey, "-pubout", "-out", paths.publicKey], dependencies);
+      const authority = localAuthority(read(paths.publicKey, "utf8"), args.keyReference, args.humanName);
+      write(paths.authority, `${JSON.stringify(authority, null, 2)}\n`, { mode: 0o600 });
+      persistExplicitDirectoryIntoRepoScope(args, directory, gitCommonDir, dependencies);
+      return {
+        ok: true, code: "PO-HUMAN-AUTHORITY-READY", authority, imported: true,
+        paths: { privateKey: paths.privateKey, publicKey: paths.publicKey, authority: paths.authority },
+      };
+    }
     if (present.privateKey && present.publicKey && !present.authority) {
       // No authority record exists yet -- there is nothing to read a name from, so this
       // is exactly the same requirement fresh generation has below (FIXTURE-2).
