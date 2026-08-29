@@ -6,7 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-29
 sprint: nova
-done_when: contains plugins/pipeline-core/lib/resume-hint.mjs pipeline.consumption-receipt
+done_when: path-exists plugins/pipeline-core/scripts/check-resume-consumption.mjs
 source: "PO ruling, recorded by scratch/greenfield-triage-2026-08-29.md finding F14 as the durable form of F12+F13, observed during the 2026-08-29 three-runner greenfield test."
 ---
 
@@ -101,3 +101,38 @@ below deliberately do not rest on it. Two mechanical pieces, composed:
   new work rather than a repair, but the PO named it as must-land before the
   candidate.
 - **Date:** 2026-08-29
+
+## Stage 1 landed, 2026-08-29 (dispatch NVA-R4-RESUMERECEIPT, commit c3020e1d)
+
+The observation half of Proposal points 1 and 2 is implemented and merged.
+`capture` now records a content digest of the whole card it persisted —
+`materialInput` and `values` included — and a new `consume`/`query` CLI pair
+binds a consuming session's identity to that digest, derived from the card's
+own recorded bytes rather than from anything the caller asserts. Receipts live
+under `.git/agent-pipeline/resume-hint/`, never the tracked tree. `query`
+distinguishes three outcomes: no card, consumed with a matching digest, and
+not-consumed-or-mismatched. A corrupt or stale receipt is reported through the
+outcome and is never fatal.
+
+Verified on the merged branch state, not taken from the dispatch report:
+`plugins/pipeline-core/scripts/resume-hint.test.mjs` 11/11 exit 0,
+`plugins/pipeline-core/lib/resume-hint.test.mjs` 21/21 exit 0,
+`harness/scripts/check-consumer-safe-paths.test.mjs` 9/9 exit 0.
+
+**This item stays open, and its `done_when` has been repointed accordingly.**
+The old predicate — a `pipeline.consumption-receipt` marker in
+`lib/resume-hint.mjs` — was satisfied the moment the mechanism existed, which
+is weaker than this item's own Acceptance demands. That Acceptance asks for a
+check that **fails loudly** when a Resume-Hint was `available` at bootstrap
+and no matching receipt exists. Nothing is wired at bootstrap yet and nothing
+fails; the machinery exists but is inert, which the old predicate could not
+tell apart from the finished state. The predicate now names the missing
+falsifier itself.
+
+That inertness is deliberate, not an oversight: the PO approved
+"observe first, enforce later" for this mechanism, the same graduation pattern
+the `done_when` UNDECLARED class already follows. Stage 2 is the graduation —
+call `resume-hint.mjs consume` at the bootstrap consumption step, and add the
+verifier asserting "an `available` card implies a matching receipt". Until
+that verifier exists, a receipt proves only that the card's bytes were read,
+never that they were understood or acted on.
