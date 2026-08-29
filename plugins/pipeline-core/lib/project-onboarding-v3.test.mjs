@@ -3906,6 +3906,58 @@ test("promoting a PRD whose language differs from kickoff's own answer reaches a
   } finally { dispose(path); }
 });
 
+// Regression for backlog: onboarding-produces-drift-it-then-has-to-repair
+// (NVA-W9-DRIFTREPAIR). The two tests above already show a language switch
+// alone reaches "ready" without drift. This one proves the OTHER half of the
+// fix: when a runtime target UNRELATED to the language marker is ALSO
+// drifted at the exact moment the language correction runs -- proven first,
+// by asserting a real "projection-drift" status before the kickoff below --
+// the SAME correction transaction repairs it too, atomically, rather than
+// leaving the caller to discover it on the next inspection and route through
+// a separate plan-repair/apply-repair.
+test("a kickoff language switch that also finds a drifted runtime target repairs it atomically, without a separate plan-repair/apply-repair (NVA-W9-DRIFTREPAIR)", () => {
+  const path = root();
+  try {
+    hostGit(path, ["init", "--initial-branch=main"]);
+    const localDeps = { ...fakeDeps, initializePoGateProfileReceipt: initializeActualPoGateProfileReceipt };
+    const barrier = initializeRestartRequiredRoot(path, localDeps);
+    clearRuntimeBarrier(path, barrier);
+
+    const goal = "Ship the first German-language feature alongside pre-existing drift";
+    const plan = planProjectOnboardingKickoffV4({ rootDir: path, goal, language: "de", deps: localDeps, runner: "codex" });
+    assert.equal(plan.language, "de");
+
+    // Corrupt a runtime target the language correction's own narrow byte
+    // patches never touch, so genuine drift exists for a reason completely
+    // independent of the language switch this kickoff apply is about to
+    // perform -- after the plan above (which is unaffected: it binds the
+    // goal/state transaction, never these bytes), so kickoff apply itself
+    // still has an admissible pre-drift status to start from.
+    const advisorPath = join(path, ".codex", "agents", "consult-advisor.toml");
+    const advisorBefore = readFileSync(advisorPath, "utf8");
+    assert.match(advisorBefore, /model = "[^"]+"/u);
+    writeFileSync(advisorPath, advisorBefore.replace(/model = "[^"]*"/u, 'model = "corrupted-drift-probe"'));
+    assert.equal(
+      inspectProjectOnboardingV3({ rootDir: path, deps: localDeps, runner: "codex" }).status,
+      "projection-drift",
+      "fixture setup must actually produce drift before the language switch runs",
+    );
+
+    const applied = applyProjectOnboardingKickoffV4({
+      rootDir: path, goal, language: "de", planSha256: plan.planSha256, activate: true, deps: localDeps, runner: "codex",
+    });
+    assert.equal(applied.status, "ready");
+    assert.equal(applied.continuity.status, "valid");
+
+    // The unrelated corruption is gone -- repaired inside the same correction
+    // transaction as the language switch, never surfaced as a separate ask.
+    assert.doesNotMatch(readFileSync(advisorPath, "utf8"), /corrupted-drift-probe/u);
+    const correctedSource = parseYaml(readFileSync(join(path, "pipeline.user.yaml"), "utf8"));
+    assert.equal(correctedSource.language.human_facing, "de");
+    assert.equal(inspectProjectOnboardingV3({ rootDir: path, deps: localDeps, runner: "codex" }).status, "ready");
+  } finally { dispose(path); }
+});
+
 // The gate the fresh seed switches on has to be PASSABLE, and that is
 // established by driving the whole path rather than by reading it. Both halves
 // are the contract: a promoted `feature` whose plan nobody approved is REFUSED
@@ -4375,12 +4427,28 @@ test("onboarding seeds ignore rules for the paths it writes into, and never touc
     // is the meaningful answer; `check-ignore` is exactly that shape.
     const checkIgnore = (candidate) => spawnSync("git", ["check-ignore", "-q", candidate],
       { cwd: fresh, encoding: "utf8" }).status;
-    for (const candidate of ["scratch/note.md", "evidence/verify-latest.json", "project/pipeline-state.json"]) {
+    for (const candidate of [
+      "scratch/note.md",
+      "evidence/verify-latest.json",
+      "project/pipeline-state.json",
+      ".claude/worktrees/agent-abc123/note.md",
+      ".claude/settings.local.json",
+      ".claude/.usage-2026-08-29.json",
+      ".claude/.stop-suggest-2026-08-29.json",
+      ".claude/.pipeline-install-consent-2026-08-29.json",
+      ".claude/.main-session-model-identity-2026-08-29.json",
+    ]) {
       assert.equal(checkIgnore(candidate), 0, `git must ignore ${candidate}`);
     }
     // ...and it must NOT reach a nested evidence directory a project may own.
     assert.notEqual(checkIgnore("backlog/evidence/x.md"), 0,
       "an anchored rule must not swallow a nested evidence directory");
+    // A dirty `.claude/` session-scratch subpath must never block verify's
+    // tree-cleanliness check, but tracked config under `.claude/` (the config
+    // this project's own onboarding wrote) must stay unaffected -- never
+    // swallowed by a blanket `.claude/` ignore.
+    assert.notEqual(checkIgnore(".claude/settings.json"), 0,
+      "tracked .claude/ config must never be swallowed by the session-scratch entries");
 
     // GF-084 regression: the seed is USELESS if `project/pipeline-state.json` can
     // already be tracked before it takes effect. Investigation found no such
@@ -4423,6 +4491,8 @@ test("onboarding seeds ignore rules for the paths it writes into, and never touc
     assert.match(ownedApplied.projectIgnoreGapAction.guidance, /\/scratch\//u);
     assert.match(ownedApplied.projectIgnoreGapAction.guidance, /\/evidence\//u);
     assert.match(ownedApplied.projectIgnoreGapAction.guidance, /\/project\/pipeline-state\.json/u);
+    assert.match(ownedApplied.projectIgnoreGapAction.guidance, /\/\.claude\/worktrees\//u);
+    assert.match(ownedApplied.projectIgnoreGapAction.guidance, /\/\.claude\/settings\.local\.json/u);
     assert.equal(readFileSync(join(owned, ".gitignore"), "utf8"), ownedBytes,
       "the ask-step itself must never mutate the file it is asking about");
 
@@ -4431,7 +4501,7 @@ test("onboarding seeds ignore rules for the paths it writes into, and never touc
     // gets no ask at all -- the check is content-based, not byte-identity.
     const complete = root();
     try {
-      const completeBytes = "# mine\nnode_modules/\n/scratch/\n/evidence/\n/project/pipeline-state.json\n";
+      const completeBytes = "# mine\nnode_modules/\n/scratch/\n/evidence/\n/project/pipeline-state.json\n/.claude/worktrees/\n/.claude/settings.local.json\n/.claude/.usage-*.json\n/.claude/.stop-suggest-*.json\n/.claude/.pipeline-install-consent-*.json\n/.claude/.main-session-model-identity-*.json\n";
       writeFileSync(join(complete, ".gitignore"), completeBytes);
       const completeApplied = applyProjectOnboardingV3(
         planProjectOnboardingV3({ runner: "codex", rootDir: complete, deps: fakeDeps }),
@@ -4561,7 +4631,7 @@ test("once an owned .gitignore's ask is fulfilled with ordinary tools, the evide
     // above) -- never a rewrite, an append onto the project's own bytes.
     const gitignorePath = join(path, ".gitignore");
     const beforeAppend = readFileSync(gitignorePath, "utf8");
-    writeFileSync(gitignorePath, `${beforeAppend}\n/scratch/\n/evidence/\n/project/pipeline-state.json\n`);
+    writeFileSync(gitignorePath, `${beforeAppend}\n/scratch/\n/evidence/\n/project/pipeline-state.json\n/.claude/worktrees/\n/.claude/settings.local.json\n/.claude/.usage-*.json\n/.claude/.stop-suggest-*.json\n/.claude/.pipeline-install-consent-*.json\n/.claude/.main-session-model-identity-*.json\n`);
 
     // A first commit -- the onboarding scaffold plus the now-repaired
     // .gitignore -- stands in for the candidate a push signature would bind.
