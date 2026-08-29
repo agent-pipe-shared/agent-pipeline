@@ -229,6 +229,51 @@ function approvePushAttempt(root, deps, pushTarget = { remote: "origin", destina
     `the requiredKinds gate must survive for every non-waived kind: ${signatureApproval.lines.join(" ")}`);
 }
 
+// NVA-CF-BL13-PENDINGWRITETEST. Dedicated unit-level coverage, at the exact write
+// site, for the NVA-PUSHFOLD-1 "hint" half (backlog/items/2026-08-26-push-approval-
+// record-always-trails-the-signed-commit.md): `approve-push`'s success write must
+// also set `pushApproval.lastApproved.pendingAuditWrite = true`, the upfront,
+// immediately-visible marker the 2026-08-29 PO decision asked for. Until now this
+// field was only proven end to end in `push-prepare.test.mjs` (that file's own
+// comment explains why: this suite is TP-protected in general project checkouts,
+// but the Pipeline's OWN repository -- this file -- is the one place a dedicated
+// unit test at the write site can actually live). Mirrors the PUSHORDER-1 chat-mode
+// fixture above (no external-key ceremony needed) rather than the full signed-proof
+// path, since only the field on the resulting record is under test here.
+{
+  const root = mktempProjectDir();
+  const gitAt = (...args) => spawnSync("git", ["-C", root, ...args], { encoding: "utf8" });
+  gitAt("init", "-q", "-b", "main");
+  gitAt("config", "user.email", "po@example.invalid");
+  gitAt("config", "user.name", "PO");
+  mkdirSync(join(root, "project"), { recursive: true });
+  writeFileSync(join(root, "project", "pipeline-state.json"), JSON.stringify({
+    schema: "pipeline.state.v0", planApproved: true,
+    activeFeature: { id: "sprint-nova-epic", planPath: "specs/sprint-nova-epic/prd.md", phase: "implementation" },
+    planApproval: { poGateAuthority: { planSha256, specSha256 } },
+  }, null, 2));
+  writeFileSync(join(root, "pipeline.user.yaml"), "schema: pipeline.user.v3\ngates:\n  push_approval: chat\n");
+  const deps = { dir: root, now: () => now, gitHead: () => ({ ok: true, commit: candidate.commit }), gitCandidate: () => ({ ok: true, ...candidate }) };
+  assert.equal(run(["materialize-push-threat-model"], deps), 0);
+  gitAt("add", "-A");
+  gitAt("commit", "-q", "-m", "pendingAuditWrite fixture baseline");
+  const realHeadCommit = gitAt("rev-parse", "HEAD").stdout.trim();
+  deps.gitHead = () => ({ ok: true, commit: realHeadCommit });
+  deps.gitCandidate = () => ({ ok: true, commit: realHeadCommit, tree: candidate.tree });
+
+  const challenge = capturedStderr(() => run(["approve-push", "--by", "PO", "--remote", "origin", "--destination", "refs/heads/main"], deps));
+  assert.equal(challenge.result, 1, `challenge step must succeed: ${challenge.lines.join(" ")}`);
+  const challengeCode = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8")).pendingPushChallenge.code;
+
+  const attendedDeps = { ...deps, isattyFn: () => true, readLineFn: () => challengeCode };
+  const approval = capturedStderr(() => run(["approve-push", "--by", "PO", "--remote", "origin", "--destination", "refs/heads/main"], attendedDeps));
+  assert.equal(approval.result, 0, `attended confirming call must succeed: ${approval.lines.join(" ")}`);
+
+  const state = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"));
+  assert.equal(state.pushApproval.lastApproved.pendingAuditWrite, true,
+    "approve-push's own write must set pendingAuditWrite = true on success (NVA-PUSHFOLD-1 hint half)");
+}
+
 // PUSHDIR-1. Both of these refusals used to name a `--dir` flag. There is no such
 // flag anywhere in this script -- the project directory comes from
 // CLAUDE_PROJECT_DIR or the cwd -- and `parseExactFlags` is closed, so a consumer
