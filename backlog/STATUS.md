@@ -341,7 +341,7 @@
 | pipeline.phase-aware-bootstrap-readiness | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.phoenix-merge-re-critic-minor-findings | closed | workflow-improvement | pipeline | 2026-08-27 | Reassigned from phoenix to nova on 2026-08-28 by PO decision, after the Phoenix line was intaked into Nova |
 | pipeline.pipeline-author-repair-signature-mode-never-actually-admits-the-edit | closed | defect | pipeline | 2026-08-18 | — |
-| pipeline.pipeline-start-hardcodes-a-stale-copy-of-the-elephant-role-prohibitions | open | defect | pipeline | 2026-08-29 | — |
+| pipeline.pipeline-start-hardcodes-a-stale-copy-of-the-elephant-role-prohibitions | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.pipeline-state-rebind-codex-default-runner | closed | defect | pipeline | 2026-08-05 | — |
 | pipeline.pipeline-state-scripts-test-file-never-runs-in-full-verify | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.pipeline-user-yaml-file-level-protection-forces-signature-ceremony | open | defect | pipeline | 2026-08-29 | — |
@@ -545,8 +545,8 @@
 
 ## Counts
 
-- open: 103
+- open: 102
 - in_progress: 3
-- closed: 417
+- closed: 418
 - rejected: 3
 - deferred: 11

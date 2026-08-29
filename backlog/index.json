@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "9fc4387a0fbd8caff1ba7d57b040f2770e6edf63ac166b0370d31b171ffd80e0"
+    "transitionHead": "12936f5081a2ec0cc180673d9069a7f4e894a1dd24e6c3a6b6c7b4a88f55fff1"
   },
   "counts": {
-    "open": 103,
+    "open": 102,
     "in_progress": 3,
-    "closed": 417,
+    "closed": 418,
     "rejected": 3,
     "deferred": 11
   },
@@ -4148,12 +4148,16 @@
     },
     {
       "id": "pipeline.pipeline-start-hardcodes-a-stale-copy-of-the-elephant-role-prohibitions",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-29",
       "source": "Claude/Windows self-audit section 5.7 from the 2026-08-29 three-runner greenfield test (finding F22 of scratch/greenfield-triage-2026-08-29.md).",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "81cde83e",
+      "closureEvidence": "harness/scripts/generate-elephant-role-prohibitions.test.mjs"
     },
     {
       "id": "pipeline.pipeline-state-rebind-codex-default-runner",
