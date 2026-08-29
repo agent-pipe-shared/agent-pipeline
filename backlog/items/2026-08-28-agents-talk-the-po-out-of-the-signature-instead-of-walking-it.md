@@ -102,6 +102,38 @@ optimising for the PO's convenience will otherwise keep re-deriving it wrong.
 - The rule names why: the signature is the one control that is protection rather than
   ceremony.
 
+## Landed, 2026-08-29 (dispatch NVA-R37-SIGWALKIT, commits `5d9577b6`, `955f5ebe`)
+
+This dispatch hit its 50-turn limit right after its own verification pass;
+the Elephant independently re-ran both test suites before committing
+(`pipeline-state.test.mjs` green, `check-consumer-safe-paths.test.mjs`
+9/9) — this note is from direct diff/test inspection, not a trusted
+self-report.
+
+- The signature-mode `approve-push` refusal (`pipeline-state.mjs`) states
+  the true PO cost — one command (`authorize-critical`), one passphrase —
+  and names which steps the agent performs itself, needing no key. It
+  offers exactly one route (`docs/push-release-flow.md`), no `chat`
+  mention, no self-push suggestion — the same discipline in the chat-mode
+  branch's message too.
+- Test coverage rewritten to assert the negative (no chat/self-push
+  mention) and the positive (true-cost language present), replacing the
+  old assertion that had PINNED the defect ("must name chat").
+- New role-contract rule `EL-35` (`roles/elephant.md` §3): proposing a
+  `gates.push_approval` downgrade or a self-push is out of contract,
+  names why (the signature is the one real control), and explicitly
+  preserves the PO's own right to change their own configuration.
+
+**Acceptance criteria status:** the ask/test/rule triad is done. Not
+independently confirmed: whether the rule was placed specifically
+"next to" the existing unblocked-while-pending rule the item's own
+Direction 3 named as a placement precedent (that rule was not found in
+`roles/elephant.md` by a quick grep — it may live in
+`docs/operating-model.md` or the push-approval reference doc instead;
+not chased further). `push-approval.md` and `docs/push-release-flow.md`
+were read-context only, not edited by this dispatch's diff. Left
+`status: open` pending a placement check and Critic review.
+
 ## Related
 
 - `2026-08-28-a-blind-session-gets-zero-followable-steps-on-the-feature-and-push-path.md`
