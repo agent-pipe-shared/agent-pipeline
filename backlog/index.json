@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "21b09d4cce61b81a7defc60afddadf7ce45f590ce6f7dbaeb26cbaa2019dbb4b"
+    "transitionHead": "58d3cb8be95dec2feba3c5c5add28e90e6a96e14e5af2f41686bbd9c59da8282"
   },
   "counts": {
-    "open": 97,
+    "open": 95,
     "in_progress": 3,
-    "closed": 423,
+    "closed": 425,
     "rejected": 3,
     "deferred": 11
   },
@@ -1603,7 +1603,7 @@
       "created": "2026-08-28",
       "source": "PO, 2026-08-28: some repositories barely push at all — live deployment runs by other routes, e.g. a Visual Studio build process, or SSH deployment straight onto the Home Assistant server.",
       "deferred": false,
-      "tracking": "Backlog / someday — PO-raised 2026-08-28; not blocking the Nova candidate, but it decides whether the release model fits a whole class of the PO's repositories"
+      "tracking": "Batman (PO decision 2026-08-29) — gate model extension to cover non-agent-invoked deploys, scheduled for Batman, not blocking the Nova/0.6.0 candidate"
     },
     {
       "id": "pipeline.design-to-implementation-path-has-no-driver",
@@ -3465,7 +3465,8 @@
       "owner": "pipeline",
       "created": "2026-08-29",
       "source": "Codex/WSL report, delivered inline in chat by the PO (priority 6 in that report), during the 2026-08-29 three-runner greenfield test.",
-      "deferred": false
+      "deferred": false,
+      "tracking": "Nova B (PO decision 2026-08-29) — low-severity UX friction, current restart-on-repair behavior is safe; investigate later, not a 0.6.0 blocker"
     },
     {
       "id": "pipeline.manifest-repair-paths-are-hardcoded-to-runners-default-codex",
@@ -4975,13 +4976,17 @@
     },
     {
       "id": "pipeline.readiness-guard-blocks-its-own-recovery",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-28",
       "source": "Consumer project HA, incident report S56 finding B3 (2026-08-28, Windows, Claude runner). The denial text is quoted from the report; the guard's own admission logic has not yet been re-read against it here.",
       "deferred": false,
-      "tracking": "NOW / Nova A — a guard that refuses the exact command its own refusal prescribes is a deadlock, and it fired twice in one consumer session"
+      "tracking": "NOW / Nova A — a guard that refuses the exact command its own refusal prescribes is a deadlock, and it fired twice in one consumer session",
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "8c9146d3",
+      "closureEvidence": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs"
     },
     {
       "id": "pipeline.readonly-and-chain-grep-pipe-trailing-stage-not-implemented",
@@ -6192,12 +6197,16 @@
     },
     {
       "id": "pipeline.undocumented-transcript-fallback-selects-wrong-file-by-mtime",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-29",
       "source": "Claude/Windows self-audit report (docs/pipeline-audit-claude-session.md §3.2), cited by scratch/greenfield-triage-2026-08-29.md finding F13, observed during the 2026-08-29 three-runner greenfield test.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "adb60c64",
+      "closureEvidence": "plugins/pipeline-core/hooks/codex-session-start-hint.test.mjs"
     },
     {
       "id": "pipeline.unenforced-process-rules-vary-by-runner",
