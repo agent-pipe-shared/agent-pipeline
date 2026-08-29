@@ -7,6 +7,7 @@ import { join, resolve } from "node:path";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { inspectResumeHint, recordResumeHintConsumption } from "../lib/resume-hint.mjs";
+import { readOnboardingIntakeCheckpoint, readOnboardingIntakeMaterialInput } from "../lib/onboarding-continuity.mjs";
 import { decideOutput, loadStateSafe, shouldActivate } from "./post-compact-reground.mjs";
 import { LEGACY_STATE, NEUTRAL_STATE, resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
 
@@ -82,6 +83,56 @@ const PRIOR_ROLLOUT_TRANSCRIPT_LINE =
   "any git-tracked file, and if no prior transcript can be found or read, say so honestly " +
   "rather than claiming this step was done.";
 
+/**
+ * NVA-CF-RESUMEVERBATIM-HOOK: resumeHintContextLines() below only ever surfaced the
+ * DISTILLED resume-hint card (intent/scope/constraints/questions/progress) -- never the
+ * onboarding intake checkpoint's own verbatim `materialInput` (the user's own design-input
+ * chunks, captured specifically to survive a restart) or its answered `values`
+ * (commit-author name/email, operator language, PO profile). `scripts/resume-hint.mjs`'s
+ * CLI `inspect` command (marker NVA-RESUMEVERBATIM-1) already closes this exact gap for the
+ * MANUAL path by merging readOnboardingIntakeCheckpoint()/readOnboardingIntakeMaterialInput()
+ * into its output -- this mirrors that same read, for the ONE path that delivers text into a
+ * session's context unbidden (see NVA-BL-72 above). Both reads sit behind a single try/catch:
+ * an absent checkpoint, a not-yet-git-initialized root (the private-state resolver has no
+ * git-free fallback), a malformed checkpoint, or any other read failure must degrade to
+ * exactly today's behaviour -- no new lines, never a throw, never a block on SessionStart.
+ * `materialInput` text is NOT re-screened here: `verbatimMaterialRejection()` already screens
+ * every chunk at CAPTURE time (scripts/resume-hint.mjs, before it is ever written into this
+ * checkpoint via applyOnboardingIntakeCapture) -- a duplicate screen here would be redundant,
+ * not defensive.
+ */
+function intakeVerbatimContextLines(root) {
+  let checkpoint;
+  let material;
+  try {
+    checkpoint = readOnboardingIntakeCheckpoint({ rootDir: root });
+    material = readOnboardingIntakeMaterialInput({ rootDir: root });
+  } catch {
+    return [];
+  }
+  if (checkpoint?.status !== "present") return [];
+  const lines = [];
+  const values = checkpoint.value?.values ?? null;
+  if (values) {
+    const parts = [];
+    const author = values.gitAuthor;
+    if (author && (author.name || author.email)) parts.push(`commit author ${author.name ?? "?"} <${author.email ?? "?"}>`);
+    if (values.language) parts.push(`operator language ${values.language}`);
+    if (values.profile) parts.push(`PO profile ${values.profile}`);
+    if (parts.length > 0) lines.push(`Resume-hint answered onboarding values (already answered, do not re-ask): ${parts.join("; ")}.`);
+  }
+  const chunks = Array.isArray(material?.chunks) ? material.chunks : [];
+  if (chunks.length > 0) {
+    lines.push(
+      `Resume-hint verbatim material input from onboarding intake is also available and MUST be read in full now, not treated as already condensed by the summary above (${chunks.length} chunk(s)):`,
+    );
+    chunks.forEach((chunk, index) => {
+      lines.push(`Resume-hint material input chunk ${index + 1} of ${chunks.length}: ${chunk.text}`);
+    });
+  }
+  return lines;
+}
+
 function resumeHintContextLines(root, sessionId) {
   let observed;
   try {
@@ -111,6 +162,7 @@ function resumeHintContextLines(root, sessionId) {
   if (Array.isArray(constraints) && constraints.length > 0) lines.push(`Resume-hint constraints: ${constraints.join("; ")}`);
   if (Array.isArray(questions) && questions.length > 0) lines.push(`Resume-hint questions: ${questions.join("; ")}`);
   if (Array.isArray(progress) && progress.length > 0) lines.push(`Resume-hint progress: ${progress.join("; ")}`);
+  lines.push(...intakeVerbatimContextLines(root));
   return lines;
 }
 
