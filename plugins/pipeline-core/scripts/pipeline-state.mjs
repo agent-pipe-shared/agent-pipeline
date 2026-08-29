@@ -8280,15 +8280,26 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       if (!parsed.ok || isBlank(by)) {
         console.error(pushWaived
           ? 'Error: approve-push requires --by, --remote and --destination (gates.push_approval is "chat"; no external proof is demanded).'
-          // The alternative is named here, not only in an ADR. `signature` is the
-          // fail-closed default, so this refusal is what a fresh consumer meets
-          // first, and a six-flag ceremony with no stated alternative reads as the
-          // only route -- the 2026-08-09 greenfield session hit exactly this, went
-          // looking for the route in the plugin's source, and pushed unapproved.
+          // NVA-R37-SIGWALKIT (backlog/items/2026-08-28-agents-talk-the-po-out-of-the-
+          // signature-instead-of-walking-it.md): this refusal is what a fresh consumer
+          // meets first, so it states the TRUE cost and offers exactly ONE route --
+          // no "or switch to chat" alternative, no self-push suggestion. Naming an
+          // alternative mode here (as an earlier version of this message did) taught an
+          // agent to read the gate as a menu instead of a standing PO decision to walk;
+          // `gates.push_approval` may only ever change by the PO's own act, never as a
+          // route this refusal hands out.
           : 'Error: approve-push requires --by, --remote, --destination, --proof-request, --proof-authority and --proof. '
-            + 'The three proof flags are demanded because gates.push_approval is "signature" (its default). '
-            + 'To let a human clear a push in-session instead, commit gates.push_approval: chat in pipeline.user.yaml '
-            + '(ADR-0056); this command then takes --by, --remote and --destination alone.');
+            + 'The three proof flags are demanded because gates.push_approval is "signature" (its default, and this '
+            + 'project\'s configured value). The PO\'s actual part in producing them is ONE command and ONE '
+            + 'passphrase: run `node plugins/pipeline-core/scripts/po-human-approval.mjs authorize-critical ...` '
+            + '(docs/push-release-flow.md, Layers 2+3) and the PO types `approve`, then their passphrase, at the '
+            + 'prompt -- that is the whole human ceremony. Every other value in that command (the subject hash, the '
+            + 'candidate binding, the expiry, the --proof-request/--proof-authority/--proof paths it produces) is '
+            + 'pure digest computation this agent performs itself first, needing no key at all. Follow '
+            + 'docs/push-release-flow.md end to end. There is no other route: an agent must never propose switching '
+            + 'the gates.push_approval mode, and must never suggest the PO complete the push without this ceremony '
+            + '-- the signature is the one control in this model that is real protection rather than ceremony, and '
+            + 'only the PO may change their own gate configuration.');
         return 2;
       }
       const head = gitHead(dir);
