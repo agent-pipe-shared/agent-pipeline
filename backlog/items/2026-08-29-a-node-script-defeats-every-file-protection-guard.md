@@ -6,7 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-29
 sprint: nova
-done_when: contains plugins/pipeline-core/scripts/check-protected-path-integrity.mjs pipeline.protected-path-integrity
+done_when: path-exists plugins/pipeline-core/scripts/pre-commit-hook-install.mjs
 source: "Antigravity's own hardening test during the 2026-08-29 three-runner greenfield run (docs/pipeline-analysis.md section 5, consumer project Rune_Test1_Agy_060_73); independently corroborated by this repository's own everyday usage pattern on the same day."
 ---
 
@@ -207,5 +207,16 @@ blocking git `pre-commit` hook that refuses a commit whose staged diff touches
 a protected path without a matching consumed capability. Stage 1 is detection
 only; nothing here is wired into any hook or invoked automatically yet — it is
 a standalone script with a `record`/`compare` CLI, not yet called from
-anywhere in the guard family. This item stays `open`; `done_when` is
-unchanged.
+anywhere in the guard family. This item stays `open`.
+
+`done_when` repointed, 2026-08-29 (Elephant, after verifying Stage 1):
+the old marker (`pipeline.protected-path-integrity`) was satisfied the
+moment Stage 1 landed — the same graduation pattern already used on the
+sibling resume-consumption item — so it stopped measuring anything once
+Stage 1 was real. Repointed to `path-exists
+plugins/pipeline-core/scripts/pre-commit-hook-install.mjs`, following this
+repository's own established naming convention for exactly this shape of
+mechanism (`pre-push-hook-install.mjs`). This is a considered guess at
+Stage 2's eventual filename, not a design decision — if Stage 2 lands under
+a different name, repoint again rather than treat a mismatch as a
+regression.
