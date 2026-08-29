@@ -1802,7 +1802,17 @@ function lifecycleArgv(argv, runner, intent = "onboarding") {
   return intent === "onboarding" ? [...argv, "--runner", runner] : [...argv, "--runner", runner, "--intent", intent];
 }
 
-function shellWord(value) {
+/**
+ * NVA-W12-COPYSAFE: exported (previously module-private) so copy-safe-command.mjs
+ * can quote the real argv values of a command that also carries an unresolved
+ * placeholder (e.g. "<plan-sha256>") without re-implementing this quoting --
+ * the placeholder text itself bypasses shellWord() entirely (see
+ * copy-safe-command.mjs's placeholder()), this export only covers the REAL
+ * values sitting alongside it in the same argv. Behavior is unchanged for
+ * every existing caller of renderProjectOnboardingAction(), which still calls
+ * this the same way it always has.
+ */
+export function shellWord(value) {
   if (typeof value !== "string" || value.includes("\0")) {
     throw new TypeError("command arguments must be NUL-free strings");
   }
