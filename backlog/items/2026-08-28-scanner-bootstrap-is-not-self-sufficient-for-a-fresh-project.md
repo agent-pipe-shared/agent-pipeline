@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.scanner-bootstrap-is-not-self-sufficient
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: 193e4dc0
+closure_evidence: plugins/pipeline-core/scripts/security-scan.test.mjs
 created: 2026-08-28
 sprint: nova
 done_when: path-exists plugins/pipeline-core/security/semgrep/pipeline.yml
@@ -81,3 +85,36 @@ scan without hand-building it.
 - Turning the security gate on in a fresh consumer project requires no
   hand-authored scanner configuration and no gate-strength override.
 - The five statuses are distinguishable in the evidence.
+
+## Closure, 2026-08-29 (dispatch NVA-R18-SCANBOOT)
+
+Both Acceptance criteria met, verified by the dispatcher directly:
+`security-scan.test.mjs` → 143/143 (including 8 new fresh-consumer/status-
+distinction cases), `semgrep-default-rules.test.mjs` → 7/7 (real semgrep
+binary exercised live, private-key rule fires), `project-onboarding-v3.
+test.mjs` → 147/0, `check-consumer-safe-paths.test.mjs` → 9/9.
+
+`plugins/pipeline-core/security/semgrep/pipeline.yml` exists — a real,
+tested ruleset, relocated (git-detected 93% rename) from an already-shipped-
+but-differently-named file (`config/security/semgrep-default-rules.yml`,
+landed by an earlier, unrelated dispatch `92d1b711`) rather than duplicated;
+all production/test references repointed.
+
+The two stale seeding-comment reasons this item's own analysis identified
+are corrected in `project-onboarding-v3.mjs` (`19233eab`); the gate's
+default seeded value stays `off`, unchanged, per this item's own
+acknowledgment that the reasoning for defaulting off is sound.
+
+**The "required capabilities" blocker turned out not to be a real
+fresh-consumer problem at all** — disproving this item's own remaining-
+blocker hypothesis, confirmed empirically rather than assumed: an absent
+`governance/security-controls/catalog.json` (the normal fresh-consumer
+shape) already degrades the required-capability set to empty, so
+`checkSecurityCompleteness` (the actual guard-push v2 gate) already passes
+today. No capability-resolution code needed to change; a new regression
+test (`security-scan.test.mjs`'s "fresh consumer (no catalog)" block) pins
+this directly. `sourceCapabilityPlan()`'s `mod.cli-lib` activation heuristic
+— the thing that actually produced the "3 offending required capabilities"
+verdict this item measured — is self-application-only (it fires against
+this repository's own catalog, not a fresh consumer's absent one); noted for
+awareness, not filed as a new item.
