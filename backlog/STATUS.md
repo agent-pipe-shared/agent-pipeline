@@ -470,7 +470,7 @@
 | pipeline.signed-authority-binding-durability | closed | defect | pipeline | 2026-08-06 | — |
 | pipeline.signed-guard-override-has-no-command-that-emits-the-digest-to-sign | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.signing-ceremony-designed-for-the-verifier-not-the-signer | closed | defect | pipeline | 2026-08-08 | — |
-| pipeline.signing-fails-without-a-tty-and-the-error-reads-as-a-wrong-passphrase | open | defect | pipeline | 2026-08-29 | — |
+| pipeline.signing-fails-without-a-tty-and-the-error-reads-as-a-wrong-passphrase | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.single-trust-anchor-excludes-key-rotation-and-teams | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.skill-arguments-and-bootstrap-length | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.source-available-commercial-licensing | closed | workflow-improvement | pipeline | 2026-07-20 | — |
@@ -545,8 +545,8 @@
 
 ## Counts
 
-- open: 95
+- open: 94
 - in_progress: 3
-- closed: 425
+- closed: 426
 - rejected: 3
 - deferred: 11
