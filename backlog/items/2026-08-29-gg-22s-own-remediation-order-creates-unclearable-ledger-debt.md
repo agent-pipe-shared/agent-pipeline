@@ -129,3 +129,16 @@ this dispatch — `guard-git.test.mjs` is TP-1 protected (`guard-testpath.mjs`)
 with no override route available to a Goldfish (`status:
 author-repair-required`). Left `status: open` for the Elephant to add the
 tests (author-repair route or an Elephant-run stage-0 edit) and close.
+
+**Elephant follow-up, 2026-08-29:** the same TP-1 protection refuses the
+identical edit from the Elephant role too — this is a structural, self-
+application constraint on `guard-git.test.mjs` (it gates the git-guard
+union itself), not something role alone resolves. Genuinely needs a PO-
+signed author-repair ceremony. Queued in the PO-gate/signature topic list
+rather than spent now. The drafted `GG22-7`/`GG22-8` test code is preserved
+verbatim in `evidence/dispatch-record-NVA-R16-GG22FIX.json`'s
+`stopCondition.draftTests` field, ready to paste above the `// ---- Summary`
+line once a ceremony clears the path. The source fix itself (commit
+`01c02971`) is real, verified, and shipped independent of this remaining
+test-coverage gap — the guard's behavior is correct today, just not yet
+pinned by a dedicated regression test for this exact case.
