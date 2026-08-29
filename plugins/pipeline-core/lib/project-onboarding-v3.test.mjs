@@ -38,6 +38,7 @@ import {
   freshCriticalHumanProofPolicyBytes,
   observeLocalTrustAnchorPointer,
 } from "./project-onboarding-v3.mjs";
+import { readCriticalHumanProofPolicy } from "./critical-human-proof-policy.mjs";
 import { planRunnerProfileMigrationV3 } from "./runner-profile-migration-v3.mjs";
 import { planInstall as planPrePushHookInstall } from "../scripts/pre-push-hook-install.mjs";
 import { validateV3BootstrapAuthority } from "../scripts/v3-bootstrap-authority.mjs";
@@ -2902,6 +2903,144 @@ test("NVA-V17-NOKEYASK: a machine with no PO signing key at all is told so, once
     assert.equal(JSON.parse(freshCriticalHumanProofPolicyBytes(fakeDeps)).schema, "pipeline.critical-human-proof-policy.v1");
   } finally {
     dispose(noPlaneRoot); dispose(noDirRoot); dispose(readyRoot);
+  }
+});
+
+// NVA-R24-TRUSTANCHOR (backlog: 2026-08-28-onboarding-must-bootstrap-the-trust-
+// anchor-once.md): `trustAnchorAvailability` (READY_ONLY_RESULT_FIELD_BUILDERS
+// above) is shape-pinned in project-onboarding-ready-gate.test.mjs, but its
+// REAL computed value -- for a genuine fresh onboarding, not a hand-typed
+// fixture -- was never exercised on either branch. This is the acceptance
+// criterion itself: "a fresh repository ends init with either a working
+// anchor or a recorded, reported absence".
+test("NVA-R24-TRUSTANCHOR: trustAnchorAvailability reports the real absent/present state at the ready gate", () => {
+  const noKeyRoot = root();
+  const keyedRoot = root();
+  const keyDir = root();
+  try {
+    // (a) absence branch: fakeDeps' own default machine plane has no
+    // poKeyDirectory recorded -- the genuine no-key case.
+    const noKeyBarrier = initializeRestartRequiredRoot(noKeyRoot);
+    clearRuntimeBarrier(noKeyRoot, noKeyBarrier);
+    completeKickoff(noKeyRoot);
+    const absentObserved = inspectProjectOnboardingV3({ rootDir: noKeyRoot, intent: "onboarding", runner: "codex", deps: fakeDeps });
+    assert.equal(absentObserved.status, "ready");
+    assert.equal(absentObserved.trustAnchorAvailability, "absent");
+
+    // (b) working-anchor branch: a machine that already holds a signing key.
+    const publicKeySha256 = "c".repeat(64);
+    writeFileSync(join(keyDir, "trust-policy.json"), `${JSON.stringify({ keyReference: "po-key-ready", publicKeySha256, humanName: "Ready Test" }, null, 2)}\n`);
+    const machineHasKey = { ...fakeDeps, readMachinePlane() {
+      return {
+        status: "valid",
+        plane: {
+          schema: "pipeline.machine-plane.v1", poKeyDirectory: keyDir, pushApprovalDefault: "signature",
+          routing: null, language: null, session: null, usage: null, updatedAt: "2026-08-08T00:00:00.000Z",
+        },
+      };
+    } };
+    const keyedBarrier = initializeRestartRequiredRoot(keyedRoot, machineHasKey);
+    clearRuntimeBarrier(keyedRoot, keyedBarrier);
+    completeKickoff(keyedRoot, "Build a safe project", machineHasKey);
+    const presentObserved = inspectProjectOnboardingV3({ rootDir: keyedRoot, intent: "onboarding", runner: "codex", deps: machineHasKey });
+    assert.equal(presentObserved.status, "ready");
+    assert.equal(presentObserved.trustAnchorAvailability, "present");
+  } finally {
+    dispose(noKeyRoot); dispose(keyedRoot); dispose(keyDir);
+  }
+});
+
+// NVA-R24-TRUSTANCHOR (backlog: 2026-08-28-onboarding-must-bootstrap-the-trust-
+// anchor-once.md, Direction #1): "an existing key directory is detected and
+// reused when present -- never silently overwritten". Every write site for
+// `project/critical-human-proof.json` is create-only, so nothing in this
+// codebase currently has a write path to `poKeyDirectory` at all -- this test
+// pins that as an explicit, observable fact (byte-for-byte, full directory
+// listing) rather than leaving it as an absence of a code path nobody
+// measured.
+test("NVA-R24-TRUSTANCHOR: a pre-existing key directory is reused byte-for-byte, never written to, by the onboarding transaction", () => {
+  const keyedRoot = root();
+  const keyDir = root();
+  try {
+    const publicKeySha256 = "d".repeat(64);
+    const trustPolicyPath = join(keyDir, "trust-policy.json");
+    const originalBytes = `${JSON.stringify({ keyReference: "po-key-byteforbyte", publicKeySha256, humanName: "Byte Test" }, null, 2)}\n`;
+    writeFileSync(trustPolicyPath, originalBytes);
+    const entriesBefore = readdirSync(keyDir).sort();
+
+    const machineHasKey = { ...fakeDeps, readMachinePlane() {
+      return {
+        status: "valid",
+        plane: {
+          schema: "pipeline.machine-plane.v1", poKeyDirectory: keyDir, pushApprovalDefault: "signature",
+          routing: null, language: null, session: null, usage: null, updatedAt: "2026-08-08T00:00:00.000Z",
+        },
+      };
+    } };
+    const barrier = initializeRestartRequiredRoot(keyedRoot, machineHasKey);
+    clearRuntimeBarrier(keyedRoot, barrier);
+    completeKickoff(keyedRoot, "Build a safe project", machineHasKey);
+    const observed = inspectProjectOnboardingV3({ rootDir: keyedRoot, intent: "onboarding", runner: "codex", deps: machineHasKey });
+    assert.equal(observed.status, "ready");
+    assert.equal(observed.trustAnchorAvailability, "present",
+      "the key directory must actually have been read and reused, not merely left untouched by accident");
+
+    assert.deepEqual(readdirSync(keyDir).sort(), entriesBefore,
+      "onboarding must never create or remove any file inside the reused key directory");
+    assert.equal(readFileSync(trustPolicyPath, "utf8"), originalBytes,
+      "onboarding must never modify the reused key directory's own trust-policy.json bytes");
+  } finally {
+    dispose(keyedRoot); dispose(keyDir);
+  }
+});
+
+// NVA-R24-TRUSTANCHOR (backlog: 2026-08-28-onboarding-must-bootstrap-the-trust-
+// anchor-once.md, acceptance criterion 3 / DoD check 5): closely simulates the
+// exact circularity the item's "What happened" section describes -- the first
+// human-override ceremony discovering the anchor's absence as
+// HGO-TRUST-ANCHOR-MISSING (human-guard-override.mjs:3157-3168) only because
+// `setup` never ran. `authorizeHumanGuardOverrideBySignature()` resolves its
+// trust anchors through readCriticalHumanProofPolicy(rootDir) exactly as
+// exercised here (human-guard-override.mjs's own resolution branch: a
+// non-`ok` policy or an empty/absent `trustAnchors` set both fall straight
+// through to that fail); a full signed ceremony additionally needs a real
+// Ed25519 proof this test does not fabricate, so this pins the one precondition
+// that previously made the ceremony unreachable regardless of proof validity.
+//
+// This is also the regression pin for the shape defect this dispatch found
+// live (scratch/probe-trust-anchor-shape.mjs): the materialized v3 document
+// omitted `waivedKinds`, which critical-human-proof-policy.mjs's own
+// exactKeys() shape check requires on every v2/v3 document -- so the seeded
+// anchor was rejected by its own consumer as CRITICAL-PROOF-POLICY-INVALID,
+// reproducing the exact deadlock this function exists to prevent.
+test("NVA-R24-TRUSTANCHOR: a freshly bootstrapped anchor is actually accepted by the same resolution the signed override ceremony uses -- no HGO-TRUST-ANCHOR-MISSING deadlock", () => {
+  const keyedRoot = root();
+  const keyDir = root();
+  try {
+    const publicKeySha256 = "e".repeat(64);
+    writeFileSync(join(keyDir, "trust-policy.json"), `${JSON.stringify({ keyReference: "po-key-hgo", publicKeySha256, humanName: "HGO Test" }, null, 2)}\n`);
+    const machineHasKey = { ...fakeDeps, readMachinePlane() {
+      return {
+        status: "valid",
+        plane: {
+          schema: "pipeline.machine-plane.v1", poKeyDirectory: keyDir, pushApprovalDefault: "signature",
+          routing: null, language: null, session: null, usage: null, updatedAt: "2026-08-08T00:00:00.000Z",
+        },
+      };
+    } };
+    const barrier = initializeRestartRequiredRoot(keyedRoot, machineHasKey);
+    clearRuntimeBarrier(keyedRoot, barrier);
+    completeKickoff(keyedRoot, "Build a safe project", machineHasKey);
+
+    // The exact same read authorizeHumanGuardOverrideBySignature() performs
+    // before it would otherwise fail("HGO-TRUST-ANCHOR-MISSING", ...).
+    const policy = readCriticalHumanProofPolicy(keyedRoot);
+    assert.equal(policy.ok, true, "the seeded policy document must parse as valid, never CRITICAL-PROOF-POLICY-INVALID");
+    assert.equal(Array.isArray(policy.trustAnchors) && policy.trustAnchors.length > 0, true,
+      "a non-empty resolved trustAnchors set is exactly what keeps authorizeHumanGuardOverrideBySignature() out of the HGO-TRUST-ANCHOR-MISSING branch");
+    assert.equal(policy.trustAnchors[0].publicKeySha256, publicKeySha256);
+  } finally {
+    dispose(keyedRoot); dispose(keyDir);
   }
 });
 
