@@ -22,7 +22,7 @@ import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 
 import { createCriticalActionApprovalRequest, criticalActionSubjectSha256 } from "../lib/critical-action-approval-request.mjs";
-import { SCHEMA_ID, continuityLockPath, externalPathIsOutsideRoot, run, statePath, statePhaseProjectionMarker } from "./pipeline-state.mjs";
+import { PO_ACK_APPLY_CONFIRMATION_TOKEN, SCHEMA_ID, continuityLockPath, externalPathIsOutsideRoot, run, statePath, statePhaseProjectionMarker } from "./pipeline-state.mjs";
 import { INTAKE_STAGING_DIRNAME } from "../lib/onboarding-continuity.mjs";
 import {
   PLAN_AUTHORITY_PROMOTION_SUBCOMMAND,
@@ -563,10 +563,12 @@ function invokeCaptured(argv, deps) {
   assert.equal(planned.status, 0, planned.err);
   const plan = JSON.parse(planned.out);
   assert.equal(plan.schema, "pipeline.po-authority-acknowledge-plan.v1");
-  // AGY-PRDGATE-1: apply is now gated by requireAttendedChatGateConfirmation();
+  // AGY-PRDGATE-1/AGY-CF-BL15: apply is gated by requireAttendedChatGateConfirmation();
   // a genuinely attended confirming call (simulated via the injectable seam)
-  // must retype the exact --by value to succeed.
-  const attendedDeps = { ...deps, isattyFn: () => true, readLineFn: () => plan.by };
+  // must retype the fixed PO_ACK_APPLY_CONFIRMATION_TOKEN to succeed -- never
+  // --by itself (backlog/items/2026-08-28-a-gate-should-not-demand-a-human-
+  // name-typed-byte-exactly.md).
+  const attendedDeps = { ...deps, isattyFn: () => true, readLineFn: () => PO_ACK_APPLY_CONFIRMATION_TOKEN };
   const applied = invokeCaptured(plan.applyAction.argv.slice(1), attendedDeps);
   assert.equal(applied.status, 0, applied.err);
   const prdAfter = readFileSync(join(root, planPath), "utf8");
@@ -618,10 +620,10 @@ function invokeCaptured(argv, deps) {
   staleArgv[shaIndex] = wrongSha;
   const before = readFileSync(join(root, planPath), "utf8");
   const beforeState = readFileSync(statePath(root), "utf8");
-  // AGY-PRDGATE-1: --by is unchanged ("PO") in this stale-digest scenario, so
-  // an attended confirmation of it must pass the gate and fall through to the
+  // AGY-PRDGATE-1/AGY-CF-BL15: the attended confirmation types the fixed
+  // token (independent of --by), passes the gate, and falls through to the
   // pre-existing stale-plan digest refusal below.
-  const attendedDeps = { ...deps, isattyFn: () => true, readLineFn: () => "PO" };
+  const attendedDeps = { ...deps, isattyFn: () => true, readLineFn: () => PO_ACK_APPLY_CONFIRMATION_TOKEN };
   const rejected = invokeCaptured(staleArgv, attendedDeps);
   assert.equal(rejected.status, 2);
   assert.ok(rejected.err.toLowerCase().includes("stale"), rejected.err);
@@ -658,18 +660,19 @@ function invokeCaptured(argv, deps) {
   mismatchedArgv[byIndex] = "Someone Else";
   const before = readFileSync(join(root, planPath), "utf8");
   const beforeState = readFileSync(statePath(root), "utf8");
-  // AGY-PRDGATE-1: the confirmation gate is checked against THIS call's own
-  // --by ("Someone Else"), so an attended retyping of that exact (wrong,
-  // mismatched-attribution) value still passes the gate and falls through to
-  // the pre-existing stale-plan digest refusal below.
-  const mismatchedAttendedDeps = { ...deps, isattyFn: () => true, readLineFn: () => "Someone Else" };
+  // AGY-CF-BL15: the confirmation gate compares against the fixed token, not
+  // --by, so an attended retyping of the token still passes the gate
+  // regardless of the (wrong, mismatched-attribution) --by value, and falls
+  // through to the pre-existing stale-plan digest refusal below -- proving
+  // --by's binding lives in the digest check, never in the confirmation gate.
+  const mismatchedAttendedDeps = { ...deps, isattyFn: () => true, readLineFn: () => PO_ACK_APPLY_CONFIRMATION_TOKEN };
   const rejected = invokeCaptured(mismatchedArgv, mismatchedAttendedDeps);
   assert.equal(rejected.status, 2);
   assert.ok(rejected.err.toLowerCase().includes("stale"), rejected.err);
   assert.equal(readFileSync(join(root, planPath), "utf8"), before, "a mismatched-attribution apply must leave the PRD untouched");
   assert.equal(readFileSync(statePath(root), "utf8"), beforeState, "a mismatched-attribution apply must leave State untouched");
   // The exact --by the plan recorded still applies cleanly.
-  const realAttendedDeps = { ...deps, isattyFn: () => true, readLineFn: () => "PO" };
+  const realAttendedDeps = { ...deps, isattyFn: () => true, readLineFn: () => PO_ACK_APPLY_CONFIRMATION_TOKEN };
   const applied = invokeCaptured(realArgv, realAttendedDeps);
   assert.equal(applied.status, 0, applied.err);
 }
@@ -691,7 +694,7 @@ function invokeCaptured(argv, deps) {
   const observed = [];
   const failingDeps = {
     ...deps,
-    isattyFn: () => true, readLineFn: () => plan.by,
+    isattyFn: () => true, readLineFn: () => PO_ACK_APPLY_CONFIRMATION_TOKEN,
     v4Inspection: (request) => request.intent === "dispatch"
       ? { status: "blocked", diagnostics: [{ code: "TEST-INJECTED-NOT-READY" }] }
       : { status: "ready" },
@@ -721,6 +724,64 @@ function invokeCaptured(argv, deps) {
   // Fail-closed behaviour itself is unchanged: rollback actually happened.
   assert.equal(readFileSync(join(root, planPath), "utf8"), before, "a failed postimage readback must leave the PRD untouched");
   assert.equal(readFileSync(statePath(root), "utf8"), beforeState, "a failed postimage readback must leave State untouched");
+}
+
+// AGY-CF-BL15 (backlog/items/2026-08-28-a-gate-should-not-demand-a-human-name-
+// typed-byte-exactly.md): the compared confirmation value must be a short,
+// fixed ASCII token, independent of --by -- never the free-form name itself
+// (arbitrary Unicode, arbitrary length, not reliably reproducible through
+// every terminal's input path). Proven two ways: (1) the token itself is
+// short, printable ASCII; (2) an attended confirmation that types the token
+// succeeds for a --by value carrying non-ASCII bytes that could never
+// themselves survive a byte-exact console retype, while typing that --by
+// value back (the OLD comparison) is now refused.
+{
+  assert.ok(/^[\x21-\x7E]{1,32}$/u.test(PO_ACK_APPLY_CONFIRMATION_TOKEN),
+    `the confirmation token must be short, printable ASCII: ${JSON.stringify(PO_ACK_APPLY_CONFIRMATION_TOKEN)}`);
+
+  const { deps } = acknowledgeFixture("token-independent-of-by");
+  const planned = invokeCaptured(["po-authority-acknowledge-plan", "--by", "André"], deps);
+  assert.equal(planned.status, 0, planned.err);
+  const plan = JSON.parse(planned.out);
+  assert.equal(plan.by, "André", "a non-ASCII --by value must still be accepted and planned");
+
+  // Typing the (non-ASCII, disclosed) --by value back is refused: the gate no
+  // longer compares against it.
+  const typedByValue = invokeCaptured(plan.applyAction.argv.slice(1),
+    { ...deps, isattyFn: () => true, readLineFn: () => plan.by });
+  assert.equal(typedByValue.status, 1, typedByValue.err);
+  assert.ok(typedByValue.err.includes("CHAT-GATE-CONFIRMATION-MISMATCH"), typedByValue.err);
+
+  // Typing the fixed token succeeds -- independent of what --by was.
+  const typedToken = invokeCaptured(plan.applyAction.argv.slice(1),
+    { ...deps, isattyFn: () => true, readLineFn: () => PO_ACK_APPLY_CONFIRMATION_TOKEN });
+  assert.equal(typedToken.status, 0, typedToken.err);
+}
+
+// AGY-CF-BL15: the disclosure must still show the human's name unchanged,
+// even though the COMPARED value no longer is it (acceptance criterion: "the
+// disclosure still shows the human name, unchanged, so the audit trail is
+// not reduced").
+{
+  const { deps } = acknowledgeFixture("disclosure-unchanged");
+  const planned = invokeCaptured(["po-authority-acknowledge-plan", "--by", "Jordan Rivera"], deps);
+  assert.equal(planned.status, 0, planned.err);
+  const plan = JSON.parse(planned.out);
+  let capturedPrompt = null;
+  const attendedDeps = {
+    ...deps, isattyFn: () => true,
+    readLineFn: (prompt) => { capturedPrompt = prompt; return PO_ACK_APPLY_CONFIRMATION_TOKEN; },
+  };
+  const applied = invokeCaptured(plan.applyAction.argv.slice(1), attendedDeps);
+  assert.equal(applied.status, 0, applied.err);
+  assert.ok(capturedPrompt !== null, "the confirmation prompt must be built and shown");
+  assert.ok(capturedPrompt.includes(`by: ${plan.by}`),
+    `the disclosed human name must still appear unchanged in the confirmation summary: ${capturedPrompt}`);
+  // Durable audit trail: the persisted acknowledgement still records the real
+  // human name, never the fixed token.
+  const stateAfter = JSON.parse(readFileSync(statePath(deps.dir), "utf8"));
+  assert.equal(stateAfter.poGateAcknowledgement.by, "Jordan Rivera",
+    "the durable acknowledgement record must keep the disclosed human name, not the confirmation token");
 }
 
 // NVA-STAGINGBOLT-1: a plan submission or approval whose plan or spec path
