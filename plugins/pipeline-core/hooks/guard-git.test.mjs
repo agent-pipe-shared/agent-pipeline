@@ -1348,6 +1348,52 @@ check(
   { projectDir: GG22_DEBT_DIR, env: { PATH: "/nonexistent-guard-test-bin" } },
 );
 
+// GG22-7: the corrected remediation order (item edits committed FIRST, reconciler run ONCE, ledger
+// commit LAST) drains debt cleanly -- this is the exact sequence that trapped an agent following the
+// OLD (reconcile-first) printed order live on 2026-08-29
+// (backlog/items/2026-08-29-gg-22s-own-remediation-order-creates-unclearable-ledger-debt.md). Batches
+// two item closures into one commit (the guard's own code comment: "batched multi-item closures ...
+// before one shared reconciliation commit are an established, legitimate pattern").
+const GG22_FIXED_ORDER_DIR = gitRepoFixture("guard-test-gg22-fixed-order-");
+commitFile(GG22_FIXED_ORDER_DIR, "seed.txt", "seed\n");
+gg22CommitItem(GG22_FIXED_ORDER_DIR, "one.md", "open", "chore: add item one (open)");
+gg22CommitItem(GG22_FIXED_ORDER_DIR, "two.md", "open", "chore: add item two (open)");
+gg22CommitLedgerTouch(GG22_FIXED_ORDER_DIR, "chore: reconcile backlog ledger", 1);
+// Batch-close both items in one commit -- item edits committed FIRST, per the corrected order.
+mkdirSync(join(GG22_FIXED_ORDER_DIR, "backlog", "items"), { recursive: true });
+writeFileSync(join(GG22_FIXED_ORDER_DIR, "backlog", "items", "one.md"), gg22ItemBody("closed"));
+writeFileSync(join(GG22_FIXED_ORDER_DIR, "backlog", "items", "two.md"), gg22ItemBody("closed"));
+gitIn(GG22_FIXED_ORDER_DIR)("add", "--", "backlog/items/one.md", "backlog/items/two.md");
+gitIn(GG22_FIXED_ORDER_DIR)("commit", "--quiet", "-m", "chore: close items one and two");
+// Reconcile ONCE, ledger commit LAST -- after the item commit, not before it.
+gg22CommitLedgerTouch(GG22_FIXED_ORDER_DIR, "chore: reconcile backlog ledger", 2);
+gg22StageFile(GG22_FIXED_ORDER_DIR, "src/app.mjs", "export const x = 1;\n");
+check(
+  "GG22-7 allow  fixed order: item edits committed first, reconciler run once, ledger commit last -- no debt",
+  'git commit -m "feat: add app"',
+  ALLOW,
+  { projectDir: GG22_FIXED_ORDER_DIR },
+);
+
+// GG22-8: the remediation guidance TEXT itself states the corrected order -- item edits first,
+// reconciler once, ledger commit last -- and reuses GG22-3's own debt fixture (same BLOCK case) to
+// prove the printed message no longer tells an agent to commit the ledger "before any other commit"
+// (the phrasing that forced the inverted, debt-trapping order) and instead names the item-edits-first,
+// ledger-last sequence.
+check(
+  "GG22-8 block  remediation text states the corrected reconcile-last order, not reconcile-first",
+  'git commit -m "feat: add app"',
+  BLOCK,
+  {
+    projectDir: GG22_DEBT_DIR,
+    stderrIncludes: [
+      "GG-22",
+      "Commit any pending backlog/items/ status edits first",
+      "then commit the resulting backlog/STATUS.md / backlog/index.json / backlog/transitions.ndjson changes last.",
+    ],
+  },
+);
+
 // ---- Summary -------------------------------------------------------------------------------------
 for (const dir of [EMPTY_DIR, CFG_DIR, BROKEN_DIR, OV_DIR, OV_NOLEDGER_DIR, CFG_GITOPT_DIR, ...SIGNED_ROOTS]) {
   try {

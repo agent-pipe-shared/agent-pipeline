@@ -678,6 +678,129 @@ function stepEntrypoint({ dryRun, preview }) {
   return { status: "applied", detail };
 }
 
+/* ---------------------------------- F. guard-git.test.mjs (TP-1) GG22-7/GG22-8 fixtures */
+
+// WHY. backlog/items/2026-08-29-gg-22s-own-remediation-order-creates-unclearable-ledger-debt.md
+// -- the source fix (corrected remediation text, commit 01c02971) already landed. The two
+// fixture tests it also requires (GG22-7: the corrected item-edits-first/reconcile-once/
+// ledger-last order drains debt cleanly; GG22-8: the printed remediation text names that
+// corrected order, not the inverted one that trapped an agent following it literally) could
+// not be committed by that dispatch or by a follow-up Elephant attempt -- guard-git.test.mjs
+// is TP-1 protected with no override route (`author-repair-required`, structural, not
+// role-dependent). This step is the sanctioned operator route, mirroring stepGuardGitCwd.
+
+const GG22_ANCHOR = `// GG22-6: fail-open -- a spawnSync git failure (PATH broken for the guard's own child process)
+// must never block, even against the exact same debt state that GG22-3 proves DOES block.
+check(
+  "GG22-6 allow  fail-open: a spawnSync git failure never blocks (same debt state as GG22-3)",
+  'git commit -m "feat: add app"',
+  ALLOW,
+  { projectDir: GG22_DEBT_DIR, env: { PATH: "/nonexistent-guard-test-bin" } },
+);
+
+// ---- Summary -------------------------------------------------------------------------------------`;
+
+const GG22_REPLACEMENT = `// GG22-6: fail-open -- a spawnSync git failure (PATH broken for the guard's own child process)
+// must never block, even against the exact same debt state that GG22-3 proves DOES block.
+check(
+  "GG22-6 allow  fail-open: a spawnSync git failure never blocks (same debt state as GG22-3)",
+  'git commit -m "feat: add app"',
+  ALLOW,
+  { projectDir: GG22_DEBT_DIR, env: { PATH: "/nonexistent-guard-test-bin" } },
+);
+
+// GG22-7: the corrected remediation order (item edits committed FIRST, reconciler run ONCE, ledger
+// commit LAST) drains debt cleanly -- this is the exact sequence that trapped an agent following the
+// OLD (reconcile-first) printed order live on 2026-08-29
+// (backlog/items/2026-08-29-gg-22s-own-remediation-order-creates-unclearable-ledger-debt.md). Batches
+// two item closures into one commit (the guard's own code comment: "batched multi-item closures ...
+// before one shared reconciliation commit are an established, legitimate pattern").
+const GG22_FIXED_ORDER_DIR = gitRepoFixture("guard-test-gg22-fixed-order-");
+commitFile(GG22_FIXED_ORDER_DIR, "seed.txt", "seed\\n");
+gg22CommitItem(GG22_FIXED_ORDER_DIR, "one.md", "open", "chore: add item one (open)");
+gg22CommitItem(GG22_FIXED_ORDER_DIR, "two.md", "open", "chore: add item two (open)");
+gg22CommitLedgerTouch(GG22_FIXED_ORDER_DIR, "chore: reconcile backlog ledger", 1);
+// Batch-close both items in one commit -- item edits committed FIRST, per the corrected order.
+mkdirSync(join(GG22_FIXED_ORDER_DIR, "backlog", "items"), { recursive: true });
+writeFileSync(join(GG22_FIXED_ORDER_DIR, "backlog", "items", "one.md"), gg22ItemBody("closed"));
+writeFileSync(join(GG22_FIXED_ORDER_DIR, "backlog", "items", "two.md"), gg22ItemBody("closed"));
+gitIn(GG22_FIXED_ORDER_DIR)("add", "--", "backlog/items/one.md", "backlog/items/two.md");
+gitIn(GG22_FIXED_ORDER_DIR)("commit", "--quiet", "-m", "chore: close items one and two");
+// Reconcile ONCE, ledger commit LAST -- after the item commit, not before it.
+gg22CommitLedgerTouch(GG22_FIXED_ORDER_DIR, "chore: reconcile backlog ledger", 2);
+gg22StageFile(GG22_FIXED_ORDER_DIR, "src/app.mjs", "export const x = 1;\\n");
+check(
+  "GG22-7 allow  fixed order: item edits committed first, reconciler run once, ledger commit last -- no debt",
+  'git commit -m "feat: add app"',
+  ALLOW,
+  { projectDir: GG22_FIXED_ORDER_DIR },
+);
+
+// GG22-8: the remediation guidance TEXT itself states the corrected order -- item edits first,
+// reconciler once, ledger commit last -- and reuses GG22-3's own debt fixture (same BLOCK case) to
+// prove the printed message no longer tells an agent to commit the ledger "before any other commit"
+// (the phrasing that forced the inverted, debt-trapping order) and instead names the item-edits-first,
+// ledger-last sequence.
+check(
+  "GG22-8 block  remediation text states the corrected reconcile-last order, not reconcile-first",
+  'git commit -m "feat: add app"',
+  BLOCK,
+  {
+    projectDir: GG22_DEBT_DIR,
+    stderrIncludes: [
+      "GG-22",
+      "Commit any pending backlog/items/ status edits first",
+      "then commit the resulting backlog/STATUS.md / backlog/index.json / backlog/transitions.ndjson changes last.",
+    ],
+  },
+);
+
+// ---- Summary -------------------------------------------------------------------------------------`;
+
+const GUARD_GIT_22_EXPECTED = /232\/232 cases passed\./u;
+
+// A sibling of the real suite, same reasoning as GUARD_GIT_PREVIEW_PATH above. Never a protected
+// path: TP-1 matches `guard-git\.test\.mjs$` and this name does not.
+const GUARD_GIT_22_PREVIEW_PATH = join(dirname(GUARD_GIT_TEST_PATH), "guard-git.gg22.preview-check.mjs");
+
+function stepGuardGit22({ dryRun, preview }) {
+  const original = readFileSync(GUARD_GIT_TEST_PATH, "utf8");
+  if (original.includes("GG22-7 allow")) {
+    return { status: "already-applied", detail: "GG22-7/GG22-8 fixture tests are already present" };
+  }
+
+  const next = anchoredReplace(original, GG22_ANCHOR, GG22_REPLACEMENT, "GG22-6 block through Summary marker");
+
+  if (preview) {
+    try {
+      writeFileSync(GUARD_GIT_22_PREVIEW_PATH, next, "utf8");
+      const suite = run([GUARD_GIT_22_PREVIEW_PATH]);
+      const summary = suite.output.split("\n").filter((line) => /^(FAIL|\d+\/\d+ cases passed\.)/u.test(line)).join("\n");
+      if (suite.code !== 0 || !GUARD_GIT_22_EXPECTED.test(suite.output)) {
+        throw new Error(`preview run did not reach "232/232 cases passed." (exit ${suite.code}):\n${summary || suite.output.slice(-2000)}`);
+      }
+      return { status: "preview-green", detail: `${summary} -- run from a removed sibling; ${rel(GUARD_GIT_TEST_PATH)} was not touched` };
+    } finally {
+      rmSync(GUARD_GIT_22_PREVIEW_PATH, { force: true });
+    }
+  }
+
+  if (dryRun) {
+    return { status: "would-apply", detail: "1 anchored edit: insert GG22-7/GG22-8 fixture tests before the Summary marker" };
+  }
+
+  const detail = writeThenVerifyOrRevert(GUARD_GIT_TEST_PATH, original, next, () => {
+    const suite = run([GUARD_GIT_TEST_PATH]);
+    if (suite.code !== 0 || !GUARD_GIT_22_EXPECTED.test(suite.output)) {
+      const summary = suite.output.split("\n").filter((line) => /^(FAIL|\d+\/\d+ cases passed\.)/u.test(line)).join("\n");
+      return { ok: false, detail: `expected "232/232 cases passed.", got exit ${suite.code}:\n${summary || suite.output.slice(-2000)}` };
+    }
+    return { ok: true, detail: "guard-git: 232/232 cases passed." };
+  });
+
+  return { status: "applied", detail };
+}
+
 /* ---------------------------------------- D. guard-git.test.mjs (TP-1) fixture cwd */
 
 // WHY. guard-git.mjs's GIT-03 message-file check now resolves a `-F <path>` against
@@ -869,9 +992,10 @@ const STEPS = [
   { key: "entrypoint", label: `C. stop EP07 recording real guard denials against this repo in ${rel(ENTRYPOINT_PATH)} (TP-8)`, fn: stepEntrypoint },
   { key: "guard-git-cwd", label: `D. set runGuard()'s spawned guard cwd to its own fixture dir in ${rel(GUARD_GIT_TEST_PATH)} (TP-1)`, fn: stepGuardGitCwd },
   { key: "verify-nva-c-protected", label: `E. register ${VERIFY_REGISTRATIONS_NVA_C_PROTECTED.length} more pending suites (NVA-C-PROTECTED) in ${rel(VERIFY_PATH)} (TP-3)`, fn: stepVerifyNvaCProtected },
+  { key: "guard-git-22", label: `F. add GG22-7/GG22-8 fixture tests to ${rel(GUARD_GIT_TEST_PATH)} (TP-1)`, fn: stepGuardGit22 },
 ];
 
-const PREVIEWABLE = new Set(["gate-strength", "entrypoint", "guard-git-cwd", "verify-nva-c-protected"]);
+const PREVIEWABLE = new Set(["gate-strength", "entrypoint", "guard-git-cwd", "verify-nva-c-protected", "guard-git-22"]);
 
 if (only !== null && !STEPS.some((step) => step.key === only)) {
   process.stderr.write(`unknown --only value: ${only}\nExpected one of: ${STEPS.map((step) => step.key).join(", ")}\n`);
