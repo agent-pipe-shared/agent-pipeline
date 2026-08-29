@@ -64,6 +64,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { writeTargetPath } from "../lib/tool-write-target.mjs";
+import { parseYaml } from "../lib/yaml-lite.mjs";
 import { bootstrapBindingStagingAuthoringAdmitted } from "../lib/onboarding-staging-authoring.mjs";
 import { isNeverLiftableKernelPath, windowCoversRule } from "../lib/guard-maintenance-window.mjs";
 import { readPushApprovalMode } from "../lib/critical-human-proof-policy.mjs";
@@ -175,6 +176,147 @@ export const GATE_STRENGTH_PATHS = Object.freeze([
     reason: "onboarding staging artifacts are coordinator-managed and must not be modified directly during implementation.",
   }),
 ]);
+
+// ---------------------------------------------------------------------------------
+// NVA-W13-GATESTRENGTH (backlog/items/2026-08-29-pipeline-user-yaml-file-level-
+// protection-forces-signature-ceremony.md): field-scoped protection for GS-1 only.
+// pipeline.field-scoped-gate-strength-protection -- the marker `done_when` greps for.
+//
+// GS-1's own stated `reason` above names ONE field (`gates.push_approval`), not the
+// file's contents as a whole, but the write lane matches by PATH only -- so editing
+// the wholly unrelated `language.human_facing` field cost the identical full ceremony
+// as editing `gates.push_approval` itself. This closes that gap for GS-1 alone (the
+// only entry in GATE_STRENGTH_PATHS whose stated reason names a single field, per the
+// backlog item's own Proposal §1): an Edit/Write whose FIELD-LEVEL diff touches only
+// an explicitly allowlisted, known-safe dotted path stands down; everything else --
+// any field this allowlist does not name, any parse failure, any edit this module
+// cannot cleanly simulate -- falls straight through to the unchanged, file-scoped
+// ceremony below. Default-deny by construction (Acceptance bullet 2's own framing:
+// "any field not on the explicit non-protected allowlist... still requires the full
+// ceremony"): widening the allowlist is a deliberate, reviewable, one-line addition,
+// never a class of edit silently slipping through.
+//
+// Deliberately does NOT touch the shell lane (`GUARD-GATE-STRENGTH-SHELL` in
+// guard-lifecycle-ready.mjs): that classifier matches on the file NAME appearing
+// anywhere in an arbitrary shell command string and says so in its own denial text --
+// it cannot tell a read from a write inside such a string, let alone which FIELD a
+// write would touch, so it stays file-scoped even after this fix (Acceptance bullet
+// 3; see the backlog item's own Shell-lane note for the disclosed rationale).
+// ---------------------------------------------------------------------------------
+
+export const GATE_STRENGTH_FIELD_SCOPE_SCHEMA = "pipeline.field-scoped-gate-strength-protection.v1";
+
+/** Dotted-path allowlist per GATE_STRENGTH_PATHS `path`. Only GS-1 has an entry today;
+ * every other rule keeps its unqualified, file-level protection, unchanged. */
+export const GATE_STRENGTH_FIELD_EXEMPTIONS = Object.freeze({
+  "pipeline.user.yaml": Object.freeze(["language.human_facing"]),
+});
+
+/** Flattens a parsed yaml-lite value into `{ "a.b.c": leafValue }`, treating arrays and
+ * `null` as opaque leaves (never descended into) -- this only needs to tell "this leaf
+ * changed" from "this leaf did not", never to diff array contents element-by-element. */
+function flattenGateStrengthYaml(value, prefix, out) {
+  if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+    for (const key of Object.keys(value)) {
+      flattenGateStrengthYaml(value[key], prefix === "" ? key : `${prefix}.${key}`, out);
+    }
+    return;
+  }
+  out.set(prefix, value);
+}
+
+/** Structural equality over yaml-lite's own value shapes (string/number/boolean/null/
+ * array/plain object) -- deliberately not JSON.stringify, whose key-order sensitivity
+ * would misclassify a semantically-unchanged object as a changed leaf. */
+function gateStrengthValuesEqual(a, b) {
+  if (a === b) return true;
+  if (Array.isArray(a) || Array.isArray(b)) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+    return a.every((entry, index) => gateStrengthValuesEqual(entry, b[index]));
+  }
+  if (a !== null && b !== null && typeof a === "object" && typeof b === "object") {
+    const aKeys = Object.keys(a);
+    const bKeys = Object.keys(b);
+    if (aKeys.length !== bKeys.length) return false;
+    return aKeys.every((key) => Object.hasOwn(b, key) && gateStrengthValuesEqual(a[key], b[key]));
+  }
+  return false;
+}
+
+/** The set of dotted leaf paths that differ between two parsed yaml-lite documents --
+ * added, removed, or changed value alike. Exported for direct unit coverage. */
+export function changedGateStrengthDottedPaths(before, after) {
+  const beforeMap = new Map();
+  const afterMap = new Map();
+  flattenGateStrengthYaml(before, "", beforeMap);
+  flattenGateStrengthYaml(after, "", afterMap);
+  const paths = new Set([...beforeMap.keys(), ...afterMap.keys()]);
+  const changed = [];
+  for (const path of paths) {
+    if (!beforeMap.has(path) || !afterMap.has(path) || !gateStrengthValuesEqual(beforeMap.get(path), afterMap.get(path))) {
+      changed.push(path);
+    }
+  }
+  return changed;
+}
+
+/**
+ * The proposed full post-write text for a write-shaped tool call, against the target's
+ * CURRENT on-disk content -- mirrors `guard-handover-size.mjs`'s own `proposedHandoverBytes`
+ * Edit-simulation shape (single-occurrence replacement computed by hand, never
+ * `String.prototype.replace()`, whose replacement-string argument treats `$&`/`$\``/`$'`/`$$`
+ * as special patterns even for a literal search string). Returns `null` when the shape
+ * cannot be determined; callers fail CLOSED on `null` here (unlike the size guard's
+ * fail-open), because "cannot determine" means "cannot prove this touches only the
+ * allowlist," and the safe default for that is to stay protected.
+ */
+export function simulateGateStrengthWriteContent({ toolName, toolInput, currentContent }) {
+  if (toolName === "Write") {
+    if (typeof toolInput?.content !== "string") return null;
+    return toolInput.content;
+  }
+  if (toolName === "Edit") {
+    if (typeof toolInput?.old_string !== "string" || typeof toolInput?.new_string !== "string") return null;
+    if (toolInput.replace_all === true) {
+      return currentContent.split(toolInput.old_string).join(toolInput.new_string);
+    }
+    const matchIndex = currentContent.indexOf(toolInput.old_string);
+    if (matchIndex === -1) return null;
+    return currentContent.slice(0, matchIndex) + toolInput.new_string
+      + currentContent.slice(matchIndex + toolInput.old_string.length);
+  }
+  return null; // NotebookEdit and anything else: no simulation, stays protected
+}
+
+/**
+ * True only when this Edit/Write's proposed content can be cleanly simulated, both the
+ * current and proposed text parse as yaml-lite documents, and EVERY changed dotted leaf
+ * path is on `exemptPaths`. Fails CLOSED (`exempt: false`, meaning "stay protected") on
+ * anything it cannot determine: an unparseable document on either side, a non-object
+ * top-level value, or a write shape `simulateGateStrengthWriteContent` cannot simulate.
+ * `changedPaths` is `null` whenever `exempt` could not be meaningfully evaluated, so a
+ * caller building a message never prints a stale or empty-by-construction list.
+ */
+export function evaluateGateStrengthFieldExemption({ toolName, toolInput, currentContent, exemptPaths }) {
+  if (!Array.isArray(exemptPaths) || exemptPaths.length === 0) return { exempt: false, changedPaths: null };
+  const proposedContent = simulateGateStrengthWriteContent({ toolName, toolInput, currentContent });
+  if (proposedContent === null) return { exempt: false, changedPaths: null };
+
+  let before;
+  let after;
+  try {
+    before = parseYaml(currentContent);
+    after = parseYaml(proposedContent);
+  } catch {
+    return { exempt: false, changedPaths: null };
+  }
+  if (before === null || typeof before !== "object" || Array.isArray(before)) return { exempt: false, changedPaths: null };
+  if (after === null || typeof after !== "object" || Array.isArray(after)) return { exempt: false, changedPaths: null };
+
+  const changedPaths = changedGateStrengthDottedPaths(before, after);
+  const exemptSet = new Set(exemptPaths);
+  return { exempt: changedPaths.every((path) => exemptSet.has(path)), changedPaths };
+}
 
 export const LIVE_PLUGIN_RULE = Object.freeze({
   id: "GS-6",
@@ -431,6 +573,31 @@ if (process.argv[1] && resolve(process.argv[1]).endsWith("guard-gate-strength.mj
         });
       } catch { admitted = false; }
       if (admitted) process.exit(0);
+    }
+
+    // NVA-W13-GATESTRENGTH: GS-1 stands down, and only GS-1, for an Edit/Write to
+    // pipeline.user.yaml whose FIELD-LEVEL diff touches only GATE_STRENGTH_FIELD_EXEMPTIONS'
+    // allowlisted dotted paths -- see the module-level comment above GATE_STRENGTH_FIELD_
+    // SCOPE_SCHEMA for the full rationale. Checked here, before the HGO block below, so an
+    // admitted field-scoped edit never consumes or plans an override capability for a write
+    // this guard is about to allow anyway -- the same placement discipline as the GS-15
+    // stand-down immediately above. Fails CLOSED on anything it cannot determine: the
+    // file-level ceremony below stays the default.
+    if (matched.id === "GS-1") {
+      let result = { exempt: false, changedPaths: null };
+      try {
+        const currentContent = existsSync(absolute) ? readFileSync(absolute, "utf8") : "";
+        const exemptPaths = GATE_STRENGTH_FIELD_EXEMPTIONS[matched.path] ?? [];
+        result = evaluateGateStrengthFieldExemption({ toolName, toolInput, currentContent, exemptPaths });
+      } catch { result = { exempt: false, changedPaths: null }; }
+      if (result.exempt) {
+        process.stderr.write(
+          `[pipeline-field-scope] guard-gate-strength ${GATE_STRENGTH_FIELD_SCOPE_SCHEMA}: GS-1 stands down -- ` +
+            `changed field(s) [${(result.changedPaths ?? []).join(", ") || "none"}] are on the explicit ` +
+            "non-protected allowlist; gates.push_approval is untouched.\n",
+        );
+        process.exit(0);
+      }
     }
   }
 
