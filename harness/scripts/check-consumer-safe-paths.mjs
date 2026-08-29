@@ -556,6 +556,18 @@ export const ALLOWLIST = Object.freeze([
       "does not exist there can never satisfy the predicate, so admitting the prefix is a safe no-op, " +
       "never a leak.",
   },
+
+  // --- NVA-R11-RESUMECONSUME: check-resume-consumption.mjs's own single harness/ mention.
+  {
+    file: "plugins/pipeline-core/scripts/check-resume-consumption.mjs",
+    match: "NOT REGISTERED in `harness/scripts/verify.mjs`",
+    reason:
+      "Class B: module-doc-comment prose noting this script's own `.test.mjs` sibling is not yet " +
+      "registered in `harness/scripts/verify.mjs` (TP-3-protected in this repository's own checkout, " +
+      "no in-session push-approval override) -- a self-application status note about THIS repository's " +
+      "own Verify gate wiring, the identical pattern check-backlog-done-predicate.mjs's own allowlist " +
+      "entries above already cover for that script, not a path a consumer is told to visit.",
+  },
 ]);
 
 function posixPath(value) {
