@@ -84,9 +84,11 @@ export function isExcludedRepoPath(value) {
 // ADRs that text cites -- verbatim into plugins/pipeline-core/ so a consumer
 // install carries them. A verbatim copy keeps its source file's relative
 // Markdown links, and those links only resolve from the SOURCE directory: the
-// vendored docs/adr/0005-quality-gates-dod.md still says `../operating-model.md`,
-// which is docs/operating-model.md from docs/adr/ and nothing at all from
-// plugins/pipeline-core/docs/adr/. This checker is right to call them dead; the
+// vendored docs/adr/0010-session-bootstrap.md still says `../../harness/session-bootstrap.md`,
+// which is harness/session-bootstrap.md from docs/adr/ and nothing at all from
+// plugins/pipeline-core/docs/adr/ (harness/ is a confirmed self-only exclusion,
+// never vendored -- see SELF_ONLY_EXCLUSIONS in generate-vendored-canon.mjs).
+// This checker is right to call them dead; the
 // byte-identity is the deliberate part (GF-107/GF-108), so the link breakage is
 // a known, PO-accepted, EXPLICITLY TEMPORARY gap in the "quick copy now"
 // approach rather than an oversight. It is tracked by the deferred generated
@@ -124,7 +126,6 @@ function vendoredLinkExclusion(origin, destinations) {
 }
 
 export const VENDORED_LINK_EXCLUSIONS = Object.freeze([
-  vendoredLinkExclusion("docs/adr/0005-quality-gates-dod.md", ["../operating-model.md"]),
   vendoredLinkExclusion("docs/adr/0010-session-bootstrap.md", [
     "0001-distribution-plugin-marketplace.md",
     "0006-model-effort-policy.md",
@@ -150,6 +151,7 @@ export const VENDORED_LINK_EXCLUSIONS = Object.freeze([
     "0058-guard-maintenance-window.md",
     "0059-signed-human-guard-override.md",
   ]),
+  vendoredLinkExclusion("docs/operating-model.md", ["../README.md", "../PIPELINE_FLOW.md", "../SETUP.md", "adr/0021-prd-po-gate.md"]),
 ]);
 
 /**
