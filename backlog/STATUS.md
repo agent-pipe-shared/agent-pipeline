@@ -527,7 +527,7 @@
 | pipeline.v1-trust-anchor-makes-signature-push-functionless | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — critical: it makes gates.push_approval 'signature', the documented default and this repository's own setting, functionless. Stacks with the push-gate item; a consumer hits both. |
 | pipeline.vendored-dispatch-templates-drift-from-canon | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.verify-authorship-defaults-to-source-markers-not-behavior | closed | workflow-improvement | pipeline | 2026-08-10 | — |
-| pipeline.verify-contract-fails-until-configured-but-gs-10-blocks-configuring-it | open | defect | pipeline | 2026-08-29 | NOW / Nova A -- happy-path deadlock, confirmed independently by 2 of 3 runners against the 2026-08-29 candidate (built ab0906d, stamped 0bf246d1) which already contained the 2026-08-11 verify-contract fix (674b1c0c). |
+| pipeline.verify-contract-fails-until-configured-but-gs-10-blocks-configuring-it | closed | defect | pipeline | 2026-08-29 | NOW / Nova A -- happy-path deadlock, confirmed independently by 2 of 3 runners against the 2026-08-29 candidate (built ab0906d, stamped 0bf246d1) which already contained the 2026-08-11 verify-contract fix (674b1c0c). |
 | pipeline.verify-evidence-has-no-producer | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.verify-evidence-is-trusted-on-read-and-was-forged | open | defect | pipeline | 2026-08-28 | — |
 | pipeline.verify-gate-scoped-registration | closed | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
@@ -557,8 +557,8 @@
 
 ## Counts
 
-- open: 79
+- open: 78
 - in_progress: 3
-- closed: 453
+- closed: 454
 - rejected: 3
 - deferred: 11
