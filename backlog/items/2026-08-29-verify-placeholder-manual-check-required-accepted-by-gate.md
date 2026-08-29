@@ -126,3 +126,28 @@ NOT landed — `verify.mjs` is TP-3 protected and needs a signed
 human-guard-override ceremony (see
 `evidence/dispatch-record-NVA-R26-VERIFYPREP.json` for the full drafted
 text).
+
+## Landed, 2026-08-29 (Elephant, PO-signed ceremonies, commit `3cfc7160`)
+
+The drafted mechanism is now live: `computeManualVerifyStep()` in
+`harness/scripts/verify.mjs` (~line 754 onward) rejects a `verifyManualStatus`
+value containing the exact unreplaced string `"Manual check required."` as a
+FAILURE (`exitCode: 1`, logged as `VERIFY-MANUAL-CHECK-PLACEHOLDER`) — this
+item's Acceptance criterion 2 is mechanically met, at the point named. This
+also gives the test-suite-less case (Acceptance criterion 3) an honest
+non-pass route via the same mechanism's `not-configured-yet` state (see
+sibling item `2026-08-29-mandatory-verify-gate-has-no-path-for-a-project-
+with-no-tests-yet.md`'s matching "Landed" note — the two share one
+mechanism, as this item's own pairing note anticipated).
+
+**Not yet closing.** Acceptance criterion 1 — locate the actual write site of
+the "Manual check required." placeholder and record it here — remains
+genuinely outside this repository's own source (confirmed twice now, by two
+separate dispatches' repo-wide searches): it is written by a downstream
+consumer project's scaffolding during onboarding, not by anything in this
+control repository. This item cannot close on that criterion from inside
+this repo; closing would need either a session with access to the actual
+downstream workspace, or a PO decision that the mechanism-level fix (now
+landed) supersedes the need to locate the specific write site. Left `open`
+pending that decision, plus the same missing-dedicated-test gap the sibling
+item records.
