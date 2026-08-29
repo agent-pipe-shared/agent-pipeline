@@ -649,7 +649,25 @@ test("NVA-PUSHFOLD-1: bugfix discipline -- the CURRENT gap (red) demonstrated on
   const beforeFold = checkWorkingTreeClean(root);
   assert.equal(beforeFold.ok, false, "before the fix runs, the trailing write leaves the tree dirty");
 
-  // GREEN: foldPendingPushApprovalWrite() (this fix) folds it in and clears the hint.
+  // NVA-CF-PUSHFOLD (DoD b): approve-push's own forCommit is bound to the CURRENT HEAD -- the
+  // push has not happened yet. Folding now would move HEAD past forCommit and void the
+  // approval (docs/push-release-flow.md: "Commit nothing between approve-push and the push").
+  // The fix refuses to fold in exactly this window.
+  const foldWhileOutstanding = foldPendingPushApprovalWrite(root);
+  assert.equal(foldWhileOutstanding.folded, false, "must not fold while the approval is still outstanding for HEAD");
+  assert.equal(foldWhileOutstanding.reason, "approval-outstanding");
+  assert.equal(checkWorkingTreeClean(root).ok, false, "the tree must remain dirty -- nothing was committed while blocked");
+  const stillPending = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"));
+  assert.equal(stillPending.pushApproval.lastApproved.pendingAuditWrite, true, "the hint must remain true -- untouched while blocked");
+
+  // Simulate the push having actually happened and HEAD having since moved on (a later,
+  // unrelated commit) -- this is the shape a LATER push-prepare run actually finds.
+  writeFileSync(join(root, "unrelated.txt"), "later work\n");
+  gitAtFold(root, "add", "--", "unrelated.txt");
+  gitAtFold(root, "commit", "-q", "-m", "later, unrelated work");
+
+  // GREEN: now that HEAD has moved past forCommit, foldPendingPushApprovalWrite() (this fix)
+  // folds the still-pending write in and clears the hint.
   const fold = foldPendingPushApprovalWrite(root);
   assert.equal(fold.folded, true, `expected a successful fold: ${JSON.stringify(fold)}`);
   const afterFold = checkWorkingTreeClean(root);
@@ -657,6 +675,9 @@ test("NVA-PUSHFOLD-1: bugfix discipline -- the CURRENT gap (red) demonstrated on
 
   const commitSubject = gitAtFold(root, "log", "-1", "--pretty=%s");
   assert.match(commitSubject.stdout, /fold pending push-approval record/);
+  const commitBody = gitAtFold(root, "log", "-1", "--pretty=%B");
+  assert.match(commitBody.stdout, /AI-Assisted: true/, "NVA-CF-PUSHFOLD (DoD c): the auto-commit must carry the AI-Assisted trailer");
+  assert.match(commitBody.stdout, /Dispatch: NVA-CF-PUSHFOLD \(goldfish\)/, "NVA-CF-PUSHFOLD (DoD c): the auto-commit must carry a Dispatch trailer");
   const committedState = JSON.parse(gitAtFold(root, "show", "HEAD:project/pipeline-state.json").stdout);
   assert.equal(committedState.pushApproval.lastApproved.pendingAuditWrite, false,
     "the hint must be cleared to false the moment it is actually committed -- never stale once folded");
@@ -666,14 +687,22 @@ test("NVA-PUSHFOLD-1: bugfix discipline -- the CURRENT gap (red) demonstrated on
 
 test("NVA-PUSHFOLD-1: pushPrepareReport folds the pending write in at the START, before working-tree-clean is evaluated", () => {
   const root = foldFixtureRepo();
-  const headCommit = gitAtFold(root, "rev-parse", "HEAD").stdout.trim();
+  const priorCommit = gitAtFold(root, "rev-parse", "HEAD").stdout.trim();
   const baseline = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"));
+  // Advance HEAD past the commit the approval is bound to -- NVA-CF-PUSHFOLD (DoD b): a fold
+  // must never run while forCommit still equals the CURRENT HEAD, so this fixture simulates
+  // the push having already happened and HEAD having since moved on (a later, unrelated
+  // commit), rather than the ambiguous still-outstanding-for-HEAD shape.
+  writeFileSync(join(root, "unrelated.txt"), "later work\n");
+  gitAtFold(root, "add", "--", "unrelated.txt");
+  gitAtFold(root, "commit", "-q", "-m", "later, unrelated work");
   // Simulate the exact post-approve-push dirty shape directly, without re-running the
   // whole chat-mode ceremony (already covered by the test above) -- an uncommitted
-  // pushApproval.lastApproved write with the hint still true.
+  // pushApproval.lastApproved write with the hint still true, bound to a commit that is no
+  // longer HEAD.
   writeFileSync(join(root, "project", "pipeline-state.json"), JSON.stringify({
     ...baseline,
-    pushApproval: { lastApproved: { approvedBy: "PO", forCommit: headCommit, remote: "origin", destination: "refs/heads/main", pendingAuditWrite: true } },
+    pushApproval: { lastApproved: { approvedBy: "PO", forCommit: priorCommit, remote: "origin", destination: "refs/heads/main", pendingAuditWrite: true } },
   }, null, 2));
   assert.equal(checkWorkingTreeClean(root).ok, false, "fixture must start dirty");
 
@@ -714,4 +743,78 @@ test("foldPendingPushApprovalWrite: a dirty path that is NOT the state file is l
   assert.equal(result.folded, false);
   assert.equal(result.reason, "other-dirty-paths");
   assert.equal(calls.length, 0);
+});
+
+// ---------------------------------------------------------------------------
+// NVA-CF-PUSHFOLD -- hermetic unit coverage (injected deps, no real git repo) for the two
+// narrower gates: the state file being the SOLE dirty path is necessary but not sufficient.
+// ---------------------------------------------------------------------------
+
+test("foldPendingPushApprovalWrite (DoD a): state file dirty for a reason OTHER than a pending fold is never auto-committed (pendingAuditWrite absent)", () => {
+  const calls = [];
+  const result = foldPendingPushApprovalWrite(FIXTURE_DIR, {
+    gitStatus: () => " M project/pipeline-state.json\n",
+    readFile: () => JSON.stringify({ schema: "pipeline.state.v0", activeFeature: { id: "x" } }),
+    spawn: (...args) => { calls.push(args); return { status: 0 }; },
+  });
+  assert.equal(result.folded, false);
+  assert.equal(result.reason, "not-pending");
+  assert.equal(calls.length, 0, "must never shell out to git add/commit for an operator's own unrelated state-file edit");
+});
+
+test("foldPendingPushApprovalWrite (DoD a): pendingAuditWrite explicitly false is also never auto-committed", () => {
+  const calls = [];
+  const result = foldPendingPushApprovalWrite(FIXTURE_DIR, {
+    gitStatus: () => " M project/pipeline-state.json\n",
+    readFile: () => JSON.stringify({ pushApproval: { lastApproved: { pendingAuditWrite: false, forCommit: "deadbeef" } } }),
+    spawn: (...args) => { calls.push(args); return { status: 0 }; },
+  });
+  assert.equal(result.folded, false);
+  assert.equal(result.reason, "not-pending");
+  assert.equal(calls.length, 0);
+});
+
+test("foldPendingPushApprovalWrite (DoD b): a live approval (forCommit === HEAD) blocks the fold entirely", () => {
+  const calls = [];
+  const result = foldPendingPushApprovalWrite(FIXTURE_DIR, {
+    gitStatus: () => " M project/pipeline-state.json\n",
+    readFile: () => JSON.stringify({ pushApproval: { lastApproved: { pendingAuditWrite: true, forCommit: HEAD } } }),
+    gitHead: () => HEAD,
+    spawn: (...args) => { calls.push(args); return { status: 0 }; },
+  });
+  assert.equal(result.folded, false);
+  assert.equal(result.reason, "approval-outstanding");
+  assert.equal(calls.length, 0, "must never shell out to git add/commit while the approval is still outstanding for HEAD");
+});
+
+test("foldPendingPushApprovalWrite: HEAD unavailable -> refuses to fold rather than guessing", () => {
+  const calls = [];
+  const result = foldPendingPushApprovalWrite(FIXTURE_DIR, {
+    gitStatus: () => " M project/pipeline-state.json\n",
+    readFile: () => JSON.stringify({ pushApproval: { lastApproved: { pendingAuditWrite: true, forCommit: "0".repeat(40) } } }),
+    gitHead: () => null,
+    spawn: (...args) => { calls.push(args); return { status: 0 }; },
+  });
+  assert.equal(result.folded, false);
+  assert.equal(result.reason, "head-unavailable");
+  assert.equal(calls.length, 0);
+});
+
+test("foldPendingPushApprovalWrite (DoD c): forCommit different from HEAD -> folds, commit message carries both AI-Assisted and Dispatch trailers", () => {
+  const calls = [];
+  const result = foldPendingPushApprovalWrite(FIXTURE_DIR, {
+    gitStatus: () => " M project/pipeline-state.json\n",
+    readFile: () => JSON.stringify({ pushApproval: { lastApproved: { pendingAuditWrite: true, forCommit: "0".repeat(40) } } }),
+    gitHead: () => HEAD,
+    writeFile: () => {},
+    spawn: (...args) => { calls.push(args); return { status: 0 }; },
+  });
+  assert.equal(result.folded, true, `expected a successful fold: ${JSON.stringify(result)}`);
+  assert.equal(calls.length, 2, "expects exactly a git add call and a git commit call");
+  const commitCall = calls.find((call) => call[1].includes("commit"));
+  assert.ok(commitCall, "expected a git commit invocation");
+  const commitArgv = commitCall[1];
+  const message = commitArgv[commitArgv.indexOf("-m") + 1];
+  assert.match(message, /AI-Assisted: true/);
+  assert.match(message, /Dispatch: NVA-CF-PUSHFOLD \(goldfish\)/);
 });
