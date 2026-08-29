@@ -32,6 +32,7 @@ import {
   exitCodeFor,
   gitDeps,
   isTerminalOutcome,
+  missingBriefingFields,
   parseDispatchTrailer,
   readRecordFile,
   runGeneratorInIsolatedParentTree,
@@ -66,6 +67,8 @@ test("(a) correct trailer, terminal record, paths covered -> PASS", () => {
     taskId: "DOD-A",
     outcome: "completed",
     commit: "abc1234",
+    model: "claude-sonnet-5",
+    rulesetSha: "cb16a3df",
     report: { changedFiles: ["src/thing.mjs - the change", "src/thing.test.mjs - its test"] },
   });
   const verdict = verifyCommit(
@@ -132,6 +135,8 @@ test("(f2) a multi-commit dispatch binds every sha it declares in `commits`", ()
     taskId: "DOD-F2",
     outcome: "done",
     commits: ["6ad81155", "8161c31a"],
+    model: "claude-sonnet-5",
+    rulesetSha: "cb16a3df",
     report: { changedFiles: ["src/thing.mjs - x"] },
   });
   const fixture = { message: "feat(x): a thing\n\nDispatch: DOD-F2 (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] };
@@ -182,6 +187,7 @@ test("(j) a record with a matching agentType/model/effort stays PASS/bound and c
     agentType: "goldfish-implementor",
     model: "claude-sonnet-5",
     effort: "medium",
+    rulesetSha: "cb16a3df",
     outcome: "completed",
     report: { changedFiles: ["src/thing.mjs - x"] },
   });
@@ -213,6 +219,7 @@ test("(l) an explicit, rationale-carrying modelOverride is honoured -- stays PAS
     model: "claude-opus-5",
     effort: "xhigh",
     modelOverride: { model: "claude-opus-5", effort: "xhigh", rationale: "MP-05 criterion 1: guardrail rewrite" },
+    rulesetSha: "cb16a3df",
     outcome: "completed",
     report: { changedFiles: ["src/thing.mjs - x"] },
   });
@@ -227,6 +234,7 @@ test("(m) a record without agentType (pre-NVA-BL-78 corpus) is unaffected -- cla
     taskId: "DOD-M",
     model: "claude-sonnet-5",
     effort: "medium",
+    rulesetSha: "cb16a3df",
     outcome: "completed",
     report: { changedFiles: ["src/thing.mjs - x"] },
   });
@@ -374,6 +382,8 @@ test("(n) Direction 2 checkpoint pattern: an interim outcome off the denylist al
     taskId: "DOD-N",
     outcome: "committed-pending-report",
     commits: ["n00n555"],
+    model: "claude-sonnet-5",
+    rulesetSha: "cb16a3df",
     report: { changedFiles: ["src/thing.mjs - the change"] },
   });
   const verdict = verifyCommit(
@@ -398,6 +408,54 @@ test("(n2) Direction 2 counter-case: capturing the sha early is not enough while
   );
   assert.equal(verdict.verdict, VERDICT.fail);
   assert.equal(verdict.classification, "record-not-terminal", "sha binding alone does not rescue a record whose outcome never left the denylist");
+});
+
+// `2026-08-29-dispatch-evidence-record-shape-not-enforced-beyond-taskid-and-outcome.md`:
+// a record only had to bind on taskId + terminal outcome to PASS -- nothing checked whether
+// it actually carried the minimum shape of a genuine six-field-briefing dispatch record.
+test("missingBriefingFields flags absent/empty model, rulesetSha and report independently", () => {
+  assert.deepEqual(missingBriefingFields({}), ["model", "rulesetSha", "report"]);
+  assert.deepEqual(missingBriefingFields({ model: "  ", rulesetSha: "", report: null }), ["model", "rulesetSha", "report"]);
+  assert.deepEqual(missingBriefingFields({ model: "claude-sonnet-5", rulesetSha: "cb16a3df", report: { changedFiles: ["a.mjs"] } }), []);
+  assert.deepEqual(missingBriefingFields({ model: "claude-sonnet-5", rulesetSha: "cb16a3df", report: "prose" }), []);
+  assert.deepEqual(missingBriefingFields({ model: "claude-sonnet-5", rulesetSha: "cb16a3df", report: {} }), ["report"]);
+});
+
+test("(p) a bare {id, outcome, timestamp}-shaped record -> UNVERIFIABLE, never PASS", () => {
+  writeRecord("DOD-P", { id: "DOD-P", outcome: "completed", timestamp: "2026-08-29T12:00:00Z" });
+  const verdict = verifyCommit("p00p111", commit({ message: "feat(x): a thing\n\nDispatch: DOD-P (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] }));
+  assert.equal(verdict.verdict, VERDICT.unverifiable);
+  assert.notEqual(verdict.verdict, VERDICT.pass, "a bare id/outcome/timestamp record must never mint a PASS");
+});
+
+test("(p2) a record with model + rulesetSha but missing ONLY report -> UNVERIFIABLE, not PASS", () => {
+  writeRecord("DOD-P2", {
+    taskId: "DOD-P2",
+    outcome: "completed",
+    model: "claude-sonnet-5",
+    rulesetSha: "cb16a3df",
+    commits: ["p22p222"],
+  });
+  const verdict = verifyCommit(
+    "p22p222aaa",
+    commit({ message: "feat(x): a thing\n\nDispatch: DOD-P2 (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] }),
+  );
+  assert.equal(verdict.verdict, VERDICT.unverifiable);
+  assert.notEqual(verdict.verdict, VERDICT.pass, "a record missing only `report` must never mint a PASS");
+});
+
+test("(p3) a record with valid path-covering report but missing model + rulesetSha -> UNVERIFIABLE record-missing-briefing-fields, not PASS", () => {
+  writeRecord("DOD-P3", {
+    taskId: "DOD-P3",
+    outcome: "completed",
+    commit: "p33p333",
+    report: { changedFiles: ["src/thing.mjs - x"] },
+  });
+  const verdict = verifyCommit("p33p333bbb", commit({ message: "feat(x): a thing\n\nDispatch: DOD-P3 (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] }));
+  assert.equal(verdict.verdict, VERDICT.unverifiable);
+  assert.equal(verdict.classification, "record-missing-briefing-fields");
+  assert.deepEqual(verdict.missingFields, ["model", "rulesetSha"]);
+  assert.notEqual(verdict.verdict, VERDICT.pass, "path coverage alone must not mint a PASS once model/rulesetSha are checked");
 });
 
 // Direction 3 Option B of the same item (`2026-08-09-the-dispatch-record-does-not-bind-to-
