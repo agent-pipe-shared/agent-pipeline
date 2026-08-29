@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.dispatch-evidence-record-shape-not-enforced-beyond-taskid-and-outcome
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: 01062acb
+closure_evidence: plugins/pipeline-core/scripts/dispatch-authorship-verify.test.mjs
 created: 2026-08-29
 sprint: nova
 done_when: contains plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs pipeline.dispatch-record-briefing-fields-enforced
@@ -71,3 +75,20 @@ validation is added.
 - **Assignment:** `sprint: nova`, Nova B — hardens an existing verification
   tool; does not block the 0.6.0 candidate.
 - **Date:** 2026-08-29
+
+## Closure, 2026-08-29 (dispatch NVA-R20-EVIDENCESHAPE, commit 01062acb)
+
+All three Acceptance criteria met, verified by the dispatcher directly:
+`dispatch-authorship-verify.test.mjs` → 45/45, including three new cases —
+bare `{id, outcome, timestamp}` (p), missing only `report` (p2), and
+missing `model`+`rulesetSha` (p3) — all `UNVERIFIABLE`, never `PASS`.
+`check-consumer-safe-paths.test.mjs` → 9/9. Marker confirmed with `rg`.
+
+The check is placed as the LAST gate before the final `PASS`, not
+immediately after `readRecord` — a deliberate, disclosed placement choice
+to avoid breaking ~8 unrelated existing tests whose fixtures test other
+classification dimensions (terminal-outcome, sha-binding, path-coverage)
+and legitimately never carry `model`/`rulesetSha`. Six existing fixtures
+that do reach the final PASS line were updated to carry the fields a real
+dispatch record has, closing the regression risk this reordering could
+otherwise have introduced.
