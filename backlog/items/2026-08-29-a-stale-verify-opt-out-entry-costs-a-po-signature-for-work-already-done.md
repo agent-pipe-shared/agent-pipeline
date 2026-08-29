@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.a-stale-verify-opt-out-entry-costs-a-po-signature-for-work-already-done
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-29
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: 37b35524872ec575cf351a174e6dc4f92745c109
+closure_evidence: plugins/pipeline-core/scripts/check-suite-registration.test.mjs
 sprint: nova
 done_when: contains plugins/pipeline-core/scripts/check-suite-registration.mjs pipeline.opt-out-staleness-is-fatal
 source: "Observed while registering the done_when predicate suite in verify.mjs, 2026-08-29: two of the three DELIBERATELY_UNREGISTERED entries described suites that were in fact already registered, and clearing them was part of the work that consumed a live PO signature ceremony."
@@ -106,5 +110,19 @@ check is the part that actually enforces anything.
   the sibling ceremony-ergonomics item filed the same day.
 - **Date:** 2026-08-29
 
-Fixed, 2026-08-29 (dispatch NVA-R12-OPTOUTSTALE, commit `37b35524`). Left
-`status: open` for the Elephant to independently verify and close.
+Fixed, 2026-08-29 (dispatch NVA-R12-OPTOUTSTALE, commit `37b35524`).
+
+Verified directly by the dispatcher: `check-suite-registration.test.mjs`
+30/30 exit 0, including the two new fixture tests by name (stale-opt-out-is-
+fatal, stale-even-when-absent-from-enumeratedPaths). Marker confirmed with
+`rg`. Real repository's `DELIBERATELY_UNREGISTERED` list is empty, so this
+check's own new logic produces no finding, satisfying the item's Acceptance.
+
+Running the checker fresh, unrelated to this fix, surfaced a genuine
+pre-existing gap worth recording rather than acting on now:
+`plugins/pipeline-core/scripts/resume-hint.test.mjs` (the CLI wrapper's own
+test, added by this session's `c3020e1d`) is not registered in
+`harness/scripts/verify.mjs` — only the library test
+`plugins/pipeline-core/lib/resume-hint.test.mjs` is. `verify.mjs` is TP-3
+protected, so registering it needs a signature ceremony; queued to batch
+with the other verify.mjs-touching items rather than spent alone.
