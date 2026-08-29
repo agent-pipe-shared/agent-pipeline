@@ -1317,6 +1317,14 @@ function canonicalFixtureJson(value) {
   });
   ok("PS12b0 subprocess submit-plan exit 0", submitted.status === 0, `stderr: ${submitted.stderr}`);
 
+  const presented = spawnSync(process.execPath, [
+    CLI, "present-plan", "--by", "coordinator",
+  ], {
+    encoding: "utf8",
+    env: e2eEnv,
+  });
+  ok("PS12b-1 subprocess present-plan exit 0", presented.status === 0, `stderr: ${presented.stderr}`);
+
   const res2 = spawnSync(process.execPath, [CLI, "approve-plan", "--by", "po-test"], {
     encoding: "utf8",
     env: { ...process.env, CLAUDE_PROJECT_DIR: dir },
