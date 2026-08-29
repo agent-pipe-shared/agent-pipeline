@@ -136,3 +136,55 @@ call `resume-hint.mjs consume` at the bootstrap consumption step, and add the
 verifier asserting "an `available` card implies a matching receipt". Until
 that verifier exists, a receipt proves only that the card's bytes were read,
 never that they were understood or acted on.
+
+## Stage 2 landed, 2026-08-29 (dispatch NVA-R11-RESUMECONSUME)
+
+Both remaining Stage-2 pieces are built and merged, as pure composition of
+Stage 1's own `inspectResumeHint`/`queryResumeHintConsumption`/
+`recordResumeHintConsumption` — no changes to their digest/binding logic.
+
+1. **The verifier.** `plugins/pipeline-core/scripts/check-resume-consumption.mjs`
+   (+ `.test.mjs`, 12/12 green) reads (a) whether a Resume-Hint card was
+   `available` via `inspectResumeHint`, and (b) whether a matching consumption
+   receipt exists for that exact card's current digest via
+   `queryResumeHintConsumption`. PASS when no card was available, PASS when
+   `available` + a matching receipt exists, FATAL when `available` + no
+   matching receipt (absent, corrupt, digest-mismatched, or no digest record
+   at all — the F12/F13 regression shape). A synthetic, filesystem-free
+   `inspect`/`query`-injection fixture proves the fatal path independent of
+   any real repository state, per this item's own Acceptance wording. Never
+   wired into any guard or readiness gate. Not registered in
+   `harness/scripts/verify.mjs` (TP-3-protected, no in-session override) —
+   disclosed in the script's own header, same posture
+   `check-backlog-done-predicate.mjs` used before its own later,
+   separately-authorized registration.
+2. **The missing consume call.** `plugins/pipeline-core/hooks/
+   codex-session-start-hint.mjs`'s `resumeHintContextLines()` — the one
+   place in this codebase that surfaces a resume-hint card's content into a
+   restarting session's context, on every `startup|resume|clear`
+   SessionStart (Claude and Codex alike, hooks.json hook 8) — now calls
+   `recordResumeHintConsumption({ rootDir, sessionId })` immediately before
+   building those lines, using the real hook payload's `session_id` (the
+   same field `post-compact-reground.mjs` already reads for the identical
+   purpose). Best-effort, wrapped in try/catch, never blocking: a missing
+   session id, no digest record, or any I/O failure never prevents the
+   card's content from still reaching the session. 33/33 green in
+   `codex-session-start-hint.test.mjs` (27 pre-existing + new assertions
+   proving the receipt is actually written, per-session, through both the
+   direct function call and the real CLI/stdin path).
+
+Verified on the merged branch state: `check-resume-consumption.test.mjs`
+12/12 exit 0, `codex-session-start-hint.test.mjs` 33/33 exit 0,
+`resume-hint.test.mjs` (lib) 21/21 exit 0 unchanged,
+`resume-hint.test.mjs` (scripts) 11/11 exit 0 unchanged,
+`check-consumer-safe-paths.test.mjs` 9/9 exit 0 (one new Class B allowlist
+entry added for this script's own status-note mention of
+`harness/scripts/verify.mjs`).
+
+Left open, disclosed rather than silently closed: this item's own `status`
+stays `open` (PO-facing acceptance sign-off, per this dispatch's own
+briefing); `done_when` is unedited. `check-suite-registration.mjs`'s
+`DELIBERATELY_UNREGISTERED` opt-out list was deliberately NOT given a new
+entry for the new test file (that list was emptied 2026-08-29 specifically
+because an opt-out entry with no trigger to retire it is a standing debt) —
+the unregistered-in-`verify.mjs` state is disclosed in prose instead.
