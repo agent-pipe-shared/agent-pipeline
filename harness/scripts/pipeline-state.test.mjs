@@ -1129,9 +1129,11 @@ function canonicalFixtureJson(value) {
     ["submit-plan", "--by", "coordinator", "--profile", "feature"],
     lifecycleDeps(dir, ".claude/plans/x.md"),
   );
+  const presented = run(["present-plan", "--by", "coordinator"], lifecycleDeps(dir, ".claude/plans/x.md"));
   const code = run(["approve-plan", "--by", "po-test"], lifecycleDeps(dir, ".claude/plans/x.md"));
   ok("PS06a-1 continuity-init exit 0", initialized === 0, `got ${initialized}`);
   ok("PS06a0 submit-plan exit 0", submitted === 0, `got ${submitted}`);
+  ok("PS06a0-1 present-plan exit 0", presented === 0, `got ${presented}`);
   ok("PS06a approve-plan exit 0", code === 0, `got ${code}`);
   const state = readState(dir).state;
   ok("PS06b schema field correct", state.schema === SCHEMA_ID);
