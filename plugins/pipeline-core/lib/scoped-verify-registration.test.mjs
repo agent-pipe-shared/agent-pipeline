@@ -208,6 +208,12 @@ function scopedRegistrationFailureFixture() {
       join(repoRoot, "harness", "scripts", "check-verify-suite-registration.mjs"),
       join(fixtureRoot, "harness", "scripts", "check-verify-suite-registration.mjs"),
     );
+    // verify.mjs also imports from this sibling (harness/scripts/) for the manual-check
+    // step; the fixture root must carry it too or the copied verify.mjs fails to even load.
+    copyFileSync(
+      join(repoRoot, "harness", "scripts", "manual-check-logic.mjs"),
+      join(fixtureRoot, "harness", "scripts", "manual-check-logic.mjs"),
+    );
     copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "scoped-verify-registration.mjs"), registration);
     copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "windows-assurance-verify-registration.mjs"), windowsRegistration);
     copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "verify-resume.mjs"), join(fixtureRoot, "plugins", "pipeline-core", "lib", "verify-resume.mjs"));
