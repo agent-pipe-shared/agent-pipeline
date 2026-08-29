@@ -59,13 +59,15 @@
  * `path:line` citation checking) — explicitly deferred, larger false-positive
  * surface, not part of this PO decision.
  */
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { enumerateTrackedMarkdown, stripFencedCode } from "./check-doc-contracts.mjs";
 
 const OPERATING_MODEL_PATH = "docs/operating-model.md";
+const VENDOR_PREFIX = "plugins/pipeline-core/";
+const VENDORED_OPERATING_MODEL_PATH = `${VENDOR_PREFIX}${OPERATING_MODEL_PATH}`;
 const DE_REFERENCE_MARKER = "<!-- DE-REFERENCE-BELOW";
 const EXTRA_EXCLUDED_PREFIXES = ["plugins/pipeline-core/docs/adr/", "specs/", "backlog/"];
 const EXTRA_EXCLUDED_PATHS = new Set(["docs/state.md"]);
@@ -181,16 +183,19 @@ function citationLabel(section, subsection) {
 export function checkSectionCitations(rootInput, options = {}) {
   const root = resolve(rootInput);
   const readText = options.readText ?? defaultReadText;
+  const fileExists = options.fileExists ?? ((path) => existsSync(resolve(root, path)));
   const markdownPaths = (options.markdownPaths ?? enumerateTrackedMarkdown(root))
     .filter((entry) => !isOutOfCitationScope(entry))
     .sort();
 
   const operatingModelText = readText(resolve(root, OPERATING_MODEL_PATH));
   const sections = parseOperatingModelHeadings(operatingModelText);
+  const vendoredOperatingModelExists = fileExists(VENDORED_OPERATING_MODEL_PATH);
 
   const failures = [];
   const warnings = [];
   let citationsChecked = 0;
+  const vendoredSourcesFlagged = new Set();
 
   for (const source of markdownPaths) {
     const text = readText(resolve(root, source));
@@ -198,6 +203,23 @@ export function checkSectionCitations(rootInput, options = {}) {
     for (let index = 0; index < lines.length; index += 1) {
       for (const citation of extractCitations(lines[index])) {
         citationsChecked += 1;
+        // Dangling-pointer-class check (generalizes the operating-model.md-not-
+        // vendored defect): a vendored roles/guardrails file citing
+        // docs/operating-model.md is only reachable from a plugin-only consumer
+        // install if the vendored copy itself actually exists at
+        // plugins/pipeline-core/docs/operating-model.md. This fires once per
+        // citing vendored source file, not once per citation.
+        if (
+          source.startsWith(VENDOR_PREFIX) &&
+          !vendoredOperatingModelExists &&
+          !vendoredSourcesFlagged.has(source)
+        ) {
+          vendoredSourcesFlagged.add(source);
+          failures.push(
+            `${source}:${index + 1} -> cites ${OPERATING_MODEL_PATH} but ${VENDORED_OPERATING_MODEL_PATH} does not exist ` +
+              `(dangling pointer in a plugin-only consumer install)`,
+          );
+        }
         const label = citationLabel(citation.section, citation.subsection);
         const resolved = resolveCitation(sections, citation.section, citation.subsection);
         if (resolved.status === "section-missing") {
