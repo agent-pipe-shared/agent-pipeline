@@ -320,7 +320,7 @@
 | pipeline.onboarding-continuity-assumes-calibration-handover-is-always-a-plain-string | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.onboarding-does-not-ignore-the-scratch-directory-it-mandates | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.onboarding-lifecycle-plan-hardcodes-the-codex-runner | closed | defect | pipeline | 2026-08-06 | — |
-| pipeline.onboarding-must-bootstrap-the-trust-anchor-once | open | defect | pipeline | 2026-08-28 | NOW / Nova A — happy-path blocking: its absence deadlocked the first human override in the Claude run and cost a live PO signature; PO asked for this explicitly |
+| pipeline.onboarding-must-bootstrap-the-trust-anchor-once | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — happy-path blocking: its absence deadlocked the first human override in the Claude run and cost a live PO signature; PO asked for this explicitly |
 | pipeline.onboarding-must-elicit-the-real-verify-contract | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — happy-path blocking: without a real verify contract the push gate is unsatisfiable by construction, so the path cannot reach its last step |
 | pipeline.onboarding-needs-one-guided-init | open | requirement | pipeline | 2026-08-28 | NOW / Nova A — PO decision 2026-08-28: rebuild the flow, keep the binding core untouched; pulled forward because the happy path cannot go live without it |
 | pipeline.onboarding-produces-drift-it-then-has-to-repair | open | defect | pipeline | 2026-08-28 | NOW / Nova A — happy-path blocking: four repair commands sit in the middle of the onboarding step the PO wants to be simple |
@@ -546,8 +546,8 @@
 
 ## Counts
 
-- open: 91
+- open: 90
 - in_progress: 3
-- closed: 430
+- closed: 431
 - rejected: 3
 - deferred: 11
