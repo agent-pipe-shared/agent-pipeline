@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.pipeline-start-hardcodes-a-stale-copy-of-the-elephant-role-prohibitions
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: 81cde83e
+closure_evidence: harness/scripts/generate-elephant-role-prohibitions.test.mjs
 created: 2026-08-29
 sprint: nova
 done_when: contains plugins/pipeline-core/skills/pipeline-start/SKILL.md GENERATED FROM roles/elephant.md
@@ -103,3 +107,23 @@ mechanically extracted from each included id's own `Rule:` sentence, not a
 free-hand summary) — see the dispatch report for the full deviation
 disclosure. `status` and `done_when` left untouched for the Elephant to
 verify and close.
+
+## Closure, 2026-08-29
+
+All four Acceptance criteria verified by the dispatcher directly: `node
+--test harness/scripts/generate-elephant-role-prohibitions.test.mjs` →
+11/11, including byte-equality (AC-1), the marker (AC-2), two drift proofs
+(AC-3/AC-3b — a rule-text edit changes the block; a new unaccounted EL id is
+refused, not silently dropped), full-enumeration (AC-4), and a sanitization
+check (AC-7). `check-consumer-safe-paths.test.mjs` → 9/9. Marker confirmed
+with `rg` at `SKILL.md:261`.
+
+The disclosed wording deviation (per-id text now mechanically extracted from
+each `Rule:` sentence, not the old hand-typed paraphrase) is accepted: it is
+the direct, necessary consequence of the drift test the item's own
+Acceptance explicitly demands ("editing a prohibition's rule text ... changes
+the emitted block"). The id list and confirmation blockquote stayed
+byte-identical. EL-19's forced inclusion and the EL-05/EL-13 conservative
+inclusion-then-exclusion are both disclosed judgment calls with stated
+reasons in the generator's own source, matching the third Acceptance bullet's
+requirement exactly.
