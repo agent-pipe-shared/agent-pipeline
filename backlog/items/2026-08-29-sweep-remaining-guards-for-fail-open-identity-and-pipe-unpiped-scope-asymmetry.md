@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.sweep-remaining-guards-for-fail-open-identity-and-pipe-unpiped-scope-asymmetry
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: 00f14c1916e308778519fdeb1a805bed2156ad64
+closure_evidence: backlog/items/2026-08-29-guard-sweep-completion-report.md
 created: 2026-08-29
 sprint: nova
 done_when: path-exists backlog/items/2026-08-29-guard-sweep-completion-report.md

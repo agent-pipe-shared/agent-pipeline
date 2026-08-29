@@ -6,7 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-29
 sprint: nova
-done_when: manual
+done_when: contains plugins/pipeline-core/hooks/guard-dispatch-budget.mjs pipeline.dispatch-budget-invalid-identity-fails-closed
 source: "NVA-R6-GUARDSWEEP guard-layer sweep (backlog/items/2026-08-29-sweep-remaining-guards-for-fail-open-identity-and-pipe-unpiped-scope-asymmetry.md), auditing guard-dispatch-budget.mjs for its OWN direct callers/uses of subagentIdentity()'s unresolved result beyond the guard-lifecycle-ready.mjs caller already covered by F02 (pipeline.identity-attestation-fail-closed-fallback, fixed 2026-08-29)."
 ---
 
