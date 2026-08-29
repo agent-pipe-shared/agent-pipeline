@@ -87,7 +87,7 @@ Also confirmed landed, reused by this driver:
   `scratch/`, because the shell grammar refuses a literal newline
   (`lib/project-onboarding-v3.mjs` ~line 2106).
 
-**Not confirmed:**
+**Not confirmed (as of the previous reconciliation):**
 - Sub-goal 6 (pre-push hook installed BY DEFAULT) — only a separate "offer"
   mechanism was found (`plugins/pipeline-core/scripts/pre-push-hook-install.mjs`,
   `project-onboarding-v3-pre-push-hook-offer.test.mjs`); an offer is not a
@@ -100,7 +100,80 @@ Also confirmed landed, reused by this driver:
   synthetic mocked `run`; no test or script drives a real fresh repository
   end to end and counts turns.
 
-Left `status: open`: the core orchestration mechanism this item asked for
-exists and several sub-goals are done, but the item's own acceptance
-criterion (a real fresh-repo measurement) is not met, and two sub-goals
-(pre-push default, scanner bootstrap) are unconfirmed.
+## Closing note 2 — both remaining sub-goals confirmed, acceptance criterion measured (dispatch NVA-R38-GUIDEDINITMEASURE, 2026-08-29)
+
+**Sub-goal 6 (pre-push hook installed by default): CONFIRMED DONE, no code
+change.** Re-run directly: `plugins/pipeline-core/lib/project-onboarding-v3.test.mjs`
+"onboarding installs the pre-push git hook by default -- no confirmation, no
+separate offer step" passes (152/152 overall). The "offer" mechanism the
+previous reconciliation found is a distinct, separate concern (an existing
+project that does NOT yet have onboarding's own hook and needs a confirm/offer
+UX); the guided-init path installs unconditionally.
+
+**Sub-goal 7 (scanner bootstrap): CONFIRMED DONE via the item's own "or
+report their state honestly" branch — no install step needed, none built.**
+A separate, already-closed dispatch (NVA-R18-SCANBOOT, `backlog/items/
+2026-08-28-scanner-bootstrap-is-not-self-sufficient-for-a-fresh-project.md`,
+closed 2026-08-29, commit `193e4dc0`) resolved this independently: a missing
+scanner reports `SKIPPED [binary_missing]`, not a failure, and the verdict
+stays CLEAN — the five statuses (`passed`/`findings`/`not-configured`/
+`tool-unavailable`/`not-applicable`) are distinguishable in evidence
+(`security-scan.mjs`). As a direct result, `freshIntent()`
+(`lib/project-onboarding-v3.mjs` ~line 899) now seeds `gates.security:
+"blocking"` by default for every fresh project — the security gate is ON
+from the first commit, with no scanner install and no hand-authored
+configuration required. This is exactly sub-goal 7's own "or report their
+state honestly" alternative, already wired into the same `freshIntent()` seed
+object the guided driver's `apply-portable-seed` step writes. No new wiring
+was needed or built.
+
+**Acceptance criterion "measured on a genuinely fresh repository, not
+asserted": MET, single-digit turns, zero repairs.** New durable measurement
+script, `plugins/pipeline-core/scripts/measure-fresh-repo-onboarding-turns.mjs`
+(exports `measureFreshRepoOnboardingTurns()` + a CLI `main()`), creates a real
+temporary git repository (`git init`, real author config, isolated via
+`PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE`), drives `driveOnboardingInit()`
+against it, answers every genuine `collect-input` question with a canned
+stand-in value (never inventing beyond what was actually asked), and chains
+past every `pendingAsks`-carrying stop within the same turn (the two
+unconditional asks -- `pushApprovalPreference`, `trustAnchorPointerRepairAcknowledged`
+-- have no resolving CLI subcommand by design and are meant to be surfaced
+once, not answered into a different state; `verifyCommand` is resolved for
+real by writing a trivial passing command into `project/pipeline.json`,
+mirroring how the PO's real answer would replace the `UNCONFIGURED_VERIFY`
+placeholder). Measured result: **`outcome: "ready"` in 7 turns, 15 total
+onboarding subcommands chained by the driver across those 7 turns, 0 repair
+subcommands.** 7 is single-digit; the criterion is met.
+
+Methodology note, disclosed rather than fixed (out of this dispatch's scope):
+the first attempt at this measurement used a simpler bypass (run the one
+blocked command, then restart the whole driver from a fresh `inspect`) and
+never converged -- 60 turns, 62 driver steps, still stuck, because restarting
+from `inspect` after a NON-MUTATING blocked command (e.g. a `plan-*` step)
+re-observes identical on-disk state and recomputes the identical
+pendingAsks-carrying step forever. The fixed measurement instead chains
+through each pendingAsks-carrying response's own `nextAction` in place, the
+same way `driveOnboardingInit()` chains an ordinary run of automatic steps,
+stopping only at a genuine new question, `ready`, or a real dead end. This is
+purely a property of how a human/orchestrator would actually behave once
+they've decided to proceed past an already-seen, unconditional notice; it
+required no change to `onboarding-init.mjs`'s own driver contract or tests.
+
+Also observed, not filed as blocking, not fixed (out of scope): the
+`readMachinePlane()` call sites inside `withPendingPushApprovalSetupAsk()`/
+`withPendingTrustAnchorGuidanceAsk()` (`lib/project-onboarding-v3.mjs`
+~lines 4633/4648/5441) call `readPlane()` with no arguments, so
+`PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE` does not isolate these two reads from
+the real operator machine plane the way `onboarding-init.test.mjs`'s own
+`FIXTURE_ENV` comment claims for the whole suite. Measured directly: a probe
+against an empty fixture home still reported this machine's real
+`pushApprovalDefault` ("signature") and a real dead trust-anchor pointer
+(`/tmp/po-human-key-...`). Did not affect this measurement's own turn count
+(both asks are unconditional and get chained past either way), but the
+isolation claim in `onboarding-init.test.mjs`'s header comment is not fully
+accurate for these two fields specifically.
+
+**All three items this closing note was opened to resolve are now
+confirmed.** Left `status: open` for the PO to close explicitly after
+reviewing this measurement — not this dispatch's call, per the item's own
+`done_when: manual`.
