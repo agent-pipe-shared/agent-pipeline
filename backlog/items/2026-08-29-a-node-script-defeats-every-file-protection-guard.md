@@ -150,3 +150,62 @@ remain unimpeded; they are a normal and useful working mode, not the defect.
   both) presupposes that the guard layer is where enforcement lives. Fixing those
   while this one stands open is fence-painting. This is therefore first and alone.
 - **Date:** 2026-08-29
+
+## Stage 1 landed, 2026-08-29 (dispatch NVA-R10-PROTPATH)
+
+Layer 1 (detection, additive, no existing `guard-*.mjs` file touched) is
+implemented and merged: `plugins/pipeline-core/scripts/check-protected-path-integrity.mjs`
+plus its test file. It enumerates the protected-path set from the real sources
+of truth — `GATE_STRENGTH_PATHS` (imported directly from
+`guard-gate-strength.mjs`) and `loadProtectedTestPathRules()` (the same parser
+`guard-testpath.mjs` and the shell lane already share) — never a second
+hand-maintained list. Test-path rules are regex suffix patterns rather than
+concrete paths, so covering them walks the tree (`walkFiles`, excluding `.git`,
+`node_modules`, `.claude/worktrees`) and matches each file against the rules.
+`GS-15`'s `/*` glob is expanded to every file currently under that subtree;
+`GS-6` (`LIVE_PLUGIN_RULE`, "whichever plugin root is currently enforcing") is
+deliberately NOT baselined — it names an entire live source tree under active
+development, not a discrete file (disclosed scope narrowing, file header).
+
+`recordBaseline()` writes a sha256 digest per protected path to
+`<git-common-dir>/agent-pipeline/protected-path-integrity/baseline.json` (local
+session state, the same persistence arrangement `pre-push-hook-install.mjs`
+already uses for its own install marker — never committed tracked state).
+`compareAgainstBaseline()` re-hashes every baselined path and reports a typed
+`pipeline.protected-path-integrity` finding — naming the path and both digests
+— for any digest change that has no matching CONSUMED human-guard-override
+capability (`eligiblePaths` exact match) covering that exact path.
+
+A controlled repro test (`PHASE 1` in the test file) proves the current gap
+using only pre-existing repository mechanisms — a spawned `node <script>.mjs`
+subprocess calling `fs.writeFileSync` directly against a fixture file succeeds
+silently, because the write never crosses any PreToolUse hook boundary at all.
+That assertion does not import anything from the new module and its truth does
+not depend on this dispatch. The mechanism is then verified against three
+distinct bypass shapes, each its own test (`PHASE 2a/b/c`): (a) a Node script
+writing directly via `fs.writeFileSync`; (b) a Node script that shells out via
+`execFileSync('/bin/sh', ['-c', ...])` with a `>` redirect (the redirect never
+appears in any command text a guard could inspect, because it is inside the
+spawned child, not the argv a guard ever sees); (c) a non-Node interpreter
+(`python3`, confirmed present in this environment) writing the file directly.
+All three are detected. A script-driven edit to a NON-protected path is proven
+by a test to produce no finding, and never even enters the enumerated protected
+set. A newly-protected path — added only to the fixture's protected-set INPUT,
+never to a real guard file — is proven covered in the same run, bounding the
+false-negative population by construction.
+
+Verified: `node --test plugins/pipeline-core/scripts/check-protected-path-integrity.test.mjs`
+— 25/25 pass, exit 0 (includes a read-only sanity check against this
+repository's own real `GATE_STRENGTH_PATHS`/`protectedTestPaths`, and a CLI
+usage-branch smoke test — neither mutates tracked or `.git` state).
+`node --test harness/scripts/check-consumer-safe-paths.test.mjs` — 9/9 pass,
+exit 0 (mandatory per this dispatch's briefing since it touches
+`plugins/pipeline-core/`).
+
+**What remains — Stage 2, out of scope for this dispatch:** an actual
+blocking git `pre-commit` hook that refuses a commit whose staged diff touches
+a protected path without a matching consumed capability. Stage 1 is detection
+only; nothing here is wired into any hook or invoked automatically yet — it is
+a standalone script with a `record`/`compare` CLI, not yet called from
+anywhere in the guard family. This item stays `open`; `done_when` is
+unchanged.
