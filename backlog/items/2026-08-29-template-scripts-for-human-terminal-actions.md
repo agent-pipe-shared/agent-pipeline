@@ -39,7 +39,14 @@ before it can be scoped into acceptance criteria.
 
 ## Triage
 
-- **Decision:** deferred, Nova B
+- **Decision:** deferred, Nova B, ELEVATED priority within Nova B
 - **Rationale:** genuine design idea with real supporting evidence (Antigravity's comparative
-  outperformance), but not yet scoped.
+  outperformance), but not yet scoped. PO explicitly confirmed 2026-08-29, live, that this
+  direction should be pursued: "Folgen wir agys Weg und machen template skripte die überall
+  benannt werden" -- and generalized the underlying principle to every item from this
+  greenfield-analysis batch: designs must make the enforcement layer itself surface and steer
+  toward the correct path, not merely document it or block the wrong one. Sequenced directly
+  after the current dispatch wave (NVA-CF-KEYBOOTSTRAP/-VERIFYDEADLOCK/-FORCEDQUOTE) rather
+  than folded into it, to avoid file-scope collision and because it needs its own design pass
+  first (script format, storage location, discovery mechanism).
 - **Date:** 2026-08-29
