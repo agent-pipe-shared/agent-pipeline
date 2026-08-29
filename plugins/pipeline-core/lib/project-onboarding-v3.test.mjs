@@ -3958,6 +3958,72 @@ test("a kickoff language switch that also finds a drifted runtime target repairs
   } finally { dispose(path); }
 });
 
+// Regression for NVA-CF-ONBOARDKICKOFF: the test above only proves the
+// repair happens when a language SWITCH occurs (seed "en" -> requested "de"),
+// because that is the one branch that reaches
+// correctSeededKickoffLanguage()'s regenerateRuntimeProjection() call.
+// correctSeededKickoffLanguage() returns BEFORE ever reaching that call
+// whenever the resolved kickoff language equals the already-seeded language
+// -- which is "en", the fresh-seed default, and therefore the COMMON case.
+// This test drives that exact common case: a kickoff requesting "en" (the
+// seed default -- no language change at all) with genuine, unrelated
+// pre-existing projection drift. Before the fix, "projection-drift" was
+// admitted through apply with no repair ever running, and the drift survived
+// uncorrected; this asserts it is actually repaired instead.
+test("a kickoff with the seed-default (unchanged) language still repairs genuine pre-existing projection drift (NVA-CF-ONBOARDKICKOFF)", () => {
+  const path = root();
+  try {
+    hostGit(path, ["init", "--initial-branch=main"]);
+    const localDeps = { ...fakeDeps, initializePoGateProfileReceipt: initializeActualPoGateProfileReceipt };
+    const barrier = initializeRestartRequiredRoot(path, localDeps);
+    clearRuntimeBarrier(path, barrier);
+
+    // "en" matches the fresh-seed default (v0Source() above) -- requesting it
+    // explicitly here means correctSeededKickoffLanguage()'s own
+    // seededLanguage === resolvedLanguage check is true, so ITS internal
+    // regenerateRuntimeProjection() call is skipped. Any repair the test
+    // observes below must come from applyProjectOnboardingKickoffV4's own
+    // unconditional call, not as a side effect of a language switch.
+    const goal = "Ship an English-language feature alongside pre-existing drift";
+    const plan = planProjectOnboardingKickoffV4({ rootDir: path, goal, language: "en", deps: localDeps, runner: "codex" });
+    assert.equal(plan.language, "en");
+    const preKickoffSource = parseYaml(readFileSync(join(path, "pipeline.user.yaml"), "utf8"));
+    assert.equal(preKickoffSource.language.human_facing, "en", "fixture setup must start from the seed-default language, not a switch");
+
+    // Same drift-injection technique as the sibling test above: corrupt a
+    // runtime target the language correction's own narrow byte patches never
+    // touch, so genuine drift exists for a reason completely independent of
+    // (and unaffected by) the language staying "en".
+    const advisorPath = join(path, ".codex", "agents", "consult-advisor.toml");
+    const advisorBefore = readFileSync(advisorPath, "utf8");
+    assert.match(advisorBefore, /model = "[^"]+"/u);
+    writeFileSync(advisorPath, advisorBefore.replace(/model = "[^"]*"/u, 'model = "corrupted-drift-probe-en"'));
+    assert.equal(
+      inspectProjectOnboardingV3({ rootDir: path, deps: localDeps, runner: "codex" }).status,
+      "projection-drift",
+      "fixture setup must actually produce drift before the unchanged-language kickoff apply runs",
+    );
+
+    const applied = applyProjectOnboardingKickoffV4({
+      rootDir: path, goal, language: "en", planSha256: plan.planSha256, activate: true, deps: localDeps, runner: "codex",
+    });
+    assert.equal(applied.status, "ready");
+    assert.equal(applied.continuity.status, "valid");
+
+    // The unrelated corruption must be gone even though no language switch
+    // ever ran the correction's own internal repair call -- this is the exact
+    // gap NVA-CF-ONBOARDKICKOFF closes.
+    assert.doesNotMatch(
+      readFileSync(advisorPath, "utf8"),
+      /corrupted-drift-probe-en/u,
+      "genuine pre-existing drift must be repaired even when the kickoff language does not change",
+    );
+    const correctedSource = parseYaml(readFileSync(join(path, "pipeline.user.yaml"), "utf8"));
+    assert.equal(correctedSource.language.human_facing, "en");
+    assert.equal(inspectProjectOnboardingV3({ rootDir: path, deps: localDeps, runner: "codex" }).status, "ready");
+  } finally { dispose(path); }
+});
+
 // The gate the fresh seed switches on has to be PASSABLE, and that is
 // established by driving the whole path rather than by reading it. Both halves
 // are the contract: a promoted `feature` whose plan nobody approved is REFUSED

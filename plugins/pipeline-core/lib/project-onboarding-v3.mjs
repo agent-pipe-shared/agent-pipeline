@@ -61,7 +61,7 @@ import {
   validatePoGateProfileForRepository,
 } from "./po-gate-authority.mjs";
 import { initializePoGateProfileReceipt, publishPoGateProfileReceipt } from "./po-gate-profile-publisher.mjs";
-import { correctPromotedLanguage, correctSeededKickoffLanguage } from "./onboarding-language-correction.mjs";
+import { correctPromotedLanguage, correctSeededKickoffLanguage, regenerateRuntimeProjection } from "./onboarding-language-correction.mjs";
 import { parseYaml } from "./yaml-lite.mjs";
 import { codexCustomAgentSeed, loadRuntimeProjectionV3OwnedKeys, planRuntimeProjectionV3 } from "./runtime-projection-v3.mjs";
 import {
@@ -3968,9 +3968,10 @@ function v4Inspection(rootDir, fs, intent = "onboarding", runner) {
           // Only `applyProjectOnboardingKickoffV4`'s own gate (this module)
           // reads `observed.continuity.status` to admit a pristine,
           // not-yet-kicked-off project through kickoff apply despite genuine
-          // unrelated drift, so `correctSeededKickoffLanguage`'s
-          // `regenerateRuntimeProjection()` call can repair that SAME drift
-          // atomically instead of every caller being stuck reading
+          // unrelated drift, so its own `regenerateRuntimeProjection()` call
+          // (NVA-CF-ONBOARDKICKOFF: unconditional there, never gated behind
+          // whether a language change also happens to occur) can repair that
+          // SAME drift atomically instead of every caller being stuck reading
           // "unavailable" here forever.
           let continuity;
           try {
@@ -5935,11 +5936,24 @@ export function applyProjectOnboardingKickoffV4({
   // controlling check right below, completely unchanged) but happens to
   // carry drift in a runtime target unrelated to this kickoff must not be
   // handed back its own drift status here: applyOnboardingKickoff below
-  // still runs exactly as before, and correctSeededKickoffLanguage's own
-  // regenerateRuntimeProjection() call repairs that SAME drift, atomically,
-  // in the same correction transaction, for any drifted V3 runtime target
-  // the migration governs -- not special-cased to any one file.
-  if ((!KICKOFF_PLAN_ADMITTED_STATUSES.has(observed.status) && observed.status !== "ready" && observed.status !== "projection-drift")
+  // still runs exactly as before, and the drift is repaired in the same
+  // correction transaction, for any drifted V3 runtime target the migration
+  // governs -- not special-cased to any one file.
+  //
+  // NVA-CF-ONBOARDKICKOFF: the repair used to be reached ONLY as a side
+  // effect of correctSeededKickoffLanguage()'s own regenerateRuntimeProjection()
+  // call, which that function skips via an early return whenever the
+  // resolved kickoff language equals the already-seeded language -- the seed
+  // default ("en") and therefore the common case. Every same-language
+  // kickoff with genuine pre-existing drift was admitted through apply above
+  // WITHOUT the repair that was the whole justification for admitting it.
+  // `wasProjectionDrift` is latched from the pre-apply observation (the exact
+  // status this gate admitted) and used below to call
+  // regenerateRuntimeProjection() unconditionally -- never gated behind
+  // whether a language change also happens to occur -- so the repair this
+  // admission was justified on actually always runs.
+  const admittedProjectionDrift = observed.status === "projection-drift";
+  if ((!KICKOFF_PLAN_ADMITTED_STATUSES.has(observed.status) && observed.status !== "ready" && !admittedProjectionDrift)
     || !["absent-pristine", "valid"].includes(observed.continuity.status)) {
     return observed;
   }
@@ -5960,6 +5974,13 @@ export function applyProjectOnboardingKickoffV4({
   });
   if (observed.repository.mode === "local") {
     correctSeededKickoffLanguage(observed.root, plan.language, fs);
+    // NVA-CF-ONBOARDKICKOFF: unconditional, regardless of whether the call
+    // above just did (or skipped) its own regeneration -- see the comment on
+    // `admittedProjectionDrift` above. A no-op when the language-switch
+    // branch already regenerated the projection (regenerateRuntimeProjection's
+    // own plan.status !== "ready" check makes the second call a no-op once
+    // the drift is already gone).
+    if (admittedProjectionDrift) regenerateRuntimeProjection(observed.root, fs);
     initializeKickoffPoProfile(observed.root, fs);
   }
   return v4Inspection(rootDir, fs, "onboarding", runner);

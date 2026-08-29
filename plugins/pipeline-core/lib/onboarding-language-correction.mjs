@@ -158,7 +158,23 @@ function seededManifestLanguageBlock(language) {
 // this correction, already owned by their own dedicated lifecycle branches,
 // and forcing this correction to fail on them would be a NEW failure mode
 // this fix must not introduce.
-function regenerateRuntimeProjection(root, fs) {
+//
+// NVA-CF-ONBOARDKICKOFF: exported (was module-private) because
+// `correctSeededKickoffLanguage` below only reaches this call when the
+// resolved kickoff language actually differs from the already-seeded one --
+// an early return for the (common) unchanged-language case skips it entirely.
+// `project-onboarding-v3.mjs`'s `applyProjectOnboardingKickoffV4` admits
+// `observed.status === "projection-drift"` through to apply on the premise
+// that THIS function repairs that same drift; for an unchanged-language
+// kickoff that premise only holds if that caller also calls this function
+// directly, unconditionally, whenever it admitted a `"projection-drift"`
+// observation -- which it now does, alongside (not instead of) the call
+// already made from inside `correctSeededKickoffLanguage` for the
+// language-does-change case. Calling this twice on the same repair (language
+// changed AND was pre-drifted) is safe: the second call's own `plan.status
+// !== "ready"` check makes it a no-op once the first call already regenerated
+// the projection.
+export function regenerateRuntimeProjection(root, fs) {
   const plan = planRunnerProfileMigrationV3({
     rootDir: root,
     deps: fs,
