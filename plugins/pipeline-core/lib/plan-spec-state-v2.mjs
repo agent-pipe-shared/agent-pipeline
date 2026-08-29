@@ -130,7 +130,13 @@ const INVALIDATION_KEYS = [
 ];
 const PROFILES = new Set(["epic", "feature", "mini"]);
 const PHASES = new Set(["design", "implementation"]);
-const INVALIDATION_REASONS = new Set(["reopen-design", "document-drift"]);
+// NVA-R3-PRDBIND (backlog: 2026-08-29-prd-binding-precedes-framing-with-no-
+// reopen-path-back.md): distinguishes "releasing a binding that a bind step
+// froze before it was ever submitted" from the two reasons above, neither of
+// which describes backing out of a submission or approval that never
+// existed. See reopenPlanDesign()'s fifth path below.
+const REOPEN_UNSUBMITTED_BINDING_REASON = "pipeline.reopen-bound-unsubmitted-prd";
+const INVALIDATION_REASONS = new Set(["reopen-design", "document-drift", REOPEN_UNSUBMITTED_BINDING_REASON]);
 
 export const PLAN_LIFECYCLE_STATUSES = Object.freeze([
   "draft",
@@ -332,7 +338,11 @@ export function validPlanInvalidation(value) {
   return hasExactKeys(value, INVALIDATION_KEYS)
     && value.schema === PLAN_INVALIDATION_SCHEMA
     && isNonBlankString(value.featureId)
-    && SHA256.test(value.invalidatedSubmissionSha256)
+    // NVA-R3-PRDBIND: nullable like invalidatedApprovalSha256 below -- the
+    // bound-unsubmitted-binding reason has no real submission to hash either.
+    // Purely additive: every existing writer (a real prior submission) still
+    // supplies a real hash, so this never accepts a previously-rejected value.
+    && (value.invalidatedSubmissionSha256 === null || SHA256.test(value.invalidatedSubmissionSha256))
     && (value.invalidatedApprovalSha256 === null || SHA256.test(value.invalidatedApprovalSha256))
     && isNonBlankString(value.invalidatedBy)
     && isCanonicalIso(value.invalidatedAt)
@@ -680,6 +690,22 @@ export function sealCurrentPlanApproval({ state, expectedStateSha256 }) {
   };
 }
 
+// NVA-R3-PRDBIND: true exactly when `continuity.authority` is bound to real
+// repository documents -- the same live binding
+// guard-lifecycle-ready.mjs's `boundAuthorityDocumentPath()` reads to refuse
+// direct edits (GUARD-LIFECYCLE-AUTHORITY-BOUND). Every coordinator-sourced
+// bind (`applyOnboardingBootstrapBind`) and every kickoff promotion write
+// this; a genuinely pre-continuity legacy state (the `legacyV2Approval`
+// shape reopenPlanDesign() already special-cases, and the hostile/malformed
+// fixtures this module's own tests construct) does not, and this predicate
+// deliberately fails closed (false) rather than guess when it cannot tell.
+function continuityAuthorityBound(state) {
+  const authority = state.continuity?.authority;
+  if (!isPlainObject(authority)) return false;
+  return isPlainObject(authority.prd) && isRepositoryPath(authority.prd.path) && SHA256.test(authority.prd.sha256 ?? "")
+    && isPlainObject(authority.spec) && isRepositoryPath(authority.spec.path) && SHA256.test(authority.spec.sha256 ?? "");
+}
+
 export function reopenPlanDesign({
   state,
   expectedStateSha256,
@@ -722,6 +748,59 @@ export function reopenPlanDesign({
         replay: false,
         state: next,
         invalidation: null,
+      };
+    }
+    // NVA-R3-PRDBIND: fifth path -- an authority-bound feature that was never
+    // submitted at all. This is exactly what a coordinator-sourced
+    // `applyOnboardingBootstrapBind()` bind produces (buildCoordinatorSourced-
+    // PromotionPlan(), onboarding-continuity.mjs): `continuity.authority`
+    // points at real PRD/Spec/design-input documents from the moment binding
+    // happens, regardless of phase or of whether framing was authored first.
+    // Without this branch, that state fell straight into the "already open"
+    // no-op below -- ok:true, replay:true, `state` byte-identical, `planInvalidation`
+    // never set -- which reports success while leaving the write-time guard's
+    // only release condition (a real `planInvalidation` object,
+    // guard-lifecycle-ready.mjs `boundAuthorityDocumentPath()`) unmet. Checked
+    // BEFORE the no-op below because its own precondition (design phase,
+    // `planApproved !== true`) is a strict superset of this one and would
+    // otherwise always match first.
+    if (continuityAuthorityBound(state)) {
+      const alreadyReleased = validPlanInvalidation(state.planInvalidation)
+        && state.planInvalidation.featureId === state.activeFeature.id
+        && state.planInvalidation.reason === REOPEN_UNSUBMITTED_BINDING_REASON
+        && state.planInvalidation.invalidatedSubmissionSha256 === null
+        && state.planInvalidation.invalidatedApprovalSha256 === null
+        && state.activeFeature.phase === "design"
+        && state.planApproved !== true;
+      if (alreadyReleased) {
+        return { ok: true, replay: true, state, invalidation: state.planInvalidation };
+      }
+      const invalidation = {
+        schema: PLAN_INVALIDATION_SCHEMA,
+        featureId: state.activeFeature.id,
+        // Neither a submission nor an approval ever existed for this state, so
+        // there is nothing truthful to hash -- unlike the real-submission path
+        // below, both are null (validPlanInvalidation() accepts null on both).
+        invalidatedSubmissionSha256: null,
+        invalidatedApprovalSha256: null,
+        invalidatedBy: by,
+        invalidatedAt: at,
+        reason: REOPEN_UNSUBMITTED_BINDING_REASON,
+      };
+      return {
+        ok: true,
+        replay: false,
+        state: {
+          ...state,
+          activeFeature: {
+            ...state.activeFeature,
+            phase: "design",
+            phaseHistory: appendPhaseHistory(state.activeFeature, "design", at),
+          },
+          planApproved: false,
+          planInvalidation: invalidation,
+        },
+        invalidation,
       };
     }
     if (state.activeFeature.phase === "design" && state.planApproved !== true) {
