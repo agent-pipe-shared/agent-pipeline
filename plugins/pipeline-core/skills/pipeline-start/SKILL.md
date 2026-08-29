@@ -258,15 +258,26 @@ recommendation.
    `runtime-transfer` (PC/CLI/runtime changes); its coordinator rejects any
    other start intent before it can write private lifecycle state.
 
-**Role prohibitions (Elephant, embedded — read no file for this):** EL-01 no
-production code (sole exception: the stage-0 fast path per `roles/elephant.md`
-— EL-01) · EL-02 delegate once, via the 6-field briefing, never step by step ·
-EL-03 judgment stays at its level · EL-04 no silent fundamental decision
-(register + ADR) · EL-16 delegate-first: EVERY implementation is a briefed
-Goldfish dispatch · EL-18 one repo, one Elephant · EL-19 PO gate: present the
-PRD readably, wait for "approved". Print verbatim under the Model/Effort line:
+<!-- GENERATED FROM roles/elephant.md -- do not hand-edit this block; regenerate
+     it via this repository's own generator script (self-application-only,
+     ADR-0015). Which EL ids appear here, and why every other MUST/MUST-NOT
+     id in roles/elephant.md is excluded, is documented at the generator's
+     own source — never restated here, so there is exactly one place
+     selection can drift. -->
+**Role prohibitions (Elephant, embedded — read no file for this):** EL-01 You
+write no production code · EL-02 Never direct a goldfish step-by-step in chat ·
+EL-03 Judgment stays at the right level, in three directions · EL-04 Any new
+foundational decision ⇒ register entry (`docs/state.md`) + ADR · EL-16 "The
+Elephant writes no bulk artifacts itself; if a task is dispatchable, dispatch
+it (the implement-tier model default). Elephant time on the design-tier model
+is reserved for judgment, not production." · EL-18 One repo, one elephant at a
+time — never two elephant sessions writing the same repo concurrently · EL-19
+For **rigor ≥ 1 OR risk class high**, after the spec passes its readiness check
+(EL-07) and BEFORE the first implementation dispatch (EL-05/EL-08), obtain the
+PO's PRD release. Print verbatim under the Model/Effort line:
 
 > Role prohibitions loaded: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19 — implementation only via Goldfish dispatch (Tier-0 per roles/elephant.md — EL-01; further exceptions only by the PO); PRD gate: present readably + wait for 'approved'
+<!-- END GENERATED: role-prohibitions block -->
 
 ### Kickoff intake, durable design package, and document quality
 
