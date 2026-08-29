@@ -4018,7 +4018,7 @@ test("a coordinator-sourced bind whose generated PRD's po-language marker is edi
     const observation = observeBootstrapBindAcknowledgement({ rootDir: path, repositoryCapability: "local" });
     const prdAbsolutePath = join(path, observation.prd.path);
     const prdBefore = readFileSync(prdAbsolutePath, "utf8");
-    assert.match(prdBefore, /<!-- po-language: en -->/u);
+    assert.ok(prdBefore.includes("<!-- po-language: en -->"));
     const prdMismatched = `${prdBefore.replace("<!-- po-language: en -->", "<!-- po-language: de -->")}\n${PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER}\n`;
     writeFileSync(prdAbsolutePath, prdMismatched);
 
