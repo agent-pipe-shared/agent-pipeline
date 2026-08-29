@@ -85,3 +85,11 @@ Two independent trims, either alone is worth doing:
 - **Rationale:**
 - **Assignment:** `sprint: nova` — Nova B work, not a 0.6.0 candidate blocker.
 - **Date:**
+
+## Progress note (2026-08-29, backlog sweep)
+
+Commit b6d81f42 landed Part 1 -- boundedCopySafeCommand() now renders the
+wrapped posix/powershell/cmd forms only when the inline command actually
+exceeds the column bound, instead of always producing all three. Part 2 (a
+first-denial-full / repeat-denial-short session-scoped trim) remains
+unaddressed, explicitly out of scope for that dispatch by design.

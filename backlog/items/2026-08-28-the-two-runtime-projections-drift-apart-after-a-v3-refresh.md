@@ -57,3 +57,11 @@ differ would be worse than the drift.
 
 - `2026-08-28-a-fail-closed-rollback-names-no-predicate-so-a-consumer-cannot-fix-it.md` —
   same file pair, same session; check them together.
+
+## Progress note (2026-08-29, backlog sweep)
+
+Commit cf14f274 added manifestDriftDiagnostics() to project-authority.mjs,
+detecting divergence between the neutral/legacy manifest pair the same way
+calibrationDriftDiagnostics() already does for the calibration pair. The
+item's other acceptance criterion -- a durable, stated intended relationship
+between the two files -- is still open.

@@ -188,3 +188,11 @@ since this table stays self-referencing inside `plugins/pipeline-core/`.
 `backlog-dispatch-reference-tests` remains an unstarted candidate for the
 next dispatch in this series. Item stays `open` -- still not "the general
 case": 7 suites now Tier B, roughly 261 remain Tier A.
+
+## Progress note (2026-08-29, backlog sweep)
+
+Commit 41972374 promoted backlog-dispatch-reference-tests into
+verify-journal.mjs's TIER_B_DECLARATIONS (8th suite now Tier B).
+sdlc-run-graph-tests and stack-run-outcome-tests remain blocked on the
+harness/plugin-tree consumer-safe-paths constraint noted in this item's own
+2026-08-25 entry.
