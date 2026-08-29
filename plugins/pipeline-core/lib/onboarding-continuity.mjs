@@ -72,7 +72,8 @@ import {
   resolvePoGateRepositoryTopology,
   validatePoGateLanguageProjection,
 } from "./po-gate-authority.mjs";
-import { initializePoGateProfileReceipt } from "./po-gate-profile-publisher.mjs";
+import { initializePoGateProfileReceipt, publishPoGateProfileReceipt } from "./po-gate-profile-publisher.mjs";
+import { correctPromotedLanguage } from "./onboarding-language-correction.mjs";
 import {
   inspectSessionClosure,
   listActiveSessionDescriptors,
@@ -6156,9 +6157,43 @@ export function applyOnboardingBootstrapBind({
     designInputPath: resolved.designInputPath, runner, repositoryCapability, onboardingScript, spawn,
     coordinatorSourced: true, allowAppliedReplay: true,
   });
-  return applyOnboardingKickoffPromotion({
+  const result = applyOnboardingKickoffPromotion({
     plan, expectedPlanSha256, activate, deps: { ...deps, spawn },
   });
+  // pipeline.po-language-propagated-to-configured-pair (NVA-R5-LANGWIRE): this
+  // apply used to return here, leaving language.human_facing (the pair
+  // configuredLanguage()/po-gate-authority.mjs reads) on its seeded default
+  // even when the PO's real answer was {de, en} -- applyOnboardingKickoffPromotion
+  // (shared with the legacy kickoff-promotion wrapper) never touches it, only
+  // ensureLocalPromotionPoProfileReceipt's receipt snapshot above, which
+  // snapshots whatever those files ALREADY say. The legacy wrapper
+  // (applyProjectOnboardingKickoffPromotionV4, lib/project-onboarding-v3.mjs)
+  // already closes this with the SAME correction after its own promotion
+  // call; this is the identical fix for the coordinator-sourced path. The
+  // correction's own {de,en}-vs-else early return (unmodified, see that
+  // module) is what keeps a non-{de,en} content language -- documentLanguage,
+  // already written correctly by buildCoordinatorSourcedPromotionPlan -- out
+  // of this pair entirely.
+  //
+  // Gated on "local" exactly like the legacy wrapper's own
+  // `if (observed.repository.mode === "local")` guard, and additionally on
+  // both files actually being present -- the same precondition
+  // ensureLocalPromotionPoProfileReceipt already applies immediately above,
+  // for the identical reason (this module's own unit tests exercise the
+  // promotion machinery on its own, without a real project's early
+  // apply-portable-seed having run yet; nothing to correct there).
+  if (repositoryCapability === "local") {
+    const projection = poGateProfileProjectionPaths(plan.root);
+    const source = observeOptionalProjectFile(plan.root, projection.source, "PO profile source");
+    const runtime = observeOptionalProjectFile(plan.root, projection.manifest, "PO profile runtime manifest");
+    if (source.status === "present" && runtime.status === "present") {
+      correctPromotedLanguage(plan.root, plan.authority.poLanguage, {
+        readFileSync, writeFileSync, existsSync, lstatSync, openSync, fstatSync, closeSync, constants,
+        publishPoGateProfileReceipt,
+      });
+    }
+  }
+  return result;
 }
 
 function resultFromPersisted(plan, status, mutated, spawn = defaultGitSpawn) {

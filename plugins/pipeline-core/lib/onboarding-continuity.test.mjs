@@ -27,6 +27,9 @@ import {
   validatePoGateProfileForRepository,
 } from "./po-gate-authority.mjs";
 import { sha256CanonicalJson } from "./plan-spec-state-v2.mjs";
+import { registeredCriticExportPolicy, registeredRouting } from "./runner-profiles-v3.mjs";
+import { parseYaml } from "./yaml-lite.mjs";
+import { validateContinuityState } from "./continuity-state.mjs";
 import { mkdtempTestScratch } from "./test-tmpdir.mjs";
 import { ProjectOnboardingReadyError } from "./project-onboarding-ready-gate.mjs";
 import { evaluateLifecycleReadyGuard } from "../hooks/guard-lifecycle-ready.mjs";
@@ -3854,6 +3857,157 @@ check("promotion apply replay leaves exactly one valid PO-gate profile receipt, 
     "a currently-valid receipt must not be rewritten by a promotion replay");
   const authority = validatePoGateProfileForRepository({ repoRoot: seed.root });
   assert.equal(authority.ok, true, JSON.stringify(authority));
+});
+
+// ---------------------------------------------------------------------------
+// NVA-R5-LANGWIRE: applyOnboardingBootstrapBind() previously called
+// applyOnboardingKickoffPromotion() directly and never propagated the PO's
+// answered language into the language.human_facing pair configuredLanguage()
+// (po-gate-authority.mjs) reads -- the legacy kickoff-promotion wrapper
+// already did this via correctPromotedLanguage(); these two checks target
+// bootstrap-bind-apply SPECIFICALLY (the coordinator-sourced flow), never the
+// legacy kickoff path project-onboarding-v3.test.mjs already covers, since
+// that coverage is exactly why this gap went uncaught. Both were run against
+// the pre-fix onboarding-continuity.mjs first (see the dispatch record's
+// `log` for the RED observation) before the wiring above was added.
+function renderLangYaml(value, indent = "") {
+  if (Array.isArray(value)) return value.map((item) => (item && typeof item === "object")
+    ? `${indent}-\n${renderLangYaml(item, `${indent}  `)}` : `${indent}- ${renderLangScalar(item)}\n`).join("");
+  return Object.keys(value).sort().map((key) => {
+    const child = value[key];
+    return child && typeof child === "object" ? `${indent}${key}:\n${renderLangYaml(child, `${indent}  `)}` : `${indent}${key}: ${renderLangScalar(child)}\n`;
+  }).join("");
+}
+function renderLangScalar(value) {
+  if (typeof value === "string") return JSON.stringify(value).replace(/</gu, "\\u003c").replace(/>/gu, "\\u003e");
+  if (typeof value === "boolean" || Number.isInteger(value)) return String(value);
+  throw new Error("unsupported V3 YAML scalar");
+}
+function validV3Source(language) {
+  return {
+    schema: "pipeline.user.v3",
+    language: { human_facing: language, agent_facing: language },
+    agent_runtime: "other",
+    runners: { enabled: ["codex"], default: "codex" },
+    routing: registeredRouting(),
+    usage: { common_projection: "pipeline.runner-usage.v1", raw_persistence: "none" },
+    autonomy: { push_policy: "gated", branch_model: "feature-branch", wip_limit: 1 },
+    gates: { dev_plan: "blocking", push: "blocking", security: "warn", claude_md_max_lines: 200 },
+    critic_export: registeredCriticExportPolicy(),
+  };
+}
+// Seeds a "fresh-seed shape" pipeline.user.yaml (source) plus BOTH
+// runtime-manifest tiers (.claude/pipeline.yaml, project/pipeline.yaml) --
+// correctSeededKickoffLanguage() corrects both unconditionally, mirroring
+// what a real fresh v3-onboarded project's apply-portable-seed leaves behind
+// (project-onboarding-v3.mjs), which this narrower test file's own fixture()
+// does not otherwise replicate.
+function seedFreshBootstrapBindLanguageRoot(root, language = "en") {
+  writeFileSync(join(root, "pipeline.user.yaml"), renderLangYaml(validV3Source(language)), { encoding: "utf8", mode: 0o600 });
+  const manifestBlock = `language:\n  human_facing: ${language}\n`;
+  writeFileSync(join(root, ".claude", "pipeline.yaml"), `schema: pipeline.manifest.v0\n${manifestBlock}`, { encoding: "utf8", mode: 0o600 });
+  writeFileSync(join(root, "project", "pipeline.yaml"), `schema: pipeline.manifest.v0\n${manifestBlock}`, { encoding: "utf8", mode: 0o600 });
+}
+
+check("applyOnboardingBootstrapBind: a PO answer of de propagates into the configured language pair, and the PO gate does not raise PO-GATE-PRD-LANGUAGE-MISMATCH (NVA-R5-LANGWIRE)", () => {
+  const root = fixture("bootstrap-bind-lang-de", { neutral: true });
+  seedFreshBootstrapBindLanguageRoot(root, "en");
+  applyOnboardingIntakeConsent({ rootDir: root, granted: true, language: "de", profile: "feature", activate: true });
+  applyOnboardingIntakeCapture({ rootDir: root, text: "requirement material one", activate: true });
+  applyOnboardingIntakeDesignQuestions({
+    rootDir: root,
+    answers: [{ question: "What is the goal?", answer: "Ship the coordinator." }],
+    activate: true,
+  });
+  const generatePlan = planOnboardingIntakeGenerate({ rootDir: root });
+  applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: generatePlan.planSha256, activate: true });
+  const prdAbsolute = join(root, generatePlan.targets.prd.path);
+  const prdText = readFileSync(prdAbsolute, "utf8");
+  assert.equal(prdText.startsWith("<!-- po-language: de -->"), true, prdText);
+  // validatePoGateAuthority's own acknowledgement requirement (fired below,
+  // when expectedPlanSha256/expectedSpecSha256 are passed, exactly as a real
+  // submit-plan call does) is a separate concern from the promotion-time
+  // pure-generator exemption above -- bootstrapBindReadyRoot (elsewhere in
+  // this file) adds the identical marker for the identical reason.
+  writeFileSync(prdAbsolute, `${prdText}${PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER}\n`);
+
+  const seededSource = parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8"));
+  assert.equal(seededSource.language.human_facing, "en", "fixture must start on the seeded English default before propagation");
+
+  const plan = planOnboardingBootstrapBind({ rootDir: root });
+  const applied = applyOnboardingBootstrapBind({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
+  assert.equal(applied.status, "applied");
+  assert.equal(applied.continuity.status, "valid");
+
+  const correctedSource = parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8"));
+  assert.equal(correctedSource.language.human_facing, "de",
+    "pipeline.po-language-propagated-to-configured-pair: the PO's de answer must reach the configured pair");
+  assert.match(readFileSync(join(root, ".claude", "pipeline.yaml"), "utf8"), /language:\n {2}human_facing: de\n/u);
+  assert.match(readFileSync(join(root, "project", "pipeline.yaml"), "utf8"), /language:\n {2}human_facing: de\n/u);
+
+  const topology = { repoRoot: root, gitCommonDir: join(root, ".git"), primaryRoot: root, registeredWorktreeRoots: [root] };
+  const authority = validatePoGateAuthority({
+    ...topology, expectedPlanSha256: plan.authority.prd.sha256, expectedSpecSha256: plan.authority.spec.sha256,
+  });
+  assert.equal(authority.ok, true, JSON.stringify(authority));
+  assert.notEqual(authority.code, "PO-GATE-PRD-LANGUAGE-MISMATCH");
+});
+
+check("applyOnboardingBootstrapBind: a content language outside {de, en} (fr) still binds end to end and passes the PO gate without forcing the operator-facing axis (NVA-R5-LANGWIRE)", () => {
+  const root = fixture("bootstrap-bind-lang-fr", { neutral: true });
+  seedFreshBootstrapBindLanguageRoot(root, "en");
+  applyOnboardingIntakeConsent({ rootDir: root, granted: true, language: "en", profile: "feature", activate: true });
+  applyOnboardingIntakeCapture({ rootDir: root, text: "requirement material one", activate: true });
+  applyOnboardingIntakeDesignQuestions({
+    rootDir: root,
+    answers: [{ question: "What is the goal?", answer: "Ship the coordinator." }],
+    activate: true,
+  });
+  const generatePlan = planOnboardingIntakeGenerate({ rootDir: root });
+  applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: generatePlan.planSha256, activate: true });
+  const prdAbsolute = join(root, generatePlan.targets.prd.path);
+  const original = readFileSync(prdAbsolute, "utf8");
+  assert.equal(original.startsWith("<!-- po-language: en -->"), true, original);
+  // A hand edit (even just the marker) revokes the pure-generator exemption,
+  // so the acknowledgement marker is required here, exactly as the legacy
+  // "promoting a PRD whose language differs from kickoff's own answer" case
+  // (project-onboarding-v3.test.mjs) requires it.
+  const rewritten = original.replace("<!-- po-language: en -->", "<!-- po-language: fr -->");
+  writeFileSync(prdAbsolute, `${rewritten}${PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER}\n`);
+
+  const plan = planOnboardingBootstrapBind({ rootDir: root });
+  const applied = applyOnboardingBootstrapBind({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
+  assert.equal(applied.status, "applied");
+  assert.equal(applied.continuity.status, "valid");
+
+  const source = parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8"));
+  assert.equal(source.language.human_facing, "en",
+    "a content language outside {de, en} must never be forced into the operator-facing axis");
+
+  const state = JSON.parse(readFileSync(join(root, plan.targets.state.path), "utf8"));
+  assert.equal(state.continuity.runtime.documentLanguage, "fr");
+
+  // Direct boundary assertion (not by inspection): humanFacingLanguage stays
+  // closed to {de, en}, documentLanguage stays open to any two-letter code --
+  // both checked against the ACTUAL persisted continuity object via the real
+  // validator, not merely observed to happen to be a two-letter code above.
+  const closedRejected = validateContinuityState(
+    { ...state.continuity, runtime: { ...state.continuity.runtime, humanFacingLanguage: "fr" } },
+    state.activeFeature.id,
+  );
+  assert.equal(closedRejected.ok, false, "humanFacingLanguage must reject a non-{de,en} value");
+  const openAccepted = validateContinuityState(
+    { ...state.continuity, runtime: { ...state.continuity.runtime, documentLanguage: "it" } },
+    state.activeFeature.id,
+  );
+  assert.equal(openAccepted.ok, true, JSON.stringify(openAccepted));
+
+  const topology = { repoRoot: root, gitCommonDir: join(root, ".git"), primaryRoot: root, registeredWorktreeRoots: [root] };
+  const authority = validatePoGateAuthority({
+    ...topology, expectedPlanSha256: plan.authority.prd.sha256, expectedSpecSha256: plan.authority.spec.sha256,
+  });
+  assert.equal(authority.ok, true, JSON.stringify(authority));
+  assert.notEqual(authority.code, "PO-GATE-PRD-LANGUAGE-MISMATCH");
 });
 
 console.log(`${passed} onboarding continuity/kickoff checks passed.`);
