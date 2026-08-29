@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.resume-hint-capture-consumes-card-that-failed-schema-validation
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-29
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: 284eaa78f8791cd5db1843b3afebf8f3ef845a80
+closure_evidence: plugins/pipeline-core/scripts/resume-hint.test.mjs
 sprint: nova
 done_when: contains plugins/pipeline-core/scripts/resume-hint.mjs pipeline.resume-hint-validate-before-consume
 source: "Codex/WSL report and the Claude/Windows self-audit report (docs/pipeline-audit-claude-session.md §3.2), both cited by scratch/greenfield-triage-2026-08-29.md finding F12, observed during the 2026-08-29 three-runner greenfield test."

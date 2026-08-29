@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.identity-attestation-fails-open-on-unresolved-transcript-path
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-29
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: 683b8fcc51ec0c32aff82e830717627f520ff401
+closure_evidence: plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
 sprint: nova
 done_when: contains plugins/pipeline-core/hooks/guard-dispatch-budget.mjs pipeline.identity-attestation-fail-closed-fallback
 source: "Claude/Windows self-audit report (docs/pipeline-audit-claude-session.md, section 3.1), observed during the 2026-08-29 three-runner greenfield test; this is the only one of the three runs that actually shipped code."
