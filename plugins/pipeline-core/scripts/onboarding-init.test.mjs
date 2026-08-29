@@ -26,6 +26,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test, { after } from "node:test";
+import { createHash } from "node:crypto";
 
 import { DEFAULT_STEP_CAP, SCHEMA, driveOnboardingInit } from "./onboarding-init.mjs";
 
@@ -49,6 +50,45 @@ function dispose(path) {
 const FIXTURE_HOME = freshHome();
 const FIXTURE_ENV = { ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: FIXTURE_HOME };
 after(() => dispose(FIXTURE_HOME));
+
+// NVA-CF-BL17-ONBOARDINIT (backlog: 2026-08-28-a-verify-gate-suite-reads-real-machine-
+// state-through-a-subprocess.md, AC-1): a SECOND fixture home, pre-seeded with a signing
+// key in exactly the shape `detectExistingLocalTrustAnchor()`
+// (lib/project-onboarding-v3.mjs) expects -- `<home>/.agent-pipeline/machine.json`
+// (schema `pipeline.machine-plane.v1`, `poKeyDirectory` pointing at a directory) whose
+// `trust-policy.json` names a `keyReference` and a 64-hex `publicKeySha256`
+// (`lib/machine-plane.mjs` field shapes). Both fixture homes are wired into the SAME
+// driver via the SAME env seam, so the "with a PO key" and "without one" branches are
+// each reached provably from a fixture rather than from whatever the real operator's
+// `$HOME` happens to hold.
+const FIXTURE_HOME_WITH_KEY = freshHome();
+const FIXTURE_KEY_DIRECTORY = join(FIXTURE_HOME_WITH_KEY, "po-key-directory");
+mkdirSync(FIXTURE_KEY_DIRECTORY, { recursive: true });
+mkdirSync(join(FIXTURE_HOME_WITH_KEY, ".agent-pipeline"), { recursive: true });
+const FIXTURE_PUBLIC_KEY_SHA256 = createHash("sha256").update("onboarding-init-test-fixture-key").digest("hex");
+writeFileSync(
+  join(FIXTURE_KEY_DIRECTORY, "trust-policy.json"),
+  `${JSON.stringify({
+    keyReference: "onboarding-init-test-fixture-key",
+    publicKeySha256: FIXTURE_PUBLIC_KEY_SHA256,
+    humanName: "Onboarding Init Test Fixture PO",
+  }, null, 2)}\n`,
+);
+writeFileSync(
+  join(FIXTURE_HOME_WITH_KEY, ".agent-pipeline", "machine.json"),
+  `${JSON.stringify({
+    schema: "pipeline.machine-plane.v1",
+    poKeyDirectory: FIXTURE_KEY_DIRECTORY,
+    pushApprovalDefault: "signature",
+    routing: null,
+    language: null,
+    session: null,
+    usage: null,
+    updatedAt: new Date().toISOString(),
+  }, null, 2)}\n`,
+);
+const FIXTURE_ENV_WITH_KEY = { ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: FIXTURE_HOME_WITH_KEY };
+after(() => dispose(FIXTURE_HOME_WITH_KEY));
 
 // Every driver test below pins `runner` explicitly, and that is load-bearing rather than
 // tidy. Without it the onboarding CLI resolves the lane from the ENVIRONMENT, so this suite
@@ -106,6 +146,49 @@ test("driveOnboardingInit: the runner lane is the caller's, not the ambient envi
     }
   } finally {
     dispose(root);
+  }
+});
+
+// NVA-CF-BL17-ONBOARDINIT (AC-1): the with-key and no-key fixture homes must drive the
+// SAME fresh repository to the SAME outcome SHAPE -- both are real machine-plane states a
+// real operator's `$HOME` could hold, so a suite in the verify gate must not have two
+// legitimate outcomes depending on which one it happens to run under. This does not assert
+// the two `pendingAsks` arrays are IDENTICAL (a machine with a key legitimately publishes
+// an additional trust-anchor guidance ask the no-key machine never sees -- that is a real,
+// documented difference in the DATA the driver surfaces, not in the outcome it reaches),
+// only that the driver's own classification of what happened converges: same `outcome`,
+// same `schema`, no fault on any step, and at least the identical baseline set of pending
+// asks the no-key run always reaches.
+test("driveOnboardingInit: a machine with a PO signing key converges to the same outcome shape as one without, from fixtures", () => {
+  const noKeyRoot = freshRoot();
+  const withKeyRoot = freshRoot();
+  try {
+    const noKey = driveOnboardingInit({ rootDir: noKeyRoot, runner: "claude", env: FIXTURE_ENV });
+    const withKey = driveOnboardingInit({ rootDir: withKeyRoot, runner: "claude", env: FIXTURE_ENV_WITH_KEY });
+
+    assert.equal(noKey.schema, withKey.schema, "both fixtures drive the same onboarding-init schema");
+    assert.equal(noKey.outcome, "pending-asks", JSON.stringify(noKey));
+    assert.equal(withKey.outcome, "pending-asks", JSON.stringify(withKey));
+    assert.equal(noKey.outcome, withKey.outcome, "the with-key and no-key branches converge on the same outcome");
+
+    for (const result of [noKey, withKey]) {
+      for (const step of result.steps) {
+        assert.equal(step.faultCode, null, `step ${JSON.stringify(step.argv)} must not have faulted`);
+      }
+    }
+
+    // Both are real, non-empty pendingAsks arrays carried verbatim from the underlying CLI
+    // -- the with-key machine's array may be a superset (it can legitimately include the
+    // trust-anchor guidance ask), never a divergent SHAPE (missing entirely, or a
+    // different outcome altogether).
+    assert.ok(Array.isArray(noKey.pendingAsks) && noKey.pendingAsks.length > 0);
+    assert.ok(Array.isArray(withKey.pendingAsks) && withKey.pendingAsks.length > 0);
+    const noKeyAskKinds = new Set(noKey.pendingAsks.map((ask) => ask.kind));
+    const withKeyAskKinds = new Set(withKey.pendingAsks.map((ask) => ask.kind));
+    assert.deepEqual(noKeyAskKinds, withKeyAskKinds, "the published ask KINDS are identical across both fixtures -- only per-ask content (e.g. the trust-anchor guidance text itself) may legitimately differ");
+  } finally {
+    dispose(noKeyRoot);
+    dispose(withKeyRoot);
   }
 });
 
