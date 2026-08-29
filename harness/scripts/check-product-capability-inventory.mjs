@@ -236,14 +236,6 @@ export function discoverSurfaces(root) {
 // note above documents for the surface array this file used to hand-maintain.
 const ENTRY_POINT_DIRS = ["plugins/pipeline-core/scripts", "harness/scripts"];
 
-// Tracked, not silent: these two entry points are real admitted-but-unnamed findings this
-// check surfaced against the live repo on first landing (2026-08-29). Naming them correctly
-// needs a real understanding of when an agent should invoke each directly, which is design
-// work, not a mechanical fix -- filed as
-// backlog/items/2026-08-29-two-v3-scripts-are-admitted-but-unnamed.md. This allowlist covers
-// only these two exact basenames; it does not exempt any future entry point, so the check
-// stays load-bearing for everything else.
-const KNOWN_UNREACHABLE_ENTRY_POINTS = new Set(["runner-profile-migration-v3", "v3-bootstrap-authority"]);
 const USAGE_MARKER = "Usage: node ";
 const LIFECYCLE_GUARD_PATH = "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs";
 
@@ -332,7 +324,7 @@ export function checkEntryPointReachability({ root }) {
     // admitted-but-unnamed: the guard already has an explicit pre-readiness admission rule
     // for this script, yet no skill or guard body anywhere tells an agent it exists -- the
     // guard's authority is real but undiscoverable.
-    if (admitted && !named && !KNOWN_UNREACHABLE_ENTRY_POINTS.has(entryPoint.basename)) fail(findings, `entry point admitted by ${LIFECYCLE_GUARD_PATH} but named by no skill or guard: ${entryPoint.path} (${entryPoint.usage})`);
+    if (admitted && !named) fail(findings, `entry point admitted by ${LIFECYCLE_GUARD_PATH} but named by no skill or guard: ${entryPoint.path} (${entryPoint.usage})`);
   }
   return { ok: findings.length === 0, findings };
 }
