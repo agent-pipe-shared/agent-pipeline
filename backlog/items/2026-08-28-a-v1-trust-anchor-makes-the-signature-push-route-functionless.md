@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.v1-trust-anchor-makes-signature-push-functionless
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-28
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: 4b32ec65bcbee401767a805e5861cada38c44354
+closure_evidence: backlog/items/2026-08-28-a-v1-trust-anchor-makes-the-signature-push-route-functionless.md
 sprint: nova
 tracking: "NOW / Nova A — critical: it makes gates.push_approval 'signature', the documented default and this repository's own setting, functionless. Stacks with the push-gate item; a consumer hits both."
 source: "Consumer project HA, incident report S56 finding B8 (2026-08-28, Windows), added after the first handover. Both mechanisms re-verified in this repository's own code before filing."
@@ -279,6 +283,21 @@ can honestly be called measured, not one: trust-anchor pinning exercised
 via a real `git push` through `guard-push.mjs`, an installed-plugin
 deployment shape (not this checkout), and neither is currently true. Left
 `status: open`.
+
+## PO decision, 2026-08-29 — accept and close
+
+**Decision:** the PO accepted the current measurement scope as sufficient for
+the 0.6.0 candidate and closed this item as-is, without extending
+`measure-tofu-push-e2e.mjs` to drive a real `git push` through the
+`guard-push.mjs` interception or to exercise an installed-plugin deployment
+shape. The three remaining gaps named in the Critic review above (trust-anchor
+pinning not exercised via a real push; installed-plugin deployment shape not
+exercised; commit `4b32ec65`'s message overclaiming closure, now unfixable
+without a history rewrite) remain genuinely open as disclosed limitations, not
+resolved defects — this closure accepts them rather than fixing them.
+**How to apply:** if a future session revisits push-approval or the
+trust-anchor mechanism, treat these three gaps as still-live context, not as
+already covered by this item's closure.
 
 ## Related
 

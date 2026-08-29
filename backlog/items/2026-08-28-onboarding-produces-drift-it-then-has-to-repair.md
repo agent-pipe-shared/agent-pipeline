@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.onboarding-produces-drift-it-then-has-to-repair
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-28
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: 7c446d0b9b56f981f1057b1d40683814325e33f5
+closure_evidence: backlog/items/2026-08-28-onboarding-produces-drift-it-then-has-to-repair.md
 sprint: nova
 tracking: "NOW / Nova A — happy-path blocking: four repair commands sit in the middle of the onboarding step the PO wants to be simple"
 source: "Claude/Windows greenfield run, 2026-08-28, sections 7 and 11 of its own analysis (docs/pipeline-haertungstest-und-analyse.md)."
@@ -139,3 +143,14 @@ happened at all). **PO topic:** is this level of coverage sufficient to
 close this item, or is the full language×profile matrix measurement still
 wanted before closing? Left `status: open` pending that call rather than
 closed unilaterally.
+
+## PO decision, 2026-08-29 — accept and close
+
+**Decision:** the PO accepted per-code-path regression coverage (4 real
+tests across every reachable onboarding apply path) as sufficient for the
+0.6.0 candidate and closed this item as-is, without running the full
+language×profile combinatorial matrix measurement. **How to apply:** the
+acceptance criterion's literal "measured on a real fresh repository for
+every offered language and PO profile" wording stays formally unmet; this
+closure records that the PO judged code-path coverage equivalent given the
+receipt publisher does not branch on language content.
