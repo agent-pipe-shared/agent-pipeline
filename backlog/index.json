@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "db082534e65df7d37c9e499c092c3861f1ee1ae1b1379e2b75d43a2807480ce7"
+    "transitionHead": "8896d0aef00ddbe2567b0339253e31b3661949d5456c391df61b8d3cc93e0707"
   },
   "counts": {
-    "open": 90,
+    "open": 91,
     "in_progress": 3,
-    "closed": 431,
+    "closed": 432,
     "rejected": 3,
     "deferred": 11
   },
@@ -531,6 +531,19 @@
       "created": "2026-08-07",
       "source": "PO ruling (APS, 2026-08-07) establishing the top rule that no PO activity outside the session may ever be required and that one release must cover everything. Measured from source on origin/main by the Phoenix session the same day; the mechanism work is assigned to the Nova session.",
       "deferred": false
+    },
+    {
+      "id": "pipeline.approve-announce-test-fixture-missing-present-plan-step",
+      "status": "closed",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-29",
+      "source": "Found by NVA-R31-STATEPHASEDRIFT while verifying unrelated work (2026-08-29), independently re-confirmed by the Elephant. Not caused by that dispatch or by any 2026-08-29 change.",
+      "deferred": false,
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "dc53bd79",
+      "closureEvidence": "plugins/pipeline-core/scripts/pipeline-state-approve-announce.test.mjs"
     },
     {
       "id": "pipeline.approve-push-rejects-any-fresh-post-setup1-authority-file",
@@ -3094,6 +3107,16 @@
       "closureRepository": "self",
       "closureCommit": "9ae28dad3f6c9c41833e7d629fa3d1d73872d2a2",
       "closureEvidence": "backlog/items/2026-08-18-inherited-still-open-claims-need-a-re-check-before-dispatch-no-durable-home.md"
+    },
+    {
+      "id": "pipeline.installed-marketplace-guard-copy-drifts-silently-from-repo-source",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-29",
+      "source": "Found live by the Elephant on 2026-08-29 while landing GG-22 shared-index-deadlock work-arounds during the 0.6.0 candidate build: the installed marketplace copy of guard-git.mjs still printed the pre-fix GG-22 remediation text hours after the matching repo-source fix (commit 01c02971) had already landed.",
+      "deferred": false,
+      "tracking": "PO gate/signature topic — collect for later per the 0.6.0 candidate mandate, not attempted as a fix this session. No PO decision requested yet on whether the remedy is a checker, a documented pre-flight step, or accepted as an inherent property of the local-marketplace-copy model (ADR-0052)."
     },
     {
       "id": "pipeline.installed-plugin-gmw-hgo-v3-anchor-gap-blocks-all-protected-edits",

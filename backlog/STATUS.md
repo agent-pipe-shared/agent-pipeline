@@ -49,6 +49,7 @@
 | pipeline.antigravity-sandbox-containment-push-escape-route-unclosed | closed | defect | pipeline | 2026-08-23 | — |
 | pipeline.approval-authority-setup-echoes-generic-values-not-supplied-ones | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.approval-mechanisms-require-out-of-session-po-acts | deferred | defect | pipeline | 2026-08-07 | — |
+| pipeline.approve-announce-test-fixture-missing-present-plan-step | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.approve-push-rejects-any-fresh-post-setup1-authority-file | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.approved-not-implementing-is-a-silent-trap | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.atomic-prd-approval-without-mutation | closed | workflow-improvement | pipeline | 2026-08-18 | — |
@@ -256,6 +257,7 @@
 | pipeline.identity-attestation-fails-open-on-unresolved-transcript-path | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.immutable-manifest-entries-can-be-rebound-with-no-amendment-record | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.inherited-still-open-claims-need-a-re-check-before-dispatch-no-durable-home | closed | workflow-improvement | pipeline | 2026-08-18 | — |
+| pipeline.installed-marketplace-guard-copy-drifts-silently-from-repo-source | open | defect | pipeline | 2026-08-29 | PO gate/signature topic — collect for later per the 0.6.0 candidate mandate, not attempted as a fix this session. No PO decision requested yet on whether the remedy is a checker, a documented pre-flight step, or accepted as an inherent property of the local-marketplace-copy model (ADR-0052). |
 | pipeline.installed-plugin-gmw-hgo-v3-anchor-gap-blocks-all-protected-edits | closed | defect | pipeline | 2026-08-16 | — |
 | pipeline.installing-consumer-is-never-asked-any-setup-decision | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.intake-generate-coordinator-path-undocumented-in-skill-references | closed | defect | pipeline | 2026-08-24 | — |
@@ -546,8 +548,8 @@
 
 ## Counts
 
-- open: 90
+- open: 91
 - in_progress: 3
-- closed: 431
+- closed: 432
 - rejected: 3
 - deferred: 11
