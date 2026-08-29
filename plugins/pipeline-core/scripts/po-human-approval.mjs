@@ -35,7 +35,7 @@ import { GOVERNANCE_FORK_DISPOSITION_APPROVAL, governanceForkDispositionApproval
 import { readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { MACHINE_PLANE_SCHEMA, readMachinePlane, writeMachinePlane } from "../lib/machine-plane.mjs";
-import { boundedOpaqueCopyCommand, renderProjectOnboardingAction } from "../lib/project-onboarding-v3.mjs";
+import { boundedCopySafeCommand } from "../lib/copy-safe-command.mjs";
 import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
 import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
 
@@ -891,17 +891,15 @@ function releasePreflightConfirmationLines(kind, subjectPreimage) {
  * human's real terminal) -- and it is if anything MORE consequential here: a
  * signing ceremony, not a kickoff retry.
  *
- * This is a caller of the two renderers that fix already exists as, never a
- * third re-implementation of either: `renderProjectOnboardingAction()`
- * already turns an `{ kind: "command", executable, argv }` action into one
- * exact, correctly-quoted shell line (the same `shellWord()` quoting used for
- * every other onboarding action this plugin renders, already proven to
- * single-quote a value containing spaces or non-ASCII characters correctly);
- * `boundedOpaqueCopyCommand()` already turns an assembled command STRING into
- * a bounded, multi-platform (posix/powershell/cmd), pre-quoted copy
- * rendering. Composing the two here means the bounded-chunking algorithm
- * keeps its one definition in project-onboarding-v3.mjs; this function never
- * duplicates it.
+ * This is a caller of `boundedCopySafeCommand()` (lib/copy-safe-command.mjs,
+ * NVA-W12-COPYSAFE), never a re-implementation of it: that shared renderer
+ * already turns an `{ executable, argv }` pair into the exact, correctly-quoted
+ * shell line (the same `shellWord()` quoting used for every other onboarding
+ * action this plugin renders, already proven to single-quote a value
+ * containing spaces or non-ASCII characters correctly) AND the bounded,
+ * multi-platform (posix/powershell/cmd) copy rendering, in one call -- the
+ * bounded-chunking algorithm keeps its one definition in
+ * project-onboarding-v3.mjs; this function never duplicates it.
  *
  * `--kind` is always `"push"`: this helper is specific to the push-approval
  * ceremony (`references/push-approval.md`'s worked example), not a general
@@ -933,9 +931,7 @@ export function authorizeCriticalPushCommand({
     "--subject-sha256", subjectSha256,
     "--expires-at", expiresAt,
   ];
-  const executable = "node";
-  const command = renderProjectOnboardingAction({ kind: "command", executable, argv });
-  return { executable, argv, command, copyCommand: boundedOpaqueCopyCommand(command) };
+  return boundedCopySafeCommand({ executable: "node", argv });
 }
 
 /**
