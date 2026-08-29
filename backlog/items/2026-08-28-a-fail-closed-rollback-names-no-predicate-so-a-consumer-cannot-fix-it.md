@@ -3,9 +3,13 @@ schema: pipeline.backlog-item.v1
 id: pipeline.rebind-rollback-names-no-predicate
 type: defect
 owner: pipeline
-status: open
 created: 2026-08-28
 sprint: nova
+status: closed
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: c16e40e1
+closure_evidence: plugins/pipeline-core/scripts/pipeline-state.test.mjs
 tracking: "NOW / Nova A — the only sanctioned route to a PO acknowledgement marker is unusable, and the refusal is undiagnosable from outside"
 source: "Consumer project HA, incident report S56 finding B2 (2026-08-28, Windows). The consumer independently re-derived every input digest and found all of them correct."
 done_when: contains plugins/pipeline-core/scripts/pipeline-state.test.mjs describeFailedPostimagePredicates
@@ -96,3 +100,15 @@ The predicate has therefore been repointed from the source file to the test
 file. It was previously satisfied on the day it was declared, which would have
 argued for closing an item whose acceptance was half met. Writing that test is
 small, well-defined work and is the only thing left here.
+
+## Closure, 2026-08-29
+
+The missing test now exists: `NVA-G-ROLLBACKPREDICATE` at
+`plugins/pipeline-core/scripts/pipeline-state.test.mjs:621-668`, landed in the
+same commit `c16e40e1` this item's own prior status note already names for the
+source fix. Verified directly (not trusted from a survey claim): the test
+injects a deliberately failing `v4Intents.dispatch` predicate and asserts the
+stderr message names it with `observed=blocked`, asserts no absolute host path
+leaks, and asserts the rollback left the PRD/State files byte-identical to
+before. Ran `node --test plugins/pipeline-core/scripts/pipeline-state.test.mjs`
+directly: 1/1 pass, exit 0. All three Acceptance criteria are met.
