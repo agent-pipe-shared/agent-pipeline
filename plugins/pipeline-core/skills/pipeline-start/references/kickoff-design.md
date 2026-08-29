@@ -111,6 +111,15 @@ amount of text, an assistant's preferred route, or a model preflight. The
 profile is a PO input, not a second confirmation for an already authorized
 local onboarding transaction.
 
+**Self-check before sending the first bootstrap question:** state, to
+yourself, the full list of bootstrap questions this step needs answered —
+language, goal (if not already supplied), and profile, plus any other
+still-open bootstrap question this session has identified — and confirm that
+list is complete before composing the message. Never send a question from
+that list, then wait for its answer before asking the next one; all of them
+go into ONE message, together, before any is answered. Sending them one at a
+time is the failure this self-check exists to catch.
+
 The exact invocation shape for `kickoff plan`/`kickoff apply` (guard-enforced,
 `guard-lifecycle-ready.mjs` `sanctionedOnboardingArgs`; CLI usage at
 `project-onboarding-v3.mjs:56`):
