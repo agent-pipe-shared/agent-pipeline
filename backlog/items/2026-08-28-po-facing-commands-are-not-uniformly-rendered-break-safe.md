@@ -63,3 +63,62 @@ One shared renderer, used by every path that hands a human a command:
 - A test proves each rendering round-trips to the intended argv, including
   values with spaces and non-ASCII characters.
 - No emitter prints an unbounded single-line command.
+
+## Progress note (2026-08-29, NVA-W12-COPYSAFE, goldfish-deep)
+
+Scope was the three sites this item's own investigation named plus the
+shared renderer itself; a repository-wide audit for OTHER, still-undiscovered
+hand-assembled emitters was out of this dispatch's briefed scope, so this
+item stays `status: open` rather than closed against its full "every emitter"
+acceptance criterion.
+
+Delivered:
+
+- `plugins/pipeline-core/lib/copy-safe-command.mjs` gained a
+  placeholder-passthrough mode: `placeholder(text)` wraps an argv entry (an
+  unresolved human fill-in slot like `<plan-sha256>`) so
+  `boundedCopySafeCommand()` renders it verbatim, never through the
+  `shellWord()` quoting a literal value gets -- proven by 5 new tests in
+  `copy-safe-command.test.mjs` (10/10 pass), including a direct comparison
+  against the quoted-literal rendering of the identical text and a
+  no-placeholder-path byte-identity test against
+  `renderProjectOnboardingAction()`.
+- `shellWord()` exported (previously module-private) from
+  `plugins/pipeline-core/lib/project-onboarding-v3.mjs` so
+  `copy-safe-command.mjs` can quote real argv values without re-implementing
+  that logic; behavior for every existing caller is unchanged.
+- `plugins/pipeline-core/scripts/po-human-approval.mjs`'s
+  `authorizeCriticalPushCommand` (GF-105) now calls the shared
+  `boundedCopySafeCommand()` instead of hand-composing
+  `renderProjectOnboardingAction()` + `boundedOpaqueCopyCommand()` locally --
+  byte-identical output (the no-placeholder path is the same two calls,
+  unchanged); its own 3 GF-105 tests plus the full 101-test
+  `po-human-approval.test.mjs` suite pass unmodified.
+- `plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs` and
+  `plugins/pipeline-core/hooks/guard-testpath.mjs` now build every human-
+  override-ceremony command line (`plan`/`prepare-authorization`/
+  `authorize`/`emit-signature-digest`/`authorize-by-signature`) through
+  `boundedCopySafeCommand()` instead of the hand-assembled
+  `` `${process.execPath} ${JSON.stringify(script)} ...` `` templates the
+  investigation named as the inconsistent-emitter shape. The real script/repo
+  path values keep their existing `JSON.stringify()`-quoted text byte-for-
+  byte (also routed through `placeholder()`, since that quoting is pinned by
+  each file's own pre-existing test suite); every `<...>`-shaped human fill-in
+  slot now renders through the new placeholder-passthrough mode. Both files'
+  full existing suites pass unmodified: `guard-lifecycle-ready.test.mjs`
+  (183/183) and `guard-testpath.test.mjs` (14/14 cases). No new test was
+  added to either hook's own `*.test.mjs` file for this dispatch: neither was
+  in this dispatch's briefed file scope, and `guard-testpath.test.mjs` is
+  additionally a TP-2 protected test path -- consistency at these two sites is
+  evidenced by the full unmodified regression suites above (which already
+  assert substrings of the exact rendered ceremony text) rather than by a
+  new, dedicated placeholder-rendering test. A follow-up item, if the PO
+  wants dedicated placeholder-mode coverage at these two sites specifically,
+  would need to be separately briefed with those test files in scope.
+- `node --test harness/scripts/check-consumer-safe-paths.test.mjs` passes
+  (9/9), as required for any dispatch touching `plugins/pipeline-core/`.
+
+Remaining for full closure: an audit confirming no OTHER PO-facing command
+emitter in the repository still hand-assembles a command string outside this
+renderer (this item's "every emitter" acceptance criterion) was not performed
+by this dispatch.
