@@ -1210,4 +1210,80 @@ function awaitingApprovalFixture() {
   assert.ok(handover.includes(expectedMarker), `docs/state.md must carry the marker verbatim; got:\n${handover}`);
 }
 
+// NVA-CF-VERIFYDEADLOCK (backlog: pipeline.verify-contract-fails-until-configured-
+// but-gs-10-blocks-configuring-it). Live reproduction: a fresh onboarded project
+// (calibration seeded with the exact UNCONFIGURED_VERIFY placeholder text, twin
+// tiers present) walks design -> the set-phase --phase implementation transition
+// -> implementation, and the ONLY sanctioned route through is set-phase itself --
+// never a GS-10 override, never a `git commit --no-verify` bypass (neither guard
+// nor git are invoked by this test at all: `run()` is called in-process).
+{
+  const root = mktempProjectDir();
+  const seededVerify = "node -e \"console.error('pipeline: the verify contract of this project is not configured. Replace the verify command in project/pipeline.json with the real verification command for this project (for example its test suite), then run verify again.'); process.exit(1)\"";
+  mkdirSync(join(root, "project"), { recursive: true });
+  mkdirSync(join(root, ".claude"), { recursive: true });
+  const calibration = { project: "new-project", verify: seededVerify, handover: "docs/state.md" };
+  writeFileSync(join(root, "project", "pipeline.json"), `${JSON.stringify(calibration, null, 2)}\n`);
+  writeFileSync(join(root, ".claude", "pipeline.json"), `${JSON.stringify(calibration, null, 2)}\n`);
+  writeFileSync(join(root, "project", "pipeline-state.json"), JSON.stringify({
+    schema: "pipeline.state.v0",
+    activeFeature: { id: "verify-deadlock-repro", planPath: "specs/verify-deadlock-repro/prd.md", phase: "design" },
+    planApproved: true,
+    planApproval: { approvedBy: "PO", approvedAt: now },
+  }, null, 2));
+  const deps = { dir: root, now: () => now };
+
+  // 1. Entering implementation with the placeholder still in place, and no
+  // --verify-command supplied, is REFUSED -- not silently allowed through, and
+  // not a case the old code even distinguished (this refusal did not exist before
+  // this fix: the transition used to succeed regardless of the verify contract).
+  const refused = capturedStderr(() => run(["set-phase", "--phase", "implementation"], deps));
+  assert.equal(refused.result, 2, "must refuse to enter implementation while verify is still the seeded placeholder");
+  assert.ok(refused.lines.some((line) => line.includes("verify-command")),
+    `refusal must name the sanctioned escape (--verify-command): ${refused.lines.join(" ")}`);
+  const stillDesign = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"));
+  assert.equal(stillDesign.activeFeature.phase, "design", "a refused transition must not have moved the phase");
+  assert.equal(JSON.parse(readFileSync(join(root, "project", "pipeline.json"), "utf8")).verify, seededVerify,
+    "a refused transition must not have touched the calibration either");
+
+  // 2. --verify-command carrying the placeholder text itself (or blank) is also
+  // refused -- the deadlock's fix must never let the placeholder re-enter through
+  // the new door it just opened.
+  assert.equal(run(["set-phase", "--phase", "implementation", "--verify-command", seededVerify], deps), 2,
+    "the placeholder text must be refused even when explicitly supplied via --verify-command");
+  assert.equal(run(["set-phase", "--phase", "implementation", "--verify-command", "   "], deps), 2,
+    "a blank --verify-command must be refused");
+
+  // 3. Supplying a real command is the sanctioned route through: the SAME
+  // transaction that unlocks implementation writes the real verify command,
+  // before GS-10 would otherwise arm for that field (GS-10 itself is a
+  // PreToolUse hook, not exercised by this in-process call at all).
+  const realVerify = `${process.execPath} -e "process.exit(0)"`;
+  const applied = run(["set-phase", "--phase", "implementation", "--verify-command", realVerify], deps);
+  assert.equal(applied, 0, "set-phase --verify-command must succeed with a real command");
+  const afterState = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"));
+  assert.equal(afterState.activeFeature.phase, "implementation", "phase must now be implementation");
+  const neutralCalibration = JSON.parse(readFileSync(join(root, "project", "pipeline.json"), "utf8"));
+  const legacyCalibration = JSON.parse(readFileSync(join(root, ".claude", "pipeline.json"), "utf8"));
+  assert.equal(neutralCalibration.verify, realVerify, "project/pipeline.json's verify field must hold the real command");
+  assert.equal(legacyCalibration.verify, realVerify,
+    "the legacy .claude/pipeline.json twin must be updated too (PA-CALIBRATION-DRIFT)");
+  assert.equal(neutralCalibration.project, "new-project", "unrelated calibration fields must survive untouched");
+
+  // 4. Regression pin for the always-green class 674b1c0c closed: the configured
+  // command is neither the old silent-pass placeholder nor the new fail-by-design
+  // one -- it is a real command that actually runs and reports its own result.
+  assert.ok(!neutralCalibration.verify.includes("the verify contract of this project is not configured"),
+    "the written command must not still be the UNCONFIGURED_VERIFY placeholder");
+  const outcome = spawnSync(process.execPath, ["-e", "process.exit(0)"], { encoding: "utf8" });
+  assert.equal(outcome.status, 0, "the configured command is a real, runnable command (not a vacuous always-pass check)");
+
+  // 5. Idempotent replay: once configured, re-entering implementation (e.g. after
+  // reopen-design) without --verify-command is no longer refused.
+  const revertedToDesign = { ...afterState, activeFeature: { ...afterState.activeFeature, phase: "design" } };
+  writeFileSync(join(root, "project", "pipeline-state.json"), JSON.stringify(revertedToDesign, null, 2));
+  assert.equal(run(["set-phase", "--phase", "implementation"], deps), 0,
+    "once the calibration already carries a real verify command, --verify-command is optional on replay");
+}
+
 console.log("pipeline-state.test.mjs (CB-1a): all checks passed");

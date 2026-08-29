@@ -14,6 +14,15 @@
  *   write, pretty-printed and meant to be git-committed (same audit-trail philosophy
  *   as `.claude/guard-override.log.jsonl`).
  *
+ * ONE NAMED EXCEPTION (NVA-CF-VERIFYDEADLOCK): `set-phase --phase implementation`
+ * additionally writes the calibration's `verify` field (`project/pipeline.json`,
+ * plus its legacy `.claude/pipeline.json` twin when present) when `--verify-command`
+ * is supplied, or refuses the transition outright if the calibration still carries
+ * the seeded UNCONFIGURED_VERIFY placeholder and no command was supplied. This is
+ * the one sanctioned moment that write is allowed to happen, mirroring the
+ * trust-anchor "same transaction" fix pattern -- see the comment on
+ * `readCalibrationVerifyStatus()` below for the full rationale.
+ *
  * SCHEMA (`pipeline.state.v0`) -- the file this CLI reads/writes:
  *   {
  *     "schema": "pipeline.state.v0",
@@ -400,6 +409,7 @@ import {
   readGateEstimateEvidence,
 } from "../lib/gate-estimate.mjs";
 import {
+  AUTHORITY_ARTIFACTS,
   LEGACY_STATE,
   NEUTRAL_STATE,
   resolveProjectAuthorityPaths,
@@ -3138,6 +3148,80 @@ function observeGateEstimateInputs(dir, request, deps) {
 
 function isBlank(v) {
   return v === undefined || v === null || String(v).trim() === "";
+}
+
+// NVA-CF-VERIFYDEADLOCK (backlog: pipeline.verify-contract-fails-until-configured-
+// but-gs-10-blocks-configuring-it). GS-10 (guard-gate-strength.mjs) refuses any
+// Edit/Write/Bash write to `project/pipeline.json` -- the file the onboarding seed
+// (`UNCONFIGURED_VERIFY`, project-onboarding-v3.mjs) intentionally leaves failing
+// until a real verify command replaces it. Nothing sanctioned let an agent make
+// that replacement, so two independent 2026-08-29 greenfield sessions fell back to
+// a human `git commit --no-verify` bypass. PO decision: fix it the same way the
+// sibling trust-anchor deadlock was fixed -- write the real value as part of the
+// SAME transaction that unlocks the next stage, here `set-phase --phase
+// implementation`, which is the one sanctioned CLI mutation, not a raw Edit/Write
+// tool call, so it is not itself subject to the GS-10 PreToolUse hook.
+//
+// The exact substring `UNCONFIGURED_VERIFY` (project-onboarding-v3.mjs) always
+// carries in its seeded placeholder message. push-gate-satisfiability.mjs already
+// does this exact substring match in `checkVerifyContractConfigured()`, but that
+// function is not imported here: push-gate-satisfiability.mjs imports
+// push-prepare.mjs, which imports `run` FROM this file, so importing back from
+// push-gate-satisfiability.mjs would be circular. This is a narrow, deliberate
+// mirror of that same documented, stable-wording rationale, not a re-derivation.
+const UNCONFIGURED_VERIFY_MARKER = "the verify contract of this project is not configured";
+
+/**
+ * Read-only: classifies the project calibration's `verify` field the same way
+ * push-gate-satisfiability.mjs's `checkVerifyContractConfigured()` does (missing /
+ * placeholder / configured), reading whichever calibration tier
+ * (`project/pipeline.json`, falling back to the legacy `.claude/pipeline.json`)
+ * actually exists. A malformed or unreadable calibration classifies as "missing"
+ * -- this transition is not the place to repair it.
+ */
+function readCalibrationVerifyStatus(dir) {
+  const neutralPath = join(dir, AUTHORITY_ARTIFACTS.calibration.neutral);
+  const legacyPath = join(dir, AUTHORITY_ARTIFACTS.calibration.legacy);
+  const path = existsSync(neutralPath) ? neutralPath : legacyPath;
+  if (!existsSync(path)) return { status: "missing" };
+  let parsed;
+  try {
+    parsed = JSON.parse(readFileSync(path, "utf8"));
+  } catch {
+    return { status: "missing" };
+  }
+  const command = parsed?.verify;
+  if (typeof command !== "string" || command.trim() === "") return { status: "missing" };
+  if (command.includes(UNCONFIGURED_VERIFY_MARKER)) return { status: "placeholder" };
+  return { status: "configured", command };
+}
+
+/**
+ * Writes `command` into the calibration's `verify` field for every twin tier that
+ * actually exists (`project/pipeline.json` AND its legacy `.claude/pipeline.json`
+ * compatibility copy, seeded byte-identical on day one) so this never introduces
+ * the silent PA-CALIBRATION-DRIFT gap `project-authority.mjs`'s
+ * `calibrationDriftDiagnostics()` warns about. Skips a tier that does not exist or
+ * is not a JSON object -- a malformed pre-existing calibration is not this
+ * transition's problem to repair. Returns the repository-relative paths actually
+ * written.
+ */
+function writeCalibrationVerifyCommand(dir, command) {
+  const written = [];
+  for (const relPath of [AUTHORITY_ARTIFACTS.calibration.neutral, AUTHORITY_ARTIFACTS.calibration.legacy]) {
+    const path = join(dir, relPath);
+    if (!existsSync(path)) continue;
+    let parsed;
+    try {
+      parsed = JSON.parse(readFileSync(path, "utf8"));
+    } catch {
+      continue;
+    }
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) continue;
+    writeFileSync(path, `${JSON.stringify({ ...parsed, verify: command }, null, 2)}\n`);
+    written.push(relPath);
+  }
+  return written;
 }
 
 /**
@@ -7789,6 +7873,34 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         }
         console.log('Phase already "design"; zero-write replay accepted.');
         return 0;
+      }
+      // NVA-CF-VERIFYDEADLOCK: the design->implementation transition is the one
+      // sanctioned moment that may write project/pipeline.json's `verify` field --
+      // see the UNCONFIGURED_VERIFY_MARKER comment above for why. `--verify-command`
+      // is optional once a real command is already configured (idempotent replay),
+      // but this refuses to LEAVE the placeholder in place by entering implementation
+      // silently: that refusal, not a GS-10 override, is the sanctioned way through.
+      const requestedVerifyCommand = flags["verify-command"];
+      if (requestedVerifyCommand !== undefined) {
+        if (isBlank(requestedVerifyCommand) || requestedVerifyCommand.includes(UNCONFIGURED_VERIFY_MARKER)) {
+          console.error('Error: --verify-command must be a real, non-blank verification command -- not the plugin\'s UNCONFIGURED_VERIFY placeholder text.');
+          return 2;
+        }
+      } else {
+        const verifyStatus = readCalibrationVerifyStatus(dir);
+        if (verifyStatus.status !== "configured") {
+          console.error(`Error: set-phase implementation refused -- project/pipeline.json's verify command is still ${verifyStatus.status === "missing" ? "missing" : "the seeded UNCONFIGURED_VERIFY placeholder"}. Supply the project's real verification command with set-phase --phase implementation --verify-command "<command>" (for example its test suite) before entering implementation.`);
+          return 2;
+        }
+      }
+      if (requestedVerifyCommand !== undefined) {
+        // Written BEFORE the state transition below, deliberately: if the state
+        // write then failed for an unrelated reason (a stale CAS, a concurrent
+        // edit), leaving the calibration already-configured is harmless and
+        // idempotent on retry -- the reverse order would risk landing in
+        // "implementation" phase with the verify contract still unconfigured,
+        // which is exactly the deadlock this closes.
+        writeCalibrationVerifyCommand(dir, requestedVerifyCommand);
       }
       const written = writeState(dir, undefined, base, {
         transition: (observed) => {
