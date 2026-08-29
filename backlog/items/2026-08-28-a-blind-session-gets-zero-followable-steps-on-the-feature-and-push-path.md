@@ -168,6 +168,45 @@ way it goes, a blind driver must never receive a string where it expects an acti
 - The push signature remains a stop no driver-executable action can satisfy, asserted by
   a test rather than by convention.
 
+## Progress, 2026-08-29 (dispatch NVA-R34-BLINDPUSHPATH, commit `d3dc13b4`)
+
+This dispatch hit its 80-turn limit before writing its own report; the
+Elephant independently reviewed the diff and re-ran its tests before
+committing (`pipeline-state-inspect.test.mjs` 11/11,
+`pipeline-state.test.mjs` green, `check-consumer-safe-paths.test.mjs`
+9/9) — this note is from direct inspection, not a trusted self-report.
+
+**Landed:**
+- The `PO-PROFILE-RECEIPT-INVALID` root cause is diagnosed with file/line
+  references (`resolveDraftProfileReceiptAction()`, `pipeline-state.mjs`):
+  reading 1 confirmed (an onboarding gap — the repair mechanism
+  `po-gate-profile-repair.mjs apply --activate` exists but nothing in the
+  deterministic onboarding chain ever invokes it). The `draft` branch of
+  `buildInspectNextAction` now surfaces the repair as a real
+  driver-executable `command` when it plans cleanly, or names the exact
+  precondition code/reason when it cannot — never a silent `submit-plan`
+  failure on an undiscoverable precondition.
+- One part of the `nextAction` naming collision is resolved: the bare
+  `"review"`/`"close"` queue-state label is renamed to `queueAction`
+  throughout `pipeline-state.mjs`. The rendered-prose meaning already had
+  its own field (`nextActionText`), so no rename was needed there.
+
+**Left open — not done by this dispatch:**
+- Wiring the profile-receipt repair into onboarding's own apply chain (so
+  a receipt exists BEFORE a project ever reaches `ready`, eliminating the
+  gap at the source rather than making it discoverable/repairable) —
+  disclosed as deliberately out of scope.
+- No re-run of `scratch/smoke-blind-push.mjs` confirming a
+  greater-than-zero chained-command count on the full path end to end.
+- No test asserting singularity ("exactly one next step per reachable
+  state") across the WHOLE happy path, nor a blanket placeholder-argv test
+  across all of it — only the two new profile-receipt-specific tests exist.
+- The push-signature-remains-a-stop property is not newly tested by this
+  dispatch (may already be covered elsewhere; not re-verified here).
+
+Left `status: open` — real progress on the diagnosed blocker, but the
+item's own Acceptance criteria are not fully met.
+
 ## Related
 
 - `2026-08-28-the-push-path-has-no-driver-so-its-five-layers-are-walked-by-hand.md` — the
