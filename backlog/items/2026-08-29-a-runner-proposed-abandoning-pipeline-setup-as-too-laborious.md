@@ -71,7 +71,20 @@ itself all use.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment:** `sprint: nova` — Nova B work, not a 0.6.0 candidate blocker.
-- **Date:**
+- **Decision:** accepted — PO override of the drafted Nova B assignment,
+  2026-08-29: fix now rather than defer, given the fix is a single small
+  role-contract addition, not architecture work.
+- **Rationale:** cheap (one rule, no code), and closes the gap before another
+  session hits the same temptation.
+- **Assignment:** `sprint: nova`, done now.
+- **Date:** 2026-08-29
+
+## Fixed, 2026-08-29 (dispatch NVA-R28-SETUPRULE, commit `1a1de6ef`)
+
+Added EL-34 to `roles/elephant.md` §3 (Hard prohibitions, after EL-18):
+perceived process friction is never, on its own, grounds to propose
+bypassing/abandoning a mandatory pipeline step; the correct channel is
+completing the step and filing a `type: workflow-improvement` backlog item.
+Verified: `check-section-citations.test.mjs` 17/17 green (no citation
+contract references this file's structure). Independent Critic review and
+PO acceptance still pending.

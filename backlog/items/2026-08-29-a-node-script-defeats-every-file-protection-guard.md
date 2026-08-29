@@ -283,3 +283,19 @@ mirroring the existing human-escape doctrine. `status` stays `open`: the
 `done_when` file-existence predicate is satisfied, but the item's own Acceptance
 criteria are not fully met until the onboarding wiring lands with one of these (or
 another) resolved design.
+
+## PO decision, 2026-08-29
+
+**Decision:** candidate (b), first-appearance exemption — a protected path's
+very first appearance in git history is exempt from the pre-commit hook,
+while any later re-write of already-tracked content is still caught.
+**Rationale:** cheapest of the three, needs no new capability machinery
+(unlike (a)), and re-verified against this item's own reported repro shape
+(which targets an already-committed `project/pipeline.json`) — a
+first-appearance exemption does not reopen that hole.
+**How to apply:** dispatch targeting the installed pre-commit hook's logic
+(`pre-commit-hook-install.mjs` and whatever hook script it installs) to add
+the first-appearance check, plus the small onboarding wiring call into
+`lib/project-onboarding-v3.mjs` mirroring `applyPrePushHookInstallOnboarding`'s
+call site — sequenced AFTER any other in-flight dispatch on
+`project-onboarding-v3.mjs` completes, to avoid a shared-checkout collision.
