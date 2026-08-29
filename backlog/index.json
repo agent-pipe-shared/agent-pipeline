@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "3a698d5081d95ee26465afc6bbbd8e57990927c3ee476e0d96fb74cd626d21f3"
+    "transitionHead": "ed1e8d08dd3ac7b6c69ed9542f74264cc71962a93961e62de94ec9f9122095cd"
   },
   "counts": {
-    "open": 88,
+    "open": 109,
     "in_progress": 3,
-    "closed": 396,
+    "closed": 409,
     "rejected": 3,
     "deferred": 11
   },
@@ -25,6 +25,24 @@
       "closureRepository": "self",
       "closureCommit": "615bcd247ccc0f339102d669e5d78cd6e684d874",
       "closureEvidence": "backlog/items/2026-08-08-a-checkout-that-cannot-be-clean-defeats-every-cleanliness-gate.md"
+    },
+    {
+      "id": "pipeline.a-dirty-claude-directory-blocks-verify-which-blocks-push-approval",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-29",
+      "source": "Antigravity/WSL self-analysis (docs/pipeline-analysis.md, section 2), observed during the 2026-08-29 three-runner greenfield test.",
+      "deferred": false
+    },
+    {
+      "id": "pipeline.a-node-script-defeats-every-file-protection-guard",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-29",
+      "source": "Antigravity's own hardening test during the 2026-08-29 three-runner greenfield run (docs/pipeline-analysis.md section 5, consumer project Rune_Test1_Agy_060_73); independently corroborated by this repository's own everyday usage pattern on the same day.",
+      "deferred": false
     },
     {
       "id": "pipeline.a-promoted-feature-can-never-pass-the-plan-gate",
@@ -67,6 +85,15 @@
       "deferred": false
     },
     {
+      "id": "pipeline.a-runner-proposed-abandoning-pipeline-setup-as-too-laborious",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-29",
+      "source": "PO observation during the 2026-08-29 three-runner greenfield test (finding F27 of scratch/greenfield-triage-2026-08-29.md).",
+      "deferred": false
+    },
+    {
       "id": "pipeline.a-schema-less-project-pipeline-yaml-has-no-known-repair-path",
       "status": "closed",
       "type": "defect",
@@ -91,6 +118,15 @@
       "closureRepository": "self",
       "closureCommit": "de7cf0d41cd1dff1c0f878de20834535447c0a37",
       "closureEvidence": "backlog/items/2026-08-09-a-second-dispatch-claimed-an-evidence-artifact-it-never-wrote.md"
+    },
+    {
+      "id": "pipeline.a-stale-verify-opt-out-entry-costs-a-po-signature-for-work-already-done",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-29",
+      "source": "Observed while registering the done_when predicate suite in verify.mjs, 2026-08-29: two of the three DELIBERATELY_UNREGISTERED entries described suites that were in fact already registered, and clearing them was part of the work that consumed a live PO signature ceremony.",
+      "deferred": false
     },
     {
       "id": "pipeline.a-stale-version-stamp-makes-a-plugin-reload-a-silent-no-op",
@@ -800,6 +836,15 @@
       "deferred": true
     },
     {
+      "id": "pipeline.bootstrap-po-questions-asked-sequentially-instead-of-in-one-block",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-29",
+      "source": "PO observation during the 2026-08-29 three-runner greenfield test (finding F26 of scratch/greenfield-triage-2026-08-29.md).",
+      "deferred": false
+    },
+    {
       "id": "pipeline.bootstrap-skill-grows-by-budget-raise-instead-of-by-module",
       "status": "open",
       "type": "workflow-improvement",
@@ -1381,6 +1426,15 @@
       "deferred": true
     },
     {
+      "id": "pipeline.critic-skip-not-an-explicit-logged-decision",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-29",
+      "source": "Claude/Windows self-audit report (docs/pipeline-audit-claude-session.md §3.1, §10.6), cited by scratch/greenfield-triage-2026-08-29.md finding F16, observed during the 2026-08-29 three-runner greenfield test.",
+      "deferred": false
+    },
+    {
       "id": "pipeline.critical-command-kinds-excludes-feature-package-reconcile",
       "status": "closed",
       "type": "defect",
@@ -1555,6 +1609,15 @@
       "closureEvidence": "plugins/pipeline-core/lib/onboarding-continuity.test.mjs"
     },
     {
+      "id": "pipeline.dispatch-evidence-record-shape-not-enforced-beyond-taskid-and-outcome",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-29",
+      "source": "Claude/Windows self-audit report (docs/pipeline-audit-claude-session.md §3.1), cited by scratch/greenfield-triage-2026-08-29.md finding F18, observed during the 2026-08-29 three-runner greenfield test.",
+      "deferred": false
+    },
+    {
       "id": "pipeline.dispatch-provenance",
       "status": "closed",
       "type": "workflow-improvement",
@@ -1666,6 +1729,15 @@
       "closureRepository": "self",
       "closureCommit": "339f08bd848bec332ba78f602109b83f1ea70360",
       "closureEvidence": "backlog/items/2026-08-09-doc-reconciliation-blind-to-adr-corpus-changes.md"
+    },
+    {
+      "id": "pipeline.docs-state-human-summary-diverges-from-machine-next-action",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-29",
+      "source": "Codex/WSL report, cited by scratch/greenfield-triage-2026-08-29.md finding F20, observed during the 2026-08-29 three-runner greenfield test.",
+      "deferred": false
     },
     {
       "id": "pipeline.docs-state-md-next-action-text-is-a-static-snapshot-with-no-live-sync",
@@ -2361,6 +2433,15 @@
       "deferred": true
     },
     {
+      "id": "pipeline.guard-denial-messages-repeat-70-lines-of-boilerplate",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-29",
+      "source": "Claude/Windows self-audit section 5.8 from the 2026-08-29 three-runner greenfield test (finding F25 of scratch/greenfield-triage-2026-08-29.md); reproduced live in this dispatch by an accidental piped Bash command against a gate-strength-protected path.",
+      "deferred": false
+    },
+    {
       "id": "pipeline.guard-devplan-and-guard-testpath-have-no-bash-write-lane",
       "status": "closed",
       "type": "defect",
@@ -2372,6 +2453,15 @@
       "closureRepository": "self",
       "closureCommit": "130948c15fee0afe389cf787772f11b75b6dad72",
       "closureEvidence": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs"
+    },
+    {
+      "id": "pipeline.guard-dispatch-budget-does-not-distinguish-invalid-identity-from-unresolved",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-29",
+      "source": "NVA-R6-GUARDSWEEP guard-layer sweep (backlog/items/2026-08-29-sweep-remaining-guards-for-fail-open-identity-and-pipe-unpiped-scope-asymmetry.md), auditing guard-dispatch-budget.mjs for its OWN direct callers/uses of subagentIdentity()'s unresolved result beyond the guard-lifecycle-ready.mjs caller already covered by F02 (pipeline.identity-attestation-fail-closed-fallback, fixed 2026-08-29).",
+      "deferred": false
     },
     {
       "id": "pipeline.guard-dispatch-fails-open-on-the-antigravity-subagents-payload-shape",
@@ -2492,12 +2582,16 @@
     },
     {
       "id": "pipeline.guard-maintenance-window-repofingerprint-shares-the-fixed-path-bound-defect",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-27",
       "source": "NVA-BLRECONCILE-1, 2026-08-27 — residual-scope re-check while closing backlog/items/2026-08-27-path-bound-fingerprints-break-across-windows-wsl-access.md",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "d96e14c5efa51d4f4a0b1e9060a158077cfdd007",
+      "closureEvidence": "plugins/pipeline-core/lib/guard-maintenance-window.test.mjs"
     },
     {
       "id": "pipeline.guard-reclassification-changed-what-a-signature-can-lift",
@@ -2562,6 +2656,19 @@
       "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
     },
     {
+      "id": "pipeline.guard-sweep-completion-report",
+      "status": "closed",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-29",
+      "source": "Dispatch NVA-R6-GUARDSWEEP, executing backlog/items/2026-08-29-sweep-remaining-guards-for-fail-open-identity-and-pipe-unpiped-scope-asymmetry.md",
+      "deferred": false,
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "00f14c1916e308778519fdeb1a805bed2156ad64",
+      "closureEvidence": "backlog/items/2026-08-29-guard-dispatch-budget-does-not-distinguish-invalid-identity-from-unresolved.md"
+    },
+    {
       "id": "pipeline.guard-testpath-not-kernel-protected",
       "status": "closed",
       "type": "defect",
@@ -2617,13 +2724,17 @@
     },
     {
       "id": "pipeline.guided-init-human-rounds-above-floor",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-28",
       "source": "Measured 2026-08-28 by driving scratch/smoke-guided-init-full.mjs against a genuinely fresh repository at HEAD 435063c5: 4 human rounds, 25 chained driver commands, 0 repair subcommands. Dependency analysis done against the intake state machine in onboarding-continuity.mjs, not from the measurement alone.",
       "deferred": false,
-      "tracking": "NOW / Nova A — PO asked directly whether the four human rounds can be collapsed to one or two. Three is the floor; one of the four is removable, and it is the cheapest of the four to remove."
+      "tracking": "NOW / Nova A — PO asked directly whether the four human rounds can be collapsed to one or two. Three is the floor; one of the four is removable, and it is the cheapest of the four to remove.",
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "9de5e42a",
+      "closureEvidence": "plugins/pipeline-core/lib/onboarding-continuity.test.mjs"
     },
     {
       "id": "pipeline.gwm-kernel-doc-enumeration-diverges-from-the-code-array",
@@ -2902,6 +3013,19 @@
       "closureRepository": "self",
       "closureCommit": "8acfd9361028b400418a8b6035a04eeb827b9e49",
       "closureEvidence": "backlog/items/2026-08-06-human-legible-approval-record.md"
+    },
+    {
+      "id": "pipeline.identity-attestation-fails-open-on-unresolved-transcript-path",
+      "status": "closed",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-29",
+      "source": "Claude/Windows self-audit report (docs/pipeline-audit-claude-session.md, section 3.1), observed during the 2026-08-29 three-runner greenfield test; this is the only one of the three runs that actually shipped code.",
+      "deferred": false,
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "683b8fcc51ec0c32aff82e830717627f520ff401",
+      "closureEvidence": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs"
     },
     {
       "id": "pipeline.immutable-manifest-entries-can-be-rebound-with-no-amendment-record",
@@ -3284,6 +3408,24 @@
       "deferred": true
     },
     {
+      "id": "pipeline.mandatory-verify-gate-has-no-path-for-a-project-with-no-tests-yet",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-29",
+      "source": "Antigravity/WSL self-analysis (docs/pipeline-analysis.md, section 2) and the PO's own observation, during the 2026-08-29 three-runner greenfield test.",
+      "deferred": false
+    },
+    {
+      "id": "pipeline.manifest-language-repair-demands-a-full-process-restart",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-29",
+      "source": "Codex/WSL report, delivered inline in chat by the PO (priority 6 in that report), during the 2026-08-29 three-runner greenfield test.",
+      "deferred": false
+    },
+    {
       "id": "pipeline.manifest-repair-paths-are-hardcoded-to-runners-default-codex",
       "status": "closed",
       "type": "defect",
@@ -3321,6 +3463,15 @@
       "closureRepository": "self",
       "closureCommit": "3fedc770a8a8196d49376f3c033558eaf51bf057",
       "closureEvidence": "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs"
+    },
+    {
+      "id": "pipeline.mechanical-proof-of-complete-prior-input-consumption-across-restart",
+      "status": "open",
+      "type": "requirement",
+      "owner": "pipeline",
+      "created": "2026-08-29",
+      "source": "PO ruling, recorded by scratch/greenfield-triage-2026-08-29.md finding F14 as the durable form of F12+F13, observed during the 2026-08-29 three-runner greenfield test.",
+      "deferred": false
     },
     {
       "id": "pipeline.merged-into-frontmatter-key-documented-but-unsupported",
@@ -3477,6 +3628,15 @@
       "closureRepository": "self",
       "closureCommit": "264be61996ce74b3b789374f0af396f9ce495df7",
       "closureEvidence": "backlog/evidence/2026-08-10-transcript-forensics-reference-closure.md"
+    },
+    {
+      "id": "pipeline.no-gate-catches-a-named-design-requirement-silently-absent-from-shipped-code",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-29",
+      "source": "PO judgment plus Claude/Windows audit section 3.1 from the 2026-08-29 three-runner greenfield test (finding F30 of scratch/greenfield-triage-2026-08-29.md), Antigravity/WSL run.",
+      "deferred": false
     },
     {
       "id": "pipeline.no-gate-is-tested-end-to-end-for-satisfiability",
@@ -3757,6 +3917,15 @@
       "closureEvidence": "backlog/items/2026-08-07-onboarding-restart-flow-is-codex-only-not-runner-aware.md"
     },
     {
+      "id": "pipeline.operating-model-not-shipped-with-the-plugin",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-29",
+      "source": "Claude/Windows self-audit report (docs/pipeline-audit-claude-session.md §5.6), cited by scratch/greenfield-triage-2026-08-29.md finding F21, observed during the 2026-08-29 three-runner greenfield test.",
+      "deferred": false
+    },
+    {
       "id": "pipeline.orchestrator-authored-production-commits-have-no-deterministic-control",
       "status": "closed",
       "type": "defect",
@@ -3932,6 +4101,15 @@
       "closureEvidence": "backlog/items/2026-08-18-pipeline-author-repair-signature-mode-never-actually-admits-the-edit.md"
     },
     {
+      "id": "pipeline.pipeline-start-hardcodes-a-stale-copy-of-the-elephant-role-prohibitions",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-29",
+      "source": "Claude/Windows self-audit section 5.7 from the 2026-08-29 three-runner greenfield test (finding F22 of scratch/greenfield-triage-2026-08-29.md).",
+      "deferred": false
+    },
+    {
       "id": "pipeline.pipeline-state-rebind-codex-default-runner",
       "status": "closed",
       "type": "defect",
@@ -3958,12 +4136,30 @@
       "closureEvidence": "backlog/evidence/2026-08-09-pipeline-state-f7-test-relocation-closure.md"
     },
     {
+      "id": "pipeline.pipeline-user-yaml-file-level-protection-forces-signature-ceremony",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-29",
+      "source": "Claude/Windows self-audit report (docs/pipeline-audit-claude-session.md, section 5.4), observed during the 2026-08-29 three-runner greenfield test.",
+      "deferred": false
+    },
+    {
       "id": "pipeline.plan-approval-binds-a-staging-draft-as-project-authority",
       "status": "open",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-27",
       "source": "Live state of a greenfield Antigravity test project, read 2026-08-27: the PO plan approval bound project/.onboarding-staging/ paths as project authority and advanced the feature to implementation. The generated staging files' own banner states they must not be bound as authority.",
+      "deferred": false
+    },
+    {
+      "id": "pipeline.plan-approval-is-recorded-without-a-check-that-the-design-was-shown",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-29",
+      "source": "PO observation during the 2026-08-29 three-runner greenfield test (finding F28 of scratch/greenfield-triage-2026-08-29.md), Antigravity/WSL run.",
       "deferred": false
     },
     {
@@ -4218,6 +4414,15 @@
       "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
     },
     {
+      "id": "pipeline.po-signing-key-pointer-does-not-cross-wsl-windows-boundary",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-29",
+      "source": "Claude/Windows self-audit report (docs/pipeline-audit-claude-session.md §3.2) and the PO's own observation, cited by scratch/greenfield-triage-2026-08-29.md finding F15, observed during the 2026-08-29 three-runner greenfield test.",
+      "deferred": false
+    },
+    {
       "id": "pipeline.post-compact-reground-carries-no-state-md-narrative",
       "status": "closed",
       "type": "defect",
@@ -4229,6 +4434,41 @@
       "closureRepository": "self",
       "closureCommit": "a035723503ea62562c95fad80976fc375cad2f19",
       "closureEvidence": "backlog/items/2026-08-19-post-compact-reground-carries-no-state-md-narrative.md"
+    },
+    {
+      "id": "pipeline.prd-binding-precedes-framing-with-no-reopen-path-back",
+      "status": "closed",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-29",
+      "source": "Claude/Windows self-audit report (docs/pipeline-audit-claude-session.md, sections 2 and 3.2), observed during the 2026-08-29 three-runner greenfield test. Claude had no way back from this state; Codex succeeded only because it happened to author framing before binding occurred.",
+      "deferred": false,
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "eb157d2c859e4d22bbb847742e58ceaa4fe10f92",
+      "closureEvidence": "plugins/pipeline-core/lib/plan-spec-state-v2.test.mjs"
+    },
+    {
+      "id": "pipeline.prd-framing-precondition-is-prose-not-a-check",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-29",
+      "source": "Claude/Windows self-audit report (docs/pipeline-audit-claude-session.md §10.4), cited by scratch/greenfield-triage-2026-08-29.md finding F17, observed during the 2026-08-29 three-runner greenfield test.",
+      "deferred": false
+    },
+    {
+      "id": "pipeline.prd-language-gate-reads-a-field-intake-never-writes",
+      "status": "closed",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-29",
+      "source": "Claude/Windows self-audit report (sections 2 and 3.2), reproduced on two independent runners during the 2026-08-29 three-runner greenfield test; diagnosis corrected the same day against the source after the PO restated the intended two-axis language design.",
+      "deferred": false,
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "64899377c5b3b1085de50b7f1a3c33ae9abbd436",
+      "closureEvidence": "plugins/pipeline-core/lib/onboarding-continuity.test.mjs"
     },
     {
       "id": "pipeline.prd-spec-depth-collapses-relative-to-design-input",
@@ -4427,6 +4667,15 @@
       "closureEvidence": "docs/claude-local-plugin-development.md"
     },
     {
+      "id": "pipeline.projection-drift-fault-after-design-implementation-transition-forces-restart",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-29",
+      "source": "Codex/WSL report, delivered inline in chat by the PO, plus the PO's own observations naming the design→implementation handover as the likely driver defect, during the 2026-08-29 three-runner greenfield test.",
+      "deferred": false
+    },
+    {
       "id": "pipeline.promotion-freezes-a-prd-the-po-gate-will-reject",
       "status": "closed",
       "type": "defect",
@@ -4493,13 +4742,17 @@
     },
     {
       "id": "pipeline.push-approval-mode-is-not-chosen-at-onboarding",
-      "status": "open",
+      "status": "closed",
       "type": "requirement",
       "owner": "pipeline",
       "created": "2026-08-28",
       "source": "Agy/WSL greenfield run, 2026-08-28, its own hardening self-analysis (pipeline-analysis.md), corroborated by the Codex/WSL run's independent script-indirection probe.",
       "deferred": false,
-      "tracking": "NOW / Nova A — happy-path blocking: the push approval is the last step of the path the PO named"
+      "tracking": "NOW / Nova A — happy-path blocking: the push approval is the last step of the path the PO named",
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "5e4b4d76",
+      "closureEvidence": "plugins/pipeline-core/scripts/onboarding-init.test.mjs"
     },
     {
       "id": "pipeline.push-approval-record-always-trails-the-signed-commit",
@@ -4624,6 +4877,15 @@
       "closureEvidence": "backlog/items/2026-08-07-push-release-flow-unusable-for-third-party-adopters.md"
     },
     {
+      "id": "pipeline.quote-style-fragility-in-shell-command-admission",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-29",
+      "source": "Claude/Windows self-audit sections 2 and 10.13 from the 2026-08-29 three-runner greenfield test (finding F24 of scratch/greenfield-triage-2026-08-29.md).",
+      "deferred": false
+    },
+    {
       "id": "pipeline.raw-apply_patch-is-unconditionally-admitted-by-the-outer-lifecycle-gate",
       "status": "closed",
       "type": "defect",
@@ -4635,6 +4897,19 @@
       "closureRepository": "self",
       "closureCommit": "7ceb8781a187310727c29b15a512bbce7e48a267",
       "closureEvidence": "backlog/evidence/2026-08-10-apply-patch-invariant-closure.md"
+    },
+    {
+      "id": "pipeline.read-scope-guard-admits-single-command-but-blocks-the-piped-form",
+      "status": "closed",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-29",
+      "source": "Codex hardening test during the 2026-08-29 three-runner greenfield test, reported inline in chat by the PO (Codex could not persist its own report — see the separate F21/F23 findings).",
+      "deferred": false,
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "9639d91ee78f42ca0fbe6c3a424321a9d3c492d8",
+      "closureEvidence": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs"
     },
     {
       "id": "pipeline.readiness-guard-blocks-its-own-recovery",
@@ -4772,12 +5047,16 @@
     },
     {
       "id": "pipeline.registering-a-verify-suite-silently-invalidates-the-capability-inventory",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-27",
       "source": "Measured live, 2026-08-27 session: two more product-capability-inventory breakages within the same evening, the second within the hour of a session that had just repaired the first — following two prior instances on 2026-08-19.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "f1a18d0fbc19540723a17ba0a77265599c7d2da0",
+      "closureEvidence": "harness/scripts/check-product-capability-inventory.test.mjs"
     },
     {
       "id": "pipeline.regulated-document-hooks",
@@ -4922,6 +5201,19 @@
       "closureEvidence": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs"
     },
     {
+      "id": "pipeline.resume-hint-capture-consumes-card-that-failed-schema-validation",
+      "status": "closed",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-29",
+      "source": "Codex/WSL report and the Claude/Windows self-audit report (docs/pipeline-audit-claude-session.md §3.2), both cited by scratch/greenfield-triage-2026-08-29.md finding F12, observed during the 2026-08-29 three-runner greenfield test.",
+      "deferred": false,
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "284eaa78f8791cd5db1843b3afebf8f3ef845a80",
+      "closureEvidence": "plugins/pipeline-core/scripts/resume-hint.test.mjs"
+    },
+    {
       "id": "pipeline.resume-hint-opaque-token-rejects-hyphenated-english",
       "status": "closed",
       "type": "defect",
@@ -5023,6 +5315,19 @@
       "created": "2026-08-08",
       "source": "SCRATCH-1 dispatch, 2026-08-08, reported as its own open item. The PO had asked the question directly the same night: 'hoffe nur es gibt einen Event der die Sachen auch wieder aufräumt'.",
       "deferred": true
+    },
+    {
+      "id": "pipeline.scratch-write-exemption-does-not-cover-restart-required",
+      "status": "closed",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-29",
+      "source": "Claude/Windows self-audit section 3.2 from the 2026-08-29 three-runner greenfield test (finding F23 of scratch/greenfield-triage-2026-08-29.md); Codex on the same runtime-restart mechanism could not persist its own audit report and delivered it in chat instead (the exact 'exists only in chat' failure GL-07 forbids).",
+      "deferred": false,
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "9639d91ee78f42ca0fbe6c3a424321a9d3c492d8",
+      "closureEvidence": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs"
     },
     {
       "id": "pipeline.scratch-write-refused-during-intake-against-documented-exemption",
@@ -5359,6 +5664,15 @@
       "closureEvidence": "backlog/items/2026-08-08-the-signing-ceremony-is-designed-for-the-verifier-not-the-signer.md"
     },
     {
+      "id": "pipeline.signing-fails-without-a-tty-and-the-error-reads-as-a-wrong-passphrase",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-29",
+      "source": "Live PO signature ceremony, 2026-08-29: sign-intent invoked through the session's `!` command route failed with an OpenSSL 'while reading strings' error that reads as a rejected passphrase; the PO re-ran the identical command in a separate terminal and it succeeded on the first try.",
+      "deferred": false
+    },
+    {
       "id": "pipeline.single-trust-anchor-excludes-key-rotation-and-teams",
       "status": "closed",
       "type": "defect",
@@ -5454,6 +5768,19 @@
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
       "deferred": true,
       "tracking": "Sentinel recovery baseline; deferred per PO triage 2026-08-23."
+    },
+    {
+      "id": "pipeline.sweep-remaining-guards-for-fail-open-identity-and-pipe-unpiped-scope-asymmetry",
+      "status": "closed",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-29",
+      "source": "Claude/Windows self-audit report (docs/pipeline-audit-claude-session.md, sections 6 and 10.7/10.8), observed during the 2026-08-29 three-runner greenfield test.",
+      "deferred": false,
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "00f14c1916e308778519fdeb1a805bed2156ad64",
+      "closureEvidence": "backlog/items/2026-08-29-guard-sweep-completion-report.md"
     },
     {
       "id": "pipeline.t1-governance-path-preflight",
@@ -5586,11 +5913,24 @@
     },
     {
       "id": "pipeline.three-independent-copies-of-the-wsl-windows-path-normalization",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-27",
       "source": "Noted while fixing the third instance of the WSL/Windows path-identity defect, commit d96e14c5, 2026-08-27.",
+      "deferred": false,
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "9d533fa5bfb7f15ffb41e2208b1ece01a0c3b972",
+      "closureEvidence": "plugins/pipeline-core/lib/repository-path-identity.mjs"
+    },
+    {
+      "id": "pipeline.three-runners-showed-wide-pipeline-administration-overhead-variance",
+      "status": "open",
+      "type": "idea",
+      "owner": "pipeline",
+      "created": "2026-08-29",
+      "source": "All three runners' own self-reports during the 2026-08-29 three-runner greenfield test (finding F31 of scratch/greenfield-triage-2026-08-29.md): Claude/Windows, Antigravity/WSL, Codex/WSL.",
       "deferred": false
     },
     {
@@ -5777,6 +6117,15 @@
       "deferred": false
     },
     {
+      "id": "pipeline.undocumented-transcript-fallback-selects-wrong-file-by-mtime",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-29",
+      "source": "Claude/Windows self-audit report (docs/pipeline-audit-claude-session.md §3.2), cited by scratch/greenfield-triage-2026-08-29.md finding F13, observed during the 2026-08-29 three-runner greenfield test.",
+      "deferred": false
+    },
+    {
       "id": "pipeline.unenforced-process-rules-vary-by-runner",
       "status": "open",
       "type": "defect",
@@ -5958,6 +6307,15 @@
       "closureRepository": "self",
       "closureCommit": "9b7b1d4df0c3b563c96a7afe5a87218125df82ee",
       "closureEvidence": "backlog/items/2026-08-24-verify-mjs-runs-385-suites-strictly-sequentially.md"
+    },
+    {
+      "id": "pipeline.verify-placeholder-manual-check-required-accepted-by-gate",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-29",
+      "source": "Claude/Windows self-audit report (docs/pipeline-audit-claude-session.md §7), cited by scratch/greenfield-triage-2026-08-29.md finding F19, observed during the 2026-08-29 three-runner greenfield test.",
+      "deferred": false
     },
     {
       "id": "pipeline.verify-range-mode-registration-for-orchestrator-commit-control",
