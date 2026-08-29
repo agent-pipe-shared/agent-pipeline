@@ -220,3 +220,66 @@ mechanism (`pre-push-hook-install.mjs`). This is a considered guess at
 Stage 2's eventual filename, not a design decision — if Stage 2 lands under
 a different name, repoint again rather than treat a mismatch as a
 regression.
+
+## Stage 2 partially landed, 2026-08-29 (dispatch NVA-W11-PRECOMMITGUARD)
+
+The installer itself is done and independently verified:
+`plugins/pipeline-core/scripts/pre-commit-hook-install.mjs`, modeled closely on
+`pre-push-hook-install.mjs` (identical shim/impl/marker/decline-marker install
+pattern), plus `pre-commit-hook-install.test.mjs`. It installs a real git
+`pre-commit` hook that reads the SAME sources of truth every sibling guard already
+reads — `gateStrengthRuleFor()` imported directly from `guard-gate-strength.mjs`,
+and `loadProtectedTestPathRules()`/`protectedTestPathRuleFor()` imported from
+`lib/protected-test-paths.mjs` — never a second hand-maintained list, and reuses
+Stage 1's own `defaultHasConsumedCapabilityForPath()` (from
+`check-protected-path-integrity.mjs`) for the consumed-capability check rather than
+a third copy. `done_when` (`path-exists
+plugins/pipeline-core/scripts/pre-commit-hook-install.mjs`) is now satisfied.
+
+Verified: `node --test plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs`
+— 22/22 pass, exit 0. Coverage includes: a real `git commit` staging a
+gate-strength-protected path (`pipeline.user.yaml`, GS-1) refused with no consumed
+capability; a real `git commit` staging a configured testpath-protected path
+refused the same way; a controlled repro of the item's own reported gap — a plain
+spawned `node -e "fs.writeFileSync(...)"` process (never crossing any PreToolUse
+hook) writing `project/pipeline.json` directly, then a `git commit` of that write
+still refused at the commit boundary; a matching CONSUMED human-guard-override
+capability admitting the same commit; a staged non-protected path left unaffected
+(proven, not just asserted); install/removal/decline safety mirroring
+`pre-push-hook-install.test.mjs`'s own coverage shape; and the fail-closed branch
+when the repository root cannot be resolved.
+`node --test harness/scripts/check-consumer-safe-paths.test.mjs` — 9/9 pass, exit 0
+(mandatory per this dispatch's briefing since it touches `plugins/pipeline-core/`).
+
+**What remains open — the onboarding wiring, and why it was NOT done as briefed.**
+The briefing asked for `lib/project-onboarding-v3.mjs` to wire the new installer
+into the onboarding transaction, mirroring `applyPrePushHookInstallOnboarding`'s
+own call site exactly (install-by-default, unconditional, best-effort). That wiring
+was attempted and then reverted after it broke pre-existing, passing tests in
+`project-onboarding-v3.test.mjs` (confirmed via a clean before/after re-run: 150
+pass / 1 pre-existing unrelated failure with the wiring reverted, vs. 4+ new
+failures with it in place). The cause is structural, not a bug in the wiring
+itself: onboarding's own scaffold-authoring step writes gate-strength-protected
+files (e.g. `project/pipeline.yaml`, `project/pipeline.json`,
+`project/critical-human-proof.json`, `pipeline.user.yaml`) directly to disk via
+trusted, privileged code — never through a guarded Edit/Write tool call — and the
+FIRST real git commit that captures this scaffold into history (which the
+pre-existing NVA-R9-PREPUSHHOOK test suite exercises directly, and which every real
+onboarded project does too) is indistinguishable, from a git-level pre-commit
+hook's point of view, from an untrusted bypass writing the same path. The pre-push
+hook has no analogous problem because a push is a later, separate action from the
+local first commit; a pre-commit hook fires on exactly that first commit.
+
+Resolving this needs a real design decision the backlog item does not currently
+answer, so it was deliberately NOT invented and silently built in: candidates
+include (a) onboarding recording a synthetic "genesis" consumed capability for the
+files it just authored, (b) exempting a protected path's very first appearance in
+git history while still catching any later re-write of already-tracked content
+(re-checked against this item's own attempted-bypass shape — the reported repro
+targets an ALREADY-COMMITTED `project/pipeline.json`, so a first-appearance
+exemption would not reopen that hole), or (c) documenting `git commit --no-verify`
+as the sanctioned one-time operator step for a project's own genesis commit,
+mirroring the existing human-escape doctrine. `status` stays `open`: the
+`done_when` file-existence predicate is satisfied, but the item's own Acceptance
+criteria are not fully met until the onboarding wiring lands with one of these (or
+another) resolved design.
