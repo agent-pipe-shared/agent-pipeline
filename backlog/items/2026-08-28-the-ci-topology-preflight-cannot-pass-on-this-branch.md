@@ -210,3 +210,26 @@ Layer 1 without a writer/tripwire mechanism. Verify
 `node plugins/pipeline-core/scripts/verify-topology-preflight.mjs` exits 0
 afterward. This closes this item's Layer 1; Layer 2's root (candidate-window
 sizing) remains separately open per the note above.
+
+## Progress, 2026-08-29 (dispatch NVA-CITOPO-L1DEL, landed by the Elephant, commit `2d2f155e`)
+
+**Layer 1 — CLOSED for real, per the PO decision above.** The stored
+`plugins/pipeline-core/config/ai-assisted-definition-inventory.json` record is deleted;
+`verify-topology-preflight.mjs` now computes `definitionInventoryRecord()` fresh at check
+time with no stored-file comparison at all — the "tripwire or cache?" question this item
+posed is answered: neither, the comparison itself is gone. Verified:
+`node --test plugins/pipeline-core/scripts/verify-topology-preflight.test.mjs` → 13/13 pass
+(unchanged count — no dedicated test existed for the deleted mechanism's own failure code).
+
+A plain local run (`node plugins/pipeline-core/scripts/verify-topology-preflight.mjs`, no
+env vars) now fails at `VTP-AI-HARDENING-REJECTED` instead of a Layer 1 code — expected: the
+"Update 2026-08-28" section above already established that a plain local run without
+`PIPELINE_CANDIDATE_BASE`/`PIPELINE_SECURITY_REVIEWER_ID` never reaches Layers 2/3's real
+evaluation. Reproducing the exact CI invocation shape to re-measure Layers 2/3's current
+drift was not attempted this session — out of this dispatch's scope, and their status stands
+as last measured 2026-08-28: Layer 3 closed, Layer 2 "symptom closed, root not closed" and
+still drifting with every further commit landed since.
+
+Status left `open` — the item's second acceptance criterion needs Layers 2 and 3 addressed
+too, and its first criterion (`exit 0` on this branch under the CI shape) has not been
+re-measured since the 2026-08-28 baseline.
