@@ -195,8 +195,9 @@ guards, and `guard-lifecycle-ready.mjs` refuses cross-repository mutation
 
 ### Mid-session drift between the checkout and the installed copy is accepted
 
-**PO decision, 2026-08-29** (`backlog/items/2026-08-29-installed-marketplace-
-guard-copy-drifts-silently-from-repo-source.md`): a guard/hook fix landing in
+**PO decision, 2026-08-29**
+(`backlog/items/2026-08-29-installed-marketplace-guard-copy-drifts-silently-from-repo-source.md`):
+a guard/hook fix landing in
 this checkout does not protect anything until this refresh runs — a session
 enforcing via the installed copy keeps the OLD guard behavior in the
 meantime, silently (the denial looks like an ordinary refusal, not a
