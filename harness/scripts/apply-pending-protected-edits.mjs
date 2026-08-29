@@ -204,6 +204,12 @@ const VERIFY_REGISTRATIONS = [
     file: join(REPO_ROOT, "plugins", "pipeline-core", "hooks", "guard-lifecycle-recovery-contract.test.mjs"),
   },
   {
+    // NVA-CF-ITEM25EXTRACT: the module verify.mjs's own manual-check step now imports from.
+    name: "manual-check-logic-tests",
+    line: '  { name: "manual-check-logic-tests", file: join(repoRoot, "harness", "scripts", "manual-check-logic.test.mjs") },',
+    file: join(REPO_ROOT, "harness", "scripts", "manual-check-logic.test.mjs"),
+  },
+  {
     name: "pipeline-state-inspection-contract-tests",
     line: '  { name: "pipeline-state-inspection-contract-tests", file: join(pluginScriptsDir, "pipeline-state-inspection-contract.test.mjs") },',
     file: join(REPO_ROOT, "plugins", "pipeline-core", "scripts", "pipeline-state-inspection-contract.test.mjs"),

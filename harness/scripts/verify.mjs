@@ -739,6 +739,7 @@ const TEST_SUITES = [
   { name: "check-resume-consumption-tests", file: join(pluginScriptsDir, "check-resume-consumption.test.mjs") },
   { name: "check-state-phase-consistency-tests", file: join(pluginScriptsDir, "check-state-phase-consistency.test.mjs") },
   { name: "pre-commit-hook-install-tests", file: join(pluginScriptsDir, "pre-commit-hook-install.test.mjs") },
+  { name: "manual-check-logic-tests", file: join(repoRoot, "harness", "scripts", "manual-check-logic.test.mjs") },
 ];
 
 // Manifest-gated phase steps: see header — only projects that carry a manifest at
