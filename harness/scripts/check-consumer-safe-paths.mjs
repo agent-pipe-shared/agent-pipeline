@@ -120,6 +120,7 @@ export const VENDORED_CANON_ALLOWLIST = Object.freeze([
   { file: "plugins/pipeline-core/roles/elephant.md", match: "- `harness/session-", reason: vendoredCanonAllowlistReason("roles/elephant.md") }, // L310
   // roles/goldfish.md (lines 23, 107, 123, 133)
   { file: "plugins/pipeline-core/roles/goldfish.md", match: "nants (`harness/session-", reason: vendoredCanonAllowlistReason("roles/goldfish.md") }, // L23
+  { file: "plugins/pipeline-core/roles/goldfish.md", match: "against `harness/review-protocol.md` §2.1's", reason: vendoredCanonAllowlistReason("roles/goldfish.md") }, // L107
   { file: "plugins/pipeline-core/roles/goldfish.md", match: "Per `harness/session-", reason: vendoredCanonAllowlistReason("roles/goldfish.md") }, // L123
   { file: "plugins/pipeline-core/roles/goldfish.md", match: "- `harness/session-", reason: vendoredCanonAllowlistReason("roles/goldfish.md") }, // L133
   // templates/prompts/agent-obligations.md (lines 3, 4, 90, 92)
