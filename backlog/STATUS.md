@@ -117,7 +117,7 @@
 | pipeline.continuity-repair-has-no-case-for-an-established-project-missing-only-pipeline-state-json | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.contract-suite-borrows-its-fixture-by-importing-a-109-test-file | closed | workflow-improvement | pipeline | 2026-08-08 | — |
 | pipeline.control-path-invalid-misfires-on-a-transient-repository-discovery-race | closed | defect | pipeline | 2026-08-10 | — |
-| pipeline.core-verify-cannot-pass-under-the-ci-trimmed-path | open | defect | pipeline | 2026-08-28 | — |
+| pipeline.core-verify-cannot-pass-under-the-ci-trimmed-path | closed | defect | pipeline | 2026-08-28 | — |
 | pipeline.critic-and-verify-cadence-may-be-too-fine-grained | open | workflow-improvement | pipeline | 2026-08-24 | — |
 | pipeline.critic-context-isolation | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.critic-review-has-no-defined-path-for-a-root-commit | closed | defect | pipeline | 2026-08-09 | — |
@@ -413,7 +413,7 @@
 | pipeline.readonly-command-guard-classification | closed | workflow-improvement | pipeline | 2026-07-26 | — |
 | pipeline.ready-gate-env-var-runner-authority | closed | defect | pipeline | 2026-08-05 | — |
 | pipeline.ready-gate-hand-maintained-shape-mirror | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — the second instance blocked every governed write in a ready project and was invisible until the candidate was actually installed. NVA-T-READYKEYS fixes that instance; this item is about the third one. |
-| pipeline.rebind-rollback-names-no-predicate | open | defect | pipeline | 2026-08-28 | NOW / Nova A — the only sanctioned route to a PO acknowledgement marker is unusable, and the refusal is undiagnosable from outside |
+| pipeline.rebind-rollback-names-no-predicate | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — the only sanctioned route to a PO acknowledgement marker is unusable, and the refusal is undiagnosable from outside |
 | pipeline.reconcile-backlog-ledger-evidence-commit-predates-referenced-file | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.reconcile-lock-reuse-lexical-path-comparison | closed | defect | pipeline | 2026-08-11 | — |
 | pipeline.reconcile-lock-reuse-regression-test-needs-a-tp5-window | closed | requirement | pipeline | 2026-08-18 | — |
@@ -545,8 +545,8 @@
 
 ## Counts
 
-- open: 99
+- open: 97
 - in_progress: 3
-- closed: 421
+- closed: 423
 - rejected: 3
 - deferred: 11

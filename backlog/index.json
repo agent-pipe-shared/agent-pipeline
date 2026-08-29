@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "9abe05f21d4dbd94b22fb8399ad046c9dd8309d3b6b066d67079c61de6ff7abb"
+    "transitionHead": "21b09d4cce61b81a7defc60afddadf7ce45f590ce6f7dbaeb26cbaa2019dbb4b"
   },
   "counts": {
-    "open": 99,
+    "open": 97,
     "in_progress": 3,
-    "closed": 421,
+    "closed": 423,
     "rejected": 3,
     "deferred": 11
   },
@@ -1378,12 +1378,16 @@
     },
     {
       "id": "pipeline.core-verify-cannot-pass-under-the-ci-trimmed-path",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-28",
       "source": "Local replay of .github/workflows/verify.yml's `verify` job before the first PR to main, 2026-08-28, at HEAD bbdbfd02. Steps 1-7 pass; step 8 fails. Controlled 2x5 matrix isolates the trimmed PATH as the cause.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "09f9a971",
+      "closureEvidence": "plugins/pipeline-core/scripts/ruleset-freshness.test.mjs"
     },
     {
       "id": "pipeline.critic-and-verify-cadence-may-be-too-fine-grained",
@@ -5034,13 +5038,17 @@
     },
     {
       "id": "pipeline.rebind-rollback-names-no-predicate",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-28",
       "source": "Consumer project HA, incident report S56 finding B2 (2026-08-28, Windows). The consumer independently re-derived every input digest and found all of them correct.",
       "deferred": false,
-      "tracking": "NOW / Nova A — the only sanctioned route to a PO acknowledgement marker is unusable, and the refusal is undiagnosable from outside"
+      "tracking": "NOW / Nova A — the only sanctioned route to a PO acknowledgement marker is unusable, and the refusal is undiagnosable from outside",
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "c16e40e1",
+      "closureEvidence": "plugins/pipeline-core/scripts/pipeline-state.test.mjs"
     },
     {
       "id": "pipeline.reconcile-backlog-ledger-evidence-commit-predates-referenced-file",
