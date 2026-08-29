@@ -50,3 +50,25 @@ Apply requires the exact plan digest and `--activate`; never reconstruct or use
 remote syntax. Typed statuses `portable-seed-required`,
 `runtime-initialization-required`, `runtime-attestation-required`,
 `restart-required`, `kickoff-required` and all malformed/unsafe states stop.
+
+When `project-onboarding-v3.mjs` itself returns a `legacy_source` diagnostic
+(root has a pre-V3 pipeline authority; its own `repair` field literally reads
+"use runner-profile-migration-v3 inspect, plan, then apply --activate"), or
+when a project's V3 migration state needs direct inspection outside the
+ordinary onboarding flow, run the same migration CLI
+`project-onboarding-v3.mjs` calls internally
+(`inspectRunnerProfileMigrationV3`/`planRunnerProfileMigrationV3`/
+`applyRunnerProfileMigrationV3` in `../lib/runner-profile-migration-v3.mjs`)
+directly: `runner-profile-migration-v3.mjs inspect --root "$PWD"`, then
+`plan --root "$PWD" [--initialize-missing-runtime]` to preview the change set,
+then `apply --root "$PWD" --activate` only once the plan is accepted (add
+`--initialize-missing-runtime` there too if the plan required it). This is the
+documented recovery path for that diagnostic, not a separate mechanism.
+
+For a direct, standalone readiness check of V3 bootstrap authority outside the
+ordinary `project-onboarding-v3.mjs` flow — e.g. diagnosing why bootstrap is
+not `ready` — run the read-only
+`v3-bootstrap-authority.mjs --root "$PWD" [--runner claude|codex]`; it never
+mutates, only inspects and reports the same typed JSON (`status`,
+`diagnostics[].repair`) that `project-onboarding-v3.mjs` consumes internally
+via `validateV3BootstrapAuthority`.
