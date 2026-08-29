@@ -141,6 +141,47 @@ export function measureTofuPushEndToEnd({ rootDir, keyDir, env } = {}) {
   steps.push({ step: "commit-onboarding-output", subStep: "commit", exitCode: commit.status, stderr: commit.stderr?.slice(0, 2000) });
   if (commit.status !== 0) return { schema: SCHEMA, outcome: "commit-onboarding-output-failed", steps };
 
+  // Step 0c: `approve-push` (~pipeline-state.mjs line 3572) requires
+  // `state.planApproval.poGateAuthority.planSha256`/`.specSha256` to be present -- i.e. the
+  // active feature's plan/spec must have gone through a real, explicit PO gate approval
+  // (submit-plan -> present-plan -> approve-plan), never merely existing from onboarding's
+  // own kickoff. Onboarding's own default answers use `--profile mini`
+  // (measure-fresh-repo-onboarding-turns.mjs DEFAULT_ANSWERS), so the submission below
+  // matches that same profile rather than guessing a different one.
+  //
+  // submit-plan's `beforeCommit` re-check runs with `requireAcknowledgement: true`
+  // (`validatePoGateAuthority`, lib/po-gate-authority.mjs), which additionally requires
+  // the active PRD to carry the PO's plan acknowledgement marker exactly once
+  // (`PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER`) -- onboarding's own kickoff PRD never carries
+  // it, so it is appended here exactly as a PO reviewing and acknowledging the plan
+  // would do, before submit-plan is called.
+  const earlyStatePath = join(dir, "project", "pipeline-state.json");
+  const earlyState = JSON.parse(readFileSync(earlyStatePath, "utf8"));
+  const earlyPlanPath = earlyState?.activeFeature?.planPath;
+  if (typeof earlyPlanPath !== "string" || !existsSync(join(dir, earlyPlanPath))) {
+    return { schema: SCHEMA, outcome: "no-active-feature-plan-path", steps, state: earlyState };
+  }
+  const planAbsPath = join(dir, earlyPlanPath);
+  const planText = readFileSync(planAbsPath, "utf8");
+  const ackMarker = "<!-- po-plan-acknowledged: content-sound-and-spec-consistent -->";
+  writeFileSync(planAbsPath, `${planText.replace(/\n+$/u, "")}\n${ackMarker}\n`);
+  const addAck = run(["git", "add", "-A"], dir, env);
+  steps.push({ step: "commit-plan-acknowledgement", subStep: "add", exitCode: addAck.status, stderr: addAck.stderr?.slice(0, 2000) });
+  if (addAck.status !== 0) return { schema: SCHEMA, outcome: "commit-plan-acknowledgement-failed", steps };
+  const commitAck = run(["git", "commit", "--quiet", "-m", "chore: record PO plan acknowledgement (tofu-push-e2e measurement fixture)"], dir, env);
+  steps.push({ step: "commit-plan-acknowledgement", subStep: "commit", exitCode: commitAck.status, stderr: commitAck.stderr?.slice(0, 2000) });
+  if (commitAck.status !== 0) return { schema: SCHEMA, outcome: "commit-plan-acknowledgement-failed", steps };
+
+  const submitPlan = run([process.execPath, PIPELINE_STATE_SCRIPT, "submit-plan", "--by", "PO", "--profile", "mini"], dir, env);
+  steps.push({ step: "submit-plan", exitCode: submitPlan.status, stderr: submitPlan.stderr?.slice(0, 2000) });
+  if (submitPlan.status !== 0) return { schema: SCHEMA, outcome: "submit-plan-failed", steps };
+  const presentPlan = run([process.execPath, PIPELINE_STATE_SCRIPT, "present-plan", "--by", "PO"], dir, env);
+  steps.push({ step: "present-plan", exitCode: presentPlan.status, stderr: presentPlan.stderr?.slice(0, 2000) });
+  if (presentPlan.status !== 0) return { schema: SCHEMA, outcome: "present-plan-failed", steps };
+  const approvePlan = run([process.execPath, PIPELINE_STATE_SCRIPT, "approve-plan", "--by", "PO"], dir, env);
+  steps.push({ step: "approve-plan", exitCode: approvePlan.status, stderr: approvePlan.stderr?.slice(0, 2000) });
+  if (approvePlan.status !== 0) return { schema: SCHEMA, outcome: "approve-plan-failed", steps };
+
   // Step 1: the real PO key ceremony -- driven IN-PROCESS via `runHumanApproval`'s own
   // `dependencies.spawn` injection seam (NVA-CF-BL16-PRECISEFIX; the same seam
   // `po-human-approval.test.mjs` already uses), never an external subprocess. A real,
