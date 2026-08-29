@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.onboarding-must-bootstrap-the-trust-anchor-once
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: 180d427a
+closure_evidence: plugins/pipeline-core/lib/project-onboarding-v3.test.mjs NVA-R24-TRUSTANCHOR
 created: 2026-08-28
 sprint: nova
 tracking: "NOW / Nova A — happy-path blocking: its absence deadlocked the first human override in the Claude run and cost a live PO signature; PO asked for this explicitly"
