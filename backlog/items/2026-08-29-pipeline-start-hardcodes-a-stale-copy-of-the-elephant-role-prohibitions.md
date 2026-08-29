@@ -87,7 +87,10 @@ regenerating the skill text fails a test instead of silently drifting.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment:** `sprint: nova` — Nova B work, not a 0.6.0 candidate blocker.
-- **Date:**
+- **Decision:** accepted
+- **Rationale:** small, self-contained, mirrors an existing shipped pattern
+  (`generate-agent-obligations.mjs`/`.test.mjs`) exactly, and closes a real
+  silent-drift class between a role contract and a printed summary of it.
+- **Assignment:** `sprint: nova` — Nova B work, not a 0.6.0 candidate
+  blocker, but in scope for this sprint's backlog sweep.
+- **Date:** 2026-08-29
