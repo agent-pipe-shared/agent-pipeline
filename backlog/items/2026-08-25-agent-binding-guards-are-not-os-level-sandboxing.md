@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-25
 sprint: nova
+done_when: manual
 tracking: "Escalated idea -> defect on 2026-08-28: vector 1 is no longer theoretical. Two independent greenfield runs executed it, one of them reaching the GitHub remote with no PO signature."
 source: "PO relay (chat), 2026-08-25, from a separate Agy greenfield-test session's own threat-model self-analysis (Q&A transcript pasted verbatim by the PO); PO's own framing: 'eher was fürs backlog was aber nicht zeitnah angegangen wird (Thema eher für nova B)'"
 ---
@@ -124,3 +125,44 @@ territory) before deciding which, if any, to adopt.
   or actioned this session.
 - **Assignment (if accepted):** unscheduled — Nova B.
 - **Date:** 2026-08-25
+
+### Re-triaged 2026-08-29 — this is an umbrella; its buildable halves are in the candidate, its OS-boundary half is not
+
+`done_when: manual`, deliberately. This item's own resolution is a PO scope
+decision, not a code artifact, so no mechanical predicate can honestly track
+it. What CAN be tracked is tracked elsewhere, and that split is the point of
+this entry.
+
+**The PO's standing threat model, restated 2026-08-29 and binding on this
+item:** the adversary the guard layer defends against is the *accidental*
+breakout — an agent taking a shortcut to satisfy user intent. Making that
+route hard and loud is the goal. A determined malicious agent is expected to
+get past a process-level guard; that gap is **accepted**, and the response is
+to log it, not to close it. Of the four hardenings proposed above, credential
+removal from the execution context, `bwrap`-style process sandboxing, and the
+script-execution allowlist all sit squarely in that accepted-gap territory.
+**They must not be built for this candidate**, and their absence must not be
+re-filed as a fresh finding.
+
+The third proposal is different in kind and does not depend on that scope
+decision at all. A real `.git/hooks/pre-push` runs at the git-porcelain layer,
+so it catches a push regardless of which process originated it — an agent tool
+call, a spawned script, a build tool. That is exactly the hole the 2026-08-28
+escalation recorded: Agy's push reached the remote with no PO signature
+because **two** layers were missing together, and only one of them is the
+accepted OS gap. The other, an absent pre-push hook, is cheap, is technical
+enforcement rather than another paragraph of prompt, and is tracked as
+`pipeline.pre-push-hook-is-offered-not-installed`.
+
+Buildable halves, tracked separately and in candidate scope:
+
+- `pipeline.pre-push-hook-is-offered-not-installed` — the git-layer backstop.
+- `pipeline.a-node-script-defeats-every-file-protection-guard` — the same
+  vector-1 mechanism seen from the file-protection side, whose remedy is
+  detection (`check-protected-path-integrity.mjs`) rather than prevention,
+  precisely because prevention at that layer is the accepted gap.
+
+This item stays open as the umbrella recording the residual, and closes only
+when the PO makes the Nova B scope call on the OS boundary itself. Vectors 4
+and 5 are already recorded above as mitigated; vector 3 is recorded as
+reassuring rather than concerning.
