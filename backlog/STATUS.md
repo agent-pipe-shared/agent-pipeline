@@ -325,7 +325,7 @@
 | pipeline.onboarding-must-bootstrap-the-trust-anchor-once | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — happy-path blocking: its absence deadlocked the first human override in the Claude run and cost a live PO signature; PO asked for this explicitly |
 | pipeline.onboarding-must-elicit-the-real-verify-contract | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — happy-path blocking: without a real verify contract the push gate is unsatisfiable by construction, so the path cannot reach its last step |
 | pipeline.onboarding-needs-one-guided-init | closed | requirement | pipeline | 2026-08-28 | NOW / Nova A — PO decision 2026-08-28: rebuild the flow, keep the binding core untouched; pulled forward because the happy path cannot go live without it |
-| pipeline.onboarding-produces-drift-it-then-has-to-repair | open | defect | pipeline | 2026-08-28 | NOW / Nova A — happy-path blocking: four repair commands sit in the middle of the onboarding step the PO wants to be simple |
+| pipeline.onboarding-produces-drift-it-then-has-to-repair | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — happy-path blocking: four repair commands sit in the middle of the onboarding step the PO wants to be simple |
 | pipeline.onboarding-ready-path-unconditional-restart-barrier-read | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.onboarding-restart-flow-is-codex-only-not-runner-aware | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.operating-model-not-shipped-with-the-plugin | closed | defect | pipeline | 2026-08-29 | — |
@@ -517,7 +517,7 @@
 | pipeline.unified-human-authorization-ux | closed | workflow-improvement | pipeline | 2026-08-02 | Current CYB-4 helper is a compatible first adapter only; no programme-wide migration or closure is claimed. |
 | pipeline.universal-human-command-renderer | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.unregistered-suite-is-red-and-invisible-to-verify | closed | defect | pipeline | 2026-08-07 | — |
-| pipeline.v1-trust-anchor-makes-signature-push-functionless | open | defect | pipeline | 2026-08-28 | NOW / Nova A — critical: it makes gates.push_approval 'signature', the documented default and this repository's own setting, functionless. Stacks with the push-gate item; a consumer hits both. |
+| pipeline.v1-trust-anchor-makes-signature-push-functionless | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — critical: it makes gates.push_approval 'signature', the documented default and this repository's own setting, functionless. Stacks with the push-gate item; a consumer hits both. |
 | pipeline.vendored-dispatch-templates-drift-from-canon | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.verify-authorship-defaults-to-source-markers-not-behavior | closed | workflow-improvement | pipeline | 2026-08-10 | — |
 | pipeline.verify-evidence-has-no-producer | closed | defect | pipeline | 2026-08-08 | — |
@@ -549,8 +549,8 @@
 
 ## Counts
 
-- open: 77
+- open: 75
 - in_progress: 3
-- closed: 447
+- closed: 449
 - rejected: 3
 - deferred: 11

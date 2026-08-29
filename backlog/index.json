@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "f563c7c39fa79a4e6e330de77983042a14df792ba2e0358b8ac78e2c1545220a"
+    "transitionHead": "bb382df436111ddb403dd8c1ea509a3db0a0abfedbe4d70d721a5815bb45f1b2"
   },
   "counts": {
-    "open": 77,
+    "open": 75,
     "in_progress": 3,
-    "closed": 447,
+    "closed": 449,
     "rejected": 3,
     "deferred": 11
   },
@@ -4000,13 +4000,17 @@
     },
     {
       "id": "pipeline.onboarding-produces-drift-it-then-has-to-repair",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-28",
       "source": "Claude/Windows greenfield run, 2026-08-28, sections 7 and 11 of its own analysis (docs/pipeline-haertungstest-und-analyse.md).",
       "deferred": false,
-      "tracking": "NOW / Nova A — happy-path blocking: four repair commands sit in the middle of the onboarding step the PO wants to be simple"
+      "tracking": "NOW / Nova A — happy-path blocking: four repair commands sit in the middle of the onboarding step the PO wants to be simple",
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "7c446d0b9b56f981f1057b1d40683814325e33f5",
+      "closureEvidence": "backlog/items/2026-08-28-onboarding-produces-drift-it-then-has-to-repair.md"
     },
     {
       "id": "pipeline.onboarding-ready-path-unconditional-restart-barrier-read",
@@ -6383,13 +6387,17 @@
     },
     {
       "id": "pipeline.v1-trust-anchor-makes-signature-push-functionless",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-28",
       "source": "Consumer project HA, incident report S56 finding B8 (2026-08-28, Windows), added after the first handover. Both mechanisms re-verified in this repository's own code before filing.",
       "deferred": false,
-      "tracking": "NOW / Nova A — critical: it makes gates.push_approval 'signature', the documented default and this repository's own setting, functionless. Stacks with the push-gate item; a consumer hits both."
+      "tracking": "NOW / Nova A — critical: it makes gates.push_approval 'signature', the documented default and this repository's own setting, functionless. Stacks with the push-gate item; a consumer hits both.",
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "4b32ec65bcbee401767a805e5861cada38c44354",
+      "closureEvidence": "backlog/items/2026-08-28-a-v1-trust-anchor-makes-the-signature-push-route-functionless.md"
     },
     {
       "id": "pipeline.vendored-dispatch-templates-drift-from-canon",
