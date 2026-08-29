@@ -4,13 +4,33 @@
   "model": "claude-sonnet-5",
   "rulesetSha": "cb16a3df",
   "dispatcher": "elephant",
-  "outcome": "committed-pending-report",
+  "outcome": "completed-with-open-items",
   "commits": [
     {
       "sha": "19233eab",
       "changedFiles": [
         "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
         "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs"
+      ]
+    },
+    {
+      "sha": "e39e4b36",
+      "changedFiles": [
+        "evidence/dispatch-record-NVA-R18-SCANBOOT.json"
+      ]
+    },
+    {
+      "sha": "193e4dc0",
+      "changedFiles": [
+        "plugins/pipeline-core/scripts/security-scan.test.mjs"
+      ]
+    },
+    {
+      "sha": "3066be05",
+      "changedFiles": [
+        "evidence/NVA-R18-SCANBOOT-check-consumer-safe-paths.txt",
+        "evidence/NVA-R18-SCANBOOT-project-onboarding-v3-test.txt",
+        "evidence/NVA-R18-SCANBOOT-security-scan-test.txt"
       ]
     }
   ],
@@ -28,8 +48,13 @@
     {
       "phase": "implementation",
       "toolUseCount": 30,
-      "note": "Corrected the two stale reasons in project-onboarding-v3.mjs's gates.security seeding comment (kept gate value 'off' unchanged); mirrored the correction into a nearby stale test comment in project-onboarding-v3.test.mjs. Added 8 new node:test-style cases to security-scan.test.mjs proving (a) a bare fresh consumer with no catalog.json passes checkSecurityCompleteness end to end, and (b) all five reportStatus values (passed/findings/not-configured/tool-unavailable/not-applicable) plus 'error' are independently reachable and distinguishable. security-scan.test.mjs: 143/143 passed. project-onboarding-v3.test.mjs: 147/147 passed."
+      "note": "Corrected the two stale reasons in project-onboarding-v3.mjs's gates.security seeding comment (kept gate value 'off' unchanged); mirrored the correction into a nearby stale test comment in project-onboarding-v3.test.mjs. Added 8 new cases to security-scan.test.mjs proving (a) a bare fresh consumer with no catalog.json passes checkSecurityCompleteness end to end, and (b) all five reportStatus values (passed/findings/not-configured/tool-unavailable/not-applicable) plus 'error' are independently reachable and distinguishable. security-scan.test.mjs: 143/143 passed. project-onboarding-v3.test.mjs: 147/147 passed."
+    },
+    {
+      "phase": "closing",
+      "toolUseCount": 60,
+      "note": "Wrote machine verify evidence (check-consumer-safe-paths.test.mjs exit 0, security-scan.test.mjs exit 0, project-onboarding-v3.test.mjs exit 0). Did NOT create plugins/pipeline-core/security/semgrep/pipeline.yml (DoD check 1's exact path) -- stop-condition-2 discrepancy: the item's own done_when predicate names a path that diverges from what a prior, already-shipped-and-wired dispatch (NVA-B-SCANNER) actually built and tested at config/security/semgrep-default-rules.yml. Creating a second, unwired file at the DoD-named path would be exactly the misleading stub Direction 2 warns against. Reported for the Elephant/PO to reconcile (update done_when, or explain why two paths should coexist) rather than guessed. Did not touch done_when or status per Forbidden section."
     }
   ],
-  "report": null
+  "report": "See final chat response for the full six-section report. Summary: DoD-2 (comment correction), DoD-3 (fresh-consumer gate satisfiability) and DoD-4 (five-way reportStatus distinction) are passed with committed tests/evidence. DoD-1 (exact file path plugins/pipeline-core/security/semgrep/pipeline.yml) is a discrepancy, not implemented -- the underlying capability already exists, tested and wired, at a different path from a prior dispatch (92d1b711 / NVA-B-SCANNER); flagged as a stop-condition-2 item for the Elephant to reconcile with the backlog item's done_when. No code fix was made to security-scan.mjs's capability-resolution logic because empirical testing showed no fix was needed for the fresh-consumer case named in the DoD; the item's own 'required capabilities' blocker measurement was scoped to this repository's own self-application, not a bare consumer."
 }
