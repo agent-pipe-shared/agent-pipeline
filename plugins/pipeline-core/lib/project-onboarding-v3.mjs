@@ -218,6 +218,17 @@ const SESSION_CAPABILITY_DIAGNOSE_SCRIPT = fileURLToPath(new URL("../scripts/ses
 const PO_AUTHORITY_REBIND_WRITER = fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url));
 const PO_PROFILE_REPAIR_WRITER = fileURLToPath(new URL("../scripts/po-gate-profile-repair.mjs", import.meta.url));
 const PROJECT_AUTHORITY_MIGRATION_WRITER = fileURLToPath(new URL("../scripts/project-authority-migration.mjs", import.meta.url));
+// This module's own install location IS the real absolute path every pipeline
+// script it hands the project actually lives at on THIS machine -- the same
+// derivation the *_SCRIPT/*_WRITER constants above already use per-script. A
+// consumer project's runner-permission allowlist (below) is scoped to the
+// whole directory rather than one entry per script, because Direction in
+// backlog/items/2026-08-28-a-consumer-project-must-allowlist-every-runner-
+// lane-itself.md is a coverage guarantee ("every pipeline script the flow
+// itself hands it"), and this directory is exactly the set of scripts
+// onboarding invokes across its own lifecycle (see the *_SCRIPT/*_WRITER
+// constants above, all siblings of this one directory).
+const SCRIPTS_DIR = fileURLToPath(new URL("../scripts/", import.meta.url));
 const SHA256_RE = /^[a-f0-9]{64}$/u;
 const REMOTE_REF_RE = /^refs\/heads\/[A-Za-z0-9][A-Za-z0-9._/-]*$/u;
 const MANIFEST_REPAIR_SCHEMA = "pipeline.project-onboarding-manifest-repair-plan.v1";
@@ -1114,9 +1125,52 @@ export function freshCriticalHumanProofPolicyBytes(fs = null) {
   }
   return `${JSON.stringify({ schema: CRITICAL_HUMAN_PROOF_POLICY_V1, requiredKinds: ["push"] }, null, 2)}\n`;
 }
+// Computes the `permissions.allow` entries a freshly onboarded consumer needs
+// to invoke the pipeline scripts onboarding itself hands the project, on
+// every runner lane (Bash, PowerShell) and every path spelling the same
+// absolute directory can be written with (backslash- and forward-slash-
+// separated) -- backlog:
+// 2026-08-28-a-consumer-project-must-allowlist-every-runner-lane-itself.md.
+// The gap this closes was measured live: a consumer's settings.json covered
+// exactly ONE spelling on ONE lane (a Windows backslash path, Bash only),
+// so the SAME invocation nondeterministically ran or was refused depending
+// on which lane and which path spelling the runner's own classifier saw --
+// turning an ordinary guard refusal into a total stop with no lane left to
+// retry on.
+//
+// `scriptsDirAbsolute` is this machine's own OS-native absolute path to the
+// installed plugin's `scripts/` directory (see `SCRIPTS_DIR` above) -- never
+// a project-relative path, because a marketplace install is reached from
+// outside the project root. On POSIX, forward- and backslash-normalized
+// forms of a path with no backslashes in it are byte-identical, so only ONE
+// spelling is emitted there; on Windows the two forms differ and both are
+// emitted, matching the item's own "path spelling matters on Windows
+// specifically" framing -- this never invents a spelling the host does not
+// actually need.
+export function pipelineScriptsRunnerAllowlistEntries(scriptsDirAbsolute) {
+  const trimmed = scriptsDirAbsolute.replace(/[\\/]+$/u, "");
+  const forwardSlash = trimmed.replace(/\\/gu, "/");
+  const backslash = trimmed.replace(/\//gu, "\\");
+  const spellings = forwardSlash === backslash ? [forwardSlash] : [forwardSlash, backslash];
+  const entries = [];
+  for (const lane of ["Bash", "PowerShell"]) {
+    for (const spelling of spellings) {
+      const glob = spelling.includes("\\") ? `${spelling}\\*` : `${spelling}/*`;
+      entries.push(`${lane}(node "${glob}")`);
+    }
+  }
+  return entries;
+}
+// Materializes `.claude/settings.json`'s fresh-onboarding seed bytes. Kept as
+// its own exported function (mirrors `freshCriticalHumanProofPolicyBytes`,
+// `freshCalibrationBytes` immediately above) so a test can assert on the
+// bytes directly rather than only through the larger `freshBaselines` map.
+export function freshSettingsJsonBytes() {
+  return `${JSON.stringify({ permissions: { allow: pipelineScriptsRunnerAllowlistEntries(SCRIPTS_DIR) } }, null, 2)}\n`;
+}
 function freshBaselines(intent, { hostManaged = false, profile = null, fs = null } = {}) {
   const baselines = {
-    ".claude/settings.json": { status: "present", bytes: "{}\n" },
+    ".claude/settings.json": { status: "present", bytes: freshSettingsJsonBytes() },
     // The seeded verify command FAILS until a human configures it. The previous
     // seed (`git diff --check`) was chosen to be HEAD-independent so it could
     // never fail before the user's first commit -- which made a brand-new

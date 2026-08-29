@@ -4,12 +4,12 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
-  chmodSync, closeSync, existsSync, fstatSync, fsyncSync, lstatSync, mkdirSync, mkdtempSync,
+  chmodSync, closeSync, copyFileSync, existsSync, fstatSync, fsyncSync, lstatSync, mkdirSync, mkdtempSync,
   openSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, linkSync, unlinkSync, writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
   applyProjectOnboardingManifestRepairV4,
@@ -36,6 +36,7 @@ import {
   applyProjectRemoteAdoptionV4,
   renderProjectOnboardingAction,
   freshCriticalHumanProofPolicyBytes,
+  freshSettingsJsonBytes,
   observeLocalTrustAnchorPointer,
 } from "./project-onboarding-v3.mjs";
 import { readCriticalHumanProofPolicy } from "./critical-human-proof-policy.mjs";
@@ -4581,6 +4582,144 @@ test("the seeded security gate refuses a push with missing security evidence and
     const admitted = attemptPush();
     assert.equal(admitted.status, 0, `the fully-satisfied push must be admitted: ${admitted.stderr}`);
   } finally { dispose(path); }
+});
+
+// SECGATE-2 (NVA-CF-BL20-SECGATEINSTALLED, backlog:
+// 2026-08-28-seed-the-security-gate-on-now-that-its-satisfying-path-is-open.md): SECGATE-1
+// above measures the security gate's push-refusal/push-admission shape, but its own dedicated
+// scan call runs with an EMPTY environment specifically so gitleaks is never reported
+// "installed" -- resolveGitleaksConfigPath() is therefore never invoked at all by that test,
+// from this checkout's own location or anywhere else (isInstalled() returns false before
+// run() is ever called). That leaves the exact mechanism the backlog item's "Correction"
+// section is about -- GITLEAKS_CONFIG_PATH's four-directory climb, which only finds a
+// repo-root .gitleaks.toml when the adapter module's OWN on-disk location has one above it --
+// entirely unmeasured for the security-scan.mjs orchestration this satisfying path actually
+// runs (as opposed to the standalone gitleaks.mjs module, already covered by
+// security-adapters/gitleaks.test.mjs's own "installed-plugin fixture" test cited in
+// SECGATE-1's comment above).
+//
+// This test closes that gap: it copies the WHOLE transitive local-import closure of
+// security-scan.mjs (traced by hand below, every local `import ... from "./..."` /
+// `"../..."` statement followed to its own file, recursively; none of these files imports
+// anything else local) into a fresh fixture tree shaped
+// `plugins/pipeline-core/{scripts,lib,config,security}/...` with NO repo root anywhere above
+// it -- modeling an installed-plugin (marketplace) deployment, the same shape
+// gitleaks.test.mjs's own fixture models for the adapter alone. It then imports the FIXTURE's
+// own copy of security-scan.mjs (never the real, checkout-resident one) and runs its exported
+// `runSecurityScan()` against a real, plain git candidate root, with a stub gitleaks "binary"
+// made installed via PIPELINE_GITLEAKS_PATH and trusted via the sanctioned
+// `assessTrustedExecutablePath` test seam (mirrors security-scan.test.mjs's own
+// mockAssessFixtureBinary) -- so the adapter's real run() path, and therefore its real
+// resolveGitleaksConfigPath() call, actually executes from the fixture's own installed-plugin
+// location.
+//
+// Transitive closure (traced 2026-08-29 by following every local import AND re-export
+// statement, not only `import` lines -- tool-identity.mjs's own link to
+// trusted-tool-resolution.mjs is a bare `export { ... } from "../lib/..."` re-export, caught
+// only on a second, broader pass): scripts/security-scan.mjs, scripts/tool-identity.mjs,
+// scripts/security-adapters/{gitleaks,osv-scanner,semgrep,license-check}.mjs,
+// scripts/pipeline-manifest.schema.json (manifest.mjs's DEFAULT_SCHEMA_PATH, never actually
+// read here -- the candidate carries no manifest at all -- copied for completeness),
+// lib/manifest.mjs, lib/project-authority.mjs, lib/security-completeness-gate.mjs,
+// lib/security-evidence-evaluator.mjs, lib/security-capability-plan-builder.mjs,
+// lib/security-policy-resolver.mjs, lib/document-hooks.mjs, lib/yaml-lite.mjs,
+// lib/schema-lite.mjs, lib/worktree-lifecycle.mjs, lib/windows-private-state.mjs,
+// lib/trusted-tool-resolution.mjs, config/security/gitleaks-default.toml,
+// config/security/license-allowlist.default.json, security/semgrep/pipeline.yml (the other two
+// plugin-shipped scanner defaults -- copied for fixture completeness even though this test's
+// own assertions are gitleaks-specific).
+//
+// NOT measured here (disclosed, same discipline as SECGATE-1's own comment): guard-push.mjs and
+// the onboarding/push-approval machinery are NOT copied into the fixture -- guard-push.mjs only
+// READS the evidence security-scan.mjs already wrote (SECGATE-1 proves that half end to end),
+// and neither onboarding nor push-approval does any directory-walk-up config resolution of its
+// own, so both are orthogonal to the installed-plugin gap this test exists to close.
+test("the fixture's own security-scan.mjs call graph, deployed with no repo root above it (installed-plugin shape), resolves gitleaks to the plugin-shipped default config and completes a clean scan (SECGATE-2)", async () => {
+  const fixtureRoot = mkdtempSync(join(tmpdir(), "secgate-installed-fixture-"));
+  const scanRootDir = root();
+  try {
+    hostGit(scanRootDir, ["init", "--initial-branch=main"]);
+    hostGit(scanRootDir, ["config", "user.email", "po@example.invalid"]);
+    hostGit(scanRootDir, ["config", "user.name", "PO"]);
+    hostGit(scanRootDir, ["remote", "add", "origin", "https://example.invalid/pipeline/fixture.git"]);
+    writeFileSync(join(scanRootDir, "README.md"), "installed-plugin security-scan fixture candidate\n");
+    hostGit(scanRootDir, ["add", "-A"]);
+    hostGit(scanRootDir, ["commit", "-q", "-m", "seed candidate"]);
+
+    const COPY_MAP = [
+      ["../scripts/security-scan.mjs", ["plugins", "pipeline-core", "scripts", "security-scan.mjs"]],
+      ["../scripts/tool-identity.mjs", ["plugins", "pipeline-core", "scripts", "tool-identity.mjs"]],
+      ["./trusted-tool-resolution.mjs", ["plugins", "pipeline-core", "lib", "trusted-tool-resolution.mjs"]],
+      ["../scripts/security-adapters/gitleaks.mjs", ["plugins", "pipeline-core", "scripts", "security-adapters", "gitleaks.mjs"]],
+      ["../scripts/security-adapters/osv-scanner.mjs", ["plugins", "pipeline-core", "scripts", "security-adapters", "osv-scanner.mjs"]],
+      ["../scripts/security-adapters/semgrep.mjs", ["plugins", "pipeline-core", "scripts", "security-adapters", "semgrep.mjs"]],
+      ["../scripts/security-adapters/license-check.mjs", ["plugins", "pipeline-core", "scripts", "security-adapters", "license-check.mjs"]],
+      ["../scripts/pipeline-manifest.schema.json", ["plugins", "pipeline-core", "scripts", "pipeline-manifest.schema.json"]],
+      ["./manifest.mjs", ["plugins", "pipeline-core", "lib", "manifest.mjs"]],
+      ["./project-authority.mjs", ["plugins", "pipeline-core", "lib", "project-authority.mjs"]],
+      ["./security-completeness-gate.mjs", ["plugins", "pipeline-core", "lib", "security-completeness-gate.mjs"]],
+      ["./security-evidence-evaluator.mjs", ["plugins", "pipeline-core", "lib", "security-evidence-evaluator.mjs"]],
+      ["./security-capability-plan-builder.mjs", ["plugins", "pipeline-core", "lib", "security-capability-plan-builder.mjs"]],
+      ["./security-policy-resolver.mjs", ["plugins", "pipeline-core", "lib", "security-policy-resolver.mjs"]],
+      ["./document-hooks.mjs", ["plugins", "pipeline-core", "lib", "document-hooks.mjs"]],
+      ["./yaml-lite.mjs", ["plugins", "pipeline-core", "lib", "yaml-lite.mjs"]],
+      ["./schema-lite.mjs", ["plugins", "pipeline-core", "lib", "schema-lite.mjs"]],
+      ["./worktree-lifecycle.mjs", ["plugins", "pipeline-core", "lib", "worktree-lifecycle.mjs"]],
+      ["./windows-private-state.mjs", ["plugins", "pipeline-core", "lib", "windows-private-state.mjs"]],
+      ["../config/security/gitleaks-default.toml", ["plugins", "pipeline-core", "config", "security", "gitleaks-default.toml"]],
+      ["../config/security/license-allowlist.default.json", ["plugins", "pipeline-core", "config", "security", "license-allowlist.default.json"]],
+      ["../security/semgrep/pipeline.yml", ["plugins", "pipeline-core", "security", "semgrep", "pipeline.yml"]],
+    ];
+    for (const [sourceRel, destSegments] of COPY_MAP) {
+      const sourcePath = fileURLToPath(new URL(sourceRel, import.meta.url));
+      const destPath = join(fixtureRoot, ...destSegments);
+      mkdirSync(join(fixtureRoot, ...destSegments.slice(0, -1)), { recursive: true });
+      copyFileSync(sourcePath, destPath);
+    }
+    // Sanity: this fixture models a deployment with NO repo root at all above `plugins/` --
+    // the exact shape GITLEAKS_CONFIG_PATH's four-directory climb must fail to find a
+    // repo-root .gitleaks.toml in, forcing the plugin-shipped-default branch.
+    assert.equal(existsSync(join(fixtureRoot, ".gitleaks.toml")), false, "sanity: fixture must carry no repo-root .gitleaks.toml");
+
+    const fixtureSecurityScanUrl = pathToFileURL(join(fixtureRoot, "plugins", "pipeline-core", "scripts", "security-scan.mjs")).href;
+    const fixtureSecurityScan = await import(fixtureSecurityScanUrl);
+
+    const stubGitleaksBinary = join(fixtureRoot, "gitleaks-stub");
+    writeFileSync(stubGitleaksBinary, "not a real binary -- fixtureSpawn below is fully substituted\n");
+
+    let invokedConfigArg = "unset (spawnFn never reached --report-path)";
+    const fixtureSpawn = (_cmd, args = []) => {
+      const reportIdx = args.indexOf("--report-path");
+      if (reportIdx === -1) return { status: 0, stdout: "", stderr: "", error: null };
+      const configIdx = args.indexOf("--config");
+      invokedConfigArg = configIdx === -1 ? null : args[configIdx + 1];
+      writeFileSync(args[reportIdx + 1], "[]");
+      return { status: 0, stdout: "", stderr: "", error: null };
+    };
+
+    const { evidence, exitCode } = await fixtureSecurityScan.runSecurityScan({
+      rootDir: scanRootDir,
+      env: { PIPELINE_GITLEAKS_PATH: stubGitleaksBinary },
+      spawnFn: fixtureSpawn,
+      timeoutMs: 20000,
+      assessTrustedExecutablePath: () => ({ ok: true, path: stubGitleaksBinary }),
+    });
+
+    const expectedFixtureDefault = join(fixtureRoot, "plugins", "pipeline-core", "config", "security", "gitleaks-default.toml");
+    assert.equal(invokedConfigArg, expectedFixtureDefault,
+      "the fixture's own security-scan.mjs must resolve gitleaks's --config to ITS OWN copy of the plugin-shipped default, never a this-checkout path");
+    const realRepoRoot = fileURLToPath(new URL("../../..", import.meta.url));
+    assert.ok(!String(invokedConfigArg).startsWith(realRepoRoot),
+      `the resolved config must not point back into this repository's real checkout (${realRepoRoot}) at all, got: ${invokedConfigArg}`);
+
+    const gitleaksEntry = evidence.scanners.find((s) => s.tool === "gitleaks");
+    assert.equal(gitleaksEntry?.status, "PASS", `gitleaks must actually run and pass from the installed-plugin fixture: ${JSON.stringify(gitleaksEntry)}`);
+    assert.equal(exitCode, 0, `a clean scan from the installed-plugin fixture must exit 0: ${JSON.stringify(evidence.scanners)}`);
+    assert.equal(existsSync(join(scanRootDir, "evidence", "security-latest.json")), true);
+  } finally {
+    dispose(scanRootDir);
+    rmSync(fixtureRoot, { recursive: true, force: true });
+  }
 });
 
 // PUSHPROOF-1. Backlog:
