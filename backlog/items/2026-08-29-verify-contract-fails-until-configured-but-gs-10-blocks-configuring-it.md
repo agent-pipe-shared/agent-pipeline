@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.verify-contract-fails-until-configured-but-gs-10-blocks-configuring-it
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: 64069ea3121d2da1be68f5e3079191e6610debe4
+closure_evidence: plugins/pipeline-core/scripts/pipeline-state.test.mjs
 created: 2026-08-29
 sprint: nova
 tracking: "NOW / Nova A -- happy-path deadlock, confirmed independently by 2 of 3 runners against the 2026-08-29 candidate (built ab0906d, stamped 0bf246d1) which already contained the 2026-08-11 verify-contract fix (674b1c0c)."
@@ -50,6 +54,27 @@ Candidates, not exclusive:
   human `--no-verify` bypass or manual GS-10 override for the verify field.
 - The always-green regression class this deadlock's own prerequisite fix closed
   stays closed (no test regression on `674b1c0c`'s coverage).
+
+## Closed, 2026-08-29 (NVA-CF-VERIFYDEADLOCK)
+
+Direction 1 implemented exactly: `set-phase --phase implementation`
+(`pipeline-state.mjs`, commit `64069ea3`) now REQUIRES a real
+`--verify-command <cmd>` (refuses the UNCONFIGURED_VERIFY placeholder and
+blank values) and writes it into both `project/pipeline.json` and the
+legacy `.claude/pipeline.json` twin in the SAME transaction that unlocks
+implementation, before GS-10 would otherwise arm for that field -- the
+identical "same transaction" pattern used for the sibling trust-anchor
+deadlock. Both acceptance criteria proven by a live in-process repro test
+(no `git`/guard invoked at all): a fresh project with the seeded placeholder
+is refused (exit 2, names the sanctioned escape) until a real command is
+supplied, at which point implementation begins and both calibration tiers
+carry the real, executable command; the always-green regression class
+`674b1c0c` closed stays closed (the written command is a genuine,
+runnable check, not a vacuous pass). Independently re-verified by the
+Elephant: `node plugins/pipeline-core/scripts/pipeline-state.test.mjs` ->
+"all checks passed". **Critic review required** before this candidate ships
+(A/G/S-class: gate-strength/phase-transition logic) -- folded into the
+session's single final Critic 1+1 round, not a separate dispatch.
 
 ## Triage
 
