@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.nothing-checks-that-a-capability-is-reachable
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: e7a3f5a4
+closure_evidence: harness/scripts/check-product-capability-inventory.test.mjs
 created: 2026-08-28
 sprint: nova
 tracking: "NOW / Nova A — three separate instances in one session, each found by the PO or by an end-to-end walk rather than by any check. This is the check that would have caught all three."
@@ -94,10 +98,27 @@ naming them correctly needs real usage-scenario knowledge, not a mechanical fix.
 an explicit, commented exception in the checker itself so the check stays load-bearing for
 every other entry point.
 
-**Not yet closing this item**: AC1 requires the check to be **Verify-registered**. It exists
-and passes standalone but is not yet wired into `harness/scripts/verify.mjs` — that
-registration is the remaining gap (tracked as part of NVA-R26, `harness/scripts/verify.mjs`
-TP-3 insertion work, not yet landed this session).
+## Correction, 2026-08-29 (Elephant): AC1 was already satisfied, closing for real
+
+The note above was wrong. `harness/scripts/verify.mjs` line 408 already registers
+`check-product-capability-inventory.test.mjs` itself as an unconditional suite
+(`product-capability-inventory-tests`, inside the main `TEST_SUITES` array, not a scoped or
+Windows-only one) — that registration predates this dispatch and needed no new insertion.
+Since HAW-B00 through HAW-B05 (the new reachability tests) live in that same file, they run
+under ordinary Verify already. `harness/scripts/verify.mjs` was never touched by this
+dispatch, and did not need to be — NVA-R26's TP-3 work is unrelated (a manual-check
+placeholder mechanism and a separate `resume-hint-scripts-tests` registration), not this
+item.
+
+All four acceptance criteria are met: (1) Verify-registered, as above; (2) DERIVED
+enumeration (`discoverEntryPoints()`, the `Usage: node ...` convention, no hand-maintained
+list); (3) the general named-but-refused/admitted-but-unnamed shape is covered by dedicated
+fixture tests (HAW-B03/B04), and HAW-B05 proves both directions — named+admitted passes,
+removing either makes it fail — for AC3 exactly; (4) a consumer-shaped fixture (HAW-B02)
+degrades to zero findings rather than a false failure.
+
+Status: closed. Closure evidence: `harness/scripts/check-product-capability-inventory.test.mjs`,
+commit `e7a3f5a4`. Verified: 23/23 pass, exit 0; `node harness/scripts/check-product-capability-inventory.mjs --check-reachability` → PASS.
 
 ## Related
 
