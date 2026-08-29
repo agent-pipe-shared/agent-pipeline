@@ -1424,6 +1424,8 @@ function canonicalFixtureJson(value) {
     CLI, "submit-plan", "--by", "coordinator", "--profile", "feature",
   ], { encoding: "utf8", env });
   ok("PS14a0 F1-integration: real submit-plan subprocess exit 0", submitted.status === 0, `stderr: ${submitted.stderr}`);
+  const presented = spawnSync(process.execPath, [CLI, "present-plan", "--by", "coordinator"], { encoding: "utf8", env });
+  ok("PS14a2 F1-integration: real present-plan subprocess exit 0", presented.status === 0, `stderr: ${presented.stderr}`);
   const r2 = spawnSync(process.execPath, [CLI, "approve-plan", "--by", "po-test"], { encoding: "utf8", env });
   ok("PS14b F1-integration: real approve-plan subprocess exit 0", r2.status === 0, `stderr: ${r2.stderr}`);
   const r3 = spawnSync(process.execPath, [CLI, "set-phase", "--phase", "implementation"], { encoding: "utf8", env });
