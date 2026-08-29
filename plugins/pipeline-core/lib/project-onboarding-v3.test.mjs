@@ -3979,6 +3979,8 @@ test("the seeded dev-plan gate refuses implementation before approval and admits
     const submitted = state(["submit-plan", "--by", "po", "--profile", "feature"]);
     assert.equal(submitted.code, 0, submitted.stderr);
     assert.equal(attemptWrite("src/index.html").status, 2, "a submitted but unapproved plan still refuses implementation");
+    const presented = state(["present-plan", "--by", "po"]);
+    assert.equal(presented.code, 0, presented.stderr);
     const approved = state(["approve-plan", "--by", "po"]);
     assert.equal(approved.code, 0, approved.stderr);
     const phased = state(["set-phase", "--phase", "implementation"]);
@@ -4055,6 +4057,8 @@ test("V4 inspection proposes set-phase --phase implementation once the plan is a
     assert.equal(awaiting.status, "ready");
     assert.equal(awaiting.nextAction, null);
 
+    const presented = state(["present-plan", "--by", "po"]);
+    assert.equal(presented.code, 0, presented.stderr);
     const approved = state(["approve-plan", "--by", "po"]);
     assert.equal(approved.code, 0, approved.stderr);
 
