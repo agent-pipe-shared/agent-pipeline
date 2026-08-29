@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "7b8f7879a49e9c08157f0dae1adc8a60505dc25ee70a7f69d7d32419bcaae7ad"
+    "transitionHead": "dabee466c105cecf8a71cd29fe3d4bc61f0822687b66083dc0dae8ca9087aa58"
   },
   "counts": {
-    "open": 88,
+    "open": 78,
     "in_progress": 3,
-    "closed": 436,
+    "closed": 446,
     "rejected": 3,
     "deferred": 11
   },
@@ -28,21 +28,29 @@
     },
     {
       "id": "pipeline.a-dirty-claude-directory-blocks-verify-which-blocks-push-approval",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-29",
       "source": "Antigravity/WSL self-analysis (docs/pipeline-analysis.md, section 2), observed during the 2026-08-29 three-runner greenfield test.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "562ea6bc8f857f53816cb8f08598bf20ce9b6f63",
+      "closureEvidence": "backlog/items/2026-08-29-a-dirty-claude-directory-blocks-verify-which-blocks-push-approval.md"
     },
     {
       "id": "pipeline.a-node-script-defeats-every-file-protection-guard",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-29",
       "source": "Antigravity's own hardening test during the 2026-08-29 three-runner greenfield run (docs/pipeline-analysis.md section 5, consumer project Rune_Test1_Agy_060_73); independently corroborated by this repository's own everyday usage pattern on the same day.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "b4908639ac14e53832a3ec6f3b2a68bf06a2fed7",
+      "closureEvidence": "backlog/items/2026-08-29-a-node-script-defeats-every-file-protection-guard.md"
     },
     {
       "id": "pipeline.a-promoted-feature-can-never-pass-the-plan-gate",
@@ -86,12 +94,16 @@
     },
     {
       "id": "pipeline.a-runner-proposed-abandoning-pipeline-setup-as-too-laborious",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-29",
       "source": "PO observation during the 2026-08-29 three-runner greenfield test (finding F27 of scratch/greenfield-triage-2026-08-29.md).",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "1a1de6ef4545ed8fcce812434f1edc02cfb9f26b",
+      "closureEvidence": "backlog/items/2026-08-29-a-runner-proposed-abandoning-pipeline-setup-as-too-laborious.md"
     },
     {
       "id": "pipeline.a-schema-less-project-pipeline-yaml-has-no-known-repair-path",
@@ -406,13 +418,17 @@
     },
     {
       "id": "pipeline.agents-talk-the-po-out-of-the-signature",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-28",
       "source": "PO report 2026-08-28: 'aktuell jeder agent mich als PO erstmal zu überreden lieber selber zu pushen oder die config auf chat zu ändern weil signature zu kompliziert ist - und so ist das ja nicht gedacht'. Clarified by the PO: the agent is not able to change the setting, and that is not the problem -- it simply does not want to walk the path.",
       "deferred": false,
-      "tracking": "NOW / Nova A — the one control in the model that is actual protection is the one agents routinely lobby the PO to abandon. Reported by the PO 2026-08-28 as recurring behaviour across agents, not a single incident."
+      "tracking": "NOW / Nova A — the one control in the model that is actual protection is the one agents routinely lobby the PO to abandon. Reported by the PO 2026-08-28 as recurring behaviour across agents, not a single incident.",
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "955f5ebe58b46a3e26f0b5352a417dc5ec49db08",
+      "closureEvidence": "backlog/items/2026-08-28-agents-talk-the-po-out-of-the-signature-instead-of-walking-it.md"
     },
     {
       "id": "pipeline.all-three-runners-should-install-against-the-stable-branch",
@@ -876,12 +892,16 @@
     },
     {
       "id": "pipeline.bootstrap-po-questions-asked-sequentially-instead-of-in-one-block",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-29",
       "source": "PO observation during the 2026-08-29 three-runner greenfield test (finding F26 of scratch/greenfield-triage-2026-08-29.md).",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "7a0702dd6b31d61f110c29dacd8fbf52df50a5f9",
+      "closureEvidence": "backlog/items/2026-08-29-bootstrap-po-questions-asked-sequentially-instead-of-in-one-block.md"
     },
     {
       "id": "pipeline.bootstrap-skill-grows-by-budget-raise-instead-of-by-module",
@@ -3989,13 +4009,17 @@
     },
     {
       "id": "pipeline.onboarding-needs-one-guided-init",
-      "status": "open",
+      "status": "closed",
       "type": "requirement",
       "owner": "pipeline",
       "created": "2026-08-28",
       "source": "Greenfield happy-path test of candidate 0.6.0 across all three runners, 2026-08-28. Independent self-analyses: Claude/Windows (docs/pipeline-haertungstest-und-analyse.md), Agy/WSL (pipeline-analysis.md), Codex/WSL (docs/pipeline-session-analysis-2026-08-28.md), plus the PO's own cross-run observations.",
       "deferred": false,
-      "tracking": "NOW / Nova A — PO decision 2026-08-28: rebuild the flow, keep the binding core untouched; pulled forward because the happy path cannot go live without it"
+      "tracking": "NOW / Nova A — PO decision 2026-08-28: rebuild the flow, keep the binding core untouched; pulled forward because the happy path cannot go live without it",
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "e34ea95d3db54754ec97d5afeb02c39681de6155",
+      "closureEvidence": "backlog/items/2026-08-28-onboarding-needs-one-guided-init-instead-of-a-turn-by-turn-state-machine.md"
     },
     {
       "id": "pipeline.onboarding-produces-drift-it-then-has-to-repair",
@@ -4819,12 +4843,16 @@
     },
     {
       "id": "pipeline.projection-drift-fault-after-design-implementation-transition-forces-restart",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-29",
       "source": "Codex/WSL report, delivered inline in chat by the PO, plus the PO's own observations naming the design→implementation handover as the likely driver defect, during the 2026-08-29 three-runner greenfield test.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "e5504d3f704602aa90b88e7fddb72ea5ad9e15cd",
+      "closureEvidence": "backlog/items/2026-08-29-projection-drift-fault-after-design-implementation-transition-forces-restart.md"
     },
     {
       "id": "pipeline.promotion-freezes-a-prd-the-po-gate-will-reject",
@@ -4982,13 +5010,17 @@
     },
     {
       "id": "pipeline.push-gate-unsatisfiable-in-consumer-deployment",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-28",
       "source": "Consumer project HA, session 56 (2026-08-28, Windows). The PO explicitly chose the signature route, the ceremony ran correctly end to end, the PO signed -- and the push still could not land. All three mechanisms below were then verified in this repository's own code before filing.",
       "deferred": false,
-      "tracking": "NOW / Nova A — happy-path blocking, and the most severe finding of the day: a correctly-signed push cannot land in ANY consumer deployment. Also blocks the security-gate-ON decision, whose measurement was taken in the one environment where this defect does not fire."
+      "tracking": "NOW / Nova A — happy-path blocking, and the most severe finding of the day: a correctly-signed push cannot land in ANY consumer deployment. Also blocks the security-gate-ON decision, whose measurement was taken in the one environment where this defect does not fire.",
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "af9ce953240cc3f224cf2c1b3f5bea4ac6d9711a",
+      "closureEvidence": "backlog/items/2026-08-28-the-push-gate-is-unsatisfiable-in-any-installed-plugin-deployment.md"
     },
     {
       "id": "pipeline.push-guard-worktree-target",
@@ -5006,13 +5038,17 @@
     },
     {
       "id": "pipeline.push-path-has-no-driver",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-28",
       "source": "PO request 2026-08-28. Scope established by reading what onboarding-init.mjs actually drives (project-onboarding-v3.mjs's own subcommand table, nothing else) and docs/push-release-flow.md's five authorization layers.",
       "deferred": false,
-      "tracking": "Nova B — PO-raised 2026-08-28 on seeing the guided onboarding reach ready: 'dann braucht der push pfad auch so was weil der kostet auch mega viel'. Deliberately NOT Nova A: the candidate must not grow a second driver before its first one is reviewed."
+      "tracking": "Nova B — PO-raised 2026-08-28 on seeing the guided onboarding reach ready: 'dann braucht der push pfad auch so was weil der kostet auch mega viel'. Deliberately NOT Nova A: the candidate must not grow a second driver before its first one is reviewed.",
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "6d0c95eeb830f7876e131cb747c76366be0e0900",
+      "closureEvidence": "backlog/items/2026-08-28-the-push-path-has-no-driver-so-its-five-layers-are-walked-by-hand.md"
     },
     {
       "id": "pipeline.push-release-flow-unusable-for-third-party-adopters",
@@ -6512,12 +6548,16 @@
     },
     {
       "id": "pipeline.verify-placeholder-manual-check-required-accepted-by-gate",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-29",
       "source": "Claude/Windows self-audit report (docs/pipeline-audit-claude-session.md §7), cited by scratch/greenfield-triage-2026-08-29.md finding F19, observed during the 2026-08-29 three-runner greenfield test.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "3cfc7160b613b84682a551be7ea3d8a3d62e2f4b",
+      "closureEvidence": "backlog/items/2026-08-29-verify-placeholder-manual-check-required-accepted-by-gate.md"
     },
     {
       "id": "pipeline.verify-range-mode-registration-for-orchestrator-commit-control",
