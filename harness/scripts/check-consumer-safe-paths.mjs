@@ -568,6 +568,13 @@ export const ALLOWLIST = Object.freeze([
       "own Verify gate wiring, the identical pattern check-backlog-done-predicate.mjs's own allowlist " +
       "entries above already cover for that script, not a path a consumer is told to visit.",
   },
+
+  // --- NVA-R13-VENDOROPMODEL: docs/operating-model.md is now vendored byte-identically
+  // (generate-vendored-canon.mjs UNIVERSAL_STANDALONE_FILES); its two harness/ mentions
+  // (§7, English and its German reference-translation counterpart) are inherited unchanged
+  // from the source, same class as the pre-existing VENDORED_CANON_ALLOWLIST entries above.
+  { file: "plugins/pipeline-core/docs/operating-model.md", match: "harness/scripts/check-po-gate-authority.mjs`; user-facing", reason: vendoredCanonAllowlistReason("docs/operating-model.md") }, // L350 (EN)
+  { file: "plugins/pipeline-core/docs/operating-model.md", match: "harness/scripts/check-po-gate-authority.mjs`; Nutzertexte", reason: vendoredCanonAllowlistReason("docs/operating-model.md") }, // L696 (DE reference translation)
 ]);
 
 function posixPath(value) {
