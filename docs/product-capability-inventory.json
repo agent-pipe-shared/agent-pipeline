@@ -544,6 +544,7 @@
         "verify-phase:harness/scripts/verify.mjs:repair-map-tests",
         "verify-phase:harness/scripts/verify.mjs:repository-freshness-tests",
         "verify-phase:harness/scripts/verify.mjs:repository-path-identity-tests",
+        "verify-phase:harness/scripts/verify.mjs:resume-hint-scripts-tests",
         "verify-phase:harness/scripts/verify.mjs:resume-hint-tests",
         "verify-phase:harness/scripts/verify.mjs:review-economy-tests",
         "verify-phase:harness/scripts/verify.mjs:review-retry-plan-check",
