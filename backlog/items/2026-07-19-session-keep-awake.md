@@ -7,6 +7,7 @@ status: "in_progress"
 created: "2026-07-19"
 source: "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md"
 tracking: "Sentinel recovery baseline; no completion claim."
+done_when: manual
 ---
 
 # pipeline.session-keep-awake

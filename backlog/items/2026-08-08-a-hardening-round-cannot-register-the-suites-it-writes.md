@@ -8,6 +8,7 @@ created: 2026-08-08
 sprint: alfred
 due: 2026-08-22
 source: "Observed 2026-08-08 during the 0.5.4 hardening block itself: the SETUP-2b dispatch was refused when registering its own new suite, correctly stopped rather than routing around the guard, and the registration is still outstanding. Second confirmed instance of the guard-testpath gap already recorded in docs/state.md."
+done_when: manual
 ---
 
 # A hardening round cannot register the test suites it writes

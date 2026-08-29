@@ -8,6 +8,7 @@ created: 2026-08-08
 sprint: nightwing
 due: 2026-08-22
 source: "Reported by the Phoenix session of 2026-08-08 after a PO authority decision it had to resolve; verified against the source in this repository before filing."
+done_when: manual
 ---
 
 # The authority decision presents two candidates, and one of them is a literal

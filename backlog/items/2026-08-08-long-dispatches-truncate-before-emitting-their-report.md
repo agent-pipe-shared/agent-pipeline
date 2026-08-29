@@ -8,6 +8,7 @@ created: 2026-08-08
 sprint: alfred
 due: 2026-08-22
 source: "Three occurrences in one unattended block, 2026-08-07/08: two Goldfish dispatches and one Critic dispatch ended mid-sentence with the work done and no report."
+done_when: contains templates/prompts/goldfish-task.md Never start a background job and end your own turn before holding its result.
 ---
 
 # A long dispatch can finish its work and lose its report
