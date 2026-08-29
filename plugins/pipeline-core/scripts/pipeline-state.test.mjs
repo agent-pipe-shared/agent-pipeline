@@ -22,7 +22,7 @@ import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 
 import { createCriticalActionApprovalRequest, criticalActionSubjectSha256 } from "../lib/critical-action-approval-request.mjs";
-import { PO_ACK_APPLY_CONFIRMATION_TOKEN, SCHEMA_ID, continuityLockPath, externalPathIsOutsideRoot, run, statePath, statePhaseProjectionMarker } from "./pipeline-state.mjs";
+import { PLAN_AUTHORITY_PRD_FRAMING_CODE, PO_ACK_APPLY_CONFIRMATION_TOKEN, SCHEMA_ID, continuityLockPath, externalPathIsOutsideRoot, run, statePath, statePhaseProjectionMarker } from "./pipeline-state.mjs";
 import { INTAKE_STAGING_DIRNAME } from "../lib/onboarding-continuity.mjs";
 import {
   PLAN_AUTHORITY_PROMOTION_SUBCOMMAND,
@@ -963,6 +963,62 @@ function planAuthorityFixture({ featureId, planPath, specPath, now = "2026-08-27
   assert.equal(reapproved.result, 0, `re-presenting the resubmitted plan must unblock approval: ${reapproved.lines.join(" ")}`);
   const state = JSON.parse(readFileSync(statePath(root), "utf8"));
   assert.equal(state.planApproved, true);
+}
+
+// pipeline.prd-framing-precondition-check (backlog:
+// 2026-08-29-prd-framing-precondition-is-prose-not-a-check.md): submit-plan
+// refuses when the PRD document at the bound planPath still contains its own
+// unmodified framing placeholder text, and succeeds once that section has
+// been genuinely authored -- even with different prose that reuses some of
+// the same vocabulary (a naive keyword/substring check would false-positive
+// on that; an exact-phrase check must not).
+{
+  const featureId = "prdframing-refusal";
+  const planPath = `specs/${featureId}/prd_${featureId}.md`;
+  const specPath = `specs/${featureId}/spec.md`;
+  const { root, deps } = planAuthorityFixture({ featureId, planPath, specPath });
+  mkdirSync(join(root, "specs", featureId), { recursive: true });
+  writeFileSync(join(root, planPath), [
+    "# PRD - PRD framing refusal fixture",
+    "",
+    "## Why",
+    "<Problem/benefit/trigger; how success is measured.>",
+    "",
+    "Notes: framing must be authored and reviewed before the plan is submitted.",
+  ].join("\n"));
+  writeFileSync(join(root, specPath), "# spec\n");
+  const attempt = capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps));
+  assert.equal(attempt.result, 2, attempt.lines.join(" "));
+  assert.ok(attempt.lines.some((line) => line.includes(PLAN_AUTHORITY_PRD_FRAMING_CODE)),
+    `refusal must name the typed PRD-framing code: ${attempt.lines.join(" ")}`);
+  const state = JSON.parse(readFileSync(statePath(root), "utf8"));
+  assert.equal(state.planSubmission, undefined, "a refused submission must not be recorded");
+}
+
+// Success path: framing genuinely authored. The replacement prose reuses the
+// words "framing" and "reviewed" and "submitted" -- an exact-phrase check
+// must not be tripped by shared vocabulary, only by the literal unedited
+// placeholder text.
+{
+  const featureId = "prdframing-success";
+  const planPath = `specs/${featureId}/prd_${featureId}.md`;
+  const specPath = `specs/${featureId}/spec.md`;
+  const { root, deps } = planAuthorityFixture({ featureId, planPath, specPath });
+  mkdirSync(join(root, "specs", featureId), { recursive: true });
+  writeFileSync(join(root, planPath), [
+    "# PRD - PRD framing success fixture",
+    "",
+    "## Why",
+    "The framing of this change was reviewed with the PO before it was submitted:",
+    "onboarding turns cost too many tokens, and this shaves the worst offender.",
+    "",
+    "Notes: reviewed and ready.",
+  ].join("\n"));
+  writeFileSync(join(root, specPath), "# spec\n");
+  const submitted = capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps));
+  assert.equal(submitted.result, 0, `genuinely authored framing must not be refused: ${submitted.lines.join(" ")}`);
+  const state = JSON.parse(readFileSync(statePath(root), "utf8"));
+  assert.ok(state.planSubmission, "a genuinely authored PRD must submit successfully");
 }
 
 // The refusal must point at a REAL registered action, not a plausible-looking
