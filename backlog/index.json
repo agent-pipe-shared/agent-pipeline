@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "38d046f90d77d7da7a7678371cc0f8c69400edbc1a79b57fa4939f4803d9df98"
+    "transitionHead": "ad0e54ff149a0633043a4f5d516ec25fd7651dc593267dc0dfa9a0bffc357278"
   },
   "counts": {
-    "open": 107,
+    "open": 106,
     "in_progress": 3,
-    "closed": 413,
+    "closed": 414,
     "rejected": 3,
     "deferred": 11
   },
@@ -4136,13 +4136,17 @@
     },
     {
       "id": "pipeline.phoenix-merge-re-critic-minor-findings",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-27",
       "source": "Re-Critic (delta) on the Phoenix-merge rework diff 290bd599..eeebeed5, PASS with three minor findings, 2026-08-27",
       "deferred": false,
-      "tracking": "Reassigned from phoenix to nova on 2026-08-28 by PO decision, after the Phoenix line was intaked into Nova"
+      "tracking": "Reassigned from phoenix to nova on 2026-08-28 by PO decision, after the Phoenix line was intaked into Nova",
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "b774f74b",
+      "closureEvidence": "plugins/pipeline-core/hooks/guard-push.test.mjs"
     },
     {
       "id": "pipeline.pipeline-author-repair-signature-mode-never-actually-admits-the-edit",

@@ -342,7 +342,7 @@
 | pipeline.per-phase-progress-message-budget | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.permitted-edit-drops-session-into-unrecoverable-readiness | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.phase-aware-bootstrap-readiness | closed | workflow-improvement | pipeline | 2026-08-18 | — |
-| pipeline.phoenix-merge-re-critic-minor-findings | open | workflow-improvement | pipeline | 2026-08-27 | Reassigned from phoenix to nova on 2026-08-28 by PO decision, after the Phoenix line was intaked into Nova |
+| pipeline.phoenix-merge-re-critic-minor-findings | closed | workflow-improvement | pipeline | 2026-08-27 | Reassigned from phoenix to nova on 2026-08-28 by PO decision, after the Phoenix line was intaked into Nova |
 | pipeline.pipeline-author-repair-signature-mode-never-actually-admits-the-edit | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.pipeline-start-hardcodes-a-stale-copy-of-the-elephant-role-prohibitions | open | defect | pipeline | 2026-08-29 | — |
 | pipeline.pipeline-state-rebind-codex-default-runner | closed | defect | pipeline | 2026-08-05 | — |
@@ -549,8 +549,8 @@
 
 ## Counts
 
-- open: 107
+- open: 106
 - in_progress: 3
-- closed: 413
+- closed: 414
 - rejected: 3
 - deferred: 11
