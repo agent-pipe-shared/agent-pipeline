@@ -1280,6 +1280,68 @@ function planAuthorityFixture({ featureId, planPath, specPath, now = "2026-08-27
   assert.ok(state.planSubmission, "a genuinely authored PRD must submit successfully");
 }
 
+// NVA-R22-PLANSHOWN Scenario 5: approve-plan refuses when present-plan was
+// NEVER called -- the exact gap the item names (a plan approved without a
+// mechanical record it was shown first). Proves the DoD's core refusal case,
+// isolated from the staging bolt above.
+{
+  const featureId = "planshown-no-presentation";
+  const planPath = `specs/${featureId}/prd_${featureId}.md`;
+  const specPath = `specs/${featureId}/spec.md`;
+  const { root, deps } = planAuthorityFixture({ featureId, planPath, specPath });
+  const submitted = capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps));
+  assert.equal(submitted.result, 0, submitted.lines.join(" "));
+  const attempt = capturedStderr(() => run(["approve-plan", "--by", "po-test"], deps));
+  assert.equal(attempt.result, 2, "approve-plan must refuse when never presented");
+  assert.ok(attempt.lines.some((line) => line.includes("present-plan")),
+    `refusal must name present-plan as the fix: ${attempt.lines.join(" ")}`);
+  const state = JSON.parse(readFileSync(statePath(root), "utf8"));
+  assert.equal(state.planApproved, false, "a refused approval must not flip planApproved");
+}
+
+// NVA-R22-PLANSHOWN Scenario 6: present-plan itself is refused unattributed,
+// and refused before any submission exists -- mirrors approve-plan's own
+// --by/lifecycle-match style exactly.
+{
+  const featureId = "planshown-present-preconditions";
+  const planPath = `specs/${featureId}/prd_${featureId}.md`;
+  const specPath = `specs/${featureId}/spec.md`;
+  const { deps } = planAuthorityFixture({ featureId, planPath, specPath });
+  const blankBy = capturedStderr(() => run(["present-plan", "--by", ""], deps));
+  assert.equal(blankBy.result, 2, "present-plan must refuse an unattributed caller");
+  const noSubmission = capturedStderr(() => run(["present-plan", "--by", "coordinator"], deps));
+  assert.equal(noSubmission.result, 2, "present-plan must refuse before any plan is submitted");
+  assert.ok(noSubmission.lines.some((line) => line.includes("submit-plan")),
+    `refusal must name submit-plan as the fix: ${noSubmission.lines.join(" ")}`);
+}
+
+// NVA-R22-PLANSHOWN Scenario 7: a presentation bound to an OLD submission
+// does not authorize approval of a NEW (resubmitted) one -- the digest
+// binding, not merely "was present-plan ever called once", is what gates.
+{
+  const featureId = "planshown-resubmission-invalidates";
+  const planPath = `specs/${featureId}/prd_${featureId}.md`;
+  const specPath = `specs/${featureId}/spec.md`;
+  const { root, deps } = planAuthorityFixture({ featureId, planPath, specPath, now: "2026-08-27T10:00:00.000Z" });
+  assert.equal(capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps)).result, 0);
+  assert.equal(capturedStderr(() => run(["present-plan", "--by", "coordinator"], deps)).result, 0);
+  // Reopen and resubmit with a DIFFERENT timestamp -> a new submissionSha256,
+  // simulating a revised plan re-entering the same gate.
+  assert.equal(capturedStderr(() => run(["reopen-design", "--by", "po-test"], deps)).result, 0);
+  const laterDeps = { ...deps, now: () => "2026-08-27T11:00:00.000Z" };
+  assert.equal(capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], laterDeps)).result, 0);
+  const staleAttempt = capturedStderr(() => run(["approve-plan", "--by", "po-test"], laterDeps));
+  assert.equal(staleAttempt.result, 2, "an approval bound to a stale presentation must be refused");
+  assert.ok(staleAttempt.lines.some((line) => line.includes("present-plan")),
+    `refusal must name present-plan as the fix: ${staleAttempt.lines.join(" ")}`);
+  // The correct remedy -- re-present, then approve -- succeeds.
+  assert.equal(capturedStderr(() => run(["present-plan", "--by", "coordinator"], laterDeps)).result, 0);
+  const reapproved = capturedStderr(() => run(["approve-plan", "--by", "po-test"], laterDeps));
+  assert.equal(reapproved.result, 0, `re-presenting the resubmitted plan must unblock approval: ${reapproved.lines.join(" ")}`);
+  const state = JSON.parse(readFileSync(statePath(root), "utf8"));
+  assert.equal(state.planApproved, true);
+}
+
 // The refusal must point at a REAL registered action, not a plausible-looking
 // fabrication: PLAN_AUTHORITY_PROMOTION_SUBCOMMAND has to be an actual member
 // of project-onboarding-v3.mjs's own ONBOARDING_SUBCOMMANDS table.
