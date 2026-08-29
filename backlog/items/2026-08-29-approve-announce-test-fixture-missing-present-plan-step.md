@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.approve-announce-test-fixture-missing-present-plan-step
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: dc53bd79
+closure_evidence: plugins/pipeline-core/scripts/pipeline-state-approve-announce.test.mjs
 created: 2026-08-29
 sprint: nova
 done_when: "script-exit-zero node --test plugins/pipeline-core/scripts/pipeline-state-approve-announce.test.mjs"
@@ -57,3 +61,11 @@ production code change expected — this is a test-fixture-only fix.
 - The fixture change does not alter what the test actually asserts (the
   `set-phase --phase implementation` announcement in `approve-plan`'s
   success output) — only adds the missing precondition step.
+
+## Fixed, 2026-08-29 (dispatch NVA-R35-APPROVEANNOUNCEFIX, commit `dc53bd79`)
+
+Inserted the missing `present-plan --by "coordinator"` call between
+`submit-plan` and `approve-plan`, matching the shape used elsewhere in
+`pipeline-state.test.mjs`. Test-fixture-only fix, no production code
+touched. Verified: `pipeline-state-approve-announce.test.mjs` 1/1,
+`check-consumer-safe-paths.test.mjs` 9/9.
