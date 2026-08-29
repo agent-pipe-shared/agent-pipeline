@@ -13,36 +13,72 @@ import {
   ProjectOnboardingReadyError,
   requireProjectOnboardingReady,
 } from "./project-onboarding-ready-gate.mjs";
+import {
+  inspectProjectOnboardingV3,
+  PROJECT_ONBOARDING_BASE_RESULT_KEYS,
+  PROJECT_ONBOARDING_READY_ONLY_RESULT_KEYS,
+} from "./project-onboarding-v3.mjs";
 
 function root() { return mkdtempSync(join(tmpdir(), "project-ready-gate-")); }
 
+// pipeline.ready-gate-keys-derived-from-producer: this file's own fixture-shape stub used to
+// hand-type the eleven base field names independently of both the gate's own hand-typed list
+// AND the producer's actual construction site -- the "third copy" that let this suite stay
+// green while the real producer shape drifted underneath it (backlog:
+// pipeline.ready-gate-hand-maintained-shape-mirror, "Predicate note, 2026-08-29"). Iterating
+// PROJECT_ONBOARDING_BASE_RESULT_KEYS (imported from the producer, same as the gate itself
+// now imports) instead means: a key REMOVED from the producer's shape is simply no longer
+// requested here (still correct); a key ADDED to the producer's shape has no entry in
+// FIELD_PLACEHOLDER below and throws immediately, loudly, right here in this test file,
+// rather than silently building an incomplete stub that happens to still satisfy a
+// same-vintage gate list.
+function fieldPlaceholder(key, rootDir, intent, runner) {
+  switch (key) {
+    case "schema": return "pipeline.project-onboarding.v4";
+    case "status": return "ready";
+    case "root": return realpathSync(rootDir);
+    case "runner": return runner;
+    case "intent": return intent;
+    case "repository": return {};
+    case "runtime": return {};
+    case "continuity": return {};
+    case "appServer": return {};
+    case "nextAction": return null;
+    case "diagnostics": return [];
+    default:
+      throw new Error(
+        `project-onboarding-ready-gate.test.mjs's readyResult() has no placeholder value wired `
+        + `for producer-derived base key "${key}" -- the producer's shape changed; wire a value `
+        + "here, do not guess.",
+      );
+  }
+}
+
 function readyResult(rootDir, intent, runner = "codex") {
-  return {
-    schema: "pipeline.project-onboarding.v4",
-    status: "ready",
-    root: realpathSync(rootDir),
-    runner,
-    intent,
-    repository: {},
-    runtime: {},
-    continuity: {},
-    appServer: {},
-    nextAction: null,
-    diagnostics: [],
-  };
+  const result = {};
+  for (const key of PROJECT_ONBOARDING_BASE_RESULT_KEYS) {
+    result[key] = fieldPlaceholder(key, rootDir, intent, runner);
+  }
+  return result;
 }
 
 // NVA-T-READYKEYS: a real ready V4 observation carries two more fields than the base
 // eleven -- project-onboarding-v3.mjs attaches pushApprovalMode/trustAnchorAvailability
-// only to a `status: "ready"` result. readyResult() above stays the eleven-key base shape
-// (reused by the non-ready-status tests, where those two fields must NOT be present); this
-// is the thirteen-key ready shape a real inspection actually returns.
+// only to a `status: "ready"` result. readyResult() above stays the base shape (reused by
+// the non-ready-status tests, where those two fields must NOT be present); this is the
+// wider ready shape a real inspection actually returns, built the same derived way: any
+// PROJECT_ONBOARDING_READY_ONLY_RESULT_KEYS name without a placeholder below throws.
 function readyResultWithPushApprovalKeys(rootDir, intent, runner = "codex") {
-  return {
-    ...readyResult(rootDir, intent, runner),
-    pushApprovalMode: "signature",
-    trustAnchorAvailability: "present",
-  };
+  const result = readyResult(rootDir, intent, runner);
+  for (const key of PROJECT_ONBOARDING_READY_ONLY_RESULT_KEYS) {
+    if (key === "pushApprovalMode") { result[key] = "signature"; continue; }
+    if (key === "trustAnchorAvailability") { result[key] = "present"; continue; }
+    throw new Error(
+      `project-onboarding-ready-gate.test.mjs's readyResultWithPushApprovalKeys() has no `
+      + `placeholder value wired for producer-derived ready-only key "${key}".`,
+    );
+  }
+  return result;
 }
 
 function withClaudecode(value, run) {
@@ -303,4 +339,47 @@ test("unsupported or missing intents are rejected before inspection", () => {
     }), (error) => error instanceof ProjectOnboardingReadyError && error.code === "PORG-INTENT");
     assert.equal(calls, 0);
   }
+});
+
+// pipeline.ready-gate-keys-derived-from-producer, Direction option 2 fallback (backlog:
+// pipeline.ready-gate-hand-maintained-shape-mirror): the accepted STATUS enumeration cannot
+// be derived structurally the way the two key lists above now are (see the comment above
+// PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES in project-onboarding-ready-gate.mjs for
+// the concrete obstacle). This test drives the gate against a REAL, non-stubbed
+// inspectProjectOnboardingV3() result instead -- a genuinely fresh, empty temp root, with no
+// `inspect` override -- so at least one status is proven end to end against actual producer
+// output, not an internally-consistent fixture that only agrees with itself.
+test("a real, non-stubbed inspectProjectOnboardingV3() result is driven straight through the gate (Direction option 2 fallback)", () => {
+  const path = root();
+  try {
+    const real = inspectProjectOnboardingV3({ rootDir: path, intent: "onboarding", runner: "codex" });
+    // Pinned so this test fails loudly (not silently) if project-onboarding-v3.mjs ever
+    // changes what a genuinely fresh, empty root observes -- the exact drift class this
+    // item exists to catch, this time on the STATUS axis rather than the key axis.
+    assert.equal(real.status, "portable-seed-required");
+    assert(PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES.includes(real.status), real.status);
+    assert.deepEqual(Object.keys(real).sort(), [...PROJECT_ONBOARDING_BASE_RESULT_KEYS].sort());
+    assert.throws(() => requireProjectOnboardingReady({
+      rootDir: path,
+      intent: "onboarding",
+      runner: "codex",
+      inspect: () => real,
+    }), (error) => {
+      assert(error instanceof ProjectOnboardingReadyError);
+      assert.equal(error.code, "PORG-NOT-READY");
+      assert.equal(error.lifecycleStatus, "portable-seed-required");
+      return true;
+    });
+    // The other half of Direction option 2: a status the gate does not know about -- standing
+    // in for "the producer gained a new lifecycle status" -- built from this SAME real
+    // observation with only `status` mutated, so every other field stays genuinely
+    // producer-shaped rather than hand-typed. Must fail the check, never silently pass or
+    // silently block every other write.
+    assert.throws(() => requireProjectOnboardingReady({
+      rootDir: path,
+      intent: "onboarding",
+      runner: "codex",
+      inspect: () => ({ ...real, status: "a-status-this-gate-has-never-heard-of" }),
+    }), (error) => error instanceof ProjectOnboardingReadyError && error.code === "PORG-INVALID-OBSERVATION");
+  } finally { rmSync(path, { recursive: true, force: true }); }
 });
