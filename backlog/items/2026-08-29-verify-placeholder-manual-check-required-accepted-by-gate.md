@@ -89,3 +89,40 @@ placeholder` at the point this rejection is added.
   accepts an unreplaced placeholder as a pass is a false-green on the
   mandatory verify step itself.
 - **Date:** 2026-08-29
+
+## Investigation update (NVA-R26-VERIFYPREP, 2026-08-29)
+
+Repo-wide search for the literal string `"Manual check required."` (grep
+across `*.md`/`*.mjs`/`*.json`/`*.yaml`/`*.yml`) found it ONLY inside this
+item's own prose, its sibling F11 item's prose, and their worktree copies
+under `.claude/worktrees/**` — zero occurrences anywhere in this
+repository's actual source, including `harness/scripts/verify.mjs` (traced
+in full, all 863 lines) and every `plugins/pipeline-core/scripts/*.mjs`
+checked in this repository. `docs/pipeline-analysis.md` and
+`docs/pipeline-audit-claude-session.md`, the two documents this item and its
+sibling cite as sources, do NOT exist in this repository either (confirmed
+via `find`) — they were almost certainly produced in a downstream/consumer
+project workspace during the actual three-runner greenfield test, not in
+this control repo.
+
+Conclusion, with the specific evidence above: **no mechanism inside this
+repository's own committed source treats the placeholder as passing** — not
+because a placeholder-aware branch exists and was bypassed, but because
+`verify.mjs` never parses any log's free-text content at all (identical
+finding recorded on sibling item F11). The proposal's own fallback
+hypothesis is therefore the confirmed one: it "passes" only in the sense
+that nothing in this repo is placeholder-aware to begin with. The exact
+write site the Acceptance criteria ask to locate is outside this
+repository and was not reachable within this dispatch's scope (a read-only
+Pipeline-repo dispatch; the downstream project workspace was not provided
+as a context file).
+
+A complete, ready-to-paste drafted diff for `harness/scripts/verify.mjs`
+rejecting the exact unreplaced placeholder text (marker
+`pipeline.reject-unreplaced-manual-check-placeholder`) was produced and
+proven against a scratch fixture
+(`scratch/nva-r26-verifyprep/manual-check-logic.test.mjs`, 7/7 passing) but
+NOT landed — `verify.mjs` is TP-3 protected and needs a signed
+human-guard-override ceremony (see
+`evidence/dispatch-record-NVA-R26-VERIFYPREP.json` for the full drafted
+text).
