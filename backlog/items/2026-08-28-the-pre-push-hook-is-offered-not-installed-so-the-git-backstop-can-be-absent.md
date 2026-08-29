@@ -8,7 +8,7 @@ created: 2026-08-28
 closed_at: 2026-08-29
 closure_repository: self
 closure_commit: caf9a2e6cd9c28390fc11bc9ccf9792ddcc3b0b8
-closure_evidence: plugins/pipeline-core/lib/project-onboarding-v3.mjs, plugins/pipeline-core/scripts/pre-push-hook-install.mjs
+closure_evidence: plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
 sprint: nova
 done_when: contains plugins/pipeline-core/scripts/project-onboarding-v3.mjs installed-by-default
 source: "Agy/WSL greenfield run, 2026-08-28, its own hardening self-analysis (pipeline-analysis.md), corroborated by the Codex/WSL run's independent script-indirection probe."
