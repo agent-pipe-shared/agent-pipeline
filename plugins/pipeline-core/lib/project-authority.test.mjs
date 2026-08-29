@@ -118,6 +118,31 @@ try {
     assert.equal(classification.source, "neutral");
     assert.deepEqual(classification.diagnostics, []);
   });
+  ok("classification reports a diverging twin manifest pair and names the authoritative file", () => {
+    const base = root();
+    neutral(base, { schema: "pipeline.state.v0" });
+    legacy(base);
+    // Simulate the V3-refresh defect: the migrator updated only the legacy
+    // `.claude/pipeline.yaml` copy, leaving the neutral projection stale.
+    write(base, LEGACY_MANIFEST, "schema: pipeline.manifest.v0\nrefreshed: v3\n");
+    const classification = classifyProjectAuthority({ rootDir: base });
+    assert.equal(classification.source, "neutral");
+    assert.deepEqual(classification.diagnostics, [{
+      path: NEUTRAL_MANIFEST,
+      legacyPath: LEGACY_MANIFEST,
+      code: "PA-MANIFEST-DRIFT",
+      message: `${NEUTRAL_MANIFEST} and ${LEGACY_MANIFEST} disagree`,
+      authoritative: NEUTRAL_MANIFEST,
+    }]);
+  });
+  ok("classification reports no drift for a matching twin manifest pair", () => {
+    const base = root();
+    neutral(base, { schema: "pipeline.state.v0" });
+    legacy(base);
+    const classification = classifyProjectAuthority({ rootDir: base });
+    assert.equal(classification.source, "neutral");
+    assert.deepEqual(classification.diagnostics, []);
+  });
   ok("adoption provenance rejects malformed downstream receipts before mutation", () => {
     const base = root(); legacy(base); write(base, NEUTRAL_MANIFEST, "provisional\n");
     const plan = planProjectAuthorityMigration({ rootDir: base, provenance: {

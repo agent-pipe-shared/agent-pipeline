@@ -363,6 +363,26 @@ function calibrationDriftDiagnostics(layer, legacyLayer, source) {
   }];
 }
 
+// The manifest pair (`project/pipeline.yaml` and `.claude/pipeline.yaml`) can
+// drift the same way the twin calibration pair above does: each tier is
+// writable independently, and a migrator that updates only one copy (e.g.
+// `runner-profile-migration-v3.mjs` updating only `.claude/pipeline.yaml`)
+// leaves the two runtime projections silently disagreeing (backlog:
+// 2026-08-28-the-two-runtime-projections-drift-apart-after-a-v3-refresh.md).
+// Report that divergence the same way `calibrationDriftDiagnostics()` does,
+// naming which file is authoritative.
+function manifestDriftDiagnostics(layer, legacyLayer, source) {
+  if (layer.manifest.status !== "present" || legacyLayer.manifest.status !== "present") return [];
+  if (layer.manifest.sha256 === legacyLayer.manifest.sha256) return [];
+  return [{
+    path: NEUTRAL_MANIFEST,
+    legacyPath: LEGACY_MANIFEST,
+    code: "PA-MANIFEST-DRIFT",
+    message: `${NEUTRAL_MANIFEST} and ${LEGACY_MANIFEST} disagree`,
+    authoritative: source === "legacy" ? LEGACY_MANIFEST : NEUTRAL_MANIFEST,
+  }];
+}
+
 export function classifyProjectAuthority({ rootDir = process.cwd() } = {}) {
   try {
     const root = realRoot(rootDir);
@@ -375,7 +395,10 @@ export function classifyProjectAuthority({ rootDir = process.cwd() } = {}) {
       status: current.status,
       source: current.source ?? null,
       files: classifyLayer(layer, current.source, legacyLayer),
-      diagnostics: calibrationDriftDiagnostics(layer, legacyLayer, current.source),
+      diagnostics: [
+        ...calibrationDriftDiagnostics(layer, legacyLayer, current.source),
+        ...manifestDriftDiagnostics(layer, legacyLayer, current.source),
+      ],
       git: gitEvidence(root),
     };
   } catch {
