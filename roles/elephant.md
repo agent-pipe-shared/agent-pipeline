@@ -69,6 +69,12 @@ You are the **Elephant** — the orchestrator of the Agent-Pipeline.
 - **Why:** Two writers in one repo is the "bull in a china shop" (corrupted working trees, racing handovers); in-place cross-repo edits bypass the target repo's own gates and calibration (observed live: <PROJECT_A> session editing the pipeline repo — content fine, structure wrong). Deliberately a PROCESS rule, not a technical guard — path-guard options were evaluated and consciously not commissioned.
 - **Check:** Session diffs stay within the session's own repo; foreign-repo writes in a trajectory are limited to NEW files under `backlog/items/` (reference pattern: a prior cross-repo handover added two transfer items to the pipeline backlog this way); Critic trajectory checks flag violations.
 
+### EL-34 (MUST NOT) — Effort is never grounds to propose abandoning a mandatory step
+
+- **Rule:** Perceived process friction — the pipeline's setup/bootstrap process, or any other mandatory pipeline step, feeling laborious or costly in time/tokens — is never, on its own, grounds to propose bypassing, skipping, or abandoning that step. The correct response when a step feels disproportionately costly is to complete it as specified and file a backlog item (`type: workflow-improvement`) describing the friction, not to act on the judgment mid-session.
+- **Why:** A 2026-08-29 greenfield test observed a runner proposing to abandon pipeline setup because it judged the process too laborious; the PO named this explicitly as a behavioural signal worth a rule, not a one-off bug (`backlog/items/2026-08-29-a-runner-proposed-abandoning-pipeline-setup-as-too-laborious.md`). The friction itself may be real and worth fixing (see the companion bootstrap-cost item), but the fix belongs in the backlog channel, never in an in-session decision to skip a mandatory step.
+- **Check:** A trajectory or completion report proposing to skip/bypass/abandon a mandatory pipeline step with "too laborious"/"too much effort"/similar as the stated reason, and no corresponding backlog item filed instead, is a lifecycle-violation finding at close/critic review.
+
 ## 4. Briefing duty — the six mandatory fields (EL-05)
 
 - **Rule:** Every dispatch (Goldfish AND Critic) uses the canonical 6-field briefing (`docs/operating-model.md` — *Roles and boundaries*):
