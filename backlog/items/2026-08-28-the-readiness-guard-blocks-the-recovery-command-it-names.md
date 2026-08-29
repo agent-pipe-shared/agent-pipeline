@@ -3,8 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.readiness-guard-blocks-its-own-recovery
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-28
+closed_at: 2026-08-29
+closure_commit: 8c9146d3
+closure_evidence: "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs test 'NVA-W4-READYGUARDTEST: the recovery inspection named by a non-ready denial is admitted at every controlling status'; node --test plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs -> 183/183 pass, exit 0; node --test harness/scripts/check-consumer-safe-paths.test.mjs -> 9/9 pass, exit 0"
 sprint: nova
 done_when: manual
 tracking: "NOW / Nova A — a guard that refuses the exact command its own refusal prescribes is a deadlock, and it fired twice in one consumer session"
@@ -62,6 +65,30 @@ inspection is read-only (`mutation: false`), so admitting it widens nothing.
 - A test asserts that whatever command a readiness refusal names is itself admitted —
   the property, not one hard-coded example.
 - No mutating command becomes admitted as a side effect.
+
+## Closure (2026-08-29, NVA-W4-READYGUARDTEST)
+
+All three acceptance criteria are met in live code, verified this dispatch:
+
+- AC-1 (the typed recovery inspection is admitted at every readiness status, including
+  `partial` and `migration-required`): already true in the live `guard-lifecycle-ready.mjs` /
+  `guard-command-grammar.mjs` before this dispatch — confirmed by running the pre-existing
+  182-test suite, all green, and by the new sweep test below passing against unmodified guard
+  code.
+- AC-2 (a test asserts the property, not one hard-coded example): added by this dispatch —
+  `guard-lifecycle-ready.test.mjs`, test "NVA-W4-READYGUARDTEST: the recovery inspection named
+  by a non-ready denial is admitted at every controlling status". It iterates every status in
+  `PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES` (28 statuses) and asserts
+  `evaluateLifecycleReadyGuard` admits `node <ONBOARDING_SCRIPT> inspect --root <root> --intent
+  session` (exitCode 0) at each one.
+- AC-3 (no mutating command becomes admitted as a side effect): unaffected — no production
+  guard code was touched by this dispatch (test-file-only change), and the full pre-existing
+  suite (182 tests covering refused mutating/near-miss shapes) plus the new test all still
+  pass.
+
+Evidence: `node --test plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs` → 183/183
+pass, exit 0. `node --test harness/scripts/check-consumer-safe-paths.test.mjs` → 9/9 pass,
+exit 0 (required because this dispatch touched a file under `plugins/pipeline-core/`).
 
 ## Related
 
