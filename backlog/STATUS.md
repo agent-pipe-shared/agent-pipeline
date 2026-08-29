@@ -374,7 +374,7 @@
 | pipeline.prd-language-gate-reads-a-field-intake-never-writes | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.prd-spec-depth-collapses-relative-to-design-input | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.pre-existing-failure-claims-need-evidence | closed | workflow-improvement | pipeline | 2026-08-08 | — |
-| pipeline.pre-push-hook-is-offered-not-installed | open | defect | pipeline | 2026-08-28 | — |
+| pipeline.pre-push-hook-is-offered-not-installed | closed | defect | pipeline | 2026-08-28 | — |
 | pipeline.preflight-user-and-matching-project-scope-still-collide-as-ambiguous | closed | defect | pipeline | 2026-08-11 | — |
 | pipeline.preimage-repin-disclosure-incomplete-for-roles-critic | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.prepared-maintenance-window-dies-at-the-next-commit | closed | defect | pipeline | 2026-08-08 | — |
@@ -545,8 +545,8 @@
 
 ## Counts
 
-- open: 109
+- open: 108
 - in_progress: 3
-- closed: 411
+- closed: 412
 - rejected: 3
 - deferred: 11

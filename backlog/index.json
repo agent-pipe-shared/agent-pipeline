@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "35d3a65ce08e7a549bca730a15b9b346986902ec0a07c5c2f0ae0f80cb96ebf6"
+    "transitionHead": "222b1e7e22e8cf909d002aff4391ff87d296355e1d0061d6a0ff89e5a8c4144e"
   },
   "counts": {
-    "open": 109,
+    "open": 108,
     "in_progress": 3,
-    "closed": 411,
+    "closed": 412,
     "rejected": 3,
     "deferred": 11
   },
@@ -4524,12 +4524,16 @@
     },
     {
       "id": "pipeline.pre-push-hook-is-offered-not-installed",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-28",
       "source": "Agy/WSL greenfield run, 2026-08-28, its own hardening self-analysis (pipeline-analysis.md), corroborated by the Codex/WSL run's independent script-indirection probe.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "caf9a2e6cd9c28390fc11bc9ccf9792ddcc3b0b8",
+      "closureEvidence": "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs"
     },
     {
       "id": "pipeline.preflight-user-and-matching-project-scope-still-collide-as-ambiguous",
