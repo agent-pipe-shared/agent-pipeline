@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { canonicalJson, itemPreTriageContent, transitionHash } from "../lib/backlog-state.mjs";
+import { canonicalJson, itemPreTriageContent, transitionHash, validateBacklogItem } from "../lib/backlog-state.mjs";
 import { applyBacklogItemHashRescopeAmendment, checkBacklogState, writeBacklogProjections } from "./check-backlog-state.mjs";
 
 const REPO_ROOT = resolve(fileURLToPath(new URL("../../..", import.meta.url)));
@@ -378,6 +378,34 @@ try {
     const result = checkBacklogState(base);
     assert.equal(result.ok, true, result.findings.join("; "));
     assert.ok(!result.findings.some((finding) => finding.includes("bytes changed since the Nova/Phoenix merge")), result.findings.join("; "));
+  });
+  // NVA-DONEWHEN-2: validateBacklogItem() must admit `done_when` as a
+  // recognised optional field (widened ITEM_OPTIONAL by exactly this one
+  // key) without validating its VALUE -- that grammar belongs solely to
+  // check-backlog-done-predicate.mjs, per `sprint`'s precedent.
+  check("CBS14 an item carrying a valid done_when value validates cleanly", () => {
+    const errors = validateBacklogItem({
+      path: "backlog/items/2026-08-29-done-when-sigma.md",
+      metadata: {
+        schema: "pipeline.backlog-item.v1", id: "pipeline.done-when-sigma", type: "defect",
+        owner: "pipeline", status: "open", created: "2026-08-29", source: "fixture",
+        done_when: "path-exists backlog/README.md",
+      },
+    });
+    assert.deepEqual(errors, []);
+  });
+
+  check("CBS15 an item carrying a genuinely unsupported field is still rejected -- widened by exactly one key, not disabled", () => {
+    const errors = validateBacklogItem({
+      path: "backlog/items/2026-08-29-done-when-tau.md",
+      metadata: {
+        schema: "pipeline.backlog-item.v1", id: "pipeline.done-when-tau", type: "defect",
+        owner: "pipeline", status: "open", created: "2026-08-29", source: "fixture",
+        done_when: "path-exists backlog/README.md",
+        not_a_real_field: "anything",
+      },
+    });
+    assert.deepEqual(errors, ["backlog/items/2026-08-29-done-when-tau.md: unsupported field not_a_real_field"]);
   });
 } finally {
   console.log(`${passed} passed, ${failed} failed`);
