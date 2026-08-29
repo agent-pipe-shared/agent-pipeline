@@ -148,6 +148,52 @@ empty-`trustAnchors`-still-fails-closed case already pinned by
 `human-guard-override`'s own test (Acceptance criterion 4). This closes the
 Direction-1 gap this item's own closing note left open.
 
+## Landed, 2026-08-29 (dispatch NVA-TOFU-1, commit `85fefb99`)
+
+Implemented as decided, applied SYMMETRICALLY to both `authorizeRecordedPush()` and
+`authorizeRecordedDeploy()` (they share one policy file, so pinning only one route would
+leave the other order-dependently broken — proved by new test DPA12, a key pinned via the
+push route also governs the deploy route). `trustAnchorsFor()`
+(`plugins/pipeline-core/lib/critical-action-authorization.mjs`) now returns
+`pinOnSuccess: true` only for the genuinely-anchor-less case (no `trustAnchor`, no
+`trustAnchors` field at all) — never for a v3 document's explicit empty `trustAnchors: []`,
+which stays a permanent "any well-formed key, every time" posture (PPA21 unchanged). New
+`pinTrustAnchorOnFirstUse()` writes the verifying key back as a v3 `trustAnchors` entry only
+AFTER every other check has passed and the call is actually about to authorize (a proof that
+verifies cryptographically but is refused for an unrelated reason, e.g. an unconsumed ledger
+entry, never pins) — atomic temp-file/fsync/rename/dir-fsync write, copied from
+`pipeline-state.mjs`'s existing durable-write pattern; best-effort and silent on write
+failure so a write error never retroactively unauthorizes an already-decided action.
+
+Confirmed untouched: the v3 any-key-forever posture (PPA21), and the human-guard-override
+route's own separate empty-`trustAnchors`-fails-closed behavior (Acceptance criterion 4;
+`NVA-HGOFIX-1` in `human-guard-override.test.mjs`, still refusing with
+`HGO-TRUST-ANCHOR-MISSING`) — a different consumer of the same policy file, deliberately out
+of scope.
+
+Verified independently by the Elephant, not only taken from the dispatch report:
+`critical-action-authorization.test.mjs` 39/39 (was 36/36),
+`human-guard-override.test.mjs` 94/94, `critical-human-proof-policy.test.mjs` 32/32,
+`check-consumer-safe-paths.test.mjs` 9/9. Only the two briefed files changed (confirmed via
+`git show --stat`).
+
+**Follow-up fix, same session, commit `1b19628e`:** `push-prepare.mjs`'s own
+`checkCriticalHumanProofPolicy()` — the reader `trustAnchorsFor()`'s own doc comment names as
+existing specifically to mirror it (NVA-N-PUSHDIAG, Acceptance criterion 3 "the two readers
+agree") — was out of NVA-TOFU-1's briefed scope and was left reporting the OLD "posture:
+unavailable, cannot authorize any key" message for the anchor-less case, which the landed fix
+had just made untrue. Left alone this would have silently reintroduced the exact
+two-readers-disagree defect this item's own Direction 3 fixed, and would have shown
+`push-prepare.test.mjs` red (confirmed: 46/48 before this follow-up, 48/48 after). Fixed by
+updating the mirrored diagnostic to `ok: true` with a trust-on-first-use message, and
+rewriting the two tests that pinned the old expectation.
+
+Acceptance criterion 3 ("A test drives one fixture through both readers and asserts they
+agree") is met by the existing/updated agreement tests in `push-prepare.test.mjs`.
+Acceptance criterion 1 ("A freshly onboarded project completes a signature push end to end,
+measured against an installed-plugin deployment") was NOT measured this session — only unit-
+and fixture-level tests. Status left `open` pending that end-to-end measurement.
+
 ## Related
 
 - `2026-08-28-the-push-gate-is-unsatisfiable-in-any-installed-plugin-deployment.md` — the
