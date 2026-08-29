@@ -15,7 +15,7 @@
 | pipeline.a-runner-proposed-abandoning-pipeline-setup-as-too-laborious | open | workflow-improvement | pipeline | 2026-08-29 | — |
 | pipeline.a-schema-less-project-pipeline-yaml-has-no-known-repair-path | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.a-second-dispatch-claimed-an-evidence-artifact-it-never-wrote | closed | defect | pipeline | 2026-08-09 | — |
-| pipeline.a-stale-verify-opt-out-entry-costs-a-po-signature-for-work-already-done | open | defect | pipeline | 2026-08-29 | — |
+| pipeline.a-stale-verify-opt-out-entry-costs-a-po-signature-for-work-already-done | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.a-stale-version-stamp-makes-a-plugin-reload-a-silent-no-op | open | defect | pipeline | 2026-08-27 | — |
 | pipeline.a7-gate-review-found-a-spec-plan-contradiction-and-a-lifecycle-admission-question | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.absent-runner-flag-silently-defaults-to-codex | closed | defect | pipeline | 2026-08-07 | — |
@@ -545,8 +545,8 @@
 
 ## Counts
 
-- open: 108
+- open: 107
 - in_progress: 3
-- closed: 412
+- closed: 413
 - rejected: 3
 - deferred: 11
