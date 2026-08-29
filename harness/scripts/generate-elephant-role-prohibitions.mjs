@@ -95,7 +95,7 @@ export const START_MARKER = "<!-- GENERATED FROM roles/elephant.md -- do not han
 export const END_MARKER = "<!-- END GENERATED: role-prohibitions block -->";
 
 /** Print order and forced membership. See the module doc comment above for the reason each id is here. */
-export const INCLUDED_EL_IDS = Object.freeze(["EL-01", "EL-02", "EL-03", "EL-04", "EL-16", "EL-18", "EL-19"]);
+export const INCLUDED_EL_IDS = Object.freeze(["EL-01", "EL-02", "EL-03", "EL-04", "EL-16", "EL-18", "EL-19", "EL-34", "EL-35"]);
 
 const DISPATCH_PIPELINE_DUTY =
   "operational dispatch-pipeline duty (roles/elephant.md §4/5) -- describes HOW to run the pipeline, not a bootstrap-time prohibition boundary";
