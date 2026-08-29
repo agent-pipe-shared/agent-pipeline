@@ -155,6 +155,34 @@ function blocked({ agentId, agentType, maxTurns, workingCap, count }) {
 }
 
 /**
+ * pipeline.identity-attestation-fail-closed-fallback (2026-08-29): the one
+ * caller-visible signal that lets an authority-bearing gate built on top of
+ * this identity resolver (evaluateBootstrapReceiptGate in
+ * guard-lifecycle-ready.mjs, GL-09) tell "genuinely ambiguous -- may still be
+ * the orchestrator's own quirky payload" apart from "a transcript_path field
+ * IS present and is simply not usable". The audited defect (17 live
+ * occurrences in one run, `docs/pipeline-audit-claude-session.md` §3.1) was
+ * that both shapes collapsed into the same `kind: "unresolved"` and every
+ * caller that fails open on "unresolved" therefore fails open on BOTH,
+ * including the second shape, which is never a legitimate orchestrator
+ * payload (an orchestrator's transcript sits directly under the session
+ * directory; it is never a truthy relative or non-string value).
+ *
+ * This constant, `agentId` and `agentType` are a fixed sentinel identity,
+ * never emitted by any real dispatch (a real subagent's `agentId` always
+ * derives from its own `agent-<id>.jsonl` transcript stem). No code in this
+ * repository ever writes a bootstrap-preflight receipt or a dispatch-budget
+ * counter keyed to this sentinel -- `recordBootstrapPreflightReceipt`
+ * (guard-lifecycle-ready.mjs) only writes for `identity.kind === "subagent"`,
+ * and this sentinel's `kind` is deliberately NOT `"subagent"` -- so a
+ * receipt-gated caller's existing, unmodified "no receipt for this agentId"
+ * branch denies it every time, by construction, without that caller's own
+ * code needing to change at all.
+ */
+export const INVALID_TRANSCRIPT_PATH_SENTINEL_AGENT_ID = "pipeline.identity-attestation-fail-closed-fallback";
+export const INVALID_TRANSCRIPT_PATH_SENTINEL_AGENT_TYPE = "unattested-invalid-transcript-path";
+
+/**
  * Distinguishes a dispatched subagent's PreToolUse payload from the
  * orchestrating session's own, and resolves as much of its identity as the
  * payload actually supports. See the identity-chain doc block above for
@@ -162,8 +190,25 @@ function blocked({ agentId, agentType, maxTurns, workingCap, count }) {
  */
 export function subagentIdentity(input, dependencies = {}) {
   const transcriptPath = input?.transcript_path;
-  if (typeof transcriptPath !== "string" || transcriptPath.trim() === "" || !isAbsolute(transcriptPath)) {
+  // Genuinely absent (or blank) is ambiguous -- a real orchestrator payload
+  // observed on the Windows runner (the audited defect) carried no usable
+  // transcript_path at all, so this shape alone stays "unresolved" and
+  // every existing caller's fail-open-on-ambiguity behaviour is unchanged.
+  if (transcriptPath === undefined || (typeof transcriptPath === "string" && transcriptPath.trim() === "")) {
     return { kind: "unresolved", reason: "transcript-path-missing-or-relative" };
+  }
+  // PRESENT but not a usable absolute path (wrong type, or a relative
+  // string) is never a legitimate orchestrator shape -- see the sentinel
+  // doc block above for why this must not share "unresolved"'s fail-open
+  // fate on an authority-bearing caller.
+  if (typeof transcriptPath !== "string" || !isAbsolute(transcriptPath)) {
+    return {
+      kind: "invalid-identity",
+      reason: "transcript-path-present-but-not-absolute",
+      agentId: INVALID_TRANSCRIPT_PATH_SENTINEL_AGENT_ID,
+      agentType: INVALID_TRANSCRIPT_PATH_SENTINEL_AGENT_TYPE,
+      transcriptPath,
+    };
   }
   const dir = dirname(transcriptPath);
   if (basename(dir) !== "subagents") {
