@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.po-signing-key-pointer-does-not-cross-wsl-windows-boundary
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-29
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: 09696633932428f93c5a9c097a715730f01f994a
+closure_evidence: backlog/items/2026-08-29-po-signing-key-pointer-does-not-cross-wsl-windows-boundary.md
 sprint: nova
 done_when: manual
 source: "Claude/Windows self-audit report (docs/pipeline-audit-claude-session.md §3.2) and the PO's own observation, cited by scratch/greenfield-triage-2026-08-29.md finding F15, observed during the 2026-08-29 three-runner greenfield test."
@@ -185,3 +189,12 @@ text (disclosed by the dispatch as a judgment call, not an oversight), and
 the "future session locates the exact code path" sub-criterion is now
 satisfied by NVA-R23-KEYPOINTER's prior investigation + this fix, but the
 item's own predicate is still `manual`.
+
+## Closed, 2026-08-29 — accept interim fix, no further action this candidate
+
+Reviewed as part of the Topic 8 defer-design/unclear sweep. The Acceptance
+OR-clause is satisfied by the landed interim fix; closing rather than
+carrying the missing regression test or the larger per-physical-machine
+resolution mechanism forward as open work for this candidate. If a future
+session revisits key-pointer scoping, that larger direction is new,
+narrower-scoped work, not a reopening of this item.
