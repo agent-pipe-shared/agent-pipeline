@@ -7,6 +7,7 @@ status: open
 created: 2026-08-28
 sprint: nova
 source: "Codex/WSL greenfield run, 2026-08-28 (docs/pipeline-session-analysis-2026-08-28.md), plus the PO's own observation that this runner needed three sessions and the most detours."
+done_when: contains plugins/pipeline-core/lib/project-onboarding-v3.mjs copy-safe-command.mjs
 ---
 
 # Commands handed to the PO for external execution are not uniformly rendered break-safe, and every runner lost turns to it

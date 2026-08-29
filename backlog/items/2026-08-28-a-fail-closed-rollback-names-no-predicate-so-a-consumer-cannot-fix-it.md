@@ -8,6 +8,7 @@ created: 2026-08-28
 sprint: nova
 tracking: "NOW / Nova A — the only sanctioned route to a PO acknowledgement marker is unusable, and the refusal is undiagnosable from outside"
 source: "Consumer project HA, incident report S56 finding B2 (2026-08-28, Windows). The consumer independently re-derived every input digest and found all of them correct."
+done_when: contains plugins/pipeline-core/scripts/pipeline-state.mjs describeFailedPostimagePredicates
 ---
 
 # A fail-closed rollback that names no predicate cannot be fixed by the consumer

@@ -8,6 +8,7 @@ created: 2026-08-28
 sprint: nova
 tracking: "Nova B"
 source: "Greenfield happy-path test of candidate 0.6.0 across all three runners, 2026-08-28. Independent self-analyses: Claude/Windows (docs/pipeline-haertungstest-und-analyse.md), Agy/WSL (pipeline-analysis.md), Codex/WSL (docs/pipeline-session-analysis-2026-08-28.md), plus the PO's own cross-run observations."
+done_when: manual
 ---
 
 # The rules no guard enforces are followed very differently by each runner — the rework limit failed by a factor of five

@@ -8,6 +8,7 @@ created: 2026-08-28
 sprint: nova
 tracking: "NOW / Nova A — three separate instances in one session, each found by the PO or by an end-to-end walk rather than by any check. This is the check that would have caught all three."
 source: "Pattern identified 2026-08-28 after the PO asked whether agents can even find the guided driver. Each instance below was verified in code or by measurement in the same session."
+done_when: contains harness/scripts/check-product-capability-inventory.mjs reachab
 ---
 
 # Nothing checks that a shipped capability is reachable
