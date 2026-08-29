@@ -249,15 +249,60 @@ test("checkCriticalHumanProofPolicy: unreadable policy file -> ok:false", () => 
 // v3-empty-set "unrestricted" posture. This was the two-readers disagreement:
 // this reader used to fold "no set concept at all" and "explicit empty v3 set"
 // into the same `[]` and report green for both.
+//
+// NARROWED (NVA-CF-TOFUAGREE, following NVA-CF-TOFUFIX's already-landed narrowing of
+// `trustAnchorsFor()`'s own open-verification window): the anchor-less case no longer reads
+// as an unconditional ok:true either -- `checkCriticalHumanProofPolicy()` now independently
+// resolves this machine's own registered operator key (`resolveLocalOperatorKeyAnchor()`,
+// `../lib/machine-plane.mjs`) and reports ok:true only when it resolves. `machinePlaneFixture()`
+// mirrors `critical-action-authorization.test.mjs`'s own fixture of the identical name: a real
+// temp home directory with a real `.agent-pipeline/machine.json` pointing at a real
+// `trust-policy.json`. `noMachineKeyFixture()` is its negative counterpart -- a temp home with
+// no `.agent-pipeline/` at all, so `readMachinePlane()` reports "absent" deterministically,
+// independent of whatever the real machine actually has configured.
 // ---------------------------------------------------------------------------
 
-test("checkCriticalHumanProofPolicy: v1/v2 document with no trustAnchor -> ok:true, unrestricted-once (trust-on-first-use, NVA-TOFU-1)", () => {
+function machinePlaneFixture(overrides = {}) {
+  const home = mkdtempSync(join(SCRATCH, "push-prepare-machine-home-"));
+  after(() => rmSync(home, { recursive: true, force: true }));
+  const keyDirectory = mkdtempSync(join(SCRATCH, "push-prepare-po-key-dir-"));
+  after(() => rmSync(keyDirectory, { recursive: true, force: true }));
+  writeFileSync(join(keyDirectory, "trust-policy.json"), JSON.stringify({
+    keyReference: overrides.keyReference ?? "machine-op-key",
+    publicKeySha256: overrides.publicKeySha256 ?? "c".repeat(64),
+  }));
+  mkdirSync(join(home, ".agent-pipeline"), { recursive: true });
+  writeFileSync(join(home, ".agent-pipeline", "machine.json"), JSON.stringify({
+    schema: "pipeline.machine-plane.v1", poKeyDirectory: keyDirectory, pushApprovalDefault: "signature",
+    routing: null, language: null, session: null, usage: null, updatedAt: "2026-08-29T00:00:00.000Z",
+  }));
+  return { homedirFn: () => home };
+}
+
+function noMachineKeyFixture() {
+  const home = mkdtempSync(join(SCRATCH, "push-prepare-machine-home-empty-"));
+  after(() => rmSync(home, { recursive: true, force: true }));
+  return { homedirFn: () => home };
+}
+
+test("checkCriticalHumanProofPolicy: v1/v2 document with no trustAnchor, machine HAS a resolvable operator key -> ok:true, unrestricted-once (trust-on-first-use, NVA-TOFU-1/NVA-CF-TOFUAGREE)", () => {
   const result = checkCriticalHumanProofPolicy(FIXTURE_DIR, {
     readCriticalHumanProofPolicy: () => ({ ok: true, trustAnchor: null, trustAnchors: null }),
+    ...machinePlaneFixture(),
   });
   assert.equal(result.ok, true);
   assert.match(result.message, /unrestricted, once/);
   assert.match(result.message, /trust-on-first-use/);
+});
+
+test("checkCriticalHumanProofPolicy: v1/v2 document with no trustAnchor, machine has NO resolvable operator key -> ok:false, TRUST-ANCHOR-MISSING-shaped (NVA-CF-TOFUAGREE)", () => {
+  const result = checkCriticalHumanProofPolicy(FIXTURE_DIR, {
+    readCriticalHumanProofPolicy: () => ({ ok: true, trustAnchor: null, trustAnchors: null }),
+    ...noMachineKeyFixture(),
+  });
+  assert.equal(result.ok, false);
+  assert.match(result.message, /TRUST-ANCHOR-MISSING/);
+  assert.ok(result.remedy);
 });
 
 // ---------------------------------------------------------------------------
@@ -275,31 +320,57 @@ function agreementFixtureDir(name) {
   mkdirSync(join(dir, "project"), { recursive: true });
   return dir;
 }
-function agreementAuthorize(dir) {
+function agreementAuthorize(dir, machinePlaneDeps = {}) {
   // No approval is recorded at all -- irrelevant to the trust-anchor step, which
   // `authorizeRecordedPush` checks FIRST, before it ever looks at `state.pushApproval`.
   return authorizeRecordedPush({
     projectDir: dir, anchorDir: dir, state: {}, candidate: FIXED_CANDIDATE,
     remote: "origin", destination: "refs/heads/main", now: new Date().toISOString(),
+    machinePlaneDeps,
   });
 }
 
-test("agreement: v1 document, no trustAnchor field -> BOTH readers call the route open, trust-on-first-use (NVA-TOFU-1)", () => {
-  const dir = agreementFixtureDir("v1-no-anchor");
+// NARROWED (NVA-CF-TOFUAGREE, following NVA-CF-TOFUFIX): the v1-no-anchor case is no longer
+// a single "both readers call it open" agreement -- it now depends on whether THIS machine
+// has a registered operator key, so both directions are asserted, each hermetically, with the
+// SAME `machinePlaneFixture()`/`noMachineKeyFixture()` fixture (`homedirFn`) fed to BOTH
+// readers, never to just one -- that shared fixture is what makes "agree" a real claim rather
+// than two independently-plausible results.
+test("agreement: v1 document, no trustAnchor field, machine HAS a resolvable operator key -> BOTH readers call the route open, trust-on-first-use (NVA-TOFU-1/NVA-CF-TOFUAGREE)", () => {
+  const dir = agreementFixtureDir("v1-no-anchor-with-key");
   writeFileSync(
     join(dir, "project", "critical-human-proof.json"),
     JSON.stringify({ schema: "pipeline.critical-human-proof-policy.v1", requiredKinds: ["push"] }),
   );
-  const prepared = checkCriticalHumanProofPolicy(dir);
-  const authorized = agreementAuthorize(dir);
-  assert.equal(prepared.ok, true, "push-prepare must call a v1 document with no trustAnchor open (trust-on-first-use)");
+  const machineDeps = machinePlaneFixture();
+  const prepared = checkCriticalHumanProofPolicy(dir, { ...machineDeps });
+  const authorized = agreementAuthorize(dir, machineDeps);
+  assert.equal(prepared.ok, true, "push-prepare must call a v1 document with no trustAnchor open when this machine has a resolvable operator key");
   assert.match(prepared.message, /unrestricted, once/);
   // No proof is recorded at all in this fixture (agreementAuthorize's own state: {}), so the
   // trust-anchor step no longer being what blocks this push -- confirmed by the DIFFERENT
-  // failure code below -- proves the two readers now agree the route is open, without this
+  // failure code below -- proves the two readers agree the route is open, without this
   // specific unconfigured push becoming an automatic pass.
   assert.equal(authorized.authorized, false, "an unconfigured push (no recorded proof at all) must still fail closed");
-  assert.notEqual(authorized.code, "PUSH-PROOF-TRUST-ANCHOR-MISSING", "the trust-anchor step itself must NOT be what blocks this push anymore");
+  assert.notEqual(authorized.code, "PUSH-PROOF-TRUST-ANCHOR-MISSING", "the trust-anchor step itself must NOT be what blocks this push when a local key resolves");
+});
+
+test("agreement: v1 document, no trustAnchor field, machine has NO resolvable operator key -> BOTH readers refuse, TRUST-ANCHOR-MISSING (NVA-CF-TOFUFIX/NVA-CF-TOFUAGREE)", () => {
+  const dir = agreementFixtureDir("v1-no-anchor-no-key");
+  writeFileSync(
+    join(dir, "project", "critical-human-proof.json"),
+    JSON.stringify({ schema: "pipeline.critical-human-proof-policy.v1", requiredKinds: ["push"] }),
+  );
+  const machineDeps = noMachineKeyFixture();
+  const prepared = checkCriticalHumanProofPolicy(dir, { ...machineDeps });
+  const authorized = agreementAuthorize(dir, machineDeps);
+  assert.equal(prepared.ok, false, "push-prepare must call a v1 document with no trustAnchor UNAVAILABLE when this machine has no registered operator key");
+  assert.match(prepared.message, /TRUST-ANCHOR-MISSING/);
+  // The authorization module refuses this BEFORE it ever looks at state.pushApproval (see its
+  // own doc comment) -- so on a machine with no local key, the trust-anchor step IS exactly
+  // what blocks this push, and both readers now agree on that too.
+  assert.equal(authorized.authorized, false);
+  assert.equal(authorized.code, "PUSH-PROOF-TRUST-ANCHOR-MISSING", "the trust-anchor step itself must be what blocks this push when no local key resolves");
 });
 
 test("agreement: v3 document, explicit EMPTY trustAnchors -> BOTH readers call it unrestricted, but the push still fails closed", () => {

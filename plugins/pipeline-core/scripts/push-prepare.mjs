@@ -41,6 +41,7 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
+import { resolveLocalOperatorKeyAnchor } from "../lib/machine-plane.mjs";
 import { gateConfig, loadManifestSafe } from "../lib/manifest.mjs";
 import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
 import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
@@ -218,9 +219,28 @@ export function checkPushThreatModel(dir, deps = {}) {
  * like a v3 document's explicit empty `trustAnchors: []` for that one call,
  * except the anchor-less case is a ONE-TIME open window (it self-closes the
  * moment a key is pinned) where the v3 empty-array posture stays permanently
- * open. This diagnostic mirrors that: both report `ok: true`, distinguished
- * only in message text, since neither can be refused by a local-key
- * membership check that does not yet apply.
+ * open.
+ *
+ * NARROWED (NVA-CF-TOFUFIX, PO decision 2026-08-29, "TOFU-Fix" ->
+ * "A: Provenienz verlangen", same-day follow-up to TRUST-ON-FIRST-USE above):
+ * `trustAnchorsFor()`'s open-verification window no longer accepts ANY
+ * well-formed key on the anchor-less path -- only a signer that resolves to
+ * THIS machine's own registered operator key
+ * (`resolveLocalOperatorKeyAnchor()`, `../lib/machine-plane.mjs`, the same
+ * `readMachinePlane().poKeyDirectory` -> that directory's own
+ * `trust-policy.json` two-hop lookup) may consume it at all; every other
+ * signer is refused outright, not merely left unpinned
+ * (`${prefix}-TRUST-ANCHOR-MISSING`). This diagnostic now AGREES rather than
+ * merely describing the posture: for the anchor-less case it independently
+ * resolves the same local-machine anchor (via the identical
+ * `resolveLocalOperatorKeyAnchor()` resolution, given the SAME `deps` this
+ * function already threads through) and reports `ok:true` only when this
+ * machine actually has one; when it does not, it reports `ok:false`, a
+ * TRUST-ANCHOR-MISSING-shaped precondition-unmet outcome -- never the
+ * unconditional `ok:true` this diagnostic used to report for that case. The
+ * v3 explicit-empty-set posture below (`anchors.length === 0`) is untouched
+ * by this: it was never routed through the narrowing gate either, in the
+ * authorization module or here.
  */
 export function checkCriticalHumanProofPolicy(dir, deps = {}) {
   const readPolicy = deps.readCriticalHumanProofPolicy ?? readCriticalHumanProofPolicy;
@@ -234,9 +254,26 @@ export function checkCriticalHumanProofPolicy(dir, deps = {}) {
   // is the only signal -- `null` there means no key has been pinned yet, and the first
   // successful push pins whichever well-formed key signs it (trust-on-first-use).
   if (policy.trustAnchors === null && policy.trustAnchor === null) {
+    // NARROWED (see the doc comment above): agree with `trustAnchorsFor()` by resolving the
+    // identical local-machine anchor, through the SAME `deps` this function already threads
+    // to every other check below -- `resolveLocalOperatorKeyAnchor()`'s dependency-injection
+    // keys (`homedirFn`/`realpathSyncFn`/`existsSyncFn`/`readFileSyncFn`) never collide with
+    // this file's own flat `exists`/`readFile` keys, so no separate deps namespace is needed;
+    // a test that wants a hermetic result overrides `homedirFn` (mirrors
+    // `critical-action-authorization.test.mjs`'s `machinePlaneFixture()`), and a production
+    // caller that overrides nothing gets the real machine, exactly like `authorizeRecordedPush`.
+    const resolveLocalAnchor = deps.resolveLocalOperatorKeyAnchor ?? resolveLocalOperatorKeyAnchor;
+    const localAnchor = resolveLocalAnchor(deps);
+    if (localAnchor === null) {
+      return {
+        id, ok: false,
+        message: "posture: unrestricted, once (trust-on-first-use) -- but TRUST-ANCHOR-MISSING: project/critical-human-proof.json declares no trustAnchor and no trustAnchors, and this machine has no registered operator key (readMachinePlane()'s poKeyDirectory names none, or its trust-policy.json does not resolve), so the open-verification route is unavailable until one is registered.",
+        remedy: "register this machine's operator key, e.g. node plugins/pipeline-core/scripts/po-human-approval.mjs setup --repo-root <repo> --directory <external-dir> --human-name <name>, then record that directory as poKeyDirectory in ~/.agent-pipeline/machine.json",
+      };
+    }
     return {
       id, ok: true,
-      message: "posture: unrestricted, once (trust-on-first-use); project/critical-human-proof.json declares no trustAnchor and no trustAnchors, so the next successful signature push authorizes with any well-formed key and pins it as this project's trust anchor for every later push.",
+      message: "posture: unrestricted, once (trust-on-first-use); project/critical-human-proof.json declares no trustAnchor and no trustAnchors, and this machine's own registered operator key resolves, so the next successful signature push authorizes with it and pins it as this project's trust anchor for every later push.",
     };
   }
   const anchors = policy.trustAnchors !== null ? policy.trustAnchors : [policy.trustAnchor];
