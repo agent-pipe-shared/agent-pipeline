@@ -504,6 +504,7 @@
 | pipeline.tp-guard-rules-lifted-on-the-merging-machine-must-be-restored | closed | defect | pipeline | 2026-08-27 | — |
 | pipeline.transactional-readbacks-not-status-cascades | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.triage-verdict-text-can-contaminate-a-backlog-item-as-a-later-spec-reference | closed | defect | pipeline | 2026-08-18 | — |
+| pipeline.trust-anchor-bootstrap-confirmed-still-circular-live | open | defect | pipeline | 2026-08-29 | NOW / Nova A -- happy-path blocker, confirmed live by 2 of 3 independent runners against the exact candidate the PO tested with. |
 | pipeline.trust-mismatch-names-neither-key-nor-directory | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.trust-policy-exact-key-shape-refuses-a-third-field-and-blames-the-key | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.trust-policy-shape-disagreement-between-sign-intent-and-verify-po-approval-proof | closed | defect | pipeline | 2026-08-17 | — |
@@ -524,6 +525,7 @@
 | pipeline.v1-trust-anchor-makes-signature-push-functionless | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — critical: it makes gates.push_approval 'signature', the documented default and this repository's own setting, functionless. Stacks with the push-gate item; a consumer hits both. |
 | pipeline.vendored-dispatch-templates-drift-from-canon | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.verify-authorship-defaults-to-source-markers-not-behavior | closed | workflow-improvement | pipeline | 2026-08-10 | — |
+| pipeline.verify-contract-fails-until-configured-but-gs-10-blocks-configuring-it | open | defect | pipeline | 2026-08-29 | NOW / Nova A -- happy-path deadlock, confirmed independently by 2 of 3 runners against the 2026-08-29 candidate (built ab0906d, stamped 0bf246d1) which already contained the 2026-08-11 verify-contract fix (674b1c0c). |
 | pipeline.verify-evidence-has-no-producer | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.verify-evidence-is-trusted-on-read-and-was-forged | open | defect | pipeline | 2026-08-28 | — |
 | pipeline.verify-gate-scoped-registration | closed | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
@@ -553,7 +555,7 @@
 
 ## Counts
 
-- open: 76
+- open: 78
 - in_progress: 3
 - closed: 452
 - rejected: 3
