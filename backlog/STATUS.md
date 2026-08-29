@@ -89,6 +89,7 @@
 | pipeline.chat-mode-push-approval-has-no-enforced-human-turn-boundary | closed | defect | pipeline | 2026-08-25 | — |
 | pipeline.ci-topology-preflight-cannot-pass-on-this-branch | closed | defect | pipeline | 2026-08-28 | — |
 | pipeline.citation-coordinate-checker-bare-basename | closed | defect | pipeline | 2026-08-08 | — |
+| pipeline.claude-code-has-no-mechanical-resume-hint-delivery-hook | open | defect | pipeline | 2026-08-29 | Nova B -- new hooks.json entry needed (TP-4 protected, PO signature ceremony), larger scope than the Codex-side fix; not this candidate. |
 | pipeline.claude-dir-leftovers-defeat-runner-neutral-project-migration | closed | defect | pipeline | 2026-08-05 | — |
 | pipeline.claude-greenfield-run-happy-path-findings | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.claude-has-no-start-time-opt-in-adoption-path | closed | idea | pipeline | 2026-08-05 | — |
@@ -560,7 +561,7 @@
 
 ## Counts
 
-- open: 79
+- open: 80
 - in_progress: 3
 - closed: 452
 - rejected: 3
