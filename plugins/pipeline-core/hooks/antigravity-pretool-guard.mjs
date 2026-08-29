@@ -17,7 +17,16 @@ import {
 } from "../lib/human-guard-override.mjs";
 import { readPushApprovalMode } from "../lib/critical-human-proof-policy.mjs";
 import { loadRuntimeProjectionV3OwnedKeys } from "../lib/runtime-projection-v3.mjs";
-import { boundedOpaqueCopyCommand } from "../lib/project-onboarding-v3.mjs";
+// NVA-CF-BL19-COPYSAFEADOPT: sourced from the shared renderer module rather
+// than project-onboarding-v3.mjs directly -- boundedOpaqueCopyCommand is the
+// same function (re-exported there, unchanged), so this file's bounded-
+// rendering output stays byte-identical. boundedCopySafeCommand/placeholder
+// build the ceremony command lines below, replacing the hand-assembled
+// `${process.execPath} ${JSON.stringify(script)} ...` templates the backlog
+// item measured as one of the inconsistent emitters, mirroring the identical
+// adoption already landed in guard-lifecycle-ready.mjs, guard-testpath.mjs
+// and guard-gate-strength.mjs (NVA-W12-COPYSAFE).
+import { boundedCopySafeCommand, boundedOpaqueCopyCommand, placeholder } from "../lib/copy-safe-command.mjs";
 import {
   nativeHookSessionId,
   rememberedNativeHookFailure,
@@ -655,31 +664,63 @@ export async function runAntigravityPreToolGuard(rawInput) {
           let approvalMode = "signature";
           try { approvalMode = readPushApprovalMode(projectRoot, { spawn: overrideSpawn })?.mode ?? "signature"; }
           catch { approvalMode = "signature"; }
+          // NVA-CF-BL19-COPYSAFEADOPT: every ceremony command line built through the
+          // shared renderer instead of a hand-assembled `${JSON.stringify(...)}`
+          // template. A human fill-in slot like "<plan-sha256>" passes through
+          // placeholder() verbatim -- never shellWord()-quoted like a literal
+          // value. script/overrideRepo are ALSO passed through placeholder() here,
+          // pre-rendered with JSON.stringify(); request-sha256 is the one real
+          // value that goes through ordinary shellWord() quoting. Mirrors
+          // guard-testpath.mjs's own ceremonyCommand() exactly.
+          const ceremonyCommand = (subcommand, ...extraArgv) =>
+            boundedCopySafeCommand({
+              executable: process.execPath,
+              argv: [
+                placeholder(JSON.stringify(script)), subcommand, "--repo", placeholder(JSON.stringify(overrideRepo)),
+                "--request-sha256", planned.requestSha256, ...extraArgv,
+              ],
+            }).command;
           const continuation = approvalMode === "chat"
             ? [
               `Then (the human confirms in-session; this is attribution, not proof -- gates.push_approval is "chat"):`,
-              `${process.execPath} ${JSON.stringify(script)} prepare-authorization --repo ${JSON.stringify(overrideRepo)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256-from-plan> --reason "<human-reason>"`,
-              `${process.execPath} ${JSON.stringify(script)} authorize --repo ${JSON.stringify(overrideRepo)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256> --selection-sha256 <selection-sha256> --reason "<human-reason>" --reason-sha256 <reason-sha256> --activate`,
+              ceremonyCommand(
+                "prepare-authorization", "--plan-sha256", placeholder("<plan-sha256-from-plan>"), "--reason", placeholder('"<human-reason>"'),
+              ),
+              ceremonyCommand(
+                "authorize", "--plan-sha256", placeholder("<plan-sha256>"), "--selection-sha256", placeholder("<selection-sha256>"),
+                "--reason", placeholder('"<human-reason>"'), "--reason-sha256", placeholder("<reason-sha256>"), "--activate",
+              ),
             ].join("\n")
             : [
               `Then, in this session (pure digest computation against data already in the repository -- neither step needs the external key, ADR-0059 Decision 1):`,
-              `${process.execPath} ${JSON.stringify(script)} prepare-authorization --repo ${JSON.stringify(overrideRepo)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256-from-plan> --reason "<fixed HGO_SIGNATURE_REASON text>"`,
-              `${process.execPath} ${JSON.stringify(script)} emit-signature-digest --repo ${JSON.stringify(overrideRepo)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256>`,
+              ceremonyCommand(
+                "prepare-authorization", "--plan-sha256", placeholder("<plan-sha256-from-plan>"), "--reason", placeholder('"<fixed HGO_SIGNATURE_REASON text>"'),
+              ),
+              ceremonyCommand("emit-signature-digest", "--plan-sha256", placeholder("<plan-sha256>")),
               `Then, outside this session (gates.push_approval is "${approvalMode}"; only the signature itself needs the external Ed25519 key; presence of a valid, correctly-bound signature IS the authorization -- there is no in-session activate step for this mode):`,
-              `${process.execPath} ${JSON.stringify(script)} authorize-by-signature --repo ${JSON.stringify(overrideRepo)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256> --proof <external-proof.json>`,
+              ceremonyCommand(
+                "authorize-by-signature", "--plan-sha256", placeholder("<plan-sha256>"), "--proof", placeholder("<external-proof.json>"),
+              ),
             ].join("\n");
           overrideGuidance = [
             "",
             "Human override available for this exact action (one use; audited; explicit confirmation required):",
-            `${process.execPath} ${JSON.stringify(script)} plan --repo ${JSON.stringify(overrideRepo)} --request-sha256 ${planned.requestSha256}`,
+            ceremonyCommand("plan"),
             continuation,
           ].join("\n");
         } else if (planned.status === "author-repair-required") {
           const script = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+          const authorRepairCommand = boundedCopySafeCommand({
+            executable: process.execPath,
+            argv: [
+              placeholder(JSON.stringify(script)), "plan", "--repo", placeholder(JSON.stringify(overrideRepo)),
+              "--request-sha256", planned.requestSha256, "--author-source-root", placeholder(JSON.stringify(planned.candidateSourceRoot)),
+            ],
+          }).command;
           overrideGuidance = [
             "",
             "Pipeline Author Repair is available for this exact source action (one use; audited; explicit confirmation required):",
-            `${process.execPath} ${JSON.stringify(script)} plan --repo ${JSON.stringify(overrideRepo)} --request-sha256 ${planned.requestSha256} --author-source-root ${JSON.stringify(planned.candidateSourceRoot)}`,
+            authorRepairCommand,
           ].join("\n");
         } else if (new Set(["narrower-recovery-required", "external-operator-required"]).has(planned.status)) {
           overrideGuidance = [
