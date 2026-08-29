@@ -717,6 +717,12 @@ const TEST_SUITES = [
   // rule set. check-suite-registration.mjs named exactly these two.
   { name: "push-init-tests", file: join(pluginScriptsDir, "push-init.test.mjs") },
   { name: "semgrep-default-rules-tests", file: join(repoRoot, "plugins", "pipeline-core", "config", "security", "semgrep-default-rules.test.mjs") },
+  // NVA-DONEWHEN-1: the done_when predicate checker's own suite. It passed
+  // standalone since the day it was written but never ran in the gate, which is
+  // the exact shape of defect it exists to catch -- a declaration nothing
+  // mechanically checks. check-suite-registration.mjs named it as the last
+  // genuine opt-out; its two sibling entries were already stale.
+  { name: "backlog-done-predicate-tests", file: join(pluginScriptsDir, "check-backlog-done-predicate.test.mjs") },
 ];
 
 // Manifest-gated phase steps: see header — only projects that carry a manifest at
