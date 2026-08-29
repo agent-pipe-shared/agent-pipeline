@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.three-independent-copies-of-the-wsl-windows-path-normalization
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: 9d533fa5bfb7f15ffb41e2208b1ece01a0c3b972
+closure_evidence: plugins/pipeline-core/lib/repository-path-identity.mjs
 created: 2026-08-27
 sprint: none
 source: "Noted while fixing the third instance of the WSL/Windows path-identity defect, commit d96e14c5, 2026-08-27."

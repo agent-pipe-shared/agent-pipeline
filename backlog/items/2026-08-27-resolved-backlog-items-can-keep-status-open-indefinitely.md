@@ -7,7 +7,7 @@ status: open
 created: 2026-08-27
 sprint: nova
 source: "NVA-BLRECONCILE-1, 2026-08-27 — process-defect finding from the briefing that reported two same-day dispatches briefed against already-finished work"
-done_when: path-exists plugins/pipeline-core/scripts/check-backlog-done-predicate.mjs
+done_when: contains plugins/pipeline-core/scripts/check-backlog-done-predicate.mjs pipeline.undeclared-is-fatal
 ---
 
 # A resolved backlog item can keep `status: open` indefinitely, so a dispatcher only avoids re-briefing finished work by remembering to check
@@ -79,3 +79,30 @@ were not evaluated here.
 ## Triage
 
 - **Decision:** open, unassigned.
+
+### Predicate note, 2026-08-29 — the mechanism exists but does not yet bind
+
+A predicate of `path-exists plugins/pipeline-core/scripts/check-backlog-done-predicate.mjs`
+was briefly declared here and reported satisfied. It was replaced, because a
+`path-exists` on a file that already existed before this item was assessed can
+never go from false to true — it is not falsifiable, and a predicate that
+cannot fail measures nothing.
+
+The checker genuinely is the right mechanism. Its STALE-OPEN class is exactly
+this item's ask: an item whose remedy has landed is mechanically identified
+instead of sitting `open` forever on nobody's word. It caught six such items in
+a single day, including five whose fixes had landed hours earlier.
+
+But the mechanism only reaches items that declare a predicate, and UNDECLARED
+is reported without being fatal. As of 2026-08-29, 81 open items declare
+nothing, so for those the original defect is untouched: they can still sit
+`open` indefinitely with no mechanical challenge. The mechanism exists; it does
+not yet bind.
+
+The predicate therefore names the graduation rather than the mechanism: a
+marker `pipeline.undeclared-is-fatal` in the checker, placed when UNDECLARED
+on an open item stops being advisory. That is the point at which a resolved
+item can no longer stay silently open, and it is reachable only once the open
+backlog actually carries predicates — which is the work in progress now.
+Making UNDECLARED fatal today would simply break the gate for 81 items nobody
+has assessed yet.

@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.registering-a-verify-suite-silently-invalidates-the-capability-inventory
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: f1a18d0fbc19540723a17ba0a77265599c7d2da0
+closure_evidence: harness/scripts/check-product-capability-inventory.test.mjs
 created: 2026-08-27
 sprint: none
 source: "Measured live, 2026-08-27 session: two more product-capability-inventory breakages within the same evening, the second within the hour of a session that had just repaired the first — following two prior instances on 2026-08-19."
