@@ -8,6 +8,7 @@ created: 2026-08-27
 sprint: nova
 tracking: "Reassigned from phoenix to nova on 2026-08-28 by PO decision, after the Phoenix line was intaked into Nova"
 source: "Re-Critic (delta) on the Phoenix-merge rework diff 290bd599..eeebeed5, PASS with three minor findings, 2026-08-27"
+done_when: contains plugins/pipeline-core/hooks/guard-push.test.mjs resolveImplicitPushDestination
 ---
 
 # Three minor findings from the Phoenix-merge re-Critic, recorded rather than fixed in-cycle

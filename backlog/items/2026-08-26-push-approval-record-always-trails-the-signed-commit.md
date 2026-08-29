@@ -8,6 +8,7 @@ created: 2026-08-26
 sprint: nova
 tracking: "Reassigned from phoenix to nova on 2026-08-28 by PO decision, after the Phoenix line was intaked into Nova"
 source: "PO observation, 2026-08-26, live during a routine push: 'dieses update des push standes wird jetzt aber nicht auf dem anderen pc ankommen. das ist noch eine schwäche im ablauf da die infos verloren gehen' -- caught mid-session, reproduced twice in the same push sequence."
+done_when: manual
 ---
 
 # `approve-push`'s own audit-trail write structurally can never be part of the push it records

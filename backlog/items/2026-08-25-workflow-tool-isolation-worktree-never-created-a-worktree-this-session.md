@@ -7,6 +7,7 @@ status: open
 created: 2026-08-25
 sprint: nova
 source: "Elephant, 2026-08-25, live incident this session: three parallel Agent-tool dispatches with isolation: \"worktree\" all wrote into the SAME shared checkout, causing zero-commit truncations and a detached-HEAD incident; root-caused and recovered same session"
+done_when: contains CLAUDE.md containment check performed BEFORE
 ---
 
 # `isolation: "worktree"` (Agent tool) did not create separate worktrees this session — three parallel dispatches raced on one shared checkout

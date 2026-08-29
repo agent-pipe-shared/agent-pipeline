@@ -7,6 +7,7 @@ status: open
 created: 2026-08-27
 sprint: nova
 source: "NVA-BLRECONCILE-1, 2026-08-27 — process-defect finding from the briefing that reported two same-day dispatches briefed against already-finished work"
+done_when: path-exists plugins/pipeline-core/scripts/check-backlog-done-predicate.mjs
 ---
 
 # A resolved backlog item can keep `status: open` indefinitely, so a dispatcher only avoids re-briefing finished work by remembering to check

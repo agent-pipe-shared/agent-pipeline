@@ -7,6 +7,7 @@ status: open
 created: 2026-08-27
 sprint: none
 source: "Measured live, 2026-08-27 session: two more product-capability-inventory breakages within the same evening, the second within the hour of a session that had just repaired the first — following two prior instances on 2026-08-19."
+done_when: contains harness/scripts/check-product-capability-inventory.mjs NVA-INVDERIVE-1
 ---
 
 # Registering a verify suite silently invalidates the capability inventory, and nothing links the two files

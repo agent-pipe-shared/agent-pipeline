@@ -7,6 +7,7 @@ status: open
 created: 2026-08-12
 sprint: nova
 source: "Independently reported by three separate goldfish dispatches (NVA-BL-40-FIX, NVA-BL-42-FIX, NVA-BL-64) in one wave, 2026-08-12, each hitting the same shared-single-slot evidence artifact while running their own closing `verify.mjs`."
+done_when: manual
 ---
 
 # `evidence/verify-latest.json` is a single shared slot; concurrent dispatches on one checkout overwrite each other's closing evidence
