@@ -635,13 +635,15 @@ function humanOverrideRoute(code, reason, subject, root, toolName, toolInput, de
         // names). A human fill-in slot like "<plan-sha256>" passes through
         // placeholder() verbatim -- never shellWord()-quoted like a literal
         // value, which is what the backlog item's mode targets. script/root are
-        // ALSO passed through placeholder() here, but pre-rendered with
-        // JSON.stringify() -- the exact quoting this denial already used before
-        // this change (pinned by this file's own existing tests) -- rather than
-        // shellWord()'s conditional quoting, which would drop the surrounding
-        // quotes for an already-safe path and change this denial's exact text
-        // for no reason the backlog item asked for. request-sha256 is the one
-        // real value that goes through ordinary shellWord() quoting.
+        // ALSO passed through placeholder() here, pre-rendered with
+        // JSON.stringify(), but since NVA-CF-TOFUFIX-adjacent copy-safe-command.mjs
+        // narrowing (placeholder() no longer renders a JSON.stringify()'d live
+        // path verbatim -- only a genuine "<...>" template slot) this now goes
+        // through the SAME shellWord() conditional quoting request-sha256 always
+        // used: an already-safe absolute path renders unquoted. The
+        // JSON.stringify() wrapping is harmless but no longer changes the
+        // rendered shape -- kept only so a future path containing a shell-special
+        // character still round-trips through shellWord() correctly.
         const ceremonyCommand = (subcommand, ...extraArgv) =>
           boundedCopySafeCommand({
             executable: process.execPath,
