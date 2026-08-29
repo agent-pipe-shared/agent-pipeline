@@ -173,3 +173,18 @@ confirmed by import audit but not live-permission-tested this dispatch)
 remain good candidates for the next one. Item stays `open` -- still not
 "the general case": 6 suites now Tier B, roughly 262 remain Tier A, and the
 harness-vs-plugin-tree boundary above is unresolved.
+
+### Progress, 2026-08-29 (`NVA-W2-TIERBDECL`)
+
+`parallel-dispatch-planner-tests` promoted to a Tier-B declared-input entry
+(same shape again): `parallel-dispatch-planner.mjs` has zero imports of its
+own, and its test file imports only `node:assert/strict` plus this one
+module -- confirmed by a real
+`node --permission --allow-fs-read=<src> --allow-fs-read=<test> <test>` run
+(10/10 checks passed, no other grant). `verify-journal.test.mjs` still
+passes unchanged (35/35), and
+`harness/scripts/check-consumer-safe-paths.test.mjs` still passes (9/9)
+since this table stays self-referencing inside `plugins/pipeline-core/`.
+`backlog-dispatch-reference-tests` remains an unstarted candidate for the
+next dispatch in this series. Item stays `open` -- still not "the general
+case": 7 suites now Tier B, roughly 261 remain Tier A.
