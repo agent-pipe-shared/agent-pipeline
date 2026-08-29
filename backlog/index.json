@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "667cdffe30bff47d9ef194ef5a21b59811edd3d7a3bbc7b8c729637bc6ca8bf3"
+    "transitionHead": "864bf0ba4c6951ec7ee643c7251b9d0776f0cca1ed780ed04bf77355cd788a12"
   },
   "counts": {
-    "open": 79,
+    "open": 80,
     "in_progress": 3,
     "closed": 452,
     "rejected": 3,
@@ -1034,6 +1034,16 @@
       "closureRepository": "self",
       "closureCommit": "b54d8d0f9d1f18df2f5e82b5d908f33931036d2b",
       "closureEvidence": "backlog/items/2026-08-08-citation-coordinate-checker-resolved-bare-basenames-to-the-wrong-file.md"
+    },
+    {
+      "id": "pipeline.claude-code-has-no-mechanical-resume-hint-delivery-hook",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-29",
+      "source": "Found while root-causing 2026-08-29-codex-restart-context-loss-needs-a-different-approach-not-harder-enforcement.md (point 5 of its root-cause note).",
+      "deferred": false,
+      "tracking": "Nova B -- new hooks.json entry needed (TP-4 protected, PO signature ceremony), larger scope than the Codex-side fix; not this candidate."
     },
     {
       "id": "pipeline.claude-dir-leftovers-defeat-runner-neutral-project-migration",
