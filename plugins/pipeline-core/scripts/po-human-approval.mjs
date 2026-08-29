@@ -21,9 +21,10 @@
  */
 import { createHash, createPublicKey } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, readSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, closeSync, existsSync, lstatSync, mkdirSync, openSync, readFileSync, readSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, posix as posixPath, resolve, win32 as win32Path } from "node:path";
 import { fileURLToPath } from "node:url";
+import { isatty as nodeIsatty } from "node:tty";
 
 import { approvalRequestFromExternalJson, observeCleanCandidate, run as runApprovalRequest } from "./po-approval-request.mjs";
 import { decodeTypedLine } from "../lib/chat-gate-ceremony.mjs";
@@ -939,14 +940,40 @@ export function authorizeCriticalPushCommand({
  * error-reads-as-a-wrong-passphrase.md): OpenSSL needs a controlling terminal to
  * run its own interactive prompt during signing. Without one it fails with noise
  * that a human reads as a rejected key rather than as "no terminal was attached" --
- * a real ceremony failure observed live. `dependencies.isTTY` is the injectable
- * seam for tests (a boolean or a zero-arg function); with neither supplied this
- * falls back to the real `process.stdin.isTTY`.
+ * a real ceremony failure observed live.
+ *
+ * NVA-CF-MINORPUSH-RETRY: `process.stdin.isTTY` answers a DIFFERENT question --
+ * whether THIS process's stdin descriptor is a terminal -- and is `false` for a
+ * redirected/piped stdin even while a real controlling terminal is attached and
+ * usable. OpenSSL's own interactive prompt does not read this process's stdin at
+ * all; it opens the controlling terminal directly (`/dev/tty` on POSIX), so that
+ * is the condition this function has to probe. `dependencies.isTTY` remains the
+ * injectable seam for tests (a boolean or a zero-arg function) and, when supplied,
+ * is honoured exactly as before -- unchanged for every existing caller. With
+ * neither supplied, this opens the controlling terminal itself
+ * (`dependencies.openControllingTty`, default: `openSync("/dev/tty", "r+")`) and
+ * asks `dependencies.isatty` (default: `node:tty`'s `isatty`) whether the
+ * resulting descriptor is a real terminal, closing it again immediately either
+ * way. Failing to open it (ENXIO/ENOENT/ENODEV -- no controlling terminal at
+ * all, e.g. a daemon, CI runner, or fully detached session) means false, not a
+ * thrown error.
  */
 function isAttendedTerminal(dependencies = {}) {
   if (typeof dependencies.isTTY === "function") return Boolean(dependencies.isTTY());
   if (typeof dependencies.isTTY === "boolean") return dependencies.isTTY;
-  return Boolean(process.stdin.isTTY);
+  const openControllingTty = dependencies.openControllingTty ?? (() => openSync("/dev/tty", "r+"));
+  const checkIsatty = dependencies.isatty ?? nodeIsatty;
+  let fd = null;
+  try {
+    fd = openControllingTty();
+    return Boolean(checkIsatty(fd));
+  } catch {
+    return false;
+  } finally {
+    if (fd !== null) {
+      try { closeSync(fd); } catch { /* already gone; nothing left to release */ }
+    }
+  }
 }
 
 /**
@@ -967,7 +994,8 @@ function signIntentIntoProof({ intentSha256, keys, artifacts, io, dependencies }
   // rejected key on a correct entry.
   if (isPrivateKeyPassphraseProtected(keys.privateKey, dependencies) && !isAttendedTerminal(dependencies)) {
     fail(
-      "sign-intent needs an attended terminal to complete: this process has no controlling terminal " +
+      "sign-intent needs an attended terminal to complete: this process could not open a controlling " +
+      "terminal (/dev/tty) for OpenSSL's own interactive prompt to run on " +
       "(pipeline.signing-requires-attended-terminal). Run the identical command in a terminal window " +
       "you can type into directly.",
     );
