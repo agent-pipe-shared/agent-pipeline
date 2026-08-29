@@ -1272,12 +1272,22 @@ if (inspection.message !== null) {
         // are an established, legitimate pattern) UNION the ledger files themselves.
         const disallowed = stagedPaths.filter((path) => !path.startsWith("backlog/items/") && !LEDGER_PATHS.has(path));
         if (disallowed.length > 0) {
+          // Remediation order (marker: pipeline.gg-22-remediation-order-is-reconcile-last;
+          // backlog/items/2026-08-29-gg-22s-own-remediation-order-creates-unclearable-ledger-debt.md):
+          // item edits commit FIRST (batching several closures into one commit is fine), the
+          // reconciler runs ONCE, and the ledger commit lands LAST. The inverse order (reconcile
+          // before every pending item edit is committed) makes the reconciler consume working-tree
+          // transitions that have not landed yet, so committing those item edits afterwards creates
+          // fresh, unreconcilable debt -- confirmed live 2026-08-29. This mirrors the comment above:
+          // "batched multi-item closures across several commits before one shared reconciliation
+          // commit are an established, legitimate pattern."
           emit(2, [
             `BLOCKED (git-guard GG-22, plugin pipeline-core): an earlier commit changed ` +
               `${debtPaths.join(", ")}'s status without a matching ledger reconciliation since ` +
               `${lastReconcile || "repository start"}.`,
-            "Run: node plugins/pipeline-core/scripts/reconcile-backlog-ledger.mjs --activate",
-            "Then commit the resulting backlog/STATUS.md / backlog/index.json / backlog/transitions.ndjson changes before any other commit.",
+            "Commit any pending backlog/items/ status edits first (batching several closures into one commit is fine),",
+            "then run: node plugins/pipeline-core/scripts/reconcile-backlog-ledger.mjs --activate",
+            "then commit the resulting backlog/STATUS.md / backlog/index.json / backlog/transitions.ndjson changes last.",
           ]);
         }
       }
