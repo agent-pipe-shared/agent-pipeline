@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.pre-push-hook-is-offered-not-installed
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-28
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: caf9a2e6cd9c28390fc11bc9ccf9792ddcc3b0b8
+closure_evidence: plugins/pipeline-core/lib/project-onboarding-v3.mjs, plugins/pipeline-core/scripts/pre-push-hook-install.mjs
 sprint: nova
 done_when: contains plugins/pipeline-core/scripts/project-onboarding-v3.mjs installed-by-default
 source: "Agy/WSL greenfield run, 2026-08-28, its own hardening self-analysis (pipeline-analysis.md), corroborated by the Codex/WSL run's independent script-indirection probe."
@@ -71,3 +75,52 @@ it. Agy's push succeeded only because both layers were missing at once.
 - A foreign hook is still never overwritten.
 - A regression test drives a push through a script wrapper and asserts the hook
   refuses it.
+
+## Closure, 2026-08-29
+
+Fixed by `caf9a2e6` (dispatch `NVA-R9-PREPUSHHOOK`), verified directly by the
+dispatcher against the merged tree, not from the dispatch report alone.
+
+- **Install by default:** `applyProjectOnboardingV3` now calls
+  `applyInstall` (`pre-push-hook-install.mjs`) unconditionally during the
+  first real onboarding apply, placed after every earlier throw point so a
+  rolled-back onboarding never orphans a hook. Stronger than the item's own
+  "Direction #1" (keep a confirmation, make skipping a stated decision): a
+  fresh onboarding no longer offers a choice to skip at all, closing the
+  silent-decline path the original incident depended on outright rather than
+  just recording it. Marker `installed-by-default` at
+  `scripts/project-onboarding-v3.mjs:472`.
+- **Declining possible / recorded / surfaced:** the offer/decline surface in
+  `scripts/project-onboarding-v3.mjs` (`buildPrePushHookOfferAction`,
+  `applyDecline`) still exists as the recovery path for a project onboarded
+  before this change, or one whose hook is foreign or failed to install; a
+  decline is recorded with a timestamp (`planInstall`: `status: "declined"`,
+  `declinedAt`). Surfacing at bootstrap was **not built by this dispatch** —
+  checked directly and found already present from an earlier, unrelated
+  dispatch (`NVA-PREPUSHVISIBLE-1`,
+  `pipeline-start-preflight.mjs:884`/`:1064`): every bootstrap observes
+  `prePushHookObservation` (states `absent`/`declined`/
+  `present-but-not-ours-or-modified`/`installed-and-current`, each carrying a
+  remediation `installCommand`) and reports it as an advisory field, by
+  documented design never gating readiness — that design choice is its own
+  prior decision (the doc comment cites "the live-bootstrap incident that
+  corrected this"), out of scope to revisit here.
+- **Foreign hook never overwritten:** `applyInstall`'s existing
+  `foreign-hook-present`/hash-mismatch refusal, now pinned by a dedicated
+  test (`project-onboarding-v3.test.mjs`: "a project that already owns a
+  pre-push hook is never overwritten by onboarding").
+- **Regression test fires the hook:** rather than a literal
+  `bash scratch/push-test.sh` wrapper (the original incident's exact
+  invocation shape), the new test spawns the onboarding-installed hook file
+  directly with real ref-update stdin — the same way git itself invokes
+  `.git/hooks/pre-push` regardless of what process ran `git push`. This is
+  the stronger of the two: it validates the property the wrapper reproduction
+  would only have exercised indirectly (the hook fires at the git-porcelain
+  layer no matter what invoked it), and both a blocking and an admitting case
+  are asserted.
+
+Verified independently by the dispatcher: `project-onboarding-v3.test.mjs`
+147/0 (RED-before-GREEN on the three new tests), `pre-push-hook-install.test.mjs`
+30/0, `project-onboarding-v3-pre-push-hook-offer.test.mjs` 7/0 (unchanged
+offer/decline behavior confirmed as a regression pin),
+`check-consumer-safe-paths.test.mjs` 9/0.
