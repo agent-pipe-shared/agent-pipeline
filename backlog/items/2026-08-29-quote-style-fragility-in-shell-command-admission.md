@@ -3,8 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.quote-style-fragility-in-shell-command-admission
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-29
+closed_at: 2026-08-29
+closure_repository: self
+closure_evidence: backlog/items/2026-08-29-quote-style-fragility-in-shell-command-admission.md
 sprint: nova
 done_when: manual
 source: "Claude/Windows self-audit sections 2 and 10.13 from the 2026-08-29 three-runner greenfield test (finding F24 of scratch/greenfield-triage-2026-08-29.md)."
@@ -75,7 +78,10 @@ session's targeted repro before design work starts.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment:** `sprint: nova` — Nova B work, not a 0.6.0 candidate blocker.
-- **Date:**
+- **Decision:** discarded
+- **Rationale:** PO decision, 2026-08-29, during the Topic 8 defer-design/
+  unclear sweep: static reading found no asymmetry and the live-repro
+  investigation this item's own Acceptance criteria require was not
+  considered worth the dispatch. Dropped rather than pursued.
+- **Assignment:** `sprint: nova` — closed, no further work.
+- **Date:** 2026-08-29

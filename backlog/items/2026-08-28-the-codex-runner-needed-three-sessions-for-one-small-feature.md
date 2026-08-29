@@ -3,8 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.codex-runner-needed-three-sessions-for-one-small-feature
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-28
+closed_at: 2026-08-29
+closure_repository: self
+closure_evidence: backlog/items/2026-08-28-the-codex-runner-needed-three-sessions-for-one-small-feature.md
 sprint: nova
 done_when: manual
 tracking: "Nova B — PO asked for this to be examined in detail"
@@ -56,3 +59,12 @@ adapter defect versus a general flow defect already covered elsewhere.
 - A turn-level accounting of the three sessions, naming which losses are
   Codex-specific and which are the general items.
 - Any Codex-specific defect filed separately with its own reproduction.
+
+## PO decision, 2026-08-29 — discard
+
+**Decision:** discarded rather than investigated. The item's source document
+(`docs/pipeline-session-analysis-2026-08-28.md`) is missing from this
+checkout, so the forensic turn-level accounting the Acceptance criteria ask
+for cannot be produced. The PO chose to drop the item rather than supply the
+document. If the underlying friction recurs, it should be re-filed fresh
+against live evidence rather than reopening this item.
