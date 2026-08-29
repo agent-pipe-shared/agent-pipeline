@@ -167,3 +167,21 @@ of which resolution direction is chosen.
   cannot locate their own already-registered key on a machine they already
   configured is a hard block on any ceremony needing a signature.
 - **Date:** 2026-08-29
+
+## Fixed, 2026-08-29 (dispatch NVA-R30-KEYPOINTERGUIDE, commit `09696633`)
+
+Acceptance's OR-clause (interim, low-risk step) landed:
+`proposeTrustAnchorAbsentGuidanceAction()` in `lib/project-onboarding-v3.mjs`
+now names that the machine plane is scoped to the CURRENT process's
+`os.homedir()` (so a WSL shell and a native Windows shell on the same
+physical machine never share one pointer) and appends "from THIS SAME
+environment" to the registration-command instruction. Verified:
+`project-onboarding-v3.test.mjs` 151/151 (no regression),
+`check-consumer-safe-paths.test.mjs` 9/9. The larger direction (a genuine
+per-physical-machine resolution mechanism) remains unbuilt — out of scope
+for this interim fix, per the item's own Acceptance OR-clause. Left
+`status: open`: no dedicated regression test asserts the new sentence's
+text (disclosed by the dispatch as a judgment call, not an oversight), and
+the "future session locates the exact code path" sub-criterion is now
+satisfied by NVA-R23-KEYPOINTER's prior investigation + this fix, but the
+item's own predicate is still `manual`.
