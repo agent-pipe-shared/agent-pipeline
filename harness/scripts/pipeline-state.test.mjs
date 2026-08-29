@@ -1193,6 +1193,7 @@ function canonicalFixtureJson(value) {
   const reopened = run(["reopen-design", "--by", "po-test"], deps);
   const successorDeps = lifecycleDeps(dir, planPath, { now: () => "2026-07-08T21:00:00.000Z" });
   const successorSubmitted = run(["submit-plan", "--by", "coordinator", "--profile", "feature"], successorDeps);
+  const successorPresented = run(["present-plan", "--by", "coordinator"], successorDeps);
   const successorApproved = run(["approve-plan", "--by", "po-test"], successorDeps);
   const legacy = readState(dir).state;
   const { priorInvalidationSha256: _ignored, ...v3Approval } = legacy.planApproval;
@@ -1206,6 +1207,7 @@ function canonicalFixtureJson(value) {
   const sealed = captureConsole(() => run(["seal-plan-approval"], successorDeps));
   const afterSeal = readState(dir).state;
   ok("PS08a-1 fixture reopens a prior approval before retaining a successor v3 audit record", reopened === 0 && successorSubmitted === 0 && successorApproved === 0 && beforeSeal.planInvalidation?.schema === "pipeline.plan-invalidation.v1");
+  ok("PS08a-1a present-plan exit 0 for the successor submission", successorPresented === 0, `got ${successorPresented}`);
   ok("PS08a-2 seal-plan-approval upgrades only a retained v3 approval and emits its audit receipt", sealed.value === 0 && sealed.text.includes("Plan approval audit seal written"));
   ok(
     "PS08a-3 seal readback is exact v4 and binds the canonical retained invalidation",
