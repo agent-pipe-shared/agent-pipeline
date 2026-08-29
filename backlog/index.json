@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "9d03a3acaebe68f377da7bc19ca51b45410e7afbbec25771c57e8694aea0284d"
+    "transitionHead": "01135e0fd420d6f6a386163d8cc4b45591a4f6eeababadaf8dc67c2d826b361c"
   },
   "counts": {
-    "open": 105,
+    "open": 104,
     "in_progress": 3,
-    "closed": 415,
+    "closed": 416,
     "rejected": 3,
     "deferred": 11
   },
@@ -2664,13 +2664,17 @@
     },
     {
       "id": "pipeline.guard-root-admission-compares-typed-to-realpathed",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-28",
       "source": "Found 2026-08-28 while independently verifying dispatch NVA-G-GUARDDEADLOCK's negative result against guard-lifecycle-ready.mjs. The dispatch refuted the reported cause of HA incident report S56 finding B3 and named this as the most plausible remaining one; the code was then re-read here to confirm the mechanism exists.",
       "deferred": false,
-      "tracking": "NOW / Nova A — the surviving candidate cause for a consumer session that lost both its lanes on Windows, and a platform-neutrality defect in the guard that decides whether any recovery command runs at all"
+      "tracking": "NOW / Nova A — the surviving candidate cause for a consumer session that lost both its lanes on Windows, and a platform-neutrality defect in the guard that decides whether any recovery command runs at all",
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "fdc02abc",
+      "closureEvidence": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs"
     },
     {
       "id": "pipeline.guard-string-match-makes-a-file-uncommittable",

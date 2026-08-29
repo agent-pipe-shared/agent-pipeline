@@ -223,7 +223,7 @@
 | pipeline.guard-reclassification-changed-what-a-signature-can-lift | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.guard-refuses-documented-bounded-diagnostic | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.guard-refuses-the-prescribed-recovery | closed | defect | pipeline | 2026-08-08 | — |
-| pipeline.guard-root-admission-compares-typed-to-realpathed | open | defect | pipeline | 2026-08-28 | NOW / Nova A — the surviving candidate cause for a consumer session that lost both its lanes on Windows, and a platform-neutrality defect in the guard that decides whether any recovery command runs at all |
+| pipeline.guard-root-admission-compares-typed-to-realpathed | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — the surviving candidate cause for a consumer session that lost both its lanes on Windows, and a platform-neutrality defect in the guard that decides whether any recovery command runs at all |
 | pipeline.guard-string-match-makes-a-file-uncommittable | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.guard-sweep-completion-report | closed | workflow-improvement | pipeline | 2026-08-29 | — |
 | pipeline.guard-testpath-not-kernel-protected | closed | defect | pipeline | 2026-08-10 | — |
@@ -545,8 +545,8 @@
 
 ## Counts
 
-- open: 105
+- open: 104
 - in_progress: 3
-- closed: 415
+- closed: 416
 - rejected: 3
 - deferred: 11
