@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "8896d0aef00ddbe2567b0339253e31b3661949d5456c391df61b8d3cc93e0707"
+    "transitionHead": "ed599345f6777d388189b7b358a505e270cea4d8c27c0e4767bb9d27f0bd5699"
   },
   "counts": {
-    "open": 91,
+    "open": 90,
     "in_progress": 3,
-    "closed": 432,
+    "closed": 433,
     "rejected": 3,
     "deferred": 11
   },
@@ -1000,12 +1000,16 @@
     },
     {
       "id": "pipeline.ci-topology-preflight-cannot-pass-on-this-branch",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-28",
       "source": "Measured live, 2026-08-28, by running verify-topology-preflight.mjs at HEAD after an unrelated change and then isolating each rejecting sub-check with a controlled probe.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "03c6e1e4",
+      "closureEvidence": "plugins/pipeline-core/scripts/verify-topology-preflight.test.mjs"
     },
     {
       "id": "pipeline.citation-coordinate-checker-bare-basename",
