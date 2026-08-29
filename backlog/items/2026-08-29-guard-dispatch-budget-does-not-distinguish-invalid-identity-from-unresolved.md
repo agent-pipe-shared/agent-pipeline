@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.guard-dispatch-budget-does-not-distinguish-invalid-identity-from-unresolved
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-29
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: 865d8d9d
+closure_evidence: plugins/pipeline-core/hooks/guard-dispatch-budget.test.mjs
 sprint: nova
 done_when: contains plugins/pipeline-core/hooks/guard-dispatch-budget.mjs pipeline.dispatch-budget-invalid-identity-fails-closed
 source: "NVA-R6-GUARDSWEEP guard-layer sweep (backlog/items/2026-08-29-sweep-remaining-guards-for-fail-open-identity-and-pipe-unpiped-scope-asymmetry.md), auditing guard-dispatch-budget.mjs for its OWN direct callers/uses of subagentIdentity()'s unresolved result beyond the guard-lifecycle-ready.mjs caller already covered by F02 (pipeline.identity-attestation-fail-closed-fallback, fixed 2026-08-29)."
