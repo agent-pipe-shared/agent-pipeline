@@ -149,7 +149,7 @@
 | pipeline.dispatched-agents-return-truncated-mid-step | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.dispatches-report-completed-on-a-truncated-fragment | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.doc-reconciliation-blind-to-adr-corpus-changes | closed | defect | pipeline | 2026-08-09 | — |
-| pipeline.docs-state-human-summary-diverges-from-machine-next-action | open | defect | pipeline | 2026-08-29 | — |
+| pipeline.docs-state-human-summary-diverges-from-machine-next-action | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.docs-state-md-next-action-text-is-a-static-snapshot-with-no-live-sync | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.docs-state-md-sync-ignores-calibration-configured-handover-path | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.documentation-information-architecture | deferred | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; deferred per PO triage 2026-08-23. |
@@ -548,8 +548,8 @@
 
 ## Counts
 
-- open: 90
+- open: 89
 - in_progress: 3
-- closed: 433
+- closed: 434
 - rejected: 3
 - deferred: 11

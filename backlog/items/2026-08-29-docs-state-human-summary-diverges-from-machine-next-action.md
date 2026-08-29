@@ -3,10 +3,14 @@ schema: pipeline.backlog-item.v1
 id: pipeline.docs-state-human-summary-diverges-from-machine-next-action
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-29
+closure_commit: 0e9019bf
+closure_repository: "self"
+closure_evidence: plugins/pipeline-core/scripts/check-state-phase-consistency.test.mjs
 created: 2026-08-29
 sprint: nova
-done_when: contains plugins/pipeline-core/scripts/check-release-state-consistency.mjs pipeline.state-phase-projection-atomicity
+done_when: contains plugins/pipeline-core/scripts/check-state-phase-consistency.mjs pipeline.state-phase-projection-atomicity
 source: "Codex/WSL report, cited by scratch/greenfield-triage-2026-08-29.md finding F20, observed during the 2026-08-29 three-runner greenfield test."
 ---
 
@@ -79,3 +83,21 @@ point this lands.
   `docs/state.md` to understand where a project stands is reading a document
   that can silently lie about the phase.
 - **Date:** 2026-08-29
+
+## Closure, 2026-08-29 (found already satisfied — dispatch NVA-R31-STATEPHASEDRIFT, commits `5ac1a658`/`0e9019bf`)
+
+This item's exact fix was already landed earlier the same session under a different dispatch
+name, targeting `docs/state.md`'s live phase-drift problem directly rather than this item text
+(the two were not cross-referenced at dispatch time). `pipeline-state.mjs` gained
+`statePhaseProjectionMarker()`/`upsertStatePhaseMarkerLine()`/`syncStatePhaseMarker()`, wired
+into `syncNextActionDocs()` so the marker (`**Lifecycle phase:** feature \`<id>\` · phase
+\`<phase>\``) is written atomically with every phase-changing mutation. A new checker,
+`plugins/pipeline-core/scripts/check-state-phase-consistency.mjs` (mirroring
+`check-release-state-consistency.mjs`'s pattern, marker `pipeline.state-phase-projection-
+atomicity` embedded), satisfies all three of this item's own Acceptance criteria directly —
+independently re-verified just now: `node --test
+plugins/pipeline-core/scripts/check-state-phase-consistency.test.mjs` → 3/3 pass, covering
+exactly the drift class reported ("design" text vs "implementation" machine phase reported
+blocked), the agreeing case reported consistent, and atomicity through a real
+design→implementation transition via `pipeline-state.mjs`. `done_when` repointed from the
+originally-guessed file path to the real one.
