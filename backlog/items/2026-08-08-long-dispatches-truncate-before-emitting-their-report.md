@@ -8,7 +8,7 @@ created: 2026-08-08
 sprint: alfred
 due: 2026-08-22
 source: "Three occurrences in one unattended block, 2026-08-07/08: two Goldfish dispatches and one Critic dispatch ended mid-sentence with the work done and no report."
-done_when: contains templates/prompts/goldfish-task.md Never start a background job and end your own turn before holding its result.
+done_when: manual
 ---
 
 # A long dispatch can finish its work and lose its report
@@ -613,3 +613,23 @@ backlog-only, template-scoped dispatch could safely reach.
 - **Status left unchanged** by this dispatch (`open`) — the Elephant
   reconciles `status:`/closure centrally after collecting the sweep.
 - **Date:** 2026-08-25
+
+### Predicate note, 2026-08-29
+
+A `contains` predicate pointing at the prevention marker in
+`templates/prompts/goldfish-task.md` was declared and immediately reported
+STALE-OPEN, correctly: that marker is present and the prevention half IS
+landed. The predicate was wrong all the same, because it measured the half
+that is finished rather than the half that keeps this item open. It is now
+`manual`.
+
+Detection — telling from outside whether a silent dispatch is paused and will
+resume, or is abandoned — remains undesigned, and no code artifact exists to
+point a mechanical predicate at. When a detection design lands, replace
+`manual` with a predicate naming it.
+
+Live corroboration the same day: a dispatch in this session overran a 45-use
+budget to 85 and was cut off mid-sentence by the harness `maxTurns` cliff with
+no report and no closing handover. Its work was recoverable only because the
+dispatcher inspected the working tree directly. That is exactly the detection
+gap this item describes, observed rather than hypothesised.
