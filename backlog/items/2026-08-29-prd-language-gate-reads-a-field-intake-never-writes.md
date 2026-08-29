@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.prd-language-gate-reads-a-field-intake-never-writes
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-29
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: 64899377c5b3b1085de50b7f1a3c33ae9abbd436
+closure_evidence: plugins/pipeline-core/lib/onboarding-continuity.test.mjs
 sprint: nova
 done_when: contains plugins/pipeline-core/lib/onboarding-continuity.mjs pipeline.po-language-propagated-to-configured-pair
 source: "Claude/Windows self-audit report (sections 2 and 3.2), reproduced on two independent runners during the 2026-08-29 three-runner greenfield test; diagnosis corrected the same day against the source after the PO restated the intended two-axis language design."
@@ -154,3 +158,56 @@ source for it that does not depend on a file onboarding cannot write.
   `pipeline.pipeline-user-yaml-file-level-protection-forces-signature-ceremony`
   (F07), the latter possibly this item's cause rather than its consequence.
 - **Date:** 2026-08-29
+
+## Closure, 2026-08-29 — both axes, verified on the merged state
+
+**F07 was not this item's cause.** The hypothesis above — that
+`pipeline.user.yaml` being GS-1 protected made the write structurally
+impossible — was tested and disproved. A writer already existed and was
+already two-axis-safe: `correctPromotedLanguage()` returns early for any
+non-`{de, en}` value, so a content language is never forced into the operator
+axis. It was simply not called on the flow the blocked runners used.
+`applyOnboardingBootstrapBind()` called `applyOnboardingKickoffPromotion()`
+directly, bypassing the legacy wrapper that carried the correction. The fix is
+a wiring change and required no signature ceremony. The F05 → F06 → F07
+ordering in the triage stands. Full evidence:
+`backlog/evidence/2026-08-29-prd-language-gate-decisive-check-answered.md`.
+
+Reaching that writer needed one piece of plumbing first: `project-onboarding-v3.mjs`
+already imports FROM `onboarding-continuity.mjs` (line 54), so importing the
+correction back the other way would have been a real circular dependency. The
+correction therefore moved to a new leaf module,
+`plugins/pipeline-core/lib/onboarding-language-correction.mjs`, that both
+callers import (`54e01923`, a pure move, verified behaviour-preserving at
+144/144). The wiring and its tests followed in `64899377`.
+
+Acceptance, item by item:
+
+- The decisive check is answered in writing, with file and function named —
+  the evidence file above.
+- A `de` answer through `bootstrap-bind-apply` no longer raises
+  `PO-GATE-PRD-LANGUAGE-MISMATCH`. Written RED first: exit 1 with
+  `'en' !== 'de'` before the wiring, exit 0 after.
+- A content language outside `{de, en}` still works end to end. `fr` binds and
+  passes the same gate. **Honest limitation:** this test was never observed
+  RED, because the code path it pins was already correct as of `b77fbab5` —
+  it is a regression pin for an untested fix, not a proof of a bug this commit
+  closed. Recorded rather than dressed up as red-first.
+- `humanFacingLanguage` closed to `{de, en}` and `documentLanguage` open to
+  `/^[a-z]{2}$/` are asserted directly via `validateContinuityState` against
+  the real persisted continuity object, not inspected.
+- Existing kickoff-promotion coverage passes unchanged: 144/144.
+
+Verified by the dispatcher on the merged branch state, not taken from the
+dispatch report: `node --test plugins/pipeline-core/lib/onboarding-continuity.test.mjs`
+→ 260/260, exit 0, both new `NVA-R5-LANGWIRE` cases present;
+`node --test plugins/pipeline-core/lib/project-onboarding-v3.test.mjs` →
+144/144, exit 0.
+
+Known follow-up, not a blocker and deliberately not fixed here: the new leaf
+module re-implements `safePath`, `renderYaml`/`renderScalar`,
+`readBoundPhysicalFile`, `fileIdentity` and `sameIdentity` rather than sharing
+them, matching this codebase's existing per-module `safePath` convention.
+`project-onboarding-v3.mjs` keeps its own copies in use at roughly fifteen
+other, unrelated call sites. Extracting those five helpers into a shared leaf
+is a separate refactor.
