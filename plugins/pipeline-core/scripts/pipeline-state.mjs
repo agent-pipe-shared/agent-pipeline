@@ -123,11 +123,27 @@
  *                 --min-minutes <integer>
  *                 --max-minutes <integer>
  *                 --by coordinator
+ *   present-plan  --by <name>                     NVA-R22-PLANSHOWN: records
+ *                                                 planPresentation={schema,
+ *                                                 submissionSha256,presentedBy,
+ *                                                 presentedAt} bound to the exact
+ *                                                 current submission (requires the
+ *                                                 same "exact current submitted
+ *                                                 plan" precondition approve-plan
+ *                                                 itself checks). Run after
+ *                                                 submit-plan and before
+ *                                                 approve-plan -- the mechanical
+ *                                                 record that the design was
+ *                                                 actually shown before approval.
  *   approve-plan  --by <name>                     Sets planApproved=true, records
  *                                                 exact v2 planApproval including its
  *                                                 Spec binding; the same profile/PRD/Spec
  *                                                 authority is revalidated under the
- *                                                 writer lock before commit.
+ *                                                 writer lock before commit. Additionally
+ *                                                 refused (NVA-R22-PLANSHOWN, no override)
+ *                                                 when no planPresentation record bound to
+ *                                                 the exact current submission exists --
+ *                                                 run present-plan first.
  *                                                 Clears any prior planRevocation.
  *   revoke-plan   --by <name>                     Sets planApproved=false, records
  *                                                 the exact v2 revocation bound to the
@@ -587,7 +603,7 @@ const CONTINUITY_REQUEST_MAX_BYTES = 32_768;
 // that exact command as the way out of a stuck approval.
 const PIPELINE_STATE_COMMANDS = Object.freeze([
   "inspect",
-  "set-feature", "submit-plan", "approve-plan", "reopen-design", "seal-plan-approval",
+  "set-feature", "submit-plan", "present-plan", "approve-plan", "reopen-design", "seal-plan-approval",
   "set-phase", "set-gate-estimate", "revoke-plan", "bind-plan-spec", "approve-push",
   "materialize-push-threat-model", "prepare-push-subject", "close-feature", "discard-feature", "approve-deploy",
   "consume-deploy", "clear-deploy", "po-authority-rebind-plan", "po-authority-rebind-apply",
@@ -7251,6 +7267,49 @@ function validPlanApprovalBriefing(value) {
 }
 
 /**
+ * NVA-R22-PLANSHOWN: closes the gap named in
+ * backlog/items/2026-08-29-plan-approval-is-recorded-without-a-check-that-the-design-was-shown.md
+ * -- `approve-plan` previously checked WHO approved (`--by`) and WHICH plan
+ * (lifecycle-match) but never WHETHER the plan/design content was actually
+ * rendered to the human first. `present-plan` is the new, separate CLI step
+ * (mirroring EL-19's "present readably + wait for 'approved'") that records
+ * this fact; it must run after `submit-plan` and before `approve-plan`.
+ *
+ * Bound to `submissionSha256` (the same digest `derivePlanLifecycle` already
+ * computes from `state.planSubmission`, and the same one `approve-plan`
+ * already requires to be current) rather than to raw plan/spec digests
+ * directly: this ties the presentation record to the EXACT submission (plan
+ * + spec + profile, as bound at submit time) that is later approved, so a
+ * resubmission (new plan, new spec, or even just a new profile) invalidates
+ * any prior presentation and forces a fresh `present-plan` call -- exactly
+ * the "was THIS content shown" question, not "was something once shown".
+ *
+ * Deliberately a top-level sibling of `planApproval`/`planSubmission`
+ * (mirrors `planApprovalBriefing` immediately above) rather than a field
+ * inside either: `plan-spec-state-v2.mjs` owns the closed key sets of those
+ * two records and stays untouched by this change.
+ *
+ * Deliberately a session-side ATTESTATION (an explicit "I rendered this"
+ * claim by the caller, like `--by` is an explicit "I am this person" claim)
+ * rather than a hash of literally-rendered bytes or a passive flag some
+ * other step sets as a side effect: this CLI has no channel to observe what
+ * actually appeared on a human's screen, so the strongest available
+ * mechanism is the same one `--by` already relies on -- a caller-supplied,
+ * non-blank, exactly-bound claim, refused unattributed exactly like every
+ * other `--by`-taking mutation in this file.
+ */
+const PLAN_PRESENTATION_SCHEMA = "pipeline.plan-presentation.v1";
+const PLAN_PRESENTATION_KEYS = ["schema", "submissionSha256", "presentedBy", "presentedAt"];
+
+function validPlanPresentation(value) {
+  return hasExactBriefingKeys(value, PLAN_PRESENTATION_KEYS)
+    && value.schema === PLAN_PRESENTATION_SCHEMA
+    && SHA256_RE.test(value.submissionSha256)
+    && typeof value.presentedBy === "string" && value.presentedBy.length > 0
+    && typeof value.presentedAt === "string" && value.presentedAt.length > 0;
+}
+
+/**
  * The prior approved binding this submission's briefing diffs against, read
  * from whatever valid current (v4) approval the state still carries at
  * submit time -- the last binding a PO actually approved, not merely the
@@ -7598,6 +7657,53 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       return 0;
     }
 
+    // NVA-R22-PLANSHOWN: the mechanical record that the plan/design content was
+    // actually rendered to the human before approval -- run after submit-plan,
+    // before approve-plan. See the PLAN_PRESENTATION_SCHEMA doc comment above for
+    // why this is a caller attestation bound to the exact current submission
+    // rather than a hash of rendered bytes or a passive side-effect flag.
+    case "present-plan": {
+      const by = flags.by;
+      if (isBlank(by)) {
+        console.error('Error: present-plan requires --by <name> (non-empty) -- an unattributed presentation is refused.');
+        return 2;
+      }
+      const lifecycle = derivePlanLifecycle(base);
+      if (!lifecycle.ok || lifecycle.status !== "awaiting-approval"
+        || !SHA256_RE.test(lifecycle.submissionSha256 ?? "")) {
+        console.error(`Error: present-plan requires an exact current submitted plan (${lifecycle.code}); run submit-plan first.`);
+        return 2;
+      }
+      const submissionSha256 = lifecycle.submissionSha256;
+      let presentedAt;
+      const written = writeState(dir, undefined, base, {
+        transition: (observed) => {
+          presentedAt = now();
+          return {
+            ok: true,
+            state: {
+              ...observed,
+              planPresentation: {
+                schema: PLAN_PRESENTATION_SCHEMA,
+                submissionSha256,
+                presentedBy: by,
+                presentedAt,
+              },
+              updatedAt: presentedAt,
+            },
+          };
+        },
+      });
+      if (!stateWriteSucceeded(written)) {
+        console.error(`Error: present-plan failed before commit (${written.code}); no presentation was recorded.`);
+        return 2;
+      }
+      syncNextActionDocs(dir, written.transition.state);
+      console.log(`Plan presentation recorded by "${by}" on ${presentedAt}; bound to submission ${submissionSha256.slice(0, 12)}....`);
+      console.log('Next: run `approve-plan --by <name>` once the PO has confirmed \'approved\'.');
+      return 0;
+    }
+
     case "reopen-design": {
       const by = flags.by;
       if (isBlank(by)) {
@@ -7755,6 +7861,20 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       const approveStagingRefusal = refusePlanAuthorityStagingPath({ rootDir: dir, planPath: authority.value.planPath, specPath: authority.value.specPath });
       if (!approveStagingRefusal.ok) {
         console.error(`Error: approve-plan blocked by ${approveStagingRefusal.code}: ${approveStagingRefusal.message}`);
+        return 2;
+      }
+      // NVA-R22-PLANSHOWN: attribution, lifecycle-match and authority (above)
+      // answer WHO approved, WHICH plan, and whether it is otherwise a valid
+      // candidate for approval; this last precondition answers WHETHER it was
+      // actually shown to the human first. Checked last (not alongside
+      // attribution/lifecycle) so a request invalid for another reason still
+      // reports THAT reason, not this one. No override flag -- the PO's
+      // universal escape hatch (edit/delete the state file directly, outside
+      // this CLI) already covers the case this check must never itself
+      // provide a bypass for.
+      if (!validPlanPresentation(base.planPresentation)
+        || base.planPresentation.submissionSha256 !== lifecycle.submissionSha256) {
+        console.error("Error: approve-plan requires a prior present-plan record bound to this exact submission -- an approval of unseen content is refused; run present-plan --by <name> first.");
         return 2;
       }
       const expectedPlanSha256 = authority.value.planSha256;
