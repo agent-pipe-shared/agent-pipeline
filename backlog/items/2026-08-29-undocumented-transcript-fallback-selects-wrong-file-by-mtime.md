@@ -6,7 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-29
 sprint: nova
-done_when: contains plugins/pipeline-core/skills/pipeline-start/references/onboarding-recovery.md pipeline.deterministic-transcript-selection
+done_when: contains plugins/pipeline-core/hooks/codex-session-start-hint.mjs pipeline.deterministic-transcript-selection
 source: "Claude/Windows self-audit report (docs/pipeline-audit-claude-session.md §3.2), cited by scratch/greenfield-triage-2026-08-29.md finding F13, observed during the 2026-08-29 three-runner greenfield test."
 ---
 
@@ -98,3 +98,66 @@ today:
 - **Assignment:** `sprint: nova`; blocks the 0.6.0 candidate as part of the
   F12+F13+F14 restart-continuity chain (triage "Ordering recommendation" #3).
 - **Date:** 2026-08-29
+
+## Correction, 2026-08-29 (Elephant, measured — the "Where it is" section above is wrong)
+
+The investigation recorded above searched
+`plugins/pipeline-core/skills/` and `plugins/pipeline-core/lib/resume-hint.mjs`
+and concluded that **no** mtime-based transcript-selection mechanism exists in
+this repository. It never searched `plugins/pipeline-core/hooks/`. The
+mechanism lives there, and it is ours:
+
+`plugins/pipeline-core/hooks/codex-session-start-hint.mjs:59` defines
+`PRIOR_ROLLOUT_TRANSCRIPT_LINE`, whose text instructs a restarting session to
+look under `$CODEX_HOME/sessions` (or `~/.codex/sessions`), pick the file
+**"most recent by modification time and excluding the file this session is
+itself writing to"**, and read its last handful of tool-call/result/error
+entries. It is unconditional — emitted on every session start, independent of
+whether a resume-hint card exists — wired into the governed-branch context
+array at line 111 and invoked by `codex-hooks.json` on
+`startup|resume|clear|compact`.
+
+So the failing heuristic is not an unsanctioned inference a runner invented.
+For Codex it is a **mandatory instruction this repository ships**, and
+"most recent by mtime, minus my own file" is exactly the rule that picked a
+sibling guardian/review transcript in the observed failure.
+
+Two things follow, and they replace this item's Proposal and Acceptance:
+
+1. **The remedy in the Proposal section is factually wrong as written.**
+   Stating in `references/onboarding-recovery.md` that this pipeline
+   "provides no supported transcript-based recovery mechanism" would
+   contradict shipped, unit-tested behaviour. Do not write that sentence.
+2. **This is a known, named residual, not a surprise.** The closed item
+   `pipeline.codex-restart-cannot-recover-operational-context-from-its-own-prior-transcript`
+   (closed 2026-08-19) explicitly recorded, in its own implementation entry,
+   that disambiguating "which prior rollout file belongs to THIS project"
+   had no code-level solution and was left to "the restarting agent's own
+   judgment (recency + exclusion of its own currently-growing file)". That
+   named residual is what fired here. The closure was honest; the residual
+   was simply never given an owner.
+
+Why the observed run looked emergent anyway: the failure was reported by the
+**Claude/Windows** runner, where this Codex-only hook does not fire. On that
+runner the guess genuinely was the host's own behaviour. The correction is
+that the identical wrong heuristic is what we actively instruct **Codex** to
+perform on every single restart — which is the runner whose context loss the
+PO is trying to fix.
+
+### Revised acceptance
+
+- `PRIOR_ROLLOUT_TRANSCRIPT_LINE` selects deterministically by **project
+  identity first, recency only as a tiebreak within that set**: a Codex
+  rollout file records its originating workspace in its own session
+  metadata, so the instruction must direct the reader to that field and to
+  discard transcripts belonging to another project outright, rather than
+  ranking every session on the machine by mtime.
+- The instruction states what to do when no transcript matches this project:
+  say so honestly and continue, never widen the search back to "most recent
+  overall".
+- A marker `pipeline.deterministic-transcript-selection` is placed at that
+  code, and `codex-session-start-hint.test.mjs` asserts the emitted context
+  carries the project-scoping clause — the existing test at line 40 only
+  asserts the line is present at all, which is why this defect survived it.
+- `references/onboarding-recovery.md` may point at the mechanism, but must
+  not claim none exists.
