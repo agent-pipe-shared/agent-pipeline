@@ -121,6 +121,15 @@ export const DELIBERATELY_UNREGISTERED = Object.freeze([
       + "push-gate-satisfiability.test.mjs`. A follow-up carrying the TP-3 ceremony should fold this suite into "
       + "TEST_SUITES and remove this entry.",
   },
+  {
+    path: "plugins/pipeline-core/scripts/check-backlog-done-predicate.test.mjs",
+    reason: "NVA-DONEWHEN-1: passes standalone (`node --test plugins/pipeline-core/scripts/"
+      + "check-backlog-done-predicate.test.mjs`); registering it in TEST_SUITES means editing "
+      + "harness/scripts/verify.mjs, which is TP-3-protected and this repository's `signature` "
+      + "push-approval mode offers no in-session activation step -- out of scope for this additive "
+      + "dispatch. The dispatcher will register it together with the done_when UNDECLARED-to-fatal "
+      + "enforcement graduation, in one signed maintenance-window ceremony, and remove this entry.",
+  },
 ]);
 
 /** The five directory constants `verify.mjs` itself defines, expressed as repo-relative segments. */
