@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.a-node-script-defeats-every-file-protection-guard
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-29
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: b4908639ac14e53832a3ec6f3b2a68bf06a2fed7
+closure_evidence: backlog/items/2026-08-29-a-node-script-defeats-every-file-protection-guard.md
 sprint: nova
 done_when: path-exists plugins/pipeline-core/scripts/pre-commit-hook-install.mjs
 source: "Antigravity's own hardening test during the 2026-08-29 three-runner greenfield run (docs/pipeline-analysis.md section 5, consumer project Rune_Test1_Agy_060_73); independently corroborated by this repository's own everyday usage pattern on the same day."
@@ -393,3 +397,15 @@ unused — closing the gap the "Progress" note above flagged as
 "correctly NOT landed" pending this PO decision. The hook's refusal of
 an already-tracked-file rewrite with no `--no-verify` and no consumed
 capability is unchanged and unweakened everywhere else in the suite.
+
+## Triage (filled in by the Elephant of the next Pipeline session)
+
+- **Decision:** close
+- **Rationale:** re-verified 2026-08-29: commits `b4908639` (pre-commit-hook
+  install wired into `applyProjectOnboardingV3`), `faf283a7` (first-appearance
+  exemption for a protected path), and `fad21756` (pre-commit hook installer
+  itself, enforcing protected-path rules) are all present in the current tree.
+  Onboarding wiring confirmed at `project-onboarding-v3.mjs` lines ~75-76,
+  4870, 4895, 4897 (`applyInstall` call from `pre-commit-hook-install.mjs`,
+  `preCommitHookInstall` field on both apply-chain return branches).
+- **Date:** 2026-08-29

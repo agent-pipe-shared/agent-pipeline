@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.bootstrap-po-questions-asked-sequentially-instead-of-in-one-block
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-29
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: 7a0702dd6b31d61f110c29dacd8fbf52df50a5f9
+closure_evidence: backlog/items/2026-08-29-bootstrap-po-questions-asked-sequentially-instead-of-in-one-block.md
 sprint: nova
 done_when: manual
 source: "PO observation during the 2026-08-29 three-runner greenfield test (finding F26 of scratch/greenfield-triage-2026-08-29.md)."
@@ -97,3 +101,13 @@ style. `check-consumer-safe-paths.test.mjs` 9/9 green. Independent Critic
 review and PO acceptance still pending; closure evidence is necessarily
 `manual` (a future session's transcript), per the item's own Acceptance
 criteria.
+
+## Triage (filled in by the Elephant of the next Pipeline session)
+
+- **Decision:** close
+- **Rationale:** re-verified 2026-08-29: commit `7a0702dd` is present in the
+  current tree;
+  `plugins/pipeline-core/skills/pipeline-start/references/kickoff-design.md`
+  carries the "Self-check before sending the first bootstrap question"
+  paragraph at lines ~114-121.
+- **Date:** 2026-08-29

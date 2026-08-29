@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.a-dirty-claude-directory-blocks-verify-which-blocks-push-approval
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-29
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: 562ea6bc8f857f53816cb8f08598bf20ce9b6f63
+closure_evidence: backlog/items/2026-08-29-a-dirty-claude-directory-blocks-verify-which-blocks-push-approval.md
 sprint: nova
 done_when: manual
 source: "Antigravity/WSL self-analysis (docs/pipeline-analysis.md, section 2), observed during the 2026-08-29 three-runner greenfield test."
@@ -106,3 +110,13 @@ file/line reference) also remains open — this fix addresses the ignore-rule
 side (what gets tracked), not the specific check inside `verify.mjs` or
 `push-prepare.mjs` that reads tree cleanliness, which was not traced this
 session.
+
+## Triage (filled in by the Elephant of the next Pipeline session)
+
+- **Decision:** close
+- **Rationale:** re-verified 2026-08-29: commit `562ea6bc` confirms
+  `PROJECT_IGNORE_SEED` in `plugins/pipeline-core/lib/project-onboarding-v3.mjs`
+  (present in current tree, lines ~172 onward) includes anchored `.claude/`
+  session-scratch ignore entries; a real `git check-ignore` test in
+  `project-onboarding-v3.test.mjs` covers these paths.
+- **Date:** 2026-08-29

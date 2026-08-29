@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.projection-drift-fault-after-design-implementation-transition-forces-restart
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-29
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: e5504d3f704602aa90b88e7fddb72ea5ad9e15cd
+closure_evidence: backlog/items/2026-08-29-projection-drift-fault-after-design-implementation-transition-forces-restart.md
 sprint: nova
 done_when: manual
 source: "Codex/WSL report, delivered inline in chat by the PO, plus the PO's own observations naming the design→implementation handover as the likely driver defect, during the 2026-08-29 three-runner greenfield test."
@@ -148,4 +152,20 @@ this reproduction's plausibility) currently supports it.
   group. Independent of the F05/F06/F07 chain; may share a root cause with F09
   (restart over-used as the default readiness remedy) — worth checking both
   together.
+- **Date:** 2026-08-29
+
+## Triage (filled in by the Elephant of the next Pipeline session)
+
+- **Decision:** close
+- **Rationale:** re-verified 2026-08-29: the producer is located at
+  `plugins/pipeline-core/lib/project-onboarding-v3.mjs` ~L3864-3993 (per the
+  item's own "UPDATE" section above); commit `e5504d3f` ports the controlled
+  reproduction as permanent regression coverage in
+  `project-onboarding-v3.test.mjs` ("NVA-R40-PROJDRIFT: set-phase --phase
+  implementation does not itself cause projection-drift..."), refuting the
+  phase-transition hypothesis and identifying the real trigger (an untracked
+  `pipeline.user.yaml` edit bypassing regeneration). Per this item's own
+  Acceptance criteria, the "causal link NOT confirmed" branch applies and is
+  satisfied by the reproduction test plus this item's own update — no further
+  code fix is required to close this item.
 - **Date:** 2026-08-29

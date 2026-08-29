@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.agents-talk-the-po-out-of-the-signature
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-28
+closed_at: 2026-08-29
+closure_repository: self
+closure_commit: 955f5ebe58b46a3e26f0b5352a417dc5ec49db08
+closure_evidence: backlog/items/2026-08-28-agents-talk-the-po-out-of-the-signature-instead-of-walking-it.md
 sprint: nova
 tracking: "NOW / Nova A — the one control in the model that is actual protection is the one agents routinely lobby the PO to abandon. Reported by the PO 2026-08-28 as recurring behaviour across agents, not a single incident."
 source: "PO report 2026-08-28: 'aktuell jeder agent mich als PO erstmal zu überreden lieber selber zu pushen oder die config auf chat zu ändern weil signature zu kompliziert ist - und so ist das ja nicht gedacht'. Clarified by the PO: the agent is not able to change the setting, and that is not the problem -- it simply does not want to walk the path."
@@ -144,3 +148,14 @@ were read-context only, not edited by this dispatch's diff. Left
   that made the friction real; fixed 2026-08-28.
 - `2026-08-28-the-push-path-has-no-driver-so-its-five-layers-are-walked-by-hand.md` — the
   driver whose whole value is making the signature the only place a human is asked.
+
+## Triage (filled in by the Elephant of the next Pipeline session)
+
+- **Decision:** close
+- **Rationale:** re-verified 2026-08-29 against current code: commits `5d9577b6`
+  (states the true PO cost, one route only, in `pipeline-state.mjs`'s signature-mode
+  `approve-push` refusal) and `955f5ebe` (EL-35 landed at `roles/elephant.md` line
+  ~78-82, forbidding a `gates.push_approval` downgrade or self-push proposal) are
+  both present in the current tree; `EL-35`'s heading and text confirmed at that
+  exact location.
+- **Date:** 2026-08-29
