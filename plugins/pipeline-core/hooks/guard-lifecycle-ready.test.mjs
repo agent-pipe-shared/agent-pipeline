@@ -1079,10 +1079,22 @@ test("closed command grammar preserves native Windows paths and direct node.exe 
     executable: "node.exe",
     argv: [script, "inspect", "--root", windowsRoot, "--intent", "bootstrap"],
   });
+  // NVA-R15-ROOTADMIT: this test's `windowsRoot` is a fabricated win32 path with no real
+  // directory behind it on the (non-Windows) machine actually running this suite, so the
+  // new resolved-vs-resolved root comparison (rootValueIdentityMatcher) needs
+  // resolveFn/realpathSyncFn identity stand-ins -- same idea as the processExecPath
+  // override just above, applied to the one new seam this fix adds. A real win32 host
+  // needs no such override: resolve()/realpathSync() there already operate on this exact
+  // path natively.
   assert.equal(isSanctionedLifecycleCommand(
     `node.exe "${ONBOARDING_SCRIPT}" inspect --root "${windowsRoot}" --intent bootstrap`,
     windowsRoot,
-    { platform: "win32", processExecPath: "C:\\Program Files\\nodejs\\node.exe" },
+    {
+      platform: "win32",
+      processExecPath: "C:\\Program Files\\nodejs\\node.exe",
+      resolveFn: (value) => value,
+      realpathSyncFn: (value) => value,
+    },
   ), true);
 });
 
@@ -1156,6 +1168,100 @@ test("Claude/Bash-path command parsing ignores a win32 host: $PWD expands and PO
     Object.defineProperty(process, "platform", originalPlatform);
     rmSync(path, { recursive: true, force: true });
   }
+});
+
+// NVA-R15-ROOTADMIT (backlog: 2026-08-28-the-guards-root-admission-compares-a-typed-path-to-
+// a-realpathed-one.md): sanctionedOnboardingArgs()'s --root comparison now runs the typed
+// value through the same resolve()+realpathSync() normalisation the guard's own root
+// already goes through, folded through repository-path-identity.mjs, instead of a byte-exact
+// comparison against the pre-resolved root.
+test("NVA-R15-ROOTADMIT: a --root value that does not resolve at all stays refused, and carries no root-identity-mismatch hint", () => {
+  const path = root();
+  try {
+    const missing = join(path, "does-not-exist");
+    const command = `node '${ONBOARDING_SCRIPT}' inspect --root '${missing}' --intent session`;
+    assert.equal(isSanctionedLifecycleCommand(command, path), false);
+
+    // Acceptance Criteria #3: only a --root value that DOES resolve, to a DIFFERENT place,
+    // is a distinguishable root-identity mismatch. A value that does not resolve at all
+    // stays the ordinary "unadmitted shape" denial, exactly as the byte-exact comparison
+    // this replaces already refused it.
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const result = evaluateLifecycleReadyGuard(bash(command), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { deny("partial"); },
+    });
+    assert.equal(result.exitCode, 2);
+    assert.doesNotMatch(result.stderr, /root-identity mismatch/u);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("NVA-R15-ROOTADMIT: a --root value that resolves to a DIFFERENT real directory stays refused, and the denial names it a root-identity mismatch, not an unadmitted shape", () => {
+  const path = root();
+  const elsewhere = root();
+  try {
+    const command = `node '${ONBOARDING_SCRIPT}' inspect --root '${elsewhere}' --intent session`;
+    // Acceptance Criteria #4 (negative-control regression pin): `elsewhere` is a real,
+    // resolvable directory -- but not `path` -- and must NOT become newly admitted.
+    assert.equal(isSanctionedLifecycleCommand(command, path), false);
+
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const result = evaluateLifecycleReadyGuard(bash(command), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { deny("partial"); },
+    });
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /root-identity mismatch, not an unadmitted command shape/u);
+    assert.match(result.stderr, new RegExp(elsewhere.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "u"));
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(elsewhere, { recursive: true, force: true });
+  }
+});
+
+test("NVA-R15-ROOTADMIT: a symlinked parent resolving to the exact same project root is admitted regardless of which spelling was typed", () => {
+  const path = root();
+  const linkParent = mkdtempSync(join(tmpdir(), "guard-lifecycle-ready-link-parent-"));
+  const link = join(linkParent, "consumer-link");
+  try {
+    symlinkSync(path, link);
+    const command = `node '${ONBOARDING_SCRIPT}' inspect --root '${link}' --intent session`;
+    // The guard's own `root` here is already the real, non-symlinked path (mirroring how
+    // evaluateLifecycleReadyGuard's own realpathSync(resolve(...)) pre-resolves it); the
+    // caller typed the symlinked spelling -- the SAME logical root, a different string.
+    assert.equal(isSanctionedLifecycleCommand(command, path), true);
+  } finally {
+    rmSync(link, { force: true });
+    rmSync(linkParent, { recursive: true, force: true });
+    rmSync(path, { recursive: true, force: true });
+  }
+});
+
+// Platform-specific mismatch shapes (differing separator, differing drive-letter case) have
+// no real Windows filesystem to resolve against on this (non-Windows) test runner. Run under
+// this repository's existing win32 platform-guard convention -- `options.platform: "win32"`
+// plus resolveFn/realpathSyncFn identity stand-ins, the exact technique "closed command
+// grammar preserves native Windows paths and direct node.exe identity" above already uses --
+// never skipped outright on non-Windows.
+test("NVA-R15-ROOTADMIT: differing separator and differing drive-letter case admit the same logical Windows root", () => {
+  const canonicalRoot = "C:\\Users\\Pipeline User\\consumer";
+  const identityOptions = {
+    platform: "win32",
+    processExecPath: "C:\\Program Files\\nodejs\\node.exe",
+    resolveFn: (value) => value,
+    realpathSyncFn: (value) => value,
+  };
+  for (const typedRoot of [
+    "C:/Users/Pipeline User/consumer", // differing separator
+    "c:\\Users\\Pipeline User\\consumer", // differing drive-letter case
+  ]) {
+    const command = `node.exe "${ONBOARDING_SCRIPT}" inspect --root "${typedRoot}" --intent session`;
+    assert.equal(isSanctionedLifecycleCommand(command, canonicalRoot, identityOptions), true, typedRoot);
+  }
+  // Negative control: a genuinely different Windows path, same notation, must NOT admit.
+  const differentRoot = "D:\\Dev\\other";
+  const differentCommand = `node.exe "${ONBOARDING_SCRIPT}" inspect --root "${differentRoot}" --intent session`;
+  assert.equal(isSanctionedLifecycleCommand(differentCommand, canonicalRoot, identityOptions), false);
 });
 
 test("only bounded rg search pipelines and platform null redirect are read-only", () => {

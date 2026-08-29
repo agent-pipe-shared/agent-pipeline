@@ -43,6 +43,11 @@ import {
   readCodexHostRepositoryInitAdmission,
 } from "../lib/codex-host-layout.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+// NVA-R15-ROOTADMIT (backlog: 2026-08-28-the-guards-root-admission-compares-a-typed-path-to-
+// a-realpathed-one.md): the one reviewed, already-consolidated path-identity fold -- reused
+// here rather than writing a fourth independent copy of WSL/Windows path-identity logic
+// (see that module's own header for the three prior copies this consolidated).
+import { repositoryPathIdentityOrSelf } from "../lib/repository-path-identity.mjs";
 import { readPushApprovalMode } from "../lib/critical-human-proof-policy.mjs";
 import {
   consumeHumanGuardOverride,
@@ -2586,7 +2591,78 @@ function withoutRunnerFlag(args) {
   return args;
 }
 
-function sanctionedOnboardingArgs(rawArgs, root) {
+/**
+ * NVA-R15-ROOTADMIT (backlog: 2026-08-28-the-guards-root-admission-compares-a-typed-path-to-
+ * a-realpathed-one.md): the caller's typed `--root` value through the SAME
+ * resolve()+realpathSync() normalisation this file already applies to its own root
+ * (evaluateLifecycleReadyGuard, above), folded through repository-path-identity.mjs's
+ * shared comparator so a residual cross-notation spelling difference (WSL /mnt/<drive>
+ * mount vs. native Windows drive letter, differing case, differing separator) that
+ * survives OS-level realpath still compares equal. A value that does not resolve at all
+ * (does not exist, or is not a path this process's filesystem view can reach) stays
+ * refused, exactly as the byte-exact comparison this replaces already refused it --
+ * `realpathSync` throwing is caught and treated as "does not resolve", never as an error.
+ * `options.resolveFn`/`options.realpathSyncFn` mirror the same injection seam this file
+ * already threads for `parseGuardCommand`'s `options.platform`/`options.processExecPath`
+ * (resolveSanctionedScriptInvocation above): a test exercising native-Windows argv PARSING
+ * on a non-Windows runner has no real win32 filesystem to resolve against, so it injects
+ * identity stand-ins here the same way it already injects a fake `processExecPath`.
+ * Production call sites never pass either override -- both default to the real functions.
+ */
+function resolveRootComparisonValue(value, options = {}) {
+  if (typeof value !== "string" || value === "") return null;
+  const resolveFn = options.resolveFn ?? resolve;
+  const realpath = options.realpathSyncFn ?? realpathSync;
+  try {
+    const resolved = realpath(resolveFn(value));
+    return { resolved, identity: repositoryPathIdentityOrSelf(resolved) };
+  } catch {
+    return null;
+  }
+}
+
+function rootValueIdentityMatcher(root, options = {}) {
+  const rootIdentity = repositoryPathIdentityOrSelf(root);
+  const cache = new Map();
+  return (value) => {
+    if (typeof value !== "string" || value === "") return false;
+    if (cache.has(value)) return cache.get(value);
+    const comparison = resolveRootComparisonValue(value, options);
+    const result = comparison !== null && comparison.identity === rootIdentity;
+    cache.set(value, result);
+    return result;
+  };
+}
+
+/**
+ * NVA-R15-ROOTADMIT: distinguishes a refusal caused specifically by the caller's --root
+ * value resolving to a DIFFERENT physical location than this guard's own root, from every
+ * other reason a sanctioned-script invocation is refused (Direction #2 of the backlog item
+ * above -- "say so and show both sides", extending the same nearMissHint reporting
+ * mechanism `restartResumeHintNearMissWrite`/`restartResumeHintNearMissHint` already use,
+ * rather than inventing a parallel one). Returns `null` -- no distinguishable mismatch --
+ * for a command that is not a recognised sanctioned-script invocation, carries no --root
+ * token, or whose --root token does not resolve at all (that stays the ordinary
+ * "unadmitted shape" refusal, unchanged, exactly as Acceptance Criteria #3 requires).
+ */
+function rootIdentityMismatch(command, root, options = {}) {
+  const resolved = resolveSanctionedScriptInvocation(command, root, options);
+  // Scoped to ONBOARDING_SCRIPT only, matching the exact scope of the comparison fix in
+  // sanctionedOnboardingArgs() above -- the sibling scripts (driver, push-init, migration,
+  // ...) still compare their own --root tokens byte-exact (unchanged, out of scope for this
+  // fix), so a mismatch hint here for one of THEIR commands would describe a comparison that
+  // was never actually applied to them.
+  if (resolved === null || resolved.script !== ONBOARDING_SCRIPT) return null;
+  const args = withoutRunnerFlag(resolved.args);
+  const rootIndex = args.indexOf("--root");
+  if (rootIndex === -1) return null;
+  const typedValue = args[rootIndex + 1];
+  const comparison = resolveRootComparisonValue(typedValue, options);
+  if (comparison === null || comparison.identity === repositoryPathIdentityOrSelf(root)) return null;
+  return { typedValue, resolvedTyped: comparison.resolved, root };
+}
+
+function sanctionedOnboardingArgs(rawArgs, root, options = {}) {
   const args = withoutRunnerFlag(rawArgs);
   // NVA-BOOTADMIT-2: every branch below matches its argv TAIL through matchFlagSpec()
   // (defined near exactRoot()) rather than checking fixed positions -- the declared flag SET
@@ -2594,7 +2670,7 @@ function sanctionedOnboardingArgs(rawArgs, root) {
   // to match construction order. Shared validators, one per flag semantics, reused across
   // branches below exactly where the original per-branch checks already agreed with each
   // other; every branch still states its OWN flag set and required/optional split.
-  const isRootValue = (value) => value === root;
+  const isRootValue = rootValueIdentityMatcher(root, options);
   const isHexDigest = (value) => HEX.test(value);
   const isIntentValue = (value) => ["onboarding", "bootstrap", "session", "dispatch"].includes(value);
   const isLanguageValue = (value) => ["de", "en"].includes(value);
@@ -3267,7 +3343,7 @@ export function isSanctionedLifecycleCommand(command, root, options = {}) {
   const resolved = resolveSanctionedScriptInvocation(command, root, options);
   if (resolved === null) return false;
   const { script, args } = resolved;
-  if (script === ONBOARDING_SCRIPT) return sanctionedOnboardingArgs(args, root);
+  if (script === ONBOARDING_SCRIPT) return sanctionedOnboardingArgs(args, root, options);
   // NVA-K-DRIVERREACH: admitted read-only by exact argv shape (sanctionedDriverArgs() above)
   // -- grants no authority beyond ONBOARDING_SCRIPT's own admissions just above, since every
   // mutating step this driver spawns is itself re-checked against this same guard when it
@@ -3796,6 +3872,21 @@ function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
     const invalidObservation = error instanceof ProjectOnboardingReadyError
       && error.code === "PORG-INVALID-OBSERVATION"
       && error.intent === "session";
+    // NVA-R15-ROOTADMIT: same discoverability fix as restartResumeHintNearMissHint above,
+    // for a different near miss -- a recognised sanctioned-script invocation refused only
+    // because its --root token resolves to a different physical location than this guard's
+    // own root. Mutually exclusive with restartResumeHintNearMissHint by construction (one
+    // fires only for WRITE_TOOLS, the other only for toolName === "Bash"), so a plain
+    // fallback is enough -- never both truthy for the same denial.
+    const rootMismatch = toolName === "Bash"
+      ? rootIdentityMismatch((input.tool_input.command ?? input.tool_input.CommandLine), root)
+      : null;
+    const rootIdentityMismatchHint = rootMismatch
+      ? `This command's shape is otherwise recognised, but its --root value `
+        + `("${rootMismatch.typedValue}", resolving to ${rootMismatch.resolvedTyped}) is not `
+        + `the same project root as this guard's own root (${rootMismatch.root}) -- the `
+        + "refusal is a root-identity mismatch, not an unadmitted command shape."
+      : null;
     return toolName === "Bash"
       && (isSanctionedLifecycleCommand((input.tool_input.command ?? input.tool_input.CommandLine), root)
         || isSanctionedGhReadOnlyDiagnostic((input.tool_input.command ?? input.tool_input.CommandLine), root))
@@ -3811,7 +3902,7 @@ function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
         "",
         null,
         null,
-        restartResumeHintNearMissHint,
+        restartResumeHintNearMissHint ?? rootIdentityMismatchHint,
         invalidObservation,
       );
   }
