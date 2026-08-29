@@ -21,11 +21,30 @@
  * codebase -- `safePath` alone is already duplicated in half a dozen files
  * here). Only the two correction functions themselves move; nothing else in
  * either caller's behaviour changes.
+ *
+ * NVA-W9-DRIFTREPAIR: this module now also imports
+ * `planRunnerProfileMigrationV3`/`applyRunnerProfileMigrationV3` from
+ * `runner-profile-migration-v3.mjs` (backlog:
+ * onboarding-produces-drift-it-then-has-to-repair), which itself imports FROM
+ * `project-onboarding-v3.mjs` (`freshCalibrationBytes`/`freshManifestBytes`).
+ * Combined with `project-onboarding-v3.mjs` already importing this module,
+ * that closes a real three-module import cycle
+ * (onboarding-language-correction.mjs -> runner-profile-migration-v3.mjs ->
+ * project-onboarding-v3.mjs -> onboarding-language-correction.mjs) -- the
+ * "deliberate leaf" claim the paragraph above still makes for the other four
+ * imports no longer extends to this one. This is safe by the same reasoning
+ * `project-onboarding-v3.mjs` and `runner-profile-migration-v3.mjs` already
+ * rely on for their OWN existing direct two-module cycle: every one of these
+ * three modules only ever calls the imported bindings from inside a function
+ * body, never at top-level module-evaluation time, so ESM's hoisted
+ * `export function` bindings resolve correctly regardless of which of the
+ * three modules a given entry point happens to load first.
  */
 import { parseYaml } from "./yaml-lite.mjs";
 import { validatePipelineUserV3 } from "./runner-profiles-v3.mjs";
 import { poGateProfileProjectionPaths } from "./po-gate-authority.mjs";
 import { NEUTRAL_MANIFEST } from "./project-authority.mjs";
+import { applyRunnerProfileMigrationV3, planRunnerProfileMigrationV3 } from "./runner-profile-migration-v3.mjs";
 
 const SOURCE = "pipeline.user.yaml";
 const SAFE_RELATIVE = /^(?!\/)(?!.*(?:^|\/)\.\.?($|\/))[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/u;
@@ -112,11 +131,58 @@ function seededManifestLanguageBlock(language) {
   return `language:\n  human_facing: ${language}\n`;
 }
 
-// Verbatim move of project-onboarding-v3.mjs's `correctSeededKickoffLanguage`
-// (its own comment, unchanged): corrects the seeded `pipeline.user.yaml` and
-// both runtime-manifest tiers' operator-facing language marker after the PO's
-// real kickoff answer diverges from the fresh-seed default -- fails closed
-// rather than rewriting anything unrecognized.
+// NVA-W9-DRIFTREPAIR (backlog: onboarding-produces-drift-it-then-has-to-repair):
+// the two narrow byte patches above only ever touch the exact
+// "language:\n  human_facing: <x>\n" span inside the two known fresh-seed
+// manifests -- any OTHER runtime target the V3 projection owns (or those same
+// two files, for any OTHER reason they might already differ from a fresh
+// derivation) is regenerated here, from the now-corrected source, in the SAME
+// correction transaction, so the caller's next lifecycle inspection never has
+// to discover projection drift and route through the manual
+// plan-repair/apply-repair follow-up (the exact "partial" branch,
+// project-onboarding-v3.mjs, still correctly serves any OTHER, unrelated
+// drift cause -- this only ever closes drift a language correction runs
+// alongside). Mirrors the existing repair-apply call shape exactly
+// (project-onboarding-v3.mjs's applyLifecycle, operation === "repair"):
+// initializeMissingRuntimeForSlimV3 stays false because the correction only
+// ever runs after runtime targets already exist (kickoff/promotion apply
+// always seed them first); overlayCalibration stays false because this path
+// is always an ordinary consumer project, never a private overlay activating
+// itself (see planRunnerProfileMigrationV3's own parameter comment).
+//
+// Fails closed only for the one case this bug is actually about: a "ready"
+// plan (real drift) that then fails to apply. Any OTHER plan status
+// (invalid-root, invalid-source, invalid-intent, invalid-baseline,
+// recovery-required, invalid-authority-lock, or "noop") is left exactly
+// alone -- those are pre-existing runtime-baseline conditions unrelated to
+// this correction, already owned by their own dedicated lifecycle branches,
+// and forcing this correction to fail on them would be a NEW failure mode
+// this fix must not introduce.
+function regenerateRuntimeProjection(root, fs) {
+  const plan = planRunnerProfileMigrationV3({
+    rootDir: root,
+    deps: fs,
+    initializeMissingRuntimeForSlimV3: false,
+    overlayCalibration: false,
+  });
+  if (plan.status !== "ready") return;
+  const applied = applyRunnerProfileMigrationV3(plan, { rootDir: root, activate: true, deps: fs });
+  if (applied.status !== "applied") {
+    throw new Error(`kickoff language correction failed to regenerate the drifted runtime projection (${applied.status})`);
+  }
+}
+
+// Originally a verbatim move of project-onboarding-v3.mjs's
+// `correctSeededKickoffLanguage`: corrects the seeded `pipeline.user.yaml`
+// and both runtime-manifest tiers' operator-facing language marker after the
+// PO's real kickoff answer diverges from the fresh-seed default -- fails
+// closed rather than rewriting anything unrecognized. The two narrow byte
+// patches below are UNCHANGED from that original. NVA-W9-DRIFTREPAIR adds
+// the final `regenerateRuntimeProjection` call: once the source and the two
+// known manifests are corrected, the same correction transaction also
+// regenerates the complete runtime projection from that corrected source, so
+// a language switch never leaves the caller's next lifecycle inspection to
+// discover projection drift on its own.
 export function correctSeededKickoffLanguage(root, resolvedLanguage, fs) {
   const sourcePath = safePath(root, SOURCE, fs);
   const intent = parseYaml(fs.readFileSync(sourcePath, "utf8"));
@@ -134,6 +200,7 @@ export function correctSeededKickoffLanguage(root, resolvedLanguage, fs) {
     if (start === -1 || bytes.indexOf(before, start + 1) !== -1) throw new Error(`kickoff language correction: ${relative} is not the expected fresh-seed shape`);
     fs.writeFileSync(target, bytes.slice(0, start) + after + bytes.slice(start + before.length), { encoding: "utf8", mode: 0o600 });
   }
+  regenerateRuntimeProjection(root, fs);
   return true;
 }
 

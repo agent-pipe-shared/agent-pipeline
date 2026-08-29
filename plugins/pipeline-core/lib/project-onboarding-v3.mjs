@@ -152,7 +152,7 @@ const USER_RESERVED_PATHS = new Set([".agents", ".claude", ".codex", "project"])
  * for GF-084; see the regression test extending IGNORESEED-1 for the checked-in
  * proof against a real Git repository).
  *
- * All three entries are ANCHORED (`/scratch/`, not `scratch/`). An unanchored rule
+ * Every entry is ANCHORED (`/scratch/`, not `scratch/`). An unanchored rule
  * is how `evidence/` once swallowed `backlog/evidence/` in this repository and
  * silently broke the closure citations the backlog gate demands
  * (`pipeline.over-broad-ignore-rule-swallows-closure-evidence`). The same
@@ -185,6 +185,22 @@ const PROJECT_IGNORE_SEED = [
   "# tracked dirties the tree on every command and can invalidate an already",
   "# signed, commit-bound push approval if it gets re-committed after signing.",
   "/project/pipeline-state.json",
+  "",
+  "# Claude Code session-scratch state under .claude/: worktree-isolated dispatch",
+  "# directories and per-session usage/consent/model-identity markers this",
+  "# Pipeline's own scripts write. Named individually, NOT a blanket `.claude/`",
+  "# ignore -- .claude/settings.json, .claude/pipeline.json and",
+  "# .claude/pipeline.yaml are tracked project configuration and must stay",
+  "# tracked. Leaving these untracked-but-unignored is what left a dirty tree",
+  "# blocking verify and, in turn, push approval on a fresh greenfield project",
+  "# (2026-08-29 backlog: a-dirty-claude-directory-blocks-verify-which-blocks-",
+  "# push-approval.md).",
+  "/.claude/worktrees/",
+  "/.claude/settings.local.json",
+  "/.claude/.usage-*.json",
+  "/.claude/.stop-suggest-*.json",
+  "/.claude/.pipeline-install-consent-*.json",
+  "/.claude/.main-session-model-identity-*.json",
   "",
 ].join("\n");
 // Derived, never a second hand-copied list: these are the exact anchored
@@ -3923,6 +3939,29 @@ function v4Inspection(rootDir, fs, intent = "onboarding", runner) {
             }
           }
           const runtime = { ...emptyRuntime(initialize ? "missing" : "projection-drift"), sourceSha256: runtimePlan.sourceSha256 ?? null };
+          // NVA-W9-DRIFTREPAIR: a real continuity classification is attached
+          // here (mirroring afterRuntimeLifecycleResult's own try/catch
+          // pattern above) instead of the default emptyContinuity() this
+          // result used to carry. The reported top-level `status` below is
+          // completely unchanged -- still exactly "projection-drift"/
+          // "runtime-initialization-required" for every existing caller.
+          // Only `applyProjectOnboardingKickoffV4`'s own gate (this module)
+          // reads `observed.continuity.status` to admit a pristine,
+          // not-yet-kicked-off project through kickoff apply despite genuine
+          // unrelated drift, so `correctSeededKickoffLanguage`'s
+          // `regenerateRuntimeProjection()` call can repair that SAME drift
+          // atomically instead of every caller being stuck reading
+          // "unavailable" here forever.
+          let continuity;
+          try {
+            continuity = (fs.classifyOnboardingContinuity ?? classifyOnboardingContinuity)({
+              rootDir: legacy.root,
+              repositoryCapability: repository.mode,
+              spawn: fs.spawnSync,
+            });
+          } catch {
+            continuity = emptyContinuity();
+          }
           return lifecycleResult({
             status: initialize ? "runtime-initialization-required" : "projection-drift",
             root: legacy.root,
@@ -3930,6 +3969,7 @@ function v4Inspection(rootDir, fs, intent = "onboarding", runner) {
             intent,
             repository,
             runtime,
+            continuity,
             nextAction: commandAction(lifecycleArgv([ONBOARDING_SCRIPT, initialize ? "plan-runtime" : "plan-repair", "--root", legacy.root], runner, intent), false, false, SCHEMA, [initialize ? "runtime-initialization-required" : "projection-drift"]),
             diagnostics: [lifecycleDiagnostic("$.runtime", initialize ? "runtime_missing" : "projection_drift", initialize ? "required Codex runtime targets are absent" : "generated runtime bytes differ from the V3 projection", "review the lifecycle runtime plan")],
           });
@@ -5854,7 +5894,18 @@ export function applyProjectOnboardingKickoffV4({
   // See KICKOFF_PLAN_ADMITTED_STATUSES above (design SSe; NVA-W5-COORD-STEP6-1):
   // "ready" is kept for the exact same replay-after-apply case it always
   // covered, unrelated to this widening.
-  if ((!KICKOFF_PLAN_ADMITTED_STATUSES.has(observed.status) && observed.status !== "ready")
+  // NVA-W9-DRIFTREPAIR: "projection-drift" is ALSO admitted here -- apply
+  // only, never plan; KICKOFF_PLAN_ADMITTED_STATUSES itself stays untouched
+  // so planProjectOnboardingKickoffV4's own gate above is unaffected. A
+  // project that is otherwise still pristine (continuity.status stays the
+  // controlling check right below, completely unchanged) but happens to
+  // carry drift in a runtime target unrelated to this kickoff must not be
+  // handed back its own drift status here: applyOnboardingKickoff below
+  // still runs exactly as before, and correctSeededKickoffLanguage's own
+  // regenerateRuntimeProjection() call repairs that SAME drift, atomically,
+  // in the same correction transaction, for any drifted V3 runtime target
+  // the migration governs -- not special-cased to any one file.
+  if ((!KICKOFF_PLAN_ADMITTED_STATUSES.has(observed.status) && observed.status !== "ready" && observed.status !== "projection-drift")
     || !["absent-pristine", "valid"].includes(observed.continuity.status)) {
     return observed;
   }
