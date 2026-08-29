@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "46cf18800bc37602010482dd326df4ecc3cc6cc113362c87d20bf37788f07ce4"
+    "transitionHead": "e175fed1612fd833253ec2c2260f6e9a84bd7c4187d123a51e0fe350dff2f84a"
   },
   "counts": {
-    "open": 92,
+    "open": 91,
     "in_progress": 3,
-    "closed": 428,
+    "closed": 429,
     "rejected": 3,
     "deferred": 11
   },
@@ -5423,12 +5423,16 @@
     },
     {
       "id": "pipeline.scratch-cleanup-mechanism-not-wired-to-any-event",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "SCRATCH-1 dispatch, 2026-08-08, reported as its own open item. The PO had asked the question directly the same night: 'hoffe nur es gibt einen Event der die Sachen auch wieder aufräumt'.",
-      "deferred": true
+      "deferred": true,
+      "closedAt": "2026-08-29",
+      "closureRepository": "self",
+      "closureCommit": "3ede9d0d",
+      "closureEvidence": "plugins/pipeline-core/hooks/staleness-check.test.mjs"
     },
     {
       "id": "pipeline.scratch-write-exemption-does-not-cover-restart-required",
