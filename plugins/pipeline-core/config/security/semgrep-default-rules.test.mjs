@@ -19,7 +19,10 @@ import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-const RULES_PATH = fileURLToPath(new URL("./semgrep-default-rules.yml", import.meta.url));
+// NVA-R18-SCANBOOT (2026-08-29): the shipped ruleset itself now lives at
+// security/semgrep/pipeline.yml (matching the backlog item's own done_when path);
+// this test file stays put and just points at the relocated file.
+const RULES_PATH = fileURLToPath(new URL("../../security/semgrep/pipeline.yml", import.meta.url));
 
 let pass = 0;
 const failures = [];

@@ -34,7 +34,8 @@
  *     gitleaks+osv-scanner+license-check enabled, semgrep enabled").
  *   - `security.scanners.semgrep.rules_dir` -- resolved to `<rootDir>/<rules_dir>`; absent
  *     -> NVA-B-SCANNER (2026-08-28): falls back to the plugin-shipped default ruleset
- *     (`config/security/semgrep-default-rules.yml`, resolved relative to THIS file, never
+ *     (`security/semgrep/pipeline.yml`, relocated here by NVA-R18-SCANBOOT 2026-08-29,
+ *     resolved relative to THIS file, never
  *     rootDir), not semgrep's own "auto" registry mode -- "auto" was MEASURED to fail
  *     outright under this codebase's fixed `SEMGREP_SEND_METRICS=off` scan env. See
  *     `buildAdapterConfig()`'s own doc comment for the full rationale.
@@ -139,7 +140,7 @@ const DEFAULT_GOVERNANCE_POLICIES_PATH = "governance/examples/policies";
 // `governance/examples/policies/license-allowlist.json` at all (that path exists only in the
 // Pipeline's own repository).
 const PLUGIN_ROOT = fileURLToPath(new URL("..", import.meta.url));
-const DEFAULT_SEMGREP_RULES_PATH = join(PLUGIN_ROOT, "config", "security", "semgrep-default-rules.yml");
+const DEFAULT_SEMGREP_RULES_PATH = join(PLUGIN_ROOT, "security", "semgrep", "pipeline.yml");
 const DEFAULT_LICENSE_ALLOWLIST_PATH = join(PLUGIN_ROOT, "config", "security", "license-allowlist.default.json");
 // NVA-SECGATE-1: no local DEFAULT_GATE_MODE / resolveGateMode anymore -- both now live as
 // the single shared `resolveSecurityGateMode()` in ../lib/security-completeness-gate.mjs
