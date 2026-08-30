@@ -300,6 +300,59 @@ separate, unstarted design. Until that exists, sequence is the only
 protection: finalize everything that will be committed, commit it, THEN
 start Layer 2/3.
 
+### The identical binding applies to `guard-human-override.mjs`'s general override ceremony
+
+The `plan` / `prepare-authorization` / `emit-signature-digest` /
+`authorize-by-signature` chain in
+`plugins/pipeline-core/lib/human-guard-override.mjs` (CLI wrapper:
+`scripts/guard-human-override.mjs`) — used to obtain a signed PO override for
+an arbitrary guard denial (e.g. an edit to a protected path like
+`.claude/settings.json`/`hooks.json`), not specifically a push — binds the
+PO's signature to the repository's exact whole-tree HEAD (`{commit, tree}`
+from `git rev-parse HEAD` / `git rev-parse HEAD^{tree}`) at `plan` time, the
+same way `approve-push` does above. `authorize-by-signature` re-checks this
+at arm time and refuses with `HGO-CANDIDATE-DRIFT` on any mismatch.
+
+**This is stricter than the push-approval case above in one important way:
+it is NOT limited to the operator's own commits.** Any commit landing on
+HEAD before `authorize-by-signature` consumes the signature — including a
+totally unrelated, concurrent background dispatch's commit that touches
+different files entirely — invalidates the ceremony and forces
+`refreeze-plan` plus a brand-new PO signature for the byte-identical edit
+(live-reproduced 2026-08-30,
+`backlog/items/2026-08-30-hgo-candidate-drift-invalidates-ceremony-on-any-concurrent-commit.md`).
+
+**Why the binding stays whole-tree, not narrowed to the target path:** the
+frozen plan also freezes a safety analysis of the specific override being
+granted (`eligiblePaths`/`preview`/`denials`) that is never recomputed at
+arm time, and `signedCandidate` is not only an internal freshness check — it
+is baked directly into the PO's own Ed25519-signed intent. Narrowing what it
+binds to would change what the PO is cryptographically attesting to, and
+proving that only the target path's bytes can affect the frozen safety
+analysis (no interaction via shared directory components, symlink
+placement, or path classification elsewhere in the tree) is a security claim
+that has not been verified — so the strict, whole-tree invariant is kept by
+design rather than narrowed speculatively (see the code comment at the
+`HGO-CANDIDATE-DRIFT` `fail()` site in `human-guard-override.mjs`).
+
+**Practical mitigation, until a narrower binding is proven safe:**
+- Treat an open HGO signature ceremony (between `plan` and
+  `authorize-by-signature`) exactly like the push-approval ordering rule
+  above: avoid committing anything yourself, and avoid launching or letting
+  other concurrent dispatches/sessions land commits, while the ceremony is
+  open.
+- `guard-human-override.mjs plan` prints a best-effort ADVISORY on stderr
+  naming this risk every time, plus a heightened one when `git worktree
+  list` shows other worktrees present. That heightened signal is partial
+  only — it does not detect a concurrent commit landing directly into the
+  SAME (shared) checkout, which has been the more common case in this
+  repository's own history.
+- Seed the request, get the PO's signature, and consume it with
+  `authorize-by-signature` as one uninterrupted sequence — do not interleave
+  other work (including writing a briefing) between
+  `prepare-for-signature`/`emit-signature-digest` and
+  `authorize-by-signature`.
+
 ### Layer 4 — consume the proof into pipeline state (agent work)
 
 ```
