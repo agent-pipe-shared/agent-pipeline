@@ -51,6 +51,27 @@ assert.throws(() => prepareNativeReadback({ ...{
   transactionId: "btm-d2-1", provider: "codex", pluginId: "pipeline-core", sourceOid: hex("a", 40), loadedRootKind: "codex-provider-cache",
   manifest: { relativePath: ".codex-plugin/plugin.json", name: "pipeline-core", version: "0.2.0", digest: manifestDigest }, loadedChain: [{ relativePath: "hooks/guard-push.mjs", expectedDigest: guardDigest }], extra: true,
 } }), /keys/);
+const antigravityRoot = mkdtempSync(join(tmpdir(), "native-readback-antigravity-"));
+mkdirSync(join(antigravityRoot, "hooks"));
+const antigravityManifest = JSON.stringify({ name: "agent-pipeline-core", version: "0.2.0" });
+writeFileSync(join(antigravityRoot, "plugin.json"), antigravityManifest);
+writeFileSync(join(antigravityRoot, "hooks/antigravity-pretool-guard.mjs"), "antigravity-adapter");
+const antigravityPrepared = prepareNativeReadback({
+  transactionId: "btm-d2-antigravity", provider: "antigravity", pluginId: "pipeline-core", sourceOid: hex("b", 40), loadedRootKind: "antigravity-project-scope",
+  manifest: { relativePath: "plugin.json", name: "agent-pipeline-core", version: "0.2.0", digest: createHash("sha256").update(antigravityManifest).digest("hex") },
+  loadedChain: [{ relativePath: "hooks/antigravity-pretool-guard.mjs", expectedDigest: digest("antigravity-adapter") }],
+});
+let antigravityState = antigravityPrepared;
+for (const phase of ["update-observed", "reload-observed", "trust-observed", "fresh-session-observed"]) {
+  antigravityState = recordNativeReadbackStep(antigravityState, { expectedRevision: antigravityState.revision, expectedStateSha256: digest(antigravityState), phase, observation: { status: "observed", phase, evidenceDigest: hex(String(antigravityState.revision + 1)), observedAt: antigravityState.revision + 1 } });
+}
+assert.equal(finalizeNativeReadback(antigravityState, antigravityRoot).phase, "verified");
+assert.throws(() => prepareNativeReadback({
+  transactionId: "btm-d2-antigravity-invalid", provider: "antigravity", pluginId: "pipeline-core", sourceOid: hex("b", 40), loadedRootKind: "antigravity-project-scope",
+  manifest: { relativePath: "plugin.json", name: "pipeline-core", version: "0.2.0", digest: createHash("sha256").update(antigravityManifest).digest("hex") },
+  loadedChain: [{ relativePath: "hooks/antigravity-pretool-guard.mjs", expectedDigest: digest("antigravity-adapter") }],
+}), /manifest invalid/);
 rmSync(root, { recursive: true, force: true });
 rmSync(common, { recursive: true, force: true });
-console.log("native-plugin-readback: 8 tests passed");
+rmSync(antigravityRoot, { recursive: true, force: true });
+console.log("native-plugin-readback: 10 tests passed");
