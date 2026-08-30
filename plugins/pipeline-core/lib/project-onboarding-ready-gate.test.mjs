@@ -81,6 +81,17 @@ function readyResultWithPushApprovalKeys(rootDir, intent, runner = "codex") {
   return result;
 }
 
+function implementationHandoverAction() {
+  return {
+    kind: "command",
+    executable: "node",
+    argv: ["/plugin/pipeline-state.mjs", "set-phase", "--phase", "implementation"],
+    mutation: true,
+    requiresConfirmation: true,
+    expected: { schema: "pipeline.project-onboarding.v4", statuses: ["ready"] },
+  };
+}
+
 function withClaudecode(value, run) {
   const had = Object.prototype.hasOwnProperty.call(process.env, "CLAUDECODE");
   const previous = process.env.CLAUDECODE;
@@ -207,6 +218,50 @@ test("a real V4 ready observation carrying pushApprovalMode/trustAnchorAvailabil
       status: "ready",
       intent: "session",
     });
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("a ready observation may carry the producer's helpful design-to-implementation handover without becoming PORG-INVALID-OBSERVATION", () => {
+  const path = root();
+  try {
+    const observed = readyResultWithPushApprovalKeys(path, "session");
+    observed.nextAction = implementationHandoverAction();
+    const result = requireProjectOnboardingReady({
+      rootDir: path,
+      intent: "session",
+      runner: "codex",
+      inspect: () => observed,
+    });
+    assert.deepEqual(result, {
+      schema: PROJECT_ONBOARDING_READY_GATE_SCHEMA,
+      status: "ready",
+      intent: "session",
+    });
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("the ready handover exception remains closed to arbitrary or malformed actions", () => {
+  const path = root();
+  try {
+    const valid = implementationHandoverAction();
+    const invalidActions = [
+      { ...valid, argv: ["/plugin/not-pipeline-state.mjs", ...valid.argv.slice(1)] },
+      { ...valid, argv: [valid.argv[0], "set-phase", "--phase", "design"] },
+      { ...valid, mutation: false },
+      { ...valid, requiresConfirmation: false },
+      { ...valid, unexpected: true },
+      { ...valid, expected: { schema: valid.expected.schema, statuses: ["ready", "partial"] } },
+    ];
+    for (const nextAction of invalidActions) {
+      const observed = readyResultWithPushApprovalKeys(path, "dispatch");
+      observed.nextAction = nextAction;
+      assert.throws(() => requireProjectOnboardingReady({
+        rootDir: path,
+        intent: "dispatch",
+        runner: "codex",
+        inspect: () => observed,
+      }), (error) => error instanceof ProjectOnboardingReadyError && error.code === "PORG-INVALID-OBSERVATION");
+    }
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
