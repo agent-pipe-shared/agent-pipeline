@@ -36,6 +36,15 @@ repository's current `gates.push_approval: signature` is unchanged.
 
 **PO's own standing instruction, still in force: STOP after this stamp and wait for the PO's own greenfield happy-path re-test of the locally stamped candidate before any push-approval ceremony.** Nothing here authorizes a push. `gates.push_approval: signature` unchanged.
 
+**Emergency push, 2026-08-30 — PO-executed from a terminal, `--no-verify`, no approval recorded.** Under time pressure the PO committed the open tree and pushed both working branches by hand, on the PO's own explicit decision. What went out, both confirmed against the remote with `git ls-remote`:
+
+- Nova, this repository: `cc22ffa630aa30f72510ee5d6c98961b275eeac8` → `origin` `refs/heads/feat/sprint-nova-codex-v046`. Two commits were made immediately before it, both follow-ups to `00c65908`: `df1665f7` (`chore(canon)`: register ADR-0076 in `UNIVERSAL_ADRS`, rebaseline the `harness/review-protocol.md` `rawSha256` in the isolated-critic protected preimage) and `cc22ffa6` (`test(gates)`: drive `approve-push` through the terminal-free global chat posture, add `humanApproval` to two release-preflight fixtures).
+- Alfred, the `agent-pipeline-share_alfred` checkout: `d418ee953ecf5581abbeca7bb06d261b49c6ac35` → same remote, `refs/heads/feat/sprint-alfred` (branch had no upstream before, pushed with `-u`). That commit already existed; only the push is new.
+
+**What was skipped, stated plainly:** `--no-verify` makes git skip hook invocation entirely, so `.git/hooks/pre-push` never ran in either repository. **No push approval exists for either tip** — `pipeline-state.mjs approve-push` was not run, no Ed25519 proof was produced, and `gates.push_approval: signature` is unchanged and unsatisfied. Nothing in the repository records these pushes as approved; the hook's own header documents that a `--no-verify` push leaves no trace there by design. This also knowingly overrides the standing "STOP after this stamp, no push before the PO's own greenfield happy-path re-test" instruction recorded directly above. No force-push, history rewrite, branch/tag deletion or protected-branch write was involved — both pushes were plain fast-forwards to feature branches.
+
+**Open for reconciliation, next session:** (1) decide whether the two pushed tips get a retroactive record — a completed approval ceremony against them, or a documented waiver — or whether the deviation stands as logged here only; (2) decide whether the pre-push hook should gain an explicit emergency-bypass audit path, since today it can only record pushes that went *through* it, which is precisely the case an emergency bypass is not. Both are Nova B candidates, neither is filed as a backlog item yet.
+
 ## Prior current handover — the three-runner greenfield findings are being worked, happy path first (2026-08-28)
 
 **READ THIS FIRST.** The greenfield test ran candidate 0.6.0 across Claude/Windows,
