@@ -2838,8 +2838,13 @@ function sanctionedOnboardingArgs(rawArgs, root, options = {}) {
 
 /**
  * NVA-K-DRIVERREACH: the guided driver's own exact argv surface (`parseArgs()` in
- * scripts/onboarding-init.mjs) and nothing wider than it -- `--root <root>` required,
- * `--runner <claude|codex|antigravity>` and `--step-cap <positive integer>` both optional,
+ * scripts/onboarding-init.mjs). The ordinary driving shape keeps `--root <root>` required,
+ * with `--runner <claude|codex|antigravity>` and `--step-cap <positive integer>` optional.
+ * A second, closed shape is the attended first-anchor bootstrap published by the driver's
+ * own collect-input contract: it requires an explicit runner plus all four setup answers,
+ * permits no step cap, pins the destination/key paths outside this repository, and enforces
+ * the mode-dependent `absolute existing path` versus literal `none` choice here as well as
+ * in the driver. Raw po-human-approval setup remains denied by isHumanPoSigningCommand().
  * order-insensitive via matchFlagSpec() like every sibling admission above. Deliberately
  * NOT admitting `--help`/`-h` here (unlike GF-093's ONBOARDING_SCRIPT admission just above):
  * the acceptance criteria this closes name only the three chaining flags, so this stays the
@@ -2849,7 +2854,7 @@ function sanctionedOnboardingArgs(rawArgs, root, options = {}) {
  * refuse.
  */
 function sanctionedDriverArgs(args, root) {
-  return matchFlagSpec(args, {
+  const ordinary = matchFlagSpec(args, {
     requiredValue: { "--root": (value) => value === root },
     optionalValue: {
       "--runner": (value) => VALID_RUNNERS.has(value),
@@ -2859,6 +2864,25 @@ function sanctionedDriverArgs(args, root) {
       },
     },
   });
+  if (ordinary) return true;
+
+  const nonEmpty = (value) => typeof value === "string" && value.trim().length > 0 && !value.startsWith("--");
+  const externalAbsolute = (value) => isAbsolute(value) && !pathInside(root, resolve(value));
+  const bootstrap = matchFlagSpec(args, {
+    requiredValue: {
+      "--root": (value) => value === root,
+      "--runner": (value) => VALID_RUNNERS.has(value),
+      "--trust-anchor-mode": (value) => value === "existing" || value === "new",
+      "--trust-anchor-directory": externalAbsolute,
+      "--trust-anchor-human-name": (value) => nonEmpty(value) && value.length <= 512,
+      "--trust-anchor-existing-key": (value) => value === "none" || externalAbsolute(value),
+    },
+  });
+  if (!bootstrap) return false;
+  const valueAfter = (flag) => args[args.indexOf(flag) + 1];
+  const mode = valueAfter("--trust-anchor-mode");
+  const existingKey = valueAfter("--trust-anchor-existing-key");
+  return mode === "new" ? existingKey === "none" : existingKey !== "none";
 }
 
 /**

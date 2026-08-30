@@ -555,6 +555,10 @@ function invokeCaptured(argv, deps) {
   }
 }
 
+function acknowledgedApplyArgs(plan, runner = "codex") {
+  return [...plan.applyAction.argv.slice(1), "--runner", runner];
+}
+
 // NVA-GF-GREENFIELD-POACKROOT-1: onboarding presents project-scoped commands
 // with an explicit --root. The acknowledge family must accept that exact
 // ordinary CLI shape instead of misdiagnosing the otherwise-present --by as
@@ -631,7 +635,7 @@ function invokeCaptured(argv, deps) {
   // --by itself (backlog/items/2026-08-28-a-gate-should-not-demand-a-human-
   // name-typed-byte-exactly.md).
   const attendedDeps = { ...deps, isattyFn: () => true, readLineFn: () => PO_ACK_APPLY_CONFIRMATION_TOKEN };
-  const applied = invokeCaptured(plan.applyAction.argv.slice(1), attendedDeps);
+  const applied = invokeCaptured(acknowledgedApplyArgs(plan), attendedDeps);
   assert.equal(applied.status, 0, applied.err);
   const prdAfter = readFileSync(join(root, planPath), "utf8");
   assert.match(prdAfter, /<!-- po-plan-acknowledged: content-sound-and-spec-consistent -->/u,
@@ -675,7 +679,7 @@ function invokeCaptured(argv, deps) {
   const planned = invokeCaptured(["po-authority-acknowledge-plan", "--by", "PO"], deps);
   assert.equal(planned.status, 0, planned.err);
   const plan = JSON.parse(planned.out);
-  const realArgv = plan.applyAction.argv.slice(1);
+  const realArgv = acknowledgedApplyArgs(plan);
   const shaIndex = realArgv.indexOf("--plan-sha256") + 1;
   const wrongSha = realArgv[shaIndex] === "f".repeat(64) ? "e".repeat(64) : "f".repeat(64);
   const staleArgv = [...realArgv];
@@ -716,7 +720,7 @@ function invokeCaptured(argv, deps) {
   assert.equal(planned.status, 0, planned.err);
   const plan = JSON.parse(planned.out);
   assert.equal(plan.by, "PO", "the plan payload must record who is attributed");
-  const realArgv = plan.applyAction.argv.slice(1);
+  const realArgv = acknowledgedApplyArgs(plan);
   const byIndex = realArgv.indexOf("--by") + 1;
   const mismatchedArgv = [...realArgv];
   mismatchedArgv[byIndex] = "Someone Else";
@@ -762,7 +766,7 @@ function invokeCaptured(argv, deps) {
       : { status: "ready" },
     observeRebindPostimageEvidence: (evidence) => { observed.push(evidence); },
   };
-  const applied = invokeCaptured(plan.applyAction.argv.slice(1), failingDeps);
+  const applied = invokeCaptured(acknowledgedApplyArgs(plan), failingDeps);
   assert.equal(applied.status, 2);
   assert.ok(applied.err.includes("postimage readback failed"), applied.err);
   assert.ok(applied.err.includes("v4Intents.dispatch"), applied.err);
@@ -809,13 +813,13 @@ function invokeCaptured(argv, deps) {
 
   // Typing the (non-ASCII, disclosed) --by value back is refused: the gate no
   // longer compares against it.
-  const typedByValue = invokeCaptured(plan.applyAction.argv.slice(1),
+  const typedByValue = invokeCaptured(acknowledgedApplyArgs(plan),
     { ...deps, isattyFn: () => true, readLineFn: () => plan.by });
   assert.equal(typedByValue.status, 1, typedByValue.err);
   assert.ok(typedByValue.err.includes("CHAT-GATE-CONFIRMATION-MISMATCH"), typedByValue.err);
 
   // Typing the fixed token succeeds -- independent of what --by was.
-  const typedToken = invokeCaptured(plan.applyAction.argv.slice(1),
+  const typedToken = invokeCaptured(acknowledgedApplyArgs(plan),
     { ...deps, isattyFn: () => true, readLineFn: () => PO_ACK_APPLY_CONFIRMATION_TOKEN });
   assert.equal(typedToken.status, 0, typedToken.err);
 }
@@ -834,7 +838,7 @@ function invokeCaptured(argv, deps) {
     ...deps, isattyFn: () => true,
     readLineFn: (prompt) => { capturedPrompt = prompt; return PO_ACK_APPLY_CONFIRMATION_TOKEN; },
   };
-  const applied = invokeCaptured(plan.applyAction.argv.slice(1), attendedDeps);
+  const applied = invokeCaptured(acknowledgedApplyArgs(plan), attendedDeps);
   assert.equal(applied.status, 0, applied.err);
   assert.ok(capturedPrompt !== null, "the confirmation prompt must be built and shown");
   assert.ok(capturedPrompt.includes(`by: ${plan.by}`),

@@ -22,14 +22,14 @@
  */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test, { after } from "node:test";
-import { createHash } from "node:crypto";
+import { createHash, generateKeyPairSync } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
-import { DEFAULT_STEP_CAP, SCHEMA, driveOnboardingInit } from "./onboarding-init.mjs";
+import { DEFAULT_STEP_CAP, SCHEMA, applyTrustAnchorBootstrap, driveOnboardingInit } from "./onboarding-init.mjs";
 
 const PROJECT_ONBOARDING_SCRIPT_PATH = fileURLToPath(new URL("./project-onboarding-v3.mjs", import.meta.url));
 
@@ -205,6 +205,361 @@ test("driveOnboardingInit: Claude, Codex, and Antigravity converge across fresh 
     assert.equal(new Set(firstShapes.map((shape) => JSON.stringify(shape))).size, 1, "all six cells converge to one driver outcome shape");
   } finally {
     for (const root of roots) dispose(root);
+  }
+});
+
+test("public onboarding driver imports and materializes the first existing anchor for Claude, Codex, and Antigravity in one returned action", () => {
+  const fixtures = [];
+  try {
+    for (const runner of GREENFIELD_RUNNERS) {
+      const root = freshRoot();
+      const home = freshHome();
+      const sourceDirectory = mkdtempSync(join(tmpdir(), "onboarding-init-existing-source-"));
+      const destination = join(home, "po-authority");
+      const existingKey = join(sourceDirectory, "existing-private.pem");
+      fixtures.push(root, home, sourceDirectory);
+      const { privateKey } = generateKeyPairSync("ed25519");
+      writeFileSync(existingKey, privateKey.export({ format: "pem", type: "pkcs8" }), { mode: 0o600 });
+      const env = withConflictingAmbientRunner({
+        ...process.env,
+        PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home,
+      }, runner);
+
+      const first = driveOnboardingInit({ rootDir: root, runner, env });
+      assert.equal(first.outcome, "pending-asks", runner);
+      const setupAsk = first.pendingAsks.find((ask) => ask.inputs?.some((input) => input.name === "trustAnchorSetupMode"));
+      assert.ok(setupAsk, `${runner}: public inspect publishes the structured first-anchor action`);
+      const replacements = new Map([
+        ["<existing|new>", "existing"],
+        ["<absolute external key directory>", destination],
+        ["<human attribution>", "Greenfield Anchor PO"],
+        ["<absolute existing key path|none>", existingKey],
+      ]);
+      const argv = setupAsk.applyAction.argv.map((value) => replacements.get(value) ?? value);
+      assert.equal(argv[0].endsWith("onboarding-init.mjs"), true, `${runner}: no internal setup script is guessed`);
+      assert.equal(argv.includes("po-human-approval.mjs"), false, `${runner}: raw setup is not published`);
+      const applied = spawnSync(setupAsk.applyAction.executable, argv, {
+        encoding: "utf8", shell: false, env, maxBuffer: 8 * 1024 * 1024,
+      });
+      assert.equal(applied.status, 0, `${runner}: ${applied.stderr}\n${applied.stdout}`);
+      assert.doesNotMatch(applied.stdout, /PRIVATE KEY|BEGIN [A-Z ]+KEY/u, `${runner}: no key bytes reach driver JSON`);
+      const result = JSON.parse(applied.stdout);
+      assert.deepEqual(result.bootstrap, { ok: true, code: "TRUST-ANCHOR-BOOTSTRAP-COMPLETE", mode: "existing" });
+      assertPinnedRunner(result, runner, `${runner}/post-bootstrap`);
+
+      const policy = JSON.parse(readFileSync(join(root, "project", "critical-human-proof.json"), "utf8"));
+      assert.equal(policy.schema, "pipeline.critical-human-proof-policy.v3");
+      assert.equal(policy.trustAnchors.length, 1);
+      const machine = JSON.parse(readFileSync(join(home, ".agent-pipeline", "machine.json"), "utf8"));
+      assert.equal(machine.poKeyDirectory, destination, `${runner}: machine pointer is durable`);
+      const repositoryPointer = JSON.parse(readFileSync(join(root, ".git", "agent-pipeline", "po-key-directory.json"), "utf8"));
+      assert.equal(repositoryPointer.poKeyDirectory, destination, `${runner}: repository pointer is durable`);
+
+      const reentered = driveOnboardingInit({ rootDir: root, runner, env });
+      const names = [
+        ...(reentered.pendingAsks ?? []).flatMap(actionInputNames),
+        ...actionInputNames(reentered.collectInput),
+      ];
+      assert.equal(names.includes("trustAnchorSetupMode"), false, `${runner}: completed setup is not asked again`);
+    }
+  } finally {
+    for (const path of fixtures) dispose(path);
+  }
+});
+
+test("new-key bootstrap omits an existing-key operand, requires durable pointer readback, and refuses a pre-existing repository anchor before setup", () => {
+  const root = freshRoot();
+  const home = freshHome();
+  const destination = join(home, "new-po-authority");
+  try {
+    const seeded = driveOnboardingInit({
+      rootDir: root,
+      runner: "codex",
+      env: { ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home },
+    });
+    assert.equal(seeded.outcome, "pending-asks");
+    let setupCalls = 0;
+    const runSetup = (_executable, argv) => {
+      setupCalls += 1;
+      assert.equal(argv.includes("--existing-key"), false, "new mode never fabricates an existing key path");
+      mkdirSync(destination, { recursive: true });
+      writeFileSync(join(destination, "trust-policy.json"), `${JSON.stringify({
+        keyReference: "local-po-key",
+        publicKeySha256: "a".repeat(64),
+        humanName: "New Key PO",
+      })}\n`);
+      mkdirSync(join(root, ".git", "agent-pipeline"), { recursive: true });
+      writeFileSync(join(root, ".git", "agent-pipeline", "po-key-directory.json"), `${JSON.stringify({
+        schema: "pipeline.po-key-directory.v1",
+        poKeyDirectory: destination,
+        updatedAt: new Date().toISOString(),
+      })}\n`);
+      return { status: 0 };
+    };
+    const applied = applyTrustAnchorBootstrap({
+      rootDir: root,
+      mode: "new",
+      directory: destination,
+      humanName: "New Key PO",
+      existingKey: "none",
+      env: { ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home },
+      runSetup,
+    });
+    assert.deepEqual(applied, { ok: true, code: "TRUST-ANCHOR-BOOTSTRAP-COMPLETE", mode: "new" });
+    assert.equal(setupCalls, 1);
+
+    const replay = applyTrustAnchorBootstrap({
+      rootDir: root,
+      mode: "new",
+      directory: destination,
+      humanName: "New Key PO",
+      existingKey: "none",
+      env: { ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home },
+      runSetup,
+    });
+    assert.deepEqual(replay, {
+      ok: true,
+      code: "TRUST-ANCHOR-BOOTSTRAP-COMPLETE",
+      mode: "new",
+      alreadyComplete: true,
+    });
+    assert.equal(setupCalls, 1, "a stale/replayed setup action stops before touching key state again");
+    const authorityPath = join(destination, "trust-policy.json");
+    const different = JSON.parse(readFileSync(authorityPath, "utf8"));
+    different.publicKeySha256 = "c".repeat(64);
+    writeFileSync(authorityPath, `${JSON.stringify(different)}\n`);
+    const conflict = applyTrustAnchorBootstrap({
+      rootDir: root,
+      mode: "new",
+      directory: destination,
+      humanName: "New Key PO",
+      existingKey: "none",
+      env: { ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home },
+      runSetup,
+    });
+    assert.equal(conflict.code, "TRUST-ANCHOR-REPOSITORY-CONFLICT");
+    assert.equal(setupCalls, 1, "a differing established anchor fails before setup");
+  } finally {
+    dispose(root);
+    dispose(home);
+  }
+});
+
+test("first-anchor transaction restores exact repository, machine, and pointer preimages on every post-setup failure boundary", () => {
+  const failures = [
+    {
+      name: "setup",
+      runSetup: ({ writeAuthorityAndPointer }) => { writeAuthorityAndPointer(); return { status: 1 }; },
+    },
+    {
+      name: "repository-pointer-readback",
+      runSetup: ({ writeAuthority }) => { writeAuthority(); return { status: 0 }; },
+    },
+    {
+      name: "machine-write",
+      runSetup: ({ writeAuthorityAndPointer }) => { writeAuthorityAndPointer(); return { status: 0 }; },
+      writeMachine() { throw new Error("injected machine write failure"); },
+    },
+    {
+      name: "machine-readback",
+      runSetup: ({ writeAuthorityAndPointer }) => { writeAuthorityAndPointer(); return { status: 0 }; },
+      writeMachine() {},
+    },
+    {
+      name: "policy-write",
+      runSetup: ({ writeAuthorityAndPointer }) => { writeAuthorityAndPointer(); return { status: 0 }; },
+      writePolicy() { throw new Error("injected policy write failure"); },
+    },
+    {
+      name: "policy-readback",
+      runSetup: ({ writeAuthorityAndPointer }) => { writeAuthorityAndPointer(); return { status: 0 }; },
+      writePolicy(path) { writeFileSync(path, "{malformed"); },
+    },
+    {
+      name: "existing-pem-policy-write",
+      mode: "existing",
+      runSetup: ({ writeAuthorityAndPointer, destination }) => {
+        writeAuthorityAndPointer();
+        writeFileSync(join(destination, "po-private.pem"), "fixture private-key container");
+        writeFileSync(join(destination, "po-public.pem"), "fixture public-key container");
+        return { status: 0 };
+      },
+      writePolicy() { throw new Error("injected imported-PEM policy write failure"); },
+    },
+  ];
+  for (const failure of failures) {
+    const root = freshRoot();
+    const home = freshHome();
+    const destination = join(home, `authority-${failure.name}`);
+    try {
+      const env = { ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home };
+      assert.equal(driveOnboardingInit({ rootDir: root, runner: "codex", env }).outcome, "pending-asks");
+      const policyPath = join(root, "project", "critical-human-proof.json");
+      const policyPreimage = readFileSync(policyPath, "utf8");
+      const pointerPath = join(root, ".git", "agent-pipeline", "po-key-directory.json");
+      const machinePath = join(home, ".agent-pipeline", "machine.json");
+      const existingKey = join(home, "source-existing.pem");
+      if (failure.mode === "existing") writeFileSync(existingKey, "source PEM remains authoritative");
+      const writeAuthority = () => {
+        mkdirSync(destination, { recursive: true });
+        writeFileSync(join(destination, "trust-policy.json"), `${JSON.stringify({
+          keyReference: "local-po-key",
+          publicKeySha256: "b".repeat(64),
+          humanName: "Rollback PO",
+        })}\n`);
+      };
+      const writePointer = () => {
+        mkdirSync(join(root, ".git", "agent-pipeline"), { recursive: true });
+        writeFileSync(pointerPath, `${JSON.stringify({
+          schema: "pipeline.po-key-directory.v1",
+          poKeyDirectory: destination,
+          updatedAt: new Date().toISOString(),
+        })}\n`);
+      };
+      const runSetup = () => failure.runSetup({
+        destination,
+        writeAuthority,
+        writeAuthorityAndPointer() { writeAuthority(); writePointer(); },
+      });
+      const result = applyTrustAnchorBootstrap({
+        rootDir: root,
+        mode: failure.mode ?? "new",
+        directory: destination,
+        humanName: "Rollback PO",
+        existingKey: failure.mode === "existing" ? existingKey : "none",
+        env,
+        runSetup,
+        ...(failure.writeMachine ? { writeMachine: failure.writeMachine } : {}),
+        ...(failure.writePolicy ? { writePolicy: failure.writePolicy } : {}),
+      });
+      assert.equal(result.ok, false, failure.name);
+      assert.doesNotMatch(result.code, /ROLLBACK-FAILED/u, failure.name);
+      assert.equal(readFileSync(policyPath, "utf8"), policyPreimage, `${failure.name}: policy bytes restored`);
+      assert.equal(existsSync(pointerPath), false, `${failure.name}: repository pointer absence restored`);
+      assert.equal(existsSync(machinePath), false, `${failure.name}: machine pointer absence restored`);
+      if (failure.mode === "existing") {
+        assert.equal(existsSync(destination), false, "owned imported PEM copy is removed on rollback");
+        assert.equal(readFileSync(existingKey, "utf8"), "source PEM remains authoritative",
+          "the PO-selected source PEM is never touched");
+      }
+    } finally {
+      dispose(root);
+      dispose(home);
+    }
+  }
+});
+
+test("a new-key post-setup failure replays the same public action from its bound recovery receipt without running setup twice", () => {
+  const root = freshRoot();
+  const home = freshHome();
+  const destination = join(home, "recoverable-new-authority");
+  const env = { ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home };
+  try {
+    assert.equal(driveOnboardingInit({ rootDir: root, runner: "antigravity", env }).outcome, "pending-asks");
+    const policyPath = join(root, "project", "critical-human-proof.json");
+    const policyPreimage = readFileSync(policyPath, "utf8");
+    const pointerPath = join(root, ".git", "agent-pipeline", "po-key-directory.json");
+    const recoveryPath = join(root, ".git", "agent-pipeline", "first-anchor-bootstrap-recovery.json");
+    let setupCalls = 0;
+    const runSetup = () => {
+      setupCalls += 1;
+      mkdirSync(destination, { recursive: true });
+      writeFileSync(join(destination, "po-private.pem"), "encrypted key container owned by setup");
+      writeFileSync(join(destination, "po-public.pem"), "public key container owned by setup");
+      writeFileSync(join(destination, "trust-policy.json"), `${JSON.stringify({
+        keyReference: "local-po-key",
+        publicKeySha256: "d".repeat(64),
+        humanName: "Recovery PO",
+      })}\n`);
+      mkdirSync(join(root, ".git", "agent-pipeline"), { recursive: true });
+      writeFileSync(pointerPath, `${JSON.stringify({
+        schema: "pipeline.po-key-directory.v1",
+        poKeyDirectory: destination,
+        updatedAt: new Date().toISOString(),
+      })}\n`);
+      return { status: 0 };
+    };
+    const first = applyTrustAnchorBootstrap({
+      rootDir: root,
+      mode: "new",
+      directory: destination,
+      humanName: "Recovery PO",
+      existingKey: "none",
+      env,
+      runSetup,
+      writePolicy() { throw new Error("post-setup policy failure"); },
+    });
+    assert.equal(first.code, "TRUST-ANCHOR-REPOSITORY-MATERIALIZATION-WRITE-FAILED");
+    assert.equal(setupCalls, 1);
+    assert.equal(readFileSync(policyPath, "utf8"), policyPreimage);
+    assert.equal(existsSync(pointerPath), false);
+    assert.equal(existsSync(join(home, ".agent-pipeline", "machine.json")), false);
+    assert.equal(existsSync(recoveryPath), true, "only the public authority-bound recovery receipt remains");
+
+    const replay = applyTrustAnchorBootstrap({
+      rootDir: root,
+      mode: "new",
+      directory: destination,
+      humanName: "Recovery PO",
+      existingKey: "none",
+      env,
+      runSetup() { throw new Error("setup must not run on recovery"); },
+    });
+    assert.deepEqual(replay, { ok: true, code: "TRUST-ANCHOR-BOOTSTRAP-COMPLETE", mode: "new" });
+    assert.equal(setupCalls, 1);
+    assert.equal(existsSync(recoveryPath), false, "receipt is consumed only after all readbacks pass");
+    assert.equal(JSON.parse(readFileSync(pointerPath, "utf8")).poKeyDirectory, destination);
+    assert.equal(JSON.parse(readFileSync(join(home, ".agent-pipeline", "machine.json"), "utf8")).poKeyDirectory, destination);
+    assert.equal(JSON.parse(readFileSync(policyPath, "utf8")).trustAnchors[0].publicKeySha256, "d".repeat(64));
+  } finally {
+    dispose(root);
+    dispose(home);
+  }
+});
+
+test("new-key recovery refuses malformed or foreign authority receipts before setup", () => {
+  for (const variant of ["malformed-authority", "foreign-receipt"]) {
+    const root = freshRoot();
+    const home = freshHome();
+    const destination = join(home, variant);
+    const env = { ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home };
+    try {
+      assert.equal(driveOnboardingInit({ rootDir: root, runner: "claude", env }).outcome, "pending-asks");
+      mkdirSync(destination, { recursive: true });
+      const authority = {
+        keyReference: "local-po-key",
+        publicKeySha256: "e".repeat(64),
+        humanName: "Receipt PO",
+      };
+      writeFileSync(join(destination, "trust-policy.json"), variant === "malformed-authority"
+        ? "{malformed"
+        : `${JSON.stringify(authority)}\n`);
+      const recoveryPath = join(root, ".git", "agent-pipeline", "first-anchor-bootstrap-recovery.json");
+      mkdirSync(join(root, ".git", "agent-pipeline"), { recursive: true });
+      writeFileSync(recoveryPath, `${JSON.stringify({
+        schema: "pipeline.first-anchor-bootstrap-recovery.v1",
+        root,
+        directory: destination,
+        humanName: "Receipt PO",
+        keyReference: "local-po-key",
+        publicKeySha256: variant === "foreign-receipt" ? "f".repeat(64) : "e".repeat(64),
+      })}\n`);
+      let setupCalls = 0;
+      const result = applyTrustAnchorBootstrap({
+        rootDir: root,
+        mode: "new",
+        directory: destination,
+        humanName: "Receipt PO",
+        existingKey: "none",
+        env,
+        runSetup() { setupCalls += 1; return { status: 0 }; },
+      });
+      assert.equal(result.code, "TRUST-ANCHOR-RECOVERY-RECEIPT-CONFLICT", variant);
+      assert.equal(setupCalls, 0, variant);
+    } finally {
+      dispose(root);
+      dispose(home);
+    }
   }
 });
 

@@ -2254,6 +2254,12 @@ test("NVA-K-DRIVERREACH: the guided driver is admitted at every non-ready readin
       admit(`node '${DRIVER_SCRIPT}' --root '${path}' --runner claude`);
       admit(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --step-cap 10`);
       admit(`node '${DRIVER_SCRIPT}' --step-cap 5 --root '${path}' --runner antigravity`);
+      const externalDirectory = join(tmpdir(), "guard-first-anchor-directory");
+      const externalKey = join(tmpdir(), "guard-existing-po-key.pem");
+      for (const runner of ["claude", "codex", "antigravity"]) {
+        admit(`node '${DRIVER_SCRIPT}' --root '${path}' --runner ${runner} --trust-anchor-mode existing --trust-anchor-directory '${externalDirectory}' --trust-anchor-human-name 'Test PO' --trust-anchor-existing-key '${externalKey}'`);
+        admit(`node '${DRIVER_SCRIPT}' --trust-anchor-human-name 'Test PO' --trust-anchor-existing-key none --runner ${runner} --root '${path}' --trust-anchor-directory '${externalDirectory}' --trust-anchor-mode new`);
+      }
 
       // Near misses: no argv at all, wrong root, an out-of-set runner, a step-cap
       // parseArgs() itself would refuse (zero, negative, non-numeric), a flag the driver's
@@ -2267,6 +2273,10 @@ test("NVA-K-DRIVERREACH: the guided driver is admitted at every non-ready readin
       refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --profile mini`);
       refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --root '${path}'`);
       refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --intent bootstrap`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --trust-anchor-mode existing --trust-anchor-directory '${externalDirectory}' --trust-anchor-human-name 'Test PO' --trust-anchor-existing-key none`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --trust-anchor-mode new --trust-anchor-directory '${externalDirectory}' --trust-anchor-human-name 'Test PO' --trust-anchor-existing-key '${externalKey}'`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --trust-anchor-mode new --trust-anchor-directory '${join(path, "key-dir")}' --trust-anchor-human-name 'Test PO' --trust-anchor-existing-key none`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --step-cap 5 --trust-anchor-mode new --trust-anchor-directory '${externalDirectory}' --trust-anchor-human-name 'Test PO' --trust-anchor-existing-key none`);
 
       // The control the backlog item's own measurement insists on: a fail-open fixture
       // (no governance marker) would have admitted this too.

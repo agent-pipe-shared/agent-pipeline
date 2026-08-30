@@ -1386,7 +1386,11 @@ test("neutral PO decision apply requires all transactional V4 postimage readback
     const authority = ({ expectedPlanSha256, expectedSpecSha256 }) => expectedSpecSha256 === newSpecSha
       ? { ok: true, value: { ...profile, schema: "pipeline.po-gate-authority.v2", planPath, planSha256: expectedPlanSha256, specPath, specSha256: newSpecSha } }
       : { ok: false, code: "PO-GATE-AUTHORITY-STALE" };
-    const writerDeps = { dir: path, now: () => "2026-07-30T10:00:00.000Z", ownerNonce: () => "postimage-red-0001", poGateProfile: () => ({ ok: true, value: profile }), poGateAuthority: authority };
+    const writerDeps = {
+      dir: path, now: () => "2026-07-30T10:00:00.000Z", ownerNonce: () => "postimage-red-0001",
+      env: { CLAUDECODE: "1" },
+      poGateProfile: () => ({ ok: true, value: profile }), poGateAuthority: authority,
+    };
     const plan = JSON.parse(capture(() => pipelineStateRun(["po-authority-decision-plan"], writerDeps)).stdout);
     const selectionAction = plan.selectionActions.find((action) => action.selectedCandidate === "spec");
     const selection = JSON.parse(capture(() => pipelineStateRun(selectionAction.argv.slice(1), writerDeps)).stdout);
@@ -1394,8 +1398,8 @@ test("neutral PO decision apply requires all transactional V4 postimage readback
     const beforeState = readFileSync(join(path, "project/pipeline-state.json"), "utf8");
     const readbacks = [];
     let postimageEvidence = null;
-    const v4Inspection = ({ rootDir, intent, deps: transactionDeps }) => {
-      const result = inspectProjectOnboardingV3({ runner: "codex",
+    const v4Inspection = ({ rootDir, intent, runner, deps: transactionDeps }) => {
+      const result = inspectProjectOnboardingV3({ runner,
         rootDir,
         intent,
         deps: {
@@ -1405,7 +1409,7 @@ test("neutral PO decision apply requires all transactional V4 postimage readback
           ...transactionDeps,
         },
       });
-      readbacks.push({ intent, status: result.status, predicate: result.diagnostics?.[0]?.code ?? null });
+      readbacks.push({ intent, runner, status: result.status, predicate: result.diagnostics?.[0]?.code ?? null });
       return result;
     };
     const applied = capture(() => pipelineStateRun(selection.applyAction.argv.slice(1), {
@@ -1416,9 +1420,9 @@ test("neutral PO decision apply requires all transactional V4 postimage readback
     const exact = JSON.stringify(readbacks);
     assert.equal(applied.exit, 0, `decision postimage must be V4-ready; observed ${exact}; writer stderr: ${applied.stderr.trim()}`);
     assert.deepEqual(readbacks, [
-      { intent: "bootstrap", status: "ready", predicate: null },
-      { intent: "session", status: "ready", predicate: null },
-      { intent: "dispatch", status: "ready", predicate: null },
+      { intent: "bootstrap", runner: "claude", status: "ready", predicate: null },
+      { intent: "session", runner: "claude", status: "ready", predicate: null },
+      { intent: "dispatch", runner: "claude", status: "ready", predicate: null },
     ]);
     assert.deepEqual(
       postimageEvidence.predicates.v4Intents.map(({ intent, ok, status }) => ({ intent, ok, status })),
@@ -1467,6 +1471,7 @@ test("V4 authority drift reopens the historical approval instead of rebinding it
       dir: path,
       now: () => "2026-08-02T10:00:00.000Z",
       ownerNonce: () => "v4-reopen-0001",
+      env: { CLAUDECODE: "1" },
       poGateProfile: () => ({ ok: true, value: profile }),
       poGateAuthority: authority,
     };
@@ -1475,13 +1480,15 @@ test("V4 authority drift reopens the historical approval instead of rebinding it
     const plan = JSON.parse(result.stdout);
     const selectionAction = plan.selectionActions.find((action) => action.selectedCandidate === "spec");
     const selection = JSON.parse(capture(() => pipelineStateRun(selectionAction.argv.slice(1), writerDeps)).stdout);
+    const observedRunners = [];
     const applied = capture(() => pipelineStateRun(selection.applyAction.argv.slice(1), {
       ...writerDeps,
-      v4Inspection: () => ({ status: "ready", diagnostics: [] }),
+      v4Inspection: ({ runner }) => { observedRunners.push(runner); return { status: "ready", diagnostics: [] }; },
     }));
     assert.equal(plan.status, "planned"); assert.equal(plan.transition.toPhase, "design");
     assert.equal(selection.selectedCandidate, "spec");
     assert.equal(applied.exit, 0, applied.stdout);
+    assert.deepEqual(observedRunners, ["claude", "claude", "claude"]);
     assert.equal(plan.preimage.planApproval.schema, "pipeline.plan-approval.v4");
     const state = JSON.parse(readFileSync(join(path, "project/pipeline-state.json"), "utf8"));
     assert.equal(state.activeFeature.phase, "design");
@@ -2263,13 +2270,9 @@ test("apply-portable-seed --activate surfaces the push-approval-setup ask-step f
       "must propose a default PO key directory, never demand one");
     assert.doesNotMatch(applied.result.pushApprovalSetupAction.guidance, /\bsetup\.mjs\b/u,
       "must never point an installing consumer at the script SETUP.md forbids them to use");
-    assert.match(applied.result.pushApprovalSetupAction.guidance, /po-human-approval\.mjs/u);
-    // NVA-CF-EXISTINGKEYASK: the first-time ceremony must ask the PO an
-    // explicit existing-key sub-question BEFORE proposing to create a new
-    // one, and name the exact --existing-key registration path.
-    assert.match(applied.result.pushApprovalSetupAction.guidance,
-      /do you already have an existing signing key on this machine/u);
-    assert.match(applied.result.pushApprovalSetupAction.guidance, /--existing-key/u);
+    assert.match(applied.result.pushApprovalSetupAction.guidance, /sibling trust-anchor setup question/u);
+    assert.doesNotMatch(applied.result.pushApprovalSetupAction.guidance, /THEMSELVES|outside this session/u,
+      "the happy path is the returned public-driver action, not manual terminal choreography");
 
     // A replay of the exact same apply call (zero-write, same digest) must
     // observe the identical ask-step.
@@ -2799,9 +2802,11 @@ test("NVA-V6-ANCHORREPORT: a broken pointer and a malformed policy each raise th
       "informational only -- nothing agent-runnable to create a key");
     assert.equal(Object.prototype.hasOwnProperty.call(noDirAction, "argv"), false,
       "informational only -- nothing agent-runnable to create a key");
-    assert.match(noDirAction.guidance, /no PO signing key recorded/u);
-    assert.notEqual(noDirAction.input.name, brokenAction.input.name);
-    assert.notEqual(noDirAction.input.name, malformedAction.input.name);
+    assert.match(noDirAction.guidance, /no recorded PO signing key/u);
+    assert.equal(noDirAction.applyAction.kind, "command");
+    const noDirNames = noDirAction.inputs.map((input) => input.name);
+    assert.equal(noDirNames.includes(brokenAction.input.name), false);
+    assert.equal(noDirNames.includes(malformedAction.input.name), false);
     assert.notEqual(noDirAction.guidance, brokenAction.guidance);
     assert.notEqual(noDirAction.guidance, malformedAction.guidance);
   } finally {
@@ -2821,7 +2826,7 @@ test("NVA-V6-ANCHORREPORT: a broken pointer and a malformed policy each raise th
 // closes that silence with one new informational ask, reachable on BOTH
 // statuses and on both the apply-portable-seed and the ordinary inspect
 // composition path.
-test("NVA-V17-NOKEYASK: a machine with no PO signing key at all is told so, once, informationally, on both no-plane and no-directory, and on both composition paths", () => {
+test("NVA-V17-NOKEYASK: a machine with no PO signing key gets one structured public-driver bootstrap action on both absence states and composition paths", () => {
   const noPlaneRoot = root();
   const noDirRoot = root();
   const readyRoot = root();
@@ -2841,25 +2846,25 @@ test("NVA-V17-NOKEYASK: a machine with no PO signing key at all is told so, once
     const noPlane = applyFresh(noPlaneRoot, noPlaneDeps);
     assert.equal(noPlane.code, 0);
     const noPlaneAction = noPlane.result.trustAnchorGuidanceAction;
-    assert.ok(noPlaneAction, "a no-plane machine must raise the new informational ask");
+    assert.ok(noPlaneAction, "a no-plane machine must raise the guided setup ask");
     assert.equal(noPlaneAction.kind, "collect-input");
-    assert.equal(noPlaneAction.mutation, false, "informational only, per DoD");
-    assert.equal(Object.prototype.hasOwnProperty.call(noPlaneAction, "executable"), false,
-      "informational only -- nothing agent-runnable to create a key");
-    assert.equal(Object.prototype.hasOwnProperty.call(noPlaneAction, "argv"), false,
-      "informational only -- nothing agent-runnable to create a key");
-    assert.match(noPlaneAction.guidance, /no PO signing key recorded/u);
-    assert.match(noPlaneAction.guidance, /signature push route .* cannot work until one exists/u);
-    assert.match(noPlaneAction.guidance, /po-human-approval\.mjs setup/u);
-    assert.match(noPlaneAction.guidance, /--repo-root/u);
-    assert.match(noPlaneAction.guidance, /--directory/u);
-    assert.match(noPlaneAction.guidance, /--human-name/u);
-    assert.match(noPlaneAction.guidance, /PO .*themselves|themselves.*PO/u);
-    // NVA-CF-EXISTINGKEYASK: the no-key-at-all guidance must also ask the
-    // existing-key sub-question BEFORE the new-key instruction, and name the
-    // exact --existing-key registration path.
-    assert.match(noPlaneAction.guidance, /do you already have an existing signing key on this machine/u);
-    assert.match(noPlaneAction.guidance, /--existing-key/u);
+    assert.equal(noPlaneAction.mutation, false, "collecting answers itself does not mutate");
+    assert.deepEqual(noPlaneAction.inputs.map((input) => input.name), [
+      "trustAnchorSetupMode", "trustAnchorDirectory", "trustAnchorHumanName", "trustAnchorExistingKeyPath",
+    ]);
+    assert.equal(noPlaneAction.applyAction.kind, "command");
+    assert.equal(noPlaneAction.applyAction.requiresConfirmation, true,
+      "the attended setup action cannot execute before the PO confirms its four answers");
+    assert.equal(noPlaneAction.applyAction.expected.schema, "pipeline.onboarding-init.v1");
+    assert.match(noPlaneAction.applyAction.argv[0], /onboarding-init\.mjs$/u);
+    assert.equal(noPlaneAction.applyAction.argv.includes("po-human-approval.mjs"), false);
+    assert.equal(noPlaneAction.applyAction.argv[noPlaneAction.applyAction.argv.indexOf("--root") + 1], noPlaneRoot);
+    assert.equal(noPlaneAction.applyAction.argv[noPlaneAction.applyAction.argv.indexOf("--runner") + 1], "codex");
+    for (const flag of ["--trust-anchor-mode", "--trust-anchor-directory", "--trust-anchor-human-name", "--trust-anchor-existing-key"]) {
+      assert.ok(noPlaneAction.applyAction.argv.includes(flag), `${flag} is carried by the one bounded action`);
+    }
+    assert.doesNotMatch(noPlaneAction.guidance, /THEMSELVES|outside this session/u);
+    assert.match(noPlaneAction.guidance, /existing.*new|new.*existing/u);
 
     // (b) no-directory: a valid plane, but no poKeyDirectory recorded --
     // fakeDeps's own default shape. The same "genuine absence" message, not
@@ -2868,12 +2873,15 @@ test("NVA-V17-NOKEYASK: a machine with no PO signing key at all is told so, once
     assert.equal(noDir.code, 0);
     const noDirAction = noDir.result.trustAnchorGuidanceAction;
     assert.ok(noDirAction, "a no-directory machine must raise the new informational ask");
-    assert.deepEqual(noDirAction, noPlaneAction,
-      "no-plane and no-directory are both a genuine absence and must raise the identical informational ask");
+    assert.deepEqual(
+      { ...noDirAction, applyAction: { ...noDirAction.applyAction, argv: noDirAction.applyAction.argv.map((value) => value === noDirRoot ? noPlaneRoot : value) } },
+      noPlaneAction,
+      "no-plane and no-directory differ only by the repository path bound into applyAction",
+    );
 
     // Distinguishable from the two dead-pointer asks (own input.name).
-    assert.notEqual(noDirAction.input.name, "trustAnchorPointerRepairAcknowledged");
-    assert.notEqual(noDirAction.input.name, "trustAnchorPolicyRepairAcknowledged");
+    assert.equal(noDirAction.inputs.some((input) => input.name === "trustAnchorPointerRepairAcknowledged"), false);
+    assert.equal(noDirAction.inputs.some((input) => input.name === "trustAnchorPolicyRepairAcknowledged"), false);
 
     // The ask reaches the ORDINARY inspect path too (NVA-V13-ASKWINDOW's
     // nextAction.pendingAsks channel), not only apply-portable-seed --
@@ -2881,13 +2889,12 @@ test("NVA-V17-NOKEYASK: a machine with no PO signing key at all is told so, once
     const inspected = invoke(["inspect", "--root", noDirRoot, "--runner", "codex"], fakeDeps);
     assert.equal(inspected.code, 0);
     assert.equal(inspected.result.status, noDir.result.status);
-    const pendingNames = (inspected.result.nextAction?.pendingAsks ?? []).map((ask) => ask.input?.name);
-    assert.ok(pendingNames.includes("trustAnchorAbsentAcknowledged"),
+    const pendingNames = (inspected.result.nextAction?.pendingAsks ?? []).flatMap((ask) => (ask.inputs ?? [ask.input]).map((input) => input?.name));
+    assert.ok(pendingNames.includes("trustAnchorSetupMode"),
       "an ordinary inspect must surface the same no-key ask apply-portable-seed already published");
-    const pendingAsk = inspected.result.nextAction.pendingAsks.find((ask) => ask.input?.name === "trustAnchorAbsentAcknowledged");
+    const pendingAsk = inspected.result.nextAction.pendingAsks.find((ask) => ask.inputs?.some((input) => input.name === "trustAnchorSetupMode"));
     assert.equal(pendingAsk.mutation, false);
-    assert.equal(Object.prototype.hasOwnProperty.call(pendingAsk, "executable"), false);
-    assert.equal(Object.prototype.hasOwnProperty.call(pendingAsk, "argv"), false);
+    assert.equal(pendingAsk.applyAction.kind, "command");
 
     // The `ready` status is unaffected -- checked against the REAL,
     // unliftable, fail-closed ready gate, not a hand-typed shape assumption.

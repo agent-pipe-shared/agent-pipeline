@@ -216,6 +216,7 @@ const PROJECT_IGNORE_SEED = [
 // literal array would.
 const REQUIRED_PROJECT_IGNORE_PATTERNS = PROJECT_IGNORE_SEED.split("\n").filter((line) => line.startsWith("/"));
 const ONBOARDING_SCRIPT = fileURLToPath(new URL("../scripts/project-onboarding-v3.mjs", import.meta.url));
+const ONBOARDING_INIT_DRIVER = fileURLToPath(new URL("../scripts/onboarding-init.mjs", import.meta.url));
 const MIGRATION_SCRIPT = fileURLToPath(new URL("../scripts/runner-profile-migration-v3.mjs", import.meta.url));
 const HOST_REPOSITORY_INIT_SCRIPT = fileURLToPath(new URL("../scripts/codex-host-repository-init.mjs", import.meta.url));
 const SESSION_CLEANUP_SCRIPT = fileURLToPath(new URL("../scripts/session-cleanup.mjs", import.meta.url));
@@ -4666,7 +4667,7 @@ function collectPushApprovalPreferenceAction(poKeyDirectoryHint, machineDefault)
     requiresConfirmation: false,
     guidance: firstAsk
       ? "this machine has never been asked how a push approval is cleared, and every setting today resolves silently to the strictest default; ask the PO once, in plain language: \"signature\" proves each approval with a detached Ed25519 signature whose private key never leaves the PO's own terminal (recommended); \"chat\" instead records an attribution in the session -- a labelled record, not a proof. Accept exactly \"signature\" or \"chat\" as the answer, never invent one. "
-        + `If "signature": ALSO ask the PO's name up front, in the SAME turn as the signature/chat question -- never discover the name requirement mid-ceremony as a second, failed call (backlog: 2026-08-18-po-key-trust-anchor-onboarding.md). In that SAME turn, ALSO ask the PO an explicit sub-question BEFORE proposing to create anything: "do you already have an existing signing key on this machine?" If yes: ask for the existing key's absolute path, then have the PO run \`node plugins/pipeline-core/scripts/po-human-approval.mjs setup --repo-root <this repository> --directory <the chosen directory> --existing-key <the existing key's absolute path> --human-name "<the name they gave>"\` THEMSELVES to register that existing key -- this imports it into a fresh directory instead of creating a new one; \`--existing-key\` refuses if the chosen directory already carries key material, and refuses if the given path does not exist. Only if the answer is no, walk the PO through creating a NEW signing key, proposing (never demanding) ${poKeyDirectoryHint ?? "a directory outside every repository"} as the default location -- let them choose a different absolute path if they prefer, but it must stay outside any checkout. The PO then runs \`node plugins/pipeline-core/scripts/po-human-approval.mjs setup --repo-root <this repository> --directory <the chosen directory> --human-name "<the name they gave>"\` THEMSELVES, in their own terminal -- never through a tool call, and never with the key read, moved, or copied afterward. `
+        + `If "signature": the sibling trust-anchor setup question in this same onboarding round collects whether an existing key should be reused or a new one created, its external directory, and the human attribution. Its returned applyAction is the only setup command to execute; do not reconstruct or copy a separate po-human-approval command. The suggested external directory is ${poKeyDirectoryHint ?? "a directory outside every repository"}, but the PO may choose another absolute path outside every checkout. `
         + "This repository's gates.push_approval in pipeline.user.yaml is seeded with the answer automatically (repository plane, ADR-0056), so no further write is needed for THIS repository; also record the same answer -- plus the key directory, if \"signature\" -- in the machine-scoped configuration plane (machine-plane.mjs) so the NEXT repository on this machine starts pre-filled with it instead of asking from scratch."
       : `this repository's gates.push_approval (pipeline.user.yaml, ADR-0056) is pre-filled from this machine's remembered preference, "${machineDefault}" (machine-plane.mjs). This is a per-repository confirmation, not a one-time machine question -- it is asked again for every new repository, seeded with the machine default so the PO can confirm in one short turn rather than re-typing it from scratch. Ask the PO to confirm "${machineDefault}" for THIS repository, or type the other value ("signature" or "chat") to override it for this repository only -- an override here does not change the machine's own remembered default in machine-plane.mjs, and pipeline.user.yaml is already seeded with the pre-filled value, so only an override needs a further edit to gates.push_approval. Accept exactly "signature" or "chat" as the answer, never invent one.`,
     expected: { schema: SCHEMA, statuses: PORTABLE_APPLY_IDENTITY_ASK_STATUSES },
@@ -5712,21 +5713,54 @@ function proposeTrustAnchorPolicyRepairAction(directory) {
 // at all" message never reads as either dead-pointer repair message: "no key
 // exists yet" and "a key's pointer is broken" are different situations with
 // different remedies.
-function proposeTrustAnchorAbsentGuidanceAction() {
+const TRUST_ANCHOR_MODE_PLACEHOLDER = "<existing|new>";
+const TRUST_ANCHOR_DIRECTORY_PLACEHOLDER = "<absolute external key directory>";
+const TRUST_ANCHOR_HUMAN_NAME_PLACEHOLDER = "<human attribution>";
+const TRUST_ANCHOR_EXISTING_KEY_PLACEHOLDER = "<absolute existing key path|none>";
+
+function trustAnchorSetupInput(name, maxBytes) {
+  return {
+    name,
+    encoding: "utf8",
+    trim: true,
+    minBytes: 1,
+    maxBytes,
+    singleLine: true,
+    rejectNul: true,
+  };
+}
+
+function proposeTrustAnchorAbsentGuidanceAction(root, runner) {
   return {
     kind: "collect-input",
-    input: {
-      name: "trustAnchorAbsentAcknowledged",
-      encoding: "utf8",
-      trim: true,
-      minBytes: 1,
-      maxBytes: TRUST_ANCHOR_ACK_MAX_BYTES,
-      singleLine: true,
-      rejectNul: true,
-    },
+    inputs: [
+      trustAnchorSetupInput("trustAnchorSetupMode", 8),
+      trustAnchorSetupInput("trustAnchorDirectory", 4096),
+      trustAnchorSetupInput("trustAnchorHumanName", 512),
+      trustAnchorSetupInput("trustAnchorExistingKeyPath", 4096),
+    ],
     mutation: false,
     requiresConfirmation: false,
-    guidance: "this machine has no PO signing key recorded at all for THIS environment -- not a broken pointer, a genuine absence. Note this is scoped to the current process's home directory, not the physical machine: the machine plane lives at `<home>/.agent-pipeline/machine.json`, so a WSL shell and a native Windows shell on the same physical box resolve two different home directories and never share one pointer -- a key registered from one is invisible from the other, even though the same physical machine may already have a key registered under its OTHER environment. The signature push route (pipeline.user.yaml's gates.push_approval: \"signature\") cannot work until one exists: BEFORE telling the PO to create anything, ask them an explicit sub-question, \"do you already have an existing signing key on this machine (or another environment on this physical machine)?\" If yes: ask for the existing key's absolute path and have the PO run `po-human-approval.mjs setup --repo-root <repo> --directory <external-dir> --existing-key <the existing key's absolute path> --human-name \"<the human this key's approvals will be attributed to>\"` THEMSELVES, outside this session, to register that existing key into THIS environment's machine plane -- this imports it rather than creating a new one; `--existing-key` refuses if the chosen directory already carries key material, and refuses if the given path does not exist. Only if the answer is no, tell the PO exactly this, and that they create a NEW key themselves, outside this session, by running `po-human-approval.mjs setup --repo-root <repo> --directory <external-dir> --human-name \"<the human this key's approvals will be attributed to>\"` from THIS SAME environment (add `--key-reference <id>` for a non-default reference); this library never writes to a key directory or to the machine plane's poKeyDirectory on anyone's behalf, and a project with no signing key still reaches \"ready\" -- it simply cannot sign a push yet. Reply with a short acknowledgment (\"done\" or \"skip\") once the PO has seen this, whether or not they acted on it now.",
+    guidance: `this environment has no recorded PO signing key. Ask once, in this same onboarding round: (1) import an existing PEM key or create a new key, (2) the absolute external destination directory, and (3) the human name approvals are attributed to. For "existing", also collect the absolute private-key PEM path. For "new", use the literal value "none" for trustAnchorExistingKeyPath; the attended command will prompt locally for the new key's passphrase. Only after the PO confirms those answers, replace the four placeholders in applyAction.argv with exactly them and execute that one returned action through the public onboarding driver. It performs setup, verifies both machine and repository directory pointers, materializes the first public trust anchor into this repository, and re-enters onboarding. It never returns private-key bytes. A repository that already carries a different anchor is refused as a conflict.`,
+    applyAction: {
+      kind: "command",
+      executable: "node",
+      argv: [
+        ONBOARDING_INIT_DRIVER,
+        "--root", root,
+        "--runner", runner,
+        "--trust-anchor-mode", TRUST_ANCHOR_MODE_PLACEHOLDER,
+        "--trust-anchor-directory", TRUST_ANCHOR_DIRECTORY_PLACEHOLDER,
+        "--trust-anchor-human-name", TRUST_ANCHOR_HUMAN_NAME_PLACEHOLDER,
+        "--trust-anchor-existing-key", TRUST_ANCHOR_EXISTING_KEY_PLACEHOLDER,
+      ],
+      mutation: true,
+      requiresConfirmation: true,
+      expected: {
+        schema: "pipeline.onboarding-init.v1",
+        outcomes: ["ready", "collect-input", "pending-asks"],
+      },
+    },
     expected: { schema: SCHEMA, statuses: PORTABLE_APPLY_IDENTITY_ASK_STATUSES },
   };
 }
@@ -5766,7 +5800,7 @@ function withPendingTrustAnchorGuidanceAsk(observed, fs) {
   if (!PORTABLE_APPLY_IDENTITY_ASK_STATUSES.includes(observed.status)) return observed;
   const pointer = observeLocalTrustAnchorPointer(fs);
   if (pointer.status === "no-plane" || pointer.status === "no-directory") {
-    return { ...observed, trustAnchorGuidanceAction: proposeTrustAnchorAbsentGuidanceAction() };
+    return { ...observed, trustAnchorGuidanceAction: proposeTrustAnchorAbsentGuidanceAction(observed.root, observed.runner) };
   }
   if (unresolvedMachinePushApprovalSetup(fs)) return observed;
   if (pointer.status === "broken-pointer") {
