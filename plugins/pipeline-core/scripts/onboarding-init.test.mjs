@@ -370,6 +370,72 @@ test("driveOnboardingInit: re-anchors after an executed step settles with no nex
   }
 });
 
+test("driveOnboardingInit: re-anchors after a published command succeeds with plain human-facing output", () => {
+  const root = freshRoot();
+  try {
+    let calls = 0;
+    const run = () => {
+      calls += 1;
+      if (calls === 1) {
+        return respond({
+          schema: "pipeline.synthetic.v1",
+          status: "ready",
+          nextAction: {
+            kind: "command",
+            executable: "node",
+            argv: ["/plugin/pipeline-state.mjs", "set-phase", "--phase", "implementation"],
+          },
+        });
+      }
+      if (calls === 2) return { status: 0, stdout: 'Phase set: "implementation"; lifecycle="implementing".\n', stderr: "" };
+      return respond({ schema: "pipeline.synthetic.v1", status: "ready", nextAction: null });
+    };
+    const result = driveOnboardingInit({ rootDir: root, runner: "claude", run });
+    assert.equal(result.outcome, "ready", JSON.stringify(result));
+    assert.equal(result.stepsExecuted, 3);
+    assert.equal(result.steps[1].faultCode, null);
+    assert.equal(result.steps[1].outputKind, "plain-success");
+    assert.equal(result.steps[2].argv[1], "inspect", "plain command success must re-enter only through public inspect");
+  } finally {
+    dispose(root);
+  }
+});
+
+test("driveOnboardingInit: plain or malformed anchor output, JSON-shaped malformed command output, and nonzero command output remain errors", () => {
+  for (const [name, run, expectedExitCode] of [
+    ["plain-anchor", () => ({ status: 0, stdout: "not protocol json", stderr: "" }), 0],
+    ["malformed-anchor", () => ({ status: 0, stdout: "{not-json", stderr: "" }), 0],
+    ["malformed-command", (() => {
+      let calls = 0;
+      return () => {
+        calls += 1;
+        return calls === 1
+          ? respond({ schema: "pipeline.synthetic.v1", status: "ready", nextAction: { kind: "command", executable: "node", argv: ["tool"] } })
+          : { status: 0, stdout: "{not-json", stderr: "" };
+      };
+    })(), 0],
+    ["nonzero-command", (() => {
+      let calls = 0;
+      return () => {
+        calls += 1;
+        return calls === 1
+          ? respond({ schema: "pipeline.synthetic.v1", status: "ready", nextAction: { kind: "command", executable: "node", argv: ["tool"] } })
+          : { status: 2, stdout: "command refused", stderr: "refused" };
+      };
+    })(), 2],
+  ]) {
+    const root = freshRoot();
+    try {
+      const result = driveOnboardingInit({ rootDir: root, run });
+      assert.equal(result.outcome, "error", `${name}: ${JSON.stringify(result)}`);
+      assert.equal(result.error.faultCode, "unparseable-output", name);
+      assert.equal(result.error.exitCode, expectedExitCode, name);
+    } finally {
+      dispose(root);
+    }
+  }
+});
+
 test("driveOnboardingInit: a nextAction-less result from the anchoring inspect itself does not re-anchor again", () => {
   const root = freshRoot();
   try {
