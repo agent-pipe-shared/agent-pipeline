@@ -41,7 +41,7 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
-import { resolveLocalOperatorKeyAnchor } from "../lib/machine-plane.mjs";
+import { readMachinePlane, resolveLocalOperatorKeyAnchor } from "../lib/machine-plane.mjs";
 import { gateConfig, loadManifestSafe } from "../lib/manifest.mjs";
 import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
 import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
@@ -271,9 +271,25 @@ export function checkCriticalHumanProofPolicy(dir, deps = {}) {
         remedy: "register this machine's operator key, e.g. node plugins/pipeline-core/scripts/po-human-approval.mjs setup --repo-root <repo> --directory <external-dir> --human-name <name>, then record that directory as poKeyDirectory in ~/.agent-pipeline/machine.json",
       };
     }
+    // The resolver above proves the key through the machine plane's poKeyDirectory ->
+    // trust-policy.json chain. Carry that SAME registered directory forward so the complete
+    // push-prepare flow signs with the key whose provenance made this TOFU check green. Do
+    // not fall through to parseHumanArgs() here: its higher-precedence repo-scoped tier may
+    // legitimately name a different directory, which would discard the provenance binding.
+    const readLocalPlane = deps.readMachinePlane ?? readMachinePlane;
+    const localPlane = readLocalPlane(deps);
+    const directory = localPlane.status === "valid" ? localPlane.plane?.poKeyDirectory : null;
+    if (typeof directory !== "string" || directory.length === 0) {
+      return {
+        id, ok: false,
+        message: "posture: unrestricted, once (trust-on-first-use) -- but TRUST-ANCHOR-MISSING: this machine's registered operator key directory could not be resolved consistently.",
+        remedy: "fix this machine's poKeyDirectory registration in ~/.agent-pipeline/machine.json",
+      };
+    }
     return {
       id, ok: true,
       message: "posture: unrestricted, once (trust-on-first-use); project/critical-human-proof.json declares no trustAnchor and no trustAnchors, and this machine's own registered operator key resolves, so the next successful signature push authorizes with it and pins it as this project's trust anchor for every later push.",
+      directory,
     };
   }
   const anchors = policy.trustAnchors !== null ? policy.trustAnchors : [policy.trustAnchor];
