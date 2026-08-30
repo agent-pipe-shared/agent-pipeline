@@ -113,21 +113,6 @@ export { machinePlaneFilePath };
 // today. Closing the residual half is an eligibility() change in lib/human-guard-override.mjs,
 // which is out of scope for this file.
 const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-// GF-078 bug 2: the one additional approved root threaded into the bounded rg-to-rg/
-// rg-to-head diagnostic pipeline (guard-command-grammar.mjs's isBoundedReadOnlyPipeline),
-// alongside the project root every call site already carries. Every single, non-piped
-// read-only command in isReadOnlyDiagnosticCommand below (rg, grep, cat, head, tail, wc,
-// stat, file) already carries NO path restriction at all -- an agent reading its own
-// installed plugin's code with a single `rg` call was already unconditionally admitted;
-// only the identical read piped through a second rg or head was refused, purely because it
-// is a pipeline. Resolved once, defensively, from THIS module's own location -- never a
-// project- or command-supplied path -- exactly like gateStrengthShellReadOnlyScriptExemption's
-// own realpath of PLUGIN_ROOT a few lines below. Falling back to the un-realpathed constant
-// on a (practically unreachable, since this module is itself executing from there) realpath
-// failure is still strictly narrower than the single-command allowance above, never wider.
-const BOUNDED_PIPELINE_ADDITIONAL_ROOTS = (() => {
-  try { return [realpathSync(PLUGIN_ROOT)]; } catch { return [PLUGIN_ROOT]; }
-})();
 
 export const BASE_GOVERNANCE_MARKERS = [
   ".agent-pipeline/core.lock.json",
@@ -314,22 +299,6 @@ const GRAMMAR_DENIAL_GUIDANCE = {
   "GUARD-REDIRECT-UNAPPROVED": "The command contains an unapproved shell redirection.",
 };
 
-/**
- * NVA-BL-76: the bounded read-only diagnostic pipeline (rg-to-head / rg-to-rg) whose only
- * unmet condition is that a read target resolves OUTSIDE the project root. Before this code
- * existed the same refusal was issued as GUARD-OPERATOR-UNAPPROVED (or, with the admitted
- * `2>/dev/null` suppressor, GUARD-REDIRECT-UNAPPROVED) -- a reason that is false: the
- * identical pipeline, identical operator, is admitted one directory over, and the refusal's
- * own closing line names bounded rg-to-head as an admitted exception while refusing one.
- *
- * Deliberately NOT the cross-repository-mutation family: nothing here writes anywhere. It is
- * a narrower READ-scope refusal, and it is routed through humanOverrideRoute() exactly like
- * the grammar codes, so a human signature can authorize one exact outside-root read
- * (measured class `cross-repository-target`, ADR-0059 Decision 6). Distinguishing this from
- * a write is the whole point of giving it its own code: a signature that may authorize
- * reading a background job's log outside the checkout is not a signature that may authorize
- * mutating another repository.
- */
 // backlog/items/2026-08-19-closed-shell-grammar-still-rejects-common-readonly-composition.md
 // Proposal point 1: a SMALL, explicit allowlist of read-only commands admitted when
 // chained with `&&`. Deliberately bounded and small -- 6 segments comfortably covers the
@@ -338,8 +307,6 @@ const GRAMMAR_DENIAL_GUIDANCE = {
 // constant at module-load time -- a `const` a few hundred lines further down would still be in
 // its temporal dead zone at that point.
 const MAX_AND_CHAIN_SEGMENTS = 6;
-const READ_SCOPE_DENIAL_CODE = "GUARD-READ-SCOPE-OUTSIDE-ROOT";
-const READ_SCOPE_DENIAL_GUIDANCE = "The bounded read-only diagnostic pipeline reads a path outside the project root.";
 // NVA-I-GRAMMAR (PO, 2026-08-28, backlog: 2026-08-27-shell-grammar-reads-quoted-content-as-
 // shell-syntax.md): "wichtig ist, dass der guard das erlaubte grammar immer auch sagt" -- the
 // refusal must state the COMPLETE admitted grammar with bounds and exact spellings, not just
@@ -391,28 +358,14 @@ export const ADMITTED_GRAMMAR_SHAPES = [
 function grammarShapeLines() {
   return ADMITTED_GRAMMAR_SHAPES.map((shape) => `- ${shape.spelling} (e.g. "${shape.example}").`);
 }
-// The four lines every grammar denial has always printed, moved verbatim out of blocked()'s
-// template so a code that must NOT print them (READ_SCOPE_DENIAL_CODE) can say something
-// true instead. Byte-identical output for the three grammar codes.
+// The lines every grammar denial prints. Kept in one table so all three grammar codes stay
+// byte-identical apart from their typed reason.
 const GRAMMAR_DENIAL_REMEDY = [
   "Use one simple shell command per tool call; issue independent read-only commands as separate parallel tool calls.",
   "Do not construct a new composed command with ;, pipelines, redirects, or line continuation outside the admitted shapes below.",
   "If typed retryActions are present, run only those exact read-only actions as separate tool calls.",
   "The complete admitted grammar, with bounds and exact spellings:",
   ...grammarShapeLines(),
-];
-// Every line here is executable advice that actually clears THIS refusal -- the item's
-// second requirement ("make the remedy true or omit it"), and the reason the old text was a
-// defect rather than a wording nit: it sent the operator to fix a pipeline that was never
-// the objection. Since pipeline.read-scope-single-command-root-check (backlog:
-// 2026-08-29-read-scope-guard-admits-single-command-but-blocks-the-piped-form.md), a single,
-// un-piped read command is ALSO root-checked -- it is no longer a shape admitted "without a
-// path-location restriction", so line 3 no longer claims that. Both remaining claims are
-// pinned by the NVA-BL-76 tests, which EXECUTE the advice rather than matching its wording.
-const READ_SCOPE_DENIAL_REMEDY = [
-  "The pipeline is not the objection: the identical bounded rg-to-rg / rg-to-head pipeline is admitted when every read target resolves inside the project root.",
-  "Recomposing the same read -- splitting it, adding operators, redirects or line continuation -- cannot lift this refusal.",
-  "Re-target the read inside the project root: the identical bounded pipeline AND the identical single, un-piped read are both admitted once every read target resolves inside the project root.",
 ];
 
 /**
@@ -475,21 +428,19 @@ function blocked(
     && CONTROLLING_NON_READY_STATUSES.has(lifecycleStatus)
     ? lifecycleStatus
     : null;
-  const readScope = code === READ_SCOPE_DENIAL_CODE;
-  const grammarReason = readScope ? READ_SCOPE_DENIAL_GUIDANCE : GRAMMAR_DENIAL_GUIDANCE[code];
+  const grammarReason = GRAMMAR_DENIAL_GUIDANCE[code];
   if (grammarReason) {
     const retryEnvelope = {
       schema: "pipeline.guard-retry-actions.v1",
       retryActions,
     };
-    const remedy = readScope ? READ_SCOPE_DENIAL_REMEDY : GRAMMAR_DENIAL_REMEDY;
     return verdict(
       2,
       "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
         + `${code}: ${grammarReason}\n`
         + (rejectedElement ? `Rejected element: ${rejectedElement}.\n` : "")
         + (remediation ? `${remediation}\n` : "")
-        + remedy.map((line) => `${line}\n`).join("")
+        + GRAMMAR_DENIAL_REMEDY.map((line) => `${line}\n`).join("")
         + `${JSON.stringify(retryEnvelope)}\n`
         + overrideGuidance,
     );
@@ -1656,6 +1607,24 @@ function isValidPipelineHeadArgs(argv) {
 }
 
 /**
+ * The shared rg pipeline validator still accepts an optional set of read roots. For this
+ * lifecycle guard, every parsed argv token is supplied as an exact candidate root so the
+ * validator continues to own the closed rg/head grammar while filesystem containment no
+ * longer turns a genuinely read-only diagnostic into a human-override event. Resolving all
+ * tokens is intentional: validateRg() still decides which tokens are paths and independently
+ * rejects unknown flags, malformed values, extra segments, redirects, and unbounded sinks.
+ */
+function diagnosticReadArgumentRoots(parsed, root) {
+  if (!parsed || parsed.parseStatus !== "accepted") return [];
+  return parsed.segments.flatMap((segment) => segment.argv
+    .filter((token) => typeof token === "string" && token !== "" && !token.includes("\0"))
+    .map((token) => {
+      try { return resolve(root, token); } catch { return null; }
+    })
+    .filter((value) => value !== null));
+}
+
+/**
  * Extends the bounded read-only pipeline family (guard-command-grammar.mjs's
  * isBoundedReadOnlyPipeline, rg-to-rg/rg-to-head only) with the "grep-to-grep"
  * and "grep-to-head" shapes: the same closed, bounded two-segment structure
@@ -1719,32 +1688,18 @@ const CAT_PIPELINE_DISPLAY_FLAGS = new Set([
   "-v", "--show-nonprinting",
 ]);
 
-// A local twin of guard-command-grammar.mjs's approvedReadPath(): resolve `value` against
-// `root` and require it to stay inside `root`. Not imported -- approvedReadPath is not
-// exported from that file (only parseGuardCommand and isBoundedReadOnlyPipeline are), and this
-// dispatch's briefed scope excludes editing it. Uses this file's own already-local
-// `pathInside` (below), the same containment logic guard-command-grammar.mjs's copy applies.
-// A separate copy from isApprovedSingleCommandReadArg's near-identical containment check
-// (isReadOnlySimpleWords' single-command rule, above) on purpose -- this dispatch's briefing
-// asks for "the same approved-read-path rule the existing [rg] predicates use" for this
-// pipeline family specifically, and out-of-scope for this dispatch to merge the two; this
-// function must not change functionally, a different pipeline family from the single-command
-// shape (pipeline.read-scope-single-command-root-check).
-function isApprovedCatPipelineReadPath(value, root) {
-  if (typeof value !== "string" || value === "" || value.includes("\0")) return false;
-  try {
-    return pathInside(resolve(root), resolve(root, value));
-  } catch {
-    return false;
-  }
+// Cat's source still requires one or more explicit path tokens. Their location is no longer
+// an admission condition; token shape and the fixed display-flag allowlist remain closed.
+function isValidCatPipelineReadPath(value) {
+  return typeof value === "string" && value !== "" && !value.includes("\0");
 }
 
 // cat's argv, source side: zero or more CAT_PIPELINE_DISPLAY_FLAGS entries (an optional `--`
 // ends flag parsing, matching ordinary shell convention), then one or more read paths, each
-// approved by isApprovedCatPipelineReadPath above. At least one path is required -- a `cat`
+// validated by isValidCatPipelineReadPath above. At least one path is required -- a `cat`
 // with no path argument reads stdin only, which is not a file read this pipeline family
 // exists to admit.
-function isValidCatPipelineSourceArgs(argv, root) {
+function isValidCatPipelineSourceArgs(argv) {
   let afterDashDash = false;
   const paths = [];
   for (const arg of argv) {
@@ -1755,7 +1710,7 @@ function isValidCatPipelineSourceArgs(argv, root) {
     }
     paths.push(arg);
   }
-  return paths.length > 0 && paths.every((path) => isApprovedCatPipelineReadPath(path, root));
+  return paths.length > 0 && paths.every((path) => isValidCatPipelineReadPath(path));
 }
 
 /**
@@ -1783,7 +1738,7 @@ function isBoundedCatPipeline(parsed, root) {
   const expectedCat = windows ? "cat.exe" : "cat";
   const sourceName = basename(parsed.segments[0].executable).toLowerCase();
   if (sourceName !== expectedCat) return false;
-  if (!isValidCatPipelineSourceArgs(parsed.segments[0].argv, root)) return false;
+  if (!isValidCatPipelineSourceArgs(parsed.segments[0].argv)) return false;
   const sinkName = basename(parsed.segments[1].executable).toLowerCase();
   const expectedGrep = windows ? "grep.exe" : "grep";
   if (sinkName === expectedGrep) {
@@ -1809,17 +1764,14 @@ function isBoundedCatPipeline(parsed, root) {
  * Subcommand trust is the SAME predicate the single-command git rule uses -- isReadOnlyGitSubcommand,
  * factored out of isReadOnlySimpleWords below so the two can never diverge; this pipeline family
  * never admits a git subcommand the single-command form doesn't already trust. Unlike that
- * single-command form (which applies no path restriction to git's own arguments), every non-flag
- * source argument is additionally scoped to the project root via the identical
- * isApprovedSingleCommandReadArg containment check the un-piped rg/grep/cat/head/tail/wc/stat/file
- * family already applies -- deliberately narrower than the single-command git rule, the same
- * discipline NVA-CATPIPE-1 already applied to the cat pipeline family for the same reason.
+ * single-command form, the pipeline applies no filesystem-location restriction to git's own
+ * arguments. The shared read-only subcommand predicate remains the authority boundary.
  *
  * Sink half identical to isBoundedGrepPipeline/isBoundedCatPipeline's head leg: `head` only
  * (no grep sink for git -- out of this dispatch's scope), same canonical 1..500 bound, same
  * optional trailing `2>/dev/null`.
  */
-function isBoundedGitPipeline(parsed, root, extraRoots = BOUNDED_PIPELINE_ADDITIONAL_ROOTS) {
+function isBoundedGitPipeline(parsed) {
   if (!parsed || parsed.parseStatus !== "accepted"
     || parsed.segments.length !== 2
     || parsed.operators.length !== 1
@@ -1834,7 +1786,6 @@ function isBoundedGitPipeline(parsed, root, extraRoots = BOUNDED_PIPELINE_ADDITI
   const subcommand = sourceArgv[0];
   const subargs = sourceArgv.slice(1);
   if (!isReadOnlyGitSubcommand(subcommand, subargs)) return false;
-  if (!subargs.every((arg) => isApprovedSingleCommandReadArg(arg, root, extraRoots))) return false;
   const sinkName = basename(parsed.segments[1].executable).toLowerCase();
   if (sinkName !== (windows ? "head.exe" : "head")) return false;
   if (parsed.redirects.length === 1) {
@@ -2105,40 +2056,21 @@ function isReadOnlyDiagnosticCommandWithTrailingStderrRedirect(command, root) {
 }
 
 /**
- * A single un-piped read command's path-taking argument, checked against the identical
- * containment rule isOutsideRootBoundedDiagnosticRead() already applies to the piped shape:
- * a flag (commandPath() returns null) is never a path token and is always approved; a real
- * path argument must resolve inside `root` or one of `extraRoots`. Reused rather than a
- * second copy of the containment logic (see isOutsideRootBoundedDiagnosticRead's own
- * scopeLifted comment for why a second copy is exactly the drift this repository's
- * guardrails warn against).
- */
-function isApprovedSingleCommandReadArg(arg, root, extraRoots) {
-  const resolved = commandPath(arg, root); // null for flags -> not a path token
-  if (resolved === null) return true;
-  if (pathInside(root, resolved)) return true;
-  return extraRoots.some((extra) => {
-    try { return pathInside(resolve(extra), resolved); } catch { return false; }
-  });
-}
-
-/**
  * Keep fail-closed lifecycle states diagnosable without turning arbitrary
  * shell syntax into a write bypass.  Only one simple command is accepted; the
  * parser already rejects control operators, redirections and command
- * substitution. The bounded rg and grep pipeline families (above) are the
- * only two-segment exceptions.
+ * substitution. The bounded diagnostic pipeline families above are the only
+ * two-segment exceptions.
  *
  * Shared tail logic, factored out of isReadOnlyDiagnosticCommand so the trailing-redirect
  * exception above can validate an already-tokenized `[executable, ...argv]` shape without
- * re-parsing (and without duplicating this whole classifier). Behavior for every existing
- * caller of isReadOnlyDiagnosticCommand is unchanged -- this is a pure extraction.
+ * re-parsing (and without duplicating this whole classifier).
  *
- * `extraRoots` defaults to BOUNDED_PIPELINE_ADDITIONAL_ROOTS so both existing call sites
- * (neither of which passes a third argument) keep exactly the piped shape's own allowance
- * for reading this plugin's own installed root, for free.
+ * Filesystem location is deliberately not part of this predicate. Once the executable and
+ * argv pass this closed read-only grammar, reading a path outside the project root adds no
+ * write authority and must remain available during onboarding/restart diagnosis.
  */
-function isReadOnlySimpleWords(words, root, extraRoots = BOUNDED_PIPELINE_ADDITIONAL_ROOTS) {
+function isReadOnlySimpleWords(words, root) {
   if (!words || words.length === 0) return false;
   const executable = basename(words[0]).toLowerCase();
   const args = words.slice(1);
@@ -2177,10 +2109,7 @@ function isReadOnlySimpleWords(words, root, extraRoots = BOUNDED_PIPELINE_ADDITI
   }
   if (["ls", "rg", "grep", "cat", "head", "tail", "wc", "stat", "file"].includes(executable)) {
     if (args.some((arg) => arg === "--files-with-matches" && executable === "grep")) return false;
-    // The single-command sibling of isOutsideRootBoundedDiagnosticRead's containment check --
-    // see isOutsideRootSingleCommandRead() below, whose comment carries the item's done_when
-    // marker.
-    return args.every((arg) => isApprovedSingleCommandReadArg(arg, root, extraRoots));
+    return true;
   }
   if (executable === "sed") {
     return !args.some((arg) => /^-[^-]*[iew]/u.test(arg) || /^--(?:in-place|expression|file)(?:=|$)/u.test(arg));
@@ -2223,10 +2152,10 @@ function isReadOnlyGitSubcommand(subcommand, subargs) {
 
 export function isReadOnlyDiagnosticCommand(command, root) {
   const parsed = parseGuardCommand(command, root, { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM });
-  if (isBoundedReadOnlyPipeline(parsed, root, BOUNDED_PIPELINE_ADDITIONAL_ROOTS)) return true;
+  if (isBoundedReadOnlyPipeline(parsed, root, diagnosticReadArgumentRoots(parsed, root))) return true;
   if (isBoundedGrepPipeline(parsed, root)) return true;
   if (isBoundedCatPipeline(parsed, root)) return true;
-  if (isBoundedGitPipeline(parsed, root, BOUNDED_PIPELINE_ADDITIONAL_ROOTS)) return true;
+  if (isBoundedGitPipeline(parsed)) return true;
   if (isBoundedReadOnlyAndChain(command, root)) return true;
   if (isReadOnlyDiagnosticCommandWithTrailingStderrRedirect(command, root)) return true;
   return isReadOnlySimpleWords(simpleWords(command, root), root);
@@ -2439,75 +2368,6 @@ function hasExternalOutputRedirect(command, root) {
   return false;
 }
 
-/**
- * NVA-BL-76: is this command the bounded read-only diagnostic pipeline that
- * isReadOnlyDiagnosticCommand() admits in every respect EXCEPT that a read target resolves
- * outside the project root (and outside BOUNDED_PIPELINE_ADDITIONAL_ROOTS)?
- *
- * Answered by evaluating the SAME predicate twice -- never by a second, competing parse of
- * the command, and never by re-deriving which argv token is a path (the rule against a rival
- * parser that rejectedGrammarElement() states one screen up applies here verbatim). The
- * second call passes every argv token, resolved against the invocation root, as its own
- * approved read root; `approvedReadPath` resolves a candidate exactly the same way, so
- * `pathInside(extra, target)` is true (rel === "") for precisely the path candidates and the
- * call returns true iff every OTHER bound already holds: two segments, one `|`, rg as the
- * producer, validateRg's flag allowlist on both sides, head's canonical 1..500 count, and
- * the single admitted `2>/dev/null` suppressor. `rg … | tee out.txt`, `… | head -n 9999`
- * and `… | head -n 5 > out.txt` therefore stay false and keep their existing codes.
- *
- * This never admits anything. Its only consumer picks WHICH refusal is printed, so the
- * relaxed second evaluation cannot widen what the guard allows: the first call, with the
- * real roots, is still the one that decides admission (isReadOnlyDiagnosticCommand).
- */
-export function isOutsideRootBoundedDiagnosticRead(parsed, root) {
-  if (!parsed || parsed.parseStatus !== "accepted") return false;
-  if (isBoundedReadOnlyPipeline(parsed, root, BOUNDED_PIPELINE_ADDITIONAL_ROOTS)) return false;
-  const scopeLifted = parsed.segments.flatMap((segment) => segment.argv
-    .filter((token) => typeof token === "string" && token !== "" && !token.includes("\0"))
-    .map((token) => {
-      try { return resolve(root, token); } catch { return null; }
-    })
-    .filter((value) => value !== null));
-  return isBoundedReadOnlyPipeline(parsed, root, [...BOUNDED_PIPELINE_ADDITIONAL_ROOTS, ...scopeLifted]);
-}
-
-/**
- * pipeline.read-scope-single-command-root-check: the single, un-piped sibling of
- * isOutsideRootBoundedDiagnosticRead() just above -- is this command the single-command
- * read-only shape isReadOnlyDiagnosticCommand() admits in every respect EXCEPT that a read
- * target resolves outside the project root (and outside BOUNDED_PIPELINE_ADDITIONAL_ROOTS)?
- * Before this check existed, isReadOnlySimpleWords() imposed no containment restriction at
- * all on the single-command shape while the piped shape was already root-checked -- so
- * protection against reading outside the project root depended on the shell shape of the
- * command (piped vs. not), not on the actual filesystem target being read (backlog:
- * 2026-08-29-read-scope-guard-admits-single-command-but-blocks-the-piped-form.md).
- *
- * Answered by the identical two-call pattern as the piped sibling: the first call, with the
- * real roots, decides whether this shape is a read-only single command AT ALL (an in-root
- * read short-circuits earlier via isReadOnlyDiagnosticCommand() and never reaches this
- * function; a command not shaped like a read-only single command -- e.g. `grep
- * --files-with-matches`, or any write/mutating command -- returns false on the first call
- * regardless of extraRoots, since none of those branches ever consult extraRoots). The
- * second call, with the read's own literal path arguments additionally approved as extra
- * roots, answers "was the containment check the ONLY thing blocking this command" -- exactly
- * the question isOutsideRootBoundedDiagnosticRead() answers for the piped shape. This never
- * admits anything; its only consumer (evaluateLifecycleReadyGuard()) picks WHICH refusal
- * code is printed, so the relaxed second evaluation cannot widen what the guard allows.
- */
-export function isOutsideRootSingleCommandRead(parsed, root) {
-  if (!parsed || parsed.parseStatus !== "accepted" || parsed.segments.length !== 1
-    || parsed.operators.length !== 0 || parsed.redirects.length !== 0) return false;
-  const words = [parsed.segments[0].executable, ...parsed.segments[0].argv];
-  if (isReadOnlySimpleWords(words, root)) return false;
-  const scopeLifted = words.slice(1)
-    .filter((token) => typeof token === "string" && token !== "" && !token.includes("\0"))
-    .map((token) => {
-      try { return resolve(root, token); } catch { return null; }
-    })
-    .filter((value) => value !== null);
-  return isReadOnlySimpleWords(words, root, [...BOUNDED_PIPELINE_ADDITIONAL_ROOTS, ...scopeLifted]);
-}
-
 function poApprovalArgs(command, root, scriptPath) {
   const words = simpleWords(command, root);
   if (!words || words.length < 3 || resolve(root, words[1]) !== scriptPath) return null;
@@ -2579,10 +2439,10 @@ export function isForbiddenCrossRepositoryMutation(command, root, dependencies =
     if (poArgs.length === 1 && ["--help", "--version"].includes(poArgs[0])) return false;
     return true;
   }
-  if (isBoundedReadOnlyPipeline(parsed, root, BOUNDED_PIPELINE_ADDITIONAL_ROOTS)) return false;
+  if (isBoundedReadOnlyPipeline(parsed, root, diagnosticReadArgumentRoots(parsed, root))) return false;
   if (isBoundedGrepPipeline(parsed, root)) return false;
   if (isBoundedCatPipeline(parsed, root)) return false;
-  if (isBoundedGitPipeline(parsed, root, BOUNDED_PIPELINE_ADDITIONAL_ROOTS)) return false;
+  if (isBoundedGitPipeline(parsed)) return false;
   if (isBoundedReadOnlyAndChain(command, root)) return false;
   if (isReadOnlyDiagnosticCommandWithTrailingStderrRedirect(command, root)) return false;
   if (parsed.parseStatus !== "accepted" && hasExternalOutputRedirect(command, root)) return true;
@@ -4186,15 +4046,8 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
       }
       lifts.push(route.admitted);
     } else if (parsed.operators.length > 0 || parsed.redirects.length > 0) {
-      // NVA-BL-76: the read-scope refusal is decided FIRST, because for this one shape the
-      // operator/redirect codes state a reason that is demonstrably not the reason.
-      const readScope = isOutsideRootBoundedDiagnosticRead(parsed, root);
-      const code = readScope
-        ? READ_SCOPE_DENIAL_CODE
-        : parsed.redirects.length > 0 ? "GUARD-REDIRECT-UNAPPROVED" : "GUARD-OPERATOR-UNAPPROVED";
-      const reason = readScope
-        ? `${code}: ${READ_SCOPE_DENIAL_GUIDANCE}`
-        : `${code}: ${GRAMMAR_DENIAL_GUIDANCE[code]}`;
+      const code = parsed.redirects.length > 0 ? "GUARD-REDIRECT-UNAPPROVED" : "GUARD-OPERATOR-UNAPPROVED";
+      const reason = `${code}: ${GRAMMAR_DENIAL_GUIDANCE[code]}`;
       const route = humanOverrideRoute(
         code, reason, "command", root, toolName, input.tool_input, dependencies,
       );
@@ -4211,17 +4064,6 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
           code, null, [], route.overrideGuidance, rejectedGrammarElement(code, (input.tool_input.command ?? input.tool_input.CommandLine), parsed),
         ));
       }
-      lifts.push(route.admitted);
-    } else if (isOutsideRootSingleCommandRead(parsed, root)) {
-      // pipeline.read-scope-single-command-root-check: the single-command sibling of the
-      // NVA-BL-76 branch just above -- a single, un-piped read whose target resolves outside
-      // the project root is refused under the identical code the piped shape already uses. An
-      // in-root single read still short-circuits at the isReadOnlyDiagnosticCommand() fast
-      // path above and never reaches this branch.
-      const code = READ_SCOPE_DENIAL_CODE;
-      const reason = `${code}: ${READ_SCOPE_DENIAL_GUIDANCE}`;
-      const route = humanOverrideRoute(code, reason, "command", root, toolName, input.tool_input, dependencies);
-      if (!route.admitted) return withLifts(lifts, blocked(code, null, [], route.overrideGuidance));
       lifts.push(route.admitted);
     }
   }
