@@ -816,6 +816,38 @@ test("driveOnboardingInit: re-anchors after a published command succeeds with pl
   }
 });
 
+test("driveOnboardingInit: binds a returned root-less project action to the Driver root", () => {
+  const root = freshRoot();
+  try {
+    let calls = 0;
+    const run = (executable, argv, options) => {
+      calls += 1;
+      if (calls === 1) {
+        assert.equal(argv.includes("--root"), true);
+        assert.equal(options.env, undefined, "explicit --root actions retain their published environment");
+        return respond({
+          schema: "pipeline.inspect.v1",
+          status: "draft",
+          nextAction: {
+            kind: "command",
+            executable: process.execPath,
+            argv: ["/pipeline-state.mjs", "inspect"],
+          },
+        });
+      }
+      assert.equal(executable, process.execPath);
+      assert.deepEqual(argv, ["/pipeline-state.mjs", "inspect"]);
+      assert.equal(options.env.CLAUDE_PROJECT_DIR, root);
+      return respond({ schema: "pipeline.inspect.v1", status: "ready", nextAction: null });
+    };
+    const result = driveOnboardingInit({ rootDir: root, runner: "codex", run });
+    assert.equal(result.outcome, "ready", JSON.stringify(result));
+    assert.equal(calls, 2);
+  } finally {
+    dispose(root);
+  }
+});
+
 test("driveOnboardingInit: plain or malformed anchor output, JSON-shaped malformed command output, and nonzero command output remain errors", () => {
   for (const [name, run, expectedExitCode] of [
     ["plain-anchor", () => ({ status: 0, stdout: "not protocol json", stderr: "" }), 0],
