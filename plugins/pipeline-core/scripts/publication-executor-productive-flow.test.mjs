@@ -152,6 +152,7 @@ function releasePreflightFixture({ candidateOid, candidateTree, baseOid, baseTre
         .sort((left, right) => left.path.localeCompare(right.path)),
     },
     consent: { decisionId: h("9"), status: "approved", authoritySha256: h("a"), evaluatedAt: "2026-08-01T00:00:00.000Z", expiresAt: "2026-12-01T00:00:00.000Z" },
+    humanApproval: null,
     gates: {
       gg03: { required: false, binding: null },
       inventory: [
