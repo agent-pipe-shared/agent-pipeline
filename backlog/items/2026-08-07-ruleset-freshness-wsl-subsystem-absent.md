@@ -3,12 +3,25 @@ schema: pipeline.backlog-item.v1
 id: pipeline.ruleset-freshness-wsl-subsystem-absent
 type: defect
 owner: pipeline
-status: in_progress
+status: closed
 source: merge report section 4 finding 10 (specs/sprint-phoenix-epic/evidence/merge-0.5.2-what-fell-away.md gitignored evidence artifact); merge commit 75b8361
 created: 2026-08-07
 due: 2026-09-06
 done_when: manual
+closed_at: "2026-08-30"
+closure_repository: "self"
+closure_commit: "6e84d73aa6468b11dbde03a7c741c8a63bf96580"
+closure_evidence: "backlog/evidence/2026-08-30-ruleset-freshness-reverification.md"
 ---
+
+# Closed — 2026-08-30
+
+This is not a Sentinel closure: current-code re-verification shows that the
+Codex-on-WSL host-boundary mechanism described by the item is present and
+covered. `ruleset-freshness.test.mjs` passed 16/16 and
+`pipeline-start-preflight.test.mjs` passed 54/54; the durable details are in
+the closure evidence above. A future freshness/host-transport defect must be
+filed against the current design, not by reviving this merge-recovery record.
 
 # The WSL host-authorized freshness/self-application-comparison subsystem is gone
 

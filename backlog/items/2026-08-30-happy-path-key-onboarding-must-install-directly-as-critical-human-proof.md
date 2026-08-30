@@ -3,12 +3,26 @@ schema: pipeline.backlog-item.v1
 id: pipeline.happy-path-key-onboarding-must-install-directly-as-critical-human-proof
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-30
 sprint: nova
 tracking: "NOW / Nova A -- PO explicit future requirement, 2026-08-30, filed alongside the trust-anchor-circularity fix it depends on."
 source: "PO live session 2026-08-30, item #4 of a 12-point instruction list: 'künftig muss ein frisches projekt einen neuen oder bestehenden key im happy path easy onboarden und auch direkt als critical proof.json installieren' -- filed as a distinct forward-looking item, separate from verifying today's circularity fix (see Related)."
+closed_at: "2026-08-30"
+closure_repository: "self"
+closure_commit: "64544e404b852c87c24c0fd6424b875bee5742a2"
+closure_evidence: "backlog/evidence/2026-08-30-sentinel-retirement-and-nova-a-reverification.md"
 ---
+
+# Closed — 2026-08-30
+
+The current driver path now proves both required cases rather than merely
+guiding them. `onboarding-init.test.mjs` passed 22/22 across Claude, Codex,
+and Antigravity for both no-key and valid-existing-key homes; it verifies
+reuse without replacement and first-anchor materialization. The driver-only
+end-to-end suite passed 5/5 to the first implementation file, and the
+onboarding suite passed 158/158 including `critical-human-proof.json`
+materialization. The detailed durable evidence is referenced above.
 
 # A fresh project must easily onboard a new-or-existing signing key in the happy path, and have it installed directly as `critical-human-proof.json`
 

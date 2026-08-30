@@ -3,12 +3,24 @@ schema: "pipeline.backlog-item.v1"
 id: "pipeline.session-keep-awake"
 type: "workflow-improvement"
 owner: "pipeline"
-status: "in_progress"
+status: "closed"
 created: "2026-07-19"
 source: "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md"
 tracking: "Sentinel recovery baseline; no completion claim."
 done_when: manual
+closed_at: "2026-08-30"
+closure_repository: "self"
+closure_commit: "64544e404b852c87c24c0fd6424b875bee5742a2"
+closure_evidence: "backlog/evidence/2026-08-30-sentinel-retirement-and-nova-a-reverification.md"
 ---
+
+# Closed — 2026-08-30
+
+The PO retired this stale Sentinel baseline. Sentinel will not be reopened
+through historic final-candidate administration; a renewed need must be a new
+item with current scope and evidence. See the durable PO decision in the
+closure evidence above. This closure does not claim a retrospective Sentinel
+release or remote readback.
 
 # pipeline.session-keep-awake
 

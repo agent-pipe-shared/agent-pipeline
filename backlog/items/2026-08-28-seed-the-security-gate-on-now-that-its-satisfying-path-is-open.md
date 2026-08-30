@@ -3,13 +3,27 @@ schema: pipeline.backlog-item.v1
 id: pipeline.seed-security-gate-on
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-28
 sprint: nova
 done_when: "contains plugins/pipeline-core/lib/project-onboarding-v3.mjs security: \"blocking\", claude_md_max_lines: 200"
 tracking: "NOW / Nova A — PO decision 2026-08-28 stands, but BLOCKED: the measurement below was taken in this repository's own checkout, the one place the consumer-side defect does not fire. See 'Correction' before implementing."
 source: "Measured 2026-08-28 against a genuinely fresh onboarded project at HEAD a304195d. Measured, not assumed — the same standard the original `off` decision was held to."
+closed_at: "2026-08-30"
+closure_repository: "self"
+closure_commit: "64544e404b852c87c24c0fd6424b875bee5742a2"
+closure_evidence: "backlog/evidence/2026-08-30-sentinel-retirement-and-nova-a-reverification.md"
 ---
+
+# Closed — 2026-08-30
+
+The previous real-consumer measurement exposed a stale installed artifact,
+not a missing source fix. Current re-verification passed the full
+`project-onboarding-v3.test.mjs` suite (158/158): `SECGATE-1` proves the
+blocking gate refuses before evidence and admits after the shipped scan, and
+`SECGATE-2` runs the fixture's own installed-plugin `security-scan.mjs` with
+no repository root above it and proves plugin-shipped configuration resolution
+plus a clean exit. The detailed durable evidence is referenced above.
 
 # Seed the security gate ON, now that its satisfying path is open
 
