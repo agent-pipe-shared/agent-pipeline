@@ -2262,6 +2262,12 @@ test("apply-portable-seed --activate surfaces the push-approval-setup ask-step f
     assert.doesNotMatch(applied.result.pushApprovalSetupAction.guidance, /\bsetup\.mjs\b/u,
       "must never point an installing consumer at the script SETUP.md forbids them to use");
     assert.match(applied.result.pushApprovalSetupAction.guidance, /po-human-approval\.mjs/u);
+    // NVA-CF-EXISTINGKEYASK: the first-time ceremony must ask the PO an
+    // explicit existing-key sub-question BEFORE proposing to create a new
+    // one, and name the exact --existing-key registration path.
+    assert.match(applied.result.pushApprovalSetupAction.guidance,
+      /do you already have an existing signing key on this machine/u);
+    assert.match(applied.result.pushApprovalSetupAction.guidance, /--existing-key/u);
 
     // A replay of the exact same apply call (zero-write, same digest) must
     // observe the identical ask-step.
@@ -2847,6 +2853,11 @@ test("NVA-V17-NOKEYASK: a machine with no PO signing key at all is told so, once
     assert.match(noPlaneAction.guidance, /--directory/u);
     assert.match(noPlaneAction.guidance, /--human-name/u);
     assert.match(noPlaneAction.guidance, /PO .*themselves|themselves.*PO/u);
+    // NVA-CF-EXISTINGKEYASK: the no-key-at-all guidance must also ask the
+    // existing-key sub-question BEFORE the new-key instruction, and name the
+    // exact --existing-key registration path.
+    assert.match(noPlaneAction.guidance, /do you already have an existing signing key on this machine/u);
+    assert.match(noPlaneAction.guidance, /--existing-key/u);
 
     // (b) no-directory: a valid plane, but no poKeyDirectory recorded --
     // fakeDeps's own default shape. The same "genuine absence" message, not
