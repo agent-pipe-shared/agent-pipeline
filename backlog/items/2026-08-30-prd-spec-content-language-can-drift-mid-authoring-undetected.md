@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.prd-spec-content-language-can-drift-mid-authoring-undetected
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-30
+closure_repository: self
+closure_commit: 7d299c569c8f1fa34e48bb745830655412ceaec7
+closure_evidence: templates/prd.md
 created: 2026-08-30
 sprint: nova
 tracking: "NOW / Nova A -- PO live, 2026-08-30: Codex/Claude can switch human-facing language mid-PRD/Spec-authoring (e.g. start German, drift to English), and no code path detects this against the expected po-language value; every such drift forces expensive repair. PO wants a cheap first fix (document the requirement explicitly in the template) before considering a heavier content-language-detection mechanism."
@@ -55,6 +59,26 @@ fordert viel Reparatur").
   ändern darf") as related context. A backlog search on 2026-08-30 found no
   existing item matching that description -- flagged back to the PO for
   confirmation of where that lives, not invented here.
+
+## Closed, 2026-08-30 (NVA-CF-LANGTEMPLATE)
+
+Commit `7d299c56` implemented the Proposal's step-1 cheap fix: a loud,
+explicit warning against mid-document human-facing-language drift, added
+next to the existing language guidance in `templates/prd.md`,
+`templates/spec.md`, and both mirrored kickoff-prompt pairs
+(`templates/prompts/{kickoff-new-project,elephant-kickoff}.md` and their
+`plugins/pipeline-core/templates/prompts/` copies). Independently
+re-verified by the Elephant: `node --test harness/scripts/check-consumer-safe-paths.test.mjs`
+-- 9/9 pass; diff confirmed limited to exactly the 6 named files.
+
+Step 2 (a lightweight content-language detection gate) is explicitly NOT
+built here, per the Proposal's own "measure whether this alone reduces the
+drift rate before adding cost" instruction and the PO's explicit request for
+the cheap route first. Closing on the landed cheap fix rather than leaving
+this open pending a drift-rate measurement that can only happen through
+future PRD/Spec authoring sessions -- if drift recurs after this fix, file
+a fresh item for the heavier detection mechanism rather than reopening this
+one (ledger append-only discipline).
 
 ## Triage
 
