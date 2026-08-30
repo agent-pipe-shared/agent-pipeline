@@ -167,7 +167,19 @@ function runOnboardingStep({ executable, argv, run, env = null }) {
   // `PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE` handling), extending across the process
   // boundary the same injected-dependency pattern the in-process library callers already
   // have (lib/machine-plane.mjs `homedirFn`).
-  if (env) options.env = env;
+  if (env) {
+    const homedirOverride = env.PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE;
+    // The project-onboarding CLI consumes the explicit variable above, while a few
+    // machine-plane helpers it delegates to still reach Node's process-level
+    // `os.homedir()` default. Keep both reads on the same caller-selected fixture home:
+    // POSIX resolves that default through HOME and Windows through USERPROFILE. Without
+    // this bridge, a driver call carrying an explicit hermetic home could still seed the
+    // real operator's registered key into the disposable project. No override means no
+    // env object here at all, preserving ordinary child inheritance byte-for-byte.
+    options.env = typeof homedirOverride === "string" && homedirOverride.length > 0
+      ? { ...env, HOME: homedirOverride, USERPROFILE: homedirOverride }
+      : env;
+  }
   const result = run(executable, argv, options);
   if (result?.error) {
     return { ok: false, faultCode: "spawn-failed", exitCode: result.status ?? null, stderr: String(result.error?.message ?? "") };
