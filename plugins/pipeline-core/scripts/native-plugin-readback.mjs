@@ -32,6 +32,18 @@ export const digest = (value) => createHash("sha256").update(typeof value === "s
 function assertHex(value, label) {
   if (!/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(value ?? "")) throw new Error(`${label} invalid`);
 }
+function expectedManifestName(provider) {
+  return provider === "antigravity" ? "agent-pipeline-core" : "pipeline-core";
+}
+function expectedManifestRelativePath(provider) {
+  return provider === "claude" ? ".claude-plugin/plugin.json" : provider === "antigravity" ? "plugin.json" : ".codex-plugin/plugin.json";
+}
+function validProviderManifest(manifest, provider) {
+  return manifest.name === expectedManifestName(provider)
+    && manifest.relativePath === expectedManifestRelativePath(provider)
+    && typeof manifest.version === "string"
+    && manifest.version !== "";
+}
 function assertKeys(value, keys, label) {
   const actual = Object.keys(value ?? {}).sort();
   const expected = [...keys].sort();
@@ -45,7 +57,7 @@ export function prepareNativeReadback(input) {
   if (input.loadedRootKind !== (input.provider === "claude" ? "claude-project-scope" : input.provider === "antigravity" ? "antigravity-project-scope" : "codex-provider-cache")) throw new Error("loadedRootKind invalid");
   assertHex(input.sourceOid, "sourceOid");
   assertKeys(input.manifest, ["relativePath", "name", "version", "digest"], "manifest");
-  if (input.manifest.name !== "pipeline-core" || input.manifest.relativePath !== (input.provider === "claude" ? ".claude-plugin/plugin.json" : input.provider === "antigravity" ? "plugin.json" : ".codex-plugin/plugin.json") || typeof input.manifest.version !== "string" || input.manifest.version === "") throw new Error("manifest invalid");
+  if (!validProviderManifest(input.manifest, input.provider)) throw new Error("manifest invalid");
   assertHex(input.manifest.digest, "manifest.digest");
   if (!Array.isArray(input.loadedChain) || input.loadedChain.length === 0) throw new Error("loadedChain invalid");
   const seen = new Set();
@@ -138,6 +150,7 @@ export function validateNativeReadback(state) {
   if (state.loadedRootKind !== (state.provider === "claude" ? "claude-project-scope" : state.provider === "antigravity" ? "antigravity-project-scope" : "codex-provider-cache")) throw new Error("loadedRootKind invalid");
   assertHex(state.sourceOid, "sourceOid");
   assertKeys(state.manifest, ["relativePath", "name", "version", "digest"], "manifest");
+  if (!validProviderManifest(state.manifest, state.provider)) throw new Error("manifest invalid");
   assertHex(state.manifest.digest, "manifest.digest");
   if (!Array.isArray(state.loadedChain) || !Array.isArray(state.observations)) throw new Error("native readback observations invalid");
   const seenPaths = new Set();

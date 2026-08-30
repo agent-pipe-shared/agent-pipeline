@@ -71,6 +71,7 @@ function versionSurfaces(version, overrides = {}) {
     { surface: "versionFile", path: "VERSION", bytes: `${version}\n` },
     { surface: "codexPlugin", path: "plugins/pipeline-core/.codex-plugin/plugin.json", bytes: manifest(version, { provider: "codex" }) },
     { surface: "claudePlugin", path: "plugins/pipeline-core/.claude-plugin/plugin.json", bytes: manifest(version, { provider: "claude" }) },
+    { surface: "antigravityPlugin", path: "plugins/pipeline-core/plugin.json", bytes: manifest(version, { provider: "antigravity" }) },
     { surface: "codexMarketplaceResolved", path: "plugins/pipeline-core/.codex-plugin/plugin.json", bytes: manifest(version, { provider: "codex" }) },
     { surface: "claudeMarketplaceResolved", path: "plugins/pipeline-core/.claude-plugin/plugin.json", bytes: manifest(version, { provider: "claude" }) },
   ];
@@ -234,14 +235,14 @@ const cases = [
       assert.throws(() => storeReleaseVersionDecision({ gitCommonDir: common, repoFingerprint: h("9"), decision }, { nowMs: NOW }), (error) => error instanceof ReleaseVersionDecisionError && error.code === "RVD-CONFLICT");
     } finally { rmSync(common, { recursive: true, force: true }); }
   }],
-  ["sealed plan binds the exact decision and all five version surfaces", () => {
+  ["sealed plan binds the exact decision and all six version surfaces", () => {
     const inputValue = planInput();
     const plan = createReleaseVersionPlan(inputValue, { nowMs: NOW });
     assert.equal(plan.status, "sealed");
     assert.equal(plan.targetVersion, "0.4.7");
     assert.deepEqual(plan.selection, inputValue.decision.selection);
     assert.equal(plan.versions.codexMarketplaceResolved, plan.targetVersion);
-    assert.equal(plan.surfaceDigests.private.length, 5);
+    assert.equal(plan.surfaceDigests.private.length, 6);
     assert.equal(validateReleaseVersionPlan(plan, { decision: inputValue.decision, nowMs: NOW }), true);
   }],
   ["surface consistency requires exact VERSION bytes and all resolved versions", () => {

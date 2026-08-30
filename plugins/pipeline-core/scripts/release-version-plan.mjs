@@ -36,11 +36,12 @@ const STABLE_VERSION = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/u;
 const BETA_VERSION = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-beta\.(0|[1-9][0-9]*)$/u;
 const SAFE_REF = /^refs\/(?:heads|tags)\/[A-Za-z0-9._/-]+$/u;
 const SAFE_REPOSITORY_PATH = /^(?!\/)(?!.*(?:^|\/)\.\.?$)(?!.*(?:^|\/)\.\.(?:\/|$))[A-Za-z0-9._@+\-/]+$/u;
-const VERSION_SURFACES = Object.freeze(["versionFile", "codexPlugin", "claudePlugin", "codexMarketplaceResolved", "claudeMarketplaceResolved"]);
+const VERSION_SURFACES = Object.freeze(["versionFile", "codexPlugin", "claudePlugin", "antigravityPlugin", "codexMarketplaceResolved", "claudeMarketplaceResolved"]);
 const VERSION_SURFACE_PATHS = Object.freeze({
   versionFile: "VERSION",
   codexPlugin: "plugins/pipeline-core/.codex-plugin/plugin.json",
   claudePlugin: "plugins/pipeline-core/.claude-plugin/plugin.json",
+  antigravityPlugin: "plugins/pipeline-core/plugin.json",
   codexMarketplaceResolved: "plugins/pipeline-core/.codex-plugin/plugin.json",
   claudeMarketplaceResolved: "plugins/pipeline-core/.claude-plugin/plugin.json",
 });
@@ -347,7 +348,7 @@ function validateSurfaceDigestRecord(record, label) {
 }
 
 function validateSurfaceDigestChannel(records, label) {
-  if (!Array.isArray(records) || records.length !== VERSION_SURFACES.length) fail("RVP-SURFACE", `${label} must have exactly five version surfaces`);
+  if (!Array.isArray(records) || records.length !== VERSION_SURFACES.length) fail("RVP-SURFACE", `${label} must have exactly six version surfaces`);
   const seen = new Set();
   for (const record of records) {
     validateSurfaceDigestRecord(record, label);
@@ -386,7 +387,7 @@ export function releaseVersionPlanId(payload) {
 }
 
 /**
- * Derive the five exact release-version values and their channel-bound raw
+ * Derive the six exact release-version values and their channel-bound raw
  * digests.  Marketplace inputs are already resolved provider manifests; this
  * helper deliberately does not fetch, read a tree, or invoke a marketplace.
  */
@@ -397,7 +398,7 @@ export function deriveVersionSurfaceConsistency(versionSurfaces, targetVersion, 
   const derived = {};
   for (const channel of ["private", "neutralPublic"]) {
     const entries = versionSurfaces[channel];
-    if (!Array.isArray(entries) || entries.length !== VERSION_SURFACES.length) fail("RVP-SURFACE", `${channel} must supply exactly five version surfaces`);
+    if (!Array.isArray(entries) || entries.length !== VERSION_SURFACES.length) fail("RVP-SURFACE", `${channel} must supply exactly six version surfaces`);
     const bySurface = new Map();
     for (const entry of entries) {
       exactKeys(entry, ["surface", "path", "bytes"], `${channel} version surface`);
