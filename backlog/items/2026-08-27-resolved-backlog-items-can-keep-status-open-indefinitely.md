@@ -5,7 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-08-27
-sprint: nova
+sprint: nova-b
 source: "NVA-BLRECONCILE-1, 2026-08-27 — process-defect finding from the briefing that reported two same-day dispatches briefed against already-finished work"
 done_when: contains plugins/pipeline-core/scripts/check-backlog-done-predicate.mjs pipeline.undeclared-is-fatal
 ---

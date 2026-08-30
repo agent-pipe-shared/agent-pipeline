@@ -3,12 +3,23 @@ schema: pipeline.backlog-item.v1
 id: pipeline.prd-framing-precondition-is-prose-not-a-check
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-29
 sprint: nova
 done_when: contains plugins/pipeline-core/scripts/pipeline-state.mjs pipeline.prd-framing-precondition-check
 source: "Claude/Windows self-audit report (docs/pipeline-audit-claude-session.md §10.4), cited by scratch/greenfield-triage-2026-08-29.md finding F17, observed during the 2026-08-29 three-runner greenfield test."
+closed_at: "2026-08-30"
+closure_repository: "self"
+closure_commit: "3783c88ac6a366ea2082f0db61be638d164d43ee"
+closure_evidence: "backlog/evidence/2026-08-30-nova-open-item-code-map.md"
 ---
+
+# Closed — 2026-08-30
+
+`submit-plan` now refuses the exact unedited framing marker with a typed
+`PRD-FRAMING-NOT-AUTHORED` result and accepts genuinely authored replacement
+text.  The current `pipeline-state.test.mjs` proves both paths; the referenced
+code map records the re-verification.
 
 # Nothing enforces that a PRD contains synthesized framing before `submit-plan`
 

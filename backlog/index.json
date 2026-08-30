@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "26a32f2c0466dfb3ad969c50b487119f23f1f50e6cbe94e7640be38c0f414ff5"
+    "transitionHead": "6b00168159dde96fd38f0a4950b318b5776982c3b4cbd008dd31c003d6eb1422"
   },
   "counts": {
-    "open": 76,
+    "open": 73,
     "in_progress": 0,
-    "closed": 472,
+    "closed": 475,
     "rejected": 3,
     "deferred": 11
   },
@@ -3622,12 +3622,16 @@
     },
     {
       "id": "pipeline.mandatory-verify-gate-has-no-path-for-a-project-with-no-tests-yet",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-29",
       "source": "Antigravity/WSL self-analysis (docs/pipeline-analysis.md, section 2) and the PO's own observation, during the 2026-08-29 three-runner greenfield test.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-30",
+      "closureRepository": "self",
+      "closureCommit": "3783c88ac6a366ea2082f0db61be638d164d43ee",
+      "closureEvidence": "backlog/evidence/2026-08-30-nova-open-item-code-map.md"
     },
     {
       "id": "pipeline.manifest-language-repair-demands-a-full-process-restart",
@@ -4780,12 +4784,16 @@
     },
     {
       "id": "pipeline.prd-framing-precondition-is-prose-not-a-check",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-29",
       "source": "Claude/Windows self-audit report (docs/pipeline-audit-claude-session.md §10.4), cited by scratch/greenfield-triage-2026-08-29.md finding F17, observed during the 2026-08-29 three-runner greenfield test.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-30",
+      "closureRepository": "self",
+      "closureCommit": "3783c88ac6a366ea2082f0db61be638d164d43ee",
+      "closureEvidence": "backlog/evidence/2026-08-30-nova-open-item-code-map.md"
     },
     {
       "id": "pipeline.prd-language-gate-reads-a-field-intake-never-writes",
@@ -5108,13 +5116,17 @@
     },
     {
       "id": "pipeline.push-approval-record-always-trails-the-signed-commit",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-26",
       "source": "PO observation, 2026-08-26, live during a routine push: 'dieses update des push standes wird jetzt aber nicht auf dem anderen pc ankommen. das ist noch eine schwäche im ablauf da die infos verloren gehen' -- caught mid-session, reproduced twice in the same push sequence.",
       "deferred": false,
-      "tracking": "Reassigned from phoenix to nova on 2026-08-28 by PO decision, after the Phoenix line was intaked into Nova"
+      "tracking": "Reassigned from phoenix to nova on 2026-08-28 by PO decision, after the Phoenix line was intaked into Nova",
+      "closedAt": "2026-08-30",
+      "closureRepository": "self",
+      "closureCommit": "3783c88ac6a366ea2082f0db61be638d164d43ee",
+      "closureEvidence": "backlog/evidence/2026-08-30-nova-open-item-code-map.md"
     },
     {
       "id": "pipeline.push-approval-signature-ceremony-is-not-staged-by-project-profile",

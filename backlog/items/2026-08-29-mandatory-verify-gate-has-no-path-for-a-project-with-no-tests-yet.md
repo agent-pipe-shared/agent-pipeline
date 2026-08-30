@@ -3,12 +3,25 @@ schema: pipeline.backlog-item.v1
 id: pipeline.mandatory-verify-gate-has-no-path-for-a-project-with-no-tests-yet
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-29
 sprint: nova
 done_when: contains harness/scripts/verify.mjs pipeline.verify-manual-check-placeholder-detection
 source: "Antigravity/WSL self-analysis (docs/pipeline-analysis.md, section 2) and the PO's own observation, during the 2026-08-29 three-runner greenfield test."
+closed_at: "2026-08-30"
+closure_repository: "self"
+closure_commit: "3783c88ac6a366ea2082f0db61be638d164d43ee"
+closure_evidence: "backlog/evidence/2026-08-30-nova-open-item-code-map.md"
 ---
+
+# Closed — 2026-08-30
+
+The placeholder is now a failing state, while an explicit not-configured-yet
+state remains distinguishable.  The current Driver-only three-runner E2E
+starts from an empty static project, surfaces one real `verifyCommand`,
+persists it, creates `game.js`, and verifies it with `node --check game.js`.
+The full evidence and exact test results are recorded in the referenced
+code-map document.
 
 # A static project with no test suite gets stuck at the mandatory verify step, and its unfilled placeholder passes silently
 
