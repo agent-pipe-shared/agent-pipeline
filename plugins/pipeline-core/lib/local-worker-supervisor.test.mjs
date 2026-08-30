@@ -265,17 +265,26 @@ check("builds a fixed Codex exec adapter without arbitrary argv, web, network, o
   const value = request("codex-exec");
   const built = buildLocalWorkerLaunch({ request: value, worker: value.workers[0], workspacePath: "/tmp/workspace" });
   assert.equal(built.ok, true);
-  assert.deepEqual(built.launch.args.slice(0, 8), ["--ask-for-approval", "never", "exec", "--strict-config", "--ignore-user-config", "--sandbox", "workspace-write", "--ephemeral"]);
+  assert.deepEqual(built.launch.args.slice(0, 8), ["--ask-for-approval", "never", "exec", "--strict-config", "--ignore-user-config", "--sandbox", "danger-full-access", "--ephemeral"]);
   assert.equal(built.launch.args.includes("--json"), true);
   assert.equal(built.launch.args.includes("--cd"), true);
   assert.equal(built.launch.args.includes("web_search=\"disabled\""), true);
-  assert.equal(built.launch.args.includes("sandbox_workspace_write.network_access=false"), true);
   assert.equal(built.launch.args.includes("shell_environment_policy.inherit=\"none\""), true);
   assert.equal(built.launch.args.includes("shell_environment_policy.include_only=[\"PATH\",\"LANG\",\"LC_ALL\"]"), true);
   assert.equal(built.launch.args.at(-1), "-");
   assert.equal(built.launch.args.includes(value.workers[0].instruction), false);
   assert.equal(built.launch.stdin, value.workers[0].instruction);
   assert.equal(built.launch.shell, false);
+});
+
+check("uses the host-boundary sandbox for real Codex worker dispatch, never workspace-write", () => {
+  const value = request("codex-exec");
+  const built = buildLocalWorkerLaunch({ request: value, worker: value.workers[0], workspacePath: "/tmp/workspace" });
+  assert.equal(built.ok, true);
+  assert.equal(built.launch.args.includes("--sandbox"), true);
+  assert.equal(built.launch.args.includes("danger-full-access"), true);
+  assert.equal(built.launch.args.includes("workspace-write"), false);
+  assert.equal(built.launch.args.some((entry) => typeof entry === "string" && entry.includes("sandbox_workspace_write.network_access")), false);
 });
 
 check("observes the live Linux owner with PID, start, boot, and executable digests", () => {
