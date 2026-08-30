@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.trust-anchor-bootstrap-confirmed-still-circular-live
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-30
+closure_repository: self
+closure_commit: 6876ba53eb1213e4857881ec4f4a0aa36eaf8134
+closure_evidence: plugins/pipeline-core/lib/trust-anchor-bootstrap-circularity.repro.test.mjs
 created: 2026-08-29
 sprint: nova
 tracking: "NOW / Nova A -- happy-path blocker, confirmed live by 2 of 3 independent runners against the exact candidate the PO tested with."
@@ -93,6 +97,36 @@ in the committed test flips from documenting-the-bug to proving-the-fix.
 - **Rationale:** confirmed live by 2 independent runners against the actual
   tested candidate; PO explicitly confirmed the finding 2026-08-29.
 - **Date:** 2026-08-29
+
+## Closed, 2026-08-30 (NVA-CF-TRUSTANCHOR-TOFU)
+
+Commit `6876ba53` (dispatch NVA-CF-TRUSTANCHOR-TOFU, PO decision Option A)
+added a second, narrow `isTrustAnchorBootstrapUpgrade()` exemption in
+`pre-commit-hook-install.mjs`, firing only for
+`project/critical-human-proof.json`, only for a v1/v2/v3(no-anchor) ->
+v3(exactly-one-anchor) transition with `requiredKinds`/`waivedKinds`
+semantically unchanged. This closes exactly the gap this item's own
+"Progress" note identified: adding the FIRST trust anchor to the
+already-tracked file after key creation now commits directly, with no
+`--no-verify` bypass. Any other already-tracked rewrite of that path (a
+replaced anchor, a second anchor, an unrelated bundled field) stays exactly
+as blocked as before -- covered by the fix commit's own new
+`pre-commit-hook-install.trust-anchor-bootstrap.test.mjs`.
+`human-guard-override.mjs`'s fail-closed posture is untouched, per the PO's
+explicit choice of fix location.
+
+This item's own Acceptance Criteria required the reproduction to flip from
+documenting-the-bug to proving-the-fix, not a fresh reproduction attempt --
+the fix commit did exactly that: `trust-anchor-bootstrap-circularity.repro.test.mjs`'s
+final assertion changed from expecting the commit to fail to asserting
+`r.status === 0` and that the committed policy file actually carries the new
+anchor. Independently re-verified by the Elephant, 2026-08-30:
+`node --test plugins/pipeline-core/lib/trust-anchor-bootstrap-circularity.repro.test.mjs`
+-- 1/1 pass. (Minor, non-blocking: that test's own `test(...)` title string
+still reads "...is still blocked without --no-verify" -- stale wording left
+over from before the fix; the assertions inside it are correct and green.
+Worth a one-line title fix alongside the next dispatch that touches this
+file, not worth its own dispatch.)
 
 ## Related
 
