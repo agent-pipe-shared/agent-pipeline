@@ -3051,6 +3051,7 @@ function sanctionedPoAuthorityRebindArgs(args, root) {
       requiredValue: {
         "--root": (value) => value === root,
         "--by": targetValue,
+        "--runner": (value) => VALID_RUNNERS.has(value),
       },
     });
   }
@@ -3069,6 +3070,7 @@ function sanctionedPoAuthorityRebindArgs(args, root) {
         "--by": targetValue,
       },
       required: { "--activate": true },
+      optionalValue: { "--runner": (value) => VALID_RUNNERS.has(value) },
     });
   }
   const rebindApply = args[0] === "po-authority-rebind-apply"

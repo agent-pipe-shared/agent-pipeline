@@ -443,7 +443,12 @@ import {
   readCloseCoordinator,
 } from "./publication-close-journal.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
-import { nextActionSection, readOnboardingIntakeCheckpoint, syncStateMdNextAction } from "../lib/onboarding-continuity.mjs";
+import {
+  nextActionSection,
+  observeBootstrapBindAcknowledgement,
+  readOnboardingIntakeCheckpoint,
+  syncStateMdNextAction,
+} from "../lib/onboarding-continuity.mjs";
 import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
 import { refusePlanAuthorityStagingPath } from "../lib/plan-authority-staging-guard.mjs";
 
@@ -3353,6 +3358,7 @@ function resolvePushThreatModelArtifact(dir) {
 // with the answers" shape.
 /** Delivery profiles `submit-plan --profile` accepts; mirrors the case handler's own literal. */
 const DRAFT_PLAN_PROFILES = new Set(["epic", "feature", "mini"]);
+const PLAN_APPROVER_NAME_PLACEHOLDER = "<PO_PLAN_APPROVER_NAME>";
 
 /**
  * NVA-Q2-DRAFTDERIVE: the `draft` gate previously always asked a human for
@@ -3555,29 +3561,32 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
         expected: { schema: INSPECT_SCHEMA, statuses: ["awaiting-approval"] },
       };
     }
-    // NVA-V2B-APPROVERENDER: the command is RENDERED, exactly as the draft branch above
-    // renders its own, and for the same reason -- naming a command without spelling it
-    // leaves the caller to reconstruct an invocation from prose, which is how this
-    // repository has previously handed a PO a subcommand that did not exist. Rendering
-    // it is not a step toward making it agent-runnable: this stays `collect-input`, and
-    // deliberately carries NO `executable` and NO `argv`, which are the two fields a
-    // driver executes. `--by` stays a placeholder rather than a derived value even
-    // though the local Git author is readable here (the draft gate derives exactly that,
-    // one step earlier) -- filling it in would let a session run this on the PO's
-    // behalf, and this is the approval the whole gate exists to reserve for them.
+    // The approval remains a human decision: the action collects the PO's own
+    // name and requires confirmation. The nested action exists so a driver
+    // substitutes exactly one typed argv element and executes the already
+    // sanctioned approve-plan command instead of rebuilding shell text.
     const scriptPath = fileURLToPath(import.meta.url);
-    const command = `${process.execPath} ${scriptPath} approve-plan --by "<the PO's own name>"`;
+    const rendered = boundedCopySafeCommand({
+      executable: process.execPath,
+      argv: [scriptPath, "approve-plan", "--by", placeholder(PLAN_APPROVER_NAME_PLACEHOLDER)],
+    });
     return {
       kind: "collect-input",
+      input: { name: "by", encoding: "utf8", trim: true, minBytes: 1, maxBytes: 128, singleLine: true, rejectNul: true },
       mutation: false,
       requiresConfirmation: false,
       guidance: "binding requires the PO's own judgement about the submitted plan and specification -- an"
         + " agent must never supply this on the PO's behalf. Ask the PO to read the plan at"
         + ` ${submission.planPath} (sha256 ${submission.planSha256}) and the specification at`
         + ` ${submission.specPath} (sha256 ${submission.specSha256}); if and only if satisfied, the PO`
-        + ` approves it themselves by replacing the placeholder and running: ${command}`
-        + " -- there is no command that records this approval on their behalf, and none should ever"
-        + " be offered.",
+        + ` approves it themselves. Replace exactly ${PLAN_APPROVER_NAME_PLACEHOLDER} in applyAction.argv`
+        + " with that typed name and execute the exact returned action; do not reconstruct approve-plan.",
+      applyAction: {
+        kind: "command",
+        ...rendered,
+        mutation: true,
+        requiresConfirmation: true,
+      },
       expected: { schema: INSPECT_SCHEMA, statuses: ["awaiting-approval"] },
     };
   }
@@ -5914,7 +5923,7 @@ function parsePoRebindApply(argv) {
 function parsePoAcknowledgeFlags(argv, { apply }) {
   const valueFlags = apply
     ? new Set(["plan-sha256", "updated-at", "by", "runner", "root"])
-    : new Set(["by", "root"]);
+    : new Set(["by", "runner", "root"]);
   const values = {};
   let activate = false;
   for (let index = 0; index < argv.length; index += 1) {
@@ -5938,7 +5947,12 @@ function parsePoAcknowledgeFlags(argv, { apply }) {
     index += 1;
   }
   if (isBlank(values.by)) return { ok: false, error: "missing --by <name>" };
-  if (!apply) return { ok: true, value: { by: values.by, ...(values.root === undefined ? {} : { root: values.root }) } };
+  if (!apply) {
+    if (!PO_REBIND_RUNNERS.has(values.runner)) {
+      return { ok: false, error: "--runner requires claude, codex, or antigravity" };
+    }
+    return { ok: true, value: { by: values.by, runner: values.runner, ...(values.root === undefined ? {} : { root: values.root }) } };
+  }
   if (!SHA256_RE.test(values["plan-sha256"] ?? "")) return { ok: false, error: "--plan-sha256 requires one lowercase sha256" };
   if (!canonicalIso(values["updated-at"])) return { ok: false, error: "--updated-at requires a canonical ISO-8601 timestamp" };
   if (!activate) return { ok: false, error: "missing --activate" };
@@ -6281,7 +6295,7 @@ function runPoAuthorityAcknowledgeCommand(sub, rest, deps) {
     ? parsePoAcknowledgeFlags(rest, { apply: false })
     : null;
   if (sub === "po-authority-acknowledge-plan" && !plan.ok) {
-    console.error(`Error: PO authority acknowledge plan arguments are invalid (${plan.error}). Usage: po-authority-acknowledge-plan --by <name> [--root <project-dir>].`);
+    console.error(`Error: PO authority acknowledge plan arguments are invalid (${plan.error}). Usage: po-authority-acknowledge-plan --by <name> --runner <claude|codex|antigravity> [--root <project-dir>].`);
     return 2;
   }
   const parsedApply = sub === "po-authority-acknowledge-apply"
@@ -6362,6 +6376,11 @@ function runPoAuthorityAcknowledgeCommand(sub, rest, deps) {
     } finally { releaseContinuityLock(lock); }
   }
   const existing = readStateRaw(deps.dir);
+  const runnerResolved = resolvePoRebindRunner(plan.value.runner, deps.env ?? process.env);
+  if (!runnerResolved.ok) {
+    console.error(`Error: po-authority-acknowledge-plan refused (${runnerResolved.code}); --runner must be claude, codex, or antigravity.`);
+    return 2;
+  }
   const ackDeps = { ...deps, acknowledgeBy: planBy };
   const planned = buildPoAuthorityAcknowledgePlan(ackDeps.dir, ackDeps, existing);
   if (!planned.ok) {
@@ -6370,7 +6389,7 @@ function runPoAuthorityAcknowledgeCommand(sub, rest, deps) {
   }
   console.log(JSON.stringify({ ...planned.payload, planSha256: planned.planSha256, applyAction: {
     executable: process.execPath,
-    argv: [fileURLToPath(import.meta.url), "po-authority-acknowledge-apply", "--root", planned.payload.root, "--plan-sha256", planned.planSha256, "--updated-at", planned.payload.plannedAt, "--by", planBy, "--activate"],
+    argv: [fileURLToPath(import.meta.url), "po-authority-acknowledge-apply", "--root", planned.payload.root, "--plan-sha256", planned.planSha256, "--updated-at", planned.payload.plannedAt, "--by", planBy, "--activate", "--runner", runnerResolved.runner],
     mutation: true, requiresConfirmation: true, requiresHostBoundary: true,
   } }, null, 2));
   return 0;
@@ -7965,6 +7984,24 @@ function checkPrdFramingPrecondition({ dir, planPath, readFileFn = readFileSync 
   return { ok: false, code: PLAN_AUTHORITY_PRD_FRAMING_CODE, marker, planPath };
 }
 
+function exactGeneratorAcknowledgementExemption({ dir, authority, deps }) {
+  try {
+    const observed = (deps.observeBootstrapBindAcknowledgement ?? observeBootstrapBindAcknowledgement)({
+      rootDir: dir,
+      repositoryCapability: "local",
+      spawn: deps.spawn,
+    });
+    return observed?.exempt === true
+      && observed?.acknowledged === false
+      && observed?.prd?.path === authority.planPath
+      && observed.prd.sha256 === authority.planSha256
+      && observed?.spec?.path === authority.specPath
+      && observed.spec.sha256 === authority.specSha256;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Runs the CLI logic. Never calls process.exit itself (testable); returns the exit
  * code. `deps` allows tests to inject `dir`, `now`, `gitHead`, and `env` without
@@ -8227,11 +8264,14 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         beforeCommit: () => {
           const nextAuthority = poGateAuthority({ repoRoot: dir, expectedPlanSha256, expectedSpecSha256 });
           const nextProfile = (deps.poGateProfile ?? ((request) => validatePoGateProfileForRepository(request)))({ repoRoot: dir });
+          const generatorExempt = !nextAuthority?.ok
+            && nextAuthority?.code === "PO-GATE-PRD-ACKNOWLEDGEMENT-MISSING"
+            && exactGeneratorAcknowledgementExemption({ dir, authority: authority.value, deps });
           if (!nextAuthority?.ok && nextAuthority?.code === "PO-GATE-PRD-ACKNOWLEDGEMENT-MISSING") {
             acknowledgementMissingDetail = { reason: nextAuthority.reason ?? null, repair: nextAuthority.repair ?? null };
           }
-          return nextAuthority?.ok
-            && JSON.stringify(nextAuthority.value) === JSON.stringify(authority.value)
+          return (nextAuthority?.ok || generatorExempt)
+            && (generatorExempt || JSON.stringify(nextAuthority.value) === JSON.stringify(authority.value))
             && nextProfile?.ok
             && sha256CanonicalJson(nextProfile.value) === profileSha256
             ? { ok: true }
@@ -8535,8 +8575,11 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         beforeCommit: () => {
           const observed = poGateAuthority({ repoRoot: dir, expectedPlanSha256, expectedSpecSha256 });
           const observedProfile = (deps.poGateProfile ?? ((request) => validatePoGateProfileForRepository(request)))({ repoRoot: dir });
-          return observed?.ok
-            && JSON.stringify(observed.value) === JSON.stringify(authority.value)
+          const generatorExempt = !observed?.ok
+            && observed?.code === "PO-GATE-PRD-ACKNOWLEDGEMENT-MISSING"
+            && exactGeneratorAcknowledgementExemption({ dir, authority: authority.value, deps });
+          return (observed?.ok || generatorExempt)
+            && (generatorExempt || JSON.stringify(observed.value) === JSON.stringify(authority.value))
             && observedProfile?.ok
             && sha256CanonicalJson(observedProfile.value) === profileSha256
             ? { ok: true }
