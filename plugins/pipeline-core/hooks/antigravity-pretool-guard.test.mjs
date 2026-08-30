@@ -423,6 +423,59 @@ const CRITIC_TEMPLATE_PATH_FIXTURE_PROMPT = [
   "model: sonnet",
 ].join("\n");
 
+const ROOT_CRITIC_TEMPLATE = readFileSync(join(pluginRoot, "..", "..", "templates", "prompts", "critic-review.md"), "utf8");
+const VENDORED_CRITIC_TEMPLATE = readFileSync(join(pluginRoot, "templates", "prompts", "critic-review.md"), "utf8");
+const AGY_ENVELOPE_MATCH = ROOT_CRITIC_TEMPLATE.match(/<!-- AGY-CRITIC-PROMPT-ENVELOPE:START -->\s*```text\s*([\s\S]*?)\s*```\s*<!-- AGY-CRITIC-PROMPT-ENVELOPE:END -->/);
+assert.ok(AGY_ENVELOPE_MATCH, "canonical Critic template must carry an Antigravity Prompt envelope");
+const RENDERED_AGY_CRITIC_ENVELOPE = AGY_ENVELOPE_MATCH[1]
+  .replace("{{SPEC_PATH}}", "specs/feat-1/prd.md")
+  .replace("{{COMMIT_SHA}}", "0123456789abcdef0123456789abcdef01234567")
+  .replace("{{GUARDRAIL_PATH}}", "guardrails/security.md")
+  .replace("{{EVIDENCE_PATH}}", "evidence/verify-latest.json")
+  .replace("{{TRIGGER_ROW}}", "T1")
+  .replace("{{RULESET_SHA}}", "b6e2db657d078f023773853e8571a941bb29c2a5")
+  .replace("{{MODEL}}", "gemini-3.7");
+
+check("Antigravity Critic template carries a guard-admissible native envelope", () => {
+  assert.equal(ROOT_CRITIC_TEMPLATE, VENDORED_CRITIC_TEMPLATE);
+  assert.match(ROOT_CRITIC_TEMPLATE, /Antigravity native dispatch has a deliberately different carrier/);
+  assert.ok(RENDERED_AGY_CRITIC_ENVELOPE.startsWith("templates/prompts/critic-review.md\n"));
+  assert.doesNotMatch(RENDERED_AGY_CRITIC_ENVELOPE, /(?<![\w-])(you are|please|examine|look at|review)\b/i);
+});
+
+check("Antigravity pretool guard admits the actual rendered Critic envelope", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: {
+      name: "invoke_subagent",
+      args: {
+        Subagents: [{ TypeName: "critic", Role: "Critic", Prompt: RENDERED_AGY_CRITIC_ENVELOPE }],
+      },
+    },
+  }, root));
+
+  assert.equal(res.decision, "allow");
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard still rejects copying the full canonical Critic body into Prompt", () => {
+  const root = fixture();
+  const bodyStart = ROOT_CRITIC_TEMPLATE.indexOf("You are the **Critic**");
+  assert.ok(bodyStart > 0, "canonical Critic body marker must remain present");
+  const res = decision(run({
+    toolCall: {
+      name: "invoke_subagent",
+      args: {
+        Subagents: [{ TypeName: "critic", Role: "Critic", Prompt: ROOT_CRITIC_TEMPLATE.slice(bodyStart) }],
+      },
+    },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /Contamination Rule/);
+  rmSync(root, { recursive: true, force: true });
+});
+
 check("Antigravity pretool guard does not treat a paths-only critic dispatch as prose (neighbour case)", () => {
   const root = fixture();
   const res = decision(run({
@@ -812,4 +865,3 @@ check("Antigravity pretool guard blocks inline bash -o pipefail -c execution, an
 });
 
 console.log(`\nAll ${passed} antigravity-pretool-guard tests passed.`);
-

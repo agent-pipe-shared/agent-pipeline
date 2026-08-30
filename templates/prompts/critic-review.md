@@ -131,6 +131,27 @@ USAGE (Elephant)
    `agentType` prefix, a stated tool-call budget, the worktree self-heal block
    where isolation is used) layered on top of this template, not a replacement
    for it.
+8. **Antigravity native dispatch has a deliberately different carrier.** Its
+   `invoke_subagent` `Subagents[].Prompt` is checked by the paths-only
+   contamination guard, so it MUST contain the rendered reference envelope,
+   never the full body below. Copy this exact envelope after replacing only its
+   placeholders; repeat a `commit`, `guardrail`, or `evidence` row when there
+   is more than one. The first line is this canonical template path; the
+   Critic reads it itself, then resolves the remaining bare references. Do not
+   add a greeting, role description, summary, or any other prose around it.
+
+   <!-- AGY-CRITIC-PROMPT-ENVELOPE:START -->
+   ```text
+   templates/prompts/critic-review.md
+   spec: {{SPEC_PATH}}
+   commit: {{COMMIT_SHA}}
+   guardrail: {{GUARDRAIL_PATH}}
+   evidence: {{EVIDENCE_PATH}}
+   route: {{TRIGGER_ROW}}
+   ruleset-sha: {{RULESET_SHA}}
+   model: {{MODEL}}
+   ```
+   <!-- AGY-CRITIC-PROMPT-ENVELOPE:END -->
 ═══════════════════════════════════════════════════════════════════════════
 COPY EVERYTHING BELOW THIS LINE
 -->
