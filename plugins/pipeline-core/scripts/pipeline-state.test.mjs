@@ -555,6 +555,67 @@ function invokeCaptured(argv, deps) {
   }
 }
 
+// NVA-GF-GREENFIELD-POACKROOT-1: onboarding presents project-scoped commands
+// with an explicit --root. The acknowledge family must accept that exact
+// ordinary CLI shape instead of misdiagnosing the otherwise-present --by as
+// missing merely because --root came first (Claude greenfield reproduction).
+{
+  const { root, deps, planPath } = acknowledgeFixture("explicit-root-plan");
+  const outside = mktempProjectDir();
+  const outsideDeps = { ...deps, dir: outside };
+  const planned = invokeCaptured([
+    "po-authority-acknowledge-plan", "--root", root, "--by", "PO",
+  ], outsideDeps);
+  assert.equal(planned.status, 0, planned.err);
+  const plan = JSON.parse(planned.out);
+  assert.equal(plan.root, root);
+  const rootIndex = plan.applyAction.argv.indexOf("--root");
+  assert.equal(plan.applyAction.argv[rootIndex + 1], root,
+    "the generated apply action must carry the same accepted project root");
+  const renderedApply = [plan.applyAction.executable, ...plan.applyAction.argv]
+    .map((value) => JSON.stringify(value))
+    .join(" ");
+  assert.equal(isSanctionedLifecycleCommand(renderedApply, root), true,
+    `the readiness guard must admit the exact --root action the planner emits: ${renderedApply}`);
+
+  const reordered = invokeCaptured([
+    "po-authority-acknowledge-plan", "--by", "PO", "--root", root,
+  ], outsideDeps);
+  assert.equal(reordered.status, 0, reordered.err);
+  assert.equal(JSON.parse(reordered.out).planSha256, plan.planSha256,
+    "ordinary flag order must not alter the plan");
+
+  const applyArgs = [...plan.applyAction.argv.slice(1), "--runner", "codex"];
+  const attended = { ...outsideDeps, isattyFn: () => true, readLineFn: () => PO_ACK_APPLY_CONFIRMATION_TOKEN };
+  const applied = invokeCaptured(applyArgs, attended);
+  assert.equal(applied.status, 0, applied.err);
+  assert.match(readFileSync(join(root, planPath), "utf8"),
+    /<!-- po-plan-acknowledged: content-sound-and-spec-consistent -->/u,
+    "an apply invoked outside the project must still mutate only --root's bound PRD");
+
+  for (const [argv, message] of [
+    [["po-authority-acknowledge-plan", "--root", root], "missing --by"],
+    [["po-authority-acknowledge-plan", "--by", "PO", "--by", "Other", "--root", root], "duplicate --by"],
+    [["po-authority-acknowledge-plan", "--by", "PO", "--root", root, "--root", root], "duplicate --root"],
+    [["po-authority-acknowledge-plan", "--by", "PO", "--root"], "--root requires a non-empty value"],
+    [["po-authority-acknowledge-plan", "--by", "PO", "--unknown", "value"], "unsupported argument --unknown"],
+  ]) {
+    const rejected = invokeCaptured(argv, outsideDeps);
+    assert.equal(rejected.status, 2, `${argv.join(" ")} must be rejected`);
+    assert.ok(rejected.err.includes(message), rejected.err);
+  }
+
+  for (const [mutate, message] of [
+    [(argv) => [...argv, "--root", root], "duplicate --root"],
+    [(argv) => argv.filter((value) => value !== "--activate"), "missing --activate"],
+    [(argv) => [...argv, "--runner", "unknown"], "--runner requires claude, codex, or antigravity"],
+  ]) {
+    const rejected = invokeCaptured(mutate(plan.applyAction.argv.slice(1)), outsideDeps);
+    assert.equal(rejected.status, 2);
+    assert.ok(rejected.err.includes(message), rejected.err);
+  }
+}
+
 // Happy path: plan then apply inserts the marker as a new trailing PRD line,
 // bumps continuity.revision, and rebinds continuity.authority.prd.sha256 to
 // the new bytes -- without ever releasing the binding.

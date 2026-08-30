@@ -5911,15 +5911,50 @@ function parsePoRebindApply(argv) {
 // the caller-supplied one, and the existing stale-plan refusal in
 // runPoAuthorityRebindApply() catches it -- the same mechanism every other
 // preimage/postimage field already relies on.
-function parsePoAcknowledgeApply(argv) {
-  if (argv.length !== 7 && argv.length !== 9) return null;
-  if (argv[0] !== "--plan-sha256" || !SHA256_RE.test(argv[1])
-    || argv[2] !== "--updated-at" || !canonicalIso(argv[3])
-    || argv[4] !== "--by" || isBlank(argv[5])
-    || argv[6] !== "--activate") return null;
-  if (argv.length === 7) return { planSha256: argv[1], plannedAt: argv[3], by: argv[5] };
-  if (argv[7] !== "--runner" || !PO_REBIND_RUNNERS.has(argv[8])) return null;
-  return { planSha256: argv[1], plannedAt: argv[3], by: argv[5], runner: argv[8] };
+function parsePoAcknowledgeFlags(argv, { apply }) {
+  const valueFlags = apply
+    ? new Set(["plan-sha256", "updated-at", "by", "runner", "root"])
+    : new Set(["by", "root"]);
+  const values = {};
+  let activate = false;
+  for (let index = 0; index < argv.length; index += 1) {
+    const raw = argv[index];
+    if (raw === "--activate" && apply) {
+      if (activate) return { ok: false, error: "duplicate --activate" };
+      activate = true;
+      continue;
+    }
+    if (typeof raw !== "string" || !raw.startsWith("--")) {
+      return { ok: false, error: `unexpected positional argument ${JSON.stringify(raw)}` };
+    }
+    const name = raw.slice(2);
+    if (!valueFlags.has(name)) return { ok: false, error: `unsupported argument --${name}` };
+    if (Object.prototype.hasOwnProperty.call(values, name)) return { ok: false, error: `duplicate --${name}` };
+    const value = argv[index + 1];
+    if (value === undefined || (typeof value === "string" && value.startsWith("--")) || isBlank(value)) {
+      return { ok: false, error: `--${name} requires a non-empty value` };
+    }
+    values[name] = value;
+    index += 1;
+  }
+  if (isBlank(values.by)) return { ok: false, error: "missing --by <name>" };
+  if (!apply) return { ok: true, value: { by: values.by, ...(values.root === undefined ? {} : { root: values.root }) } };
+  if (!SHA256_RE.test(values["plan-sha256"] ?? "")) return { ok: false, error: "--plan-sha256 requires one lowercase sha256" };
+  if (!canonicalIso(values["updated-at"])) return { ok: false, error: "--updated-at requires a canonical ISO-8601 timestamp" };
+  if (!activate) return { ok: false, error: "missing --activate" };
+  if (values.runner !== undefined && !PO_REBIND_RUNNERS.has(values.runner)) {
+    return { ok: false, error: "--runner requires claude, codex, or antigravity" };
+  }
+  return {
+    ok: true,
+    value: {
+      planSha256: values["plan-sha256"],
+      plannedAt: values["updated-at"],
+      by: values.by,
+      ...(values.runner === undefined ? {} : { runner: values.runner }),
+      ...(values.root === undefined ? {} : { root: values.root }),
+    },
+  };
 }
 
 function parsePoDecisionSelection(argv) {
@@ -6232,15 +6267,24 @@ function buildPoAuthorityAcknowledgePlan(dir, deps, existing, plannedAt = deps.n
 }
 
 function runPoAuthorityAcknowledgeCommand(sub, rest, deps) {
-  const planBy = sub === "po-authority-acknowledge-plan"
-    ? (rest.length === 2 && rest[0] === "--by" && !isBlank(rest[1]) ? rest[1] : null)
+  const plan = sub === "po-authority-acknowledge-plan"
+    ? parsePoAcknowledgeFlags(rest, { apply: false })
     : null;
-  if (sub === "po-authority-acknowledge-plan" && planBy === null) {
-    console.error("Error: PO authority acknowledge plan requires --by <name> (non-empty) -- an unattributed acknowledgement is refused.");
+  if (sub === "po-authority-acknowledge-plan" && !plan.ok) {
+    console.error(`Error: PO authority acknowledge plan arguments are invalid (${plan.error}). Usage: po-authority-acknowledge-plan --by <name> [--root <project-dir>].`);
     return 2;
   }
-  const apply = sub === "po-authority-acknowledge-apply" ? parsePoAcknowledgeApply(rest) : null;
-  if (sub === "po-authority-acknowledge-apply" && apply === null) { console.error("Error: PO authority acknowledge apply requires --plan-sha256 <sha256> --updated-at <ISO-8601> --by <name> --activate [--runner claude|codex]."); return 2; }
+  const parsedApply = sub === "po-authority-acknowledge-apply"
+    ? parsePoAcknowledgeFlags(rest, { apply: true })
+    : null;
+  if (sub === "po-authority-acknowledge-apply" && !parsedApply.ok) {
+    console.error(`Error: PO authority acknowledge apply arguments are invalid (${parsedApply.error}). Usage: po-authority-acknowledge-apply --plan-sha256 <sha256> --updated-at <ISO-8601> --by <name> --activate [--runner claude|codex|antigravity] [--root <project-dir>].`);
+    return 2;
+  }
+  const selectedRoot = sub === "po-authority-acknowledge-plan" ? plan.value.root : parsedApply.value.root;
+  deps = selectedRoot === undefined ? deps : { ...deps, dir: resolve(selectedRoot) };
+  const planBy = plan?.value.by ?? null;
+  const apply = parsedApply?.value ?? null;
   if (sub === "po-authority-acknowledge-plan" && existsSync(rebindTransactionPath(deps.dir))) {
     console.error("Error: PO authority acknowledge recovery is pending; replay the exact previously confirmed apply action.");
     return 2;
@@ -6278,7 +6322,7 @@ function runPoAuthorityAcknowledgeCommand(sub, rest, deps) {
       if (confirmation.code === "CHAT-GATE-NOT-ATTENDED") {
         console.error(`Error: po-authority-acknowledge-apply refused (CHAT-GATE-NOT-ATTENDED); a human must confirm --by ${apply.by} directly, in their own attended terminal -- an agent's own tool call cannot complete this step.`);
         console.error("Re-run this EXACT command yourself and type the value shown above when prompted:");
-        console.error(`node plugins/pipeline-core/scripts/pipeline-state.mjs po-authority-acknowledge-apply --plan-sha256 ${apply.planSha256} --updated-at ${apply.plannedAt} --by ${JSON.stringify(apply.by)} --activate${apply.runner ? ` --runner ${apply.runner}` : ""}`);
+        console.error(`node plugins/pipeline-core/scripts/pipeline-state.mjs po-authority-acknowledge-apply --root ${JSON.stringify(realpathSync(resolve(deps.dir)))} --plan-sha256 ${apply.planSha256} --updated-at ${apply.plannedAt} --by ${JSON.stringify(apply.by)} --activate${apply.runner ? ` --runner ${apply.runner}` : ""}`);
       } else {
         console.error(`Error: po-authority-acknowledge-apply refused (${confirmation.code}); the typed value did not match the confirmation value shown above.`);
       }
@@ -6316,7 +6360,7 @@ function runPoAuthorityAcknowledgeCommand(sub, rest, deps) {
   }
   console.log(JSON.stringify({ ...planned.payload, planSha256: planned.planSha256, applyAction: {
     executable: process.execPath,
-    argv: [fileURLToPath(import.meta.url), "po-authority-acknowledge-apply", "--plan-sha256", planned.planSha256, "--updated-at", planned.payload.plannedAt, "--by", planBy, "--activate"],
+    argv: [fileURLToPath(import.meta.url), "po-authority-acknowledge-apply", "--root", planned.payload.root, "--plan-sha256", planned.planSha256, "--updated-at", planned.payload.plannedAt, "--by", planBy, "--activate"],
     mutation: true, requiresConfirmation: true, requiresHostBoundary: true,
   } }, null, 2));
   return 0;
