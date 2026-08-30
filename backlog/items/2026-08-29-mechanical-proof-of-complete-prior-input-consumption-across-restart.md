@@ -225,3 +225,21 @@ signature verified against trust anchor
 `03c1edcd`. Sanity-checked live against this repository: PASS
 (`RH-CHECK-NO-CARD`, no card currently available). The mechanism is now a
 real verify-gate check, not only an on-demand observation.
+
+**Critic Round 2 (delta `2437d338..20ffd8fe`), 2026-08-30: FAIL, self-verified
+closed, no Round 3.** Found 1 blocker -- the new `resume-consumption-check`
+surface was registered in `verify.mjs` without a matching `docs/product-
+capability-inventory.json` surfaceId (QG-08), which broke the already-green
+`check-product-capability-inventory.test.mjs` (HAW-A02) -- and 1 minor --
+`check-resume-consumption.mjs`'s own header comment still claimed it was
+entirely unregistered, stale after Stage 3. Both fixed in commit `985751c0`
+(which, while re-running the checker, also incidentally fixed two other
+PRE-EXISTING unrelated registration gaps from earlier the same day:
+`guard-worktree-isolation.mjs`'s hooks.json wiring and the trust-anchor-
+bootstrap-circularity repro suite -- neither introduced by this item's own
+work, both from commits `0859afe6`/`b93f3023`). Self-verified by the
+Elephant: `check-product-capability-inventory.test.mjs` 23/23 (was 1 fail).
+Per this repository's own "Critic rounds strictly 1+1" discipline, no Round
+3 was dispatched -- Round 2 was itself the re-critic pass, and its own
+findings were closed by direct self-verification against the same test
+suite the Critic's own finding cited, not by a further Critic dispatch.
