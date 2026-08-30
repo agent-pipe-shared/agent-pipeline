@@ -1225,9 +1225,12 @@ const PIPELINE_STATE_DOCUMENT_LANGUAGE_FIXTURE_REPLACEMENT = `  const deps = {
 // error rather than failing earlier for an omitted runner).  Match only a call
 // that does NOT already carry the exact runner immediately after the command;
 // a re-run therefore has zero matches and is idempotent.
-const PIPELINE_STATE_ACKNOWLEDGE_PLAN_CALL_RE = /"po-authority-acknowledge-plan",\s*(?!"--runner")/gu;
+// Test the next argument before consuming whitespace.  Putting `\s*` before
+// the negative lookahead lets the engine backtrack to zero spaces, which made
+// an already runner-bound call match and receive a second `--runner`.
+const PIPELINE_STATE_ACKNOWLEDGE_PLAN_CALL_RE = /"po-authority-acknowledge-plan",(?!(?:\s*"--runner"))\s*/gu;
 const PIPELINE_STATE_ACKNOWLEDGE_PLAN_CALL_REPLACEMENT = '"po-authority-acknowledge-plan", "--runner", "codex", ';
-const PIPELINE_STATE_ACKNOWLEDGE_PLAN_CALL_COUNT = 16;
+const PIPELINE_STATE_ACKNOWLEDGE_PLAN_CALL_COUNT = 1;
 const PIPELINE_STATE_ACKNOWLEDGED_APPLY_ARGS_ANCHOR = `function acknowledgedApplyArgs(plan, runner = "codex") {
   return [...plan.applyAction.argv.slice(1), "--runner", runner];
 }`;
