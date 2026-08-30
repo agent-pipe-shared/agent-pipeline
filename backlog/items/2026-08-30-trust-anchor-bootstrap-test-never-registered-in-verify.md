@@ -1,0 +1,66 @@
+---
+schema: pipeline.backlog-item.v1
+id: pipeline.trust-anchor-bootstrap-test-never-registered-in-verify
+type: defect
+owner: pipeline
+status: open
+created: 2026-08-30
+sprint: nova
+tracking: "Nova B — pre-existing gap found while registering an unrelated verify.mjs suite; not introduced by this session's own work."
+source: "Found by check-verify-suite-registration.mjs while preparing the TP-3 ceremony for NVA-CF-RESUMECHECKANYSESSION's own verify.mjs registration, 2026-08-30."
+---
+
+# `pre-commit-hook-install.trust-anchor-bootstrap.test.mjs` exists but was never registered in `verify.mjs`
+
+## What happened
+
+`node harness/scripts/check-verify-suite-registration.mjs` reports:
+
+```
+UNREGISTERED plugins/pipeline-core/scripts/pre-commit-hook-install.trust-anchor-bootstrap.test.mjs
+is a *.test.mjs suite under a registered root with no verify.mjs registration entry
+```
+
+This test file was added by `NVA-CF-TRUSTANCHOR-TOFU` (closed 2026-08-30,
+commit `6876ba53`), exercising the trust-anchor bootstrap exemption in
+`pre-commit-hook-install.mjs`. It passed standalone and was independently
+re-verified by the Elephant at closure time, but nobody ran
+`check-verify-suite-registration.mjs` against the repository at that point
+-- the exact class of gap this checker exists to catch (a suite that exists
+and passes but never actually runs in the gate).
+
+Found incidentally, not by this session's own work: while preparing the
+TP-3 signed-override ceremony to register an UNRELATED new suite
+(`resume-consumption-check`, `2026-08-29-mechanical-proof-of-complete-prior-
+input-consumption-across-restart.md` Stage 3) into `verify.mjs`, running the
+registration checker surfaced this pre-existing, independent gap. Left
+unfixed in that same commit deliberately -- the armed TP-3 override
+capability was bound to one exact byte-identical edit; bundling an unrelated
+second edit into it was out of scope for that ceremony.
+
+## Proposal
+
+Add one line to `harness/scripts/verify.mjs`'s `TEST_SUITES` array,
+registering `pre-commit-hook-install.trust-anchor-bootstrap.test.mjs`,
+mirroring every other `*-tests` entry's shape. This needs its own TP-3
+signed-override ceremony (a fresh `plan`/`prepare-authorization`/
+`emit-signature-digest`/`authorize-by-signature` chain, a fresh PO
+signature) -- the ceremony armed for the resume-consumption registration
+does not cover this edit.
+
+## Acceptance criteria
+
+- `node harness/scripts/check-verify-suite-registration.mjs` reports zero
+  unregistered suites.
+- `node --test plugins/pipeline-core/scripts/pre-commit-hook-install.trust-anchor-bootstrap.test.mjs`
+  still passes (6/6 per its own closure evidence), now actually exercised
+  by a real `verify.mjs` run, not just standalone.
+
+## Triage
+
+- **Decision:** accepted, Nova B
+- **Rationale:** real gate-coverage gap, but not urgent/blocking -- the
+  suite itself already passes standalone and was independently re-verified
+  at its own closure; this is about making it actually run in the gate,
+  not about a suspected regression.
+- **Date:** 2026-08-30

@@ -201,3 +201,27 @@ the fatal path independent of any real repository state. Closed here.
 entry for the new test file (that list was emptied 2026-08-29 specifically
 because an opt-out entry with no trigger to retire it is a standing debt) —
 the unregistered-in-`verify.mjs` state is disclosed in prose instead.
+
+## Stage 3 landed, 2026-08-30 (PO explicit request: "bauen wir es jetzt ein
+sonst findet es ja keiner" — graduating from observe to enforce)
+
+`check-resume-consumption.mjs` required a live `--session-id` to check
+against, which a batch `verify.mjs` run has no way to supply — the real
+reason Stage 2 left it unregistered, not only the TP-3 ceremony cost. Closed
+by dispatch `NVA-CF-RESUMECHECKANYSESSION` (commit `2437d338`): a new
+`--any-session` mode (new lib function `anyResumeHintConsumptionReceipt`,
+new CLI flag, additive-only — the existing single-session mode is
+byte-for-byte unchanged) answers "does ANY recorded receipt, from any
+session, match the currently-available card's digest" — still genuinely
+mechanical, no session identity required. Independently re-verified by the
+Elephant: `resume-hint.test.mjs` (lib) 26/26, `check-resume-consumption.test.mjs`
+21/21, `check-consumer-safe-paths.test.mjs` 9/9.
+
+Registered into `harness/scripts/verify.mjs` via the TP-3 signed-override
+ceremony (request `46c5e8fe6149479e67fa8ddc24b25e24ccc392e03a56b0e93c1716aaa90d2641`,
+plan `3bb7a50261be98e2e07ed6428eaad3b5e1baf0ddd74821d73579d4eae318e74a`, PO
+signature verified against trust anchor
+`2de20a39d0f1c13c15350e428ea0c70be50f8fbca26ec88758a8dcb1a880beee`), commit
+`03c1edcd`. Sanity-checked live against this repository: PASS
+(`RH-CHECK-NO-CARD`, no card currently available). The mechanism is now a
+real verify-gate check, not only an on-demand observation.
