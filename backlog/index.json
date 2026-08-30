@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "67ec3ab4666fc4ba6624b2bbaad519f3496622ff627717e3f3b968646d18271f"
+    "transitionHead": "26a32f2c0466dfb3ad969c50b487119f23f1f50e6cbe94e7640be38c0f414ff5"
   },
   "counts": {
-    "open": 78,
-    "in_progress": 3,
-    "closed": 467,
+    "open": 76,
+    "in_progress": 0,
+    "closed": 472,
     "rejected": 3,
     "deferred": 11
   },
@@ -285,13 +285,17 @@
     },
     {
       "id": "pipeline.afk-assumption-mode",
-      "status": "in_progress",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-07-19",
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
       "deferred": false,
-      "tracking": "Sentinel recovery baseline; no completion claim."
+      "tracking": "Sentinel recovery baseline; no completion claim.",
+      "closedAt": "2026-08-30",
+      "closureRepository": "self",
+      "closureCommit": "64544e404b852c87c24c0fd6424b875bee5742a2",
+      "closureEvidence": "backlog/evidence/2026-08-30-sentinel-retirement-and-nova-a-reverification.md"
     },
     {
       "id": "pipeline.agent-binding-guards-are-not-os-level-sandboxing",
@@ -2988,13 +2992,17 @@
     },
     {
       "id": "pipeline.happy-path-key-onboarding-must-install-directly-as-critical-human-proof",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-30",
       "source": "PO live session 2026-08-30, item #4 of a 12-point instruction list: 'künftig muss ein frisches projekt einen neuen oder bestehenden key im happy path easy onboarden und auch direkt als critical proof.json installieren' -- filed as a distinct forward-looking item, separate from verifying today's circularity fix (see Related).",
       "deferred": false,
-      "tracking": "NOW / Nova A -- PO explicit future requirement, 2026-08-30, filed alongside the trust-anchor-circularity fix it depends on."
+      "tracking": "NOW / Nova A -- PO explicit future requirement, 2026-08-30, filed alongside the trust-anchor-circularity fix it depends on.",
+      "closedAt": "2026-08-30",
+      "closureRepository": "self",
+      "closureCommit": "64544e404b852c87c24c0fd6424b875bee5742a2",
+      "closureEvidence": "backlog/evidence/2026-08-30-sentinel-retirement-and-nova-a-reverification.md"
     },
     {
       "id": "pipeline.happy-path-local-telemetry",
@@ -5636,12 +5644,16 @@
     },
     {
       "id": "pipeline.ruleset-freshness-wsl-subsystem-absent",
-      "status": "in_progress",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "merge report section 4 finding 10 (specs/sprint-phoenix-epic/evidence/merge-0.5.2-what-fell-away.md gitignored evidence artifact); merge commit 75b8361",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-30",
+      "closureRepository": "self",
+      "closureCommit": "6e84d73aa6468b11dbde03a7c741c8a63bf96580",
+      "closureEvidence": "backlog/evidence/2026-08-30-ruleset-freshness-reverification.md"
     },
     {
       "id": "pipeline.ruleset-source-test-unregistered-in-the-verify-gate",
@@ -5809,13 +5821,17 @@
     },
     {
       "id": "pipeline.seed-security-gate-on",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-28",
       "source": "Measured 2026-08-28 against a genuinely fresh onboarded project at HEAD a304195d. Measured, not assumed — the same standard the original `off` decision was held to.",
       "deferred": false,
-      "tracking": "NOW / Nova A — PO decision 2026-08-28 stands, but BLOCKED: the measurement below was taken in this repository's own checkout, the one place the consumer-side defect does not fire. See 'Correction' before implementing."
+      "tracking": "NOW / Nova A — PO decision 2026-08-28 stands, but BLOCKED: the measurement below was taken in this repository's own checkout, the one place the consumer-side defect does not fire. See 'Correction' before implementing.",
+      "closedAt": "2026-08-30",
+      "closureRepository": "self",
+      "closureCommit": "64544e404b852c87c24c0fd6424b875bee5742a2",
+      "closureEvidence": "backlog/evidence/2026-08-30-sentinel-retirement-and-nova-a-reverification.md"
     },
     {
       "id": "pipeline.seeded-verify-contract-is-always-green",
@@ -5906,13 +5922,17 @@
     },
     {
       "id": "pipeline.session-keep-awake",
-      "status": "in_progress",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-07-19",
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
       "deferred": false,
-      "tracking": "Sentinel recovery baseline; no completion claim."
+      "tracking": "Sentinel recovery baseline; no completion claim.",
+      "closedAt": "2026-08-30",
+      "closureRepository": "self",
+      "closureCommit": "64544e404b852c87c24c0fd6424b875bee5742a2",
+      "closureEvidence": "backlog/evidence/2026-08-30-sentinel-retirement-and-nova-a-reverification.md"
     },
     {
       "id": "pipeline.session-scratchpad-is-unwritable-under-the-cross-repo-guard",
