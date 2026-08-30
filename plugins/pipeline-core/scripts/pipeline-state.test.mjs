@@ -22,6 +22,7 @@ import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 
 import { createCriticalActionApprovalRequest, criticalActionSubjectSha256 } from "../lib/critical-action-approval-request.mjs";
+import { sha256CanonicalJson } from "../lib/plan-spec-state-v2.mjs";
 import { PLAN_AUTHORITY_PRD_FRAMING_CODE, PO_ACK_APPLY_CONFIRMATION_TOKEN, SCHEMA_ID, continuityLockPath, externalPathIsOutsideRoot, resolvePoRebindRunner, run, statePath, statePhaseProjectionMarker } from "./pipeline-state.mjs";
 import { INTAKE_STAGING_DIRNAME } from "../lib/onboarding-continuity.mjs";
 import {
@@ -1133,6 +1134,16 @@ function awaitingApprovalFixture() {
     profile: "feature",
     profileSha256: sha256Hex("profile"),
     submittedBy: "coordinator", submittedAt: localNow,
+  };
+  // NVA-CF-PRESENTPLANDRIVER: bind a matching planPresentation record so this
+  // fixture correctly reaches the approve-plan collect-input stage under the
+  // new present-plan-first sequencing (approve-plan itself already refuses
+  // unseen content without one -- case "approve-plan", ~line 8364-8365).
+  state.planPresentation = {
+    schema: "pipeline.plan-presentation.v1",
+    submissionSha256: sha256CanonicalJson(state.planSubmission),
+    presentedBy: "coordinator",
+    presentedAt: localNow,
   };
   writeFileSync(statePath(root), JSON.stringify(state, null, 2) + "\n");
   return { root, deps: { dir: root, now: () => localNow }, planPath, specPath, planSha256: state.planSubmission.planSha256, specSha256: state.planSubmission.specSha256 };

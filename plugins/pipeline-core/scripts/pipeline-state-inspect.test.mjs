@@ -28,6 +28,7 @@ import { fileURLToPath } from "node:url";
 import { run, SCHEMA_ID, statePath as resolveStatePath } from "./pipeline-state.mjs";
 import { applyOnboardingIntakeConsent, nextActionSection } from "../lib/onboarding-continuity.mjs";
 import { mkdtempTestScratch } from "../lib/test-tmpdir.mjs";
+import { sha256CanonicalJson } from "../lib/plan-spec-state-v2.mjs";
 
 const roots = [];
 const NOW = "2026-08-18T12:00:00.000Z";
@@ -129,18 +130,14 @@ test("inspect after set-feature surfaces phase, draft lifecycle, and the live Ne
   assert.equal(afterBytes, beforeBytes, "inspect must not mutate the state file");
 });
 
-// NVA-Q2-DRAFTDERIVE -- written FIRST, per the task's own DoD ordering: the
-// property that keeps a machine from approving the PO's plan on their behalf
-// must never regress while the sibling `draft` gate is made more capable.
-test("awaiting-approval stays collect-input with no executable/argv -- a machine must never approve a plan", () => {
-  const root = freshRoot("awaiting-approval");
-  const featureId = "widget";
-  const planPath = "specs/widget/prd.md";
-  assert.equal(run(["set-feature", "--id", featureId, "--plan-path", planPath], { dir: root, now: () => NOW }), 0);
-
-  const statePathValue = resolveStatePath(root);
-  const state = JSON.parse(readFileSync(statePathValue, "utf8"));
-  state.planSubmission = {
+// NVA-CF-PRESENTPLANDRIVER: a submission with no bound `planPresentation`
+// record yet must surface `present-plan` first -- `approve-plan` itself
+// refuses unseen content (case "approve-plan", ~line 8364), so the OLD
+// version of this fixture (no planPresentation at all) exercised the WRONG
+// lifecycle stage: it would now receive the new present-plan command, not
+// the approve-plan collect-input. Shared by the fixture-builder below.
+function awaitingApprovalSubmission(featureId, planPath) {
+  return {
     schema: "pipeline.plan-submission.v1",
     featureId, planPath,
     planSha256: sha256Hex(`plan:${planPath}`),
@@ -150,6 +147,38 @@ test("awaiting-approval stays collect-input with no executable/argv -- a machine
     profileSha256: sha256Hex("profile"),
     submittedBy: "coordinator",
     submittedAt: NOW,
+  };
+}
+
+function awaitingApprovalFixture(name) {
+  const root = freshRoot(name);
+  gitInitRoot(root);
+  const featureId = "widget";
+  const planPath = "specs/widget/prd.md";
+  assert.equal(run(["set-feature", "--id", featureId, "--plan-path", planPath], { dir: root, now: () => NOW }), 0);
+
+  const statePathValue = resolveStatePath(root);
+  const state = JSON.parse(readFileSync(statePathValue, "utf8"));
+  state.planSubmission = awaitingApprovalSubmission(featureId, planPath);
+  writeFileSync(statePathValue, JSON.stringify(state, null, 2) + "\n");
+  return { root, statePathValue, state };
+}
+
+// NVA-Q2-DRAFTDERIVE -- written FIRST, per the task's own DoD ordering: the
+// property that keeps a machine from approving the PO's plan on their behalf
+// must never regress while the sibling `draft` gate is made more capable.
+// NVA-CF-PRESENTPLANDRIVER: this fixture now ALSO carries a `planPresentation`
+// record bound to the exact current submission's sha256, so it correctly
+// exercises the approve-plan stage rather than the present-plan stage that
+// now precedes it (see the two present-plan tests directly below).
+test("awaiting-approval stays collect-input with no executable/argv -- a machine must never approve a plan", () => {
+  const { root, statePathValue, state } = awaitingApprovalFixture("awaiting-approval");
+  const submissionSha256 = sha256CanonicalJson(state.planSubmission);
+  state.planPresentation = {
+    schema: "pipeline.plan-presentation.v1",
+    submissionSha256,
+    presentedBy: "coordinator",
+    presentedAt: NOW,
   };
   writeFileSync(statePathValue, JSON.stringify(state, null, 2) + "\n");
 
@@ -164,6 +193,75 @@ test("awaiting-approval stays collect-input with no executable/argv -- a machine
     "the awaiting-approval gate must never carry an argv -- that would let a machine approve the PO's plan");
   assert.ok(payload.nextAction.guidance.includes("approve-plan"),
     "guidance must still point the PO at approve-plan themselves");
+});
+
+// NVA-CF-PRESENTPLANDRIVER: no planPresentation record exists yet -- the
+// mechanical, session-safe present-plan step must surface as a runnable
+// command (derivable --by), never straight to the approve-plan collect-input
+// a session would otherwise walk into and be refused by.
+test("awaiting-approval surfaces present-plan as a runnable command when no presentation record exists yet, with --by derived from local Git config", () => {
+  const { root } = awaitingApprovalFixture("awaiting-approval-no-presentation");
+  setLocalGitUserName(root, "Jordan Example");
+
+  const result = invoke(root, ["inspect"]);
+  assert.equal(result.status, 0, result.err);
+  const payload = JSON.parse(result.out);
+  assert.equal(payload.status, "awaiting-approval");
+  assert.equal(payload.nextAction.kind, "command");
+  assert.equal(payload.nextAction.executable, process.execPath);
+  assert.deepEqual(payload.nextAction.argv, [
+    PIPELINE_STATE_SCRIPT_PATH, "present-plan", "--by", "Jordan Example",
+  ]);
+  assert.equal(payload.nextAction.mutation, true);
+  assert.equal(payload.nextAction.requiresConfirmation, true);
+});
+
+// Same gap, but --by is not derivable: the branch must fall back to
+// collect-input naming the missing value and rendering the exact command
+// string, mirroring the `draft` branch's own undeliverable-value fallback --
+// never a silent omission or an invented value.
+test("awaiting-approval asks for present-plan's --by when local Git config carries none", () => {
+  const { root } = awaitingApprovalFixture("awaiting-approval-no-presentation-no-by");
+  // Deliberately no setLocalGitUserName call: the local Git config carries no user.name.
+
+  const result = invoke(root, ["inspect"]);
+  assert.equal(result.status, 0, result.err);
+  const payload = JSON.parse(result.out);
+  assert.equal(payload.status, "awaiting-approval");
+  assert.equal(payload.nextAction.kind, "collect-input");
+  assert.equal(payload.nextAction.executable, undefined);
+  assert.equal(payload.nextAction.argv, undefined);
+  assert.deepEqual(payload.nextAction.inputs.map((input) => input.name), ["by"]);
+  assert.ok(payload.nextAction.guidance.includes("present-plan"),
+    `guidance must name present-plan: ${payload.nextAction.guidance}`);
+  assert.ok(payload.nextAction.guidance.includes(PIPELINE_STATE_SCRIPT_PATH),
+    `guidance must name the resolved absolute script path: ${payload.nextAction.guidance}`);
+});
+
+// A STALE presentation (bound to a prior submission's sha256, not the
+// current one) is the exact edge approve-plan's own check already guards
+// against (case "approve-plan", ~line 8364-8365): the driver must treat it
+// exactly like "no presentation" and re-surface present-plan, not fall
+// through to the approve-plan collect-input.
+test("awaiting-approval re-surfaces present-plan when the existing presentation record is bound to a stale submission", () => {
+  const { root, statePathValue, state } = awaitingApprovalFixture("awaiting-approval-stale-presentation");
+  setLocalGitUserName(root, "Jordan Example");
+  state.planPresentation = {
+    schema: "pipeline.plan-presentation.v1",
+    submissionSha256: sha256Hex("a-different-earlier-submission"),
+    presentedBy: "coordinator",
+    presentedAt: NOW,
+  };
+  writeFileSync(statePathValue, JSON.stringify(state, null, 2) + "\n");
+
+  const result = invoke(root, ["inspect"]);
+  assert.equal(result.status, 0, result.err);
+  const payload = JSON.parse(result.out);
+  assert.equal(payload.status, "awaiting-approval");
+  assert.equal(payload.nextAction.kind, "command");
+  assert.deepEqual(payload.nextAction.argv, [
+    PIPELINE_STATE_SCRIPT_PATH, "present-plan", "--by", "Jordan Example",
+  ]);
 });
 
 // NVA-CF-PUSHDRIVERFINISH: the `implementing` branch (once the push
