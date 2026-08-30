@@ -25,6 +25,17 @@
         ]
       },
       {
+        "$comment": "Worktree-isolation count check (NVA-W7-WORKTREECOUNT, 2026-08-29). Compares a pre/post `git worktree list` count around an isolation:\"worktree\"-flagged Agent/Workflow dispatch and surfaces a mismatch as a stderr warning (exit 1, never blocks -- it cannot un-launch a dispatch that already ran). Matcher is match-all for the same reason guard-dispatch-budget.mjs's is: the check needs to observe the FIRST tool call after a dispatch launches, whatever tool that happens to be, not just another dispatch call. See lib/worktree-count-check.mjs for the tested comparison logic and backlog/items/2026-08-25-workflow-tool-isolation-worktree-never-created-a-worktree-this-session.md for the incident this closes the detection gap for.",
+        "matcher": "Bash|Edit|Glob|Grep|NotebookEdit|Read|Task|TodoWrite|WebFetch|WebSearch|Write|Workflow",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-worktree-isolation.mjs\"",
+            "timeout": 10
+          }
+        ]
+      },
+      {
         "matcher": "Bash|PowerShell",
         "hooks": [
           {
