@@ -18,6 +18,12 @@ import {
   refreezeHumanGuardOverridePlan,
   verifyHumanGuardOverrideAudit,
 } from "../lib/human-guard-override.mjs";
+// NVA-CF-GUARDVERBOSITY: `render-copy-safe` (below) reconstructs the exact ceremony
+// command lines and their bounded multi-shell renderings, the same way guard-testpath.mjs
+// and guard-lifecycle-ready.mjs build their own flat chain -- see that subcommand's own
+// header for why this duplicates rather than imports their construction.
+import { boundedCopySafeCommand, boundedOpaqueCopyCommand, placeholder } from "../lib/copy-safe-command.mjs";
+import { readPushApprovalMode } from "../lib/critical-human-proof-policy.mjs";
 
 const SCRIPT = fileURLToPath(import.meta.url);
 const PLUGIN_ROOT = resolve(dirname(SCRIPT), "..");
@@ -38,6 +44,7 @@ function usage() {
     "  guard-human-override.mjs refreeze-plan --repo <absolute-root> --request-sha256 <64hex> [--author-source-root <absolute-root>]",
     "  guard-human-override.mjs authorize --repo <absolute-root> --request-sha256 <64hex> --plan-sha256 <64hex> --selection-sha256 <64hex> --reason <text> --reason-sha256 <64hex> [--author-source-root <absolute-root>] --activate",
     "  guard-human-override.mjs authorize-by-signature --repo <absolute-root> --request-sha256 <64hex> --plan-sha256 <64hex> --proof <external-public-json> [--author-source-root <absolute-root>]",
+    "  guard-human-override.mjs render-copy-safe --repo <absolute-root> --request-sha256 <64hex> [--author-source-root <absolute-root>]",
     "  guard-human-override.mjs verify-audit --repo <absolute-root>",
   ].join("\n");
 }
@@ -96,6 +103,41 @@ function exactFlagSet(value, required, optional = []) {
   return Object.keys(value).every((key) => allowed.has(key));
 }
 
+/**
+ * NVA-CF-GUARDVERBOSITY: the `render-copy-safe` subcommand's own construction, moved here
+ * verbatim from guard-testpath.mjs/guard-lifecycle-ready.mjs (NVA-W4-01B) -- those two hook
+ * files used to inline this unconditionally in every ceremony denial (up to 5 steps x 3
+ * shells, ~150 lines on a real denial, the dominant driver of context bloat on a TP-guard
+ * refusal). The safety property is unchanged: a human whose terminal wraps a long copied
+ * line still gets a bounded (<=72 columns/line), copy-safe posix/powershell/cmd.exe
+ * rendering of every ceremony step -- it is just no longer dumped inline by default. Both
+ * hooks now print a short pointer to this subcommand instead of the block itself.
+ *
+ * Byte-identical to the two hooks' own (now-removed) copies by construction, not merely by
+ * intent: same boundedOpaqueCopyCommand() call, same per-shell null handling, same label
+ * text. Kept here as its own small function (rather than a shared new lib export) for the
+ * same reason the two hook files already tolerate mirroring this construction between
+ * themselves -- see their own headers.
+ */
+function boundedCeremonyRenderingBlock(steps) {
+  const blocks = [];
+  for (const { label, command } of steps) {
+    let bounded;
+    try {
+      bounded = boundedOpaqueCopyCommand(command);
+    } catch {
+      continue;
+    }
+    const shells = [];
+    if (bounded.posix) shells.push(`  posix:\n${bounded.posix}`);
+    if (bounded.powershell) shells.push(`  powershell:\n${bounded.powershell}`);
+    if (bounded.cmd) shells.push(`  cmd.exe:\n${bounded.cmd}`);
+    if (shells.length === 0) continue;
+    blocks.push(`Bounded copy-safe rendering of the ${label} step (max ${bounded.maxColumns} columns per line; use this if the line above wrapped when you copied it):\n${shells.join("\n")}`);
+  }
+  return blocks.join("\n\n");
+}
+
 export function main(argv = process.argv.slice(2), io = {}, options = {}) {
   const write = io.write ?? process.stdout.write.bind(process.stdout);
   const writeError = io.writeError ?? process.stderr.write.bind(process.stderr);
@@ -152,6 +194,80 @@ export function main(argv = process.argv.slice(2), io = {}, options = {}) {
         );
       }
       writeError(`${advisoryLines.join("\n")}\n`);
+      return 0;
+    }
+    // NVA-CF-GUARDVERBOSITY: the on-demand replacement for the full per-step
+    // posix/powershell/cmd.exe bounded ceremony rendering guard-testpath.mjs and
+    // guard-lifecycle-ready.mjs used to inline unconditionally (NVA-W4-01B) -- see
+    // boundedCeremonyRenderingBlock()'s own header above for the full rationale. Requires
+    // only what a human already has from the short pointer both hooks now print: --repo,
+    // --request-sha256 (the SAME digest that appears, unchanged, on every flat ceremony
+    // command line). planHumanGuardOverride() is called first and its result otherwise
+    // discarded -- the same validated-request lookup `plan` itself performs, so a
+    // bogus/never-recorded digest is refused with the same HGO-* error every other
+    // subcommand already gives one, rather than silently rendering a plausible-looking
+    // block for a request that was never denied.
+    //
+    // Deliberately PLAIN TEXT on stdout, not this CLI's usual JSON contract (every other
+    // subcommand's stdout is machine-parseable JSON): the entire point of this output is a
+    // directly copy-pasteable multi-shell block. JSON-escaping its embedded newlines would
+    // defeat the safety property it exists for -- a human running this straight in a
+    // terminal needs real line breaks, not literal "\n" text to unescape by hand first.
+    if (command === "render-copy-safe") {
+      const parsed = flags(rest);
+      if (!exactFlagSet(parsed, ["repo", "request-sha256"], ["author-source-root"])
+        || typeof parsed.repo !== "string"
+        || !SHA256.test(parsed["request-sha256"] ?? "")) throw new Error(usage());
+      if (Object.hasOwn(parsed, "author-source-root") && typeof parsed["author-source-root"] !== "string") throw new Error(usage());
+      const authorSourceRoot = parsed["author-source-root"] ?? null;
+      planHumanGuardOverride({
+        rootDir: parsed.repo,
+        pluginRoot: PLUGIN_ROOT,
+        requestSha256: parsed["request-sha256"],
+        scriptPath: SCRIPT,
+        authorSourceRoot,
+      });
+      let approvalMode = "signature";
+      try { approvalMode = readPushApprovalMode(parsed.repo)?.mode ?? "signature"; } catch { approvalMode = "signature"; }
+      // Same ceremonyCommand() construction the two hooks build for their own flat chain
+      // (script/repo pre-rendered via JSON.stringify()+placeholder(), request-sha256 through
+      // ordinary shellWord() quoting) -- see their own NVA-W12-COPYSAFE comments.
+      const ceremonyCommand = (subcommand, ...extraArgv) =>
+        boundedCopySafeCommand({
+          executable: process.execPath,
+          argv: [
+            placeholder(JSON.stringify(SCRIPT)), subcommand, "--repo", placeholder(JSON.stringify(parsed.repo)),
+            "--request-sha256", parsed["request-sha256"], ...extraArgv,
+          ],
+        }).command;
+      const planCommand = ceremonyCommand("plan");
+      const prepareAuthorizationChat = ceremonyCommand(
+        "prepare-authorization", "--plan-sha256", placeholder("<plan-sha256-from-plan>"), "--reason", placeholder('"<human-reason>"'),
+      );
+      const authorizeChat = ceremonyCommand(
+        "authorize", "--plan-sha256", placeholder("<plan-sha256>"), "--selection-sha256", placeholder("<selection-sha256>"),
+        "--reason", placeholder('"<human-reason>"'), "--reason-sha256", placeholder("<reason-sha256>"), "--activate",
+      );
+      const prepareAuthorizationSignature = ceremonyCommand(
+        "prepare-authorization", "--plan-sha256", placeholder("<plan-sha256-from-plan>"), "--reason", placeholder('"<fixed HGO_SIGNATURE_REASON text>"'),
+      );
+      const emitSignatureDigest = ceremonyCommand("emit-signature-digest", "--plan-sha256", placeholder("<plan-sha256>"));
+      const authorizeBySignature = ceremonyCommand(
+        "authorize-by-signature", "--plan-sha256", placeholder("<plan-sha256>"), "--proof", placeholder("<external-proof.json>"),
+      );
+      const ceremonySteps = approvalMode === "chat"
+        ? [
+          { label: "plan", command: planCommand },
+          { label: "prepare-authorization", command: prepareAuthorizationChat },
+          { label: "authorize", command: authorizeChat },
+        ]
+        : [
+          { label: "plan", command: planCommand },
+          { label: "prepare-authorization", command: prepareAuthorizationSignature },
+          { label: "emit-signature-digest", command: emitSignatureDigest },
+          { label: "authorize-by-signature", command: authorizeBySignature },
+        ];
+      write(`${boundedCeremonyRenderingBlock(ceremonySteps)}\n`);
       return 0;
     }
     if (command === "prepare-authorization") {
