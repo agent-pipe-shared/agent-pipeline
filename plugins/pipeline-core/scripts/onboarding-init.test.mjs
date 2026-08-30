@@ -164,7 +164,7 @@ test("driveOnboardingInit: Claude, Codex, and Antigravity converge across fresh 
         const first = driveOnboardingInit({ rootDir: root, runner, env });
 
         assert.equal(first.schema, SCHEMA, label);
-        assert.equal(first.outcome, "pending-asks", `${label}: first stable stop is genuine published human input`);
+        assert.equal(first.outcome, "pending-asks", `${label}: first stable stop is genuine published human input: ${JSON.stringify(first)}`);
         assert.equal(first.final?.status, "runtime-initialization-required", `${label}: runner choice must not alter the stable boundary`);
         assert.equal(first.final?.nextAction?.kind, "command", `${label}: pending asks accompany the unchanged real next command`);
         assert.ok(first.pendingAsks.length > 0, `${label}: the boundary must carry real asks`);
@@ -227,9 +227,13 @@ test("public onboarding driver imports and materializes the first existing ancho
 
       const first = driveOnboardingInit({ rootDir: root, runner, env });
       assert.equal(first.outcome, "pending-asks", runner);
+      assert.equal(first.pendingAsks.length, 1, `${runner}: the first PO stop is one bundled action, not sibling command fragments`);
       const setupAsk = first.pendingAsks.find((ask) => ask.inputs?.some((input) => input.name === "trustAnchorSetupMode"));
       assert.ok(setupAsk, `${runner}: public inspect publishes the structured first-anchor action`);
       const replacements = new Map([
+        ["<PO_GIT_AUTHOR_NAME>", "Greenfield Anchor PO"],
+        ["<PO_GIT_AUTHOR_EMAIL>", "greenfield-anchor@example.invalid"],
+        ["<signature|chat>", "signature"],
         ["<existing|new>", "existing"],
         ["<absolute external key directory>", destination],
         ["<human attribution>", "Greenfield Anchor PO"],
@@ -244,8 +248,18 @@ test("public onboarding driver imports and materializes the first existing ancho
       assert.equal(applied.status, 0, `${runner}: ${applied.stderr}\n${applied.stdout}`);
       assert.doesNotMatch(applied.stdout, /PRIVATE KEY|BEGIN [A-Z ]+KEY/u, `${runner}: no key bytes reach driver JSON`);
       const result = JSON.parse(applied.stdout);
-      assert.deepEqual(result.bootstrap, { ok: true, code: "TRUST-ANCHOR-BOOTSTRAP-COMPLETE", mode: "existing" });
+      assert.deepEqual(result.initialAnswers, {
+        ok: true,
+        code: "INITIAL-ANSWERS-APPLIED",
+        pushApprovalPreference: "signature",
+        trustAnchor: "TRUST-ANCHOR-BOOTSTRAP-COMPLETE",
+      });
       assertPinnedRunner(result, runner, `${runner}/post-bootstrap`);
+
+      assert.equal(spawnSync("git", ["-C", root, "config", "--local", "user.name"], { encoding: "utf8" }).stdout.trim(), "Greenfield Anchor PO");
+      assert.equal(spawnSync("git", ["-C", root, "config", "--local", "user.email"], { encoding: "utf8" }).stdout.trim(), "greenfield-anchor@example.invalid");
+      assert.match(readFileSync(join(root, "pipeline.user.yaml"), "utf8"), /^\s*push_approval:\s*"signature"\s*$/mu);
+      assert.equal(existsSync(join(root, ".git", "agent-pipeline", "onboarding-initial-answers.json")), true);
 
       const policy = JSON.parse(readFileSync(join(root, "project", "critical-human-proof.json"), "utf8"));
       assert.equal(policy.schema, "pipeline.critical-human-proof-policy.v3");
@@ -261,9 +275,55 @@ test("public onboarding driver imports and materializes the first existing ancho
         ...actionInputNames(reentered.collectInput),
       ];
       assert.equal(names.includes("trustAnchorSetupMode"), false, `${runner}: completed setup is not asked again`);
+      assert.equal(names.includes("pushApprovalPreference"), false, `${runner}: durable receipt prevents a repeated push-preference ask`);
     }
   } finally {
     for (const path of fixtures) dispose(path);
+  }
+});
+
+test("a failed bundled first-anchor action restores Git/source/machine state and leaves no receipt that could mask the retry", () => {
+  const root = freshRoot();
+  const home = freshHome();
+  try {
+    const env = { ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home };
+    const first = driveOnboardingInit({ rootDir: root, runner: "claude", env });
+    assert.equal(first.outcome, "pending-asks");
+    assert.equal(first.pendingAsks.length, 1);
+    const action = first.pendingAsks[0];
+    assert.deepEqual(action.inputs.map((input) => input.name), [
+      "gitAuthorName",
+      "gitAuthorEmail",
+      "pushApprovalPreference",
+      "trustAnchorSetupMode",
+      "trustAnchorDirectory",
+      "trustAnchorHumanName",
+      "trustAnchorExistingKeyPath",
+    ]);
+    const replacements = new Map([
+      ["<PO_GIT_AUTHOR_NAME>", "Rollback PO"],
+      ["<PO_GIT_AUTHOR_EMAIL>", "rollback@example.invalid"],
+      ["<signature|chat>", "chat"],
+      ["<existing|new>", "existing"],
+      ["<absolute external key directory>", join(home, "failed-authority")],
+      ["<human attribution>", "Rollback PO"],
+      ["<absolute existing key path|none>", join(home, "missing-private.pem")],
+    ]);
+    const failed = spawnSync(action.applyAction.executable, action.applyAction.argv.map((value) => replacements.get(value) ?? value), {
+      encoding: "utf8", shell: false, env, maxBuffer: 8 * 1024 * 1024,
+    });
+    assert.equal(failed.status, 1, failed.stderr);
+    const result = JSON.parse(failed.stdout);
+    assert.equal(result.outcome, "error");
+    assert.equal(result.initialAnswers.code, "TRUST-ANCHOR-SETUP-FAILED");
+    assert.equal(existsSync(join(root, ".git", "agent-pipeline", "onboarding-initial-answers.json")), false);
+    assert.equal(spawnSync("git", ["-C", root, "config", "--local", "--get", "user.name"], { encoding: "utf8" }).status, 1);
+    assert.equal(spawnSync("git", ["-C", root, "config", "--local", "--get", "user.email"], { encoding: "utf8" }).status, 1);
+    assert.match(readFileSync(join(root, "pipeline.user.yaml"), "utf8"), /^\s*push_approval:\s*"signature"\s*$/mu);
+    assert.equal(existsSync(join(home, ".agent-pipeline", "machine.json")), false);
+  } finally {
+    dispose(root);
+    dispose(home);
   }
 });
 

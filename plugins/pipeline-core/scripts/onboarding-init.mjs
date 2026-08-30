@@ -106,6 +106,12 @@ import {
   CRITICAL_HUMAN_PROOF_POLICY_V3,
 } from "../lib/critical-human-proof-policy.mjs";
 import {
+  PROJECT_ONBOARDING_INITIAL_ANSWERS_RECEIPT_PATH,
+  PROJECT_ONBOARDING_INITIAL_ANSWERS_RECEIPT_SCHEMA,
+} from "../lib/project-onboarding-v3.mjs";
+import { validatePipelineUserV3 } from "../lib/runner-profiles-v3.mjs";
+import { parseYaml } from "../lib/yaml-lite.mjs";
+import {
   MACHINE_PLANE_SCHEMA,
   machinePlaneFilePath,
   readMachinePlane,
@@ -123,10 +129,11 @@ export const DEFAULT_STEP_CAP = 50;
 const ONBOARDING_SCRIPT_PATH = fileURLToPath(new URL("./project-onboarding-v3.mjs", import.meta.url));
 const PO_HUMAN_APPROVAL_SCRIPT_PATH = fileURLToPath(new URL("./po-human-approval.mjs", import.meta.url));
 const TRUST_ANCHOR_MODES = new Set(["existing", "new"]);
+const PUSH_APPROVAL_MODES = new Set(["signature", "chat"]);
 const TRUST_ANCHOR_RECOVERY_SCHEMA = "pipeline.first-anchor-bootstrap-recovery.v1";
 
 function usage() {
-  return "Usage: node plugins/pipeline-core/scripts/onboarding-init.mjs --root <project-dir> [--runner claude|codex|antigravity] [--step-cap <n>] [--trust-anchor-mode existing|new --trust-anchor-directory <absolute-external-dir> --trust-anchor-human-name <name> --trust-anchor-existing-key <absolute-key-path|none>]";
+  return "Usage: node plugins/pipeline-core/scripts/onboarding-init.mjs --root <project-dir> [--runner claude|codex|antigravity] [--step-cap <n>] [--git-author-name <name> --git-author-email <email> --push-approval signature|chat] [--trust-anchor-mode existing|new --trust-anchor-directory <absolute-external-dir> --trust-anchor-human-name <name> --trust-anchor-existing-key <absolute-key-path|none>]";
 }
 
 // The runner lane, pinned rather than inherited.
@@ -191,6 +198,21 @@ function parseArgs(argv) {
       if (!value || value.startsWith("--")) return { error: "--trust-anchor-existing-key requires an absolute path or the literal none" };
       output.trustAnchorExistingKey = value;
       index += 1;
+    } else if (arg === "--git-author-name") {
+      const value = argv[index + 1];
+      if (!value || value.startsWith("--") || value.trim().length === 0) return { error: "--git-author-name requires a non-empty value" };
+      output.gitAuthorName = value;
+      index += 1;
+    } else if (arg === "--git-author-email") {
+      const value = argv[index + 1];
+      if (!value || value.startsWith("--") || value.trim().length === 0) return { error: "--git-author-email requires a non-empty value" };
+      output.gitAuthorEmail = value;
+      index += 1;
+    } else if (arg === "--push-approval") {
+      const value = argv[index + 1];
+      if (!PUSH_APPROVAL_MODES.has(value)) return { error: "--push-approval requires signature or chat" };
+      output.pushApproval = value;
+      index += 1;
     } else if (arg === "--help" || arg === "-h") {
       output.help = true;
     } else {
@@ -199,6 +221,15 @@ function parseArgs(argv) {
   }
   if (!output.help && !output.root) return { error: "--root is required" };
   const setupValues = [output.trustAnchorMode, output.trustAnchorDirectory, output.trustAnchorHumanName, output.trustAnchorExistingKey];
+  const identityValues = [output.gitAuthorName, output.gitAuthorEmail];
+  if (identityValues.some((value) => value !== undefined) && identityValues.some((value) => value === undefined)) {
+    return { error: "initial answers require both --git-author-name and --git-author-email" };
+  }
+  if ((identityValues.some((value) => value !== undefined) || output.pushApproval !== undefined) && !output.pushApproval) {
+    return { error: "initial answers require --push-approval" };
+  }
+  if (output.pushApproval !== undefined && !output.runner) return { error: "initial answers require an explicit --runner" };
+  if (output.pushApproval !== undefined && output.stepCap !== undefined) return { error: "initial answers do not accept --step-cap" };
   if (setupValues.some((value) => value !== undefined)) {
     if (setupValues.some((value) => value === undefined)) return { error: "trust-anchor bootstrap requires all four --trust-anchor-* flags" };
     if (!output.runner) return { error: "trust-anchor bootstrap requires an explicit --runner" };
@@ -502,6 +533,144 @@ export function applyTrustAnchorBootstrap({
     catch { return fail("TRUST-ANCHOR-RECOVERY-RECEIPT-CLEANUP-FAILED"); }
   }
   return { ok: true, code: "TRUST-ANCHOR-BOOTSTRAP-COMPLETE", mode };
+}
+
+function readLocalGitConfig(root, key, env) {
+  const result = spawnSync("git", ["-C", root, "config", "--local", "--get", key], {
+    encoding: "utf8", shell: false, env,
+  });
+  if (result?.status === 1) return { present: false, value: null };
+  if (result?.error || result?.status !== 0) return null;
+  return { present: true, value: String(result.stdout ?? "").replace(/[\r\n]+$/u, "") };
+}
+
+function writeLocalGitConfig(root, key, value, env) {
+  const result = spawnSync("git", ["-C", root, "config", "--local", key, value], {
+    encoding: "utf8", shell: false, env,
+  });
+  return !result?.error && result?.status === 0;
+}
+
+function restoreLocalGitConfig(root, key, snapshot, env) {
+  if (snapshot.present) return writeLocalGitConfig(root, key, snapshot.value, env);
+  const result = spawnSync("git", ["-C", root, "config", "--local", "--unset-all", key], {
+    encoding: "utf8", shell: false, env,
+  });
+  return !result?.error && (result?.status === 0 || result?.status === 5);
+}
+
+/**
+ * Applies the first driver question as one bounded, replayable transaction. The values
+ * remain argv data throughout: no shell string is assembled, Git identity is repository
+ * local, the generated source is changed only at its one validated push-approval scalar,
+ * and a repo-private receipt makes the per-repository confirmation durable across restart.
+ */
+export function applyInitialOnboardingAnswers({
+  rootDir,
+  runner,
+  gitAuthorName = null,
+  gitAuthorEmail = null,
+  pushApproval,
+  trustAnchor = null,
+  env = null,
+} = {}) {
+  const root = resolve(rootDir);
+  const effectiveEnv = childEnvironment(env) ?? process.env;
+  if (!RUNNERS.has(runner)) return { ok: false, code: "INITIAL-ANSWERS-RUNNER-INVALID" };
+  if (!PUSH_APPROVAL_MODES.has(pushApproval)) return { ok: false, code: "INITIAL-ANSWERS-PUSH-APPROVAL-INVALID" };
+  if ((gitAuthorName === null) !== (gitAuthorEmail === null)) return { ok: false, code: "INITIAL-ANSWERS-GIT-IDENTITY-INCOMPLETE" };
+  if (gitAuthorName !== null && (![gitAuthorName, gitAuthorEmail].every((value) => typeof value === "string"
+    && value.trim().length > 0 && value.length <= 320 && !/[\r\n\0]/u.test(value)))) {
+    return { ok: false, code: "INITIAL-ANSWERS-GIT-IDENTITY-INVALID" };
+  }
+
+  const sourcePath = join(root, "pipeline.user.yaml");
+  const receiptPath = join(root, PROJECT_ONBOARDING_INITIAL_ANSWERS_RECEIPT_PATH);
+  const home = effectiveEnv.PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE
+    ?? effectiveEnv.HOME
+    ?? effectiveEnv.USERPROFILE
+    ?? homedir();
+  const machineDependencies = { homedirFn: () => home };
+  const machinePath = machinePlaneFilePath(machineDependencies);
+  if (machinePath === null || !existsSync(sourcePath)) return { ok: false, code: "INITIAL-ANSWERS-PREIMAGE-MISSING" };
+  const snapshots = [sourcePath, machinePath, receiptPath]
+    .map((path) => fileSnapshot(path, { exists: existsSync, lstat: lstatSync, read: readFileSync }));
+  if (snapshots.some((snapshot) => snapshot === null)) return { ok: false, code: "INITIAL-ANSWERS-PREIMAGE-UNSAFE" };
+  const gitSnapshots = gitAuthorName === null ? null : {
+    name: readLocalGitConfig(root, "user.name", effectiveEnv),
+    email: readLocalGitConfig(root, "user.email", effectiveEnv),
+  };
+  if (gitSnapshots && (gitSnapshots.name === null || gitSnapshots.email === null)) {
+    return { ok: false, code: "INITIAL-ANSWERS-GIT-PREIMAGE-UNREADABLE" };
+  }
+  const rollback = (code) => {
+    const filesRestored = restoreSnapshots(snapshots, existsSync);
+    const gitRestored = gitSnapshots === null || (
+      restoreLocalGitConfig(root, "user.name", gitSnapshots.name, effectiveEnv)
+      && restoreLocalGitConfig(root, "user.email", gitSnapshots.email, effectiveEnv)
+    );
+    return filesRestored && gitRestored ? { ok: false, code } : { ok: false, code: `${code}-ROLLBACK-FAILED` };
+  };
+
+  const currentPlane = readMachinePlane(machineDependencies);
+  if (currentPlane.status === "invalid") return { ok: false, code: "INITIAL-ANSWERS-MACHINE-PLANE-INVALID" };
+  let sourceBytes;
+  try { sourceBytes = readFileSync(sourcePath, "utf8"); }
+  catch { return { ok: false, code: "INITIAL-ANSWERS-SOURCE-UNREADABLE" }; }
+  const approvalLines = sourceBytes.match(/^\s*push_approval:\s*"(?:signature|chat)"\s*$/gmu) ?? [];
+  if (approvalLines.length !== 1) return { ok: false, code: "INITIAL-ANSWERS-SOURCE-SHAPE-INVALID" };
+  const nextSource = sourceBytes.replace(
+    /^(\s*push_approval:\s*)"(?:signature|chat)"\s*$/mu,
+    `$1${JSON.stringify(pushApproval)}`,
+  );
+  let parsedSource;
+  try { parsedSource = parseYaml(nextSource); }
+  catch { return { ok: false, code: "INITIAL-ANSWERS-SOURCE-SHAPE-INVALID" }; }
+  if (!validatePipelineUserV3(parsedSource).ok) return { ok: false, code: "INITIAL-ANSWERS-SOURCE-VALIDATION-FAILED" };
+
+  try { atomicReplaceFile(sourcePath, nextSource, lstatSync(sourcePath).mode & 0o777); }
+  catch { return rollback("INITIAL-ANSWERS-SOURCE-WRITE-FAILED"); }
+  if (gitSnapshots && (!writeLocalGitConfig(root, "user.name", gitAuthorName, effectiveEnv)
+    || !writeLocalGitConfig(root, "user.email", gitAuthorEmail, effectiveEnv))) {
+    return rollback("INITIAL-ANSWERS-GIT-WRITE-FAILED");
+  }
+  const nextPlane = currentPlane.status === "valid"
+    ? { ...currentPlane.plane, pushApprovalDefault: pushApproval, updatedAt: new Date().toISOString() }
+    : {
+      schema: MACHINE_PLANE_SCHEMA,
+      poKeyDirectory: null,
+      pushApprovalDefault: pushApproval,
+      routing: null,
+      language: null,
+      session: null,
+      usage: null,
+      updatedAt: new Date().toISOString(),
+    };
+  try { writeMachinePlane(nextPlane, machineDependencies); }
+  catch { return rollback("INITIAL-ANSWERS-MACHINE-WRITE-FAILED"); }
+  try {
+    atomicReplaceFile(receiptPath, `${JSON.stringify({
+      schema: PROJECT_ONBOARDING_INITIAL_ANSWERS_RECEIPT_SCHEMA,
+      root,
+      runner,
+      pushApprovalPreference: pushApproval,
+      updatedAt: new Date().toISOString(),
+    }, null, 2)}\n`);
+  } catch {
+    return rollback("INITIAL-ANSWERS-RECEIPT-WRITE-FAILED");
+  }
+
+  let bootstrap = null;
+  if (trustAnchor !== null) {
+    bootstrap = applyTrustAnchorBootstrap({ rootDir: root, ...trustAnchor, env: effectiveEnv });
+    if (!bootstrap.ok) return rollback(bootstrap.code);
+  }
+  return {
+    ok: true,
+    code: "INITIAL-ANSWERS-APPLIED",
+    pushApprovalPreference: pushApproval,
+    trustAnchor: bootstrap?.code ?? "existing-anchor-reused",
+  };
 }
 
 /**
@@ -850,7 +1019,26 @@ export function main(args = process.argv.slice(2), {
     return 2;
   }
   let bootstrap = null;
-  if (options.trustAnchorMode) {
+  let initialAnswers = null;
+  if (options.pushApproval) {
+    initialAnswers = applyInitialOnboardingAnswers({
+      rootDir: options.root,
+      runner: options.runner,
+      gitAuthorName: options.gitAuthorName ?? null,
+      gitAuthorEmail: options.gitAuthorEmail ?? null,
+      pushApproval: options.pushApproval,
+      trustAnchor: options.trustAnchorMode ? {
+        mode: options.trustAnchorMode,
+        directory: options.trustAnchorDirectory,
+        humanName: options.trustAnchorHumanName,
+        existingKey: options.trustAnchorExistingKey,
+      } : null,
+    });
+    if (!initialAnswers.ok) {
+      write(`${JSON.stringify({ schema: SCHEMA, runner: options.runner, root: resolve(options.root), outcome: "error", initialAnswers }, null, 2)}\n`);
+      return 1;
+    }
+  } else if (options.trustAnchorMode) {
     bootstrap = applyTrustAnchorBootstrap({
       rootDir: options.root,
       mode: options.trustAnchorMode,
@@ -865,8 +1053,12 @@ export function main(args = process.argv.slice(2), {
   }
   const result = driveOnboardingInit({ rootDir: options.root, runner: options.runner ?? null, stepCap: options.stepCap });
   if (bootstrap) result.bootstrap = bootstrap;
+  if (initialAnswers) result.initialAnswers = initialAnswers;
   write(`${JSON.stringify(result, null, 2)}\n`);
-  return result.outcome === "ready" || result.outcome === "collect-input" || result.outcome === "pending-asks" ? 0 : 1;
+  return result.outcome === "ready"
+    || result.outcome === "collect-input"
+    || result.outcome === "pending-asks"
+    || (initialAnswers !== null && result.outcome === "unsupported-next-action") ? 0 : 1;
 }
 
 if (isDirectInvocation(import.meta.url)) process.exit(main());
