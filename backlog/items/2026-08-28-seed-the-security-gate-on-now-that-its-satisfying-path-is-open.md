@@ -145,6 +145,40 @@ direct code/test inspection, not a trusted self-report):
   same limitation the item's own "Correction" section flagged for the
   original measurement. Left `status: open` for this reason.
 
+## Measured, 2026-08-30 (dispatch NVA-CF-SECGATEMEASURE) — installed-plugin measurement now done, result is FAIL
+
+The remaining gap above is now genuinely measured, not just reasoned about.
+Ran `security-scan.mjs --root .` from the actual installed plugin cache
+(`~/.claude/plugins/cache/agent-pipeline/pipeline-core/0.5.4/`, an
+independent on-disk copy with no `.git`/`.gitleaks.toml` in its own path)
+against a real installed-plugin consumer project
+(`Rune_Test1_Agy_060_76`, `gates.security: "blocking"` from its own earlier
+onboarding, unmodified for this measurement):
+
+```
+gitleaks: OK [success] (0 findings)
+osv-scanner: SKIPPED [success] (0 findings) -- no package sources
+semgrep: ERROR [scanner_error] -- "Cannot create auto config when metrics
+  are off. Please allow metrics or run with a specific config."
+license-check: SKIPPED [scanner_error] -- allowlist not found
+Verdict: BLOCKING -> exit 2
+```
+
+**Root cause: version skew, not a missing fix.** Gitleaks' config-resolution
+fix (`867d287a`) IS present and working in the installed 0.5.4 cache. But
+the plugin-shipped-default-fallback logic for semgrep's `rules_dir` and the
+license-check allowlist (NVA-B-SCANNER / NVA-R18-SCANBOOT) landed in this
+repo's source tree AFTER 0.5.4 was cached — this repo's `VERSION` currently
+reads 0.6.0-in-progress. The fix exists in source; it has not yet reached
+the artifact a real consumer actually has installed.
+
+**Staying open.** The satisfying path is not yet confirmed working for any
+real consumer today. Expected resolution path: once the 0.6.0 candidate is
+stamped and the local plugin cache is refreshed to it (this session's own
+planned end-of-sprint step), re-run this exact measurement against the
+refreshed installed cache. If it then passes, close with that evidence; if
+it still fails, the gap is real and needs its own fix, not just a stamp.
+
 ## Related
 
 - `2026-08-28-scanner-bootstrap-is-not-self-sufficient-for-a-fresh-project.md` — the work
