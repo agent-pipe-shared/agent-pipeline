@@ -1517,6 +1517,62 @@ test("NVA-CATPIPE-1: a recognised display-only cat flag is admitted, an unrecogn
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
+// NVA-CF-GITPIPEALLOWLIST. Measured live this session: `git log | head` was refused
+// GUARD-PARSE-UNSUPPORTED even though `git log` alone is already unconditionally trusted
+// read-only. Mirrors NVA-CATPIPE-1's own admission test shape for the `head`-only sink.
+test("NVA-CF-GITPIPEALLOWLIST: git-sourced bounded pipeline into head is admitted, both head forms", () => {
+  const path = root();
+  try {
+    for (const command of ["git log | head -5", "git log | head -n 40", "git status | head -n 3"]) {
+      assert.equal(isReadOnlyDiagnosticCommand(command, path), true, command);
+      assert.equal(isForbiddenCrossRepositoryMutation(command, path), false, command);
+      assert.deepEqual(evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny("continuity-damaged"); },
+      }), { exitCode: 0, stderr: "" });
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// NVA-CF-GITPIPEALLOWLIST. Exactness: the same closed bounds isBoundedGrepPipeline/
+// isBoundedCatPipeline already enforce (out-of-range head count, a non-read-only git
+// subcommand as the source, an out-of-root path argument) all apply identically to the git
+// source. `git commit ... | head` in particular must never be admitted -- "commit" is not in
+// the read-only subcommand set isReadOnlyGitSubcommand trusts.
+test("NVA-CF-GITPIPEALLOWLIST: exactness -- out-of-range head count, a non-read-only git subcommand, and an outside-root path argument all stay refused", () => {
+  const path = root();
+  const outside = mkdtempSync(join(tmpdir(), "guard-lifecycle-gitpipe-outside-"));
+  try {
+    for (const command of [
+      "git log | head -n 0",
+      "git log | head -n 501",
+      "git commit -m x | head -5",
+      "git push origin main | head -5",
+      `git log ${join(outside, "secret.txt")} | head -5`,
+      "git log | grep open",
+      "git log | head -n 5 > output.txt",
+    ]) {
+      assert.equal(isReadOnlyDiagnosticCommand(command, path), false, command);
+    }
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+// NVA-CF-GITPIPEALLOWLIST. The refusal message's "complete admitted grammar" text now names
+// the new shape too, in the same terse style as every other bullet -- executed rather than
+// merely matched, per NVA-I-GRAMMAR's own discipline (ADMITTED_GRAMMAR_SHAPES pins the exact
+// live text, and its own test elsewhere proves every example is independently admitted).
+test("NVA-CF-GITPIPEALLOWLIST: the admitted grammar shapes include the git-to-head pipeline, and its example is genuinely admitted", () => {
+  const path = root();
+  try {
+    const shape = ADMITTED_GRAMMAR_SHAPES.find((entry) => entry.spelling.includes("git-to-head"));
+    assert.ok(shape, "a git-to-head shape must be present in ADMITTED_GRAMMAR_SHAPES");
+    assert.equal(isReadOnlyDiagnosticCommand(shape.example, path), true, shape.example);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
 // backlog/items/2026-08-19-closed-shell-grammar-still-rejects-common-readonly-composition.md
 test("the &&-chain union (read-only classifier plus the small always-safe-write allowlist) and trailing 2>/dev/null admit exactly the backlog's triggering shapes, widened per NVA-I-GRAMMAR, and nothing more", () => {
   const path = root();
@@ -1543,6 +1599,14 @@ test("the &&-chain union (read-only classifier plus the small always-safe-write 
       // this widening grants no new authority, since `git log --all` was always independently
       // reachable as its own tool call. Previously refused as a "disclosed exclusion".
       "git log --all && git status",
+      // NVA-CF-GITPIPEALLOWLIST: `git log --oneline -5 | head -n 5` is now independently
+      // admitted as a standalone read-only command (isBoundedGitPipeline), so under the exact
+      // same "no new authority" union rule already exercised above for the grep-to-head
+      // segment, it is also admitted as a chain segment. Previously refused (see the git-log
+      // NVA-CATPIPE-1-era comment moved out of the refused list below): this widening grants
+      // no new authority, since the pipe segment was always independently reachable as its
+      // own tool call once isBoundedGitPipeline exists.
+      "git rev-parse HEAD && git log --oneline -5 | head -n 5",
     ]) {
       assert.equal(isReadOnlyDiagnosticCommand(command, path), true, command);
       assert.equal(isForbiddenCrossRepositoryMutation(command, path), false, command);
@@ -1564,8 +1628,6 @@ test("the &&-chain union (read-only classifier plus the small always-safe-write 
       "echo 1 && echo 2 && echo 3 && echo 4 && echo 5 && echo 6 && echo 7",
       "git status ; git log",
       "git status || git log",
-      // Trailing pipe where source is not grep (git log | head -n 5) fails closed
-      "git rev-parse HEAD && git log --oneline -5 | head -n 5",
       // Trailing pipe where sink is neither grep nor head fails closed
       'git rev-parse HEAD && grep -rl "pattern" backlog/items/ | cat',
       // Disclosed exclusion: a git global -c flag is never a subcommand match, so the
