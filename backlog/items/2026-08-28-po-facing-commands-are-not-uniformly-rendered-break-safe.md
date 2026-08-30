@@ -5,7 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-08-28
-sprint: nova
+sprint: nova-b
 source: "Codex/WSL greenfield run, 2026-08-28 (docs/pipeline-session-analysis-2026-08-28.md), plus the PO's own observation that this runner needed three sessions and the most detours."
 done_when: contains plugins/pipeline-core/lib/project-onboarding-v3.mjs copy-safe-command.mjs
 ---

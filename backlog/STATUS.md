@@ -297,7 +297,7 @@
 | pipeline.maintenance-window-signature-voided-by-unrelated-write | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.managed-onboarding-repair-item-sha256-pin-blocks-its-own-triage-edits | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.managed-onboarding-success-contract | deferred | workflow-improvement | pipeline | 2026-07-25 | — |
-| pipeline.mandatory-verify-gate-has-no-path-for-a-project-with-no-tests-yet | open | defect | pipeline | 2026-08-29 | — |
+| pipeline.mandatory-verify-gate-has-no-path-for-a-project-with-no-tests-yet | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.manifest-language-repair-demands-a-full-process-restart | open | defect | pipeline | 2026-08-29 | Nova B (PO decision 2026-08-29) — low-severity UX friction, current restart-on-repair behavior is safe; investigate later, not a 0.6.0 blocker |
 | pipeline.manifest-repair-paths-are-hardcoded-to-runners-default-codex | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.marketplace-install-topology-unattested | closed | defect | pipeline | 2026-08-07 | — |
@@ -389,7 +389,7 @@
 | pipeline.po-signing-key-pointer-does-not-cross-wsl-windows-boundary | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.post-compact-reground-carries-no-state-md-narrative | closed | defect | pipeline | 2026-08-19 | — |
 | pipeline.prd-binding-precedes-framing-with-no-reopen-path-back | closed | defect | pipeline | 2026-08-29 | — |
-| pipeline.prd-framing-precondition-is-prose-not-a-check | open | workflow-improvement | pipeline | 2026-08-29 | — |
+| pipeline.prd-framing-precondition-is-prose-not-a-check | closed | workflow-improvement | pipeline | 2026-08-29 | — |
 | pipeline.prd-language-gate-reads-a-field-intake-never-writes | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.prd-spec-content-language-can-drift-mid-authoring-undetected | closed | defect | pipeline | 2026-08-30 | NOW / Nova A -- PO live, 2026-08-30: Codex/Claude can switch human-facing language mid-PRD/Spec-authoring (e.g. start German, drift to English), and no code path detects this against the expected po-language value; every such drift forces expensive repair. PO wants a cheap first fix (document the requirement explicitly in the template) before considering a heavier content-language-detection mechanism. |
 | pipeline.prd-spec-depth-collapses-relative-to-design-input | closed | defect | pipeline | 2026-08-10 | — |
@@ -415,7 +415,7 @@
 | pipeline.published-lifecycle-event-schema-still-enumerates-cancellation | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.push-approval-general-mode-lane-does-not-bind-remote-or-destination | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.push-approval-mode-is-not-chosen-at-onboarding | closed | requirement | pipeline | 2026-08-28 | NOW / Nova A — happy-path blocking: the push approval is the last step of the path the PO named |
-| pipeline.push-approval-record-always-trails-the-signed-commit | open | defect | pipeline | 2026-08-26 | Reassigned from phoenix to nova on 2026-08-28 by PO decision, after the Phoenix line was intaked into Nova |
+| pipeline.push-approval-record-always-trails-the-signed-commit | closed | defect | pipeline | 2026-08-26 | Reassigned from phoenix to nova on 2026-08-28 by PO decision, after the Phoenix line was intaked into Nova |
 | pipeline.push-approval-signature-ceremony-is-not-staged-by-project-profile | closed | idea | pipeline | 2026-08-09 | — |
 | pipeline.push-approval-signature-commands-also-line-wrap | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.push-approval-skill-reference-predates-adr-0061 | closed | defect | pipeline | 2026-08-09 | — |
@@ -574,8 +574,8 @@
 
 ## Counts
 
-- open: 76
+- open: 73
 - in_progress: 0
-- closed: 472
+- closed: 475
 - rejected: 3
 - deferred: 11

@@ -3,13 +3,25 @@ schema: pipeline.backlog-item.v1
 id: pipeline.push-approval-record-always-trails-the-signed-commit
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-26
 sprint: nova
 tracking: "Reassigned from phoenix to nova on 2026-08-28 by PO decision, after the Phoenix line was intaked into Nova"
 source: "PO observation, 2026-08-26, live during a routine push: 'dieses update des push standes wird jetzt aber nicht auf dem anderen pc ankommen. das ist noch eine schwäche im ablauf da die infos verloren gehen' -- caught mid-session, reproduced twice in the same push sequence."
 done_when: manual
+closed_at: "2026-08-30"
+closure_repository: "self"
+closure_commit: "3783c88ac6a366ea2082f0db61be638d164d43ee"
+closure_evidence: "backlog/evidence/2026-08-30-nova-open-item-code-map.md"
 ---
+
+# Closed — 2026-08-30
+
+`approve-push` now marks the trailing audit write as pending, and the next
+`push-prepare` safely folds only that sole state-file write before evaluating
+the remaining push preconditions.  `push-prepare.test.mjs` passed 54/54,
+including the real-repository red-to-green reproduction and refusal to absorb
+unrelated work.  The referenced code map records the re-verification.
 
 # `approve-push`'s own audit-trail write structurally can never be part of the push it records
 
