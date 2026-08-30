@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "1945d2025ed5f15bc8d389ac7996db9fa1d3016388bf57d28db0a3894c7d7a08"
+    "transitionHead": "3601f943b75393c9cb95c895938ea7d6b043ca643f5a843255a76e7062a9d5d5"
   },
   "counts": {
-    "open": 77,
+    "open": 76,
     "in_progress": 3,
-    "closed": 466,
+    "closed": 467,
     "rejected": 3,
     "deferred": 11
   },
@@ -1738,13 +1738,17 @@
     },
     {
       "id": "pipeline.design-to-implementation-path-has-no-driver",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-28",
       "source": "PO request 2026-08-28. Scope established by reading what onboarding-init.mjs drives (project-onboarding-v3.mjs's subcommand table only) against where the design-to-implementation transition actually lives (pipeline-state.mjs).",
       "deferred": false,
-      "tracking": "Nova B — PO-raised 2026-08-28: the next path complex enough to need a driver. Ranked BEHIND the push driver, for the reason stated below."
+      "tracking": "Nova A — re-prioritized 2026-08-30, retrospective-analysis follow-up item #4 ('ja das brauchen wir')",
+      "closedAt": "2026-08-30",
+      "closureRepository": "self",
+      "closureCommit": "d7600de5",
+      "closureEvidence": "plugins/pipeline-core/scripts/pipeline-state-inspect.test.mjs"
     },
     {
       "id": "pipeline.discarded-feature-dead-end",
