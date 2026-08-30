@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "64732ef44245ff8841b096c6b332b945abfde4d653e42db4b97159f5b0281a5c"
+    "transitionHead": "dd2ecddda7058a839246c2d568df78b1260f728850409b1df903157544604ea7"
   },
   "counts": {
-    "open": 76,
+    "open": 75,
     "in_progress": 3,
-    "closed": 461,
+    "closed": 462,
     "rejected": 3,
     "deferred": 11
   },
@@ -4745,13 +4745,17 @@
     },
     {
       "id": "pipeline.prd-spec-content-language-can-drift-mid-authoring-undetected",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-30",
       "source": "PO live session 2026-08-30, clarifying that backlog item 2026-08-28-onboarding-produces-drift-it-then-has-to-repair.md (closed) does NOT cover this -- that item only checks a metadata marker (po-language field) against a profile receipt, never the actual prose language of PRD/Spec content.",
       "deferred": false,
-      "tracking": "NOW / Nova A -- PO live, 2026-08-30: Codex/Claude can switch human-facing language mid-PRD/Spec-authoring (e.g. start German, drift to English), and no code path detects this against the expected po-language value; every such drift forces expensive repair. PO wants a cheap first fix (document the requirement explicitly in the template) before considering a heavier content-language-detection mechanism."
+      "tracking": "NOW / Nova A -- PO live, 2026-08-30: Codex/Claude can switch human-facing language mid-PRD/Spec-authoring (e.g. start German, drift to English), and no code path detects this against the expected po-language value; every such drift forces expensive repair. PO wants a cheap first fix (document the requirement explicitly in the template) before considering a heavier content-language-detection mechanism.",
+      "closedAt": "2026-08-30",
+      "closureRepository": "self",
+      "closureCommit": "7d299c569c8f1fa34e48bb745830655412ceaec7",
+      "closureEvidence": "templates/prd.md"
     },
     {
       "id": "pipeline.prd-spec-depth-collapses-relative-to-design-input",

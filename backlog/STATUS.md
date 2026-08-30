@@ -385,7 +385,7 @@
 | pipeline.prd-binding-precedes-framing-with-no-reopen-path-back | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.prd-framing-precondition-is-prose-not-a-check | open | workflow-improvement | pipeline | 2026-08-29 | — |
 | pipeline.prd-language-gate-reads-a-field-intake-never-writes | closed | defect | pipeline | 2026-08-29 | — |
-| pipeline.prd-spec-content-language-can-drift-mid-authoring-undetected | open | defect | pipeline | 2026-08-30 | NOW / Nova A -- PO live, 2026-08-30: Codex/Claude can switch human-facing language mid-PRD/Spec-authoring (e.g. start German, drift to English), and no code path detects this against the expected po-language value; every such drift forces expensive repair. PO wants a cheap first fix (document the requirement explicitly in the template) before considering a heavier content-language-detection mechanism. |
+| pipeline.prd-spec-content-language-can-drift-mid-authoring-undetected | closed | defect | pipeline | 2026-08-30 | NOW / Nova A -- PO live, 2026-08-30: Codex/Claude can switch human-facing language mid-PRD/Spec-authoring (e.g. start German, drift to English), and no code path detects this against the expected po-language value; every such drift forces expensive repair. PO wants a cheap first fix (document the requirement explicitly in the template) before considering a heavier content-language-detection mechanism. |
 | pipeline.prd-spec-depth-collapses-relative-to-design-input | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.pre-existing-failure-claims-need-evidence | closed | workflow-improvement | pipeline | 2026-08-08 | — |
 | pipeline.pre-push-hook-is-offered-not-installed | closed | defect | pipeline | 2026-08-28 | — |
@@ -566,8 +566,8 @@
 
 ## Counts
 
-- open: 76
+- open: 75
 - in_progress: 3
-- closed: 461
+- closed: 462
 - rejected: 3
 - deferred: 11
