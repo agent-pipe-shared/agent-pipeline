@@ -348,6 +348,7 @@ const TEST_SUITES = [
   { name: "threat-model-tests", file: join(libDir, "threat-model.test.mjs") },
   { name: "po-approval-proof-tests", file: join(libDir, "po-approval-proof.test.mjs") },
   { name: "critical-human-proof-policy-tests", file: join(libDir, "critical-human-proof-policy.test.mjs") },
+  { name: "trust-anchor-bootstrap-circularity-repro-tests", file: join(libDir, "trust-anchor-bootstrap-circularity.repro.test.mjs") },
   // Registered in the same commit that created them. An unregistered suite is not a test
   // Verify forgot to run -- it is a test that protects nothing, and the gap is invisible
   // precisely because the file exists and passes when run by hand.
