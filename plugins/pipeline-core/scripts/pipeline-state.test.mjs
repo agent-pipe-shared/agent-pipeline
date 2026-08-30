@@ -965,6 +965,65 @@ function planAuthorityFixture({ featureId, planPath, specPath, now = "2026-08-27
   assert.equal(state.planApproved, true);
 }
 
+// NVA-CF-PUSHDRIVERFINISH (backlog:
+// 2026-08-28-a-blind-session-gets-zero-followable-steps-on-the-feature-and-push-path.md,
+// "Re-verification, 2026-08-29"): submit-plan's OWN top-of-handler
+// `poGateAuthority({ repoRoot: dir })` call runs WITHOUT expectedPlanSha256/
+// expectedSpecSha256, so PO-GATE-PRD-ACKNOWLEDGEMENT-MISSING can never fire
+// there (po-gate-authority.mjs's own `requireAcknowledgement` is only true
+// once at least one expected digest is passed) -- a real acknowledgement-
+// missing case is caught ONLY inside `beforeCommit`, which re-checks WITH
+// both digests. This fixture's `poGateAuthority` stub mirrors exactly that
+// asymmetry: `ok: true` on the first (no-expected-digest) call,
+// PO-GATE-PRD-ACKNOWLEDGEMENT-MISSING on the second (with-expected-digest)
+// call -- the live shape, not a hand-picked shortcut.
+{
+  const featureId = "ackmissing-submit-plan";
+  const planPath = `specs/${featureId}/prd_${featureId}.md`;
+  const specPath = `specs/${featureId}/spec.md`;
+  const { root, deps, planSha256, specSha256 } = planAuthorityFixture({ featureId, planPath, specPath });
+  const ackReason = "The active PRD must carry the PO's plan acknowledgement marker exactly once.";
+  const ackRepair = "run po-authority-acknowledge-plan --by <name>, then po-authority-acknowledge-apply --activate.";
+  const ackMissingDeps = {
+    ...deps,
+    poGateAuthority: ({ expectedPlanSha256, expectedSpecSha256 } = {}) => {
+      if (expectedPlanSha256 !== undefined || expectedSpecSha256 !== undefined) {
+        return { ok: false, code: "PO-GATE-PRD-ACKNOWLEDGEMENT-MISSING", reason: ackReason, repair: ackRepair };
+      }
+      return {
+        ok: true,
+        value: {
+          schema: "pipeline.po-gate-authority.v2", humanFacing: "en",
+          sourceSha256: "1".repeat(64), runtimeSha256: "2".repeat(64),
+          receiptSha256: "3".repeat(64), repositoryFingerprint: "4".repeat(64),
+          planPath, planSha256, specPath, specSha256,
+        },
+      };
+    },
+  };
+  const attempt = invokeCaptured(["submit-plan", "--by", "coordinator", "--profile", "feature"], ackMissingDeps);
+  assert.equal(attempt.status, 2, attempt.err);
+  assert.equal(attempt.err, "",
+    `the acknowledgement-missing stop must be structured JSON on stdout, never a raw stderr crash: ${attempt.err}`);
+  const payload = JSON.parse(attempt.out);
+  assert.equal(payload.schema, "pipeline.submit-plan-stop.v1");
+  assert.equal(payload.command, "submit-plan");
+  assert.equal(payload.code, "PO-GATE-PRD-ACKNOWLEDGEMENT-MISSING");
+  assert.equal(payload.nextAction.kind, "collect-input");
+  assert.equal(payload.nextAction.input, undefined,
+    "no input field -- there is nothing an agent may fill in on the PO's behalf");
+  assert.equal(payload.nextAction.inputs, undefined,
+    "no inputs field -- there is nothing an agent may fill in on the PO's behalf");
+  assert.ok(payload.nextAction.guidance.includes(planPath), payload.nextAction.guidance);
+  assert.ok(payload.nextAction.guidance.includes(planSha256), payload.nextAction.guidance);
+  assert.ok(payload.nextAction.guidance.includes(specPath), payload.nextAction.guidance);
+  assert.ok(payload.nextAction.guidance.includes(specSha256), payload.nextAction.guidance);
+  assert.ok(payload.nextAction.guidance.includes(ackReason), payload.nextAction.guidance);
+  assert.ok(payload.nextAction.guidance.includes(ackRepair), payload.nextAction.guidance);
+  const state = JSON.parse(readFileSync(statePath(root), "utf8"));
+  assert.equal(state.planSubmission, undefined, "a blocked submission must not be recorded");
+}
+
 // pipeline.prd-framing-precondition-check (backlog:
 // 2026-08-29-prd-framing-precondition-is-prose-not-a-check.md): submit-plan
 // refuses when the PRD document at the bound planPath still contains its own

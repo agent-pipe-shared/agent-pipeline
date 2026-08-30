@@ -166,6 +166,70 @@ test("awaiting-approval stays collect-input with no executable/argv -- a machine
     "guidance must still point the PO at approve-plan themselves");
 });
 
+// NVA-CF-PUSHDRIVERFINISH: the `implementing` branch (once the push
+// threat-model artifact exists) now surfaces push-init.mjs discoverably --
+// before this fix `grep -c "push-init" pipeline-state.mjs` was 0 (backlog:
+// 2026-08-28-a-blind-session-gets-zero-followable-steps-on-the-feature-and-push-path.md,
+// "Re-verification, 2026-08-29"). `planApproval` here is the minimal LEGACY
+// shape (`{approvedBy, approvedAt}`) -- the cheapest fixture that makes
+// derivePlanLifecycle() (lib/plan-spec-state-v2.mjs) report a non-null
+// current approval with no planSubmission present, which is exactly what
+// turns `phase: "implementation"` into status `implementing` rather than
+// `draft` (both submission and approval null would fall to `draft` instead).
+function implementingFixture(name) {
+  const root = freshRoot(name);
+  gitInitRoot(root);
+  mkdirSync(join(root, "project"), { recursive: true });
+  writeFileSync(join(root, "project", "push-threat-model.md"), "# Push threat model\nReviewed.\n");
+  writeFileSync(resolveStatePath(root), JSON.stringify({
+    schema: SCHEMA_ID,
+    activeFeature: { id: "widget", planPath: "specs/widget/prd.md", phase: "implementation" },
+    planApproved: true,
+    planApproval: { approvedBy: "PO", approvedAt: "2026-08-18T12:00:00.000Z" },
+  }, null, 2) + "\n");
+  return root;
+}
+
+test("implementing next-action surfaces push-init.mjs discoverably, with the submitter derived from local Git config", () => {
+  const root = implementingFixture("implementing-push-init-derivable");
+  setLocalGitUserName(root, "Jordan Example");
+
+  const result = invoke(root, ["inspect"]);
+  assert.equal(result.status, 0, result.err);
+  const payload = JSON.parse(result.out);
+  assert.equal(payload.status, "implementing");
+  assert.equal(payload.nextAction.kind, "collect-input");
+  assert.equal(payload.nextAction.executable, undefined,
+    "the implementing gate must never carry an executable -- the signature stays irreducibly human");
+  assert.equal(payload.nextAction.argv, undefined,
+    "the implementing gate must never carry an argv -- the signature stays irreducibly human");
+  assert.ok(payload.nextAction.guidance.includes("push-init.mjs"),
+    `guidance must name push-init.mjs so a blind session can discover it: ${payload.nextAction.guidance}`);
+  assert.ok(payload.nextAction.guidance.includes("Jordan Example"),
+    `guidance must fill in the submitter it DID resolve rather than placeholder it too: ${payload.nextAction.guidance}`);
+  assert.ok(payload.nextAction.guidance.includes("<remote>"),
+    `guidance must ask for the remote it cannot derive: ${payload.nextAction.guidance}`);
+  assert.ok(payload.nextAction.guidance.includes("refs/heads/<branch>"),
+    `guidance must ask for the destination it cannot derive: ${payload.nextAction.guidance}`);
+  assert.ok(payload.nextAction.guidance.includes("docs/push-release-flow.md"),
+    "the signature ceremony itself must still be named -- push-init.mjs never produces the signature");
+  assert.ok(!/<[^>]+>/.test(payload.nextAction.guidance.replace(/<remote>|<submitter's name>|<project-root>|refs\/heads\/<branch>/g, "")),
+    `no OTHER unfilled placeholder shape may leak into the guidance text: ${payload.nextAction.guidance}`);
+});
+
+test("implementing next-action also asks for the submitter when local Git config carries none", () => {
+  const root = implementingFixture("implementing-push-init-no-by");
+  // Deliberately no setLocalGitUserName call: the local Git config carries no user.name.
+
+  const result = invoke(root, ["inspect"]);
+  assert.equal(result.status, 0, result.err);
+  const payload = JSON.parse(result.out);
+  assert.equal(payload.status, "implementing");
+  assert.ok(payload.nextAction.guidance.includes("push-init.mjs"));
+  assert.ok(payload.nextAction.guidance.includes("<submitter's name>"),
+    `guidance must ask for the submitter it cannot derive: ${payload.nextAction.guidance}`);
+});
+
 test("draft next-action becomes a runnable submit-plan command once submitter and profile are both derivable", () => {
   const root = freshRoot("both-derivable");
   gitInitRoot(root);
