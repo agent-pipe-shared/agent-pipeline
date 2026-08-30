@@ -94,9 +94,33 @@ than launching into a predictable failure every time. This likely needs:
 - `2026-08-30-codex-worker-dispatch-fails-session-capability-probe-root-does-not.md`
   (closed) -- the live diagnosis this item's fix location was found from.
 
+## Quick fix accepted, 2026-08-30 (PO explicit direction, risk consciously accepted)
+
+PO's own words: "danger-full-access ... die pipeline greift ja trotzdem und
+unterbindet gefährliche sachen. Das ist ein zu akzeptierendes Risiko. Was
+sehr schade ist, weil wir hatten eigentlich zu 110% einen Weg gefunden, mit
+einem eigenen Profil eine sichere Sandbox zu bauen, die aber nicht mehr
+diese Fehler hatte." Accepted quick fix: switch
+`local-worker-supervisor.mjs`'s real Codex worker dispatch from
+`--sandbox workspace-write` to `--sandbox danger-full-access` -- this
+repository's own git-guard-union hooks remain the real protection layer
+(the accepted threat model has always been accidental breakout, not a
+malicious attacker; OS-level sandboxing was never the primary defense
+elsewhere in this codebase either). This is the SIMPLE flat substitution,
+not the more elaborate detect-and-select mechanism this item's own Proposal
+above describes.
+
+**The proper fix -- the custom, less-restrictive-but-still-safe sandbox
+profile the PO recalls having configured before, which reportedly did not
+hit this EPERM class -- remains the preferred long-term direction and is
+NOT superseded by this quick fix.** Locating and reintroducing that profile
+(Proposal step 1 above) is still open, Nova B, once the "110%" configuration
+the PO is recalling can actually be found/reconstructed.
+
 ## Triage
 
-- **Decision:** accepted, Nova A
+- **Decision:** accepted, Nova A (quick fix landed); proper custom-profile
+  fix remains open, Nova B
 - **Rationale:** PO-prioritized, recurring defect across multiple prior
   Codex sessions per the PO's own account, not a one-off
 - **Date:** 2026-08-30
