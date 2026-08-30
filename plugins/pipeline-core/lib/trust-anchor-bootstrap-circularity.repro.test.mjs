@@ -155,19 +155,21 @@ test("NVA-CF-KEYBOOTSTRAP: a fresh signature-mode project's first commit succeed
     assert.equal(r.status, 0, `git add (anchor commit) failed: ${r.stderr}`);
     r = git(["commit", "-m", "add trust anchor"], root);
 
-    // THE FINDING: still blocked. When this flips to 0 elsewhere (a fix in
-    // pre-commit-hook-install.mjs or human-guard-override.mjs, both outside
-    // NVA-CF-KEYBOOTSTRAP's scope), update this assertion in that same change.
-    assert.notEqual(r.status, 0, "REGRESSION-OR-FIX: the trust-anchor addition committed cleanly -- if a real fix landed elsewhere, update this test's assertions (do not just relax them) to assert the new GREEN behavior.");
-    assert.match(r.stderr, /BLOCKED \(agent-pipeline pre-commit hook\)/u);
-    assert.match(r.stderr, /GS-2 project\/critical-human-proof\.json/u);
-    assert.match(r.stderr, /HUMAN OPERATOR ONLY/u);
+    // THE FIX (NVA-CF-TRUSTANCHOR-TOFU, 2026-08-30, PO decision Option A): the
+    // trust-anchor-only upgrade of the already-tracked GS-2 path now commits cleanly,
+    // directly -- no --no-verify bypass needed. pre-commit-hook-install.mjs's new,
+    // narrow isTrustAnchorBootstrapUpgrade() exemption recognizes exactly this
+    // transition (v1/v2/v3 with no anchor -> v3 with exactly one anchor,
+    // requiredKinds/waivedKinds unchanged in substance) and lets it through, while
+    // every other already-tracked-path rewrite -- including a second/different/
+    // replaced trust anchor, or any other field bundled alongside the anchor -- stays
+    // exactly as blocked as before (see that file's own new regression tests).
+    assert.equal(r.status, 0, `the trust-anchor addition was unexpectedly still blocked: ${r.stderr}`);
 
-    // Confirms the only escape today is the human-operator-only --no-verify
-    // bypass the hook's own message names -- evidence, never a route this
-    // test recommends taking.
-    const bypass = git(["commit", "--no-verify", "-m", "add trust anchor (bypass, evidence only)"], root);
-    assert.equal(bypass.status, 0);
+    const committed = JSON.parse(readFileSync(join(root, CRITICAL_HUMAN_PROOF_POLICY_PATH), "utf8"));
+    assert.equal(committed.schema, "pipeline.critical-human-proof-policy.v3");
+    assert.equal(committed.trustAnchors.length, 1);
+    assert.equal(committed.trustAnchors[0].publicKeySha256, trustPolicy.publicKeySha256);
   } finally {
     rmSync(root, { recursive: true, force: true });
     rmSync(keyDir, { recursive: true, force: true });
