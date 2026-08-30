@@ -30,16 +30,14 @@ import {
   RUNNERS_WITHOUT_APP_SERVER,
 } from "./codex-onboarding-app-server.mjs";
 import { observeCodexOnboardingCapabilities } from "./codex-onboarding-capabilities.mjs";
-// NVA-INTAKEARGV-1: guidance strings render their command form from the SAME declaration the
-// CLI emits from and guard-lifecycle-ready.mjs admits by, so a nextAction can no longer tell
-// an agent to run a command the guard refuses. Hand-written prose here omitted the mandatory
-// --activate and deadlocked a real Codex greenfield session on 2026-08-27.
-import { mutatingApplyCommandHint } from "./onboarding-argv-shapes.mjs";
 import {
   applyOnboardingContinuityRepair,
   applyOnboardingKickoff,
   applyOnboardingKickoffPromotion,
   classifyOnboardingContinuity,
+  INTAKE_CAPTURE_APPLY_SCHEMA,
+  INTAKE_CONSENT_APPLY_SCHEMA,
+  INTAKE_DESIGN_QUESTIONS_APPLY_SCHEMA,
   INTAKE_GENERATE_PLAN_SCHEMA,
   KICKOFF_GOAL_MAX_BYTES,
   KICKOFF_PROMOTION_PLAN_SCHEMA,
@@ -2142,18 +2140,41 @@ function collectGoalAction() {
 // values are not already known -- `intake-consent-apply` itself is
 // idempotent and only fills fields still null, so re-asking an already-
 // answered field costs nothing.
-function intakeConsentAction() {
-  return {
-    kind: "collect-input",
-    inputs: [
+const INTAKE_GIT_AUTHOR_NAME_PLACEHOLDER = "<PO_INTAKE_GIT_AUTHOR_NAME>";
+const INTAKE_GIT_AUTHOR_EMAIL_PLACEHOLDER = "<PO_INTAKE_GIT_AUTHOR_EMAIL>";
+const INTAKE_LANGUAGE_PLACEHOLDER = "<PO_INTAKE_LANGUAGE>";
+const INTAKE_PROFILE_PLACEHOLDER = "<PO_INTAKE_PROFILE>";
+const INTAKE_DESIGN_ANSWERS_PLACEHOLDER = "<PO_INTAKE_DESIGN_ANSWERS_JSON>";
+const INTAKE_TEXT_FILE = "scratch/onboarding-intake.txt";
+
+function intakeConsentAction(root, runner, checkpoint, missingAuthorIdentity) {
+  const values = checkpoint.status === "present"
+    ? checkpoint.value.values
+    : { gitAuthor: null, language: null, profile: null };
+  const needsGitAuthor = values.gitAuthor === null && missingAuthorIdentity.length > 0;
+  const needsLanguage = values.language === null;
+  const needsProfile = values.profile === null;
+  const inputs = [
+    ...(needsGitAuthor ? [
       { name: "gitAuthorName", encoding: "utf8", trim: true, minBytes: 1, maxBytes: AUTHOR_IDENTITY_FIELD_MAX_BYTES, singleLine: true, rejectNul: true },
       { name: "gitAuthorEmail", encoding: "utf8", trim: true, minBytes: 1, maxBytes: AUTHOR_IDENTITY_FIELD_MAX_BYTES, singleLine: true, rejectNul: true },
-      { name: "language", encoding: "utf8", trim: true, minBytes: 2, maxBytes: 2, singleLine: true, rejectNul: true },
-      { name: "profile", encoding: "utf8", trim: true, minBytes: 4, maxBytes: 7, singleLine: true, rejectNul: true },
-    ],
+    ] : []),
+    ...(needsLanguage ? [{ name: "language", encoding: "utf8", trim: true, minBytes: 2, maxBytes: 2, singleLine: true, rejectNul: true }] : []),
+    ...(needsProfile ? [{ name: "profile", encoding: "utf8", trim: true, minBytes: 4, maxBytes: 7, singleLine: true, rejectNul: true }] : []),
+    { name: "projectDescription", encoding: "utf8", trim: false, minBytes: 1, maxBytes: INTAKE_MATERIAL_TEXT_MAX_BYTES, singleLine: false, rejectNul: true },
+  ];
+  const argv = [ONBOARDING_SCRIPT, "intake-consent-apply", "--root", root, "--granted"];
+  if (needsGitAuthor) argv.push("--git-author-name", INTAKE_GIT_AUTHOR_NAME_PLACEHOLDER, "--git-author-email", INTAKE_GIT_AUTHOR_EMAIL_PLACEHOLDER);
+  if (needsLanguage) argv.push("--language", INTAKE_LANGUAGE_PLACEHOLDER);
+  if (needsProfile) argv.push("--profile", INTAKE_PROFILE_PLACEHOLDER);
+  argv.push("--text-file", INTAKE_TEXT_FILE, "--activate", "--runner", runner);
+  return {
+    kind: "collect-input",
+    inputs,
     mutation: false,
     requiresConfirmation: false,
-    guidance: `no private intake checkpoint exists yet (or one exists with no recorded consent); ask the PO once, in plain language, for explicit affirmative consent to begin the intake conversation, plus their git author name and email, human-facing language (de or en), and profile (epic, feature, or mini) for whichever of those the PO has not already stated -- AND, in the same message, their first description of the project (requirements, goals, constraints, or existing decisions), so the PO answers once rather than waiting for a second round. Then call \`${mutatingApplyCommandHint("intake-consent-apply", { "--text": "<exactly what the PO wrote>", "--text-file": "<repo-relative file holding exactly what the PO wrote>" })}\`, supplying whichever of --git-author-name/--git-author-email/--language/--profile were answered -- omit any the PO has not stated yet, they can be filled on a later call -- and supplying --text or --text-file (never both) with that first description when the PO already gave it, so consent and that first chunk are recorded in this ONE call; use --text-file whenever the description contains a newline (the closed Pipeline shell grammar refuses a command carrying one), writing it to a file under scratch/ first. If the PO has not described the project yet, omit both --text and --text-file here -- the next step will ask for it via intake-capture-apply.`,
+    guidance: `ask once for explicit consent, the still-unresolved typed values listed in inputs, and the first project description. Write the projectDescription bytes verbatim to ${INTAKE_TEXT_FILE} inside this repository (create scratch/ if absent); the returned applyAction deliberately uses only --text-file, never --text, so multiline text remains copy-safe and the two mutually exclusive forms can never collide. Replace only the typed placeholders present in applyAction.argv with the matching verbatim single-line answers, then execute that exact action. Git author fields are omitted when repository-local Git already resolves them; do not ask for them again or reconstruct intake-consent-apply yourself.`,
+    applyAction: commandAction(argv, true, true, INTAKE_CONSENT_APPLY_SCHEMA, ["applied"]),
     expected: { schema: SCHEMA, statuses: ["intake-required"] },
   };
 }
@@ -2170,13 +2191,17 @@ const INTAKE_MATERIAL_TEXT_MAX_BYTES = 1_000_000;
 // multi-line prose (a PO message), so singleLine is false here -- no
 // consumer in this file validates that flag; it is descriptive metadata for
 // the caller collecting the value.
-function intakeCaptureAction() {
+function intakeCaptureAction(root, runner) {
   return {
     kind: "collect-input",
     input: { name: "text", encoding: "utf8", trim: false, minBytes: 1, maxBytes: INTAKE_MATERIAL_TEXT_MAX_BYTES, singleLine: false, rejectNul: true },
     mutation: false,
     requiresConfirmation: false,
-    guidance: `consent is already recorded; ask the PO for their next message containing project requirements, goals, constraints, or existing decisions, then call \`${mutatingApplyCommandHint("intake-capture-apply", { "--text": "<exactly what the PO wrote>", "--text-file": "<repo-relative file holding exactly what the PO wrote>" })}\`. Use --text-file whenever the PO's message contains a newline: the closed Pipeline shell grammar refuses a command carrying one, so a multi-line design document cannot be passed through --text in any quoting -- write it to a file under scratch/ first and pass that path. Call this once per PO message, repeatedly, until the PO indicates they are done describing the project.`,
+    guidance: `consent is already recorded; ask for the next project-material message, write its bytes verbatim to ${INTAKE_TEXT_FILE}, and execute the exact returned applyAction. It uses only --text-file, never the mutually exclusive --text form, so multiline content is copy-safe. Do not reconstruct intake-capture-apply.`,
+    applyAction: commandAction(
+      [ONBOARDING_SCRIPT, "intake-capture-apply", "--root", root, "--text-file", INTAKE_TEXT_FILE, "--activate", "--runner", runner],
+      true, true, INTAKE_CAPTURE_APPLY_SCHEMA, ["applied"],
+    ),
     expected: { schema: SCHEMA, statuses: ["intake-required"] },
   };
 }
@@ -2185,13 +2210,17 @@ function intakeCaptureAction() {
 // required` nextAction offered once at least one material-input chunk is
 // captured but the one bundled design-question round has not been answered
 // yet (checkpoint transactionState "design-questions-pending").
-function intakeDesignQuestionsAction() {
+function intakeDesignQuestionsAction(root, runner) {
   return {
     kind: "collect-input",
     input: { name: "answersJson", encoding: "utf8", trim: true, minBytes: 2, maxBytes: 65_536, singleLine: false, rejectNul: true },
     mutation: false,
     requiresConfirmation: false,
-    guidance: `at least one material-input chunk is captured; ask the PO the ONE bundled round of design questions this project still needs answered (never a second round -- intake-design-questions-apply refuses a different answer set once the round is answered), then call \`${mutatingApplyCommandHint("intake-design-questions-apply", { "--answers-json": "<JSON array of {question, answer} objects covering everything asked>" })}\`.`,
+    guidance: `ask the PO the ONE bundled round of design questions this project still needs answered. Replace exactly ${INTAKE_DESIGN_ANSWERS_PLACEHOLDER} in applyAction.argv with the JSON array of {question, answer} objects as one argv data element, then execute that exact returned action; never reconstruct the command or ask a second round.`,
+    applyAction: commandAction(
+      [ONBOARDING_SCRIPT, "intake-design-questions-apply", "--root", root, "--answers-json", INTAKE_DESIGN_ANSWERS_PLACEHOLDER, "--activate", "--runner", runner],
+      true, true, INTAKE_DESIGN_QUESTIONS_APPLY_SCHEMA, ["applied"],
+    ),
     expected: { schema: SCHEMA, statuses: ["intake-design-questions-required"] },
   };
 }
@@ -2623,10 +2652,11 @@ function readyLifecycleResult({ root, runner, intent, repository, runtime, conti
     const consentMissing = checkpoint.status === "absent" || checkpoint.value.consent === null;
     const transactionState = checkpoint.status === "present" ? checkpoint.value.transactionState : null;
     if (consentMissing) {
+      const missingAuthorIdentity = unresolvedAuthorIdentityKeys(root, repository.mode !== "local", fs);
       return lifecycleResult({
         status: "intake-required",
         root, runner, intent, repository, runtime, continuity, appServer,
-        nextAction: intakeConsentAction(),
+        nextAction: intakeConsentAction(root, runner, checkpoint, missingAuthorIdentity),
         diagnostics: [lifecycleDiagnostic(
           "$.continuity",
           "intake_required",
@@ -2641,7 +2671,7 @@ function readyLifecycleResult({ root, runner, intent, repository, runtime, conti
       return lifecycleResult({
         status: "intake-required",
         root, runner, intent, repository, runtime, continuity, appServer,
-        nextAction: intakeCaptureAction(),
+        nextAction: intakeCaptureAction(root, runner),
         diagnostics: [lifecycleDiagnostic(
           "$.continuity",
           "intake_required",
@@ -2654,7 +2684,7 @@ function readyLifecycleResult({ root, runner, intent, repository, runtime, conti
       return lifecycleResult({
         status: "intake-design-questions-required",
         root, runner, intent, repository, runtime, continuity, appServer,
-        nextAction: intakeDesignQuestionsAction(),
+        nextAction: intakeDesignQuestionsAction(root, runner),
         diagnostics: [lifecycleDiagnostic(
           "$.continuity",
           "intake_design_questions_required",
