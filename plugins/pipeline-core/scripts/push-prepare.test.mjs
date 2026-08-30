@@ -276,7 +276,7 @@ function machinePlaneFixture(overrides = {}) {
     schema: "pipeline.machine-plane.v1", poKeyDirectory: keyDirectory, pushApprovalDefault: "signature",
     routing: null, language: null, session: null, usage: null, updatedAt: "2026-08-29T00:00:00.000Z",
   }));
-  return { homedirFn: () => home };
+  return { homedirFn: () => home, keyDirectory };
 }
 
 function noMachineKeyFixture() {
@@ -520,6 +520,36 @@ test("pushPrepareReport: all preconditions met -> ready:true, all three commands
   assert.equal(result.ok, true);
   assert.equal(result.report.ready, true);
   assert.equal(result.report.subjectSha256, "7fefc0ada3b7726f39460bf7e001ed4b71ad66c173f0132d00fcbd0648f5601a");
+  assert.ok(result.lines.authorize.length > 0);
+  assert.ok(result.lines.approvePush.length > 0);
+  assert.equal(result.lines.gitPush, "git push origin HEAD:refs/heads/main");
+});
+
+test("pushPrepareReport: v1/v2 trust-on-first-use carries the registered machine key directory through command rendering", () => {
+  const machine = machinePlaneFixture();
+  let renderedDirectory = null;
+  const result = pushPrepareReport(
+    ["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"],
+    readyDeps({
+      ...machine,
+      readCriticalHumanProofPolicy: () => ({ ok: true, trustAnchor: null, trustAnchors: null }),
+      authorizeCriticalPushCommand: ({ directory }) => {
+        renderedDirectory = directory;
+        return {
+          executable: "node",
+          argv: [
+            "/plugin-root/scripts/po-human-approval.mjs", "authorize-critical",
+            "--repo-root", FIXTURE_DIR, "--directory", directory,
+          ],
+        };
+      },
+    }),
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(result.report.ready, true, JSON.stringify(result.report.checks));
+  assert.equal(result.report.checks.some((check) => check.id === "approval-directory"), false);
+  assert.equal(renderedDirectory, machine.keyDirectory);
   assert.ok(result.lines.authorize.length > 0);
   assert.ok(result.lines.approvePush.length > 0);
   assert.equal(result.lines.gitPush, "git push origin HEAD:refs/heads/main");
