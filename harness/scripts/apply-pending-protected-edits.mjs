@@ -36,12 +36,13 @@
  *      runs a suite (only lists pending names), so it cannot stand in for the
  *      sibling-copy green-preview proof this batch needs before an operator applies it
  *      sight-unseen. Verified green via `--preview` before being offered here.
- *   H. `harness/scripts/pipeline-state.test.mjs` (TP-5) -- the PO authority
- *      rebind/decision fixtures omitted their own runner environment and therefore
- *      inherited whichever runner marker happened to launch the suite. A naked
- *      CI/operator shell has no such marker, so the real writer correctly refused
- *      with PO-REBIND-RUNNER-UNKNOWN and the fixture produced ambient-only reds.
- *      The pending edit gives only those fixtures a non-empty Codex marker.
+ *   H. `harness/scripts/pipeline-state.test.mjs` and
+ *      `plugins/pipeline-core/scripts/pipeline-state.test.mjs` (TP-5) -- the PO
+ *      authority rebind/decision fixtures omitted their own runner environment and
+ *      one older positive acknowledgement-plan invocation omitted its now-required
+ *      explicit runner. A naked CI/operator shell has no ambient marker, so the real
+ *      writer correctly refused with PO-REBIND-RUNNER-UNKNOWN. The pending atomic
+ *      edit gives only those fixtures a hermetic Codex runner identity.
  *
  * `guard-testpath` refuses both from inside a session, and for (B) there is no
  * override at all: the target is Pipeline plugin source in a source checkout, so
@@ -87,6 +88,7 @@ const GATE_STRENGTH_PATH = join(REPO_ROOT, "plugins", "pipeline-core", "hooks", 
 const ENTRYPOINT_PATH = join(REPO_ROOT, "plugins", "pipeline-core", "lib", "entrypoint.test.mjs");
 const GUARD_GIT_TEST_PATH = join(REPO_ROOT, "plugins", "pipeline-core", "hooks", "guard-git.test.mjs");
 const PIPELINE_STATE_TEST_PATH = join(REPO_ROOT, "harness", "scripts", "pipeline-state.test.mjs");
+const PIPELINE_STATE_PLUGIN_TEST_PATH = join(REPO_ROOT, "plugins", "pipeline-core", "scripts", "pipeline-state.test.mjs");
 
 /* ------------------------------------------------------------------ helpers */
 
@@ -102,6 +104,19 @@ function anchoredReplace(source, anchor, replacement, label) {
     throw new Error(`anchor is ambiguous (${label}): the expected text occurs more than once. Nothing was written.`);
   }
   return source.slice(0, first) + replacement + source.slice(first + anchor.length);
+}
+
+/** Replace one uniquely delimited block while retaining its end marker. */
+function anchoredBlockReplace(source, startAnchor, endAnchor, replacement, label) {
+  const start = source.indexOf(startAnchor);
+  if (start === -1 || source.indexOf(startAnchor, start + startAnchor.length) !== -1) {
+    throw new Error(`block start is missing or ambiguous (${label}). Nothing was written.`);
+  }
+  const end = source.indexOf(endAnchor, start + startAnchor.length);
+  if (end === -1 || source.indexOf(endAnchor, end + endAnchor.length) !== -1) {
+    throw new Error(`block end is missing or ambiguous (${label}). Nothing was written.`);
+  }
+  return source.slice(0, start) + replacement + source.slice(end);
 }
 
 /**
@@ -172,6 +187,30 @@ function writeThenVerifyOrRevert(path, original, next, verifier) {
     throw new Error(`verification failed, original restored.\n${verdict.detail}`);
   }
   return verdict.detail;
+}
+
+/** Same contract as writeThenVerifyOrRevert(), atomically across several files. */
+function writeManyThenVerifyOrRevert(files, verifier) {
+  const restore = () => {
+    const failures = [];
+    for (const file of files) {
+      try { writeFileSync(file.path, file.original, "utf8"); }
+      catch (error) { failures.push(`${rel(file.path)}: ${error.message}`); }
+    }
+    if (failures.length > 0) throw new Error(`rollback failed:\n${failures.join("\n")}`);
+  };
+  try {
+    for (const file of files) writeFileSync(file.path, file.next, "utf8");
+    const verdict = verifier();
+    if (!verdict.ok) throw new Error(`verification failed.\n${verdict.detail}`);
+    return verdict.detail;
+  } catch (error) {
+    try { restore(); }
+    catch (restoreError) {
+      throw new Error(`${error.message}\n${restoreError.message}`);
+    }
+    throw new Error(`${error.message}\nall originals restored`);
+  }
 }
 
 /* ------------------------------------------------------- step A: verify.mjs */
@@ -1180,7 +1219,72 @@ const PIPELINE_STATE_DOCUMENT_LANGUAGE_FIXTURE_REPLACEMENT = `  const deps = {
     now: () => "2026-08-09T10:00:00.000Z",
     poGateProfile: () => ({ ok: true, value: profile }),
   };`;
+const PIPELINE_STATE_ACKNOWLEDGE_PLAN_RUNNER_ANCHOR = `  const planned = invokeCaptured([
+    "po-authority-acknowledge-plan", "--root", root, "--by", "PO",
+  ], outsideDeps);`;
+const PIPELINE_STATE_ACKNOWLEDGE_PLAN_RUNNER_REPLACEMENT = `  const planned = invokeCaptured([
+    "po-authority-acknowledge-plan", "--root", root, "--by", "PO", "--runner", "codex",
+  ], outsideDeps);`;
+const PIPELINE_STATE_APPROVE_ACTION_START_ANCHOR = "// NVA-V2B-APPROVERENDER:";
+const PIPELINE_STATE_APPROVE_ACTION_END_ANCHOR = "// NVA-V2-APPROVEREACH (PO's mandatory addendum, 2026-08-28): spelling a";
+const PIPELINE_STATE_APPROVE_ACTION_REPLACEMENT = `// NVA-V2B-APPROVERENDER: approval remains a typed collect-input with one exact nested argv.
+// Execute that returned argv after substituting its one PO-supplied value; never recover a
+// command from guidance prose.
+{
+  const { root, deps } = awaitingApprovalFixture();
+  const inspected = capturedStdout(() => run(["inspect"], deps));
+  const action = JSON.parse(inspected.lines.join("\\n")).nextAction;
+  const scriptPath = fileURLToPath(new URL("./pipeline-state.mjs", import.meta.url));
+
+  assert.equal(action.kind, "collect-input");
+  assert.equal(action.input?.name, "by");
+  assert.equal(action.applyAction?.kind, "command");
+  assert.equal(action.applyAction?.executable, process.execPath);
+  assert.deepEqual(action.applyAction?.argv, [
+    scriptPath, "approve-plan", "--by", "<PO_PLAN_APPROVER_NAME>",
+  ]);
+  assert.equal(action.applyAction?.mutation, true);
+  assert.equal(action.applyAction?.requiresConfirmation, true);
+
+  const argv = action.applyAction.argv.map((part) => (
+    part === "<PO_PLAN_APPROVER_NAME>" ? "Probe Person" : part
+  ));
+  const executed = spawnSync(action.applyAction.executable, [...argv, "--dir", root], { encoding: "utf8" });
+  const stderr = executed.stderr ?? "";
+  assert.ok(!/unknown subcommand|Usage:|requires --by/i.test(stderr),
+    "the returned approve-plan argv must reach its own gate logic: " + stderr);
+  assert.ok(executed.status === 0 || /approve-plan (requires|blocked by)/.test(stderr),
+    "the returned approve-plan argv must reach its own gate logic; status=" + executed.status + ", stderr=" + stderr);
+}
+
+`;
+const PIPELINE_STATE_APPROVE_REACH_START_ANCHOR = "// NVA-V2-APPROVEREACH (PO's mandatory addendum, 2026-08-28): spelling a";
+const PIPELINE_STATE_APPROVE_REACH_END_ANCHOR = "// NVA-R31-STATEPHASEDRIFT";
+const PIPELINE_STATE_APPROVE_REACH_REPLACEMENT = `// NVA-V2-APPROVEREACH: the exact nested approve action must also be admitted by the
+// readiness guard after substituting its one typed input.
+{
+  const { root, deps } = awaitingApprovalFixture();
+  const inspected = capturedStdout(() => run(["inspect"], deps));
+  const action = JSON.parse(inspected.lines.join("\\n")).nextAction;
+  assert.equal(action.input?.name, "by");
+  assert.deepEqual(action.applyAction?.argv.slice(1), [
+    "approve-plan", "--by", "<PO_PLAN_APPROVER_NAME>",
+  ]);
+
+  const command = action.applyAction.command.replace("<PO_PLAN_APPROVER_NAME>", "'Probe Person'");
+  assert.equal(isSanctionedLifecycleCommand(command, root), true,
+    "the exact returned approve-plan command must be admitted by the readiness guard: " + command);
+
+  const blankBy = "'" + process.execPath + "' '"
+    + fileURLToPath(new URL("./pipeline-state.mjs", import.meta.url))
+    + "' approve-plan --by ''";
+  assert.equal(isSanctionedLifecycleCommand(blankBy, root), false,
+    "an unattributed approve-plan must stay refused by the same guard");
+}
+
+`;
 const PIPELINE_STATE_PREVIEW_PATH = join(dirname(PIPELINE_STATE_TEST_PATH), "pipeline-state.runner-fixture.preview-check.mjs");
+const PIPELINE_STATE_PLUGIN_PREVIEW_PATH = join(dirname(PIPELINE_STATE_PLUGIN_TEST_PATH), "pipeline-state.ack-plan-runner.preview-check.mjs");
 const RUNNER_ENV_KEYS = ["CLAUDECODE", "ANTIGRAVITY_AGENT", "AI_AGENT", "CODEX_SESSION_ID", "CODEX_THREAD_ID"];
 
 function nakedRunnerEnv(extra = {}) {
@@ -1197,10 +1301,14 @@ function pipelineStateSuiteSummary(output) {
 
 function stepPipelineStateRunnerFixture({ dryRun, preview }) {
   const original = readFileSync(PIPELINE_STATE_TEST_PATH, "utf8");
+  const pluginOriginal = readFileSync(PIPELINE_STATE_PLUGIN_TEST_PATH, "utf8");
   const seedApplied = original.includes('CODEX_THREAD_ID: "pipeline-state-po-authority-fixture"');
   const documentLanguageApplied = original.includes('CODEX_THREAD_ID: "pipeline-state-po-authority-document-language-fixture"');
-  if (seedApplied && documentLanguageApplied) {
-    return { status: "already-applied", detail: "both PO-authority fixture environments already carry hermetic Codex runner markers" };
+  const acknowledgePlanRunnerApplied = pluginOriginal.includes(PIPELINE_STATE_ACKNOWLEDGE_PLAN_RUNNER_REPLACEMENT);
+  const approveActionApplied = pluginOriginal.includes("approval remains a typed collect-input with one exact nested argv");
+  const approveReachApplied = pluginOriginal.includes("the exact nested approve action must also be admitted by the");
+  if (seedApplied && documentLanguageApplied && acknowledgePlanRunnerApplied && approveActionApplied && approveReachApplied) {
+    return { status: "already-applied", detail: "all five pipeline-state fixture repairs are already applied" };
   }
 
   let next = original;
@@ -1220,12 +1328,42 @@ function stepPipelineStateRunnerFixture({ dryRun, preview }) {
       "non-de/en document-language PO-authority deps environment",
     );
   }
+  let pluginNext = pluginOriginal;
+  if (!acknowledgePlanRunnerApplied) {
+    pluginNext = anchoredReplace(
+      pluginNext,
+      PIPELINE_STATE_ACKNOWLEDGE_PLAN_RUNNER_ANCHOR,
+      PIPELINE_STATE_ACKNOWLEDGE_PLAN_RUNNER_REPLACEMENT,
+      "positive explicit-root PO acknowledge-plan runner",
+    );
+  }
+  if (!approveActionApplied) {
+    pluginNext = anchoredBlockReplace(
+      pluginNext,
+      PIPELINE_STATE_APPROVE_ACTION_START_ANCHOR,
+      PIPELINE_STATE_APPROVE_ACTION_END_ANCHOR,
+      PIPELINE_STATE_APPROVE_ACTION_REPLACEMENT,
+      "typed approve-plan applyAction contract",
+    );
+  }
+  if (!approveReachApplied) {
+    pluginNext = anchoredBlockReplace(
+      pluginNext,
+      PIPELINE_STATE_APPROVE_REACH_START_ANCHOR,
+      PIPELINE_STATE_APPROVE_REACH_END_ANCHOR,
+      PIPELINE_STATE_APPROVE_REACH_REPLACEMENT,
+      "typed approve-plan guard reachability contract",
+    );
+  }
 
   if (preview) {
     try {
       writeFileSync(PIPELINE_STATE_PREVIEW_PATH, next, "utf8");
+      writeFileSync(PIPELINE_STATE_PLUGIN_PREVIEW_PATH, pluginNext, "utf8");
       const parsed = run(["--check", PIPELINE_STATE_PREVIEW_PATH]);
       if (parsed.code !== 0) throw new Error(`pipeline-state.test.mjs (preview copy) no longer parses:\n${parsed.output}`);
+      const pluginParsed = run(["--check", PIPELINE_STATE_PLUGIN_PREVIEW_PATH]);
+      if (pluginParsed.code !== 0) throw new Error(`plugin pipeline-state.test.mjs (preview copy) no longer parses:\n${pluginParsed.output}`);
       const suite = run(
         [PIPELINE_STATE_PREVIEW_PATH],
         REPO_ROOT,
@@ -1237,26 +1375,37 @@ function stepPipelineStateRunnerFixture({ dryRun, preview }) {
       }
       return {
         status: "preview-green",
-        detail: `${summary || "pipeline-state PO-authority slice: exit 0"} -- ran from a removed sibling with no ambient runner marker; ${rel(PIPELINE_STATE_TEST_PATH)} was not touched`,
+        detail: `${summary || "pipeline-state PO-authority PS53 slice: exit 0"}; both transformed siblings parse and the PS53 slice ran with no ambient runner marker. The policy-bearing plugin suite is deliberately reserved for the attended real apply: Codex sandbox child Git reports status 0 together with EPERM, which its fail-closed committed-policy reader must reject. Real apply runs both full markerless suites and atomically rolls both protected files back on any failure; protected targets were not touched by this preview`,
       };
     } finally {
       rmSync(PIPELINE_STATE_PREVIEW_PATH, { force: true });
+      rmSync(PIPELINE_STATE_PLUGIN_PREVIEW_PATH, { force: true });
     }
   }
 
   if (dryRun) {
-    return { status: "would-apply", detail: "2 anchored edits: give only the two PO-authority fixture environments non-empty CODEX_THREAD_ID markers" };
+    return { status: "would-apply", detail: "5 unique anchored fixture repairs across 2 protected suites: two runner env markers, one explicit --runner codex, and two typed approve-plan action expectations" };
   }
 
-  const detail = writeThenVerifyOrRevert(PIPELINE_STATE_TEST_PATH, original, next, () => {
+  const detail = writeManyThenVerifyOrRevert([
+    { path: PIPELINE_STATE_TEST_PATH, original, next },
+    { path: PIPELINE_STATE_PLUGIN_TEST_PATH, original: pluginOriginal, next: pluginNext },
+  ], () => {
     const parsed = run(["--check", PIPELINE_STATE_TEST_PATH]);
     if (parsed.code !== 0) return { ok: false, detail: `pipeline-state.test.mjs no longer parses:\n${parsed.output}` };
+    const pluginParsed = run(["--check", PIPELINE_STATE_PLUGIN_TEST_PATH]);
+    if (pluginParsed.code !== 0) return { ok: false, detail: `plugin pipeline-state.test.mjs no longer parses:\n${pluginParsed.output}` };
     const suite = run([PIPELINE_STATE_TEST_PATH], REPO_ROOT, nakedRunnerEnv());
     const summary = pipelineStateSuiteSummary(suite.output);
     if (suite.code !== 0) {
       return { ok: false, detail: `pipeline-state.test.mjs did not pass completely in a runner-marker-free shell (exit ${suite.code}):\n${summary || suite.output.slice(-4000)}` };
     }
-    return { ok: true, detail: `${summary || "pipeline-state.test.mjs: exit 0"}; full suite passed with no ambient runner marker` };
+    const pluginSuite = run([PIPELINE_STATE_PLUGIN_TEST_PATH], REPO_ROOT, nakedRunnerEnv());
+    const pluginSummary = pipelineStateSuiteSummary(pluginSuite.output);
+    if (pluginSuite.code !== 0) {
+      return { ok: false, detail: `plugin pipeline-state.test.mjs did not pass completely in a runner-marker-free shell (exit ${pluginSuite.code}):\n${pluginSummary || pluginSuite.output.slice(-4000)}` };
+    }
+    return { ok: true, detail: `${summary || "pipeline-state.test.mjs: exit 0"}; ${pluginSummary || "plugin pipeline-state.test.mjs: exit 0"}; both full suites passed with no ambient runner marker` };
   });
 
   return { status: "applied", detail };
@@ -1278,7 +1427,7 @@ const STEPS = [
   { key: "verify-nva-c-protected", label: `E. register ${VERIFY_REGISTRATIONS_NVA_C_PROTECTED.length} more pending suites (NVA-C-PROTECTED) in ${rel(VERIFY_PATH)} (TP-3)`, fn: stepVerifyNvaCProtected },
   { key: "guard-git-22", label: `F. add GG22-7/GG22-8 fixture tests to ${rel(GUARD_GIT_TEST_PATH)} (TP-1)`, fn: stepGuardGit22 },
   { key: "verify-manual-check-extract", label: `G. extract the manual-check logic out of ${rel(VERIFY_PATH)} into a testable module (TP-3)`, fn: stepVerifyManualCheckExtract },
-  { key: "pipeline-state-runner-fixture", label: `H. bind the PO-authority fixtures to their Codex runner in ${rel(PIPELINE_STATE_TEST_PATH)} (TP-5)`, fn: stepPipelineStateRunnerFixture },
+  { key: "pipeline-state-runner-fixture", label: `H. bind the PO-authority fixtures to their Codex runner in ${rel(PIPELINE_STATE_TEST_PATH)} and ${rel(PIPELINE_STATE_PLUGIN_TEST_PATH)} (TP-5)`, fn: stepPipelineStateRunnerFixture },
 ];
 
 const PREVIEWABLE = new Set(["gate-strength", "entrypoint", "guard-git-cwd", "verify-nva-c-protected", "guard-git-22", "verify-manual-check-extract", "pipeline-state-runner-fixture"]);
