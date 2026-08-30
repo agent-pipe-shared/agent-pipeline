@@ -6,6 +6,7 @@ owner: pipeline
 status: closed
 closed_at: 2026-08-30
 closure_repository: self
+closure_commit: b2bd05ed300a46b727f02c14a27f4cd66db00f71
 closure_evidence: plugins/pipeline-core/lib/codex-onboarding-capabilities.mjs
 created: 2026-08-30
 sprint: nova
