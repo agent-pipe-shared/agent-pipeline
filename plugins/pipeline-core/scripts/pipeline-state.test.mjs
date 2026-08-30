@@ -555,8 +555,8 @@ function invokeCaptured(argv, deps) {
   }
 }
 
-function acknowledgedApplyArgs(plan, runner = "codex") {
-  return [...plan.applyAction.argv.slice(1), "--runner", runner];
+function acknowledgedApplyArgs(plan) {
+  return plan.applyAction.argv.slice(1);
 }
 
 // NVA-GF-GREENFIELD-POACKROOT-1: onboarding presents project-scoped commands
@@ -568,7 +568,7 @@ function acknowledgedApplyArgs(plan, runner = "codex") {
   const outside = mktempProjectDir();
   const outsideDeps = { ...deps, dir: outside };
   const planned = invokeCaptured([
-    "po-authority-acknowledge-plan", "--root", root, "--by", "PO",
+    "po-authority-acknowledge-plan", "--runner", "codex", "--root", root, "--by", "PO",
   ], outsideDeps);
   assert.equal(planned.status, 0, planned.err);
   const plan = JSON.parse(planned.out);
@@ -583,13 +583,13 @@ function acknowledgedApplyArgs(plan, runner = "codex") {
     `the readiness guard must admit the exact --root action the planner emits: ${renderedApply}`);
 
   const reordered = invokeCaptured([
-    "po-authority-acknowledge-plan", "--by", "PO", "--root", root,
+    "po-authority-acknowledge-plan", "--runner", "codex", "--by", "PO", "--root", root,
   ], outsideDeps);
   assert.equal(reordered.status, 0, reordered.err);
   assert.equal(JSON.parse(reordered.out).planSha256, plan.planSha256,
     "ordinary flag order must not alter the plan");
 
-  const applyArgs = [...plan.applyAction.argv.slice(1), "--runner", "codex"];
+  const applyArgs = plan.applyAction.argv.slice(1);
   const attended = { ...outsideDeps, isattyFn: () => true, readLineFn: () => PO_ACK_APPLY_CONFIRMATION_TOKEN };
   const applied = invokeCaptured(applyArgs, attended);
   assert.equal(applied.status, 0, applied.err);
@@ -598,11 +598,11 @@ function acknowledgedApplyArgs(plan, runner = "codex") {
     "an apply invoked outside the project must still mutate only --root's bound PRD");
 
   for (const [argv, message] of [
-    [["po-authority-acknowledge-plan", "--root", root], "missing --by"],
-    [["po-authority-acknowledge-plan", "--by", "PO", "--by", "Other", "--root", root], "duplicate --by"],
-    [["po-authority-acknowledge-plan", "--by", "PO", "--root", root, "--root", root], "duplicate --root"],
-    [["po-authority-acknowledge-plan", "--by", "PO", "--root"], "--root requires a non-empty value"],
-    [["po-authority-acknowledge-plan", "--by", "PO", "--unknown", "value"], "unsupported argument --unknown"],
+    [["po-authority-acknowledge-plan", "--runner", "codex", "--root", root], "missing --by"],
+    [["po-authority-acknowledge-plan", "--runner", "codex", "--by", "PO", "--by", "Other", "--root", root], "duplicate --by"],
+    [["po-authority-acknowledge-plan", "--runner", "codex", "--by", "PO", "--root", root, "--root", root], "duplicate --root"],
+    [["po-authority-acknowledge-plan", "--runner", "codex", "--by", "PO", "--root"], "--root requires a non-empty value"],
+    [["po-authority-acknowledge-plan", "--runner", "codex", "--by", "PO", "--unknown", "value"], "unsupported argument --unknown"],
   ]) {
     const rejected = invokeCaptured(argv, outsideDeps);
     assert.equal(rejected.status, 2, `${argv.join(" ")} must be rejected`);
@@ -612,7 +612,7 @@ function acknowledgedApplyArgs(plan, runner = "codex") {
   for (const [mutate, message] of [
     [(argv) => [...argv, "--root", root], "duplicate --root"],
     [(argv) => argv.filter((value) => value !== "--activate"), "missing --activate"],
-    [(argv) => [...argv, "--runner", "unknown"], "--runner requires claude, codex, or antigravity"],
+    [(argv) => argv.map((value) => value === "codex" ? "unknown" : value), "--runner requires claude, codex, or antigravity"],
   ]) {
     const rejected = invokeCaptured(mutate(plan.applyAction.argv.slice(1)), outsideDeps);
     assert.equal(rejected.status, 2);
@@ -625,7 +625,7 @@ function acknowledgedApplyArgs(plan, runner = "codex") {
 // the new bytes -- without ever releasing the binding.
 {
   const { root, deps, planPath } = acknowledgeFixture("happy");
-  const planned = invokeCaptured(["po-authority-acknowledge-plan", "--by", "PO"], deps);
+  const planned = invokeCaptured(["po-authority-acknowledge-plan", "--runner", "codex", "--by", "PO"], deps);
   assert.equal(planned.status, 0, planned.err);
   const plan = JSON.parse(planned.out);
   assert.equal(plan.schema, "pipeline.po-authority-acknowledge-plan.v1");
@@ -651,7 +651,7 @@ function acknowledgedApplyArgs(plan, runner = "codex") {
 
   // Re-running the plan against the now-acknowledged PRD must refuse: the
   // marker is already present, and the route is one-shot per PRD.
-  const rePlanned = invokeCaptured(["po-authority-acknowledge-plan", "--by", "PO"], deps);
+  const rePlanned = invokeCaptured(["po-authority-acknowledge-plan", "--runner", "codex", "--by", "PO"], deps);
   assert.equal(rePlanned.status, 2);
   assert.ok(rePlanned.err.includes("PO-ACK-ALREADY-ACKNOWLEDGED"), rePlanned.err);
 }
@@ -664,7 +664,7 @@ function acknowledgedApplyArgs(plan, runner = "codex") {
   });
   const before = readFileSync(join(root, planPath), "utf8");
   const beforeState = readFileSync(statePath(root), "utf8");
-  const refused = invokeCaptured(["po-authority-acknowledge-plan", "--by", "PO"], deps);
+  const refused = invokeCaptured(["po-authority-acknowledge-plan", "--runner", "codex", "--by", "PO"], deps);
   assert.equal(refused.status, 2);
   assert.ok(refused.err.includes("PO-ACK-ALREADY-ACKNOWLEDGED"), refused.err);
   assert.equal(readFileSync(join(root, planPath), "utf8"), before, "an already-acknowledged PRD must be byte-for-byte untouched");
@@ -676,7 +676,7 @@ function acknowledgedApplyArgs(plan, runner = "codex") {
 // sibling rebind/decision routes it shares runPoAuthorityRebindApply with.
 {
   const { root, deps, planPath } = acknowledgeFixture("digest-mismatch");
-  const planned = invokeCaptured(["po-authority-acknowledge-plan", "--by", "PO"], deps);
+  const planned = invokeCaptured(["po-authority-acknowledge-plan", "--runner", "codex", "--by", "PO"], deps);
   assert.equal(planned.status, 0, planned.err);
   const plan = JSON.parse(planned.out);
   const realArgv = acknowledgedApplyArgs(plan);
@@ -705,7 +705,7 @@ function acknowledgedApplyArgs(plan, runner = "codex") {
   const missing = invokeCaptured(["po-authority-acknowledge-plan"], deps);
   assert.equal(missing.status, 2);
   assert.ok(missing.err.includes("--by"), missing.err);
-  const blank = invokeCaptured(["po-authority-acknowledge-plan", "--by", ""], deps);
+  const blank = invokeCaptured(["po-authority-acknowledge-plan", "--runner", "codex", "--by", ""], deps);
   assert.equal(blank.status, 2);
   assert.ok(blank.err.includes("--by"), blank.err);
 }
@@ -716,7 +716,7 @@ function acknowledgedApplyArgs(plan, runner = "codex") {
 // relies on -- not a separate, bolt-on comparison that could be forgotten.
 {
   const { root, deps, planPath } = acknowledgeFixture("by-bound-to-digest");
-  const planned = invokeCaptured(["po-authority-acknowledge-plan", "--by", "PO"], deps);
+  const planned = invokeCaptured(["po-authority-acknowledge-plan", "--runner", "codex", "--by", "PO"], deps);
   assert.equal(planned.status, 0, planned.err);
   const plan = JSON.parse(planned.out);
   assert.equal(plan.by, "PO", "the plan payload must record who is attributed");
@@ -752,7 +752,7 @@ function acknowledgedApplyArgs(plan, runner = "codex") {
 // fails only the v4Intents predicate without disturbing anything else.
 {
   const { root, deps, planPath } = acknowledgeFixture("postimage-predicate-named");
-  const planned = invokeCaptured(["po-authority-acknowledge-plan", "--by", "PO"], deps);
+  const planned = invokeCaptured(["po-authority-acknowledge-plan", "--runner", "codex", "--by", "PO"], deps);
   assert.equal(planned.status, 0, planned.err);
   const plan = JSON.parse(planned.out);
   const before = readFileSync(join(root, planPath), "utf8");
@@ -806,7 +806,7 @@ function acknowledgedApplyArgs(plan, runner = "codex") {
     `the confirmation token must be short, printable ASCII: ${JSON.stringify(PO_ACK_APPLY_CONFIRMATION_TOKEN)}`);
 
   const { deps } = acknowledgeFixture("token-independent-of-by");
-  const planned = invokeCaptured(["po-authority-acknowledge-plan", "--by", "André"], deps);
+  const planned = invokeCaptured(["po-authority-acknowledge-plan", "--runner", "codex", "--by", "André"], deps);
   assert.equal(planned.status, 0, planned.err);
   const plan = JSON.parse(planned.out);
   assert.equal(plan.by, "André", "a non-ASCII --by value must still be accepted and planned");
@@ -830,7 +830,7 @@ function acknowledgedApplyArgs(plan, runner = "codex") {
 // not reduced").
 {
   const { deps } = acknowledgeFixture("disclosure-unchanged");
-  const planned = invokeCaptured(["po-authority-acknowledge-plan", "--by", "Jordan Rivera"], deps);
+  const planned = invokeCaptured(["po-authority-acknowledge-plan", "--runner", "codex", "--by", "Jordan Rivera"], deps);
   assert.equal(planned.status, 0, planned.err);
   const plan = JSON.parse(planned.out);
   let capturedPrompt = null;
@@ -1214,9 +1214,9 @@ function awaitingApprovalFixture() {
   return { root, deps: { dir: root, now: () => localNow }, planPath, specPath, planSha256: state.planSubmission.planSha256, specSha256: state.planSubmission.specSha256 };
 }
 
-// This is the test that matters most in this package: no `nextAction` the
-// `awaiting-approval` gate publishes may be an action an agent can execute
-// to satisfy the plan approval on the PO's behalf.
+// Awaiting approval must never publish a direct runnable command: an agent
+// cannot approve the PO's plan. It may publish the PO's one typed attribution
+// field plus a nested command which remains explicitly human-confirmed.
 {
   const { root, deps } = awaitingApprovalFixture();
   const inspected = capturedStdout(() => run(["inspect"], deps));
@@ -1224,14 +1224,20 @@ function awaitingApprovalFixture() {
   const payload = JSON.parse(inspected.lines.join("\n"));
   assert.equal(payload.status, "awaiting-approval");
   assert.equal(payload.nextAction.kind, "collect-input",
-    "awaiting-approval must never publish a runnable kind:\"command\" -- that would let a machine approve the PO's plan");
+    "awaiting-approval must never publish a direct kind:\"command\" -- that would let a machine approve the PO's plan");
   assert.equal(payload.nextAction.executable, undefined,
-    "the awaiting-approval gate must never carry an executable");
+    "the awaiting-approval gate must never carry a top-level executable");
   assert.equal(payload.nextAction.argv, undefined,
-    "the awaiting-approval gate must never carry an argv");
-  assert.equal(payload.nextAction.input, undefined);
-  assert.equal(payload.nextAction.inputs, undefined,
-    "there is nothing an agent may fill in on the PO's behalf for this gate");
+    "the awaiting-approval gate must never carry a top-level argv");
+  assert.deepEqual(payload.nextAction.input, {
+    name: "by", encoding: "utf8", trim: true, minBytes: 1, maxBytes: 128,
+    singleLine: true, rejectNul: true,
+  });
+  assert.equal(payload.nextAction.inputs, undefined);
+  assert.equal(payload.nextAction.applyAction?.kind, "command");
+  assert.equal(payload.nextAction.applyAction?.mutation, true);
+  assert.equal(payload.nextAction.applyAction?.requiresConfirmation, true,
+    "the nested approve action remains explicitly human-confirmed");
   void root;
 }
 
@@ -1251,78 +1257,54 @@ function awaitingApprovalFixture() {
     "guidance must point the PO at approve-plan themselves");
 }
 
-// NVA-V2B-APPROVERENDER: the command the guidance renders is EXECUTED here, not
-// merely matched against an expected string. Naming a command the caller then
-// cannot run is a failure this repository has shipped before -- a runner once
-// handed the PO an invented `sign-digest` subcommand mid-ceremony -- and prose
-// that merely describes a command ("run approve-plan with their own name as
-// --by") leaves the reader to reconstruct the invocation, which is the same
-// defect one step removed. So: pull the rendered command out of the guidance,
-// substitute the placeholder the way a human would, run it, and require that it
-// reaches the gate's own logic rather than dying in argv parsing.
+// NVA-V2B-APPROVERENDER: approval remains a typed collect-input with one exact nested argv.
+// Execute that returned argv after substituting its one PO-supplied value; never recover a
+// command from guidance prose.
 {
   const { root, deps } = awaitingApprovalFixture();
   const inspected = capturedStdout(() => run(["inspect"], deps));
-  const { guidance } = JSON.parse(inspected.lines.join("\n")).nextAction;
+  const action = JSON.parse(inspected.lines.join("\n")).nextAction;
+  const scriptPath = fileURLToPath(new URL("./pipeline-state.mjs", import.meta.url));
 
-  const rendered = /running: (.+?) -- there is no command/s.exec(guidance)?.[1] ?? null;
-  assert.ok(rendered, `guidance must render a runnable command, got: ${guidance}`);
-  assert.ok(rendered.includes("approve-plan --by "),
-    `the rendered command must be the approve-plan invocation, got: ${rendered}`);
+  assert.equal(action.kind, "collect-input");
+  assert.equal(action.input?.name, "by");
+  assert.equal(action.applyAction?.kind, "command");
+  assert.equal(action.applyAction?.executable, process.execPath);
+  assert.deepEqual(action.applyAction?.argv, [
+    scriptPath, "approve-plan", "--by", "<PO_PLAN_APPROVER_NAME>",
+  ]);
+  assert.equal(action.applyAction?.mutation, true);
+  assert.equal(action.applyAction?.requiresConfirmation, true);
 
-  // Exactly the substitution a human performs: replace the placeholder, keep
-  // everything else byte for byte.
-  const parts = rendered.replace('"<the PO\'s own name>"', "Probe Person").split(" ");
-  const [executable, scriptPath, subcommand, byFlag] = parts;
-  assert.equal(executable, process.execPath, "the rendered executable must be this runtime");
-  assert.equal(scriptPath, fileURLToPath(new URL("./pipeline-state.mjs", import.meta.url)),
-    "the rendered script path must be pipeline-state.mjs itself, not a guessed path");
-  assert.equal(subcommand, "approve-plan");
-  assert.equal(byFlag, "--by");
-
-  const executed = spawnSync(executable, [scriptPath, subcommand, byFlag, "Probe Person", "--dir", root], { encoding: "utf8" });
+  const argv = action.applyAction.argv.map((part) => (
+    part === "<PO_PLAN_APPROVER_NAME>" ? "Probe Person" : part
+  ));
+  const executed = spawnSync(action.applyAction.executable, [...argv, "--dir", root], { encoding: "utf8" });
   const stderr = executed.stderr ?? "";
-  // The gate may legitimately refuse this fixture (missing PO-gate authority,
-  // staging refusal, ...). What it must NOT do is fail to understand the
-  // invocation -- that would mean the rendered command is not real.
   assert.ok(!/unknown subcommand|Usage:|requires --by/i.test(stderr),
-    `the rendered command must parse; approve-plan rejected its own rendered argv: ${stderr}`);
+    "the returned approve-plan argv must reach its own gate logic: " + stderr);
   assert.ok(executed.status === 0 || /approve-plan (requires|blocked by)/.test(stderr),
-    `the rendered command must reach approve-plan's own gate logic; got status ${executed.status}, stderr: ${stderr}`);
+    "the returned approve-plan argv must reach its own gate logic; status=" + executed.status + ", stderr=" + stderr);
 }
 
-// NVA-V2-APPROVEREACH (PO's mandatory addendum, 2026-08-28): spelling a
-// command correctly is not proof it runs -- this repository has shipped
-// nextActions naming a command the readiness guard then refused. This test
-// takes the EXACT rendered command NVA-V2B-APPROVERENDER's guidance emits
-// (extracted from the live `inspect` payload, not a hand-typed copy of it,
-// same regex extraction the NVA-V2B-APPROVERENDER test above already uses)
-// and drives it straight into `guard-lifecycle-ready.mjs`'s own real
-// admission function, `isSanctionedLifecycleCommand` -- the same pattern
-// `guard-lifecycle-ready.test.mjs`'s "NVA-CODEXARGV-1 (AC-3)" test uses for
-// the CLI's mutating-apply argv. This closes the loop the PO named: the
-// guidance's rendered command is not merely well-typed prose, it is a
-// command this repository's own readiness guard actually admits, proven
-// against the guard's real function rather than asserted in a comment.
+// NVA-V2-APPROVEREACH: the exact nested approve action must also be admitted by the
+// readiness guard after substituting its one typed input.
 {
   const { root, deps } = awaitingApprovalFixture();
   const inspected = capturedStdout(() => run(["inspect"], deps));
-  const { guidance } = JSON.parse(inspected.lines.join("\n")).nextAction;
-  const rendered = /running: (.+?) -- there is no command/s.exec(guidance)?.[1] ?? null;
-  assert.ok(rendered, `guidance must render a runnable command, got: ${guidance}`);
+  const action = JSON.parse(inspected.lines.join("\n")).nextAction;
+  assert.equal(action.input?.name, "by");
+  assert.deepEqual(action.applyAction?.argv.slice(1), [
+    "approve-plan", "--by", "<PO_PLAN_APPROVER_NAME>",
+  ]);
 
-  const substituted = rendered.replace('"<the PO\'s own name>"', "'Probe Person'");
-  const command = substituted.replace(process.execPath, `'${process.execPath}'`);
+  const command = action.applyAction.command.replace("<PO_PLAN_APPROVER_NAME>", "'Probe Person'");
   assert.equal(isSanctionedLifecycleCommand(command, root), true,
-    `the exact command this gate's guidance renders must be admitted by the readiness guard: ${command}`);
+    "the exact returned approve-plan command must be admitted by the readiness guard: " + command);
 
-  // Regression pin (mirrors AC-4's shape one gate earlier): a command this gate
-  // must NEVER be able to satisfy for the PO -- one with an invented/blank --by,
-  // or the mutating auto-fill shape the sibling `draft` gate is allowed to emit
-  // for itself -- stays refused. This is not a positive claim about what IS
-  // rendered (this gate never emits an executable/argv of its own); it is proof
-  // the guard's admission for THIS subcommand still refuses an unattributed run.
-  const blankBy = `'${process.execPath}' '${fileURLToPath(new URL("./pipeline-state.mjs", import.meta.url))}' approve-plan --by ''`;
+  const blankBy = "'" + process.execPath + "' '"
+    + fileURLToPath(new URL("./pipeline-state.mjs", import.meta.url))
+    + "' approve-plan --by ''";
   assert.equal(isSanctionedLifecycleCommand(blankBy, root), false,
     "an unattributed approve-plan must stay refused by the same guard");
 }
