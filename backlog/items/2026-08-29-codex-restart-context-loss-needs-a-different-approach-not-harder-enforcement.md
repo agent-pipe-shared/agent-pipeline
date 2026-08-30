@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.codex-restart-context-loss-needs-a-different-approach
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-30
+closure_repository: self
+closure_commit: 567be68085c59e3b1bfbf84ec4718d3a67728877
+closure_evidence: plugins/pipeline-core/hooks/codex-session-start-hint.test.mjs
 created: 2026-08-29
 sprint: nova
 tracking: "NOW / Nova A -- PO explicitly elevated this 2026-08-29, live: 'was echt ein riesen thema ist, sind die fehlenden codex übergaben. Da braucht es eine ganz andere idee mal als ansatz bzw. härtere durchsetzung mit dem hint - das kann codex so einfach nie sauber verarbeiten' (this is a genuinely huge topic; needs a completely different approach, or harder enforcement -- Codex apparently can never cleanly process the current mechanism this simply)."
@@ -146,12 +150,26 @@ mechanical proof of the injection but not a substitute for an actual live
 Codex restart. That gap is recorded on the PO decisions list.
 
 **Landed, 2026-08-29:** commit `567be680`, independently re-verified by the
-Elephant (`codex-session-start-hint.test.mjs` 48/48 pass). **Item stays
-OPEN** -- per this item's own history (2 prior wrong closures on
-code-reading/unit-test evidence alone), do not close this until an actual
-live Codex CLI restart against this fix confirms the materialInput/values
-text really arrives in a real Codex session's context, not only in the
-hook's own unit-test harness.
+Elephant (`codex-session-start-hint.test.mjs` 48/48 pass).
+
+**Closed, 2026-08-30 -- explicit informed PO decision.** This item's own
+history (2 prior wrong closures on code-reading/unit-test evidence alone)
+was put to the PO directly, naming that history and the fact that this
+session cannot execute a real Codex CLI restart to prove the fix live. The
+PO's explicit choice: accept the mechanical unit-test proof (the hook
+demonstrably fires on every SessionStart and its output demonstrably
+contains materialInput/values for a fixture card) as sufficient, rather
+than leave the item open pending a live restart nobody has scheduled. This
+is NOT a third silent "found already satisfied" -- the distinction from the
+two prior wrong closures is that a human with full knowledge of the risk
+made this call, rather than an agent re-asserting it from a second read of
+the same code. If a live Codex restart later shows the fix does not hold,
+file a NEW item rather than reopening this one (ledger is append-only).
+
+The fix is proven via the hook's own unit-test contract, not a substitute
+for the actual live Codex restart the item's original acceptance criteria
+named -- that gap is now accepted, not closed by evidence, per the PO
+decision above.
 
 ## Triage
 
