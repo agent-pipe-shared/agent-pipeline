@@ -846,6 +846,8 @@ test("PRD/Spec drift exposes only the validated digest-bound PO rebind action", 
       "--updated-at",
       plannedAt,
       "--activate",
+      "--runner",
+      "antigravity",
     ];
     const diagnosticAction = {
       kind: "command",
@@ -855,7 +857,7 @@ test("PRD/Spec drift exposes only the validated digest-bound PO rebind action", 
       requiresConfirmation: false,
       expected: { schema: "pipeline.po-authority-rebind-plan.v1" },
     };
-    const observed = inspectProjectOnboardingV3({ runner: "codex",
+    const observed = inspectProjectOnboardingV3({ runner: "antigravity",
       rootDir: path,
       intent: "dispatch",
       deps: {
@@ -868,6 +870,8 @@ test("PRD/Spec drift exposes only the validated digest-bound PO rebind action", 
             && JSON.stringify(args) === JSON.stringify([writer, "po-authority-rebind-plan"])) {
             assert.equal(options.cwd, path);
             assert.equal(options.shell, false);
+            assert.equal(options.env.ANTIGRAVITY_AGENT, "1");
+            assert.equal(options.env.CLAUDECODE, undefined);
             return {
               status: 0,
               stderr: "",
@@ -1276,6 +1280,8 @@ test("general PRD/Spec drift exposes the same neutral read-only decision plan fo
       plannedAt,
       "--selection",
       "spec",
+      "--runner",
+      "claude",
     ];
     const deps = {
       ...fakeDeps,
@@ -1290,6 +1296,8 @@ test("general PRD/Spec drift exposes the same neutral read-only decision plan fo
         if (command === process.execPath
           && JSON.stringify(args) === JSON.stringify([writer, "po-authority-decision-plan"])) {
           assert.equal(options.cwd, path);
+          assert.equal(options.env.CLAUDECODE, "1");
+          assert.equal(options.env.ANTIGRAVITY_AGENT, undefined);
           return {
             status: 0,
             stderr: "",
@@ -1321,7 +1329,7 @@ test("general PRD/Spec drift exposes the same neutral read-only decision plan fo
       },
     };
     for (const intent of ["bootstrap", "session", "dispatch"]) {
-      const observed = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, intent, deps });
+      const observed = inspectProjectOnboardingV3({ runner: "claude", rootDir: path, intent, deps });
       assert.equal(observed.status, "partial", intent);
       assertDiagnostic(observed, "po_authority_decision_required");
       assert.deepEqual(observed.nextAction, {
@@ -1518,6 +1526,8 @@ test("coherent current documents with stale persisted authority require the same
       plannedAt,
       "--selection",
       "spec",
+      "--runner",
+      "codex",
     ];
     let validatedExpected = 0;
     const deps = {
@@ -1539,6 +1549,7 @@ test("coherent current documents with stale persisted authority require the same
         if (command === process.execPath
           && JSON.stringify(args) === JSON.stringify([writer, "po-authority-decision-plan"])) {
           assert.equal(options.cwd, path);
+          assert.equal(options.env.CODEX_SESSION_ID, "project-onboarding-driver");
           return {
             status: 0,
             stderr: "",
@@ -2306,7 +2317,7 @@ test("apply-portable-seed --activate surfaces the push-approval-setup ask-step f
 // above: drives the real CLI `apply-portable-seed --activate` path and
 // proves the ask surfaces there, additively, without changing the resting
 // status or the primary chained nextAction.
-test("apply-portable-seed --activate surfaces the verify-contract ask-step, offering a REAL detected candidate, never a default", () => {
+test("apply-portable-seed records the unresolved verify contract but defers its PO question to the implementation handover", () => {
   const withCandidate = root();
   const withoutCandidate = root();
   const invoke = (args, deps) => {
@@ -2339,8 +2350,8 @@ test("apply-portable-seed --activate surfaces the verify-contract ask-step, offe
     assert.equal(applied.result.verifyContractStatus, "placeholder");
     assert.equal(applied.result.pushGateSatisfiable, false,
       "typed field, not prose: a caller must be able to branch on this directly");
-    assert.ok(applied.result.nextAction.pendingAsks.some((ask) => ask.input?.name === "verifyCommand"),
-      "the ask must also surface on nextAction.pendingAsks like its siblings");
+    assert.equal(applied.result.nextAction.pendingAsks.some((ask) => ask.input?.name === "verifyCommand"), false,
+      "the first setup round must not ask for a test command before the project design exists");
 
     // A replay of the exact same apply call (zero-write, same digest) must
     // observe the identical ask-step.

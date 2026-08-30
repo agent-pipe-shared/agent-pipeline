@@ -110,6 +110,8 @@ const SCHEMA = "pipeline.project-onboarding.v4";
 // answer before executing the nested applyAction. It is data, never a shell
 // interpolation convention and never itself accepted by pipeline-state.mjs.
 export const PROJECT_ONBOARDING_VERIFY_COMMAND_PLACEHOLDER = "<PO_VERIFY_COMMAND>";
+export const PROJECT_ONBOARDING_INITIAL_ANSWERS_RECEIPT_PATH = ".git/agent-pipeline/onboarding-initial-answers.json";
+export const PROJECT_ONBOARDING_INITIAL_ANSWERS_RECEIPT_SCHEMA = "pipeline.onboarding-initial-answers.v1";
 const LEGACY_SCHEMA = "pipeline.project-onboarding.v3";
 const PLAN_SCHEMA = "pipeline.project-onboarding-plan.v3";
 const REMOTE_ADOPTION_PLAN_SCHEMA = "pipeline.project-onboarding-remote-adoption-plan.v1";
@@ -1534,7 +1536,16 @@ function persistedPoAuthority(root, fs) {
   }
 }
 
-function observePoAuthorityRebind(root, fs) {
+function plannerEnvironmentForRunner(runner) {
+  const env = { ...process.env };
+  for (const key of ["CLAUDECODE", "ANTIGRAVITY_AGENT", "AI_AGENT", "CODEX_SESSION_ID", "CODEX_THREAD_ID"]) delete env[key];
+  if (runner === "claude") env.CLAUDECODE = "1";
+  else if (runner === "antigravity") env.ANTIGRAVITY_AGENT = "1";
+  else env.CODEX_SESSION_ID = "project-onboarding-driver";
+  return env;
+}
+
+function observePoAuthorityRebind(root, fs, runner) {
   const unavailable = (reason) => ({ status: "unavailable", reason });
   const injectedValidator = typeof fs.validatePoGateAuthorityForRepository === "function";
   const validateAuthority = fs.validatePoGateAuthorityForRepository ?? validatePoGateAuthorityForRepository;
@@ -1586,6 +1597,7 @@ function observePoAuthorityRebind(root, fs) {
     cwd: root,
     encoding: "utf8",
     shell: false,
+    env: plannerEnvironmentForRunner(runner),
     maxBuffer: 2 * 1024 * 1024,
   });
   if (planned?.error) return unavailable("planner-execution-unavailable");
@@ -1606,6 +1618,8 @@ function observePoAuthorityRebind(root, fs) {
     "--updated-at",
     plan?.plannedAt,
     "--activate",
+    "--runner",
+    runner,
   ];
   if (!plan || typeof plan !== "object" || Array.isArray(plan)
     || plan.schema !== "pipeline.po-authority-rebind-plan.v1"
@@ -1638,7 +1652,7 @@ function observePoAuthorityRebind(root, fs) {
   };
 }
 
-function observePoAuthorityDecision(root, fs) {
+function observePoAuthorityDecision(root, fs, runner) {
   let writer;
   try {
     writer = PO_AUTHORITY_REBIND_WRITER;
@@ -1653,6 +1667,7 @@ function observePoAuthorityDecision(root, fs) {
     cwd: root,
     encoding: "utf8",
     shell: false,
+    env: plannerEnvironmentForRunner(runner),
     maxBuffer: 2 * 1024 * 1024,
   });
   if (planned?.error || planned?.status !== 0 || String(planned.stderr ?? "").trim() !== "") {
@@ -1674,6 +1689,8 @@ function observePoAuthorityDecision(root, fs) {
     plan?.plannedAt,
     "--selection",
     "spec",
+    "--runner",
+    runner,
   ];
   if (!plan || typeof plan !== "object" || Array.isArray(plan)
     || plan.schema !== "pipeline.po-authority-decision-plan.v1"
@@ -2774,7 +2791,7 @@ function readyLifecycleResult({ root, runner, intent, repository, runtime, conti
       )],
     });
   }
-  const poAuthorityRebind = observePoAuthorityRebind(root, fs);
+  const poAuthorityRebind = observePoAuthorityRebind(root, fs, runner);
   if (poAuthorityRebind.status === "required") {
     return lifecycleResult({
       status: "partial",
@@ -2795,7 +2812,7 @@ function readyLifecycleResult({ root, runner, intent, repository, runtime, conti
     });
   }
   if (poAuthorityRebind.status === "unavailable") {
-    const poAuthorityDecision = observePoAuthorityDecision(root, fs);
+    const poAuthorityDecision = observePoAuthorityDecision(root, fs, runner);
     if (poAuthorityDecision.status === "required") {
       return lifecycleResult({
         status: "partial",
@@ -4528,6 +4545,9 @@ function unresolvedAuthorIdentityKeys(root, hostManaged, fs) {
 // role KICKOFF_GOAL_MAX_BYTES plays for the kickoff goal, kept local here
 // rather than imported so this stays independent of onboarding-continuity.mjs.
 const AUTHOR_IDENTITY_FIELD_MAX_BYTES = 320;
+const INITIAL_GIT_AUTHOR_NAME_PLACEHOLDER = "<PO_GIT_AUTHOR_NAME>";
+const INITIAL_GIT_AUTHOR_EMAIL_PLACEHOLDER = "<PO_GIT_AUTHOR_EMAIL>";
+const INITIAL_PUSH_APPROVAL_PLACEHOLDER = "<signature|chat>";
 
 // Same `collect-input` shape as `collectGoalAction()`, asking for both fields
 // at once: the PO's own wording asks once for both, never one at a time and
@@ -4672,6 +4692,22 @@ function collectPushApprovalPreferenceAction(poKeyDirectoryHint, machineDefault)
       : `this repository's gates.push_approval (pipeline.user.yaml, ADR-0056) is pre-filled from this machine's remembered preference, "${machineDefault}" (machine-plane.mjs). This is a per-repository confirmation, not a one-time machine question -- it is asked again for every new repository, seeded with the machine default so the PO can confirm in one short turn rather than re-typing it from scratch. Ask the PO to confirm "${machineDefault}" for THIS repository, or type the other value ("signature" or "chat") to override it for this repository only -- an override here does not change the machine's own remembered default in machine-plane.mjs, and pipeline.user.yaml is already seeded with the pre-filled value, so only an override needs a further edit to gates.push_approval. Accept exactly "signature" or "chat" as the answer, never invent one.`,
     expected: { schema: SCHEMA, statuses: PORTABLE_APPLY_IDENTITY_ASK_STATUSES },
   };
+}
+
+function initialAnswersReceipt(root, fs) {
+  try {
+    const path = safePath(root, PROJECT_ONBOARDING_INITIAL_ANSWERS_RECEIPT_PATH, fs);
+    if (!fs.existsSync(path)) return null;
+    const stat = fs.lstatSync(path);
+    if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1) return null;
+    const parsed = JSON.parse(fs.readFileSync(path, "utf8"));
+    if (parsed?.schema !== PROJECT_ONBOARDING_INITIAL_ANSWERS_RECEIPT_SCHEMA
+      || parsed.root !== root
+      || !["signature", "chat"].includes(parsed.pushApprovalPreference)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -5335,6 +5371,7 @@ function withPendingAuthorIdentityAsk(observed, fs) {
 function withPendingPushApprovalSetupAsk(observed, fs) {
   if (observed.repository?.mode !== "local") return observed;
   if (!PORTABLE_APPLY_IDENTITY_ASK_STATUSES.includes(observed.status)) return observed;
+  if (initialAnswersReceipt(observed.root, fs) !== null) return observed;
   return { ...observed, pushApprovalSetupAction: collectPushApprovalPreferenceAction(defaultPoKeyDirectoryHint(fs), machinePushApprovalPreference(fs)) };
 }
 
@@ -5524,8 +5561,60 @@ function withPendingVerifyContractAsk(observed) {
 // step ever being masked. The original per-field channels
 // (`authorIdentityAction` etc.) are left in place, unchanged, for the
 // existing tests and any caller already reading them directly.
+function collectInitialAnswersAction(observed) {
+  if (!observed.pushApprovalSetupAction) return null;
+  const authorInputs = observed.authorIdentityAction?.inputs ?? [];
+  const trustSetup = observed.trustAnchorGuidanceAction?.applyAction?.argv?.[0] === ONBOARDING_INIT_DRIVER
+    ? observed.trustAnchorGuidanceAction
+    : null;
+  const inputs = [
+    ...authorInputs,
+    observed.pushApprovalSetupAction.input,
+    ...(trustSetup?.inputs ?? []),
+  ];
+  const argv = [ONBOARDING_INIT_DRIVER, "--root", observed.root, "--runner", observed.runner];
+  if (authorInputs.length > 0) {
+    argv.push(
+      "--git-author-name", INITIAL_GIT_AUTHOR_NAME_PLACEHOLDER,
+      "--git-author-email", INITIAL_GIT_AUTHOR_EMAIL_PLACEHOLDER,
+    );
+  }
+  argv.push("--push-approval", INITIAL_PUSH_APPROVAL_PLACEHOLDER);
+  if (trustSetup) {
+    argv.push(
+      "--trust-anchor-mode", TRUST_ANCHOR_MODE_PLACEHOLDER,
+      "--trust-anchor-directory", TRUST_ANCHOR_DIRECTORY_PLACEHOLDER,
+      "--trust-anchor-human-name", TRUST_ANCHOR_HUMAN_NAME_PLACEHOLDER,
+      "--trust-anchor-existing-key", TRUST_ANCHOR_EXISTING_KEY_PLACEHOLDER,
+    );
+  }
+  return {
+    kind: "collect-input",
+    inputs,
+    mutation: false,
+    requiresConfirmation: false,
+    guidance: `collect this one initial PO round, replace each placeholder in applyAction.argv with the matching verbatim answer, then execute that exact returned action once. It records the repository-local Git author, applies the push-approval preference, ${trustSetup ? "imports an existing PEM key or creates one new key and materializes its public anchor, " : "reuses the already materialized public anchor, "}and re-enters the public onboarding driver. Do not reconstruct git config, machine-plane, intake, or key-setup commands. The real verify command is intentionally deferred until the approved design-to-implementation handover can offer the project's actual test command.`,
+    applyAction: commandAction(
+      argv,
+      true,
+      true,
+      "pipeline.onboarding-init.v1",
+      ["ready", "collect-input", "pending-asks", "unsupported-next-action"],
+    ),
+    expected: { schema: "pipeline.onboarding-init.v1", outcomes: ["ready", "collect-input", "pending-asks", "unsupported-next-action"] },
+  };
+}
+
 function withPendingAsksSurfacedOnNextAction(observed) {
-  const pendingAsks = [observed.authorIdentityAction, observed.pushApprovalSetupAction, observed.verifyContractAction, observed.trustAnchorGuidanceAction, observed.projectIgnoreGapAction].filter(Boolean);
+  const initialAnswersAction = collectInitialAnswersAction(observed);
+  const trustSetupBundled = initialAnswersAction !== null
+    && observed.trustAnchorGuidanceAction?.applyAction?.argv?.[0] === ONBOARDING_INIT_DRIVER;
+  const pendingAsks = [
+    initialAnswersAction ?? observed.authorIdentityAction,
+    initialAnswersAction === null ? observed.pushApprovalSetupAction : null,
+    trustSetupBundled ? null : observed.trustAnchorGuidanceAction,
+    observed.projectIgnoreGapAction,
+  ].filter(Boolean);
   if (pendingAsks.length === 0 || observed.nextAction == null) return observed;
   return { ...observed, nextAction: { ...observed.nextAction, pendingAsks } };
 }
