@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "6b2f6e69cdc3598bb42feaa0db2951766e2bc837c6b3e1d8bf7198bd4b6f07b3"
+    "transitionHead": "87b272f33c3a18b34ee02c8ec79e8e622d0a3ec3767c19b20bf2f91c26a686dc"
   },
   "counts": {
-    "open": 80,
+    "open": 78,
     "in_progress": 3,
-    "closed": 457,
+    "closed": 459,
     "rejected": 3,
     "deferred": 11
   },
@@ -4627,13 +4627,17 @@
     },
     {
       "id": "pipeline.po-human-approval-setup-silently-swallows-writemachineplane-error",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-30",
       "source": "Claude-060-78 greenfield retrospective, section 8, tool defect 2; verified live against plugins/pipeline-core/scripts/po-human-approval.mjs:109 on 2026-08-30.",
       "deferred": false,
-      "tracking": "NOW / Nova A -- surfaced 2026-08-30 while cross-checking the Claude/Windows greenfield retrospective against current code; confirmed still present, unfixed."
+      "tracking": "NOW / Nova A -- surfaced 2026-08-30 while cross-checking the Claude/Windows greenfield retrospective against current code; confirmed still present, unfixed.",
+      "closedAt": "2026-08-30",
+      "closureRepository": "self",
+      "closureCommit": "c2cb4b3332a077719ae9efa643189e5235e746db",
+      "closureEvidence": "plugins/pipeline-core/scripts/po-human-approval.test.mjs"
     },
     {
       "id": "pipeline.po-key-directory-default-should-be-repo-scoped-not-machine-wide",
@@ -6003,13 +6007,17 @@
     },
     {
       "id": "pipeline.signing-ceremony-tty-check-has-no-windows-fallback",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-30",
       "source": "Claude-060-78 greenfield retrospective, section 8, tool defect 3; verified live against plugins/pipeline-core/scripts/po-human-approval.mjs:964 on 2026-08-30.",
       "deferred": false,
-      "tracking": "NOW / Nova A -- surfaced 2026-08-30 while cross-checking the Claude/Windows greenfield retrospective against current code; confirmed still present, unfixed."
+      "tracking": "NOW / Nova A -- surfaced 2026-08-30 while cross-checking the Claude/Windows greenfield retrospective against current code; confirmed still present, unfixed.",
+      "closedAt": "2026-08-30",
+      "closureRepository": "self",
+      "closureCommit": "c2cb4b3332a077719ae9efa643189e5235e746db",
+      "closureEvidence": "plugins/pipeline-core/scripts/po-human-approval.test.mjs"
     },
     {
       "id": "pipeline.signing-fails-without-a-tty-and-the-error-reads-as-a-wrong-passphrase",

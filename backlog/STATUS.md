@@ -376,7 +376,7 @@
 | pipeline.po-gate-authority-receipt-readback | closed | defect | pipeline | 2026-07-25 | — |
 | pipeline.po-gate-worktree-authority | closed | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.po-human-approval-outside-check-uses-a-posix-only-separator-on-windows | closed | defect | pipeline | 2026-08-17 | — |
-| pipeline.po-human-approval-setup-silently-swallows-writemachineplane-error | open | defect | pipeline | 2026-08-30 | NOW / Nova A -- surfaced 2026-08-30 while cross-checking the Claude/Windows greenfield retrospective against current code; confirmed still present, unfixed. |
+| pipeline.po-human-approval-setup-silently-swallows-writemachineplane-error | closed | defect | pipeline | 2026-08-30 | NOW / Nova A -- surfaced 2026-08-30 while cross-checking the Claude/Windows greenfield retrospective against current code; confirmed still present, unfixed. |
 | pipeline.po-key-directory-default-should-be-repo-scoped-not-machine-wide | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.po-key-trust-anchor-onboarding | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.po-language-is-set-without-asking-and-cannot-be-changed | closed | defect | pipeline | 2026-08-08 | — |
@@ -486,7 +486,7 @@
 | pipeline.signed-authority-binding-durability | closed | defect | pipeline | 2026-08-06 | — |
 | pipeline.signed-guard-override-has-no-command-that-emits-the-digest-to-sign | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.signing-ceremony-designed-for-the-verifier-not-the-signer | closed | defect | pipeline | 2026-08-08 | — |
-| pipeline.signing-ceremony-tty-check-has-no-windows-fallback | open | defect | pipeline | 2026-08-30 | NOW / Nova A -- surfaced 2026-08-30 while cross-checking the Claude/Windows greenfield retrospective against current code; confirmed still present, unfixed. |
+| pipeline.signing-ceremony-tty-check-has-no-windows-fallback | closed | defect | pipeline | 2026-08-30 | NOW / Nova A -- surfaced 2026-08-30 while cross-checking the Claude/Windows greenfield retrospective against current code; confirmed still present, unfixed. |
 | pipeline.signing-fails-without-a-tty-and-the-error-reads-as-a-wrong-passphrase | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.single-trust-anchor-excludes-key-rotation-and-teams | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.skill-arguments-and-bootstrap-length | closed | defect | pipeline | 2026-08-08 | — |
@@ -566,8 +566,8 @@
 
 ## Counts
 
-- open: 80
+- open: 78
 - in_progress: 3
-- closed: 457
+- closed: 459
 - rejected: 3
 - deferred: 11
