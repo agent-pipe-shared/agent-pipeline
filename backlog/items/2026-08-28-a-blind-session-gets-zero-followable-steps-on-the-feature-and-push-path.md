@@ -3,11 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.blind-session-zero-followable-steps-on-push-path
 type: defect
 owner: pipeline
-status: closed
-closed_at: 2026-08-30
-closure_repository: self
-closure_commit: e0bc0cc84ccd14be116f71365fa3f6e3501d11ce
-closure_evidence: backlog/evidence/2026-08-30-blind-push-driver-closure.md
+status: open
 created: 2026-08-28
 sprint: nova-a
 tracking: "NOW / Nova A — measured, not argued: a fresh session gets 15 chained commands on the onboarding path and 0 on the feature/push path. PO 2026-08-28: the paths must be tested without the Pipeline's context knowledge, because a greenfield session does not have it."
@@ -266,16 +262,6 @@ in this dispatch's briefed scope, this dispatch stopped here rather than attempt
 fixtures those tests would need first requires diagnosing/working around this new
 gate, itself a larger, undiagnosed piece of work outside this dispatch's budget and
 briefed scope. Left `status: open`.
-
-## Closure, 2026-08-30
-
-Closed against `backlog/evidence/2026-08-30-blind-push-driver-closure.md`
-(`closure_commit` `e0bc0cc84ccd14be116f71365fa3f6e3501d11ce`).  The durable
-TOFU Driver test now follows only returned actions from an empty local project
-through `signed-push-recorded`; it replaces the untracked hand-maintained
-smoke probe with a registered regression.  The shared Driver path is also
-green for Claude, Codex, and Antigravity.  The test preserves genuine
-human-only stops and does not claim an actual `git push` hook interception.
 
 ## Related
 

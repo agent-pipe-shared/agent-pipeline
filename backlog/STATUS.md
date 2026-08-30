@@ -73,7 +73,7 @@
 | pipeline.backlog-strip-for-dispatch-drops-every-section-after-triage | open | defect | pipeline | 2026-08-25 | — |
 | pipeline.bare-branch-name-in-git-push-fails-approval-with-a-misleading-code | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.benchmark-fixture-digest-binding-does-not-cover-executed-workload-code | closed | workflow-improvement | pipeline | 2026-08-11 | — |
-| pipeline.blind-session-zero-followable-steps-on-push-path | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — measured, not argued: a fresh session gets 15 chained commands on the onboarding path and 0 on the feature/push path. PO 2026-08-28: the paths must be tested without the Pipeline's context knowledge, because a greenfield session does not have it. |
+| pipeline.blind-session-zero-followable-steps-on-push-path | open | defect | pipeline | 2026-08-28 | NOW / Nova A — measured, not argued: a fresh session gets 15 chained commands on the onboarding path and 0 on the feature/push path. PO 2026-08-28: the paths must be tested without the Pipeline's context knowledge, because a greenfield session does not have it. |
 | pipeline.blocking-push-gate-has-no-terminal-exception-boundary | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.bootstrap-and-kickoff-teach-their-own-constraints-only-by-live-rejection | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.bootstrap-po-questions-asked-sequentially-instead-of-in-one-block | closed | workflow-improvement | pipeline | 2026-08-29 | — |
@@ -570,8 +570,8 @@
 
 ## Counts
 
-- open: 72
+- open: 73
 - in_progress: 0
-- closed: 476
+- closed: 475
 - rejected: 3
 - deferred: 11

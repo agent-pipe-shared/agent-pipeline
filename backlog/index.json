@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "5728a9044307cc07fc215000e950f5de01b6a64b491c81a652eb4ac7ea295357"
+    "transitionHead": "6b00168159dde96fd38f0a4950b318b5776982c3b4cbd008dd31c003d6eb1422"
   },
   "counts": {
-    "open": 72,
+    "open": 73,
     "in_progress": 0,
-    "closed": 476,
+    "closed": 475,
     "rejected": 3,
     "deferred": 11
   },
@@ -855,17 +855,13 @@
     },
     {
       "id": "pipeline.blind-session-zero-followable-steps-on-push-path",
-      "status": "closed",
+      "status": "open",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-28",
       "source": "Measured 2026-08-28 at HEAD 129d8c8e by scratch/smoke-blind-push.mjs: a genuinely fresh repository onboarded to ready through the real driver, then walked following ONLY structural nextAction objects, exactly as onboarding-init.mjs does. The walk is deliberately ignorant -- it may never reach for a command name it was not handed.",
       "deferred": false,
-      "tracking": "NOW / Nova A — measured, not argued: a fresh session gets 15 chained commands on the onboarding path and 0 on the feature/push path. PO 2026-08-28: the paths must be tested without the Pipeline's context knowledge, because a greenfield session does not have it.",
-      "closedAt": "2026-08-30",
-      "closureRepository": "self",
-      "closureCommit": "e0bc0cc84ccd14be116f71365fa3f6e3501d11ce",
-      "closureEvidence": "backlog/evidence/2026-08-30-blind-push-driver-closure.md"
+      "tracking": "NOW / Nova A — measured, not argued: a fresh session gets 15 chained commands on the onboarding path and 0 on the feature/push path. PO 2026-08-28: the paths must be tested without the Pipeline's context knowledge, because a greenfield session does not have it."
     },
     {
       "id": "pipeline.blocking-push-gate-has-no-terminal-exception-boundary",
