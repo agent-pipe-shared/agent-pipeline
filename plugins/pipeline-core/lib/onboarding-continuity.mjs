@@ -5689,6 +5689,10 @@ const INTAKE_TRACKED_LOCAL_PATH_PATTERNS = [
   /\b[A-Za-z]:[\\/][^\s"'<>|]+/gu,
   // POSIX home roots (including WSL-mounted Windows homes) and shell home.
   /(?:~|\/(?:home|Users)\/[A-Za-z0-9._~-]+|\/root|\/mnt\/[A-Za-z])\/[^\s"'<>|]+/gu,
+  // Other local POSIX system roots.  Limit this to host-specific roots so
+  // ordinary absolute-looking prose such as an HTTP route (`/v1/items`) is
+  // not projected as a private host path.
+  /(?<![A-Za-z0-9._:/\\-])\/(?:private\/)?(?:var|tmp)\/[^\s"'<>|]+/gu,
 ];
 const INTAKE_TRACKED_PATH_TRAILING_PUNCTUATION = /[),.;:!?\]}]+$/u;
 
