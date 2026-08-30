@@ -23,7 +23,7 @@
  *     returns that action's own `inputs`/`input`/`guidance` fields VERBATIM (via the raw
  *     final onboarding-cli response, never re-worded or summarized).
  *
- * SURFACES PUBLISHED PENDING ASKS, NEVER ANSWERS THEM: any `nextAction` (of either kind
+ * SURFACES PUBLISHED PENDING ASKS, NEVER INVENTS ANSWERS: any `nextAction` (of either kind
  * above) can additionally carry a `pendingAsks` array (the library's own
  * `withPendingAsksSurfacedOnNextAction()` side-channel merge). The driver reads it
  * generically -- a well-formed entry is any object with a string `kind`, the same shape a
@@ -31,8 +31,10 @@
  * `pendingAsks`, stops and reports `outcome: "pending-asks"` INSTEAD OF executing the
  * command, so a published ask is never silently stepped past. On a `collect-input` step, any
  * sibling `pendingAsks` is surfaced alongside the primary question, not dropped. It still
- * never resolves, characterizes, or answers any individual ask -- that would be exactly the
- * domain knowledge this driver is built to hold none of.
+ * never invents an answer. One explicit re-entry surface is deliberately domain-specific:
+ * the first-anchor collect-input action returns this driver's closed `--trust-anchor-*`
+ * argv. Once the runner substitutes the PO's four answers and invokes that exact action,
+ * the driver performs the one attended setup transaction and re-enters the generic loop.
  *
  * RE-ANCHORS AFTER A SILENT SUCCESS, INSTEAD OF STOPPING THERE: a step this driver just
  * EXECUTED (a `command` action it ran, not the bootstrap `inspect` itself) can come back
@@ -74,16 +76,41 @@
  * starts a fresh `inspect --root <root>` and walks forward from whatever the underlying
  * CLI's own durable, on-disk state says right now. A human supplying an answer means
  * someone runs the specific mutating command the `collect-input` action named, with the
- * real answer values, OUTSIDE this driver, exactly once; re-running this driver afterward
- * picks up from the new state -- there is nothing to double-apply, because this driver
- * remembers nothing between invocations.
+ * real answer values, exactly once; re-running this driver afterward picks up from the new
+ * state. The first-anchor action names this driver itself, which performs setup and then
+ * continues from a fresh inspect in that same invocation. There is nothing to double-apply,
+ * because durable repository/machine readback -- not process memory -- records progress.
  */
 
 import { spawnSync } from "node:child_process";
-import { resolve } from "node:path";
+import {
+  closeSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  readdirSync,
+  renameSync,
+  rmdirSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { homedir } from "node:os";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import {
+  CRITICAL_HUMAN_PROOF_POLICY_PATH,
+  CRITICAL_HUMAN_PROOF_POLICY_V3,
+} from "../lib/critical-human-proof-policy.mjs";
+import {
+  MACHINE_PLANE_SCHEMA,
+  machinePlaneFilePath,
+  readMachinePlane,
+  writeMachinePlane,
+} from "../lib/machine-plane.mjs";
 
 export const SCHEMA = "pipeline.onboarding-init.v1";
 
@@ -94,9 +121,12 @@ export const SCHEMA = "pipeline.onboarding-init.v1";
 export const DEFAULT_STEP_CAP = 50;
 
 const ONBOARDING_SCRIPT_PATH = fileURLToPath(new URL("./project-onboarding-v3.mjs", import.meta.url));
+const PO_HUMAN_APPROVAL_SCRIPT_PATH = fileURLToPath(new URL("./po-human-approval.mjs", import.meta.url));
+const TRUST_ANCHOR_MODES = new Set(["existing", "new"]);
+const TRUST_ANCHOR_RECOVERY_SCHEMA = "pipeline.first-anchor-bootstrap-recovery.v1";
 
 function usage() {
-  return "Usage: node plugins/pipeline-core/scripts/onboarding-init.mjs --root <project-dir> [--runner claude|codex|antigravity] [--step-cap <n>]";
+  return "Usage: node plugins/pipeline-core/scripts/onboarding-init.mjs --root <project-dir> [--runner claude|codex|antigravity] [--step-cap <n>] [--trust-anchor-mode existing|new --trust-anchor-directory <absolute-external-dir> --trust-anchor-human-name <name> --trust-anchor-existing-key <absolute-key-path|none>]";
 }
 
 // The runner lane, pinned rather than inherited.
@@ -141,6 +171,26 @@ function parseArgs(argv) {
       if (!Number.isInteger(value) || value < 1) return { error: "--step-cap requires a positive integer" };
       output.stepCap = value;
       index += 1;
+    } else if (arg === "--trust-anchor-mode") {
+      const value = argv[index + 1];
+      if (!TRUST_ANCHOR_MODES.has(value)) return { error: "--trust-anchor-mode requires existing or new" };
+      output.trustAnchorMode = value;
+      index += 1;
+    } else if (arg === "--trust-anchor-directory") {
+      const value = argv[index + 1];
+      if (!value || value.startsWith("--") || !isAbsolute(value)) return { error: "--trust-anchor-directory requires an absolute path" };
+      output.trustAnchorDirectory = value;
+      index += 1;
+    } else if (arg === "--trust-anchor-human-name") {
+      const value = argv[index + 1];
+      if (!value || value.startsWith("--") || value.trim().length === 0) return { error: "--trust-anchor-human-name requires a non-empty attribution" };
+      output.trustAnchorHumanName = value;
+      index += 1;
+    } else if (arg === "--trust-anchor-existing-key") {
+      const value = argv[index + 1];
+      if (!value || value.startsWith("--")) return { error: "--trust-anchor-existing-key requires an absolute path or the literal none" };
+      output.trustAnchorExistingKey = value;
+      index += 1;
     } else if (arg === "--help" || arg === "-h") {
       output.help = true;
     } else {
@@ -148,7 +198,310 @@ function parseArgs(argv) {
     }
   }
   if (!output.help && !output.root) return { error: "--root is required" };
+  const setupValues = [output.trustAnchorMode, output.trustAnchorDirectory, output.trustAnchorHumanName, output.trustAnchorExistingKey];
+  if (setupValues.some((value) => value !== undefined)) {
+    if (setupValues.some((value) => value === undefined)) return { error: "trust-anchor bootstrap requires all four --trust-anchor-* flags" };
+    if (!output.runner) return { error: "trust-anchor bootstrap requires an explicit --runner" };
+    if (output.stepCap !== undefined) return { error: "trust-anchor bootstrap does not accept --step-cap" };
+    if (output.trustAnchorMode === "existing" && !isAbsolute(output.trustAnchorExistingKey)) {
+      return { error: "existing trust-anchor bootstrap requires an absolute --trust-anchor-existing-key path" };
+    }
+    if (output.trustAnchorMode === "new" && output.trustAnchorExistingKey !== "none") {
+      return { error: "new trust-anchor bootstrap requires --trust-anchor-existing-key none" };
+    }
+  }
   return output;
+}
+
+function childEnvironment(env) {
+  if (!env) return null;
+  const override = env.PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE;
+  return typeof override === "string" && override.length > 0
+    ? { ...env, HOME: override, USERPROFILE: override }
+    : env;
+}
+
+function parseJsonFile(path, read) {
+  try { return JSON.parse(read(path, "utf8")); } catch { return null; }
+}
+
+function repositoryAnchors(policy) {
+  if (policy?.schema === CRITICAL_HUMAN_PROOF_POLICY_V3 && Array.isArray(policy.trustAnchors)) return policy.trustAnchors;
+  return policy?.trustAnchor && typeof policy.trustAnchor === "object" ? [policy.trustAnchor] : [];
+}
+
+function validAuthority(authority, humanName) {
+  return typeof authority?.keyReference === "string"
+    && typeof authority?.publicKeySha256 === "string"
+    && /^[a-f0-9]{64}$/u.test(authority.publicKeySha256)
+    && authority.humanName === humanName;
+}
+
+function recoveryReceiptMatches(receipt, { root, directory, authority, humanName }) {
+  return receipt?.schema === TRUST_ANCHOR_RECOVERY_SCHEMA
+    && receipt.root === root
+    && receipt.directory === directory
+    && receipt.humanName === humanName
+    && receipt.keyReference === authority?.keyReference
+    && receipt.publicKeySha256 === authority?.publicKeySha256;
+}
+
+function fileSnapshot(path, { exists, lstat, read }) {
+  if (!exists(path)) return { path, present: false, bytes: null, mode: null };
+  const stat = lstat(path);
+  if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1) return null;
+  return { path, present: true, bytes: read(path), mode: stat.mode & 0o777 };
+}
+
+function atomicReplaceFile(path, bytes, mode = 0o600) {
+  mkdirSync(dirname(path), { recursive: true });
+  const temporary = `${path}.trust-anchor-bootstrap-${process.pid}`;
+  const fd = openSync(temporary, "wx", mode);
+  try { writeFileSync(fd, bytes); }
+  finally { closeSync(fd); }
+  renameSync(temporary, path);
+}
+
+function restoreSnapshots(snapshots, exists = existsSync) {
+  try {
+    for (const snapshot of [...snapshots].reverse()) {
+      if (snapshot.present) atomicReplaceFile(snapshot.path, snapshot.bytes, snapshot.mode);
+      else if (exists(snapshot.path)) unlinkSync(snapshot.path);
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function removeOwnedPemImportDirectory(directory, { exists, lstat }) {
+  if (!exists(directory)) return true;
+  const allowed = new Set(["po-private.pem", "po-public.pem", "trust-policy.json"]);
+  try {
+    const names = readdirSync(directory);
+    if (names.some((name) => !allowed.has(name))) return false;
+    for (const name of names) {
+      const path = join(directory, name);
+      const stat = lstat(path);
+      if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1) return false;
+    }
+    for (const name of names) unlinkSync(join(directory, name));
+    rmdirSync(directory);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * One attended first-anchor transaction owned by the public onboarding driver. The
+ * underlying setup command is deliberately not published as a raw shell command: this
+ * function supplies its exact argv, suppresses its JSON stdout (which contains filesystem
+ * paths), verifies both durable directory pointers, and materializes only the public
+ * key-reference/digest pair into the repository policy. The parent driver never reads or
+ * returns private-key bytes; the attended po-human-approval child exclusively owns key
+ * generation/import, and that child's ordinary stdout is suppressed from the driver JSON.
+ */
+export function applyTrustAnchorBootstrap({
+  rootDir,
+  mode,
+  directory,
+  humanName,
+  existingKey,
+  env = null,
+  runSetup = spawnSync,
+  runGit = spawnSync,
+  read = readFileSync,
+  exists = existsSync,
+  lstat = lstatSync,
+  writeMachine = writeMachinePlane,
+  writePolicy = atomicReplaceFile,
+} = {}) {
+  const root = resolve(rootDir);
+  const targetDirectory = resolve(directory);
+  const targetDirectoryExisted = exists(targetDirectory);
+  const effectiveEnv = childEnvironment(env) ?? process.env;
+  const policyPath = join(root, CRITICAL_HUMAN_PROOF_POLICY_PATH);
+  const existingPolicy = exists(policyPath) ? parseJsonFile(policyPath, read) : null;
+  if (exists(policyPath) && existingPolicy === null) return { ok: false, code: "TRUST-ANCHOR-REPOSITORY-POLICY-INVALID" };
+
+  const home = effectiveEnv.PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE
+    ?? effectiveEnv.HOME
+    ?? effectiveEnv.USERPROFILE
+    ?? homedir();
+  const machineDependencies = { homedirFn: () => home };
+  const machinePath = machinePlaneFilePath(machineDependencies);
+  if (machinePath === null) return { ok: false, code: "TRUST-ANCHOR-MACHINE-PLANE-UNAVAILABLE" };
+  const common = runGit("git", ["-C", root, "rev-parse", "--path-format=absolute", "--git-common-dir"], {
+    encoding: "utf8", shell: false, env: effectiveEnv,
+  });
+  if (common?.status !== 0) return { ok: false, code: "TRUST-ANCHOR-REPOSITORY-POINTER-READBACK-FAILED" };
+  const commonDir = resolve(root, String(common.stdout ?? "").trim());
+  const repositoryPointerPath = join(commonDir, "agent-pipeline", "po-key-directory.json");
+  const recoveryPath = join(commonDir, "agent-pipeline", "first-anchor-bootstrap-recovery.json");
+  const snapshots = [policyPath, machinePath, repositoryPointerPath]
+    .map((path) => fileSnapshot(path, { exists, lstat, read }));
+  if (snapshots.some((snapshot) => snapshot === null)) return { ok: false, code: "TRUST-ANCHOR-TRANSACTION-PREIMAGE-UNSAFE" };
+  let setupStarted = false;
+  const fail = (code) => {
+    if (!setupStarted) return { ok: false, code };
+    const stateRestored = restoreSnapshots(snapshots, exists);
+    const importedCopyRestored = mode !== "existing" || targetDirectoryExisted
+      || removeOwnedPemImportDirectory(targetDirectory, { exists, lstat });
+    return stateRestored && importedCopyRestored
+      ? { ok: false, code }
+      : { ok: false, code: `${code}-ROLLBACK-FAILED` };
+  };
+
+  const observedPlane = readMachinePlane(machineDependencies);
+  if (observedPlane.status === "invalid") return fail("TRUST-ANCHOR-MACHINE-PLANE-INVALID");
+  if (observedPlane.status === "valid"
+    && typeof observedPlane.plane.poKeyDirectory === "string"
+    && observedPlane.plane.poKeyDirectory.length > 0
+    && resolve(observedPlane.plane.poKeyDirectory) !== targetDirectory) {
+    return fail("TRUST-ANCHOR-MACHINE-CONFLICT");
+  }
+  const beforeRepositoryPointer = parseJsonFile(repositoryPointerPath, read);
+  if (beforeRepositoryPointer !== null
+    && resolve(beforeRepositoryPointer.poKeyDirectory ?? ".") !== targetDirectory) {
+    return fail("TRUST-ANCHOR-REPOSITORY-POINTER-CONFLICT");
+  }
+  const beforeAuthority = parseJsonFile(join(targetDirectory, "trust-policy.json"), read);
+  const recoveryReceipt = parseJsonFile(recoveryPath, read);
+  if (exists(recoveryPath)
+    && (mode !== "new" || !validAuthority(beforeAuthority, humanName)
+      || !recoveryReceiptMatches(recoveryReceipt, {
+        root, directory: targetDirectory, authority: beforeAuthority, humanName,
+      }))) {
+    return fail("TRUST-ANCHOR-RECOVERY-RECEIPT-CONFLICT");
+  }
+  const recoveringNewAuthority = mode === "new" && recoveryReceipt !== null
+    && validAuthority(beforeAuthority, humanName)
+    && recoveryReceiptMatches(recoveryReceipt, {
+      root, directory: targetDirectory, authority: beforeAuthority, humanName,
+    });
+  const currentAnchors = repositoryAnchors(existingPolicy);
+  if (currentAnchors.length > 0) {
+    const same = currentAnchors.length === 1
+      && beforeAuthority !== null
+      && currentAnchors[0].keyReference === beforeAuthority.keyReference
+      && currentAnchors[0].publicKeySha256 === beforeAuthority.publicKeySha256;
+    if (!same) return fail("TRUST-ANCHOR-REPOSITORY-CONFLICT");
+    const pointersMatch = observedPlane.status === "valid"
+      && resolve(observedPlane.plane.poKeyDirectory ?? ".") === targetDirectory
+      && resolve(beforeRepositoryPointer?.poKeyDirectory ?? ".") === targetDirectory;
+    if (pointersMatch) {
+      if (recoveringNewAuthority) {
+        try { unlinkSync(recoveryPath); } catch { return fail("TRUST-ANCHOR-RECOVERY-RECEIPT-CLEANUP-FAILED"); }
+      }
+      return { ok: true, code: "TRUST-ANCHOR-BOOTSTRAP-COMPLETE", mode, alreadyComplete: true };
+    }
+    return fail("TRUST-ANCHOR-PARTIAL-STATE-REQUIRES-NOVA-B");
+  }
+
+  const setupArgs = [
+    PO_HUMAN_APPROVAL_SCRIPT_PATH,
+    "setup",
+    "--repo-root", root,
+    "--directory", targetDirectory,
+    "--human-name", humanName,
+  ];
+  if (mode === "existing") setupArgs.push("--existing-key", resolve(existingKey));
+  setupStarted = true;
+  if (!recoveringNewAuthority) {
+    const setup = runSetup(process.execPath, setupArgs, {
+      shell: false,
+      stdio: ["inherit", "ignore", "inherit"],
+      env: effectiveEnv,
+    });
+    if (setup?.error || setup?.status !== 0) return fail("TRUST-ANCHOR-SETUP-FAILED");
+  }
+
+  const authority = parseJsonFile(join(targetDirectory, "trust-policy.json"), read);
+  if (!validAuthority(authority, humanName)) {
+    return fail("TRUST-ANCHOR-AUTHORITY-READBACK-FAILED");
+  }
+  if (mode === "new" && !recoveringNewAuthority) {
+    try {
+      atomicReplaceFile(recoveryPath, `${JSON.stringify({
+        schema: TRUST_ANCHOR_RECOVERY_SCHEMA,
+        root,
+        directory: targetDirectory,
+        humanName,
+        keyReference: authority.keyReference,
+        publicKeySha256: authority.publicKeySha256,
+      }, null, 2)}\n`);
+    } catch {
+      return fail("TRUST-ANCHOR-RECOVERY-RECEIPT-WRITE-FAILED");
+    }
+  }
+
+  const anchoredAlready = currentAnchors.length === 1
+    && currentAnchors[0].keyReference === authority.keyReference
+    && currentAnchors[0].publicKeySha256 === authority.publicKeySha256;
+  if (currentAnchors.length > 0 && !anchoredAlready) return fail("TRUST-ANCHOR-REPOSITORY-CONFLICT");
+
+  if (recoveringNewAuthority) {
+    try {
+      atomicReplaceFile(repositoryPointerPath, `${JSON.stringify({
+        schema: "pipeline.po-key-directory.v1",
+        poKeyDirectory: targetDirectory,
+        updatedAt: new Date().toISOString(),
+      }, null, 2)}\n`);
+    } catch {
+      return fail("TRUST-ANCHOR-REPOSITORY-POINTER-WRITE-FAILED");
+    }
+  }
+  const repositoryPointer = parseJsonFile(repositoryPointerPath, read);
+  if (resolve(repositoryPointer?.poKeyDirectory ?? ".") !== targetDirectory) {
+    return fail("TRUST-ANCHOR-REPOSITORY-POINTER-READBACK-FAILED");
+  }
+  const nextPlane = observedPlane.status === "valid"
+    ? { ...observedPlane.plane, poKeyDirectory: targetDirectory, updatedAt: new Date().toISOString() }
+    : {
+      schema: MACHINE_PLANE_SCHEMA,
+      poKeyDirectory: targetDirectory,
+      pushApprovalDefault: "signature",
+      routing: null,
+      language: null,
+      session: null,
+      usage: null,
+      updatedAt: new Date().toISOString(),
+    };
+  try { writeMachine(nextPlane, machineDependencies); }
+  catch { return fail("TRUST-ANCHOR-MACHINE-POINTER-WRITE-FAILED"); }
+  const machinePlane = readMachinePlane(machineDependencies);
+  if (machinePlane.status !== "valid" || resolve(machinePlane.plane.poKeyDirectory ?? ".") !== targetDirectory) {
+    return fail("TRUST-ANCHOR-MACHINE-POINTER-READBACK-FAILED");
+  }
+
+  if (!exists(policyPath)) return fail("TRUST-ANCHOR-REPOSITORY-POLICY-MISSING");
+  const stat = lstat(policyPath);
+  if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1) {
+    return fail("TRUST-ANCHOR-REPOSITORY-POLICY-UNSAFE");
+  }
+  if (!anchoredAlready) {
+    const nextPolicy = {
+      ...existingPolicy,
+      schema: CRITICAL_HUMAN_PROOF_POLICY_V3,
+      trustAnchors: [{ keyReference: authority.keyReference, publicKeySha256: authority.publicKeySha256 }],
+    };
+    delete nextPolicy.trustAnchor;
+    try { writePolicy(policyPath, `${JSON.stringify(nextPolicy, null, 2)}\n`, stat.mode & 0o777); }
+    catch { return fail("TRUST-ANCHOR-REPOSITORY-MATERIALIZATION-WRITE-FAILED"); }
+  }
+  const readback = parseJsonFile(policyPath, read);
+  const anchors = repositoryAnchors(readback);
+  if (anchors.length !== 1
+    || anchors[0].keyReference !== authority.keyReference
+    || anchors[0].publicKeySha256 !== authority.publicKeySha256) {
+    return fail("TRUST-ANCHOR-REPOSITORY-MATERIALIZATION-READBACK-FAILED");
+  }
+  if (mode === "new" && exists(recoveryPath)) {
+    try { unlinkSync(recoveryPath); }
+    catch { return fail("TRUST-ANCHOR-RECOVERY-RECEIPT-CLEANUP-FAILED"); }
+  }
+  return { ok: true, code: "TRUST-ANCHOR-BOOTSTRAP-COMPLETE", mode };
 }
 
 /**
@@ -496,7 +849,22 @@ export function main(args = process.argv.slice(2), {
     writeError(`${usage()}\n${options.error}\n`);
     return 2;
   }
+  let bootstrap = null;
+  if (options.trustAnchorMode) {
+    bootstrap = applyTrustAnchorBootstrap({
+      rootDir: options.root,
+      mode: options.trustAnchorMode,
+      directory: options.trustAnchorDirectory,
+      humanName: options.trustAnchorHumanName,
+      existingKey: options.trustAnchorExistingKey,
+    });
+    if (!bootstrap.ok) {
+      write(`${JSON.stringify({ schema: SCHEMA, runner: options.runner, root: resolve(options.root), outcome: "error", bootstrap }, null, 2)}\n`);
+      return 1;
+    }
+  }
   const result = driveOnboardingInit({ rootDir: options.root, runner: options.runner ?? null, stepCap: options.stepCap });
+  if (bootstrap) result.bootstrap = bootstrap;
   write(`${JSON.stringify(result, null, 2)}\n`);
   return result.outcome === "ready" || result.outcome === "collect-input" || result.outcome === "pending-asks" ? 0 : 1;
 }
