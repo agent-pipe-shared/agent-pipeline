@@ -6,6 +6,7 @@ import { mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
   PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES,
@@ -120,6 +121,19 @@ function implementationVerifyHandoverAction() {
       expected: { schema: "pipeline.project-onboarding.v4", statuses: ["ready"] },
     },
     expected: { schema: "pipeline.project-onboarding.v4", statuses: ["ready"] },
+  };
+}
+
+const PIPELINE_STATE_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url));
+
+function planLifecycleInspectAction() {
+  return {
+    kind: "command",
+    executable: "node",
+    argv: [PIPELINE_STATE_SCRIPT, "inspect"],
+    mutation: false,
+    requiresConfirmation: false,
+    expected: { schema: "pipeline.inspect.v1", statuses: ["draft", "awaiting-approval"] },
   };
 }
 
@@ -287,6 +301,57 @@ test("a ready observation may carry only the closed verify-command collect/apply
       status: "ready",
       intent: "session",
     });
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("all runners admit the exact read-only plan-lifecycle inspect action for draft and awaiting-approval", () => {
+  const path = root();
+  try {
+    for (const runner of ["claude", "codex", "antigravity"]) {
+      const observed = readyResultWithPushApprovalKeys(path, "session", runner);
+      observed.nextAction = planLifecycleInspectAction();
+      const result = requireProjectOnboardingReady({
+        rootDir: path,
+        intent: "session",
+        runner,
+        inspect: () => observed,
+      });
+      assert.deepEqual(result, {
+        schema: PROJECT_ONBOARDING_READY_GATE_SCHEMA,
+        status: "ready",
+        intent: "session",
+      });
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("the plan-lifecycle inspect exception rejects arbitrary paths, argv, mutation, and expected states", () => {
+  const path = root();
+  try {
+    const valid = planLifecycleInspectAction();
+    const invalidActions = [
+      { ...valid, executable: process.execPath },
+      { ...valid, argv: ["/other/pipeline-state.mjs", "inspect"] },
+      { ...valid, argv: [valid.argv[0], "status"] },
+      { ...valid, argv: [...valid.argv, "--runner", "codex"] },
+      { ...valid, mutation: true },
+      { ...valid, requiresConfirmation: true },
+      { ...valid, expected: { schema: "pipeline.project-onboarding.v4", statuses: ["draft", "awaiting-approval"] } },
+      { ...valid, expected: { schema: "pipeline.inspect.v1", statuses: ["awaiting-approval", "draft"] } },
+      { ...valid, expected: { schema: "pipeline.inspect.v1", statuses: ["draft"] } },
+      { ...valid, expected: { schema: "pipeline.inspect.v1", statuses: ["draft", "awaiting-approval", "approved"] } },
+      { ...valid, unexpected: true },
+    ];
+    for (const nextAction of invalidActions) {
+      const observed = readyResultWithPushApprovalKeys(path, "dispatch");
+      observed.nextAction = nextAction;
+      assert.throws(() => requireProjectOnboardingReady({
+        rootDir: path,
+        intent: "dispatch",
+        runner: "codex",
+        inspect: () => observed,
+      }), (error) => error instanceof ProjectOnboardingReadyError && error.code === "PORG-INVALID-OBSERVATION");
+    }
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
