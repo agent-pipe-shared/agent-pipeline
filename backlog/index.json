@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "0ddf37299d9f1981d9402b9f82dc33d818521b2f8403df6360aeb37370fe9b5a"
+    "transitionHead": "1945d2025ed5f15bc8d389ac7996db9fa1d3016388bf57d28db0a3894c7d7a08"
   },
   "counts": {
     "open": 77,
     "in_progress": 3,
-    "closed": 465,
+    "closed": 466,
     "rejected": 3,
     "deferred": 11
   },
@@ -4079,6 +4079,20 @@
       "closureRepository": "self",
       "closureCommit": "d7a52fedbccb6fbce30492227b48c65059a1d1ef",
       "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
+    },
+    {
+      "id": "pipeline.onboarding-guidance-never-asks-about-an-existing-signing-key",
+      "status": "closed",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-30",
+      "source": "PO's greenfield-test relay, 2026-08-30: onboarding's key-setup guidance defaults to walking the PO through a brand-new key, never asking whether one already exists on the machine, even though closed item 2026-08-29-onboarding-has-no-happy-path-for-an-existing-signing-key.md already built the --existing-key mechanism.",
+      "deferred": false,
+      "tracking": "Retrospective-analysis follow-up item #2, PO-confirmed 2026-08-30 ('auch verdrahten und fixen! das muss der runner zwingend abfragen')",
+      "closedAt": "2026-08-30",
+      "closureRepository": "self",
+      "closureCommit": "4b29d1ad",
+      "closureEvidence": "plugins/pipeline-core/lib/project-onboarding-v3.mjs"
     },
     {
       "id": "pipeline.onboarding-has-no-happy-path-for-an-existing-signing-key",
