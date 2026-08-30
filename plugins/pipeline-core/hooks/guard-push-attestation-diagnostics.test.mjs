@@ -65,6 +65,30 @@ function writeProofPolicy(dir, policy) {
   writeFileSync(join(dir, "project", "critical-human-proof.json"), `${JSON.stringify(policy, null, 2)}\n`);
 }
 
+function registeredOperatorEnvironment(prefix) {
+  const home = mkdtempSync(join(tmpdir(), `guard-push-attest-home-${prefix}-`));
+  const directory = join(home, "operator-key");
+  ALL_DIRS.push(home);
+  mkdirSync(join(home, ".agent-pipeline"), { recursive: true });
+  mkdirSync(directory, { recursive: true });
+  writeFileSync(join(directory, "trust-policy.json"), `${JSON.stringify({
+    keyReference: "fixture-operator-key",
+    publicKeySha256: "a".repeat(64),
+    humanName: "Fixture Operator",
+  }, null, 2)}\n`);
+  writeFileSync(join(home, ".agent-pipeline", "machine.json"), `${JSON.stringify({
+    schema: "pipeline.machine-plane.v1",
+    poKeyDirectory: directory,
+    pushApprovalDefault: "signature",
+    routing: null,
+    language: null,
+    session: null,
+    usage: null,
+    updatedAt: "2026-08-30T00:00:00.000Z",
+  }, null, 2)}\n`);
+  return { HOME: home, USERPROFILE: home };
+}
+
 function canonicalJson(value) {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
   if (value && typeof value === "object") return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`;
@@ -84,8 +108,8 @@ function runGuard(command, dir, { env = {} } = {}) {
 
 let pass = 0;
 const failures = [];
-function check(id, command, dir, expectExit, { stderrIncludes, stderrNotIncludes } = {}) {
-  const { code, stderr } = runGuard(command, dir);
+function check(id, command, dir, expectExit, { stderrIncludes, stderrNotIncludes, env } = {}) {
+  const { code, stderr } = runGuard(command, dir, { env });
   const problems = [];
   if (code !== expectExit) problems.push(`exit ${code} (expected ${expectExit}) -- stderr: ${stderr.trim().slice(0, 400)}`);
   for (const needle of [].concat(stderrIncludes ?? [])) {
@@ -104,21 +128,53 @@ function check(id, command, dir, expectExit, { stderrIncludes, stderrNotIncludes
 }
 const BLOCK = 2, ALLOW = 0;
 
-// ---- MB1 (task a) -- attestedMainPublication() names the refusal's real predicate, ------
-// same as the general (non-main) push flow already did before this task. A v1 policy
-// document with no trustAnchor is the exact backlog fixture: the route is unavailable,
-// and the fully-qualified main push must say so by name, not render the generic
-// "no such proof verified here" every other refusal shares.
+// ---- MB1 (task a) -- attestedMainPublication() names the refusal's real predicate. -------
+// A v1 policy with no committed trustAnchor plus a machine-registered fixture operator key
+// is the supported first-use/TOFU posture: trust is available for the first valid proof, so
+// this proof-less fixture diagnoses RECORD-INCOMPLETE as the primary refusal. It also carries
+// the qualified compatibility fact that no project anchor is committed yet, without claiming
+// that TOFU is unavailable. The machine plane is fixture-owned; no user key is read.
 {
   const { dir } = freshRepo("mb1-trust-anchor-missing");
   writeState(dir, { schema: "pipeline.state.v0" });
   writeProofPolicy(dir, { schema: "pipeline.critical-human-proof-policy.v1", requiredKinds: ["push"] });
   check(
-    "MB1 block  main-boundary refusal names PUSH-PROOF-TRUST-ANCHOR-MISSING, not a generic message",
+    "MB1 block  TOFU-ready main-boundary refusal carries the record failure and qualified missing-committed-anchor fact",
     "git push origin main:refs/heads/main",
     dir,
     BLOCK,
-    { stderrIncludes: ["raw Bash/Git cannot publish refs/heads/main", "PUSH-PROOF-TRUST-ANCHOR-MISSING"] },
+    {
+      env: registeredOperatorEnvironment("mb1"),
+      stderrIncludes: [
+        "raw Bash/Git cannot publish refs/heads/main",
+        "PUSH-PROOF-RECORD-INCOMPLETE",
+        "PUSH-PROOF-TRUST-ANCHOR-MISSING: no committed project trust anchor exists yet",
+        "machine-plane TOFU remains available for a valid first proof",
+      ],
+    },
+  );
+}
+
+// ---- MB1b -- a genuinely pinned policy must not receive the compatibility fact. --------
+// RECORD-INCOMPLETE remains the primary refusal, but a committed anchor already exists, so
+// saying that one is missing would be false even as metadata.
+{
+  const { dir } = freshRepo("mb1b-pinned-record-incomplete");
+  writeState(dir, { schema: "pipeline.state.v0" });
+  writeProofPolicy(dir, {
+    schema: "pipeline.critical-human-proof-policy.v1",
+    requiredKinds: ["push"],
+    trustAnchor: { keyReference: "fixture-pinned-key", publicKeySha256: "b".repeat(64) },
+  });
+  check(
+    "MB1b block  pinned main-boundary record failure does not claim a committed anchor is missing",
+    "git push origin main:refs/heads/main",
+    dir,
+    BLOCK,
+    {
+      stderrIncludes: ["PUSH-PROOF-RECORD-INCOMPLETE"],
+      stderrNotIncludes: ["PUSH-PROOF-TRUST-ANCHOR-MISSING", "machine-plane TOFU remains available"],
+    },
   );
 }
 

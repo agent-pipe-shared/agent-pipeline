@@ -769,6 +769,32 @@ function checkAnonymousPublicPush(binding, sourceCommit) {
 }
 
 /**
+ * Preserve the authorization primitive's primary refusal while also carrying the
+ * compatibility diagnostic older operators/tests use for an unpinned v1/v2 policy.
+ *
+ * `*-TRUST-ANCHOR-MISSING` used to mean that this route was unavailable. Under the
+ * machine-provenance TOFU contract, a registered operator key makes the route available,
+ * so a proof-less action correctly fails first as `*-RECORD-INCOMPLETE`. The project still
+ * has no committed anchor at that instant, though. Naming both facts is truthful provided
+ * the latter is explicitly qualified as committed-project metadata rather than the primary
+ * authorization verdict. A pinned policy and v3's intentional empty-set posture never get
+ * this companion diagnostic.
+ */
+function attestationFailureDiagnostic(code, anchorDir) {
+  const missingAnchorCode = code === "PUSH-PROOF-RECORD-INCOMPLETE"
+    ? "PUSH-PROOF-TRUST-ANCHOR-MISSING"
+    : code === "DEPLOY-PROOF-RECORD-INCOMPLETE"
+      ? "DEPLOY-PROOF-TRUST-ANCHOR-MISSING"
+      : null;
+  if (missingAnchorCode === null) return code;
+
+  const policy = readCriticalHumanProofPolicy(anchorDir);
+  if (!policy.ok || policy.trustAnchor !== null || policy.trustAnchors !== null) return code;
+  return `${code}; ${missingAnchorCode}: no committed project trust anchor exists yet, `
+    + "while machine-plane TOFU remains available for a valid first proof";
+}
+
+/**
  * The one thing that opens the main boundary: a detached proof, verified here.
  *
  * This runs BEFORE the manifest is read, which is why it is self-contained rather than
@@ -873,10 +899,11 @@ if (mainPublicationAttempt && !mainAttestation.authorized) {
   // `mainAttestation.code` is always a typed identifier (PUSH-PROOF-*), never free text --
   // it names the predicate that refused, not how to satisfy it, so it carries nothing an
   // unauthorized caller could use to learn about the anchor or key material.
+  const attestationDiagnostic = attestationFailureDiagnostic(mainAttestation.code, fallbackProjectDir());
   const lines = [
     "BLOCKED (guard-push publication boundary): raw Bash/Git cannot publish refs/heads/main.",
     "Only the plugin-owned fixed publication executor may consume exact-candidate main authority; GG-03 and Human Guard Override do not widen it.",
-    `The one exception is a push the human attested for this exact commit, tree, remote and ref (ADR-0056 §6); no such proof verified here (${mainAttestation.code}).`,
+    `The one exception is a push the human attested for this exact commit, tree, remote and ref (ADR-0056 §6); no such proof verified here (${attestationDiagnostic}).`,
   ];
   if (mainAttestation.code === "PUSH-PROOF-DESTINATION-UNRESOLVED") {
     // The colon-less form's destination could not be established at all (a configured
@@ -1329,9 +1356,10 @@ function checkDeployApprovals(required) {
         now,
       });
     if (!attested.authorized) {
+      const attestationDiagnostic = attestationFailureDiagnostic(attested.code, fallbackProjectDir());
       reasons.push(
         `Environment '${req.environment}': the deployApproval for artifact '${req.display}' is not externally attested ` +
-          `for this exact candidate (${attested.code}). Re-record it with --proof-request/--proof-authority/--proof.`,
+          `for this exact candidate (${attestationDiagnostic}). Re-record it with --proof-request/--proof-authority/--proof.`,
       );
     }
   }
@@ -2044,6 +2072,7 @@ try {
             now: new Date().toISOString(),
           });
         if (!attested.authorized) {
+          const attestationDiagnostic = attestationFailureDiagnostic(attested.code, fallbackProjectDir());
           failures.push(
             pushWaiver.code === null
               // Operand text is deliberately NOT interpolated here. `remote` is any positional
@@ -2052,7 +2081,7 @@ try {
             // (SEC-01). The file already redacts elsewhere for exactly this reason (PG17i);
             // that fixture cannot reach this line, so PG12s15 covers it. The operator does
             // not need the values echoed back -- they are in the command they just ran.
-            ? `Push approval is not externally attested for this exact action (${attested.code}). `
+            ? `Push approval is not externally attested for this exact action (${attestationDiagnostic}). `
                 + `Record one for this commit, remote and destination ref: node ${pipelineStateScriptRef()} `
                 + "approve-push --by <name> --remote <remote> --destination <full-ref> "
                 + "--proof-request <path> --proof-authority <path> --proof <path>."
