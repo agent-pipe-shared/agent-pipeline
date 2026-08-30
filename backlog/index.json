@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "874b0cb87b19cd91bbf69173bce140d074e02982f21488a9a7909f0028d20020"
+    "transitionHead": "03111acb1f9ef368ae18d06cb6d495aa4f716ac389af3fa805dced3171c201fe"
   },
   "counts": {
     "open": 77,
     "in_progress": 3,
-    "closed": 463,
+    "closed": 464,
     "rejected": 3,
     "deferred": 11
   },
@@ -1281,13 +1281,17 @@
     },
     {
       "id": "pipeline.codex-worker-dispatch-fails-session-capability-probe-root-does-not",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-30",
       "source": "Codex-060-77 greenfield retrospective, section on root/worker capability mismatch. Confirmed live: root runner was session-ready after bootstrap; two dispatched Codex workers (a generic author, an explicit implementor) each got repository-control-path-invalid/session-capability-unavailable and failed closed, no change made.",
       "deferred": false,
-      "tracking": "NOW / Nova A -- PO-raised 2026-08-30 from the Codex/WSL greenfield retrospective; confirmed via code trace to be a genuinely separate defect from the resume-hint enforcement gap and the design-binding gap raised alongside it."
+      "tracking": "NOW / Nova A -- PO-raised 2026-08-30 from the Codex/WSL greenfield retrospective; confirmed via code trace to be a genuinely separate defect from the resume-hint enforcement gap and the design-binding gap raised alongside it.",
+      "closedAt": "2026-08-30",
+      "closureRepository": "self",
+      "closureCommit": "b2bd05ed300a46b727f02c14a27f4cd66db00f71",
+      "closureEvidence": "plugins/pipeline-core/lib/codex-onboarding-capabilities.mjs"
     },
     {
       "id": "pipeline.codex-worker-subagent-dispatch-capability-is-broken",
@@ -1298,6 +1302,16 @@
       "source": "Codex 060-77 greenfield retrospective (scratch/greenfield-reports/pipeline-retrospective-codex-060-77.md), section 'Root und Worker hatten unterschiedliche Funktionsfähigkeit'.",
       "deferred": false,
       "tracking": "Nova B -- needs deeper Codex-runner-side investigation, likely outside pure Pipeline-repo code; not a same-session fix."
+    },
+    {
+      "id": "pipeline.codex-worker-supervisor-hardcodes-a-sandbox-mode-that-blocks-git-spawn",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-30",
+      "source": "PO, 2026-08-30: 'das hatten wir ja schon bei vielen themen mit codex und da sollte dann aber immer automatisch als folge schritt eine anweisung sein, dass bei diesen fehler eine andere art der sandbox nötig ist! dazu hatten wir eigentlich schon mal ein extra profil konfiguriert aber das muss halt auch im bootstrap abgefragt werden und dann anders starten.'",
+      "deferred": false,
+      "tracking": "NOW / Nova A -- PO explicit follow-up 2026-08-30 after live-diagnosing the Codex worker session-capability failure: this has recurred across multiple prior Codex sessions, and a bootstrap-time sandbox-profile query/selection was discussed before but never wired up."
     },
     {
       "id": "pipeline.command-grammar-guesses-shell-dialect-from-host-os-not-the-actual-tool-shell",
