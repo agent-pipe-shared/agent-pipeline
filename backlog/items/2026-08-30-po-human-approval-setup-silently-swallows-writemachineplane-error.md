@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.po-human-approval-setup-silently-swallows-writemachineplane-error
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-30
+closure_repository: self
+closure_commit: c2cb4b3332a077719ae9efa643189e5235e746db
+closure_evidence: plugins/pipeline-core/scripts/po-human-approval.test.mjs
 created: 2026-08-30
 sprint: nova
 tracking: "NOW / Nova A -- surfaced 2026-08-30 while cross-checking the Claude/Windows greenfield retrospective against current code; confirmed still present, unfixed."
@@ -37,6 +41,17 @@ pass can actually notice.
 - `setup` itself still succeeds/does not throw on this failure (unchanged
   best-effort behavior).
 - Regression test added covering the warning-on-failure path.
+
+## Closed, 2026-08-30 (NVA-CF-POHUMANAPPROVAL-2FIX)
+
+`persistExplicitDirectoryIntoMachinePlane()`'s catch block now logs a visible
+`PO-HUMAN-APPROVAL-WARN: ...` warning naming the failure before swallowing
+it (commit `c2cb4b33`), preserving the existing best-effort "never fails
+setup itself" contract. Regression test added
+(`2026-08-30-po-human-approval-setup-silently-swallows-writemachineplane-error`
+in `po-human-approval.test.mjs`), independently re-verified by the Elephant:
+`node --test plugins/pipeline-core/scripts/po-human-approval.test.mjs` --
+109/109 pass, including this test.
 
 ## Triage
 

@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.signing-ceremony-tty-check-has-no-windows-fallback
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-30
+closure_repository: self
+closure_commit: c2cb4b3332a077719ae9efa643189e5235e746db
+closure_evidence: plugins/pipeline-core/scripts/po-human-approval.test.mjs
 created: 2026-08-30
 sprint: nova
 tracking: "NOW / Nova A -- surfaced 2026-08-30 while cross-checking the Claude/Windows greenfield retrospective against current code; confirmed still present, unfixed."
@@ -47,6 +51,21 @@ guarantee.
   Windows branch (native Windows execution may not be testable from this
   WSL session -- note that limitation honestly rather than fabricating
   coverage).
+
+## Closed, 2026-08-30 (NVA-CF-POHUMANAPPROVAL-2FIX)
+
+New `controllingTtyPath(dependencies)` helper picks `\\.\CONIN$` when
+`(dependencies.platform ?? process.platform) === "win32"`, else `/dev/tty`;
+`isAttendedTerminal()`'s default `openControllingTty` and the refusal
+message in `signIntentIntoProof()` both use it now (commit `c2cb4b33`).
+Two regression tests added: one proves the win32 branch selection and
+refusal-message wording reach `\\.\CONIN$` (honestly not a fabricated
+native-Windows pass -- actually opening that handle cannot be verified from
+this WSL session, only the branch-selection logic); one proves a win32
+"attended terminal accepted" path with an injected `openControllingTty`/
+`isatty` behaves exactly like the POSIX path. Independently re-verified by
+the Elephant: `node --test plugins/pipeline-core/scripts/po-human-approval.test.mjs`
+-- 109/109 pass, including both new tests.
 
 ## Triage
 
