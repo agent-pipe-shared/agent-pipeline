@@ -107,6 +107,177 @@ function planRebind(f) {
   return JSON.parse(result.out);
 }
 
+function acknowledgeFixture(name) {
+  const f = fixture(`ack-${name}`);
+  const state = JSON.parse(readFileSync(statePath(f.dir), "utf8"));
+  state.planApproved = false;
+  state.continuity.authority.spec.sha256 = hash(readFileSync(join(f.dir, state.continuity.authority.spec.path)));
+  writeFileSync(statePath(f.dir), JSON.stringify(state, null, 2) + "\n");
+  return f;
+}
+
+function planAcknowledge(f, runner) {
+  const result = invoke([
+    "po-authority-acknowledge-plan", "--root", f.dir,
+    "--by", "Runner PO", "--runner", runner,
+  ], { ...f.deps, env: {} });
+  assert.equal(result.status, 0, result.err);
+  return JSON.parse(result.out);
+}
+
+test("acknowledge returned-action roundtrip carries every supported runner into markerless attended apply", () => {
+  for (const runner of ["claude", "codex", "antigravity"]) {
+    const f = acknowledgeFixture(runner);
+    const plan = planAcknowledge(f, runner);
+    assert.deepEqual(plan.applyAction.argv.slice(-2), ["--runner", runner]);
+    assert.equal(isSanctionedLifecycleCommand(actionCommand(plan.applyAction), f.dir), true);
+    const observed = [];
+    const applied = invoke(plan.applyAction.argv.slice(1), {
+      ...f.deps,
+      env: {},
+      isattyFn: () => true,
+      readLineFn: () => "CONFIRM",
+      v4Inspection: ({ runner: observedRunner }) => { observed.push(observedRunner); return { status: "ready" }; },
+    });
+    assert.equal(applied.status, 0, `${runner}: ${applied.err}`);
+    assert.deepEqual(observed, [runner, runner, runner]);
+  }
+});
+
+test("acknowledge plan rejects absent and invalid runner without mutation", () => {
+  for (const runnerArgs of [[], ["--runner", "codepilot"]]) {
+    const f = acknowledgeFixture(runnerArgs.length === 0 ? "missing-runner" : "invalid-runner");
+    const before = readFileSync(statePath(f.dir), "utf8");
+    const rejected = invoke([
+      "po-authority-acknowledge-plan", "--root", f.dir, "--by", "Runner PO", ...runnerArgs,
+    ], { ...f.deps, env: {} });
+    assert.equal(rejected.status, 2);
+    assert.equal(readFileSync(statePath(f.dir), "utf8"), before);
+  }
+});
+
+test("markerless external acknowledge apply succeeds only with the plan-returned runner tail", () => {
+  const f = acknowledgeFixture("external-tail");
+  const plan = planAcknowledge(f, "codex");
+  const before = readFileSync(statePath(f.dir), "utf8");
+  const attended = {
+    ...f.deps, env: {}, isattyFn: () => true, readLineFn: () => "CONFIRM",
+    v4Inspection: () => ({ status: "ready" }),
+  };
+  const rejected = invoke(withoutRunnerTail(plan.applyAction.argv).slice(1), attended);
+  assert.equal(rejected.status, 2);
+  assert.match(rejected.err, /PO-REBIND-RUNNER-UNKNOWN/u);
+  assert.equal(readFileSync(statePath(f.dir), "utf8"), before);
+  const applied = invoke(plan.applyAction.argv.slice(1), attended);
+  assert.equal(applied.status, 0, applied.err);
+});
+
+function generatorSubmitFixture(name, { exempt }) {
+  const dir = mkdtempSync(join(tmpdir(), `pipeline-generator-submit-${name}-`)); roots.push(dir);
+  const featureId = `generator-${name}`;
+  const planPath = `specs/${featureId}/prd_${featureId}.md`;
+  const specPath = `specs/${featureId}/spec.md`;
+  mkdirSync(join(dir, `specs/${featureId}`), { recursive: true });
+  mkdirSync(dirname(statePath(dir)), { recursive: true });
+  writeFileSync(join(dir, specPath), "# Generated specification\n");
+  const specSha256 = hash(readFileSync(join(dir, specPath)));
+  writeFileSync(join(dir, planPath), `<!-- po-language: en -->\n<!-- technical-spec-sha256: ${specSha256} -->\n# Generated plan\n`);
+  const planSha256 = hash(readFileSync(join(dir, planPath)));
+  const profile = {
+    schema: "pipeline.po-gate-authority-evidence.v1", humanFacing: "en",
+    sourceSha256: h("1"), runtimeSha256: h("2"), receiptSha256: h("3"), repositoryFingerprint: h("4"),
+  };
+  const authority = {
+    ...profile, schema: "pipeline.po-gate-authority.v2",
+    planPath, planSha256, specPath, specSha256,
+  };
+  const continuity = {
+    schema: "pipeline.continuity.v0", featureId, revision: 0,
+    runtime: { humanFacingLanguage: "en", activeDuty: "Coordinator" },
+    authority: { prd: { path: planPath, sha256: planSha256 }, spec: { path: specPath, sha256: specSha256 }, result: null },
+    queueHead: { packageId: "initial-planning", actionId: "review-plan", nextAction: "review", productRetryCount: 0, environmentRerouteCount: 0, dispatch: null },
+    blocker: null, acknowledgedFinal: null, resume: { mode: "immediate", sourceRevision: 0, reasonCode: "active-turn" }, recovery: null, decisionTxn: null,
+    capacity: { concurrencyLimit: 4, reservedCriticSlots: 1, reservedRecoverySlots: 1, fallbackPolicy: "defer" },
+  };
+  const state = {
+    schema: SCHEMA_ID, activeFeature: { id: featureId, planPath, phase: "design" },
+    planApproved: false, continuity, updatedAt: "2026-08-30T10:00:00.000Z",
+  };
+  writeFileSync(statePath(dir), JSON.stringify(state, null, 2) + "\n");
+  const deps = {
+    dir,
+    now: () => "2026-08-30T10:01:00.000Z",
+    poGateProfile: () => ({ ok: true, value: profile }),
+    poGateAuthority: (request) => request.expectedPlanSha256 === undefined
+      ? { ok: true, value: authority }
+      : { ok: false, code: "PO-GATE-PRD-ACKNOWLEDGEMENT-MISSING", reason: "marker missing", repair: "PO acknowledgement required" },
+    observeBootstrapBindAcknowledgement: () => ({
+      acknowledged: false,
+      exempt,
+      prd: { path: planPath, sha256: planSha256 },
+      spec: { path: specPath, sha256: specSha256 },
+    }),
+  };
+  return { dir, deps };
+}
+
+test("submit-plan honors the exact generator-identical acknowledgement exemption", () => {
+  const f = generatorSubmitFixture("exact", { exempt: true });
+  const submitted = invoke(["submit-plan", "--by", "coordinator", "--profile", "feature"], f.deps);
+  assert.equal(submitted.status, 0, submitted.err);
+  assert.ok(JSON.parse(readFileSync(statePath(f.dir), "utf8")).planSubmission);
+});
+
+test("submit-plan still demands PO acknowledgement for modified non-exempt bytes", () => {
+  const f = generatorSubmitFixture("modified", { exempt: false });
+  const before = readFileSync(statePath(f.dir), "utf8");
+  const rejected = invoke(["submit-plan", "--by", "coordinator", "--profile", "feature"], f.deps);
+  assert.equal(rejected.status, 2);
+  assert.match(rejected.out, /PO-GATE-PRD-ACKNOWLEDGEMENT-MISSING/u);
+  assert.equal(readFileSync(statePath(f.dir), "utf8"), before);
+});
+
+test("submit-plan rejects an exempt observation whose artifact identity does not match the bound authority", () => {
+  const f = generatorSubmitFixture("identity-mismatch", { exempt: true });
+  const observe = f.deps.observeBootstrapBindAcknowledgement;
+  f.deps.observeBootstrapBindAcknowledgement = () => {
+    const result = observe();
+    return { ...result, prd: { ...result.prd, sha256: h("f") } };
+  };
+  const before = readFileSync(statePath(f.dir), "utf8");
+  const rejected = invoke(["submit-plan", "--by", "coordinator", "--profile", "feature"], f.deps);
+  assert.equal(rejected.status, 2);
+  assert.match(rejected.out, /PO-GATE-PRD-ACKNOWLEDGEMENT-MISSING/u);
+  assert.equal(readFileSync(statePath(f.dir), "utf8"), before);
+});
+
+test("inspect exposes one typed PO approval action after submit and presentation, independent of runner", () => {
+  for (const runner of ["claude", "codex", "antigravity"]) {
+    const f = generatorSubmitFixture(`approval-${runner}`, { exempt: true });
+    const runnerDeps = { ...f.deps, env: runnerEnv(runner) };
+    assert.equal(invoke(["submit-plan", "--by", "coordinator", "--profile", "feature"], runnerDeps).status, 0);
+    assert.equal(invoke(["present-plan", "--by", "coordinator"], runnerDeps).status, 0);
+    const inspected = invoke(["inspect"], runnerDeps);
+    assert.equal(inspected.status, 0, inspected.err);
+    const action = JSON.parse(inspected.out).nextAction;
+    assert.equal(action.kind, "collect-input");
+    assert.deepEqual(action.input, { name: "by", encoding: "utf8", trim: true, minBytes: 1, maxBytes: 128, singleLine: true, rejectNul: true });
+    assert.equal(action.applyAction.executable, process.execPath);
+    assert.deepEqual(action.applyAction.argv, [
+      new URL("./pipeline-state.mjs", import.meta.url).pathname,
+      "approve-plan", "--by", "<PO_PLAN_APPROVER_NAME>",
+    ]);
+    assert.equal(action.applyAction.mutation, true);
+    assert.equal(action.applyAction.requiresConfirmation, true);
+    assert.equal(action.applyAction.argv.includes("--runner"), false);
+    assert.ok(action.applyAction.copyCommand?.posix);
+    const approvedArgv = action.applyAction.argv.slice(1).map((value) => value === "<PO_PLAN_APPROVER_NAME>" ? "Runner PO" : value);
+    assert.equal(isSanctionedLifecycleCommand(actionCommand({ ...action.applyAction, argv: [action.applyAction.argv[0], ...approvedArgv] }), f.dir), true);
+    assert.equal(invoke(approvedArgv, runnerDeps).status, 0);
+    assert.equal(JSON.parse(invoke(["inspect"], runnerDeps).out).lifecycle.status, "approved");
+  }
+});
+
 /**
  * PHX-WP-REBIND-V4-SCHEMA: same physical shape as fixture(), but planApproval.schema
  * is "pipeline.plan-approval.v4" (this repository's live schema) -- bound via a

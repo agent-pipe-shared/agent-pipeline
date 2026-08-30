@@ -1954,8 +1954,8 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
     const overlayRoute = `node '${PRIVATE_OVERLAY_SCRIPT}' route --project-root '${path}'`;
     const poRebind = `node '${PIPELINE_STATE_SCRIPT}' po-authority-rebind-apply --plan-sha256 ${"d".repeat(64)} --updated-at 2026-07-29T09:00:00.000Z --activate`;
     const poRebindCodex = `${poRebind} --runner codex`;
-    const poAcknowledgePlan = `node '${PIPELINE_STATE_SCRIPT}' po-authority-acknowledge-plan --root '${path}' --by 'Phoenix PO'`;
-    const poAcknowledgeApply = `node '${PIPELINE_STATE_SCRIPT}' po-authority-acknowledge-apply --root '${path}' --plan-sha256 ${"d".repeat(64)} --updated-at 2026-07-29T09:00:00.000Z --by 'Phoenix PO' --activate`;
+    const poAcknowledgePlan = `node '${PIPELINE_STATE_SCRIPT}' po-authority-acknowledge-plan --root '${path}' --by 'Phoenix PO' --runner codex`;
+    const poAcknowledgeApply = `node '${PIPELINE_STATE_SCRIPT}' po-authority-acknowledge-apply --root '${path}' --plan-sha256 ${"d".repeat(64)} --updated-at 2026-07-29T09:00:00.000Z --by 'Phoenix PO' --activate --runner codex`;
     const poAcknowledgeApplyCwd = `node '${PIPELINE_STATE_SCRIPT}' po-authority-acknowledge-apply --plan-sha256 ${"d".repeat(64)} --updated-at 2026-07-29T09:00:00.000Z --by 'Phoenix PO' --activate`;
     const poDecisionPlan = `node '${PIPELINE_STATE_SCRIPT}' po-authority-decision-plan`;
     const poDecisionSelect = `node '${PIPELINE_STATE_SCRIPT}' po-authority-decision-select --plan-sha256 ${"d".repeat(64)} --planned-at 2026-07-29T09:00:00.000Z --selection spec`;
@@ -2002,7 +2002,7 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
     // the writer's exact root-bound set; root-less plan stays unavailable and the existing
     // cwd-relative apply spelling above remains admitted unchanged.
     assert.equal(isSanctionedLifecycleCommand(
-      `node '${PIPELINE_STATE_SCRIPT}' po-authority-acknowledge-plan --by 'Phoenix PO' --root '${path}'`, path,
+      `node '${PIPELINE_STATE_SCRIPT}' po-authority-acknowledge-plan --by 'Phoenix PO' --runner claude --root '${path}'`, path,
     ), true);
     assert.equal(isSanctionedLifecycleCommand(
       `node '${PIPELINE_STATE_SCRIPT}' po-authority-acknowledge-apply --by 'Phoenix PO' --activate --updated-at 2026-07-29T09:00:00.000Z --root '${path}' --plan-sha256 ${"d".repeat(64)}`, path,
@@ -2048,6 +2048,7 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
       `${poRebind} --runner codepilot`,
       `${poRebindCodex} --runner claude`,
       `node '${PIPELINE_STATE_SCRIPT}' po-authority-acknowledge-plan --by 'Phoenix PO'`,
+      `node '${PIPELINE_STATE_SCRIPT}' po-authority-acknowledge-plan --root '${path}' --by 'Phoenix PO' --runner codepilot`,
       `node '${PIPELINE_STATE_SCRIPT}' po-authority-acknowledge-plan --root /tmp/other --by 'Phoenix PO'`,
       `${poAcknowledgePlan} --root '${path}'`,
       `${poAcknowledgePlan} --bypass`,
@@ -2057,6 +2058,7 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
       `${poAcknowledgeApply} --activate`,
       `node '${PIPELINE_STATE_SCRIPT}' po-authority-acknowledge-apply --root '${path}' --plan-sha256 ${"D".repeat(64)} --updated-at 2026-07-29T09:00:00.000Z --by 'Phoenix PO' --activate`,
       `node '${PIPELINE_STATE_SCRIPT}' po-authority-acknowledge-apply --root '${path}' --plan-sha256 ${"d".repeat(64)} --updated-at invalid --by 'Phoenix PO' --activate`,
+      `${poAcknowledgeApply} --runner claude`,
       `${poDecisionPlan} --selection spec`,
       `${poDecisionSelect} --runner codepilot`,
       `${poDecisionSelectClaude} --runner codex`,
