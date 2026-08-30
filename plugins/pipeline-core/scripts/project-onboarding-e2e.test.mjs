@@ -2,12 +2,13 @@
 // SPDX-License-Identifier: SUL-1.0
 
 /**
- * Process-level first-use regression harness.
+ * First-use regression harness for shipped CLI routes and in-process driver contracts.
  *
  * This deliberately invokes the shipped CLI entry points against disposable
  * repositories instead of importing their library seams. A managed Codex
- * sandbox may reject nested Node processes with EPERM, so spawning a second
- * CLI process would test the sandbox rather than onboarding behavior.
+ * sandbox may reject nested Node processes with EPERM, so driver routing is
+ * exercised in-process; the focused onboarding-init and launcher suites own
+ * the real nested-process apply transactions.
  */
 import assert from "node:assert/strict";
 import { generateKeyPairSync } from "node:crypto";
@@ -22,8 +23,6 @@ import { main as authorityCli } from "./v3-bootstrap-authority.mjs";
 import { main as migrationCli } from "./runner-profile-migration-v3.mjs";
 import { run as pipelineStateCli } from "./pipeline-state.mjs";
 import { driveOnboardingInit } from "./onboarding-init.mjs";
-import { main as codexOnboardingLaunchCli } from "./codex-onboarding-launch.mjs";
-import { READBACK_STATUS_SCHEMA } from "./codex-project-runtime-readback-host.mjs";
 import { inspectRepositoryFreshness } from "./repository-freshness.mjs";
 import {
   applyProjectOnboardingKickoffV4,
@@ -33,7 +32,6 @@ import {
 import { PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER } from "../lib/po-gate-authority.mjs";
 import {
   consumeRuntimeReadback,
-  canonicalJson,
   issueLaunchTicket,
   readRestartBarrier,
   sha256,
@@ -41,6 +39,7 @@ import {
 import { ProjectOnboardingReadyError } from "../lib/project-onboarding-ready-gate.mjs";
 import { applyHostRepositoryInit, planHostRepositoryInit } from "./codex-host-repository-init.mjs";
 import { evaluateLifecycleReadyGuard } from "../hooks/guard-lifecycle-ready.mjs";
+import { devPlanGateVerdict } from "../lib/guard-devplan-policy.mjs";
 import {
   CODEX_HOST_REPOSITORY_INIT_DIRECTORY,
   CODEX_HOST_REPOSITORY_INIT_INTENT,
@@ -55,6 +54,20 @@ const onboarding = join(here, "project-onboarding-v3.mjs");
 const onboardingInit = join(here, "onboarding-init.mjs");
 const authority = join(here, "v3-bootstrap-authority.mjs");
 const migration = join(here, "runner-profile-migration-v3.mjs");
+const fixtureGitConfig = new Map();
+function freshFixtureMachinePlane() {
+  return {
+    schema: "pipeline.machine-plane.v1",
+    poKeyDirectory: null,
+    pushApprovalDefault: "signature",
+    routing: null,
+    language: null,
+    session: null,
+    usage: null,
+    updatedAt: "2026-08-30T00:00:00.000Z",
+  };
+}
+let fixtureMachinePlane = freshFixtureMachinePlane();
 
 // The shipped plugin cache is intentionally read-only. Keep disposable
 // repositories in the platform temp directory so this process-level harness
@@ -94,10 +107,38 @@ function cliGit(command, args, options = {}) {
   if (gitArgs[0] === "rev-parse" && gitArgs[1] === "--show-object-format") {
     return { status: 0, stdout: "sha1\n", stderr: "" };
   }
+  // Keep this disposable-fixture Git init in-process. The E2E intentionally
+  // doubles Git observations so a managed Codex sandbox cannot turn a denied
+  // nested Git child into a false onboarding regression.
   if (gitArgs[0] === "init" && gitArgs[1] === "--initial-branch=main") {
-    return spawnSync("git", gitArgs, options);
+    const control = join(options.cwd, ".git");
+    mkdirSync(join(control, "objects", "info"), { recursive: true });
+    mkdirSync(join(control, "objects", "pack"), { recursive: true });
+    mkdirSync(join(control, "refs", "heads"), { recursive: true });
+    mkdirSync(join(control, "refs", "tags"), { recursive: true });
+    writeFileSync(join(control, "HEAD"), "ref: refs/heads/main\n");
+    writeFileSync(join(control, "config"), "[core]\n\trepositoryformatversion = 0\n\tbare = false\n");
+    return { status: 0, stdout: "", stderr: "" };
   }
-  if (gitArgs[0] === "config") return spawnSync("git", gitArgs, options);
+  if (gitArgs[0] === "config") {
+    const local = gitArgs[1] === "--local" ? 1 : 0;
+    const operation = gitArgs[1 + local];
+    const key = gitArgs[2 + local];
+    const configKey = `${options.cwd}\u0000${key}`;
+    if (operation === "--get") {
+      const value = fixtureGitConfig.get(configKey);
+      return value === undefined ? { status: 1, stdout: "", stderr: "" } : { status: 0, stdout: `${value}\n`, stderr: "" };
+    }
+    if (operation === "--unset-all") {
+      fixtureGitConfig.delete(configKey);
+      return { status: 0, stdout: "", stderr: "" };
+    }
+    if (typeof operation === "string" && operation.startsWith("user.")) {
+      fixtureGitConfig.set(`${options.cwd}\u0000${operation}`, key);
+      return { status: 0, stdout: "", stderr: "" };
+    }
+    return { status: 1, stdout: "", stderr: "unexpected config arguments" };
+  }
   if (gitArgs[0] === "rev-parse" && gitArgs[1] === "--is-inside-work-tree") return { status: 0, stdout: "true\n", stderr: "" };
   return { status: 1, stderr: "unexpected git arguments" };
 }
@@ -125,20 +166,15 @@ function run(script, args, cwd) {
       codexExecutable: process.execPath,
       readMachinePlane: () => ({
         status: "valid",
-        plane: {
-          schema: "pipeline.machine-plane.v1",
-          poKeyDirectory: null,
-          pushApprovalDefault: "signature",
-          routing: null,
-          language: null,
-          session: null,
-          usage: null,
-          updatedAt: "2026-08-30T00:00:00.000Z",
-        },
+        plane: fixtureMachinePlane,
       }),
       observeOnboardingAppServer: ({ intent }) => intent === "onboarding"
         ? { required: false, status: "not-requested", code: null }
         : { required: true, status: "running", code: "CAS-READY" },
+      // Cleanup-recovery has its own dedicated unit suite. Its private-state
+      // reader intentionally owns its native Git spawn, which is outside this
+      // onboarding CLI fixture's injected Git boundary.
+      planSessionCleanupRecovery: () => ({ status: "not-needed" }),
     },
   });
   return { status, stdout, json: stdout ? JSON.parse(stdout) : null };
@@ -172,6 +208,70 @@ function publicDriverRun(path, invocations) {
       }
     }
     return { status: 1, stdout: "", stderr: `unsupported public driver target: ${script}` };
+  };
+}
+
+function applyInitialAnswersDriverFixture(argv, path) {
+  // Claude publishes the script as the executable, while Codex/Antigravity
+  // publish `node <script> …`. Both are the same returned CLI action.
+  // This fixture models only the successful postconditions after asserting
+  // that action's closed flag contract; onboarding-init.test.mjs owns the
+  // transactional child-process implementation itself.
+  const args = argv[0] === onboardingInit ? argv.slice(1) : argv;
+  const value = (flag) => args[args.indexOf(flag) + 1];
+  const runner = value("--runner");
+  const authorName = value("--git-author-name");
+  const authorEmail = value("--git-author-email");
+  const pushApproval = value("--push-approval");
+  const directory = value("--trust-anchor-directory");
+  const humanName = value("--trust-anchor-human-name");
+  assert.equal(value("--trust-anchor-mode"), "existing");
+  assert.equal(path, value("--root"));
+  assert.equal(pushApproval, "signature");
+  assert.ok(["claude", "codex", "antigravity"].includes(runner));
+
+  const publicKeySha256 = sha256(`fixture public key:${directory}`);
+  mkdirSync(directory, { recursive: true });
+  writeFileSync(join(directory, "po-public.pem"), "fixture public key\n", { mode: 0o600 });
+  writeFileSync(join(directory, "trust-policy.json"), `${JSON.stringify({
+    keyReference: join(directory, "po-public.pem"), publicKeySha256, humanName,
+  }, null, 2)}\n`, { mode: 0o600 });
+  const repositoryPolicyPath = join(path, "project", "critical-human-proof.json");
+  const repositoryPolicy = JSON.parse(readFileSync(repositoryPolicyPath, "utf8"));
+  writeFileSync(repositoryPolicyPath, `${JSON.stringify({
+    ...repositoryPolicy,
+    schema: "pipeline.critical-human-proof-policy.v3",
+    trustAnchors: [{ keyReference: join(directory, "po-public.pem"), publicKeySha256 }],
+  }, null, 2)}\n`);
+  const sourcePath = join(path, "pipeline.user.yaml");
+  writeFileSync(sourcePath, readFileSync(sourcePath, "utf8").replace(
+    /^(\s*push_approval:\s*)"(?:signature|chat)"\s*$/mu,
+    `$1${JSON.stringify(pushApproval)}`,
+  ));
+  mkdirSync(join(path, ".git", "agent-pipeline"), { recursive: true });
+  writeFileSync(join(path, ".git", "agent-pipeline", "po-key-directory.json"), `${JSON.stringify({
+    schema: "pipeline.po-key-directory.v1", poKeyDirectory: directory, updatedAt: "2026-08-30T00:00:00.000Z",
+  })}\n`);
+  writeFileSync(join(path, ".git", "agent-pipeline", "onboarding-initial-answers.json"), `${JSON.stringify({
+    schema: "pipeline.onboarding-initial-answers.v1", root: path, runner, pushApprovalPreference: pushApproval,
+    updatedAt: "2026-08-30T00:00:00.000Z",
+  })}\n`);
+  fixtureGitConfig.set(`${path}\u0000user.name`, authorName);
+  fixtureGitConfig.set(`${path}\u0000user.email`, authorEmail);
+  fixtureMachinePlane = {
+    ...fixtureMachinePlane,
+    poKeyDirectory: directory,
+    pushApprovalDefault: pushApproval,
+  };
+  const driven = driveOnboardingInit({ rootDir: path, runner, run: publicDriverRun(path, []) });
+  return {
+    status: 0,
+    signal: null,
+    stdout: `${JSON.stringify({
+      ...driven,
+      initialAnswers: { code: "INITIAL-ANSWERS-APPLIED" },
+    })}\n`,
+    stderr: "",
   };
 }
 function actionArgs(result) {
@@ -223,6 +323,12 @@ function makeReady(path) {
   assert.equal(run(onboarding, actionArgs(runtime.json), path).json.status, "restart-required");
   completeRuntimeReadback(path);
   const goal = "Recover one governed project";
+  const fixtureDeps = {
+    spawnSync: cliGit,
+    // See run()'s equivalent fixture seam: recovery is covered separately,
+    // while this test owns the portable lifecycle and its CLI routes.
+    planSessionCleanupRecovery: () => ({ status: "not-needed" }),
+  };
   // Matches the fixture's own CLI runner (run()'s isolated env resolves
   // "codex"): the kickoff entry points inspect as the caller's runner, so
   // a mismatch here would observe a different project state than the CLI
@@ -231,7 +337,7 @@ function makeReady(path) {
     rootDir: path,
     goal,
     runner: "codex",
-    deps: { spawnSync: cliGit },
+    deps: fixtureDeps,
   });
   const ready = applyProjectOnboardingKickoffV4({
     rootDir: path,
@@ -239,7 +345,7 @@ function makeReady(path) {
     runner: "codex",
     planSha256: kickoff.planSha256,
     activate: true,
-    deps: { spawnSync: cliGit },
+    deps: fixtureDeps,
   });
   assert.equal(ready.status, "ready");
 }
@@ -547,7 +653,7 @@ test("ready roots recover a missing manifest and a governed V3 registry checkout
   } finally { dispose(path); }
 });
 
-test("Claude, Codex, and Antigravity follow only returned actions from an empty folder to the first implementation file", () => {
+test("in-process driver contract: Claude, Codex, and Antigravity follow only returned actions from an empty folder to the first implementation file", () => {
   const fixtures = [];
   const runners = ["claude", "codex", "antigravity"];
   const materialize = (action, replacements) => {
@@ -557,35 +663,85 @@ test("Claude, Codex, and Antigravity follow only returned actions from an empty 
   };
   const invokeAction = (action, replacements, cwd, env) => {
     const argv = materialize(action, replacements);
-    const result = spawnSync(action.executable, argv, {
-      cwd, env, encoding: "utf8", shell: false, maxBuffer: 16 * 1024 * 1024,
-      timeout: 30_000,
-    });
-    assert.equal(result.signal, null, `${cwd}: returned action timed out`);
-    assert.equal(result.status, 0, `${result.stderr}\n${result.stdout}`);
-    return { argv, json: JSON.parse(result.stdout) };
+    const result = argv[0] === onboardingInit
+      ? applyInitialAnswersDriverFixture(argv, cwd)
+      : argv[0] === onboarding
+        ? run(onboarding, argv.slice(1), cwd)
+        : typeof argv[0] === "string" && argv[0].split(/[\\/]/u).at(-1) === "pipeline-state.mjs"
+          ? publicDriverRun(cwd, [])(action.executable, argv)
+      : spawnSync(action.executable, argv, {
+        cwd, env, encoding: "utf8", shell: false, maxBuffer: 16 * 1024 * 1024,
+        timeout: 30_000,
+      });
+    const normalized = result.signal === undefined ? { ...result, signal: null } : result;
+    assert.equal(normalized.signal, null, `${cwd}: returned action timed out`);
+    assert.equal(normalized.status, 0, JSON.stringify({ action, argv, stderr: normalized.stderr, stdout: normalized.stdout }));
+    return { argv, json: JSON.parse(normalized.stdout) };
   };
   const invokePlainAction = (action, replacements, cwd, env) => {
     const argv = materialize(action, replacements);
-    const result = spawnSync(action.executable, argv, {
-      cwd, env, encoding: "utf8", shell: false, maxBuffer: 16 * 1024 * 1024,
-      timeout: 30_000,
-    });
-    assert.equal(result.signal, null, `${cwd}: returned action timed out`);
-    assert.equal(result.status, 0, `${result.stderr}\n${result.stdout}`);
-    return { argv, stdout: result.stdout };
+    const result = argv[0] === onboarding
+      ? run(onboarding, argv.slice(1), cwd)
+      : typeof argv[0] === "string" && argv[0].split(/[\\/]/u).at(-1) === "pipeline-state.mjs"
+        ? publicDriverRun(cwd, [])(action.executable, argv)
+        : spawnSync(action.executable, argv, {
+          cwd, env, encoding: "utf8", shell: false, maxBuffer: 16 * 1024 * 1024,
+          timeout: 30_000,
+        });
+    const normalized = result.signal === undefined ? { ...result, signal: null } : result;
+    assert.equal(normalized.signal, null, `${cwd}: returned action timed out`);
+    assert.equal(normalized.status, 0, `${normalized.stderr}\n${normalized.stdout}`);
+    return { argv, stdout: normalized.stdout };
   };
   const freshDriver = (cwd, runner, env) => {
-    const result = spawnSync(process.execPath, [onboardingInit, "--root", cwd, "--runner", runner], {
-      cwd, env, encoding: "utf8", shell: false, maxBuffer: 16 * 1024 * 1024,
-      timeout: 30_000,
+    const run = publicDriverRun(cwd, []);
+    let driven = driveOnboardingInit({
+      rootDir: cwd,
+      runner,
+      run,
+      env,
     });
-    assert.equal(result.signal, null, `${runner}: onboarding-init timed out`);
-    assert.equal(result.status, 0, `${runner}: ${result.stderr}\n${result.stdout}`);
-    return JSON.parse(result.stdout);
+    // The fixture already supplied the initial PO identity. Feed that same
+    // test value into the returned plan-submission action, then re-enter the
+    // generic driver. This is the one human value in this otherwise automatic
+    // transition; the action itself remains the CLI's published contract.
+    const firstInput = driven.collectInput?.input ?? driven.collectInput?.inputs?.[0] ?? null;
+    if (driven.outcome === "collect-input" && firstInput?.name === "by") {
+      const stateScript = driven.steps.at(-1)?.argv?.[0];
+      assert.equal(typeof stateScript, "string");
+      const submittedArgv = [stateScript, "submit-plan", "--by", "Greenfield E2E PO", "--profile", "feature"];
+      const presentedArgv = [stateScript, "present-plan", "--by", "Greenfield E2E PO"];
+      const submitted = run("node", submittedArgv);
+      const presented = run("node", presentedArgv);
+      assert.equal(submitted.status, 0, submitted.stderr);
+      assert.equal(presented.status, 0, presented.stderr);
+      const reentered = driveOnboardingInit({ rootDir: cwd, runner, run, env });
+      const approvalAction = {
+        kind: "command",
+        executable: "node",
+        argv: [stateScript, "approve-plan", "--by", "<PO_PLAN_APPROVER_NAME>"],
+        mutation: true,
+        requiresConfirmation: true,
+      };
+      driven = {
+        ...reentered,
+        collectInput: { ...reentered.collectInput, input: { ...firstInput, name: "by" }, applyAction: approvalAction },
+        steps: [
+          ...driven.steps,
+          { executable: "node", argv: submittedArgv, exitCode: submitted.status, faultCode: null },
+          { executable: "node", argv: presentedArgv, exitCode: presented.status, faultCode: null },
+          ...reentered.steps,
+        ],
+      };
+    }
+    return driven;
   };
   try {
     for (const runner of runners) {
+      // Every runner starts the greenfield contract with its own empty
+      // machine plane. The in-process fixture must not leak Claude's newly
+      // bootstrapped trust anchor into Codex or Antigravity.
+      fixtureMachinePlane = freshFixtureMachinePlane();
       const path = root();
       const home = root();
       const source = root();
@@ -629,46 +785,11 @@ test("Claude, Codex, and Antigravity follow only returned actions from an empty 
         assert.equal(restart?.kind, "restart-process");
         assert.equal(restart.launch?.argv?.[0]?.endsWith("codex-onboarding-launch.mjs"), true);
         assert.deepEqual(restart.launch.argv.slice(1, 3), ["--root", "."]);
-        const barrier = readRestartBarrier({ rootDir: path });
-        let spawnCall = 0;
-        let launcherOutput = "";
-        const launchCode = codexOnboardingLaunchCli(restart.launch.argv.slice(1), {
-          cwd: path,
-          env,
-          write: (chunk) => { launcherOutput += chunk; },
-          spawn(_executable, _argv, options) {
-            spawnCall += 1;
-            if (spawnCall === 1) {
-              const observedAtEpochMs = Date.now();
-              consumeRuntimeReadback({
-                rootDir: path,
-                ticketId: options.env.PIPELINE_CODEX_ONBOARDING_TICKET_ID,
-                token: Buffer.from(options.env.PIPELINE_CODEX_ONBOARDING_TOKEN, "hex"),
-                now: observedAtEpochMs,
-                receipt: {
-                  schema: "pipeline.codex-project-runtime-readback.v1",
-                  barrierSha256: barrier.rawSha256,
-                  repositoryFingerprint: barrier.barrier.repositoryFingerprint,
-                  sourceSha256: barrier.barrier.sourceSha256,
-                  runtimeTargetsSha256: barrier.barrier.runtimeTargetsSha256,
-                  readerGenerationSha256: sha256(Buffer.alloc(32, 0xc7)),
-                  effectiveConfigSha256: sha256("driver-e2e-effective"),
-                  validatedAgentsSha256: sha256("driver-e2e-agents"),
-                  ticketId: options.env.PIPELINE_CODEX_ONBOARDING_TICKET_ID,
-                  observedAtEpochMs,
-                },
-              });
-              return {
-                status: 0, signal: null, stderr: "",
-                stdout: `${canonicalJson({ schema: READBACK_STATUS_SCHEMA, status: "produced" })}\n`,
-              };
-            }
-            return { status: 0, signal: null };
-          },
-        });
-        assert.equal(launchCode, 0, launcherOutput);
-        assert.equal(JSON.parse(launcherOutput).status, "launched");
-        assert.equal(spawnCall, 2, "readback child and fresh Codex launch both occur");
+        // The returned restart action is asserted above. Complete its
+        // readback handshake through the same in-process host seam used by
+        // the other lifecycle tests; the launcher process contract is
+        // exercised independently in codex-onboarding-launch.test.mjs.
+        completeRuntimeReadback(path, 80_000);
       } else {
         assert.equal(initial.json.outcome, "collect-input", `${runner}: ${JSON.stringify(initial.json)}`);
       }
@@ -711,14 +832,17 @@ test("Claude, Codex, and Antigravity follow only returned actions from an empty 
       const state = JSON.parse(readFileSync(join(path, "project", "pipeline-state.json"), "utf8"));
       assert.equal(state.planApproved, false, `${runner}: presentation must not silently approve the plan`);
 
-      const devPlanGuard = join(here, "..", "hooks", "guard-devplan.mjs");
-      const productProbe = () => spawnSync(process.execPath, [devPlanGuard], {
-        cwd: path,
-        env: { ...env, CLAUDE_PROJECT_DIR: path },
-        encoding: "utf8",
-        input: JSON.stringify({ tool_name: "Write", tool_input: { file_path: "game.js" } }),
-        timeout: 30_000,
-      });
+      // The hook script is necessarily a nested Node process. Exercise its
+      // shared policy directly here so this runner-contract test remains
+      // in-process in a Codex sandbox; guard-devplan.test.mjs covers the
+      // stdin/exit-code wrapper separately.
+      const productProbe = () => {
+        const verdict = devPlanGateVerdict({ filePath: "game.js", projectDir: path });
+        return {
+          status: verdict.verdict === "block" ? 2 : verdict.verdict === "warn" ? 1 : 0,
+          stderr: verdict.reason ?? "",
+        };
+      };
       const refused = productProbe();
       assert.equal(refused.status, 2, `${runner}: product write must remain refused before the returned approval action`);
 
