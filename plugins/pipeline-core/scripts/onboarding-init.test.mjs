@@ -22,13 +22,16 @@
  */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test, { after } from "node:test";
 import { createHash } from "node:crypto";
+import { fileURLToPath } from "node:url";
 
 import { DEFAULT_STEP_CAP, SCHEMA, driveOnboardingInit } from "./onboarding-init.mjs";
+
+const PROJECT_ONBOARDING_SCRIPT_PATH = fileURLToPath(new URL("./project-onboarding-v3.mjs", import.meta.url));
 
 function freshRoot() {
   return mkdtempSync(join(tmpdir(), "onboarding-init-test-"));
@@ -90,105 +93,118 @@ writeFileSync(
 const FIXTURE_ENV_WITH_KEY = { ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: FIXTURE_HOME_WITH_KEY };
 after(() => dispose(FIXTURE_HOME_WITH_KEY));
 
-// Every driver test below pins `runner` explicitly, and that is load-bearing rather than
-// tidy. Without it the onboarding CLI resolves the lane from the ENVIRONMENT, so this suite
-// asserted one thing under an agent (CLAUDECODE=1 -> claude -> a real collect-input
-// question) and a different thing in an operator's own shell (no marker -> codex -> a Codex
-// restart barrier the driver correctly refuses as `unsupported-next-action`). Measured
-// 2026-08-28: eight green runs under an agent, and a deterministic double failure under
-// `env -u CLAUDECODE`. A suite in the verify gate must not have two legitimate outcomes
-// depending on who runs it.
-test("driveOnboardingInit: the runner lane is the caller's, not the ambient environment's", () => {
-  const root = freshRoot();
-  try {
-    // Pinned claude: a fresh repository reaches a genuine published question. Since
-    // NVA-V3-PENDINGASKS, that is the pendingAsks stop published on the `apply-portable-seed`
-    // command step (author identity/push-approval/verify-contract), reached before the
-    // later intake-consent collect-input this test pinned pre-fix -- surfacing it earlier is
-    // exactly this task's fix, not a regression here.
-    const claude = driveOnboardingInit({ rootDir: root, runner: "claude", env: FIXTURE_ENV });
-    assert.equal(claude.runner, "claude", "the resolved lane is reported, not left for the caller to assume");
-    assert.equal(claude.outcome, "pending-asks");
-    assert.equal(claude.steps[0].argv.includes("--runner"), true, "the pinned lane reaches the first inspect");
+// NVA-GF-GREENFIELD-3RUNNERDRIVER-1: one explicit runner x machine-key matrix replaces
+// the former two-runner lane test plus Claude-only key comparison. Every cell is a real
+// subprocess walk against a fresh root. The injected ambient marker deliberately names a
+// DIFFERENT runner, so an omitted `--runner` on any generated step fails visibly instead
+// of accidentally agreeing with the current test host.
+const GREENFIELD_RUNNERS = ["claude", "codex", "antigravity"];
+const GREENFIELD_MACHINE_STATES = [
+  { name: "no-registered-key", env: FIXTURE_ENV, hasKey: false },
+  { name: "valid-registered-key", env: FIXTURE_ENV_WITH_KEY, hasKey: true },
+];
 
-    // Pinned codex on the SAME fresh repository shape: pendingAsks itself is not
-    // runner-specific (both lanes reach it here), but the pinned lane is still what decides
-    // WHICH runner value is threaded through every constructed step -- reported and
-    // asserted below rather than assumed. (The Codex restart barrier this test previously
-    // distinguished the lanes by is reached LATER in the chain, past where pendingAsks now
-    // stops the driver first -- NVA-V3-PENDINGASKS moved the first stop earlier.)
-    const other = freshRoot();
-    try {
-      const codex = driveOnboardingInit({ rootDir: other, runner: "codex", env: FIXTURE_ENV });
-      assert.equal(codex.runner, "codex");
-      // The load-bearing assertion, and deliberately not `codex.runner !== claude.runner`,
-      // which is true by construction of the two calls and would prove nothing: the pinned
-      // lane must actually be THREADED into every step this driver constructs. Read the
-      // value that follows `--runner` in each step's argv and require it to be this lane's,
-      // on both sides -- so a driver that accepted the parameter and then inherited an
-      // ambient runner anyway would fail here.
-      const runnerValues = (result) => result.steps.map((step) => step.argv[step.argv.indexOf("--runner") + 1]);
-      assert.deepEqual(new Set(runnerValues(codex)), new Set(["codex"]), "every codex-lane step carries the codex runner");
-      assert.deepEqual(new Set(runnerValues(claude)), new Set(["claude"]), "every claude-lane step carries the claude runner");
-    } finally {
-      dispose(other);
-    }
+function withConflictingAmbientRunner(env, runner) {
+  const conflicted = { ...env };
+  for (const key of ["CLAUDECODE", "ANTIGRAVITY_AGENT", "AI_AGENT", "CODEX_SESSION_ID", "CODEX_THREAD_ID"]) delete conflicted[key];
+  if (runner === "claude") conflicted.CODEX_THREAD_ID = "ambient-codex-fixture";
+  else conflicted.CLAUDECODE = "1";
+  return conflicted;
+}
 
-    // Omitting the runner stays the CLI's own environment resolution -- unchanged
-    // behaviour, reported as null so a caller can tell it was never pinned. Only the
-    // reported field is asserted: the OUTCOME of that path is environment-dependent by
-    // construction, which is the very thing this test exists to keep out of the others.
-    const ambient = freshRoot();
-    try {
-      assert.equal(driveOnboardingInit({ rootDir: ambient, runner: null, env: FIXTURE_ENV }).runner, null);
-    } finally {
-      dispose(ambient);
-    }
-  } finally {
-    dispose(root);
+function actionInputNames(action) {
+  if (!action || typeof action !== "object") return [];
+  return (action.inputs ?? (action.input ? [action.input] : []))
+    .map((input) => input?.name)
+    .filter((name) => typeof name === "string");
+}
+
+function assertPinnedRunner(result, runner, label) {
+  assert.equal(result.runner, runner, `${label}: the selected lane is reported`);
+  for (const step of result.steps) {
+    const indexes = step.argv.flatMap((value, index) => value === "--runner" ? [index] : []);
+    assert.equal(indexes.length, 1, `${label}: every generated step has exactly one --runner`);
+    assert.equal(step.argv[indexes[0] + 1], runner, `${label}: every generated step carries the selected runner`);
+    assert.equal(step.faultCode, null, `${label}: ${JSON.stringify(step.argv)} must not fault`);
+    assert.equal(step.exitCode, 0, `${label}: ${JSON.stringify(step.argv)} must exit zero`);
   }
-});
+}
 
-// NVA-CF-BL17-ONBOARDINIT (AC-1): the with-key and no-key fixture homes must drive the
-// SAME fresh repository to the SAME outcome SHAPE -- both are real machine-plane states a
-// real operator's `$HOME` could hold, so a suite in the verify gate must not have two
-// legitimate outcomes depending on which one it happens to run under. This does not assert
-// the two `pendingAsks` arrays are IDENTICAL (a machine with a key legitimately publishes
-// an additional trust-anchor guidance ask the no-key machine never sees -- that is a real,
-// documented difference in the DATA the driver surfaces, not in the outcome it reaches),
-// only that the driver's own classification of what happened converges: same `outcome`,
-// same `schema`, no fault on any step, and at least the identical baseline set of pending
-// asks the no-key run always reaches.
-test("driveOnboardingInit: a machine with a PO signing key converges to the same outcome shape as one without, from fixtures", () => {
-  const noKeyRoot = freshRoot();
-  const withKeyRoot = freshRoot();
+function recordAnsweredOnboardingValues(root, runner, env) {
+  const applied = spawnSync(process.execPath, [
+    PROJECT_ONBOARDING_SCRIPT_PATH,
+    "intake-consent-apply",
+    "--root", root,
+    "--granted",
+    "--git-author-name", "Greenfield Matrix PO",
+    "--git-author-email", "greenfield-matrix@example.invalid",
+    "--language", "en",
+    "--profile", "feature",
+    "--activate",
+    "--runner", runner,
+  ], { encoding: "utf8", shell: false, env });
+  assert.equal(applied.status, 0, applied.stderr);
+
+  for (const [key, value] of [["user.name", "Greenfield Matrix PO"], ["user.email", "greenfield-matrix@example.invalid"]]) {
+    const configured = spawnSync("git", ["config", key, value], { cwd: root, encoding: "utf8", shell: false, env });
+    assert.equal(configured.status, 0, configured.stderr);
+  }
+}
+
+test("driveOnboardingInit: Claude, Codex, and Antigravity converge across fresh no-key/valid-key homes without ambient drift or repeated answered asks", () => {
+  const roots = [];
+  const firstShapes = [];
   try {
-    const noKey = driveOnboardingInit({ rootDir: noKeyRoot, runner: "claude", env: FIXTURE_ENV });
-    const withKey = driveOnboardingInit({ rootDir: withKeyRoot, runner: "claude", env: FIXTURE_ENV_WITH_KEY });
+    for (const runner of GREENFIELD_RUNNERS) {
+      for (const machine of GREENFIELD_MACHINE_STATES) {
+        const root = freshRoot();
+        roots.push(root);
+        const label = `${runner}/${machine.name}`;
+        const env = withConflictingAmbientRunner(machine.env, runner);
+        const first = driveOnboardingInit({ rootDir: root, runner, env });
 
-    assert.equal(noKey.schema, withKey.schema, "both fixtures drive the same onboarding-init schema");
-    assert.equal(noKey.outcome, "pending-asks", JSON.stringify(noKey));
-    assert.equal(withKey.outcome, "pending-asks", JSON.stringify(withKey));
-    assert.equal(noKey.outcome, withKey.outcome, "the with-key and no-key branches converge on the same outcome");
+        assert.equal(first.schema, SCHEMA, label);
+        assert.equal(first.outcome, "pending-asks", `${label}: first stable stop is genuine published human input`);
+        assert.equal(first.final?.status, "runtime-initialization-required", `${label}: runner choice must not alter the stable boundary`);
+        assert.equal(first.final?.nextAction?.kind, "command", `${label}: pending asks accompany the unchanged real next command`);
+        assert.ok(first.pendingAsks.length > 0, `${label}: the boundary must carry real asks`);
+        assertPinnedRunner(first, runner, label);
+        firstShapes.push({ schema: first.schema, outcome: first.outcome, status: first.final.status, nextActionKind: first.final.nextAction.kind });
 
-    for (const result of [noKey, withKey]) {
-      for (const step of result.steps) {
-        assert.equal(step.faultCode, null, `step ${JSON.stringify(step.argv)} must not have faulted`);
+        const askNames = first.pendingAsks.flatMap(actionInputNames);
+        assert.equal(askNames.includes("trustAnchorPointerRepairAcknowledged"), false, `${label}: a fresh or valid key is never a broken pointer`);
+        assert.equal(askNames.includes("trustAnchorPolicyRepairAcknowledged"), false, `${label}: a valid policy is never an external repair failure`);
+        if (machine.hasKey) {
+          const policy = JSON.parse(readFileSync(join(root, "project", "critical-human-proof.json"), "utf8"));
+          assert.equal(policy.schema, "pipeline.critical-human-proof-policy.v3", `${label}: the existing key is reusable`);
+          assert.ok(policy.trustAnchors.some((anchor) => anchor.publicKeySha256 === FIXTURE_PUBLIC_KEY_SHA256), `${label}: the reusable key digest is materialized into the fresh policy`);
+          assert.equal(askNames.includes("trustAnchorAbsentAcknowledged"), false, `${label}: a valid existing key is not reported absent`);
+        } else {
+          const policy = JSON.parse(readFileSync(join(root, "project", "critical-human-proof.json"), "utf8"));
+          assert.equal(policy.schema, "pipeline.critical-human-proof-policy.v1", `${label}: the no-key home must not inherit an external anchor`);
+          assert.equal(Object.prototype.hasOwnProperty.call(policy, "trustAnchors"), false, `${label}: the no-key policy carries no inherited anchors`);
+        }
+
+        // Record the values the first human round already supplied, then re-enter the SAME
+        // root. Identity is fulfilled through the exact repository-local git-config route
+        // its ask names; language/profile remain in the private intake checkpoint. None may
+        // be asked again, while unrelated unresolved asks remain a truthful stopping point.
+        recordAnsweredOnboardingValues(root, runner, env);
+        const reentrant = driveOnboardingInit({ rootDir: root, runner, env });
+        assert.equal(reentrant.outcome, "pending-asks", `${label}: unrelated genuine asks remain surfaced`);
+        assertPinnedRunner(reentrant, runner, `${label}/reentrant`);
+        const reentrantNames = [
+          ...reentrant.pendingAsks.flatMap(actionInputNames),
+          ...actionInputNames(reentrant.collectInput),
+        ];
+        for (const answered of ["gitAuthorName", "gitAuthorEmail", "language", "profile"]) {
+          assert.equal(reentrantNames.includes(answered), false, `${label}: answered ${answered} must not be asked again`);
+        }
       }
     }
-
-    // Both are real, non-empty pendingAsks arrays carried verbatim from the underlying CLI
-    // -- the with-key machine's array may be a superset (it can legitimately include the
-    // trust-anchor guidance ask), never a divergent SHAPE (missing entirely, or a
-    // different outcome altogether).
-    assert.ok(Array.isArray(noKey.pendingAsks) && noKey.pendingAsks.length > 0);
-    assert.ok(Array.isArray(withKey.pendingAsks) && withKey.pendingAsks.length > 0);
-    const noKeyAskKinds = new Set(noKey.pendingAsks.map((ask) => ask.kind));
-    const withKeyAskKinds = new Set(withKey.pendingAsks.map((ask) => ask.kind));
-    assert.deepEqual(noKeyAskKinds, withKeyAskKinds, "the published ask KINDS are identical across both fixtures -- only per-ask content (e.g. the trust-anchor guidance text itself) may legitimately differ");
+    assert.equal(new Set(firstShapes.map((shape) => JSON.stringify(shape))).size, 1, "all six cells converge to one driver outcome shape");
   } finally {
-    dispose(noKeyRoot);
-    dispose(withKeyRoot);
+    for (const root of roots) dispose(root);
   }
 });
 
