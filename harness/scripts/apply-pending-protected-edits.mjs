@@ -1219,12 +1219,55 @@ const PIPELINE_STATE_DOCUMENT_LANGUAGE_FIXTURE_REPLACEMENT = `  const deps = {
     now: () => "2026-08-09T10:00:00.000Z",
     poGateProfile: () => ({ ok: true, value: profile }),
   };`;
-const PIPELINE_STATE_ACKNOWLEDGE_PLAN_RUNNER_ANCHOR = `  const planned = invokeCaptured([
-    "po-authority-acknowledge-plan", "--root", root, "--by", "PO",
-  ], outsideDeps);`;
-const PIPELINE_STATE_ACKNOWLEDGE_PLAN_RUNNER_REPLACEMENT = `  const planned = invokeCaptured([
-    "po-authority-acknowledge-plan", "--root", root, "--by", "PO", "--runner", "codex",
-  ], outsideDeps);`;
+// The production planner now deliberately requires its selected runner.  Every
+// acknowledge-plan fixture in this one test file is the Codex lane, including
+// the negative argument-shape probes (which must reach their own asserted
+// error rather than failing earlier for an omitted runner).  Match only a call
+// that does NOT already carry the exact runner immediately after the command;
+// a re-run therefore has zero matches and is idempotent.
+const PIPELINE_STATE_ACKNOWLEDGE_PLAN_CALL_RE = /"po-authority-acknowledge-plan",\s*(?!"--runner")/gu;
+const PIPELINE_STATE_ACKNOWLEDGE_PLAN_CALL_REPLACEMENT = '"po-authority-acknowledge-plan", "--runner", "codex", ';
+const PIPELINE_STATE_ACKNOWLEDGE_PLAN_CALL_COUNT = 16;
+const PIPELINE_STATE_ACKNOWLEDGED_APPLY_ARGS_ANCHOR = `function acknowledgedApplyArgs(plan, runner = "codex") {
+  return [...plan.applyAction.argv.slice(1), "--runner", runner];
+}`;
+const PIPELINE_STATE_ACKNOWLEDGED_APPLY_ARGS_REPLACEMENT = `function acknowledgedApplyArgs(plan) {
+  return plan.applyAction.argv.slice(1);
+}`;
+const PIPELINE_STATE_EXPLICIT_ROOT_APPLY_ARGS_ANCHOR = '  const applyArgs = [...plan.applyAction.argv.slice(1), "--runner", "codex"];';
+const PIPELINE_STATE_EXPLICIT_ROOT_APPLY_ARGS_REPLACEMENT = '  const applyArgs = plan.applyAction.argv.slice(1);';
+const PIPELINE_STATE_INVALID_RUNNER_MUTATOR_ANCHOR = '    [(argv) => [...argv, "--runner", "unknown"], "--runner requires claude, codex, or antigravity"],';
+const PIPELINE_STATE_INVALID_RUNNER_MUTATOR_REPLACEMENT = '    [(argv) => argv.map((value) => value === "codex" ? "unknown" : value), "--runner requires claude, codex, or antigravity"],';
+const PIPELINE_STATE_APPROVAL_STOP_START_ANCHOR = "// This is the test that matters most in this package: no `nextAction` the";
+const PIPELINE_STATE_APPROVAL_STOP_END_ANCHOR = "// The command may PREPARE and PRESENT the artifacts (name them by path and";
+const PIPELINE_STATE_APPROVAL_STOP_REPLACEMENT = `// Awaiting approval must never publish a direct runnable command: an agent
+// cannot approve the PO's plan. It may publish the PO's one typed attribution
+// field plus a nested command which remains explicitly human-confirmed.
+{
+  const { root, deps } = awaitingApprovalFixture();
+  const inspected = capturedStdout(() => run(["inspect"], deps));
+  assert.equal(inspected.result, 0, inspected.lines.join(" "));
+  const payload = JSON.parse(inspected.lines.join("\\n"));
+  assert.equal(payload.status, "awaiting-approval");
+  assert.equal(payload.nextAction.kind, "collect-input",
+    "awaiting-approval must never publish a direct kind:\\"command\\" -- that would let a machine approve the PO's plan");
+  assert.equal(payload.nextAction.executable, undefined,
+    "the awaiting-approval gate must never carry a top-level executable");
+  assert.equal(payload.nextAction.argv, undefined,
+    "the awaiting-approval gate must never carry a top-level argv");
+  assert.deepEqual(payload.nextAction.input, {
+    name: "by", encoding: "utf8", trim: true, minBytes: 1, maxBytes: 128,
+    singleLine: true, rejectNul: true,
+  });
+  assert.equal(payload.nextAction.inputs, undefined);
+  assert.equal(payload.nextAction.applyAction?.kind, "command");
+  assert.equal(payload.nextAction.applyAction?.mutation, true);
+  assert.equal(payload.nextAction.applyAction?.requiresConfirmation, true,
+    "the nested approve action remains explicitly human-confirmed");
+  void root;
+}
+
+`;
 const PIPELINE_STATE_APPROVE_ACTION_START_ANCHOR = "// NVA-V2B-APPROVERENDER:";
 const PIPELINE_STATE_APPROVE_ACTION_END_ANCHOR = "// NVA-V2-APPROVEREACH (PO's mandatory addendum, 2026-08-28): spelling a";
 const PIPELINE_STATE_APPROVE_ACTION_REPLACEMENT = `// NVA-V2B-APPROVERENDER: approval remains a typed collect-input with one exact nested argv.
@@ -1304,11 +1347,16 @@ function stepPipelineStateRunnerFixture({ dryRun, preview }) {
   const pluginOriginal = readFileSync(PIPELINE_STATE_PLUGIN_TEST_PATH, "utf8");
   const seedApplied = original.includes('CODEX_THREAD_ID: "pipeline-state-po-authority-fixture"');
   const documentLanguageApplied = original.includes('CODEX_THREAD_ID: "pipeline-state-po-authority-document-language-fixture"');
-  const acknowledgePlanRunnerApplied = pluginOriginal.includes(PIPELINE_STATE_ACKNOWLEDGE_PLAN_RUNNER_REPLACEMENT);
+  const rawAcknowledgePlanCalls = pluginOriginal.match(PIPELINE_STATE_ACKNOWLEDGE_PLAN_CALL_RE) ?? [];
+  const acknowledgePlanRunnerApplied = rawAcknowledgePlanCalls.length === 0;
+  const acknowledgeApplyHelperApplied = pluginOriginal.includes(PIPELINE_STATE_ACKNOWLEDGED_APPLY_ARGS_REPLACEMENT);
+  const explicitRootApplyArgsApplied = pluginOriginal.includes(PIPELINE_STATE_EXPLICIT_ROOT_APPLY_ARGS_REPLACEMENT);
+  const invalidRunnerMutatorApplied = pluginOriginal.includes(PIPELINE_STATE_INVALID_RUNNER_MUTATOR_REPLACEMENT);
+  const approvalStopApplied = pluginOriginal.includes("the nested approve action remains explicitly human-confirmed");
   const approveActionApplied = pluginOriginal.includes("approval remains a typed collect-input with one exact nested argv");
   const approveReachApplied = pluginOriginal.includes("the exact nested approve action must also be admitted by the");
-  if (seedApplied && documentLanguageApplied && acknowledgePlanRunnerApplied && approveActionApplied && approveReachApplied) {
-    return { status: "already-applied", detail: "all five pipeline-state fixture repairs are already applied" };
+  if (seedApplied && documentLanguageApplied && acknowledgePlanRunnerApplied && acknowledgeApplyHelperApplied && explicitRootApplyArgsApplied && invalidRunnerMutatorApplied && approvalStopApplied && approveActionApplied && approveReachApplied) {
+    return { status: "already-applied", detail: "all eight pipeline-state fixture repairs are already applied" };
   }
 
   let next = original;
@@ -1330,11 +1378,42 @@ function stepPipelineStateRunnerFixture({ dryRun, preview }) {
   }
   let pluginNext = pluginOriginal;
   if (!acknowledgePlanRunnerApplied) {
+    if (rawAcknowledgePlanCalls.length !== PIPELINE_STATE_ACKNOWLEDGE_PLAN_CALL_COUNT) {
+      throw new Error(`acknowledge-plan fixture runner calls: expected ${PIPELINE_STATE_ACKNOWLEDGE_PLAN_CALL_COUNT} unbound calls, found ${rawAcknowledgePlanCalls.length}. Nothing was written.`);
+    }
+    pluginNext = pluginNext.replace(PIPELINE_STATE_ACKNOWLEDGE_PLAN_CALL_RE, PIPELINE_STATE_ACKNOWLEDGE_PLAN_CALL_REPLACEMENT);
+  }
+  if (!acknowledgeApplyHelperApplied) {
     pluginNext = anchoredReplace(
       pluginNext,
-      PIPELINE_STATE_ACKNOWLEDGE_PLAN_RUNNER_ANCHOR,
-      PIPELINE_STATE_ACKNOWLEDGE_PLAN_RUNNER_REPLACEMENT,
-      "positive explicit-root PO acknowledge-plan runner",
+      PIPELINE_STATE_ACKNOWLEDGED_APPLY_ARGS_ANCHOR,
+      PIPELINE_STATE_ACKNOWLEDGED_APPLY_ARGS_REPLACEMENT,
+      "acknowledge apply helper must consume the returned runner-bound action unchanged",
+    );
+  }
+  if (!explicitRootApplyArgsApplied) {
+    pluginNext = anchoredReplace(
+      pluginNext,
+      PIPELINE_STATE_EXPLICIT_ROOT_APPLY_ARGS_ANCHOR,
+      PIPELINE_STATE_EXPLICIT_ROOT_APPLY_ARGS_REPLACEMENT,
+      "explicit-root acknowledge apply must consume the returned runner-bound action unchanged",
+    );
+  }
+  if (!invalidRunnerMutatorApplied) {
+    pluginNext = anchoredReplace(
+      pluginNext,
+      PIPELINE_STATE_INVALID_RUNNER_MUTATOR_ANCHOR,
+      PIPELINE_STATE_INVALID_RUNNER_MUTATOR_REPLACEMENT,
+      "invalid runner probe must replace the returned runner instead of duplicating it",
+    );
+  }
+  if (!approvalStopApplied) {
+    pluginNext = anchoredBlockReplace(
+      pluginNext,
+      PIPELINE_STATE_APPROVAL_STOP_START_ANCHOR,
+      PIPELINE_STATE_APPROVAL_STOP_END_ANCHOR,
+      PIPELINE_STATE_APPROVAL_STOP_REPLACEMENT,
+      "awaiting-approval typed nested action contract",
     );
   }
   if (!approveActionApplied) {
@@ -1384,7 +1463,7 @@ function stepPipelineStateRunnerFixture({ dryRun, preview }) {
   }
 
   if (dryRun) {
-    return { status: "would-apply", detail: "5 unique anchored fixture repairs across 2 protected suites: two runner env markers, one explicit --runner codex, and two typed approve-plan action expectations" };
+    return { status: "would-apply", detail: "8 unique anchored fixture repairs across 2 protected suites: two runner env markers, 16 explicit --runner codex plan calls, two runner-bound apply consumers, one invalid-runner replacement, and three typed approve-plan action expectations" };
   }
 
   const detail = writeManyThenVerifyOrRevert([

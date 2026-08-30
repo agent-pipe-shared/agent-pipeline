@@ -104,7 +104,11 @@ function seedPoAuthorityRebind(prefix = "po-rebind") {
   };
   writeFileSync(statePath(dir), JSON.stringify(state, null, 2) + "\n");
   const deps = {
-    dir, now: () => "2026-07-28T10:00:00.000Z", ownerNonce: () => `rebind-${String(++nonceSequence).padStart(8, "0")}`,
+    dir,
+    // This PO rebind/decision fixture is runner-bound independently of the
+    // naked CI/operator shell (or different runner) that launches the suite.
+    env: { CODEX_THREAD_ID: "pipeline-state-po-authority-fixture" },
+    now: () => "2026-07-28T10:00:00.000Z", ownerNonce: () => `rebind-${String(++nonceSequence).padStart(8, "0")}`,
     poGateProfile: () => ({ ok: true, value: profile }),
     poGateAuthority: ({ expectedPlanSha256, expectedSpecSha256 }) => expectedSpecSha256 === newSpecSha && typeof expectedPlanSha256 === "string"
       ? { ok: true, value: { ...profile, schema: "pipeline.po-gate-authority.v2", planPath, planSha256: expectedPlanSha256, specPath, specSha256: newSpecSha } }
@@ -484,7 +488,12 @@ function runPoAuthorityRebindTests() {
     continuity, updatedAt: "2026-08-01T00:00:00.000Z",
   };
   writeFileSync(statePath(dir), JSON.stringify(state, null, 2) + "\n");
-  const deps = { dir, now: () => "2026-08-09T10:00:00.000Z", poGateProfile: () => ({ ok: true, value: profile }) };
+  const deps = {
+    dir,
+    env: { CODEX_THREAD_ID: "pipeline-state-po-authority-document-language-fixture" },
+    now: () => "2026-08-09T10:00:00.000Z",
+    poGateProfile: () => ({ ok: true, value: profile }),
+  };
   const planned = captureConsole(() => run(["po-authority-decision-plan"], deps));
   const plan = JSON.parse(planned.text || "{}");
   ok("PS55j a non-de/en documentLanguage marker matching continuity.runtime.documentLanguage plans cleanly", planned.value === 0
