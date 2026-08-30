@@ -162,6 +162,57 @@ test("authorize-by-signature reaches authorizeHumanGuardOverrideBySignature() an
   }
 });
 
+// NVA-CF-HGOCANDIDATEDRIFT (backlog/items/2026-08-30-hgo-candidate-drift-invalidates-
+// ceremony-on-any-concurrent-commit.md, Bar 2): `plan` must warn on stderr BEFORE a
+// signature is requested, not only after a ceremony is discarded by
+// HGO-CANDIDATE-DRIFT, and that advisory must never leak into the plan's own JSON on
+// stdout (still parseable/unchanged).
+test("plan prints a candidate-drift advisory on stderr without altering the plan JSON on stdout", () => {
+  const root = fixture();
+  try {
+    const denials = [{ guard: "guard-testpath.mjs", reason: "TP-3: fixture" }];
+    const recorded = recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write",
+      toolInput: { file_path: "notes.md", content: "plan advisory\n" }, denials,
+    });
+    assert.equal(recorded.status, "planned");
+    const captured = io();
+    const status = main(["plan", "--repo", root, "--request-sha256", recorded.requestSha256], captured);
+    assert.equal(status, 0, captured.stderr);
+    const value = JSON.parse(captured.stdout);
+    assert.equal(value.schema, "pipeline.human-guard-override-plan.v2");
+    assert.match(captured.stderr, /^ADVISORY: this ceremony's signature will bind to the exact repository HEAD/);
+    assert.ok(captured.stderr.includes(value.repository.head), "advisory should name the exact bound HEAD");
+    assert.match(captured.stderr, /HGO-CANDIDATE-DRIFT/);
+    assert.doesNotMatch(captured.stderr, /other git worktree\(s\)/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("plan's advisory escalates when another git worktree is present", () => {
+  const root = fixture();
+  const worktreeDir = join(tmpdir(), `guard-human-override-cli-wt-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  try {
+    git(root, "worktree", "add", "-b", "hgo-cli-advisory-wt", worktreeDir, "HEAD");
+    const denials = [{ guard: "guard-testpath.mjs", reason: "TP-3: fixture" }];
+    const recorded = recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write",
+      toolInput: { file_path: "notes.md", content: "plan advisory worktree\n" }, denials,
+    });
+    assert.equal(recorded.status, "planned");
+    const captured = io();
+    const status = main(["plan", "--repo", root, "--request-sha256", recorded.requestSha256], captured);
+    assert.equal(status, 0, captured.stderr);
+    assert.match(captured.stderr, /ADVISORY: 1 other git worktree\(s\) are present/);
+    assert.match(captured.stderr, /HIGH RISK for HGO-CANDIDATE-DRIFT/);
+  } finally {
+    spawnSync("git", ["worktree", "remove", "--force", worktreeDir], { cwd: root, encoding: "utf8", shell: false });
+    rmSync(root, { recursive: true, force: true });
+    rmSync(worktreeDir, { recursive: true, force: true });
+  }
+});
+
 /**
  * NVA-SIGENTRY-1 DoD check 2. `emit-signature-digest` must print the exact digest
  * `authorizeHumanGuardOverrideBySignature()` gates arming on for the identical
