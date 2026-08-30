@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "74e8f8fe89590605e5affee93c59a394df8543e1ef8e72674dc067706af9b990"
+    "transitionHead": "874b0cb87b19cd91bbf69173bce140d074e02982f21488a9a7909f0028d20020"
   },
   "counts": {
-    "open": 76,
+    "open": 77,
     "in_progress": 3,
     "closed": 463,
     "rejected": 3,
@@ -1269,6 +1269,16 @@
       "closureRepository": "self",
       "closureCommit": "ad68796a1ad39a022d17b1000add1ca53aecf7a6",
       "closureEvidence": "plugins/pipeline-core/scripts/codex-sandbox-runtime.mjs"
+    },
+    {
+      "id": "pipeline.codex-worker-dispatch-fails-session-capability-probe-root-does-not",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-30",
+      "source": "Codex-060-77 greenfield retrospective, section on root/worker capability mismatch. Confirmed live: root runner was session-ready after bootstrap; two dispatched Codex workers (a generic author, an explicit implementor) each got repository-control-path-invalid/session-capability-unavailable and failed closed, no change made.",
+      "deferred": false,
+      "tracking": "NOW / Nova A -- PO-raised 2026-08-30 from the Codex/WSL greenfield retrospective; confirmed via code trace to be a genuinely separate defect from the resume-hint enforcement gap and the design-binding gap raised alongside it."
     },
     {
       "id": "pipeline.codex-worker-subagent-dispatch-capability-is-broken",
