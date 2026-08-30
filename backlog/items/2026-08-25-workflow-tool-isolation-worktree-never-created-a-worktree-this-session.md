@@ -192,3 +192,23 @@ detection LOGIC exists and is tested, but nothing calls it during a real
 session yet. Closing this item is appropriate only once the hooks.json
 wiring actually lands and at least one live run has been observed to
 surface (or correctly not surface) a mismatch.
+
+### Progress note, 2026-08-30 — hooks.json wiring landed via signed TP-4 override, live-run confirmation still outstanding
+
+The PreToolUse stanza drafted in `evidence/dispatch-record-NVA-W7-
+WORKTREECOUNT.json` landed byte-for-byte, commit `0859afe6`, via a signed
+`guard-human-override.mjs` ceremony (`mode: pipeline-author-repair`,
+request `11b92119cf69daeecca0fa4b5e7ad7643602ceb31ba57471d9fdb65eac02ed26`,
+refrozen plan `e8163f011b1ac83244ed64ed1def8c5c59139f2cf46fbd2fd02417fb8381b68e`
+after a concurrent background dispatch moved HEAD mid-ceremony, PO signature
+verified against trust anchor `2de20a39…`). The companion hook wrapper
+(`hooks/guard-worktree-isolation.mjs`) was already committed separately
+(`8760f07a`) and did not need this ceremony. `worktree-count-check.test.mjs`
+re-run clean, 33/33, after the wiring edit.
+
+**Status still stays `open`.** This item's own bar is "wiring lands AND at
+least one live run has been observed to surface (or correctly not surface)
+a mismatch" — the second half is unmet: Claude Code hooks enforce only
+after a plugin-cache refresh and session reload (this repo's own
+cache-enforcement-latency discipline, `docs/state.md`), which has not
+happened yet this session. Close only after that live observation.
