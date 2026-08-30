@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import { readFileSync } from "node:fs";
+import { spawnSync as hostSpawnSync } from "node:child_process";
 import { isAbsolute, relative, resolve } from "node:path";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { observeCodexOnboardingCapabilities } from "../lib/codex-onboarding-capabilities.mjs";
 import { requireAttendedChatGateConfirmation } from "../lib/chat-gate-ceremony.mjs";
 import { loadManifestSafe, resolveHumanFacingLanguage, gateConfig } from "../lib/manifest.mjs";
 import { planInstall as planPrePushHookInstall, MARKER_SCHEMA as PRE_PUSH_HOOK_MARKER_SCHEMA, DECLINE_MARKER_SCHEMA as PRE_PUSH_HOOK_DECLINE_MARKER_SCHEMA } from "./pre-push-hook-install.mjs";
@@ -541,6 +543,60 @@ function buildPrePushHookOfferAction({ rootDir }) {
 
 export { buildPrePushHookOfferAction };
 
+function runGitObservation(spawn, root, args) {
+  try {
+    const result = spawn("git", args, {
+      cwd: root,
+      encoding: "utf8",
+      shell: false,
+      timeout: 10_000,
+      windowsHide: true,
+    });
+    if (result?.error) return { status: null, stdout: "" };
+    return { status: result?.status ?? null, stdout: String(result?.stdout ?? "").trim() };
+  } catch {
+    return { status: null, stdout: "" };
+  }
+}
+
+/**
+ * True only for a real local worktree whose repository contains zero reachable
+ * commits anywhere. A missing HEAD alone is insufficient: a broken symbolic
+ * ref, a branch switch, or a repository with another committed ref must never
+ * suppress the real dispatch probe.
+ */
+function repositoryHasUnbornHead(root, spawn) {
+  const inside = runGitObservation(spawn, root, ["rev-parse", "--is-inside-work-tree"]);
+  if (inside.status !== 0 || inside.stdout !== "true") return false;
+  const head = runGitObservation(spawn, root, ["rev-parse", "--verify", "HEAD^{commit}"]);
+  if (head.status === 0) return false;
+  const commits = runGitObservation(spawn, root, ["rev-list", "--all", "--count"]);
+  return commits.status === 0 && commits.stdout === "0";
+}
+
+/**
+ * A detached worktree cannot be created until one commit exists. Treating that
+ * Git prerequisite as a failed capability turns an ordinary greenfield repo
+ * into a false repair dead end. At the public onboarding CLI edge only, defer
+ * the dispatch worktree probe by observing the still-genuine session
+ * capability and report worktreeCapability "not-observed". The requested
+ * lifecycle intent remains "dispatch" throughout; once any commit exists this
+ * adapter disappears and the original full dispatch probe runs unchanged.
+ */
+function withUnbornHeadDispatchDeferral({ root, intent, deps }) {
+  if (intent !== "dispatch") return deps;
+  const spawn = deps?.spawnSync ?? hostSpawnSync;
+  if (!repositoryHasUnbornHead(root, spawn)) return deps;
+  const observe = deps?.observeCodexOnboardingCapabilities ?? observeCodexOnboardingCapabilities;
+  return {
+    ...(deps ?? {}),
+    observeCodexOnboardingCapabilities(options) {
+      const deferred = observe({ ...options, intent: "session" });
+      return { ...deferred, worktreeCapability: "not-observed" };
+    },
+  };
+}
+
 export function main(args = process.argv.slice(2), {
   write = process.stdout.write.bind(process.stdout),
   writeError = process.stderr.write.bind(process.stderr),
@@ -566,6 +622,7 @@ export function main(args = process.argv.slice(2), {
       deps = { homedir: () => homedirOverride };
     }
   }
+  deps = withUnbornHeadDispatchDeferral({ root: options.root, intent: options.intent, deps });
 
   // AGY-CHATADAPTER-2: an agent's own tool-calling harness has no TTY on file
   // descriptor 0 and can never complete this step, no matter what value it

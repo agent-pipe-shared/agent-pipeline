@@ -105,6 +105,11 @@ const INTAKE_COORDINATOR_STATUSES = ["intake-required", "intake-design-questions
 
 const SOURCE = "pipeline.user.yaml";
 const SCHEMA = "pipeline.project-onboarding.v4";
+// Closed placeholder token used only in the structured handover action below.
+// A driver replaces this ONE argv element with the PO's verbatim verifyCommand
+// answer before executing the nested applyAction. It is data, never a shell
+// interpolation convention and never itself accepted by pipeline-state.mjs.
+export const PROJECT_ONBOARDING_VERIFY_COMMAND_PLACEHOLDER = "<PO_VERIFY_COMMAND>";
 const LEGACY_SCHEMA = "pipeline.project-onboarding.v3";
 const PLAN_SCHEMA = "pipeline.project-onboarding-plan.v3";
 const REMOTE_ADOPTION_PLAN_SCHEMA = "pipeline.project-onboarding-remote-adoption-plan.v1";
@@ -2444,6 +2449,17 @@ export const PO_AUTHORITY_REBIND_UNAVAILABLE_DIAGNOSTICS = [
 function designToImplementationHandoverAction(root, fs) {
   const authority = persistedPoAuthority(root, fs);
   if (authority.status !== "observed" || authority.lifecycleStatus !== "approved") return null;
+  // NVA-GF-GREENFIELD-UNBORNHEAD-1: set-phase deliberately refuses a fresh
+  // project's missing/UNCONFIGURED_VERIFY calibration unless the real command
+  // is supplied in the SAME transaction. Publishing the historical bare
+  // command in that state therefore advertised an action already known to
+  // fail. Make the missing value a primary, driver-readable collect-input
+  // boundary and bind its answer to one exact nested apply argv. No direct
+  // calibration edit is prescribed or needed; pipeline-state.mjs owns both
+  // writes atomically. A configured project retains the historical command
+  // byte-for-byte below.
+  const verify = checkVerifyContractConfigured(root);
+  if (!verify.ok) return collectImplementationVerifyCommandAction(root);
   return commandAction(
     [PO_AUTHORITY_REBIND_WRITER, "set-phase", "--phase", "implementation"],
     true,
@@ -5369,6 +5385,49 @@ function detectVerifyCommandCandidate(root) {
 // short token.
 const VERIFY_COMMAND_MAX_BYTES = 512;
 
+function verifyCommandInput() {
+  return {
+    name: "verifyCommand",
+    encoding: "utf8",
+    trim: true,
+    minBytes: 1,
+    maxBytes: VERIFY_COMMAND_MAX_BYTES,
+    singleLine: true,
+    rejectNul: true,
+  };
+}
+
+/**
+ * Approved design + unconfigured verify contract: one genuine public-driver
+ * input boundary and the exact atomic apply transaction that consumes it.
+ * The placeholder occupies exactly one argv element, so runners substitute
+ * the PO's answer as data without quoting, shell reconstruction, or chat-only
+ * knowledge. `pipeline-state.mjs` validates the answer again before writing.
+ */
+function collectImplementationVerifyCommandAction(root) {
+  const candidate = detectVerifyCommandCandidate(root);
+  return {
+    kind: "collect-input",
+    input: verifyCommandInput(),
+    mutation: false,
+    requiresConfirmation: false,
+    guidance: candidate
+      ? `the approved plan is ready for implementation, but its verify command is not configured. A candidate was detected from ${candidate.source}: "${candidate.command}". Ask the PO to confirm that exact command or supply a different real command. Then replace exactly ${PROJECT_ONBOARDING_VERIFY_COMMAND_PLACEHOLDER} in applyAction.argv with the PO's verbatim answer and execute applyAction once; that sanctioned transaction records the verify command and enters implementation atomically. Do not mutate calibration separately.`
+      : `the approved plan is ready for implementation, but its verify command is not configured. Ask the PO for this project's real verification command. Then replace exactly ${PROJECT_ONBOARDING_VERIFY_COMMAND_PLACEHOLDER} in applyAction.argv with the PO's verbatim answer and execute applyAction once; that sanctioned transaction records the verify command and enters implementation atomically. Do not mutate calibration separately.`,
+    applyAction: commandAction(
+      [
+        PO_AUTHORITY_REBIND_WRITER, "set-phase", "--phase", "implementation",
+        "--verify-command", PROJECT_ONBOARDING_VERIFY_COMMAND_PLACEHOLDER,
+      ],
+      true,
+      true,
+      SCHEMA,
+      ["ready"],
+    ),
+    expected: { schema: SCHEMA, statuses: ["ready"] },
+  };
+}
+
 /**
  * Builds the `collect-input` ask for the real verify command, OFFERING
  * `candidate` (from `detectVerifyCommandCandidate()`) for confirmation when
@@ -5384,15 +5443,7 @@ const VERIFY_COMMAND_MAX_BYTES = 512;
 function collectVerifyContractAction(candidate) {
   return {
     kind: "collect-input",
-    input: {
-      name: "verifyCommand",
-      encoding: "utf8",
-      trim: true,
-      minBytes: 1,
-      maxBytes: VERIFY_COMMAND_MAX_BYTES,
-      singleLine: true,
-      rejectNul: true,
-    },
+    input: verifyCommandInput(),
     mutation: false,
     requiresConfirmation: false,
     guidance: candidate
@@ -5417,6 +5468,12 @@ function collectVerifyContractAction(candidate) {
 function withPendingVerifyContractAsk(observed) {
   if (observed.repository?.mode !== "local") return observed;
   if (!PORTABLE_APPLY_IDENTITY_ASK_STATUSES.includes(observed.status)) return observed;
+  // designToImplementationHandoverAction() already publishes this unresolved
+  // value as the PRIMARY action with its atomic apply contract. Adding the
+  // older side-channel ask as pendingAsks would ask the same answered field
+  // twice and, worse, reintroduce its obsolete raw-calibration guidance.
+  if (observed.nextAction?.kind === "collect-input"
+    && observed.nextAction.input?.name === "verifyCommand") return observed;
   const check = checkVerifyContractConfigured(observed.root);
   if (check.ok) return observed;
   return {

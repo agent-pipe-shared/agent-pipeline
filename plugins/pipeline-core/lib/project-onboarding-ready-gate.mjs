@@ -7,6 +7,7 @@ import {
   inspectProjectOnboardingV3,
   PROJECT_ONBOARDING_BASE_RESULT_KEYS,
   PROJECT_ONBOARDING_READY_ONLY_RESULT_KEYS,
+  PROJECT_ONBOARDING_VERIFY_COMMAND_PLACEHOLDER,
 } from "./project-onboarding-v3.mjs";
 
 export const PROJECT_ONBOARDING_READY_GATE_SCHEMA = "pipeline.project-onboarding-ready-gate.v1";
@@ -117,24 +118,54 @@ function safeLifecycleStatus(value) {
   return typeof value === "string" && SAFE_STATUS.test(value) ? value : null;
 }
 
+function validReadyExpected(value) {
+  return exactKeys(value, ["schema", "statuses"])
+    && value.schema === "pipeline.project-onboarding.v4"
+    && JSON.stringify(value.statuses) === JSON.stringify(["ready"]);
+}
+
+function validImplementationHandoverCommand(value, { requiresVerifyCommand = false } = {}) {
+  const suffix = requiresVerifyCommand
+    ? ["set-phase", "--phase", "implementation", "--verify-command", PROJECT_ONBOARDING_VERIFY_COMMAND_PLACEHOLDER]
+    : ["set-phase", "--phase", "implementation"];
+  if (!exactKeys(value, ["kind", "executable", "argv", "mutation", "requiresConfirmation", "expected"])
+    || value.kind !== "command") return false;
+  return value.executable === "node"
+    && value.mutation === true
+    && value.requiresConfirmation === true
+    && Array.isArray(value.argv)
+    && value.argv.length === suffix.length + 1
+    && typeof value.argv[0] === "string"
+    && value.argv[0].split(/[\\/]/u).at(-1) === "pipeline-state.mjs"
+    && JSON.stringify(value.argv.slice(1)) === JSON.stringify(suffix)
+    && validReadyExpected(value.expected);
+}
+
+function validVerifyCommandInput(value) {
+  return exactKeys(value, ["name", "encoding", "trim", "minBytes", "maxBytes", "singleLine", "rejectNul"])
+    && value.name === "verifyCommand"
+    && value.encoding === "utf8"
+    && value.trim === true
+    && value.minBytes === 1
+    && value.maxBytes === 512
+    && value.singleLine === true
+    && value.rejectNul === true;
+}
+
 function validReadyNextAction(value) {
   if (value === null) return true;
-  if (!exactKeys(value, ["kind", "executable", "argv", "mutation", "requiresConfirmation", "expected"])
-    || value.kind !== "command"
-    || value.executable !== "node"
-    || value.mutation !== true
-    || value.requiresConfirmation !== true
-    || !Array.isArray(value.argv)
-    || value.argv.length !== 4
-    || typeof value.argv[0] !== "string"
-    || value.argv[0].split(/[\\/]/u).at(-1) !== "pipeline-state.mjs"
-    || JSON.stringify(value.argv.slice(1)) !== JSON.stringify(["set-phase", "--phase", "implementation"])
-    || !exactKeys(value.expected, ["schema", "statuses"])
-    || value.expected.schema !== "pipeline.project-onboarding.v4"
-    || JSON.stringify(value.expected.statuses) !== JSON.stringify(["ready"])) {
-    return false;
-  }
-  return true;
+  if (validImplementationHandoverCommand(value)) return true;
+  return exactKeys(value, [
+    "kind", "input", "mutation", "requiresConfirmation", "guidance", "applyAction", "expected",
+  ])
+    && value.kind === "collect-input"
+    && validVerifyCommandInput(value.input)
+    && value.mutation === false
+    && value.requiresConfirmation === false
+    && typeof value.guidance === "string"
+    && value.guidance.length > 0
+    && validImplementationHandoverCommand(value.applyAction, { requiresVerifyCommand: true })
+    && validReadyExpected(value.expected);
 }
 
 /**
