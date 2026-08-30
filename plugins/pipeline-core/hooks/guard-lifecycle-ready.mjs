@@ -2868,6 +2868,33 @@ function sanctionedDriverArgs(args, root) {
 
   const nonEmpty = (value) => typeof value === "string" && value.trim().length > 0 && !value.startsWith("--");
   const externalAbsolute = (value) => isAbsolute(value) && !pathInside(root, resolve(value));
+  const initialAnswers = matchFlagSpec(args, {
+    requiredValue: {
+      "--root": (value) => value === root,
+      "--runner": (value) => VALID_RUNNERS.has(value),
+      "--push-approval": (value) => value === "signature" || value === "chat",
+    },
+    optionalValue: {
+      "--git-author-name": (value) => nonEmpty(value) && value.length <= 320,
+      "--git-author-email": (value) => nonEmpty(value) && value.length <= 320,
+      "--trust-anchor-mode": (value) => value === "existing" || value === "new",
+      "--trust-anchor-directory": externalAbsolute,
+      "--trust-anchor-human-name": (value) => nonEmpty(value) && value.length <= 512,
+      "--trust-anchor-existing-key": (value) => value === "none" || externalAbsolute(value),
+    },
+  });
+  if (initialAnswers) {
+    const has = (flag) => args.includes(flag);
+    const identityComplete = has("--git-author-name") === has("--git-author-email");
+    const trustFlags = ["--trust-anchor-mode", "--trust-anchor-directory", "--trust-anchor-human-name", "--trust-anchor-existing-key"];
+    const trustCount = trustFlags.filter(has).length;
+    if (!identityComplete || (trustCount !== 0 && trustCount !== trustFlags.length)) return false;
+    if (trustCount === 0) return true;
+    const valueAfter = (flag) => args[args.indexOf(flag) + 1];
+    const mode = valueAfter("--trust-anchor-mode");
+    const existingKey = valueAfter("--trust-anchor-existing-key");
+    return mode === "new" ? existingKey === "none" : existingKey !== "none";
+  }
   const bootstrap = matchFlagSpec(args, {
     requiredValue: {
       "--root": (value) => value === root,
@@ -2987,23 +3014,26 @@ export function isNarrowRepositoryRecoveryCommand(command, root) {
 }
 
 function sanctionedPoAuthorityRebindArgs(args, root) {
+  const exactRunnerTail = (index) => args[index] === "--runner"
+    && VALID_RUNNERS.has(args[index + 1]);
   if (args[0] === "po-authority-decision-plan" && args.length === 1) return true;
   if (args[0] === "po-authority-decision-select") {
-    return args[1] === "--plan-sha256" && HEX.test(args[2] ?? "")
+    const base = args[1] === "--plan-sha256" && HEX.test(args[2] ?? "")
       && args[3] === "--planned-at"
       && typeof args[4] === "string" && Number.isFinite(Date.parse(args[4]))
       && new Date(args[4]).toISOString() === args[4]
-      && args[5] === "--selection" && new Set(["prd", "spec"]).has(args[6])
-      && args.length === 7;
+      && args[5] === "--selection" && new Set(["prd", "spec"]).has(args[6]);
+    return base && (args.length === 7 || (exactRunnerTail(7) && args.length === 9));
   }
   if (args[0] === "po-authority-decision-apply") {
-    return args[1] === "--plan-sha256" && HEX.test(args[2] ?? "")
+    const base = args[1] === "--plan-sha256" && HEX.test(args[2] ?? "")
       && args[3] === "--selection-digest" && HEX.test(args[4] ?? "")
       && args[5] === "--planned-at"
       && typeof args[6] === "string" && Number.isFinite(Date.parse(args[6]))
       && new Date(args[6]).toISOString() === args[6]
       && args[7] === "--selection" && args[8] === "spec"
-      && args[9] === "--activate" && args.length === 10;
+      && args[9] === "--activate";
+    return base && (args.length === 10 || (exactRunnerTail(10) && args.length === 12));
   }
   const nonBlankValue = (value) => typeof value === "string"
     && value.trim().length > 0;
@@ -3041,15 +3071,15 @@ function sanctionedPoAuthorityRebindArgs(args, root) {
       required: { "--activate": true },
     });
   }
-  return args[0] === "po-authority-rebind-apply"
+  const rebindApply = args[0] === "po-authority-rebind-apply"
     && args[1] === "--plan-sha256"
     && HEX.test(args[2] ?? "")
     && args[3] === "--updated-at"
     && typeof args[4] === "string"
     && Number.isFinite(Date.parse(args[4]))
     && new Date(args[4]).toISOString() === args[4]
-    && args[5] === "--activate"
-    && args.length === 6;
+    && args[5] === "--activate";
+  return rebindApply && (args.length === 6 || (exactRunnerTail(6) && args.length === 8));
 }
 
 /**

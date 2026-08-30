@@ -5885,7 +5885,7 @@ function buildPoAuthorityDecisionPlan(dir, deps, existing, plannedAt = deps.now?
 }
 
 /**
- * `--runner claude|codex` is optional and, unlike planSha256/plannedAt, is
+ * `--runner claude|codex|antigravity` is optional and, unlike planSha256/plannedAt, is
  * never part of the CAS/transaction digest tuple: it only tells this apply
  * which lifecycle the in-transaction V4 readback observes (ADR-0051 class),
  * never what the recovery writes. Absent, the caller falls back to its own
@@ -5958,18 +5958,24 @@ function parsePoAcknowledgeFlags(argv, { apply }) {
 }
 
 function parsePoDecisionSelection(argv) {
-  if (argv.length !== 6 || argv[0] !== "--plan-sha256" || !SHA256_RE.test(argv[1])
+  if (argv.length !== 6 && argv.length !== 8) return null;
+  if (argv[0] !== "--plan-sha256" || !SHA256_RE.test(argv[1])
     || argv[2] !== "--planned-at" || !canonicalIso(argv[3])
     || argv[4] !== "--selection" || !new Set(["prd", "spec"]).has(argv[5])) return null;
-  return { planSha256: argv[1], plannedAt: argv[3], selection: argv[5] };
+  if (argv.length === 6) return { planSha256: argv[1], plannedAt: argv[3], selection: argv[5] };
+  if (argv[6] !== "--runner" || !PO_REBIND_RUNNERS.has(argv[7])) return null;
+  return { planSha256: argv[1], plannedAt: argv[3], selection: argv[5], runner: argv[7] };
 }
 
 function parsePoDecisionApply(argv) {
-  if (argv.length !== 9 || argv[0] !== "--plan-sha256" || !SHA256_RE.test(argv[1])
+  if (argv.length !== 9 && argv.length !== 11) return null;
+  if (argv[0] !== "--plan-sha256" || !SHA256_RE.test(argv[1])
     || argv[2] !== "--selection-digest" || !SHA256_RE.test(argv[3])
     || argv[4] !== "--planned-at" || !canonicalIso(argv[5])
     || argv[6] !== "--selection" || argv[7] !== "spec" || argv[8] !== "--activate") return null;
-  return { planSha256: argv[1], selectionDigest: argv[3], plannedAt: argv[5], selection: argv[7] };
+  if (argv.length === 9) return { planSha256: argv[1], selectionDigest: argv[3], plannedAt: argv[5], selection: argv[7] };
+  if (argv[9] !== "--runner" || !PO_REBIND_RUNNERS.has(argv[10])) return null;
+  return { planSha256: argv[1], selectionDigest: argv[3], plannedAt: argv[5], selection: argv[7], runner: argv[10] };
 }
 
 function writeRebindFile(target, bytes, mode, nonce, replace, rename, sync) {
@@ -6088,14 +6094,15 @@ function recoverRebindTransaction(dir, planSha256, nonce, io, stateIo) {
  * Resolve the invoking runner for the rebind-apply recovery (ADR-0051 class)
  * at this CLI entry boundary: an explicit --runner (already validated by
  * parsePoRebindApply) always wins; absent one, the ambient CLAUDECODE /
- * ANTIGRAVITY_AGENT / AI_AGENT markers are the legitimate source here,
+ * ANTIGRAVITY_AGENT / AI_AGENT / CODEX_SESSION_ID / CODEX_THREAD_ID markers
+ * are the legitimate source here,
  * mirroring worktree-create.mjs's resolveRunner. The in-transaction V4
  * inspection itself never reads the environment -- it only receives this
  * already-resolved value.
  *
  * Fails closed (backlog/items/2026-08-30-runner-fallback-defaults-to-codex-
  * without-explicit-signal.md): when none of --runner / CLAUDECODE /
- * ANTIGRAVITY_AGENT / AI_AGENT is present, this is a human typing the
+ * ANTIGRAVITY_AGENT / AI_AGENT / CODEX_SESSION_ID / CODEX_THREAD_ID is present, this is a human typing the
  * command directly in a plain terminal, not one of the three supported AI
  * runners -- returning a silent "codex" default here mis-attributed that
  * human to the wrong runner with no warning. All three call sites resolve
@@ -6109,6 +6116,9 @@ export function resolvePoRebindRunner(explicitRunner, env) {
   if (explicitRunner) return { ok: true, runner: explicitRunner };
   if (env.CLAUDECODE === "1") return { ok: true, runner: "claude" };
   if (env.ANTIGRAVITY_AGENT === "1" || env.AI_AGENT === "antigravity") return { ok: true, runner: "antigravity" };
+  if (["CODEX_SESSION_ID", "CODEX_THREAD_ID"].some((key) => typeof env[key] === "string" && env[key].trim().length > 0)) {
+    return { ok: true, runner: "codex" };
+  }
   return { ok: false, code: "PO-REBIND-RUNNER-UNKNOWN" };
 }
 
@@ -6330,7 +6340,7 @@ function runPoAuthorityAcknowledgeCommand(sub, rest, deps) {
     }
     const runnerResolved = resolvePoRebindRunner(apply.runner, deps.env ?? process.env);
     if (!runnerResolved.ok) {
-      console.error(`Error: po-authority-acknowledge-apply refused (${runnerResolved.code}); no --runner was given and no recognized runner environment marker (CLAUDECODE, ANTIGRAVITY_AGENT, AI_AGENT) is set. Re-run with an explicit --runner claude|codex|antigravity instead of relying on a guessed default.`);
+      console.error(`Error: po-authority-acknowledge-apply refused (${runnerResolved.code}); no --runner was given and no recognized runner environment marker (CLAUDECODE, ANTIGRAVITY_AGENT, AI_AGENT, CODEX_SESSION_ID, CODEX_THREAD_ID) is set. Re-run with an explicit --runner claude|codex|antigravity instead of relying on a guessed default.`);
       return 2;
     }
     const runner = runnerResolved.runner;
@@ -6369,7 +6379,7 @@ function runPoAuthorityAcknowledgeCommand(sub, rest, deps) {
 function runPoAuthorityRebindCommand(sub, rest, deps) {
   if (sub === "po-authority-rebind-plan" && rest.length !== 0) { console.error("Error: PO authority rebind plan takes no arguments."); return 2; }
   const apply = sub === "po-authority-rebind-apply" ? parsePoRebindApply(rest) : null;
-  if (sub === "po-authority-rebind-apply" && apply === null) { console.error("Error: PO authority rebind apply requires --plan-sha256 <sha256> --updated-at <ISO-8601> --activate [--runner claude|codex]."); return 2; }
+  if (sub === "po-authority-rebind-apply" && apply === null) { console.error("Error: PO authority rebind apply requires --plan-sha256 <sha256> --updated-at <ISO-8601> --activate [--runner claude|codex|antigravity]."); return 2; }
   if (sub === "po-authority-rebind-plan" && existsSync(rebindTransactionPath(deps.dir))) {
     console.error("Error: PO authority rebind recovery is pending; replay the exact previously confirmed apply action.");
     return 2;
@@ -6377,7 +6387,7 @@ function runPoAuthorityRebindCommand(sub, rest, deps) {
   if (sub === "po-authority-rebind-apply") {
     const runnerResolved = resolvePoRebindRunner(apply.runner, deps.env ?? process.env);
     if (!runnerResolved.ok) {
-      console.error(`Error: po-authority-rebind-apply refused (${runnerResolved.code}); no --runner was given and no recognized runner environment marker (CLAUDECODE, ANTIGRAVITY_AGENT, AI_AGENT) is set. Re-run with an explicit --runner claude|codex|antigravity instead of relying on a guessed default.`);
+      console.error(`Error: po-authority-rebind-apply refused (${runnerResolved.code}); no --runner was given and no recognized runner environment marker (CLAUDECODE, ANTIGRAVITY_AGENT, AI_AGENT, CODEX_SESSION_ID, CODEX_THREAD_ID) is set. Re-run with an explicit --runner claude|codex|antigravity instead of relying on a guessed default.`);
       return 2;
     }
     const runner = runnerResolved.runner;
@@ -6399,9 +6409,14 @@ function runPoAuthorityRebindCommand(sub, rest, deps) {
     return 2;
   }
   if (sub === "po-authority-rebind-plan") {
+    const runnerResolved = resolvePoRebindRunner(undefined, deps.env ?? process.env);
+    if (!runnerResolved.ok) {
+      console.error(`Error: po-authority-rebind-plan refused (${runnerResolved.code}); no recognized runner environment marker (CLAUDECODE, ANTIGRAVITY_AGENT, AI_AGENT, CODEX_SESSION_ID, CODEX_THREAD_ID) is set.`);
+      return 2;
+    }
     console.log(JSON.stringify({ ...planned.payload, planSha256: planned.planSha256, applyAction: {
       executable: process.execPath,
-      argv: [fileURLToPath(import.meta.url), "po-authority-rebind-apply", "--plan-sha256", planned.planSha256, "--updated-at", planned.payload.plannedAt, "--activate"],
+      argv: [fileURLToPath(import.meta.url), "po-authority-rebind-apply", "--plan-sha256", planned.planSha256, "--updated-at", planned.payload.plannedAt, "--activate", "--runner", runnerResolved.runner],
       mutation: true, requiresConfirmation: true, requiresHostBoundary: true,
     } }, null, 2));
     return 0;
@@ -6416,11 +6431,11 @@ function runPoAuthorityDecisionCommand(sub, rest, deps) {
   const selection = sub === "po-authority-decision-select" ? parsePoDecisionSelection(rest) : null;
   const apply = sub === "po-authority-decision-apply" ? parsePoDecisionApply(rest) : null;
   if (sub === "po-authority-decision-select" && selection === null) {
-    console.error("Error: PO authority selection requires --plan-sha256 <sha256> --planned-at <ISO-8601> --selection <prd|spec>.");
+    console.error("Error: PO authority selection requires --plan-sha256 <sha256> --planned-at <ISO-8601> --selection <prd|spec> [--runner claude|codex|antigravity].");
     return 2;
   }
   if (sub === "po-authority-decision-apply" && apply === null) {
-    console.error("Error: PO authority decision apply requires --plan-sha256 <sha256> --selection-digest <sha256> --planned-at <ISO-8601> --selection spec --activate.");
+    console.error("Error: PO authority decision apply requires --plan-sha256 <sha256> --selection-digest <sha256> --planned-at <ISO-8601> --selection spec --activate [--runner claude|codex|antigravity].");
     return 2;
   }
   if (sub !== "po-authority-decision-apply") {
@@ -6440,6 +6455,11 @@ function runPoAuthorityDecisionCommand(sub, rest, deps) {
     }
     const writer = fileURLToPath(import.meta.url);
     if (sub === "po-authority-decision-plan") {
+      const runnerResolved = resolvePoRebindRunner(undefined, deps.env ?? process.env);
+      if (!runnerResolved.ok) {
+        console.error(`Error: po-authority-decision-plan refused (${runnerResolved.code}); no recognized runner environment marker (CLAUDECODE, ANTIGRAVITY_AGENT, AI_AGENT, CODEX_SESSION_ID, CODEX_THREAD_ID) is set.`);
+        return 2;
+      }
       console.log(JSON.stringify({
         ...planned.payload,
         selectionActions: [
@@ -6462,6 +6482,8 @@ function runPoAuthorityDecisionCommand(sub, rest, deps) {
               planned.payload.plannedAt,
               "--selection",
               "spec",
+              "--runner",
+              runnerResolved.runner,
             ],
             mutation: false,
             requiresConfirmation: true,
@@ -6472,6 +6494,11 @@ function runPoAuthorityDecisionCommand(sub, rest, deps) {
     }
     if (selection.selection === "prd") {
       console.error("Error: PO authority PRD selection is not safely formable because the referenced Spec bytes are unavailable; zero mutation.");
+      return 2;
+    }
+    const runnerResolved = resolvePoRebindRunner(selection.runner, deps.env ?? process.env);
+    if (!runnerResolved.ok) {
+      console.error(`Error: po-authority-decision-select refused (${runnerResolved.code}); no --runner was given and no recognized runner environment marker (CLAUDECODE, ANTIGRAVITY_AGENT, AI_AGENT, CODEX_SESSION_ID, CODEX_THREAD_ID) is set.`);
       return 2;
     }
     console.log(JSON.stringify({
@@ -6495,6 +6522,8 @@ function runPoAuthorityDecisionCommand(sub, rest, deps) {
           "--selection",
           "spec",
           "--activate",
+          "--runner",
+          runnerResolved.runner,
         ],
         mutation: true,
         requiresConfirmation: true,
@@ -6552,7 +6581,7 @@ function runPoAuthorityDecisionCommand(sub, rest, deps) {
     // was reachable and consequential for a Claude-rooted project.
     const runnerResolved = resolvePoRebindRunner(apply.runner, deps.env ?? process.env);
     if (!runnerResolved.ok) {
-      console.error(`Error: po-authority-decision-apply refused (${runnerResolved.code}); no --runner was given and no recognized runner environment marker (CLAUDECODE, ANTIGRAVITY_AGENT, AI_AGENT) is set. Re-run with an explicit --runner claude|codex|antigravity instead of relying on a guessed default.`);
+      console.error(`Error: po-authority-decision-apply refused (${runnerResolved.code}); no --runner was given and no recognized runner environment marker (CLAUDECODE, ANTIGRAVITY_AGENT, AI_AGENT, CODEX_SESSION_ID, CODEX_THREAD_ID) is set. Re-run with an explicit --runner claude|codex|antigravity instead of relying on a guessed default.`);
       return 2;
     }
     const runner = runnerResolved.runner;

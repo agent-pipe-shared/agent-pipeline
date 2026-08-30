@@ -26,6 +26,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { run, SCHEMA_ID, statePath } from "./pipeline-state.mjs";
 import { sha256CanonicalJson } from "../lib/plan-spec-state-v2.mjs";
+import { isSanctionedLifecycleCommand } from "../hooks/guard-lifecycle-ready.mjs";
 
 const roots = [];
 afterEach(() => { while (roots.length) rmSync(roots.pop(), { recursive: true, force: true }); });
@@ -33,6 +34,21 @@ afterEach(() => { while (roots.length) rmSync(roots.pop(), { recursive: true, fo
 const h = (value) => value.repeat(64);
 const hash = (value) => createHash("sha256").update(value).digest("hex");
 let nonce = 0;
+
+function runnerEnv(runner) {
+  if (runner === "claude") return { CLAUDECODE: "1" };
+  if (runner === "antigravity") return { ANTIGRAVITY_AGENT: "1" };
+  return { CODEX_SESSION_ID: "codex-runner-fixture" };
+}
+
+function withoutRunnerTail(argv) {
+  assert.deepEqual(argv.slice(-2, -1), ["--runner"]);
+  return argv.slice(0, -2);
+}
+
+function actionCommand(action) {
+  return [action.executable, ...action.argv].map((part) => JSON.stringify(part)).join(" ");
+}
 
 function invoke(argv, deps) {
   const out = []; const err = []; const log = console.log; const error = console.error;
@@ -75,6 +91,7 @@ function fixture(name) {
   writeFileSync(statePath(dir), JSON.stringify(state, null, 2) + "\n");
   const deps = {
     dir, now: () => "2026-07-28T10:00:00.000Z", ownerNonce: () => `rebind-runner-${String(++nonce).padStart(8, "0")}`,
+    env: runnerEnv("codex"),
     poGateProfile: () => ({ ok: true, value: profile }),
     poGateAuthority: ({ expectedPlanSha256, expectedSpecSha256 }) => expectedSpecSha256 === newSpecSha && typeof expectedPlanSha256 === "string"
       ? { ok: true, value: { ...profile, schema: "pipeline.po-gate-authority.v2", planPath, planSha256: expectedPlanSha256, specPath, specSha256: newSpecSha } }
@@ -134,6 +151,7 @@ function fixtureV4(name) {
   writeFileSync(statePath(dir), JSON.stringify(state, null, 2) + "\n");
   const deps = {
     dir, now: () => "2026-07-28T10:00:00.000Z", ownerNonce: () => `rebind-runner-v4-${String(++nonce).padStart(8, "0")}`,
+    env: runnerEnv("codex"),
     poGateProfile: () => ({ ok: true, value: profile }),
     poGateAuthority: ({ expectedPlanSha256, expectedSpecSha256 }) => expectedSpecSha256 === newSpecSha && typeof expectedPlanSha256 === "string"
       ? { ok: true, value: { ...profile, schema: "pipeline.po-gate-authority.v2", planPath, planSha256: expectedPlanSha256, specPath, specSha256: newSpecSha } }
@@ -147,7 +165,8 @@ test("rebind-plan (V4-SCHEMA): a v4-schema planApproval with a genuinely stale, 
   const f = fixtureV4("stale");
   const plan = planRebind(f);
   assert.equal(plan.schema, "pipeline.po-authority-rebind-plan.v1");
-  const applied = invoke([...plan.applyAction.argv.slice(1), "--runner", "codex"], f.deps);
+  assert.deepEqual(plan.applyAction.argv.slice(-2), ["--runner", "codex"]);
+  const applied = invoke(plan.applyAction.argv.slice(1), { ...f.deps, env: {} });
   assert.equal(applied.status, 0, applied.err);
   const result = JSON.parse(applied.out);
   assert.equal(result.phase, "design");
@@ -165,10 +184,12 @@ test("rebind-plan (V4-SCHEMA): a v4-schema planApproval that is NOT stale still 
 test("rebind-apply: every explicit supported runner reaches all three V4 intents unchanged", () => {
   for (const runner of ["claude", "codex", "antigravity"]) {
     const f = fixture(`explicit-${runner}`);
-    const plan = planRebind(f);
+    const plan = planRebind({ ...f, deps: { ...f.deps, env: runnerEnv(runner) } });
+    assert.deepEqual(plan.applyAction.argv.slice(-2), ["--runner", runner]);
+    assert.equal(isSanctionedLifecycleCommand(actionCommand(plan.applyAction), f.dir), true);
     const observed = [];
-    const applied = invoke([...plan.applyAction.argv.slice(1), "--runner", runner], {
-      ...f.deps,
+    const applied = invoke(plan.applyAction.argv.slice(1), {
+      ...f.deps, env: {},
       v4Inspection: ({ intent, runner: observedRunner }) => { observed.push({ intent, runner: observedRunner }); return { status: "ready" }; },
     });
     assert.equal(applied.status, 0, `${runner}: ${applied.err}`);
@@ -181,7 +202,7 @@ test("rebind-apply: absent --runner resolves via CLAUDECODE at the CLI boundary 
   const f = fixture("env-claude");
   const plan = planRebind(f);
   const observed = [];
-  const applied = invoke(plan.applyAction.argv.slice(1), {
+  const applied = invoke(withoutRunnerTail(plan.applyAction.argv).slice(1), {
     ...f.deps, env: { CLAUDECODE: "1" },
     v4Inspection: ({ runner }) => { observed.push(runner); return { status: "ready" }; },
   });
@@ -194,7 +215,7 @@ test("rebind-apply: absent --runner without a recognized runner marker fails clo
   const plan = planRebind(f);
   const observed = [];
   const before = readFileSync(statePath(f.dir), "utf8");
-  const applied = invoke(plan.applyAction.argv.slice(1), {
+  const applied = invoke(withoutRunnerTail(plan.applyAction.argv).slice(1), {
     ...f.deps, env: {},
     v4Inspection: ({ runner }) => { observed.push(runner); return { status: "ready" }; },
   });
@@ -208,51 +229,48 @@ test("rebind-apply: invalid explicit --runner fails closed without mutation", ()
   const f = fixture("invalid-runner");
   const plan = planRebind(f);
   const before = readFileSync(statePath(f.dir), "utf8");
-  const rejected = invoke([...plan.applyAction.argv.slice(1), "--runner", "codepilot"], f.deps);
+  const rejectedArgv = [...plan.applyAction.argv.slice(1)];
+  rejectedArgv[rejectedArgv.length - 1] = "codepilot";
+  const rejected = invoke(rejectedArgv, f.deps);
   assert.equal(rejected.status, 2);
   assert.equal(readFileSync(statePath(f.dir), "utf8"), before);
 });
 
-function planAndSelectDecision(f) {
-  const planned = invoke(["po-authority-decision-plan"], f.deps);
+function planAndSelectDecision(f, runner = "codex") {
+  const planned = invoke(["po-authority-decision-plan"], { ...f.deps, env: runnerEnv(runner) });
   assert.equal(planned.status, 0, planned.err);
   const plan = JSON.parse(planned.out);
   const selectionAction = plan.selectionActions.find((action) => action.selectedCandidate === "spec");
-  const selected = invoke(selectionAction.argv.slice(1), f.deps);
+  assert.deepEqual(selectionAction.argv.slice(-2), ["--runner", runner]);
+  assert.equal(isSanctionedLifecycleCommand(actionCommand(selectionAction), f.dir), true);
+  const selected = invoke(selectionAction.argv.slice(1), { ...f.deps, env: {} });
   assert.equal(selected.status, 0, selected.err);
-  return JSON.parse(selected.out);
+  const selection = JSON.parse(selected.out);
+  assert.deepEqual(selection.applyAction.argv.slice(-2), ["--runner", runner]);
+  assert.equal(isSanctionedLifecycleCommand(actionCommand(selection.applyAction), f.dir), true);
+  return selection;
 }
 
-test("decision-apply: no CLI --runner flag exists; the request resolves via CLAUDECODE (claude)", () => {
-  const f = fixture("decision-env-claude");
-  const selection = planAndSelectDecision(f);
-  const observed = [];
-  const applied = invoke(selection.applyAction.argv.slice(1), {
-    ...f.deps, env: { CLAUDECODE: "1" },
-    v4Inspection: ({ runner }) => { observed.push(runner); return { status: "ready" }; },
-  });
-  assert.equal(applied.status, 0, applied.err);
-  assert.deepEqual(observed, ["claude", "claude", "claude"]);
+test("decision returned-action roundtrip carries every supported runner explicitly through plan, select, and apply", () => {
+  for (const runner of ["claude", "codex", "antigravity"]) {
+    const f = fixture(`decision-env-${runner}`);
+    const selection = planAndSelectDecision(f, runner);
+    const observed = [];
+    const applied = invoke(selection.applyAction.argv.slice(1), {
+      ...f.deps, env: {},
+      v4Inspection: ({ runner: observedRunner }) => { observed.push(observedRunner); return { status: "ready" }; },
+    });
+    assert.equal(applied.status, 0, `${runner}: ${applied.err}`);
+    assert.deepEqual(observed, [runner, runner, runner]);
+  }
 });
 
-test("decision-apply: an Antigravity marker is forwarded as antigravity", () => {
-  const f = fixture("decision-env-antigravity");
-  const selection = planAndSelectDecision(f);
-  const observed = [];
-  const applied = invoke(selection.applyAction.argv.slice(1), {
-    ...f.deps, env: { ANTIGRAVITY_AGENT: "1" },
-    v4Inspection: ({ runner }) => { observed.push(runner); return { status: "ready" }; },
-  });
-  assert.equal(applied.status, 0, applied.err);
-  assert.deepEqual(observed, ["antigravity", "antigravity", "antigravity"]);
-});
-
-test("decision-apply: no runner flag or recognized marker fails closed instead of guessing codex", () => {
+test("decision-apply: legacy action without runner or recognized marker fails closed instead of guessing codex", () => {
   const f = fixture("decision-env-absent");
   const selection = planAndSelectDecision(f);
   const observed = [];
   const before = readFileSync(statePath(f.dir), "utf8");
-  const applied = invoke(selection.applyAction.argv.slice(1), {
+  const applied = invoke(withoutRunnerTail(selection.applyAction.argv).slice(1), {
     ...f.deps, env: {},
     v4Inspection: ({ runner }) => { observed.push(runner); return { status: "ready" }; },
   });
@@ -260,4 +278,31 @@ test("decision-apply: no runner flag or recognized marker fails closed instead o
   assert.match(applied.err, /PO-REBIND-RUNNER-UNKNOWN/u);
   assert.deepEqual(observed, []);
   assert.equal(readFileSync(statePath(f.dir), "utf8"), before);
+});
+
+test("rebind returned-action roundtrip recognizes both Codex session identity signals", () => {
+  for (const [signal, value] of [["CODEX_SESSION_ID", "session-1"], ["CODEX_THREAD_ID", "thread-1"]]) {
+    const f = fixture(`codex-${signal.toLowerCase()}`);
+    const plan = planRebind({ ...f, deps: { ...f.deps, env: { [signal]: value } } });
+    assert.deepEqual(plan.applyAction.argv.slice(-2), ["--runner", "codex"]);
+    const observed = [];
+    const applied = invoke(plan.applyAction.argv.slice(1), {
+      ...f.deps, env: {},
+      v4Inspection: ({ runner }) => { observed.push(runner); return { status: "ready" }; },
+    });
+    assert.equal(applied.status, 0, `${signal}: ${applied.err}`);
+    assert.deepEqual(observed, ["codex", "codex", "codex"]);
+  }
+});
+
+test("whitespace-only Codex identity signals do not impersonate a Codex runner", () => {
+  for (const signal of ["CODEX_SESSION_ID", "CODEX_THREAD_ID"]) {
+    const f = fixture(`blank-${signal.toLowerCase()}`);
+    const rejected = invoke(["po-authority-rebind-plan"], {
+      ...f.deps,
+      env: { [signal]: "   " },
+    });
+    assert.equal(rejected.status, 2);
+    assert.match(rejected.err, /PO-REBIND-RUNNER-UNKNOWN/u);
+  }
 });

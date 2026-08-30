@@ -1953,12 +1953,15 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
     const onboardingHelpShort = `node '${ONBOARDING_SCRIPT}' -h`;
     const overlayRoute = `node '${PRIVATE_OVERLAY_SCRIPT}' route --project-root '${path}'`;
     const poRebind = `node '${PIPELINE_STATE_SCRIPT}' po-authority-rebind-apply --plan-sha256 ${"d".repeat(64)} --updated-at 2026-07-29T09:00:00.000Z --activate`;
+    const poRebindCodex = `${poRebind} --runner codex`;
     const poAcknowledgePlan = `node '${PIPELINE_STATE_SCRIPT}' po-authority-acknowledge-plan --root '${path}' --by 'Phoenix PO'`;
     const poAcknowledgeApply = `node '${PIPELINE_STATE_SCRIPT}' po-authority-acknowledge-apply --root '${path}' --plan-sha256 ${"d".repeat(64)} --updated-at 2026-07-29T09:00:00.000Z --by 'Phoenix PO' --activate`;
     const poAcknowledgeApplyCwd = `node '${PIPELINE_STATE_SCRIPT}' po-authority-acknowledge-apply --plan-sha256 ${"d".repeat(64)} --updated-at 2026-07-29T09:00:00.000Z --by 'Phoenix PO' --activate`;
     const poDecisionPlan = `node '${PIPELINE_STATE_SCRIPT}' po-authority-decision-plan`;
     const poDecisionSelect = `node '${PIPELINE_STATE_SCRIPT}' po-authority-decision-select --plan-sha256 ${"d".repeat(64)} --planned-at 2026-07-29T09:00:00.000Z --selection spec`;
     const poDecisionApply = `node '${PIPELINE_STATE_SCRIPT}' po-authority-decision-apply --plan-sha256 ${"d".repeat(64)} --selection-digest ${"e".repeat(64)} --planned-at 2026-07-29T09:00:00.000Z --selection spec --activate`;
+    const poDecisionSelectClaude = `${poDecisionSelect} --runner claude`;
+    const poDecisionApplyAntigravity = `${poDecisionApply} --runner antigravity`;
     const legacyRevocationRecoveryPlan = `node '${PIPELINE_STATE_SCRIPT}' plan-legacy-v2-revocation-recovery --by 'Phoenix PO'`;
     const legacyRevocationRecoveryApply = `node '${PIPELINE_STATE_SCRIPT}' apply-legacy-v2-revocation-recovery --by 'Phoenix PO' --prepared-at 2026-07-29T09:00:00.000Z --preimage-sha256 ${"a".repeat(64)} --postimage-sha256 ${"b".repeat(64)} --plan-sha256 ${"c".repeat(64)} --activate true`;
     const reopenDesign = `node '${PIPELINE_STATE_SCRIPT}' reopen-design --by 'PO recovery'`;
@@ -1981,7 +1984,7 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
     const overrideAuthorPlan = `${overridePlan} --author-source-root '${authorRoot}'`;
     const overrideAuthorPrepare = `${overridePrepare} --author-source-root '${authorRoot}'`;
     const overrideAuthorAuthorize = `node '${HUMAN_OVERRIDE_SCRIPT}' authorize --repo '${path}' --request-sha256 ${"f".repeat(64)} --plan-sha256 ${"a".repeat(64)} --selection-sha256 ${"c".repeat(64)} --reason 'PO attended exact action' --reason-sha256 ${"b".repeat(64)} --author-source-root '${authorRoot}' --activate`;
-    for (const command of [inspect, apply, preflight, repairMap, hostPlan, hostApply, kickoffPlan, kickoffApply, onboardingHelp, onboardingHelpShort, overlayRoute, poRebind, poAcknowledgePlan, poAcknowledgeApply, poAcknowledgeApplyCwd, poDecisionPlan, poDecisionSelect, poDecisionApply, legacyRevocationRecoveryPlan, reopenDesign, submitPlan, approvePlan, setPhase, profileRepairPlan, profileRepairApply, authorityMigrationPlan, authorityMigrationApply, authorityMigrationVendorSyncPlan, authorityMigrationVendorSyncApply, overridePlan, overridePrepare, overrideAuthorize, overrideAuthorPlan, overrideAuthorPrepare, overrideAuthorAuthorize]) {
+    for (const command of [inspect, apply, preflight, repairMap, hostPlan, hostApply, kickoffPlan, kickoffApply, onboardingHelp, onboardingHelpShort, overlayRoute, poRebind, poRebindCodex, poAcknowledgePlan, poAcknowledgeApply, poAcknowledgeApplyCwd, poDecisionPlan, poDecisionSelect, poDecisionSelectClaude, poDecisionApply, poDecisionApplyAntigravity, legacyRevocationRecoveryPlan, reopenDesign, submitPlan, approvePlan, setPhase, profileRepairPlan, profileRepairApply, authorityMigrationPlan, authorityMigrationApply, authorityMigrationVendorSyncPlan, authorityMigrationVendorSyncApply, overridePlan, overridePrepare, overrideAuthorize, overrideAuthorPlan, overrideAuthorPrepare, overrideAuthorAuthorize]) {
       assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
       assert.deepEqual(evaluateLifecycleReadyGuard(bash(command), {
         projectDir: path,
@@ -2042,6 +2045,8 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
       `node '${PIPELINE_STATE_SCRIPT}' po-authority-rebind-apply --plan-sha256 ${"d".repeat(64)} --updated-at invalid --activate`,
       `node '/tmp/other/harness/scripts/pipeline-state.mjs' po-authority-rebind-apply --plan-sha256 ${"d".repeat(64)} --updated-at 2026-07-29T09:00:00.000Z --activate`,
       `${poRebind} --bypass`,
+      `${poRebind} --runner codepilot`,
+      `${poRebindCodex} --runner claude`,
       `node '${PIPELINE_STATE_SCRIPT}' po-authority-acknowledge-plan --by 'Phoenix PO'`,
       `node '${PIPELINE_STATE_SCRIPT}' po-authority-acknowledge-plan --root /tmp/other --by 'Phoenix PO'`,
       `${poAcknowledgePlan} --root '${path}'`,
@@ -2053,7 +2058,11 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
       `node '${PIPELINE_STATE_SCRIPT}' po-authority-acknowledge-apply --root '${path}' --plan-sha256 ${"D".repeat(64)} --updated-at 2026-07-29T09:00:00.000Z --by 'Phoenix PO' --activate`,
       `node '${PIPELINE_STATE_SCRIPT}' po-authority-acknowledge-apply --root '${path}' --plan-sha256 ${"d".repeat(64)} --updated-at invalid --by 'Phoenix PO' --activate`,
       `${poDecisionPlan} --selection spec`,
+      `${poDecisionSelect} --runner codepilot`,
+      `${poDecisionSelectClaude} --runner codex`,
       `${poDecisionApply} --bypass`,
+      `${poDecisionApply} --runner codepilot`,
+      `${poDecisionApplyAntigravity} --runner codex`,
       legacyRevocationRecoveryApply,
       `node '${PIPELINE_STATE_SCRIPT}' apply-legacy-v2-revocation-recovery --by 'Phoenix PO' --prepared-at 2026-07-29T09:00:00.000Z --preimage-sha256 ${"a".repeat(64)} --postimage-sha256 ${"b".repeat(64)} --plan-sha256 ${"c".repeat(64)} --activate false`,
       `${legacyRevocationRecoveryApply} --bypass`,
