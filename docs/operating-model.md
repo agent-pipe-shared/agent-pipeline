@@ -14,17 +14,22 @@ user journey, and [SETUP](../SETUP.md) is the task guide. When they disagree,
 this document and the applicable ADRs take precedence.
 
 > **0.6.0 candidate boundary (2026-08-30).** `0.6.0` is the current local
-> candidate, not a published release. Nova's public Driver route is verified
-> from an empty directory through guided onboarding, plan approval, verify
-> setup, and the first implementation file for Claude, Codex, and Antigravity.
-> A Driver action is a structured contract: runners follow it and replace only
-> its declared human-input placeholders. The first trust anchor may use an
-> existing key or create a new one. Phoenix does not relax the model's
-> fail-closed boundary: absent, stale, malformed, or candidate-mismatched
-> evidence cannot become success. Publication still requires full
-> candidate-bound release evidence and independent live Greenfield acceptance
-> for all three runners. No native-sandbox, model-identity, or platform claim
-> is implied beyond the evidence recorded for that specific runner.
+> release candidate, not a published release. **Phoenix is the completed,
+> integrated product foundation** for this candidate: candidate-bound
+> evidence and approvals, deterministic gates before review, recoverable
+> delivery records, and typed safe boundaries for external actions. Its
+> fail-closed rule is unchanged: absent, stale, malformed, or
+> candidate-mismatched evidence cannot become success. **Nova remains an
+> active product stream.** This candidate includes its guided public Driver
+> route from an empty directory through onboarding, plan approval, verify
+> setup, and the first implementation step for Claude, Codex, and
+> Antigravity. A Driver action is a structured contract: runners follow it
+> and replace only its declared human-input placeholders. The first trust
+> anchor may use an existing key or create a new one. Nova B and
+> runner-specific refinement remain open; publication requires the final
+> candidate's full Verify, security, Critic, approval, and remote-readback
+> evidence. No native-sandbox, model-identity, or platform claim is implied
+> beyond the evidence recorded for that specific runner.
 
 ## 1. What the model protects
 
@@ -431,19 +436,24 @@ Nutzerreise und [SETUP](../SETUP.md) der Aufgabenleitfaden. Bei Widerspruch
 gehen dieses Dokument und die passenden ADRs vor.
 
 > **Kandidatengrenze 0.6.0 (2026-08-30).** `0.6.0` ist der aktuelle lokale
-> Kandidat, kein veröffentlichtes Release. Novas öffentlicher Driver-Weg ist
-> für Claude, Codex und Antigravity vom leeren Verzeichnis über geführtes
-> Onboarding, Planfreigabe und Verify-Setup bis zur ersten
-> Implementierungsdatei geprüft. Eine Driver-Aktion ist ein strukturierter
-> Vertrag: Runner folgen ihr und ersetzen nur ihre benannten menschlichen
-> Eingabe-Platzhalter. Der erste Trust Anchor darf einen bestehenden Schlüssel
-> verwenden oder einen neuen anlegen. Phoenix lockert die Fail-closed-Grenze
-> nicht: Fehlende, veraltete, fehlerhafte oder nicht zum Kandidaten passende
-> Evidenz kann kein Erfolg werden. Für Veröffentlichung braucht es weiterhin
-> vollständige kandidatengebundene Release-Evidenz und unabhängige Live-
-> Greenfield-Abnahme für alle drei Runner. Daraus folgt kein Native-Sandbox-,
-> Modellidentitäts- oder Plattform-Claim über die für den jeweiligen Runner
-> festgehaltene Evidenz hinaus.
+> Release-Kandidat, kein veröffentlichtes Release. **Phoenix ist die
+> abgeschlossene, integrierte Produktgrundlage** dieses Kandidaten:
+> kandidatengebundene Evidenz und Freigaben, deterministische Gates vor dem
+> Review, wiederherstellbare Delivery-Aufzeichnungen und typisierte sichere
+> Grenzen für externe Aktionen. Seine Fail-closed-Regel bleibt unverändert:
+> Fehlende, veraltete, fehlerhafte oder nicht zum Kandidaten passende Evidenz
+> kann kein Erfolg werden. **Nova bleibt ein aktiver Produktstrang.** Dieser
+> Kandidat enthält seinen geführten öffentlichen Driver-Weg vom leeren
+> Verzeichnis über Onboarding, Planfreigabe und Verify-Setup bis zum ersten
+> Implementierungsschritt für Claude, Codex und Antigravity. Eine
+> Driver-Aktion ist ein strukturierter Vertrag: Runner folgen ihr und
+> ersetzen nur die benannten menschlichen Eingabe-Platzhalter. Der erste Trust
+> Anchor darf einen bestehenden Schlüssel verwenden oder einen neuen anlegen.
+> Nova B und runnerspezifische Verfeinerungen bleiben offen; für eine
+> Veröffentlichung braucht es die vollständige Verify-, Security-, Critic-,
+> Freigabe- und Remote-Readback-Evidenz des finalen Kandidaten. Daraus folgt
+> kein Native-Sandbox-, Modellidentitäts- oder Plattform-Claim über die für
+> den jeweiligen Runner festgehaltene Evidenz hinaus.
 
 ## 1. Was das Modell schützt
 
