@@ -403,6 +403,7 @@
 | pipeline.private-overlay-activation-bridge | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.product-capability-inventory-missing-two-new-guard-hooks | closed | defect | pipeline | 2026-08-19 | — |
 | pipeline.product-capability-inventory-two-guard-hooks-uncategorized | closed | defect | pipeline | 2026-08-19 | — |
+| pipeline.project-audit-evidence-overview-for-external-review | open | requirement | pipeline | 2026-08-30 | Nova B — PO requirement from the 0.6.0 three-runner greenfield evaluation: a reviewer of an independently developed project must be able to locate the Pipeline's applicable controls, human gates, exceptions, and evidence without relying on an operator's private local knowledge. |
 | pipeline.project-authority-dual-state-repair-and-failclosed-gate | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.project-authority-test-fixture-races-under-a-full-directory-parallel-sweep | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.project-reset-does-not-classify-the-proof-policy-artifact | closed | defect | pipeline | 2026-08-09 | — |
@@ -574,7 +575,7 @@
 
 ## Counts
 
-- open: 72
+- open: 73
 - in_progress: 0
 - closed: 476
 - rejected: 3

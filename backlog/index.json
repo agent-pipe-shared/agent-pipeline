@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "5728a9044307cc07fc215000e950f5de01b6a64b491c81a652eb4ac7ea295357"
+    "transitionHead": "0eb53e27414bd249da71da35724f822314cf574d865ea2bbb56ef1338951be17"
   },
   "counts": {
-    "open": 72,
+    "open": 73,
     "in_progress": 0,
     "closed": 476,
     "rejected": 3,
@@ -4987,6 +4987,16 @@
       "closureRepository": "self",
       "closureCommit": "897a4466a4c446838801527a00bd0bd2d65fb044",
       "closureEvidence": "docs/product-capability-inventory.json"
+    },
+    {
+      "id": "pipeline.project-audit-evidence-overview-for-external-review",
+      "status": "open",
+      "type": "requirement",
+      "owner": "pipeline",
+      "created": "2026-08-30",
+      "source": "PO observation during the 0.6.0 greenfield evaluation, 2026-08-30. Direct inspection confirmed that durable project artifacts and private runtime ledgers are intentionally split across the tracked project tree and .git/agent-pipeline/, but no reviewer-facing map explains or links the split.",
+      "deferred": false,
+      "tracking": "Nova B — PO requirement from the 0.6.0 three-runner greenfield evaluation: a reviewer of an independently developed project must be able to locate the Pipeline's applicable controls, human gates, exceptions, and evidence without relying on an operator's private local knowledge."
     },
     {
       "id": "pipeline.project-authority-dual-state-repair-and-failclosed-gate",
