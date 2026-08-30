@@ -16,7 +16,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { checkResumeConsumption, SCHEMA } from "./check-resume-consumption.mjs";
+import { checkResumeConsumption, checkResumeConsumptionAnySession, SCHEMA } from "./check-resume-consumption.mjs";
 import {
   buildResumeHint, captureResumeHint, recordResumeHintCardDigest, recordResumeHintConsumption,
 } from "../lib/resume-hint.mjs";
@@ -205,6 +205,134 @@ test("CLI: exit 1 and FATAL stderr output when an available card has no receipt"
     const result = spawnSync(process.execPath, [script, "--root", root, "--session-id", "session-a"], { encoding: "utf8" });
     assert.equal(result.status, 1);
     assert.match(result.stderr, /^FATAL \(RH-CHECK-RH-RECEIPT-ABSENT\):/u);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// --- NVA-CF-RESUMECHECKANYSESSION: checkResumeConsumptionAnySession() + CLI --any-session --
+
+test("checkResumeConsumptionAnySession PASS: no card was ever captured -- status absent", () => {
+  const root = gitInitRoot("check-resume-consumption-any-absent-");
+  try {
+    const result = checkResumeConsumptionAnySession({ rootDir: root });
+    assert.equal(result.ok, true);
+    assert.equal(result.schema, SCHEMA);
+    assert.equal(result.code, "RH-CHECK-NO-CARD");
+    assert.equal(result.cardStatus, "absent");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("checkResumeConsumptionAnySession PASS: an available card with a matching receipt from ANY session id", () => {
+  const root = gitInitRoot("check-resume-consumption-any-found-");
+  try {
+    const { cardDigest } = captureWithDigest(root);
+    const consumed = recordResumeHintConsumption({ rootDir: root, sessionId: "some-other-session-entirely" });
+    assert.equal(consumed.status, "recorded");
+
+    const result = checkResumeConsumptionAnySession({ rootDir: root });
+    assert.equal(result.ok, true);
+    assert.equal(result.code, "RH-CHECK-CONSUMED-ANY");
+    assert.equal(result.cardStatus, "available");
+    assert.equal(result.cardDigest, cardDigest);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("checkResumeConsumptionAnySession FATAL: an available card with no consumption receipt at all", () => {
+  const root = gitInitRoot("check-resume-consumption-any-noreceipt-");
+  try {
+    captureWithDigest(root);
+    const result = checkResumeConsumptionAnySession({ rootDir: root });
+    assert.equal(result.ok, false);
+    assert.equal(result.code, "RH-CHECK-RH-RECEIPT-ABSENT-ANY");
+    assert.equal(result.cardStatus, "available");
+    assert.equal(result.receiptCount, 0);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("checkResumeConsumptionAnySession FATAL: consumption-receipts directory does not exist at all", () => {
+  const root = gitInitRoot("check-resume-consumption-any-nodir-");
+  try {
+    captureWithDigest(root);
+    // No receipt of any kind was ever recorded -- the directory itself is never created.
+    const result = checkResumeConsumptionAnySession({ rootDir: root });
+    assert.equal(result.ok, false);
+    assert.equal(result.code, "RH-CHECK-RH-RECEIPT-ABSENT-ANY");
+    assert.equal(result.receiptCount, 0);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("checkResumeConsumptionAnySession FATAL: receipts exist but none match the current digest", () => {
+  const root = gitInitRoot("check-resume-consumption-any-mismatch-");
+  try {
+    captureWithDigest(root);
+    recordResumeHintConsumption({ rootDir: root, sessionId: "session-a" });
+    captureWithDigest(root, { ...BASE_CONTEXT, intent: "A different, later intent entirely." });
+
+    const result = checkResumeConsumptionAnySession({ rootDir: root });
+    assert.equal(result.ok, false);
+    assert.equal(result.code, "RH-CHECK-RH-RECEIPT-ABSENT-ANY");
+    assert.equal(result.receiptCount, 1);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("CLI: usage error (exit 3) when --any-session and --session-id are both passed", () => {
+  const root = gitInitRoot("check-resume-consumption-cli-any-conflict-");
+  try {
+    const result = spawnSync(process.execPath, [script, "--root", root, "--any-session", "--session-id", "session-a"], { encoding: "utf8" });
+    assert.equal(result.status, 3);
+    assert.match(result.stderr, /mutually exclusive/u);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("CLI: exit 0 and JSON PASS output for --any-session when no card is available", () => {
+  const root = gitInitRoot("check-resume-consumption-cli-any-pass-");
+  try {
+    const result = spawnSync(process.execPath, [script, "--root", root, "--any-session", "--json"], { encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr);
+    const payload = JSON.parse(result.stdout);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.code, "RH-CHECK-NO-CARD");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("CLI: exit 1 for --any-session when an available card has no receipt from anyone", () => {
+  const root = gitInitRoot("check-resume-consumption-cli-any-fatal-");
+  try {
+    captureWithDigest(root);
+    const result = spawnSync(process.execPath, [script, "--root", root, "--any-session"], { encoding: "utf8" });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /^FATAL \(RH-CHECK-RH-RECEIPT-ABSENT-ANY\):/u);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("CLI: exit 0 for --any-session after a DIFFERENT session consumed via the real consume CLI subcommand", () => {
+  const root = gitInitRoot("check-resume-consumption-cli-any-consumed-");
+  try {
+    captureWithDigest(root);
+    const helper = fileURLToPath(new URL("./resume-hint.mjs", import.meta.url));
+    const consumed = spawnSync(process.execPath, [helper, "consume", "--root", root, "--session-id", "an-entirely-different-session"], { encoding: "utf8" });
+    assert.equal(consumed.status, 0, consumed.stderr);
+
+    const result = spawnSync(process.execPath, [script, "--root", root, "--any-session", "--json"], { encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(JSON.parse(result.stdout).code, "RH-CHECK-CONSUMED-ANY");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
