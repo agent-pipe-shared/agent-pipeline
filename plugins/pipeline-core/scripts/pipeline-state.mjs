@@ -5930,13 +5930,29 @@ function recoverRebindTransaction(dir, planSha256, nonce, io, stateIo) {
 /**
  * Resolve the invoking runner for the rebind-apply recovery (ADR-0051 class)
  * at this CLI entry boundary: an explicit --runner (already validated by
- * parsePoRebindApply) always wins; absent one, the ambient CLAUDECODE marker
- * is the legitimate source here, mirroring worktree-create.mjs's
- * resolveRunner. The in-transaction V4 inspection itself never reads the
- * environment -- it only receives this already-resolved value.
+ * parsePoRebindApply) always wins; absent one, the ambient CLAUDECODE /
+ * ANTIGRAVITY_AGENT / AI_AGENT markers are the legitimate source here,
+ * mirroring worktree-create.mjs's resolveRunner. The in-transaction V4
+ * inspection itself never reads the environment -- it only receives this
+ * already-resolved value.
+ *
+ * Fails closed (backlog/items/2026-08-30-runner-fallback-defaults-to-codex-
+ * without-explicit-signal.md): when none of --runner / CLAUDECODE /
+ * ANTIGRAVITY_AGENT / AI_AGENT is present, this is a human typing the
+ * command directly in a plain terminal, not one of the three supported AI
+ * runners -- returning a silent "codex" default here mis-attributed that
+ * human to the wrong runner with no warning. All three call sites resolve
+ * this BEFORE any state mutation (either before acquireContinuityLock, or
+ * inside a try/finally whose finally always releases the lock), so refusing
+ * here is safe: zero mutation, lock released normally, no legitimate
+ * automated caller depended on the old "codex" fallback (every AI runner
+ * path already sets one of the three env markers).
  */
-function resolvePoRebindRunner(explicitRunner, env) {
-  return explicitRunner ?? (env.CLAUDECODE === "1" ? "claude" : (env.ANTIGRAVITY_AGENT === "1" || env.AI_AGENT === "antigravity") ? "antigravity" : "codex");
+export function resolvePoRebindRunner(explicitRunner, env) {
+  if (explicitRunner) return { ok: true, runner: explicitRunner };
+  if (env.CLAUDECODE === "1") return { ok: true, runner: "claude" };
+  if (env.ANTIGRAVITY_AGENT === "1" || env.AI_AGENT === "antigravity") return { ok: true, runner: "antigravity" };
+  return { ok: false, code: "PO-REBIND-RUNNER-UNKNOWN" };
 }
 
 // ---- NVA-W4-2B: atomic PO-plan-acknowledgement without PRD mutation ----
@@ -6146,7 +6162,12 @@ function runPoAuthorityAcknowledgeCommand(sub, rest, deps) {
       }
       return 1;
     }
-    const runner = resolvePoRebindRunner(apply.runner, deps.env ?? process.env);
+    const runnerResolved = resolvePoRebindRunner(apply.runner, deps.env ?? process.env);
+    if (!runnerResolved.ok) {
+      console.error(`Error: po-authority-acknowledge-apply refused (${runnerResolved.code}); no --runner was given and no recognized runner environment marker (CLAUDECODE, ANTIGRAVITY_AGENT, AI_AGENT) is set. Re-run with an explicit --runner claude|codex|antigravity instead of relying on a guessed default.`);
+      return 2;
+    }
+    const runner = runnerResolved.runner;
     const ackDeps = { ...deps, acknowledgeBy: apply.by };
     const lock = acquireContinuityLock(ackDeps.dir, PO_REBIND_LOCK_TOKEN, ackDeps);
     if (!lock.ok) { console.error(`Error: PO authority acknowledge refused (${lock.code}); zero mutation.`); return 2; }
@@ -6188,7 +6209,12 @@ function runPoAuthorityRebindCommand(sub, rest, deps) {
     return 2;
   }
   if (sub === "po-authority-rebind-apply") {
-    const runner = resolvePoRebindRunner(apply.runner, deps.env ?? process.env);
+    const runnerResolved = resolvePoRebindRunner(apply.runner, deps.env ?? process.env);
+    if (!runnerResolved.ok) {
+      console.error(`Error: po-authority-rebind-apply refused (${runnerResolved.code}); no --runner was given and no recognized runner environment marker (CLAUDECODE, ANTIGRAVITY_AGENT, AI_AGENT) is set. Re-run with an explicit --runner claude|codex|antigravity instead of relying on a guessed default.`);
+      return 2;
+    }
+    const runner = runnerResolved.runner;
     const lock = acquireContinuityLock(deps.dir, PO_REBIND_LOCK_TOKEN, deps);
     if (!lock.ok) { console.error(`Error: PO authority rebind refused (${lock.code}); zero mutation.`); return 2; }
     try {
@@ -6358,7 +6384,12 @@ function runPoAuthorityDecisionCommand(sub, rest, deps) {
     // RUNNERS_WITHOUT_APP_SERVER) and gates the postimage readback that must
     // be `ready` for the apply to succeed, so an implicit Codex identity here
     // was reachable and consequential for a Claude-rooted project.
-    const runner = resolvePoRebindRunner(apply.runner, deps.env ?? process.env);
+    const runnerResolved = resolvePoRebindRunner(apply.runner, deps.env ?? process.env);
+    if (!runnerResolved.ok) {
+      console.error(`Error: po-authority-decision-apply refused (${runnerResolved.code}); no --runner was given and no recognized runner environment marker (CLAUDECODE, ANTIGRAVITY_AGENT, AI_AGENT) is set. Re-run with an explicit --runner claude|codex|antigravity instead of relying on a guessed default.`);
+      return 2;
+    }
+    const runner = runnerResolved.runner;
     return runPoAuthorityRebindApply(apply, deps, lock, io, stateIo, {
       buildPlan: buildPoAuthorityDecisionPlan,
       resultSchema: "pipeline.po-authority-decision-apply.v1",

@@ -22,7 +22,7 @@ import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 
 import { createCriticalActionApprovalRequest, criticalActionSubjectSha256 } from "../lib/critical-action-approval-request.mjs";
-import { PLAN_AUTHORITY_PRD_FRAMING_CODE, PO_ACK_APPLY_CONFIRMATION_TOKEN, SCHEMA_ID, continuityLockPath, externalPathIsOutsideRoot, run, statePath, statePhaseProjectionMarker } from "./pipeline-state.mjs";
+import { PLAN_AUTHORITY_PRD_FRAMING_CODE, PO_ACK_APPLY_CONFIRMATION_TOKEN, SCHEMA_ID, continuityLockPath, externalPathIsOutsideRoot, resolvePoRebindRunner, run, statePath, statePhaseProjectionMarker } from "./pipeline-state.mjs";
 import { INTAKE_STAGING_DIRNAME } from "../lib/onboarding-continuity.mjs";
 import {
   PLAN_AUTHORITY_PROMOTION_SUBCOMMAND,
@@ -1284,6 +1284,30 @@ function awaitingApprovalFixture() {
   writeFileSync(join(root, "project", "pipeline-state.json"), JSON.stringify(revertedToDesign, null, 2));
   assert.equal(run(["set-phase", "--phase", "implementation"], deps), 0,
     "once the calibration already carries a real verify command, --verify-command is optional on replay");
+}
+
+// backlog/items/2026-08-30-runner-fallback-defaults-to-codex-without-explicit-signal.md:
+// resolvePoRebindRunner() must fail closed -- never silently guess "codex" --
+// when no explicit --runner AND none of CLAUDECODE/ANTIGRAVITY_AGENT/AI_AGENT
+// is set (exactly the case of a human typing the command directly in a plain
+// terminal, not through any of the three supported AI runners).
+{
+  const noSignal = resolvePoRebindRunner(undefined, {});
+  assert.equal(noSignal.ok, false, "no --runner and no runner env marker must refuse rather than resolve a runner");
+  assert.equal(noSignal.code, "PO-REBIND-RUNNER-UNKNOWN", "the refusal must carry a distinct, actionable code");
+  assert.notEqual(noSignal.runner, "codex", "the refusal object must never carry the old silent codex default");
+
+  const explicit = resolvePoRebindRunner("codex", {});
+  assert.deepEqual(explicit, { ok: true, runner: "codex" }, "an explicit --runner always wins, even with no env markers");
+
+  const claudeEnv = resolvePoRebindRunner(undefined, { CLAUDECODE: "1" });
+  assert.deepEqual(claudeEnv, { ok: true, runner: "claude" }, "CLAUDECODE=1 still resolves claude with no explicit --runner");
+
+  const antigravityEnv1 = resolvePoRebindRunner(undefined, { ANTIGRAVITY_AGENT: "1" });
+  assert.deepEqual(antigravityEnv1, { ok: true, runner: "antigravity" }, "ANTIGRAVITY_AGENT=1 still resolves antigravity");
+
+  const antigravityEnv2 = resolvePoRebindRunner(undefined, { AI_AGENT: "antigravity" });
+  assert.deepEqual(antigravityEnv2, { ok: true, runner: "antigravity" }, "AI_AGENT=antigravity still resolves antigravity");
 }
 
 console.log("pipeline-state.test.mjs (CB-1a): all checks passed");
