@@ -3,13 +3,49 @@ schema: pipeline.backlog-item.v1
 id: pipeline.design-to-implementation-path-has-no-driver
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-28
+closed_at: "2026-08-30"
+closure_repository: "self"
+closure_commit: "d7600de5"
+closure_evidence: "plugins/pipeline-core/scripts/pipeline-state-inspect.test.mjs"
 sprint: nova
 done_when: manual
-tracking: "Nova B — PO-raised 2026-08-28: the next path complex enough to need a driver. Ranked BEHIND the push driver, for the reason stated below."
+tracking: "Nova A — re-prioritized 2026-08-30, retrospective-analysis follow-up item #4 ('ja das brauchen wir')"
 source: "PO request 2026-08-28. Scope established by reading what onboarding-init.mjs drives (project-onboarding-v3.mjs's subcommand table only) against where the design-to-implementation transition actually lives (pipeline-state.mjs)."
 ---
+
+## Closed — 2026-08-30
+
+Re-read the Direction section below with the actual code rather than from
+memory: `buildInspectNextAction()` already drove `submit-plan` (draft),
+`approve-plan` (awaiting-approval), and `set-phase --phase implementation`
+(approved) end to end -- the "no driver" framing was stale by the time this
+was re-prioritized. The one real gap: `approve-plan` refuses unless a prior
+`present-plan --by <name>` attestation exists bound to the current
+submission, but the `awaiting-approval` branch never surfaced that
+precondition -- a blind session walked straight into the refusal, the exact
+failure class this item's sibling items already fixed for onboarding and
+the push path.
+
+`present-plan` is sequencing, not a decision (an attestation that the plan
+was rendered, not a judgement about its content) -- exactly the split
+Direction step 2 asked for. Fixed: the `awaiting-approval` branch now
+surfaces `present-plan` as an agent-runnable command (`--by` derived from
+local Git config, falling back to `collect-input` when undeliverable) when
+no matching `planPresentation` record exists yet (including the stale-sha256
+edge, when a resubmission invalidates a prior presentation); once a match
+exists, it falls through to the existing `approve-plan` `collect-input`
+unchanged -- that step stays the one genuine human decision, never
+executable/argv, re-proven by the untouched regression test.
+
+Dispatch `NVA-CF-PRESENTPLANDRIVER` (goldfish-implementor, medium).
+Independently re-verified by the Elephant: `pipeline-state-inspect.test.mjs`
+17/17 pass (3 new tests), `pipeline-state.test.mjs` 1/1 pass,
+`check-consumer-safe-paths.test.mjs` 9/9. Commit `d7600de5`. All four
+acceptance criteria below are satisfied: submit-plan/present-plan/set-phase
+each publish a `nextAction`; the sole remaining stop (`approve-plan`) names
+the plan/spec paths and sha256 and is never satisfiable by an agent.
 
 # The design → implementation path has no driver either
 
