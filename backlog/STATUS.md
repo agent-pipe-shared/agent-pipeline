@@ -247,7 +247,7 @@
 | pipeline.hash-chained-ledger-collides-with-the-secret-scanner | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.heredoc-refusal-teaches-no-substitute | open | defect | pipeline | 2026-08-28 | — |
 | pipeline.hgo-author-repair-digest-withholding-is-bypassable-by-reading-the-request-store | closed | defect | pipeline | 2026-08-19 | — |
-| pipeline.hgo-candidate-drift-invalidates-ceremony-on-any-concurrent-commit | open | defect | pipeline | 2026-08-30 | NOW / Nova A -- surfaced 2026-08-30, reproduced live in this session: a background trust-anchor-fix dispatch's commit 6876ba53 invalidated an in-flight hooks.json TP-4 signature ceremony, requiring refreeze-plan and a second PO signature for the identical edit. |
+| pipeline.hgo-candidate-drift-invalidates-ceremony-on-any-concurrent-commit | closed | defect | pipeline | 2026-08-30 | NOW / Nova A -- surfaced 2026-08-30, reproduced live in this session: a background trust-anchor-fix dispatch's commit 6876ba53 invalidated an in-flight hooks.json TP-4 signature ceremony, requiring refreeze-plan and a second PO signature for the identical edit. |
 | pipeline.hgo-ceremony-should-reduce-po-involvement-to-only-the-external-signing-step | closed | workflow-improvement | pipeline | 2026-08-19 | — |
 | pipeline.hgo-cli-side-granted-wiring-conflicts-with-arm-time-drift-check | closed | requirement | pipeline | 2026-08-19 | — |
 | pipeline.hgo-signature-ceremony-requires-more-human-steps-than-the-key-actually-needs | closed | workflow-improvement | pipeline | 2026-08-18 | — |
@@ -562,8 +562,8 @@
 
 ## Counts
 
-- open: 78
+- open: 77
 - in_progress: 3
-- closed: 459
+- closed: 460
 - rejected: 3
 - deferred: 11
