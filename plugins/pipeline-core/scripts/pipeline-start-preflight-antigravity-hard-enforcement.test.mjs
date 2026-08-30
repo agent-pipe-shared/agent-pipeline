@@ -16,7 +16,7 @@
 // observed this session (fail-closed).
 
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync, utimesSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, statSync, writeFileSync, utimesSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -157,8 +157,13 @@ test("a lock older than the freshness window is not observed, same as absent", (
 
 test("a lock exactly at the freshness window boundary still counts as observed (inclusive)", () => {
   withTempRoot((root) => {
-    const now = Date.now();
-    writeLock(root, "boundary", now - ANTIGRAVITY_HARD_ENFORCEMENT_FRESH_WINDOW_MS);
+    const requestedNow = Date.now();
+    const lockPath = writeLock(root, "boundary", requestedNow - ANTIGRAVITY_HARD_ENFORCEMENT_FRESH_WINDOW_MS);
+    // `utimesSync()` is allowed to round to the filesystem's timestamp
+    // precision. Bind the exact-window assertion to the mtime that was
+    // actually persisted instead of assuming the requested fractional value
+    // survived byte-for-byte; the production comparison remains inclusive.
+    const now = statSync(lockPath).mtimeMs + ANTIGRAVITY_HARD_ENFORCEMENT_FRESH_WINDOW_MS;
     const result = observeAntigravityHardEnforcement({ rootDir: root, now, currentVersion: TEST_VERSION });
     assert.equal(result.observed, true);
   });
