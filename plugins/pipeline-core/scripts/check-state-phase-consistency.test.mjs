@@ -192,7 +192,7 @@ test("the marker stays atomic with a real design -> implementation transition", 
     const approved = run(["approve-plan", "--by", "po-test"], lifecycleDeps(dir, planPath));
     assert.equal(approved, 0);
 
-    const setPhase = run(["set-phase", "--phase", "implementation"], { dir, now: FIXED_NOW });
+    const setPhase = run(["set-phase", "--phase", "implementation", "--verify-command", `${process.execPath} -e "process.exit(0)"`], { dir, now: FIXED_NOW });
     assert.equal(setPhase, 0);
     const afterSetPhase = checkStatePhaseConsistency({ rootDir: dir });
     assert.equal(afterSetPhase.status, "consistent", JSON.stringify(afterSetPhase));
