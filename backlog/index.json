@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "302ea220b483b4e7d7e2966da0a280489fa5e49c706a527977358e5352baab36"
+    "transitionHead": "3698499d7ef3145f927a78a0e0261f18177ebb31e667d2eb5fc8100ee9a9f5fe"
   },
   "counts": {
-    "open": 77,
+    "open": 76,
     "in_progress": 3,
-    "closed": 455,
+    "closed": 456,
     "rejected": 3,
     "deferred": 11
   },
@@ -1204,13 +1204,17 @@
     },
     {
       "id": "pipeline.codex-restart-context-loss-needs-a-different-approach",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-29",
       "source": "PO inline observation #2 (2026-08-29 greenfield synthesis: 'Codex STILL (5 fix rounds over 3 weeks!) doesn't carry inputs/data across a restart'); Codex 060-77 retrospective section 'Informationsverlust beim Wiederanlauf'; supersedes 2026-08-09-codex-restart-cannot-recover-operational-context-from-its-own-prior-transcript.md and 2026-08-29-mechanical-proof-of-complete-prior-input-consumption-across-restart.md (both closed, both via code-reading/unit-test verification only -- neither live-verified against a real Codex restart, per this session's own now-repeated 'closed via code-reading, still broken live' failure pattern).",
       "deferred": false,
-      "tracking": "NOW / Nova A -- PO explicitly elevated this 2026-08-29, live: 'was echt ein riesen thema ist, sind die fehlenden codex übergaben. Da braucht es eine ganz andere idee mal als ansatz bzw. härtere durchsetzung mit dem hint - das kann codex so einfach nie sauber verarbeiten' (this is a genuinely huge topic; needs a completely different approach, or harder enforcement -- Codex apparently can never cleanly process the current mechanism this simply)."
+      "tracking": "NOW / Nova A -- PO explicitly elevated this 2026-08-29, live: 'was echt ein riesen thema ist, sind die fehlenden codex übergaben. Da braucht es eine ganz andere idee mal als ansatz bzw. härtere durchsetzung mit dem hint - das kann codex so einfach nie sauber verarbeiten' (this is a genuinely huge topic; needs a completely different approach, or harder enforcement -- Codex apparently can never cleanly process the current mechanism this simply).",
+      "closedAt": "2026-08-30",
+      "closureRepository": "self",
+      "closureCommit": "567be68085c59e3b1bfbf84ec4718d3a67728877",
+      "closureEvidence": "plugins/pipeline-core/hooks/codex-session-start-hint.test.mjs"
     },
     {
       "id": "pipeline.codex-runner-has-no-real-support-on-native-windows",

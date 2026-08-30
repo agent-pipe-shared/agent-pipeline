@@ -101,7 +101,7 @@
 | pipeline.codex-pretool-guard-cross-repository-recovery-guidance-points-at-the-wrong-repo | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.codex-read-only-steps-escalate-individually-instead-of-once | closed | idea | pipeline | 2026-08-09 | — |
 | pipeline.codex-restart-cannot-recover-operational-context-from-its-own-prior-transcript | closed | idea | pipeline | 2026-08-09 | — |
-| pipeline.codex-restart-context-loss-needs-a-different-approach | open | defect | pipeline | 2026-08-29 | NOW / Nova A -- PO explicitly elevated this 2026-08-29, live: 'was echt ein riesen thema ist, sind die fehlenden codex übergaben. Da braucht es eine ganz andere idee mal als ansatz bzw. härtere durchsetzung mit dem hint - das kann codex so einfach nie sauber verarbeiten' (this is a genuinely huge topic; needs a completely different approach, or harder enforcement -- Codex apparently can never cleanly process the current mechanism this simply). |
+| pipeline.codex-restart-context-loss-needs-a-different-approach | closed | defect | pipeline | 2026-08-29 | NOW / Nova A -- PO explicitly elevated this 2026-08-29, live: 'was echt ein riesen thema ist, sind die fehlenden codex übergaben. Da braucht es eine ganz andere idee mal als ansatz bzw. härtere durchsetzung mit dem hint - das kann codex so einfach nie sauber verarbeiten' (this is a genuinely huge topic; needs a completely different approach, or harder enforcement -- Codex apparently can never cleanly process the current mechanism this simply). |
 | pipeline.codex-runner-has-no-real-support-on-native-windows | closed | defect | pipeline | 2026-08-19 | — |
 | pipeline.codex-runner-needed-three-sessions-for-one-small-feature | closed | workflow-improvement | pipeline | 2026-08-28 | Nova B — PO asked for this to be examined in detail |
 | pipeline.codex-sandbox-critic-longterm | closed | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
@@ -557,8 +557,8 @@
 
 ## Counts
 
-- open: 77
+- open: 76
 - in_progress: 3
-- closed: 455
+- closed: 456
 - rejected: 3
 - deferred: 11
