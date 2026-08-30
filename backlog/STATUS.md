@@ -106,8 +106,9 @@
 | pipeline.codex-runner-needed-three-sessions-for-one-small-feature | closed | workflow-improvement | pipeline | 2026-08-28 | Nova B — PO asked for this to be examined in detail |
 | pipeline.codex-sandbox-critic-longterm | closed | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.codex-sandbox-runtime-deniedroots-proc-collides-with-proc-self-in-the-runtime-read-set | closed | defect | pipeline | 2026-08-19 | — |
-| pipeline.codex-worker-dispatch-fails-session-capability-probe-root-does-not | open | defect | pipeline | 2026-08-30 | NOW / Nova A -- PO-raised 2026-08-30 from the Codex/WSL greenfield retrospective; confirmed via code trace to be a genuinely separate defect from the resume-hint enforcement gap and the design-binding gap raised alongside it. |
+| pipeline.codex-worker-dispatch-fails-session-capability-probe-root-does-not | closed | defect | pipeline | 2026-08-30 | NOW / Nova A -- PO-raised 2026-08-30 from the Codex/WSL greenfield retrospective; confirmed via code trace to be a genuinely separate defect from the resume-hint enforcement gap and the design-binding gap raised alongside it. |
 | pipeline.codex-worker-subagent-dispatch-capability-is-broken | open | defect | pipeline | 2026-08-29 | Nova B -- needs deeper Codex-runner-side investigation, likely outside pure Pipeline-repo code; not a same-session fix. |
+| pipeline.codex-worker-supervisor-hardcodes-a-sandbox-mode-that-blocks-git-spawn | open | defect | pipeline | 2026-08-30 | NOW / Nova A -- PO explicit follow-up 2026-08-30 after live-diagnosing the Codex worker session-capability failure: this has recurred across multiple prior Codex sessions, and a bootstrap-time sandbox-profile query/selection was discussed before but never wired up. |
 | pipeline.command-grammar-guesses-shell-dialect-from-host-os-not-the-actual-tool-shell | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.command-offer-schema-has-no-displayed-generated-asserted-states | rejected | requirement | pipeline | 2026-08-17 | — |
 | pipeline.commit-trailer-block-wrapped-continuation-line-parses-as-empty | closed | defect | pipeline | 2026-08-09 | — |
@@ -567,6 +568,6 @@
 
 - open: 77
 - in_progress: 3
-- closed: 463
+- closed: 464
 - rejected: 3
 - deferred: 11
