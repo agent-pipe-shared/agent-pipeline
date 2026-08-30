@@ -270,19 +270,41 @@ test("drivePushInit: missing push-threat-model.md stops at gate-satisfiability, 
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test("drivePushInit: an unavailable trust anchor (no trustAnchor, no trustAnchors) stops at gate-satisfiability, named", () => {
+test("drivePushInit: an onboarding-set machine-plane anchor carries the unpinned TOFU posture through to signature-required", () => {
   const root = freshFixtureRoot();
   try {
+    let satisfiabilityAnchorReads = 0;
+    let prepareAnchorReads = 0;
+    const tofuPolicy = () => ({ ok: true, trustAnchor: null, trustAnchors: null });
+    const machinePlane = () => ({
+      status: "valid",
+      plane: { poKeyDirectory: "/external/po-dir" },
+    });
     const result = drivePushInit({
       rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main",
       satisfiabilityDeps: satisfiabilityDepsAllGreen({
-        readCriticalHumanProofPolicy: () => ({ ok: true, trustAnchor: null, trustAnchors: null }),
+        readCriticalHumanProofPolicy: tofuPolicy,
+        resolveLocalOperatorKeyAnchor: () => {
+          satisfiabilityAnchorReads += 1;
+          return { keyReference: "fixture-operator-key", publicKeySha256: "a".repeat(64) };
+        },
+        readMachinePlane: machinePlane,
       }),
-      prepareDeps: prepareDepsAllGreen(),
+      prepareDeps: prepareDepsAllGreen({
+        readCriticalHumanProofPolicy: tofuPolicy,
+        resolveLocalOperatorKeyAnchor: () => {
+          prepareAnchorReads += 1;
+          return { keyReference: "fixture-operator-key", publicKeySha256: "a".repeat(64) };
+        },
+        readMachinePlane: machinePlane,
+      }),
     });
-    assert.equal(result.outcome, "precondition-unmet");
-    assert.equal(result.checks.some((check) => check.id === "trust-anchor-present"), true, JSON.stringify(result.checks));
-    assert.deepEqual(result.steps.map((step) => step.id), ["push-gate-satisfiability"]);
+    assert.equal(result.outcome, "signature-required", JSON.stringify(result, null, 2));
+    assert.deepEqual(result.steps.map((step) => step.id), ["push-gate-satisfiability", "push-prepare"]);
+    assert.equal(satisfiabilityAnchorReads, 1, "the cheap preflight must resolve the onboarding-set operator anchor");
+    assert.equal(prepareAnchorReads, 1, "push-prepare must independently resolve the same operator anchor");
+    assert.equal(result.signatureCommand.executedByDriver, false);
+    assert.ok(result.signatureCommand.lines.join("\n").includes("/external/po-dir"), JSON.stringify(result.signatureCommand));
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
