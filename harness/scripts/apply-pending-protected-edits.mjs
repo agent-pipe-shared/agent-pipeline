@@ -296,6 +296,20 @@ const VERIFY_REGISTRATIONS = [
     line: '  { name: "pre-push-hook-install-tests", file: join(pluginScriptsDir, "pre-push-hook-install.test.mjs") },',
     file: join(REPO_ROOT, "plugins", "pipeline-core", "scripts", "pre-push-hook-install.test.mjs"),
   },
+  // Added 2026-08-30 (NVA-GF-VERIFY-REG-BUNDLE-1). These two green suites
+  // cover the first-anchor bootstrap boundary and onboarding from an unborn
+  // HEAD. Keeping both in step A makes one attended `--only=verify` action
+  // register, run, and roll back the complete pending pair atomically.
+  {
+    name: "pre-commit-hook-install-trust-anchor-bootstrap-tests",
+    line: '  { name: "pre-commit-hook-install-trust-anchor-bootstrap-tests", file: join(pluginScriptsDir, "pre-commit-hook-install.trust-anchor-bootstrap.test.mjs") },',
+    file: join(REPO_ROOT, "plugins", "pipeline-core", "scripts", "pre-commit-hook-install.trust-anchor-bootstrap.test.mjs"),
+  },
+  {
+    name: "project-onboarding-v3-unborn-head-tests",
+    line: '  { name: "project-onboarding-v3-unborn-head-tests", file: join(pluginScriptsDir, "project-onboarding-v3-unborn-head.test.mjs") },',
+    file: join(REPO_ROOT, "plugins", "pipeline-core", "scripts", "project-onboarding-v3-unborn-head.test.mjs"),
+  },
 ];
 
 // The terminator moves every time a batch is registered, so this constant is
