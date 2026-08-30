@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.runner-fallback-defaults-to-codex-without-explicit-signal
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-30
+closure_repository: self
+closure_commit: 951c0d5b81abcf31713a97c282bddc1d3eca820b
+closure_evidence: plugins/pipeline-core/scripts/pipeline-state.test.mjs
 created: 2026-08-30
 sprint: nova
 tracking: "NOW / Nova A -- surfaced 2026-08-30 while cross-checking the Claude/Windows greenfield retrospective (docs/pipeline-retrospective-claude-060-78.md, section 8) against current code; confirmed still present, unfixed."
@@ -42,6 +46,27 @@ support without a breaking change.
 - A call with no `--runner` and no runner env var set does NOT silently
   resolve to `"codex"`.
 - Regression test added exercising exactly this case.
+
+## Closed, 2026-08-30 (NVA-RUNNERFALLBACK-1)
+
+`resolvePoRebindRunner()` now returns `{ok:false, code:"PO-REBIND-RUNNER-UNKNOWN"}`
+instead of silently guessing `"codex"` when no `--runner` and none of
+`CLAUDECODE`/`ANTIGRAVITY_AGENT`/`AI_AGENT` are present (commit `951c0d5b`).
+All three call sites (`po-authority-acknowledge-apply`,
+`po-authority-rebind-apply`, `po-authority-decision-apply`) refuse with an
+actionable error naming the missing signal, before any state mutation --
+zero legitimate automated caller relied on the old default (every AI runner
+path already sets one of the three env markers). The function is exported
+for direct unit coverage. Both acceptance criteria are met: the no-signal
+case no longer resolves to `"codex"`, and a regression test exercises the
+refusal plus all three legitimate resolution paths (explicit `--runner`,
+`CLAUDECODE`, `ANTIGRAVITY_AGENT`/`AI_AGENT`).
+
+DoD independently re-verified: `plugins/pipeline-core/scripts/pipeline-state.test.mjs`
+(CB-1a) -- all checks passed, including the new regression test;
+`harness/scripts/pipeline-state.test.mjs` -- 542/542 cases passed (full
+suite, no regression); `harness/scripts/check-consumer-safe-paths.test.mjs`
+-- 9/9 passed.
 
 ## Triage
 
