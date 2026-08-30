@@ -436,8 +436,13 @@ import {
   criticalActionSubjectSha256,
   verifyCriticalActionApprovalRequest,
 } from "../lib/critical-action-approval-request.mjs";
-import { criticalProofWaiverFor, readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
-import { requireAttendedChatGateConfirmation } from "../lib/chat-gate-ceremony.mjs";
+import {
+  USER_SOURCE_PATH,
+  criticalProofWaiverFor,
+  readCriticalHumanProofPolicy,
+  readHumanApprovalMode,
+} from "../lib/critical-human-proof-policy.mjs";
+import { chatAttributionRecord, requireAttendedChatGateConfirmation } from "../lib/chat-gate-ceremony.mjs";
 import {
   lifecycleDigest as closeCoordinatorDigest,
   readCloseCoordinator,
@@ -2952,9 +2957,15 @@ function runPublicationCommand(sub, flags, deps) {
       } else {
         if (expected.value === "absent") throw new Error("stale publication CAS");
         if (sub === "publication-approve") {
-          const policy = criticalHumanProofPolicy(dir);
-          if (!policy.ok) throw new Error(policy.code);
-          if (policy.requiredKinds.has("publication")) {
+          const publicationMode = criticalProofWaiverFor(dir, "publication");
+          if (publicationMode.code !== null && publicationMode.code !== undefined) throw new Error(publicationMode.code);
+          let publicationProofRequired = publicationMode.waived === true;
+          if (!publicationProofRequired) {
+            const policy = criticalHumanProofPolicy(dir);
+            if (!policy.ok) throw new Error(policy.code);
+            publicationProofRequired = policy.requiredKinds.has("publication");
+          }
+          if (publicationProofRequired) {
             if (prior === null) throw new Error("publication proof requires a prepared State projection");
             const candidate = { commit: prior.candidateOid, tree: prior.candidateTree };
             const verified = verifyCriticalHumanProof({
@@ -3034,7 +3045,14 @@ function runPublicationCommand(sub, flags, deps) {
     // A waived publication is recorded as a waiver, never as an absent entry —
     // otherwise durable publication authority carries no statement of what backed it
     // (ADR-0055 decision 4).
-    const proofEntry = criticalProof ?? (criticalProofWaiver === null ? null : { waiver: criticalProofWaiver });
+    const proofEntry = criticalProof ?? (criticalProofWaiver === null
+      ? null
+      : {
+        waiver: criticalProofWaiver,
+        ...(criticalProofWaiver.mode === "chat-attributed-unattested"
+          ? { humanApproval: chatAttributionRecord({ kind: "publication", by: input.attribution }) }
+          : {}),
+      });
     const proofProjection = proofEntry === null
       ? base.publicationCriticalProofs
       : { ...(base.publicationCriticalProofs ?? {}), [request.value.transactionId]: proofEntry };
@@ -3294,6 +3312,20 @@ function defaultGitCandidate(dir) {
 
 /** ADR-0055: one shared implementation, so the push guard reads the same policy. */
 const criticalHumanProofPolicy = (dir) => readCriticalHumanProofPolicy(dir);
+
+// The global selector is deliberately weaker only when its exact committed source
+// says so.  Every other reader outcome (default, invalid, unsafe, unreadable or
+// uncommitted) retains the route's existing, stricter posture.
+function committedGlobalChatHumanApproval(dir, deps = {}) {
+  try {
+    const approval = readHumanApprovalMode(dir, { spawn: deps.spawnSync ?? deps.spawn });
+    return approval.mode === "chat"
+      && approval.source === USER_SOURCE_PATH
+      && approval.scope === "global";
+  } catch {
+    return false;
+  }
+}
 
 function boundRepositoryArtifact(dir, relativePath) {
   const root = realpathSync(resolve(dir));
@@ -3744,8 +3776,6 @@ function externalPublicJson(dir, value) {
 const ALWAYS_REQUIRED_KINDS = new Set(["feature-package-reconcile"]);
 
 function verifyCriticalHumanProof({ dir, state, kind, candidate, subject, flags, now, required = false }) {
-  const policy = criticalHumanProofPolicy(dir);
-  if (!policy.ok) return policy;
   // The cryptographic proof may be stood down for this kind — by `gates.push_approval:
   // chat` in pipeline.user.yaml for `push` (ADR-0056), or by an explicit reasoned
   // waiver in the policy file for the other kinds (ADR-0055). Never inferred, never
@@ -3767,6 +3797,11 @@ function verifyCriticalHumanProof({ dir, state, kind, candidate, subject, flags,
   const configured = criticalProofWaiverFor(dir, kind);
   if (configured.code !== null && configured.code !== undefined) return { ok: false, code: configured.code };
   if (configured.waived) return { ok: true, proof: null, waived: configured.waiver };
+  // Global `human_approval: chat` returned above before this policy/anchor
+  // reader runs. Default, malformed, uncommitted and signature modes still
+  // take the historical strict path.
+  const policy = criticalHumanProofPolicy(dir);
+  if (!policy.ok) return policy;
   if (!policy.requiredKinds.has(kind) && !ALWAYS_REQUIRED_KINDS.has(kind)) {
     return required ? { ok: false, code: "CRITICAL-PROOF-POLICY-KIND-REQUIRED" } : { ok: true, proof: null };
   }
@@ -6266,7 +6301,13 @@ function buildPoAuthorityAcknowledgePlan(dir, deps, existing, plannedAt = deps.n
   // carries no exact-keys validator in this file (confirmed: only
   // `state.schema` is checked at each call site, never the full key set),
   // so this is additive, not a schema change to anything already validated.
-  nextState.poGateAcknowledgement = { by, at: plannedAt };
+  nextState.poGateAcknowledgement = {
+    by,
+    at: plannedAt,
+    ...(deps.acknowledgeGlobalHumanApproval === true
+      ? { humanApproval: chatAttributionRecord({ kind: "po-plan-acknowledgement", by }) }
+      : {}),
+  };
   if (nextState.gateEstimate !== undefined) return { ok: false, code: "PO-ACK-STATE" };
   const payload = {
     schema: PO_ACK_PLAN_SCHEMA,
@@ -6319,9 +6360,11 @@ function runPoAuthorityAcknowledgeCommand(sub, rest, deps) {
     // ready agent session could otherwise run itself, with --by supplied only by
     // the agent's own claim about what the PO said in chat -- exactly the
     // "gate held != gate fulfilled" risk ADR-0021's R-M14 addendum named but
-    // never mechanically enforced. No mode branching: unlike approve-push there
-    // is no signature/chat alternative for this gate, so the ceremony applies
-    // unconditionally. Stateless, single-call design (mirrors
+    // never mechanically enforced. The ordinary/default posture uses the
+    // attended-terminal ceremony.  The committed global `human_approval: chat`
+    // product choice is explicitly non-attested, so it instead records a clear
+    // chat-attributed-unattested marker and must not touch a TTY. Stateless,
+    // single-call design (mirrors
     // project-onboarding-v3.mjs's kickoff --language/--profile gate,
     // AGY-CHATADAPTER-2) rather than approve-push's persisted
     // pendingPushChallenge: ADR-0061 Decision 1 forbids "a hash pasted from one
@@ -6331,26 +6374,29 @@ function runPoAuthorityAcknowledgeCommand(sub, rest, deps) {
     // as the first statement in this branch, before the lock/transaction below,
     // so an unattended or mismatched attempt touches no lock and no rebind
     // transaction file.
-    const confirmation = requireAttendedChatGateConfirmation({
-      summaryLines: [
-        "PO PLAN ACKNOWLEDGEMENT CONFIRMATION -- read before you type the value:",
-        `  by: ${apply.by}`,
-        `  plan-sha256: ${apply.planSha256}`,
-        `  updated-at: ${apply.plannedAt}`,
-        `  confirmation value: ${PO_ACK_APPLY_CONFIRMATION_TOKEN}`,
-      ],
-      expected: PO_ACK_APPLY_CONFIRMATION_TOKEN,
-      dependencies: deps,
-    });
-    if (!confirmation.ok) {
-      if (confirmation.code === "CHAT-GATE-NOT-ATTENDED") {
-        console.error(`Error: po-authority-acknowledge-apply refused (CHAT-GATE-NOT-ATTENDED); a human must confirm --by ${apply.by} directly, in their own attended terminal -- an agent's own tool call cannot complete this step.`);
-        console.error("Re-run this EXACT command yourself and type the value shown above when prompted:");
-        console.error(`node plugins/pipeline-core/scripts/pipeline-state.mjs po-authority-acknowledge-apply --root ${JSON.stringify(realpathSync(resolve(deps.dir)))} --plan-sha256 ${apply.planSha256} --updated-at ${apply.plannedAt} --by ${JSON.stringify(apply.by)} --activate${apply.runner ? ` --runner ${apply.runner}` : ""}`);
-      } else {
-        console.error(`Error: po-authority-acknowledge-apply refused (${confirmation.code}); the typed value did not match the confirmation value shown above.`);
+    const globalChat = committedGlobalChatHumanApproval(deps.dir, deps);
+    if (!globalChat) {
+      const confirmation = requireAttendedChatGateConfirmation({
+        summaryLines: [
+          "PO PLAN ACKNOWLEDGEMENT CONFIRMATION -- read before you type the value:",
+          `  by: ${apply.by}`,
+          `  plan-sha256: ${apply.planSha256}`,
+          `  updated-at: ${apply.plannedAt}`,
+          `  confirmation value: ${PO_ACK_APPLY_CONFIRMATION_TOKEN}`,
+        ],
+        expected: PO_ACK_APPLY_CONFIRMATION_TOKEN,
+        dependencies: deps,
+      });
+      if (!confirmation.ok) {
+        if (confirmation.code === "CHAT-GATE-NOT-ATTENDED") {
+          console.error(`Error: po-authority-acknowledge-apply refused (CHAT-GATE-NOT-ATTENDED); a human must confirm --by ${apply.by} directly, in their own attended terminal -- an agent's own tool call cannot complete this step.`);
+          console.error("Re-run this EXACT command yourself and type the value shown above when prompted:");
+          console.error(`node plugins/pipeline-core/scripts/pipeline-state.mjs po-authority-acknowledge-apply --root ${JSON.stringify(realpathSync(resolve(deps.dir)))} --plan-sha256 ${apply.planSha256} --updated-at ${apply.plannedAt} --by ${JSON.stringify(apply.by)} --activate${apply.runner ? ` --runner ${apply.runner}` : ""}`);
+        } else {
+          console.error(`Error: po-authority-acknowledge-apply refused (${confirmation.code}); the typed value did not match the confirmation value shown above.`);
+        }
+        return 1;
       }
-      return 1;
     }
     const runnerResolved = resolvePoRebindRunner(apply.runner, deps.env ?? process.env);
     if (!runnerResolved.ok) {
@@ -6358,7 +6404,7 @@ function runPoAuthorityAcknowledgeCommand(sub, rest, deps) {
       return 2;
     }
     const runner = runnerResolved.runner;
-    const ackDeps = { ...deps, acknowledgeBy: apply.by };
+    const ackDeps = { ...deps, acknowledgeBy: apply.by, acknowledgeGlobalHumanApproval: globalChat };
     const lock = acquireContinuityLock(ackDeps.dir, PO_REBIND_LOCK_TOKEN, ackDeps);
     if (!lock.ok) { console.error(`Error: PO authority acknowledge refused (${lock.code}); zero mutation.`); return 2; }
     try {
@@ -6381,7 +6427,11 @@ function runPoAuthorityAcknowledgeCommand(sub, rest, deps) {
     console.error(`Error: po-authority-acknowledge-plan refused (${runnerResolved.code}); --runner must be claude, codex, or antigravity.`);
     return 2;
   }
-  const ackDeps = { ...deps, acknowledgeBy: planBy };
+  const ackDeps = {
+    ...deps,
+    acknowledgeBy: planBy,
+    acknowledgeGlobalHumanApproval: committedGlobalChatHumanApproval(deps.dir, deps),
+  };
   const planned = buildPoAuthorityAcknowledgePlan(ackDeps.dir, ackDeps, existing);
   if (!planned.ok) {
     console.error(`Error: PO authority acknowledge refused (${planned.code}); zero mutation.`);
@@ -7639,6 +7689,9 @@ function defaultFeaturePackageReconcileApproval(argv, deps) {
     // though `criticalProof` is null, which is what closes F-B's "chat mode nothing is
     // commit-bound" half.
     const approvalRecord = { approvedBy: flags.by, approvedAt: now, forCommit: candidate.commit, criticalProof: verified.proof };
+    if (verified.waived?.mode === "chat-attributed-unattested") {
+      approvalRecord.humanApproval = chatAttributionRecord({ kind, by: flags.by });
+    }
     if (verified.waived !== undefined) approvalRecord.criticalProofWaiver = verified.waived;
     const next = {
       ...state,
@@ -8555,6 +8608,10 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       const expectedSpecSha256 = authority.value.specSha256;
       const profileSha256 = sha256CanonicalJson(profile.value);
       const expectedSubmissionSha256 = lifecycle.submissionSha256;
+      // `approveSubmittedPlan` deliberately validates its approval envelope with
+      // an exact key set.  Keep that strong historical schema intact and carry
+      // the weaker global-chat basis in an adjacent, explicit record instead.
+      const globalChat = committedGlobalChatHumanApproval(dir, deps);
       let approvedAt;
       const written = writeState(dir, undefined, base, {
         transition: (observed) => {
@@ -8569,7 +8626,16 @@ export function run(argv = process.argv.slice(2), deps = {}) {
             at: approvedAt,
           });
           return transition.ok
-            ? { ...transition, state: { ...transition.state, updatedAt: approvedAt } }
+            ? {
+              ...transition,
+              state: {
+                ...transition.state,
+                updatedAt: approvedAt,
+                ...(globalChat
+                  ? { planApprovalAttribution: chatAttributionRecord({ kind: "plan", by }) }
+                  : {}),
+              },
+            }
             : transition;
         },
         beforeCommit: () => {
@@ -8790,8 +8856,6 @@ export function run(argv = process.argv.slice(2), deps = {}) {
     }
 
     case "approve-push": {
-      const policy = criticalHumanProofPolicy(dir);
-      if (!policy.ok) { console.error(`Error: approve-push refused (${policy.code}).`); return 2; }
       // A push cleared in chat mode (ADR-0056) must not demand proof paths the operator
       // deliberately stood down; every other binding stays exactly as strict as before.
       const pushMode = criticalProofWaiverFor(dir, "push");
@@ -8851,21 +8915,14 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         console.error("Error: approve-push requires a safe --remote and full --destination ref.");
         return 2;
       }
-      if (pushWaived) {
-        // AGY-CHATADAPTER-1: closes a confirmed self-approval hole
-        // (backlog/items/2026-08-25-chat-mode-push-approval-has-no-enforced-
-        // human-turn-boundary.md). The OLD shape took a `--challenge <code>`
-        // CLI flag on this same call -- nothing stopped the same automated
-        // actor that read the code from this command's own first-run stderr
-        // from immediately supplying it back on a second, still fully
-        // non-interactive, invocation. There is now no `--challenge` flag at
-        // all: a pending challenge is only ever confirmed by re-running this
-        // EXACT command (`--by`/`--remote`/`--destination` unchanged, ADR-0056)
-        // from a real attended terminal, which `requireAttendedChatGateConfirmation`
-        // (`lib/chat-gate-ceremony.mjs`) verifies via `isAttendedTerminal()`
-        // BEFORE it ever reads anything -- an agent's own tool-calling harness
-        // has no TTY on fd 0, so it cannot complete this step no matter what
-        // it pipes into stdin.
+      // Global chat is intentionally a terminal-free, non-attested attribution
+      // route.  It still binds the approval to the exact commit/remote/ref below,
+      // but it must not manufacture a challenge or read a TTY: doing either would
+      // turn the PO's selected weak posture back into a terminal ceremony.
+      if (pushWaived && pushMode.waiver?.mode !== "chat-attributed-unattested") {
+        // Preserve the historical, action-local `gates.push_approval: chat`
+        // ceremony for unmigrated projects.  Only the new committed global mode
+        // intentionally removes this attended-terminal boundary.
         const pending = base?.pendingPushChallenge;
         const hasValidPending = pending && typeof pending.code === "string"
           && pending.forCommit === head.commit
@@ -8958,6 +9015,9 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       // The record states on its face what backed it: a consumed proof, or the waiver
       // and its reason. There is no third, unlabelled state.
       const approvalRecord = { approvedBy: by, approvedAt, forCommit: head.commit, criticalProof: verified.proof, remote, destination, threatModel: threatModelBinding };
+      if (verified.waived?.mode === "chat-attributed-unattested") {
+        approvalRecord.humanApproval = chatAttributionRecord({ kind: "push", by });
+      }
       if (verified.waived !== undefined) approvalRecord.criticalProofWaiver = verified.waived;
       // Written only when one was supplied and validated, so `hooks/guard-push.mjs`'s own
       // opt-in dual-evaluation (its check (c)) has the reference to re-validate at read time.
@@ -9349,12 +9409,21 @@ export function run(argv = process.argv.slice(2), deps = {}) {
     }
 
     case "approve-deploy": {
-      const policy = criticalHumanProofPolicy(dir);
-      if (!policy.ok) { console.error(`Error: approve-deploy refused (${policy.code}).`); return 2; }
       // ADR-0055: a waived kind STAYS in requiredKinds, so `has("deploy")` is not the
       // question — "is the proof still demanded" is. Keying off requiredKinds alone
       // would force the operator to pass three proof paths that are never read.
-      const deployProofDemanded = policy.requiredKinds.has("deploy") && !policy.waivers?.has("deploy");
+      const deployMode = criticalProofWaiverFor(dir, "deploy");
+      if (deployMode.code !== null && deployMode.code !== undefined) {
+        console.error(`Error: approve-deploy refused (${deployMode.code}).`);
+        return 2;
+      }
+      const deployWaived = deployMode.waived === true;
+      let deployProofDemanded = deployWaived;
+      if (!deployWaived) {
+        const policy = criticalHumanProofPolicy(dir);
+        if (!policy.ok) { console.error(`Error: approve-deploy refused (${policy.code}).`); return 2; }
+        deployProofDemanded = policy.requiredKinds.has("deploy") && !policy.waivers?.has("deploy");
+      }
       // H-AC-12: optional `--decision-reference`, admitted only when actually passed -- see
       // approve-push's identical note on why `parseExactFlags` makes unconditional admission a
       // breaking change, and `evaluateOptInDecisionReference` for the dual-evaluation itself.
@@ -9380,7 +9449,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       const approvedAt = now();
       let proof = null;
       let waiver = null;
-      if (policy.requiredKinds.has("deploy")) {
+      if (deployProofDemanded) {
         const candidate = gitCandidate(dir);
         if (!candidate.ok) { console.error("Error: current candidate commit/tree could not be determined; deploy proof was not recorded."); return 2; }
         const verified = verifyCriticalHumanProof({
@@ -9415,6 +9484,9 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         forArtifact: artifact, forEnvironment: env, approvedBy: by, approvedAt,
         ...(proof === null ? {} : { criticalProof: proof }),
         ...(waiver === null ? {} : { criticalProofWaiver: waiver }),
+        ...(waiver?.mode === "chat-attributed-unattested"
+          ? { humanApproval: chatAttributionRecord({ kind: "deploy", by }) }
+          : {}),
         // Absent unless one was supplied and validated -- the entry stays byte-identical then.
         ...(decisionReference === undefined ? {} : { decisionReference }),
       };

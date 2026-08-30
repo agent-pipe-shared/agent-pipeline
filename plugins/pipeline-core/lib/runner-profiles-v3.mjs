@@ -274,7 +274,7 @@ function validateRoot(value, errors) {
     && (value.usage.common_projection !== "pipeline.runner-usage.v1" || value.usage.raw_persistence !== "none")) add(errors, "$.usage", "contract", "usage persistence contract is not registered", "restore the V3 usage contract");
   if (validateClosedObject(value.autonomy, "$.autonomy", ["push_policy", "branch_model", "wip_limit"], errors, "restore exactly the registered autonomy values")
     && (!["gated", "standing-approved"].includes(value.autonomy.push_policy) || !["feature-branch", "direct-main"].includes(value.autonomy.branch_model) || !Number.isInteger(value.autonomy.wip_limit) || value.autonomy.wip_limit < 1)) add(errors, "$.autonomy", "contract", "autonomy contract is invalid", "restore registered autonomy values");
-  if (validateClosedObject(value.gates, "$.gates", ["dev_plan", "push", "security", "claude_md_max_lines"], errors, "restore exactly the registered gate values", ["push_approval", "push_external_ledger", "reconcile_approval"])
+  if (validateClosedObject(value.gates, "$.gates", ["dev_plan", "push", "security", "claude_md_max_lines"], errors, "restore exactly the registered gate values", ["human_approval", "push_approval", "push_external_ledger", "reconcile_approval"])
     && (!["blocking", "warn", "off"].includes(value.gates.dev_plan) || !["blocking", "warn", "off"].includes(value.gates.push) || !["blocking", "warn", "off"].includes(value.gates.security) || !Number.isInteger(value.gates.claude_md_max_lines) || value.gates.claude_md_max_lines < 1)) add(errors, "$.gates", "contract", "gate contract is invalid", "restore registered gate values");
   // How a human clears the push gate. Optional; absent means the fail-closed default
   // `signature` (ADR-0056). `gates.push` decides WHETHER the gate blocks; this decides
@@ -282,6 +282,10 @@ function validateRoot(value, errors) {
   if (isObject(value.gates) && Object.hasOwn(value.gates, "push_approval")
     && !PUSH_APPROVAL_MODES.includes(value.gates.push_approval)) {
     add(errors, "$.gates.push_approval", "contract", `push_approval must be one of ${PUSH_APPROVAL_MODES.join(", ")}`, "use signature for a detached external proof, or chat for an in-session human clearance");
+  }
+  if (isObject(value.gates) && Object.hasOwn(value.gates, "human_approval")
+    && !PUSH_APPROVAL_MODES.includes(value.gates.human_approval)) {
+    add(errors, "$.gates.human_approval", "contract", `human_approval must be one of ${PUSH_APPROVAL_MODES.join(", ")}`, "use signature for detached external proofs, or chat for terminal-free attributed human approvals");
   }
   // How a human clears the feature-package-reconcile critical-action gate (ADR-0056's
   // 2026-08-11 Follow-up). Optional; same enum and same fail-closed-absent-default

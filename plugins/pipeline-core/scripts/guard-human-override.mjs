@@ -21,7 +21,7 @@ import {
 // `render-copy-safe` remains a backward-compatible view of the same shared
 // renderer now used in the default hook hand-off.
 import { placeholder, renderHumanCopySafeCommand } from "../lib/copy-safe-command.mjs";
-import { readPushApprovalMode } from "../lib/critical-human-proof-policy.mjs";
+import { USER_SOURCE_PATH, readHumanApprovalMode } from "../lib/critical-human-proof-policy.mjs";
 
 const SCRIPT = fileURLToPath(import.meta.url);
 const PLUGIN_ROOT = resolve(dirname(SCRIPT), "..");
@@ -201,8 +201,10 @@ export function main(argv = process.argv.slice(2), io = {}, options = {}) {
         scriptPath: SCRIPT,
         authorSourceRoot,
       });
-      let approvalMode = "signature";
-      try { approvalMode = readPushApprovalMode(parsed.repo)?.mode ?? "signature"; } catch { approvalMode = "signature"; }
+      let approval = { mode: "signature", scope: "default", source: "default" };
+      try { approval = readHumanApprovalMode(parsed.repo, { legacyKind: "push" }) ?? approval; } catch { /* fail closed */ }
+      const approvalMode = approval.mode;
+      const globalChat = approvalMode === "chat" && approval.scope === "global" && approval.source === USER_SOURCE_PATH;
       // Same ceremonyCommand() construction the two hooks build for their default hand-off
       // (script/repo pre-rendered via JSON.stringify()+placeholder(), request-sha256 through
       // ordinary shellWord() quoting) -- see their own NVA-W12-COPYSAFE comments.
@@ -233,7 +235,7 @@ export function main(argv = process.argv.slice(2), io = {}, options = {}) {
       const ceremonySteps = approvalMode === "chat"
         ? [planCommand, prepareAuthorizationChat, authorizeChat]
         : [planCommand, prepareAuthorizationSignature, emitSignatureDigest, authorizeBySignature];
-      write(`${ceremonySteps.map((step) => step.text).join("\n\n")}\n`);
+      write(`${globalChat ? "Committed global chat approval: chat-attributed-unattested; no terminal ceremony, key, or proof is required.\n\n" : ""}${ceremonySteps.map((step) => step.text).join("\n\n")}\n`);
       return 0;
     }
     if (command === "prepare-authorization") {

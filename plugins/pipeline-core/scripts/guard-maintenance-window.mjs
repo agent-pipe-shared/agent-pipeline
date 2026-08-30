@@ -82,7 +82,7 @@ import { join, resolve } from "node:path";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { readPublicRepositoryFile } from "../lib/threat-model-approval-request.mjs";
-import { readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
+import { USER_SOURCE_PATH, readCriticalHumanProofPolicy, readHumanApprovalMode } from "../lib/critical-human-proof-policy.mjs";
 import { livePluginRoots } from "../hooks/guard-gate-strength.mjs";
 import {
   closeGuardMaintenanceWindow,
@@ -351,9 +351,13 @@ export async function run(argv = process.argv.slice(2)) {
   }
 
   if (args.command === "install") {
-    if (!args.request || !args.proof || !args.plan || !args.spec) throw new Error(usage);
+    const configuredApproval = readHumanApprovalMode(rootDir);
+    const globalChat = configuredApproval.mode === "chat"
+      && configuredApproval.scope === "global"
+      && configuredApproval.source === USER_SOURCE_PATH;
+    if (!args.request || !args.plan || !args.spec || (!globalChat && !args.proof)) throw new Error(usage);
     const request = JSON.parse(readFileSync(resolve(args.request), "utf8"));
-    const proof = externalJson(rootDir, args.proof);
+    const proof = globalChat ? null : externalJson(rootDir, args.proof);
     // The shared trustPolicy contract (verifyAgainstTrustAnchors) checks an EXACT
     // {keyReference, publicKeySha256} shape per anchor; the external authority file may
     // additionally carry `humanName` (SETUP-1: `po-human-approval.mjs setup --human-name`
@@ -362,7 +366,7 @@ export async function run(argv = process.argv.slice(2)) {
     // narrowing already applied in pipeline-state.mjs's verifyCriticalHumanProof and
     // po-approval-request.mjs's verify subcommand. Wrapped as a one-element set for the
     // array-based lib signature (`anchors`), consistent with every other branch below.
-    const anchors = args.authority
+    const anchors = globalChat ? null : args.authority
       ? [(() => {
         const authority = externalJson(rootDir, args.authority);
         return { keyReference: authority?.keyReference, publicKeySha256: authority?.publicKeySha256 };
@@ -406,29 +410,32 @@ export async function run(argv = process.argv.slice(2)) {
       installedAtMs: nowMs, plan, spec, authorityClass: "product-owner",
     };
 
-    const reqId = requestDecisionId({ intentSha256 });
-    const { decisions } = await queryHumanGovernanceDecisions({ repositoryRoot: repo.primaryRoot, repositoryFingerprint: fingerprint });
-    const liveGrant = findLiveWindowGrant(decisions, reqId);
+    let liveGrant = null;
     let justAppendedGrant = null;
     const ledger = [];
-    if (liveGrant === null) {
+    if (!globalChat) {
+      const reqId = requestDecisionId({ intentSha256 });
+      const { decisions } = await queryHumanGovernanceDecisions({ repositoryRoot: repo.primaryRoot, repositoryFingerprint: fingerprint });
+      liveGrant = findLiveWindowGrant(decisions, reqId);
+      if (liveGrant === null) {
       // Step (b): appended once per signed request, skipped on every later install of
       // the same live-or-not-yet-disposed request (§6/§7.3).
-      if (!decisions.some((entry) => entry.decisionId === reqId)) {
-        const requestedDecision = buildWindowRequestDecision(builderRequest);
+        if (!decisions.some((entry) => entry.decisionId === reqId)) {
+          const requestedDecision = buildWindowRequestDecision(builderRequest);
+          ledger.push(await appendWindowDecision({
+            repositoryRoot: repo.primaryRoot, repositoryFingerprint: fingerprint, decision: requestedDecision,
+            occurredAtEpochMs: nowMs, featureId, requestId: intentSha256, capturePolicyDigest,
+          }));
+        }
+        // Step (c): `g` is the number of grants already linked to this request (§7.3).
+        const generation = decisions.filter((entry) => entry.event === "granted" && entry.links.requestDecisionId === reqId).length;
+        const grantDecision = buildWindowGrantDecision({ ...builderRequest, generation });
         ledger.push(await appendWindowDecision({
-          repositoryRoot: repo.primaryRoot, repositoryFingerprint: fingerprint, decision: requestedDecision,
+          repositoryRoot: repo.primaryRoot, repositoryFingerprint: fingerprint, decision: grantDecision,
           occurredAtEpochMs: nowMs, featureId, requestId: intentSha256, capturePolicyDigest,
         }));
+        justAppendedGrant = { decision: grantDecision, generation };
       }
-      // Step (c): `g` is the number of grants already linked to this request (§7.3).
-      const generation = decisions.filter((entry) => entry.event === "granted" && entry.links.requestDecisionId === reqId).length;
-      const grantDecision = buildWindowGrantDecision({ ...builderRequest, generation });
-      ledger.push(await appendWindowDecision({
-        repositoryRoot: repo.primaryRoot, repositoryFingerprint: fingerprint, decision: grantDecision,
-        occurredAtEpochMs: nowMs, featureId, requestId: intentSha256, capturePolicyDigest,
-      }));
-      justAppendedGrant = { decision: grantDecision, generation };
     }
 
     // Step (d)/(e): verify-and-arm. A pre-arm ledger append failure above already fails
@@ -459,8 +466,8 @@ export async function run(argv = process.argv.slice(2)) {
     // flag is supplied. Runs AFTER installGuardMaintenanceWindow has already returned
     // without throwing -- never before arming, never inside the fail-closed pre-arm
     // block above.
-    let attribution = null;
-    if (args.attributionKeyFile) {
+    let attribution = globalChat ? { status: "chat-attributed-unattested" } : null;
+    if (args.attributionKeyFile && !globalChat) {
       const grantReasonCode = justAppendedGrant !== null ? justAppendedGrant.decision.reasonCode : liveGrant.reasonCode;
       attribution = await appendWindowAttribution({
         repo, fingerprint, rationale: request?.subject?.reason, reasonCode: grantReasonCode,

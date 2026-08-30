@@ -29,6 +29,7 @@ function fixture() {
     lifecycle: { featureId: "sprint-nova-epic", manifestPath: "specs/nova/lifecycle.json", manifestSha256: h("7"), status: "prepared" },
     retention: { policySha256: h("8"), records: Object.values(documentation).map((document) => ({ path: document.path, classification: "public", retentionClass: "active", archiveDigest: null, archiveProvenanceSha256: null })).sort((left, right) => left.path.localeCompare(right.path)) },
     consent: { decisionId: h("9"), status: "approved", authoritySha256: h("a"), evaluatedAt: "2026-07-25T10:00:00.000Z", expiresAt: "2026-08-25T10:00:00.000Z" },
+    humanApproval: null,
     gates: gates(),
     extensions: { schema: "pipeline.release-preflight-extension-input.v1", status: "none", registrySha256: null, requirements: [] },
   };
@@ -38,6 +39,7 @@ const cases = [
     const schema = JSON.parse(readFileSync(new URL("./release-preflight.schema.json", import.meta.url), "utf8"));
     assert.equal(schema.additionalProperties, false);
     for (const definition of ["candidate", "versionDecision", "repository", "document", "documentation", "lifecycle", "retentionRecord", "retentionSection", "consent", "gg03Binding", "gg03", "gate", "gates", "extensionRequirement", "extensions"]) assert.equal(schema.$defs[definition].additionalProperties, false, definition);
+    assert.ok(schema.$defs.humanApproval, "humanApproval schema is present");
     assert.equal(schema.$defs.retentionSection.properties.records.minItems, 4);
     assert.equal(schema.$defs.retentionSection.properties.records.maxItems, 4);
     assert.equal(schema.$defs.gates.properties.inventory.prefixItems.length, 5);
@@ -48,6 +50,18 @@ const cases = [
     const result = createReleasePreflight(fixture());
     assert.equal(result.status, "ready"); assert.deepEqual(result.reasons, []); assert.equal(result.gates.inventory.every((gate) => gate.status === "pending"), true);
     assert.equal(validateReleasePreflight(result), true);
+  }],
+  ["RPF-chat records the explicit, bounded global chat attribution marker", () => {
+    const input = fixture();
+    input.humanApproval = { mode: "chat-attributed-unattested", kind: "release-preflight" };
+    const result = createReleasePreflight(input);
+    assert.deepEqual(result.humanApproval, input.humanApproval);
+    assert.equal(validateReleasePreflight(result), true);
+  }],
+  ["RPF-chat refuses an ambiguous or mismatched human approval marker", () => {
+    const input = fixture();
+    input.humanApproval = { mode: "chat", kind: "release-preflight" };
+    assert.throws(() => createReleasePreflight(input), (error) => error?.code === "RPF-HUMAN-APPROVAL");
   }],
   ["A56-2 version drift blocks before any final-gate claim", () => {
     const input = fixture(); input.version.candidateVersion = "0.4.2";

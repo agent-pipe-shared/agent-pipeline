@@ -53,7 +53,7 @@ import { createHash } from "node:crypto";
 import { lstatSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
-import { createReleasePreflight, validateReleasePreflight } from "./release-preflight.mjs";
+import { canonicalJson, createReleasePreflight, validateReleasePreflight } from "./release-preflight.mjs";
 import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { criticalActionSubjectSha256, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
@@ -75,6 +75,7 @@ const RELEASE_PREFLIGHT_CONSENT_SUBJECT_SCHEMA = "pipeline.release-preflight-con
 // Decision 5), matching the discipline every other external-artifact reader in
 // this plugin already applies (pipeline-state.mjs's EXTERNAL_PUBLIC_ARTIFACT_MAX_BYTES).
 const EXTERNAL_PROOF_ARTIFACT_MAX_BYTES = 65_536;
+const GLOBAL_CHAT_CONSENT_SCHEMA = "pipeline.release-preflight-chat-attribution.v1";
 
 export class ReleasePreflightCliError extends Error {
   constructor(code, message) { super(message); this.name = "ReleasePreflightCliError"; this.code = code; }
@@ -206,6 +207,40 @@ function resolveHandSuppliedConsent(root, consentPath) {
   return consent;
 }
 
+function globalChatAttribution(root) {
+  const waiver = criticalProofWaiverFor(root, "release-preflight");
+  return waiver.waived === true
+    && waiver.waiver?.mode === "chat-attributed-unattested"
+    && waiver.waiver?.kind === "release-preflight"
+    ? { mode: "chat-attributed-unattested", kind: "release-preflight" }
+    : null;
+}
+
+/**
+ * The weak global route still records a candidate- and subject-bound durable
+ * decision; it simply makes no claim that a key, terminal, host, or human
+ * presence technically attested it.  The explicit record marker is the
+ * authority basis, while the two digests bind that marker to this preflight's
+ * exact observed candidate and subject.
+ */
+function resolveConsentFromGlobalChat({ candidate, subject, now }) {
+  const attribution = { mode: "chat-attributed-unattested", kind: "release-preflight" };
+  const binding = {
+    schema: GLOBAL_CHAT_CONSENT_SCHEMA,
+    attribution,
+    candidate,
+    subject,
+  };
+  const digest = sha256(canonicalJson(binding));
+  return {
+    authoritySha256: digest,
+    decisionId: digest,
+    evaluatedAt: now,
+    expiresAt: now,
+    status: "approved",
+  };
+}
+
 /**
  * ADR-0064 Decision 5: resolves the trust-anchor SET from the project's OWN
  * committed policy (never the external directory), then tries `verifyCriticalActionApprovalRequest`
@@ -325,7 +360,14 @@ export function buildReleasePreflight({
   const root = resolve(rootDir);
   if ((proofRequestPath === null) !== (proofPath === null)) fail("RPC-USAGE", "--proof-request and --proof must be supplied together");
   if (consentPath !== null && proofRequestPath !== null) fail("RPC-USAGE", "--consent and --proof-request/--proof are mutually exclusive");
-  if (consentPath === null && proofRequestPath === null) fail("RPC-USAGE", "either --consent or --proof-request/--proof is required");
+  // Preserve the public usage contract before inspecting any other repository
+  // input.  The sole exception is the committed global selector; its resolver
+  // compares the source to HEAD and therefore cannot be activated by a working
+  // tree edit.
+  const humanApproval = globalChatAttribution(root);
+  if (consentPath === null && proofRequestPath === null && humanApproval === null) {
+    fail("RPC-USAGE", "either --consent or --proof-request/--proof is required unless committed gates.human_approval is chat");
+  }
 
   const lifecycleInput = readJson(root, lifecyclePath, "lifecycle");
   const repository = observeRepository(root);
@@ -335,19 +377,21 @@ export function buildReleasePreflight({
   const manifestAbsolute = repoFile(root, lifecyclePath, "lifecycle manifest");
   const manifestSha256 = sha256(readFileSync(manifestAbsolute));
   const candidateVersion = readFileSync(repoFile(root, "VERSION", "VERSION"), "utf8").trim();
-
+  const subject = {
+    schema: RELEASE_PREFLIGHT_CONSENT_SUBJECT_SCHEMA,
+    version: candidateVersion,
+    base,
+    lifecycle: { featureId: lifecycleInput.featureId, manifestPath: lifecyclePath, manifestSha256 },
+    retentionPolicySha256,
+  };
   const consent = consentPath !== null
     ? resolveHandSuppliedConsent(root, consentPath)
-    : resolveConsentFromVerifiedProof({
+    : proofRequestPath !== null
+      ? resolveConsentFromVerifiedProof({
       root, candidate, proofRequestPath, proofPath, now,
-      subject: {
-        schema: RELEASE_PREFLIGHT_CONSENT_SUBJECT_SCHEMA,
-        version: candidateVersion,
-        base,
-        lifecycle: { featureId: lifecycleInput.featureId, manifestPath: lifecyclePath, manifestSha256 },
-        retentionPolicySha256,
-      },
-    });
+      subject,
+    })
+      : resolveConsentFromGlobalChat({ candidate, subject, now });
 
   const version = observeVersion(root, consent, candidateVersion);
   const documentation = observeDocumentation(root, lifecycleInput);
@@ -376,6 +420,7 @@ export function buildReleasePreflight({
       // "approved" of its own accord either way.
       status: consent.status,
     },
+    humanApproval: humanApproval !== null && proofRequestPath === null ? humanApproval : null,
     gates: {
       gg03: gg03Path === null ? { required: false, binding: null } : { required: true, binding: readJson(root, gg03Path, "gates.gg03.binding") },
       inventory: FINAL_GATES.map((id) => ({ id, kind: ["remote", "human"].includes(id) ? "external" : "local-final", status: "pending" })),
@@ -410,9 +455,12 @@ function parseArgs(argv) {
   // (tests), so this is the CLI-argv-specific half of that same rule.
   if (Boolean(value["--proof-request"]) !== Boolean(value["--proof"])) fail("RPC-USAGE", "--proof-request and --proof must be supplied together");
   if (value["--consent"] && value["--proof-request"]) fail("RPC-USAGE", "--consent and --proof-request/--proof are mutually exclusive");
-  if (!value["--consent"] && !value["--proof-request"]) fail("RPC-USAGE", "either --consent or --proof-request/--proof is required");
+  const rootDir = value["--root"] ?? process.cwd();
+  if (!value["--consent"] && !value["--proof-request"] && globalChatAttribution(resolve(rootDir)) === null) {
+    fail("RPC-USAGE", "either --consent or --proof-request/--proof is required unless committed gates.human_approval is chat");
+  }
   return {
-    rootDir: value["--root"] ?? process.cwd(),
+    rootDir,
     preflightId: value["--preflight-id"],
     baseCommit: value["--base"],
     consentPath: value["--consent"] ?? null,

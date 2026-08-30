@@ -33,6 +33,23 @@ import { readSync } from "node:fs";
 
 export const CHAT_GATE_NOT_ATTENDED = "CHAT-GATE-NOT-ATTENDED";
 export const CHAT_GATE_CONFIRMATION_MISMATCH = "CHAT-GATE-CONFIRMATION-MISMATCH";
+export const CHAT_ATTRIBUTION_UNATTESTED = "chat-attributed-unattested";
+
+/**
+ * Describe the deliberately weak global-chat route without pretending that it is
+ * a terminal, host, or cryptographic attestation.  The caller still owns the
+ * subject binding (commit/ref, tool input, window scope, ...); this stable marker
+ * makes the weaker basis visible in every persisted record.
+ */
+export function chatAttributionRecord({ kind, by = null } = {}) {
+  if (typeof kind !== "string" || kind.trim() === "") throw new TypeError("chat attribution kind is required");
+  if (by !== null && (typeof by !== "string" || by.trim() === "")) throw new TypeError("chat attribution by must be non-blank or null");
+  return {
+    mode: CHAT_ATTRIBUTION_UNATTESTED,
+    kind,
+    ...(by === null ? {} : { by }),
+  };
+}
 
 /**
  * True only when fd 0 is a real terminal device. Never throws -- any

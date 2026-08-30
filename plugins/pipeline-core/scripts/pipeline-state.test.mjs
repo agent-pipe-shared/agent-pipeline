@@ -16,7 +16,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -228,6 +228,59 @@ function approvePushAttempt(root, deps, pushTarget = { remote: "origin", destina
   assert.equal(signatureApproval.result, 2, "signature mode must still refuse an unproven approval");
   assert.ok(signatureApproval.lines.some((line) => line.includes("CRITICAL-PROOF-POLICY-KIND-REQUIRED")),
     `the requiredKinds gate must survive for every non-waived kind: ${signatureApproval.lines.join(" ")}`);
+}
+
+// The committed global selection is intentionally different from the older push-local
+// setting below.  It must win for push too, omit the historical TTY challenge, and leave
+// an explicit non-attested marker rather than a lookalike signature/anchor record.
+{
+  const root = mktempProjectDir();
+  const gitAt = (...args) => spawnSync("git", ["-C", root, ...args], { encoding: "utf8" });
+  gitAt("init", "-q", "-b", "main");
+  gitAt("config", "user.email", "po@example.invalid");
+  gitAt("config", "user.name", "PO");
+  mkdirSync(join(root, "project"), { recursive: true });
+  const initialState = {
+    schema: "pipeline.state.v0", planApproved: true,
+    activeFeature: { id: "sprint-nova-epic", planPath: "specs/sprint-nova-epic/prd.md", phase: "implementation" },
+    planApproval: { poGateAuthority: { planSha256, specSha256 } },
+  };
+  writeFileSync(join(root, "project", "pipeline-state.json"), JSON.stringify(initialState, null, 2));
+  writeFileSync(join(root, "pipeline.user.yaml"), 'schema: pipeline.user.v3\ngates:\n  human_approval: chat\n  push_approval: signature\n');
+  const deps = { dir: root, now: () => now, gitHead: () => ({ ok: true, commit: candidate.commit }), gitCandidate: () => ({ ok: true, ...candidate }) };
+  assert.equal(run(["materialize-push-threat-model"], deps), 0);
+  gitAt("add", "-A");
+  gitAt("commit", "-q", "-m", "committed global human chat");
+  const realHeadCommit = gitAt("rev-parse", "HEAD").stdout.trim();
+  deps.gitHead = () => ({ ok: true, commit: realHeadCommit });
+  deps.gitCandidate = () => ({ ok: true, commit: realHeadCommit, tree: candidate.tree });
+
+  let terminalCalls = 0;
+  const approved = capturedStderr(() => run([
+    "approve-push", "--by", "PO", "--remote", "origin", "--destination", "refs/heads/main",
+  ], {
+    ...deps,
+    isattyFn: () => { terminalCalls += 1; throw new Error("global chat must not inspect a terminal"); },
+    readLineFn: () => { terminalCalls += 1; throw new Error("global chat must not read a terminal"); },
+  }));
+  assert.equal(approved.result, 0, approved.lines.join(" "));
+  assert.equal(terminalCalls, 0, "global chat must not create or confirm a terminal challenge");
+  assert.equal(approved.lines.some((line) => line.includes("PO-CHALLENGE")), false);
+  const state = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"));
+  const approval = state.pushApproval.lastApproved;
+  assert.equal(approval.criticalProof, null, "global chat must not require or import a detached proof");
+  assert.deepEqual(approval.humanApproval, {
+    mode: "chat-attributed-unattested",
+    kind: "push",
+    by: "PO",
+  });
+  assert.deepEqual(approval.criticalProofWaiver, {
+    kind: "push",
+    reason: "gates.human_approval: chat (pipeline.user.yaml)",
+    mode: "chat-attributed-unattested",
+    source: "pipeline.user.yaml",
+  });
+  assert.equal(state.pendingPushChallenge, undefined);
 }
 
 // NVA-CF-BL13-PENDINGWRITETEST. Dedicated unit-level coverage, at the exact write
@@ -542,6 +595,22 @@ function acknowledgeFixture(name, { prdText } = {}) {
   return { root, deps, planPath, specPath, planSha, specSha };
 }
 
+function commitGlobalHumanApproval(root, mode) {
+  const git = (...args) => spawnSync("git", ["-C", root, ...args], { encoding: "utf8" });
+  assert.equal(git("init", "-q", "-b", "main").status, 0);
+  assert.equal(git("config", "user.email", "po@example.invalid").status, 0);
+  assert.equal(git("config", "user.name", "PO").status, 0);
+  writeFileSync(join(root, "pipeline.user.yaml"), [
+    "schema: pipeline.user.v3",
+    "gates:",
+    `  human_approval: ${mode}`,
+    "",
+  ].join("\n"));
+  assert.equal(git("add", "-A").status, 0);
+  const committed = git("commit", "-q", "-m", "configure global human approval");
+  assert.equal(committed.status, 0, committed.stderr);
+}
+
 function invokeCaptured(argv, deps) {
   const originalLog = console.log;
   const originalError = console.error;
@@ -654,6 +723,50 @@ function acknowledgedApplyArgs(plan) {
   const rePlanned = invokeCaptured(["po-authority-acknowledge-plan", "--runner", "codex", "--by", "PO"], deps);
   assert.equal(rePlanned.status, 2);
   assert.ok(rePlanned.err.includes("PO-ACK-ALREADY-ACKNOWLEDGED"), rePlanned.err);
+}
+
+// A committed global chat selection is intentionally not a terminal ceremony.
+// The exact planner/apply pair must bind that selected basis into the postimage,
+// so a later source change makes the normal stale-plan check reject it.
+{
+  const { root, deps } = acknowledgeFixture("global-chat");
+  commitGlobalHumanApproval(root, "chat");
+  const planned = invokeCaptured(["po-authority-acknowledge-plan", "--runner", "codex", "--by", "PO"], deps);
+  assert.equal(planned.status, 0, planned.err);
+  const plan = JSON.parse(planned.out);
+  let terminalCalls = 0;
+  const applied = invokeCaptured(acknowledgedApplyArgs(plan), {
+    ...deps,
+    isattyFn: () => { terminalCalls += 1; throw new Error("global chat must not inspect a terminal"); },
+    readLineFn: () => { terminalCalls += 1; throw new Error("global chat must not read a terminal"); },
+  });
+  assert.equal(applied.status, 0, applied.err);
+  assert.equal(terminalCalls, 0, "global chat must not request a terminal ceremony");
+  const stateAfter = JSON.parse(readFileSync(statePath(root), "utf8"));
+  assert.deepEqual(stateAfter.poGateAcknowledgement.humanApproval, {
+    mode: "chat-attributed-unattested",
+    kind: "po-plan-acknowledgement",
+    by: "PO",
+  });
+}
+
+// Only the exact committed global `chat` selection weakens the acknowledgement
+// ceremony.  Signature, invalid, uncommitted, and unreadable inputs all retain
+// the historical attended-terminal refusal; the ordinary no-config case above
+// remains covered by the happy path's explicit terminal seam.
+for (const [name, prepare] of [
+  ["signature", (root) => commitGlobalHumanApproval(root, "signature")],
+  ["invalid", (root) => commitGlobalHumanApproval(root, "not-a-mode")],
+  ["uncommitted", (root) => { commitGlobalHumanApproval(root, "signature"); writeFileSync(join(root, "pipeline.user.yaml"), "schema: pipeline.user.v3\ngates:\n  human_approval: chat\n"); }],
+  ["unreadable", (root) => { commitGlobalHumanApproval(root, "chat"); chmodSync(join(root, "pipeline.user.yaml"), 0o000); }],
+]) {
+  const { root, deps } = acknowledgeFixture(`global-${name}-closed`);
+  prepare(root);
+  const planned = invokeCaptured(["po-authority-acknowledge-plan", "--runner", "codex", "--by", "PO"], deps);
+  assert.equal(planned.status, 0, `${name}: ${planned.err}`);
+  const refused = invokeCaptured(acknowledgedApplyArgs(JSON.parse(planned.out)), deps);
+  assert.equal(refused.status, 1, `${name}: ${refused.err}`);
+  assert.match(refused.err, /CHAT-GATE-NOT-ATTENDED/);
 }
 
 // Rejection: already acknowledged. Plan must refuse without mutating anything
@@ -967,6 +1080,29 @@ function planAuthorityFixture({ featureId, planPath, specPath, now = "2026-08-27
   assert.equal(approved.result, 0, `an ordinary path must not be refused by the staging bolt: ${approved.lines.join(" ")}`);
   const state = JSON.parse(readFileSync(statePath(root), "utf8"));
   assert.equal(state.planApproved, true, "an ordinary specs/ path must approve normally");
+  assert.equal(state.planApprovalAttribution, undefined,
+    "the default signature posture must not acquire a chat-attribution record");
+}
+
+// A plan approval has no terminal prompt of its own, but it is still a human
+// gate: the committed global selection must be recorded beside its closed v2
+// approval envelope without making a cryptographic or host-attested claim.
+{
+  const featureId = "global-chat-plan-approval";
+  const planPath = `specs/${featureId}/prd_${featureId}.md`;
+  const specPath = `specs/${featureId}/spec.md`;
+  const { root, deps } = planAuthorityFixture({ featureId, planPath, specPath });
+  commitGlobalHumanApproval(root, "chat");
+  assert.equal(capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps)).result, 0);
+  assert.equal(capturedStderr(() => run(["present-plan", "--by", "coordinator"], deps)).result, 0);
+  assert.equal(capturedStderr(() => run(["approve-plan", "--by", "PO"], deps)).result, 0);
+  const state = JSON.parse(readFileSync(statePath(root), "utf8"));
+  assert.equal(state.planApproved, true);
+  assert.deepEqual(state.planApprovalAttribution, {
+    mode: "chat-attributed-unattested",
+    kind: "plan",
+    by: "PO",
+  });
 }
 
 // NVA-R22-PLANSHOWN Scenario 5: approve-plan refuses when present-plan was

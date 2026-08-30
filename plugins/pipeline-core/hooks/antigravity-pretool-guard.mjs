@@ -15,7 +15,7 @@ import {
   humanGuardOverrideInternals,
   recordHumanGuardDenial,
 } from "../lib/human-guard-override.mjs";
-import { readPushApprovalMode } from "../lib/critical-human-proof-policy.mjs";
+import { USER_SOURCE_PATH, readHumanApprovalMode } from "../lib/critical-human-proof-policy.mjs";
 import { loadRuntimeProjectionV3OwnedKeys } from "../lib/runtime-projection-v3.mjs";
 // NVA-CF-BL19-COPYSAFEADOPT: sourced from the shared renderer module rather
 // than project-onboarding-v3.mjs directly -- boundedOpaqueCopyCommand is the
@@ -661,9 +661,11 @@ export async function runAntigravityPreToolGuard(rawInput) {
           : projectRoot;
         if (planned.status === "planned") {
           const script = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
-          let approvalMode = "signature";
-          try { approvalMode = readPushApprovalMode(projectRoot, { spawn: overrideSpawn })?.mode ?? "signature"; }
-          catch { approvalMode = "signature"; }
+          let approval = { mode: "signature", scope: "default", source: "default" };
+          try { approval = readHumanApprovalMode(projectRoot, { legacyKind: "push", spawn: overrideSpawn }) ?? approval; }
+          catch { /* fail closed */ }
+          const approvalMode = approval.mode;
+          const globalChat = approvalMode === "chat" && approval.scope === "global" && approval.source === USER_SOURCE_PATH;
           // NVA-CF-BL19-COPYSAFEADOPT: every ceremony command line built through the
           // shared renderer instead of a hand-assembled `${JSON.stringify(...)}`
           // template. A human fill-in slot like "<plan-sha256>" passes through
@@ -682,7 +684,9 @@ export async function runAntigravityPreToolGuard(rawInput) {
             }).command;
           const continuation = approvalMode === "chat"
             ? [
-              `Then (the human confirms in-session; this is attribution, not proof -- gates.push_approval is "chat"):`,
+              globalChat
+                ? "Then (the committed global human approval is chat-attributed-unattested; no terminal ceremony, key, or proof is required):"
+                : "Then (the human confirms in-session; this is attribution, not proof -- legacy gates.push_approval is \"chat\"): ",
               ceremonyCommand(
                 "prepare-authorization", "--plan-sha256", placeholder("<plan-sha256-from-plan>"), "--reason", placeholder('"<human-reason>"'),
               ),

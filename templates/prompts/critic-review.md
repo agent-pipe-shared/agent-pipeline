@@ -97,10 +97,12 @@ USAGE (Elephant)
    base/head/tree, prior receipt ID/digest, changed paths/behaviour claims and
    affected invariant IDs. Review only that delta plus those invariants; do not
    request or read prior verdict prose. Missing/unknown/ambiguous impact means
-   full review, never an invented narrow scope. There are at most four Critic
-   rounds per package: the initial review plus one fresh re-Critic after each
-   of up to three fresh local correction commits. The host reconciles each
-   exact correction range before it selects either mode.
+   full review, never an invented narrow scope. There are at most two Critic
+   rounds per package: the initial review plus one fresh re-Critic for the
+   first correction commit. If that re-Critic still reports a blocking
+   finding, the Elephant self-verifies the next correction directly rather
+   than dispatching a third Critic round. The host reconciles the exact
+   correction range before it selects either mode.
 5. A native-isolation failure is never retried in the same lane. The Coordinator
    may use exactly one standing functional-equivalent Critic with frozen
    bindings and `mayDelegate=false`; a second/unproven failure, inability to

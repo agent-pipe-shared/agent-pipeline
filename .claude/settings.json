@@ -10,6 +10,15 @@
     "type": "command",
     "command": "node plugins/pipeline-core/scripts/statusline-context.mjs"
   },
-  "enabledPlugins": {},
-  "extraKnownMarketplaces": {}
+  "enabledPlugins": {
+    "pipeline-core@agent-pipeline": true
+  },
+  "extraKnownMarketplaces": {
+    "agent-pipeline": {
+      "source": {
+        "source": "github",
+        "repo": "agent-pipe-shared/agent-pipeline"
+      }
+    }
+  }
 }

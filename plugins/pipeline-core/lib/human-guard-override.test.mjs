@@ -72,6 +72,22 @@ function fixture() {
   return root;
 }
 
+function fixtureHumanApproval({ humanApproval, pushApproval = "signature", commit = true } = {}) {
+  const root = fixture();
+  writeFileSync(join(root, "pipeline.user.yaml"), [
+    'schema: "pipeline.user.v3"',
+    "gates:",
+    `  human_approval: "${humanApproval}"`,
+    `  push_approval: "${pushApproval}"`,
+    "",
+  ].join("\n"));
+  if (commit) {
+    git(root, "add", "pipeline.user.yaml");
+    git(root, "commit", "-q", "-m", "set global human approval");
+  }
+  return root;
+}
+
 function reasonDigest(reason) {
   return createHash("sha256").update(Buffer.from(reason, "utf8")).digest("hex");
 }
@@ -712,6 +728,77 @@ test("one exact attended capability is audited, consumed once and cannot be repl
     });
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("committed global chat arms HGO without a terminal or signature material and marks its capability/audit", () => {
+  const root = fixtureHumanApproval({ humanApproval: "chat" });
+  try {
+    const toolInput = { file_path: "global-chat.md", content: "global attributed approval\n" };
+    const request = recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: denial, nowMs: 1_000,
+    });
+    const plan = planHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, nowMs: 2_000,
+      scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"),
+    });
+    const reason = "PO chooses the committed global chat attribution posture";
+    const prepared = prepareHumanGuardOverrideAuthorization({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, planSha256: plan.planSha256,
+      reason, nowMs: 2_500, scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"),
+    });
+    let terminalCalls = 0;
+    const armed = authorizeHumanGuardOverride({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      requestSha256: request.requestSha256,
+      planSha256: plan.planSha256,
+      selectionSha256: prepared.selectionSha256,
+      reason,
+      reasonSha256: reasonDigest(reason),
+      activate: true,
+      dependencies: {
+        isattyFn: () => { terminalCalls += 1; throw new Error("global chat must not inspect a terminal"); },
+        readLineFn: () => { terminalCalls += 1; throw new Error("global chat must not read a terminal"); },
+      },
+      nowMs: 3_000,
+      scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"),
+    });
+    assert.equal(armed.status, "armed");
+    assert.equal(terminalCalls, 0, "global chat must not run the legacy attended-terminal challenge");
+
+    const common = git(root, "rev-parse", "--path-format=absolute", "--git-common-dir");
+    const base = join(common, "agent-pipeline", "human-guard-overrides");
+    const [capabilityFile] = readdirSync(join(base, "capabilities"));
+    const capability = JSON.parse(readFileSync(join(base, "capabilities", capabilityFile), "utf8"));
+    assert.deepEqual(capability.humanApproval, {
+      mode: "chat-attributed-unattested",
+      kind: "human-guard-override",
+    });
+    assert.equal(capability.signedCandidate, null, "global chat creates no signature-bound candidate");
+    const audit = readFileSync(join(base, "audit.jsonl"), "utf8").trim().split("\n").map((line) => JSON.parse(line).event);
+    assert.deepEqual(audit.find((event) => event.type === "authorized").humanApproval, capability.humanApproval);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("signature, invalid, and uncommitted global human approval all fail closed before HGO can arm", () => {
+  for (const { name, humanApproval, commit } of [
+    { name: "signature", humanApproval: "signature", commit: true },
+    { name: "invalid", humanApproval: "not-a-mode", commit: true },
+    { name: "uncommitted chat", humanApproval: "chat", commit: false },
+  ]) {
+    const root = fixtureHumanApproval({ humanApproval, commit });
+    try {
+      assert.throws(
+        () => authorizeHumanGuardOverride({ rootDir: root, pluginRoot: PLUGIN_ROOT, activate: true }),
+        (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-SIGNATURE-MODE-REQUIRED",
+        `${name} must not reach HGO's keyless activation path`,
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   }
 });
 

@@ -115,7 +115,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { readPushApprovalMode } from "../lib/critical-human-proof-policy.mjs";
+import { USER_SOURCE_PATH, readHumanApprovalMode } from "../lib/critical-human-proof-policy.mjs";
 import { windowCoversRule } from "../lib/guard-maintenance-window.mjs";
 import {
   consumeHumanGuardOverride,
@@ -224,8 +224,10 @@ if (matched) {
   // weaken" without that qualifier is the same overselling that produced C1 in this exact
   // spot. What the commit costs an agent is invisibility, not capability. Full reasoning on
   // committedUnchanged in critical-human-proof-policy.
-  let approvalMode = "signature";
-  try { approvalMode = readPushApprovalMode(projectDir)?.mode ?? "signature"; } catch { approvalMode = "signature"; }
+  let approval = { mode: "signature", scope: "default", source: "default" };
+  try { approval = readHumanApprovalMode(projectDir, { legacyKind: "push" }) ?? approval; } catch { /* fail closed */ }
+  const approvalMode = approval.mode;
+  const globalChat = approvalMode === "chat" && approval.scope === "global" && approval.source === USER_SOURCE_PATH;
 
   let consumed = { status: "absent" };
   try {
@@ -305,7 +307,9 @@ if (matched) {
         // "for this exact edit" message shape.
         const continuation = approvalMode === "chat"
           ? [
-            `Then (the human confirms in-session; this is attribution, not proof):`,
+            globalChat
+              ? "Then (the committed global human approval is chat-attributed-unattested; no terminal ceremony, key, or proof is required):"
+              : "Then (the human confirms in-session; this is attribution, not proof):",
             prepareAuthorizationChat.text,
             authorizeChat.text,
           ].join("\n")
@@ -342,8 +346,10 @@ if (matched) {
       `that gate its own implementation (QG-04 / roles/goldfish.md GF-04). A genuine test ` +
       `change is its own, explicitly briefed task.`,
     approvalMode === "chat"
-      ? `Clearance: gates.push_approval is "chat", so an in-session audited override is ` +
-        `admitted for this exact edit — see below. It is attribution, not proof.`
+      ? (globalChat
+        ? "Clearance: committed gates.human_approval is \"chat\", so this exact edit is chat-attributed-unattested without a terminal ceremony, key, or proof — see below."
+        : `Clearance: gates.push_approval is "chat", so an in-session audited override is ` +
+          `admitted for this exact edit — see below. It is attribution, not proof.`)
       : `Clearance: gates.push_approval is "${approvalMode}", so the in-session activation ` +
         `step is refused — a ready session could otherwise clear its own gate. A signed ` +
         `override is admitted instead: presence of a valid, correctly-bound external ` +

@@ -611,6 +611,21 @@ test("ADR-0072 gates.push_approval: chat records an attributed, self-declaring i
   assert.equal(Object.hasOwn(approval, "proofSha256"), false, "a chat clearance must never masquerade as carrying proof material");
 });
 
+test("ADR-0076 committed global human_approval: chat records a terminal- and proof-free explicit attribution bound to the observed fork", async (t) => {
+  const { root } = await forkedLifecycleFixture(); t.after(() => cleanup(root));
+  await writeFile(path.join(root, "pipeline.user.yaml"), "gates:\n  human_approval: chat\n");
+  execFileSync("git", ["-C", root, "add", "--", "pipeline.user.yaml"]);
+  execFileSync("git", ["-C", root, "-c", "user.email=fixture@example.invalid", "-c", "user.name=fixture", "commit", "-q", "-m", "fixture: configure global chat approval mode"]);
+  const disposition = { idempotencyKey: "fork-disp-global-chat", sequence: 2, acknowledgedEventIds: ["evt-2", "evt-fork"], reasonCode: "GOVERNED_ACK", disposedAtEpochMs: 1, approval: { mode: "chat", clearedBy: "product-owner", clearedAtEpochMs: 5 } };
+  await recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition });
+  const inspected = await inspectForkedGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle" });
+  const approval = inspected.forks[0].disposition.approval;
+  assert.equal(approval.mode, "chat-attributed-unattested");
+  assert.equal(approval.subjectSha256, governanceForkDispositionApprovalSubject({ repositoryFingerprint: fingerprint, streamId: "lifecycle", sequence: 2, forkedEventDigests: await forkedEventDigestsAt(root, "lifecycle", 2) }).subjectSha256);
+  assert.equal(approval.source, "pipeline.user.yaml");
+  assert.equal(Object.hasOwn(approval, "proofSha256"), false);
+});
+
 test("ADR-0072 the durable record references the verified approval and never re-embeds the raw proof or signature", async (t) => {
   const { root } = await forkedLifecycleFixture(); t.after(() => cleanup(root));
   const approval = await approvalFor(root, "lifecycle", 2);

@@ -137,7 +137,7 @@ import { spawnSync } from "node:child_process";
 
 import { loadManifest, gateConfig, loadDeployPolicy } from "../lib/manifest.mjs";
 import { authorizeRecordedDeploy, authorizeRecordedPush } from "../lib/critical-action-authorization.mjs";
-import { criticalProofWaiverFor, readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
+import { USER_SOURCE_PATH, criticalProofWaiverFor, readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
 // AGY-MKTATTEST-1: reuses the SAME attestation `human-guard-override.test.mjs`'s F1 case
 // exercises (via `humanGuardOverrideInternals.localPluginInstallSourceObservation`), rather
 // than a second, independently written comparison -- see checkMarketplaceAttestation() below.
@@ -795,6 +795,35 @@ function attestationFailureDiagnostic(code, anchorDir) {
 }
 
 /**
+ * A policy waiver and a state record are deliberately different evidence: the
+ * former proves that the repository selected the weak global posture, while the
+ * latter says which exact action was chat-attributed.  Do not infer one from the
+ * other.  In particular, legacy action-local chat retains its historical record
+ * shape; only the committed global selector requires this explicit marker.
+ */
+function isTrustedGlobalChatWaiver(waiver, kind) {
+  return waiver?.waived === true
+    && waiver.waiver?.kind === kind
+    && waiver.waiver?.mode === "chat-attributed-unattested"
+    && waiver.waiver?.source === USER_SOURCE_PATH;
+}
+
+function hasGlobalChatAttribution(record, kind) {
+  return record?.humanApproval?.mode === "chat-attributed-unattested"
+    && record.humanApproval?.kind === kind;
+}
+
+function globalChatPushApprovalBound(approval, candidate, binding) {
+  return hasGlobalChatAttribution(approval, "push")
+    && approval?.criticalProofWaiver?.kind === "push"
+    && approval.criticalProofWaiver?.mode === "chat-attributed-unattested"
+    && approval.criticalProofWaiver?.source === USER_SOURCE_PATH
+    && approval?.forCommit === candidate.commit
+    && approval?.remote === binding.remote
+    && approval?.destination === binding.destination;
+}
+
+/**
  * The one thing that opens the main boundary: a detached proof, verified here.
  *
  * This runs BEFORE the manifest is read, which is why it is self-contained rather than
@@ -853,6 +882,16 @@ function attestedMainPublication(binding) {
   // its own. PG12s13 exited 0 before this line existed.
   const anchorDir = fallbackProjectDir();
   const candidate = { commit, tree: tree.stdout.trim() };
+  const waiver = criticalProofWaiverFor(anchorDir, "push");
+  // The committed global chat selector resolves before any policy/anchor
+  // verification.  Calling the signature verifier first would make this weak,
+  // explicitly key-free route depend on the very anchor it is meant to bypass.
+  if (isTrustedGlobalChatWaiver(waiver, "push")) {
+    const approval = state?.pushApproval?.lastApproved;
+    return globalChatPushApprovalBound(approval, candidate, binding)
+      ? { authorized: true, code: "PUSH-PROOF-WAIVED" }
+      : { authorized: false, code: "PUSH-PROOF-CHAT-ATTRIBUTION-MISSING" };
+  }
   const attested = authorizeRecordedPush({
     projectDir: binding.projectDir,
     anchorDir,
@@ -872,7 +911,6 @@ function attestedMainPublication(binding) {
   // backed by this waiver. Before this, `chat` mode opened every branch except the one that
   // matters most (2026-08-06 Critic round, F4): this call was the only route into `main` and
   // it consulted no waiver at all.
-  const waiver = criticalProofWaiverFor(anchorDir, "push");
   if (!waiver.waived) return { authorized: false, code: attested.code };
   const approval = state?.pushApproval?.lastApproved;
   const waiverBound = approval?.forCommit === candidate.commit
@@ -1319,11 +1357,16 @@ function checkDeployApprovals(required) {
   // from the pushed repository lets that repository decide whether it needs a proof, and a
   // nested one could simply omit `deploy` from requiredKinds. Not part of the T6 finding —
   // found while fixing it, and fixed here rather than left as the next report's F1.
-  const policy = readCriticalHumanProofPolicy(fallbackProjectDir());
-  if (!policy.ok) {
-    return [`Deploy approval policy cannot be read (${policy.code}); a gate of unknown strength is treated as demanding proof.`];
+  const waiver = criticalProofWaiverFor(fallbackProjectDir(), "deploy");
+  const globalChat = isTrustedGlobalChatWaiver(waiver, "deploy");
+  let proofDemanded = false;
+  if (!globalChat) {
+    const policy = readCriticalHumanProofPolicy(fallbackProjectDir());
+    if (!policy.ok) {
+      return [`Deploy approval policy cannot be read (${policy.code}); a gate of unknown strength is treated as demanding proof.`];
+    }
+    proofDemanded = policy.requiredKinds.has("deploy") && !policy.waivers.has("deploy");
   }
-  const proofDemanded = policy.requiredKinds.has("deploy") && !policy.waivers.has("deploy");
   // Resolved locally rather than through the module-level `sourceCommit`/`resolveSourceTree`
   // pair: this function runs from the deploy branch, which executes BEFORE either of those
   // bindings is initialized. Reaching for them here would be a temporal-dead-zone throw on
@@ -1341,6 +1384,17 @@ function checkDeployApprovals(required) {
         `Environment '${req.environment}': no unused deployApproval for artifact '${req.display}' -- record it: ` +
           `node ${pipelineStateScriptRef()} approve-deploy --env ${req.environment} --artifact <tag-or-sha> --by <name>.`,
       );
+      continue;
+    }
+    if (globalChat) {
+      if (!hasGlobalChatAttribution(match, "deploy")
+        || match?.criticalProofWaiver?.kind !== "deploy"
+        || match.criticalProofWaiver?.mode !== "chat-attributed-unattested"
+        || match.criticalProofWaiver?.source !== USER_SOURCE_PATH) {
+        reasons.push(
+          `Environment '${req.environment}': the deployApproval for artifact '${req.display}' lacks the required chat-attributed-unattested record for this global chat configuration.`,
+        );
+      }
       continue;
     }
     if (!proofDemanded) continue;
@@ -2048,6 +2102,13 @@ try {
       // a nested repository would do it. Same root cause as the anchor (T6 F1); the fix
       // belongs in both places or in neither.
       const pushWaiver = criticalProofWaiverFor(fallbackProjectDir(), "push");
+      const globalChatPush = isTrustedGlobalChatWaiver(pushWaiver, "push");
+      if (pushGate.approval === "required" && globalChatPush
+        && !globalChatPushApprovalBound(approval, { commit: sourceCommit }, pushBinding)) {
+        failures.push(
+          "Push approval is not chat-attributed-unattested for this exact commit, remote and destination ref.",
+        );
+      }
       if (pushGate.approval === "required" && !pushWaiver.waived) {
         // ADR-0056 §6. This branch used to refuse EVERY agent-issued push and point at the
         // fixed publication executor. That was safe and unusable: publication is a release

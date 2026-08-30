@@ -28,6 +28,8 @@ import { parseYaml } from "./yaml-lite.mjs";
 
 export const USER_SOURCE_PATH = "pipeline.user.yaml";
 export const DEFAULT_PUSH_APPROVAL_MODE = "signature";
+export const DEFAULT_HUMAN_APPROVAL_MODE = "signature";
+export const HUMAN_APPROVAL_MODE_KEY = "human_approval";
 // PHX-WP-PAC08-RECONCILE-APPROVAL (ADR-0056's 2026-08-11 Follow-up): a second
 // action kind gets the identical signature/chat mode shape, under its OWN
 // `gates.*` key (not an overload of `gates.push_approval` -- decision 5's "the
@@ -146,9 +148,7 @@ function committedBytes(root, spawn) {
  * mean the fail-closed default: a gate whose configuration cannot be read is at its
  * strongest setting, never its weakest.
  */
-function readGateApprovalMode(dir, kind, { spawn = spawnSync } = {}) {
-  const key = GATE_APPROVAL_MODE_KEYS[kind];
-  const fallback = GATE_APPROVAL_MODE_DEFAULTS[kind];
+function readApprovalModeKey(dir, key, fallback, { spawn = spawnSync } = {}) {
   const path = join(resolve(dir), USER_SOURCE_PATH);
   if (!existsSync(path)) {
     // Absence is a claim too, and it needs the same evidence. If HEAD carries this file, an
@@ -178,6 +178,10 @@ function readGateApprovalMode(dir, kind, { spawn = spawnSync } = {}) {
   }
 }
 
+function readGateApprovalMode(dir, kind, opts = {}) {
+  return readApprovalModeKey(dir, GATE_APPROVAL_MODE_KEYS[kind], GATE_APPROVAL_MODE_DEFAULTS[kind], opts);
+}
+
 export function readPushApprovalMode(dir, opts = {}) {
   return readGateApprovalMode(dir, "push", opts);
 }
@@ -185,6 +189,49 @@ export function readPushApprovalMode(dir, opts = {}) {
 /** Mirrors `readPushApprovalMode` exactly, for `gates.reconcile_approval` (ADR-0056 Follow-up). */
 export function readReconcileApprovalMode(dir, opts = {}) {
   return readGateApprovalMode(dir, "feature-package-reconcile", opts);
+}
+
+/**
+ * The one mode selector for a human gate.
+ *
+ * `gates.human_approval` is a deliberate, repository-wide product choice.  Once a
+ * committed value is present it wins over the older action-local settings: an
+ * operator choosing global `chat` has explicitly chosen the weaker, non-attested
+ * attribution route for every participating human gate.  We do not turn an old
+ * `push_approval: signature` default into a configuration conflict, because that
+ * would make a migrated repository unable to choose the newly-authorized global
+ * posture without an atomic edit to every historical key.
+ *
+ * Before the shared key exists, the old action-local contract remains intact.  A
+ * caller that historically followed push mode (HGO) passes `legacyKind: "push"`;
+ * GMW deliberately passes no legacy kind and therefore remains signature-only in
+ * an unmigrated repository.
+ */
+export function readHumanApprovalMode(dir, { legacyKind = null, spawn = spawnSync } = {}) {
+  const global = readApprovalModeKey(dir, HUMAN_APPROVAL_MODE_KEY, DEFAULT_HUMAN_APPROVAL_MODE, { spawn });
+  if (global.source !== "default") {
+    return {
+      mode: global.mode,
+      source: global.source,
+      key: HUMAN_APPROVAL_MODE_KEY,
+      scope: "global",
+    };
+  }
+  if (legacyKind !== null && GATE_APPROVAL_MODE_KEYS[legacyKind] !== undefined) {
+    const legacy = readGateApprovalMode(dir, legacyKind, { spawn });
+    return {
+      mode: legacy.mode,
+      source: legacy.source,
+      key: GATE_APPROVAL_MODE_KEYS[legacyKind],
+      scope: "legacy",
+    };
+  }
+  return {
+    mode: DEFAULT_HUMAN_APPROVAL_MODE,
+    source: "default",
+    key: HUMAN_APPROVAL_MODE_KEY,
+    scope: "default",
+  };
 }
 
 export const CRITICAL_HUMAN_PROOF_POLICY_PATH = "project/critical-human-proof.json";
@@ -372,6 +419,36 @@ export function readCriticalHumanProofPolicy(dir) {
  * @returns {{waived: false, code: string|null} | {waived: true, code: null, waiver: {kind: string, reason: string}}}
  */
 export function criticalProofWaiverFor(dir, kind) {
+  const globalMode = readHumanApprovalMode(dir);
+  // The explicitly committed global chat selection is intentionally the weak,
+  // operator-chosen posture for *every* critical human gate.  It therefore has to
+  // resolve before the proof-policy document: requiring that document to parse, or
+  // consulting its anchors, would turn a key-free chat selection back into a key
+  // ceremony.  An uncommitted/invalid/unsafe source never reaches this branch.
+  if (globalMode.scope === "global" && globalMode.source === USER_SOURCE_PATH) {
+    if (globalMode.mode === "chat") {
+      return {
+        waived: true,
+        code: null,
+        waiver: {
+          kind,
+          reason: `gates.${HUMAN_APPROVAL_MODE_KEY}: chat (${globalMode.source})`,
+          mode: "chat-attributed-unattested",
+          source: globalMode.source,
+        },
+      };
+    }
+    // `signature` is a strict transport selection, not a retroactive deletion of
+    // a project's already-recorded policy waivers.  Fall through to the policy's
+    // historic per-kind decision, while deliberately skipping old action-local
+    // chat keys: the committed shared setting now owns the mode.
+    const policy = readCriticalHumanProofPolicy(dir);
+    if (!policy.ok) return { waived: false, code: policy.code };
+    const reason = policy.waivers.get(kind);
+    return reason === undefined
+      ? { waived: false, code: null }
+      : { waived: true, code: null, waiver: { kind, reason } };
+  }
   const policy = readCriticalHumanProofPolicy(dir);
   if (!policy.ok) return { waived: false, code: policy.code };
   const reason = policy.waivers.get(kind);
@@ -385,7 +462,7 @@ export function criticalProofWaiverFor(dir, kind) {
   // this branch entirely, exactly as before.
   const approvalModeKey = GATE_APPROVAL_MODE_KEYS[kind];
   if (approvalModeKey !== undefined) {
-    const configured = readGateApprovalMode(dir, kind);
+    const configured = readHumanApprovalMode(dir, { legacyKind: kind });
     if (configured.mode === "chat") {
       const hasTrustAnchor = policy.trustAnchor !== null || (Array.isArray(policy.trustAnchors) && policy.trustAnchors.length > 0);
       if (hasTrustAnchor && reason === undefined) {

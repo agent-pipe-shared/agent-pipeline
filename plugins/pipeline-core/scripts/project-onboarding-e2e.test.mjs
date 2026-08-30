@@ -22,7 +22,12 @@ import { main as onboardingCli } from "./project-onboarding-v3.mjs";
 import { main as authorityCli } from "./v3-bootstrap-authority.mjs";
 import { main as migrationCli } from "./runner-profile-migration-v3.mjs";
 import { run as pipelineStateCli } from "./pipeline-state.mjs";
-import { driveOnboardingInit } from "./onboarding-init.mjs";
+import {
+  applyInitialOnboardingAnswers,
+  applyTrustAnchorBootstrap,
+  driveOnboardingInit,
+  main as onboardingInitCli,
+} from "./onboarding-init.mjs";
 import { inspectRepositoryFreshness } from "./repository-freshness.mjs";
 import {
   applyProjectOnboardingKickoffV4,
@@ -211,68 +216,70 @@ function publicDriverRun(path, invocations) {
   };
 }
 
-function applyInitialAnswersDriverFixture(argv, path) {
-  // Claude publishes the script as the executable, while Codex/Antigravity
-  // publish `node <script> …`. Both are the same returned CLI action.
-  // This fixture models only the successful postconditions after asserting
-  // that action's closed flag contract; onboarding-init.test.mjs owns the
-  // transactional child-process implementation itself.
-  const args = argv[0] === onboardingInit ? argv.slice(1) : argv;
-  const value = (flag) => args[args.indexOf(flag) + 1];
-  const runner = value("--runner");
-  const authorName = value("--git-author-name");
-  const authorEmail = value("--git-author-email");
-  const pushApproval = value("--push-approval");
-  const directory = value("--trust-anchor-directory");
-  const humanName = value("--trust-anchor-human-name");
-  assert.equal(value("--trust-anchor-mode"), "existing");
-  assert.equal(path, value("--root"));
-  assert.equal(pushApproval, "signature");
-  assert.ok(["claude", "codex", "antigravity"].includes(runner));
-
-  const publicKeySha256 = sha256(`fixture public key:${directory}`);
-  mkdirSync(directory, { recursive: true });
-  writeFileSync(join(directory, "po-public.pem"), "fixture public key\n", { mode: 0o600 });
-  writeFileSync(join(directory, "trust-policy.json"), `${JSON.stringify({
-    keyReference: join(directory, "po-public.pem"), publicKeySha256, humanName,
-  }, null, 2)}\n`, { mode: 0o600 });
-  const repositoryPolicyPath = join(path, "project", "critical-human-proof.json");
-  const repositoryPolicy = JSON.parse(readFileSync(repositoryPolicyPath, "utf8"));
-  writeFileSync(repositoryPolicyPath, `${JSON.stringify({
-    ...repositoryPolicy,
-    schema: "pipeline.critical-human-proof-policy.v3",
-    trustAnchors: [{ keyReference: join(directory, "po-public.pem"), publicKeySha256 }],
-  }, null, 2)}\n`);
-  const sourcePath = join(path, "pipeline.user.yaml");
-  writeFileSync(sourcePath, readFileSync(sourcePath, "utf8").replace(
-    /^(\s*push_approval:\s*)"(?:signature|chat)"\s*$/mu,
-    `$1${JSON.stringify(pushApproval)}`,
-  ));
-  mkdirSync(join(path, ".git", "agent-pipeline"), { recursive: true });
-  writeFileSync(join(path, ".git", "agent-pipeline", "po-key-directory.json"), `${JSON.stringify({
-    schema: "pipeline.po-key-directory.v1", poKeyDirectory: directory, updatedAt: "2026-08-30T00:00:00.000Z",
-  })}\n`);
-  writeFileSync(join(path, ".git", "agent-pipeline", "onboarding-initial-answers.json"), `${JSON.stringify({
-    schema: "pipeline.onboarding-initial-answers.v1", root: path, runner, pushApprovalPreference: pushApproval,
-    updatedAt: "2026-08-30T00:00:00.000Z",
-  })}\n`);
-  fixtureGitConfig.set(`${path}\u0000user.name`, authorName);
-  fixtureGitConfig.set(`${path}\u0000user.email`, authorEmail);
-  fixtureMachinePlane = {
-    ...fixtureMachinePlane,
-    poKeyDirectory: directory,
-    pushApprovalDefault: pushApproval,
+function runOnboardingInitActionInProcess(action, path, env) {
+  // The returned action is the public onboarding-init entry point. Invoke that
+  // entry point directly so this driver test exercises its parse/apply/re-enter
+  // contract without turning the outer action into another child process;
+  // onboarding-init.test.mjs owns the real child-process transaction coverage.
+  assert.equal(action.executable, "node");
+  const { argv } = action;
+  assert.equal(argv[0], onboardingInit);
+  const fixtureGit = (command, args, options = {}) => {
+    const [flag, rootDir, ...rest] = args;
+    assert.equal(flag, "-C");
+    assert.equal(rootDir, path);
+    return cliGit(command, rest, { ...options, cwd: path });
   };
-  const driven = driveOnboardingInit({ rootDir: path, runner, run: publicDriverRun(path, []) });
-  return {
-    status: 0,
-    signal: null,
-    stdout: `${JSON.stringify({
-      ...driven,
-      initialAnswers: { code: "INITIAL-ANSWERS-APPLIED" },
-    })}\n`,
-    stderr: "",
+  const fixtureTrustAnchorSetup = (executable, args) => {
+    assert.equal(executable, process.execPath);
+    assert.equal(args[1], "setup");
+    const value = (flag) => args[args.indexOf(flag) + 1];
+    const directory = value("--directory");
+    const humanName = value("--human-name");
+    const publicKeySha256 = sha256(`fixture public key:${directory}`);
+    mkdirSync(directory, { recursive: true });
+    writeFileSync(join(directory, "po-public.pem"), "fixture public key\n", { mode: 0o600 });
+    writeFileSync(join(directory, "trust-policy.json"), `${JSON.stringify({
+      keyReference: join(directory, "po-public.pem"), publicKeySha256, humanName,
+    }, null, 2)}\n`, { mode: 0o600 });
+    mkdirSync(join(path, ".git", "agent-pipeline"), { recursive: true });
+    writeFileSync(join(path, ".git", "agent-pipeline", "po-key-directory.json"), `${JSON.stringify({
+      schema: "pipeline.po-key-directory.v1", poKeyDirectory: directory, updatedAt: "2026-08-30T00:00:00.000Z",
+    })}\n`);
+    return { status: 0, stdout: "", stderr: "" };
   };
+  const applyFixtureTrustAnchor = (options) => {
+    const applied = applyTrustAnchorBootstrap({
+      ...options,
+      runGit: fixtureGit,
+      runSetup: fixtureTrustAnchorSetup,
+    });
+    fixtureMachinePlane = JSON.parse(readFileSync(join(env.PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE, ".agent-pipeline", "machine.json"), "utf8"));
+    return applied;
+  };
+  let stdout = "";
+  let stderr = "";
+  const status = onboardingInitCli(argv.slice(1), {
+    write: (chunk) => { stdout += chunk; },
+    writeError: (chunk) => { stderr += chunk; },
+    env,
+    applyInitialAnswers: (options) => {
+      const applied = applyInitialOnboardingAnswers({
+        ...options,
+        runGit: fixtureGit,
+        applyTrustAnchor: applyFixtureTrustAnchor,
+      });
+      fixtureMachinePlane = JSON.parse(readFileSync(join(env.PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE, ".agent-pipeline", "machine.json"), "utf8"));
+      return applied;
+    },
+    applyTrustAnchor: applyFixtureTrustAnchor,
+    drive: (options) => driveOnboardingInit({
+      ...options,
+      run: publicDriverRun(path, []),
+      env,
+    }),
+  });
+  return { status, signal: null, stdout, stderr };
 }
 function actionArgs(result) {
   assert.equal(result.nextAction?.kind, "command");
@@ -664,7 +671,7 @@ test("in-process driver contract: Claude, Codex, and Antigravity follow only ret
   const invokeAction = (action, replacements, cwd, env) => {
     const argv = materialize(action, replacements);
     const result = argv[0] === onboardingInit
-      ? applyInitialAnswersDriverFixture(argv, cwd)
+      ? runOnboardingInitActionInProcess({ ...action, argv }, cwd, env)
       : argv[0] === onboarding
         ? run(onboarding, argv.slice(1), cwd)
         : typeof argv[0] === "string" && argv[0].split(/[\\/]/u).at(-1) === "pipeline-state.mjs"
@@ -765,23 +772,39 @@ test("in-process driver contract: Claude, Codex, and Antigravity follow only ret
       const first = freshDriver(path, runner, env);
       assert.equal(first.outcome, "pending-asks", `${runner}: ${JSON.stringify(first)}`);
       assert.equal(first.pendingAsks.length, 1, `${runner}: initial PO round must be one action`);
-      const bundled = first.pendingAsks[0];
-      assert.equal(bundled.applyAction?.kind, "command");
-      const initial = invokeAction(bundled.applyAction, new Map([
+      const initialAsk = first.pendingAsks[0];
+      assert.equal(initialAsk.applyAction?.kind, "command");
+      assert.deepEqual(initialAsk.inputs.map((input) => input.name), ["gitAuthorName", "gitAuthorEmail", "pushApprovalPreference"]);
+      const initial = invokeAction(initialAsk.applyAction, new Map([
         ["<PO_GIT_AUTHOR_NAME>", "Greenfield E2E PO"],
         ["<PO_GIT_AUTHOR_EMAIL>", "greenfield-e2e@example.invalid"],
         ["<signature|chat>", "signature"],
+      ]), path, env);
+      assert.equal(initial.json.initialAnswers?.code, "INITIAL-ANSWERS-APPLIED", `${runner}: ${JSON.stringify(initial.json)}`);
+      assert.equal(initial.json.initialAnswers?.trustAnchor, "not-requested");
+      assert.equal(existsSync(join(path, ".git", "agent-pipeline", "onboarding-initial-answers.json")), true);
+      const initialPolicy = readFileSync(join(path, "pipeline.user.yaml"), "utf8");
+      assert.match(initialPolicy, /^\s*human_approval:\s*"signature"\s*$/mu,
+        `${runner}: initial decision records the shared human-approval policy`);
+      assert.match(initialPolicy, /^\s*push_approval:\s*"signature"\s*$/mu,
+        `${runner}: push remains aligned with the shared policy for existing push consumers`);
+      assert.ok(initial.json.steps.some((step) => step.argv[0] === onboarding && step.argv[1] === "inspect"),
+        `${runner}: the returned onboarding-init action must re-enter through its public inspect driver`);
+      const anchorAsk = initial.json.pendingAsks?.find((ask) => ask.inputs?.some((input) => input.name === "trustAnchorSetupMode"))
+        ?? freshDriver(path, runner, env).pendingAsks?.find((ask) => ask.inputs?.some((input) => input.name === "trustAnchorSetupMode"));
+      assert.ok(anchorAsk, `${runner}: signature re-entry reaches the separate trust-anchor action`);
+      assert.equal(anchorAsk.applyAction.argv.includes("--push-approval"), false);
+      const anchored = invokeAction(anchorAsk.applyAction, new Map([
         ["<existing|new>", "existing"],
         ["<absolute external key directory>", destination],
         ["<human attribution>", "Greenfield E2E PO"],
         ["<absolute existing key path|none>", existingKey],
       ]), path, env);
-      assert.equal(initial.json.initialAnswers?.code, "INITIAL-ANSWERS-APPLIED", `${runner}: ${JSON.stringify(initial.json)}`);
-      assert.equal(existsSync(join(path, ".git", "agent-pipeline", "onboarding-initial-answers.json")), true);
+      assert.equal(anchored.json.bootstrap?.code, "TRUST-ANCHOR-BOOTSTRAP-COMPLETE");
 
       if (runner === "codex") {
-        const restart = initial.json.final?.nextAction;
-        assert.equal(initial.json.outcome, "unsupported-next-action", JSON.stringify(initial.json));
+        const restart = anchored.json.final?.nextAction;
+        assert.equal(anchored.json.outcome, "unsupported-next-action", JSON.stringify(anchored.json));
         assert.equal(restart?.kind, "restart-process");
         assert.equal(restart.launch?.argv?.[0]?.endsWith("codex-onboarding-launch.mjs"), true);
         assert.deepEqual(restart.launch.argv.slice(1, 3), ["--root", "."]);
@@ -791,7 +814,7 @@ test("in-process driver contract: Claude, Codex, and Antigravity follow only ret
         // exercised independently in codex-onboarding-launch.test.mjs.
         completeRuntimeReadback(path, 80_000);
       } else {
-        assert.equal(initial.json.outcome, "collect-input", `${runner}: ${JSON.stringify(initial.json)}`);
+        assert.equal(anchored.json.outcome, "collect-input", `${runner}: ${JSON.stringify(anchored.json)}`);
       }
 
       let intake = freshDriver(path, runner, env);

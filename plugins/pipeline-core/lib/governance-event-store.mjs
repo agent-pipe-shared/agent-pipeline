@@ -22,7 +22,7 @@ import {
   validateGovernanceEventEnvelope,
 } from "./governance-event.mjs";
 import { criticalActionSubjectSha256, verifyCriticalActionApprovalRequest } from "./critical-action-approval-request.mjs";
-import { readCriticalHumanProofPolicy, readPushApprovalMode } from "./critical-human-proof-policy.mjs";
+import { USER_SOURCE_PATH, readCriticalHumanProofPolicy, readHumanApprovalMode } from "./critical-human-proof-policy.mjs";
 import { discoverRepository } from "./worktree-lifecycle.mjs";
 import { validateHumanGovernanceDecision } from "./human-governance-decision.mjs";
 import { isHumanRoleExceptionDecision, validateHumanRoleExceptionDecision } from "./human-role-exception-decision.mjs";
@@ -1196,6 +1196,14 @@ function assertForkDispositionApprovalReference(approval, code) {
       || typeof approval.source !== "string" || !FORK_DISPOSITION_TOKEN.test(approval.source)) fail(code, "The recorded chat-mode approval reference is invalid.");
     return approval;
   }
+  if (approval.mode === "chat-attributed-unattested") {
+    if (!exactKeys(approval, ["mode", "subjectSha256", "clearedBy", "clearedAtEpochMs", "source"])
+      || !SHA256.test(approval.subjectSha256 ?? "")
+      || typeof approval.clearedBy !== "string" || !FORK_DISPOSITION_TOKEN.test(approval.clearedBy)
+      || !Number.isSafeInteger(approval.clearedAtEpochMs) || approval.clearedAtEpochMs < 0
+      || approval.source !== USER_SOURCE_PATH) fail(code, "The recorded global chat attribution reference is invalid.");
+    return approval;
+  }
   fail(code, "A recorded fork disposition approval must declare either signature or chat mode.");
 }
 
@@ -1231,7 +1239,8 @@ function authorizeForkDisposition(root, registry, streamId, disposition, fork, n
     forkedEventDigests: fork.entries.map((entry) => entry.eventDigest),
   });
   const authorization = disposition.approval;
-  const configured = readPushApprovalMode(root);
+  const configured = readHumanApprovalMode(root, { legacyKind: "push" });
+  const globalChat = configured.mode === "chat" && configured.scope === "global" && configured.source === USER_SOURCE_PATH;
   // Chat is admissible only where the human genuinely, committedly configured
   // it. Every other resolution -- default, invalid, unreadable, unsafe,
   // uncommitted -- is `signature`, which is what `readPushApprovalMode`
@@ -1242,7 +1251,7 @@ function authorizeForkDisposition(root, registry, streamId, disposition, fork, n
   }
   if (authorization.mode === "chat") {
     return Object.freeze({
-      mode: "chat",
+      mode: globalChat ? "chat-attributed-unattested" : "chat",
       subjectSha256,
       clearedBy: authorization.clearedBy,
       clearedAtEpochMs: authorization.clearedAtEpochMs,
@@ -1411,6 +1420,12 @@ async function readForkDisposition(root, registry, streamId, sequence, fork = nu
   // of being surfaced verbatim as a trustworthy governed disposition.
   assertForkDispositionFields(record, "GES-FORK-DISPOSITION-RECORD");
   assertForkDispositionApprovalReference(record.approval, "GES-FORK-DISPOSITION-RECORD");
+  if (record.approval.mode === "chat-attributed-unattested") {
+    const configured = readHumanApprovalMode(root, { legacyKind: "push" });
+    if (configured.mode !== "chat" || configured.scope !== "global" || configured.source !== USER_SOURCE_PATH) {
+      fail("GES-FORK-DISPOSITION-RECORD", "The recorded global chat attribution no longer matches a committed global human approval mode.");
+    }
+  }
   // Mirrors readEvent's own GES-NONCANONICAL check: a persisted disposition
   // whose on-disk bytes are not the exact canonical serialization of its own
   // parsed value is rejected rather than silently accepted.
