@@ -1515,9 +1515,11 @@ function persistedPoAuthority(root, fs) {
         : {}),
     });
     if (!lifecycle.ok) return { status: "drifted", nextAction: lifecycle.nextAction };
-    if (lifecycle.status === null
-      || lifecycle.status === "draft"
-      || lifecycle.status === "awaiting-approval") return { status: "absent" };
+    if (lifecycle.status === null) return { status: "absent", lifecycleStatus: null };
+    if (lifecycle.status === "draft"
+      || lifecycle.status === "awaiting-approval") {
+      return { status: "absent", lifecycleStatus: lifecycle.status };
+    }
     const approval = state.planApproval?.poGateAuthority;
     if (!SHA256_RE.test(approval?.planSha256 ?? "")
       || !SHA256_RE.test(approval?.specSha256 ?? "")
@@ -2516,6 +2518,28 @@ function designToImplementationHandoverAction(root, fs) {
   );
 }
 
+/**
+ * Enters the existing public plan-lifecycle driver once onboarding itself is
+ * ready but the persisted plan still needs submission/presentation/approval.
+ * `persistedPoAuthority()` is deliberately reused here: its before/after
+ * identity checks and `derivePlanLifecycle()` projection are the safe source
+ * of truth already used by the approved handover directly above.  An absent
+ * feature, an approved design, and implementation therefore remain outside
+ * this action's closed two-status domain.
+ */
+function planLifecycleInspectAction(root, fs) {
+  const authority = persistedPoAuthority(root, fs);
+  if (authority.status !== "absent"
+    || !new Set(["draft", "awaiting-approval"]).has(authority.lifecycleStatus)) return null;
+  return commandAction(
+    [PO_AUTHORITY_REBIND_WRITER, "inspect"],
+    false,
+    false,
+    "pipeline.inspect.v1",
+    ["draft", "awaiting-approval"],
+  );
+}
+
 function readyLifecycleResult({ root, runner, intent, repository, runtime, continuity = emptyContinuity() }, fs) {
   requireRunner(runner, "readyLifecycleResult");
   // The fresh protected-mount transition is not a ready-state claim.  Its
@@ -2940,7 +2964,8 @@ function readyLifecycleResult({ root, runner, intent, repository, runtime, conti
       runtime,
       continuity,
       appServer,
-      nextAction: designToImplementationHandoverAction(root, fs),
+      nextAction: planLifecycleInspectAction(root, fs)
+        ?? designToImplementationHandoverAction(root, fs),
       diagnostics: [],
     }),
     ...readyOnlyFields,
