@@ -40,6 +40,7 @@ import { existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { renderHumanCopySafeCommand } from "../lib/copy-safe-command.mjs";
 import { readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
 import { readMachinePlane, resolveLocalOperatorKeyAnchor } from "../lib/machine-plane.mjs";
 import { gateConfig, loadManifestSafe } from "../lib/manifest.mjs";
@@ -397,26 +398,6 @@ export function criticalArtifactPaths(dir, directory, deps = {}) {
 }
 
 /**
- * F7 rendering rule (skills/pipeline-start/references/failure-cases.md): one
- * logical segment per physical line, every line but the last ending in a
- * single trailing backslash, continuation lines indented by two spaces, never
- * splitting a token or an absolute path across lines.
- */
-export function renderF7Lines(segments) {
-  return segments.map((segment, index) => {
-    const body = index === 0 ? segment : `  ${segment}`;
-    return index === segments.length - 1 ? body : `${body} \\`;
-  });
-}
-
-/** Groups a node-script argv into F7 segments: exe, script, subcommand, then one "--flag value" pair per line. */
-export function segmentsForNodeCommand(executable, argv) {
-  const segments = [executable, argv[0], argv[1]];
-  for (let index = 2; index < argv.length; index += 2) segments.push(`${argv[index]} ${argv[index + 1]}`);
-  return segments;
-}
-
-/**
  * NVA-PUSHFOLD-1: `approve-push` (`pipeline-state.mjs`) writes `pushApproval.lastApproved`
  * to the project's state file strictly AFTER the signed subject was computed, so that write
  * structurally can never be part of the commit it records
@@ -589,7 +570,11 @@ export function pushPrepareReport(argv, deps = {}) {
     repoRoot: dir, directory, featureId: feature.featureId, plan: feature.planPath, spec: feature.specPath,
     subjectSha256, expiresAt,
   });
-  const authorizeLines = renderF7Lines(segmentsForNodeCommand(authorize.executable, authorize.argv));
+  const authorizeCommand = renderHumanCopySafeCommand({
+    label: "human authorize-critical",
+    executable: authorize.executable,
+    argv: authorize.argv,
+  });
 
   const artifacts = criticalArtifactPaths(dir, directory, deps);
   const approveArgv = [
@@ -597,24 +582,37 @@ export function pushPrepareReport(argv, deps = {}) {
     "--by", by, "--remote", remote, "--destination", destination,
     "--proof-request", artifacts.request, "--proof-authority", artifacts.authority, "--proof", artifacts.proof,
   ];
-  const approveLines = renderF7Lines(segmentsForNodeCommand("node", approveArgv));
-
-  const gitPushLine = `git push ${remote} HEAD:${destination}`;
+  const approveCommand = renderHumanCopySafeCommand({
+    label: "agent approve-push",
+    executable: "node",
+    argv: approveArgv,
+  });
+  const gitPushCommand = renderHumanCopySafeCommand({
+    label: "agent push",
+    executable: "git",
+    argv: ["push", remote, `HEAD:${destination}`],
+  });
 
   report.subjectSha256 = subjectSha256;
-  return { ok: true, report, lines: { authorize: authorizeLines, approvePush: approveLines, gitPush: gitPushLine } };
+  return {
+    ok: true,
+    report,
+    lines: {
+      authorize: authorizeCommand.text.split("\n"),
+      approvePush: approveCommand.text.split("\n"),
+      gitPush: gitPushCommand.text,
+    },
+  };
 }
 
-function printReport(result) {
-  process.stdout.write(`${JSON.stringify(result.report, null, 2)}\n`);
+export function printReport(result, io = {}) {
+  const write = io.write ?? process.stdout.write.bind(process.stdout);
+  const writeError = io.writeError ?? process.stderr.write.bind(process.stderr);
+  write(`${JSON.stringify(result.report, null, 2)}\n`);
   if (result.lines) {
-    process.stdout.write("\n# Copy-paste commands (F7 rendering: one token per line, trailing backslash continuation)\n\n");
-    process.stdout.write("## 1) HUMAN, at their own terminal: authorize-critical (prepares + signs, one invocation)\n\n");
-    process.stdout.write(`${result.lines.authorize.join("\n")}\n\n`);
-    process.stdout.write("## 2) AGENT: consume the proof into pipeline state\n\n");
-    process.stdout.write(`${result.lines.approvePush.join("\n")}\n\n`);
-    process.stdout.write("## 3) AGENT: push\n\n");
-    process.stdout.write(`${result.lines.gitPush}\n`);
+    writeError(`${result.lines.authorize.join("\n")}\n\n`);
+    writeError(`${result.lines.approvePush.join("\n")}\n\n`);
+    writeError(`${result.lines.gitPush}\n`);
   }
 }
 

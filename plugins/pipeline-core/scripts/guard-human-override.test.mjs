@@ -37,11 +37,7 @@ import {
   recordHumanGuardDenial,
 } from "../lib/human-guard-override.mjs";
 import { createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA } from "../lib/po-approval-proof.mjs";
-// NVA-CF-GUARDVERBOSITY: used only by the render-copy-safe tests below, to independently
-// recompute the same flat command line + bounded rendering render-copy-safe itself builds,
-// mirroring guard-lifecycle-ready.test.mjs's own NVA-GF-COPYSAFE "recompute independently
-// and byte-compare" technique.
-import { boundedCopySafeCommand, boundedOpaqueCopyCommand } from "../lib/copy-safe-command.mjs";
+import { placeholder, renderHumanCopySafeCommand } from "../lib/copy-safe-command.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PLUGIN_ROOT = join(HERE, "..");
@@ -231,17 +227,7 @@ test("plan's advisory escalates when another git worktree is present", () => {
   }
 });
 
-// NVA-CF-GUARDVERBOSITY (backlog: 2026-08-30-...guard-denials-inline-the-full-multi-shell-
-// ceremony-block-by-default.md): `render-copy-safe` is the on-demand replacement for the
-// full per-step posix/powershell/cmd.exe bounded rendering guard-testpath.mjs and
-// guard-lifecycle-ready.mjs used to inline unconditionally in every ceremony denial
-// (NVA-W4-01B). Proves the underlying safety property is still genuinely reachable: run
-// against a REAL recorded request (built the same way recordHumanGuardDenial() itself
-// produces one for a genuine TP-guard denial), it reproduces byte-identical
-// posix/powershell/cmd.exe renderings -- independently recomputed here via the exact same
-// boundedOpaqueCopyCommand() the subcommand itself calls, fed the same flat command line,
-// mirroring guard-lifecycle-ready.test.mjs's own NVA-GF-COPYSAFE technique.
-test("render-copy-safe reproduces the ceremony's bounded posix/powershell/cmd.exe rendering for a real recorded request (signature mode)", () => {
+test("render-copy-safe keeps its backward-compatible entry point on the shared bounded renderer (signature mode)", () => {
   const root = fixture();
   try {
     const denials = [{ guard: "guard-testpath.mjs", reason: "TP-3: fixture" }];
@@ -257,32 +243,26 @@ test("render-copy-safe reproduces the ceremony's bounded posix/powershell/cmd.ex
 
     // Signature mode: plan/prepare-authorization/emit-signature-digest/authorize-by-signature,
     // never the in-session activate step (that belongs to chat mode only).
-    assert.match(captured.stdout, /Bounded copy-safe rendering of the plan step/u);
-    assert.match(captured.stdout, /Bounded copy-safe rendering of the prepare-authorization step/u);
-    assert.match(captured.stdout, /Bounded copy-safe rendering of the emit-signature-digest step/u);
-    assert.match(captured.stdout, /Bounded copy-safe rendering of the authorize-by-signature step/u);
-    assert.doesNotMatch(captured.stdout, /Bounded copy-safe rendering of the authorize step\b/u,
+    assert.match(captured.stdout, /Step: plan\nPOSIX:/u);
+    assert.match(captured.stdout, /Step: prepare-authorization/u);
+    assert.match(captured.stdout, /Step: emit-signature-digest/u);
+    assert.match(captured.stdout, /Step: authorize-by-signature/u);
+    assert.doesNotMatch(captured.stdout, /Step: authorize\n/u,
       "signature mode has no in-session activate step; nothing to bound-render for it");
     assert.match(captured.stdout, /eval "\$CMD"/u);
+    assert.match(captured.stdout, /PowerShell:/u);
+    assert.equal(captured.stdout.trimEnd().split(/\r?\n/u).every((line) => line.length <= 72), true, captured.stdout);
 
-    // Byte-identical independent recomputation of the "plan" step's own bounded block, from
-    // the SAME flat command line render-copy-safe's internal ceremonyCommand() builds.
-    const flatPlanLine = boundedCopySafeCommand({
+    const recomputed = renderHumanCopySafeCommand({
+      label: "plan",
       executable: process.execPath,
-      argv: [SCRIPT, "plan", "--repo", root, "--request-sha256", recorded.requestSha256],
-    }).command;
-    const recomputed = boundedOpaqueCopyCommand(flatPlanLine);
-    assert.ok(recomputed.posix, "posix rendering must succeed for a real plan command");
-    assert.ok(
-      captured.stdout.includes(`  posix:\n${recomputed.posix}`),
-      "render-copy-safe's posix block must byte-match the independent recomputation",
-    );
-    if (recomputed.powershell) {
-      assert.ok(
-        captured.stdout.includes(`  powershell:\n${recomputed.powershell}`),
-        "render-copy-safe's powershell block must byte-match the independent recomputation",
-      );
-    }
+      argv: [
+        placeholder(JSON.stringify(SCRIPT)), "plan", "--repo", placeholder(JSON.stringify(root)),
+        "--request-sha256", recorded.requestSha256,
+      ],
+    });
+    assert.ok(captured.stdout.includes(recomputed.text),
+      "render-copy-safe must use the shared argv-native renderer without a second quoting path");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -300,12 +280,12 @@ test("render-copy-safe selects the chat-mode ceremony steps (plan/prepare-author
     const captured = io();
     const status = main(["render-copy-safe", "--repo", root, "--request-sha256", recorded.requestSha256], captured);
     assert.equal(status, 0, captured.stderr);
-    assert.match(captured.stdout, /Bounded copy-safe rendering of the plan step/u);
-    assert.match(captured.stdout, /Bounded copy-safe rendering of the prepare-authorization step/u);
-    assert.match(captured.stdout, /Bounded copy-safe rendering of the authorize step/u);
-    assert.doesNotMatch(captured.stdout, /Bounded copy-safe rendering of the authorize-by-signature step/u,
+    assert.match(captured.stdout, /Step: plan/u);
+    assert.match(captured.stdout, /Step: prepare-authorization/u);
+    assert.match(captured.stdout, /Step: authorize\n/u);
+    assert.doesNotMatch(captured.stdout, /Step: authorize-by-signature/u,
       "chat mode has no signing step; nothing to bound-render for it");
-    assert.doesNotMatch(captured.stdout, /Bounded copy-safe rendering of the emit-signature-digest step/u);
+    assert.doesNotMatch(captured.stdout, /Step: emit-signature-digest/u);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -692,6 +672,13 @@ test("prepare-for-signature emits the exact §3.3 output shape, with real resolv
       requiresConfirmation: true,
       executionBoundary: "local-process",
     });
+    assert.match(first.stderr, /Step: sign-intent\nPOSIX:/u);
+    assert.match(first.stderr, /Step: authorize-by-signature\nPOSIX:/u);
+    assert.match(first.stderr, /PowerShell:/u);
+    assert.equal(first.stderr.trimEnd().split(/\r?\n/u).every((line) => line.length <= 72), true, first.stderr);
+    assert.doesNotMatch(first.stderr, /available on demand|render-copy-safe/u);
+    assert.doesNotMatch(first.stdout, /Step:|POSIX:|PowerShell:/u,
+      "the JSON stdout channel must remain machine-readable without human prose");
 
     // Reproducibility: a second call against the same (requestSha256, null
     // authorSourceRoot) pair reads the same persisted plan back unchanged

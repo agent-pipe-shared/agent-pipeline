@@ -58,14 +58,6 @@ import { GATE_STRENGTH_PATHS } from "./guard-gate-strength.mjs";
 // through the guard's own re-export, so this test cannot pass merely because both
 // names happen to reference the identical function object.
 import { MACHINE_PLANE_SCHEMA, machinePlaneFilePath as libMachinePlaneFilePath, writeMachinePlane } from "../lib/machine-plane.mjs";
-// NVA-GF-COPYSAFE: imported straight from the shared renderer module the guard now defers
-// to (never through the guard's own re-export), so the byte-identity test below cannot pass
-// merely because both names happen to reference the identical function object.
-import { boundedOpaqueCopyCommand } from "../lib/copy-safe-command.mjs";
-// NVA-CF-GUARDVERBOSITY: the on-demand `render-copy-safe` CLI subcommand this hook's denial
-// now points to instead of inlining the bounded block itself -- aliased, this file already
-// imports a `main` from the guard module under test above.
-import { main as guardHumanOverrideMain } from "../scripts/guard-human-override.mjs";
 import {
   isBoundedReadOnlyPipeline,
   parseGuardCommand,
@@ -1961,6 +1953,9 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
     const onboardingHelpShort = `node '${ONBOARDING_SCRIPT}' -h`;
     const overlayRoute = `node '${PRIVATE_OVERLAY_SCRIPT}' route --project-root '${path}'`;
     const poRebind = `node '${PIPELINE_STATE_SCRIPT}' po-authority-rebind-apply --plan-sha256 ${"d".repeat(64)} --updated-at 2026-07-29T09:00:00.000Z --activate`;
+    const poAcknowledgePlan = `node '${PIPELINE_STATE_SCRIPT}' po-authority-acknowledge-plan --root '${path}' --by 'Phoenix PO'`;
+    const poAcknowledgeApply = `node '${PIPELINE_STATE_SCRIPT}' po-authority-acknowledge-apply --root '${path}' --plan-sha256 ${"d".repeat(64)} --updated-at 2026-07-29T09:00:00.000Z --by 'Phoenix PO' --activate`;
+    const poAcknowledgeApplyCwd = `node '${PIPELINE_STATE_SCRIPT}' po-authority-acknowledge-apply --plan-sha256 ${"d".repeat(64)} --updated-at 2026-07-29T09:00:00.000Z --by 'Phoenix PO' --activate`;
     const poDecisionPlan = `node '${PIPELINE_STATE_SCRIPT}' po-authority-decision-plan`;
     const poDecisionSelect = `node '${PIPELINE_STATE_SCRIPT}' po-authority-decision-select --plan-sha256 ${"d".repeat(64)} --planned-at 2026-07-29T09:00:00.000Z --selection spec`;
     const poDecisionApply = `node '${PIPELINE_STATE_SCRIPT}' po-authority-decision-apply --plan-sha256 ${"d".repeat(64)} --selection-digest ${"e".repeat(64)} --planned-at 2026-07-29T09:00:00.000Z --selection spec --activate`;
@@ -1986,7 +1981,7 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
     const overrideAuthorPlan = `${overridePlan} --author-source-root '${authorRoot}'`;
     const overrideAuthorPrepare = `${overridePrepare} --author-source-root '${authorRoot}'`;
     const overrideAuthorAuthorize = `node '${HUMAN_OVERRIDE_SCRIPT}' authorize --repo '${path}' --request-sha256 ${"f".repeat(64)} --plan-sha256 ${"a".repeat(64)} --selection-sha256 ${"c".repeat(64)} --reason 'PO attended exact action' --reason-sha256 ${"b".repeat(64)} --author-source-root '${authorRoot}' --activate`;
-    for (const command of [inspect, apply, preflight, repairMap, hostPlan, hostApply, kickoffPlan, kickoffApply, onboardingHelp, onboardingHelpShort, overlayRoute, poRebind, poDecisionPlan, poDecisionSelect, poDecisionApply, legacyRevocationRecoveryPlan, reopenDesign, submitPlan, approvePlan, setPhase, profileRepairPlan, profileRepairApply, authorityMigrationPlan, authorityMigrationApply, authorityMigrationVendorSyncPlan, authorityMigrationVendorSyncApply, overridePlan, overridePrepare, overrideAuthorize, overrideAuthorPlan, overrideAuthorPrepare, overrideAuthorAuthorize]) {
+    for (const command of [inspect, apply, preflight, repairMap, hostPlan, hostApply, kickoffPlan, kickoffApply, onboardingHelp, onboardingHelpShort, overlayRoute, poRebind, poAcknowledgePlan, poAcknowledgeApply, poAcknowledgeApplyCwd, poDecisionPlan, poDecisionSelect, poDecisionApply, legacyRevocationRecoveryPlan, reopenDesign, submitPlan, approvePlan, setPhase, profileRepairPlan, profileRepairApply, authorityMigrationPlan, authorityMigrationApply, authorityMigrationVendorSyncPlan, authorityMigrationVendorSyncApply, overridePlan, overridePrepare, overrideAuthorize, overrideAuthorPlan, overrideAuthorPrepare, overrideAuthorAuthorize]) {
       assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
       assert.deepEqual(evaluateLifecycleReadyGuard(bash(command), {
         projectDir: path,
@@ -2000,6 +1995,15 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
     // target already accepted unchanged; this pair is pre-authorized to flip to admitted.
     assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' kickoff plan --root '${path}' --language de --goal 'Build one HTML game'`, path), true);
     assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' kickoff apply --root '${path}' --language de --goal 'Build one HTML game' --plan-sha256 ${"c".repeat(64)} --activate`, path), true);
+    // POACKROOT: the target parser is flag-order-insensitive. Admit only permutations of
+    // the writer's exact root-bound set; root-less plan stays unavailable and the existing
+    // cwd-relative apply spelling above remains admitted unchanged.
+    assert.equal(isSanctionedLifecycleCommand(
+      `node '${PIPELINE_STATE_SCRIPT}' po-authority-acknowledge-plan --by 'Phoenix PO' --root '${path}'`, path,
+    ), true);
+    assert.equal(isSanctionedLifecycleCommand(
+      `node '${PIPELINE_STATE_SCRIPT}' po-authority-acknowledge-apply --by 'Phoenix PO' --activate --updated-at 2026-07-29T09:00:00.000Z --root '${path}' --plan-sha256 ${"d".repeat(64)}`, path,
+    ), true);
     for (const command of [
       `${inspect}; printf bypass > src/output.txt`,
       `node '${ONBOARDING_SCRIPT}' apply-readback --root /tmp/other --plan-sha256 ${"a".repeat(64)} --activate`,
@@ -2038,6 +2042,16 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
       `node '${PIPELINE_STATE_SCRIPT}' po-authority-rebind-apply --plan-sha256 ${"d".repeat(64)} --updated-at invalid --activate`,
       `node '/tmp/other/harness/scripts/pipeline-state.mjs' po-authority-rebind-apply --plan-sha256 ${"d".repeat(64)} --updated-at 2026-07-29T09:00:00.000Z --activate`,
       `${poRebind} --bypass`,
+      `node '${PIPELINE_STATE_SCRIPT}' po-authority-acknowledge-plan --by 'Phoenix PO'`,
+      `node '${PIPELINE_STATE_SCRIPT}' po-authority-acknowledge-plan --root /tmp/other --by 'Phoenix PO'`,
+      `${poAcknowledgePlan} --root '${path}'`,
+      `${poAcknowledgePlan} --bypass`,
+      `node '${PIPELINE_STATE_SCRIPT}' po-authority-acknowledge-apply --root /tmp/other --plan-sha256 ${"d".repeat(64)} --updated-at 2026-07-29T09:00:00.000Z --by 'Phoenix PO' --activate`,
+      `${poAcknowledgeApply} --root '${path}'`,
+      `${poAcknowledgeApply} --runner codex`,
+      `${poAcknowledgeApply} --activate`,
+      `node '${PIPELINE_STATE_SCRIPT}' po-authority-acknowledge-apply --root '${path}' --plan-sha256 ${"D".repeat(64)} --updated-at 2026-07-29T09:00:00.000Z --by 'Phoenix PO' --activate`,
+      `node '${PIPELINE_STATE_SCRIPT}' po-authority-acknowledge-apply --root '${path}' --plan-sha256 ${"d".repeat(64)} --updated-at invalid --by 'Phoenix PO' --activate`,
       `${poDecisionPlan} --selection spec`,
       `${poDecisionApply} --bypass`,
       legacyRevocationRecoveryApply,
@@ -4324,18 +4338,6 @@ function hgoGitFixture(mode) {
   return base;
 }
 
-/** NVA-CF-GUARDVERBOSITY: captures guardHumanOverrideMain()'s stdout/stderr, mirroring guard-human-override.test.mjs's own io() helper. */
-function hgoCaptureIo() {
-  let stdout = "";
-  let stderr = "";
-  return {
-    write: (chunk) => { stdout += chunk; return true; },
-    writeError: (chunk) => { stderr += chunk; return true; },
-    get stdout() { return stdout; },
-    get stderr() { return stderr; },
-  };
-}
-
 /** Arms a real one-time capability via the chat-mode in-session path (denial -> plan -> prepare-authorization -> authorize --activate). */
 function hgoArmByChat(root, toolInput, denials) {
   const shared = { rootDir: root, pluginRoot: HGO_PLUGIN_ROOT, scriptPath: HGO_OVERRIDE_SCRIPT };
@@ -4455,11 +4457,11 @@ test("NOVA-LCR-HGO-1: with nothing armed, the grammar denial names the mode-appr
     assert.equal(chatResult.exitCode, 2);
     assert.match(chatResult.stderr, /Human override available for this exact command/u);
     assert.match(chatResult.stderr, /guard-human-override\.mjs/u);
-    assert.match(chatResult.stderr, /\bplan --repo\b/u);
-    assert.match(chatResult.stderr, /prepare-authorization --repo/u);
-    assert.match(chatResult.stderr, /\bauthorize --repo\b[^\n]*--activate/u);
-    assert.doesNotMatch(chatResult.stderr, /authorize-by-signature/u);
-    assert.doesNotMatch(chatResult.stderr, /emit-signature-digest/u, "chat mode has no signing step; nothing to emit a digest for");
+    assert.match(chatResult.stderr, /Step: plan/u);
+    assert.match(chatResult.stderr, /Step: prepare-authorization/u);
+    assert.match(chatResult.stderr, /Step: authorize\n/u);
+    assert.doesNotMatch(chatResult.stderr, /Step: authorize-by-signature/u);
+    assert.doesNotMatch(chatResult.stderr, /Step: emit-signature-digest/u, "chat mode has no signing step; nothing to emit a digest for");
     assert.doesNotMatch(chatResult.stderr, /capability consumed/u);
 
     const sigRoot = hgoGitFixture("signature");
@@ -4467,145 +4469,56 @@ test("NOVA-LCR-HGO-1: with nothing armed, the grammar denial names the mode-appr
     const sigResult = evaluateLifecycleReadyGuard(bash(command), { projectDir: sigRoot });
     assert.equal(sigResult.exitCode, 2);
     assert.match(sigResult.stderr, /Human override available for this exact command/u);
-    assert.match(sigResult.stderr, /\bplan --repo\b/u);
-    assert.match(sigResult.stderr, /prepare-authorization --repo/u);
+    assert.match(sigResult.stderr, /Step: plan/u);
+    assert.match(sigResult.stderr, /Step: prepare-authorization/u);
     // NVA-SIGENTRY-2 F2: the digest-emission step must appear before the human is expected
     // to sign anything out-of-band -- i.e. between prepare-authorization and
     // authorize-by-signature, not merely somewhere in the guidance text.
-    assert.match(sigResult.stderr, /emit-signature-digest --repo/u);
+    assert.match(sigResult.stderr, /Step: emit-signature-digest/u);
     // PO decision 2026-08-18 #12: prepare-authorization/emit-signature-digest are now
     // labelled "in this session" and authorize-by-signature "outside this session" (ADR-0059
     // Decision 1 -- neither of the first two touches the external key). The inserted mode-
     // change label line between emit-signature-digest and authorize-by-signature is allowed
     // for by the optional group below; order and the in-session/outside-this-session split
     // are still pinned.
-    assert.match(
-      sigResult.stderr,
-      /prepare-authorization --repo[^\n]*\n[^\n]*emit-signature-digest --repo[^\n]*\n(?:[^\n]*\n)?[^\n]*authorize-by-signature --repo/u,
-      "emit-signature-digest must sit between prepare-authorization and authorize-by-signature",
-    );
-    assert.match(
-      sigResult.stderr,
-      /Then, in this session[^\n]*\n[^\n]*prepare-authorization --repo/u,
-      "prepare-authorization must be labelled as running in this session",
-    );
-    assert.match(
-      sigResult.stderr,
-      /Then, outside this session[^\n]*\n[^\n]*authorize-by-signature --repo/u,
-      "authorize-by-signature must be labelled as running outside this session",
-    );
+    const prepareIndex = sigResult.stderr.indexOf("Step: prepare-authorization");
+    const emitIndex = sigResult.stderr.indexOf("Step: emit-signature-digest");
+    const authorizeIndex = sigResult.stderr.indexOf("Step: authorize-by-signature");
+    assert.ok(prepareIndex !== -1 && prepareIndex < emitIndex && emitIndex < authorizeIndex,
+      "emit-signature-digest must sit between prepare-authorization and authorize-by-signature");
+    assert.ok(sigResult.stderr.indexOf("Then, in this session") < prepareIndex,
+      "prepare-authorization must be labelled as running in this session");
+    assert.ok(sigResult.stderr.indexOf("Then, outside this session") < authorizeIndex,
+      "authorize-by-signature must be labelled as running outside this session");
     assert.doesNotMatch(sigResult.stderr, /--activate/u, "signature mode must not offer the in-session activate step");
   } finally { for (const entry of roots) rmSync(entry, { recursive: true, force: true }); }
 });
 
-// NVA-CF-GUARDVERBOSITY (backlog: 2026-08-30-guard-denials-inline-the-full-multi-shell-
-// ceremony-block-by-default.md): the full per-step posix/powershell/cmd.exe bounded
-// rendering (NVA-W4-01B) used to be inlined here unconditionally -- up to 5 steps x 3
-// shells, observed to run to ~150 lines on a real denial and to dominate context cost on
-// every TP-guard refusal. The flat per-command chain stays exactly as pinned by the
-// previous test, unchanged; the bounded block is replaced by a short pointer to the
-// on-demand `render-copy-safe` subcommand, which reproduces every headline the block used
-// to carry inline when run against the SAME request-sha256 the denial already prints.
-test("NVA-CF-GUARDVERBOSITY: the denial no longer inlines the bounded ceremony block by default -- a short pointer to render-copy-safe replaces it, and running it reproduces the same per-step headlines", () => {
+test("NVA-GF-COPYSAFE: lifecycle denials default to bounded POSIX and PowerShell command blocks without an unsafe primary command or rendering prerequisite", () => {
   const roots = [];
   try {
     const command = "rg -n lifecycle . && touch output.txt";
-
-    const sigRoot = hgoGitFixture("signature");
-    roots.push(sigRoot);
-    const sigResult = evaluateLifecycleReadyGuard(bash(command), { projectDir: sigRoot });
-    assert.equal(sigResult.exitCode, 2);
-    // The full per-step block is gone from the default denial text.
-    assert.doesNotMatch(sigResult.stderr, /Bounded copy-safe rendering of the plan step/u);
-    assert.doesNotMatch(sigResult.stderr, /Bounded copy-safe rendering of the prepare-authorization step/u);
-    assert.doesNotMatch(sigResult.stderr, /Bounded copy-safe rendering of the emit-signature-digest step/u);
-    assert.doesNotMatch(sigResult.stderr, /Bounded copy-safe rendering of the authorize-by-signature step/u);
-    // A short pointer to the on-demand mechanism sits strictly after the (unchanged) flat
-    // chain, not interleaved with it.
-    assert.match(sigResult.stderr, /available on demand/u);
-    assert.match(sigResult.stderr, /render-copy-safe --repo/u);
-    const flatIndex = sigResult.stderr.indexOf("authorize-by-signature --repo");
-    const pointerIndex = sigResult.stderr.indexOf("available on demand");
-    assert.ok(flatIndex !== -1 && pointerIndex !== -1 && flatIndex < pointerIndex,
-      `expected the flat chain before the on-demand pointer:\n${sigResult.stderr}`);
-
-    // Running the pointed-to command against the SAME request-sha256 the denial already
-    // prints reproduces the full per-step block, proving the safety net is still reachable.
-    const requestMatch = sigResult.stderr.match(/--request-sha256 ([a-f0-9]{64})/u);
-    assert.ok(requestMatch, "expected a request-sha256 in the denial");
-    const captured = hgoCaptureIo();
-    const status = guardHumanOverrideMain(
-      ["render-copy-safe", "--repo", sigRoot, "--request-sha256", requestMatch[1]], captured,
-    );
-    assert.equal(status, 0, captured.stderr);
-    assert.match(captured.stdout, /Bounded copy-safe rendering of the plan step/u);
-    assert.match(captured.stdout, /Bounded copy-safe rendering of the prepare-authorization step/u);
-    assert.match(captured.stdout, /Bounded copy-safe rendering of the emit-signature-digest step/u);
-    assert.match(captured.stdout, /Bounded copy-safe rendering of the authorize-by-signature step/u);
-    assert.doesNotMatch(captured.stdout, /Bounded copy-safe rendering of the authorize step\b/u,
-      "signature mode has no in-session activate step; nothing to bound-render for it");
-    assert.match(captured.stdout, /eval "\$CMD"/u);
-
-    const chatRoot = hgoGitFixture("chat");
-    roots.push(chatRoot);
-    const chatResult = evaluateLifecycleReadyGuard(bash(command), { projectDir: chatRoot });
-    assert.equal(chatResult.exitCode, 2);
-    assert.doesNotMatch(chatResult.stderr, /Bounded copy-safe rendering of the plan step/u);
-    assert.match(chatResult.stderr, /available on demand/u);
-    const chatRequestMatch = chatResult.stderr.match(/--request-sha256 ([a-f0-9]{64})/u);
-    assert.ok(chatRequestMatch, "expected a request-sha256 in the chat-mode denial");
-    const chatCaptured = hgoCaptureIo();
-    const chatStatus = guardHumanOverrideMain(
-      ["render-copy-safe", "--repo", chatRoot, "--request-sha256", chatRequestMatch[1]], chatCaptured,
-    );
-    assert.equal(chatStatus, 0, chatCaptured.stderr);
-    assert.match(chatCaptured.stdout, /Bounded copy-safe rendering of the plan step/u);
-    assert.match(chatCaptured.stdout, /Bounded copy-safe rendering of the prepare-authorization step/u);
-    assert.match(chatCaptured.stdout, /Bounded copy-safe rendering of the authorize step/u);
-    assert.doesNotMatch(chatCaptured.stdout, /Bounded copy-safe rendering of the authorize-by-signature step/u,
-      "chat mode has no signing step; nothing to bound-render for it");
-    assert.doesNotMatch(chatCaptured.stdout, /Bounded copy-safe rendering of the emit-signature-digest step/u);
-  } finally { for (const entry of roots) rmSync(entry, { recursive: true, force: true }); }
-});
-
-// NVA-GF-COPYSAFE / NVA-CF-GUARDVERBOSITY: this suite's own byte-identity proof, now against
-// render-copy-safe's output rather than the hook's own (removed) inline block -- the actual
-// bounded "plan" rendering must still be exactly what independently recomputing it from the
-// SAME shared function, on the SAME flat command line the denial itself prints, produces --
-// proving relocating the disclosure changed nothing about the rendering itself.
-test("NVA-GF-COPYSAFE: render-copy-safe's bounded 'plan' rendering is byte-identical to recomputing it via the shared copy-safe-command.mjs function from the same flat command line", () => {
-  const sigRoot = hgoGitFixture("signature");
-  try {
-    const command = "rg -n lifecycle . && touch output.txt";
-    const sigResult = evaluateLifecycleReadyGuard(bash(command), { projectDir: sigRoot });
-    assert.equal(sigResult.exitCode, 2);
-    const lines = sigResult.stderr.split("\n");
-    const headerIndex = lines.findIndex((line) => /^Human override available for this exact/u.test(line));
-    assert.ok(headerIndex !== -1, "expected the human override header line");
-    const flatPlanLine = lines[headerIndex + 1];
-    assert.match(flatPlanLine, /\bplan --repo\b/u, flatPlanLine);
-    const recomputed = boundedOpaqueCopyCommand(flatPlanLine);
-    assert.equal(recomputed.maxColumns, 72);
-    assert.ok(recomputed.posix, "posix rendering must succeed for a real plan command");
-
-    const requestMatch = sigResult.stderr.match(/--request-sha256 ([a-f0-9]{64})/u);
-    assert.ok(requestMatch, "expected a request-sha256 in the denial");
-    const captured = hgoCaptureIo();
-    const status = guardHumanOverrideMain(
-      ["render-copy-safe", "--repo", sigRoot, "--request-sha256", requestMatch[1]], captured,
-    );
-    assert.equal(status, 0, captured.stderr);
-    assert.ok(
-      captured.stdout.includes(`  posix:\n${recomputed.posix}`),
-      "render-copy-safe's posix block must byte-match the shared function's independent recomputation",
-    );
-    if (recomputed.powershell) {
-      assert.ok(
-        captured.stdout.includes(`  powershell:\n${recomputed.powershell}`),
-        "render-copy-safe's powershell block must byte-match the shared function's independent recomputation",
+    for (const mode of ["signature", "chat"]) {
+      const projectRoot = hgoGitFixture(mode);
+      roots.push(projectRoot);
+      const result = evaluateLifecycleReadyGuard(bash(command), { projectDir: projectRoot });
+      assert.equal(result.exitCode, 2);
+      assert.match(result.stderr, /Step: plan\nPOSIX:/u);
+      assert.match(result.stderr, /PowerShell:/u);
+      assert.match(result.stderr, /eval "\$CMD"/u);
+      assert.match(result.stderr, /Invoke-Expression \$CMD/u);
+      assert.doesNotMatch(result.stderr, /available on demand|render-copy-safe/u);
+      assert.doesNotMatch(
+        result.stderr,
+        /^(?:node|\S*node) .*guard-human-override\.mjs .*--repo /mu,
+        "the default output must not print a flat primary command",
       );
+      const commandLines = result.stderr.split(/\r?\n/u).filter((line) =>
+        /^(?:Step: |POSIX:|PowerShell:|cmd\.exe:|CMD=|\$CMD (?:=|\+=) |set "CMD=|eval "\$CMD"|Invoke-Expression \$CMD|%CMD%)/u.test(line));
+      assert.ok(commandLines.length > 10, result.stderr);
+      assert.equal(commandLines.every((line) => line.length <= 72), true, commandLines.join("\n"));
     }
-  } finally { rmSync(sigRoot, { recursive: true, force: true }); }
+  } finally { for (const entry of roots) rmSync(entry, { recursive: true, force: true }); }
 });
 
 test("NOVA-LCR-HGO-1: an unusable override store leaves the plain grammar refusal exactly as it was", () => {
@@ -4667,10 +4580,10 @@ test("NOVA-XREPO-HGO-1: with nothing armed a cross-repo denial still refuses, an
     assert.match(sig.stderr, /GUARD-CROSS-REPO-MUTATION/u);
     assert.doesNotMatch(sig.stderr, /capability consumed/u);
     assert.match(sig.stderr, /Human override available for this exact command/u);
-    assert.match(sig.stderr, /\bplan --repo\b/u);
-    assert.match(sig.stderr, /prepare-authorization --repo/u);
-    assert.match(sig.stderr, /emit-signature-digest --repo/u);
-    assert.match(sig.stderr, /authorize-by-signature --repo/u);
+    assert.match(sig.stderr, /Step: plan/u);
+    assert.match(sig.stderr, /Step: prepare-authorization/u);
+    assert.match(sig.stderr, /Step: emit-signature-digest/u);
+    assert.match(sig.stderr, /Step: authorize-by-signature/u);
     assert.doesNotMatch(sig.stderr, /--activate/u, "signature mode must not offer the in-session activate step");
 
     const chatRoot = hgoGitFixture("chat");
@@ -4678,9 +4591,9 @@ test("NOVA-XREPO-HGO-1: with nothing armed a cross-repo denial still refuses, an
     const chat = evaluateLifecycleReadyGuard(bash(XREPO_COMMAND), { projectDir: chatRoot, ...hgoReadyDeps() });
     assert.equal(chat.exitCode, 2, "an unarmed agent gained admission");
     assert.match(chat.stderr, /GUARD-CROSS-REPO-MUTATION/u);
-    assert.match(chat.stderr, /\bauthorize --repo\b[^\n]*--activate/u);
-    assert.doesNotMatch(chat.stderr, /authorize-by-signature/u);
-    assert.doesNotMatch(chat.stderr, /emit-signature-digest/u, "chat mode has no signing step; nothing to emit a digest for");
+    assert.match(chat.stderr, /Step: authorize\n/u);
+    assert.doesNotMatch(chat.stderr, /Step: authorize-by-signature/u);
+    assert.doesNotMatch(chat.stderr, /Step: emit-signature-digest/u, "chat mode has no signing step; nothing to emit a digest for");
   } finally { for (const entry of roots) rmSync(entry, { recursive: true, force: true }); }
 });
 
@@ -4923,8 +4836,8 @@ function overrideReachability(command, projectDir) {
     return { code, reach: `never-liftable:${recorded.status}:${recorded.code ?? "<none>"}` };
   }
   assert.match(result.stderr, /Human override available for this exact command/u, command);
-  assert.match(result.stderr, /emit-signature-digest --repo/u, command);
-  assert.match(result.stderr, /authorize-by-signature --repo/u, command);
+  assert.match(result.stderr, /Step: emit-signature-digest/u, command);
+  assert.match(result.stderr, /Step: authorize-by-signature/u, command);
   const planned = planHumanGuardOverride({
     rootDir: projectDir,
     pluginRoot: HGO_PLUGIN_ROOT,
@@ -6450,10 +6363,10 @@ test("TPSHELL-4: the shell-lane refusal is liftable by a real chat- and signatur
       assert.match(first.stderr, new RegExp(TESTPATH_SHELL_DENIAL_CODE, "u"), mode);
       // ADR-0059 Decision 4: the denial names the CURRENTLY CONFIGURED mode's next command.
       if (mode === "chat") {
-        assert.match(first.stderr, /guard-human-override\.mjs authorize --repo/u, "chat denial must name its own activate step");
-        assert.doesNotMatch(first.stderr, /authorize-by-signature/u, "chat denial must not name signature's step");
+        assert.match(first.stderr, /Step: authorize\n/u, "chat denial must name its own activate step");
+        assert.doesNotMatch(first.stderr, /Step: authorize-by-signature/u, "chat denial must not name signature's step");
       } else {
-        assert.match(first.stderr, /authorize-by-signature/u, "signature denial must name the signed step");
+        assert.match(first.stderr, /Step: authorize-by-signature/u, "signature denial must name the signed step");
         assert.doesNotMatch(first.stderr, /--activate/u, "signature denial must not offer in-session activation");
       }
 
