@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "c493cea8110b213e15f48bfc435f66561c3d416fd661abeca1aabf03e431a4ea"
+    "transitionHead": "6b2f6e69cdc3598bb42feaa0db2951766e2bc837c6b3e1d8bf7198bd4b6f07b3"
   },
   "counts": {
-    "open": 81,
+    "open": 80,
     "in_progress": 3,
-    "closed": 456,
+    "closed": 457,
     "rejected": 3,
     "deferred": 11
   },
@@ -5570,13 +5570,17 @@
     },
     {
       "id": "pipeline.runner-fallback-defaults-to-codex-without-explicit-signal",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-30",
       "source": "Claude-060-78 greenfield retrospective, section 8, tool defect 1; verified live against plugins/pipeline-core/scripts/pipeline-state.mjs:5938-5939 on 2026-08-30.",
       "deferred": false,
-      "tracking": "NOW / Nova A -- surfaced 2026-08-30 while cross-checking the Claude/Windows greenfield retrospective (docs/pipeline-retrospective-claude-060-78.md, section 8) against current code; confirmed still present, unfixed."
+      "tracking": "NOW / Nova A -- surfaced 2026-08-30 while cross-checking the Claude/Windows greenfield retrospective (docs/pipeline-retrospective-claude-060-78.md, section 8) against current code; confirmed still present, unfixed.",
+      "closedAt": "2026-08-30",
+      "closureRepository": "self",
+      "closureCommit": "951c0d5b81abcf31713a97c282bddc1d3eca820b",
+      "closureEvidence": "plugins/pipeline-core/scripts/pipeline-state.test.mjs"
     },
     {
       "id": "pipeline.runner-neutrality-before-third-runner",
