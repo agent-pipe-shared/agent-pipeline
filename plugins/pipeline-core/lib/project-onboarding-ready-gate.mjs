@@ -117,6 +117,26 @@ function safeLifecycleStatus(value) {
   return typeof value === "string" && SAFE_STATUS.test(value) ? value : null;
 }
 
+function validReadyNextAction(value) {
+  if (value === null) return true;
+  if (!exactKeys(value, ["kind", "executable", "argv", "mutation", "requiresConfirmation", "expected"])
+    || value.kind !== "command"
+    || value.executable !== "node"
+    || value.mutation !== true
+    || value.requiresConfirmation !== true
+    || !Array.isArray(value.argv)
+    || value.argv.length !== 4
+    || typeof value.argv[0] !== "string"
+    || value.argv[0].split(/[\\/]/u).at(-1) !== "pipeline-state.mjs"
+    || JSON.stringify(value.argv.slice(1)) !== JSON.stringify(["set-phase", "--phase", "implementation"])
+    || !exactKeys(value.expected, ["schema", "statuses"])
+    || value.expected.schema !== "pipeline.project-onboarding.v4"
+    || JSON.stringify(value.expected.statuses) !== JSON.stringify(["ready"])) {
+    return false;
+  }
+  return true;
+}
+
 /**
  * Require one exact V4 `ready` observation for the caller's explicit intent.
  *
@@ -210,7 +230,7 @@ export function requireProjectOnboardingReady({
     || !plainObject(observed.runtime)
     || !plainObject(observed.continuity)
     || !plainObject(observed.appServer)
-    || observed.nextAction !== null
+    || !validReadyNextAction(observed.nextAction)
     || !Array.isArray(observed.diagnostics)
     || observed.diagnostics.length !== 0) {
     fail(
