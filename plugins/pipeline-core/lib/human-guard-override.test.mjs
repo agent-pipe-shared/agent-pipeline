@@ -29,6 +29,7 @@ import {
   authorizeHumanGuardOverride,
   authorizeHumanGuardOverrideBySignature,
   buildHumanGuardOverrideSignatureIntent,
+  concurrentWorktreeAdvisory,
   consumeHumanGuardOverride,
   describeHumanGuardOverrideSelection,
   HGO_SIGNATURE_REASON,
@@ -4273,4 +4274,45 @@ test("governance/events/ status lines are excluded from statusSha256 drift check
       "?? scratch/probe.txt",
     ].join("\n"),
   );
+});
+
+// NVA-CF-HGOCANDIDATEDRIFT: concurrentWorktreeAdvisory() is a best-effort, advisory-only
+// signal for scripts/guard-human-override.mjs's `plan` command (see the code comment at
+// its own definition and the HGO-CANDIDATE-DRIFT fail() site above) -- never part of the
+// request/plan/capability trust chain, so it is unit-tested directly here rather than only
+// indirectly through the CLI's stderr output.
+test("concurrentWorktreeAdvisory() reports zero other worktrees for an ordinary single-checkout repository", () => {
+  const root = fixture();
+  try {
+    const advisory = concurrentWorktreeAdvisory(root);
+    assert.equal(advisory.checked, true);
+    assert.equal(advisory.otherWorktrees, 0);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("concurrentWorktreeAdvisory() counts an additional git worktree", () => {
+  const root = fixture();
+  const worktreeDir = join(tmpdir(), `human-guard-override-wt-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  try {
+    git(root, "worktree", "add", "-b", "hgo-advisory-wt", worktreeDir, "HEAD");
+    const advisory = concurrentWorktreeAdvisory(root);
+    assert.equal(advisory.checked, true);
+    assert.equal(advisory.otherWorktrees, 1);
+  } finally {
+    spawnSync("git", ["worktree", "remove", "--force", worktreeDir], { cwd: root, encoding: "utf8", shell: false });
+    rmSync(root, { recursive: true, force: true });
+    rmSync(worktreeDir, { recursive: true, force: true });
+  }
+});
+
+test("concurrentWorktreeAdvisory() never throws: a failing spawn reports checked:false rather than propagating", () => {
+  const root = fixture();
+  try {
+    const advisory = concurrentWorktreeAdvisory(root, () => { throw new Error("spawn boundary broken"); });
+    assert.deepEqual(advisory, { checked: false, otherWorktrees: 0 });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });

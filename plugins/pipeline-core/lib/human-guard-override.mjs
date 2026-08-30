@@ -953,6 +953,33 @@ function armTimeFreshnessCheck({ repo, pluginRoot, planned, spawn }) {
   return repository;
 }
 
+/**
+ * NVA-CF-HGOCANDIDATEDRIFT: a best-effort, ADVISORY-ONLY signal for the `plan` CLI step
+ * (scripts/guard-human-override.mjs), surfaced on stderr only -- it is never folded into
+ * the plan/request/capability JSON shape or hash preimage (PLAN_KEYS/CAPABILITY_KEYS/
+ * REQUEST_SCHEMA are untouched by this function) and never gates or refuses anything.
+ * `git worktree list` is one cheap, read-only subprocess call and catches ONE class of
+ * concurrent-commit risk for the HGO-CANDIDATE-DRIFT refusal above: another dispatch or
+ * session working in an isolated worktree that could land a commit and move HEAD before
+ * this ceremony's signature is consumed. It deliberately does NOT attempt to detect the
+ * other, arguably more common class in this repository's own history -- a concurrent
+ * commit landing directly into THIS shared checkout, with no separate worktree at all --
+ * because there is no cheap, reliable signal for that case (see
+ * docs/push-release-flow.md). Never throws: a `plan` call must never fail because this
+ * advisory could not be computed (unusual git version, detached-common-dir edge case,
+ * etc.) -- `checked: false` is the honest "could not determine" answer, not an error.
+ */
+export function concurrentWorktreeAdvisory(root, spawn = spawnSync) {
+  try {
+    const result = spawn("git", ["worktree", "list", "--porcelain"], { cwd: root, encoding: "utf8", shell: false, timeout: 5000 });
+    if (result?.status !== 0 || result?.error || typeof result.stdout !== "string") return { checked: false, otherWorktrees: 0 };
+    const count = result.stdout.split("\n").filter((line) => line.startsWith("worktree ")).length;
+    return { checked: true, otherWorktrees: Math.max(0, count - 1) };
+  } catch {
+    return { checked: false, otherWorktrees: 0 };
+  }
+}
+
 function safePath(root, candidate, { platform = process.platform } = {}) {
   if (typeof candidate !== "string" || candidate.trim() === "" || candidate.includes("\0")) return null;
   const absolute = resolve(root, candidate);
@@ -3214,6 +3241,28 @@ export function authorizeHumanGuardOverrideBySignature({
   // re-derived. Step 5's check: the fresh 3a observation's head/tree must still
   // match it, or a commit landed on HEAD after signing but before this arm call.
   const signedCandidate = { commit: planned.repository.head, tree: planned.repository.tree };
+  // NVA-CF-HGOCANDIDATEDRIFT (backlog/items/2026-08-30-hgo-candidate-drift-invalidates-
+  // ceremony-on-any-concurrent-commit.md): this compares the WHOLE-repository root tree
+  // (`git rev-parse HEAD^{tree}`, see repositoryObservation()), not just the target
+  // path's own blob -- so ANY commit anywhere in the repository, including one that
+  // touches completely unrelated files, drifts `tree` and refuses here, even though the
+  // target edit itself is byte-identical to what was signed. This was considered and kept
+  // deliberately strict rather than narrowed to the target path alone, for two reasons:
+  // (1) `signedCandidate` is not only an internal freshness check -- it is baked into the
+  // PO's own Ed25519-signed intent (`candidate: {commit, tree}` in
+  // prepareHumanGuardOverrideForSignature()/authorizeHumanGuardOverrideBySignature()'s
+  // po-approval-proof.mjs call), so narrowing what it binds to would change what the PO is
+  // cryptographically attesting to, not just an internal bookkeeping detail; (2) the frozen
+  // `planned` object also freezes a safety analysis of the override being granted
+  // (`eligiblePaths`/`preview`/`denials`, see PLAN_KEYS above) that is never recomputed at
+  // arm time -- proving that ONLY the target path's bytes can affect that analysis (no
+  // interaction via shared directory components, symlink placement, or path
+  // classification elsewhere in the tree) is a security claim nobody has verified here, so
+  // the cheap, provably-safe whole-tree invariant is kept rather than a narrower one whose
+  // safety this file cannot currently demonstrate. See docs/push-release-flow.md ("The
+  // identical binding applies to guard-human-override.mjs's general override ceremony")
+  // for the operator-facing mitigation and the `plan` command's own advisory output
+  // (concurrentWorktreeAdvisory() below) for the partial, best-effort in-flight signal.
   if (freshRepository.head !== signedCandidate.commit || freshRepository.tree !== signedCandidate.tree) {
     fail(
       "HGO-CANDIDATE-DRIFT",

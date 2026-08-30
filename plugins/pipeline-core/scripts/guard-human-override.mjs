@@ -9,6 +9,7 @@ import {
   authorizeHumanGuardOverride,
   authorizeHumanGuardOverrideBySignature,
   buildHumanGuardOverrideSignatureIntent,
+  concurrentWorktreeAdvisory,
   HGO_SIGNATURE_REASON,
   HumanGuardOverrideError,
   planHumanGuardOverride,
@@ -113,13 +114,44 @@ export function main(argv = process.argv.slice(2), io = {}, options = {}) {
         || typeof parsed.repo !== "string"
         || !SHA256.test(parsed["request-sha256"] ?? "")) throw new Error(usage());
       if (Object.hasOwn(parsed, "author-source-root") && typeof parsed["author-source-root"] !== "string") throw new Error(usage());
-      write(`${JSON.stringify(planHumanGuardOverride({
+      const planned = planHumanGuardOverride({
         rootDir: parsed.repo,
         pluginRoot: PLUGIN_ROOT,
         requestSha256: parsed["request-sha256"],
         scriptPath: SCRIPT,
         authorSourceRoot: parsed["author-source-root"] ?? null,
-      }), null, 2)}\n`);
+      });
+      write(`${JSON.stringify(planned, null, 2)}\n`);
+      // NVA-CF-HGOCANDIDATEDRIFT: advisory-only, stderr, never folded into the plan's own
+      // JSON/hash shape above -- warn BEFORE a signature is requested, not only after a
+      // ceremony is discarded by HGO-CANDIDATE-DRIFT
+      // (backlog/items/2026-08-30-hgo-candidate-drift-invalidates-ceremony-on-any-
+      // concurrent-commit.md). See the code comment at the HGO-CANDIDATE-DRIFT `fail()`
+      // call in lib/human-guard-override.mjs for why the binding stays whole-tree-strict.
+      const advisoryLines = [
+        "ADVISORY: this ceremony's signature will bind to the exact repository HEAD "
+          + `(${planned.repository.head ?? "unborn"}) and its whole-repository tree at plan `
+          + "time. ANY commit landing on HEAD before authorize-by-signature consumes the "
+          + "PO's signature -- including an unrelated, concurrent commit from another "
+          + "dispatch or session, not just your own -- invalidates it (HGO-CANDIDATE-DRIFT) "
+          + "and forces refreeze-plan plus a brand-new PO signature for the identical edit. "
+          + "Avoid committing, and avoid letting other concurrent work commit, while this "
+          + "ceremony is open; run prepare-for-signature/emit-signature-digest, get the "
+          + "signature, and authorize-by-signature as one uninterrupted sequence. See "
+          + "docs/push-release-flow.md.",
+      ];
+      const worktreeAdvisory = concurrentWorktreeAdvisory(parsed.repo);
+      if (worktreeAdvisory.checked && worktreeAdvisory.otherWorktrees > 0) {
+        advisoryLines.push(
+          `ADVISORY: ${worktreeAdvisory.otherWorktrees} other git worktree(s) are present `
+            + "under this repository's common git directory. If a dispatch or session is "
+            + "active in one of them, treat this ceremony as HIGH RISK for "
+            + "HGO-CANDIDATE-DRIFT. This is a partial signal only: it does not detect a "
+            + "concurrent commit landing directly into THIS (shared) checkout, with no "
+            + "separate worktree at all.",
+        );
+      }
+      writeError(`${advisoryLines.join("\n")}\n`);
       return 0;
     }
     if (command === "prepare-authorization") {
