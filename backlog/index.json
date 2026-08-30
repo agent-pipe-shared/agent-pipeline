@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "03111acb1f9ef368ae18d06cb6d495aa4f716ac389af3fa805dced3171c201fe"
+    "transitionHead": "0ddf37299d9f1981d9402b9f82dc33d818521b2f8403df6360aeb37370fe9b5a"
   },
   "counts": {
     "open": 77,
     "in_progress": 3,
-    "closed": 464,
+    "closed": 465,
     "rejected": 3,
     "deferred": 11
   },
@@ -1109,6 +1109,20 @@
       "closureRepository": "self",
       "closureCommit": "00fcc336cfd163d85fed20aa0a7ec2dbcfb6c31a",
       "closureEvidence": "backlog/evidence/2026-08-06-third-reconciliation-pass.md"
+    },
+    {
+      "id": "pipeline.closed-grammar-rejects-git-subcommand-piped-to-head",
+      "status": "closed",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-30",
+      "source": "PO's greenfield-test relay, 2026-08-30: repeated live GUARD-PARSE-UNSUPPORTED hits on ordinary `git log --oneline | head` / `git <read-only subcommand> | head` diagnostic commands, both in this Elephant session and in the PO's own relayed Codex session.",
+      "deferred": false,
+      "tracking": "Retrospective-analysis follow-up item #6, PO-confirmed 2026-08-30 ('ja bitte umsetzen')",
+      "closedAt": "2026-08-30",
+      "closureRepository": "self",
+      "closureCommit": "272d772a",
+      "closureEvidence": "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs"
     },
     {
       "id": "pipeline.closed-input-channel-review-economics",

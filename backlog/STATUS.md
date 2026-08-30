@@ -94,6 +94,7 @@
 | pipeline.claude-has-no-start-time-opt-in-adoption-path | closed | idea | pipeline | 2026-08-05 | — |
 | pipeline.cli-docs-generated-from-parser | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.close-spec-retention-and-consent | closed | workflow-improvement | pipeline | 2026-07-21 | — |
+| pipeline.closed-grammar-rejects-git-subcommand-piped-to-head | closed | workflow-improvement | pipeline | 2026-08-30 | Retrospective-analysis follow-up item #6, PO-confirmed 2026-08-30 ('ja bitte umsetzen') |
 | pipeline.closed-input-channel-review-economics | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.closed-shell-grammar-still-rejects-common-readonly-composition | closed | workflow-improvement | pipeline | 2026-08-19 | — |
 | pipeline.codex-critic-isolation-fixture-rejects-merge-commit-head | closed | defect | pipeline | 2026-08-07 | — |
@@ -568,6 +569,6 @@
 
 - open: 77
 - in_progress: 3
-- closed: 464
+- closed: 465
 - rejected: 3
 - deferred: 11
