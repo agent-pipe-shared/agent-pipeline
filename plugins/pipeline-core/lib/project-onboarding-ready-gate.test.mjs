@@ -17,6 +17,7 @@ import {
   inspectProjectOnboardingV3,
   PROJECT_ONBOARDING_BASE_RESULT_KEYS,
   PROJECT_ONBOARDING_READY_ONLY_RESULT_KEYS,
+  PROJECT_ONBOARDING_VERIFY_COMMAND_PLACEHOLDER,
 } from "./project-onboarding-v3.mjs";
 
 function root() { return mkdtempSync(join(tmpdir(), "project-ready-gate-")); }
@@ -88,6 +89,36 @@ function implementationHandoverAction() {
     argv: ["/plugin/pipeline-state.mjs", "set-phase", "--phase", "implementation"],
     mutation: true,
     requiresConfirmation: true,
+    expected: { schema: "pipeline.project-onboarding.v4", statuses: ["ready"] },
+  };
+}
+
+function implementationVerifyHandoverAction() {
+  return {
+    kind: "collect-input",
+    input: {
+      name: "verifyCommand",
+      encoding: "utf8",
+      trim: true,
+      minBytes: 1,
+      maxBytes: 512,
+      singleLine: true,
+      rejectNul: true,
+    },
+    mutation: false,
+    requiresConfirmation: false,
+    guidance: "Ask the PO for the real verify command, bind it to the published apply action, and do not edit calibration directly.",
+    applyAction: {
+      kind: "command",
+      executable: "node",
+      argv: [
+        "/plugin/pipeline-state.mjs", "set-phase", "--phase", "implementation",
+        "--verify-command", PROJECT_ONBOARDING_VERIFY_COMMAND_PLACEHOLDER,
+      ],
+      mutation: true,
+      requiresConfirmation: true,
+      expected: { schema: "pipeline.project-onboarding.v4", statuses: ["ready"] },
+    },
     expected: { schema: "pipeline.project-onboarding.v4", statuses: ["ready"] },
   };
 }
@@ -240,6 +271,25 @@ test("a ready observation may carry the producer's helpful design-to-implementat
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
+test("a ready observation may carry only the closed verify-command collect/apply handover when calibration is not configured", () => {
+  const path = root();
+  try {
+    const observed = readyResultWithPushApprovalKeys(path, "session");
+    observed.nextAction = implementationVerifyHandoverAction();
+    const result = requireProjectOnboardingReady({
+      rootDir: path,
+      intent: "session",
+      runner: "claude",
+      inspect: () => ({ ...observed, runner: "claude" }),
+    });
+    assert.deepEqual(result, {
+      schema: PROJECT_ONBOARDING_READY_GATE_SCHEMA,
+      status: "ready",
+      intent: "session",
+    });
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
 test("the ready handover exception remains closed to arbitrary or malformed actions", () => {
   const path = root();
   try {
@@ -260,6 +310,34 @@ test("the ready handover exception remains closed to arbitrary or malformed acti
         intent: "dispatch",
         runner: "codex",
         inspect: () => observed,
+      }), (error) => error instanceof ProjectOnboardingReadyError && error.code === "PORG-INVALID-OBSERVATION");
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("the unconfigured-verify handover exception is exact about its input and placeholder-bound apply argv", () => {
+  const path = root();
+  try {
+    const valid = implementationVerifyHandoverAction();
+    const invalidActions = [
+      { ...valid, input: { ...valid.input, name: "verify-command" } },
+      { ...valid, input: { ...valid.input, unexpected: true } },
+      { ...valid, guidance: null },
+      { ...valid, applyAction: { ...valid.applyAction, executable: "bash" } },
+      { ...valid, applyAction: { ...valid.applyAction, argv: ["/plugin/not-pipeline-state.mjs", ...valid.applyAction.argv.slice(1)] } },
+      { ...valid, applyAction: { ...valid.applyAction, argv: [...valid.applyAction.argv.slice(0, -1), "npm test"] } },
+      { ...valid, applyAction: { ...valid.applyAction, argv: valid.applyAction.argv.slice(0, -2) } },
+      { ...valid, applyAction: { ...valid.applyAction, mutation: false } },
+      { ...valid, unexpected: true },
+    ];
+    for (const nextAction of invalidActions) {
+      const observed = readyResultWithPushApprovalKeys(path, "dispatch");
+      observed.nextAction = nextAction;
+      assert.throws(() => requireProjectOnboardingReady({
+        rootDir: path,
+        intent: "dispatch",
+        runner: "antigravity",
+        inspect: () => ({ ...observed, runner: "antigravity" }),
       }), (error) => error instanceof ProjectOnboardingReadyError && error.code === "PORG-INVALID-OBSERVATION");
     }
   } finally { rmSync(path, { recursive: true, force: true }); }

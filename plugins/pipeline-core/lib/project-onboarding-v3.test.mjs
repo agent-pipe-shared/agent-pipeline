@@ -39,6 +39,7 @@ import {
   freshSettingsJsonBytes,
   observeLocalTrustAnchorPointer,
   pipelineScriptsRunnerAllowlistEntries,
+  PROJECT_ONBOARDING_VERIFY_COMMAND_PLACEHOLDER,
 } from "./project-onboarding-v3.mjs";
 import { readCriticalHumanProofPolicy } from "./critical-human-proof-policy.mjs";
 import { planRunnerProfileMigrationV3 } from "./runner-profile-migration-v3.mjs";
@@ -48,6 +49,7 @@ import { parseYaml } from "./yaml-lite.mjs";
 import { validatePipelineUserV3 } from "./runner-profiles-v3.mjs";
 import { validCurrentPlanApproval, validPlanSubmission } from "./plan-spec-state-v2.mjs";
 import { main as onboardingCli } from "../scripts/project-onboarding-v3.mjs";
+import { driveOnboardingInit } from "../scripts/onboarding-init.mjs";
 import { main as sessionCleanupCli } from "../scripts/session-cleanup.mjs";
 import { run as pipelineStateRun } from "../scripts/pipeline-state.mjs";
 import {
@@ -4209,102 +4211,144 @@ test("the seeded dev-plan gate refuses implementation before approval and admits
 // directly above) is the sole mechanism that actually refuses implementation
 // writes, and it is completely unaffected by whether this proposal exists or
 // is ever acted on -- both halves are asserted below.
-test("V4 inspection proposes set-phase --phase implementation once the plan is approved, and only then", () => {
-  const path = root();
+test("the public onboarding handover is executable for every runner with placeholder and configured verify", () => {
+  const paths = [];
+  const verifyCommand = `${process.execPath} -e "process.exit(0)"`;
+  const verifyPlaceholder = PROJECT_ONBOARDING_VERIFY_COMMAND_PLACEHOLDER;
   try {
-    hostGit(path, ["init", "--initial-branch=main"]);
-    const localDeps = { ...fakeDeps, initializePoGateProfileReceipt: initializeActualPoGateProfileReceipt };
-    const barrier = initializeRestartRequiredRoot(path, localDeps);
-    clearRuntimeBarrier(path, barrier);
-    completeKickoff(path, "Ship one gated feature", localDeps);
+    for (const runner of ["claude", "codex", "antigravity"]) {
+      const path = root();
+      paths.push(path);
+      hostGit(path, ["init", "--initial-branch=main"]);
+      const localDeps = { ...fakeDeps, initializePoGateProfileReceipt: initializeActualPoGateProfileReceipt };
 
-    mkdirSync(join(path, "specs", "handover"), { recursive: true });
-    const prdPath = "specs/handover/prd_handover.md";
-    const specPath = "specs/handover/spec.md";
-    const designInputPath = "specs/handover/design-input.md";
-    writeFileSync(join(path, specPath), "# Handover technical specification\n");
-    const specSha256 = sha256(readFileSync(join(path, specPath)));
-    writeFileSync(join(path, prdPath), [
-      "<!-- po-language: en -->",
-      `<!-- technical-spec-sha256: ${specSha256} -->`,
-      PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER,
-      "",
-      "# Handover product requirements",
-      "",
-    ].join("\n"));
-    writeFileSync(join(path, designInputPath), "# Handover design input\n");
-    const promotion = {
-      rootDir: path, profile: "feature", featureId: "handover-work", planPath: prdPath,
-      prdPath, specPath, designInputPath, runner: "codex", deps: localDeps,
-    };
-    const planned = planProjectOnboardingKickoffPromotionV4(promotion);
-    const promoted = applyProjectOnboardingKickoffPromotionV4({ runner: "codex", ...promotion, planSha256: planned.planSha256, activate: true });
-    assert.equal(promoted.status, "ready");
-
-    const inspect = () => inspectProjectOnboardingV3({ runner: "codex", rootDir: path, intent: "bootstrap", deps: localDeps });
-
-    // Draft (freshly promoted, not yet submitted): unapproved, unchanged from
-    // today -- never propose the transition prematurely.
-    const draft = inspect();
-    assert.equal(draft.status, "ready");
-    assert.equal(draft.nextAction, null);
-
-    const state = (argv) => {
-      const stderr = [];
-      const code = pipelineStateRun(argv, {
-        dir: path,
-        now: () => "2026-08-01T12:00:00.000Z",
-        writeError: (value) => stderr.push(String(value)),
+      const portable = planProjectOnboardingV3({ rootDir: path, deps: localDeps, runner });
+      assert.equal(applyProjectOnboardingV3(portable, { rootDir: path, activate: true, deps: localDeps }).status, "applied");
+      const runtime = planProjectOnboardingLifecycleV4({ rootDir: path, deps: localDeps, operation: "runtime", runner });
+      const runtimeDigest = runtime.nextAction.argv[runtime.nextAction.argv.indexOf("--plan-sha256") + 1];
+      const initialized = applyProjectOnboardingLifecycleV4({
+        rootDir: path, deps: localDeps, operation: "runtime",
+        planSha256: runtimeDigest, activate: true, runner,
       });
-      return { code, stderr: stderr.join("") };
-    };
-    const submitted = state(["submit-plan", "--by", "po", "--profile", "feature"]);
-    assert.equal(submitted.code, 0, submitted.stderr);
+      if (initialized.status === "restart-required") clearRuntimeBarrier(path, readRestartBarrier({ rootDir: path, spawn: fakeGit }));
+      else assert.ok(["kickoff-required", "intake-required"].includes(initialized.status), `${runner}: ${initialized.status}`);
+      completeKickoff(path, `Ship one ${runner} handover feature`, localDeps, "ready", runner);
 
-    // Awaiting-approval: still not approved, still unchanged.
-    const awaiting = inspect();
-    assert.equal(awaiting.status, "ready");
-    assert.equal(awaiting.nextAction, null);
+      mkdirSync(join(path, "specs", `handover-${runner}`), { recursive: true });
+      const prdPath = `specs/handover-${runner}/prd_handover.md`;
+      const specPath = `specs/handover-${runner}/spec.md`;
+      const designInputPath = `specs/handover-${runner}/design-input.md`;
+      writeFileSync(join(path, specPath), `# ${runner} handover technical specification\n`);
+      const specSha256 = sha256(readFileSync(join(path, specPath)));
+      writeFileSync(join(path, prdPath), [
+        "<!-- po-language: en -->",
+        `<!-- technical-spec-sha256: ${specSha256} -->`,
+        PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER,
+        "",
+        `# ${runner} handover product requirements`,
+        "",
+      ].join("\n"));
+      writeFileSync(join(path, designInputPath), `# ${runner} handover design input\n`);
+      const promotion = {
+        rootDir: path, profile: "feature", featureId: `handover-${runner}`, planPath: prdPath,
+        prdPath, specPath, designInputPath, runner, deps: localDeps,
+      };
+      const planned = planProjectOnboardingKickoffPromotionV4(promotion);
+      const promoted = applyProjectOnboardingKickoffPromotionV4({ ...promotion, planSha256: planned.planSha256, activate: true });
+      assert.equal(promoted.status, "ready");
 
-    const presented = state(["present-plan", "--by", "po"]);
-    assert.equal(presented.code, 0, presented.stderr);
-    const approved = state(["approve-plan", "--by", "po"]);
-    assert.equal(approved.code, 0, approved.stderr);
+      let tick = 0;
+      const state = (argv) => {
+        const stderr = [];
+        tick += 1;
+        const code = pipelineStateRun(argv, {
+          dir: path,
+          now: () => `2026-08-30T12:00:${String(tick).padStart(2, "0")}.000Z`,
+          writeError: (value) => stderr.push(String(value)),
+        });
+        return { code, stderr: stderr.join("") };
+      };
+      const approve = () => {
+        for (const argv of [
+          ["submit-plan", "--by", "po", "--profile", "feature"],
+          ["present-plan", "--by", "po"],
+          ["approve-plan", "--by", "po"],
+        ]) {
+          const result = state(argv);
+          assert.equal(result.code, 0, `${runner}: ${argv[0]}: ${result.stderr}`);
+        }
+      };
+      const publicInspect = () => {
+        let stdout = "";
+        let stderr = "";
+        const code = onboardingCli(["inspect", "--root", path, "--intent", "bootstrap", "--runner", runner], {
+          deps: localDeps,
+          env: { CLAUDECODE: "1" },
+          write: (chunk) => { stdout += chunk; },
+          writeError: (chunk) => { stderr += chunk; },
+        });
+        assert.equal(code, 0, `${runner}: public inspect: ${stderr || stdout}`);
+        return JSON.parse(stdout);
+      };
+      const reenterDriver = () => driveOnboardingInit({
+        rootDir: path,
+        runner,
+        run(executable, argv) {
+          if (executable !== "node" || argv[0] !== ONBOARDING_SCRIPT) {
+            return { status: 1, stdout: "{}", stderr: "unexpected driver command" };
+          }
+          let stdout = "";
+          let stderr = "";
+          const status = onboardingCli(argv.slice(1), {
+            deps: localDeps,
+            env: { CLAUDECODE: "1" },
+            write: (chunk) => { stdout += chunk; },
+            writeError: (chunk) => { stderr += chunk; },
+          });
+          return { status, stdout, stderr };
+        },
+      });
 
-    // Approved, but still phase "design": the proposal appears.
-    const readyForHandover = inspect();
-    assert.equal(readyForHandover.status, "ready");
-    assert.equal(readyForHandover.nextAction?.kind, "command");
-    assert.equal(readyForHandover.nextAction.executable, "node");
-    assert.deepEqual(readyForHandover.nextAction.argv, [PIPELINE_STATE_SCRIPT, "set-phase", "--phase", "implementation"]);
-    assert.equal(readyForHandover.nextAction.mutation, true);
-    assert.equal(readyForHandover.nextAction.requiresConfirmation, true);
-    assert.equal(readyForHandover.nextAction.expected.schema, "pipeline.project-onboarding.v4");
-    assert.deepEqual(readyForHandover.nextAction.expected.statuses, ["ready"]);
+      approve();
 
-    // The proposal is never a gate: an implementation write is still refused
-    // before it is acted on -- the same guard-devplan check as the sibling
-    // dev-plan-gate test, run here to prove the two mechanisms are independent.
-    const attemptWrite = (target) => spawnSync(
-      process.execPath,
-      [fileURLToPath(new URL("../hooks/guard-devplan.mjs", import.meta.url))],
-      {
-        cwd: path,
-        encoding: "utf8",
-        input: JSON.stringify({ tool_name: "Write", tool_input: { file_path: target } }),
-        env: { ...process.env, CLAUDE_PROJECT_DIR: path },
-      },
-    );
-    assert.equal(attemptWrite("src/index.html").status, 2, "the proposal alone must not admit implementation writes");
+      // Fresh calibration still contains UNCONFIGURED_VERIFY. The public CLI
+      // must publish one primary collect-input action whose nested apply argv
+      // is the sanctioned atomic phase+verify transaction -- no raw config edit.
+      const placeholder = publicInspect();
+      assert.equal(placeholder.status, "ready");
+      assert.equal(placeholder.runner, runner);
+      assert.equal(placeholder.nextAction?.kind, "collect-input");
+      assert.equal(placeholder.nextAction.input?.name, "verifyCommand");
+      assert.equal(Object.hasOwn(placeholder.nextAction, "pendingAsks"), false, `${runner}: no duplicate verify ask`);
+      assert.doesNotMatch(placeholder.nextAction.guidance, /edit .*pipeline\.json/iu);
+      assert.deepEqual(placeholder.nextAction.applyAction.argv, [
+        PIPELINE_STATE_SCRIPT, "set-phase", "--phase", "implementation",
+        "--verify-command", verifyPlaceholder,
+      ]);
+      const materialized = placeholder.nextAction.applyAction.argv.map((part) => part === verifyPlaceholder ? verifyCommand : part);
+      assert.equal(materialized.filter((part) => part === verifyCommand).length, 1);
+      const firstPhase = state(materialized.slice(1));
+      assert.equal(firstPhase.code, 0, `${runner}: placeholder apply: ${firstPhase.stderr}`);
+      assert.equal(reenterDriver().outcome, "ready", `${runner}: placeholder re-entry`);
 
-    const phased = state(["set-phase", "--phase", "implementation", "--verify-command", `${process.execPath} -e "process.exit(0)"`]);
-    assert.equal(phased.code, 0, phased.stderr);
-
-    // Implementing: the handover is done, the proposal is gone again.
-    const implementing = inspect();
-    assert.equal(implementing.status, "ready");
-    assert.equal(implementing.nextAction, null);
-  } finally { dispose(path); }
+      // Return to design through the public writer, approve the unchanged plan
+      // again, and prove configured verify retains the exact historical command.
+      const reopened = state(["reopen-design", "--by", "po"]);
+      assert.equal(reopened.code, 0, `${runner}: reopen: ${reopened.stderr}`);
+      approve();
+      const configured = publicInspect();
+      assert.equal(configured.nextAction?.kind, "command");
+      assert.equal(configured.nextAction.executable, "node");
+      assert.deepEqual(configured.nextAction.argv, [PIPELINE_STATE_SCRIPT, "set-phase", "--phase", "implementation"]);
+      assert.equal(configured.nextAction.mutation, true);
+      assert.equal(configured.nextAction.requiresConfirmation, true);
+      const secondPhase = state(configured.nextAction.argv.slice(1));
+      assert.equal(secondPhase.code, 0, `${runner}: configured apply: ${secondPhase.stderr}`);
+      assert.equal(reenterDriver().outcome, "ready", `${runner}: configured re-entry`);
+    }
+  } finally {
+    for (const path of paths) dispose(path);
+  }
 });
 
 // NVA-R40-PROJDRIFT (backlog/items/2026-08-29-projection-drift-fault-after-
