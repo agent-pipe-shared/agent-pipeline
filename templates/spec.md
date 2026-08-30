@@ -7,6 +7,10 @@ ADR-0004 (rigor levels + EARS), Rensin design-doc structure
 EARS patterns, OpenSpec delta pattern.
 Language: English (spec is loaded by Goldfish/Critic at runtime → agent-facing,
 ADR-0011 primary-reader rule; the PO reviews at the gate).
+Do not drift language mid-document: once authoring begins in English, every
+section stays in English through to submission — a mid-document switch is
+undetected until it forces expensive repair; verify the whole document is
+still English before submitting/promoting it.
 
 USAGE
 1. Rigor level 0 tasks get NO spec file — issue/short briefing only (goal,

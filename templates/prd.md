@@ -31,6 +31,12 @@ PO language guidance (binding for every future PRD):
   the technical detail later anyway.
 - For feedback-/review-driven PRDs: don't skip the "Coverage Matrix" section.
 - Decision points are numbered at the end, kept separate from plain FYI items.
+- **Do not drift the human-facing language mid-document.** Once authoring
+  begins in the language named by the `po-language` marker above, every
+  section stays in that same language through to submission — never start in
+  one language and switch to another partway through. An undetected drift
+  forces expensive repair later; verify the whole document is still in the
+  declared language before submitting/promoting it.
 -->
 
 # PRD — <Feature/Topic>
