@@ -1219,7 +1219,7 @@ function canonicalFixtureJson(value) {
       && afterSeal.planApproval?.submissionSha256 === beforeSeal.planApproval?.submissionSha256
       && JSON.stringify(afterSeal.planApproval?.poGateAuthority) === JSON.stringify(beforeSeal.planApproval?.poGateAuthority),
   );
-  ok("PS08a-4 exact v4 readback permits the implementation lifecycle transition", run(["set-phase", "--phase", "implementation"], successorDeps) === 0);
+  ok("PS08a-4 exact v4 readback permits the implementation lifecycle transition", run(["set-phase", "--phase", "implementation", "--verify-command", `${process.execPath} -e "process.exit(0)"`], successorDeps) === 0);
   const beforeReplay = readFileSync(statePath(dir), "utf8");
   const replay = captureConsoleError(() => run(["seal-plan-approval"], successorDeps));
   ok("PS08a-5 seal replay rejects the already-v4 approval without a false success claim or mutation", replay.value === 2 && replay.text.includes("PLAN-APPROVAL-SEAL-V3-REQUIRED") && readFileSync(statePath(dir), "utf8") === beforeReplay);
@@ -1259,7 +1259,7 @@ function canonicalFixtureJson(value) {
   const dir = freshDir("set-phase");
   run(["set-feature", "--id", "f1", "--plan-path", "p1.md"], { dir, now: FIXED_NOW });
   submitAndApprove(dir, "p1.md");
-  const code = run(["set-phase", "--phase", "implementation"], { dir, now: FIXED_NOW });
+  const code = run(["set-phase", "--phase", "implementation", "--verify-command", `${process.execPath} -e "process.exit(0)"`], { dir, now: FIXED_NOW });
   ok("PS09a set-phase exit 0", code === 0, `got ${code}`);
   const state = readState(dir).state;
   ok("PS09b phase updated (inside activeFeature, F1 fix)", state.activeFeature?.phase === "implementation");
@@ -1428,7 +1428,7 @@ function canonicalFixtureJson(value) {
   ok("PS14a2 F1-integration: real present-plan subprocess exit 0", presented.status === 0, `stderr: ${presented.stderr}`);
   const r2 = spawnSync(process.execPath, [CLI, "approve-plan", "--by", "po-test"], { encoding: "utf8", env });
   ok("PS14b F1-integration: real approve-plan subprocess exit 0", r2.status === 0, `stderr: ${r2.stderr}`);
-  const r3 = spawnSync(process.execPath, [CLI, "set-phase", "--phase", "implementation"], { encoding: "utf8", env });
+  const r3 = spawnSync(process.execPath, [CLI, "set-phase", "--phase", "implementation", "--verify-command", `${process.execPath} -e "process.exit(0)"`], { encoding: "utf8", env });
   ok("PS14c F1-integration: real set-phase subprocess exit 0", r3.status === 0, `stderr: ${r3.stderr}`);
 
   // Feed the REAL resulting file into stop-suggest.mjs's OWN real loader/resolver (not a
@@ -1649,7 +1649,7 @@ function canonicalFixtureJson(value) {
     ].join("\n"),
   );
   run(["set-feature", "--id", "nudge-test", "--plan-path", ".claude/plans/nudge.md"], { dir, now: FIXED_NOW });
-  run(["set-phase", "--phase", "implementation"], { dir, now: FIXED_NOW });
+  run(["set-phase", "--phase", "implementation", "--verify-command", `${process.execPath} -e "process.exit(0)"`], { dir, now: FIXED_NOW });
 
   const manifestBefore = loadManifestSafe(dir);
   const stateBefore = loadStateSafe(statePath(dir));
@@ -3802,7 +3802,7 @@ function runAuthorityRevisionTests() {
   const submitted = run(["submit-plan", "--by", "coordinator", "--profile", "feature"], lifecycleDepsForFx);
   const presented = run(["present-plan", "--by", "coordinator"], lifecycleDepsForFx);
   const approved = run(["approve-plan", "--by", "po-test"], lifecycleDepsForFx);
-  const phased = run(["set-phase", "--phase", "implementation"], lifecycleDepsForFx);
+  const phased = run(["set-phase", "--phase", "implementation", "--verify-command", `${process.execPath} -e "process.exit(0)"`], lifecycleDepsForFx);
   ok("AR03h-setup a real plan-approval lifecycle moves the active feature to implementation phase after the AR plan was already built",
     submitted === 0 && approved === 0 && phased === 0, `submit=${submitted} approve=${approved} phase=${phased}`);
   ok("AR03h-setup-1 present-plan exit 0", presented === 0, `got ${presented}`);
