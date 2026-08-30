@@ -13,11 +13,21 @@
  * to widen, not a new technique.
  */
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import { boundedOpaqueCopyCommand as libBoundedOpaqueCopyCommand, renderProjectOnboardingAction } from "./project-onboarding-v3.mjs";
-import { boundedCopySafeCommand, boundedOpaqueCopyCommand, forcedQuote, placeholder } from "./copy-safe-command.mjs";
+import {
+  boundedCopySafeCommand,
+  boundedOpaqueCopyCommand,
+  forcedQuote,
+  placeholder,
+  renderHumanCopySafeCommand,
+} from "./copy-safe-command.mjs";
 
 test("boundedOpaqueCopyCommand is re-exported unchanged -- the same function object project-onboarding-v3.mjs already exported, not a reimplementation", () => {
   assert.strictEqual(boundedOpaqueCopyCommand, libBoundedOpaqueCopyCommand);
@@ -189,13 +199,14 @@ test("a short argv's bare inline command line still round-trips through a real b
  * conditional in boundedCopySafeCommand() only suppresses them when the
  * inline form actually fits.
  */
-test("a genuinely-too-long argv still gets the full wrapped posix/powershell/cmd renderings", () => {
+test("a genuinely-too-long argv still gets exact wrapped POSIX/PowerShell renderings and refuses an inexact cmd.exe rendering", () => {
   const built = boundedCopySafeCommand({ executable: "node", argv: fixtureArgv() });
   assert.ok(built.command.length > built.copyCommand.maxColumns,
     `test fixture must itself exceed the bound: ${built.command}`);
   assert.equal(typeof built.copyCommand.posix, "string");
   assert.equal(typeof built.copyCommand.powershell, "string");
-  assert.equal(typeof built.copyCommand.cmd, "string");
+  assert.equal(built.copyCommand.cmd, null,
+    "cmd.exe does not treat POSIX single quotes as argv quoting, so a spaced argv must fail closed");
 });
 
 /**
@@ -338,4 +349,184 @@ test("forcedQuote() escapes $, a backtick and a double quote inside its forced q
 test("boundedCopySafeCommand refuses an argv entry that is neither a string, a placeholder(), nor a forcedQuote() value", () => {
   assert.throws(() => boundedCopySafeCommand({ executable: "node", argv: ["a", {}] }), /non-empty argv/u);
   assert.throws(() => boundedCopySafeCommand({ executable: "node", argv: ["a", null] }), /non-empty argv/u);
+});
+
+test("renderHumanCopySafeCommand emits bounded POSIX and PowerShell blocks by default, plus cmd.exe when the argv is representable", () => {
+  const rendered = renderHumanCopySafeCommand({
+    label: "push",
+    executable: "git",
+    argv: ["push", "origin", `HEAD:refs/heads/${"release".repeat(12)}`],
+  });
+  assert.match(rendered.text, /^Step: push\nPOSIX:\n/u);
+  assert.match(rendered.text, /\nPowerShell:\n/u);
+  assert.match(rendered.text, /\ncmd\.exe:\r?\n/u);
+  assert.equal(
+    rendered.text.split(/\r?\n/u).every((line) => line.length <= rendered.copyCommand.maxColumns),
+    true,
+    rendered.text,
+  );
+  assert.ok(rendered.command.length > rendered.copyCommand.maxColumns, "fixture must exercise a wrapped command");
+  assert.equal(rendered.text.includes(rendered.command), false, "the unsafe unbounded primary line must not be printed");
+});
+
+test("renderHumanCopySafeCommand preserves exact argv through every real shell available on this host", () => {
+  const expected = ["/a very long/absolute path/with spaces/über/file.txt", "snowman-☃", "z".repeat(80)];
+  const rendered = renderHumanCopySafeCommand({
+    label: "round-trip",
+    executable: process.execPath,
+    argv: ["-e", "process.stdout.write(JSON.stringify(process.argv.slice(1)))", ...expected],
+  });
+  const posix = spawnSync("bash", ["-c", rendered.copyCommand.posix], { encoding: "utf8" });
+  assert.equal(posix.status, 0, posix.stderr);
+  assert.deepEqual(JSON.parse(posix.stdout), expected);
+
+  const powerShellProbe = spawnSync("pwsh", ["-NoProfile", "-Command", "$PSVersionTable.PSVersion.ToString()"], { encoding: "utf8" });
+  if (!powerShellProbe.error && powerShellProbe.status === 0) {
+    const powershell = spawnSync("pwsh", ["-NoProfile", "-Command", rendered.copyCommand.powershell], { encoding: "utf8" });
+    assert.equal(powershell.status, 0, powershell.stderr);
+    assert.deepEqual(JSON.parse(powershell.stdout), expected);
+  }
+
+  if (process.platform === "win32" && rendered.copyCommand.cmd) {
+    const cmd = spawnSync("cmd.exe", ["/d", "/s", "/c", rendered.copyCommand.cmd], { encoding: "utf8" });
+    assert.equal(cmd.status, 0, cmd.stderr);
+    assert.deepEqual(JSON.parse(cmd.stdout), expected);
+  }
+});
+
+test("renderHumanCopySafeCommand keeps explicit placeholders visible while bounding every physical line", () => {
+  const rendered = renderHumanCopySafeCommand({
+    label: "authorize-by-signature",
+    executable: process.execPath,
+    argv: [
+      "/a long plugin root/über/scripts/guard-human-override.mjs",
+      "authorize-by-signature",
+      "--repo", "/a long repository root/with spaces/über",
+      "--request-sha256", "a".repeat(64),
+      "--plan-sha256", placeholder("<plan-sha256>"),
+      "--proof", placeholder("<external-proof.json>"),
+    ],
+  });
+  assert.match(rendered.command, /--plan-sha256 <plan-sha256>/u);
+  assert.match(rendered.command, /--proof <external-proof\.json>/u);
+  assert.equal(rendered.text.split(/\r?\n/u).every((line) => line.length <= 72), true, rendered.text);
+  assert.doesNotMatch(rendered.text, /available on demand|render-copy-safe/u);
+});
+
+const TESTPATH_GUARD = fileURLToPath(new URL("../hooks/guard-testpath.mjs", import.meta.url));
+
+function testpathFixture(mode, prefix) {
+  const root = mkdtempSync(join(tmpdir(), prefix));
+  mkdirSync(join(root, ".claude"), { recursive: true });
+  writeFileSync(join(root, ".claude", "guard-config.json"), JSON.stringify({
+    protectedTestPaths: [{
+      id: "TP-COPY-SAFE",
+      pattern: "src/domain/important\\.test\\.mjs$",
+      reason: "fixture protected project test",
+    }],
+  }));
+  writeFileSync(
+    join(root, "pipeline.user.yaml"),
+    `schema: "pipeline.user.v3"\ngates:\n  push_approval: "${mode}"\n`,
+  );
+  execFileSync("git", ["init", "-q"], { cwd: root });
+  execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: root });
+  execFileSync("git", ["config", "user.name", "Test"], { cwd: root });
+  execFileSync("git", ["add", "-A"], { cwd: root });
+  execFileSync("git", ["commit", "-q", "-m", "fixture"], { cwd: root });
+  return root;
+}
+
+function testpathDenial(root) {
+  const result = spawnSync(process.execPath, [TESTPATH_GUARD], {
+    input: JSON.stringify({
+      tool_name: "Edit",
+      tool_input: {
+        file_path: join(root, "src", "domain", "important.test.mjs"),
+        old_string: "a",
+        new_string: "b",
+      },
+    }),
+    encoding: "utf8",
+    env: { ...process.env, CLAUDE_PROJECT_DIR: root },
+    timeout: 10_000,
+  });
+  assert.equal(result.error, undefined, result.error?.message);
+  assert.equal(result.status, 2, result.stderr);
+  return result.stderr;
+}
+
+function handoffShellBlock(stderr, step, shell) {
+  const lines = stderr.split(/\r?\n/u);
+  const stepIndex = lines.indexOf(`Step: ${step}`);
+  assert.notEqual(stepIndex, -1, stderr);
+  const label = shell === "posix" ? "POSIX:" : shell === "powershell" ? "PowerShell:" : "cmd.exe:";
+  const invocation = shell === "posix" ? 'eval "$CMD"' : shell === "powershell" ? "Invoke-Expression $CMD" : "%CMD%";
+  const labelIndex = lines.indexOf(label, stepIndex + 1);
+  assert.notEqual(labelIndex, -1, `${label} missing after Step: ${step}\n${stderr}`);
+  const endIndex = lines.indexOf(invocation, labelIndex + 1);
+  assert.notEqual(endIndex, -1, `${invocation} missing after ${label}\n${stderr}`);
+  return lines.slice(labelIndex + 1, endIndex + 1).join(shell === "cmd" ? "\r\n" : "\n");
+}
+
+function assertBoundedTestpathDefault(stderr) {
+  assert.match(stderr, /Step: plan\nPOSIX:/u);
+  assert.match(stderr, /PowerShell:/u);
+  assert.match(stderr, /Request binding \(not a command\): --request-sha256 [a-f0-9]{64}/u);
+  assert.doesNotMatch(stderr, /available on demand|render-copy-safe/u);
+  assert.doesNotMatch(
+    stderr,
+    /^(?:node|\S*node) .*guard-human-override\.mjs .*--repo /mu,
+    "default output must not contain a flat primary command",
+  );
+  const commandLines = stderr.split(/\r?\n/u).filter((line) =>
+    /^(?:Step: |POSIX:|PowerShell:|cmd\.exe:|CMD=|\$CMD (?:=|\+=) |set "CMD=|eval "\$CMD"|Invoke-Expression \$CMD|%CMD%)/u.test(line));
+  assert.ok(commandLines.length > 10, stderr);
+  assert.equal(commandLines.every((line) => line.length <= 72), true, commandLines.join("\n"));
+}
+
+test("test-path default hand-off round-trips the bounded POSIX/PowerShell plan command with spaces and Unicode", () => {
+  const root = testpathFixture("signature", `guard testpath copy safe über ${"long-".repeat(8)}`);
+  try {
+    const stderr = testpathDenial(root);
+    assertBoundedTestpathDefault(stderr);
+    assert.match(stderr, /Step: authorize-by-signature/u);
+
+    const posix = spawnSync("bash", ["-c", handoffShellBlock(stderr, "plan", "posix")], {
+      encoding: "utf8",
+      timeout: 10_000,
+    });
+    assert.equal(posix.status, 0, posix.stderr);
+    const planned = JSON.parse(posix.stdout);
+    assert.match(planned.requestSha256, /^[a-f0-9]{64}$/u);
+
+    const probe = spawnSync("pwsh", ["-NoProfile", "-NonInteractive", "-Command", "$PSVersionTable.PSVersion.ToString()"], {
+      encoding: "utf8",
+      timeout: 10_000,
+    });
+    if (!probe.error && probe.status === 0) {
+      const powershell = spawnSync(
+        "pwsh",
+        ["-NoProfile", "-NonInteractive", "-Command", handoffShellBlock(stderr, "plan", "powershell")],
+        { encoding: "utf8", timeout: 10_000 },
+      );
+      assert.equal(powershell.status, 0, powershell.stderr);
+      assert.deepEqual(JSON.parse(powershell.stdout), planned);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("test-path default chat hand-off includes cmd.exe when the exact argv is representable", () => {
+  const root = testpathFixture("chat", "gcopy-");
+  try {
+    const stderr = testpathDenial(root);
+    assertBoundedTestpathDefault(stderr);
+    assert.match(stderr, /Step: authorize\n/u);
+    assert.doesNotMatch(stderr, /Step: authorize-by-signature/u);
+    assert.match(handoffShellBlock(stderr, "plan", "cmd"), /%CMD%$/u);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });

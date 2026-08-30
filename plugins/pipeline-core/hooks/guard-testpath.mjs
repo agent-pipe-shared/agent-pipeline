@@ -122,17 +122,10 @@ import {
   humanGuardRouteUnavailableReason,
   recordHumanGuardDenial,
 } from "../lib/human-guard-override.mjs";
-// NVA-W12-COPYSAFE: sourced from the shared renderer module rather than
-// project-onboarding-v3.mjs directly -- boundedCopySafeCommand/placeholder
-// build the flat per-step command lines below, replacing the hand-assembled
-// `${process.execPath} ${JSON.stringify(script)} ...` templates the backlog
-// item measured as one of the inconsistent emitters (mirrors the identical
-// adoption in guard-lifecycle-ready.mjs). NVA-CF-GUARDVERBOSITY: the bounded
-// multi-shell rendering itself (boundedOpaqueCopyCommand, previously imported
-// here too) no longer renders inline in this file -- it moved on-demand into
-// guard-human-override.mjs's `render-copy-safe` subcommand; see the
-// `ceremonyCommand("render-copy-safe")` pointer below.
-import { boundedCopySafeCommand, placeholder } from "../lib/copy-safe-command.mjs";
+// NVA-W12-COPYSAFE: the shared argv-native renderer builds every human
+// ceremony step below. The default denial is therefore bounded and copy-safe
+// without asking the human to run a second rendering command.
+import { placeholder, renderHumanCopySafeCommand } from "../lib/copy-safe-command.mjs";
 import {
   loadProtectedTestPathRules,
   protectedTestPathRuleFor,
@@ -282,28 +275,29 @@ if (matched) {
         // already-safe path and change this denial's exact text for no reason
         // the backlog item asked for. request-sha256 is the one real value that
         // goes through ordinary shellWord() quoting.
-        const ceremonyCommand = (subcommand, ...extraArgv) =>
-          boundedCopySafeCommand({
+        const ceremonyCommand = (label, subcommand, ...extraArgv) =>
+          renderHumanCopySafeCommand({
+            label,
             executable: process.execPath,
             argv: [
               placeholder(JSON.stringify(script)), subcommand, "--repo", placeholder(JSON.stringify(projectDir)),
               "--request-sha256", planned.requestSha256, ...extraArgv,
             ],
-          }).command;
-        const planCommand = ceremonyCommand("plan");
+          });
+        const planCommand = ceremonyCommand("plan", "plan");
         const prepareAuthorizationChat = ceremonyCommand(
-          "prepare-authorization", "--plan-sha256", placeholder("<plan-sha256-from-plan>"), "--reason", placeholder('"<human-reason>"'),
+          "prepare-authorization", "prepare-authorization", "--plan-sha256", placeholder("<plan-sha256-from-plan>"), "--reason", placeholder('"<human-reason>"'),
         );
         const authorizeChat = ceremonyCommand(
-          "authorize", "--plan-sha256", placeholder("<plan-sha256>"), "--selection-sha256", placeholder("<selection-sha256>"),
+          "authorize", "authorize", "--plan-sha256", placeholder("<plan-sha256>"), "--selection-sha256", placeholder("<selection-sha256>"),
           "--reason", placeholder('"<human-reason>"'), "--reason-sha256", placeholder("<reason-sha256>"), "--activate",
         );
         const prepareAuthorizationSignature = ceremonyCommand(
-          "prepare-authorization", "--plan-sha256", placeholder("<plan-sha256-from-plan>"), "--reason", placeholder('"<fixed HGO_SIGNATURE_REASON text>"'),
+          "prepare-authorization", "prepare-authorization", "--plan-sha256", placeholder("<plan-sha256-from-plan>"), "--reason", placeholder('"<fixed HGO_SIGNATURE_REASON text>"'),
         );
-        const emitSignatureDigest = ceremonyCommand("emit-signature-digest", "--plan-sha256", placeholder("<plan-sha256>"));
+        const emitSignatureDigest = ceremonyCommand("emit-signature-digest", "emit-signature-digest", "--plan-sha256", placeholder("<plan-sha256>"));
         const authorizeBySignature = ceremonyCommand(
-          "authorize-by-signature", "--plan-sha256", placeholder("<plan-sha256>"), "--proof", placeholder("<external-proof.json>"),
+          "authorize-by-signature", "authorize-by-signature", "--plan-sha256", placeholder("<plan-sha256>"), "--proof", placeholder("<external-proof.json>"),
         );
         // ADR-0059 Decision 4: name the exact next command for the CURRENTLY CONFIGURED
         // mode, not just the mode-common `plan` step -- mirrors the continuation
@@ -312,40 +306,25 @@ if (matched) {
         const continuation = approvalMode === "chat"
           ? [
             `Then (the human confirms in-session; this is attribution, not proof):`,
-            prepareAuthorizationChat,
-            authorizeChat,
+            prepareAuthorizationChat.text,
+            authorizeChat.text,
           ].join("\n")
           : [
             `Then, in this session (pure digest computation against data already in the ` +
               `repository -- neither step needs the external key, ADR-0059 Decision 1):`,
-            prepareAuthorizationSignature,
-            emitSignatureDigest,
+            prepareAuthorizationSignature.text,
+            emitSignatureDigest.text,
             `Then, outside this session (only the signature itself needs the external Ed25519 ` +
               `key; presence of a valid, correctly-bound signature IS the authorization -- ` +
               `there is no in-session activate step for this mode):`,
-            authorizeBySignature,
+            authorizeBySignature.text,
           ].join("\n");
-        // NVA-CF-GUARDVERBOSITY: the full per-step posix/powershell/cmd.exe bounded
-        // rendering used to be inlined here unconditionally (NVA-W4-01B) -- up to 5
-        // ceremony steps x 3 shells, observed to run to ~150 lines on a real denial and
-        // to dominate context cost on every TP-guard refusal. The underlying safety
-        // property (a human whose terminal wraps a long copied line still has a
-        // shell-correct copy-safe alternative) is unchanged; only WHEN it is disclosed
-        // changes -- on demand, via `render-copy-safe`, never inlined by default. That
-        // subcommand reproduces byte-identically what used to sit here, from the same
-        // script/repo/request-sha256/approvalMode inputs (guard-human-override.mjs,
-        // where the rest of this ceremony's CLI surface already lives -- see its own
-        // header for the construction, mirrored exactly from what lived here before).
-        const renderCopySafeCommand = ceremonyCommand("render-copy-safe");
         overrideGuidance = [
           "",
           "Human override available for this exact edit (one use; audited; the human confirms):",
-          planCommand,
+          `Request binding (not a command): --request-sha256 ${planned.requestSha256}`,
+          planCommand.text,
           continuation,
-          "",
-          "A bounded, copy-safe multi-shell (posix/powershell/cmd.exe) rendering of every " +
-            "step above is available on demand -- run this if a line above wrapped when you copied it:",
-          renderCopySafeCommand,
         ].join("\n");
       } else {
         overrideGuidance = ["", humanGuardRouteUnavailableReason("edit", { planned })].join("\n");

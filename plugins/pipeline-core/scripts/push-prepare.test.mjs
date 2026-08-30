@@ -36,11 +36,10 @@ import {
   isSecurityGateActive,
   parseArgs,
   preparePushSubject,
+  printReport,
   pushPrepareReport,
-  renderF7Lines,
   resolveFeatureContext,
   resolveVerifyRemedy,
-  segmentsForNodeCommand,
 } from "./push-prepare.mjs";
 import { authorizeRecordedPush } from "../lib/critical-action-authorization.mjs";
 import { run as runPipelineState } from "./pipeline-state.mjs";
@@ -443,36 +442,9 @@ test("criticalArtifactPaths: request/proof share a fingerprint suffix; authority
 });
 
 // ---------------------------------------------------------------------------
-// D4 -- F7 rendering: one segment per line, backslash continuation, <=100 cols
+// Cross-runner human hand-off: the default output is already bounded and
+// shell-specific. There is no flat F7 command to copy first.
 // ---------------------------------------------------------------------------
-
-test("renderF7Lines: every line but the last ends with a backslash continuation", () => {
-  const lines = renderF7Lines(["node", "/short/script.mjs", "authorize-critical", "--kind push"]);
-  assert.equal(lines.length, 4);
-  for (let index = 0; index < lines.length - 1; index += 1) assert.match(lines[index], / \\$/);
-  assert.doesNotMatch(lines[lines.length - 1], / \\$/);
-});
-
-test("renderF7Lines: no emitted line exceeds 100 columns for realistic short fixture segments", () => {
-  const segments = segmentsForNodeCommand("node", [
-    "plugins/pipeline-core/scripts/po-human-approval.mjs", "authorize-critical",
-    "--repo-root", "/home/user/src/agent-pipeline",
-    "--directory", "/home/user/.po-approval",
-    "--feature-id", "nova-push-prepare",
-    "--plan", "specs/sprint-nova-epic/plans/nova-push-prepare.md",
-    "--spec", "specs/sprint-nova-epic/plans/spec.md",
-    "--kind", "push",
-    "--subject-sha256", "7fefc0ada3b7726f39460bf7e001ed4b71ad66c173f0132d00fcbd0648f5601a",
-    "--expires-at", "2026-08-16T20:00:00.000Z",
-  ]);
-  const lines = renderF7Lines(segments);
-  for (const line of lines) assert.ok(line.length <= 100, `line exceeds 100 columns: ${line}`);
-});
-
-test("segmentsForNodeCommand: groups flag/value pairs one per segment after exe/script/subcommand", () => {
-  const segments = segmentsForNodeCommand("node", ["script.mjs", "sub", "--a", "1", "--b", "2"]);
-  assert.deepEqual(segments, ["node", "script.mjs", "sub", "--a 1", "--b 2"]);
-});
 
 // ---------------------------------------------------------------------------
 // pushPrepareReport -- end to end, all preconditions met vs. unmet
@@ -522,7 +494,34 @@ test("pushPrepareReport: all preconditions met -> ready:true, all three commands
   assert.equal(result.report.subjectSha256, "7fefc0ada3b7726f39460bf7e001ed4b71ad66c173f0132d00fcbd0648f5601a");
   assert.ok(result.lines.authorize.length > 0);
   assert.ok(result.lines.approvePush.length > 0);
-  assert.equal(result.lines.gitPush, "git push origin HEAD:refs/heads/main");
+  const humanText = [result.lines.authorize.join("\n"), result.lines.approvePush.join("\n"), result.lines.gitPush].join("\n");
+  assert.match(humanText, /Step: human authorize-critical\nPOSIX:/u);
+  assert.match(humanText, /Step: agent approve-push\nPOSIX:/u);
+  assert.match(humanText, /Step: agent push\nPOSIX:/u);
+  assert.match(humanText, /PowerShell:/u);
+  assert.match(humanText, /cmd\.exe:/u);
+  assert.equal(humanText.split(/\r?\n/u).every((line) => line.length <= 72), true, humanText);
+  assert.doesNotMatch(humanText, /^git push origin HEAD:refs\/heads\/main$/mu);
+  assert.doesNotMatch(humanText, /render-copy-safe|available on demand/u);
+});
+
+test("printReport keeps stdout machine-readable and sends the bounded human commands to stderr", () => {
+  const result = pushPrepareReport(
+    ["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"],
+    readyDeps(),
+  );
+  let stdout = "";
+  let stderr = "";
+  printReport(result, {
+    write: (text) => { stdout += text; },
+    writeError: (text) => { stderr += text; },
+  });
+  assert.deepEqual(JSON.parse(stdout), result.report);
+  assert.match(stderr, /Step: human authorize-critical/u);
+  assert.match(stderr, /Step: agent approve-push/u);
+  assert.match(stderr, /Step: agent push/u);
+  assert.equal(stderr.trimEnd().split(/\r?\n/u).every((line) => line.length <= 72), true, stderr);
+  assert.doesNotMatch(stdout, /Step:|POSIX:|PowerShell:/u);
 });
 
 test("pushPrepareReport: v1/v2 trust-on-first-use carries the registered machine key directory through command rendering", () => {
@@ -552,7 +551,7 @@ test("pushPrepareReport: v1/v2 trust-on-first-use carries the registered machine
   assert.equal(renderedDirectory, machine.keyDirectory);
   assert.ok(result.lines.authorize.length > 0);
   assert.ok(result.lines.approvePush.length > 0);
-  assert.equal(result.lines.gitPush, "git push origin HEAD:refs/heads/main");
+  assert.match(result.lines.gitPush, /^Step: agent push\nPOSIX:/u);
 });
 
 test("pushPrepareReport: one unmet precondition -> ready:false, no command lines, remedy present", () => {

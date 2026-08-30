@@ -142,6 +142,37 @@ function shellDoubleQuoted(text) {
   return `"${escaped}"`;
 }
 
+/** Quote one literal argv word for PowerShell without leaving interpolation live. */
+function powershellWord(text) {
+  if (typeof text !== "string" || text.includes("\0")) {
+    throw new TypeError("command arguments must be NUL-free strings");
+  }
+  if (/[\r\n]/u.test(text)) {
+    const escaped = text
+      .replaceAll("`", "``")
+      .replaceAll('"', '`"')
+      .replaceAll("$", "`$")
+      .replaceAll("\r", "`r")
+      .replaceAll("\n", "`n");
+    return `"${escaped}"`;
+  }
+  return `'${text.replaceAll("'", "''")}'`;
+}
+
+/**
+ * cmd.exe has no general, context-free argv quoting rule for arbitrary shell
+ * metacharacters. Emit a cmd rendering only for words that need no quoting at
+ * all; every other argv returns `null` for cmd rather than a plausible but
+ * semantically different command (notably POSIX single quotes around paths
+ * containing spaces).
+ */
+function cmdWord(text) {
+  if (typeof text !== "string" || text.includes("\0")) return null;
+  return /^[A-Za-z0-9_+=:,./\\-]+$/u.test(text) && !/[%!^&|<>()"@]/u.test(text)
+    ? text
+    : null;
+}
+
 /**
  * NVA-CF-COPYSAFE: the ONLY gate deciding whether a placeholder() value is a
  * genuine unresolved template slot -- never fed real path/command data,
@@ -225,10 +256,10 @@ function resolvePlaceholderValue(text) {
  * it still goes through renderProjectOnboardingAction() unchanged, never the
  * new per-argv-entry path.
  *
- * @param {{ executable: string, argv: (string|ReturnType<typeof placeholder>|ReturnType<typeof forcedQuote>)[] }} action
+ * @param {{ executable: string, argv: (string|ReturnType<typeof placeholder>|ReturnType<typeof forcedQuote>)[], forceCopyCommand?: boolean }} action
  * @returns {{ executable: string, argv: string[], command: string, copyCommand: { maxColumns: number, posix: string|null, powershell: string|null, cmd: string|null } }}
  */
-export function boundedCopySafeCommand({ executable, argv } = {}) {
+export function boundedCopySafeCommand({ executable, argv, forceCopyCommand = false } = {}) {
   if (typeof executable !== "string" || executable.length === 0) {
     throw new TypeError("boundedCopySafeCommand requires a non-empty executable");
   }
@@ -251,9 +282,52 @@ export function boundedCopySafeCommand({ executable, argv } = {}) {
     ? [executable, ...argv].map(renderEntry).join(" ")
     : renderProjectOnboardingAction({ kind: "command", executable, argv });
   const resolvedArgv = hasSpecialEntry ? argv.map(resolveEntry) : argv;
-  const bounded = boundedOpaqueCopyCommand(command);
-  const copyCommand = command.length <= bounded.maxColumns
+  const powershellEntries = [executable, ...argv].map((part) => {
+    if (isPlaceholder(part) && isTemplateSlot(part.text)) return part.text;
+    return powershellWord(isPlaceholder(part) ? quotedLiteralRawValue(part.text) : isForcedQuote(part) ? part.text : part);
+  });
+  const powershellCommand = `& ${powershellEntries.join(" ")}`;
+  const cmdEntries = [executable, ...resolvedArgv].map(cmdWord);
+  const cmdCommand = cmdEntries.every((part) => part !== null) ? cmdEntries.join(" ") : null;
+  const posixBounded = boundedOpaqueCopyCommand(command);
+  const powershellBounded = boundedOpaqueCopyCommand(powershellCommand);
+  const cmdBounded = cmdCommand === null ? null : boundedOpaqueCopyCommand(cmdCommand);
+  const bounded = {
+    maxColumns: posixBounded.maxColumns,
+    posix: posixBounded.posix,
+    powershell: powershellBounded.powershell,
+    cmd: cmdBounded?.cmd ?? null,
+  };
+  const copyCommand = !forceCopyCommand && command.length <= bounded.maxColumns
     ? { maxColumns: bounded.maxColumns, posix: null, powershell: null, cmd: null }
     : bounded;
   return { executable, argv: resolvedArgv, command, copyCommand };
+}
+
+/**
+ * The default human hand-off form. It always emits bounded POSIX and
+ * PowerShell blocks and emits cmd.exe only when the exact argv is representable
+ * without cmd-specific ambiguity. The unbounded `command` remains available to
+ * machine consumers but is deliberately absent from `text`.
+ */
+export function renderHumanCopySafeCommand({ label, executable, argv } = {}) {
+  if (typeof label !== "string" || label.length === 0 || /[\r\n]/u.test(label)) {
+    throw new TypeError("renderHumanCopySafeCommand requires a non-empty single-line label");
+  }
+  const built = boundedCopySafeCommand({ executable, argv, forceCopyCommand: true });
+  const { copyCommand } = built;
+  const heading = `Step: ${label}`;
+  if (heading.length > copyCommand.maxColumns) {
+    throw new TypeError("copy-safe command label exceeds the shared column bound");
+  }
+  if (copyCommand.posix === null || copyCommand.powershell === null) {
+    throw new TypeError("copy-safe command could not be rendered for POSIX and PowerShell");
+  }
+  const sections = [heading, "POSIX:", copyCommand.posix, "PowerShell:", copyCommand.powershell];
+  if (copyCommand.cmd !== null) sections.push("cmd.exe:", copyCommand.cmd);
+  const text = sections.join("\n");
+  if (!text.split(/\r?\n/u).every((line) => line.length <= copyCommand.maxColumns)) {
+    throw new TypeError("copy-safe command text exceeds the shared column bound");
+  }
+  return { ...built, text };
 }

@@ -31,17 +31,10 @@ import {
   inspectProjectOnboardingV3,
   PO_AUTHORITY_REBIND_UNAVAILABLE_DIAGNOSTICS,
 } from "../lib/project-onboarding-v3.mjs";
-// NVA-GF-COPYSAFE/NVA-W12-COPYSAFE: sourced from the shared renderer module
-// rather than project-onboarding-v3.mjs directly -- boundedCopySafeCommand/
-// placeholder build the flat per-step command lines below, replacing the
-// hand-assembled `${process.execPath} ${JSON.stringify(script)} ...`
-// templates the backlog item measured as one of the inconsistent emitters.
-// NVA-CF-GUARDVERBOSITY: the bounded multi-shell rendering itself
-// (boundedOpaqueCopyCommand, previously imported here too) no longer renders
-// inline in this file -- it moved on-demand into guard-human-override.mjs's
-// `render-copy-safe` subcommand; see the `ceremonyCommand("render-copy-safe")`
-// pointer below.
-import { boundedCopySafeCommand, placeholder } from "../lib/copy-safe-command.mjs";
+// NVA-GF-COPYSAFE/NVA-W12-COPYSAFE: the shared argv-native renderer builds
+// every human ceremony step below. The default denial is therefore bounded
+// and copy-safe without asking the human to run a second rendering command.
+import { placeholder, renderHumanCopySafeCommand } from "../lib/copy-safe-command.mjs";
 import { automatedLifecycleArgvCommands, MUTATING_ONBOARDING_ARGV_SHAPES } from "../scripts/project-onboarding-v3.mjs";
 import { classifyVerifyCommand } from "../scripts/pipeline-state.mjs";
 import { isBootstrapBindingStagingAuthoringWrite } from "../lib/onboarding-staging-authoring.mjs";
@@ -575,69 +568,53 @@ function humanOverrideRoute(code, reason, subject, root, toolName, toolInput, de
         // JSON.stringify() wrapping is harmless but no longer changes the
         // rendered shape -- kept only so a future path containing a shell-special
         // character still round-trips through shellWord() correctly.
-        const ceremonyCommand = (subcommand, ...extraArgv) =>
-          boundedCopySafeCommand({
+        const ceremonyCommand = (label, subcommand, ...extraArgv) =>
+          renderHumanCopySafeCommand({
+            label,
             executable: process.execPath,
             argv: [
               placeholder(JSON.stringify(script)), subcommand, "--repo", placeholder(JSON.stringify(root)),
               "--request-sha256", planned.requestSha256, ...extraArgv,
             ],
-          }).command;
-        const planCommand = ceremonyCommand("plan");
+          });
+        const planCommand = ceremonyCommand("plan", "plan");
         const prepareAuthorizationChat = ceremonyCommand(
-          "prepare-authorization", "--plan-sha256", placeholder("<plan-sha256-from-plan>"), "--reason", placeholder('"<human-reason>"'),
+          "prepare-authorization", "prepare-authorization", "--plan-sha256", placeholder("<plan-sha256-from-plan>"), "--reason", placeholder('"<human-reason>"'),
         );
         const authorizeChat = ceremonyCommand(
-          "authorize", "--plan-sha256", placeholder("<plan-sha256>"), "--selection-sha256", placeholder("<selection-sha256>"),
+          "authorize", "authorize", "--plan-sha256", placeholder("<plan-sha256>"), "--selection-sha256", placeholder("<selection-sha256>"),
           "--reason", placeholder('"<human-reason>"'), "--reason-sha256", placeholder("<reason-sha256>"), "--activate",
         );
         const prepareAuthorizationSignature = ceremonyCommand(
-          "prepare-authorization", "--plan-sha256", placeholder("<plan-sha256-from-plan>"), "--reason", placeholder('"<fixed HGO_SIGNATURE_REASON text>"'),
+          "prepare-authorization", "prepare-authorization", "--plan-sha256", placeholder("<plan-sha256-from-plan>"), "--reason", placeholder('"<fixed HGO_SIGNATURE_REASON text>"'),
         );
-        const emitSignatureDigest = ceremonyCommand("emit-signature-digest", "--plan-sha256", placeholder("<plan-sha256>"));
+        const emitSignatureDigest = ceremonyCommand("emit-signature-digest", "emit-signature-digest", "--plan-sha256", placeholder("<plan-sha256>"));
         const authorizeBySignature = ceremonyCommand(
-          "authorize-by-signature", "--plan-sha256", placeholder("<plan-sha256>"), "--proof", placeholder("<external-proof.json>"),
+          "authorize-by-signature", "authorize-by-signature", "--plan-sha256", placeholder("<plan-sha256>"), "--proof", placeholder("<external-proof.json>"),
         );
         // ADR-0059 Decision 4: name the exact next command for the CURRENTLY CONFIGURED
         // mode -- mirrors guard-testpath.mjs's own continuation exactly in shape.
         const continuation = approvalMode === "chat"
           ? [
             `Then (the human confirms in-session; this is attribution, not proof):`,
-            prepareAuthorizationChat,
-            authorizeChat,
+            prepareAuthorizationChat.text,
+            authorizeChat.text,
           ].join("\n")
           : [
             `Then, in this session (pure digest computation against data already in the ` +
               `repository -- neither step needs the external key, ADR-0059 Decision 1):`,
-            prepareAuthorizationSignature,
-            emitSignatureDigest,
+            prepareAuthorizationSignature.text,
+            emitSignatureDigest.text,
             `Then, outside this session (only the signature itself needs the external Ed25519 ` +
               `key; presence of a valid, correctly-bound signature IS the authorization -- ` +
               `there is no in-session activate step for this mode):`,
-            authorizeBySignature,
+            authorizeBySignature.text,
           ].join("\n");
-        // NVA-CF-GUARDVERBOSITY: the full per-step posix/powershell/cmd.exe bounded
-        // rendering used to be inlined here unconditionally (NVA-W4-01B) -- up to 5
-        // ceremony steps x 3 shells, observed to run to ~150 lines on a real denial and
-        // to dominate context cost on every ceremony denial this function serves. The
-        // underlying safety property (a human whose terminal wraps a long copied line
-        // still has a shell-correct copy-safe alternative) is unchanged; only WHEN it is
-        // disclosed changes -- on demand, via `render-copy-safe`, never inlined by
-        // default. That subcommand reproduces byte-identically what used to sit here,
-        // from the same script/repo/request-sha256/approvalMode inputs
-        // (guard-human-override.mjs, where the rest of this ceremony's CLI surface
-        // already lives -- see its own header for the construction, mirrored exactly
-        // from what lived here before, and from guard-testpath.mjs's identical fix).
-        const renderCopySafeCommand = ceremonyCommand("render-copy-safe");
         overrideGuidance = [
           "",
           `Human override available for this exact ${subject} (one use; audited; the human confirms):`,
-          planCommand,
+          planCommand.text,
           continuation,
-          "",
-          "A bounded, copy-safe multi-shell (posix/powershell/cmd.exe) rendering of every " +
-            "step above is available on demand -- run this if a line above wrapped when you copied it:",
-          renderCopySafeCommand,
           "",
         ].join("\n");
       } else {
@@ -2985,7 +2962,7 @@ export function isNarrowRepositoryRecoveryCommand(command, root) {
     && index + 2 === words.length;
 }
 
-function sanctionedPoAuthorityRebindArgs(args) {
+function sanctionedPoAuthorityRebindArgs(args, root) {
   if (args[0] === "po-authority-decision-plan" && args.length === 1) return true;
   if (args[0] === "po-authority-decision-select") {
     return args[1] === "--plan-sha256" && HEX.test(args[2] ?? "")
@@ -3004,25 +2981,41 @@ function sanctionedPoAuthorityRebindArgs(args) {
       && args[7] === "--selection" && args[8] === "spec"
       && args[9] === "--activate" && args.length === 10;
   }
-  // Critic finding F4, 2026-08-19 (dispatch W4-CRITIC-2B): po-authority-
-  // acknowledge-apply's refusal text (po-gate-authority.mjs) and
-  // guard-lifecycle-ready.mjs's own bound-authority-document refusal text
-  // both name this route as sanctioned, but it was missing from this
-  // admission list -- "prescribe a command and then block it", the exact
-  // defect class this same function's own doc comment names above. The
-  // read-only po-authority-acknowledge-plan side is NOT added here: unlike
-  // po-authority-rebind-plan (admitted via isExactPoAuthorityRebindPlannerRecovery,
-  // a diagnostic-gated route above), acknowledge-plan has no equivalent
-  // diagnostic entry yet -- a disclosed, deliberately scoped-down follow-up,
-  // not an oversight; only the CAS-committing apply step is closed here.
+  const nonBlankValue = (value) => typeof value === "string"
+    && value.trim().length > 0;
+  const targetValue = (value) => nonBlankValue(value) && !value.startsWith("--");
+  const canonicalIsoValue = (value) => typeof value === "string"
+    && Number.isFinite(Date.parse(value))
+    && new Date(value).toISOString() === value;
+  // POACKROOT: the writer now publishes an explicit project root in both the
+  // plan invocation and its nested apply argv. Admit only that exact root-
+  // bound flag set, with duplicate/unknown flags rejected by matchFlagSpec().
+  // The historical cwd-relative apply spelling below remains byte-for-byte
+  // admitted; the historical root-less plan remains unavailable as before.
+  if (args[0] === "po-authority-acknowledge-plan") {
+    return matchFlagSpec(args.slice(1), {
+      requiredValue: {
+        "--root": (value) => value === root,
+        "--by": targetValue,
+      },
+    });
+  }
   if (args[0] === "po-authority-acknowledge-apply") {
-    return args[1] === "--plan-sha256" && HEX.test(args[2] ?? "")
+    const historicalCwdShape = args[1] === "--plan-sha256" && HEX.test(args[2] ?? "")
       && args[3] === "--updated-at"
-      && typeof args[4] === "string"
-      && Number.isFinite(Date.parse(args[4]))
-      && new Date(args[4]).toISOString() === args[4]
-      && args[5] === "--by" && typeof args[6] === "string" && args[6].trim().length > 0
+      && canonicalIsoValue(args[4])
+      && args[5] === "--by" && nonBlankValue(args[6])
       && args[7] === "--activate" && args.length === 8;
+    if (historicalCwdShape) return true;
+    return matchFlagSpec(args.slice(1), {
+      requiredValue: {
+        "--root": (value) => value === root,
+        "--plan-sha256": (value) => HEX.test(value ?? ""),
+        "--updated-at": canonicalIsoValue,
+        "--by": targetValue,
+      },
+      required: { "--activate": true },
+    });
   }
   return args[0] === "po-authority-rebind-apply"
     && args[1] === "--plan-sha256"
@@ -3090,7 +3083,7 @@ function isExactPoAuthorityRebindPlannerRecovery(command, root, dependencies = {
       .some((entry) => entry.offersPlannerRetry && entry.code === observed.diagnostics[0]?.code);
 }
 
-function sanctionedPipelineStateArgs(args) {
+function sanctionedPipelineStateArgs(args, root) {
   const validBy = (value) => typeof value === "string"
     && value.trim() !== "" && Buffer.byteLength(value, "utf8") <= 500;
   if (args[0] === "plan-legacy-v2-revocation-recovery") {
@@ -3122,7 +3115,7 @@ function sanctionedPipelineStateArgs(args) {
       && args.length === 5;
     return bareTransition || greenfieldVerifyTransition;
   }
-  return sanctionedPoAuthorityRebindArgs(args);
+  return sanctionedPoAuthorityRebindArgs(args, root);
 }
 
 /**
@@ -3332,7 +3325,7 @@ export function isSanctionedLifecycleCommand(command, root, options = {}) {
   if (script === SESSION_CAPABILITY_DIAGNOSE_SCRIPT) return args[0] === "--repo" && args[1] === root && args.length === 2;
   if (script === SESSION_CLEANUP_SCRIPT) return sanctionedSessionCleanupArgs(args, root);
   if (script === PIPELINE_STATE_SCRIPT) {
-    return sanctionedPipelineStateArgs(args);
+    return sanctionedPipelineStateArgs(args, root);
   }
   if (script === PO_PROFILE_REPAIR_SCRIPT) return sanctionedPoProfileRepairArgs(args, root);
   if (script === PROJECT_AUTHORITY_MIGRATION_SCRIPT) {
