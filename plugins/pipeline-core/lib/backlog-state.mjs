@@ -29,7 +29,7 @@ export const BACKLOG_TYPES = Object.freeze(["workflow-improvement", "tooling-rad
 // every other window is -- it is a pre-ADR-0043 Sprint mentioned in passing,
 // not one this ADR reserves a machine value for, so it is deliberately absent
 // here.
-export const BACKLOG_SPRINTS = Object.freeze(["alfred", "batman", "nightwing", "nova", "phoenix"]);
+export const BACKLOG_SPRINTS = Object.freeze(["alfred", "batman", "nightwing", "nova-a", "nova-b", "nova", "phoenix"]);
 // `none` is an admissible `sprint` DECLARATION, deliberately NOT a sixth entry
 // in BACKLOG_SPRINTS above: that constant is the closed slug set ADR-0043
 // reserves, and the absence of a planning window is not one of the windows it

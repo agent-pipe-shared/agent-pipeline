@@ -47,6 +47,19 @@ test("checkBacklogSprintAssignment: a valid declared sprint is counted and ok", 
   assert.equal(result.total, 1);
 });
 
+test("checkBacklogSprintAssignment: Nova A and Nova B are separate declared sprint buckets", () => {
+  const root = fixture([
+    ITEM("nova-a-item", { sprint: "nova-a" }),
+    ITEM("nova-b-item", { sprint: "nova-b" }),
+    ITEM("unpartitioned-nova-item", { sprint: "nova" }),
+  ]);
+  const result = checkBacklogSprintAssignment(root);
+  assert.equal(result.ok, true);
+  assert.equal(result.counts["nova-a"], 1);
+  assert.equal(result.counts["nova-b"], 1);
+  assert.equal(result.counts.nova, 1, "the legacy unpartitioned Nova bucket remains distinct");
+});
+
 test("checkBacklogSprintAssignment: an unrecognized sprint value is a finding and fails", () => {
   const root = fixture([ITEM("bogus-sprint-item", { sprint: "cyborg" })]);
   const result = checkBacklogSprintAssignment(root);

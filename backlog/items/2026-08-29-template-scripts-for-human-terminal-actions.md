@@ -5,7 +5,7 @@ type: idea
 owner: pipeline
 status: open
 created: 2026-08-29
-sprint: nova
+sprint: nova-b
 tracking: "Nova B -- design idea, not scoped."
 source: "PO inline observation (2026-08-29, 3-runner greenfield synthesis): Antigravity was the only runner to move quickly through the first 2 phases, in part because it built its OWN scripts to confirm the PRD faster. PO suggests: pre-built template scripts (that runners lightly rewrite, with clear placeholders) for fixed gates/installs/anything the human must run in a terminal, so what needs filling in is always clear."
 ---

@@ -5,7 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-08-29
-sprint: nova
+sprint: nova-b
 tracking: "Nova B -- needs deeper Codex-runner-side investigation, likely outside pure Pipeline-repo code; not a same-session fix."
 source: "Codex 060-77 greenfield retrospective (scratch/greenfield-reports/pipeline-retrospective-codex-060-77.md), section 'Root und Worker hatten unterschiedliche Funktionsfähigkeit'."
 ---

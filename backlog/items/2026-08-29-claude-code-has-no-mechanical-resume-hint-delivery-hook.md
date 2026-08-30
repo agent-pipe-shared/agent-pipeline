@@ -5,7 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-08-29
-sprint: nova
+sprint: nova-b
 tracking: "Nova B -- new hooks.json entry needed (TP-4 protected, PO signature ceremony), larger scope than the Codex-side fix; not this candidate."
 source: "Found while root-causing 2026-08-29-codex-restart-context-loss-needs-a-different-approach-not-harder-enforcement.md (point 5 of its root-cause note)."
 ---

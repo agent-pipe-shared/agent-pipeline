@@ -5,7 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-08-29
-sprint: nova
+sprint: nova-b
 done_when: manual
 tracking: "Nova B (PO decision 2026-08-29) — low-severity UX friction, current restart-on-repair behavior is safe; investigate later, not a 0.6.0 blocker"
 source: "Codex/WSL report, delivered inline in chat by the PO (priority 6 in that report), during the 2026-08-29 three-runner greenfield test."

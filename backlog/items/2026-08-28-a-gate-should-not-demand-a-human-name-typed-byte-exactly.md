@@ -5,7 +5,7 @@ type: workflow-improvement
 owner: pipeline
 status: open
 created: 2026-08-28
-sprint: nova
+sprint: nova-b
 tracking: "Nova B — the encoding half is fixed; this is the design half that made the encoding fragile in the first place"
 source: "Follow-up from 2026-08-28-a-chat-gate-is-unusable-with-a-non-ascii-name-on-windows.md, consumer incident report S56 finding B1's own second suggestion."
 done_when: manual

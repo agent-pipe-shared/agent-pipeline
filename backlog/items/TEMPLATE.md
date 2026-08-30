@@ -6,7 +6,7 @@ owner: pipeline
 status: open
 created: {{YYYY-MM-DD}}
 source: {{origin — retro question / radar run / critic finding / manual observation, with a concrete reference (file, ADR, session date)}}
-sprint: {{alfred|batman|nightwing|nova|phoenix|none — MANDATORY while status is open; `none` explicitly declares that this item belongs to no planning window, which is NOT the same as leaving the line out}}
+sprint: {{alfred|batman|nightwing|nova-a|nova-b|nova|phoenix|none — MANDATORY while status is open; use nova-a or nova-b when that Nova phase is decided; `nova` means deliberately unpartitioned Nova; `none` explicitly declares that this item belongs to no planning window, which is NOT the same as leaving the line out}}
 done_when: {{OPTIONAL today (see backlog/README.md) — a falsifier for when this item counts as done: `path-exists <repo-relative-path>` | `contains <repo-relative-path> <needle>` | `script-exit-zero <repo-relative-script-path>` | `manual`. Delete this line entirely if not yet declared — check-backlog-done-predicate.mjs reports but does not yet fail on a missing declaration.}}
 due: {{OPTIONAL — YYYY-MM-DD, only for time-triggered items such as ADR resubmissions; delete this line entirely if not applicable}}
 ---

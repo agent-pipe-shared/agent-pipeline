@@ -5,7 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-08-28
-sprint: nova
+sprint: nova-a
 tracking: "NOW / Nova A — measured, not argued: a fresh session gets 15 chained commands on the onboarding path and 0 on the feature/push path. PO 2026-08-28: the paths must be tested without the Pipeline's context knowledge, because a greenfield session does not have it."
 source: "Measured 2026-08-28 at HEAD 129d8c8e by scratch/smoke-blind-push.mjs: a genuinely fresh repository onboarded to ready through the real driver, then walked following ONLY structural nextAction objects, exactly as onboarding-init.mjs does. The walk is deliberately ignorant -- it may never reach for a command name it was not handed."
 done_when: manual
