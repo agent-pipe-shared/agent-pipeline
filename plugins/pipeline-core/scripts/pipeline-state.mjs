@@ -3511,6 +3511,41 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
   }
   if (lifecycle.status === "awaiting-approval") {
     const submission = state.planSubmission && typeof state.planSubmission === "object" ? state.planSubmission : {};
+    // NVA-CF-PRESENTPLANDRIVER: `approve-plan` refuses unseen content (case
+    // "approve-plan", ~line 8364) unless a `planPresentation` record exists
+    // bound to this EXACT submission's sha256 -- a session following only
+    // this next-action would otherwise walk straight into that refusal the
+    // first time it reaches approve-plan (the same "blind session gets zero
+    // followable steps" failure class fixed once already for the push and
+    // onboarding paths). `present-plan --by <name>` is a mechanical/
+    // sequencing step (recording that the design was actually shown), not a
+    // judgement about the plan's content -- unlike `approve-plan --by`, this
+    // one is safe to derive and surface as an agent-runnable `command`,
+    // mirroring the `draft` branch's own `--by` derivation pattern exactly.
+    if (!validPlanPresentation(state.planPresentation) || state.planPresentation.submissionSha256 !== lifecycle.submissionSha256) {
+      const scriptPath = fileURLToPath(import.meta.url);
+      const by = resolveLocalGitUserName(dir, deps);
+      if (by !== null) {
+        return {
+          kind: "command",
+          executable: process.execPath,
+          argv: [scriptPath, "present-plan", "--by", by],
+          mutation: true,
+          requiresConfirmation: true,
+        };
+      }
+      const byRender = "<submitter's name>";
+      const command = `${process.execPath} ${scriptPath} present-plan --by "${byRender}"`;
+      return {
+        kind: "collect-input",
+        inputs: [{ name: "by", encoding: "utf8", trim: true, minBytes: 1, maxBytes: 128, singleLine: true, rejectNul: true }],
+        mutation: false,
+        requiresConfirmation: false,
+        guidance: "the plan has not yet been presented, and this command cannot derive who is presenting it -- ask"
+          + ` who is presenting the plan, then fill the missing placeholder and run: ${command}`,
+        expected: { schema: INSPECT_SCHEMA, statuses: ["awaiting-approval"] },
+      };
+    }
     // NVA-V2B-APPROVERENDER: the command is RENDERED, exactly as the draft branch above
     // renders its own, and for the same reason -- naming a command without spelling it
     // leaves the caller to reconstruct an invocation from prose, which is how this
