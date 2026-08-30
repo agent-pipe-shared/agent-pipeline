@@ -106,7 +106,14 @@ export function persistExplicitDirectoryIntoMachinePlane(args, directory, depend
       usage: null,
       updatedAt: new Date().toISOString(),
     };
-  try { writePlane(next, dependencies); } catch { /* best-effort: never fails setup itself */ }
+  try { writePlane(next, dependencies); } catch (error) {
+    // best-effort: never fails setup itself -- but a silent swallow left an
+    // operator with no way to notice a real writeMachinePlane() failure
+    // short of independently inspecting the resulting state (backlog:
+    // 2026-08-30-po-human-approval-setup-silently-swallows-writemachineplane-error.md).
+    const writeStderr = dependencies.stderrWriteFn ?? ((text) => process.stderr.write(text));
+    writeStderr(`PO-HUMAN-APPROVAL-WARN: failed to persist poKeyDirectory into the machine plane: ${error.message}\n`);
+  }
 }
 
 /** Existence check only -- never opens or inspects anything INSIDE the
@@ -951,17 +958,24 @@ export function authorizeCriticalPushCommand({
  * injectable seam for tests (a boolean or a zero-arg function) and, when supplied,
  * is honoured exactly as before -- unchanged for every existing caller. With
  * neither supplied, this opens the controlling terminal itself
- * (`dependencies.openControllingTty`, default: `openSync("/dev/tty", "r+")`) and
- * asks `dependencies.isatty` (default: `node:tty`'s `isatty`) whether the
+ * (`dependencies.openControllingTty`, default: `openSync("/dev/tty", "r+")` on
+ * POSIX, `openSync("\\\\.\\CONIN$", "r+")` on native Windows -- backlog:
+ * 2026-08-30-signing-ceremony-tty-check-has-no-windows-fallback.md;
+ * `dependencies.platform` overrides `process.platform` for tests) and asks
+ * `dependencies.isatty` (default: `node:tty`'s `isatty`) whether the
  * resulting descriptor is a real terminal, closing it again immediately either
  * way. Failing to open it (ENXIO/ENOENT/ENODEV -- no controlling terminal at
  * all, e.g. a daemon, CI runner, or fully detached session) means false, not a
  * thrown error.
  */
+function controllingTtyPath(dependencies = {}) {
+  const platform = dependencies.platform ?? process.platform;
+  return platform === "win32" ? "\\\\.\\CONIN$" : "/dev/tty";
+}
 function isAttendedTerminal(dependencies = {}) {
   if (typeof dependencies.isTTY === "function") return Boolean(dependencies.isTTY());
   if (typeof dependencies.isTTY === "boolean") return dependencies.isTTY;
-  const openControllingTty = dependencies.openControllingTty ?? (() => openSync("/dev/tty", "r+"));
+  const openControllingTty = dependencies.openControllingTty ?? (() => openSync(controllingTtyPath(dependencies), "r+"));
   const checkIsatty = dependencies.isatty ?? nodeIsatty;
   let fd = null;
   try {
@@ -995,7 +1009,7 @@ function signIntentIntoProof({ intentSha256, keys, artifacts, io, dependencies }
   if (isPrivateKeyPassphraseProtected(keys.privateKey, dependencies) && !isAttendedTerminal(dependencies)) {
     fail(
       "sign-intent needs an attended terminal to complete: this process could not open a controlling " +
-      "terminal (/dev/tty) for OpenSSL's own interactive prompt to run on " +
+      `terminal (${controllingTtyPath(dependencies)}) for OpenSSL's own interactive prompt to run on ` +
       "(pipeline.signing-requires-attended-terminal). Run the identical command in a terminal window " +
       "you can type into directly.",
     );

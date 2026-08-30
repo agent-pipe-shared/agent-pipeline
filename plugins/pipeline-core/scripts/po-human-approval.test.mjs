@@ -963,6 +963,61 @@ test("NVA-CF-MINORPUSH-RETRY: sign-intent refuses when the controlling terminal 
   }
 });
 
+test("2026-08-30-signing-ceremony-tty-check-has-no-windows-fallback: on native Windows (dependencies.platform === \"win32\"), the controlling-terminal probe and its refusal message name the Windows console handle, not /dev/tty", () => {
+  const dirs = fixtureDirs();
+  try {
+    const passphrase = "sign-intent-fixture-passphrase";
+    encryptedKeyFixture(dirs.directory, passphrase);
+    const intentSha256 = createHash("sha256").update("pipeline.tty-sign-windows-fixture").digest("hex");
+    let spawnCalled = false;
+    const dependencies = {
+      // No isTTY/openControllingTty override supplied -- exercises the real
+      // default, which must select the platform-appropriate path. This WSL
+      // session genuinely has no "\\.\CONIN$" device, so the open still
+      // fails and the ceremony still refuses -- honest, not a fabricated
+      // Windows-native pass; what this test actually proves is that the
+      // BRANCH-SELECTION logic picked the Windows path, visible in the
+      // resulting message.
+      platform: "win32",
+      spawn: () => { spawnCalled = true; return { status: 0 }; },
+      readConfirmation: () => { throw new Error("readConfirmation must not be called before the TTY precondition"); },
+    };
+    const error = thrown(() => runHumanApproval(
+      ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", intentSha256],
+      dependencies,
+    ));
+    assert.ok(error, "signing must refuse when the controlling terminal cannot be opened, on Windows exactly as on POSIX");
+    assert.match(error.message, /could not open a controlling terminal \(\\\\\.\\CONIN\$\)/u, "the message must name the Windows console handle, not /dev/tty, when platform is win32");
+    assert.doesNotMatch(error.message, /\/dev\/tty/u, "a win32 refusal must never claim it tried the POSIX path");
+    assert.equal(spawnCalled, false, "OpenSSL must never be invoked once the TTY precondition has failed");
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("2026-08-30-signing-ceremony-tty-check-has-no-windows-fallback: on native Windows, a real controlling terminal (injected openControllingTty/isatty) is accepted exactly like on POSIX", () => {
+  const dirs = fixtureDirs();
+  try {
+    const passphrase = "sign-intent-fixture-passphrase";
+    const { privateKeyPem } = encryptedKeyFixture(dirs.directory, passphrase);
+    const intentSha256 = createHash("sha256").update("pipeline.tty-sign-windows-attended-fixture").digest("hex");
+    const dependencies = {
+      platform: "win32",
+      spawn: fakeSignSpawn(privateKeyPem, passphrase),
+      readConfirmation: () => { throw new Error("readConfirmation must not be called for a passphrase-protected key"); },
+      openControllingTty: () => 99,
+      isatty: (fd) => fd === 99,
+    };
+    let result;
+    captureStdout(() => {
+      result = runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", intentSha256], dependencies);
+    });
+    assert.equal(result.ok, true, "an attended controlling terminal must be accepted on Windows too, once opened");
+  } finally {
+    cleanup(dirs);
+  }
+});
+
 test("NVA-W5-TTYSIGN: sign-intent for an UNPROTECTED key is unaffected by a missing TTY -- OpenSSL never prompts, so no terminal is required", { skip: REQUIRES_OPENSSL }, () => {
   const dirs = fixtureDirs();
   try {
@@ -2636,6 +2691,27 @@ test("NVA-V1-KEYDIRPTR: a recorded poKeyDirectory that DOES exist on disk is nev
     rmSync(home, { recursive: true, force: true });
     rmSync(existing, { recursive: true, force: true });
     rmSync(other, { recursive: true, force: true });
+  }
+});
+
+test("2026-08-30-po-human-approval-setup-silently-swallows-writemachineplane-error: a writeMachinePlane() failure produces a visible warning and still does not throw", () => {
+  const home = machinePlaneHomeFixture(null);
+  const alive = mkdtempSync(join(tmpdir(), "po-human-approval-warn-keydir-"));
+  try {
+    let warned = null;
+    const dependencies = {
+      homedirFn: () => home,
+      writeMachinePlaneFn: () => { throw new Error("simulated disk-full write failure"); },
+      stderrWriteFn: (text) => { warned = text; },
+    };
+    // Must not throw -- the best-effort "never fails setup itself" contract is unchanged.
+    persistExplicitDirectoryIntoMachinePlane({ directorySource: "flag" }, alive, dependencies);
+    assert.ok(warned, "a writeMachinePlane() failure must produce a visible warning instead of being swallowed silently");
+    assert.match(warned, /PO-HUMAN-APPROVAL-WARN/u);
+    assert.match(warned, /simulated disk-full write failure/u, "the warning must name what failed and why");
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+    rmSync(alive, { recursive: true, force: true });
   }
 });
 
