@@ -738,6 +738,14 @@ const TEST_SUITES = [
   { name: "worktree-count-check-tests", file: join(libDir, "worktree-count-check.test.mjs") },
   { name: "check-protected-path-integrity-tests", file: join(pluginScriptsDir, "check-protected-path-integrity.test.mjs") },
   { name: "check-resume-consumption-tests", file: join(pluginScriptsDir, "check-resume-consumption.test.mjs") },
+  // NVA-CF-RESUMEGATE (2026-08-30, PO explicit request "bauen wir es jetzt ein sonst
+  // findet es ja keiner"): check-resume-consumption.mjs's own header explained why it was
+  // deliberately never registered here -- no live session id for a batch run to supply.
+  // NVA-CF-RESUMECHECKANYSESSION (commit 2437d338) closed that gap with an --any-session
+  // mode: PASS when no card is available or at least one recorded receipt (from any
+  // session) matches the card's current digest; FATAL when a card is available and no
+  // receipt anywhere matches -- the F12/F13 regression shape, now checked repo-wide.
+  { name: "resume-consumption-check", file: join(pluginScriptsDir, "check-resume-consumption.mjs"), args: ["--root", repoRoot, "--any-session"] },
   { name: "check-state-phase-consistency-tests", file: join(pluginScriptsDir, "check-state-phase-consistency.test.mjs") },
   { name: "pre-commit-hook-install-tests", file: join(pluginScriptsDir, "pre-commit-hook-install.test.mjs") },
   { name: "manual-check-logic-tests", file: join(repoRoot, "harness", "scripts", "manual-check-logic.test.mjs") },
