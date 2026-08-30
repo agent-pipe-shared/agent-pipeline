@@ -3,8 +3,8 @@
 /**
  * Operator tool: apply the protected-path edits an agent session cannot.
  *
- * WHY THIS EXISTS. Three files in this repository are protected test paths, and
- * each has finished, verified content waiting for it:
+ * WHY THIS EXISTS. Several files in this repository are protected test paths,
+ * and each has finished, verified content waiting for it:
  *
  *   A. `harness/scripts/verify.mjs`  (TP-3) -- suites written in this and earlier
  *      blocks are not registered, so Verify does not run them. The list grows: the
@@ -36,6 +36,12 @@
  *      runs a suite (only lists pending names), so it cannot stand in for the
  *      sibling-copy green-preview proof this batch needs before an operator applies it
  *      sight-unseen. Verified green via `--preview` before being offered here.
+ *   H. `harness/scripts/pipeline-state.test.mjs` (TP-5) -- the PO authority
+ *      rebind/decision fixtures omitted their own runner environment and therefore
+ *      inherited whichever runner marker happened to launch the suite. A naked
+ *      CI/operator shell has no such marker, so the real writer correctly refused
+ *      with PO-REBIND-RUNNER-UNKNOWN and the fixture produced ambient-only reds.
+ *      The pending edit gives only those fixtures a non-empty Codex marker.
  *
  * `guard-testpath` refuses both from inside a session, and for (B) there is no
  * override at all: the target is Pipeline plugin source in a source checkout, so
@@ -63,6 +69,7 @@
  *   node harness/scripts/apply-pending-protected-edits.mjs --only=entrypoint
  *   node harness/scripts/apply-pending-protected-edits.mjs --only=guard-git-cwd
  *   node harness/scripts/apply-pending-protected-edits.mjs --only=verify-nva-c-protected
+ *   node harness/scripts/apply-pending-protected-edits.mjs --only=pipeline-state-runner-fixture
  *
  * Exit code 0 = every requested step is applied and verified (or was already
  * applied). Any other exit code means nothing was left changed by the failing
@@ -79,6 +86,7 @@ const VERIFY_PATH = join(REPO_ROOT, "harness", "scripts", "verify.mjs");
 const GATE_STRENGTH_PATH = join(REPO_ROOT, "plugins", "pipeline-core", "hooks", "guard-gate-strength.test.mjs");
 const ENTRYPOINT_PATH = join(REPO_ROOT, "plugins", "pipeline-core", "lib", "entrypoint.test.mjs");
 const GUARD_GIT_TEST_PATH = join(REPO_ROOT, "plugins", "pipeline-core", "hooks", "guard-git.test.mjs");
+const PIPELINE_STATE_TEST_PATH = join(REPO_ROOT, "harness", "scripts", "pipeline-state.test.mjs");
 
 /* ------------------------------------------------------------------ helpers */
 
@@ -124,8 +132,8 @@ function suiteFailureEntry(entry, suite) {
 const SUITE_FAILURE_OUTPUT_MAX = 4000;
 
 /** Run one command, returning its combined output and exit code. Never throws. */
-function run(argv, cwd = REPO_ROOT) {
-  const result = spawnSync(process.execPath, argv, { cwd, encoding: "utf8", shell: false, timeout: 600_000 });
+function run(argv, cwd = REPO_ROOT, env = process.env) {
+  const result = spawnSync(process.execPath, argv, { cwd, encoding: "utf8", env, shell: false, timeout: 600_000 });
   return {
     code: result.status,
     output: `${result.stdout ?? ""}${result.stderr ?? ""}`,
@@ -1148,6 +1156,112 @@ function stepVerifyManualCheckExtract({ dryRun, preview }) {
   return { status: "applied", detail };
 }
 
+/* ---------------------------- H. pipeline-state.test.mjs (TP-5) runner fixture */
+
+// WHY. The real PO authority writer deliberately refuses to guess "codex" when
+// neither --runner nor a runner-owned environment marker exists. This test's
+// seedPoAuthorityRebind() fixture invokes that writer in process, but omitted
+// deps.env and therefore inherited process.env. It passed under a Codex/Claude
+// session and failed in a naked CI/operator shell. The fixture is explicitly a
+// Codex fixture; bind that fact locally instead of weakening production or
+// teaching the whole suite to impersonate a runner.
+const PIPELINE_STATE_RUNNER_FIXTURE_ANCHOR = `  const deps = {
+    dir, now: () => "2026-07-28T10:00:00.000Z", ownerNonce: () => \`rebind-\${String(++nonceSequence).padStart(8, "0")}\`,`;
+const PIPELINE_STATE_RUNNER_FIXTURE_REPLACEMENT = `  const deps = {
+    dir,
+    // This PO rebind/decision fixture is runner-bound independently of the
+    // naked CI/operator shell (or different runner) that launches the suite.
+    env: { CODEX_THREAD_ID: "pipeline-state-po-authority-fixture" },
+    now: () => "2026-07-28T10:00:00.000Z", ownerNonce: () => \`rebind-\${String(++nonceSequence).padStart(8, "0")}\`,`;
+const PIPELINE_STATE_DOCUMENT_LANGUAGE_FIXTURE_ANCHOR = '  const deps = { dir, now: () => "2026-08-09T10:00:00.000Z", poGateProfile: () => ({ ok: true, value: profile }) };';
+const PIPELINE_STATE_DOCUMENT_LANGUAGE_FIXTURE_REPLACEMENT = `  const deps = {
+    dir,
+    env: { CODEX_THREAD_ID: "pipeline-state-po-authority-document-language-fixture" },
+    now: () => "2026-08-09T10:00:00.000Z",
+    poGateProfile: () => ({ ok: true, value: profile }),
+  };`;
+const PIPELINE_STATE_PREVIEW_PATH = join(dirname(PIPELINE_STATE_TEST_PATH), "pipeline-state.runner-fixture.preview-check.mjs");
+const RUNNER_ENV_KEYS = ["CLAUDECODE", "ANTIGRAVITY_AGENT", "AI_AGENT", "CODEX_SESSION_ID", "CODEX_THREAD_ID"];
+
+function nakedRunnerEnv(extra = {}) {
+  const env = { ...process.env, ...extra };
+  for (const key of RUNNER_ENV_KEYS) delete env[key];
+  return env;
+}
+
+function pipelineStateSuiteSummary(output) {
+  return output.split("\n")
+    .filter((line) => /^(FAIL|Failures:|  - |\d+\/\d+ cases passed\.)/u.test(line))
+    .join("\n");
+}
+
+function stepPipelineStateRunnerFixture({ dryRun, preview }) {
+  const original = readFileSync(PIPELINE_STATE_TEST_PATH, "utf8");
+  const seedApplied = original.includes('CODEX_THREAD_ID: "pipeline-state-po-authority-fixture"');
+  const documentLanguageApplied = original.includes('CODEX_THREAD_ID: "pipeline-state-po-authority-document-language-fixture"');
+  if (seedApplied && documentLanguageApplied) {
+    return { status: "already-applied", detail: "both PO-authority fixture environments already carry hermetic Codex runner markers" };
+  }
+
+  let next = original;
+  if (!seedApplied) {
+    next = anchoredReplace(
+      next,
+      PIPELINE_STATE_RUNNER_FIXTURE_ANCHOR,
+      PIPELINE_STATE_RUNNER_FIXTURE_REPLACEMENT,
+      "seedPoAuthorityRebind() deps environment",
+    );
+  }
+  if (!documentLanguageApplied) {
+    next = anchoredReplace(
+      next,
+      PIPELINE_STATE_DOCUMENT_LANGUAGE_FIXTURE_ANCHOR,
+      PIPELINE_STATE_DOCUMENT_LANGUAGE_FIXTURE_REPLACEMENT,
+      "non-de/en document-language PO-authority deps environment",
+    );
+  }
+
+  if (preview) {
+    try {
+      writeFileSync(PIPELINE_STATE_PREVIEW_PATH, next, "utf8");
+      const parsed = run(["--check", PIPELINE_STATE_PREVIEW_PATH]);
+      if (parsed.code !== 0) throw new Error(`pipeline-state.test.mjs (preview copy) no longer parses:\n${parsed.output}`);
+      const suite = run(
+        [PIPELINE_STATE_PREVIEW_PATH],
+        REPO_ROOT,
+        nakedRunnerEnv({ PIPELINE_STATE_PS53_ONLY: "1" }),
+      );
+      const summary = pipelineStateSuiteSummary(suite.output);
+      if (suite.code !== 0) {
+        throw new Error(`pipeline-state PO-authority preview failed in a runner-marker-free shell (exit ${suite.code}):\n${summary || suite.output.slice(-4000)}`);
+      }
+      return {
+        status: "preview-green",
+        detail: `${summary || "pipeline-state PO-authority slice: exit 0"} -- ran from a removed sibling with no ambient runner marker; ${rel(PIPELINE_STATE_TEST_PATH)} was not touched`,
+      };
+    } finally {
+      rmSync(PIPELINE_STATE_PREVIEW_PATH, { force: true });
+    }
+  }
+
+  if (dryRun) {
+    return { status: "would-apply", detail: "2 anchored edits: give only the two PO-authority fixture environments non-empty CODEX_THREAD_ID markers" };
+  }
+
+  const detail = writeThenVerifyOrRevert(PIPELINE_STATE_TEST_PATH, original, next, () => {
+    const parsed = run(["--check", PIPELINE_STATE_TEST_PATH]);
+    if (parsed.code !== 0) return { ok: false, detail: `pipeline-state.test.mjs no longer parses:\n${parsed.output}` };
+    const suite = run([PIPELINE_STATE_TEST_PATH], REPO_ROOT, nakedRunnerEnv());
+    const summary = pipelineStateSuiteSummary(suite.output);
+    if (suite.code !== 0) {
+      return { ok: false, detail: `pipeline-state.test.mjs did not pass completely in a runner-marker-free shell (exit ${suite.code}):\n${summary || suite.output.slice(-4000)}` };
+    }
+    return { ok: true, detail: `${summary || "pipeline-state.test.mjs: exit 0"}; full suite passed with no ambient runner marker` };
+  });
+
+  return { status: "applied", detail };
+}
+
 /* ---------------------------------------------------------------- driver */
 
 const argv = process.argv.slice(2);
@@ -1164,9 +1278,10 @@ const STEPS = [
   { key: "verify-nva-c-protected", label: `E. register ${VERIFY_REGISTRATIONS_NVA_C_PROTECTED.length} more pending suites (NVA-C-PROTECTED) in ${rel(VERIFY_PATH)} (TP-3)`, fn: stepVerifyNvaCProtected },
   { key: "guard-git-22", label: `F. add GG22-7/GG22-8 fixture tests to ${rel(GUARD_GIT_TEST_PATH)} (TP-1)`, fn: stepGuardGit22 },
   { key: "verify-manual-check-extract", label: `G. extract the manual-check logic out of ${rel(VERIFY_PATH)} into a testable module (TP-3)`, fn: stepVerifyManualCheckExtract },
+  { key: "pipeline-state-runner-fixture", label: `H. bind the PO-authority fixtures to their Codex runner in ${rel(PIPELINE_STATE_TEST_PATH)} (TP-5)`, fn: stepPipelineStateRunnerFixture },
 ];
 
-const PREVIEWABLE = new Set(["gate-strength", "entrypoint", "guard-git-cwd", "verify-nva-c-protected", "guard-git-22", "verify-manual-check-extract"]);
+const PREVIEWABLE = new Set(["gate-strength", "entrypoint", "guard-git-cwd", "verify-nva-c-protected", "guard-git-22", "verify-manual-check-extract", "pipeline-state-runner-fixture"]);
 
 if (only !== null && !STEPS.some((step) => step.key === only)) {
   process.stderr.write(`unknown --only value: ${only}\nExpected one of: ${STEPS.map((step) => step.key).join(", ")}\n`);
