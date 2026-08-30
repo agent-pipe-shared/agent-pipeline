@@ -63,7 +63,8 @@ import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { createPoApprovalIntent } from "./po-approval-proof.mjs";
-import { readCriticalHumanProofPolicy, verifyAgainstTrustAnchors } from "./critical-human-proof-policy.mjs";
+import { USER_SOURCE_PATH, readCriticalHumanProofPolicy, readHumanApprovalMode, verifyAgainstTrustAnchors } from "./critical-human-proof-policy.mjs";
+import { chatAttributionRecord } from "./chat-gate-ceremony.mjs";
 import { assessWindowsPrivatePath, hardenWindowsPrivateDirectory } from "./windows-private-state.mjs";
 import { LEGACY_GUARD_CONFIG, NEUTRAL_GUARD_CONFIG, resolveProjectAuthorityPaths } from "./project-authority.mjs";
 import { repositoryPathIdentityOrSelf } from "./repository-path-identity.mjs";
@@ -1096,6 +1097,10 @@ function intervenedCommitsStayWithinScope({ root, spawn, candidateCommit, curren
 
 /** Agent-safe: verify-and-place only. Cannot succeed without a genuine proof. */
 export function installGuardMaintenanceWindow({ rootDir, request, trustPolicy, anchors, proof, livePluginRoot, nowMs = Date.now(), spawn = spawnSync } = {}) {
+  const configuredApproval = readHumanApprovalMode(rootDir, { spawn });
+  const globalChat = configuredApproval.mode === "chat"
+    && configuredApproval.scope === "global"
+    && configuredApproval.source === USER_SOURCE_PATH;
   // Fail closed on a missing/malformed anchor set. verifyAgainstTrustAnchors() coerces any
   // non-array `anchors` to [] -- which is its MOST permissive posture (an empty set derives
   // the anchor from the proof itself, so any well-formed Ed25519 key verifies). GMW never
@@ -1109,7 +1114,7 @@ export function installGuardMaintenanceWindow({ rootDir, request, trustPolicy, a
   // below into a one-element set when it is a lone object, keeping every existing
   // single-anchor caller's behavior byte-for-byte identical.
   const suppliedTrustPolicy = trustPolicy !== undefined ? trustPolicy : anchors;
-  if (suppliedTrustPolicy === undefined || suppliedTrustPolicy === null) {
+  if (!globalChat && (suppliedTrustPolicy === undefined || suppliedTrustPolicy === null)) {
     fail("GMW-ANCHORS-INVALID", "trustPolicy (or anchors) is required; a missing value is refused rather than treated as an empty set");
   }
   if (!validRequest(request)) fail("GMW-REQUEST-INVALID", "window request is malformed");
@@ -1230,12 +1235,22 @@ export function installGuardMaintenanceWindow({ rootDir, request, trustPolicy, a
   // `const`/`let` re-declaration -- `anchors` is already a destructured parameter, per the
   // `trustPolicy`/`anchors` alias above) so a caller supplying `anchors` directly is
   // honored identically to one supplying `trustPolicy`.
-  anchors = Array.isArray(suppliedTrustPolicy) ? suppliedTrustPolicy : [suppliedTrustPolicy];
-  if (anchors.length === 0) {
-    fail("GMW-TRUST-ANCHOR-MISSING", "resolved trust anchor set is empty; the Guard Maintenance Window never treats an empty/absent trustAnchors set as \"any well-formed key\"");
+  let humanApproval;
+  if (globalChat) {
+    // The global chat posture is deliberately non-attested.  Keep every
+    // candidate/scope/expiry invariant above, but do not resolve or consume a
+    // key, anchor, or proof on this route.
+    proof = null;
+    humanApproval = chatAttributionRecord({ kind: "guard-maintenance-window" });
+  } else {
+    anchors = Array.isArray(suppliedTrustPolicy) ? suppliedTrustPolicy : [suppliedTrustPolicy];
+    if (anchors.length === 0) {
+      fail("GMW-TRUST-ANCHOR-MISSING", "resolved trust anchor set is empty; the Guard Maintenance Window never treats an empty/absent trustAnchors set as \"any well-formed key\"");
+    }
+    const verified = verifyAgainstTrustAnchors({ intent: rebuiltIntent, anchors, proof });
+    if (!verified.verified) fail("GMW-PROOF-INVALID", verified.code ?? "PO-APPROVAL-PROOF-INVALID");
+    humanApproval = { mode: "signature-verified" };
   }
-  const verified = verifyAgainstTrustAnchors({ intent: rebuiltIntent, anchors, proof });
-  if (!verified.verified) fail("GMW-PROOF-INVALID", verified.code ?? "PO-APPROVAL-PROOF-INVALID");
 
   // The signed `expiresAtMs` is written through VERBATIM -- install() never recomputes
   // or extends it (F1/F2 fix). If it has already passed, there is nothing left to arm.
@@ -1280,6 +1295,7 @@ export function installGuardMaintenanceWindow({ rootDir, request, trustPolicy, a
     subject: request.subject,
     intent: rebuiltIntent,
     proof,
+    humanApproval,
     installedAtMs,
     // Both halves of the tree observation, recorded rather than enforced: what the
     // signed subject bound when the request was prepared, and what was actually there
@@ -1311,10 +1327,17 @@ function validWindowRecord(value) {
   // authorshipMode/stage0Selfcheck shape/membership is re-checked separately via
   // validStage0Declaration() below (PHX-WP-STAGE0-SELFCHECK), the same split already
   // applied to validRequest() above and to scope elsewhere in this file.
+  const approval = value?.humanApproval;
+  const legacySigned = approval === undefined && object(value?.proof);
+  const chat = object(approval)
+    && approval.mode === "chat-attributed-unattested"
+    && approval.kind === "guard-maintenance-window"
+    && value?.proof === null;
+  const signed = object(approval) && approval.mode === "signature-verified" && object(value?.proof);
   return object(value) && value.schema === GMW_WINDOW_SCHEMA && typeof value.root === "string"
     && SHA256.test(value.repoFingerprintSha256 ?? "") && validSubject(value.subject)
     && object(value.intent) && object(value.intent.value) && SHA256.test(value.intent.sha256 ?? "")
-    && object(value.proof) && Number.isFinite(value.installedAtMs)
+    && (legacySigned || chat || signed) && Number.isFinite(value.installedAtMs)
     && validTreeObservation(value.preparedTreeSha256) && validTreeObservation(value.observedTreeSha256);
 }
 
@@ -1360,6 +1383,16 @@ export function currentGuardMaintenanceWindow({ rootDir, nowMs = Date.now(), spa
   }
   if (!repoFingerprintMatches(record.subject.repoFingerprintSha256, repo)) return { status: "absent" };
 
+  const configuredApproval = readHumanApprovalMode(repo.root, { spawn });
+  const globalChat = configuredApproval.mode === "chat"
+    && configuredApproval.scope === "global"
+    && configuredApproval.source === USER_SOURCE_PATH;
+  const recordedChat = record.humanApproval?.mode === "chat-attributed-unattested";
+  // Strengthening the repository back to signature invalidates a previously
+  // weak window.  Conversely, a global-chat repository must not need to read an
+  // old signature's anchor merely to decide that the old record is unusable.
+  if (globalChat !== recordedChat) return { status: "absent" };
+
   // NVA-GMWFIX-1: this used to read the legacy SINGULAR `policy.trustAnchor` field only,
   // which is permanently `null` once `critical-human-proof.json` carries the v3
   // `trustAnchors` SET -- every window read back `absent`, including the one install()
@@ -1375,15 +1408,6 @@ export function currentGuardMaintenanceWindow({ rootDir, nowMs = Date.now(), spa
   // sprint_phoenix branch instead treated an explicit empty v3 set as "any well-formed key
   // may sign" -- superseded by NVA-GMWFIX-2 and pinned wrong-then-corrected by GMW28 below;
   // kept out of this merge on that basis.)
-  let anchors;
-  try {
-    const policy = readCriticalHumanProofPolicy(repo.root);
-    if (!policy.ok) return { status: "absent" };
-    if (Array.isArray(policy.trustAnchors) && policy.trustAnchors.length > 0) anchors = policy.trustAnchors;
-    else if (policy.trustAnchor !== null) anchors = [policy.trustAnchor];
-    else return { status: "absent" };
-  } catch { return { status: "absent" }; }
-
   const subjectSha256 = sha(record.subject);
   if (subjectSha256 !== record.intent.value?.subjectSha256) return { status: "absent" }; // tamper: subject/intent disagree
   let rebuiltIntent;
@@ -1391,13 +1415,21 @@ export function currentGuardMaintenanceWindow({ rootDir, nowMs = Date.now(), spa
     rebuiltIntent = rebuildGuardLiftIntent(record.intent.value, subjectSha256);
   } catch { return { status: "absent" }; }
   if (rebuiltIntent.sha256 !== record.intent.sha256) return { status: "absent" }; // tamper
-  // Defense in depth (belt-and-suspenders with the resolution above): never let an empty
-  // anchor set reach verification, regardless of how `anchors` above was resolved -- a
-  // future code path that resolves it differently must still be unable to pass an empty
-  // set through to verifyAgainstTrustAnchors.
-  if (!Array.isArray(anchors) || anchors.length === 0) return { status: "absent" };
-  const verified = verifyAgainstTrustAnchors({ intent: rebuiltIntent, anchors, proof: record.proof });
-  if (!verified.verified) return { status: "absent" }; // tamper / revoked anchor
+  if (!recordedChat) {
+    let anchors;
+    try {
+      const policy = readCriticalHumanProofPolicy(repo.root);
+      if (!policy.ok) return { status: "absent" };
+      if (Array.isArray(policy.trustAnchors) && policy.trustAnchors.length > 0) anchors = policy.trustAnchors;
+      else if (policy.trustAnchor !== null) anchors = [policy.trustAnchor];
+      else return { status: "absent" };
+    } catch { return { status: "absent" }; }
+    // Defense in depth (belt-and-suspenders with the resolution above): never let an empty
+    // anchor set reach verification, regardless of how `anchors` above was resolved.
+    if (!Array.isArray(anchors) || anchors.length === 0) return { status: "absent" };
+    const verified = verifyAgainstTrustAnchors({ intent: rebuiltIntent, anchors, proof: record.proof });
+    if (!verified.verified) return { status: "absent" }; // tamper / revoked anchor
+  }
 
   // Validity is derived PURELY from the signed, digest-verified `expiresAtMs` above
   // (F1/F2 fix) -- fail-closed: `Number.isFinite(...) && nowMs < ...`, never the
@@ -1417,6 +1449,7 @@ export function currentGuardMaintenanceWindow({ rootDir, nowMs = Date.now(), spa
   const shared = {
     scopeRuleIds: record.subject.scopeRuleIds,
     reason: record.subject.reason,
+    humanApproval: record.humanApproval ?? { mode: "signature-verified-legacy" },
     openingTreeSha256: record.subject.openingTreeSha256,
     // Audit-only: what the live plugin tree actually hashed to when this window was
     // armed. `null` when the record predates CEREMONY-1 or the tree was unhashable.

@@ -14,6 +14,7 @@
     "lifecycle",
     "retention",
     "consent",
+    "humanApproval",
     "gates",
     "extensions",
     "status",
@@ -31,6 +32,7 @@
     "lifecycle": {"$ref": "#/$defs/lifecycle"},
     "retention": {"$ref": "#/$defs/retentionSection"},
     "consent": {"$ref": "#/$defs/consent"},
+    "humanApproval": {"$ref": "#/$defs/humanApproval"},
     "gates": {"$ref": "#/$defs/gates"},
     "extensions": {"$ref": "#/$defs/extensions"},
     "status": {"enum": ["ready", "blocked"]},
@@ -182,6 +184,20 @@
         "evaluatedAt": {"$ref": "#/$defs/timestamp"},
         "expiresAt": {"$ref": "#/$defs/timestamp"}
       }
+    },
+    "humanApproval": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "kind"],
+          "properties": {
+            "mode": {"const": "chat-attributed-unattested"},
+            "kind": {"const": "release-preflight"}
+          }
+        }
+      ]
     },
     "gg03Binding": {
       "type": "object",

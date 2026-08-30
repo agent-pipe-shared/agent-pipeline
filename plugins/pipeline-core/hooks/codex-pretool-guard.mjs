@@ -14,7 +14,7 @@ import {
   humanGuardOverrideInternals,
   recordHumanGuardDenial,
 } from "../lib/human-guard-override.mjs";
-import { readPushApprovalMode } from "../lib/critical-human-proof-policy.mjs";
+import { USER_SOURCE_PATH, readHumanApprovalMode } from "../lib/critical-human-proof-policy.mjs";
 import { loadRuntimeProjectionV3OwnedKeys } from "../lib/runtime-projection-v3.mjs";
 import { boundedOpaqueCopyCommand } from "../lib/project-onboarding-v3.mjs";
 import { boundedCopySafeCommand, forcedQuote, placeholder } from "../lib/copy-safe-command.mjs";
@@ -521,12 +521,16 @@ if (denials.length > 0) {
         // especially) no signal that a human, not the agent, must act next. Fails
         // closed to `signature`'s continuation on any read error, exactly like
         // guard-testpath.mjs's own `readPushApprovalMode` usage.
-        let approvalMode = "signature";
-        try { approvalMode = readPushApprovalMode(projectRoot, { spawn: overrideSpawn })?.mode ?? "signature"; }
-        catch { approvalMode = "signature"; }
+        let approval = { mode: "signature", scope: "default", source: "default" };
+        try { approval = readHumanApprovalMode(projectRoot, { legacyKind: "push", spawn: overrideSpawn }) ?? approval; }
+        catch { /* fail closed */ }
+        const approvalMode = approval.mode;
+        const globalChat = approvalMode === "chat" && approval.scope === "global" && approval.source === USER_SOURCE_PATH;
         const continuation = approvalMode === "chat"
           ? [
-            `Then (the human confirms in-session; this is attribution, not proof -- gates.push_approval is "chat"):`,
+            globalChat
+              ? "Then (the committed global human approval is chat-attributed-unattested; no terminal ceremony, key, or proof is required):"
+              : "Then (the human confirms in-session; this is attribution, not proof -- legacy gates.push_approval is \"chat\"): ",
             renderOverrideCommand(script, [
               "prepare-authorization", "--repo", forcedQuote(overrideRepo), "--request-sha256", planned.requestSha256,
               "--plan-sha256", placeholder("<plan-sha256-from-plan>"), "--reason", placeholder('"<human-reason>"'),

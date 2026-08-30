@@ -13,7 +13,7 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -107,6 +107,21 @@ function neutralGitFixture(prefix) {
   };
   writeFileSync(join(root, "project", "pipeline.json"), `${JSON.stringify(calibration, null, 2)}\n`);
   return root;
+}
+
+function commitGlobalHumanApproval(root, mode) {
+  const git = (...args) => spawnSync("git", ["-C", root, ...args], { encoding: "utf8", shell: false });
+  assert.equal(git("config", "user.email", "po@example.invalid").status, 0);
+  assert.equal(git("config", "user.name", "PO").status, 0);
+  writeFileSync(join(root, "pipeline.user.yaml"), [
+    "schema: pipeline.user.v3",
+    "gates:",
+    `  human_approval: ${mode}`,
+    "",
+  ].join("\n"));
+  assert.equal(git("add", "-A").status, 0);
+  const committed = git("commit", "-q", "-m", "configure global human approval");
+  assert.equal(committed.status, 0, committed.stderr);
 }
 
 test("project-onboarding-v3 CLI: the intake -> generate -> bootstrap-bind chain works end to end through main()", () => {
@@ -217,6 +232,48 @@ test("project-onboarding-v3 CLI: kickoff plan/apply --language is refused withou
   }
 });
 
+test("project-onboarding-v3 CLI: committed global chat makes kickoff language terminal-free and labels its result unattested", () => {
+  const dir = neutralGitFixture("kickoff-language-global-chat");
+  try {
+    commitGlobalHumanApproval(dir, "chat");
+    for (const runner of ["claude", "codex", "antigravity"]) {
+      let terminalCalls = 0;
+      const plan = invoke(["kickoff", "plan", "--root", dir, "--goal", "Build one HTML game", "--language", "de", "--runner", runner], {
+        isattyFn: () => { terminalCalls += 1; throw new Error("global chat must not inspect a terminal"); },
+        readLineFn: () => { terminalCalls += 1; throw new Error("global chat must not read a terminal"); },
+      });
+      assert.doesNotMatch(plan.output, /CHAT-GATE/,
+        `${runner}: a committed global chat selection must reach kickoff itself: ${plan.output}`);
+      assert.equal(terminalCalls, 0, `${runner}: global chat must not request any terminal confirmation`);
+      const output = JSON.parse(plan.output);
+      assert.deepEqual(output.humanApproval, {
+        mode: "chat-attributed-unattested",
+        kind: "kickoff-language",
+      });
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("project-onboarding-v3 CLI: invalid, uncommitted, and unreadable global modes retain the kickoff terminal refusal", () => {
+  for (const [name, prepare] of [
+    ["uncommitted", (dir) => writeFileSync(join(dir, "pipeline.user.yaml"), "schema: pipeline.user.v3\ngates:\n  human_approval: chat\n")],
+    ["invalid", (dir) => commitGlobalHumanApproval(dir, "not-a-mode")],
+    ["unreadable", (dir) => { commitGlobalHumanApproval(dir, "chat"); chmodSync(join(dir, "pipeline.user.yaml"), 0o000); }],
+  ]) {
+    const dir = neutralGitFixture(`kickoff-language-${name}-global-human-approval`);
+    try {
+      prepare(dir);
+      const result = invoke(["kickoff", "plan", "--root", dir, "--goal", "Build one HTML game", "--language", "de"]);
+      assert.equal(result.status, 1, `${name} global source must retain the fail-closed gate: ${result.output}`);
+      assert.match(result.output, /CHAT-GATE-NOT-ATTENDED/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+});
+
 test("project-onboarding-v3 CLI: kickoff plan --language passes the confirmation gate once a human confirms it via the injectable attended-terminal seam", () => {
   const dir = neutralGitFixture("kickoff-language-attended");
   try {
@@ -277,6 +334,34 @@ test("project-onboarding-v3 CLI: kickoff promote plan/apply --profile is refused
       "--plan-sha256", "a".repeat(64), "--activate"]);
     assert.equal(apply.status, 1, `expected refusal (exit 1), got ${apply.status}: ${apply.output}`);
     assert.match(apply.output, /CHAT-GATE-NOT-ATTENDED/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("project-onboarding-v3 CLI: committed global chat makes kickoff promotion terminal-free and labels its result unattested", () => {
+  const dir = neutralGitFixture("kickoff-promote-global-chat");
+  try {
+    commitGlobalHumanApproval(dir, "chat");
+    for (const runner of ["claude", "codex", "antigravity"]) {
+      let terminalCalls = 0;
+      const plan = invoke([
+        "kickoff", "promote", "plan", "--root", dir, "--profile", "feature", "--id", "sample-feature",
+        "--plan-path", "specs/kickoff-x/prd_x.md", "--prd-path", "specs/kickoff-x/prd_x.md",
+        "--spec-path", "specs/kickoff-x/spec.md", "--design-input-path", "specs/kickoff-x/design-input.md", "--runner", runner,
+      ], {
+        isattyFn: () => { terminalCalls += 1; throw new Error("global chat must not inspect a terminal"); },
+        readLineFn: () => { terminalCalls += 1; throw new Error("global chat must not read a terminal"); },
+      });
+      assert.doesNotMatch(plan.output, /CHAT-GATE/,
+        `${runner}: a committed global chat selection must reach promotion itself: ${plan.output}`);
+      assert.equal(terminalCalls, 0, `${runner}: global chat must not request any terminal confirmation`);
+      const output = JSON.parse(plan.output);
+      assert.deepEqual(output.humanApproval, {
+        mode: "chat-attributed-unattested",
+        kind: "kickoff-promotion-profile",
+      });
+    }
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

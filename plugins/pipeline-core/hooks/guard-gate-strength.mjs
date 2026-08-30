@@ -67,7 +67,7 @@ import { writeTargetPath } from "../lib/tool-write-target.mjs";
 import { parseYaml } from "../lib/yaml-lite.mjs";
 import { bootstrapBindingStagingAuthoringAdmitted } from "../lib/onboarding-staging-authoring.mjs";
 import { isNeverLiftableKernelPath, windowCoversRule } from "../lib/guard-maintenance-window.mjs";
-import { readPushApprovalMode } from "../lib/critical-human-proof-policy.mjs";
+import { USER_SOURCE_PATH, readHumanApprovalMode } from "../lib/critical-human-proof-policy.mjs";
 import {
   consumeHumanGuardOverride,
   humanGuardRouteUnavailableReason,
@@ -643,8 +643,10 @@ if (process.argv[1] && resolve(process.argv[1]).endsWith("guard-gate-strength.mj
   // Never GS-6: that rule keeps its own separate GMW mechanism above, untouched.
   let overrideGuidance = "";
   if (matched !== LIVE_PLUGIN_RULE) {
-    let approvalMode = "signature";
-    try { approvalMode = readPushApprovalMode(projectDir)?.mode ?? "signature"; } catch { approvalMode = "signature"; }
+    let approval = { mode: "signature", scope: "default", source: "default" };
+    try { approval = readHumanApprovalMode(projectDir, { legacyKind: "push" }) ?? approval; } catch { /* fail closed */ }
+    const approvalMode = approval.mode;
+    const globalChat = approvalMode === "chat" && approval.scope === "global" && approval.source === USER_SOURCE_PATH;
 
     const denials = [{ guard: "guard-gate-strength.mjs", reason: `${matched.id}: ${matched.reason}` }];
     let consumed = { status: "absent" };
@@ -691,7 +693,9 @@ if (process.argv[1] && resolve(process.argv[1]).endsWith("guard-gate-strength.mj
             }).command;
           const continuation = approvalMode === "chat"
             ? [
-              `Then (the human confirms in-session; this is attribution, not proof):`,
+              globalChat
+                ? "Then (the committed global human approval is chat-attributed-unattested; no terminal ceremony, key, or proof is required):"
+                : "Then (the human confirms in-session; this is attribution, not proof):",
               ceremonyCommand(
                 "prepare-authorization", "--plan-sha256", placeholder("<plan-sha256-from-plan>"), "--reason", placeholder('"<human-reason>"'),
               ),
@@ -769,7 +773,7 @@ if (process.argv[1] && resolve(process.argv[1]).endsWith("guard-gate-strength.mj
             "same hole with an extra step. The sanctioned route is a signed Guard Maintenance " +
             "Window (ADR-0058) -- see below for the exact commands.")
         : " in-session by default -- a human-authorized override (chat- or signature-mode, " +
-          "matching whatever gates.push_approval is actually committed) can admit one exact, " +
+          "matching committed gates.human_approval when present, otherwise legacy gates.push_approval) can admit one exact, " +
           "audited edit, exactly like every other guard this override family already covers " +
           "(ADR-0059) -- see below."),
     matched.id === "GS-6" ? gmwGuidance : overrideGuidance,

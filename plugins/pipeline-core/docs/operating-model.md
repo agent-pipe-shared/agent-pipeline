@@ -53,6 +53,26 @@ model addresses those failure modes with five rules:
    required acceptance. The default display name is `PO`; it is a role, not an
    identity or access-control system.
 
+### Human-approval strength
+
+`gates.human_approval` selects a repository-wide posture for participating
+human gates. `signature` is the default and the only strong, cryptographically
+attested option. `chat` is permitted only for a PO-classified low-consequence,
+non-critical repository. It is recorded as `chat-attributed-unattested`: an
+agent may record an explicit chat answer without a key, trust anchor, terminal
+command, copy-paste ceremony, or UI/host/TTY attestation. That record is not
+proof that a human, account, device, or host supplied the answer.
+
+This choice does not remove deterministic checks, action bindings, or other
+non-approval safeguards. It is unsuitable for security-sensitive, regulated,
+production-critical, financially consequential, or otherwise valuable
+repositories. The policy is intentionally not an automatic materiality
+classifier. Existing action-local modes remain governed by
+[ADR-0056](adr/0056-push-approval-mode.md) until the installed implementation
+recognizes the global selector; no documentation may claim support merely
+because the policy exists. [ADR-0076](adr/0076-global-chat-attributed-unattested-approval-mode.md)
+is normative for the distinction.
+
 ## 2. Roles and boundaries
 
 | Role | Owns | Does not own |
@@ -476,6 +496,28 @@ begegnet diesen Fehlern mit fünf Regeln:
    verantwortet Priorität, mehrdeutige Abwägungen, irreversible oder externe
    Folgen und notwendige Abnahme. Die Standardanzeige ist `PO`; das ist eine
    Rolle, kein Identitäts- oder Zugriffssystem.
+
+### Freigabestärke
+
+`gates.human_approval` wählt für teilnehmende menschliche Gates eine
+repositoryweite Haltung. `signature` ist Default und die einzige starke,
+kryptografisch attestierte Option. `chat` ist nur für ein vom PO als folgenarm
+und nicht kritisch eingestuftes Repository zulässig. Es wird als
+`chat-attributed-unattested` gespeichert: Ein Agent darf eine explizite
+Chat-Antwort ohne Schlüssel, Trust Anchor, Terminalbefehl, Copy-Paste-Ritual
+oder UI-/Host-/TTY-Attestierung festhalten. Dieser Record beweist nicht, dass
+ein Mensch, Account, Gerät oder Host die Antwort geliefert hat.
+
+Die Wahl entfernt weder deterministische Checks noch Aktionsbindungen oder
+andere nicht zur Freigabe gehörende Schutzmaßnahmen. Sie ist ungeeignet für
+sicherheitskritische, regulierte, produktionskritische, finanziell relevante
+oder anderweitig wertvolle Repositories. Die Policy ist bewusst kein
+automatischer Materialitätsklassifizierer. Bestehende aktionslokale Modi bleiben
+bis zur Unterstützung des globalen Selektors durch die installierte
+Implementierung durch [ADR-0056](adr/0056-push-approval-mode.md) geregelt;
+allein die Existenz dieser Policy ist kein Support-Claim.
+[ADR-0076](adr/0076-global-chat-attributed-unattested-approval-mode.md) ist für
+diese Unterscheidung normativ.
 
 ## 2. Rollen und Grenzen
 

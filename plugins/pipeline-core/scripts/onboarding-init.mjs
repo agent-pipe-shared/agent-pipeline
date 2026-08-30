@@ -230,6 +230,9 @@ function parseArgs(argv) {
   }
   if (output.pushApproval !== undefined && !output.runner) return { error: "initial answers require an explicit --runner" };
   if (output.pushApproval !== undefined && output.stepCap !== undefined) return { error: "initial answers do not accept --step-cap" };
+  if (output.pushApproval !== undefined && setupValues.some((value) => value !== undefined)) {
+    return { error: "initial answers do not accept trust-anchor bootstrap flags" };
+  }
   if (setupValues.some((value) => value !== undefined)) {
     if (setupValues.some((value) => value === undefined)) return { error: "trust-anchor bootstrap requires all four --trust-anchor-* flags" };
     if (!output.runner) return { error: "trust-anchor bootstrap requires an explicit --runner" };
@@ -512,9 +515,11 @@ export function applyTrustAnchorBootstrap({
     return fail("TRUST-ANCHOR-REPOSITORY-POLICY-UNSAFE");
   }
   if (!anchoredAlready) {
+    const waivedKinds = Array.isArray(existingPolicy.waivedKinds) ? [...existingPolicy.waivedKinds] : [];
     const nextPolicy = {
       ...existingPolicy,
       schema: CRITICAL_HUMAN_PROOF_POLICY_V3,
+      waivedKinds,
       trustAnchors: [{ keyReference: authority.keyReference, publicKeySha256: authority.publicKeySha256 }],
     };
     delete nextPolicy.trustAnchor;
@@ -535,8 +540,8 @@ export function applyTrustAnchorBootstrap({
   return { ok: true, code: "TRUST-ANCHOR-BOOTSTRAP-COMPLETE", mode };
 }
 
-function readLocalGitConfig(root, key, env) {
-  const result = spawnSync("git", ["-C", root, "config", "--local", "--get", key], {
+function readLocalGitConfig(root, key, env, runGit = spawnSync) {
+  const result = runGit("git", ["-C", root, "config", "--local", "--get", key], {
     encoding: "utf8", shell: false, env,
   });
   if (result?.status === 1) return { present: false, value: null };
@@ -544,16 +549,16 @@ function readLocalGitConfig(root, key, env) {
   return { present: true, value: String(result.stdout ?? "").replace(/[\r\n]+$/u, "") };
 }
 
-function writeLocalGitConfig(root, key, value, env) {
-  const result = spawnSync("git", ["-C", root, "config", "--local", key, value], {
+function writeLocalGitConfig(root, key, value, env, runGit = spawnSync) {
+  const result = runGit("git", ["-C", root, "config", "--local", key, value], {
     encoding: "utf8", shell: false, env,
   });
   return !result?.error && result?.status === 0;
 }
 
-function restoreLocalGitConfig(root, key, snapshot, env) {
-  if (snapshot.present) return writeLocalGitConfig(root, key, snapshot.value, env);
-  const result = spawnSync("git", ["-C", root, "config", "--local", "--unset-all", key], {
+function restoreLocalGitConfig(root, key, snapshot, env, runGit = spawnSync) {
+  if (snapshot.present) return writeLocalGitConfig(root, key, snapshot.value, env, runGit);
+  const result = runGit("git", ["-C", root, "config", "--local", "--unset-all", key], {
     encoding: "utf8", shell: false, env,
   });
   return !result?.error && (result?.status === 0 || result?.status === 5);
@@ -573,11 +578,14 @@ export function applyInitialOnboardingAnswers({
   pushApproval,
   trustAnchor = null,
   env = null,
+  runGit = spawnSync,
+  applyTrustAnchor = applyTrustAnchorBootstrap,
 } = {}) {
   const root = resolve(rootDir);
   const effectiveEnv = childEnvironment(env) ?? process.env;
   if (!RUNNERS.has(runner)) return { ok: false, code: "INITIAL-ANSWERS-RUNNER-INVALID" };
   if (!PUSH_APPROVAL_MODES.has(pushApproval)) return { ok: false, code: "INITIAL-ANSWERS-PUSH-APPROVAL-INVALID" };
+  if (trustAnchor !== null) return { ok: false, code: "INITIAL-ANSWERS-TRUST-ANCHOR-CONFLICT" };
   if ((gitAuthorName === null) !== (gitAuthorEmail === null)) return { ok: false, code: "INITIAL-ANSWERS-GIT-IDENTITY-INCOMPLETE" };
   if (gitAuthorName !== null && (![gitAuthorName, gitAuthorEmail].every((value) => typeof value === "string"
     && value.trim().length > 0 && value.length <= 320 && !/[\r\n\0]/u.test(value)))) {
@@ -597,8 +605,8 @@ export function applyInitialOnboardingAnswers({
     .map((path) => fileSnapshot(path, { exists: existsSync, lstat: lstatSync, read: readFileSync }));
   if (snapshots.some((snapshot) => snapshot === null)) return { ok: false, code: "INITIAL-ANSWERS-PREIMAGE-UNSAFE" };
   const gitSnapshots = gitAuthorName === null ? null : {
-    name: readLocalGitConfig(root, "user.name", effectiveEnv),
-    email: readLocalGitConfig(root, "user.email", effectiveEnv),
+    name: readLocalGitConfig(root, "user.name", effectiveEnv, runGit),
+    email: readLocalGitConfig(root, "user.email", effectiveEnv, runGit),
   };
   if (gitSnapshots && (gitSnapshots.name === null || gitSnapshots.email === null)) {
     return { ok: false, code: "INITIAL-ANSWERS-GIT-PREIMAGE-UNREADABLE" };
@@ -606,8 +614,8 @@ export function applyInitialOnboardingAnswers({
   const rollback = (code) => {
     const filesRestored = restoreSnapshots(snapshots, existsSync);
     const gitRestored = gitSnapshots === null || (
-      restoreLocalGitConfig(root, "user.name", gitSnapshots.name, effectiveEnv)
-      && restoreLocalGitConfig(root, "user.email", gitSnapshots.email, effectiveEnv)
+      restoreLocalGitConfig(root, "user.name", gitSnapshots.name, effectiveEnv, runGit)
+      && restoreLocalGitConfig(root, "user.email", gitSnapshots.email, effectiveEnv, runGit)
     );
     return filesRestored && gitRestored ? { ok: false, code } : { ok: false, code: `${code}-ROLLBACK-FAILED` };
   };
@@ -617,12 +625,24 @@ export function applyInitialOnboardingAnswers({
   let sourceBytes;
   try { sourceBytes = readFileSync(sourcePath, "utf8"); }
   catch { return { ok: false, code: "INITIAL-ANSWERS-SOURCE-UNREADABLE" }; }
-  const approvalLines = sourceBytes.match(/^\s*push_approval:\s*"(?:signature|chat)"\s*$/gmu) ?? [];
-  if (approvalLines.length !== 1) return { ok: false, code: "INITIAL-ANSWERS-SOURCE-SHAPE-INVALID" };
-  const nextSource = sourceBytes.replace(
-    /^(\s*push_approval:\s*)"(?:signature|chat)"\s*$/mu,
-    `$1${JSON.stringify(pushApproval)}`,
+  const pushApprovalLines = sourceBytes.match(/^\s*push_approval:\s*"(?:signature|chat)"\s*$/gmu) ?? [];
+  const humanApprovalLines = sourceBytes.match(/^\s*human_approval:\s*"(?:signature|chat)"\s*$/gmu) ?? [];
+  if (pushApprovalLines.length !== 1 || humanApprovalLines.length > 1) {
+    return { ok: false, code: "INITIAL-ANSWERS-SOURCE-SHAPE-INVALID" };
+  }
+  let nextSource = sourceBytes.replace(
+    /^(\s*)push_approval:\s*"(?:signature|chat)"\s*$/mu,
+    `$1push_approval: ${JSON.stringify(pushApproval)}`,
   );
+  nextSource = humanApprovalLines.length === 1
+    ? nextSource.replace(
+      /^(\s*)human_approval:\s*"(?:signature|chat)"\s*$/mu,
+      `$1human_approval: ${JSON.stringify(pushApproval)}`,
+    )
+    : nextSource.replace(
+      /^(\s*)push_approval:\s*"(?:signature|chat)"\s*$/mu,
+      `$1push_approval: ${JSON.stringify(pushApproval)}\n$1human_approval: ${JSON.stringify(pushApproval)}`,
+    );
   let parsedSource;
   try { parsedSource = parseYaml(nextSource); }
   catch { return { ok: false, code: "INITIAL-ANSWERS-SOURCE-SHAPE-INVALID" }; }
@@ -630,8 +650,8 @@ export function applyInitialOnboardingAnswers({
 
   try { atomicReplaceFile(sourcePath, nextSource, lstatSync(sourcePath).mode & 0o777); }
   catch { return rollback("INITIAL-ANSWERS-SOURCE-WRITE-FAILED"); }
-  if (gitSnapshots && (!writeLocalGitConfig(root, "user.name", gitAuthorName, effectiveEnv)
-    || !writeLocalGitConfig(root, "user.email", gitAuthorEmail, effectiveEnv))) {
+  if (gitSnapshots && (!writeLocalGitConfig(root, "user.name", gitAuthorName, effectiveEnv, runGit)
+    || !writeLocalGitConfig(root, "user.email", gitAuthorEmail, effectiveEnv, runGit))) {
     return rollback("INITIAL-ANSWERS-GIT-WRITE-FAILED");
   }
   const nextPlane = currentPlane.status === "valid"
@@ -662,14 +682,14 @@ export function applyInitialOnboardingAnswers({
 
   let bootstrap = null;
   if (trustAnchor !== null) {
-    bootstrap = applyTrustAnchorBootstrap({ rootDir: root, ...trustAnchor, env: effectiveEnv });
+    bootstrap = applyTrustAnchor({ rootDir: root, ...trustAnchor, env: effectiveEnv });
     if (!bootstrap.ok) return rollback(bootstrap.code);
   }
   return {
     ok: true,
     code: "INITIAL-ANSWERS-APPLIED",
     pushApprovalPreference: pushApproval,
-    trustAnchor: bootstrap?.code ?? "existing-anchor-reused",
+    trustAnchor: bootstrap?.code ?? "not-requested",
   };
 }
 
@@ -792,6 +812,59 @@ function extractPendingAsks(nextAction) {
   return { present: true, malformed: false, asks: raw };
 }
 
+const TRUST_ANCHOR_BOOTSTRAP_FLAGS = new Set([
+  "--trust-anchor-mode",
+  "--trust-anchor-directory",
+  "--trust-anchor-human-name",
+  "--trust-anchor-existing-key",
+]);
+
+function isTrustAnchorAction(action) {
+  const argv = action?.applyAction?.argv;
+  return Array.isArray(argv) && argv.some((part) => TRUST_ANCHOR_BOOTSTRAP_FLAGS.has(part));
+}
+
+function initialAnswersActionWithoutTrustAnchor(action) {
+  if (!isTrustAnchorAction(action) || !action.applyAction.argv.includes("--push-approval")) return action;
+  const argv = [];
+  for (let index = 0; index < action.applyAction.argv.length; index += 1) {
+    const part = action.applyAction.argv[index];
+    if (TRUST_ANCHOR_BOOTSTRAP_FLAGS.has(part)) {
+      index += 1;
+      continue;
+    }
+    argv.push(part);
+  }
+  return {
+    ...action,
+    inputs: (action.inputs ?? []).filter((input) => !String(input?.name ?? "").startsWith("trustAnchor")),
+    guidance: "collect this initial PO round: the repository-local Git author and the shared human-approval policy. Replace each placeholder in applyAction.argv with the matching verbatim answer, then execute that exact returned action once. The selected value is written consistently as gates.human_approval and gates.push_approval. A selected \"chat\" route is terminal-free attributed approval and completes without a signing key or trust anchor. A selected \"signature\" route keeps detached proofs and re-enters this public driver before it surfaces the separate existing/new trust-anchor action. Do not reconstruct git config, machine-plane, intake, or key-setup commands.",
+    applyAction: { ...action.applyAction, argv },
+  };
+}
+
+function persistedInitialPushApproval(root) {
+  const receipt = parseJsonFile(join(root, PROJECT_ONBOARDING_INITIAL_ANSWERS_RECEIPT_PATH), readFileSync);
+  return receipt?.schema === PROJECT_ONBOARDING_INITIAL_ANSWERS_RECEIPT_SCHEMA
+    && receipt.root === root
+    && PUSH_APPROVAL_MODES.has(receipt.pushApprovalPreference)
+    ? receipt.pushApprovalPreference
+    : null;
+}
+
+function normalizeOnboardingDriverOutput(output, root) {
+  const nextAction = output?.nextAction;
+  if (!nextAction || typeof nextAction !== "object" || !Array.isArray(nextAction.pendingAsks)) return output;
+  const pushApproval = persistedInitialPushApproval(root);
+  const pendingAsks = nextAction.pendingAsks
+    .map(initialAnswersActionWithoutTrustAnchor)
+    .filter((action) => pushApproval !== "chat" || !isTrustAnchorAction(action));
+  return pendingAsks.length === nextAction.pendingAsks.length
+    && pendingAsks.every((action, index) => action === nextAction.pendingAsks[index])
+    ? output
+    : { ...output, nextAction: { ...nextAction, pendingAsks } };
+}
+
 /**
  * The driver loop itself. `run` (spawnSync-shaped: `(executable, argv, options) =>
  * { status, stdout, stderr, error }`) is the sole injection seam, so tests can either
@@ -867,7 +940,7 @@ export function driveOnboardingInit({ rootDir, runner = null, stepCap = DEFAULT_
       };
     }
 
-    const output = stepResult.output;
+    const output = normalizeOnboardingDriverOutput(stepResult.output, root);
     const nextAction = output && typeof output === "object" ? output.nextAction : undefined;
 
     const wasAnchorStep = isAnchorStep;
@@ -1018,6 +1091,10 @@ export function driveOnboardingInit({ rootDir, runner = null, stepCap = DEFAULT_
 export function main(args = process.argv.slice(2), {
   write = process.stdout.write.bind(process.stdout),
   writeError = process.stderr.write.bind(process.stderr),
+  env = null,
+  applyInitialAnswers = applyInitialOnboardingAnswers,
+  applyTrustAnchor = applyTrustAnchorBootstrap,
+  drive = driveOnboardingInit,
 } = {}) {
   const options = parseArgs(args);
   if (options.help) {
@@ -1031,7 +1108,7 @@ export function main(args = process.argv.slice(2), {
   let bootstrap = null;
   let initialAnswers = null;
   if (options.pushApproval) {
-    initialAnswers = applyInitialOnboardingAnswers({
+    initialAnswers = applyInitialAnswers({
       rootDir: options.root,
       runner: options.runner,
       gitAuthorName: options.gitAuthorName ?? null,
@@ -1043,32 +1120,34 @@ export function main(args = process.argv.slice(2), {
         humanName: options.trustAnchorHumanName,
         existingKey: options.trustAnchorExistingKey,
       } : null,
+      env,
     });
     if (!initialAnswers.ok) {
       write(`${JSON.stringify({ schema: SCHEMA, runner: options.runner, root: resolve(options.root), outcome: "error", initialAnswers }, null, 2)}\n`);
       return 1;
     }
   } else if (options.trustAnchorMode) {
-    bootstrap = applyTrustAnchorBootstrap({
+    bootstrap = applyTrustAnchor({
       rootDir: options.root,
       mode: options.trustAnchorMode,
       directory: options.trustAnchorDirectory,
       humanName: options.trustAnchorHumanName,
       existingKey: options.trustAnchorExistingKey,
+      env,
     });
     if (!bootstrap.ok) {
       write(`${JSON.stringify({ schema: SCHEMA, runner: options.runner, root: resolve(options.root), outcome: "error", bootstrap }, null, 2)}\n`);
       return 1;
     }
   }
-  const result = driveOnboardingInit({ rootDir: options.root, runner: options.runner ?? null, stepCap: options.stepCap });
+  const result = drive({ rootDir: options.root, runner: options.runner ?? null, stepCap: options.stepCap, env });
   if (bootstrap) result.bootstrap = bootstrap;
   if (initialAnswers) result.initialAnswers = initialAnswers;
   write(`${JSON.stringify(result, null, 2)}\n`);
   return result.outcome === "ready"
     || result.outcome === "collect-input"
     || result.outcome === "pending-asks"
-    || (initialAnswers !== null && result.outcome === "unsupported-next-action") ? 0 : 1;
+    || ((initialAnswers !== null || bootstrap !== null) && result.outcome === "unsupported-next-action") ? 0 : 1;
 }
 
 if (isDirectInvocation(import.meta.url)) process.exit(main());

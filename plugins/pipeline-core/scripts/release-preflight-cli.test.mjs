@@ -17,7 +17,7 @@ const CLI_PATH = fileURLToPath(new URL("./release-preflight-cli.mjs", import.met
 const roots = [];
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 
-function fixture({ version = "1.2.3", manifestVersion = null, consentStatus = "approved", dirty = false, waiveReleasePreflight = true } = {}) {
+function fixture({ version = "1.2.3", manifestVersion = null, consentStatus = "approved", dirty = false, waiveReleasePreflight = true, globalHumanApproval = null, commitGlobalHumanApproval = true } = {}) {
   const base = mkdtempSync(join(tmpdir(), "release-preflight-cli-"));
   roots.push(base);
   const git = (...args) => {
@@ -48,6 +48,9 @@ function fixture({ version = "1.2.3", manifestVersion = null, consentStatus = "a
     featureId: "fixture-feature",
     documents: { prd: "docs/prd.md", spec: "docs/spec.md", acceptance: "docs/acceptance.md", result: "docs/result.md" },
   });
+  if (globalHumanApproval !== null) {
+    write("pipeline.user.yaml", `schema: "pipeline.user.v3"\ngates:\n  human_approval: "${globalHumanApproval}"\n`);
+  }
   // ADR-0064 Decision 6: a hand-supplied --consent claiming "approved" now requires an
   // explicit, committed release-preflight waiver. Every fixture that exercises that
   // scenario as a SEPARATE, still-valid path (as opposed to the new proof-verified
@@ -70,6 +73,9 @@ function fixture({ version = "1.2.3", manifestVersion = null, consentStatus = "a
   git("commit", "-qm", "candidate");
   const candidateCommit = git("rev-parse", "HEAD");
   const candidateTree = git("rev-parse", "HEAD^{tree}");
+  if (globalHumanApproval !== null && !commitGlobalHumanApproval) {
+    write("pipeline.user.yaml", `schema: "pipeline.user.v3"\ngates:\n  human_approval: "${globalHumanApproval}"\n# working tree only\n`);
+  }
   if (dirty) write("docs/spec.md", "# spec\n\nuncommitted\n");
   return { base, baseCommit, candidateCommit, candidateTree, git };
 }
@@ -149,6 +155,24 @@ try {
     assert.equal(record.status, "ready");
     assert.equal(record.schema, "pipeline.release-preflight.v1");
     assert.match(record.recordSha256, /^[0-9a-f]{64}$/u);
+  });
+
+  check("RPC-chat committed global chat creates a terminal-, key- and proof-free candidate-bound consent with an explicit marker", () => {
+    const context = fixture({ globalHumanApproval: "chat" });
+    const { record } = build(context, { consentPath: null });
+    assert.equal(record.status, "ready", record.reasons.join(", "));
+    assert.deepEqual(record.humanApproval, { mode: "chat-attributed-unattested", kind: "release-preflight" });
+    assert.equal(record.consent.status, "approved");
+    assert.equal(record.consent.evaluatedAt, record.consent.expiresAt);
+  });
+
+  check("RPC-chat uncommitted global chat remains signature-default and cannot omit proof or consent", () => {
+    const context = fixture({ globalHumanApproval: "chat", commitGlobalHumanApproval: false });
+    assert.throws(() => build(context, { consentPath: null }), (error) => {
+      assert.ok(error instanceof ReleasePreflightCliError, error?.message);
+      assert.equal(error.code, "RPC-USAGE");
+      return true;
+    });
   });
 
   // The load-bearing property: no input state can be talked into "ready".

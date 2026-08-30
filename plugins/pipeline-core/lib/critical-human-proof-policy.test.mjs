@@ -6,11 +6,16 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { CRITICAL_ACTION_KINDS } from "./critical-action-approval-request.mjs";
 import {
   CRITICAL_HUMAN_PROOF_POLICY_PATH,
+  DEFAULT_HUMAN_APPROVAL_MODE,
   DEFAULT_PUSH_APPROVAL_MODE,
+  HUMAN_APPROVAL_MODE_KEY,
+  USER_SOURCE_PATH,
   criticalProofWaiverFor,
   readCriticalHumanProofPolicy,
+  readHumanApprovalMode,
   readPushApprovalMode,
 } from "./critical-human-proof-policy.mjs";
 
@@ -33,6 +38,7 @@ function userYaml(base, text) {
   return base;
 }
 const GATES = (mode) => `schema: "pipeline.user.v3"\ngates:\n  claude_md_max_lines: 200\n  dev_plan: "blocking"\n  push: "blocking"\n${mode === null ? "" : `  push_approval: "${mode}"\n`}  security: "blocking"\n`;
+const HUMAN_GATES = (mode, legacyPush = null) => `schema: "pipeline.user.v3"\ngates:\n  claude_md_max_lines: 200\n  dev_plan: "blocking"\n  push: "blocking"\n${mode === null ? "" : `  human_approval: "${mode}"\n`}${legacyPush === null ? "" : `  push_approval: "${legacyPush}"\n`}  security: "blocking"\n`;
 
 /**
  * Reach an existing fixture root through a real directory symlink.
@@ -196,15 +202,26 @@ try {
 
   check("CHP16 the push approval mode defaults to signature, the strongest setting", () => {
     assert.equal(DEFAULT_PUSH_APPROVAL_MODE, "signature");
+    assert.equal(DEFAULT_HUMAN_APPROVAL_MODE, "signature");
     // No source file at all.
     assert.deepEqual(readPushApprovalMode(root()), { mode: "signature", source: "default" });
+    assert.deepEqual(readHumanApprovalMode(root()), {
+      mode: "signature", source: "default", key: HUMAN_APPROVAL_MODE_KEY, scope: "default",
+    });
     // Source present, key absent — an older pipeline.user.yaml must keep working.
-    assert.deepEqual(readPushApprovalMode(userYaml(root(), GATES(null))), { mode: "signature", source: "default" });
+    const legacy = userYaml(root(), GATES(null));
+    assert.deepEqual(readPushApprovalMode(legacy), { mode: "signature", source: "default" });
+    assert.deepEqual(readHumanApprovalMode(legacy, { legacyKind: "push" }), {
+      mode: "signature", source: "default", key: "push_approval", scope: "legacy",
+    });
   });
 
-  check("CHP17 gates.push_approval chat stands the external signature down", () => {
+  check("CHP17 legacy gates.push_approval chat remains a push-only waiver", () => {
     const base = userYaml(root(V1()), GATES("chat"));
     assert.equal(readPushApprovalMode(base).mode, "chat");
+    assert.deepEqual(readHumanApprovalMode(base, { legacyKind: "push" }), {
+      mode: "chat", source: USER_SOURCE_PATH, key: "push_approval", scope: "legacy",
+    });
     const result = criticalProofWaiverFor(base, "push");
     assert.equal(result.waived, true);
     assert.equal(result.waiver.mode, "chat");
@@ -219,7 +236,7 @@ try {
     assert.deepEqual(criticalProofWaiverFor(base, "push"), { waived: false, code: null });
   });
 
-  check("CHP19 an unreadable or invalid source falls back to signature, never to chat", () => {
+  check("CHP19 an unreadable or invalid legacy source falls back to signature, never to chat", () => {
     for (const [text, source] of [
       ["gates:\n  push_approval: \"whatever\"\n", "invalid"],
       ["gates:\n  push_approval: true\n", "invalid"],
@@ -417,6 +434,65 @@ try {
     const result = criticalProofWaiverFor(base, "push");
     assert.equal(result.waived, false);
     assert.equal(result.code, "CRITICAL-PROOF-MODE-CONFLICT");
+  });
+
+  check("CHP33 committed global human_approval chat waives every critical kind before an unreadable policy is consulted", () => {
+    const base = userYaml(root("{ not json"), HUMAN_GATES("chat"));
+    assert.equal(readCriticalHumanProofPolicy(base).ok, false, "fixture policy must be unreadable");
+    assert.deepEqual(readHumanApprovalMode(base), {
+      mode: "chat", source: USER_SOURCE_PATH, key: HUMAN_APPROVAL_MODE_KEY, scope: "global",
+    });
+    for (const kind of CRITICAL_ACTION_KINDS) {
+      assert.deepEqual(criticalProofWaiverFor(base, kind), {
+        waived: true,
+        code: null,
+        waiver: {
+          kind,
+          reason: `gates.${HUMAN_APPROVAL_MODE_KEY}: chat (${USER_SOURCE_PATH})`,
+          mode: "chat-attributed-unattested",
+          source: USER_SOURCE_PATH,
+        },
+      }, kind);
+    }
+  });
+
+  check("CHP34 committed global signature preserves a historical policy waiver and overrules legacy push chat", () => {
+    const reason = "documented historical waiver";
+    const base = userYaml(
+      root(V2([{ kind: "push", reason }])),
+      HUMAN_GATES("signature", "chat"),
+    );
+    assert.equal(readPushApprovalMode(base).mode, "chat", "fixture must contain contradictory legacy chat");
+    assert.deepEqual(readHumanApprovalMode(base, { legacyKind: "push" }), {
+      mode: "signature", source: USER_SOURCE_PATH, key: HUMAN_APPROVAL_MODE_KEY, scope: "global",
+    });
+    assert.deepEqual(criticalProofWaiverFor(base, "push"), {
+      waived: true, code: null, waiver: { kind: "push", reason },
+    });
+  });
+
+  check("CHP35 invalid, unreadable or uncommitted global human approval stays signature and cannot stand down a policy waiver", () => {
+    const waiver = () => V2([{ kind: "push", reason: "policy-file waiver must not bypass untrusted global source" }]);
+    for (const [source, text] of [
+      ["invalid", HUMAN_GATES("not-a-real-mode", "chat")],
+      ["unreadable", ": : not yaml\n  - [\n"],
+    ]) {
+      const base = userYaml(root(waiver()), text);
+      assert.deepEqual(readHumanApprovalMode(base, { legacyKind: "push" }), {
+        mode: "signature", source, key: HUMAN_APPROVAL_MODE_KEY, scope: "global",
+      }, source);
+      assert.deepEqual(criticalProofWaiverFor(base, "push"), {
+        waived: false, code: "CRITICAL-PROOF-MODE-CONFLICT",
+      }, source);
+    }
+    const modified = userYaml(root(waiver()), HUMAN_GATES("signature", "chat"));
+    writeFileSync(join(modified, "pipeline.user.yaml"), HUMAN_GATES("chat", "chat"));
+    assert.deepEqual(readHumanApprovalMode(modified, { legacyKind: "push" }), {
+      mode: "signature", source: "uncommitted", key: HUMAN_APPROVAL_MODE_KEY, scope: "global",
+    });
+    assert.deepEqual(criticalProofWaiverFor(modified, "push"), {
+      waived: false, code: "CRITICAL-PROOF-MODE-CONFLICT",
+    });
   });
 
   check("CHP13 this repository ships the gate ON", () => {

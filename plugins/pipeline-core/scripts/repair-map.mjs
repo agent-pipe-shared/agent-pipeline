@@ -50,7 +50,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { recordHumanGuardDenial, humanGuardOverrideInternals } from "../lib/human-guard-override.mjs";
-import { readPushApprovalMode } from "../lib/critical-human-proof-policy.mjs";
+import { USER_SOURCE_PATH, readHumanApprovalMode } from "../lib/critical-human-proof-policy.mjs";
 import { isNeverLiftableKernelPath } from "../lib/guard-maintenance-window.mjs";
 
 const { eligibility } = humanGuardOverrideInternals;
@@ -151,15 +151,19 @@ function overridePlanCommands(rootDir, requestSha256, approvalMode) {
 export function classifyProbe({ rootDir, pluginRoot, toolName, toolInput }) {
   const eligible = eligibility(rootDir, toolName, toolInput);
   if (eligible.eligible === true) {
-    let approvalMode = "signature";
-    try { approvalMode = readPushApprovalMode(rootDir)?.mode ?? "signature"; } catch { approvalMode = "signature"; }
+    let approval = { mode: "signature", scope: "default", source: "default" };
+    try { approval = readHumanApprovalMode(rootDir, { legacyKind: "push" }) ?? approval; } catch { /* fail closed */ }
+    const approvalMode = approval.mode;
+    const globalChat = approvalMode === "chat" && approval.scope === "global" && approval.source === USER_SOURCE_PATH;
     return {
       code: "HGO-ELIGIBLE",
       liftable: "in-session-or-signed",
       by: approvalMode === "chat" ? "this-session-human" : "attended-operator-outside-session",
       command: overridePlanCommands("<repo-root>", "<request-sha256-from-your-denial>", approvalMode),
       reason: approvalMode === "chat"
-        ? "eligible for the general override; the human confirms in this session (attribution, not proof)."
+        ? (globalChat
+          ? "eligible for the general override; committed global chat is chat-attributed-unattested and needs no terminal ceremony, key, or proof."
+          : "eligible for the general override; the human confirms in this session (attribution, not proof).")
         : "eligible for the general override; presence of a valid, correctly-bound Ed25519 signature IS the "
           + "authorization -- there is no in-session activate step for this mode.",
       approvalMode,

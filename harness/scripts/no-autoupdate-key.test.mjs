@@ -102,6 +102,10 @@ function isTrackedSettingsPath(rawLine) {
  * silently narrow instead of catching a real regression.
  */
 const FALLBACK = [".claude/settings.json"];
+const PROJECT_SETTINGS = ".claude/settings.json";
+const PUBLIC_PIPELINE_PLUGIN = "pipeline-core@agent-pipeline";
+const PUBLIC_PIPELINE_MARKETPLACE = "agent-pipeline";
+const PUBLIC_PIPELINE_REPOSITORY = "agent-pipe-shared/agent-pipeline";
 
 /**
  * trackedSettingsPaths(repoRoot) -- git-tracked, repo-relative paths ending in
@@ -287,6 +291,44 @@ if (trackedPaths.length === 0) {
       `SCAN  ${relPath} has no committed autoUpdate key (ADR-0001 D2)`,
       hits.length === 0,
       hits.length > 0 ? `found "autoUpdate" at: ${hits.join(", ")}` : "",
+    );
+  }
+}
+
+// =============================================================================================
+// Project binding: the released Claude selector must remain committed. This is deliberately
+// separate from any host-local `agent-pipeline-local` development setup: a fresh clone has no
+// such registration, while this settings file already permits `Bash(git push *)`. ADR-0001 E1/D1
+// therefore requires the public marketplace declaration and released plugin selector here.
+// =============================================================================================
+
+{
+  const projectSettingsPath = join(REPO_ROOT, PROJECT_SETTINGS);
+  let settings = null;
+  try {
+    settings = JSON.parse(readFileSync(projectSettingsPath, "utf8"));
+  } catch (err) {
+    record(
+      `SCAN  ${PROJECT_SETTINGS} carries the portable released Pipeline binding`,
+      false,
+      `could not parse settings: ${err.message}`,
+    );
+  }
+  if (settings !== null) {
+    const pluginEnabled = settings.enabledPlugins?.[PUBLIC_PIPELINE_PLUGIN] === true;
+    const marketplaceSource = settings.extraKnownMarketplaces?.[PUBLIC_PIPELINE_MARKETPLACE]?.source;
+    const marketplaceBound =
+      marketplaceSource?.source === "github" && marketplaceSource?.repo === PUBLIC_PIPELINE_REPOSITORY;
+    const pushPreallowed = settings.permissions?.allow?.includes("Bash(git push *)") === true;
+    record(
+      `SCAN  ${PROJECT_SETTINGS} binds ${PUBLIC_PIPELINE_PLUGIN} to the public marketplace`,
+      pluginEnabled && marketplaceBound,
+      `enabled=${pluginEnabled}; marketplace=${JSON.stringify(marketplaceSource ?? null)}`,
+    );
+    record(
+      `SCAN  ${PROJECT_SETTINGS} never pre-allows git push without that portable binding`,
+      !pushPreallowed || (pluginEnabled && marketplaceBound),
+      "Bash(git push *) is present but the released Pipeline selector or public marketplace declaration is missing",
     );
   }
 }

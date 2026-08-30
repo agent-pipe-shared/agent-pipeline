@@ -841,6 +841,7 @@ function isAdoptableUnmanagedRoot(entries, root, fs) {
 function freshIntent(runner, fs) {
   requireRunner(runner, "freshIntent");
   const registry = loadRunnerProfilesV3Registry();
+  const humanApproval = machinePushApprovalPreference(fs) ?? "signature";
   return {
     schema: "pipeline.user.v3",
     language: { human_facing: "en", agent_facing: "en" },
@@ -914,7 +915,7 @@ function freshIntent(runner, fs) {
     // the PUSH gate's mode, which is `blocking`. A `warn` security gate would
     // therefore hard-block every consumer push while claiming to warn -- worse
     // than either `off` or `blocking`, and never a fallback to reach for here.
-    gates: { dev_plan: "blocking", push: "blocking", push_approval: machinePushApprovalPreference(fs) ?? "signature", security: "blocking", claude_md_max_lines: 200 },
+    gates: { dev_plan: "blocking", push: "blocking", human_approval: humanApproval, push_approval: humanApproval, security: "blocking", claude_md_max_lines: 200 },
     critic_export: clone(registry.criticExportPolicy),
     roles: { po: { display_label: "Human" } },
     session: { keep_awake: true },

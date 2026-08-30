@@ -21,12 +21,13 @@ import { spawnSync } from "node:child_process";
 import {
   CHAT_GATE_CONFIRMATION_MISMATCH,
   CHAT_GATE_NOT_ATTENDED,
+  chatAttributionRecord,
   requireAttendedChatGateConfirmation,
 } from "./chat-gate-ceremony.mjs";
 import { parseGuardCommand } from "../hooks/guard-command-grammar.mjs";
 import {
   readCriticalHumanProofPolicy,
-  readPushApprovalMode,
+  readHumanApprovalMode,
   verifyAgainstTrustAnchors,
 } from "./critical-human-proof-policy.mjs";
 // Dependency-free string helpers ONLY (see git-cmd.mjs's own header). guard-push.mjs owns
@@ -2213,6 +2214,7 @@ const CAPABILITY_KEYS = [
   "planSha256",
   "selectionSha256",
   "reasonSha256",
+  "humanApproval",
   "plugin",
   "repository",
   // Part A step 5 (design doc §1.4): the exact candidate the PO's signature
@@ -2253,6 +2255,12 @@ function validatedCapability(paths, path) {
     || !SHA256.test(value.planSha256 ?? "")
     || !SHA256.test(value.selectionSha256 ?? "")
     || !SHA256.test(value.reasonSha256 ?? "")
+    || !(object(value.humanApproval)
+      && ((value.humanApproval.mode === "chat-attributed-unattested"
+        && exactKeys(value.humanApproval, ["mode", "kind"])
+        && value.humanApproval.kind === "human-guard-override")
+        || (value.humanApproval.mode === "signature-verified"
+          && exactKeys(value.humanApproval, ["mode"]))))
     || !SHA256.test(value.toolInputSha256 ?? "")
     || typeof value.commandClass !== "string" || value.commandClass.trim() === ""
     || !(value.signedCandidate === null
@@ -2277,6 +2285,7 @@ function hasAuthorizedAuditEntry(paths, capability) {
     && event.planSha256 === capability.planSha256
     && event.reasonSha256 === capability.reasonSha256
     && event.selectionSha256 === capability.selectionSha256
+    && canonical(event.humanApproval) === canonical(capability.humanApproval)
     && event.mode === capability.mode
     && event.authorSourceRoot === capability.authorSourceRoot
     && event.at === capability.authorizedAt);
@@ -2915,20 +2924,22 @@ export function authorizeHumanGuardOverride({
 } = {}) {
   if (activate !== true) fail("HGO-ACTIVATION", "override authorization requires explicit activation");
   // ADR-0059 Decision 1, defense in depth: this in-session `activate` path is an
-  // ordinary command a ready agent session can run itself -- harmless while
-  // `gates.push_approval` is "chat" (an attribution record, not proof, same as
-  // chat-mode push approval), disqualifying while it is "signature". The calling
+  // ordinary command a ready agent session can run itself -- permitted only when
+  // the shared, committed global `gates.human_approval` selection is the expressly
+  // weak chat posture.  Legacy push-local chat keeps its historical attended-TTY
+  // ceremony below.  The calling
   // guards already stop offering this route in that mode (Decision 3), but this
   // function must refuse it outright too, never relying on the caller alone to keep
-  // it out of reach. `readPushApprovalMode` itself already fails closed to
-  // "signature" for anything absent, unreadable, unrecognised or uncommitted.
-  let approvalMode = "signature";
-  try { approvalMode = readPushApprovalMode(rootDir, { spawn })?.mode ?? "signature"; }
-  catch { approvalMode = "signature"; }
+  // it out of reach.  The shared resolver fails closed to `signature` for anything
+  // absent, unreadable, unrecognised or uncommitted.
+  let approval = { mode: "signature", scope: "default", source: "default" };
+  try { approval = readHumanApprovalMode(rootDir, { legacyKind: "push", spawn }); }
+  catch { /* fail-closed default above */ }
+  const approvalMode = approval.mode;
   if (approvalMode !== "chat") {
     fail(
       "HGO-SIGNATURE-MODE-REQUIRED",
-      `the in-session activation path is refused while gates.push_approval is "${approvalMode}"; use authorizeHumanGuardOverrideBySignature() (CLI: authorize-by-signature) instead`,
+      `the in-session activation path is refused while human approval is "${approvalMode}"; use authorizeHumanGuardOverrideBySignature() (CLI: authorize-by-signature) instead`,
     );
   }
   const reasonBytes = Buffer.from(String(reason ?? ""), "utf8");
@@ -2973,28 +2984,31 @@ export function authorizeHumanGuardOverride({
   // Placed AFTER the mode/reason/selection/plan checks above but BEFORE any capability
   // file is written or audit entry appended, so a failed attempt leaves the pending
   // request/plan/selection fully available for a genuine attended retry.
-  const confirmationExpected = `HGO-${selectionSha256.slice(0, 8).toUpperCase()}`;
-  const confirmation = requireAttendedChatGateConfirmation({
-    summaryLines: [
-      "HUMAN GUARD OVERRIDE ACTIVATION CONFIRMATION -- read before you type the value:",
-      `  reason: ${reason}`,
-      `  request-sha256: ${requestSha256}`,
-      `  plan-sha256: ${planSha256}`,
-      `  selection-sha256: ${selectionSha256}`,
-      `  confirmation value: ${confirmationExpected}`,
-    ],
-    expected: confirmationExpected,
-    dependencies,
-  });
-  if (!confirmation.ok) {
-    fail(
-      confirmation.code,
-      confirmation.code === CHAT_GATE_NOT_ATTENDED
-        ? "override activation refused (CHAT-GATE-NOT-ATTENDED); a human must confirm this activation directly, in their own attended terminal -- an agent's own tool call cannot complete this step."
-        : confirmation.code === CHAT_GATE_CONFIRMATION_MISMATCH
-          ? "override activation refused (CHAT-GATE-CONFIRMATION-MISMATCH); the typed value did not match the confirmation value shown."
-          : "override activation refused; the attended confirmation ceremony did not succeed.",
-    );
+  const globalChat = approval.scope === "global" && approval.source === "pipeline.user.yaml";
+  if (!globalChat) {
+    const confirmationExpected = `HGO-${selectionSha256.slice(0, 8).toUpperCase()}`;
+    const confirmation = requireAttendedChatGateConfirmation({
+      summaryLines: [
+        "HUMAN GUARD OVERRIDE ACTIVATION CONFIRMATION -- read before you type the value:",
+        `  reason: ${reason}`,
+        `  request-sha256: ${requestSha256}`,
+        `  plan-sha256: ${planSha256}`,
+        `  selection-sha256: ${selectionSha256}`,
+        `  confirmation value: ${confirmationExpected}`,
+      ],
+      expected: confirmationExpected,
+      dependencies,
+    });
+    if (!confirmation.ok) {
+      fail(
+        confirmation.code,
+        confirmation.code === CHAT_GATE_NOT_ATTENDED
+          ? "override activation refused (CHAT-GATE-NOT-ATTENDED); a human must confirm this activation directly, in their own attended terminal -- an agent's own tool call cannot complete this step."
+          : confirmation.code === CHAT_GATE_CONFIRMATION_MISMATCH
+            ? "override activation refused (CHAT-GATE-CONFIRMATION-MISMATCH); the typed value did not match the confirmation value shown."
+            : "override activation refused; the attended confirmation ceremony did not succeed.",
+      );
+    }
   }
   const repo = planned.mode === "global-plugin-install"
     ? controlPathTopology(rootDir)
@@ -3012,6 +3026,7 @@ export function authorizeHumanGuardOverride({
     planSha256,
     selectionSha256,
     reasonSha256,
+    humanApproval: chatAttributionRecord({ kind: "human-guard-override" }),
     plugin: planned.plugin,
     repository: freshRepository,
     // Finding 1 (design doc §1.4 step 5) is scoped to the signature path only --
@@ -3046,6 +3061,7 @@ export function authorizeHumanGuardOverride({
           planSha256,
           reasonSha256,
           selectionSha256,
+          humanApproval: capability.humanApproval,
           mode: capability.mode,
           authorSourceRoot: capability.authorSourceRoot,
         });
@@ -3064,6 +3080,7 @@ export function authorizeHumanGuardOverride({
       planSha256,
       reasonSha256,
       selectionSha256,
+      humanApproval: capability.humanApproval,
       mode: capability.mode,
       authorSourceRoot: capability.authorSourceRoot,
     });
@@ -3279,6 +3296,7 @@ export function authorizeHumanGuardOverrideBySignature({
     planSha256,
     selectionSha256: prepared.selectionSha256,
     reasonSha256: prepared.reasonSha256,
+    humanApproval: { mode: "signature-verified" },
     plugin: planned.plugin,
     repository: freshRepository,
     signedCandidate,
@@ -3311,6 +3329,7 @@ export function authorizeHumanGuardOverrideBySignature({
           planSha256,
           reasonSha256: capability.reasonSha256,
           selectionSha256: capability.selectionSha256,
+          humanApproval: capability.humanApproval,
           mode: capability.mode,
           authorSourceRoot: capability.authorSourceRoot,
         });
@@ -3329,6 +3348,7 @@ export function authorizeHumanGuardOverrideBySignature({
       planSha256,
       reasonSha256: capability.reasonSha256,
       selectionSha256: capability.selectionSha256,
+      humanApproval: capability.humanApproval,
       mode: capability.mode,
       authorSourceRoot: capability.authorSourceRoot,
     });

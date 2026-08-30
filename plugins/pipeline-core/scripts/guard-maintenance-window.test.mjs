@@ -91,13 +91,23 @@ function trustAnchorPolicy(keys) {
 }
 
 /** A real, freshly initialized git repository, Phoenix-governed, carrying `keys` as its committed trust anchor. */
-async function fixture() {
+async function fixture({ humanApproval = null, includeCriticalPolicy = true } = {}) {
   const root = await mkdtemp(path.join(os.tmpdir(), "gmw-ledger-"));
   const keys = keypair();
   await writeFile(path.join(root, "plan.md"), "fixture plan\n");
   await writeFile(path.join(root, "spec.md"), "fixture spec\n");
   await mkdir(path.join(root, "project"), { recursive: true });
-  await writeFile(path.join(root, "project/critical-human-proof.json"), `${JSON.stringify(trustAnchorPolicy(keys), null, 2)}\n`);
+  if (includeCriticalPolicy) {
+    await writeFile(path.join(root, "project/critical-human-proof.json"), `${JSON.stringify(trustAnchorPolicy(keys), null, 2)}\n`);
+  }
+  if (humanApproval !== null) {
+    await writeFile(path.join(root, "pipeline.user.yaml"), [
+      'schema: "pipeline.user.v3"',
+      "gates:",
+      `  human_approval: "${humanApproval}"`,
+      "",
+    ].join("\n"));
+  }
   execFileSync("git", ["init", "-q", root]);
   execFileSync("git", ["-C", root, "add", "-A"]);
   execFileSync("git", ["-C", root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "fixture"]);
@@ -261,6 +271,24 @@ test("install appends requested+granted to the portable ledger and arms the wind
   // the explicit "unattested" code rather than deriving one from the free-text reason.
   assert.equal(granted.reasonCode, "GUARD.MAINTENANCE.WINDOW_UNATTESTED");
   assert.equal(granted.validity.singleUse, false);
+});
+
+test("committed global chat CLI install requires neither proof nor key/anchor and reports chat attribution", async (t) => {
+  const { root, fingerprint } = await fixture({ humanApproval: "chat", includeCriticalPolicy: false });
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const { request } = prepareRequest({ root });
+  const requestPath = path.join(root, "global-chat-request.json");
+  await writeFile(requestPath, JSON.stringify(request));
+
+  const installed = await run([
+    "install", "--repo-root", root, "--request", requestPath, "--plan", "plan.md", "--spec", "spec.md",
+  ]);
+  assert.equal(installed.ok, true);
+  assert.equal(installed.value.status, "active");
+  assert.deepEqual(installed.ledger, [], "global chat emits no signature-backed requested/granted ledger pair");
+  assert.deepEqual(installed.attribution, { status: "chat-attributed-unattested" });
+  const { decisions } = await queryHumanGovernanceDecisions({ repositoryRoot: root, repositoryFingerprint: fingerprint });
+  assert.deepEqual(decisions, [], "global chat does not manufacture a signer/key record");
 });
 
 test("re-installing the identical still-live request skips the ledger append (no duplicate grant)", async (t) => {

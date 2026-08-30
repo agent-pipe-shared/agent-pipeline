@@ -23,6 +23,17 @@
 
 **Real regressions this session's own work caused, all found by the final `verify.mjs` run and fixed before stamping (not silently absorbed):** 3 backlog items closed earlier the same session with abbreviated 8-char `closure_commit` SHAs instead of full 40-char OIDs; a new backlog item using an invalid `type`; that same new item never reconciled into the backlog ledger; a stale vendored copy of `docs/push-release-flow.md`; a stale `.gitleaksignore` line-number suppression (PO-confirmed fix via `gitleaks-repair-ignore.mjs`); the first stamp attempt itself used an 8-hex short SHA where `codex-pretool-guard.test.mjs` requires exactly 7.
 
+**PO policy decision, 2026-08-30 — ADR-0076.** A future installed runtime may
+use the repository-wide `gates.human_approval` selector. `chat` is explicitly
+`chat-attributed-unattested`: an agent may record an explicit chat approval
+without a key, trust anchor, terminal, or host/UI attestation, and the record
+is not proof that a human was present. It is allowed only for PO-classified
+low-consequence repositories; `signature` remains the only strong attested
+option. This is a policy/documentation decision, not a Nova-complete or
+runtime-support claim; ADR-0056's action-local settings remain the legacy
+behavior until an installed version recognizes the global selector. This
+repository's current `gates.push_approval: signature` is unchanged.
+
 **PO's own standing instruction, still in force: STOP after this stamp and wait for the PO's own greenfield happy-path re-test of the locally stamped candidate before any push-approval ceremony.** Nothing here authorizes a push. `gates.push_approval: signature` unchanged.
 
 ## Prior current handover — the three-runner greenfield findings are being worked, happy path first (2026-08-28)
@@ -344,3 +355,16 @@ line's own checkpoint 71, see the history section below).
 
 ---
 
+## Phoenix-line history (superseded by the Nova line above — preserved in full, not deleted)
+
+> **Nova is the active state.** Below is `sprint_phoenix`'s own handover
+> exactly as it stood at that branch's last checkpoint (71, 2026-08-23)
+> before this merge — kept in full per PO instruction, as HISTORY. Any
+> "(READ THIS FIRST)"/"Next step" text inside it was live only on the
+> Phoenix line; the "Current handover" section above is the live one now.
+> Phoenix's own "Archived history" table and Sentinel-links list are
+> already folded into the sections above, not repeated here.
+
+**Last updated (Phoenix line):** 2026-08-23 (checkpoint 71)
+
+---

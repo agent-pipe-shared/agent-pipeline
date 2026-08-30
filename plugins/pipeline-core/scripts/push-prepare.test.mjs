@@ -505,6 +505,31 @@ test("pushPrepareReport: all preconditions met -> ready:true, all three commands
   assert.doesNotMatch(humanText, /render-copy-safe|available on demand/u);
 });
 
+test("committed global chat reports chat-attributed-unattested and omits all proof/key preparation", () => {
+  const root = foldFixtureRepo({ humanApproval: "chat", pushApproval: "signature" });
+  let proofPolicyReads = 0;
+  const result = pushPrepareReport(
+    ["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"],
+    readyDeps({
+      dir: root,
+      readCriticalHumanProofPolicy: () => {
+        proofPolicyReads += 1;
+        throw new Error("global chat must not resolve a key, anchor, or proof policy");
+      },
+      authorizeCriticalPushCommand: () => {
+        throw new Error("global chat must not render the signature command");
+      },
+    }),
+  );
+  assert.equal(result.ok, true);
+  assert.equal(result.report.ready, true, JSON.stringify(result.report.checks));
+  assert.equal(result.report.humanApproval, "chat-attributed-unattested");
+  assert.equal(proofPolicyReads, 0);
+  assert.deepEqual(result.lines.authorize, []);
+  const rendered = [result.lines.approvePush.join("\n"), result.lines.gitPush].join("\n");
+  assert.doesNotMatch(rendered, /authorize-critical|proof|anchor|key|directory/u);
+});
+
 test("printReport keeps stdout machine-readable and sends the bounded human commands to stderr", () => {
   const result = pushPrepareReport(
     ["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"],
@@ -705,7 +730,7 @@ function gitAtFold(root, ...args) {
 }
 
 /** A real git repo with a committed baseline state file and threat model, chat-mode gate. */
-function foldFixtureRepo() {
+function foldFixtureRepo({ humanApproval = null, pushApproval = "chat" } = {}) {
   const root = mkdtempSync(join(SCRATCH, "push-prepare-fold-"));
   after(() => rmSync(root, { recursive: true, force: true }));
   gitAtFold(root, "init", "-q", "-b", "main");
@@ -716,7 +741,13 @@ function foldFixtureRepo() {
     schema: "pipeline.state.v0", planApproved: true,
     activeFeature: { id: "sprint-nova-epic", planPath: "specs/sprint-nova-epic/prd.md", phase: "implementation" },
   }, null, 2));
-  writeFileSync(join(root, "pipeline.user.yaml"), "schema: pipeline.user.v3\ngates:\n  push_approval: chat\n");
+  writeFileSync(join(root, "pipeline.user.yaml"), [
+    "schema: pipeline.user.v3",
+    "gates:",
+    ...(humanApproval === null ? [] : [`  human_approval: ${humanApproval}`]),
+    `  push_approval: ${pushApproval}`,
+    "",
+  ].join("\n"));
   assert.equal(runPipelineState(["materialize-push-threat-model"], { dir: root }), 0, "fixture setup: materialize-push-threat-model must succeed");
   gitAtFold(root, "add", "-A");
   gitAtFold(root, "commit", "-q", "-m", "initial");

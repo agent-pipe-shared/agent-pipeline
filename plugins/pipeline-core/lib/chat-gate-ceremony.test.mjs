@@ -14,6 +14,8 @@ import test from "node:test";
 import {
   CHAT_GATE_CONFIRMATION_MISMATCH,
   CHAT_GATE_NOT_ATTENDED,
+  CHAT_ATTRIBUTION_UNATTESTED,
+  chatAttributionRecord,
   decodeTypedLine,
   isAttendedTerminal,
   readAttendedLine,
@@ -32,6 +34,20 @@ function typing(bytes) {
 }
 
 const attended = { isattyFn: () => true };
+
+test("global chat attribution is explicitly non-attested, never a terminal or proof claim", () => {
+  assert.deepEqual(chatAttributionRecord({ kind: "push", by: "PO" }), {
+    mode: CHAT_ATTRIBUTION_UNATTESTED,
+    kind: "push",
+    by: "PO",
+  });
+  assert.deepEqual(chatAttributionRecord({ kind: "guard-maintenance-window" }), {
+    mode: "chat-attributed-unattested",
+    kind: "guard-maintenance-window",
+  });
+  assert.throws(() => chatAttributionRecord({ kind: "" }), TypeError);
+  assert.throws(() => chatAttributionRecord({ kind: "push", by: "" }), TypeError);
+});
 
 test("a UTF-8 terminal's accented name decodes to what the human typed", () => {
   const utf8 = [...Buffer.from("André\n", "utf8")];

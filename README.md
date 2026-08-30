@@ -52,6 +52,16 @@ feature branches and dogfooding rounds. Feedback welcome.*
 > that kind of work via the three dials below; save full enforcement for
 > changes where a mistake is expensive.
 
+> **Choose approval strength honestly.** `gates.human_approval: "chat"` is for
+> a PO-classified low-consequence repository only. It lets the agent record an
+> explicit chat answer without a key, trust anchor, terminal command, or
+> UI/host/TTY attestation. Its durable basis is
+> `chat-attributed-unattested`: attribution, not proof that a human/account/device
+> approved. `signature` remains the default and the only strong attested option.
+> Existing installations may still use ADR-0056's action-local approval keys;
+> do not assume a global selector works until the installed runtime recognizes
+> it. See [ADR-0076](docs/adr/0076-global-chat-attributed-unattested-approval-mode.md).
+
 ## The problem
 
 Teams building with coding agents tend to reinvent the same conventions per repo —
@@ -362,6 +372,17 @@ willkommen.*
 > Tree übertragen. Umfang und bewusste Nicht-Claims stehen unter [Neu in
 > 0.6.0](docs/whats-new-0.6.0.md); den vollständigen Ablauf beschreibt der
 > [Consumer-Onboarding-Guide](docs/v3-consumer-onboarding.md).
+
+> **Freigabestärke ehrlich wählen.** `gates.human_approval: "chat"` ist nur
+> für ein vom PO ausdrücklich als folgenarm eingestuftes Repository gedacht.
+> Der Agent darf dann eine explizite Chat-Antwort ohne Schlüssel, Trust Anchor,
+> Terminalbefehl oder UI-/Host-/TTY-Attestierung festhalten. Die dauerhafte
+> Grundlage heißt `chat-attributed-unattested`: Zuschreibung, nicht der Beweis,
+> dass ein Mensch, Account oder Gerät freigegeben hat. `signature` bleibt Default
+> und die einzige starke attestierte Option. Bestehende Installationen können
+> noch ADR-0056s aktionslokale Schlüssel verwenden; einen globalen Selektor erst
+> nach Runtime-Readback als wirksam annehmen. Siehe
+> [ADR-0076](docs/adr/0076-global-chat-attributed-unattested-approval-mode.md).
 
 ## Das Problem
 

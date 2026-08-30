@@ -41,7 +41,7 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { renderHumanCopySafeCommand } from "../lib/copy-safe-command.mjs";
-import { readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
+import { readCriticalHumanProofPolicy, readHumanApprovalMode } from "../lib/critical-human-proof-policy.mjs";
 import { readMachinePlane, resolveLocalOperatorKeyAnchor } from "../lib/machine-plane.mjs";
 import { gateConfig, loadManifestSafe } from "../lib/manifest.mjs";
 import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
@@ -502,6 +502,9 @@ export function pushPrepareReport(argv, deps = {}) {
   const parsed = parseArgs(argv);
   if (parsed.error) return { ok: false, error: parsed.error };
   const { by, remote, destination } = parsed;
+  const readHumanApproval = deps.readHumanApprovalMode ?? readHumanApprovalMode;
+  const humanApproval = readHumanApproval(dir, { legacyKind: "push" });
+  const chatMode = humanApproval.mode === "chat";
 
   // Runs BEFORE anything below that assumes a clean tree (NVA-PUSHFOLD-1): a pending trailing
   // write from a prior `approve-push` is folded in here first, so `checkWorkingTreeClean`
@@ -525,16 +528,48 @@ export function pushPrepareReport(argv, deps = {}) {
     }
   }
   checks.push(checkPushThreatModel(dir, deps));
-  checks.push(checkCriticalHumanProofPolicy(dir, deps));
+  // A chat-selected push has no key, approval-directory, or proof ceremony.
+  // The global mode is deliberately weaker; the legacy push-local chat route
+  // shares the proof-free preparation shape but pipeline-state preserves its
+  // historical attended-terminal confirmation.
+  if (!chatMode) checks.push(checkCriticalHumanProofPolicy(dir, deps));
 
   const report = {
     schema: "pipeline.push-prepare-report.v1",
     by, remote, destination, headCommit,
+    humanApproval: chatMode && humanApproval.scope === "global"
+      ? "chat-attributed-unattested"
+      : humanApproval.mode,
     checks: checks.map(({ directory, ...rest }) => rest),
     ready: checks.every((check) => check.ok),
   };
 
   if (!report.ready) return { ok: true, report, lines: null };
+
+  if (chatMode) {
+    const approveCommand = renderHumanCopySafeCommand({
+      label: "agent approve-push",
+      executable: "node",
+      argv: [
+        "plugins/pipeline-core/scripts/pipeline-state.mjs", "approve-push",
+        "--by", by, "--remote", remote, "--destination", destination,
+      ],
+    });
+    const gitPushCommand = renderHumanCopySafeCommand({
+      label: "agent push",
+      executable: "git",
+      argv: ["push", remote, `HEAD:${destination}`],
+    });
+    return {
+      ok: true,
+      report,
+      lines: {
+        authorize: [],
+        approvePush: approveCommand.text.split("\n"),
+        gitPush: gitPushCommand.text,
+      },
+    };
+  }
 
   const subject = preparePushSubject({ dir, by, remote, destination }, deps);
   if (!subject.ok) {

@@ -111,6 +111,13 @@ function validateConsent(value) {
   if (expiry < evaluated) fail("RPF-CONSENT", "consent expiry precedes its bounded readback");
   if (!["approved", "declined", "expired"].includes(value.status)) fail("RPF-CONSENT", "consent.status is invalid");
 }
+function validateHumanApproval(value) {
+  if (value === null) return;
+  exact(value, ["kind", "mode"], "humanApproval");
+  if (value.mode !== "chat-attributed-unattested" || value.kind !== "release-preflight") {
+    fail("RPF-HUMAN-APPROVAL", "humanApproval must be the explicit release-preflight chat attribution marker");
+  }
+}
 function validateGg03(value) {
   exact(value, ["binding", "required"], "gates.gg03");
   if (typeof value.required !== "boolean") fail("RPF-GG03", "gates.gg03.required must be boolean");
@@ -155,11 +162,11 @@ export function releasePreflightRecordSha256(record) { return sha256(`${RELEASE_
  * stable local blocker codes.
  */
 export function createReleasePreflight(input) {
-  exact(input, ["base", "candidate", "consent", "documentation", "extensions", "gates", "lifecycle", "preflightId", "repository", "retention", "version"], "release preflight input");
+  exact(input, ["base", "candidate", "consent", "documentation", "extensions", "gates", "humanApproval", "lifecycle", "preflightId", "repository", "retention", "version"], "release preflight input");
   if (typeof input.preflightId !== "string" || !/^[a-z0-9][a-z0-9._-]{0,79}$/u.test(input.preflightId)) fail("RPF-ID", "preflightId is invalid");
   validateCandidate(input.candidate, "candidate"); validateCandidate(input.base, "base"); validateVersion(input.version); validateRepository(input.repository);
   validateDocumentation(input.documentation); validateLifecycle(input.lifecycle); validateRetention(input.retention, input.documentation);
-  validateConsent(input.consent); validateGates(input.gates); validateExtensions(input.extensions);
+  validateConsent(input.consent); validateHumanApproval(input.humanApproval); validateGates(input.gates); validateExtensions(input.extensions);
 
   const reasons = [];
   if (input.candidate.commit === input.base.commit || input.candidate.tree === input.base.tree) reasons.push("candidate-base-drift");
@@ -180,6 +187,7 @@ export function createReleasePreflight(input) {
     lifecycle: structuredClone(input.lifecycle),
     retention: structuredClone(input.retention),
     consent: structuredClone(input.consent),
+    humanApproval: structuredClone(input.humanApproval),
     gates: structuredClone(input.gates),
     extensions: structuredClone(input.extensions),
     status,
@@ -191,13 +199,13 @@ export function createReleasePreflight(input) {
 }
 
 export function validateReleasePreflight(record) {
-  exact(record, ["base", "candidate", "consent", "documentation", "extensions", "gates", "lifecycle", "preflightId", "recordSha256", "reasons", "repository", "retention", "schema", "status", "version"], "release preflight record");
+  exact(record, ["base", "candidate", "consent", "documentation", "extensions", "gates", "humanApproval", "lifecycle", "preflightId", "recordSha256", "reasons", "repository", "retention", "schema", "status", "version"], "release preflight record");
   if (record.schema !== RELEASE_PREFLIGHT_SCHEMA) fail("RPF-SCHEMA", "release preflight schema is invalid");
   if (!["ready", "blocked"].includes(record.status) || !Array.isArray(record.reasons) || record.reasons.length > BLOCKER_REASONS.length || !record.reasons.every((reason) => BLOCKER_REASONS.includes(reason))) fail("RPF-STATUS", "release preflight status or reasons are invalid");
   if (typeof record.recordSha256 !== "string" || !SHA256.test(record.recordSha256)) fail("RPF-HASH", "release preflight record hash is invalid");
   const expected = createReleasePreflight({
     preflightId: record.preflightId, candidate: record.candidate, base: record.base, version: record.version, repository: record.repository,
-    documentation: record.documentation, lifecycle: record.lifecycle, retention: record.retention, consent: record.consent, gates: record.gates, extensions: record.extensions,
+    documentation: record.documentation, lifecycle: record.lifecycle, retention: record.retention, consent: record.consent, humanApproval: record.humanApproval, gates: record.gates, extensions: record.extensions,
   });
   if (record.status !== expected.status || canonicalJson(record.reasons) !== canonicalJson(expected.reasons)) fail("RPF-STATUS", "release preflight status or reasons are not derived from its inputs");
   if (record.recordSha256 !== expected.recordSha256) fail("RPF-HASH", "release preflight record hash does not bind its full record");

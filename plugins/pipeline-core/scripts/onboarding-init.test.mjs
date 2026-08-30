@@ -208,10 +208,16 @@ test("driveOnboardingInit: Claude, Codex, and Antigravity converge across fresh 
   }
 });
 
-test("public onboarding driver imports and materializes the first existing anchor for Claude, Codex, and Antigravity in one returned action", () => {
+test("public onboarding driver keeps chat keyless and reaches a separate signature-anchor action", () => {
   const fixtures = [];
   try {
-    for (const runner of GREENFIELD_RUNNERS) {
+    const cases = [
+      ...GREENFIELD_RUNNERS.flatMap((runner) => [
+        { runner, pushApproval: "signature" },
+        { runner, pushApproval: "chat" },
+      ]),
+    ];
+    for (const { runner, pushApproval } of cases) {
       const root = freshRoot();
       const home = freshHome();
       const sourceDirectory = mkdtempSync(join(tmpdir(), "onboarding-init-existing-source-"));
@@ -228,21 +234,20 @@ test("public onboarding driver imports and materializes the first existing ancho
       const first = driveOnboardingInit({ rootDir: root, runner, env });
       assert.equal(first.outcome, "pending-asks", runner);
       assert.equal(first.pendingAsks.length, 1, `${runner}: the first PO stop is one bundled action, not sibling command fragments`);
-      const setupAsk = first.pendingAsks.find((ask) => ask.inputs?.some((input) => input.name === "trustAnchorSetupMode"));
-      assert.ok(setupAsk, `${runner}: public inspect publishes the structured first-anchor action`);
+      const initialAsk = first.pendingAsks[0];
+      assert.deepEqual(actionInputNames(initialAsk), ["gitAuthorName", "gitAuthorEmail", "pushApprovalPreference"],
+        `${runner}/${pushApproval}: initial action contains only identity and push mode`);
       const replacements = new Map([
         ["<PO_GIT_AUTHOR_NAME>", "Greenfield Anchor PO"],
         ["<PO_GIT_AUTHOR_EMAIL>", "greenfield-anchor@example.invalid"],
-        ["<signature|chat>", "signature"],
-        ["<existing|new>", "existing"],
-        ["<absolute external key directory>", destination],
-        ["<human attribution>", "Greenfield Anchor PO"],
-        ["<absolute existing key path|none>", existingKey],
+        ["<signature|chat>", pushApproval],
       ]);
-      const argv = setupAsk.applyAction.argv.map((value) => replacements.get(value) ?? value);
+      const argv = initialAsk.applyAction.argv.map((value) => replacements.get(value) ?? value);
       assert.equal(argv[0].endsWith("onboarding-init.mjs"), true, `${runner}: no internal setup script is guessed`);
       assert.equal(argv.includes("po-human-approval.mjs"), false, `${runner}: raw setup is not published`);
-      const applied = spawnSync(setupAsk.applyAction.executable, argv, {
+      assert.equal(argv.some((value) => value.startsWith("--trust-anchor-")), false,
+        `${runner}/${pushApproval}: initial action never accepts trust-anchor flags`);
+      const applied = spawnSync(initialAsk.applyAction.executable, argv, {
         encoding: "utf8", shell: false, env, maxBuffer: 8 * 1024 * 1024,
       });
       assert.equal(applied.status, 0, `${runner}: ${applied.stderr}\n${applied.stdout}`);
@@ -251,38 +256,72 @@ test("public onboarding driver imports and materializes the first existing ancho
       assert.deepEqual(result.initialAnswers, {
         ok: true,
         code: "INITIAL-ANSWERS-APPLIED",
-        pushApprovalPreference: "signature",
-        trustAnchor: "TRUST-ANCHOR-BOOTSTRAP-COMPLETE",
+        pushApprovalPreference: pushApproval,
+        trustAnchor: "not-requested",
       });
       assertPinnedRunner(result, runner, `${runner}/post-bootstrap`);
 
       assert.equal(spawnSync("git", ["-C", root, "config", "--local", "user.name"], { encoding: "utf8" }).stdout.trim(), "Greenfield Anchor PO");
       assert.equal(spawnSync("git", ["-C", root, "config", "--local", "user.email"], { encoding: "utf8" }).stdout.trim(), "greenfield-anchor@example.invalid");
-      assert.match(readFileSync(join(root, "pipeline.user.yaml"), "utf8"), /^\s*push_approval:\s*"signature"\s*$/mu);
+      assert.match(readFileSync(join(root, "pipeline.user.yaml"), "utf8"), new RegExp(`^\\s*push_approval:\\s*"${pushApproval}"\\s*$`, "mu"));
+      assert.match(readFileSync(join(root, "pipeline.user.yaml"), "utf8"), new RegExp(`^\\s*human_approval:\\s*"${pushApproval}"\\s*$`, "mu"));
       assert.equal(existsSync(join(root, ".git", "agent-pipeline", "onboarding-initial-answers.json")), true);
 
       const policy = JSON.parse(readFileSync(join(root, "project", "critical-human-proof.json"), "utf8"));
-      assert.equal(policy.schema, "pipeline.critical-human-proof-policy.v3");
-      assert.equal(policy.trustAnchors.length, 1);
+      assert.equal(policy.schema, "pipeline.critical-human-proof-policy.v1");
+      assert.equal(Object.hasOwn(policy, "trustAnchor"), false);
+      assert.equal(Object.hasOwn(policy, "trustAnchors"), false);
+      assert.equal(Object.hasOwn(policy, "waivedKinds"), false);
       const machine = JSON.parse(readFileSync(join(home, ".agent-pipeline", "machine.json"), "utf8"));
-      assert.equal(machine.poKeyDirectory, destination, `${runner}: machine pointer is durable`);
-      const repositoryPointer = JSON.parse(readFileSync(join(root, ".git", "agent-pipeline", "po-key-directory.json"), "utf8"));
-      assert.equal(repositoryPointer.poKeyDirectory, destination, `${runner}: repository pointer is durable`);
+      assert.equal(machine.poKeyDirectory, null, `${runner}/${pushApproval}: initial action leaves the key directory unset`);
 
       const reentered = driveOnboardingInit({ rootDir: root, runner, env });
       const names = [
+        ...(result.pendingAsks ?? []).flatMap(actionInputNames),
         ...(reentered.pendingAsks ?? []).flatMap(actionInputNames),
         ...actionInputNames(reentered.collectInput),
       ];
-      assert.equal(names.includes("trustAnchorSetupMode"), false, `${runner}: completed setup is not asked again`);
       assert.equal(names.includes("pushApprovalPreference"), false, `${runner}: durable receipt prevents a repeated push-preference ask`);
+      if (pushApproval === "chat") {
+        assert.equal(names.includes("trustAnchorSetupMode"), false, `${runner}: chat never asks for a signing key`);
+        assert.equal(existsSync(join(root, ".git", "agent-pipeline", "po-key-directory.json")), false,
+          `${runner}: chat creates no repository key pointer`);
+        continue;
+      }
+
+      const anchorAsk = result.pendingAsks?.find((ask) => ask.inputs?.some((input) => input.name === "trustAnchorSetupMode"))
+        ?? reentered.pendingAsks?.find((ask) => ask.inputs?.some((input) => input.name === "trustAnchorSetupMode"));
+      assert.ok(anchorAsk, `${runner}: signature reaches the separate trust-anchor action`);
+      assert.equal(anchorAsk.applyAction.argv.includes("--push-approval"), false,
+        `${runner}: signature anchor action is separate from initial push-mode selection`);
+      const anchored = spawnSync(anchorAsk.applyAction.executable, anchorAsk.applyAction.argv.map((value) => new Map([
+        ["<existing|new>", "existing"],
+        ["<absolute external key directory>", destination],
+        ["<human attribution>", "Greenfield Anchor PO"],
+        ["<absolute existing key path|none>", existingKey],
+      ]).get(value) ?? value), {
+        encoding: "utf8", shell: false, env, maxBuffer: 8 * 1024 * 1024,
+      });
+      assert.equal(anchored.status, 0, `${runner}: ${anchored.stderr}\n${anchored.stdout}`);
+      const anchoredResult = JSON.parse(anchored.stdout);
+      assert.deepEqual(anchoredResult.bootstrap, {
+        ok: true,
+        code: "TRUST-ANCHOR-BOOTSTRAP-COMPLETE",
+        mode: "existing",
+      });
+      const anchoredPolicy = JSON.parse(readFileSync(join(root, "project", "critical-human-proof.json"), "utf8"));
+      assert.equal(anchoredPolicy.schema, "pipeline.critical-human-proof-policy.v3");
+      assert.equal(anchoredPolicy.trustAnchors.length, 1);
+      assert.deepEqual(anchoredPolicy.waivedKinds, []);
+      assert.equal(JSON.parse(readFileSync(join(home, ".agent-pipeline", "machine.json"), "utf8")).poKeyDirectory, destination);
+      assert.equal(JSON.parse(readFileSync(join(root, ".git", "agent-pipeline", "po-key-directory.json"), "utf8")).poKeyDirectory, destination);
     }
   } finally {
     for (const path of fixtures) dispose(path);
   }
 });
 
-test("a failed bundled first-anchor action restores Git/source/machine state and leaves no receipt that could mask the retry", () => {
+test("a failed separate signature-anchor action preserves the completed initial chat-free transaction", () => {
   const root = freshRoot();
   const home = freshHome();
   try {
@@ -290,37 +329,43 @@ test("a failed bundled first-anchor action restores Git/source/machine state and
     const first = driveOnboardingInit({ rootDir: root, runner: "claude", env });
     assert.equal(first.outcome, "pending-asks");
     assert.equal(first.pendingAsks.length, 1);
-    const action = first.pendingAsks[0];
-    assert.deepEqual(action.inputs.map((input) => input.name), [
+    const initialAction = first.pendingAsks[0];
+    assert.deepEqual(initialAction.inputs.map((input) => input.name), [
       "gitAuthorName",
       "gitAuthorEmail",
       "pushApprovalPreference",
-      "trustAnchorSetupMode",
-      "trustAnchorDirectory",
-      "trustAnchorHumanName",
-      "trustAnchorExistingKeyPath",
     ]);
-    const replacements = new Map([
+    const initial = spawnSync(initialAction.applyAction.executable, initialAction.applyAction.argv.map((value) => new Map([
       ["<PO_GIT_AUTHOR_NAME>", "Rollback PO"],
       ["<PO_GIT_AUTHOR_EMAIL>", "rollback@example.invalid"],
-      ["<signature|chat>", "chat"],
+      ["<signature|chat>", "signature"],
+    ]).get(value) ?? value), {
+      encoding: "utf8", shell: false, env, maxBuffer: 8 * 1024 * 1024,
+    });
+    assert.equal(initial.status, 0, initial.stderr);
+    const initialResult = JSON.parse(initial.stdout);
+    const anchorAction = initialResult.pendingAsks?.find((ask) => ask.inputs?.some((input) => input.name === "trustAnchorSetupMode"))
+      ?? driveOnboardingInit({ rootDir: root, runner: "claude", env }).pendingAsks?.find((ask) => ask.inputs?.some((input) => input.name === "trustAnchorSetupMode"));
+    assert.ok(anchorAction, "signature re-entry reaches the separate anchor action");
+    const replacements = new Map([
       ["<existing|new>", "existing"],
       ["<absolute external key directory>", join(home, "failed-authority")],
       ["<human attribution>", "Rollback PO"],
       ["<absolute existing key path|none>", join(home, "missing-private.pem")],
     ]);
-    const failed = spawnSync(action.applyAction.executable, action.applyAction.argv.map((value) => replacements.get(value) ?? value), {
+    const failed = spawnSync(anchorAction.applyAction.executable, anchorAction.applyAction.argv.map((value) => replacements.get(value) ?? value), {
       encoding: "utf8", shell: false, env, maxBuffer: 8 * 1024 * 1024,
     });
     assert.equal(failed.status, 1, failed.stderr);
     const result = JSON.parse(failed.stdout);
     assert.equal(result.outcome, "error");
-    assert.equal(result.initialAnswers.code, "TRUST-ANCHOR-SETUP-FAILED");
-    assert.equal(existsSync(join(root, ".git", "agent-pipeline", "onboarding-initial-answers.json")), false);
-    assert.equal(spawnSync("git", ["-C", root, "config", "--local", "--get", "user.name"], { encoding: "utf8" }).status, 1);
-    assert.equal(spawnSync("git", ["-C", root, "config", "--local", "--get", "user.email"], { encoding: "utf8" }).status, 1);
+    assert.equal(result.bootstrap.code, "TRUST-ANCHOR-SETUP-FAILED");
+    assert.equal(existsSync(join(root, ".git", "agent-pipeline", "onboarding-initial-answers.json")), true);
+    assert.equal(spawnSync("git", ["-C", root, "config", "--local", "--get", "user.name"], { encoding: "utf8" }).stdout.trim(), "Rollback PO");
+    assert.equal(spawnSync("git", ["-C", root, "config", "--local", "--get", "user.email"], { encoding: "utf8" }).stdout.trim(), "rollback@example.invalid");
     assert.match(readFileSync(join(root, "pipeline.user.yaml"), "utf8"), /^\s*push_approval:\s*"signature"\s*$/mu);
-    assert.equal(existsSync(join(home, ".agent-pipeline", "machine.json")), false);
+    assert.match(readFileSync(join(root, "pipeline.user.yaml"), "utf8"), /^\s*human_approval:\s*"signature"\s*$/mu);
+    assert.equal(JSON.parse(readFileSync(join(home, ".agent-pipeline", "machine.json"), "utf8")).poKeyDirectory, null);
   } finally {
     dispose(root);
     dispose(home);

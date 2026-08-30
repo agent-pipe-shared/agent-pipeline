@@ -109,7 +109,7 @@ function capturePolicy() {
   ], sanitizedReceipt: { allowEventId: true, allowEventDigest: true, allowCheckpoint: true, allowReasonText: false }, mandatoryEventClasses: [] };
 }
 
-function repoFixture(prefix = "gmw-", { policy } = {}) {
+function repoFixture(prefix = "gmw-", { policy, humanApproval = null, includeCriticalPolicy = true } = {}) {
   const root = mkdtempSync(join(tmpdir(), prefix));
   roots.push(root);
   execFileSync("git", ["init", "-q"], { cwd: root });
@@ -119,14 +119,24 @@ function repoFixture(prefix = "gmw-", { policy } = {}) {
   writeFileSync(join(root, "README.md"), "# fixture\n");
   writeFileSync(join(root, "plan.md"), "plan\n");
   writeFileSync(join(root, "spec.md"), "spec\n");
-  writeFileSync(
-    join(root, "project", "critical-human-proof.json"),
-    JSON.stringify(policy ?? {
-      schema: "pipeline.critical-human-proof-policy.v1",
-      requiredKinds: ["push"],
-      trustAnchor: { keyReference: "gmw-test-key", publicKeySha256 },
-    }),
-  );
+  if (includeCriticalPolicy) {
+    writeFileSync(
+      join(root, "project", "critical-human-proof.json"),
+      JSON.stringify(policy ?? {
+        schema: "pipeline.critical-human-proof-policy.v1",
+        requiredKinds: ["push"],
+        trustAnchor: { keyReference: "gmw-test-key", publicKeySha256 },
+      }),
+    );
+  }
+  if (humanApproval !== null) {
+    writeFileSync(join(root, "pipeline.user.yaml"), [
+      'schema: "pipeline.user.v3"',
+      "gates:",
+      `  human_approval: "${humanApproval}"`,
+      "",
+    ].join("\n"));
+  }
   const repository = discoverRepository(root);
   const fingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: repository.commonDir, primaryRoot: repository.primaryRoot });
   mkdirSync(join(root, "governance", "events"), { recursive: true });
@@ -248,6 +258,53 @@ try {
     assert.equal(closeGuardMaintenanceWindow({ rootDir: root }).status, "closed");
     assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "absent");
     assert.equal(closeGuardMaintenanceWindow({ rootDir: root }).status, "absent", "closing twice is a no-op");
+  });
+
+  await check("global committed chat arms GMW without an anchor/proof and records chat-attributed-unattested", () => {
+    const root = repoFixture("gmw-global-chat-", { humanApproval: "chat", includeCriticalPolicy: false });
+    const plugin = pluginRootFixture();
+    const { planSha256, specSha256 } = planSpecShas(root);
+    const { request } = prepareGuardMaintenanceWindowRequest({
+      rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 120, reason: "global chat window",
+      featureId: "f", planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
+      authorshipMode: "goldfish-dispatch",
+    });
+    const installed = installGuardMaintenanceWindow({ rootDir: root, request, livePluginRoot: plugin });
+    assert.equal(installed.status, "active");
+    const common = execFileSync("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], { cwd: root, encoding: "utf8" }).trim();
+    const record = JSON.parse(readFileSync(join(common, "agent-pipeline", "guard-maintenance-window", "window.json"), "utf8"));
+    assert.equal(record.proof, null, "global chat must not import or persist a proof");
+    assert.deepEqual(record.humanApproval, {
+      mode: "chat-attributed-unattested",
+      kind: "guard-maintenance-window",
+    });
+    assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "active");
+  });
+
+  await check("signature/default/uncommitted/invalid human approval remains fail-closed without an anchor", () => {
+    for (const { name, humanApproval, uncommitted } of [
+      { name: "default", humanApproval: null, uncommitted: false },
+      { name: "signature", humanApproval: "signature", uncommitted: false },
+      { name: "invalid", humanApproval: "not-a-mode", uncommitted: false },
+      { name: "uncommitted chat", humanApproval: "chat", uncommitted: true },
+    ]) {
+      const root = repoFixture(`gmw-${name.replaceAll(" ", "-")}-`, { humanApproval });
+      if (uncommitted) {
+        writeFileSync(join(root, "pipeline.user.yaml"), 'schema: "pipeline.user.v3"\ngates:\n  human_approval: "chat"\n# not committed\n');
+      }
+      const plugin = pluginRootFixture();
+      const { planSha256, specSha256 } = planSpecShas(root);
+      const { request } = prepareGuardMaintenanceWindowRequest({
+        rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 120, reason: `${name} must sign`,
+        featureId: "f", planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
+        authorshipMode: "goldfish-dispatch",
+      });
+      assert.throws(
+        () => installGuardMaintenanceWindow({ rootDir: root, request, livePluginRoot: plugin }),
+        (error) => error instanceof GuardMaintenanceWindowError && error.code === "GMW-ANCHORS-INVALID",
+        `${name} must not enter the keyless global-chat path`,
+      );
+    }
   });
 
   // ---- fail-closed expiry parsing (F1: expiresAtMs lives INSIDE the signed subject) --

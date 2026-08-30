@@ -109,11 +109,13 @@ the exact base/head/tree, changed paths, changed-behaviour claims, an immutable
 prior receipt ID/digest, a complete hash-bound path-to-invariant map, and an
 unambiguous impact confirmation. Missing proof, an unknown path, a new trust
 boundary, or ambiguous impact falls back to full; it never silently narrows.
-There are at most four Critic rounds (the initial run plus one fresh re-Critic
-for each of at most three bundled correction commits) per package; the host
-reconciles that exact correction range before selecting either
-full or delta. A Critic receives the selected mode and affected invariant IDs,
-never prior verdict prose or findings.
+There are at most two Critic rounds per package: the initial run plus at most
+one fresh re-Critic for the first correction commit. The host reconciles that
+exact correction range before selecting either full or delta. If that
+re-Critic still reports a blocking finding, the Elephant self-verifies the
+next correction directly rather than dispatching a third Critic round. A
+Critic receives the selected mode and affected invariant IDs, never prior
+verdict prose or findings.
 
 **Progress and recovery:** elapsed time and liveness prose are not progress.
 The host records a monotonic vector over bound tree changes, verified output,
@@ -186,13 +188,21 @@ map's reporting validation rather than silently choosing a replacement control.
 **Rule (validate first):** Findings that violate the skip rule or lack evidence are rejected with a short note — no debate.
 **Rule (disposition):** EVERY blocker/major finding receives exactly one disposition: **fix** (rework dispatch) · **reject with recorded justification** · **escalate to the PO**. Minor findings: fix now, file as backlog item, or reject.
 **Rule (rework):** Rework is a **NEW dispatch with fresh context and a refined briefing** — never continued work in the failed context. BEFORE any re-dispatch or model escalation, run the harness checklist (P1 / `policies/tooling-policy.md` G2): (1) briefing complete and consistent? (2) context clean? (3) tools/permissions right-sized? (4) hooks/gates wired and actually run?
-**Rule (cycle cap) — UNRESOLVED merge conflict, needs an Elephant/PO decision (flagged by PHX-HARNESS during the Nova/Phoenix merge, 2026-08-26); the two branches state genuinely contradictory rules and this dispatch surfaces both verbatim rather than silently picking one:**
-- **`feat/sprint-nova-codex-v046` (Nova), labeled `Rule (cycle cap, QG-13)`:** "After the initial Critic round for a package, at most **one** re-review round follows a FAIL/blocking-finding rework — the Elephant dispatches the rework, then re-dispatches a fresh Critic exactly once against the reworked diff. If that re-review round ALSO reports a blocking finding, the Elephant self-verifies the further rework directly instead of dispatching a third Critic round for that package (`guardrails/quality-gates.md` QG-13 is the authoritative number; do not restate a different count here). The cap does not reset by re-labeling continued rework on the same finding as a "new" package or task — only a genuine scope change (a materially different diff, a newly discovered A/G/S touch, or explicit PO direction) licenses a fresh initial round."
-- **`origin/sprint_phoenix` (Phoenix), labeled `Rule (cycle cap)`:** "Max **3 fresh local rework cycles per task**. Open the PO course gate only when a further correction would exceed that budget (>3) — mandatory, no exceptions."
+**Rule (cycle cap, QG-13):** After the initial Critic round for a package, at
+most **one** re-review round follows a FAIL/blocking-finding rework: the
+Elephant dispatches the rework, then re-dispatches a fresh Critic exactly once
+against the reworked diff. If that re-review round also reports a blocking
+finding, the Elephant self-verifies the further rework directly instead of
+dispatching a third Critic round for that package. The cap does not reset by
+re-labeling continued rework on the same finding as a "new" package or task;
+only a genuine scope change (a materially different diff, a newly discovered
+A/G/S touch, or explicit PO direction) licenses a fresh initial round.
 
-These cannot both govern at once: Nova caps at one Critic-backed re-review round and routes any further failure to Elephant self-verification with no PO gate; Phoenix permits up to three fresh Critic-backed rework cycles before a PO gate opens at all. Whichever this repository adopts, `guardrails/quality-gates.md` QG-13 (cited by the Nova side) needs to state the same number as whatever lands here.
-
-**Rule (re-review):** After rework, the trigger table (§2.1) re-applies to the new diff; mandatory triggers → a NEW fresh Critic run, subject to the cycle cap above once resolved. A Critic context is never reused — it would anchor on its own previous findings (same rationale as the readiness-check repetition rule, `docs/operating-model.md` §4 — *The lifecycle*, step 3 "Spec and readiness").
+**Rule (re-review):** After the first rework, the trigger table (§2.1) re-applies
+to the new diff; mandatory triggers → one NEW fresh Critic run, subject to the
+cycle cap above. A Critic context is never reused — it would anchor on its own
+previous findings (same rationale as the readiness-check repetition rule,
+`docs/operating-model.md` §4 — *The lifecycle*, step 3 "Spec and readiness").
 **Rule (no dialogue):** There is never a Critic↔Goldfish dialogue; the Elephant mediates via briefings.
 **Why:** Findings without dispositions rot; unbounded rework cycles are the expensive form of grinding; a reused reviewer stops being fresh.
 **Check:** The gate decision records the applied trigger row, the disposition per finding, and the cycle count; a telemetry line exists per Critic run; merge blocks without a findings report where the trigger was mandatory.

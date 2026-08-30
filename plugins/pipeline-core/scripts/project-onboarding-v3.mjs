@@ -7,7 +7,8 @@ import { isAbsolute, relative, resolve } from "node:path";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { observeCodexOnboardingCapabilities } from "../lib/codex-onboarding-capabilities.mjs";
-import { requireAttendedChatGateConfirmation } from "../lib/chat-gate-ceremony.mjs";
+import { chatAttributionRecord, requireAttendedChatGateConfirmation } from "../lib/chat-gate-ceremony.mjs";
+import { USER_SOURCE_PATH, readHumanApprovalMode } from "../lib/critical-human-proof-policy.mjs";
 import { loadManifestSafe, resolveHumanFacingLanguage, gateConfig } from "../lib/manifest.mjs";
 import { planInstall as planPrePushHookInstall, MARKER_SCHEMA as PRE_PUSH_HOOK_MARKER_SCHEMA, DECLINE_MARKER_SCHEMA as PRE_PUSH_HOOK_DECLINE_MARKER_SCHEMA } from "./pre-push-hook-install.mjs";
 import { resolveActiveRunner } from "./pipeline-start-preflight.mjs";
@@ -398,6 +399,20 @@ function kickoffChatGateSpecFor(options) {
   return null;
 }
 
+// Only a committed repository-wide selection suppresses the historical terminal
+// ceremony.  A missing, malformed, unsafe, unreadable or uncommitted source stays
+// on the existing fail-closed path and therefore cannot weaken a kickoff gate.
+function committedGlobalChatHumanApproval(root, deps = {}) {
+  try {
+    const approval = readHumanApprovalMode(root, { spawn: deps.spawnSync ?? deps.spawn });
+    return approval.mode === "chat"
+      && approval.source === USER_SOURCE_PATH
+      && approval.scope === "global";
+  } catch {
+    return false;
+  }
+}
+
 // The EXACT re-run command a human copies into their own attended terminal --
 // built from the raw argv this call received (not reconstructed from parsed
 // `options`), so it is byte-faithful to what the agent actually invoked, same
@@ -624,24 +639,15 @@ export function main(args = process.argv.slice(2), {
   }
   deps = withUnbornHeadDispatchDeferral({ root: options.root, intent: options.intent, deps });
 
-  // AGY-CHATADAPTER-2: an agent's own tool-calling harness has no TTY on file
-  // descriptor 0 and can never complete this step, no matter what value it
-  // already knows or pipes into stdin -- only a human running this EXACT
-  // command directly in their own attended terminal, and typing the proposed
-  // value back, can let it through (`requireAttendedChatGateConfirmation`,
-  // `lib/chat-gate-ceremony.mjs`, the same primitive AGY-CHATADAPTER-1 built
-  // for `approve-push`). Deliberately no persisted cross-call challenge record
-  // here (contrast `pipeline-state.mjs`'s `pendingPushChallenge`): kickoff-plan
-  // is declared `mutates: false` above, and `lib/project-onboarding-v3.mjs`
-  // itself documents that no project state file exists yet this early in
-  // onboarding -- inventing a new persistence location purely to hold a
-  // pending-challenge record would be exactly the "new one-off ceremony" this
-  // backlog item's own history already stopped short of building. The gate is
-  // therefore stateless and re-checked on every call: an unattended attempt
-  // (the agent's) always refuses; an attended attempt (the human's, typing the
-  // value shown back) always succeeds, with no state surviving between them.
+  // The default/legacy posture keeps AGY-CHATADAPTER-2's attended-terminal
+  // ceremony.  A committed global `human_approval: chat` is a different
+  // product posture: explicit Chat attribution is intentionally non-attested,
+  // so it must not inspect a TTY or request a copy-back value.  Kickoff has no
+  // project-state record before this point; its durable source is the committed
+  // policy, while the successful command result carries the explicit basis.
   const gateSpec = kickoffChatGateSpecFor(options);
-  if (gateSpec) {
+  const globalChat = gateSpec !== null && committedGlobalChatHumanApproval(options.root, deps ?? {});
+  if (gateSpec && !globalChat) {
     const confirmation = requireAttendedChatGateConfirmation({
       summaryLines: gateSpec.summaryLines,
       expected: gateSpec.expected,
@@ -777,6 +783,14 @@ export function main(args = process.argv.slice(2), {
   if (options.command === "inspect" || options.command === "continuity-inspect") {
     const prePushHookOffer = buildPrePushHookOfferAction({ rootDir: options.root });
     if (prePushHookOffer) output.prePushHookOffer = prePushHookOffer;
+  }
+  if (globalChat && output !== null && typeof output === "object" && !Array.isArray(output)) {
+    output = {
+      ...output,
+      humanApproval: chatAttributionRecord({
+        kind: gateSpec.label.startsWith("--language") ? "kickoff-language" : "kickoff-promotion-profile",
+      }),
+    };
   }
   write(`${JSON.stringify(output, null, 2)}\n`);
   // Wave 4 step 4 (NVA-W4-COORD-2): intake-generate-plan is `{ schema, root,
