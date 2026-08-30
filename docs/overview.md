@@ -1,25 +1,44 @@
 # Overview
 
-The current overview lives in the top-level [README](../README.md): it explains
-the roles, the value of independent review and evidence, and why the pipeline
-scales from an individual developer to a governed team.
+Agent-Pipeline is a product for controlled, agent-assisted software delivery.
+It turns an intent into a bounded, reviewable change without making a chat
+history the source of truth. Its core loop is simple: record the work,
+dispatch it with a fresh context, collect deterministic evidence, review the
+result independently, and preserve the decision for the next session.
 
-## 0.6.0 candidate at a glance
+## The 0.6.0 product shape
 
-`0.6.0` is a local candidate, not a published release. Its Nova outcome is one
-guided Greenfield route: from an empty project directory, the runner follows
-only public Driver actions through onboarding, plan approval, verify setup, and
-the first implementation file. Human data stays explicit: a runner replaces
-only the placeholders named by the returned action, and the first trust anchor
-can use an existing key or create a new one.
+`0.6.0` is a local release candidate, not a published release. It combines a
+completed, integrated Phoenix foundation with the current candidate-ready Nova
+increment.
 
-The automated end-to-end contract covers Claude, Codex, and Antigravity.
-Phoenix's result is a boundary, not a marketing claim: missing, stale,
-malformed, or candidate-mismatched evidence remains a failure, and the
-candidate is not published until its release evidence and three independent
-live Greenfield runs are complete. See [What's new in
-0.6.0](whats-new-0.6.0.md) for the precise candidate status.
+| Product strand | What it contributes in this candidate | Status |
+| --- | --- | --- |
+| Phoenix | Durable delivery governance: explicit human decisions, candidate-bound evidence, deterministic gates before review, safe external-action boundaries, and recoverable public records. | Integrated foundation |
+| Nova | Runner-aware execution and guided adoption: public Driver actions, resumable onboarding context, a real verify setup, and scoped parallel delivery. | Active; the listed 0.6.0 subset is candidate-ready |
 
-For the normative workflow, use [`../PIPELINE_FLOW.md`](../PIPELINE_FLOW.md)
-and [`operating-model.md`](operating-model.md). For installation and adoption,
-use [`../SETUP.md`](../SETUP.md).
+The candidate's Greenfield route is covered for Claude, Codex, and Antigravity:
+from an empty directory through public onboarding actions, plan approval and a
+real verify command to the first implementation step. A runner follows the
+returned Driver action and fills only its named human placeholders. That makes
+the next step discoverable instead of relying on an agent remembering internal
+commands.
+
+Runner integrations are intentionally described by their evidence. A common
+methodology does not mean that every host has identical native hooks, sandbox
+isolation, model identity, or platform coverage. Missing, stale, malformed, or
+candidate-mismatched evidence stays a typed non-success.
+
+## What is still a roadmap item
+
+Nova B remains active. It contains the next usability and operations work, such
+as easier plan amendments and formal close, clearer runner-specific approval
+and verify guidance, delivery-loop observability, and additional
+platform-specific evidence. Those items do not reduce the controls that are
+already integrated through Phoenix, and this overview does not present them as
+completed.
+
+For the product entry point, use the top-level [README](../README.md). For a
+candidate-level summary and non-claims, see [What's new in
+0.6.0](whats-new-0.6.0.md). [Usage](usage.md) gives the normal user journey;
+[Operating Model](operating-model.md) is the normative process contract.

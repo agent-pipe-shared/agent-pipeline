@@ -22,23 +22,27 @@ feature branches and dogfooding rounds. Feedback welcome.*
 > is optional reference.
 
 > **Current candidate: `0.6.0` — not released.** The local source and plugin
-> manifests are versioned as `0.6.0`, but this is a test candidate, not an
-> installation recommendation or production release. Nova makes the Greenfield
-> path usable: the public driver leads an empty directory through guided
-> onboarding, plan approval, real verify-command setup, and the first
-> implementation file. It publishes structured actions; a runner follows those
-> actions and replaces only the declared human-input placeholders, rather than
-> reconstructing internal CLI calls. The automated path covers Claude, Codex,
-> and Antigravity, including a first trust anchor that may use an existing key
-> or create a new one. Phoenix keeps the safety boundary intact: an absent,
-> stale, malformed, or mismatched proof is never reported as success.
+> manifests are versioned as `0.6.0`, but this is a release candidate, not an
+> installation recommendation or production release. **Phoenix is the completed,
+> integrated product foundation:** durable delivery governance, explicit
+> candidate-bound evidence and approvals, independent review, and safe
+> boundaries for external actions. Missing, stale, malformed, or mismatched
+> proof remains a typed non-success.
 >
-> Publication remains deliberately separate. The candidate still needs its
-> complete candidate-bound release evidence and the independent live Greenfield
-> acceptance for all three runners; no earlier result is silently carried over
-> to a changed candidate. See [What's new in 0.6.0](docs/whats-new-0.6.0.md)
-> for scope, evidence, and non-claims, and the
-> [consumer onboarding guide](docs/v3-consumer-onboarding.md) for the full
+> **Nova remains active.** This candidate carries its usable, runner-aware
+> increment: a public Driver takes an empty directory through guided onboarding,
+> an existing or new first trust anchor, resumable intake, plan approval, real
+> verify setup, and the first implementation step. Claude, Codex, and
+> Antigravity exercise the same structured-action contract; a runner fills only
+> the declared human placeholders instead of reconstructing internal commands.
+> Nova B and runner-specific evidence remain future work, not a hidden claim
+> that Nova is complete.
+>
+> Publication remains deliberately separate. The final candidate needs its own
+> complete Verify, security, independent-review, approval, and remote-readback
+> evidence; no earlier result is silently carried over to a changed tree. See
+> [What's new in 0.6.0](docs/whats-new-0.6.0.md) for scope and non-claims, and
+> the [consumer onboarding guide](docs/v3-consumer-onboarding.md) for the full
 > lifecycle.
 
 > **What this costs you.** Enforcement is not free: gates, evidence discipline,
@@ -335,23 +339,29 @@ willkommen.*
 
 > **Aktueller Kandidat: `0.6.0` — noch nicht veröffentlicht.** Der lokale
 > Source und die Plugin-Manifeste tragen bereits `0.6.0`, aber das ist ein
-> Testkandidat und weder Installationsempfehlung noch Produktiv-Release. Nova
-> macht den Greenfield-Weg nutzbar: Der öffentliche Driver führt ein leeres
-> Verzeichnis durch das geführte Onboarding, die Planfreigabe, das Setzen eines
-> echten Verify-Kommandos und bis zur ersten Implementierungsdatei. Er liefert
-> strukturierte Aktionen; der Runner folgt diesen Aktionen und ersetzt nur die
-> ausgewiesenen menschlichen Eingabe-Platzhalter, statt interne CLI-Aufrufe zu
-> erraten. Der automatisierte Pfad deckt Claude, Codex und Antigravity ab,
-> einschließlich eines ersten Trust Anchors mit bestehendem oder neuem Schlüssel.
-> Phoenix erhält die Sicherheitsgrenze: Fehlende, veraltete, fehlerhafte oder
-> nicht passende Nachweise werden nie als Erfolg ausgegeben.
+> Release-Kandidat und weder Installationsempfehlung noch Produktiv-Release.
+> **Phoenix ist die abgeschlossene, integrierte Produktgrundlage:** dauerhafte
+> Delivery-Governance, explizite kandidatengebundene Evidenz und Freigaben,
+> unabhängige Prüfung sowie sichere Grenzen für externe Aktionen. Fehlende,
+> veraltete, fehlerhafte oder nicht passende Nachweise bleiben typisierte
+> Nicht-Erfolge.
 >
-> Die Veröffentlichung bleibt bewusst getrennt. Der Kandidat braucht noch seine
-> vollständige kandidatengebundene Release-Evidenz und die unabhängige Live-
-> Greenfield-Abnahme aller drei Runner; kein älteres Ergebnis wird still auf einen
-> veränderten Kandidaten übertragen. Umfang, Evidenz und bewusste Nicht-Claims
-> stehen unter [Neu in 0.6.0](docs/whats-new-0.6.0.md); den vollständigen Ablauf
-> beschreibt der [Consumer-Onboarding-Guide](docs/v3-consumer-onboarding.md).
+> **Nova bleibt aktiv.** Dieser Kandidat enthält dessen nutzbaren,
+> runner-bewussten Schritt: Ein öffentlicher Driver führt ein leeres Verzeichnis
+> über geführtes Onboarding, einen vorhandenen oder neuen ersten Trust Anchor,
+> wiederaufnehmbaren Intake, Planfreigabe, ein echtes Verify-Setup und den Start
+> der ersten Implementierung. Claude, Codex und Antigravity folgen dabei
+> demselben Vertrag strukturierter Aktionen; ein Runner füllt nur die
+> ausgewiesenen menschlichen Platzhalter statt interne Befehle zu erraten. Nova B
+> und runnerspezifische Evidenz bleiben Folgearbeit, nicht die Behauptung, Nova
+> sei abgeschlossen.
+>
+> Die Veröffentlichung bleibt bewusst getrennt. Der finale Kandidat braucht seine
+> vollständige eigene Verify-, Security-, unabhängige Review-, Freigabe- und
+> Remote-Readback-Evidenz; kein älteres Ergebnis wird still auf einen veränderten
+> Tree übertragen. Umfang und bewusste Nicht-Claims stehen unter [Neu in
+> 0.6.0](docs/whats-new-0.6.0.md); den vollständigen Ablauf beschreibt der
+> [Consumer-Onboarding-Guide](docs/v3-consumer-onboarding.md).
 
 ## Das Problem
 

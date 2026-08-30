@@ -1,16 +1,46 @@
 # Changelog
 
-- Fix the 0.4.6 Codex onboarding candidate so recognized damaged continuity
-  receives a bounded, digest-confirmed repair instead of a diagnostic loop;
-  established PO-bound repositories can adopt continuity without fabricating
-  kickoff history, and direct edits of the writer-owned machine State are
-  blocked.
-
-All notable changes to the Agent Pipeline are documented here.
+All notable changes to Agent-Pipeline are documented here. `0.6.0` is the
+current release candidate; a version recorded here is not, by itself, a tag,
+GitHub Release, marketplace publication, remote readback, or production-support
+claim.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versioning per [ADR-0002](docs/adr/0002-versioning-sha-then-semver.md): the `0.4.0` release candidate uses stable SemVer surfaces; a version in this file is not a tag, GitHub Release, marketplace publication, or remote readback.
 
 ## [Unreleased]
+
+## [0.6.0] — 2026-08-30 (release candidate)
+
+This is a source and plugin release candidate only. It does not create a tag,
+marketplace publication, GitHub Release, or production-support claim. Final
+publication remains contingent on evidence bound to the final candidate.
+
+### Added
+
+- The completed Phoenix product strand is integrated as the delivery-governance
+  foundation: candidate-bound evidence and approvals, deterministic checks before
+  independent review, recoverable operational records, and typed boundaries for
+  external actions.
+- The candidate-ready Nova Greenfield Driver leads a fresh directory through
+  public structured actions rather than a runner reconstructing internal
+  onboarding commands. It supports an existing or new first trust anchor,
+  resumable onboarding context, plan approval, real verify setup, and the first
+  implementation step.
+- The Greenfield contract covers Claude, Codex, and Antigravity. Independently
+  scoped delivery packages may run in parallel while retaining the normal
+  deterministic-evidence and Critic order.
+
+### Changed
+
+- The product documentation now distinguishes the integrated Phoenix foundation
+  from active Nova work. Nova B remains an explicit roadmap, not an implied
+  claim that all Nova work or all host-specific assurance is complete.
+
+### Security
+
+- Missing, stale, malformed, skipped, or candidate-mismatched evidence remains
+  a typed non-success. Smoother onboarding and delivery sequencing do not waive
+  approvals, signatures, deterministic checks, or the release boundary.
 
 ## [0.5.1] — 2026-08-02
 

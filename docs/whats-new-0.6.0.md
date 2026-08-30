@@ -1,82 +1,110 @@
-# What's new in 0.6.0 (candidate)
+# What's new in 0.6.0 (release candidate)
 
-`0.6.0` is the current local candidate. It is versioned in the source and
-plugin manifests, but it is not a published release or an installation
-recommendation yet.
+`0.6.0` is the current source and plugin release candidate. It is not yet a
+published release, marketplace publication, or production-installation
+recommendation. A release claim needs the final candidate's own verification,
+independent review, approval, and remote readback; evidence for an earlier tree
+does not carry forward automatically.
 
-## The Nova outcome: a usable Greenfield path
+## The product baseline: Phoenix is integrated
 
-The public onboarding Driver is now the user-facing sequence owner. Starting
-with an empty directory, it repeatedly inspects durable state, runs only its
-own published safe steps, and stops only for a real human decision. When it
-needs input, it returns one structured action. The runner uses that action as
-given and replaces only its explicitly declared placeholders; it does not guess
-or rebuild internal CLI sequences.
+Phoenix is the completed, integrated product strand in this candidate. It
+supplies the durable delivery controls that the rest of the pipeline uses:
 
-The tested path is:
+- a traceable path from intent and specification to bounded work, deterministic
+  checks, independent review, and close;
+- evidence and approvals bound to the candidate and their declared decision,
+  rather than an agent's summary of what happened;
+- runner-aware trust boundaries for local controls and external actions, with
+  typed non-success whenever the required proof is absent, stale, malformed, or
+  mismatched; and
+- public-safe operational records that let a later session or teammate recover
+  the decision without treating chat history as authority.
 
-1. choose installation and give the bundled initial project/author settings;
-2. use an existing first trust-anchor key or create a new one;
-3. provide the project description and design answers;
-4. review and approve the plan;
-5. give the real project verify command; and
-6. receive `ready`, then create and verify the first implementation file.
+Those controls are deliberately fail-closed. They make a missing proof visible;
+they do not prove a runner's native sandbox isolation, model identity, or
+platform support unless runner-specific evidence says so.
 
-The automated end-to-end test executes that contract for Claude, Codex, and
-Antigravity. It deliberately follows returned actions only, so it checks that a
-fresh runner can discover the next step rather than merely proving that an
-expert can call the underlying scripts in the right order.
+## The 0.6.0 Nova increment: the usable path forward
 
-## The Phoenix outcome: keep the safety claim narrow and real
+Nova remains an active product stream. `0.6.0` carries the candidate-ready
+portion of that work, rather than declaring Nova complete:
 
-The candidate retains the fail-closed evidence model. Missing, stale,
-malformed, skipped, or candidate-mismatched evidence is a typed non-success;
-it is not converted into a green result to make a flow smoother. Human
-approvals remain explicit and bound to their intended decision. The smoother
-Driver path therefore removes sequencing friction without treating a guard,
-signature, or release boundary as optional.
+- **Guided Greenfield adoption.** The public onboarding Driver leads an empty
+  directory through its returned actions. It owns the sequence; runners follow
+  the action and replace only the named human-input placeholders instead of
+  reconstructing private CLI calls.
+- **A practical first project.** The path collects project and author details,
+  accepts either an existing first trust-anchor key or a newly created one,
+  preserves supplied onboarding context across a restart, gathers the
+  design/intake input, records plan approval, installs a real verify command,
+  and reaches the first implementation step.
+- **Runner-aware delivery.** The Driver's structured contract is exercised for
+  Claude, Codex, and Antigravity. The same delivery model supports independently
+  scoped work packages running in parallel when their ownership does not
+  conflict; deterministic evidence still precedes independent review.
 
-## What 0.6.0 does not claim yet
+The Greenfield contract is intentionally an end-to-end discoverability test: it
+checks that a fresh runner can find the next public action. It does not merely
+prove that an expert can invoke private scripts in the right order.
 
-- It is not released, published, or recommended for production installation.
-- Automated three-runner coverage is not a substitute for the three independent
-  live Greenfield acceptances. Those remain release acceptance evidence.
-- Any source change invalidates release evidence for an earlier candidate; the
-  final candidate needs its own complete, candidate-bound Verify, security,
-  review, and release evidence.
-- A runner's route does not prove native sandbox isolation, model identity, or
-  unmeasured platform support. Those claims require their own runner-specific
-  evidence.
+## What remains open
 
-For the day-to-day entry path, see [Usage](usage.md). For the normative
-contract, see the [Operating Model](operating-model.md). The detailed release
-notes, migration guidance, and issue-by-issue record remain separate work; this
-page is intentionally the high-level candidate boundary.
+Nova B continues the user-experience and operational follow-up: smoother plan
+amendment and close flows, clearer cross-runner approval and verification
+guidance, stronger delivery-loop observability, and remaining platform- or
+runner-specific evidence. These are roadmap items, not hidden release claims.
+
+In particular, `0.6.0` does not claim:
+
+- publication, a Git tag, marketplace availability, or production support;
+- universal or equivalent enforcement across every host and platform;
+- that a successful automated run substitutes for the final candidate-bound
+  Verify, security checks, Critic review, approval, and remote readback; or
+- that all Nova work is finished.
+
+For the user journey, see [Usage](usage.md) and
+[PIPELINE_FLOW](../PIPELINE_FLOW.md). The normative roles and gates are in the
+[Operating Model](operating-model.md); exact runner boundaries are in
+[Runtime boundary](runtime-boundary.md).
 
 ---
 
 ## Deutsche Lesefassung (nicht normativ)
 
-`0.6.0` ist der aktuelle lokale Kandidat: Source und Plugin-Manifeste sind so
-versioniert, aber es ist noch kein veröffentlichtes Release und keine
-Installationsempfehlung. Nova liefert einen nutzbaren Greenfield-Weg. Der
-öffentliche Onboarding-Driver führt aus einem leeren Verzeichnis über seine
-eigenen veröffentlichten Schritte und hält nur bei echten menschlichen
-Entscheidungen an. Bei Eingaben gibt er eine strukturierte Aktion zurück; der
-Runner ersetzt nur deren explizite Platzhalter und errät keine internen
-CLI-Sequenzen.
+`0.6.0` ist der aktuelle Release-Kandidat für Source und Plugin. Er ist noch
+kein veröffentlichtes Release, keine Marketplace-Veröffentlichung und keine
+Empfehlung für eine Produktivinstallation. Eine Release-Behauptung braucht die
+abschließende kandidatengebundene Verifikation, unabhängige Prüfung,
+Freigabe und das Remote-Readback. Evidenz für einen älteren Tree wird nicht
+automatisch übernommen.
 
-Der automatisierte Ende-zu-Ende-Test führt diesen Vertrag für Claude, Codex und
-Antigravity aus: Installation und erste Projektdaten, vorhandener oder neuer
-Trust Anchor, Intake/Design, Planfreigabe, echtes Verify-Kommando und die erste
-geprüfte Implementierungsdatei. Phoenix hält die Sicherheitsgrenze eng: fehlende,
-veraltete, fehlerhafte, übersprungene oder nicht zum Kandidaten passende Evidenz
-bleibt ein typisierter Nicht-Erfolg. Dieser leichtere Ablauf lockert weder
-Guardrails noch Signaturen oder Release-Gates.
+**Phoenix ist der abgeschlossene, integrierte Produktstrang dieses
+Kandidaten.** Er stellt die dauerhaften Delivery-Kontrollen bereit: den
+nachvollziehbaren Weg von Absicht und Spezifikation über deterministische
+Prüfungen und unabhängiges Review bis zum Abschluss, kandidatengebundene
+Evidenz und Freigaben sowie runner-bewusste Grenzen für lokale Kontrollen und
+externe Aktionen. Fehlt ein Nachweis, ist er veraltet, fehlerhaft oder passt
+nicht zum Kandidaten, bleibt das Ergebnis ein typisierter Nicht-Erfolg. Das
+belegt für sich allein weder native Sandbox-Isolation noch Modellidentität oder
+Plattformunterstützung.
 
-Noch offen für eine Veröffentlichung sind die unabhängige Live-Greenfield-
-Abnahme aller drei Runner und die vollständige kandidatengebundene Release-
-Evidenz. Automatisierte Abdeckung ersetzt diese Abnahme nicht; eine Änderung am
-Source entwertet Evidenz eines früheren Kandidaten. Native Sandbox,
-Modellidentität und nicht gemessene Plattformunterstützung werden nicht allein
-aus einem Runner-Weg behauptet.
+**Nova bleibt ein aktiver Produktstrang.** `0.6.0` enthält dessen
+kandidatreife Ergebnisse, nicht den Abschluss von Nova: Der öffentliche
+Onboarding-Driver führt ein leeres Verzeichnis über eigene strukturierte
+Aktionen. Runner folgen diesen Aktionen und ersetzen nur ausgewiesene
+menschliche Platzhalter, statt interne CLI-Aufrufe zu erraten. Der Weg umfasst
+Projekt- und Autor-Daten, einen vorhandenen oder neuen ersten Trust Anchor,
+gespeicherten Onboarding-Kontext über einen Neustart, Intake/Design,
+Planfreigabe, ein echtes Verify-Kommando und den Start der ersten
+Implementierung. Der Vertrag wird für Claude, Codex und Antigravity getestet
+und prüft bewusst, ob ein frischer Runner den nächsten öffentlichen Schritt
+finden kann.
+
+Nova B bleibt für UX- und Betriebsverbesserungen offen, etwa Planänderungen und
+Feature-Abschluss, klarere runnerübergreifende Freigabe-/Verify-Hinweise,
+Delivery-Beobachtbarkeit sowie plattform- oder runnerspezifische Evidenz.
+`0.6.0` behauptet weder Veröffentlichung oder universelle Host-Unterstützung
+noch den Abschluss aller Nova-Arbeit. Ein automatischer Testlauf ersetzt nicht
+die abschließende kandidatengebundene Verify-, Security-, Critic-, Freigabe-
+und Remote-Readback-Evidenz.
