@@ -3,7 +3,10 @@ schema: pipeline.backlog-item.v1
 id: pipeline.codex-worker-dispatch-fails-session-capability-probe-root-does-not
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-30
+closure_repository: self
+closure_evidence: plugins/pipeline-core/lib/codex-onboarding-capabilities.mjs
 created: 2026-08-30
 sprint: nova
 tracking: "NOW / Nova A -- PO-raised 2026-08-30 from the Codex/WSL greenfield retrospective; confirmed via code trace to be a genuinely separate defect from the resume-hint enforcement gap and the design-binding gap raised alongside it."
@@ -63,6 +66,51 @@ deliberately does not guess a fix without that reproduction.
 - Root and worker sessions converge to the same capability outcome for the
   same repository, or the divergence is a deliberate, documented,
   necessary constraint (not an accidental defect).
+
+## Closed, 2026-08-30 (live diagnosis with the PO, root cause confirmed)
+
+Live-reproduced with the PO directly against `Rune_Test1_Codex_060_77`,
+using a standalone raw-probe script (`scratch/raw-session-probe-diagnostic.mjs`,
+not committed -- gitignored scratch, replicates
+`disposableWriteProbe()`'s exact `openSync`/`writeFileSync`/`fsyncSync`/
+`renameSync` sequence against the real `.git` directory) and a
+spawn-logging wrapper around the real, installed
+`diagnoseCodexOnboardingSessionCapability()`:
+
+- `.git` is a real physical directory, not a worktree/submodule pointer.
+- Plain-shell `touch`/`ls`/`rm` against `.git` succeeds cleanly (POSIX
+  permissions are fine).
+- The raw-probe script, run at the "authorized host boundary" (a plain
+  terminal, outside Codex's own tool-calling context), succeeds fully --
+  open, write, fsync, rename, cleanup, no error.
+- **The SAME script, run from inside Codex's own sandboxed tool-calling
+  context, fails immediately at its own `execSync("git rev-parse
+  --git-common-dir")` call with `spawnSync /bin/sh: EPERM`** -- child-process
+  spawning itself is blocked by the Codex sandbox, not by Git, not by
+  filesystem permissions, not by Pipeline code.
+
+**Root cause: Codex's sandbox blocks child-process spawning (EPERM) in
+(at least some) worker/tool-calling contexts.** `validateLocalRepository()`
+(`plugins/pipeline-core/lib/codex-onboarding-capabilities.mjs`) spawns
+`git` subprocesses (via `discoverRepository()`/`gitVersion()`) to validate
+the repository BEFORE `disposableWriteProbe()`'s pure-fs descriptor probe
+ever runs -- so the spawn EPERM fires first, surfacing as the redacted
+`repository-private-control` stage. This is an environmental/sandbox
+configuration constraint, not a Pipeline defect: no code fix changes
+whether Codex's sandbox permits spawning `git`.
+
+**Not fixed, and correctly not fixed:** relaxing the Pipeline's own
+git-spawn-based validation would weaken a real security-relevant check for
+every OTHER runner/environment to work around one sandbox's configuration.
+
+**Optional, cheap follow-up (Nova B, not required):** `diagnoseCodexOnboardingSessionCapability()`'s
+redaction (by design, per its own doc comment) currently reports only
+`{status, stage}` -- it could additionally recognize the specific
+`spawn EPERM` shape and name it explicitly ("git subprocess spawning is
+blocked in this environment -- check sandbox/workspace permissions")
+instead of staying fully generic, without leaking any of the currently-
+redacted descriptor paths, nonces, or DACLs. Left for a future session; not
+blocking.
 
 ## Triage
 
