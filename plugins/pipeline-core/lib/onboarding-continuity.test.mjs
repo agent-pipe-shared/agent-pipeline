@@ -3283,14 +3283,27 @@ check("planOnboardingIntakeGenerate / applyOnboardingIntakeGenerate: happy path 
 // into design-input.md, the PRD, and the spec.
 check("applyOnboardingIntakeGenerate: private host paths are projected consistently without changing restart-readable intake evidence", () => {
   const posixHomeKeyPath = "/home/example-operator/.ssh/nova-signing-key.pem";
+  const macOsPrivateVarPath = "/private/var/folders/example-operator/T/nova-signing-key.pem";
+  const posixVarPath = "/var/lib/nova/operator-state.json";
+  const posixTmpPath = "/tmp/nova/operator-input.txt";
   const windowsDriveKeyPath = String.raw`C:\Users\example-operator\.ssh\nova-signing-key.pem`;
   const wslUncKeyPath = String.raw`\\wsl.localhost\Ubuntu\home\example-operator\.ssh\nova-signing-key.pem`;
-  const privatePaths = [posixHomeKeyPath, windowsDriveKeyPath, wslUncKeyPath];
+  const privatePaths = [
+    posixHomeKeyPath,
+    macOsPrivateVarPath,
+    posixVarPath,
+    posixTmpPath,
+    windowsDriveKeyPath,
+    wslUncKeyPath,
+  ];
   const material = [
     "The service must capture meaningful product requirements and continue greenfield generation automatically.",
     `A local POSIX operator may load a signing key from ${posixHomeKeyPath}.`,
+    `A local macOS operator may stage it at ${macOsPrivateVarPath}, or under ${posixVarPath}.`,
+    `A local temporary file may be ${posixTmpPath}.`,
     `A Windows operator may use ${windowsDriveKeyPath}.`,
     `A WSL operator may use ${wslUncKeyPath}.`,
+    "The documented HTTP route /v1/onboarding/intake is not a local host path and must remain visible.",
     "The tracked design package must retain this surrounding requirement prose without requiring another human round.",
   ].join("\n");
   const marker = "[REDACTED LOCAL PATH]";
@@ -3316,6 +3329,8 @@ check("applyOnboardingIntakeGenerate: private host paths are projected consisten
     assert.equal(tracked.includes(projectedMaterial), true,
       `${key} must use the same projection while retaining surrounding requirement prose`);
     assert.equal(tracked.includes(marker), true, `${key} must carry an explicit deterministic redaction marker`);
+    assert.equal(tracked.includes("/v1/onboarding/intake"), true,
+      `${key} must preserve ordinary route prose that is not a host path`);
   }
 
   const afterCheckpoint = readOnboardingIntakeCheckpoint({ rootDir: root });
