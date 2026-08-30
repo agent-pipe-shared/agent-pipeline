@@ -62,6 +62,10 @@ import { MACHINE_PLANE_SCHEMA, machinePlaneFilePath as libMachinePlaneFilePath, 
 // to (never through the guard's own re-export), so the byte-identity test below cannot pass
 // merely because both names happen to reference the identical function object.
 import { boundedOpaqueCopyCommand } from "../lib/copy-safe-command.mjs";
+// NVA-CF-GUARDVERBOSITY: the on-demand `render-copy-safe` CLI subcommand this hook's denial
+// now points to instead of inlining the bounded block itself -- aliased, this file already
+// imports a `main` from the guard module under test above.
+import { main as guardHumanOverrideMain } from "../scripts/guard-human-override.mjs";
 import {
   isBoundedReadOnlyPipeline,
   parseGuardCommand,
@@ -4236,6 +4240,18 @@ function hgoGitFixture(mode) {
   return base;
 }
 
+/** NVA-CF-GUARDVERBOSITY: captures guardHumanOverrideMain()'s stdout/stderr, mirroring guard-human-override.test.mjs's own io() helper. */
+function hgoCaptureIo() {
+  let stdout = "";
+  let stderr = "";
+  return {
+    write: (chunk) => { stdout += chunk; return true; },
+    writeError: (chunk) => { stderr += chunk; return true; },
+    get stdout() { return stdout; },
+    get stderr() { return stderr; },
+  };
+}
+
 /** Arms a real one-time capability via the chat-mode in-session path (denial -> plan -> prepare-authorization -> authorize --activate). */
 function hgoArmByChat(root, toolInput, denials) {
   const shared = { rootDir: root, pluginRoot: HGO_PLUGIN_ROOT, scriptPath: HGO_OVERRIDE_SCRIPT };
@@ -4398,11 +4414,15 @@ test("NOVA-LCR-HGO-1: with nothing armed, the grammar denial names the mode-appr
   } finally { for (const entry of roots) rmSync(entry, { recursive: true, force: true }); }
 });
 
-// NVA-W4-01B: the flat per-command chain above stays exactly as pinned by the assertions in
-// the previous test -- the bounded, copy-safe rendering is appended AFTER it, never in place
-// of it, so a terminal that wrapped a line mid-path or mid-digest still has a copy-safe
-// alternative to fall back to.
-test("NVA-W4-01B: the denial also carries a bounded copy-safe rendering of the ceremony steps, appended after the flat chain", () => {
+// NVA-CF-GUARDVERBOSITY (backlog: 2026-08-30-guard-denials-inline-the-full-multi-shell-
+// ceremony-block-by-default.md): the full per-step posix/powershell/cmd.exe bounded
+// rendering (NVA-W4-01B) used to be inlined here unconditionally -- up to 5 steps x 3
+// shells, observed to run to ~150 lines on a real denial and to dominate context cost on
+// every TP-guard refusal. The flat per-command chain stays exactly as pinned by the
+// previous test, unchanged; the bounded block is replaced by a short pointer to the
+// on-demand `render-copy-safe` subcommand, which reproduces every headline the block used
+// to carry inline when run against the SAME request-sha256 the denial already prints.
+test("NVA-CF-GUARDVERBOSITY: the denial no longer inlines the bounded ceremony block by default -- a short pointer to render-copy-safe replaces it, and running it reproduces the same per-step headlines", () => {
   const roots = [];
   try {
     const command = "rg -n lifecycle . && touch output.txt";
@@ -4411,42 +4431,65 @@ test("NVA-W4-01B: the denial also carries a bounded copy-safe rendering of the c
     roots.push(sigRoot);
     const sigResult = evaluateLifecycleReadyGuard(bash(command), { projectDir: sigRoot });
     assert.equal(sigResult.exitCode, 2);
-    assert.match(sigResult.stderr, /Bounded copy-safe rendering of the plan step/u);
-    assert.match(sigResult.stderr, /Bounded copy-safe rendering of the prepare-authorization step/u);
-    assert.match(sigResult.stderr, /Bounded copy-safe rendering of the emit-signature-digest step/u);
-    assert.match(sigResult.stderr, /Bounded copy-safe rendering of the authorize-by-signature step/u);
-    assert.doesNotMatch(sigResult.stderr, /Bounded copy-safe rendering of the authorize step/u,
-      "signature mode has no in-session activate step; nothing to bound-render for it");
-    assert.match(sigResult.stderr, /eval "\$CMD"/u);
-    // The bounded block sits strictly after the flat chain, not interleaved with it: the
-    // last flat-chain command (authorize-by-signature's full argv) still appears before the
-    // first "Bounded copy-safe rendering" headline.
+    // The full per-step block is gone from the default denial text.
+    assert.doesNotMatch(sigResult.stderr, /Bounded copy-safe rendering of the plan step/u);
+    assert.doesNotMatch(sigResult.stderr, /Bounded copy-safe rendering of the prepare-authorization step/u);
+    assert.doesNotMatch(sigResult.stderr, /Bounded copy-safe rendering of the emit-signature-digest step/u);
+    assert.doesNotMatch(sigResult.stderr, /Bounded copy-safe rendering of the authorize-by-signature step/u);
+    // A short pointer to the on-demand mechanism sits strictly after the (unchanged) flat
+    // chain, not interleaved with it.
+    assert.match(sigResult.stderr, /available on demand/u);
+    assert.match(sigResult.stderr, /render-copy-safe --repo/u);
     const flatIndex = sigResult.stderr.indexOf("authorize-by-signature --repo");
-    const boundedIndex = sigResult.stderr.indexOf("Bounded copy-safe rendering");
-    assert.ok(flatIndex !== -1 && boundedIndex !== -1 && flatIndex < boundedIndex,
-      `expected the flat chain before the bounded block:\n${sigResult.stderr}`);
+    const pointerIndex = sigResult.stderr.indexOf("available on demand");
+    assert.ok(flatIndex !== -1 && pointerIndex !== -1 && flatIndex < pointerIndex,
+      `expected the flat chain before the on-demand pointer:\n${sigResult.stderr}`);
+
+    // Running the pointed-to command against the SAME request-sha256 the denial already
+    // prints reproduces the full per-step block, proving the safety net is still reachable.
+    const requestMatch = sigResult.stderr.match(/--request-sha256 ([a-f0-9]{64})/u);
+    assert.ok(requestMatch, "expected a request-sha256 in the denial");
+    const captured = hgoCaptureIo();
+    const status = guardHumanOverrideMain(
+      ["render-copy-safe", "--repo", sigRoot, "--request-sha256", requestMatch[1]], captured,
+    );
+    assert.equal(status, 0, captured.stderr);
+    assert.match(captured.stdout, /Bounded copy-safe rendering of the plan step/u);
+    assert.match(captured.stdout, /Bounded copy-safe rendering of the prepare-authorization step/u);
+    assert.match(captured.stdout, /Bounded copy-safe rendering of the emit-signature-digest step/u);
+    assert.match(captured.stdout, /Bounded copy-safe rendering of the authorize-by-signature step/u);
+    assert.doesNotMatch(captured.stdout, /Bounded copy-safe rendering of the authorize step\b/u,
+      "signature mode has no in-session activate step; nothing to bound-render for it");
+    assert.match(captured.stdout, /eval "\$CMD"/u);
 
     const chatRoot = hgoGitFixture("chat");
     roots.push(chatRoot);
     const chatResult = evaluateLifecycleReadyGuard(bash(command), { projectDir: chatRoot });
     assert.equal(chatResult.exitCode, 2);
-    assert.match(chatResult.stderr, /Bounded copy-safe rendering of the plan step/u);
-    assert.match(chatResult.stderr, /Bounded copy-safe rendering of the prepare-authorization step/u);
-    assert.match(chatResult.stderr, /Bounded copy-safe rendering of the authorize step/u);
-    assert.doesNotMatch(chatResult.stderr, /Bounded copy-safe rendering of the authorize-by-signature step/u,
+    assert.doesNotMatch(chatResult.stderr, /Bounded copy-safe rendering of the plan step/u);
+    assert.match(chatResult.stderr, /available on demand/u);
+    const chatRequestMatch = chatResult.stderr.match(/--request-sha256 ([a-f0-9]{64})/u);
+    assert.ok(chatRequestMatch, "expected a request-sha256 in the chat-mode denial");
+    const chatCaptured = hgoCaptureIo();
+    const chatStatus = guardHumanOverrideMain(
+      ["render-copy-safe", "--repo", chatRoot, "--request-sha256", chatRequestMatch[1]], chatCaptured,
+    );
+    assert.equal(chatStatus, 0, chatCaptured.stderr);
+    assert.match(chatCaptured.stdout, /Bounded copy-safe rendering of the plan step/u);
+    assert.match(chatCaptured.stdout, /Bounded copy-safe rendering of the prepare-authorization step/u);
+    assert.match(chatCaptured.stdout, /Bounded copy-safe rendering of the authorize step/u);
+    assert.doesNotMatch(chatCaptured.stdout, /Bounded copy-safe rendering of the authorize-by-signature step/u,
       "chat mode has no signing step; nothing to bound-render for it");
-    assert.doesNotMatch(chatResult.stderr, /Bounded copy-safe rendering of the emit-signature-digest step/u);
+    assert.doesNotMatch(chatCaptured.stdout, /Bounded copy-safe rendering of the emit-signature-digest step/u);
   } finally { for (const entry of roots) rmSync(entry, { recursive: true, force: true }); }
 });
 
-// NVA-GF-COPYSAFE: guard-lifecycle-ready.mjs's bounded rendering is the known-good reference
-// this backlog item cites (2026-08-28-po-facing-commands-are-not-uniformly-rendered-break-
-// safe.md) -- boundedOpaqueCopyCommand() moved to no new implementation here, only its import
-// path changed (from lib/project-onboarding-v3.mjs to the new lib/copy-safe-command.mjs), so
-// this is a wiring regression test: the actual denial's bounded "plan" block must be exactly
-// what independently recomputing it from the SAME shared function, on the SAME flat command
-// line the denial itself prints, produces -- proving the extraction changed nothing.
-test("NVA-GF-COPYSAFE: the bounded 'plan' rendering is byte-identical to recomputing it via the shared copy-safe-command.mjs function from the same flat command line", () => {
+// NVA-GF-COPYSAFE / NVA-CF-GUARDVERBOSITY: this suite's own byte-identity proof, now against
+// render-copy-safe's output rather than the hook's own (removed) inline block -- the actual
+// bounded "plan" rendering must still be exactly what independently recomputing it from the
+// SAME shared function, on the SAME flat command line the denial itself prints, produces --
+// proving relocating the disclosure changed nothing about the rendering itself.
+test("NVA-GF-COPYSAFE: render-copy-safe's bounded 'plan' rendering is byte-identical to recomputing it via the shared copy-safe-command.mjs function from the same flat command line", () => {
   const sigRoot = hgoGitFixture("signature");
   try {
     const command = "rg -n lifecycle . && touch output.txt";
@@ -4460,14 +4503,22 @@ test("NVA-GF-COPYSAFE: the bounded 'plan' rendering is byte-identical to recompu
     const recomputed = boundedOpaqueCopyCommand(flatPlanLine);
     assert.equal(recomputed.maxColumns, 72);
     assert.ok(recomputed.posix, "posix rendering must succeed for a real plan command");
+
+    const requestMatch = sigResult.stderr.match(/--request-sha256 ([a-f0-9]{64})/u);
+    assert.ok(requestMatch, "expected a request-sha256 in the denial");
+    const captured = hgoCaptureIo();
+    const status = guardHumanOverrideMain(
+      ["render-copy-safe", "--repo", sigRoot, "--request-sha256", requestMatch[1]], captured,
+    );
+    assert.equal(status, 0, captured.stderr);
     assert.ok(
-      sigResult.stderr.includes(`  posix:\n${recomputed.posix}`),
-      "the actual posix bounded block must byte-match the shared function's independent recomputation",
+      captured.stdout.includes(`  posix:\n${recomputed.posix}`),
+      "render-copy-safe's posix block must byte-match the shared function's independent recomputation",
     );
     if (recomputed.powershell) {
       assert.ok(
-        sigResult.stderr.includes(`  powershell:\n${recomputed.powershell}`),
-        "the actual powershell bounded block must byte-match the shared function's independent recomputation",
+        captured.stdout.includes(`  powershell:\n${recomputed.powershell}`),
+        "render-copy-safe's powershell block must byte-match the shared function's independent recomputation",
       );
     }
   } finally { rmSync(sigRoot, { recursive: true, force: true }); }
