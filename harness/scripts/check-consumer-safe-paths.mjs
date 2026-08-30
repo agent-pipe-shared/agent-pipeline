@@ -558,16 +558,28 @@ export const ALLOWLIST = Object.freeze([
       "never a leak.",
   },
 
-  // --- NVA-R11-RESUMECONSUME: check-resume-consumption.mjs's own single harness/ mention.
+  // --- NVA-R11-RESUMECONSUME: check-resume-consumption.mjs's own harness/ mentions (2 lines,
+  // updated 2026-08-30 NVA-CF-RESUMECHECKANYSESSION doc-comment fix, commit 985751c0).
   {
     file: "plugins/pipeline-core/scripts/check-resume-consumption.mjs",
-    match: "NOT REGISTERED in `harness/scripts/verify.mjs`",
+    match: "STILL never wired into `harness/scripts/verify.mjs`",
     reason:
-      "Class B: module-doc-comment prose noting this script's own `.test.mjs` sibling is not yet " +
-      "registered in `harness/scripts/verify.mjs` (TP-3-protected in this repository's own checkout, " +
-      "no in-session push-approval override) -- a self-application status note about THIS repository's " +
-      "own Verify gate wiring, the identical pattern check-backlog-done-predicate.mjs's own allowlist " +
-      "entries above already cover for that script, not a path a consumer is told to visit.",
+      "Class B: module-doc-comment prose noting this script's own `--session-id` single-session mode " +
+      "is still not registered in `harness/scripts/verify.mjs` (TP-3-protected in this repository's own " +
+      "checkout, no in-session push-approval override) -- a self-application status note about THIS " +
+      "repository's own Verify gate wiring, the identical pattern check-backlog-done-predicate.mjs's own " +
+      "allowlist entries above already cover for that script, not a path a consumer is told to visit. " +
+      "Updated 2026-08-30 (NVA-CF-RESUMECHECKANYSESSION doc-comment fix, commit 985751c0) after the " +
+      "separate `--any-session` mode became registered and the prose was corrected to distinguish the two.",
+  },
+  {
+    file: "plugins/pipeline-core/scripts/check-resume-consumption.mjs",
+    match: "IS now registered in `harness/scripts/verify.mjs` as suite",
+    reason:
+      "Class B: module-doc-comment prose noting the separate `--any-session` mode of this script IS " +
+      "now registered in `harness/scripts/verify.mjs` (commit 03c1edcd, TP-3 signed-override ceremony) " +
+      "-- the positive counterpart of the entry immediately above, same self-application status note, " +
+      "same class, not a path a consumer is told to visit.",
   },
 
   // --- NVA-R13-VENDOROPMODEL: docs/operating-model.md is now vendored byte-identically
