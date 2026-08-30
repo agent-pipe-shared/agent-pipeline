@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "34838c4639944f513fdd2575b4e4a212322c812406e9e3676ff56846e22f4689"
+    "transitionHead": "64732ef44245ff8841b096c6b332b945abfde4d653e42db4b97159f5b0281a5c"
   },
   "counts": {
-    "open": 77,
+    "open": 76,
     "in_progress": 3,
-    "closed": 460,
+    "closed": 461,
     "rejected": 3,
     "deferred": 11
   },
@@ -6325,13 +6325,17 @@
     },
     {
       "id": "pipeline.trust-anchor-bootstrap-confirmed-still-circular-live",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-29",
       "source": "Codex 060-77 and Claude/Windows 060-78 greenfield retrospectives (scratch/greenfield-reports/), plus direct PO confirmation 2026-08-29: 'das ist auch mein Eindruck ... die fixes gingen eindeutig nicht weit genug und die Runner haben die berichteten Probleme wirklich [gehabt]'.",
       "deferred": false,
-      "tracking": "NOW / Nova A -- happy-path blocker, confirmed live by 2 of 3 independent runners against the exact candidate the PO tested with."
+      "tracking": "NOW / Nova A -- happy-path blocker, confirmed live by 2 of 3 independent runners against the exact candidate the PO tested with.",
+      "closedAt": "2026-08-30",
+      "closureRepository": "self",
+      "closureCommit": "6876ba53eb1213e4857881ec4f4a0aa36eaf8134",
+      "closureEvidence": "plugins/pipeline-core/lib/trust-anchor-bootstrap-circularity.repro.test.mjs"
     },
     {
       "id": "pipeline.trust-mismatch-names-neither-key-nor-directory",
