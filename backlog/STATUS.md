@@ -448,7 +448,7 @@
 | pipeline.resume-hint-test-unregistered-in-verify-gate | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.ruleset-freshness-wsl-subsystem-absent | in_progress | defect | pipeline | 2026-08-07 | — |
 | pipeline.ruleset-source-test-unregistered-in-the-verify-gate | closed | defect | pipeline | 2026-08-07 | — |
-| pipeline.runner-fallback-defaults-to-codex-without-explicit-signal | open | defect | pipeline | 2026-08-30 | NOW / Nova A -- surfaced 2026-08-30 while cross-checking the Claude/Windows greenfield retrospective (docs/pipeline-retrospective-claude-060-78.md, section 8) against current code; confirmed still present, unfixed. |
+| pipeline.runner-fallback-defaults-to-codex-without-explicit-signal | closed | defect | pipeline | 2026-08-30 | NOW / Nova A -- surfaced 2026-08-30 while cross-checking the Claude/Windows greenfield retrospective (docs/pipeline-retrospective-claude-060-78.md, section 8) against current code; confirmed still present, unfixed. |
 | pipeline.runner-neutrality-before-third-runner | closed | workflow-improvement | pipeline | 2026-08-08 | — |
 | pipeline.runtime-projection-v2-eager-manifest-load | closed | defect | pipeline | 2026-07-27 | — |
 | pipeline.runtime-projections-drift-after-v3-refresh | open | defect | pipeline | 2026-08-28 | Nova B — a silent divergence between two files that are meant to project the same authority; a consumer cannot judge it, and neither can this report |
@@ -562,8 +562,8 @@
 
 ## Counts
 
-- open: 81
+- open: 80
 - in_progress: 3
-- closed: 456
+- closed: 457
 - rejected: 3
 - deferred: 11
