@@ -697,6 +697,13 @@ const RESULT_CASE_MIGRATION_APPLY_SCHEMA = "pipeline.continuity-result-case-migr
 const RESULT_CASE_MIGRATION_JOURNAL_SCHEMA = "pipeline.continuity-result-case-migration-journal.v1";
 const RESULT_CASE_MIGRATION_LOCK_TOKEN = "pipeline-result-case-migration-v1";
 const INSPECT_SCHEMA = "pipeline.inspect.v1";
+// NVA-CF-PUSHDRIVERFINISH: schema for the structured collect-input-shaped stop
+// `submit-plan` publishes on PO-GATE-PRD-ACKNOWLEDGEMENT-MISSING (see the
+// `case "submit-plan"` handler below) -- printed to stdout as JSON, replacing
+// what used to be a raw, non-JSON stderr crash on exit 2 (backlog:
+// 2026-08-28-a-blind-session-gets-zero-followable-steps-on-the-feature-and-push-path.md,
+// "Re-verification, 2026-08-29").
+const SUBMIT_PLAN_STOP_SCHEMA = "pipeline.submit-plan-stop.v1";
 const LEGACY_PLAN_APPROVAL_KEYS = ["approvedBy", "approvedAt", "poGateAuthority"];
 const LEGACY_PO_GATE_AUTHORITY_KEYS = [
   "schema", "humanFacing", "sourceSha256", "runtimeSha256", "receiptSha256",
@@ -3356,9 +3363,15 @@ const DRAFT_PLAN_PROFILES = new Set(["epic", "feature", "mini"]);
  * larger checkout) would silently pick up an ENCLOSING repository's
  * unrelated `user.name` instead of correctly reporting the submitter absent.
  */
-function resolveDraftPlanSubmissionDefaults(dir, deps = {}) {
+// NVA-CF-PUSHDRIVERFINISH: extracted from resolveDraftPlanSubmissionDefaults()
+// below so the same local-Git-config-only submitter derivation can also back
+// the push-init.mjs discoverability action further down (`implementing`
+// branch of buildInspectNextAction) without duplicating the
+// GIT_CEILING_DIRECTORIES scoping this function's own header comment
+// explains. No behavior change to the draft branch: this is the exact same
+// spawn call it always made, only named and reusable.
+function resolveLocalGitUserName(dir, deps = {}) {
   const spawn = deps.spawn ?? spawnSync;
-  let by = null;
   const gitResult = spawn("git", ["config", "--local", "--get", "user.name"], {
     cwd: dir,
     encoding: "utf8",
@@ -3366,8 +3379,13 @@ function resolveDraftPlanSubmissionDefaults(dir, deps = {}) {
   });
   if (!gitResult.error && gitResult.status === 0 && typeof gitResult.stdout === "string") {
     const trimmed = gitResult.stdout.trim();
-    if (trimmed !== "") by = trimmed;
+    if (trimmed !== "") return trimmed;
   }
+  return null;
+}
+
+function resolveDraftPlanSubmissionDefaults(dir, deps = {}) {
+  const by = resolveLocalGitUserName(dir, deps);
   let profile = null;
   try {
     const checkpoint = readOnboardingIntakeCheckpoint({ rootDir: dir });
@@ -3539,12 +3557,44 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
         requiresConfirmation: false,
       };
     }
+    // NVA-CF-PUSHDRIVERFINISH: push-init.mjs (backlog:
+    // 2026-08-28-the-push-path-has-no-driver-so-its-five-layers-are-walked-by-hand.md,
+    // closed, commit 6d0c95ee) already walks doc-reconciliation,
+    // push-gate-satisfiability and push-prepare for the caller and hands back
+    // the exact authorize-critical command once every precondition is green --
+    // but nothing in this file named it anywhere, so a blind session
+    // following only `nextAction` had no way to discover it exists (backlog:
+    // 2026-08-28-a-blind-session-gets-zero-followable-steps-on-the-feature-and-push-path.md,
+    // `grep -c "push-init" pipeline-state.mjs` was 0 before this fix).
+    // `--remote`/`--destination` are never derived here -- there is no
+    // recorded source for either anywhere in this project's state, and this
+    // driver's own "NEVER INVENTS A VALUE" contract (see the `draft` branch
+    // above) applies just as much to a push destination as to a submitter
+    // name. `--by` is derived the same way the `draft` branch derives it,
+    // from the same local Git config (resolveLocalGitUserName()).
+    const pushInitScript = join(PLUGIN_ROOT, "scripts", "push-init.mjs");
+    const pushInitBy = resolveLocalGitUserName(dir);
+    const pushInitCommand = boundedCopySafeCommand({
+      executable: process.execPath,
+      argv: [
+        pushInitScript,
+        "--root", placeholder("<project-root>"),
+        "--by", pushInitBy !== null ? pushInitBy : placeholder("<submitter's name>"),
+        "--remote", placeholder("<remote>"),
+        "--destination", "refs/heads/<branch>",
+      ],
+    }).command;
     return {
       kind: "collect-input",
       mutation: false,
       requiresConfirmation: false,
       guidance: "the push signature is a detached Ed25519 proof made with a key kept outside this repository"
-        + " -- an agent must never produce or supply it. Ask the human to review the push threat-model at"
+        + " -- an agent must never produce or supply it, and this driver never asks for it either. Before the"
+        + ` signature, run the push driver: ${pushInitCommand} (see push-init.mjs --help for its full usage;`
+        + " fill in the project root, remote name and target refs/heads/<branch>). It walks the"
+        + " doc-reconciliation, push-gate-satisfiability and push-prepare checks and, once every precondition"
+        + " is green, prints the exact authorize-critical command -- it never produces or executes it. Then"
+        + " ask the human to review the push threat-model at"
         + ` ${threatModel.path} (sha256 ${threatModel.sha256}), then follow the signing ceremony in`
         + " docs/push-release-flow.md (guard-human-override.mjs plan / prepare-authorization /"
         + " emit-signature-digest, signed outside this session, then authorize-by-signature). There is no"
@@ -7990,6 +8040,17 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       const expectedSpecSha256 = authority.value.specSha256;
       let submittedAt;
       let submittedBriefing;
+      // NVA-CF-PUSHDRIVERFINISH: `poGateAuthority({ repoRoot: dir })` above
+      // (no expected digests) never enforces the PO acknowledgement marker --
+      // `validatePoGateAuthority()`'s own `requireAcknowledgement` is only true
+      // when at least one expected digest is passed. A real
+      // PO-GATE-PRD-ACKNOWLEDGEMENT-MISSING is therefore only ever caught
+      // inside `beforeCommit` below, whose failure otherwise propagates
+      // through `writeState()` as a bare `{code}` with the rich
+      // `reason`/`repair` text `poGateAuthority()` already computed thrown
+      // away -- captured here so the specific handling after `writeState()`
+      // returns can build a genuine structured ask instead of guessing prose.
+      let acknowledgementMissingDetail = null;
       const written = writeState(dir, undefined, base, {
         transition: (observed) => {
           submittedAt = now();
@@ -8021,6 +8082,9 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         beforeCommit: () => {
           const nextAuthority = poGateAuthority({ repoRoot: dir, expectedPlanSha256, expectedSpecSha256 });
           const nextProfile = (deps.poGateProfile ?? ((request) => validatePoGateProfileForRepository(request)))({ repoRoot: dir });
+          if (!nextAuthority?.ok && nextAuthority?.code === "PO-GATE-PRD-ACKNOWLEDGEMENT-MISSING") {
+            acknowledgementMissingDetail = { reason: nextAuthority.reason ?? null, repair: nextAuthority.repair ?? null };
+          }
           return nextAuthority?.ok
             && JSON.stringify(nextAuthority.value) === JSON.stringify(authority.value)
             && nextProfile?.ok
@@ -8030,6 +8094,48 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         },
         allowContinuityAdvance: true,
       });
+      // NVA-CF-PUSHDRIVERFINISH (backlog:
+      // 2026-08-28-a-blind-session-gets-zero-followable-steps-on-the-feature-and-push-path.md,
+      // "Re-verification, 2026-08-29"): checked BEFORE stateWriteSucceeded()
+      // below, and deliberately never falls into it for this one code --
+      // stateWriteSucceeded() itself unconditionally emits its own generic
+      // console.error the moment `!written.ok`, so calling it first would
+      // print that raw stderr line regardless of what this handler does
+      // afterward. This specific code used to fall straight into that
+      // generic console.error+exit 2 path -- a raw, non-JSON stderr crash a
+      // blind driver following only structural `nextAction`/JSON output
+      // cannot interpret. Publish a structured collect-input-shaped stop
+      // instead, adapting collectPrdAcknowledgementAction()'s pattern
+      // (lib/project-onboarding-v3.mjs): no `input`/`inputs` field (there is
+      // nothing an agent may fill in on the PO's behalf), the PRD/spec named
+      // by path and sha256, and the exact reason/repair text
+      // `poGateAuthority()` itself already computed -- that text is the one
+      // place that correctly distinguishes a still-freely-editable PRD (the
+      // PO adds the marker line themselves) from an already kickoff-
+      // promotion-bound one (the sanctioned po-authority-acknowledge-plan/
+      // -apply ceremony, itself gated to an attended PO terminal) rather
+      // than guessing which applies here.
+      if (!written.ok && written.code === "PO-GATE-PRD-ACKNOWLEDGEMENT-MISSING" && acknowledgementMissingDetail !== null) {
+        const stop = {
+          schema: SUBMIT_PLAN_STOP_SCHEMA,
+          command: "submit-plan",
+          code: "PO-GATE-PRD-ACKNOWLEDGEMENT-MISSING",
+          nextAction: {
+            kind: "collect-input",
+            mutation: false,
+            requiresConfirmation: false,
+            guidance: "submit-plan requires the PO's own acknowledgement that the active plan is content-sound and"
+              + " consistent with its neighboring specification -- an agent must never supply this on the PO's"
+              + ` behalf. The active PRD is at ${authority.value.planPath} (sha256 ${expectedPlanSha256}); its`
+              + ` neighboring specification is at ${authority.value.specPath} (sha256 ${expectedSpecSha256}).`
+              + `${acknowledgementMissingDetail.reason ? ` ${acknowledgementMissingDetail.reason}` : ""}`
+              + `${acknowledgementMissingDetail.repair ? ` ${acknowledgementMissingDetail.repair}` : ""}`,
+            expected: { schema: SUBMIT_PLAN_STOP_SCHEMA, statuses: ["draft"] },
+          },
+        };
+        console.log(JSON.stringify(stop, null, 2));
+        return 2;
+      }
       if (!stateWriteSucceeded(written)) {
         console.error(`Error: submit-plan failed before commit (${written.code}); no submission was recorded.`);
         return 2;
