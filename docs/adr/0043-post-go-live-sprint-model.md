@@ -120,6 +120,20 @@ new lifecycle profile; the rules already stated in this ADR's Decision
 section (independent branch/PRD/spec/gates per Sprint, no unpublished
 sibling dependency) apply unchanged to all three.
 
+## Amendment (2026-08-30) — Nova A / Nova B backlog windows
+
+The PO requires Nova's two planning horizons to be machine-distinguishable in
+backlog frontmatter, rather than inferred from free-form tracking prose. The
+closed `sprint:` vocabulary therefore adds **Nova A** (`nova-a`) and **Nova
+B** (`nova-b`). They are Nova planning windows, not lifecycle profiles,
+runner selections, permission grants, branches, or a release action.
+
+The existing `nova` value remains valid and means *deliberately unpartitioned
+Nova*: it records Nova ownership without silently choosing A or B. An item
+uses `nova-a` or `nova-b` once that phase is decided; otherwise it stays
+`nova` and is presented for PO prioritisation. `tracking:` may explain a
+decision but no longer carries the canonical A/B assignment.
+
 <!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation. -->
 
 # ADR-0043: Post-Go-live-Sprint-Modell und Common-Base-Branch-Regel
@@ -201,3 +215,18 @@ Erst bei akzeptiertem Go-live-OID, notwendiger Post-Go-live-Contract-Änderung
 oder geänderter Sprint-Taxonomie erneut vorlegen. Jeder weitere Issue-,
 Branch-, Label-, Merge-, Release- oder Promotion-Schritt benötigt eigene
 Authority und Gates.
+
+## Ergänzung (2026-08-30) — Nova-A-/Nova-B-Backlog-Fenster
+
+Der PO verlangt, dass die beiden Nova-Planungshorizonte im Backlog-Frontmatter
+maschinell unterscheidbar sind, statt aus Freitext in `tracking:` abgeleitet
+zu werden. Der geschlossene `sprint:`-Wortschatz ergänzt daher **Nova A**
+(`nova-a`) und **Nova B** (`nova-b`). Das sind Nova-Planungsfenster, keine
+Lifecycle-Profile, Runner-Wahlen, Berechtigungen, Branches oder Release-Aktionen.
+
+Der bestehende Wert `nova` bleibt gültig und bedeutet *bewusst nicht
+aufgeteiltes Nova*: er ordnet Nova zu, ohne still A oder B zu wählen. Sobald
+die Phase entschieden ist, wird `nova-a` oder `nova-b` gesetzt; andernfalls
+bleibt das Item `nova` und wird dem PO zur Priorisierung vorgelegt.
+`tracking:` kann eine Entscheidung erklären, ist aber nicht mehr die
+kanonische A/B-Zuordnung.

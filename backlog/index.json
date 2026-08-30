@@ -1320,7 +1320,7 @@
       "created": "2026-08-30",
       "source": "PO, 2026-08-30: 'das hatten wir ja schon bei vielen themen mit codex und da sollte dann aber immer automatisch als folge schritt eine anweisung sein, dass bei diesen fehler eine andere art der sandbox nötig ist! dazu hatten wir eigentlich schon mal ein extra profil konfiguriert aber das muss halt auch im bootstrap abgefragt werden und dann anders starten.'",
       "deferred": false,
-      "tracking": "NOW / Nova A -- PO explicit follow-up 2026-08-30 after live-diagnosing the Codex worker session-capability failure: this has recurred across multiple prior Codex sessions, and a bootstrap-time sandbox-profile query/selection was discussed before but never wired up."
+      "tracking": "Nova B -- Nova A's danger-full-access quick fix is landed and re-verified; the remaining scope is the PO-recalled custom, safer sandbox profile with bootstrap-time selection."
     },
     {
       "id": "pipeline.command-grammar-guesses-shell-dialect-from-host-os-not-the-actual-tool-shell",

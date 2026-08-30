@@ -5,7 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-08-30
-sprint: nova
+sprint: nova-b
 tracking: "Nova B — pre-existing gap found while registering an unrelated verify.mjs suite; not introduced by this session's own work."
 source: "Found by check-verify-suite-registration.mjs while preparing the TP-3 ceremony for NVA-CF-RESUMECHECKANYSESSION's own verify.mjs registration, 2026-08-30."
 ---

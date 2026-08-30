@@ -5,7 +5,7 @@ type: workflow-improvement
 owner: pipeline
 status: open
 created: 2026-08-29
-sprint: nova
+sprint: nova-b
 tracking: "Nova B — PO request, 2026-08-29 (German verbatim): 'es stört mich das die Pipeline immer nur sequentiell von sich aus arbeitet. ich möchte ein durchgesetztes system per Maschine haben was für Standardmäßiges slicen von Aufgaben ohne Überschneidungen sorgt die dann mit workflow tool oder vergleichbaren subagenten arbeiten. wir müssen designen wie wir das in die Durchsetzungsschicht bekommen da die vergangenen Versuche dafür zu sorgen gescheitert sind'. Deliberately NOT Nova A: this needs a real design pass, not a same-session patch, and the candidate must not grow new enforcement surface before its current diff is reviewed."
 source: "PO request, live in the same 2026-08-29 session that ran the 0.6.0 candidate's Critic 1+1. The PO explicitly named this a design problem ('wir müssen designen'), not a mechanical fix, and explicitly named that past attempts to secure this have already failed."
 done_when: manual
