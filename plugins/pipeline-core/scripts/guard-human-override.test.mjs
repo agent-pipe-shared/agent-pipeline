@@ -37,6 +37,11 @@ import {
   recordHumanGuardDenial,
 } from "../lib/human-guard-override.mjs";
 import { createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA } from "../lib/po-approval-proof.mjs";
+// NVA-CF-GUARDVERBOSITY: used only by the render-copy-safe tests below, to independently
+// recompute the same flat command line + bounded rendering render-copy-safe itself builds,
+// mirroring guard-lifecycle-ready.test.mjs's own NVA-GF-COPYSAFE "recompute independently
+// and byte-compare" technique.
+import { boundedCopySafeCommand, boundedOpaqueCopyCommand } from "../lib/copy-safe-command.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PLUGIN_ROOT = join(HERE, "..");
@@ -84,6 +89,19 @@ function fixture() {
 /** External (outside the repo) directory for `--proof`/`--authority` files, mirroring guard-maintenance-window.mjs's own discipline. */
 function externalDir() {
   return mkdtempSync(join(tmpdir(), "guard-human-override-cli-proof-"));
+}
+
+/** Chat-mode fixture, otherwise identical to fixture() -- no trust anchor needed for chat mode's own ceremony steps. */
+function chatFixture() {
+  const root = mkdtempSync(join(tmpdir(), "guard-human-override-cli-chat-"));
+  git(root, "init", "-q", "-b", "main");
+  git(root, "config", "user.name", "Fixture");
+  git(root, "config", "user.email", "fixture@example.invalid");
+  writeFileSync(join(root, "README.md"), "fixture\n");
+  writeFileSync(join(root, "pipeline.user.yaml"), 'schema: "pipeline.user.v3"\ngates:\n  push_approval: "chat"\n');
+  git(root, "add", "README.md", "pipeline.user.yaml");
+  git(root, "commit", "-q", "-m", "fixture");
+  return root;
 }
 
 function io() {
@@ -210,6 +228,126 @@ test("plan's advisory escalates when another git worktree is present", () => {
     spawnSync("git", ["worktree", "remove", "--force", worktreeDir], { cwd: root, encoding: "utf8", shell: false });
     rmSync(root, { recursive: true, force: true });
     rmSync(worktreeDir, { recursive: true, force: true });
+  }
+});
+
+// NVA-CF-GUARDVERBOSITY (backlog: 2026-08-30-...guard-denials-inline-the-full-multi-shell-
+// ceremony-block-by-default.md): `render-copy-safe` is the on-demand replacement for the
+// full per-step posix/powershell/cmd.exe bounded rendering guard-testpath.mjs and
+// guard-lifecycle-ready.mjs used to inline unconditionally in every ceremony denial
+// (NVA-W4-01B). Proves the underlying safety property is still genuinely reachable: run
+// against a REAL recorded request (built the same way recordHumanGuardDenial() itself
+// produces one for a genuine TP-guard denial), it reproduces byte-identical
+// posix/powershell/cmd.exe renderings -- independently recomputed here via the exact same
+// boundedOpaqueCopyCommand() the subcommand itself calls, fed the same flat command line,
+// mirroring guard-lifecycle-ready.test.mjs's own NVA-GF-COPYSAFE technique.
+test("render-copy-safe reproduces the ceremony's bounded posix/powershell/cmd.exe rendering for a real recorded request (signature mode)", () => {
+  const root = fixture();
+  try {
+    const denials = [{ guard: "guard-testpath.mjs", reason: "TP-3: fixture" }];
+    const recorded = recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write",
+      toolInput: { file_path: "notes.md", content: "render-copy-safe fixture\n" }, denials,
+    });
+    assert.equal(recorded.status, "planned");
+    const captured = io();
+    const status = main(["render-copy-safe", "--repo", root, "--request-sha256", recorded.requestSha256], captured);
+    assert.equal(status, 0, captured.stderr);
+    assert.equal(captured.stderr, "", "render-copy-safe prints nothing but the rendered block");
+
+    // Signature mode: plan/prepare-authorization/emit-signature-digest/authorize-by-signature,
+    // never the in-session activate step (that belongs to chat mode only).
+    assert.match(captured.stdout, /Bounded copy-safe rendering of the plan step/u);
+    assert.match(captured.stdout, /Bounded copy-safe rendering of the prepare-authorization step/u);
+    assert.match(captured.stdout, /Bounded copy-safe rendering of the emit-signature-digest step/u);
+    assert.match(captured.stdout, /Bounded copy-safe rendering of the authorize-by-signature step/u);
+    assert.doesNotMatch(captured.stdout, /Bounded copy-safe rendering of the authorize step\b/u,
+      "signature mode has no in-session activate step; nothing to bound-render for it");
+    assert.match(captured.stdout, /eval "\$CMD"/u);
+
+    // Byte-identical independent recomputation of the "plan" step's own bounded block, from
+    // the SAME flat command line render-copy-safe's internal ceremonyCommand() builds.
+    const flatPlanLine = boundedCopySafeCommand({
+      executable: process.execPath,
+      argv: [SCRIPT, "plan", "--repo", root, "--request-sha256", recorded.requestSha256],
+    }).command;
+    const recomputed = boundedOpaqueCopyCommand(flatPlanLine);
+    assert.ok(recomputed.posix, "posix rendering must succeed for a real plan command");
+    assert.ok(
+      captured.stdout.includes(`  posix:\n${recomputed.posix}`),
+      "render-copy-safe's posix block must byte-match the independent recomputation",
+    );
+    if (recomputed.powershell) {
+      assert.ok(
+        captured.stdout.includes(`  powershell:\n${recomputed.powershell}`),
+        "render-copy-safe's powershell block must byte-match the independent recomputation",
+      );
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("render-copy-safe selects the chat-mode ceremony steps (plan/prepare-authorization/authorize, never the signature-only steps)", () => {
+  const root = chatFixture();
+  try {
+    const denials = [{ guard: "guard-testpath.mjs", reason: "TP-3: fixture" }];
+    const recorded = recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write",
+      toolInput: { file_path: "notes.md", content: "render-copy-safe chat fixture\n" }, denials,
+    });
+    assert.equal(recorded.status, "planned");
+    const captured = io();
+    const status = main(["render-copy-safe", "--repo", root, "--request-sha256", recorded.requestSha256], captured);
+    assert.equal(status, 0, captured.stderr);
+    assert.match(captured.stdout, /Bounded copy-safe rendering of the plan step/u);
+    assert.match(captured.stdout, /Bounded copy-safe rendering of the prepare-authorization step/u);
+    assert.match(captured.stdout, /Bounded copy-safe rendering of the authorize step/u);
+    assert.doesNotMatch(captured.stdout, /Bounded copy-safe rendering of the authorize-by-signature step/u,
+      "chat mode has no signing step; nothing to bound-render for it");
+    assert.doesNotMatch(captured.stdout, /Bounded copy-safe rendering of the emit-signature-digest step/u);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("render-copy-safe refuses a request-sha256 that was never recorded, with the same HGO-* error other subcommands give", () => {
+  const root = fixture();
+  try {
+    const bogus = "0".repeat(64);
+    const captured = io();
+    const status = main(["render-copy-safe", "--repo", root, "--request-sha256", bogus], captured);
+    assert.equal(status, 2);
+    assert.match(captured.stderr, /^HGO-/u);
+    assert.equal(captured.stdout, "");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("render-copy-safe validates its flag set like the sibling plan subcommand", () => {
+  const root = fixture();
+  try {
+    const denials = [{ guard: "guard-testpath.mjs", reason: "TP-3: fixture" }];
+    const recorded = recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write",
+      toolInput: { file_path: "notes.md", content: "render-copy-safe flags fixture\n" }, denials,
+    });
+    assert.equal(recorded.status, "planned");
+    assert.equal(main(["render-copy-safe", "--repo", root], io()), 2, "missing --request-sha256");
+    assert.equal(main(["render-copy-safe", "--request-sha256", recorded.requestSha256], io()), 2, "missing --repo");
+    assert.equal(
+      main(["render-copy-safe", "--repo", root, "--request-sha256", "not-hex"], io()),
+      2,
+      "request-sha256 must be 64 lowercase hex characters",
+    );
+    assert.equal(
+      main(["render-copy-safe", "--repo", root, "--request-sha256", recorded.requestSha256, "--bogus", "x"], io()),
+      2,
+      "unknown flag",
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });
 
