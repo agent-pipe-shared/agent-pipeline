@@ -21,14 +21,25 @@ feature branches and dogfooding rounds. Feedback welcome.*
 > required next document is `SETUP.md`; deeper and conceptual documentation
 > is optional reference.
 
-> **Released version: `0.5.3`.** Policy-complete security evidence, AI-assisted
-> hardening, finding lifecycle, and security readiness all run through the
-> shared Verify gate; a portable human-approval path keeps the encrypted
-> Ed25519 private key and its passphrase outside the repository. `0.5.4` is a
-> release candidate in preparation and is not yet published — do not install
-> against it. See the [consumer onboarding guide](docs/v3-consumer-onboarding.md)
-> for the full lifecycle and [What's new in 0.5.0](docs/whats-new-0.5.0.md) for
-> the security/readiness baseline it builds on.
+> **Current candidate: `0.6.0` — not released.** The local source and plugin
+> manifests are versioned as `0.6.0`, but this is a test candidate, not an
+> installation recommendation or production release. Nova makes the Greenfield
+> path usable: the public driver leads an empty directory through guided
+> onboarding, plan approval, real verify-command setup, and the first
+> implementation file. It publishes structured actions; a runner follows those
+> actions and replaces only the declared human-input placeholders, rather than
+> reconstructing internal CLI calls. The automated path covers Claude, Codex,
+> and Antigravity, including a first trust anchor that may use an existing key
+> or create a new one. Phoenix keeps the safety boundary intact: an absent,
+> stale, malformed, or mismatched proof is never reported as success.
+>
+> Publication remains deliberately separate. The candidate still needs its
+> complete candidate-bound release evidence and the independent live Greenfield
+> acceptance for all three runners; no earlier result is silently carried over
+> to a changed candidate. See [What's new in 0.6.0](docs/whats-new-0.6.0.md)
+> for scope, evidence, and non-claims, and the
+> [consumer onboarding guide](docs/v3-consumer-onboarding.md) for the full
+> lifecycle.
 
 > **What this costs you.** Enforcement is not free: gates, evidence discipline,
 > and independent review trade tokens and speed for correctness. That trade is
@@ -321,6 +332,26 @@ willkommen.*
 > **Einstieg für Neue:** Diese README ist der einzige Einstieg. Für die Übernahme ist
 > als Nächstes nur `SETUP.md` erforderlich; weiterführende und
 > konzeptionelle Dokumentation ist optionales Nachschlagewerk.
+
+> **Aktueller Kandidat: `0.6.0` — noch nicht veröffentlicht.** Der lokale
+> Source und die Plugin-Manifeste tragen bereits `0.6.0`, aber das ist ein
+> Testkandidat und weder Installationsempfehlung noch Produktiv-Release. Nova
+> macht den Greenfield-Weg nutzbar: Der öffentliche Driver führt ein leeres
+> Verzeichnis durch das geführte Onboarding, die Planfreigabe, das Setzen eines
+> echten Verify-Kommandos und bis zur ersten Implementierungsdatei. Er liefert
+> strukturierte Aktionen; der Runner folgt diesen Aktionen und ersetzt nur die
+> ausgewiesenen menschlichen Eingabe-Platzhalter, statt interne CLI-Aufrufe zu
+> erraten. Der automatisierte Pfad deckt Claude, Codex und Antigravity ab,
+> einschließlich eines ersten Trust Anchors mit bestehendem oder neuem Schlüssel.
+> Phoenix erhält die Sicherheitsgrenze: Fehlende, veraltete, fehlerhafte oder
+> nicht passende Nachweise werden nie als Erfolg ausgegeben.
+>
+> Die Veröffentlichung bleibt bewusst getrennt. Der Kandidat braucht noch seine
+> vollständige kandidatengebundene Release-Evidenz und die unabhängige Live-
+> Greenfield-Abnahme aller drei Runner; kein älteres Ergebnis wird still auf einen
+> veränderten Kandidaten übertragen. Umfang, Evidenz und bewusste Nicht-Claims
+> stehen unter [Neu in 0.6.0](docs/whats-new-0.6.0.md); den vollständigen Ablauf
+> beschreibt der [Consumer-Onboarding-Guide](docs/v3-consumer-onboarding.md).
 
 ## Das Problem
 
