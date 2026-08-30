@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "40fd705d572d36e97357bad6a6a2d5b83769f8618ccaacb3457a7792e16ac49e"
+    "transitionHead": "67ec3ab4666fc4ba6624b2bbaad519f3496622ff627717e3f3b968646d18271f"
   },
   "counts": {
-    "open": 77,
+    "open": 78,
     "in_progress": 3,
     "closed": 467,
     "rejected": 3,
@@ -1130,7 +1130,7 @@
       "tracking": "Retrospective-analysis follow-up item #6, PO-confirmed 2026-08-30 ('ja bitte umsetzen')",
       "closedAt": "2026-08-30",
       "closureRepository": "self",
-      "closureCommit": "272d772a",
+      "closureCommit": "272d772aa2fb1c1b7a0b827f8c22a7a747f6dc46",
       "closureEvidence": "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs"
     },
     {
@@ -1747,7 +1747,7 @@
       "tracking": "Nova A — re-prioritized 2026-08-30, retrospective-analysis follow-up item #4 ('ja das brauchen wir')",
       "closedAt": "2026-08-30",
       "closureRepository": "self",
-      "closureCommit": "d7600de5",
+      "closureCommit": "d7600de57502e89fc18bb95d2324f02e022e5352",
       "closureEvidence": "plugins/pipeline-core/scripts/pipeline-state-inspect.test.mjs"
     },
     {
@@ -4045,6 +4045,16 @@
       "closureEvidence": "backlog/evidence/2026-07-24-completed-companion-deliveries.md"
     },
     {
+      "id": "pipeline.observerunner-has-no-test-coverage",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-30",
+      "source": "Critic review, backlog/items/2026-08-30-codex-worker-supervisor-hardcodes-a-sandbox-mode-that-blocks-git-spawn.md, Finding 2",
+      "deferred": false,
+      "tracking": "Nova B -- Critic finding (minor), NVA-CF-SANDBOXQUICKFIX delta review, not blocking"
+    },
+    {
       "id": "pipeline.onboarding-asks-published-in-one-window-only",
       "status": "closed",
       "type": "defect",
@@ -4095,7 +4105,7 @@
       "tracking": "Retrospective-analysis follow-up item #2, PO-confirmed 2026-08-30 ('auch verdrahten und fixen! das muss der runner zwingend abfragen')",
       "closedAt": "2026-08-30",
       "closureRepository": "self",
-      "closureCommit": "4b29d1ad",
+      "closureCommit": "4b29d1ad2ed5f38c060f790a265bfa600986e2d7",
       "closureEvidence": "plugins/pipeline-core/lib/project-onboarding-v3.mjs"
     },
     {

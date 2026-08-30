@@ -7,7 +7,7 @@ status: closed
 created: 2026-08-30
 closed_at: "2026-08-30"
 closure_repository: "self"
-closure_commit: "4b29d1ad"
+closure_commit: "4b29d1ad2ed5f38c060f790a265bfa600986e2d7"
 closure_evidence: "plugins/pipeline-core/lib/project-onboarding-v3.mjs"
 tracking: "Retrospective-analysis follow-up item #2, PO-confirmed 2026-08-30 ('auch verdrahten und fixen! das muss der runner zwingend abfragen')"
 source: "PO's greenfield-test relay, 2026-08-30: onboarding's key-setup guidance defaults to walking the PO through a brand-new key, never asking whether one already exists on the machine, even though closed item 2026-08-29-onboarding-has-no-happy-path-for-an-existing-signing-key.md already built the --existing-key mechanism."
