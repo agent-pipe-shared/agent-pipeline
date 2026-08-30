@@ -242,6 +242,7 @@
 | pipeline.handover-file-exceeds-its-own-size-cap-after-the-phoenix-merge | closed | defect | pipeline | 2026-08-27 | — |
 | pipeline.handover-file-has-no-rotation-obligation | closed | workflow-improvement | pipeline | 2026-08-07 | — |
 | pipeline.handover-rotation-extraction-acknowledgment-is-repo-wide-not-section-scoped | closed | defect | pipeline | 2026-08-18 | — |
+| pipeline.happy-path-key-onboarding-must-install-directly-as-critical-human-proof | open | workflow-improvement | pipeline | 2026-08-30 | NOW / Nova A -- PO explicit future requirement, 2026-08-30, filed alongside the trust-anchor-circularity fix it depends on. |
 | pipeline.happy-path-local-telemetry | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.happy-path-turn-and-wall-clock-cost-is-not-externally-defensible | closed | workflow-improvement | pipeline | 2026-08-10 | — |
 | pipeline.hardening-round-cannot-register-its-own-suites | open | defect | pipeline | 2026-08-08 | — |
@@ -566,7 +567,7 @@
 
 ## Counts
 
-- open: 75
+- open: 76
 - in_progress: 3
 - closed: 462
 - rejected: 3

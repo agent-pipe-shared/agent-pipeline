@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "dd2ecddda7058a839246c2d568df78b1260f728850409b1df903157544604ea7"
+    "transitionHead": "8ca4a5e57f321b9b0dd942cdeeb38ec5892d62e637b7ca90b79af145c7e33ee7"
   },
   "counts": {
-    "open": 75,
+    "open": 76,
     "in_progress": 3,
     "closed": 462,
     "rejected": 3,
@@ -2943,6 +2943,16 @@
       "closureRepository": "self",
       "closureCommit": "9ae28dad3f6c9c41833e7d629fa3d1d73872d2a2",
       "closureEvidence": "backlog/items/2026-08-18-handover-rotation-extraction-acknowledgment-is-repo-wide-not-section-scoped.md"
+    },
+    {
+      "id": "pipeline.happy-path-key-onboarding-must-install-directly-as-critical-human-proof",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-30",
+      "source": "PO live session 2026-08-30, item #4 of a 12-point instruction list: 'künftig muss ein frisches projekt einen neuen oder bestehenden key im happy path easy onboarden und auch direkt als critical proof.json installieren' -- filed as a distinct forward-looking item, separate from verifying today's circularity fix (see Related).",
+      "deferred": false,
+      "tracking": "NOW / Nova A -- PO explicit future requirement, 2026-08-30, filed alongside the trust-anchor-circularity fix it depends on."
     },
     {
       "id": "pipeline.happy-path-local-telemetry",
