@@ -4609,11 +4609,13 @@ test("the seeded push gate refuses an unapproved push and admits it after the sh
     calibration.verify = `${JSON.stringify(process.execPath)} -e "process.exit(0)"`;
     writeFileSync(calibrationPath, `${JSON.stringify(calibration, null, 2)}\n`);
 
-    // (3) The human chooses how a push is cleared. `chat` is the route for an
-    // operator without key management (ADR-0056); `signature` stays the default.
+    // (3) The human chooses the repository-wide Chat attribution posture.  The
+    // seeded global `human_approval: signature` owns the push gate too, so an
+    // old push-local change alone must not silently weaken it.  Conversely, a
+    // committed global `chat` intentionally needs neither a key nor a TTY.
     const userPath = join(path, "pipeline.user.yaml");
-    writeFileSync(userPath, readFileSync(userPath, "utf8").replace(/push_approval: "?signature"?/u, 'push_approval: "chat"'));
-    commit("configure verify and push approval", { noVerify: true });
+    writeFileSync(userPath, readFileSync(userPath, "utf8").replace(/human_approval: "?signature"?/u, 'human_approval: "chat"'));
+    commit("configure verify and global human approval", { noVerify: true });
 
     // (4) The artifact the approval binds, from the plugin's shipped template.
     assert.equal(state(["materialize-push-threat-model"]).code, 0);
@@ -4621,21 +4623,12 @@ test("the seeded push gate refuses an unapproved push and admits it after the sh
     assert.equal(produceEvidence().status, 0, "a configured, passing verify command must yield evidence");
     assert.equal(produceSecurityEvidence().status, 0, "a fresh consumer with no catalog must yield a clean, non-blocking security scan");
 
-    // (5) The approval itself -- the human step the whole gate exists for.
-    // Chat mode's first call issues a challenge rather than completing the
-    // approval (ADR-0056); only a follow-up call, re-run from an ATTENDED
-    // terminal and typing that challenge back, actually clears the gate
-    // (AGY-CHATADAPTER-1, commit 1ad664a8: there is no `--challenge` CLI flag
-    // any more -- `lib/chat-gate-ceremony.mjs`'s `requireAttendedChatGateConfirmation`
-    // reads the confirmation from `dependencies.isattyFn`/`dependencies.readLineFn`,
-    // simulated here the same way `pipeline-state.test.mjs`'s own already-fixed
-    // tests do it).
-    const challengeAttempt = state(["approve-push", "--by", "po", "--remote", "origin", "--destination", "refs/heads/feat/x"]);
-    assert.equal(challengeAttempt.code, 1, challengeAttempt.stderr);
-    assert.match(challengeAttempt.stderr, /PO-CHALLENGE/u);
-    const challengeCode = JSON.parse(readFileSync(join(path, "project", "pipeline-state.json"), "utf8")).pendingPushChallenge.code;
-    const approved = state(["approve-push", "--by", "po", "--remote", "origin", "--destination", "refs/heads/feat/x"],
-      { isattyFn: () => true, readLineFn: () => challengeCode });
+    // (5) Global Chat is explicitly non-attested: the recorded Chat answer is
+    // enough, with no copy-back challenge and no terminal inspection.
+    const approved = state(["approve-push", "--by", "po", "--remote", "origin", "--destination", "refs/heads/feat/x"], {
+      isattyFn: () => { throw new Error("global chat must not inspect a terminal"); },
+      readLineFn: () => { throw new Error("global chat must not read a terminal"); },
+    });
     assert.equal(approved.code, 0, approved.stderr);
 
     const admitted = attemptPush();
@@ -4736,16 +4729,15 @@ test("the seeded security gate refuses a push with missing security evidence and
     calibration.verify = `${JSON.stringify(process.execPath)} -e "process.exit(0)"`;
     writeFileSync(calibrationPath, `${JSON.stringify(calibration, null, 2)}\n`);
     const userPath = join(path, "pipeline.user.yaml");
-    writeFileSync(userPath, readFileSync(userPath, "utf8").replace(/push_approval: "?signature"?/u, 'push_approval: "chat"'));
-    commit("configure verify and push approval", { noVerify: true });
+    writeFileSync(userPath, readFileSync(userPath, "utf8").replace(/human_approval: "?signature"?/u, 'human_approval: "chat"'));
+    commit("configure verify and global human approval", { noVerify: true });
     assert.equal(state(["materialize-push-threat-model"]).code, 0);
     commit("push threat model");
     assert.equal(produceVerifyEvidence().status, 0, "a configured, passing verify command must yield evidence");
-    const challengeAttempt = state(["approve-push", "--by", "po", "--remote", "origin", "--destination", "refs/heads/feat/x"]);
-    assert.equal(challengeAttempt.code, 1, challengeAttempt.stderr);
-    const challengeCode = JSON.parse(readFileSync(join(path, "project", "pipeline-state.json"), "utf8")).pendingPushChallenge.code;
-    const approved = state(["approve-push", "--by", "po", "--remote", "origin", "--destination", "refs/heads/feat/x"],
-      { isattyFn: () => true, readLineFn: () => challengeCode });
+    const approved = state(["approve-push", "--by", "po", "--remote", "origin", "--destination", "refs/heads/feat/x"], {
+      isattyFn: () => { throw new Error("global chat must not inspect a terminal"); },
+      readLineFn: () => { throw new Error("global chat must not read a terminal"); },
+    });
     assert.equal(approved.code, 0, approved.stderr);
 
     // The push bucket is fully satisfied now. Only the security bucket can still refuse.
@@ -4931,14 +4923,14 @@ test("the fixture's own security-scan.mjs call graph, deployed with no repo root
 // only demonstrates the unrelated flag-parsing refusal and would pass
 // unchanged whether or not this fix exists.
 //
-// `chat` half: ADR-0056's fix in pipeline-state.mjs reads the `push_approval:
-// chat` stand-down BEFORE `requiredKinds` is even consulted, so a chat-mode
+// `chat` half: the committed global `human_approval: chat` stand-down is read
+// BEFORE `requiredKinds` is even consulted, so a chat-mode
 // `approve-push` succeeds whether or not `project/critical-human-proof.json`
 // exists -- there is no policy-kind refusal to reproduce here, pre- or
 // post-fix. This half is therefore driven end to end (PUSHSEED-2's chat
 // shape) as a regression guard: the seeded policy file must not break the
 // already-satisfiable chat path.
-test("onboarding materializes project/critical-human-proof.json declaring push, for both push_approval modes", () => {
+test("onboarding materializes project/critical-human-proof.json declaring push, for both global human approval modes", () => {
   const signatureRoot = root();
   const chatRoot = root();
   try {
@@ -4968,7 +4960,7 @@ test("onboarding materializes project/critical-human-proof.json declaring push, 
       const commit = (message) => { hostGit(path, ["add", "-A"]); hostGit(path, ["commit", "-q", "-m", message]); };
       if (mode === "chat") {
         const userPath = join(path, "pipeline.user.yaml");
-        writeFileSync(userPath, readFileSync(userPath, "utf8").replace(/push_approval: "?signature"?/u, 'push_approval: "chat"'));
+        writeFileSync(userPath, readFileSync(userPath, "utf8").replace(/human_approval: "?signature"?/u, 'human_approval: "chat"'));
       }
       commit(`seeded consumer (${mode})`);
 
@@ -4997,33 +4989,15 @@ test("onboarding materializes project/critical-human-proof.json declaring push, 
         assert.match(String(attempted.stderr), /CRITICAL-PROOF-EXTERNAL-PATH/u,
           "the refusal must be the external-proof gate reached AFTER the policy-kind check, not the policy-kind refusal itself");
       } else {
-        // `chat` mode stands the private-key proof down before `requiredKinds`
-        // is even consulted (ADR-0056 -- see comment above the test), so this
+        // Global `chat` stands the private-key proof down before `requiredKinds`
+        // is even consulted, so this
         // half exercises `approve-push` to a genuine completed approval
         // (PUSHSEED-2's chat shape) rather than a proxy command: materializing
         // the policy file must not regress the already-satisfiable chat path.
-        // The first call issues a challenge instead of completing the
-        // approval; the follow-up call, echoing that challenge back, is what
-        // actually clears the gate (ADR-0056).
-        const challengeAttempt = state("approve-push", "--by", "po", "--remote", "origin", "--destination", "refs/heads/feat/x");
-        assert.equal(challengeAttempt.status, 1, challengeAttempt.stderr);
-        assert.match(String(challengeAttempt.stderr), /PO-CHALLENGE/u);
-        const challengeCode = JSON.parse(readFileSync(join(path, "project", "pipeline-state.json"), "utf8")).pendingPushChallenge.code;
-        // AGY-CHATADAPTER-1 (commit 1ad664a8) removed the `--challenge` CLI flag
-        // entirely; completing the ceremony now requires an ATTENDED terminal
-        // (`isAttendedTerminal()`), which a spawned subprocess's plain piped
-        // stdin can never satisfy -- that refusal is the exact security property
-        // proven elsewhere (this file's own PUSHSEED-2 test above, and
-        // project-onboarding-v3-argv-closure.test.mjs's live kickoff subprocess
-        // tests). This final confirming call is therefore made in-process
-        // instead, using the primitive's own injectable isattyFn/readLineFn seam
-        // to simulate a genuinely attended human -- same pattern PUSHSEED-2
-        // above and pipeline-state.test.mjs's own already-fixed coverage use.
-        const approved = pipelineStateRun(
-          ["approve-push", "--by", "po", "--remote", "origin", "--destination", "refs/heads/feat/x"],
-          { dir: path, isattyFn: () => true, readLineFn: () => challengeCode },
-        );
-        assert.equal(approved, 0, "chat-mode approval must be reachable from an attended terminal");
+        // No terminal/copy-back confirmation is permitted under this global
+        // posture, so the real CLI subprocess must complete directly.
+        const approved = state("approve-push", "--by", "po", "--remote", "origin", "--destination", "refs/heads/feat/x");
+        assert.equal(approved.status, 0, `global chat approval must be terminal-free: ${approved.stderr}`);
       }
     }
   } finally { dispose(signatureRoot); dispose(chatRoot); }

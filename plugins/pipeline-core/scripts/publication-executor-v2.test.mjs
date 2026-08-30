@@ -28,6 +28,7 @@ function releaseRecord(capability) {
     lifecycle: { featureId: "sprint-nova-epic", manifestPath: "specs/nova/lifecycle.json", manifestSha256: digest("7"), status: "prepared" },
     retention: { policySha256: digest("8"), records: Object.values(documentation).map((value) => ({ path: value.path, classification: "public", retentionClass: "active", archiveDigest: null, archiveProvenanceSha256: null })).sort((a, b) => a.path.localeCompare(b.path)) },
     consent: { decisionId: digest("9"), status: "approved", authoritySha256: digest("a"), evaluatedAt: "2026-08-01T10:00:00.000Z", expiresAt: "2026-08-02T10:00:00.000Z" },
+    humanApproval: null,
     gates: { gg03: { required: true, binding: { schema: "pipeline.gg-03-binding.v1", operation: "protected-main-fast-forward", candidateCommit: candidate.commit, candidateTree: candidate.tree, authoritySha256: digest("c"), evidenceSha256: digest("d") } }, inventory: [{ id: "verify", kind: "local-final", status: "pending" }, { id: "security", kind: "local-final", status: "pending" }, { id: "critic", kind: "local-final", status: "pending" }, { id: "remote", kind: "external", status: "pending" }, { id: "human", kind: "external", status: "pending" }] },
     extensions: { schema: "pipeline.release-preflight-extension-input.v1", status: "registered", registrySha256: digest("e"), requirements: [{ id: "publication-capability-preflight", sha256: capability.recordSha256, status: "accepted" }] },
   });
@@ -109,7 +110,7 @@ check("prepare rejects failed gate outcomes, missing capability extension, and e
   const input = { rootDir: value.root, transactionId: "tx-escape", channel: "private", preflightPath: "../outside.json", identityPath: "evidence/identity.json", verifyPath: "evidence/verify.json", securityPath: "evidence/security.json", criticPath: "evidence/critic.json", releasePreflightPath: "evidence/release.json" };
   assert.throws(() => preparePublicationTransaction(input), /path is invalid|escaped/u);
   const bound = releaseRecord(value.capability); const unbound = { ...bound, extensions: { schema: "pipeline.release-preflight-extension-input.v1", status: "none", registrySha256: null, requirements: [] } };
-  writeFileSync(join(value.root, "evidence/unbound-release.json"), `${JSON.stringify(createReleasePreflight({ preflightId: unbound.preflightId, candidate: unbound.candidate, base: unbound.base, version: unbound.version, repository: unbound.repository, documentation: unbound.documentation, lifecycle: unbound.lifecycle, retention: unbound.retention, consent: unbound.consent, gates: unbound.gates, extensions: unbound.extensions }))}\n`);
+  writeFileSync(join(value.root, "evidence/unbound-release.json"), `${JSON.stringify(createReleasePreflight({ preflightId: unbound.preflightId, candidate: unbound.candidate, base: unbound.base, version: unbound.version, repository: unbound.repository, documentation: unbound.documentation, lifecycle: unbound.lifecycle, retention: unbound.retention, consent: unbound.consent, humanApproval: unbound.humanApproval, gates: unbound.gates, extensions: unbound.extensions }))}\n`);
   assert.throws(() => preparePublicationTransaction({ ...input, transactionId: "tx-unbound", preflightPath: "evidence/preflight.json", releasePreflightPath: "evidence/unbound-release.json" }), /not bound/u);
 });
 
