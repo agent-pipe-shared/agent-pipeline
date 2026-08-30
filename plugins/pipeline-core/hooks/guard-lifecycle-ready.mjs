@@ -374,6 +374,13 @@ export const ADMITTED_GRAMMAR_SHAPES = [
     example: "cat probe.txt | head -5",
   },
   {
+    spelling: "bounded git-to-head diagnostic pipeline: \"git <read-only-subcommand> ... | "
+      + "head -n N\" / \"git <read-only-subcommand> ... | head -N\" (the same read-only "
+      + "subcommand set the un-piped git form already trusts; N in 1..500), optionally "
+      + "followed by \"2>/dev/null\"",
+    example: "git log | head -5",
+  },
+  {
     spelling: `up to ${MAX_AND_CHAIN_SEGMENTS} "&&"-chained segments, admitted only when EVERY `
       + "segment is independently one of the shapes above or the small always-safe-write "
       + "allowlist (echo; \"mkdir -p\" under scratch/ or .claude/worktrees/)",
@@ -1791,6 +1798,53 @@ function isBoundedCatPipeline(parsed, root) {
 }
 
 /**
+ * NVA-CF-GITPIPEALLOWLIST. Extends the same bounded pipeline family isBoundedGrepPipeline/
+ * isBoundedCatPipeline established with a `git`-sourced source, scoped to `head` only:
+ * `git <read-only-subcommand> ... | head -n N` / `git <read-only-subcommand> ... | head -N`.
+ * Measured live this session: `git log | head` was refused GUARD-PARSE-UNSUPPORTED even though
+ * `git log` alone is already unconditionally trusted read-only (isReadOnlySimpleWords' git
+ * branch, via isReadOnlyGitSubcommand below).
+ *
+ * Subcommand trust is the SAME predicate the single-command git rule uses -- isReadOnlyGitSubcommand,
+ * factored out of isReadOnlySimpleWords below so the two can never diverge; this pipeline family
+ * never admits a git subcommand the single-command form doesn't already trust. Unlike that
+ * single-command form (which applies no path restriction to git's own arguments), every non-flag
+ * source argument is additionally scoped to the project root via the identical
+ * isApprovedSingleCommandReadArg containment check the un-piped rg/grep/cat/head/tail/wc/stat/file
+ * family already applies -- deliberately narrower than the single-command git rule, the same
+ * discipline NVA-CATPIPE-1 already applied to the cat pipeline family for the same reason.
+ *
+ * Sink half identical to isBoundedGrepPipeline/isBoundedCatPipeline's head leg: `head` only
+ * (no grep sink for git -- out of this dispatch's scope), same canonical 1..500 bound, same
+ * optional trailing `2>/dev/null`.
+ */
+function isBoundedGitPipeline(parsed, root, extraRoots = BOUNDED_PIPELINE_ADDITIONAL_ROOTS) {
+  if (!parsed || parsed.parseStatus !== "accepted"
+    || parsed.segments.length !== 2
+    || parsed.operators.length !== 1
+    || parsed.operators[0].operator !== "|"
+    || parsed.redirects.length > 1) return false;
+  const windows = parsed.dialect === "windows-readonly-pipeline";
+  const expectedGit = windows ? "git.exe" : "git";
+  const sourceName = basename(parsed.segments[0].executable).toLowerCase();
+  if (sourceName !== expectedGit) return false;
+  const sourceArgv = parsed.segments[0].argv;
+  if (sourceArgv.length === 0) return false;
+  const subcommand = sourceArgv[0];
+  const subargs = sourceArgv.slice(1);
+  if (!isReadOnlyGitSubcommand(subcommand, subargs)) return false;
+  if (!subargs.every((arg) => isApprovedSingleCommandReadArg(arg, root, extraRoots))) return false;
+  const sinkName = basename(parsed.segments[1].executable).toLowerCase();
+  if (sinkName !== (windows ? "head.exe" : "head")) return false;
+  if (parsed.redirects.length === 1) {
+    const redirect = parsed.redirects[0];
+    if (redirect.segment !== 0 || redirect.fd !== 2 || redirect.direction !== ">"
+      || (windows ? redirect.target.toLowerCase() !== "nul" : redirect.target !== "/dev/null")) return false;
+  }
+  return isValidPipelineHeadArgs(parsed.segments[1].argv);
+}
+
+/**
  * Splits a command string on top-level `&&` occurrences only, mirroring
  * retryActionsForDeniedCommand's own quote- and escape-aware local scanner below (same
  * file) but for `&&` instead of `;`/newline. Deliberately NOT delegated to
@@ -2138,6 +2192,16 @@ function isReadOnlySimpleWords(words, root, extraRoots = BOUNDED_PIPELINE_ADDITI
   if (args[index] === "-C") index += 2;
   const subcommand = args[index];
   const subargs = args.slice(index + 1);
+  return isReadOnlyGitSubcommand(subcommand, subargs);
+}
+
+// NVA-CF-GITPIPEALLOWLIST: factored out of isReadOnlySimpleWords' git branch (pure extraction,
+// behavior for the existing single-command caller unchanged) so isBoundedGitPipeline above can
+// reuse the EXACT read-only-subcommand determination rather than a second, drift-prone copy.
+// `-C <dir>` handling stays in the caller (isReadOnlySimpleWords) deliberately -- neither this
+// function nor isBoundedGitPipeline support it, keeping both callers free of the
+// cross-repository-reaching `-C` shape.
+function isReadOnlyGitSubcommand(subcommand, subargs) {
   if (["status", "diff", "log", "show", "rev-parse", "ls-files", "ls-tree", "for-each-ref"].includes(subcommand)) {
     return true;
   }
@@ -2161,6 +2225,7 @@ export function isReadOnlyDiagnosticCommand(command, root) {
   if (isBoundedReadOnlyPipeline(parsed, root, BOUNDED_PIPELINE_ADDITIONAL_ROOTS)) return true;
   if (isBoundedGrepPipeline(parsed, root)) return true;
   if (isBoundedCatPipeline(parsed, root)) return true;
+  if (isBoundedGitPipeline(parsed, root, BOUNDED_PIPELINE_ADDITIONAL_ROOTS)) return true;
   if (isBoundedReadOnlyAndChain(command, root)) return true;
   if (isReadOnlyDiagnosticCommandWithTrailingStderrRedirect(command, root)) return true;
   return isReadOnlySimpleWords(simpleWords(command, root), root);
@@ -2516,6 +2581,7 @@ export function isForbiddenCrossRepositoryMutation(command, root, dependencies =
   if (isBoundedReadOnlyPipeline(parsed, root, BOUNDED_PIPELINE_ADDITIONAL_ROOTS)) return false;
   if (isBoundedGrepPipeline(parsed, root)) return false;
   if (isBoundedCatPipeline(parsed, root)) return false;
+  if (isBoundedGitPipeline(parsed, root, BOUNDED_PIPELINE_ADDITIONAL_ROOTS)) return false;
   if (isBoundedReadOnlyAndChain(command, root)) return false;
   if (isReadOnlyDiagnosticCommandWithTrailingStderrRedirect(command, root)) return false;
   if (parsed.parseStatus !== "accepted" && hasExternalOutputRedirect(command, root)) return true;
