@@ -513,6 +513,7 @@
 | pipeline.three-independent-copies-of-the-wsl-windows-path-normalization | closed | defect | pipeline | 2026-08-27 | — |
 | pipeline.three-runners-showed-wide-pipeline-administration-overhead-variance | open | idea | pipeline | 2026-08-29 | — |
 | pipeline.three-smaller-greenfield-defects | closed | defect | pipeline | 2026-08-08 | — |
+| pipeline.tp-ceremony-denials-inline-a-150-line-multi-shell-block-by-default | closed | workflow-improvement | pipeline | 2026-08-30 | NOW / Nova A -- PO decision 2026-08-30, item #12 of a 12-point instruction list: implement the Elephant's own guard-verbosity-slimming proposal. |
 | pipeline.tp-guard-rules-lifted-on-the-merging-machine-must-be-restored | closed | defect | pipeline | 2026-08-27 | — |
 | pipeline.transactional-readbacks-not-status-cascades | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.triage-verdict-text-can-contaminate-a-backlog-item-as-a-later-spec-reference | closed | defect | pipeline | 2026-08-18 | — |
@@ -569,6 +570,6 @@
 
 - open: 76
 - in_progress: 3
-- closed: 462
+- closed: 463
 - rejected: 3
 - deferred: 11

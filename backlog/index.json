@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "8ca4a5e57f321b9b0dd942cdeeb38ec5892d62e637b7ca90b79af145c7e33ee7"
+    "transitionHead": "74e8f8fe89590605e5affee93c59a394df8543e1ef8e72674dc067706af9b990"
   },
   "counts": {
     "open": 76,
     "in_progress": 3,
-    "closed": 462,
+    "closed": 463,
     "rejected": 3,
     "deferred": 11
   },
@@ -6333,6 +6333,20 @@
       "closureRepository": "self",
       "closureCommit": "4a3534ce970962eda367f6eeb523e69ceb84da94",
       "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
+    },
+    {
+      "id": "pipeline.tp-ceremony-denials-inline-a-150-line-multi-shell-block-by-default",
+      "status": "closed",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-30",
+      "source": "PO live session 2026-08-30, raised while diagnosing why context returns to ~200k tokens immediately after every /compact: every TP-protected-file guard denial (hooks.json, verify.mjs, 5x pipeline-state.test.mjs today alone) dumped a ~150-line block with 4x redundant posix/powershell/cmd.exe copy-safe renderings for every ceremony step.",
+      "deferred": false,
+      "tracking": "NOW / Nova A -- PO decision 2026-08-30, item #12 of a 12-point instruction list: implement the Elephant's own guard-verbosity-slimming proposal.",
+      "closedAt": "2026-08-30",
+      "closureRepository": "self",
+      "closureCommit": "2d8c2990960ac2182fa6f9c0ba59e8077971e3a3",
+      "closureEvidence": "plugins/pipeline-core/scripts/guard-human-override.test.mjs"
     },
     {
       "id": "pipeline.tp-guard-rules-lifted-on-the-merging-machine-must-be-restored",
