@@ -50,14 +50,22 @@
  * 1 = FATAL (a card was available and no matching receipt exists for the given session).
  * 3 = usage error (missing --root/--session-id, or the check itself could not run).
  *
+ * NVA-CF-RESUMECHECKANYSESSION added a SEPARATE `--any-session` mode (mutually exclusive
+ * with `--session-id`) for a caller with no live session identity -- e.g. a future
+ * `verify.mjs` batch registration. It answers a different question: does ANY recorded
+ * consumption receipt, from any session, match the currently-available card's digest? PASS/
+ * FATAL semantics mirror the single-session mode exactly. The existing `--session-id` mode's
+ * behavior, exit codes and messages are unchanged.
+ *
  * Usage:
  *   node plugins/pipeline-core/scripts/check-resume-consumption.mjs --root <project> --session-id <id>
  *   node plugins/pipeline-core/scripts/check-resume-consumption.mjs --root <project> --session-id <id> --json
+ *   node plugins/pipeline-core/scripts/check-resume-consumption.mjs --root <project> --any-session
  */
 import { resolve } from "node:path";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
-import { inspectResumeHint, queryResumeHintConsumption } from "../lib/resume-hint.mjs";
+import { anyResumeHintConsumptionReceipt, inspectResumeHint, queryResumeHintConsumption } from "../lib/resume-hint.mjs";
 
 export const SCHEMA = "pipeline.check-resume-consumption.v1";
 
@@ -113,17 +121,72 @@ export function checkResumeConsumption({
   };
 }
 
+/**
+ * Any-session composition, mirroring `checkResumeConsumption()`'s exact PASS/FATAL shape
+ * (see that function's own doc comment above for the rationale). Answers a different
+ * question than the single-session mode: does ANY recorded consumption receipt -- from ANY
+ * session, not one caller-supplied id -- match the currently-available card's digest? This
+ * is the mode `verify.mjs` (a batch check with no live session identity) will eventually be
+ * able to call. `inspect`/`query` are injectable for the same filesystem-free-test reason as
+ * `checkResumeConsumption()` above.
+ */
+export function checkResumeConsumptionAnySession({
+  rootDir,
+  inspect = inspectResumeHint, query = anyResumeHintConsumptionReceipt,
+} = {}) {
+  const inspected = inspect({ rootDir });
+  if (inspected.status !== "available") {
+    return {
+      ok: true, schema: SCHEMA, code: "RH-CHECK-NO-CARD", cardStatus: inspected.status,
+      message: `no Resume-Hint card was available at bootstrap (status: ${inspected.status}) -- nothing to consume`,
+    };
+  }
+  const queried = query({ rootDir });
+  if (queried.outcome === "found") {
+    return {
+      ok: true, schema: SCHEMA, code: "RH-CHECK-CONSUMED-ANY", cardStatus: inspected.status, cardDigest: queried.cardDigest,
+      message: `an available Resume-Hint card produced a matching consumption receipt from session ${JSON.stringify(queried.sessionId)}`,
+    };
+  }
+  if (queried.outcome === "no-card") {
+    return {
+      ok: false, schema: SCHEMA, code: "RH-CHECK-NO-DIGEST-RECORD", cardStatus: inspected.status,
+      message:
+        "a Resume-Hint card was available at bootstrap but no card-digest record exists to verify " +
+        "consumption against (captured outside the CLI capture path, or the digest record is " +
+        "unavailable) -- this is the F12/F13 regression shape: the agent proceeded as if it had " +
+        "read the card, with no mechanical way to confirm it",
+    };
+  }
+  // queried.outcome === "not-found": a digest is recorded but no receipt anywhere matches it.
+  return {
+    ok: false, schema: SCHEMA, code: "RH-CHECK-RH-RECEIPT-ABSENT-ANY", cardStatus: inspected.status,
+    cardDigest: queried.cardDigest, receiptCount: queried.receiptCount,
+    message:
+      "an available Resume-Hint card at bootstrap has no matching consumption receipt from ANY " +
+      `session (${queried.receiptCount} receipt(s) inspected) -- this is the F12/F13 regression ` +
+      "shape, now checked repo-wide: no session anywhere consumed the currently-live card",
+  };
+}
+
 function main(argv) {
   const json = argv.includes("--json");
+  const anySession = argv.includes("--any-session");
   const root = value(argv, "--root");
   const sessionId = value(argv, "--session-id");
-  if (!root || !sessionId) {
-    process.stderr.write("usage: check-resume-consumption.mjs --root <project> --session-id <id> [--json]\n");
+  if (anySession && sessionId) {
+    process.stderr.write("usage: check-resume-consumption.mjs --any-session and --session-id are mutually exclusive\n");
+    return 3;
+  }
+  if (!root || (!anySession && !sessionId)) {
+    process.stderr.write("usage: check-resume-consumption.mjs --root <project> (--session-id <id> | --any-session) [--json]\n");
     return 3;
   }
   let result;
   try {
-    result = checkResumeConsumption({ rootDir: resolve(root), sessionId });
+    result = anySession
+      ? checkResumeConsumptionAnySession({ rootDir: resolve(root) })
+      : checkResumeConsumption({ rootDir: resolve(root), sessionId });
   } catch (error) {
     process.stderr.write(`check-resume-consumption unavailable: ${error.message}\n`);
     return 3;

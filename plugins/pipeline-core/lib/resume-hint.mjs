@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 /** Non-authoritative, discardable context for a brief session restart. */
 import { createHash } from "node:crypto";
-import { existsSync, lstatSync, openSync, renameSync, unlinkSync, writeFileSync, closeSync, readFileSync, mkdirSync, realpathSync } from "node:fs";
+import { existsSync, lstatSync, openSync, renameSync, unlinkSync, writeFileSync, closeSync, readFileSync, readdirSync, mkdirSync, realpathSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 
@@ -480,4 +480,45 @@ export function queryResumeHintConsumption({
     return { outcome: "not-consumed", cardDigest: cardRecord.cardDigest, receiptDigest: receipt.cardDigest, code: "RH-RECEIPT-DIGEST-MISMATCH" };
   }
   return { outcome: "consumed", cardDigest: cardRecord.cardDigest };
+}
+
+/**
+ * NVA-CF-RESUMECHECKANYSESSION: the any-session variant of `queryResumeHintConsumption()`
+ * above, for a caller (a batch `verify.mjs`-style check) that has no live session identity to
+ * supply. Answers a different, still mechanical question: does ANY recorded consumption
+ * receipt, from any session, match the currently recorded card digest? Reuses
+ * `resolvePrivateStateDir()`/`readJsonRecord()`/`readResumeHintCardDigest()` unchanged --
+ * never a second copy of their logic. Exactly three outcomes:
+ *   - "no-card": no card was ever captured (or the capture-time digest record is gone).
+ *   - "found": at least one receipt under `consumption-receipts/` matches the current digest.
+ *     `sessionId` is the FIRST matching receipt's own `sessionId` field, for diagnostic value
+ *     only -- it is never used to gate anything. `receiptCount` is the number of receipt files
+ *     inspected (valid or not) up to and including the match.
+ *   - "not-found": a digest is recorded but nothing under `consumption-receipts/` matches it,
+ *     including when the directory does not exist at all or is empty. `receiptCount` is the
+ *     total number of receipt files inspected (valid or not).
+ * A corrupt or unreadable individual receipt file is skipped, never thrown -- the same
+ * discipline `readJsonRecord()` already applies.
+ */
+export function anyResumeHintConsumptionReceipt({
+  rootDir, fs = { existsSync, lstatSync, readFileSync, readdirSync }, spawnSyncFn = spawnSync,
+} = {}) {
+  const cardRecord = readResumeHintCardDigest({ rootDir, fs, spawnSyncFn });
+  if (cardRecord === null) return { outcome: "no-card" };
+  const dir = resolvePrivateStateDir(rootDir, { spawnSyncFn });
+  const receiptsDir = dir === null ? null : join(dir, "consumption-receipts");
+  let filenames = [];
+  if (receiptsDir !== null) {
+    try { filenames = fs.readdirSync(receiptsDir); } catch { filenames = []; }
+  }
+  let receiptCount = 0;
+  for (const filename of filenames) {
+    const receipt = readJsonRecord(join(receiptsDir, filename), fs);
+    receiptCount += 1;
+    if (receipt && receipt.schema === CONSUMPTION_RECEIPT_SCHEMA && typeof receipt.cardDigest === "string"
+      && receipt.cardDigest === cardRecord.cardDigest) {
+      return { outcome: "found", cardDigest: cardRecord.cardDigest, sessionId: receipt.sessionId, receiptCount };
+    }
+  }
+  return { outcome: "not-found", cardDigest: cardRecord.cardDigest, receiptCount };
 }

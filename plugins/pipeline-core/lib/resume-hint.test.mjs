@@ -7,7 +7,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { RESUME_HINT_SCHEMA, buildResumeHint, resumeHintContextDetail, validateResumeHint, verbatimMaterialRejection } from "./resume-hint.mjs";
+import {
+  RESUME_HINT_SCHEMA, buildResumeHint, resumeHintContextDetail, validateResumeHint, verbatimMaterialRejection,
+  anyResumeHintConsumptionReceipt, captureResumeHint, recordResumeHintCardDigest, recordResumeHintConsumption,
+} from "./resume-hint.mjs";
 
 const BASE = {
   intent: "Resume the bounded rollout review where it stopped.",
@@ -581,6 +584,93 @@ test("NVA-RESUMEVERBATIM-1 a legacy four-key card (no materialInput/values) is u
     const result = spawnSync(process.execPath, [helper, "capture", "--root", root, "--card-file", cardPath], { encoding: "utf8" });
     assert.equal(result.status, 0, result.stderr);
     assert.ok(!("intake" in JSON.parse(result.stdout)), "a legacy card must not gain a new output key");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// --- NVA-CF-RESUMECHECKANYSESSION: anyResumeHintConsumptionReceipt() -----------------------
+
+test("anyResumeHintConsumptionReceipt: no-card when no card-digest record exists", () => {
+  const root = gitInitRoot("resume-hint-any-no-card-");
+  try {
+    const result = anyResumeHintConsumptionReceipt({ rootDir: root });
+    assert.deepEqual(result, { outcome: "no-card" });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("anyResumeHintConsumptionReceipt: found when a receipt from ANY session id matches, not the literal string \"any\"", () => {
+  const root = gitInitRoot("resume-hint-any-found-");
+  try {
+    captureResumeHint({ rootDir: root, context: BASE });
+    const { cardDigest } = recordResumeHintCardDigest({ rootDir: root, card: BASE });
+    const consumed = recordResumeHintConsumption({ rootDir: root, sessionId: "a-completely-different-session-id" });
+    assert.equal(consumed.status, "recorded");
+
+    const result = anyResumeHintConsumptionReceipt({ rootDir: root });
+    assert.equal(result.outcome, "found");
+    assert.equal(result.cardDigest, cardDigest);
+    assert.equal(result.sessionId, "a-completely-different-session-id");
+    assert.equal(result.receiptCount, 1);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("anyResumeHintConsumptionReceipt: not-found when the consumption-receipts directory does not exist at all", () => {
+  const root = gitInitRoot("resume-hint-any-no-dir-");
+  try {
+    const { cardDigest } = (() => {
+      captureResumeHint({ rootDir: root, context: BASE });
+      return recordResumeHintCardDigest({ rootDir: root, card: BASE });
+    })();
+    const result = anyResumeHintConsumptionReceipt({ rootDir: root });
+    assert.equal(result.outcome, "not-found");
+    assert.equal(result.cardDigest, cardDigest);
+    assert.equal(result.receiptCount, 0);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("anyResumeHintConsumptionReceipt: not-found when receipts exist but none match the current digest", () => {
+  const root = gitInitRoot("resume-hint-any-mismatch-");
+  try {
+    captureResumeHint({ rootDir: root, context: BASE });
+    recordResumeHintCardDigest({ rootDir: root, card: BASE });
+    recordResumeHintConsumption({ rootDir: root, sessionId: "session-a" }); // receipt bound to digest 1
+
+    // A second capture replaces the card and its recorded digest without a new consumption.
+    const secondContext = { ...BASE, intent: "A different, later intent entirely." };
+    captureResumeHint({ rootDir: root, context: secondContext });
+    const { cardDigest: secondDigest } = recordResumeHintCardDigest({ rootDir: root, card: secondContext });
+
+    const result = anyResumeHintConsumptionReceipt({ rootDir: root });
+    assert.equal(result.outcome, "not-found");
+    assert.equal(result.cardDigest, secondDigest);
+    assert.equal(result.receiptCount, 1);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("anyResumeHintConsumptionReceipt: a corrupt receipt file is skipped, not thrown, and a valid one is still found", () => {
+  const root = gitInitRoot("resume-hint-any-corrupt-");
+  try {
+    captureResumeHint({ rootDir: root, context: BASE });
+    const { cardDigest } = recordResumeHintCardDigest({ rootDir: root, card: BASE });
+    const receiptsDir = join(root, ".git", "agent-pipeline", "resume-hint", "consumption-receipts");
+    mkdirSync(receiptsDir, { recursive: true });
+    writeFileSync(join(receiptsDir, "not-json-at-all.json"), "not valid json{{{");
+    const consumed = recordResumeHintConsumption({ rootDir: root, sessionId: "session-a" });
+    assert.equal(consumed.status, "recorded");
+
+    const result = anyResumeHintConsumptionReceipt({ rootDir: root });
+    assert.equal(result.outcome, "found");
+    assert.equal(result.cardDigest, cardDigest);
+    assert.ok(result.receiptCount >= 1, "must have inspected at least the matching receipt");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
