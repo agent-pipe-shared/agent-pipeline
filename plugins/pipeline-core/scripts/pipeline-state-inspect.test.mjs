@@ -33,6 +33,7 @@ import { sha256CanonicalJson } from "../lib/plan-spec-state-v2.mjs";
 const roots = [];
 const NOW = "2026-08-18T12:00:00.000Z";
 const PIPELINE_STATE_SCRIPT_PATH = fileURLToPath(new URL("./pipeline-state.mjs", import.meta.url));
+const SEEDED_VERIFY = "node -e \"console.error('pipeline: the verify contract of this project is not configured. Replace the verify command in project/pipeline.json with the real verification command for this project (for example its test suite), then run verify again.'); process.exit(1)\"";
 afterEach(() => { while (roots.length) rmSync(roots.pop(), { recursive: true, force: true }); });
 
 // NVA-R34-BLINDPUSHPATH: `buildInspectNextAction`'s `draft` branch now checks
@@ -262,6 +263,80 @@ test("awaiting-approval re-surfaces present-plan when the existing presentation 
   assert.deepEqual(payload.nextAction.argv, [
     PIPELINE_STATE_SCRIPT_PATH, "present-plan", "--by", "Jordan Example",
   ]);
+});
+
+function approvedFixture(name, verify) {
+  const root = freshRoot(name);
+  mkdirSync(join(root, "project"), { recursive: true });
+  writeFileSync(join(root, "project", "pipeline.json"), JSON.stringify({
+    project: "new-project",
+    verify,
+    handover: "docs/state.md",
+  }, null, 2) + "\n");
+  writeFileSync(resolveStatePath(root), JSON.stringify({
+    schema: SCHEMA_ID,
+    activeFeature: { id: "widget", planPath: "specs/widget/prd.md", phase: "design" },
+    planApproved: true,
+    planApproval: { approvedBy: "PO", approvedAt: NOW },
+  }, null, 2) + "\n");
+  return root;
+}
+
+test("approved next-action with the seeded verify placeholder collects a real command and renders the writer-required transition", () => {
+  const root = approvedFixture("approved-placeholder-verify", SEEDED_VERIFY);
+  const statePathValue = resolveStatePath(root);
+  const calibrationPath = join(root, "project", "pipeline.json");
+  const beforeState = readFileSync(statePathValue, "utf8");
+  const beforeCalibration = readFileSync(calibrationPath, "utf8");
+
+  const result = invoke(root, ["inspect"]);
+  assert.equal(result.status, 0, result.err);
+  const payload = JSON.parse(result.out);
+  assert.equal(payload.status, "approved");
+  assert.equal(payload.nextAction.kind, "collect-input");
+  assert.deepEqual(payload.nextAction.inputs.map((input) => input.name), ["verify-command"]);
+  assert.equal(payload.nextAction.executable, undefined,
+    "an unresolved verify command must never be published as an executable action");
+  assert.equal(payload.nextAction.argv, undefined,
+    "an unresolved verify command must never leak a placeholder into runnable argv");
+  assert.ok(payload.nextAction.guidance.includes("set-phase --phase implementation --verify-command"),
+    `guidance must render the exact writer-required transition: ${payload.nextAction.guidance}`);
+  assert.ok(payload.nextAction.guidance.includes("<project verify command>"),
+    `guidance must identify the one missing value truthfully: ${payload.nextAction.guidance}`);
+  assert.equal(readFileSync(statePathValue, "utf8"), beforeState, "inspect must not mutate State");
+  assert.equal(readFileSync(calibrationPath, "utf8"), beforeCalibration, "inspect must not configure verify itself");
+
+  const realVerify = "node --test";
+  const transitioned = invoke(root, [
+    "set-phase", "--phase", "implementation", "--verify-command", realVerify,
+  ]);
+  assert.equal(transitioned.status, 0, transitioned.err);
+  assert.equal(JSON.parse(readFileSync(statePathValue, "utf8")).activeFeature.phase, "implementation");
+  assert.equal(JSON.parse(readFileSync(calibrationPath, "utf8")).verify, realVerify,
+    "the exact transition shape inspect renders must satisfy the writer's verify contract");
+});
+
+test("approved next-action keeps the existing bare set-phase command when verify is already configured", () => {
+  const root = approvedFixture("approved-configured-verify", "node --test");
+
+  const result = invoke(root, ["inspect"]);
+  assert.equal(result.status, 0, result.err);
+  const payload = JSON.parse(result.out);
+  assert.equal(payload.status, "approved");
+  assert.deepEqual(payload.nextAction, {
+    kind: "command",
+    executable: process.execPath,
+    argv: [PIPELINE_STATE_SCRIPT_PATH, "set-phase", "--phase", "implementation"],
+    mutation: true,
+    requiresConfirmation: true,
+  });
+
+  const transitioned = invoke(root, payload.nextAction.argv.slice(1));
+  assert.equal(transitioned.status, 0, transitioned.err);
+  assert.equal(JSON.parse(readFileSync(resolveStatePath(root), "utf8")).activeFeature.phase, "implementation",
+    "the already-configured bare transition must remain runnable without --verify-command");
+  assert.equal(JSON.parse(readFileSync(join(root, "project", "pipeline.json"), "utf8")).verify, "node --test",
+    "the already-configured bare transition must leave verify unchanged");
 });
 
 // NVA-CF-PUSHDRIVERFINISH: the `implementing` branch (once the push

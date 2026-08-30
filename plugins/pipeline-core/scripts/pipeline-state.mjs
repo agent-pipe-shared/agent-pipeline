@@ -3179,6 +3179,16 @@ function isBlank(v) {
 const UNCONFIGURED_VERIFY_MARKER = "the verify contract of this project is not configured";
 
 /**
+ * One raw-value classifier for the writer, inspect route and lifecycle guard.
+ * Keeping the placeholder marker here prevents the guard from admitting a value
+ * the writer immediately refuses (or maintaining a second marker that can drift).
+ */
+export function classifyVerifyCommand(command) {
+  if (typeof command !== "string" || command.trim() === "") return "missing";
+  return command.includes(UNCONFIGURED_VERIFY_MARKER) ? "placeholder" : "configured";
+}
+
+/**
  * Read-only: classifies the project calibration's `verify` field the same way
  * push-gate-satisfiability.mjs's `checkVerifyContractConfigured()` does (missing /
  * placeholder / configured), reading whichever calibration tier
@@ -3198,9 +3208,8 @@ function readCalibrationVerifyStatus(dir) {
     return { status: "missing" };
   }
   const command = parsed?.verify;
-  if (typeof command !== "string" || command.trim() === "") return { status: "missing" };
-  if (command.includes(UNCONFIGURED_VERIFY_MARKER)) return { status: "placeholder" };
-  return { status: "configured", command };
+  const status = classifyVerifyCommand(command);
+  return status === "configured" ? { status, command } : { status };
 }
 
 /**
@@ -3573,6 +3582,34 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
     };
   }
   if (lifecycle.status === "approved") {
+    const verifyStatus = readCalibrationVerifyStatus(dir);
+    if (verifyStatus.status !== "configured") {
+      const scriptPath = fileURLToPath(import.meta.url);
+      const command = boundedCopySafeCommand({
+        executable: process.execPath,
+        argv: [
+          scriptPath,
+          "set-phase", "--phase", "implementation",
+          "--verify-command", placeholder("<project verify command>"),
+        ],
+      }).command;
+      return {
+        kind: "collect-input",
+        inputs: [{
+          name: "verify-command",
+          encoding: "utf8",
+          trim: true,
+          minBytes: 1,
+          maxBytes: 32_768,
+          singleLine: true,
+          rejectNul: true,
+        }],
+        mutation: false,
+        requiresConfirmation: false,
+        guidance: `the plan is approved, but implementation is not ready because the project verify command is ${verifyStatus.status}. Ask for this project's real verification command, then replace the one placeholder and run: ${command}`,
+        expected: { schema: INSPECT_SCHEMA, statuses: ["approved"] },
+      };
+    }
     return {
       kind: "command",
       executable: process.execPath,
@@ -7998,7 +8035,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       // silently: that refusal, not a GS-10 override, is the sanctioned way through.
       const requestedVerifyCommand = flags["verify-command"];
       if (requestedVerifyCommand !== undefined) {
-        if (isBlank(requestedVerifyCommand) || requestedVerifyCommand.includes(UNCONFIGURED_VERIFY_MARKER)) {
+        if (classifyVerifyCommand(requestedVerifyCommand) !== "configured") {
           console.error('Error: --verify-command must be a real, non-blank verification command -- not the plugin\'s UNCONFIGURED_VERIFY placeholder text.');
           return 2;
         }

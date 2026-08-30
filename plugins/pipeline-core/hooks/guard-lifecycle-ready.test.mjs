@@ -2073,6 +2073,33 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
+test("greenfield verify transition admits only the exact non-placeholder set-phase argv", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const nonReady = {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { deny("runtime-attestation-required"); },
+    };
+    const valid = `node '${PIPELINE_STATE_SCRIPT}' set-phase --phase implementation --verify-command 'node --test'`;
+    assert.equal(isSanctionedLifecycleCommand(valid, path), true, valid);
+    assert.deepEqual(evaluateLifecycleReadyGuard(bash(valid), nonReady), { exitCode: 0, stderr: "" });
+
+    for (const command of [
+      `node '${PIPELINE_STATE_SCRIPT}' set-phase --phase implementation --verify-command`,
+      `node '${PIPELINE_STATE_SCRIPT}' set-phase --phase implementation --verify-command 'the verify contract of this project is not configured'`,
+      `node '${PIPELINE_STATE_SCRIPT}' set-phase --phase implementation --verify-command 'node --test' --verify-command 'node test.mjs'`,
+      `node '${PIPELINE_STATE_SCRIPT}' set-phase --phase implementation --verify-commands 'node --test'`,
+      `${valid} --bypass`,
+      `node '${PIPELINE_STATE_SCRIPT}' set-phase --phase design --verify-command 'node --test'`,
+      `node '${PIPELINE_STATE_SCRIPT}' reopen-design --by 'PO recovery' --verify-command 'node --test'`,
+    ]) {
+      assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+      assert.equal(evaluateLifecycleReadyGuard(bash(command), nonReady).exitCode, 2, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
 /**
  * GF-097. `gh --version` and `gh auth status`, bare, are GitHub CLI's own documented
  * read-only diagnostics and must reach the operator even while lifecycle is not-ready --
