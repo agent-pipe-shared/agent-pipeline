@@ -43,6 +43,7 @@ import {
 // pointer below.
 import { boundedCopySafeCommand, placeholder } from "../lib/copy-safe-command.mjs";
 import { automatedLifecycleArgvCommands, MUTATING_ONBOARDING_ARGV_SHAPES } from "../scripts/project-onboarding-v3.mjs";
+import { classifyVerifyCommand } from "../scripts/pipeline-state.mjs";
 import { isBootstrapBindingStagingAuthoringWrite } from "../lib/onboarding-staging-authoring.mjs";
 import { loadRuntimeProjectionV3OwnedKeys } from "../lib/runtime-projection-v3.mjs";
 import {
@@ -3252,8 +3253,14 @@ function sanctionedPipelineStateArgs(args) {
     return args[1] === "--by" && validBy(args[2]) && args.length === 3;
   }
   if (args[0] === "set-phase") {
-    return args[1] === "--phase" && new Set(["design", "implementation"]).has(args[2])
+    const bareTransition = args[1] === "--phase"
+      && new Set(["design", "implementation"]).has(args[2])
       && args.length === 3;
+    const greenfieldVerifyTransition = args[1] === "--phase" && args[2] === "implementation"
+      && args[3] === "--verify-command"
+      && classifyVerifyCommand(args[4]) === "configured"
+      && args.length === 5;
+    return bareTransition || greenfieldVerifyTransition;
   }
   return sanctionedPoAuthorityRebindArgs(args);
 }
