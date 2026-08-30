@@ -3259,6 +3259,83 @@ check("planOnboardingIntakeGenerate / applyOnboardingIntakeGenerate: happy path 
   }
 });
 
+// NVA-GF-GREENFIELD-INTAKEPROJ-1: capture remains lossless and private, while
+// intake-generate-apply publishes one deterministic tracked projection. A
+// local operator path must not strand the greenfield flow or ride unchanged
+// into design-input.md, the PRD, and the spec.
+check("applyOnboardingIntakeGenerate: private host paths are projected consistently without changing restart-readable intake evidence", () => {
+  const posixHomeKeyPath = "/home/example-operator/.ssh/nova-signing-key.pem";
+  const windowsDriveKeyPath = String.raw`C:\Users\example-operator\.ssh\nova-signing-key.pem`;
+  const wslUncKeyPath = String.raw`\\wsl.localhost\Ubuntu\home\example-operator\.ssh\nova-signing-key.pem`;
+  const privatePaths = [posixHomeKeyPath, windowsDriveKeyPath, wslUncKeyPath];
+  const material = [
+    "The service must capture meaningful product requirements and continue greenfield generation automatically.",
+    `A local POSIX operator may load a signing key from ${posixHomeKeyPath}.`,
+    `A Windows operator may use ${windowsDriveKeyPath}.`,
+    `A WSL operator may use ${wslUncKeyPath}.`,
+    "The tracked design package must retain this surrounding requirement prose without requiring another human round.",
+  ].join("\n");
+  const marker = "[REDACTED LOCAL PATH]";
+  const projectedMaterial = privatePaths.reduce((text, value) => text.replaceAll(value, marker), material);
+  const root = readyToGenerateRoot("intake-generate-private-path-projection", material);
+  const beforeCheckpoint = readOnboardingIntakeCheckpoint({ rootDir: root });
+  const beforeMaterialEntries = Buffer.from(JSON.stringify(beforeCheckpoint.value.materialInput), "utf8");
+  const privateEvidencePath = join(beforeCheckpoint.paths.directory, beforeCheckpoint.value.materialInput[0].evidencePath);
+  const beforeEvidence = readFileSync(privateEvidencePath);
+  assert.equal(beforeEvidence.toString("utf8"), material);
+
+  const plan = planOnboardingIntakeGenerate({ rootDir: root });
+  const applied = applyOnboardingIntakeGenerate({
+    rootDir: root, expectedPlanSha256: plan.planSha256, activate: true,
+  });
+  assert.equal(applied.checkpoint.transactionState, "generated");
+
+  for (const key of ["designInput", "prd", "spec"]) {
+    const tracked = readFileSync(join(root, plan.targets[key].path), "utf8");
+    for (const privatePath of privatePaths) {
+      assert.equal(tracked.includes(privatePath), false, `${key} must not contain a captured private host path`);
+    }
+    assert.equal(tracked.includes(projectedMaterial), true,
+      `${key} must use the same projection while retaining surrounding requirement prose`);
+    assert.equal(tracked.includes(marker), true, `${key} must carry an explicit deterministic redaction marker`);
+  }
+
+  const afterCheckpoint = readOnboardingIntakeCheckpoint({ rootDir: root });
+  assert.deepEqual(Buffer.from(JSON.stringify(afterCheckpoint.value.materialInput), "utf8"), beforeMaterialEntries,
+    "generation metadata may advance, but the checkpoint's captured material references must stay byte-identical");
+  assert.deepEqual(readFileSync(privateEvidencePath), beforeEvidence,
+    "the private content-addressed evidence bytes must never be rewritten by projection");
+  assert.deepEqual(readOnboardingIntakeMaterialInput({ rootDir: root }).chunks.map((chunk) => chunk.text), [material],
+    "restart consumption must still recover the PO's exact original input");
+
+  const replayPlan = planOnboardingIntakeGenerate({ rootDir: root });
+  assert.equal(replayPlan.planSha256, plan.planSha256, "the tracked projection must reconstruct deterministically");
+  const replay = applyOnboardingIntakeGenerate({
+    rootDir: root, expectedPlanSha256: replayPlan.planSha256, activate: true,
+  });
+  assert.equal(replay.mutated, false);
+  for (const key of ["designInput", "prd", "spec"]) assert.equal(replay.targets[key].wrote, false);
+});
+
+check("planOnboardingIntakeGenerate: path-free material keeps the pre-projection byte layout in all three artifacts", () => {
+  const material = "The coordinator must preserve ordinary requirement prose byte for byte, including café and punctuation: yes.";
+  const root = readyToGenerateRoot("intake-generate-path-free-byte-identity", material);
+  const checkpoint = readOnboardingIntakeCheckpoint({ rootDir: root }).value;
+  const entry = checkpoint.materialInput[0];
+  const expectedMaterialBlock = [
+    "### Chunk 1 -- sha256:" + entry.sha256 + ", " + entry.byteLength + " bytes, received " + entry.receivedAt,
+    "",
+    material + "\n",
+  ].join("\n");
+  const plan = planOnboardingIntakeGenerate({ rootDir: root });
+  for (const key of ["designInput", "prd", "spec"]) {
+    assert.equal(plan.targets[key].content.includes(expectedMaterialBlock), true,
+      key + " must retain the exact legacy material-input rendering for clean text");
+    assert.equal(plan.targets[key].content.includes("[REDACTED LOCAL PATH]"), false);
+    assert.equal(plan.targets[key].content.includes("Tracked projection:"), false);
+  }
+});
+
 check("planOnboardingIntakeGenerate: publishes a nextAction naming intake-generate-apply with the plan's own digest, so the generic guided driver (onboarding-init.mjs, which reads ONLY nextAction) does not stall here", () => {
   const root = readyToGenerateRoot("intake-generate-next-action");
   const plan = planOnboardingIntakeGenerate({ rootDir: root });

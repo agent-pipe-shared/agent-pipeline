@@ -5676,9 +5676,46 @@ function readIntakeMaterialInputChunks(paths, checkpoint) {
   });
 }
 
+// NVA-GF-GREENFIELD-INTAKEPROJ-1: the checkpoint/evidence store above is the
+// lossless private source. Git-tracked design artifacts receive a derived
+// projection instead. Keep this deliberately path-shaped and narrow: it is
+// not a credential scanner, capture gate, quarantine state, or reason to
+// discard the rest of a material-input chunk.
+const INTAKE_TRACKED_LOCAL_PATH_MARKER = "[REDACTED LOCAL PATH]";
+const INTAKE_TRACKED_LOCAL_PATH_PATTERNS = [
+  // WSL and ordinary UNC host/share paths.
+  /\\\\(?:wsl(?:\.localhost|\$)?|[A-Za-z0-9._-]+)\\[^\s"'<>|]+/giu,
+  // Windows drive-rooted paths, accepting either native or POSIX separators.
+  /\b[A-Za-z]:[\\/][^\s"'<>|]+/gu,
+  // POSIX home roots (including WSL-mounted Windows homes) and shell home.
+  /(?:~|\/(?:home|Users)\/[A-Za-z0-9._~-]+|\/root|\/mnt\/[A-Za-z])\/[^\s"'<>|]+/gu,
+];
+const INTAKE_TRACKED_PATH_TRAILING_PUNCTUATION = /[),.;:!?\]}]+$/u;
+
+function trackedIntakeProjectionText(text) {
+  return INTAKE_TRACKED_LOCAL_PATH_PATTERNS.reduce((projected, pattern) => (
+    projected.replace(pattern, (matched) => {
+      const trailing = matched.match(INTAKE_TRACKED_PATH_TRAILING_PUNCTUATION)?.[0] ?? "";
+      return INTAKE_TRACKED_LOCAL_PATH_MARKER + trailing;
+    })
+  ), text);
+}
+
+function projectIntakeMaterialInputChunks(chunks) {
+  return chunks.map((chunk) => {
+    const text = trackedIntakeProjectionText(chunk.text);
+    return text === chunk.text ? chunk : { ...chunk, text, trackedProjection: "local-path-redacted" };
+  });
+}
+
 function renderIntakeMaterialInputSection(chunks) {
   if (chunks.length === 0) return "(no material input captured)\n";
   return chunks.map((chunk, index) => [
+    ...(chunk.trackedProjection === "local-path-redacted" ? [
+      "> Tracked projection: local/private host paths were replaced with "
+        + INTAKE_TRACKED_LOCAL_PATH_MARKER + "; private intake evidence remains unchanged.",
+      "",
+    ] : []),
     `### Chunk ${index + 1} -- sha256:${chunk.sha256}, ${chunk.byteLength} bytes, received ${chunk.receivedAt}`,
     "",
     chunk.text.endsWith("\n") ? chunk.text : `${chunk.text}\n`,
@@ -5830,7 +5867,10 @@ function buildOnboardingIntakeGeneratePlan({
   if (!INTAKE_GENERATE_READY_STATES.has(checkpoint.transactionState)) {
     fail("INTAKE-GENERATE-PRECONDITION", "intake staging generation requires transactionState ready-to-generate or generated");
   }
-  const chunks = readIntakeMaterialInputChunks(observed.paths, checkpoint);
+  // One projection, shared by design-input.md, PRD and spec. The private
+  // source chunks remain untouched and are still returned verbatim by
+  // readOnboardingIntakeMaterialInput() across a restart.
+  const chunks = projectIntakeMaterialInputChunks(readIntakeMaterialInputChunks(observed.paths, checkpoint));
   const featureId = deriveIntakeFeatureId(checkpoint);
   const designInputContent = buildIntakeDesignInputContent(checkpoint, chunks);
   // NVA-BL-INTAKEBIND-1: spec content (and its sha256) must be computed BEFORE
