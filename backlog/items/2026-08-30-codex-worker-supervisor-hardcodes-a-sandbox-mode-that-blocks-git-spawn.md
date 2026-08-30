@@ -44,6 +44,21 @@ scoped ONLY to `advisory`/`readiness`/`critic` duties (Advisor
 consultation), not to general worker/implementation dispatch -- it does
 not cover this case.
 
+## Confirming context, 2026-08-30 (Codex's own live analysis)
+
+Asked live (via the PO) why an alternative sandbox profile "should" have
+avoided this EPERM but apparently did not fire, Codex's own reasoning
+converged on the same location this item already names: either (2) the
+active profile is enabled but does not permit `child_process`/`/bin/sh`
+spawns, or (3) the worker still inherits the restrictive default profile
+instead of the intended alternative one. Root and worker both failing
+identically against the same `.git` is cited as evidence favoring (2)/(3)
+over a worktree-specific problem. This matches
+`local-worker-supervisor.mjs`'s hardcoded `--sandbox workspace-write` at
+both spawn call sites exactly -- no code path there currently selects a
+different profile at all, so both (2) and (3) reduce to the same fix
+location this item already proposes.
+
 ## Proposal
 
 At worker-dispatch bootstrap time (before launching a Codex worker via
