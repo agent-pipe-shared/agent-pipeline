@@ -19,8 +19,10 @@ import test from "node:test";
 import { main as onboardingCli } from "./project-onboarding-v3.mjs";
 import { main as authorityCli } from "./v3-bootstrap-authority.mjs";
 import { main as migrationCli } from "./runner-profile-migration-v3.mjs";
+import { run as pipelineStateCli } from "./pipeline-state.mjs";
 import { inspectRepositoryFreshness } from "./repository-freshness.mjs";
 import { applyProjectOnboardingKickoffV4, planProjectOnboardingKickoffV4 } from "../lib/project-onboarding-v3.mjs";
+import { PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER } from "../lib/po-gate-authority.mjs";
 import {
   consumeRuntimeReadback,
   issueLaunchTicket,
@@ -85,6 +87,7 @@ function cliGit(command, args, options = {}) {
   if (gitArgs[0] === "init" && gitArgs[1] === "--initial-branch=main") {
     return spawnSync("git", gitArgs, options);
   }
+  if (gitArgs[0] === "config") return spawnSync("git", gitArgs, options);
   if (gitArgs[0] === "rev-parse" && gitArgs[1] === "--is-inside-work-tree") return { status: 0, stdout: "true\n", stderr: "" };
   return { status: 1, stderr: "unexpected git arguments" };
 }
@@ -110,6 +113,19 @@ function run(script, args, cwd) {
     deps: {
       spawnSync: cliGit,
       codexExecutable: process.execPath,
+      readMachinePlane: () => ({
+        status: "valid",
+        plane: {
+          schema: "pipeline.machine-plane.v1",
+          poKeyDirectory: null,
+          pushApprovalDefault: "signature",
+          routing: null,
+          language: null,
+          session: null,
+          usage: null,
+          updatedAt: "2026-08-30T00:00:00.000Z",
+        },
+      }),
       observeOnboardingAppServer: ({ intent }) => intent === "onboarding"
         ? { required: false, status: "not-requested", code: null }
         : { required: true, status: "running", code: "CAS-READY" },
@@ -120,6 +136,14 @@ function run(script, args, cwd) {
 function actionArgs(result) {
   assert.equal(result.nextAction?.kind, "command");
   return result.nextAction.argv.slice(1);
+}
+
+function explicitRunnerActionArgs(result, runner) {
+  const args = actionArgs(result);
+  const index = args.indexOf("--runner");
+  assert.notEqual(index, -1, `generated ${args[0]} action must preserve the explicit runner`);
+  assert.equal(args[index + 1], runner);
+  return args;
 }
 
 function completeRuntimeReadback(path, now = 50_000) {
@@ -480,4 +504,120 @@ test("ready roots recover a missing manifest and a governed V3 registry checkout
     assert.equal(migrated.json.status, "applied");
     assert.equal(run(onboarding, ["inspect", "--root", path], path).json.status, "ready");
   } finally { dispose(path); }
+});
+
+test("Claude, Codex, and Antigravity complete the same fresh intake-to-implementation happy path", () => {
+  const paths = [];
+  const runners = ["claude", "codex", "antigravity"];
+  const inputNames = (action) => [
+    ...(action?.inputs ?? []),
+    ...(action?.input ? [action.input] : []),
+    ...((action?.pendingAsks ?? []).flatMap((ask) => [
+      ...(ask?.inputs ?? []),
+      ...(ask?.input ? [ask.input] : []),
+    ])),
+  ].map((input) => input?.name).filter(Boolean);
+  try {
+    for (const runner of runners) {
+      const path = root();
+      paths.push(path);
+
+      const portablePlan = run(onboarding, ["plan", "--root", path, "--runner", runner], path);
+      assert.equal(portablePlan.status, 0, portablePlan.stdout);
+      const portableApplied = run(onboarding, explicitRunnerActionArgs(portablePlan.json, runner), path);
+      assert.equal(portableApplied.status, 0, portableApplied.stdout);
+
+      const runtimePlan = run(onboarding, ["plan-runtime", "--root", path, "--runner", runner], path);
+      assert.equal(runtimePlan.status, 0, runtimePlan.stdout);
+      const runtimeApplied = run(onboarding, explicitRunnerActionArgs(runtimePlan.json, runner), path);
+      assert.equal(runtimeApplied.status, 0, runtimeApplied.stdout);
+      if (runner === "codex") {
+        assert.equal(runtimeApplied.json.status, "restart-required", "Codex must reach its truthful native-runtime readback boundary");
+        completeRuntimeReadback(path, 70_000 + paths.length * 100);
+      } else {
+        assert.equal(runtimeApplied.json.status, "intake-required", `${runner}: plugin-native runtime continues directly to intake`);
+      }
+
+      const beforeIntake = run(onboarding, ["inspect", "--root", path, "--runner", runner], path);
+      assert.equal(beforeIntake.status, 0, beforeIntake.stdout);
+      assert.doesNotMatch(JSON.stringify(beforeIntake.json), /trustAnchor(?:Pointer|Policy)RepairAcknowledged/u,
+        `${runner}: an intentionally empty machine plane is not a broken trust anchor`);
+
+      const consented = run(onboarding, [
+        "intake-consent-apply", "--root", path, "--granted",
+        "--git-author-name", "Greenfield E2E PO",
+        "--git-author-email", "greenfield-e2e@example.invalid",
+        "--language", "en", "--profile", "feature", "--activate", "--runner", runner,
+      ], path);
+      assert.equal(consented.status, 0, consented.stdout);
+      git(["config", "user.name", "Greenfield E2E PO"], path);
+      git(["config", "user.email", "greenfield-e2e@example.invalid"], path);
+
+      const captured = run(onboarding, [
+        "intake-capture-apply", "--root", path,
+        "--text", "Build a locally playable mini HTML game with no external dependencies.",
+        "--activate", "--runner", runner,
+      ], path);
+      assert.equal(captured.status, 0, captured.stdout);
+      const answers = JSON.stringify([
+        { question: "What is the primary goal?", answer: "Ship a keyboard-playable local game." },
+        { question: "How is it verified?", answer: "Run the repository verify script." },
+      ]);
+      const answered = run(onboarding, [
+        "intake-design-questions-apply", "--root", path, "--answers-json", answers,
+        "--activate", "--runner", runner,
+      ], path);
+      assert.equal(answered.status, 0, answered.stdout);
+
+      const afterAnswers = run(onboarding, ["inspect", "--root", path, "--runner", runner], path);
+      assert.equal(afterAnswers.status, 0, afterAnswers.stdout);
+      const repeated = inputNames(afterAnswers.json.nextAction);
+      for (const name of ["gitAuthorName", "gitAuthorEmail", "language", "profile"]) {
+        assert.equal(repeated.includes(name), false, `${runner}: answered ${name} must not be asked again`);
+      }
+
+      const generatePlan = run(onboarding, ["intake-generate-plan", "--root", path, "--runner", runner], path);
+      assert.equal(generatePlan.status, 0, generatePlan.stdout);
+      const generated = run(onboarding, [
+        "intake-generate-apply", "--root", path, "--plan-sha256", generatePlan.json.planSha256,
+        "--activate", "--runner", runner,
+      ], path);
+      assert.equal(generated.status, 0, generated.stdout);
+      const prdPath = join(path, generated.json.targets.prd.path);
+      writeFileSync(prdPath, `${PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER}\n${readFileSync(prdPath, "utf8")}`);
+
+      const bindPlan = run(onboarding, ["bootstrap-bind-plan", "--root", path, "--runner", runner], path);
+      assert.equal(bindPlan.status, 0, bindPlan.stdout);
+      const bound = run(onboarding, [
+        "bootstrap-bind-apply", "--root", path, "--plan-sha256", bindPlan.json.planSha256,
+        "--activate", "--runner", runner,
+      ], path);
+      assert.equal(bound.status, 0, bound.stdout);
+      assert.equal(bound.json.status, "applied", `${runner}: generated design package must bind without a recovery detour`);
+
+      const state = (args) => {
+        let stderr = "";
+        const status = pipelineStateCli(args, {
+          dir: path,
+          now: () => "2026-08-30T12:00:00.000Z",
+          writeError: (chunk) => { stderr += chunk; },
+        });
+        assert.equal(status, 0, `${runner}: pipeline-state ${args[0]} failed: ${stderr}`);
+      };
+      state(["submit-plan", "--by", "Greenfield E2E PO", "--profile", "feature"]);
+      state(["present-plan", "--by", "Greenfield E2E PO"]);
+      state(["approve-plan", "--by", "Greenfield E2E PO"]);
+      const verifyCommand = `${process.execPath} -e "process.exit(0)"`;
+      state(["set-phase", "--phase", "implementation", "--verify-command", verifyCommand]);
+
+      const ready = run(onboarding, ["inspect", "--root", path, "--runner", runner], path);
+      assert.equal(ready.status, 0, ready.stdout);
+      assert.equal(ready.json.status, "ready", `${runner}: final inspection must remain ready`);
+      assert.equal(ready.json.nextAction, null, `${runner}: implementation-ready must not point back into onboarding`);
+      const calibration = JSON.parse(readFileSync(join(path, "project", "pipeline.json"), "utf8"));
+      assert.equal(calibration.verify, verifyCommand, `${runner}: the real verify command is persisted at the transition`);
+    }
+  } finally {
+    for (const path of paths) dispose(path);
+  }
 });
