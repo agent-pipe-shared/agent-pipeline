@@ -30,7 +30,7 @@ import { sha256CanonicalJson } from "./plan-spec-state-v2.mjs";
 import { registeredCriticExportPolicy, registeredRouting } from "./runner-profiles-v3.mjs";
 import { parseYaml } from "./yaml-lite.mjs";
 import { validateContinuityState } from "./continuity-state.mjs";
-import { mkdtempTestScratch } from "./test-tmpdir.mjs";
+import { mkdtempTestScratch as createTestScratch } from "./test-tmpdir.mjs";
 import { ProjectOnboardingReadyError } from "./project-onboarding-ready-gate.mjs";
 import { evaluateLifecycleReadyGuard } from "../hooks/guard-lifecycle-ready.mjs";
 
@@ -76,7 +76,20 @@ import {
 } from "./onboarding-continuity.mjs";
 
 let passed = 0;
+let activeScratchRoots = null;
+
+function mkdtempTestScratch(prefix, base) {
+  const root = base === undefined
+    ? createTestScratch(prefix)
+    : createTestScratch(prefix, base);
+  activeScratchRoots?.add(root);
+  return root;
+}
+
 function check(name, fn) {
+  const priorScratchRoots = activeScratchRoots;
+  const ownedScratchRoots = new Set();
+  activeScratchRoots = ownedScratchRoots;
   try {
     fn();
     passed += 1;
@@ -84,6 +97,11 @@ function check(name, fn) {
   } catch (error) {
     console.error(`not ok - ${name}`);
     throw error;
+  } finally {
+    activeScratchRoots = priorScratchRoots;
+    for (const root of [...ownedScratchRoots].sort((a, b) => b.length - a.length)) {
+      rmSync(root, { recursive: true, force: true });
+    }
   }
 }
 

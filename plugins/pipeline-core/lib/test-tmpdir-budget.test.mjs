@@ -20,13 +20,12 @@ function check(name, condition, detail = "") {
   }
 }
 
-const created = [];
+const suiteRoot = mkdtempTestScratch("tb-suite-root-");
 function fakeRepoRoot() {
-  const root = mkdtempTestScratch("tb-fake-root-");
-  created.push(root);
-  return root;
+  return mkdtempTestScratch("tb-fake-root-", suiteRoot);
 }
 
+try {
 // TB01: an untouched fake repo (no scratch/test-tmp/ yet) measures as empty and within budget.
 {
   const root = fakeRepoRoot();
@@ -111,15 +110,19 @@ function fakeRepoRoot() {
   check("TB06 a symlink's target is never traversed for bytes", measured.bytes === 0, String(measured.bytes));
 }
 
-// TB07: the direct-invocation CLI runs clean against this repo's real scratch/test-tmp/
-// (well under budget from ordinary test-suite activity) and exits 0.
+// TB07: the direct-invocation CLI can target an isolated repository root, so
+// this suite proves the CLI contract without inheriting historical fixtures
+// from other tests sharing the checkout's real scratch/test-tmp/.
 {
+  const root = fakeRepoRoot();
+  mkdirSync(join(root, "scratch", "test-tmp", "fixture"), { recursive: true });
   const modulePath = fileURLToPath(new URL("./test-tmpdir-budget.mjs", import.meta.url));
-  const result = spawnSync(process.execPath, [modulePath], { encoding: "utf8" });
-  check("TB07 direct invocation exits 0 when the real scratch/test-tmp/ is within budget", result.status === 0, `status=${result.status} stderr=${result.stderr}`);
+  const result = spawnSync(process.execPath, [modulePath, "--base", root], { encoding: "utf8" });
+  check("TB07 direct invocation exits 0 for an isolated scratch/test-tmp/", result.status === 0, `status=${result.status} stderr=${result.stderr}`);
   check("TB07 direct invocation prints an OK summary line", /test-tmp budget OK/.test(result.stdout), result.stdout);
 }
-
-for (const root of created) rmSync(root, { recursive: true, force: true });
+} finally {
+  rmSync(suiteRoot, { recursive: true, force: true });
+}
 console.log(`\n${passed}/${passed + failed} checks passed.`);
 process.exit(failed === 0 ? 0 : 1);

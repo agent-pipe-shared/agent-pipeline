@@ -31,7 +31,7 @@
  * `node plugins/pipeline-core/lib/test-tmpdir-budget.mjs`.
  */
 import { readdirSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 import { DEFAULT_TEST_TMP_ROOT_BASE, testTmpRoot } from "./test-tmpdir.mjs";
 import { isDirectInvocation } from "./entrypoint.mjs";
@@ -137,7 +137,15 @@ export function measureTestTmpUsage(base = DEFAULT_TEST_TMP_ROOT_BASE, { maxByte
 }
 
 if (isDirectInvocation(import.meta.url)) {
-  const measured = measureTestTmpUsage();
+  let base = DEFAULT_TEST_TMP_ROOT_BASE;
+  if (process.argv.length > 2) {
+    if (process.argv.length !== 4 || process.argv[2] !== "--base" || process.argv[3].length === 0) {
+      console.error("Usage: node test-tmpdir-budget.mjs [--base <repository-root>]");
+      process.exit(2);
+    }
+    base = resolve(process.argv[3]);
+  }
+  const measured = measureTestTmpUsage(base);
   for (const finding of measured.findings) console.error(`FAIL test-tmp budget: ${finding}`);
   if (measured.bytes > measured.maxBytes) {
     console.error(`FAIL test-tmp budget: ${measured.bytes} bytes under ${measured.root} exceeds max ${measured.maxBytes}`);
