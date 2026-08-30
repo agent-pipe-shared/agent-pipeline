@@ -82,6 +82,17 @@
  * stays exactly as blocked as before — this is the property the item's own reported repro
  * (an already-committed `project/pipeline.json` being bypass-written) depends on.
  *
+ * TRUST-ANCHOR BOOTSTRAP EXEMPTION (PO decision, 2026-08-30, Option A, backlog/items/
+ * 2026-08-29-trust-anchor-bootstrap-confirmed-still-circular-live.md): a second, much narrower
+ * exemption, layered on top of the first-appearance one above, for the one circularity a
+ * genuinely fresh signature-mode project still hits — see `isTrustAnchorBootstrapUpgrade()` in
+ * the generated `renderImpl()` output for the exact narrow-shape contract and its fail-closed
+ * default. It fires ONLY for `project/critical-human-proof.json`, ONLY for a trust-anchor-only
+ * v1/v2/v3(no-anchor) → v3(exactly-one-anchor) transition with `requiredKinds`/`waivedKinds`
+ * otherwise unchanged in substance. Every other already-tracked-path rewrite this hook blocks —
+ * including a second/different/replaced trust anchor, or any other field bundled alongside the
+ * anchor addition — stays exactly as blocked as before.
+ *
  * FAIL-CLOSED, DELIBERATELY UNLIKE THE PLUGIN GUARD FAMILY'S FAIL-OPEN CONVENTION (mirrors
  * pre-push-hook-install.mjs's own doctrine exactly): an unresolved repository root, an
  * un-enumerable staged diff, or any other unexpected exception all BLOCK the commit — this hook
@@ -279,6 +290,126 @@ export function pathAlreadyTrackedInHistory(projectRoot, relPath) {
   return (result.stdout ?? "").trim().length > 0;
 }
 
+/**
+ * TRUST-ANCHOR BOOTSTRAP EXEMPTION (PO decision, 2026-08-30, Option A, backlog/items/
+ * 2026-08-29-trust-anchor-bootstrap-confirmed-still-circular-live.md): a second, narrower
+ * exemption for the ONE circularity a genuinely fresh signature-mode project hits on its
+ * very first trust-anchor bootstrap. Onboarding's own scaffold commit seeds
+ * \`project/critical-human-proof.json\` with NO trust anchor (exempt above, first-appearance).
+ * A signing key is only ever created AFTERWARD, by a human running \`po-human-approval.mjs
+ * setup\` -- never by this hook's own first-appearance exemption, since the file is already
+ * tracked by then. Adding that key's anchor is therefore an ordinary "already tracked"
+ * rewrite this hook would otherwise block, with no route through except the
+ * human-operator-only \`--no-verify\` escape this hook's own message names.
+ *
+ * Deliberately narrow: fires ONLY for \`project/critical-human-proof.json\`, ONLY for a
+ * v1/v2/v3(no anchor) -> v3(exactly one anchor) transition, with \`requiredKinds\`/
+ * \`waivedKinds\` unchanged in SEMANTIC content (order-insensitive; v1's absent \`waivedKinds\`
+ * treated as equivalent to v2/v3's explicit empty array -- the only shape onboarding's own
+ * \`freshCriticalHumanProofPolicyBytes\` ever seeds). Any parse failure, unexpected top-level
+ * key, duplicate entry, or other ambiguity fails CLOSED (not exempt -- stays blocked),
+ * matching \`pathAlreadyTrackedInHistory\`'s own doctrine above. Deliberately NOT a
+ * re-implementation of critical-human-proof-policy.mjs's full schema validation -- this
+ * hook's only job is to gate whether this one write may cross the commit boundary.
+ */
+const CRITICAL_HUMAN_PROOF_POLICY_PATH = "project/critical-human-proof.json";
+const CRITICAL_HUMAN_PROOF_POLICY_V1 = "pipeline.critical-human-proof-policy.v1";
+const CRITICAL_HUMAN_PROOF_POLICY_V2 = "pipeline.critical-human-proof-policy.v2";
+const CRITICAL_HUMAN_PROOF_POLICY_V3 = "pipeline.critical-human-proof-policy.v3";
+
+function trustAnchorEntryShapeOk(entry) {
+  return entry !== null && typeof entry === "object" && !Array.isArray(entry)
+    && typeof entry.keyReference === "string" && entry.keyReference.length > 0
+    && typeof entry.publicKeySha256 === "string" && entry.publicKeySha256.length > 0;
+}
+
+/** Minimal, self-contained parse of the ONE shape this exemption cares about. Returns
+ * \`null\` (cannot establish with confidence) on any unexpected field, duplicate entry, or
+ * malformed shape -- the caller then treats the whole exemption as not applicable, never
+ * as "assume the best". */
+function readTrustAnchorBootstrapShape(parsed) {
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  const schemaVersion = parsed.schema;
+  if (schemaVersion !== CRITICAL_HUMAN_PROOF_POLICY_V1
+    && schemaVersion !== CRITICAL_HUMAN_PROOF_POLICY_V2
+    && schemaVersion !== CRITICAL_HUMAN_PROOF_POLICY_V3) return null;
+  if (!Array.isArray(parsed.requiredKinds) || parsed.requiredKinds.some((kind) => typeof kind !== "string")) return null;
+  const requiredKinds = new Set(parsed.requiredKinds);
+  if (requiredKinds.size !== parsed.requiredKinds.length) return null; // duplicate -- ambiguous, fail closed
+
+  const isV1 = schemaVersion === CRITICAL_HUMAN_PROOF_POLICY_V1;
+  let waivedKindsRaw = [];
+  if (Object.hasOwn(parsed, "waivedKinds")) {
+    if (isV1 || !Array.isArray(parsed.waivedKinds)) return null; // v1 never carries waivedKinds
+    waivedKindsRaw = parsed.waivedKinds;
+  }
+  const waiverKeys = [];
+  for (const entry of waivedKindsRaw) {
+    if (entry === null || typeof entry !== "object" || Array.isArray(entry)) return null;
+    if (typeof entry.kind !== "string" || typeof entry.reason !== "string") return null;
+    waiverKeys.push(JSON.stringify([entry.kind, entry.reason]));
+  }
+  const waivedKindsSet = new Set(waiverKeys);
+  if (waivedKindsSet.size !== waiverKeys.length) return null; // duplicate waiver -- ambiguous, fail closed
+
+  let anchorCount;
+  if (schemaVersion === CRITICAL_HUMAN_PROOF_POLICY_V3) {
+    if (Object.hasOwn(parsed, "trustAnchor")) return null; // v3 never carries the singular field
+    if (Object.hasOwn(parsed, "trustAnchors")) {
+      if (!Array.isArray(parsed.trustAnchors) || parsed.trustAnchors.some((entry) => !trustAnchorEntryShapeOk(entry))) return null;
+      anchorCount = parsed.trustAnchors.length;
+    } else {
+      anchorCount = 0;
+    }
+  } else {
+    if (Object.hasOwn(parsed, "trustAnchors")) return null; // v1/v2 never carry the plural field
+    if (Object.hasOwn(parsed, "trustAnchor")) {
+      const anchor = parsed.trustAnchor;
+      if (anchor === null) anchorCount = 0;
+      else if (trustAnchorEntryShapeOk(anchor)) anchorCount = 1;
+      else return null;
+    } else {
+      anchorCount = 0;
+    }
+  }
+
+  return { schemaVersion, requiredKinds, waivedKindsSet, anchorCount };
+}
+
+function sameKindSet(left, right) {
+  if (left.size !== right.size) return false;
+  for (const value of left) if (!right.has(value)) return false;
+  return true;
+}
+
+/** \`true\` ONLY for the exact anchor-only v1/v2/v3(no-anchor) -> v3(exactly-one-anchor)
+ * upgrade of \`project/critical-human-proof.json\` -- see this section's own header comment
+ * for the full narrow-shape contract. Reads the last-committed content via \`git show
+ * HEAD:<path>\` and the staged (index) content via \`git show :<path>\`, the same \`git()\`
+ * helper every other check in this hook already uses. Any git or parse failure fails
+ * CLOSED (returns \`false\` -- not exempt, stays blocked). */
+function isTrustAnchorBootstrapUpgrade(projectRoot, relPath) {
+  if (relPath !== CRITICAL_HUMAN_PROOF_POLICY_PATH) return false;
+  const headShow = git(["show", "HEAD:" + relPath], projectRoot);
+  if (headShow.status !== 0) return false; // no committed version at this exact path -- cannot establish, fail closed
+  let headParsed;
+  try { headParsed = JSON.parse(headShow.stdout); } catch { return false; }
+  const headShape = readTrustAnchorBootstrapShape(headParsed);
+  if (!headShape || headShape.anchorCount !== 0) return false; // HEAD must carry NO trust anchor
+
+  const stagedShow = git(["show", ":" + relPath], projectRoot);
+  if (stagedShow.status !== 0) return false;
+  let stagedParsed;
+  try { stagedParsed = JSON.parse(stagedShow.stdout); } catch { return false; }
+  const stagedShape = readTrustAnchorBootstrapShape(stagedParsed);
+  if (!stagedShape || stagedShape.schemaVersion !== CRITICAL_HUMAN_PROOF_POLICY_V3 || stagedShape.anchorCount !== 1) return false; // staged must be v3 with EXACTLY one anchor
+
+  if (!sameKindSet(headShape.requiredKinds, stagedShape.requiredKinds)) return false;
+  if (!sameKindSet(headShape.waivedKindsSet, stagedShape.waivedKindsSet)) return false;
+
+  return true;
+}
+
 function block(lines) {
   process.stderr.write(
     [
@@ -338,6 +469,9 @@ async function main() {
     let alreadyTracked = true;
     try { alreadyTracked = pathAlreadyTrackedInHistory(projectRoot, relPath); } catch { alreadyTracked = true; }
     if (!alreadyTracked) continue; // first appearance in git history -- exempt (PO decision, candidate (b))
+    let bootstrapExempt = false;
+    try { bootstrapExempt = isTrustAnchorBootstrapUpgrade(projectRoot, relPath); } catch { bootstrapExempt = false; }
+    if (bootstrapExempt) continue; // trust-anchor-only v1/v2/v3(no-anchor) -> v3(one-anchor) upgrade (PO decision, Option A)
     findings.push({ path: relPath, id: rule.id, reason: rule.reason });
   }
 
