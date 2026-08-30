@@ -10,6 +10,7 @@
  * CLI process would test the sandbox rather than onboarding behavior.
  */
 import assert from "node:assert/strict";
+import { generateKeyPairSync } from "node:crypto";
 import { chmodSync, existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -21,11 +22,18 @@ import { main as authorityCli } from "./v3-bootstrap-authority.mjs";
 import { main as migrationCli } from "./runner-profile-migration-v3.mjs";
 import { run as pipelineStateCli } from "./pipeline-state.mjs";
 import { driveOnboardingInit } from "./onboarding-init.mjs";
+import { main as codexOnboardingLaunchCli } from "./codex-onboarding-launch.mjs";
+import { READBACK_STATUS_SCHEMA } from "./codex-project-runtime-readback-host.mjs";
 import { inspectRepositoryFreshness } from "./repository-freshness.mjs";
-import { applyProjectOnboardingKickoffV4, planProjectOnboardingKickoffV4 } from "../lib/project-onboarding-v3.mjs";
+import {
+  applyProjectOnboardingKickoffV4,
+  planProjectOnboardingKickoffV4,
+  PROJECT_ONBOARDING_VERIFY_COMMAND_PLACEHOLDER,
+} from "../lib/project-onboarding-v3.mjs";
 import { PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER } from "../lib/po-gate-authority.mjs";
 import {
   consumeRuntimeReadback,
+  canonicalJson,
   issueLaunchTicket,
   readRestartBarrier,
   sha256,
@@ -44,6 +52,7 @@ import {
 
 const here = dirname(fileURLToPath(import.meta.url));
 const onboarding = join(here, "project-onboarding-v3.mjs");
+const onboardingInit = join(here, "onboarding-init.mjs");
 const authority = join(here, "v3-bootstrap-authority.mjs");
 const migration = join(here, "runner-profile-migration-v3.mjs");
 
@@ -538,7 +547,213 @@ test("ready roots recover a missing manifest and a governed V3 registry checkout
   } finally { dispose(path); }
 });
 
-test("Claude, Codex, and Antigravity complete the same fresh intake-to-implementation happy path", () => {
+test("Claude, Codex, and Antigravity follow only returned actions from an empty folder to the first implementation file", () => {
+  const fixtures = [];
+  const runners = ["claude", "codex", "antigravity"];
+  const materialize = (action, replacements) => {
+    assert.equal(typeof action?.executable, "string");
+    assert.ok(Array.isArray(action.argv));
+    return action.argv.map((value) => replacements.get(value) ?? value);
+  };
+  const invokeAction = (action, replacements, cwd, env) => {
+    const argv = materialize(action, replacements);
+    const result = spawnSync(action.executable, argv, {
+      cwd, env, encoding: "utf8", shell: false, maxBuffer: 16 * 1024 * 1024,
+      timeout: 30_000,
+    });
+    assert.equal(result.signal, null, `${cwd}: returned action timed out`);
+    assert.equal(result.status, 0, `${result.stderr}\n${result.stdout}`);
+    return { argv, json: JSON.parse(result.stdout) };
+  };
+  const invokePlainAction = (action, replacements, cwd, env) => {
+    const argv = materialize(action, replacements);
+    const result = spawnSync(action.executable, argv, {
+      cwd, env, encoding: "utf8", shell: false, maxBuffer: 16 * 1024 * 1024,
+      timeout: 30_000,
+    });
+    assert.equal(result.signal, null, `${cwd}: returned action timed out`);
+    assert.equal(result.status, 0, `${result.stderr}\n${result.stdout}`);
+    return { argv, stdout: result.stdout };
+  };
+  const freshDriver = (cwd, runner, env) => {
+    const result = spawnSync(process.execPath, [onboardingInit, "--root", cwd, "--runner", runner], {
+      cwd, env, encoding: "utf8", shell: false, maxBuffer: 16 * 1024 * 1024,
+      timeout: 30_000,
+    });
+    assert.equal(result.signal, null, `${runner}: onboarding-init timed out`);
+    assert.equal(result.status, 0, `${runner}: ${result.stderr}\n${result.stdout}`);
+    return JSON.parse(result.stdout);
+  };
+  try {
+    for (const runner of runners) {
+      const path = root();
+      const home = root();
+      const source = root();
+      fixtures.push(path, home, source);
+      const destination = join(home, "po-authority");
+      const existingKey = join(source, "existing-private.pem");
+      const { privateKey } = generateKeyPairSync("ed25519");
+      writeFileSync(existingKey, privateKey.export({ format: "pem", type: "pkcs8" }), { mode: 0o600 });
+      const env = {
+        ...process.env,
+        PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home,
+        HOME: home,
+        USERPROFILE: home,
+      };
+      delete env.CLAUDECODE;
+      delete env.ANTIGRAVITY_AGENT;
+      delete env.AI_AGENT;
+      delete env.CODEX_THREAD_ID;
+      delete env.CODEX_SESSION_ID;
+
+      const first = freshDriver(path, runner, env);
+      assert.equal(first.outcome, "pending-asks", `${runner}: ${JSON.stringify(first)}`);
+      assert.equal(first.pendingAsks.length, 1, `${runner}: initial PO round must be one action`);
+      const bundled = first.pendingAsks[0];
+      assert.equal(bundled.applyAction?.kind, "command");
+      const initial = invokeAction(bundled.applyAction, new Map([
+        ["<PO_GIT_AUTHOR_NAME>", "Greenfield E2E PO"],
+        ["<PO_GIT_AUTHOR_EMAIL>", "greenfield-e2e@example.invalid"],
+        ["<signature|chat>", "signature"],
+        ["<existing|new>", "existing"],
+        ["<absolute external key directory>", destination],
+        ["<human attribution>", "Greenfield E2E PO"],
+        ["<absolute existing key path|none>", existingKey],
+      ]), path, env);
+      assert.equal(initial.json.initialAnswers?.code, "INITIAL-ANSWERS-APPLIED", `${runner}: ${JSON.stringify(initial.json)}`);
+      assert.equal(existsSync(join(path, ".git", "agent-pipeline", "onboarding-initial-answers.json")), true);
+
+      if (runner === "codex") {
+        const restart = initial.json.final?.nextAction;
+        assert.equal(initial.json.outcome, "unsupported-next-action", JSON.stringify(initial.json));
+        assert.equal(restart?.kind, "restart-process");
+        assert.equal(restart.launch?.argv?.[0]?.endsWith("codex-onboarding-launch.mjs"), true);
+        assert.deepEqual(restart.launch.argv.slice(1, 3), ["--root", "."]);
+        const barrier = readRestartBarrier({ rootDir: path });
+        let spawnCall = 0;
+        let launcherOutput = "";
+        const launchCode = codexOnboardingLaunchCli(restart.launch.argv.slice(1), {
+          cwd: path,
+          env,
+          write: (chunk) => { launcherOutput += chunk; },
+          spawn(_executable, _argv, options) {
+            spawnCall += 1;
+            if (spawnCall === 1) {
+              const observedAtEpochMs = Date.now();
+              consumeRuntimeReadback({
+                rootDir: path,
+                ticketId: options.env.PIPELINE_CODEX_ONBOARDING_TICKET_ID,
+                token: Buffer.from(options.env.PIPELINE_CODEX_ONBOARDING_TOKEN, "hex"),
+                now: observedAtEpochMs,
+                receipt: {
+                  schema: "pipeline.codex-project-runtime-readback.v1",
+                  barrierSha256: barrier.rawSha256,
+                  repositoryFingerprint: barrier.barrier.repositoryFingerprint,
+                  sourceSha256: barrier.barrier.sourceSha256,
+                  runtimeTargetsSha256: barrier.barrier.runtimeTargetsSha256,
+                  readerGenerationSha256: sha256(Buffer.alloc(32, 0xc7)),
+                  effectiveConfigSha256: sha256("driver-e2e-effective"),
+                  validatedAgentsSha256: sha256("driver-e2e-agents"),
+                  ticketId: options.env.PIPELINE_CODEX_ONBOARDING_TICKET_ID,
+                  observedAtEpochMs,
+                },
+              });
+              return {
+                status: 0, signal: null, stderr: "",
+                stdout: `${canonicalJson({ schema: READBACK_STATUS_SCHEMA, status: "produced" })}\n`,
+              };
+            }
+            return { status: 0, signal: null };
+          },
+        });
+        assert.equal(launchCode, 0, launcherOutput);
+        assert.equal(JSON.parse(launcherOutput).status, "launched");
+        assert.equal(spawnCall, 2, "readback child and fresh Codex launch both occur");
+      } else {
+        assert.equal(initial.json.outcome, "collect-input", `${runner}: ${JSON.stringify(initial.json)}`);
+      }
+
+      let intake = freshDriver(path, runner, env);
+      assert.equal(intake.outcome, "collect-input", `${runner}: ${JSON.stringify(intake)}`);
+      assert.deepEqual(intake.collectInput.inputs.map((input) => input.name), ["language", "profile", "projectDescription"]);
+      assert.equal(intake.collectInput.applyAction.argv.includes("--git-author-name"), false);
+      mkdirSync(join(path, "scratch"), { recursive: true });
+      writeFileSync(join(path, "scratch", "onboarding-intake.txt"), "Build a locally playable mini HTML game.\nNo external dependencies.\n");
+      invokeAction(intake.collectInput.applyAction, new Map([
+        ["<PO_INTAKE_LANGUAGE>", "en"],
+        ["<PO_INTAKE_PROFILE>", "feature"],
+      ]), path, env);
+
+      intake = freshDriver(path, runner, env);
+      assert.equal(intake.outcome, "collect-input", `${runner}: ${JSON.stringify(intake)}`);
+      assert.equal(intake.collectInput.input.name, "answersJson");
+      const answers = JSON.stringify([
+        { question: "Primary goal?", answer: "A keyboard-playable local game." },
+        { question: "Verification?", answer: "Run the repository verify script." },
+      ]);
+      invokeAction(intake.collectInput.applyAction, new Map([
+        ["<PO_INTAKE_DESIGN_ANSWERS_JSON>", answers],
+      ]), path, env);
+
+      const approval = freshDriver(path, runner, env);
+      assert.equal(approval.outcome, "collect-input", `${runner}: ${JSON.stringify(approval)}`);
+      assert.equal(approval.final.status, "awaiting-approval");
+      assert.equal(approval.collectInput.input?.name, "by");
+      assert.equal(approval.collectInput.applyAction?.kind, "command");
+      assert.equal(approval.collectInput.applyAction.argv.filter((value) => value === "<PO_PLAN_APPROVER_NAME>").length, 1);
+      const planSteps = approval.steps.map((step) => step.argv);
+      assert.ok(planSteps.some((argv) => argv[0]?.endsWith("pipeline-state.mjs") && argv[1] === "inspect"),
+        `${runner}: ready must enter the returned public pipeline-state inspect driver`);
+      assert.ok(planSteps.some((argv) => argv[1] === "submit-plan"),
+        `${runner}: the returned inspect chain must execute submit-plan`);
+      assert.ok(planSteps.some((argv) => argv[1] === "present-plan"),
+        `${runner}: the returned inspect chain must execute present-plan`);
+      const state = JSON.parse(readFileSync(join(path, "project", "pipeline-state.json"), "utf8"));
+      assert.equal(state.planApproved, false, `${runner}: presentation must not silently approve the plan`);
+
+      const devPlanGuard = join(here, "..", "hooks", "guard-devplan.mjs");
+      const productProbe = () => spawnSync(process.execPath, [devPlanGuard], {
+        cwd: path,
+        env: { ...env, CLAUDE_PROJECT_DIR: path },
+        encoding: "utf8",
+        input: JSON.stringify({ tool_name: "Write", tool_input: { file_path: "game.js" } }),
+        timeout: 30_000,
+      });
+      const refused = productProbe();
+      assert.equal(refused.status, 2, `${runner}: product write must remain refused before the returned approval action`);
+
+      invokePlainAction(approval.collectInput.applyAction, new Map([
+        ["<PO_PLAN_APPROVER_NAME>", "Greenfield E2E PO"],
+      ]), path, env);
+
+      const handover = freshDriver(path, runner, env);
+      assert.equal(handover.outcome, "collect-input", `${runner}: ${JSON.stringify(handover)}`);
+      assert.equal(handover.collectInput.input?.name, "verifyCommand");
+      assert.equal(handover.collectInput.applyAction?.kind, "command");
+      assert.equal(handover.collectInput.applyAction.argv.filter(
+        (value) => value === PROJECT_ONBOARDING_VERIFY_COMMAND_PLACEHOLDER,
+      ).length, 1);
+      const verifyCommand = `"${process.execPath}" --check game.js`;
+      invokePlainAction(handover.collectInput.applyAction, new Map([
+        [PROJECT_ONBOARDING_VERIFY_COMMAND_PLACEHOLDER, verifyCommand],
+      ]), path, env);
+
+      const implementing = freshDriver(path, runner, env);
+      assert.equal(implementing.outcome, "ready", `${runner}: ${JSON.stringify(implementing)}`);
+      assert.equal(implementing.final.status, "ready");
+      assert.equal(implementing.final.nextAction, null);
+      const admitted = productProbe();
+      assert.equal(admitted.status, 0, `${runner}: ${admitted.stderr}`);
+      writeFileSync(join(path, "game.js"), "export const playable = true;\n");
+      const verified = spawnSync(verifyCommand, { cwd: path, env, encoding: "utf8", shell: true, timeout: 30_000 });
+      assert.equal(verified.status, 0, `${runner}: ${verified.stderr}`);
+    }
+  } finally {
+    for (const path of fixtures) dispose(path);
+  }
+});
+
+test.skip("legacy helper-driven intake-to-implementation path (superseded by the driver-only E2E above)", () => {
   const paths = [];
   const runners = ["claude", "codex", "antigravity"];
   const inputNames = (action) => [

@@ -325,6 +325,17 @@ function assertSingleLineAction(action, expected) {
   return rendered;
 }
 
+function assertPlanLifecycleInspectAction(action) {
+  return assertSingleLineAction(action, {
+    kind: "command",
+    executable: "node",
+    argv: [PIPELINE_STATE_SCRIPT, "inspect"],
+    mutation: false,
+    requiresConfirmation: false,
+    expected: { schema: "pipeline.inspect.v1", statuses: ["draft", "awaiting-approval"] },
+  });
+}
+
 function assertBoundedRestartCopyCommand(action) {
   const copy = action?.launch?.copyCommand;
   assert.deepEqual(Object.keys(copy).sort(), ["cmd", "maxColumns", "posix", "powershell"]);
@@ -732,7 +743,7 @@ test("runtime-current bootstrap exposes cleanup recovery before App Server or se
     assert.equal(readyApplyCalls, 1);
     assert.equal(readyAppServerCalls, 1);
     assert.equal(readyAndApplied.status, "ready");
-    assert.equal(readyAndApplied.nextAction, null);
+    assertPlanLifecycleInspectAction(readyAndApplied.nextAction);
 
     let activeSessionAppServerCalls = 0;
     const activeSession = inspectProjectOnboardingV3({ runner: "codex",
@@ -753,7 +764,7 @@ test("runtime-current bootstrap exposes cleanup recovery before App Server or se
       },
     });
     assert.equal(activeSession.status, "ready");
-    assert.equal(activeSession.nextAction, null);
+    assertPlanLifecycleInspectAction(activeSession.nextAction);
     assert.equal(activeSessionAppServerCalls, 1);
 
     const unavailable = inspectProjectOnboardingV3({ runner: "codex",
@@ -979,7 +990,7 @@ test("unapproved kickoff state has no PO authority to rebind", () => {
     delete deps.observePersistedPoAuthority;
     const observed = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, intent: "session", deps });
     assert.equal(observed.status, "ready", JSON.stringify(observed.diagnostics));
-    assert.equal(observed.nextAction, null);
+    assertPlanLifecycleInspectAction(observed.nextAction);
     assert.equal(observed.diagnostics.length, 0);
     const statePath = join(path, "project/pipeline-state.json");
     const malformedApproved = JSON.parse(readFileSync(statePath, "utf8"));
@@ -1073,7 +1084,7 @@ test("completed legacy cleanup recovery returns session V4 to ready after exact 
     assert.equal(applyProjectAuthoritySessionCleanupRecovery(plan, { rootDir: path, activate: true }).status, "recovered");
     const ready = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, intent: "session", deps: fakeDeps });
     assert.equal(ready.status, "ready", JSON.stringify(ready.diagnostics));
-    assert.equal(ready.nextAction, null);
+    assertPlanLifecycleInspectAction(ready.nextAction);
   } finally { dispose(path); }
 });
 
@@ -1242,7 +1253,7 @@ test("exact revoke-plan v2 postimage keeps repeated PRD and Spec design edits wr
     delete deps.observePersistedPoAuthority;
     const observed = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, intent: "session", deps });
     assert.equal(observed.status, "ready", JSON.stringify(observed.diagnostics));
-    assert.equal(observed.nextAction, null);
+    assertPlanLifecycleInspectAction(observed.nextAction);
     assert.deepEqual(observed.diagnostics, []);
 
     writeFileSync(join(path, planPath), `${readFileSync(join(path, planPath), "utf8")}\nFirst revised product decision.\n`);
@@ -1252,7 +1263,7 @@ test("exact revoke-plan v2 postimage keeps repeated PRD and Spec design edits wr
     writeFileSync(join(path, planPath), `${readFileSync(join(path, planPath), "utf8")}\nSecond revised product decision.\n`);
     const afterRepeatedEdits = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, intent: "session", deps });
     assert.equal(afterRepeatedEdits.status, "ready", JSON.stringify(afterRepeatedEdits.diagnostics));
-    assert.equal(afterRepeatedEdits.nextAction, null);
+    assertPlanLifecycleInspectAction(afterRepeatedEdits.nextAction);
 
     state.planRevocation.specSha256 = "e".repeat(64);
     writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
@@ -2505,9 +2516,9 @@ test("an ask whose condition has been resolved stops appearing on the next ordin
 
 // The single highest-risk consequence of this dispatch (its own briefing's
 // words): the "ready" status must be unaffected, checked against the REAL
-// gate function -- an unliftable, fail-closed exactKeys() check that any
-// stray extra top-level key, or a non-null nextAction on a ready result,
-// fails every session closed.
+// gate function -- an unliftable, fail-closed exactKeys() check. This fixture
+// has a draft feature, so its one legitimate non-null action is the closed
+// public plan-lifecycle inspect handoff.
 test("the ready status observation is unaffected by the ask-window change, checked against the real ready gate", () => {
   const path = root();
   try {
@@ -2517,8 +2528,7 @@ test("the ready status observation is unaffected by the ask-window change, check
 
     const observed = inspectProjectOnboardingV3({ rootDir: path, intent: "onboarding", runner: "codex", deps: fakeDeps });
     assert.equal(observed.status, "ready");
-    assert.equal(observed.nextAction, null,
-      "a ready observation must still carry a null nextAction, never a pendingAsks-bearing object");
+    assertPlanLifecycleInspectAction(observed.nextAction);
 
     const receipt = requireProjectOnboardingReady({
       rootDir: path,
@@ -2911,14 +2921,14 @@ test("NVA-V17-NOKEYASK: a machine with no PO signing key gets one structured pub
     // unliftable, fail-closed ready gate, not a hand-typed shape assumption.
     // fakeDeps's own default machine plane (poKeyDirectory: null) is exactly
     // the "no-directory" case this dispatch adds an ask for, so this also
-    // proves a project with no signing key still reaches "ready".
+    // proves a project with no signing key still reaches "ready" and exposes
+    // only the closed inspect handoff for its draft feature.
     const barrier = initializeRestartRequiredRoot(readyRoot);
     clearRuntimeBarrier(readyRoot, barrier);
     completeKickoff(readyRoot);
     const readyObserved = inspectProjectOnboardingV3({ rootDir: readyRoot, intent: "onboarding", runner: "codex", deps: fakeDeps });
     assert.equal(readyObserved.status, "ready");
-    assert.equal(readyObserved.nextAction, null,
-      "a ready observation must still carry a null nextAction, never a pendingAsks-bearing object");
+    assertPlanLifecycleInspectAction(readyObserved.nextAction);
     const readyReceipt = requireProjectOnboardingReady({
       rootDir: readyRoot,
       intent: "onboarding",
@@ -4327,7 +4337,30 @@ test("the public onboarding handover is executable for every runner with placeho
         },
       });
 
-      approve();
+      // A ready onboarding envelope must hand draft/awaiting plan lifecycle
+      // ownership to pipeline-state's existing public inspect driver.  The
+      // action is exact and closed; onboarding does not reproduce any of the
+      // submit/present/approve policy itself.
+      const draftEntry = publicInspect();
+      assert.equal(draftEntry.status, "ready");
+      assert.equal(draftEntry.runner, runner);
+      assert.deepEqual(draftEntry.nextAction, {
+        kind: "command",
+        executable: "node",
+        argv: [PIPELINE_STATE_SCRIPT, "inspect"],
+        mutation: false,
+        requiresConfirmation: false,
+        expected: { schema: "pipeline.inspect.v1", statuses: ["draft", "awaiting-approval"] },
+      });
+      const submitted = state(["submit-plan", "--by", "po", "--profile", "feature"]);
+      assert.equal(submitted.code, 0, `${runner}: submit-plan: ${submitted.stderr}`);
+      const awaitingEntry = publicInspect();
+      assert.deepEqual(awaitingEntry.nextAction, draftEntry.nextAction,
+        `${runner}: awaiting approval remains owned by the same public inspect driver`);
+      const presented = state(["present-plan", "--by", "po"]);
+      assert.equal(presented.code, 0, `${runner}: present-plan: ${presented.stderr}`);
+      const approved = state(["approve-plan", "--by", "po"]);
+      assert.equal(approved.code, 0, `${runner}: approve-plan: ${approved.stderr}`);
 
       // Fresh calibration still contains UNCONFIGURED_VERIFY. The public CLI
       // must publish one primary collect-input action whose nested apply argv
