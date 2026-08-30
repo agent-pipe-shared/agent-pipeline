@@ -2,6 +2,7 @@
 
 /** One fail-closed, intent-bound admission gate for mutating Pipeline entrypoints. */
 import { realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 import {
   inspectProjectOnboardingV3,
@@ -90,6 +91,7 @@ const BASE_RESULT_KEYS = PROJECT_ONBOARDING_BASE_RESULT_KEYS;
 const READY_ONLY_RESULT_KEYS = PROJECT_ONBOARDING_READY_ONLY_RESULT_KEYS;
 const READY_RESULT_KEYS = Object.freeze([...BASE_RESULT_KEYS, ...READY_ONLY_RESULT_KEYS]);
 const SAFE_STATUS = /^[a-z][a-z0-9-]{0,79}$/u;
+const PIPELINE_STATE_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url));
 
 export class ProjectOnboardingReadyError extends Error {
   constructor(code, message, { intent = null, lifecycleStatus = null } = {}) {
@@ -141,6 +143,19 @@ function validImplementationHandoverCommand(value, { requiresVerifyCommand = fal
     && validReadyExpected(value.expected);
 }
 
+function validPlanLifecycleInspectCommand(value) {
+  return exactKeys(value, ["kind", "executable", "argv", "mutation", "requiresConfirmation", "expected"])
+    && value.kind === "command"
+    && value.executable === "node"
+    && Array.isArray(value.argv)
+    && JSON.stringify(value.argv) === JSON.stringify([PIPELINE_STATE_SCRIPT, "inspect"])
+    && value.mutation === false
+    && value.requiresConfirmation === false
+    && exactKeys(value.expected, ["schema", "statuses"])
+    && value.expected.schema === "pipeline.inspect.v1"
+    && JSON.stringify(value.expected.statuses) === JSON.stringify(["draft", "awaiting-approval"]);
+}
+
 function validVerifyCommandInput(value) {
   return exactKeys(value, ["name", "encoding", "trim", "minBytes", "maxBytes", "singleLine", "rejectNul"])
     && value.name === "verifyCommand"
@@ -154,6 +169,7 @@ function validVerifyCommandInput(value) {
 
 function validReadyNextAction(value) {
   if (value === null) return true;
+  if (validPlanLifecycleInspectCommand(value)) return true;
   if (validImplementationHandoverCommand(value)) return true;
   return exactKeys(value, [
     "kind", "input", "mutation", "requiresConfirmation", "guidance", "applyAction", "expected",
