@@ -37,14 +37,18 @@
  * after-the-fact, checkable fact, run on demand or by a Critic/verification pass, the same
  * posture check-backlog-done-predicate.mjs already uses for its own standalone checker.
  *
- * NOT REGISTERED in `harness/scripts/verify.mjs`: that file is TP-3-protected
- * (`templates/prompts/agent-obligations.md`) and this repository's `signature` push-approval
- * mode offers no in-session override for it -- the same wall `check-backlog-done-predicate.mjs`
- * itself named before a later, separately-authorized dispatch registered it.
- * `check-suite-registration.mjs`'s own `DELIBERATELY_UNREGISTERED` opt-out list was emptied
- * 2026-08-29 specifically because a written-but-unverified opt-out entry is a debt with no
- * trigger to ever pay it off -- so this gap is disclosed here in prose instead of manufacturing
- * a fresh entry in that list.
+ * REGISTRATION STATUS (updated 2026-08-30, NVA-CF-RESUMEGATE): the single-session
+ * `--session-id` mode above is STILL never wired into `harness/scripts/verify.mjs` -- a batch
+ * verify run has no live session identity to supply, so this mode stays exactly what this
+ * comment always said: standalone, after-the-fact, run on demand or by a Critic/verification
+ * pass. The SEPARATE `--any-session` mode (added by NVA-CF-RESUMECHECKANYSESSION, commit
+ * `2437d338`) answers a session-independent question instead ("does ANY recorded receipt match
+ * the current card's digest") and IS now registered in `harness/scripts/verify.mjs` as suite
+ * `resume-consumption-check` (commit `03c1edcd`, TP-3 signed-override ceremony) -- it is a live
+ * verify-gate check, not merely observed. `check-suite-registration.mjs`'s own
+ * `DELIBERATELY_UNREGISTERED` opt-out list carries no entry for either mode: the single-session
+ * mode's gap is disclosed here in prose (never a manufactured opt-out entry, per the 2026-08-29
+ * policy), and the any-session mode needs no opt-out at all since it is now registered.
  *
  * EXIT CODES: 0 = PASS (no card was available, or an available card has a matching receipt).
  * 1 = FATAL (a card was available and no matching receipt exists for the given session).
