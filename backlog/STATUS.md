@@ -518,6 +518,7 @@
 | pipeline.transactional-readbacks-not-status-cascades | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.triage-verdict-text-can-contaminate-a-backlog-item-as-a-later-spec-reference | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.trust-anchor-bootstrap-confirmed-still-circular-live | closed | defect | pipeline | 2026-08-29 | NOW / Nova A -- happy-path blocker, confirmed live by 2 of 3 independent runners against the exact candidate the PO tested with. |
+| pipeline.trust-anchor-bootstrap-test-never-registered-in-verify | open | defect | pipeline | 2026-08-30 | Nova B — pre-existing gap found while registering an unrelated verify.mjs suite; not introduced by this session's own work. |
 | pipeline.trust-mismatch-names-neither-key-nor-directory | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.trust-policy-exact-key-shape-refuses-a-third-field-and-blames-the-key | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.trust-policy-shape-disagreement-between-sign-intent-and-verify-po-approval-proof | closed | defect | pipeline | 2026-08-17 | — |
@@ -568,7 +569,7 @@
 
 ## Counts
 
-- open: 76
+- open: 77
 - in_progress: 3
 - closed: 467
 - rejected: 3

@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "3601f943b75393c9cb95c895938ea7d6b043ca643f5a843255a76e7062a9d5d5"
+    "transitionHead": "40fd705d572d36e97357bad6a6a2d5b83769f8618ccaacb3457a7792e16ac49e"
   },
   "counts": {
-    "open": 76,
+    "open": 77,
     "in_progress": 3,
     "closed": 467,
     "rejected": 3,
@@ -6420,6 +6420,16 @@
       "closureRepository": "self",
       "closureCommit": "6876ba53eb1213e4857881ec4f4a0aa36eaf8134",
       "closureEvidence": "plugins/pipeline-core/lib/trust-anchor-bootstrap-circularity.repro.test.mjs"
+    },
+    {
+      "id": "pipeline.trust-anchor-bootstrap-test-never-registered-in-verify",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-30",
+      "source": "Found by check-verify-suite-registration.mjs while preparing the TP-3 ceremony for NVA-CF-RESUMECHECKANYSESSION's own verify.mjs registration, 2026-08-30.",
+      "deferred": false,
+      "tracking": "Nova B — pre-existing gap found while registering an unrelated verify.mjs suite; not introduced by this session's own work."
     },
     {
       "id": "pipeline.trust-mismatch-names-neither-key-nor-directory",
