@@ -4,10 +4,18 @@ Start at the top-level [README](../README.md) to understand the problem the
 pipeline solves. For installation, V3 activation, and per-repository adoption,
 use [`SETUP.md`](../SETUP.md).
 
+`0.6.0` is the current local candidate, not a published release. Its user-facing
+change is a guided Greenfield path for Claude, Codex, and Antigravity; its
+security controls and release evidence remain fail-closed. Start with
+[What's new in 0.6.0](whats-new-0.6.0.md) for the candidate boundary and
+non-claims before using it for a live evaluation.
+
 The maintained references are:
 
 - [`../PIPELINE_FLOW.md`](../PIPELINE_FLOW.md) — end-to-end V3 flow, recovery
   boundaries, and gates.
+- [`whats-new-0.6.0.md`](whats-new-0.6.0.md) — current candidate scope,
+  Greenfield evidence, release boundary, and non-claims.
 - [`operating-model.md`](operating-model.md) — normative operating model.
 - [`runtime-boundary.md`](runtime-boundary.md) — runner-neutral methodology
   versus Claude Code enforcement.
