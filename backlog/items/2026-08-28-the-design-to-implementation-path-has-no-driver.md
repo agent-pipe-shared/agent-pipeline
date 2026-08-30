@@ -7,7 +7,7 @@ status: closed
 created: 2026-08-28
 closed_at: "2026-08-30"
 closure_repository: "self"
-closure_commit: "d7600de5"
+closure_commit: "d7600de57502e89fc18bb95d2324f02e022e5352"
 closure_evidence: "plugins/pipeline-core/scripts/pipeline-state-inspect.test.mjs"
 sprint: nova
 done_when: manual

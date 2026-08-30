@@ -1,7 +1,7 @@
 ---
 schema: pipeline.backlog-item.v1
 id: pipeline.observerunner-has-no-test-coverage
-type: gap
+type: defect
 owner: pipeline
 status: open
 created: 2026-08-30

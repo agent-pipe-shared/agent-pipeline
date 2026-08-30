@@ -7,7 +7,7 @@ status: closed
 created: 2026-08-30
 closed_at: "2026-08-30"
 closure_repository: "self"
-closure_commit: "272d772a"
+closure_commit: "272d772aa2fb1c1b7a0b827f8c22a7a747f6dc46"
 closure_evidence: "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs"
 tracking: "Retrospective-analysis follow-up item #6, PO-confirmed 2026-08-30 ('ja bitte umsetzen')"
 source: "PO's greenfield-test relay, 2026-08-30: repeated live GUARD-PARSE-UNSUPPORTED hits on ordinary `git log --oneline | head` / `git <read-only subcommand> | head` diagnostic commands, both in this Elephant session and in the PO's own relayed Codex session."
