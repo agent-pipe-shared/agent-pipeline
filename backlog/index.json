@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "87b272f33c3a18b34ee02c8ec79e8e622d0a3ec3767c19b20bf2f91c26a686dc"
+    "transitionHead": "34838c4639944f513fdd2575b4e4a212322c812406e9e3676ff56846e22f4689"
   },
   "counts": {
-    "open": 78,
+    "open": 77,
     "in_progress": 3,
-    "closed": 459,
+    "closed": 460,
     "rejected": 3,
     "deferred": 11
   },
@@ -3029,13 +3029,17 @@
     },
     {
       "id": "pipeline.hgo-candidate-drift-invalidates-ceremony-on-any-concurrent-commit",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-30",
       "source": "Claude-060-78 and Codex-060-77 greenfield retrospectives both flag digest/command-drift loops during the signing ceremony; live reproduction 2026-08-30 in this session confirms the general mechanism, not just a report claim.",
       "deferred": false,
-      "tracking": "NOW / Nova A -- surfaced 2026-08-30, reproduced live in this session: a background trust-anchor-fix dispatch's commit 6876ba53 invalidated an in-flight hooks.json TP-4 signature ceremony, requiring refreeze-plan and a second PO signature for the identical edit."
+      "tracking": "NOW / Nova A -- surfaced 2026-08-30, reproduced live in this session: a background trust-anchor-fix dispatch's commit 6876ba53 invalidated an in-flight hooks.json TP-4 signature ceremony, requiring refreeze-plan and a second PO signature for the identical edit.",
+      "closedAt": "2026-08-30",
+      "closureRepository": "self",
+      "closureCommit": "67f6e1c3807520d4e7bfa7ad40e81063fe9b5840",
+      "closureEvidence": "plugins/pipeline-core/lib/human-guard-override.test.mjs"
     },
     {
       "id": "pipeline.hgo-ceremony-should-reduce-po-involvement-to-only-the-external-signing-step",
