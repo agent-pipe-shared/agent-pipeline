@@ -425,9 +425,13 @@ const CRITIC_TEMPLATE_PATH_FIXTURE_PROMPT = [
 
 const ROOT_CRITIC_TEMPLATE = readFileSync(join(pluginRoot, "..", "..", "templates", "prompts", "critic-review.md"), "utf8");
 const VENDORED_CRITIC_TEMPLATE = readFileSync(join(pluginRoot, "templates", "prompts", "critic-review.md"), "utf8");
-const AGY_ENVELOPE_MATCH = ROOT_CRITIC_TEMPLATE.match(/<!-- AGY-CRITIC-PROMPT-ENVELOPE:START -->\s*```text\s*([\s\S]*?)\s*```\s*<!-- AGY-CRITIC-PROMPT-ENVELOPE:END -->/);
-assert.ok(AGY_ENVELOPE_MATCH, "canonical Critic template must carry an Antigravity Prompt envelope");
-const RENDERED_AGY_CRITIC_ENVELOPE = AGY_ENVELOPE_MATCH[1]
+const AGY_ENVELOPE_START = "<!-- AGY-CRITIC-PROMPT-ENVELOPE:START -->";
+const AGY_ENVELOPE_END = "<!-- AGY-CRITIC-PROMPT-ENVELOPE:END -->";
+const agyEnvelopeRegion = ROOT_CRITIC_TEMPLATE.split(AGY_ENVELOPE_START)[1]?.split(AGY_ENVELOPE_END)[0];
+assert.ok(agyEnvelopeRegion, "canonical Critic template must carry an Antigravity Prompt envelope");
+const AGY_ENVELOPE = agyEnvelopeRegion.split("```text")[1]?.split("```")[0]?.trim();
+assert.ok(AGY_ENVELOPE, "canonical Critic template envelope must contain a text code block");
+const RENDERED_AGY_CRITIC_ENVELOPE = AGY_ENVELOPE
   .replace("{{SPEC_PATH}}", "specs/feat-1/prd.md")
   .replace("{{COMMIT_SHA}}", "0123456789abcdef0123456789abcdef01234567")
   .replace("{{GUARDRAIL_PATH}}", "guardrails/security.md")
