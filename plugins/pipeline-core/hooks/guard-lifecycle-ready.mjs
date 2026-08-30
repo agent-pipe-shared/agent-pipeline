@@ -32,13 +32,16 @@ import {
   PO_AUTHORITY_REBIND_UNAVAILABLE_DIAGNOSTICS,
 } from "../lib/project-onboarding-v3.mjs";
 // NVA-GF-COPYSAFE/NVA-W12-COPYSAFE: sourced from the shared renderer module
-// rather than project-onboarding-v3.mjs directly -- boundedOpaqueCopyCommand
-// is the same function (re-exported there, unchanged), so this file's
-// bounded-rendering output stays byte-identical. boundedCopySafeCommand/
+// rather than project-onboarding-v3.mjs directly -- boundedCopySafeCommand/
 // placeholder build the flat per-step command lines below, replacing the
 // hand-assembled `${process.execPath} ${JSON.stringify(script)} ...`
 // templates the backlog item measured as one of the inconsistent emitters.
-import { boundedCopySafeCommand, boundedOpaqueCopyCommand, placeholder } from "../lib/copy-safe-command.mjs";
+// NVA-CF-GUARDVERBOSITY: the bounded multi-shell rendering itself
+// (boundedOpaqueCopyCommand, previously imported here too) no longer renders
+// inline in this file -- it moved on-demand into guard-human-override.mjs's
+// `render-copy-safe` subcommand; see the `ceremonyCommand("render-copy-safe")`
+// pointer below.
+import { boundedCopySafeCommand, placeholder } from "../lib/copy-safe-command.mjs";
 import { automatedLifecycleArgvCommands, MUTATING_ONBOARDING_ARGV_SHAPES } from "../scripts/project-onboarding-v3.mjs";
 import { isBootstrapBindingStagingAuthoringWrite } from "../lib/onboarding-staging-authoring.mjs";
 import { loadRuntimeProjectionV3OwnedKeys } from "../lib/runtime-projection-v3.mjs";
@@ -571,37 +574,6 @@ function blocked(
  * @param {string} reason the exact denial reason text the refusal prints, bound into the capability.
  * @param {string} subject short noun for humanGuardRouteUnavailableReason ("command", "write").
  */
-/**
- * Renders each already-assembled ceremony command through boundedOpaqueCopyCommand()
- * (NVA-W4-01B) so a human whose terminal wraps a line mid-path or mid-digest still has a
- * copy-safe alternative -- appended AFTER the existing flat per-command chain, never
- * replacing it: the flat chain's own strict line-adjacency assertions
- * (guard-lifecycle-ready.test.mjs) stay pinned to their unmodified text. A rendering
- * failure for one step (or one shell within a step) never suppresses the flat chain or the
- * other steps -- boundedOpaqueCopyCommand() already returns `null` per-shell rather than
- * throwing for an unrenderable value; this only additionally guards the exceptional case of
- * a completely non-string/empty command, which should not happen here but must not fail the
- * whole denial message if it somehow does.
- */
-function boundedCeremonyRenderingBlock(steps) {
-  const blocks = [];
-  for (const { label, command } of steps) {
-    let bounded;
-    try {
-      bounded = boundedOpaqueCopyCommand(command);
-    } catch {
-      continue;
-    }
-    const shells = [];
-    if (bounded.posix) shells.push(`  posix:\n${bounded.posix}`);
-    if (bounded.powershell) shells.push(`  powershell:\n${bounded.powershell}`);
-    if (bounded.cmd) shells.push(`  cmd.exe:\n${bounded.cmd}`);
-    if (shells.length === 0) continue;
-    blocks.push(`Bounded copy-safe rendering of the ${label} step (max ${bounded.maxColumns} columns per line; use this if the line above wrapped when you copied it):\n${shells.join("\n")}`);
-  }
-  return blocks.join("\n\n");
-}
-
 function humanOverrideRoute(code, reason, subject, root, toolName, toolInput, dependencies = {}) {
   const denials = [{ guard: "guard-lifecycle-ready.mjs", reason }];
   const consumeFn = dependencies.consumeHumanGuardOverrideFn ?? consumeHumanGuardOverride;
@@ -685,28 +657,29 @@ function humanOverrideRoute(code, reason, subject, root, toolName, toolInput, de
               `there is no in-session activate step for this mode):`,
             authorizeBySignature,
           ].join("\n");
-        // NVA-W4-01B: the same steps rendered again, bounded, appended AFTER the flat
-        // chain above -- see boundedCeremonyRenderingBlock()'s own header.
-        const ceremonySteps = approvalMode === "chat"
-          ? [
-            { label: "plan", command: planCommand },
-            { label: "prepare-authorization", command: prepareAuthorizationChat },
-            { label: "authorize", command: authorizeChat },
-          ]
-          : [
-            { label: "plan", command: planCommand },
-            { label: "prepare-authorization", command: prepareAuthorizationSignature },
-            { label: "emit-signature-digest", command: emitSignatureDigest },
-            { label: "authorize-by-signature", command: authorizeBySignature },
-          ];
-        const boundedBlock = boundedCeremonyRenderingBlock(ceremonySteps);
+        // NVA-CF-GUARDVERBOSITY: the full per-step posix/powershell/cmd.exe bounded
+        // rendering used to be inlined here unconditionally (NVA-W4-01B) -- up to 5
+        // ceremony steps x 3 shells, observed to run to ~150 lines on a real denial and
+        // to dominate context cost on every ceremony denial this function serves. The
+        // underlying safety property (a human whose terminal wraps a long copied line
+        // still has a shell-correct copy-safe alternative) is unchanged; only WHEN it is
+        // disclosed changes -- on demand, via `render-copy-safe`, never inlined by
+        // default. That subcommand reproduces byte-identically what used to sit here,
+        // from the same script/repo/request-sha256/approvalMode inputs
+        // (guard-human-override.mjs, where the rest of this ceremony's CLI surface
+        // already lives -- see its own header for the construction, mirrored exactly
+        // from what lived here before, and from guard-testpath.mjs's identical fix).
+        const renderCopySafeCommand = ceremonyCommand("render-copy-safe");
         overrideGuidance = [
           "",
           `Human override available for this exact ${subject} (one use; audited; the human confirms):`,
           planCommand,
           continuation,
           "",
-          ...(boundedBlock ? [boundedBlock, ""] : []),
+          "A bounded, copy-safe multi-shell (posix/powershell/cmd.exe) rendering of every " +
+            "step above is available on demand -- run this if a line above wrapped when you copied it:",
+          renderCopySafeCommand,
+          "",
         ].join("\n");
       } else {
         // ADR-0059 Decision 4: a denial that could not be routed must SAY so. Silence here

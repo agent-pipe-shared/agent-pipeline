@@ -123,13 +123,16 @@ import {
   recordHumanGuardDenial,
 } from "../lib/human-guard-override.mjs";
 // NVA-W12-COPYSAFE: sourced from the shared renderer module rather than
-// project-onboarding-v3.mjs directly -- boundedOpaqueCopyCommand is the same
-// function (re-exported there, unchanged); boundedCopySafeCommand/placeholder
+// project-onboarding-v3.mjs directly -- boundedCopySafeCommand/placeholder
 // build the flat per-step command lines below, replacing the hand-assembled
 // `${process.execPath} ${JSON.stringify(script)} ...` templates the backlog
 // item measured as one of the inconsistent emitters (mirrors the identical
-// adoption in guard-lifecycle-ready.mjs).
-import { boundedCopySafeCommand, boundedOpaqueCopyCommand, placeholder } from "../lib/copy-safe-command.mjs";
+// adoption in guard-lifecycle-ready.mjs). NVA-CF-GUARDVERBOSITY: the bounded
+// multi-shell rendering itself (boundedOpaqueCopyCommand, previously imported
+// here too) no longer renders inline in this file -- it moved on-demand into
+// guard-human-override.mjs's `render-copy-safe` subcommand; see the
+// `ceremonyCommand("render-copy-safe")` pointer below.
+import { boundedCopySafeCommand, placeholder } from "../lib/copy-safe-command.mjs";
 import {
   loadProtectedTestPathRules,
   protectedTestPathRuleFor,
@@ -137,35 +140,6 @@ import {
 import { writeTargetPath } from "../lib/tool-write-target.mjs";
 
 const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-
-/**
- * Renders each already-assembled ceremony command through boundedOpaqueCopyCommand()
- * (NVA-W4-01B) so a human whose terminal wraps a line mid-path or mid-digest still has a
- * copy-safe alternative -- appended AFTER the existing flat per-command chain, never
- * replacing it: the flat chain's own text stays exactly as printed today. Mirrors
- * guard-lifecycle-ready.mjs's own boundedCeremonyRenderingBlock() exactly, the same
- * near-byte-identical-duplicate arrangement this file's continuation text already uses. A
- * rendering failure for one step (or one shell within a step) never suppresses the flat
- * chain or the other steps.
- */
-function boundedCeremonyRenderingBlock(steps) {
-  const blocks = [];
-  for (const { label, command } of steps) {
-    let bounded;
-    try {
-      bounded = boundedOpaqueCopyCommand(command);
-    } catch {
-      continue;
-    }
-    const shells = [];
-    if (bounded.posix) shells.push(`  posix:\n${bounded.posix}`);
-    if (bounded.powershell) shells.push(`  powershell:\n${bounded.powershell}`);
-    if (bounded.cmd) shells.push(`  cmd.exe:\n${bounded.cmd}`);
-    if (shells.length === 0) continue;
-    blocks.push(`Bounded copy-safe rendering of the ${label} step (max ${bounded.maxColumns} columns per line; use this if the line above wrapped when you copied it):\n${shells.join("\n")}`);
-  }
-  return blocks.join("\n\n");
-}
 
 // ---- read tool input (fail-open) --------------------------------------------------
 let filePath = "";
@@ -351,27 +325,27 @@ if (matched) {
               `there is no in-session activate step for this mode):`,
             authorizeBySignature,
           ].join("\n");
-        // NVA-W4-01B: the same steps rendered again, bounded, appended AFTER the flat
-        // chain above -- see boundedCeremonyRenderingBlock()'s own header.
-        const ceremonySteps = approvalMode === "chat"
-          ? [
-            { label: "plan", command: planCommand },
-            { label: "prepare-authorization", command: prepareAuthorizationChat },
-            { label: "authorize", command: authorizeChat },
-          ]
-          : [
-            { label: "plan", command: planCommand },
-            { label: "prepare-authorization", command: prepareAuthorizationSignature },
-            { label: "emit-signature-digest", command: emitSignatureDigest },
-            { label: "authorize-by-signature", command: authorizeBySignature },
-          ];
-        const boundedBlock = boundedCeremonyRenderingBlock(ceremonySteps);
+        // NVA-CF-GUARDVERBOSITY: the full per-step posix/powershell/cmd.exe bounded
+        // rendering used to be inlined here unconditionally (NVA-W4-01B) -- up to 5
+        // ceremony steps x 3 shells, observed to run to ~150 lines on a real denial and
+        // to dominate context cost on every TP-guard refusal. The underlying safety
+        // property (a human whose terminal wraps a long copied line still has a
+        // shell-correct copy-safe alternative) is unchanged; only WHEN it is disclosed
+        // changes -- on demand, via `render-copy-safe`, never inlined by default. That
+        // subcommand reproduces byte-identically what used to sit here, from the same
+        // script/repo/request-sha256/approvalMode inputs (guard-human-override.mjs,
+        // where the rest of this ceremony's CLI surface already lives -- see its own
+        // header for the construction, mirrored exactly from what lived here before).
+        const renderCopySafeCommand = ceremonyCommand("render-copy-safe");
         overrideGuidance = [
           "",
           "Human override available for this exact edit (one use; audited; the human confirms):",
           planCommand,
           continuation,
-          ...(boundedBlock ? ["", boundedBlock] : []),
+          "",
+          "A bounded, copy-safe multi-shell (posix/powershell/cmd.exe) rendering of every " +
+            "step above is available on demand -- run this if a line above wrapped when you copied it:",
+          renderCopySafeCommand,
         ].join("\n");
       } else {
         overrideGuidance = ["", humanGuardRouteUnavailableReason("edit", { planned })].join("\n");
