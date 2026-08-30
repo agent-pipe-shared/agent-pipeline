@@ -20,6 +20,7 @@ import { main as onboardingCli } from "./project-onboarding-v3.mjs";
 import { main as authorityCli } from "./v3-bootstrap-authority.mjs";
 import { main as migrationCli } from "./runner-profile-migration-v3.mjs";
 import { run as pipelineStateCli } from "./pipeline-state.mjs";
+import { driveOnboardingInit } from "./onboarding-init.mjs";
 import { inspectRepositoryFreshness } from "./repository-freshness.mjs";
 import { applyProjectOnboardingKickoffV4, planProjectOnboardingKickoffV4 } from "../lib/project-onboarding-v3.mjs";
 import { PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER } from "../lib/po-gate-authority.mjs";
@@ -132,6 +133,37 @@ function run(script, args, cwd) {
     },
   });
   return { status, stdout, json: stdout ? JSON.parse(stdout) : null };
+}
+
+function publicDriverRun(path, invocations) {
+  return (executable, argv) => {
+    invocations.push({ executable, argv: [...argv] });
+    const [script, ...args] = argv;
+    if (script === onboarding) {
+      const result = run(onboarding, args, path);
+      return { status: result.status, stdout: result.stdout, stderr: "" };
+    }
+    if (typeof script === "string" && script.split(/[\\/]/u).at(-1) === "pipeline-state.mjs") {
+      const originalLog = console.log;
+      const originalError = console.error;
+      const stdout = [];
+      const stderr = [];
+      console.log = (...parts) => { stdout.push(parts.join(" ")); };
+      console.error = (...parts) => { stderr.push(parts.join(" ")); };
+      try {
+        const status = pipelineStateCli(args, {
+          dir: path,
+          now: () => "2026-08-30T12:00:00.000Z",
+          writeError: (chunk) => { stderr.push(String(chunk)); },
+        });
+        return { status, stdout: stdout.join("\n"), stderr: stderr.join("\n") };
+      } finally {
+        console.log = originalLog;
+        console.error = originalError;
+      }
+    }
+    return { status: 1, stdout: "", stderr: `unsupported public driver target: ${script}` };
+  };
 }
 function actionArgs(result) {
   assert.equal(result.nextAction?.kind, "command");
@@ -608,7 +640,44 @@ test("Claude, Codex, and Antigravity complete the same fresh intake-to-implement
       state(["present-plan", "--by", "Greenfield E2E PO"]);
       state(["approve-plan", "--by", "Greenfield E2E PO"]);
       const verifyCommand = `${process.execPath} -e "process.exit(0)"`;
-      state(["set-phase", "--phase", "implementation", "--verify-command", verifyCommand]);
+      if (runner === "claude") {
+        const calibrationPath = join(path, "project", "pipeline.json");
+        const calibration = JSON.parse(readFileSync(calibrationPath, "utf8"));
+        writeFileSync(calibrationPath, `${JSON.stringify({ ...calibration, verify: verifyCommand }, null, 2)}\n`);
+      }
+      const driverInvocations = [];
+      let handover = driveOnboardingInit({
+        rootDir: path,
+        runner,
+        run: publicDriverRun(path, driverInvocations),
+      });
+      if (runner === "claude") {
+        assert.equal(handover.outcome, "ready",
+          `${runner}: the configured-verify command published by onboarding-init must execute and re-enter ready: ${JSON.stringify(handover)}`);
+      } else {
+        assert.equal(handover.outcome, "collect-input",
+          `${runner}: a seeded verify placeholder must surface the public verify-command input instead of executing a doomed bare transition: ${JSON.stringify(handover)}`);
+        assert.equal(handover.collectInput?.input?.name, "verifyCommand", JSON.stringify(handover));
+        const publishedApply = handover.collectInput?.applyAction;
+        assert.equal(publishedApply?.kind, "command", JSON.stringify(handover));
+        assert.equal(typeof publishedApply.executable, "string");
+        assert.ok(Array.isArray(publishedApply.argv));
+        assert.equal(publishedApply.argv.filter((value) => value === "<PO_VERIFY_COMMAND>").length, 1,
+          `${runner}: the public contract must expose exactly one verify placeholder`);
+        const materializedArgv = publishedApply.argv.map((value) => value === "<PO_VERIFY_COMMAND>" ? verifyCommand : value);
+        const applied = publicDriverRun(path, driverInvocations)(publishedApply.executable, materializedArgv);
+        assert.equal(applied.status, 0, `${runner}: the materialized published applyAction failed: ${applied.stderr}`);
+        assert.deepEqual(driverInvocations.at(-1), { executable: publishedApply.executable, argv: materializedArgv },
+          `${runner}: the mutating handover must be exactly the published contract with only its declared placeholder replaced`);
+        handover = driveOnboardingInit({
+          rootDir: path,
+          runner,
+          run: publicDriverRun(path, driverInvocations),
+        });
+        assert.equal(handover.outcome, "ready",
+          `${runner}: re-entering the public driver after its published applyAction must reach ready: ${JSON.stringify(handover)}`);
+      }
+      assert.ok(driverInvocations.length >= 1, `${runner}: public driver must execute at least its own inspect`);
 
       const ready = run(onboarding, ["inspect", "--root", path, "--runner", runner], path);
       assert.equal(ready.status, 0, ready.stdout);

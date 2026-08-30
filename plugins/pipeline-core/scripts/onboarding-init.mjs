@@ -207,6 +207,16 @@ function runOnboardingStep({ executable, argv, run, env = null }) {
   return { ok: true, exitCode, output: parsed };
 }
 
+function isPlainSuccessfulCommandOutput(stepResult) {
+  if (stepResult?.faultCode !== "unparseable-output" || stepResult.exitCode !== 0) return false;
+  const trimmed = String(stepResult.stdout ?? "").trimStart();
+  // A JSON-shaped document that failed parsing is malformed protocol output,
+  // never a successful human-text command. Empty stdout and ordinary CLI
+  // status prose are both legitimate success shapes for a published command
+  // whose durable effect is observed by the following fresh inspect.
+  return !trimmed.startsWith("{") && !trimmed.startsWith("[");
+}
+
 function buildInspectArgv(root, runner) {
   return runner === null
     ? [ONBOARDING_SCRIPT_PATH, "inspect", "--root", root]
@@ -292,6 +302,21 @@ export function driveOnboardingInit({ rootDir, runner = null, stepCap = DEFAULT_
     });
 
     if (!stepResult.ok) {
+      if (!isAnchorStep && isPlainSuccessfulCommandOutput(stepResult)) {
+        // A command action is allowed to be an ordinary human-facing CLI, not
+        // another JSON protocol endpoint. Exit 0 is the success contract; its
+        // durable result is established by re-entering through the public
+        // inspect anchor, exactly like a parsed successful command that
+        // settles without nextAction. Never apply this to the anchor itself:
+        // inspect owns the JSON protocol and malformed/plain output there is
+        // still an error.
+        steps[steps.length - 1].faultCode = null;
+        steps[steps.length - 1].outputKind = "plain-success";
+        executable = "node";
+        argv = buildInspectArgv(root, runner);
+        isAnchorStep = true;
+        continue;
+      }
       return {
         schema: SCHEMA,
         runner,
