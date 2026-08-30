@@ -247,6 +247,7 @@
 | pipeline.hash-chained-ledger-collides-with-the-secret-scanner | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.heredoc-refusal-teaches-no-substitute | open | defect | pipeline | 2026-08-28 | — |
 | pipeline.hgo-author-repair-digest-withholding-is-bypassable-by-reading-the-request-store | closed | defect | pipeline | 2026-08-19 | — |
+| pipeline.hgo-candidate-drift-invalidates-ceremony-on-any-concurrent-commit | open | defect | pipeline | 2026-08-30 | NOW / Nova A -- surfaced 2026-08-30, reproduced live in this session: a background trust-anchor-fix dispatch's commit 6876ba53 invalidated an in-flight hooks.json TP-4 signature ceremony, requiring refreeze-plan and a second PO signature for the identical edit. |
 | pipeline.hgo-ceremony-should-reduce-po-involvement-to-only-the-external-signing-step | closed | workflow-improvement | pipeline | 2026-08-19 | — |
 | pipeline.hgo-cli-side-granted-wiring-conflicts-with-arm-time-drift-check | closed | requirement | pipeline | 2026-08-19 | — |
 | pipeline.hgo-signature-ceremony-requires-more-human-steps-than-the-key-actually-needs | closed | workflow-improvement | pipeline | 2026-08-18 | — |
@@ -372,6 +373,7 @@
 | pipeline.po-gate-authority-receipt-readback | closed | defect | pipeline | 2026-07-25 | — |
 | pipeline.po-gate-worktree-authority | closed | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.po-human-approval-outside-check-uses-a-posix-only-separator-on-windows | closed | defect | pipeline | 2026-08-17 | — |
+| pipeline.po-human-approval-setup-silently-swallows-writemachineplane-error | open | defect | pipeline | 2026-08-30 | NOW / Nova A -- surfaced 2026-08-30 while cross-checking the Claude/Windows greenfield retrospective against current code; confirmed still present, unfixed. |
 | pipeline.po-key-directory-default-should-be-repo-scoped-not-machine-wide | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.po-key-trust-anchor-onboarding | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.po-language-is-set-without-asking-and-cannot-be-changed | closed | defect | pipeline | 2026-08-08 | — |
@@ -380,6 +382,7 @@
 | pipeline.prd-binding-precedes-framing-with-no-reopen-path-back | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.prd-framing-precondition-is-prose-not-a-check | open | workflow-improvement | pipeline | 2026-08-29 | — |
 | pipeline.prd-language-gate-reads-a-field-intake-never-writes | closed | defect | pipeline | 2026-08-29 | — |
+| pipeline.prd-spec-content-language-can-drift-mid-authoring-undetected | open | defect | pipeline | 2026-08-30 | NOW / Nova A -- PO live, 2026-08-30: Codex/Claude can switch human-facing language mid-PRD/Spec-authoring (e.g. start German, drift to English), and no code path detects this against the expected po-language value; every such drift forces expensive repair. PO wants a cheap first fix (document the requirement explicitly in the template) before considering a heavier content-language-detection mechanism. |
 | pipeline.prd-spec-depth-collapses-relative-to-design-input | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.pre-existing-failure-claims-need-evidence | closed | workflow-improvement | pipeline | 2026-08-08 | — |
 | pipeline.pre-push-hook-is-offered-not-installed | closed | defect | pipeline | 2026-08-28 | — |
@@ -445,6 +448,7 @@
 | pipeline.resume-hint-test-unregistered-in-verify-gate | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.ruleset-freshness-wsl-subsystem-absent | in_progress | defect | pipeline | 2026-08-07 | — |
 | pipeline.ruleset-source-test-unregistered-in-the-verify-gate | closed | defect | pipeline | 2026-08-07 | — |
+| pipeline.runner-fallback-defaults-to-codex-without-explicit-signal | open | defect | pipeline | 2026-08-30 | NOW / Nova A -- surfaced 2026-08-30 while cross-checking the Claude/Windows greenfield retrospective (docs/pipeline-retrospective-claude-060-78.md, section 8) against current code; confirmed still present, unfixed. |
 | pipeline.runner-neutrality-before-third-runner | closed | workflow-improvement | pipeline | 2026-08-08 | — |
 | pipeline.runtime-projection-v2-eager-manifest-load | closed | defect | pipeline | 2026-07-27 | — |
 | pipeline.runtime-projections-drift-after-v3-refresh | open | defect | pipeline | 2026-08-28 | Nova B — a silent divergence between two files that are meant to project the same authority; a consumer cannot judge it, and neither can this report |
@@ -478,6 +482,7 @@
 | pipeline.signed-authority-binding-durability | closed | defect | pipeline | 2026-08-06 | — |
 | pipeline.signed-guard-override-has-no-command-that-emits-the-digest-to-sign | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.signing-ceremony-designed-for-the-verifier-not-the-signer | closed | defect | pipeline | 2026-08-08 | — |
+| pipeline.signing-ceremony-tty-check-has-no-windows-fallback | open | defect | pipeline | 2026-08-30 | NOW / Nova A -- surfaced 2026-08-30 while cross-checking the Claude/Windows greenfield retrospective against current code; confirmed still present, unfixed. |
 | pipeline.signing-fails-without-a-tty-and-the-error-reads-as-a-wrong-passphrase | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.single-trust-anchor-excludes-key-rotation-and-teams | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.skill-arguments-and-bootstrap-length | closed | defect | pipeline | 2026-08-08 | — |
@@ -557,7 +562,7 @@
 
 ## Counts
 
-- open: 76
+- open: 81
 - in_progress: 3
 - closed: 456
 - rejected: 3

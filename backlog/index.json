@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "3698499d7ef3145f927a78a0e0261f18177ebb31e667d2eb5fc8100ee9a9f5fe"
+    "transitionHead": "c493cea8110b213e15f48bfc435f66561c3d416fd661abeca1aabf03e431a4ea"
   },
   "counts": {
-    "open": 76,
+    "open": 81,
     "in_progress": 3,
     "closed": 456,
     "rejected": 3,
@@ -3010,6 +3010,16 @@
       "closureEvidence": "plugins/pipeline-core/lib/human-guard-override.mjs"
     },
     {
+      "id": "pipeline.hgo-candidate-drift-invalidates-ceremony-on-any-concurrent-commit",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-30",
+      "source": "Claude-060-78 and Codex-060-77 greenfield retrospectives both flag digest/command-drift loops during the signing ceremony; live reproduction 2026-08-30 in this session confirms the general mechanism, not just a report claim.",
+      "deferred": false,
+      "tracking": "NOW / Nova A -- surfaced 2026-08-30, reproduced live in this session: a background trust-anchor-fix dispatch's commit 6876ba53 invalidated an in-flight hooks.json TP-4 signature ceremony, requiring refreeze-plan and a second PO signature for the identical edit."
+    },
+    {
       "id": "pipeline.hgo-ceremony-should-reduce-po-involvement-to-only-the-external-signing-step",
       "status": "closed",
       "type": "workflow-improvement",
@@ -4589,6 +4599,16 @@
       "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-17-po-human-approval-windows-posix-separator-fix-closure.md"
     },
     {
+      "id": "pipeline.po-human-approval-setup-silently-swallows-writemachineplane-error",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-30",
+      "source": "Claude-060-78 greenfield retrospective, section 8, tool defect 2; verified live against plugins/pipeline-core/scripts/po-human-approval.mjs:109 on 2026-08-30.",
+      "deferred": false,
+      "tracking": "NOW / Nova A -- surfaced 2026-08-30 while cross-checking the Claude/Windows greenfield retrospective against current code; confirmed still present, unfixed."
+    },
+    {
       "id": "pipeline.po-key-directory-default-should-be-repo-scoped-not-machine-wide",
       "status": "closed",
       "type": "defect",
@@ -4687,6 +4707,16 @@
       "closureRepository": "self",
       "closureCommit": "64899377c5b3b1085de50b7f1a3c33ae9abbd436",
       "closureEvidence": "plugins/pipeline-core/lib/onboarding-continuity.test.mjs"
+    },
+    {
+      "id": "pipeline.prd-spec-content-language-can-drift-mid-authoring-undetected",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-30",
+      "source": "PO live session 2026-08-30, clarifying that backlog item 2026-08-28-onboarding-produces-drift-it-then-has-to-repair.md (closed) does NOT cover this -- that item only checks a metadata marker (po-language field) against a profile receipt, never the actual prose language of PRD/Spec content.",
+      "deferred": false,
+      "tracking": "NOW / Nova A -- PO live, 2026-08-30: Codex/Claude can switch human-facing language mid-PRD/Spec-authoring (e.g. start German, drift to English), and no code path detects this against the expected po-language value; every such drift forces expensive repair. PO wants a cheap first fix (document the requirement explicitly in the template) before considering a heavier content-language-detection mechanism."
     },
     {
       "id": "pipeline.prd-spec-depth-collapses-relative-to-design-input",
@@ -5512,6 +5542,16 @@
       "closureEvidence": "backlog/items/2026-08-07-ruleset-source-test-unregistered-in-the-verify-gate.md"
     },
     {
+      "id": "pipeline.runner-fallback-defaults-to-codex-without-explicit-signal",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-30",
+      "source": "Claude-060-78 greenfield retrospective, section 8, tool defect 1; verified live against plugins/pipeline-core/scripts/pipeline-state.mjs:5938-5939 on 2026-08-30.",
+      "deferred": false,
+      "tracking": "NOW / Nova A -- surfaced 2026-08-30 while cross-checking the Claude/Windows greenfield retrospective (docs/pipeline-retrospective-claude-060-78.md, section 8) against current code; confirmed still present, unfixed."
+    },
+    {
       "id": "pipeline.runner-neutrality-before-third-runner",
       "status": "closed",
       "type": "workflow-improvement",
@@ -5920,6 +5960,16 @@
       "closureRepository": "self",
       "closureCommit": "9ae28dad3f6c9c41833e7d629fa3d1d73872d2a2",
       "closureEvidence": "backlog/items/2026-08-08-the-signing-ceremony-is-designed-for-the-verifier-not-the-signer.md"
+    },
+    {
+      "id": "pipeline.signing-ceremony-tty-check-has-no-windows-fallback",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-30",
+      "source": "Claude-060-78 greenfield retrospective, section 8, tool defect 3; verified live against plugins/pipeline-core/scripts/po-human-approval.mjs:964 on 2026-08-30.",
+      "deferred": false,
+      "tracking": "NOW / Nova A -- surfaced 2026-08-30 while cross-checking the Claude/Windows greenfield retrospective against current code; confirmed still present, unfixed."
     },
     {
       "id": "pipeline.signing-fails-without-a-tty-and-the-error-reads-as-a-wrong-passphrase",
