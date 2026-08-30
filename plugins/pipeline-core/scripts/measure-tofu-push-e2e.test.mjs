@@ -9,10 +9,10 @@
  * in `parseJsonStdout` (F2) went undetected. Scope, per the fix dispatch's own
  * briefing: cover `parseJsonStdout`'s normal case and the F2 regression case, and
  * `fakeSetupSpawn`'s genpkey/pkey interception (mirroring
- * `po-human-approval.test.mjs`'s own `fakeSetupSpawn` test pattern). The full
- * `measureTofuPushEndToEnd()` live-subprocess walk is intentionally NOT
- * re-exercised here -- it already has its own live-run evidence from prior
- * dispatches; this file targets only the previously-untested internal helpers.
+ * `po-human-approval.test.mjs`'s own `fakeSetupSpawn` test pattern).  The
+ * current suite also executes the full disposable Driver path, so a new
+ * onboarding handover shape cannot make the measurement silently stop before
+ * the real TOFU push ceremony.
  */
 import assert from "node:assert/strict";
 import { createPrivateKey, createPublicKey } from "node:crypto";
@@ -21,7 +21,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { fakeSetupSpawn, parseJsonStdout } from "./measure-tofu-push-e2e.mjs";
+import { fakeSetupSpawn, main, parseJsonStdout } from "./measure-tofu-push-e2e.mjs";
 
 test("parseJsonStdout: normal case -- clean JSON stdout with no leading prompt text parses straight through", () => {
   const value = { subjectSha256: "a".repeat(64), ok: true };
@@ -118,4 +118,21 @@ test("fakeSetupSpawn: every other openssl invocation falls through to a real spa
   const result = fakeSetupSpawn("openssl", ["version"]);
   assert.equal(typeof result.status, "number");
   assert.equal(result.status, 0);
+});
+
+test("full TOFU measurement follows Driver-provided design answers through to a recorded signed push", { timeout: 120_000 }, () => {
+  let stdout = "";
+  const status = main([], { write: (chunk) => { stdout += chunk; } });
+  assert.equal(status, 0, stdout);
+  const result = JSON.parse(stdout);
+  assert.equal(result.outcome, "signed-push-recorded", stdout);
+  assert.equal(result.steps[0]?.step, "onboarding");
+  assert.equal(result.steps[0]?.outcome, "ready", stdout);
+  assert.ok(result.steps.some((step) => step.step === "approve-push" && step.exitCode === 0), stdout);
+  // This measurement deliberately ends at approve-push.  The already accepted
+  // separate TOFU boundary is the real git-push guard interception, where a
+  // v1 policy would be upgraded and pinned; do not claim that unexecuted hook
+  // path as evidence here.
+  assert.equal(result.trustAnchorPinned, false, stdout);
+  assert.equal(result.policy?.schema, "pipeline.critical-human-proof-policy.v1", stdout);
 });

@@ -679,28 +679,38 @@ export function applyInitialOnboardingAnswers({
  * process exited non-zero) is folded into a typed `ok: false` result the caller reports
  * rather than crashes on.
  */
-function runOnboardingStep({ executable, argv, run, env = null }) {
+function runOnboardingStep({ executable, argv, run, env = null, projectRoot = null }) {
   const options = { encoding: "utf8", shell: false, maxBuffer: 8 * 1024 * 1024 };
-  // Opt-in only: omitting `env` (the default) leaves `options` exactly as before this
-  // seam existed, so a caller that never supplies one gets byte-identical behaviour --
-  // the child inherits the real process environment via spawnSync's own default, same as
-  // it always did. Supplying `env` is the seam a caller uses to override what the spawned
+  // Supplying `env` lets callers override what the spawned
   // `project-onboarding-v3.mjs` CLI resolves its homedir against (see that script's own
   // `PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE` handling), extending across the process
   // boundary the same injected-dependency pattern the in-process library callers already
-  // have (lib/machine-plane.mjs `homedirFn`).
-  if (env) {
-    const homedirOverride = env.PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE;
+  // have (lib/machine-plane.mjs `homedirFn`). Explicit-`--root` actions with no supplied
+  // environment keep spawnSync's normal environment inheritance unchanged.
+  // Some returned project actions intentionally use the pipeline-state CLI,
+  // whose project selector is CLAUDE_PROJECT_DIR rather than --root. Bind only
+  // that closed, root-less shape: actions that already carry --root preserve
+  // their published argv and their normal child environment exactly as before.
+  const bindProjectRoot = typeof projectRoot === "string"
+    && projectRoot.length > 0
+    && Array.isArray(argv)
+    && !argv.includes("--root");
+  if (env || bindProjectRoot) {
+    const inherited = env ?? process.env;
+    const homedirOverride = inherited.PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE;
     // The project-onboarding CLI consumes the explicit variable above, while a few
     // machine-plane helpers it delegates to still reach Node's process-level
     // `os.homedir()` default. Keep both reads on the same caller-selected fixture home:
     // POSIX resolves that default through HOME and Windows through USERPROFILE. Without
     // this bridge, a driver call carrying an explicit hermetic home could still seed the
-    // real operator's registered key into the disposable project. No override means no
-    // env object here at all, preserving ordinary child inheritance byte-for-byte.
-    options.env = typeof homedirOverride === "string" && homedirOverride.length > 0
-      ? { ...env, HOME: homedirOverride, USERPROFILE: homedirOverride }
-      : env;
+    // real operator's registered key into the disposable project.
+    options.env = {
+      ...inherited,
+      ...(typeof homedirOverride === "string" && homedirOverride.length > 0
+        ? { HOME: homedirOverride, USERPROFILE: homedirOverride }
+        : {}),
+      ...(bindProjectRoot ? { CLAUDE_PROJECT_DIR: projectRoot } : {}),
+    };
   }
   const result = run(executable, argv, options);
   if (result?.error) {
@@ -815,7 +825,7 @@ export function driveOnboardingInit({ rootDir, runner = null, stepCap = DEFAULT_
   let executedSinceAnchor = false;
 
   for (let stepIndex = 0; stepIndex < stepCap; stepIndex += 1) {
-    const stepResult = runOnboardingStep({ executable, argv, run, env });
+    const stepResult = runOnboardingStep({ executable, argv, run, env, projectRoot: root });
     steps.push({
       executable,
       argv,

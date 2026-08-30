@@ -168,29 +168,38 @@ export function measureTofuPushEndToEnd({ rootDir, keyDir, env } = {}) {
   // PO reviewing and acknowledging the plan would do, before submit-plan is called.
   const earlyStatePath = join(dir, "project", "pipeline-state.json");
   const earlyState = JSON.parse(readFileSync(earlyStatePath, "utf8"));
-  const earlyPlanPath = earlyState?.activeFeature?.planPath;
-  if (typeof earlyPlanPath !== "string" || !existsSync(join(dir, earlyPlanPath))) {
-    return { schema: SCHEMA, outcome: "no-active-feature-plan-path", steps, state: earlyState };
-  }
-  const planAbsPath = join(dir, earlyPlanPath);
-  const planText = readFileSync(planAbsPath, "utf8");
-  writeFileSync(planAbsPath, `${planText.replace(/\n+$/u, "")}\n${PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER}\n`);
-  const addAck = run(["git", "add", "-A"], dir, env);
-  steps.push({ step: "commit-plan-acknowledgement", subStep: "add", exitCode: addAck.status, stderr: addAck.stderr?.slice(0, 2000) });
-  if (addAck.status !== 0) return { schema: SCHEMA, outcome: "commit-plan-acknowledgement-failed", steps };
-  const commitAck = run(["git", "commit", "--quiet", "-m", "chore: record PO plan acknowledgement (tofu-push-e2e measurement fixture)"], dir, env);
-  steps.push({ step: "commit-plan-acknowledgement", subStep: "commit", exitCode: commitAck.status, stderr: commitAck.stderr?.slice(0, 2000) });
-  if (commitAck.status !== 0) return { schema: SCHEMA, outcome: "commit-plan-acknowledgement-failed", steps };
+  // The current public Driver already follows the returned submit/present/
+  // approve/set-phase actions.  Older Driver contracts stopped before that
+  // handover, so retain the explicit compatibility walk only when no approved
+  // plan is present.  Re-running approval after a current Driver run is not a
+  // product test; it invalidates the already-bound state.
+  if (earlyState?.planApproved === true) {
+    steps.push({ step: "plan-approval", outcome: "already-approved-by-driver" });
+  } else {
+    const earlyPlanPath = earlyState?.activeFeature?.planPath;
+    if (typeof earlyPlanPath !== "string" || !existsSync(join(dir, earlyPlanPath))) {
+      return { schema: SCHEMA, outcome: "no-active-feature-plan-path", steps, state: earlyState };
+    }
+    const planAbsPath = join(dir, earlyPlanPath);
+    const planText = readFileSync(planAbsPath, "utf8");
+    writeFileSync(planAbsPath, `${planText.replace(/\n+$/u, "")}\n${PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER}\n`);
+    const addAck = run(["git", "add", "-A"], dir, env);
+    steps.push({ step: "commit-plan-acknowledgement", subStep: "add", exitCode: addAck.status, stderr: addAck.stderr?.slice(0, 2000) });
+    if (addAck.status !== 0) return { schema: SCHEMA, outcome: "commit-plan-acknowledgement-failed", steps };
+    const commitAck = run(["git", "commit", "--quiet", "-m", "chore: record PO plan acknowledgement (tofu-push-e2e measurement fixture)"], dir, env);
+    steps.push({ step: "commit-plan-acknowledgement", subStep: "commit", exitCode: commitAck.status, stderr: commitAck.stderr?.slice(0, 2000) });
+    if (commitAck.status !== 0) return { schema: SCHEMA, outcome: "commit-plan-acknowledgement-failed", steps };
 
-  const submitPlan = run([process.execPath, PIPELINE_STATE_SCRIPT, "submit-plan", "--by", "PO", "--profile", "mini"], dir, env);
-  steps.push({ step: "submit-plan", exitCode: submitPlan.status, stderr: submitPlan.stderr?.slice(0, 2000) });
-  if (submitPlan.status !== 0) return { schema: SCHEMA, outcome: "submit-plan-failed", steps };
-  const presentPlan = run([process.execPath, PIPELINE_STATE_SCRIPT, "present-plan", "--by", "PO"], dir, env);
-  steps.push({ step: "present-plan", exitCode: presentPlan.status, stderr: presentPlan.stderr?.slice(0, 2000) });
-  if (presentPlan.status !== 0) return { schema: SCHEMA, outcome: "present-plan-failed", steps };
-  const approvePlan = run([process.execPath, PIPELINE_STATE_SCRIPT, "approve-plan", "--by", "PO"], dir, env);
-  steps.push({ step: "approve-plan", exitCode: approvePlan.status, stderr: approvePlan.stderr?.slice(0, 2000) });
-  if (approvePlan.status !== 0) return { schema: SCHEMA, outcome: "approve-plan-failed", steps };
+    const submitPlan = run([process.execPath, PIPELINE_STATE_SCRIPT, "submit-plan", "--by", "PO", "--profile", "mini"], dir, env);
+    steps.push({ step: "submit-plan", exitCode: submitPlan.status, stderr: submitPlan.stderr?.slice(0, 2000) });
+    if (submitPlan.status !== 0) return { schema: SCHEMA, outcome: "submit-plan-failed", steps };
+    const presentPlan = run([process.execPath, PIPELINE_STATE_SCRIPT, "present-plan", "--by", "PO"], dir, env);
+    steps.push({ step: "present-plan", exitCode: presentPlan.status, stderr: presentPlan.stderr?.slice(0, 2000) });
+    if (presentPlan.status !== 0) return { schema: SCHEMA, outcome: "present-plan-failed", steps };
+    const approvePlan = run([process.execPath, PIPELINE_STATE_SCRIPT, "approve-plan", "--by", "PO"], dir, env);
+    steps.push({ step: "approve-plan", exitCode: approvePlan.status, stderr: approvePlan.stderr?.slice(0, 2000) });
+    if (approvePlan.status !== 0) return { schema: SCHEMA, outcome: "approve-plan-failed", steps };
+  }
 
   // Step 1: the real PO key ceremony -- driven IN-PROCESS via `runHumanApproval`'s own
   // `dependencies.spawn` injection seam (NVA-CF-BL16-PRECISEFIX; the same seam

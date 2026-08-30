@@ -60,10 +60,15 @@ const ONBOARDING_SCRIPT = resolve(fileURLToPath(new URL("./project-onboarding-v3
 const DEFAULT_ANSWERS = Object.freeze({
   gitAuthorName: "Turn Measurement",
   gitAuthorEmail: "turn-measurement@example.invalid",
+  planApproverName: "Turn Measurement",
+  verifyCommand: "node -e \"process.exit(0)\"",
   language: "en",
   profile: "mini",
   text: "A tiny local HTML game. One page, no backend, no build step. Done when it runs in a browser.",
-  answersJson: JSON.stringify([{ question: "Scope?", answer: "One static page, no dependencies." }]),
+  answersJson: JSON.stringify([
+    { question: "Primary goal?", answer: "A keyboard-playable local HTML game." },
+    { question: "Verification?", answer: "Run a real local syntax check after the first implementation file exists." },
+  ]),
 });
 
 /** Runs one onboarding-cli (or arbitrary) command synchronously via spawnSync. */
@@ -82,19 +87,55 @@ function answerArgvForCollectInput(dir, action) {
   const names = inputs.map((i) => i?.name).filter(Boolean);
   const guidance = String(action.guidance ?? "");
 
+  // The public Driver owns the mutation shape.  In particular the bundled
+  // design-question stop deliberately says to replace one data placeholder in
+  // its returned applyAction and execute that exact action.  Reconstructing an
+  // older intake command from prose made this measurement stop even though the
+  // Driver had supplied a complete, executable handover (NVA-A TOFU path).
+  function publishedActionWithSingleReplacement(placeholder, replacement) {
+    const applyAction = action.applyAction;
+    if (applyAction?.kind !== "command" || typeof applyAction.executable !== "string" || !Array.isArray(applyAction.argv)) {
+      return { kind: "unanswerable", names, guidance, reason: `${placeholder} action omitted a usable applyAction` };
+    }
+    const occurrences = applyAction.argv.filter((value) => value === placeholder).length;
+    if (occurrences !== 1) {
+      return { kind: "unanswerable", names, guidance, reason: `${placeholder} applyAction has ${occurrences} declared placeholders` };
+    }
+    return {
+      kind: "command",
+      executable: applyAction.executable,
+      argv: applyAction.argv.map((value) => value === placeholder ? replacement : value),
+      publishedAction: true,
+    };
+  }
+
+  if (names.includes("answersJson")) {
+    return publishedActionWithSingleReplacement("<PO_INTAKE_DESIGN_ANSWERS_JSON>", DEFAULT_ANSWERS.answersJson);
+  }
+  // This disposable measurement explicitly models the PO approval required by
+  // the returned plan handover.  It substitutes only the declared name slot
+  // in that exact action; the later TOFU signature remains the real proof
+  // ceremony this harness measures.
+  if (names.includes("by")) {
+    return publishedActionWithSingleReplacement("<PO_PLAN_APPROVER_NAME>", DEFAULT_ANSWERS.planApproverName);
+  }
+  if (names.includes("verifyCommand")) {
+    return publishedActionWithSingleReplacement("<PO_VERIFY_COMMAND>", DEFAULT_ANSWERS.verifyCommand);
+  }
+
   if (names.includes("gitAuthorName") || guidance.includes("intake-consent-apply")) {
     const argv = [ONBOARDING_SCRIPT, "intake-consent-apply", "--root", dir, "--granted", "--activate"];
     if (names.includes("gitAuthorName")) argv.push("--git-author-name", DEFAULT_ANSWERS.gitAuthorName);
     if (names.includes("gitAuthorEmail")) argv.push("--git-author-email", DEFAULT_ANSWERS.gitAuthorEmail);
     if (names.includes("language")) argv.push("--language", DEFAULT_ANSWERS.language);
     if (names.includes("profile")) argv.push("--profile", DEFAULT_ANSWERS.profile);
-    return { kind: "command", argv };
+    return { kind: "command", executable: process.execPath, argv };
   }
   if (guidance.includes("intake-capture-apply")) {
-    return { kind: "command", argv: [ONBOARDING_SCRIPT, "intake-capture-apply", "--root", dir, "--text", DEFAULT_ANSWERS.text, "--activate"] };
+    return { kind: "command", executable: process.execPath, argv: [ONBOARDING_SCRIPT, "intake-capture-apply", "--root", dir, "--text", DEFAULT_ANSWERS.text, "--activate"] };
   }
   if (guidance.includes("intake-design-questions-apply")) {
-    return { kind: "command", argv: [ONBOARDING_SCRIPT, "intake-design-questions-apply", "--root", dir, "--answers-json", DEFAULT_ANSWERS.answersJson, "--activate"] };
+    return { kind: "command", executable: process.execPath, argv: [ONBOARDING_SCRIPT, "intake-design-questions-apply", "--root", dir, "--answers-json", DEFAULT_ANSWERS.answersJson, "--activate"] };
   }
   // The PO's plan acknowledgement: deliberately not a command. The whole point of this ask
   // is that no command writes this line -- the stand-in human edits the staging PRD
@@ -170,7 +211,11 @@ function chainPastPendingAsks(dir, runner, env, startObserved) {
       const argvValid = typeof nextAction.executable === "string" && Array.isArray(nextAction.argv);
       if (!argvValid) return { outcome: "malformed-command-action", observed, steps };
       resolveVerifyContractIfPending(dir, nextAction.pendingAsks);
-      const applied = run([process.execPath, ...nextAction.argv], REPO_ROOT, env);
+      // A returned pipeline-state action may intentionally omit `--root` and
+      // rely on the consumer project's cwd.  Running it from the Pipeline
+      // checkout silently observes unrelated state instead of continuing this
+      // fresh-project Driver path.
+      const applied = run([nextAction.executable, ...nextAction.argv], dir, env);
       steps.push({ argv: nextAction.argv, exitCode: applied.status });
       if (applied.status !== 0) return { outcome: "command-failed", observed, steps, error: { stderr: applied.stderr, stdout: applied.stdout } };
       try { observed = JSON.parse(applied.stdout); } catch { return { outcome: "unparseable-output", observed, steps, raw: applied.stdout.slice(0, 2000) }; }
@@ -249,8 +294,8 @@ export function measureFreshRepoOnboardingTurns({ rootDir, runner = "claude", en
       const answer = answerArgvForCollectInput(dir, action);
       turns += 1;
       if (answer.kind === "command") {
-        const applied = run([process.execPath, ...answer.argv], REPO_ROOT, env);
-        rounds.push({ turn, outcome: result.outcome, driverStepsThisRound: executed.length, resolved: "answered-collect-input", appliedExitCode: applied.status });
+        const applied = run([answer.executable ?? process.execPath, ...answer.argv], dir, env);
+        rounds.push({ turn, outcome: result.outcome, driverStepsThisRound: executed.length, resolved: answer.publishedAction ? "answered-published-collect-input" : "answered-collect-input", appliedExitCode: applied.status });
         if (applied.status !== 0) {
           return { schema: SCHEMA, root: dir, runner, outcome: "collect-input-answer-failed", turns: rounds.length, driverStepsChained, repairSubcommands, rounds, final: result.final, error: { stderr: applied.stderr, stdout: applied.stdout } };
         }
