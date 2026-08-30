@@ -7880,6 +7880,16 @@ test("v4Inspection routes a genuinely fresh repository through the full intake c
     assert.equal(fresh.nextAction.kind, "collect-input");
     assert.deepEqual(fresh.nextAction.expected, { schema: "pipeline.project-onboarding.v4", statuses: ["intake-required"] });
     assert.ok(fresh.nextAction.inputs.some((input) => input.name === "gitAuthorName"));
+    assert.deepEqual(fresh.nextAction.applyAction.argv, [
+      ONBOARDING_SCRIPT, "intake-consent-apply", "--root", path, "--granted",
+      "--git-author-name", "<PO_INTAKE_GIT_AUTHOR_NAME>",
+      "--git-author-email", "<PO_INTAKE_GIT_AUTHOR_EMAIL>",
+      "--language", "<PO_INTAKE_LANGUAGE>",
+      "--profile", "<PO_INTAKE_PROFILE>",
+      "--text-file", "scratch/onboarding-intake.txt", "--activate", "--runner", "codex",
+    ]);
+    assert.equal(fresh.nextAction.applyAction.argv.includes("--text"), false,
+      "the multiline-safe returned action uses exactly one of --text/--text-file");
 
     // Consent recorded, no material captured yet: still intake-required, but
     // nextAction switches to intake-capture-apply.
@@ -7889,6 +7899,11 @@ test("v4Inspection routes a genuinely fresh repository through the full intake c
     assert.equal(afterConsent.status, "intake-required");
     assert.equal(afterConsent.nextAction.kind, "collect-input");
     assert.equal(afterConsent.nextAction.input.name, "text");
+    assert.deepEqual(afterConsent.nextAction.applyAction.argv, [
+      ONBOARDING_SCRIPT, "intake-capture-apply", "--root", path,
+      "--text-file", "scratch/onboarding-intake.txt", "--activate", "--runner", "codex",
+    ]);
+    assert.equal(afterConsent.nextAction.applyAction.argv.includes("--text"), false);
 
     // First material chunk captured: intake-design-questions-required,
     // nextAction asks for the one bundled design-question round.
@@ -7898,6 +7913,10 @@ test("v4Inspection routes a genuinely fresh repository through the full intake c
     assert.equal(afterCapture.status, "intake-design-questions-required");
     assert.equal(afterCapture.nextAction.kind, "collect-input");
     assert.equal(afterCapture.nextAction.input.name, "answersJson");
+    assert.deepEqual(afterCapture.nextAction.applyAction.argv, [
+      ONBOARDING_SCRIPT, "intake-design-questions-apply", "--root", path,
+      "--answers-json", "<PO_INTAKE_DESIGN_ANSWERS_JSON>", "--activate", "--runner", "codex",
+    ]);
 
     // Design questions answered: still intake-design-questions-required (SSa.4:
     // "until step 4 runs"), but nextAction is now a real, ready-to-run
@@ -7932,6 +7951,70 @@ test("v4Inspection routes a genuinely fresh repository through the full intake c
     assert.equal(afterGenerate.nextAction.kind, "command");
     assert.equal(afterGenerate.nextAction.argv[1], "bootstrap-bind-plan");
   } finally { dispose(path); }
+});
+
+test("all three runners execute the exact returned consent and design-question actions without repeating durable Git identity", () => {
+  const paths = [];
+  try {
+    for (const runner of ["claude", "codex", "antigravity"]) {
+      const path = root();
+      paths.push(path);
+      const barrier = initializeRestartRequiredRoot(path);
+      clearRuntimeBarrier(path, barrier);
+      const configuredGit = (command, args, options) => {
+        if (command === "git" && args[0] === "config" && args[1] === "--get") {
+          return { status: 0, stdout: args[2] === "user.name" ? "Durable PO\n" : "durable@example.invalid\n", stderr: "" };
+        }
+        return fakeGit(command, args, options);
+      };
+      const intakeDeps = { ...fakeDeps, spawnSync: configuredGit, spawn: configuredGit };
+      const invokeReturned = (action, replacements) => {
+        const materialized = action.applyAction.argv.map((value) => replacements.get(value) ?? value);
+        assert.equal(materialized[0], ONBOARDING_SCRIPT);
+        let output = "";
+        let stderr = "";
+        const code = onboardingCli(materialized.slice(1), {
+          deps: intakeDeps,
+          write: (chunk) => { output += chunk; },
+          writeError: (chunk) => { stderr += chunk; },
+        });
+        assert.equal(code, 0, `${runner}: ${stderr}`);
+        return JSON.parse(output);
+      };
+
+      const consent = inspectProjectOnboardingV3({ rootDir: path, runner, deps: intakeDeps }).nextAction;
+      const consentNames = consent.inputs.map((input) => input.name);
+      assert.equal(consentNames.includes("gitAuthorName"), false, `${runner}: local Git already resolved the name`);
+      assert.equal(consentNames.includes("gitAuthorEmail"), false, `${runner}: local Git already resolved the email`);
+      assert.deepEqual(consentNames, ["language", "profile", "projectDescription"]);
+      assert.deepEqual(consent.applyAction.argv, [
+        ONBOARDING_SCRIPT, "intake-consent-apply", "--root", path, "--granted",
+        "--language", "<PO_INTAKE_LANGUAGE>", "--profile", "<PO_INTAKE_PROFILE>",
+        "--text-file", "scratch/onboarding-intake.txt", "--activate", "--runner", runner,
+      ]);
+      mkdirSync(join(path, "scratch"));
+      writeFileSync(join(path, "scratch", "onboarding-intake.txt"), "Build one local mini HTML game.\nKeyboard only.\n");
+      invokeReturned(consent, new Map([
+        ["<PO_INTAKE_LANGUAGE>", "en"],
+        ["<PO_INTAKE_PROFILE>", "feature"],
+      ]));
+
+      const design = inspectProjectOnboardingV3({ rootDir: path, runner, deps: intakeDeps }).nextAction;
+      assert.equal(design.kind, "collect-input");
+      assert.equal(design.input.name, "answersJson");
+      assert.deepEqual(design.applyAction.argv, [
+        ONBOARDING_SCRIPT, "intake-design-questions-apply", "--root", path,
+        "--answers-json", "<PO_INTAKE_DESIGN_ANSWERS_JSON>", "--activate", "--runner", runner,
+      ]);
+      const answers = JSON.stringify([{ question: "Controls?", answer: "Keyboard." }]);
+      invokeReturned(design, new Map([["<PO_INTAKE_DESIGN_ANSWERS_JSON>", answers]]));
+      const after = inspectProjectOnboardingV3({ rootDir: path, runner, deps: intakeDeps });
+      assert.equal(after.nextAction.kind, "command");
+      assert.equal(after.nextAction.argv[1], "intake-generate-plan");
+    }
+  } finally {
+    for (const path of paths) dispose(path);
+  }
 });
 
 test("NVA-D-ACKASK: bootstrap-binding-required asks the PO for the acknowledgement instead of naming a command that can only fail, then names bootstrap-bind-plan again once it is present and the bind succeeds", () => {
