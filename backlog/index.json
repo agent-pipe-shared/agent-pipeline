@@ -3,16 +3,25 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "0eb53e27414bd249da71da35724f822314cf574d865ea2bbb56ef1338951be17"
+    "transitionHead": "8a311b796467fae7c39a87c6ff436615657e0a83e50df842be93ab552ca49fe9"
   },
   "counts": {
-    "open": 73,
+    "open": 76,
     "in_progress": 0,
     "closed": 476,
     "rejected": 3,
     "deferred": 11
   },
   "items": [
+    {
+      "id": "pipeline.a-captured-resume-hint-card-reds-the-verify-gate-until-another-session-consumes-it",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-31",
+      "source": "Observed live on 2026-08-31 during release preparation. The Elephant captured a Resume-Hint card for compact safety; the next full verify.mjs run went red on resume-consumption-check, and push-prepare.mjs requires green candidate-bound verify evidence.",
+      "deferred": false
+    },
     {
       "id": "pipeline.a-checkout-that-cannot-be-clean-defeats-every-cleanliness-gate",
       "status": "closed",
@@ -25,6 +34,15 @@
       "closureRepository": "self",
       "closureCommit": "615bcd247ccc0f339102d669e5d78cd6e684d874",
       "closureEvidence": "backlog/items/2026-08-08-a-checkout-that-cannot-be-clean-defeats-every-cleanliness-gate.md"
+    },
+    {
+      "id": "pipeline.a-deferred-item-is-terminal-so-a-live-defect-can-be-parked-invisibly",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-31",
+      "source": "Measured 2026-08-31 during 0.6.0 release preparation, while verifying that only Nova B / Alfred / Batman / Nightwing items remained open.",
+      "deferred": false
     },
     {
       "id": "pipeline.a-dirty-claude-directory-blocks-verify-which-blocks-push-approval",
@@ -1496,6 +1514,15 @@
       "closureRepository": "self",
       "closureCommit": "f57375ff77263a2df70bbb3201feb361912f07f6",
       "closureEvidence": "plugins/pipeline-core/lib/codex-onboarding-capabilities.mjs"
+    },
+    {
+      "id": "pipeline.copy-safe-renderer-wrap-point-is-path-length-sensitive",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-31",
+      "source": "Found 2026-08-31 by the Nova Elephant while verifying dispatch NVA-CIVERIFY: a single-assertion regex failure (guard-lifecycle-ready.test.mjs, NOVA-LCR-HGO-1) reproduced identically in two independent clones at longer checkout paths, and did not reproduce in the shorter main checkout.",
+      "deferred": false
     },
     {
       "id": "pipeline.core-verify-cannot-pass-under-the-ci-trimmed-path",
