@@ -456,6 +456,7 @@
 | pipeline.resolved-backlog-items-can-keep-status-open-indefinitely | open | defect | pipeline | 2026-08-27 | — |
 | pipeline.restart-launch-is-codex-only-for-every-runner | closed | defect | pipeline | 2026-08-06 | — |
 | pipeline.restart-resume-hint-write-misses-the-project-prefix | closed | defect | pipeline | 2026-08-09 | — |
+| pipeline.restricted-store-files-exceed-the-spec-inventory-the-privacy-contract-asserts | open | defect | pipeline | 2026-08-31 | — |
 | pipeline.resume-hint-capture-consumes-card-that-failed-schema-validation | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.resume-hint-opaque-token-rejects-hyphenated-english | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.resume-hint-test-unregistered-in-verify-gate | closed | defect | pipeline | 2026-08-18 | — |
@@ -516,6 +517,7 @@
 | pipeline.the-ai-hardening-gate-has-no-home-in-any-approved-feature-package | open | defect | pipeline | 2026-08-28 | Scheduled for Nova B (PO decision 2026-08-28) |
 | pipeline.the-ledger-reconciler-writes-before-the-items-are-validated | deferred | defect | pipeline | 2026-08-08 | — |
 | pipeline.the-pipeline-cannot-merge-two-parallel-sprint-ledgers | closed | requirement | pipeline | 2026-08-27 | — |
+| pipeline.the-privacy-sign-off-is-bound-to-a-superseded-candidate | open | defect | pipeline | 2026-08-31 | — |
 | pipeline.the-two-suite-registration-checkers-disagree | closed | defect | pipeline | 2026-08-27 | — |
 | pipeline.this-hosts-local-marketplace-copy-is-not-symlinked-to-source | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.three-doc-and-adr-checkers-never-run-in-verify | rejected | defect | pipeline | 2026-08-27 | — |
@@ -578,7 +580,7 @@
 
 ## Counts
 
-- open: 76
+- open: 78
 - in_progress: 0
 - closed: 476
 - rejected: 3
