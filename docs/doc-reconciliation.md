@@ -47,6 +47,51 @@ something to do here without review.
 
 ## Entries
 
+## Candidate f8b7b441c00c4fc88924d45a6f0bd5834f9fc17a — 2026-09-01, range dfd26254..f8b7b441, the 0.6.0 interim-release preparation
+
+- ADR-0012: checked, no change needed.
+
+  `docs/state.md` was rotated and rewritten under this ADR's own rules: the
+  CI-blocker block was acknowledged for extraction and archived via
+  `handover-rotate.mjs` (schema v2 per-section content hash), the archive index
+  row was added, and a new current-handover section replaced it. An independent
+  review then found that three live carry-forwards had been dropped despite the
+  index row asserting extraction; they were restored in `77742ef8` before this
+  record was written. The ADR's canonicalization rule is unchanged and was the
+  standard the defect was measured against, so it needs no amendment.
+
+- ADR-0045: checked, no change needed.
+
+  One new file under `specs/`:
+  `specs/sprint-phoenix-epic/evidence/privacy-sweep-critic-review-4defe09e.md`.
+  It is an evidence artifact placed in the epic's existing `evidence/`
+  directory alongside its sibling `*-critic-review-*.md` files, which is the
+  topology this ADR already prescribes. No spec package, directory kind, or
+  authority artifact was created, moved, or renamed; the epic's digest-bound
+  files (`spec.md`, `design/privacy-review.md`, `lifecycle.json`) were
+  deliberately not touched.
+
+- ADR-0069: checked, no change needed.
+
+  `docs/adr/0076-global-chat-attributed-unattested-approval-mode.md` was
+  changed, which implicates this ADR because it governs ADR files. The change
+  allocated no number, renumbered nothing, and altered no status: it repaired a
+  malformed `Governs:` line that embedded prose where
+  `check-doc-reconciliation.mjs` parses a comma-separated glob list, and moved
+  the qualifying prose to a paragraph below. ADR-0069's allocation-at-acceptance
+  rule is untouched by a metadata repair to an already-accepted record.
+
+- ADR-0076: checked, no change needed.
+
+  Implicated because `README.md` is named in this ADR's repaired `Governs:`
+  line and `README.md` changed in this range. The change (`f7ab9b42`) is
+  confined to the runner-route paragraph and its German reference translation:
+  it adds Antigravity to the registered routes and the "a requested route is not
+  proof of observed model identity" qualifier. It touches neither
+  `gates.human_approval`, nor `chat-attributed-unattested`, nor any approval
+  guidance this ADR governs — verified by reading the full diff of `README.md`
+  over this range. The ADR's own decision is unaffected.
+
 ## Candidate 4e9db9a7ff8b16026c435ebe125cb96374ee9e21 — 2026-08-19, range 85b718cf..4e9db9a7, checkpoint 69 (push confirmation) + gitleaks-item closure bookkeeping
 
 - ADR-0012: checked, no change needed.
