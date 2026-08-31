@@ -458,6 +458,7 @@
 | pipeline.restart-launch-is-codex-only-for-every-runner | closed | defect | pipeline | 2026-08-06 | — |
 | pipeline.restart-resume-hint-write-misses-the-project-prefix | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.restricted-store-files-exceed-the-spec-inventory-the-privacy-contract-asserts | open | defect | pipeline | 2026-08-31 | — |
+| pipeline.restricted-store-rationale-field-lacks-adversarial-variant-coverage | open | defect | pipeline | 2026-08-31 | — |
 | pipeline.resume-hint-capture-consumes-card-that-failed-schema-validation | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.resume-hint-opaque-token-rejects-hyphenated-english | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.resume-hint-test-unregistered-in-verify-gate | closed | defect | pipeline | 2026-08-18 | — |
@@ -581,7 +582,7 @@
 
 ## Counts
 
-- open: 79
+- open: 80
 - in_progress: 0
 - closed: 476
 - rejected: 3
