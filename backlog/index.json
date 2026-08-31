@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "8a311b796467fae7c39a87c6ff436615657e0a83e50df842be93ab552ca49fe9"
+    "transitionHead": "d679579281c1b5d31a76734fc5f5724b3ee73178eec0d15ba1fa539a084fb7b2"
   },
   "counts": {
-    "open": 76,
+    "open": 78,
     "in_progress": 0,
     "closed": 476,
     "rejected": 3,
@@ -5630,6 +5630,15 @@
       "closureEvidence": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs"
     },
     {
+      "id": "pipeline.restricted-store-files-exceed-the-spec-inventory-the-privacy-contract-asserts",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-31",
+      "source": "Independent Critic privacy-sweep review (F1), specs/sprint-phoenix-epic/evidence/privacy-sweep-critic-review-4defe09e.md, candidate 4defe09ece85721747f039036356ef80aed1b084",
+      "deferred": false
+    },
+    {
       "id": "pipeline.resume-hint-capture-consumes-card-that-failed-schema-validation",
       "status": "closed",
       "type": "defect",
@@ -6366,6 +6375,15 @@
       "closureRepository": "self",
       "closureCommit": "ec7d2e11705e8c90502445737859c3965259f87a",
       "closureEvidence": "docs/adr/0068-backlog-ledger-merge-semantics.md"
+    },
+    {
+      "id": "pipeline.the-privacy-sign-off-is-bound-to-a-superseded-candidate",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-31",
+      "source": "Independent Critic privacy-sweep review (F2), specs/sprint-phoenix-epic/evidence/privacy-sweep-critic-review-4defe09e.md, candidate 4defe09ece85721747f039036356ef80aed1b084",
+      "deferred": false
     },
     {
       "id": "pipeline.the-two-suite-registration-checkers-disagree",
