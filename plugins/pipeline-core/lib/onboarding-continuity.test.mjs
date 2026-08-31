@@ -56,6 +56,7 @@ import {
   applyOnboardingKickoff,
   applyOnboardingKickoffPromotion,
   applyOnboardingKickoffPromotionCleanupRecovery,
+  bindEphemeralPrivateCleanup,
   bindOnboardingSessionCleanup,
   classifyOnboardingContinuity,
   nextActionSection,
@@ -983,6 +984,56 @@ check("cleanup descriptor bind and release use exact state CAS without touching 
   assert.equal(released.mutated, true);
   assert.equal(released.revision, bound.revision + 1);
   assert.equal(readOnboardingSessionCleanupBinding({ rootDir: root }).status, "unbound");
+});
+
+check("bindEphemeralPrivateCleanup only ever takes the private-runtime route, on a neutral unbound state", () => {
+  const root = fixture("ephemeral-cleanup-neutral", { neutral: true });
+  const plan = planOnboardingKickoff({ rootDir: root, goal: "Exercise the ephemeral cleanup binding route" });
+  applyOnboardingKickoff({ plan, expectedPlanSha256: plan.planSha256, activate: true });
+  const statePath = join(root, "project", "pipeline-state.json");
+  const beforeBytes = readFileSync(statePath);
+  const before = readOnboardingSessionCleanupBinding({ rootDir: root });
+  assert.equal(before.status, "unbound");
+  const tuple = { sessionId: "ephemeral-session-01", descriptorSha256: "c".repeat(64) };
+  const bound = bindEphemeralPrivateCleanup({ rootDir: root, sessionCleanup: tuple });
+  assert.equal(bound.status, "bound");
+  assert.equal(bound.storage, "private-runtime");
+  assert.deepEqual(bound.sessionCleanup, tuple);
+  // The tracked authority file never moved: the write landed under .git/agent-pipeline/**.
+  assert.deepEqual(readFileSync(statePath), beforeBytes);
+  assert.deepEqual(readOnboardingSessionCleanupBinding({ rootDir: root }).sessionCleanup, tuple);
+});
+
+check("bindEphemeralPrivateCleanup refuses a non-neutral (legacy .claude/) state -- it never writes tracked authority state on a session-less caller's behalf", () => {
+  const root = fixture("ephemeral-cleanup-legacy");
+  const plan = planOnboardingKickoff({ rootDir: root, goal: "Exercise the legacy-tier refusal" });
+  applyOnboardingKickoff({ plan, expectedPlanSha256: plan.planSha256, activate: true });
+  const statePath = join(root, ".claude", "pipeline-state.json");
+  const beforeBytes = readFileSync(statePath);
+  const before = readOnboardingSessionCleanupBinding({ rootDir: root });
+  assert.equal(before.status, "unbound");
+  expectKickoffError("SESSION-CLEANUP-EPHEMERAL-NOT-APPLICABLE", () => bindEphemeralPrivateCleanup({
+    rootDir: root,
+    sessionCleanup: { sessionId: "ephemeral-session-02", descriptorSha256: "d".repeat(64) },
+  }));
+  assert.deepEqual(readFileSync(statePath), beforeBytes);
+});
+
+check("bindEphemeralPrivateCleanup refuses a state that is already bound, closed, or otherwise not plainly unbound", () => {
+  const root = fixture("ephemeral-cleanup-already-bound", { neutral: true });
+  const plan = planOnboardingKickoff({ rootDir: root, goal: "Exercise the already-bound refusal" });
+  applyOnboardingKickoff({ plan, expectedPlanSha256: plan.planSha256, activate: true });
+  const before = readOnboardingSessionCleanupBinding({ rootDir: root });
+  bindOnboardingSessionCleanup({
+    rootDir: root,
+    expectedStateSha256: before.stateSha256,
+    expectedRevision: before.revision,
+    sessionCleanup: { sessionId: "real-session-01", descriptorSha256: "e".repeat(64) },
+  });
+  expectKickoffError("SESSION-CLEANUP-EPHEMERAL-NOT-APPLICABLE", () => bindEphemeralPrivateCleanup({
+    rootDir: root,
+    sessionCleanup: { sessionId: "ephemeral-session-03", descriptorSha256: "f".repeat(64) },
+  }));
 });
 
 check("bounded repair normalizes only the invalid active-turn resume pair", () => {
