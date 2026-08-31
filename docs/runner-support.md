@@ -10,8 +10,6 @@ the exact candidate and its required evidence.
 | Claude Code | The same bounded continuation contract has its own adapter and conformance coverage. | A claim that another runner's evidence proves Claude behavior. |
 | Antigravity | Native plugin integration, hook mapping, and standard lifecycle continuation equivalence with Codex and Claude. | Global marketplace publishing or automatic global network discovery (handled via Workspace-local plugins.json). |
 
-work remains the separately tracked `#69` scope with `sprint:NONE`.
-
 Runner evidence and platform evidence are independent. In particular, the
 synthetic macOS contract suite does not claim native macOS support for any
 runner.

@@ -132,14 +132,17 @@ readback → sanctioned kickoff → ready — together with host-managed limits 
 the goal-and-plan-digest-bound kickoff apply contract:
 [`docs/v3-consumer-onboarding.md`](docs/v3-consumer-onboarding.md).
 
-V3 has registered routes for both Claude and Codex. Claude Code is the
-full-enforcement runtime: its plugin and hooks can enforce configured guards.
-Codex and other CLIs can use the same roles, evidence, and review methodology,
-but this does not claim Claude hooks, plugin installation, automatic guards, or
-model identity. For Codex, every duty assigned to Fable resolves to
+V3 has registered routes for Claude, Codex, and Antigravity. Claude Code is
+the full-enforcement runtime: its plugin and hooks can enforce configured
+guards. Codex, Antigravity, and other CLIs can use the same roles, evidence,
+and review methodology, but this does not claim Claude hooks, plugin
+installation, automatic guards, or model identity — a requested route is not
+proof of observed model identity, and one runner's evidence does not prove
+another's behavior. For Codex, every duty assigned to Fable resolves to
 `gpt-5.6-sol` at the same effort tier; Claude assignments remain unchanged.
 See [`docs/runtime-boundary.md`](docs/runtime-boundary.md) for the exact
-division of responsibility.
+division of responsibility and [`docs/runner-support.md`](docs/runner-support.md)
+for the per-runner boundary table.
 
 The native Codex selected-sandbox route remains the preferred, attested route;
 this README does **not** claim that its current host limitation is fixed. After
@@ -459,14 +462,17 @@ Onboarding-/Migrationspfad. **Generierte Runtime-Konfiguration wird nie von
 Hand bearbeitet.** Der Compiler erkennt Drift, statt eine lokale Änderung
 stillschweigend zur Autorität zu machen.
 
-V3 hat registrierte Routen für Claude und Codex. Claude Code ist die
-Full-Enforcement-Laufzeit: Plugin und Hooks können konfigurierte Guardrails
-durchsetzen. Codex und andere CLIs können dieselbe Rollen-, Evidenz- und
-Review-Methodik nutzen, aber daraus folgt weder ein Anspruch auf Claude-Hooks,
-Plugin-Installation, automatische Guardrails noch Modellidentität. In Codex
-wird jede Fable-Aufgabe bei gleichem Effort-Tier zu `gpt-5.6-sol` aufgelöst;
-Claude-Zuweisungen bleiben unverändert. Die genaue Zuständigkeitsgrenze steht in
-[`docs/runtime-boundary.md`](docs/runtime-boundary.md).
+V3 hat registrierte Routen für Claude, Codex und Antigravity. Claude Code ist
+die Full-Enforcement-Laufzeit: Plugin und Hooks können konfigurierte
+Guardrails durchsetzen. Codex, Antigravity und andere CLIs können dieselbe
+Rollen-, Evidenz- und Review-Methodik nutzen, aber daraus folgt weder ein
+Anspruch auf Claude-Hooks, Plugin-Installation, automatische Guardrails noch
+Modellidentität — eine angefragte Route ist kein Beweis für beobachtete
+Modellidentität, und die Evidenz eines Runners belegt nicht das Verhalten
+eines anderen. In Codex wird jede Fable-Aufgabe bei gleichem Effort-Tier zu
+`gpt-5.6-sol` aufgelöst; Claude-Zuweisungen bleiben unverändert. Die genaue
+Zuständigkeitsgrenze steht in [`docs/runtime-boundary.md`](docs/runtime-boundary.md),
+die Boundary-Tabelle je Runner in [`docs/runner-support.md`](docs/runner-support.md).
 
 Die native Codex-Selected-Sandbox-Route bleibt der bevorzugte, attestierte Weg;
 diese README behauptet **nicht**, dass die aktuelle Host-Einschränkung behoben
