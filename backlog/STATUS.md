@@ -5,7 +5,9 @@
 
 | ID | Status | Type | Owner | Created | Tracking |
 | --- | --- | --- | --- | --- | --- |
+| pipeline.a-captured-resume-hint-card-reds-the-verify-gate-until-another-session-consumes-it | open | defect | pipeline | 2026-08-31 | — |
 | pipeline.a-checkout-that-cannot-be-clean-defeats-every-cleanliness-gate | closed | defect | pipeline | 2026-08-08 | — |
+| pipeline.a-deferred-item-is-terminal-so-a-live-defect-can-be-parked-invisibly | open | defect | pipeline | 2026-08-31 | — |
 | pipeline.a-dirty-claude-directory-blocks-verify-which-blocks-push-approval | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.a-node-script-defeats-every-file-protection-guard | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.a-promoted-feature-can-never-pass-the-plan-gate | closed | defect | pipeline | 2026-08-07 | — |
@@ -125,6 +127,7 @@
 | pipeline.continuity-repair-has-no-case-for-an-established-project-missing-only-pipeline-state-json | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.contract-suite-borrows-its-fixture-by-importing-a-109-test-file | closed | workflow-improvement | pipeline | 2026-08-08 | — |
 | pipeline.control-path-invalid-misfires-on-a-transient-repository-discovery-race | closed | defect | pipeline | 2026-08-10 | — |
+| pipeline.copy-safe-renderer-wrap-point-is-path-length-sensitive | open | defect | pipeline | 2026-08-31 | — |
 | pipeline.core-verify-cannot-pass-under-the-ci-trimmed-path | closed | defect | pipeline | 2026-08-28 | — |
 | pipeline.critic-and-verify-cadence-may-be-too-fine-grained | open | workflow-improvement | pipeline | 2026-08-24 | — |
 | pipeline.critic-context-isolation | closed | workflow-improvement | pipeline | 2026-07-20 | — |
@@ -575,7 +578,7 @@
 
 ## Counts
 
-- open: 73
+- open: 76
 - in_progress: 0
 - closed: 476
 - rejected: 3
