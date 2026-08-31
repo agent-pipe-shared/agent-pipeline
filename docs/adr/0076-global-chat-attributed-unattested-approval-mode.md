@@ -9,10 +9,12 @@ repository deliberately chooses one approval posture for every participating
 human gate. It does not rewrite ADR-0056's historical account of the old
 route.
 
-**Governs:** the global `gates.human_approval` choice in `pipeline.user.yaml`,
-the language used for approval records, and user-facing approval guidance. It
-does **not** claim that every installed plugin version or every gate has already
-implemented that selector.
+**Governs:** pipeline.user.yaml, README.md, docs/usage.md, docs/operating-model.md
+
+This covers the global `gates.human_approval` choice in `pipeline.user.yaml`,
+plus the language used for approval records and the user-facing approval
+guidance carried in those three docs. It does **not** claim that every
+installed plugin version or every gate has already implemented that selector.
 
 ## Context
 
