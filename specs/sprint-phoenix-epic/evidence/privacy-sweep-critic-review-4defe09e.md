@@ -1,5 +1,13 @@
 # Independent Critic review — exhaustive privacy sweep — VERDICT: FAIL
 
+> **Authorship boundary.** Everything from the "Persisted by the Elephant..."
+> paragraph below through "Coverage disclosure" is the independent reviewer's
+> own text, transcribed verbatim because that reviewer had no Write tool of
+> its own — it is therefore bound to no digest of an original file the
+> reviewer itself produced. The two sections below it, "Elephant's disposition"
+> and "PO disposition", are LATER annotations by the Elephant and the PO, not
+> part of the independent verdict — do not read them as reviewer findings.
+
 Persisted by the Elephant because the Critic could not persist it itself: it has
 no Write tool and the enforced shell grammar admits no redirects, so CR-06-D file
 persistence was unavailable and it emitted the report inline. Recorded here
