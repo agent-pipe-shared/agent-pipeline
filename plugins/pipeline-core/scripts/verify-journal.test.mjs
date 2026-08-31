@@ -9,6 +9,8 @@ import { dirname, join, resolve } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { digestJson } from "../lib/verify-resume.mjs";
+import { applyOnboardingKickoff, planOnboardingKickoff, readOnboardingSessionCleanupBinding } from "../lib/onboarding-continuity.mjs";
+import { startSessionDescriptor } from "../lib/worktree-lifecycle.mjs";
 import { compileVerifySuites, createVerifyRun, runVerifyJournal, sealVerifyCleanupRegistration, verifySuiteArtifactName } from "./verify-journal.mjs";
 
 function fixture() {
@@ -136,6 +138,70 @@ test("cleanup registration is required before any private run directory is creat
     assert.throws(() => lstatSync(join(f.common, "agent-pipeline", "verify")));
     assert.notEqual(verifySuiteArtifactName("suite:a"), verifySuiteArtifactName("suite_a"));
   } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("a session-less checkout (no Pipeline session, no prior .git/agent-pipeline state -- the CI condition) establishes a private ephemeral cleanup binding and registers the run, instead of aborting with zero suites started", async () => {
+  const root = mkdtempSync(join(tmpdir(), "verify-journal-sessionless-"));
+  chmodSync(root, 0o700);
+  const git = spawnSync("git", ["init", "-q"], { cwd: root, encoding: "utf8", shell: false });
+  assert.equal(git.status, 0, git.stderr);
+  mkdirSync(join(root, "project"), { recursive: true });
+  writeFileSync(join(root, "project", "pipeline.yaml"), "schema: pipeline.project.v1\n");
+  writeFileSync(join(root, "project", "pipeline.json"), `${JSON.stringify({
+    project: "fixture", verify: "node verify.mjs", autonomy: "bounded",
+    branchModel: "local", worktree: "supported", stakes: "high", constraints: [],
+  }, null, 2)}\n`);
+  const kickoff = planOnboardingKickoff({ rootDir: root, goal: "Exercise session-less Verify registration" });
+  applyOnboardingKickoff({ plan: kickoff, expectedPlanSha256: kickoff.planSha256, activate: true });
+  const statePath = join(root, "project", "pipeline-state.json");
+  const beforeStateBytes = readFileSync(statePath);
+  const common = join(root, ".git");
+  const suiteFile = join(root, "fixture.test.mjs");
+  writeFileSync(suiteFile, "process.stdout.write('complete private log\\n')\n", { mode: 0o600 });
+  const sessionlessSuites = [{ name: "fixture-suite", file: suiteFile }];
+  try {
+    // No `registerRun` callback: this is the ordinary, automatic CLI path -- exactly what
+    // harness/scripts/verify.mjs's own call site uses.
+    const result = await runVerifyJournal({ gitCommonDir: common, repoRoot: root, candidate, suites: sessionlessSuites, policyInputs: { harness: "test" }, runId: "verify-sessionless-1", spawn: spawnPass });
+    assert.equal(result.terminal.status, "passed");
+    assert.equal(result.steps.length, 1);
+    // The tracked authority file is byte-identical before and after: the ephemeral binding
+    // took the private-runtime (.git/agent-pipeline/**) route, never the tracked-file route.
+    assert.deepEqual(readFileSync(statePath), beforeStateBytes);
+    const binding = readOnboardingSessionCleanupBinding({ rootDir: root });
+    assert.equal(binding.status, "bound");
+    // A second session-less run against the SAME checkout reuses the now-bound descriptor
+    // rather than conflicting with it (WT-SESSION-UNBOUND-DESCRIPTOR).
+    const again = await runVerifyJournal({ gitCommonDir: common, repoRoot: root, candidate, suites: sessionlessSuites, policyInputs: { harness: "test" }, runId: "verify-sessionless-2", spawn: spawnPass });
+    assert.equal(again.terminal.status, "passed");
+    assert.deepEqual(readFileSync(statePath), beforeStateBytes);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("a session-less checkout with an already-active session descriptor falls back to the original refusal, never overriding it", async () => {
+  const root = mkdtempSync(join(tmpdir(), "verify-journal-sessionless-conflict-"));
+  chmodSync(root, 0o700);
+  const git = spawnSync("git", ["init", "-q"], { cwd: root, encoding: "utf8", shell: false });
+  assert.equal(git.status, 0, git.stderr);
+  mkdirSync(join(root, "project"), { recursive: true });
+  writeFileSync(join(root, "project", "pipeline.yaml"), "schema: pipeline.project.v1\n");
+  writeFileSync(join(root, "project", "pipeline.json"), `${JSON.stringify({
+    project: "fixture", verify: "node verify.mjs", autonomy: "bounded",
+    branchModel: "local", worktree: "supported", stakes: "high", constraints: [],
+  }, null, 2)}\n`);
+  const kickoff = planOnboardingKickoff({ rootDir: root, goal: "Exercise the conflicting-descriptor refusal" });
+  applyOnboardingKickoff({ plan: kickoff, expectedPlanSha256: kickoff.planSha256, activate: true });
+  // A descriptor already exists with no continuity binding pointing at it (e.g. a prior,
+  // still-open real session) -- the ephemeral fallback must never create a second one or
+  // silently proceed around it.
+  startSessionDescriptor(root, {});
+  const common = join(root, ".git");
+  const suiteFile = join(root, "fixture.test.mjs");
+  writeFileSync(suiteFile, "process.stdout.write('complete private log\\n')\n", { mode: 0o600 });
+  try {
+    await assert.rejects(() => runVerifyJournal({ gitCommonDir: common, repoRoot: root, candidate, suites: [{ name: "fixture-suite", file: suiteFile }], policyInputs: { harness: "test" }, runId: "verify-sessionless-conflict", spawn: spawnPass }), /VERIFY-CLEANUP-REGISTRATION-REQUIRED/u);
+    assert.throws(() => lstatSync(join(common, "agent-pipeline", "verify")));
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 test("a completed receipt owned by a currently live exact writer is never reused", async () => {

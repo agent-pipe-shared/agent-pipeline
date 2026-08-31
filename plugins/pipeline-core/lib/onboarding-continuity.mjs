@@ -2977,6 +2977,42 @@ export function bindOnboardingSessionCleanup({
 }
 
 /**
+ * A narrower, refusal-biased sibling of bindOnboardingSessionCleanup for a
+ * caller that has no Pipeline session to bind against at all (a session-less
+ * checkout -- e.g. a CI runner, which discards the entire checkout including
+ * `.git` when the job ends, so nothing this binds can ever leak). This is
+ * NOT a general-purpose bind entrypoint: it refuses -- never falling through
+ * to the tracked-authority-file write path bindOnboardingSessionCleanup takes
+ * for a non-neutral continuity state -- whenever the resolved authority tier
+ * is not neutral, or the continuity state is not a plain bindable "unbound"
+ * active state (any other status -- bound, closed, released, design-unbound,
+ * a malformed/invalid observation -- is a caller error, never silently
+ * retried here). A caller unable to satisfy this narrow precondition gets a
+ * typed refusal and falls back to its own prior behavior; it never receives
+ * a forged or unsealed receipt.
+ */
+export function bindEphemeralPrivateCleanup({ rootDir, sessionCleanup, deps = {} } = {}) {
+  if (!isObject(sessionCleanup)) {
+    fail("SESSION-CLEANUP-EPHEMERAL-REQUEST", "ephemeral cleanup binding request is invalid");
+  }
+  const observed = observeSessionCleanupState(rootDir, deps.spawn ?? defaultGitSpawn);
+  if (!observed.neutral || observed.mode !== "active" || observed.revision === null || observed.sessionCleanup !== null) {
+    fail("SESSION-CLEANUP-EPHEMERAL-NOT-APPLICABLE", "ephemeral private cleanup binding is not applicable to this continuity state");
+  }
+  const bound = bindOnboardingSessionCleanup({
+    rootDir,
+    expectedStateSha256: observed.stateSha256,
+    expectedRevision: observed.revision,
+    sessionCleanup,
+    deps,
+  });
+  if (bound.storage !== "private-runtime") {
+    fail("SESSION-CLEANUP-EPHEMERAL-STORAGE", "ephemeral cleanup binding unexpectedly targeted tracked authority state");
+  }
+  return bound;
+}
+
+/**
  * Clear one exact persisted handle after the caller has proved that descriptor
  * closure completed. Unknown or different handles never rotate through this
  * routine.

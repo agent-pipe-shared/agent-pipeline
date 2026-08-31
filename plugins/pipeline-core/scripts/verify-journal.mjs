@@ -12,8 +12,8 @@ import {
   sealVerifySuiteReceipt,
   validateVerifySuiteReceipt,
 } from "../lib/verify-resume.mjs";
-import { readOnboardingSessionCleanupBinding } from "../lib/onboarding-continuity.mjs";
-import { finalizeTemporaryResource, loadSessionDescriptor, registerTemporaryIntent } from "../lib/worktree-lifecycle.mjs";
+import { bindEphemeralPrivateCleanup, readOnboardingSessionCleanupBinding } from "../lib/onboarding-continuity.mjs";
+import { finalizeTemporaryResource, listActiveSessionDescriptors, loadSessionDescriptor, registerTemporaryIntent, retireSessionDescriptor, startSessionDescriptor } from "../lib/worktree-lifecycle.mjs";
 import { assessWindowsPrivatePath, hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
 
 const MAX_LOG_BYTES = 16 * 1024 * 1024;
@@ -160,12 +160,43 @@ function validateCleanupRegistration(receipt, { runId, runPath }) {
   } catch { return false; }
 }
 
+// A session-less checkout (a GitHub Actions runner, in particular: no Pipeline session ever
+// started there, and the ENTIRE checkout including `.git` is discarded when the job ends, so
+// there is genuinely nothing later to leak) has no existing bound cleanup to read. Rather than
+// abort with zero suites started, establish a real, narrowly-scoped session descriptor and a
+// PRIVATE (never tracked -- bindEphemeralPrivateCleanup refuses outright otherwise) cleanup
+// binding for exactly this run, satisfying the SAME registration contract this function already
+// enforces for an ordinary bound session. Never a forged or unsealed receipt, never a skipped
+// registration: every precondition failure here falls back to the original
+// VERIFY-CLEANUP-REGISTRATION-REQUIRED unchanged, including when a binding of any status other
+// than exactly "unbound" already exists, or another active session descriptor is already
+// present (mirroring session-cleanup.mjs's own "start" safety check) -- so an ordinary session's
+// real binding is never overridden. Deliberately no matching release/retire: this repo's
+// own bindOnboardingSessionCleanup permits binding replay (reused, not re-thrown) precisely so a
+// second session-less run against the SAME checkout reuses this one rather than conflicting.
+function establishSessionLessCleanupBinding({ repoRoot, priorBinding }) {
+  if (priorBinding.status !== "unbound") throw new Error("VERIFY-CLEANUP-REGISTRATION-REQUIRED");
+  if (listActiveSessionDescriptors(repoRoot).length !== 0) throw new Error("VERIFY-CLEANUP-REGISTRATION-REQUIRED");
+  let started;
+  try { started = startSessionDescriptor(repoRoot, {}); }
+  catch { throw new Error("VERIFY-CLEANUP-REGISTRATION-REQUIRED"); }
+  try {
+    return bindEphemeralPrivateCleanup({
+      rootDir: repoRoot,
+      sessionCleanup: { sessionId: started.sessionId, descriptorSha256: started.descriptorSha256 },
+    });
+  } catch {
+    try { retireSessionDescriptor(repoRoot, started); } catch { /* best-effort rollback, never mask the original refusal */ }
+    throw new Error("VERIFY-CLEANUP-REGISTRATION-REQUIRED");
+  }
+}
+
 function registerBoundVerifyRun({ repoRoot, runId, runPath }) {
   let binding;
   try { binding = readOnboardingSessionCleanupBinding({ rootDir: repoRoot }); }
   catch { throw new Error("VERIFY-CLEANUP-REGISTRATION-REQUIRED"); }
   if (binding.status !== "bound" || binding.sessionCleanup === null) {
-    throw new Error("VERIFY-CLEANUP-REGISTRATION-REQUIRED");
+    binding = establishSessionLessCleanupBinding({ repoRoot, priorBinding: binding });
   }
   const descriptor = loadSessionDescriptor(repoRoot, binding.sessionCleanup.sessionId, {
     expectedDescriptorSha256: binding.sessionCleanup.descriptorSha256,
