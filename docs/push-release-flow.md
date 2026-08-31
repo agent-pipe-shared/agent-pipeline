@@ -172,8 +172,12 @@ prompts), so it belongs in shell configuration, never in this repository.
 
 **`--repo-root` must be a checkout that is clean including untracked files**
 (`observeCleanCandidate`). In this repository the main checkout can never
-satisfy that: `.claude/settings.json`, `project/pipeline-state.json` and
-`project/resume-hint.json` are tracked and permanently modified. Point
+satisfy that: `.claude/settings.json` and `project/pipeline-state.json` are
+tracked and permanently modified. `project/resume-hint.json` is NOT tracked —
+`.gitignore` excludes it as a "bounded non-authoritative restart aid" that must
+never enter history — so it never dirties this check; but because a fresh
+clone therefore carries no live card, a resume-hint check can be red in the
+working checkout and green in a fresh clone of the same commit. Point
 `--repo-root` at the detached verify worktree instead, after moving it to the
 candidate — that is what it exists for.
 
@@ -451,7 +455,10 @@ Everything above can pass and the remote can still refuse. `main` is covered by
 the repository ruleset `protect-main` (`gh api
 repos/<owner>/<repo>/rules/branches/main` lists what actually applies to a ref).
 It currently enforces `deletion` and `non_fast_forward` — both deliberate, both
-aligned with this repo's own hard rules.
+aligned with this repo's own hard rules. Since 2026-08-28 it also enforces
+`required_status_checks` on context `verify`, with `bypass_actors: []` and
+`current_user_can_bypass: "never"`. In practice: nothing reaches `main` while
+that check is red.
 
 It also carried `required_linear_history` until the v0.5.3 release, where that
 rule rejected the push with `GH013` because the candidate contained the
