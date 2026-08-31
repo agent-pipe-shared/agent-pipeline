@@ -158,6 +158,21 @@ closing-allowance-only message. The briefed tool budget is not a mechanism —
   verbatim intake transcript until an agent authors the product framing, and
   nothing forces that authoring step.
 - **Retrospective follow-up items #7 and #8** stay deferred to Nova B per PO.
+- **The Critic 1+1 run on the sandbox-quickfix delta returned FAIL, unresolved,
+  with no Round 3 dispatched.** 1 major — `roles/elephant.md` stage-0 fast-path
+  violated by a self-committed fix to `check-consumer-safe-paths.mjs`; 1 minor —
+  `observeRunner()` untested, filed. Both were self-verified and documented, no
+  functional defect found, but the FAIL itself is still unresolved.
+- **`f7ab9b42` (NVA-DOC060) has had no independent Critic review.** Implementation
+  complete (user-facing documentation aligned with the real 0.6.0 three-runner
+  state); the diff has not been through an independent Critic pass.
+- **Two unanswered NVA-CIVERIFY questions, carried to the Critic and still open:**
+  (i) the change lets ANY session-less checkout self-provision a binding, a plain
+  local clone included, where the previous behaviour was an outright refusal —
+  intended, or to be narrowed? (ii) a `guard-lifecycle-ready.test.mjs` failure in
+  its own reproduction log whose expected paths point into `scratch/ci-repro/…` —
+  clone-nesting artifact, or real? The release review found no code defect in the
+  change itself, so (i) is the question that remains genuinely open.
 - **`guard-lifecycle-ready-tests` / `NOVA-LCR-HGO-1`:** the copy-safe renderer's
   wrap column is path-length sensitive, so at a long enough checkout path a
   denial no longer visibly names `guard-human-override.mjs` — possibly an
