@@ -211,19 +211,24 @@ not turn a repository rule into host-wide enforcement, a governance path into IA
 a requested route into observed model identity, or a machine gate into proof of
 every semantic property.
 
-The in-progress Hawkeye packages are not release claims in this document:
+`0.6.0` is the current source and plugin release candidate, not yet a
+published release, and its scope is bounded accordingly:
 
-- **HAW-S** is a candidate for Codex sandbox-compatibility selection; it is not
-  claimed as released merely because a local candidate or its tests exist.
-- **HAW-U** (the display-only `roles.po.display_label`) and **HAW-B** (the
-  bounded, descriptor-bound session keep-awake controller) are implemented
-  candidate slices. They become a support promise only with the Hawkeye
-  release that carries them; neither changes authority or bypasses a host
-  boundary.
-- **HAW-C** currently provides public policy validation, private immutable
-  binding storage, and a candidate-bound lifecycle evaluation. A complete
-  regulated-document adapter, renderer, and release evidence chain are still
-  not a user-facing support promise.
+- The completed Phoenix product strand is integrated as the delivery-governance
+  foundation: candidate-bound evidence and approvals, deterministic checks
+  before independent review, recoverable operational records, and typed
+  boundaries for external actions.
+- Nova's candidate-ready increment is included: the guided Greenfield Driver,
+  a practical first project, and runner-aware delivery.
+- Nova B remains open as a roadmap item — smoother plan amendment and close
+  flows, clearer cross-runner approval and verification guidance, stronger
+  delivery-loop observability, and remaining platform- or runner-specific
+  evidence.
+- The three-runner Greenfield contract is covered for Claude, Codex, and
+  Antigravity, but that coverage is not a claim of identical native
+  enforcement per host.
+- This candidate does not claim publication, a Git tag, marketplace
+  availability, or production support.
 
 For normative detail, see the [Operating Model](docs/operating-model.md). For
 adoption and migration, use [SETUP.md](SETUP.md) and
@@ -458,21 +463,24 @@ Durchsetzung, aus einem Governance-Pfad kein IAM, aus einer angefragten Route
 keine beobachtete Modellidentität und aus einem Maschinen-Gate keinen Beweis
 jeder semantischen Eigenschaft.
 
-Die laufenden Hawkeye-Pakete sind in diesem Dokument keine Release-Behauptungen:
+`0.6.0` ist der aktuelle Release-Kandidat für Source und Plugin, noch kein
+veröffentlichtes Release, und sein Umfang ist entsprechend begrenzt:
 
-- **HAW-S** ist ein Kandidat für Codex-Sandbox-Kompatibilitätsauswahl; er wird
-  nicht als veröffentlicht behauptet, nur weil ein lokaler Kandidat oder dessen
-  Tests existieren.
-- **HAW-U** (das reine Anzeige-Label `roles.po.display_label`) und **HAW-B**
-  (der begrenzte, descriptor-gebundene Session-Wachhaltecontroller) sind
-  implementierte Kandidatenscheiben. Ein Supportversprechen werden sie erst mit
-  dem Hawkeye-Release, das sie trägt; keines von beiden ändert Autorität oder
-  umgeht eine Host-Grenze.
-- **HAW-C** enthält derzeit öffentliche Policy-Validierung, privaten
-  unveränderlichen Binding-Speicher und eine kandidatengebundene
-  Lifecycle-Auswertung. Ein vollständiger Adapter für regulierte Dokumente,
-  Renderer und die Release-Evidenzkette sind noch kein user-facing
-  Supportversprechen.
+- Der abgeschlossene Phoenix-Produktstrang ist als Delivery-Governance-
+  Fundament integriert: kandidatengebundene Evidenz und Freigaben,
+  deterministische Prüfungen vor unabhängigem Review, wiederherstellbare
+  Betriebsaufzeichnungen und typisierte Grenzen für externe Aktionen.
+- Novas kandidatreifes Increment ist enthalten: der geführte Greenfield-
+  Driver, ein praktikables erstes Projekt und runner-bewusstes Delivery.
+- Nova B bleibt als Roadmap-Punkt offen — leichtere Planänderungs- und
+  Abschlussflüsse, klarere runnerübergreifende Freigabe- und Verify-Hinweise,
+  stärkere Delivery-Loop-Beobachtbarkeit sowie verbleibende plattform- oder
+  runnerspezifische Evidenz.
+- Der Drei-Runner-Greenfield-Vertrag ist für Claude, Codex und Antigravity
+  abgedeckt, aber diese Abdeckung ist kein Anspruch auf identische native
+  Durchsetzung je Host.
+- Dieser Kandidat behauptet weder Veröffentlichung, einen Git-Tag,
+  Marketplace-Verfügbarkeit noch Produktivsupport.
 
 Normative Details stehen im [Operating Model](docs/operating-model.md). Für
 Adoption und Migration nutze [SETUP.md](SETUP.md) und

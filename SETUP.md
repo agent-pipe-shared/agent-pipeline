@@ -44,15 +44,18 @@ end-to-end flow; this page only explains installation and adoption.
 
 The methodology (roles, specifications, evidence, review separation, and
 handover) is runner-neutral. The current V3 authority contains registered
-routes for Claude and Codex duties, but a requested route is not proof that a
-host used that model.
+routes for Claude, Codex, and Antigravity duties, but a requested route is not
+proof that a host used that model, and one runner's evidence does not prove
+another's behavior.
 
 Claude Code is the supported full-enforcement runtime: its plugin and hooks can
-enforce configured guards and lifecycle checks. On Codex or another runtime,
-use the same methodology only where that host exposes the needed integration;
-do not assume Claude hooks, plugin installation, or automatic guard enforcement
-exists there. See [`docs/runtime-boundary.md`](docs/runtime-boundary.md) for the
-exact boundary and manual responsibilities.
+enforce configured guards and lifecycle checks. On Codex, Antigravity, or
+another runtime, use the same methodology only where that host exposes the
+needed integration; do not assume Claude hooks, plugin installation, or
+automatic guard enforcement exists there. See
+[`docs/runtime-boundary.md`](docs/runtime-boundary.md) for the exact boundary
+and manual responsibilities, and [`docs/runner-support.md`](docs/runner-support.md)
+for the per-runner boundary table.
 
 ### Codex local agent activity troubleshooting
 
@@ -197,6 +200,16 @@ Repeat this section for every application or service repository you want to
 govern. A governed project does not inherit your local account or credentials;
 it commits only its portable calibration and its project rules.
 
+For a fresh or adopting project, the normal route is the guided Greenfield
+onboarding Driver, exercised across Claude, Codex, and Antigravity: it
+inspects the directory and returns the next structured action, and it owns
+the sequence. Follow the returned action as given and replace only its named
+human-input placeholders instead of reconstructing a private sequence of
+onboarding commands. The digest-bound `apply-portable-seed` command in B.0
+below is what that returned action resolves to for an operator invoking it
+directly; it is the fallback for an attended step, not the primary
+instruction for a first read of this section.
+
 ### 0. Let `pipeline-start` classify the consumer root first
 
 Do not copy `setup.mjs` into a consumer project or start a blank directory by
@@ -297,25 +310,6 @@ new thread in the project root before invoking `/pipeline-core:pipeline-start`.
 For a later refresh, start a new Codex thread as well. Do not hand-edit Codex
 marketplace or cache files.
 
-### 1c. Declare the Git lifecycle before delivery
-
-An ordinary initial seed deliberately sets `repositoryMode: "local-only"` in
-the project calibration at its resolved authority tier (`project/pipeline.json`,
-else `.claude/pipeline.json`): onboarding creates a repository but no initial commit,
-remote, or credential binding. Make the initial commit before normal work.
-When the project is intentionally connected to a shared remote, change the
-committed calibration to `repositoryMode: "remote-tracked"`; the session
-freshness check then requires an upstream and blocks writes when it is stale or
-unknown. `local-only` permits local work only; it never authorizes a push,
-publication, or release claim.
-
-For the exact Codex `fresh-host-managed` layout, the seed instead records
-`repositoryMode: "host-managed"` and deliberately creates neither Git metadata
-nor an initial commit. Codex owns `.git` and `.codex`; retain those controls,
-configure a project-specific verification command, and do not make a
-push/publication/release claim from this mode until the project has its own
-delivery-ready repository lifecycle.
-
 ### 1b. Activate a slim private overlay
 
 A slim private overlay contains project configuration and allowlisted inputs,
@@ -346,6 +340,25 @@ or treat an overlay-local harness as Public-plugin identity evidence. After an
 explicit activation, rerun `pipeline-core:pipeline-start`; project calibration,
 handover, Verify, and feature-state checks remain separate and may still fail
 closed even when the overlay bridge is activated.
+
+### 1c. Declare the Git lifecycle before delivery
+
+An ordinary initial seed deliberately sets `repositoryMode: "local-only"` in
+the project calibration at its resolved authority tier (`project/pipeline.json`,
+else `.claude/pipeline.json`): onboarding creates a repository but no initial commit,
+remote, or credential binding. Make the initial commit before normal work.
+When the project is intentionally connected to a shared remote, change the
+committed calibration to `repositoryMode: "remote-tracked"`; the session
+freshness check then requires an upstream and blocks writes when it is stale or
+unknown. `local-only` permits local work only; it never authorizes a push,
+publication, or release claim.
+
+For the exact Codex `fresh-host-managed` layout, the seed instead records
+`repositoryMode: "host-managed"` and deliberately creates neither Git metadata
+nor an initial commit. Codex owns `.git` and `.codex`; retain those controls,
+configure a project-specific verification command, and do not make a
+push/publication/release claim from this mode until the project has its own
+delivery-ready repository lifecycle.
 
 ### 2. Complete project calibration after onboarding
 
