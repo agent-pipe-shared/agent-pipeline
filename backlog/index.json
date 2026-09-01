@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "33eb4b6f9c3c6e8f6d4bf37a131829d9e39c2f7eed7efae102e083cf0f3be01d"
+    "transitionHead": "3e9677b5ae7cfef6b3c36b1c9c374bba10b3b2669ecb0285264056858956d3a8"
   },
   "counts": {
-    "open": 99,
+    "open": 101,
     "in_progress": 0,
     "closed": 488,
     "rejected": 3,
@@ -3482,6 +3482,15 @@
       "closureEvidence": "backlog/items/2026-08-18-inherited-still-open-claims-need-a-re-check-before-dispatch-no-durable-home.md"
     },
     {
+      "id": "pipeline.inode-identity-decides-deletion-in-a-second-rollback-path",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-01",
+      "source": "NVA-B-CIGREEN-1's own follow-up recommendation after fixing the same shape in plugins/pipeline-core/lib/project-onboarding-v3.mjs at 9a7c309b; the second occurrence is named as sameIdentity and removeRecordedTree in plugins/pipeline-core/lib/codex-onboarding-capabilities.mjs.",
+      "deferred": false
+    },
+    {
       "id": "pipeline.installed-marketplace-guard-copy-drifts-silently-from-repo-source",
       "status": "closed",
       "type": "defect",
@@ -4054,6 +4063,15 @@
       "closureRepository": "self",
       "closureCommit": "4630dd26395c713432c378298e68f3e119b4e369",
       "closureEvidence": "harness/scripts/verify.mjs"
+    },
+    {
+      "id": "pipeline.no-check-holds-the-shipped-copies-of-push-release-flow-in-agreement",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-01",
+      "source": "Round-K Critic finding F3 and the NVA-B-ROUNDK-FIX dispatch's own measurement of TEMPLATE_PAIRS in plugins/pipeline-core/scripts/check-vendored-template-sync.mjs and of plugins/pipeline-core/scripts/push-release-flow-docs-contract.test.mjs.",
+      "deferred": false
     },
     {
       "id": "pipeline.no-check-validates-prose-section-citations",

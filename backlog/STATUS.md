@@ -287,6 +287,7 @@
 | pipeline.identity-attestation-fails-open-on-unresolved-transcript-path | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.immutable-manifest-entries-can-be-rebound-with-no-amendment-record | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.inherited-still-open-claims-need-a-re-check-before-dispatch-no-durable-home | closed | workflow-improvement | pipeline | 2026-08-18 | — |
+| pipeline.inode-identity-decides-deletion-in-a-second-rollback-path | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.installed-marketplace-guard-copy-drifts-silently-from-repo-source | closed | defect | pipeline | 2026-08-29 | PO decision 2026-08-29: candidate 3 (accept as inherent), documented permanently. |
 | pipeline.installed-plugin-gmw-hgo-v3-anchor-gap-blocks-all-protected-edits | closed | defect | pipeline | 2026-08-16 | — |
 | pipeline.installing-consumer-is-never-asked-any-setup-decision | closed | defect | pipeline | 2026-08-08 | — |
@@ -333,6 +334,7 @@
 | pipeline.neutral-authority-tier-is-a-frozen-snapshot-the-compiler-never-updates | closed | defect | pipeline | 2026-08-06 | — |
 | pipeline.new-docs-file-needs-governance-registry-rule-has-no-repo-level-home | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.nine-test-suites-run-in-no-verify-invocation | closed | defect | pipeline | 2026-08-27 | — |
+| pipeline.no-check-holds-the-shipped-copies-of-push-release-flow-in-agreement | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.no-check-validates-prose-section-citations | closed | workflow-improvement | pipeline | 2026-08-07 | — |
 | pipeline.no-design-to-implementation-handover-exists | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.no-durable-practice-for-mining-session-transcripts-for-happy-path-defects | closed | workflow-improvement | pipeline | 2026-08-09 | — |
@@ -613,7 +615,7 @@
 
 ## Counts
 
-- open: 99
+- open: 101
 - in_progress: 0
 - closed: 488
 - rejected: 3
