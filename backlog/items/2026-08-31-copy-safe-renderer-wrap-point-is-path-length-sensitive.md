@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.copy-safe-renderer-wrap-point-is-path-length-sensitive
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-01
+closure_repository: self
+closure_commit: e2b8afa154467299584fdf87af44a172bbf4b7cf
+closure_evidence: plugins/pipeline-core/lib/copy-safe-command.test.mjs
 created: "2026-08-31"
 sprint: nova-b
 done_when: manual
@@ -96,3 +100,30 @@ Owner: PO, for assignment. Ordered by cost, and deliberately not pre-deciding.
 3. **Do not weaken or relax the test assertion** to tolerate a wrapped filename
    — that would hide the human-facing regression (an unrecognisable denial in
    a consumer project) rather than fix it.
+
+## Closure, 2026-09-01
+
+Closed via `6ea2add3` and `e2b8afa1`, after one Critic round.
+
+The item's framing turned out to be wrong in an instructive way. It asked for the
+rendered length at which the wrap splits a filename, and direction 1 above wanted
+a third data point from a short path outside the repository. There is no
+threshold: the split occurs in **periodic bands roughly every 62 characters**, an
+alignment artifact of the 72-column bound. That reconciles all three of the
+item's original data points, and the missing fourth would have decided nothing.
+
+`6ea2add3` took direction 2 — the wrap point now backs off to the nearest
+preceding delimiter (space, forward slash, backslash) so a filename stays
+contiguous. Direction 3 was honoured: no assertion was weakened, skipped or
+deleted anywhere.
+
+The Critic round raised no blocker and no major finding. Both findings were about
+the strength of the pin rather than the behaviour: the backslash arm of the new
+predicate was load-bearing but untested — the reviewer measured that removing it
+re-splits a Windows launcher path at 23 of 60 root lengths — and the
+band-spanning assertion tested the three renderers' concatenated output, so a
+regression in exactly one renderer was masked. `e2b8afa1` pins both, and proved
+each red before restoring: the Windows path test failed at 18 of 60 root lengths
+without the backslash arm, and the per-renderer test failed with every failure
+tagged `(cmd)` while the pre-existing concatenated test stayed green in the same
+run — reproducing the masking the reviewer had argued. Suite 29 → 31.
