@@ -210,6 +210,11 @@ export const EXCLUSIONS = Object.freeze({
     owner: "PO",
     expires: "2026-09-07",
   }),
+  "harness/scripts/print-verify-failures.test.mjs": Object.freeze({
+    reason: "GREEN, not red: 17/17 passing (NVA-B-CIDIAG/NVA-B-CIDIAG2, 2026-09-01), covering the per-suite and global byte/line bounds with their explicit truncation notices, redaction of ghp_/github_pat_/AKIA/PEM-private-key-block credential shapes (including a regression check that the -{5}-quantifier rewrite of PRIVATE_KEY_BEGIN_RE/PRIVATE_KEY_END_RE in 58fe2d4b still matches a realistic BEGIN/END marker), and all evidence-degrade branches (missing evidence artifact, corrupt evidence JSON, evidence present but verifyRun null, missing run directory, missing per-suite receipt, missing per-suite log file). Parked solely because registering it edits verify.mjs, a protected test path whose maintenance window is closed and whose reopening needs a human signature -- confirmed unavailable in-session (guard-testpath override planning returned HGO-AUDIT with no route offered; no PO present in this dispatch to complete a signature ceremony). Register on the next window; this entry is a scheduling record, not a defect record.",
+    owner: "PO",
+    expires: "2026-09-07",
+  }),
 });
 
 function toPosix(rawPath) { return rawPath.split(sep).join("/"); }
