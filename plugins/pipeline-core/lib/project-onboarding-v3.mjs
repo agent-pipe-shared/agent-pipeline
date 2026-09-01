@@ -476,7 +476,11 @@ export function applyProjectPartialAuthorityAdoption({ rootDir = process.cwd(), 
       ensureTargetParents(root, path, createdDirectories, fs);
       fs.writeFileSync(path, bytes.get(target.path), { encoding: "utf8", flag: "wx", mode: 0o600 });
       const identity = fileIdentity(fs.lstatSync(path)); if (!identity) throw new Error(`created target identity is unavailable: ${target.path}`);
-      created.push({ path, identity });
+      // The digest is recorded from the bytes actually written, not re-read
+      // from disk: `rollback()` deletes only what still IS these bytes, and a
+      // re-read could adopt foreign content as this transaction's own
+      // (NVA-B-ROUNDL-F4).
+      created.push({ path, identity, sha256: sha256(bytes.get(target.path)) });
     }
     const after = inspectProjectOnboardingV3({ rootDir: root, deps: fs, runner });
     return { schema: PARTIAL_AUTHORITY_PLAN_SCHEMA, status: "applied", root, changes: plan.targets.map((target) => target.path), postInspection: after };
@@ -723,10 +727,27 @@ function recoverProbeIdentity(fd, path, candidate, fs) {
   return null;
 }
 
-function cleanupRuntimeProbe(path, identity, fs) {
+const RUNTIME_CAPABILITY_PROBE_BYTES = "runtime-capability-probe";
+
+/**
+ * NVA-B-ROUNDL-F4. The identity check below is NOT protection against inode
+ * reuse: under reuse the identity is exactly what matches, because the freed
+ * number is handed straight back to the file that replaced ours (see
+ * `ownsPublishedOutput()`'s docblock for why). The delete therefore has to be
+ * authorized by content -- `expectedSha256` is the digest of the bytes this
+ * probe itself last wrote at this path (the empty preimage between the
+ * exclusive create and the write, the probe bytes after it). Anything else at
+ * this path is foreign, and this transaction's contract is explicit that a
+ * leaked or foreign probe path is never silently ignored: refuse the delete and
+ * surface it, rather than destroying bytes the probe never wrote.
+ */
+function cleanupRuntimeProbe(path, identity, expectedSha256, fs) {
   if (!fs.existsSync(path)) return;
   if (!identity || !sameIdentity(identity, path, fs)) {
     throw new Error("runtime capability probe changed identity before rollback");
+  }
+  if (!expectedSha256 || !ownsPublishedOutput(identity, expectedSha256, path, fs)) {
+    throw new Error("runtime capability probe content is not this probe's own before rollback");
   }
   fs.unlinkSync(path);
 }
@@ -769,19 +790,27 @@ function probeSelectedRuntimeTargets(root, fs) {
     let identity = null;
     let createdIdentity = null;
     let primaryError = null;
+    // The digest of the bytes THIS probe last wrote at its own path, advanced
+    // as the transaction advances: null before the exclusive create, the empty
+    // preimage once the file exists, the probe bytes once they are written.
+    // `cleanupRuntimeProbe` authorizes its delete against this, never against
+    // `{dev, ino}` alone (NVA-B-ROUNDL-F4).
+    let probeSha256 = null;
     try {
       fd = fs.openSync(
         source,
         fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL | (fs.constants.O_NOFOLLOW ?? 0),
         0o600,
       );
+      probeSha256 = sha256("");
       createdIdentity = fileIdentity(fs.lstatSync(source));
       const opened = fileIdentity(fs.fstatSync(fd));
       if (!createdIdentity || !opened
         || createdIdentity.dev !== opened.dev
         || createdIdentity.ino !== opened.ino) throw new Error("runtime capability probe identity is unavailable");
       identity = opened;
-      fs.writeFileSync(fd, Buffer.from("runtime-capability-probe", "utf8"));
+      fs.writeFileSync(fd, Buffer.from(RUNTIME_CAPABILITY_PROBE_BYTES, "utf8"));
+      probeSha256 = sha256(RUNTIME_CAPABILITY_PROBE_BYTES);
       fs.fsyncSync(fd);
       fs.closeSync(fd);
       fd = undefined;
@@ -796,8 +825,8 @@ function probeSelectedRuntimeTargets(root, fs) {
     if (fd !== undefined) {
       try { fs.closeSync(fd); } catch (error) { cleanupErrors.push(error); }
     }
-    try { cleanupRuntimeProbe(source, identity, fs); } catch (error) { cleanupErrors.push(error); }
-    try { cleanupRuntimeProbe(target, identity, fs); } catch (error) { cleanupErrors.push(error); }
+    try { cleanupRuntimeProbe(source, identity, probeSha256, fs); } catch (error) { cleanupErrors.push(error); }
+    try { cleanupRuntimeProbe(target, identity, probeSha256, fs); } catch (error) { cleanupErrors.push(error); }
     try { fsyncDirectory(parent, fs); } catch (error) { cleanupErrors.push(error); }
     if (cleanupErrors.length > 0) throw cleanupErrors[0];
     if (primaryError) throw primaryError;
@@ -3814,7 +3843,15 @@ export function applyProjectOnboardingManifestRepairV4({
       try { fs.closeSync(fd); } catch {}
     }
     try {
-      if (temporaryIdentity && temporary && sameIdentity(temporaryIdentity, temporary, fs)) fs.unlinkSync(temporary);
+      // NVA-B-ROUNDL-F4: `sameIdentity` alone cannot authorize this delete --
+      // under inode reuse it is precisely what matches foreign content that
+      // replaced our temporary. The temporary's bytes are known exactly
+      // (`authenticated.afterBytes`, the same bytes written to it above), so
+      // ownership is decided on content; anything else is left in place.
+      if (temporaryIdentity && temporary
+        && ownsPublishedOutput(temporaryIdentity, sha256(authenticated.afterBytes), temporary, fs)) {
+        fs.unlinkSync(temporary);
+      }
     } catch {}
     if (committed) {
       let quarantined = true;
@@ -4992,6 +5029,14 @@ function rollback(root, created, createdDirectories, gitIdentity, gitTree, gitWa
       if (!entry.identity || !sameIdentity(entry.identity, entry.path, fs)) {
         throw new Error("created target changed identity before rollback");
       }
+      // NVA-B-ROUNDL-F4: the identity check above is not reuse protection --
+      // under inode reuse it is exactly what matches the file that replaced
+      // ours. This rollback deletes a target only while its content still IS
+      // the bytes this transaction wrote there; anything else is foreign and
+      // is left in place, with the failure surfaced rather than swallowed.
+      if (!entry.sha256 || !ownsPublishedOutput(entry.identity, entry.sha256, entry.path, fs)) {
+        throw new Error("created target content is not this transaction's own before rollback");
+      }
       fs.unlinkSync(entry.path);
     } catch (error) { failures.push(error); }
   }
@@ -5046,7 +5091,9 @@ export function applyProjectOnboardingV3(plan, { rootDir = plan?.root ?? process
       fs.writeFileSync(path, target.bytes, { encoding: "utf8", flag: "wx", mode: 0o600 });
       const identity = fileIdentity(fs.lstatSync(path));
       if (!identity) throw new Error(`created target identity is unavailable: ${target.path}`);
-      created.push({ path, identity });
+      // Digest of the bytes actually written -- see the same push in
+      // applyProjectPartialAuthorityAdoption (NVA-B-ROUNDL-F4).
+      created.push({ path, identity, sha256: sha256(target.bytes) });
     }
     const source = inspectRunnerProfileMigrationV3({ rootDir: root, deps: fs });
     if (source.status !== "ready" || source.sourceKind !== "v3") throw new Error("post-apply portable source validation was not ready");
