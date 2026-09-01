@@ -66,3 +66,5 @@ the no-throw path; the first-denial guarantee holding structurally rather than
 only by test; the override ceremony text identical in both renderings. The
 non-atomic read-modify-write and a torn state file both fail open, worst case a
 redundant full rendering.
+
+## Placeholder-marker-for-append
