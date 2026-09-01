@@ -88,3 +88,35 @@ violation surfaced because the agent disclosed it, not because anything detected
 it. That is exactly the gap this item describes — nothing detects it — and it
 means the four known occurrences are a lower bound, counting only the dispatches
 honest enough to say so.
+
+## Fifth occurrence, same day — and this one was caused by the briefing itself
+
+Dispatch `NVA-B-EVIDENCELIMBO` called the Advisor once and self-reported it
+unasked, exactly as the fourth did. What makes it worth its own section is the
+reason, which is not the agent's.
+
+The briefing contained a genuine internal contradiction. Its Forbidden section
+said "you write exactly one file, the new backlog item — every other path is
+read-only". Its Dispatch-metadata section required the dispatch to write
+`evidence/dispatch-record-NVA-B-EVIDENCELIMBO.json`. Those two instructions
+cannot both be followed. The dispatch noticed the conflict, could not resolve it
+from the briefing, and consulted the Advisor to resolve it — and only afterwards
+noticed that the same Forbidden section also prohibited that consultation.
+
+Its resolution was correct: it wrote the record, on the ground that the
+prohibition targets mutating existing artifacts rather than creating the one the
+briefing itself demands, corroborated by ten pre-existing dispatch records
+already living in that directory.
+
+**This shifts where the defect sits.** The first four occurrences read as agents
+reaching for the Advisor under budget pressure despite a clear rule. This one is
+a briefing that made consultation the reasonable move by being self-contradictory,
+and then forbade the reasonable move. Firmer wording would not have helped; it
+was the wording that created the need.
+
+Two consequences follow, and both belong to the dispatcher rather than to any
+agent. The "exactly one file" formulation collides with the standing
+dispatch-record duty in every briefing that uses both — it is not specific to this
+one, and other briefings from the same session carry the same pair. And the
+occurrence count remains a lower bound for the reason already stated above: five
+is what was disclosed, not what happened.
