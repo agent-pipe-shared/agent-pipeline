@@ -57,6 +57,33 @@ fixed, so the next red run will name it.
 3. If the audit confirms it, apply the same content-binding remedy rather than
    a second bespoke fix.
 
+## Progress, 2026-09-02 — the three sites inside `project-onboarding-v3.mjs` are closed
+
+Commit `7eb9192c` corrected the three remaining sites in that file:
+`cleanupRuntimeProbe`, the manifest-repair temporary cleanup in
+`applyProjectOnboardingManifestRepairV4`, and `rollback`. Each gained a
+deterministic inode-reuse regression test through its own entry point, each
+confirmed RED before its fix. The `rollback` digests are taken from the bytes
+actually written rather than re-read from disk, since a re-read can adopt
+foreign content as the transaction's own.
+
+Two residuals inside that same file are named here rather than left in a
+gitignored artifact, per QG-06:
+
+- `plugins/pipeline-core/lib/project-onboarding-v3.mjs:3195` unlinks a
+  temporary file with **no identity and no content check at all**. It sits
+  directly beside the corrected site. The exposure is small — the path carries
+  24 hex characters of randomness, so a foreign file at exactly that path is
+  implausible — but "no check" contradicts the reasoning the adjacent docblock
+  now states, and that inconsistency is what makes it worth naming.
+- `plugins/pipeline-core/lib/project-onboarding-v3.mjs:5276` unlinks inside a
+  `row.kind === "file"` loop and was never measured either way.
+
+What this item still owns is unchanged: the same pattern in
+`plugins/pipeline-core/lib/codex-onboarding-capabilities.mjs`
+(`sameIdentity`, `removeRecordedTree`), and the question of whether it explains
+that suite's intermittent CI failure.
+
 ## Acceptance
 
 - The failing test in `codex-onboarding-capabilities-tests` is named, from
