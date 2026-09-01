@@ -1317,10 +1317,16 @@ function rebaseAuthorityShapeRefusal(command, root, authority) {
       index += 2;
       continue;
     }
+    // Requirement 4's prohibition is "no arbitrary -c", and it is exactly that -- not "no
+    // global options". Every OTHER leading option (`--no-pager`, `-p`, `--git-dir=…`) is left
+    // to the lanes that already judge it: refusing them here would invent a mid-rebase
+    // refusal the spec never asked for, and would silently take away reads that were admitted
+    // a moment before the rebase started.
+    if (argv[index] !== "-c" && !/^-c./u.test(String(argv[index]))) return null;
     return {
-      element: `the global git option "${argv[index]}"`,
-      why: "Requirement 4 admits no arbitrary -c and no other global git option while this "
-        + "authority is active. The only admitted spelling is \"-c core.editor=true\", and only "
+      element: `the global git config option "${argv[index]}"`,
+      why: "Requirement 4 admits no arbitrary -c while this authority is active. The only "
+        + "admitted spelling is \"-c core.editor=true\" as two separate tokens, and only "
         + "directly in front of \"rebase --continue\".",
     };
   }
