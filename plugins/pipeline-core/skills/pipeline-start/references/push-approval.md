@@ -22,7 +22,7 @@ Before hand-running the layers below one at a time, one command chains the
 preparatory push layers up to the point of signature:
 
 ```
-node plugins/pipeline-core/scripts/push-init.mjs --root <repo> --by <name> --remote <remote> --destination refs/heads/<branch> [--base <ref>]
+node plugins/pipeline-core/scripts/push-init.mjs --root <repo> --by <name> --remote <remote> --destination refs/heads/<branch> [--base <ref> --candidate <ref> [--record-ref <ref>]]
 ```
 
 It runs the same read-only checks documented in `docs/push-release-flow.md`

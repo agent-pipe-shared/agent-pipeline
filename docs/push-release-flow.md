@@ -521,7 +521,7 @@ because it structurally isn't one.
 
 | Layer | Step | Runs as |
 |---|---|---|
-| — | `push-init.mjs --root … --by … --remote … --destination … [--base …]` — fast path chaining 1b through the readiness check; stops at the signature | Agent |
+| — | `push-init.mjs --root … --by … --remote … --destination … [--base … --candidate … [--record-ref …]]` — fast path chaining 1b through the readiness check; stops at the signature | Agent |
 | 1 | Policy already set in `pipeline.user.yaml` | n/a (config, not a per-push action) |
 | 1b | `check-doc-reconciliation.mjs --base … --candidate …` | Agent |
 | 2+3 | `authorize-critical` (prepare + sign, one invocation) | **PO only** — one command, `approve`, passphrase. The agent constructs the command and computes `--subject-sha256`. |
