@@ -287,21 +287,22 @@ runtime-boundary document.
 
 Codex uses its own marketplace and install commands. Add the approved Git
 source once, refresh its snapshot when the approved ref advances, and install
-the plugin from the marketplace name declared by that source. Consumers
-default to the `stable` distribution channel, so pin the marketplace snapshot
-to the `stable` branch (`--ref` is the same flag already verified in
+the plugin from the marketplace name declared by that source. `main` is the
+only published branch — development happens locally and on feature branches,
+and `main` carries releases (ADR-0078 D1) — so pin the marketplace snapshot to
+`main` (`--ref` is the same flag already verified in
 [`docs/codex-local-plugin-development.md`](docs/codex-local-plugin-development.md)):
 
 ```sh
-codex plugin marketplace add https://github.com/agent-pipe-shared/agent-pipeline.git --ref stable
+codex plugin marketplace add https://github.com/agent-pipe-shared/agent-pipeline.git --ref main
 codex plugin marketplace upgrade agent-pipeline
 codex plugin add pipeline-core@agent-pipeline
 codex plugin list --marketplace agent-pipeline --json
 ```
 
-`stable` tracks the current released version rather than an in-progress
-candidate; it is a distribution channel created at release time, not
-guaranteed to exist ahead of the first release that publishes it.
+The `stable` *update channel* (as reported by the Pipeline's own freshness
+check, not by Codex) resolves separately, to the highest final `vX.Y.Z`
+release tag on `main` (ADR-0078 D2) — it was never a branch.
 
 The final command must report exactly one installed and enabled
 `pipeline-core@agent-pipeline`. A Git marketplace snapshot is not the running
