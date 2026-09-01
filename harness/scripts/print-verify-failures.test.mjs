@@ -199,6 +199,37 @@ check("a log over 200 lines is truncated to the last 200, with an explicit trunc
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+// --- NVA-B-CIGREEN-1: a failing line in the omitted head is still reported --
+// CI run 33551001455 reported codex-onboarding-capabilities-tests red with 22
+// of 23 tests passing, and which test failed could not be recovered from the
+// step log at all: node:test emits its result lines in test order, so an early
+// failure is the first thing a TAIL bound drops. A truncation that hides the
+// failing test's own line defeats the reporter.
+check("a failing line that falls into the truncated head is still present in the output", () => {
+  const failingLine = "not ok 3 - a fresh Codex root with only an empty read-only .git mount is host-managed";
+  const rawLines = [
+    "ok 1 - first",
+    "ok 2 - second",
+    failingLine,
+    ...Array.from({ length: MAX_LINES_PER_SUITE + 50 }, (_, index) => `ok ${index + 4} - filler-${index}`),
+  ];
+  const logText = `${rawLines.join("\n")}\n`;
+  const bounded = boundSuiteTail(logText);
+  assert.equal(bounded.truncated, true);
+  assert.equal(bounded.text.includes(failingLine), true, "the failing line must survive the line bound");
+  assert.ok(bounded.text.endsWith(`ok ${rawLines.length} - filler-${MAX_LINES_PER_SUITE + 49}`), bounded.text.slice(-60));
+
+  const root = makeRoot();
+  try {
+    const runId = "verify-run-head-failure";
+    const runsRoot = join(root, "runs");
+    seedSuiteLog(runsRoot, runId, "head-failure-suite", { logText });
+    const evidencePath = writeEvidence(root, evidenceWithSteps([{ name: "head-failure-suite", exitCode: 1 }], { runId }));
+    const { lines } = buildFailureReport({ evidencePath, runsRoot, repoRoot: root });
+    assert.ok(lines.join("\n").includes(failingLine), "the reporter's own output must still name the failing test");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 // --- AC-2: per-suite byte bound, one line longer than the byte cap --------
 check("a single line longer than the byte cap is tail-sliced, not dropped entirely", () => {
   const hugeLine = "x".repeat(MAX_BYTES_PER_SUITE + 5000);
