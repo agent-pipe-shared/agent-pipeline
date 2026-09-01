@@ -7230,3 +7230,153 @@ test("NVA-I-GRAMMAR DoD 6: negative regression -- no mutating, protected-path, o
     rmSync(outside, { recursive: true, force: true });
   }
 });
+
+// ---------------------------------------------------------------------------------------
+// NVA-B-DENIALTRIM: a second grammar denial of the SAME class within one session renders
+// shorter than the first, per-session state living under `<git-common-dir>/agent-pipeline/
+// guard-denial-classes/` -- the exact sibling tree bootstrap-receipt/ (NVA-BOOTRECEIPT-1)
+// already established. `bootstrapCommonDirFixture()` is reused unmodified: a real, throwaway
+// directory standing in for `<git-common-dir>`, injected via `resolveGitCommonDirFn`.
+// ---------------------------------------------------------------------------------------
+
+function bashWithSession(command, sessionId) {
+  const input = { tool_name: "Bash", tool_input: { command } };
+  if (sessionId !== null) input.session_id = sessionId;
+  return input;
+}
+
+function guardDenialClassesPathFixture(commonDir, sessionId) {
+  return join(commonDir, "agent-pipeline", "guard-denial-classes", `${sessionId}.json`);
+}
+
+test("NVA-B-DENIALTRIM AC-1/AC-2/AC-3: a second same-class denial in one session renders shorter, the first stays full, and both stay actionable", () => {
+  const path = root();
+  const commonDir = bootstrapCommonDirFixture();
+  writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+  try {
+    const sessionId = "denialtrim-session-1";
+    const deps = { projectDir: path, resolveGitCommonDirFn: () => commonDir };
+    const command = "rg -n lifecycle . | tee output.txt"; // GUARD-OPERATOR-UNAPPROVED
+
+    const first = evaluateLifecycleReadyGuard(bashWithSession(command, sessionId), deps);
+    assert.equal(first.exitCode, 2);
+    assert.match(first.stderr, /GUARD-OPERATOR-UNAPPROVED/u);
+    // AC-2: the first denial of a class in a session still renders the full remedy text,
+    // including the admitted-grammar listing.
+    assert.match(first.stderr, /The complete admitted grammar, with bounds and exact spellings:/u);
+    assert.match(first.stderr, /rg -n needle probe\.txt/u);
+
+    const second = evaluateLifecycleReadyGuard(bashWithSession(command, sessionId), deps);
+    assert.equal(second.exitCode, 2, "the decision itself must never be weakened by the trim");
+    assert.match(second.stderr, /GUARD-OPERATOR-UNAPPROVED/u);
+    // AC-1: measured on RENDERED LENGTH, never a marker-string grep.
+    assert.ok(
+      second.stderr.length < first.stderr.length,
+      `expected the second denial (${second.stderr.length} chars) to be shorter than the first (${first.stderr.length} chars)`,
+    );
+    // The short form must not carry the full admitted-grammar listing (that is what shrank).
+    assert.doesNotMatch(second.stderr, /The complete admitted grammar, with bounds and exact spellings:/u);
+    // AC-3: still names what was rejected (the code, and the rejected-element line -- both
+    // unchanged in both forms) and still names a route forward (the one-simple-command
+    // constraint, plus where to find the full listing again).
+    assert.match(second.stderr, /Rejected element: the operator "\|"\./u);
+    assert.match(second.stderr, /Use one simple shell command per tool call/u);
+    assert.match(second.stderr, /already printed on the earlier denial of this kind this session/u);
+    // Everything besides the grammar-shape listing stays present and unchanged: the typed
+    // retryActions envelope and (in this "nothing armed" fixture) the human-override guidance.
+    assert.match(second.stderr, /"schema":"pipeline\.guard-retry-actions\.v1"/u);
+    assert.match(second.stderr, /No human override route is offered|Human override available/u);
+
+    // A THIRD call with a DIFFERENT session id for the SAME command is full-length again.
+    const differentSession = evaluateLifecycleReadyGuard(bashWithSession(command, "denialtrim-session-2"), deps);
+    assert.equal(differentSession.exitCode, 2);
+    assert.match(differentSession.stderr, /The complete admitted grammar, with bounds and exact spellings:/u);
+    assert.equal(differentSession.stderr.length, first.stderr.length);
+
+    // A call with a DIFFERENT code under the SAME session id is still full-length (AC-3's
+    // "class" is the grammar denial code, not the whole session).
+    const differentCode = evaluateLifecycleReadyGuard(
+      bashWithSession('git commit -m "line one\n\nline two"', sessionId), deps,
+    );
+    assert.equal(differentCode.exitCode, 2);
+    assert.match(differentCode.stderr, /GUARD-PARSE-UNSUPPORTED/u);
+    assert.match(differentCode.stderr, /The complete admitted grammar, with bounds and exact spellings:/u);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(commonDir, { recursive: true, force: true });
+  }
+});
+
+test("NVA-B-DENIALTRIM AC-4: with no resolvable session identity, the guard renders full text every time and never throws", () => {
+  const path = root();
+  const commonDir = bootstrapCommonDirFixture();
+  writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+  try {
+    const command = "rg -n lifecycle . | tee output.txt"; // GUARD-OPERATOR-UNAPPROVED
+
+    // (a) sessionId is null (never set on the tool_input at all).
+    const noSessionDeps = { projectDir: path, resolveGitCommonDirFn: () => commonDir };
+    const noSessionFirst = evaluateLifecycleReadyGuard(bashWithSession(command, null), noSessionDeps);
+    const noSessionSecond = evaluateLifecycleReadyGuard(bashWithSession(command, null), noSessionDeps);
+    assert.equal(noSessionFirst.exitCode, 2);
+    assert.equal(noSessionSecond.exitCode, 2);
+    assert.match(noSessionFirst.stderr, /The complete admitted grammar, with bounds and exact spellings:/u);
+    assert.match(noSessionSecond.stderr, /The complete admitted grammar, with bounds and exact spellings:/u);
+    assert.equal(noSessionSecond.stderr.length, noSessionFirst.stderr.length);
+    // Fail-open must never write a state file either -- there is no session id to key one on.
+    assert.equal(existsSync(join(commonDir, "agent-pipeline", "guard-denial-classes")), false);
+
+    // (b) a real session id, but the state directory is unwritable/unresolvable
+    // (resolveGitCommonDirFn returns null, mirroring evaluateBootstrapReceiptGate()'s own
+    // fail-open convention).
+    const unresolvableDeps = { projectDir: path, resolveGitCommonDirFn: () => null };
+    const unresolvableFirst = evaluateLifecycleReadyGuard(
+      bashWithSession(command, "denialtrim-unresolvable"), unresolvableDeps,
+    );
+    const unresolvableSecond = evaluateLifecycleReadyGuard(
+      bashWithSession(command, "denialtrim-unresolvable"), unresolvableDeps,
+    );
+    assert.equal(unresolvableFirst.exitCode, 2);
+    assert.equal(unresolvableSecond.exitCode, 2);
+    assert.match(unresolvableFirst.stderr, /The complete admitted grammar, with bounds and exact spellings:/u);
+    assert.match(unresolvableSecond.stderr, /The complete admitted grammar, with bounds and exact spellings:/u);
+    assert.equal(unresolvableSecond.stderr.length, unresolvableFirst.stderr.length);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(commonDir, { recursive: true, force: true });
+  }
+});
+
+test("NVA-B-DENIALTRIM AC-6: per-session denial-class state is written under the git common dir's agent-pipeline/ tree, never scratch/ or the working tree", () => {
+  const path = root();
+  const commonDir = bootstrapCommonDirFixture();
+  writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+  try {
+    const sessionId = "denialtrim-session-ac6";
+    const deps = { projectDir: path, resolveGitCommonDirFn: () => commonDir };
+
+    evaluateLifecycleReadyGuard(bashWithSession("rg -n lifecycle . | tee output.txt", sessionId), deps);
+    const statePath = guardDenialClassesPathFixture(commonDir, sessionId);
+    assert.ok(existsSync(statePath), "expected a per-session denial-class state file under the common dir");
+    const state = JSON.parse(readFileSync(statePath, "utf8"));
+    assert.equal(state.schema, "pipeline.guard-denial-classes-seen.v1");
+    assert.deepEqual(state.seenClasses, ["GUARD-OPERATOR-UNAPPROVED"]);
+
+    // Nothing was written to the project working tree or to its scratch/ directory.
+    assert.equal(existsSync(join(path, "scratch")), false);
+    assert.equal(existsSync(join(path, "agent-pipeline")), false);
+
+    // A second, different-class denial in the same session appends rather than replaces.
+    evaluateLifecycleReadyGuard(bashWithSession('git commit -m "line one\n\nline two"', sessionId), deps);
+    const updated = JSON.parse(readFileSync(statePath, "utf8"));
+    assert.deepEqual(updated.seenClasses, ["GUARD-OPERATOR-UNAPPROVED", "GUARD-PARSE-UNSUPPORTED"]);
+
+    // Only the expected sibling directory exists under agent-pipeline/ -- proven the same way
+    // NVA-BOOTRECEIPT-1's own "every gate decision is observed" test proves its own tree.
+    const pipelineDirEntries = readdirSync(join(commonDir, "agent-pipeline"));
+    assert.deepEqual(pipelineDirEntries, ["guard-denial-classes"]);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(commonDir, { recursive: true, force: true });
+  }
+});
