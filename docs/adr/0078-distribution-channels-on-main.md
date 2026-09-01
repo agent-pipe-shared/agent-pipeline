@@ -70,11 +70,23 @@ round trip to re-prove something the release ceremony already guarantees.
 
 `alpha` MUST NOT resolve to `refs/heads/main`. It resolves from one of two sources:
 
-1. **A local marketplace / self-development checkout.** No remote comparison is made at all.
-2. **A named feature branch** (`feat/sprint-nova-codex-v046`, `feat/sprint-alfred`, …), supplied by
+1. **A named feature branch** (`feat/sprint-nova-codex-v046`, `feat/sprint-alfred`, …), supplied by
    an optional persisted project field. Only a persisted project field may name it — no
    caller-provided ref crosses the resolver boundary, preserving the closed-input property
    `resolvePipelineUpdateChannelConfig`'s own comment already asserts.
+2. **A local marketplace / self-development checkout with no such field set.** No remote comparison
+   is made at all.
+
+**These two are ordered, not alternatives — amended 2026-09-01, during implementation.** As first
+written, this decision listed them the other way round and did not say which wins, which left a
+real ambiguity: whether a self-development topology suppresses remote comparison even when a ref
+IS configured. It does not. A configured ref always wins; the topology only decides what happens
+in its absence. The reason is that `resolvePipelineUpdateChannel` defaults to `alpha` *only* under
+`local-self-development` topology, so a topology gate would make this field unreachable in the one
+habitat where `alpha` is the default — reproducing exactly the outcome the rejected alternative
+"alpha makes no remote claim ever" was rejected for. The ambiguity was found by the implementing
+dispatch rather than by review, and is recorded here rather than left to be re-derived from the
+code.
 
 When neither is available, `alpha` reports a typed "local, no remote claim" result. It never
 fabricates a comparison against an arbitrary ref. A channel that cannot honestly answer "are you
