@@ -1642,14 +1642,17 @@ function checkReleaseTagAncestry(binding, releaseSection) {
     { timeout: 5000 },
   );
   if (originMain.status !== 0) {
-    // AC-3: fail closed rather than silently pass when the comparison target itself is
-    // unavailable -- a release-tag push is rare enough that this one-command remedy is an
-    // acceptable cost, and an unfetched ref must never become an accidental bypass.
-    emit(2, [
-      `BLOCKED (guard-push release-tag ancestry, plugin pipeline-core): refs/remotes/origin/main does not exist ` +
-        `locally, so release tag '${tagRef}' (commit ${tagCommit}) cannot be checked for reachability under ADR-0078 D5.`,
-      "Fix: run `git fetch origin main` and retry.",
-    ]);
+    // AC-2 (ADR-0078 D5 correction, NVA-B-TAGFIX -- replaces the earlier fail-closed
+    // AC-3 comment here): absence of refs/remotes/origin/main means main is not the
+    // published line in THIS repository, and D5 governs a repository where it is. This
+    // hook ships in plugins/pipeline-core/ to every consumer project, and a guard must
+    // not impose one repository's branch topology on another -- failing closed made a
+    // legitimate release-tag push permanently impossible, with no working remedy, in
+    // any repository whose remote has no main branch at all. Returning here instead of
+    // refusing is the accepted trade, and its residual cost is recorded rather than
+    // hidden: an operator who has simply never fetched origin/main in a repository
+    // where main IS the published line loses this check for that one push.
+    return;
   }
 
   const ancestry = spawnSync(
