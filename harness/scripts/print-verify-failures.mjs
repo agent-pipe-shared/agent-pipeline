@@ -136,6 +136,33 @@ export const FAILURE_LINE_RE = /^\s*(?:not ok\b|FAIL\b|✖|✗|×|#\s*fail\b|[A-
 // exactly the suites that need them most.
 const RECOVERED_BLOCK_BYTE_SHARE = 0.5;
 
+// UTF-8 structure, not a bound: a continuation byte is `10xxxxxx`.
+const UTF8_CONTINUATION_MASK = 0xC0;
+const UTF8_CONTINUATION_BYTE = 0x80;
+
+/**
+ * Round-N finding F-E. Keeps the last `byteCount` bytes of `buffer` and decodes
+ * them, never cutting inside a UTF-8 sequence.
+ *
+ * `buffer.subarray(n).toString("utf8")` decodes each orphaned continuation byte
+ * to U+FFFD, and U+FFFD re-encodes to THREE bytes -- so a slice of exactly N
+ * bytes could decode to a string of N+4 to N+6 bytes, and the documented
+ * `keptBytes <= MAX_BYTES_PER_SUITE` invariant simply did not hold (measured on
+ * a 3-byte-character log: 20004 bytes against a 20000-byte cap). The start
+ * offset is therefore advanced past any continuation bytes, dropping the
+ * partial character rather than replacing it; the result is always at most
+ * `byteCount` bytes and carries no manufactured replacement characters. The END
+ * never needs this treatment: a tail slice runs to the end of a complete
+ * encoding.
+ */
+function tailSlice(buffer, byteCount) {
+  let start = Math.max(0, buffer.length - Math.max(0, byteCount));
+  while (start < buffer.length && (buffer[start] & UTF8_CONTINUATION_MASK) === UTF8_CONTINUATION_BYTE) {
+    start += 1;
+  }
+  return buffer.subarray(start).toString("utf8");
+}
+
 /**
  * AC-2 per-suite bounding: at most MAX_LINES_PER_SUITE lines, then at most
  * MAX_BYTES_PER_SUITE bytes — for the WHOLE returned text, recovered failure
@@ -158,7 +185,15 @@ const RECOVERED_BLOCK_BYTE_SHARE = 0.5;
  * entirely. The bound is now ENFORCED across both parts: the recovered block is
  * admitted line by line within its own byte reserve, and the tail is then shrunk
  * to whatever the cap leaves, so `keptBytes <= MAX_BYTES_PER_SUITE` always holds
- * and is always the true byte length of `text`.
+ * and is always the true byte length of `text`. Round-N finding F-E: that
+ * invariant is exact only because both byte slices go through `tailSlice()`,
+ * which snaps the cut forward to a UTF-8 character boundary -- a raw
+ * `subarray().toString("utf8")` can decode to MORE bytes than it sliced.
+ *
+ * Round-N findings F-C and F-D concern which lines reach the block at all: a
+ * line too long for the reserve is SKIPPED rather than ending the admission
+ * loop, and the exclusion set is re-derived from the tail that actually
+ * survives the re-shrink rather than from the tail as it stood before it.
  */
 export function boundSuiteTail(text) {
   const originalBytes = Buffer.byteLength(text, "utf8");
@@ -174,43 +209,71 @@ export function boundSuiteTail(text) {
   let byteTruncated = false;
   if (keptBytes > MAX_BYTES_PER_SUITE) {
     byteTruncated = true;
-    const buffer = Buffer.from(keptText, "utf8");
-    keptText = buffer.subarray(buffer.length - MAX_BYTES_PER_SUITE).toString("utf8");
+    keptText = tailSlice(Buffer.from(keptText, "utf8"), MAX_BYTES_PER_SUITE);
     keptBytes = Buffer.byteLength(keptText, "utf8");
   }
-  // Line EQUALITY, not `includes`: a short failure line that happens to occur
-  // inside any kept line was previously treated as already present and dropped
-  // from recovery (round-L finding F7).
-  const keptLines = new Set(keptText.split("\n"));
-  const recoveredFailureLines = (lineTruncated || byteTruncated)
-    ? allLines
-      .filter((line) => FAILURE_LINE_RE.test(line) && !keptLines.has(line))
-      .slice(0, MAX_RECOVERED_FAILURE_LINES)
-    : [];
-  if (recoveredFailureLines.length > 0) {
+  if (lineTruncated || byteTruncated) {
     const headerBytes = Buffer.byteLength(RECOVERED_FAILURE_HEADER, "utf8") + 1;
     const reserve = Math.min(
       Math.floor(MAX_BYTES_PER_SUITE * RECOVERED_BLOCK_BYTE_SHARE),
       MAX_BYTES_PER_SUITE,
     );
-    const admitted = [];
-    let blockBytes = headerBytes;
-    for (const line of recoveredFailureLines) {
-      const cost = Buffer.byteLength(line, "utf8") + 1;
-      if (blockBytes + cost > reserve) break;
-      admitted.push(line);
-      blockBytes += cost;
+    // Indices, not line texts: two identical failure lines are two separate
+    // candidates, exactly as the previous `filter()` over `allLines` treated them.
+    const failureIndices = [];
+    for (let index = 0; index < allLines.length; index += 1) {
+      if (FAILURE_LINE_RE.test(allLines[index])) failureIndices.push(index);
     }
-    if (admitted.length > 0) {
+    const boundedTail = Buffer.from(keptText, "utf8");
+    const admitted = new Set();
+    let blockBytes = headerBytes;
+    let tailText = keptText;
+    // A fixed point, not a single pass (round-N finding F-D). Admitting a line
+    // shrinks the tail, and shrinking the tail can cut away a failure line that
+    // was excluded from recovery precisely BECAUSE it was still in the tail --
+    // so it ended up in neither place. The exclusion set therefore has to be
+    // re-derived from the tail that actually survives. This terminates: every
+    // pass either admits a line (bounded by MAX_RECOVERED_FAILURE_LINES) or
+    // leaves the tail unchanged and stops, and the tail only ever shrinks.
+    for (let pass = 0; pass <= MAX_RECOVERED_FAILURE_LINES; pass += 1) {
+      // Line EQUALITY, not `includes`: a short failure line that happens to
+      // occur inside any kept line was previously treated as already present
+      // and dropped from recovery (round-L finding F7).
+      const tailLines = new Set(tailText.split("\n"));
+      let changed = false;
+      for (const index of failureIndices) {
+        if (admitted.size >= MAX_RECOVERED_FAILURE_LINES) break;
+        if (admitted.has(index) || tailLines.has(allLines[index])) continue;
+        const cost = Buffer.byteLength(allLines[index], "utf8") + 1;
+        // SKIP, never break (round-N finding F-C). `failureIndices` is in file
+        // order, so breaking on the first line too long for the reserve emptied
+        // the block and suppressed the header plus every shorter failure line
+        // behind it -- the suite whose earliest omitted failure line is a long
+        // assertion diff got no recovered block at all. Truncating the long line
+        // instead was the other option and is worse here: it would consume the
+        // whole reserve and starve those same shorter lines, and half a marker
+        // line can lose the very assertion text that motivated recovering it.
+        // (The tail's partial slice is defensible because it is contiguous
+        // end-of-log context; half a recovered line is not.)
+        if (blockBytes + cost > reserve) continue;
+        admitted.add(index);
+        blockBytes += cost;
+        changed = true;
+      }
       // Enforce, don't recompute: the tail gives up exactly what the recovered
       // block takes, so the joined text is bounded by MAX_BYTES_PER_SUITE.
-      const tailBudget = Math.max(0, MAX_BYTES_PER_SUITE - blockBytes);
-      if (Buffer.byteLength(keptText, "utf8") > tailBudget) {
-        byteTruncated = true;
-        const buffer = Buffer.from(keptText, "utf8");
-        keptText = buffer.subarray(buffer.length - tailBudget).toString("utf8");
-      }
-      keptText = [RECOVERED_FAILURE_HEADER, ...admitted, keptText].join("\n");
+      const tailBudget = admitted.size > 0 ? Math.max(0, MAX_BYTES_PER_SUITE - blockBytes) : MAX_BYTES_PER_SUITE;
+      const nextTail = tailSlice(boundedTail, tailBudget);
+      if (nextTail !== tailText) { tailText = nextTail; changed = true; }
+      if (!changed) break;
+    }
+    if (admitted.size > 0) {
+      if (tailText !== keptText) byteTruncated = true;
+      keptText = [
+        RECOVERED_FAILURE_HEADER,
+        ...[...admitted].sort((a, b) => a - b).map((index) => allLines[index]),
+        tailText,
+      ].join("\n");
       keptBytes = Buffer.byteLength(keptText, "utf8");
     }
   }
@@ -230,11 +293,12 @@ export function boundSuiteTail(text) {
  * Shrinks an already per-suite-bounded tail further to fit a remaining
  * global-budget byte count (AC-2's MAX_TOTAL_BYTES, applied across all
  * suites). Same tail-keeping rule as boundSuiteTail: the LAST `remaining`
- * bytes are kept, not the first.
+ * bytes are kept, not the first -- and through the same character-boundary-safe
+ * slice (round-N finding F-E), so this cannot hand the global gate a `keptBytes`
+ * larger than the budget it was given.
  */
 function shrinkToRemainingBudget(bounded, remaining) {
-  const buffer = Buffer.from(bounded.text, "utf8");
-  const newText = buffer.subarray(Math.max(0, buffer.length - remaining)).toString("utf8");
+  const newText = tailSlice(Buffer.from(bounded.text, "utf8"), remaining);
   const newBytes = Buffer.byteLength(newText, "utf8");
   return { ...bounded, text: newText, keptBytes: newBytes, omittedBytes: bounded.originalBytes - newBytes, truncated: true };
 }
