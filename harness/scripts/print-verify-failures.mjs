@@ -76,8 +76,8 @@ const AKIA_RE = /\bAKIA[0-9A-Z]{16}\b/g;
 // comment). No `g` flag on either pattern below: used with .test() per line,
 // and a global-flag regex reused across .test() calls would leak lastIndex
 // state.
-const PRIVATE_KEY_BEGIN_RE = /-----BEGIN[\w ]*PRIVATE KEY-----/;
-const PRIVATE_KEY_END_RE = /-----END[\w ]*PRIVATE KEY-----/;
+const PRIVATE_KEY_BEGIN_RE = /-{5}BEGIN[\w ]*PRIVATE KEY-{5}/;
+const PRIVATE_KEY_END_RE = /-{5}END[\w ]*PRIVATE KEY-{5}/;
 
 /**
  * AC-3 redaction pass. Applied line by line (never across a line boundary):
