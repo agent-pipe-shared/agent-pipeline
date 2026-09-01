@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "18cda6fe5946fad55c69ef0a529b6a5a86e1babec921b0d2277def5079e35859"
+    "transitionHead": "e40cc85dcfdc64fd04c9b89702dfc529b2e4f1b25cf37a826021e96108aea85a"
   },
   "counts": {
-    "open": 96,
+    "open": 94,
     "in_progress": 0,
-    "closed": 484,
+    "closed": 488,
     "rejected": 3,
     "deferred": 11
   },
@@ -1604,12 +1604,16 @@
     },
     {
       "id": "pipeline.copy-safe-renderer-wrap-point-is-path-length-sensitive",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-31",
       "source": "Found 2026-08-31 by the Nova Elephant while verifying dispatch NVA-CIVERIFY: a single-assertion regex failure (guard-lifecycle-ready.test.mjs, NOVA-LCR-HGO-1) reproduced identically in two independent clones at longer checkout paths, and did not reproduce in the shorter main checkout.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-09-01",
+      "closureRepository": "self",
+      "closureCommit": "e2b8afa154467299584fdf87af44a172bbf4b7cf",
+      "closureEvidence": "plugins/pipeline-core/lib/copy-safe-command.test.mjs"
     },
     {
       "id": "pipeline.core-verify-cannot-pass-under-the-ci-trimmed-path",
@@ -2163,6 +2167,15 @@
       "deferred": false
     },
     {
+      "id": "pipeline.every-stage-0-commit-loses-its-assistance-marker-to-a-blank-line",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-01",
+      "source": "Critic round J, finding F-1, 2026-09-01, reviewing commits ccc7df84 and 25c51c90. Verified independently by the Elephant against git's own trailer parser before filing.",
+      "deferred": false
+    },
+    {
       "id": "pipeline.evidence-bound-review-retry-economics",
       "status": "closed",
       "type": "workflow-improvement",
@@ -2411,12 +2424,16 @@
     },
     {
       "id": "pipeline.git-09-still-calls-the-append-only-source-ledger-a-projection-file",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-01",
       "source": "Residual of Critic round NVA-CR-E finding F-2, reported by dispatch NVA-B-LEDGERRULE2-FIX as out of its own scope: the correction landed in GIT-10 (commit 1c2d2681) while GIT-09 keeps the same wrong phrase.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-09-01",
+      "closureRepository": "self",
+      "closureCommit": "25c51c90c539545f264007140d92a2fc84690495",
+      "closureEvidence": "guardrails/git.md"
     },
     {
       "id": "pipeline.git-appears-despite-initializes-git-false",
@@ -3081,6 +3098,15 @@
       "closureRepository": "self",
       "closureCommit": "a910ed069f0df9d4d49bd4dfdd8d1be17b7f4366",
       "closureEvidence": "backlog/items/2026-08-18-h-ac-11-restricted-profile-intake-record-is-design-increment-2.md"
+    },
+    {
+      "id": "pipeline.half-the-dispatch-records-omit-the-field-that-binds-them-to-their-commit",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-01",
+      "source": "Critic round I, finding F-2, 2026-09-01, reviewing commit 7bca7f5d. Measured against evidence/dispatch-record-NVA-B-HANDOVERPATH-FIX.json and then against the whole evidence corpus.",
+      "deferred": false
     },
     {
       "id": "pipeline.handover-file-exceeds-its-own-size-cap-after-the-phoenix-merge",
@@ -6538,21 +6564,29 @@
     },
     {
       "id": "pipeline.the-dispatch-record-field-enumeration-omits-a-field-the-checker-requires",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-01",
       "source": "Found 2026-09-01 while verifying dispatch NVA-B-WFRECORD, which had to add the same missing field to a copy of this list in the Workflow-dispatch reference (commit 6ce146f4). The source list was left uncorrected.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-09-01",
+      "closureRepository": "self",
+      "closureCommit": "63c1a8ab06f2169ad490b3a1c3d5b178707f1d4c",
+      "closureEvidence": "templates/prompts/goldfish-task.md"
     },
     {
       "id": "pipeline.the-handover-size-guard-only-sees-one-of-two-write-paths",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-01",
       "source": "Direct measurement, 2026-09-01: docs/state.md found at 30115 bytes, already over the guard's own 30000-byte cap.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-09-01",
+      "closureRepository": "self",
+      "closureCommit": "7e929b6a1a1606530dff0307cd89f47467981d1f",
+      "closureEvidence": "plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs"
     },
     {
       "id": "pipeline.the-handover-size-guards-header-comment-contradicts-its-own-registration",
