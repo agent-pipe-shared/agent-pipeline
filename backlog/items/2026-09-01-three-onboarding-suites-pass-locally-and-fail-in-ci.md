@@ -63,49 +63,46 @@ else. No `openssl`, no `env`, no other binary is reachable by name. `HOME` is wh
 runner sets it to (a fresh, previously-unused directory with no `.agent-pipeline/machine.json` and no
 registered PO key), unlike a developer's own machine which usually has both.
 
-### Per-suite analysis: what could plausibly explain a CI-only failure
+### Per-suite analysis: MEASURED, not hypothesized
 
-**`trust-anchor-bootstrap-circularity-repro-tests`** — citable, not speculative. The suite
-(`trust-anchor-bootstrap-circularity.repro.test.mjs:98-110`) fakes `po-human-approval.mjs`'s `setup`
-command's spawn calls via `fakeOpensslSpawn`, but that fake only intercepts the `openssl genpkey`
-subcommand (lines 99-106); any other `openssl` invocation falls through to a REAL
-`spawnSync(executable, args, { stdio: "pipe" })` (line 108). `po-human-approval.mjs`'s real `setup` path
-calls `openssl` a second time, unconditionally, to derive the public key from the freshly generated
-private key: `command("openssl", ["pkey", "-in", paths.privateKey, "-pubout", "-out", paths.publicKey], dependencies)`
-(`po-human-approval.mjs:1238`). On a developer machine `openssl` is normally on `PATH`; in this CI step's
-synthetic four-binary `PATH` it is not, so that second call cannot resolve the executable at all. This is
-the strongest, most directly citable candidate of the three.
+Root cause was established after this item was first filed by three controlled local runs reproducing
+the workflow step's synthetic `PATH` (each run repo-relative, reproducible):
 
-**`project-onboarding-v3-tests`** — investigated, not established. This suite's default `fakeDeps`
-object explicitly documents avoiding the real machine plane ("Deterministic 'already asked' by default —
-never falls through to the REAL `~/.agent-pipeline/machine.json`", `project-onboarding-v3.test.mjs:157-161`)
-and every in-process `onboardingCli(...)` call I found threads that same `fakeDeps`/`readMachinePlane`
-override. I did not find a call in this file that spawns `po-human-approval.mjs`'s real `setup` (no real
-`openssl` invocation, unlike the repro suite above), nor a real subprocess call to the onboarding CLI that
-omits an equivalent home-directory guard. **I could not pin an exact line that explains this suite's
-CI-only failure; do not read the above as ruling one out — it only means the specific dependency was not
-found by this pass.**
+- **Scenario "restricted `PATH` only"** (symlinks to `node`/`git`/`bash`/`sh` only, exactly matching
+  `.github/workflows/verify.yml:55`): all three suites FAIL, matching CI.
+- **Scenario "empty `HOME` only, full `PATH`"**: all three suites PASS. **The absent
+  `~/.agent-pipeline/machine.json` is NOT the cause** — this was the obvious guess this item originally
+  entertained, and it is wrong; state it here so the next reader does not re-open that lead.
+- **Scenario "restricted `PATH` + `openssl` added back"**: `trust-anchor-bootstrap-circularity-repro-tests`
+  and `onboarding-init-tests` both PASS (exit 0). **The missing binary is `openssl`.**
 
-**`onboarding-init-tests`** — investigated, not established, with one already-fixed adjacent issue on
-record. The suite's own header comment cites `NVA-W3-ONBOARDENV`: it used to read the real operator's
-`$HOME` machine-plane state through a spawned subprocess (backlog:
-`2026-08-28-a-verify-gate-suite-reads-real-machine-state-through-a-subprocess.md`) and was fixed by
-threading `PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE` into every subprocess `env` that omits its own synthetic
-`run` responder (`onboarding-init.test.mjs:14-21`). Key-creation paths in this suite use synthetic
-`runSetup`/mocked responders rather than a real `openssl` subprocess, so the repro suite's specific cause
-does not obviously transfer here either. **I could not find the specific environment dependency behind
-this suite's CI-only failure in this pass; it may share a root cause with one of the other two, or have
-its own, not yet identified.**
+**`trust-anchor-bootstrap-circularity-repro-tests` and `onboarding-init-tests` — CAUSE ESTABLISHED.**
+`plugins/pipeline-core/scripts/po-human-approval.mjs` shells out to the `openssl` binary for the whole
+key/signature chain: `genpkey -algorithm ED25519 -aes-256-cbc` (~line 1237), `pkey -in … -pubout` (~lines
+1170 and 1238), and `pkeyutl -sign -rawin` (~line 1018). The workflow step at
+`.github/workflows/verify.yml:55` symlinks only `node`, `git`, `bash`, `sh` into the synthetic `PATH` —
+`openssl` is not among them. Signature mode therefore has a real external-binary dependency that the
+"Runner-free offline Core Verify" step's own premise (only those four binaries exist) does not admit.
+This is now a measured cause, not a hypothesis: both suites pass once `openssl` is restored to the
+restricted `PATH` and fail without it, with nothing else changed.
+
+**`project-onboarding-v3-tests` — CAUSE STILL NOT ESTABLISHED; do not conflate with the above.** This
+suite failed in CI in 74s (run 33471808564, 05:01:34→05:02:48Z), but locally it PASSES under the
+restricted `PATH` with a fresh `HOME`, both with and without `openssl` present. Its only observed local
+failure mode is an unrelated ~150s hang that occurs solely against this particular machine's real `HOME`,
+whose machine-plane `poKeyDirectory` sits on a slow `/mnt/c` Windows mount — that is a local environment
+artifact of one operator's machine, not the CI cause, and must not be reported as the same thing. **This
+suite's CI-only failure cause remains genuinely unknown.**
 
 ### What this item is NOT claiming
 
-The environment-difference explanation above is a HYPOTHESIS for one of the three suites
-(`trust-anchor-bootstrap-circularity-repro-tests`, backed by an exact cited line) and an open question for
-the other two. This item does not claim the failures are "just environmental" — the release cannot reach
-`main` until the `verify` status check is green, so a wrong reassurance here would be expensive. Whoever
-picks this item up next should treat the openssl finding as a lead to reproduce, not a closed diagnosis,
-and should still investigate the other two suites from scratch rather than assuming they share the same
-cause.
+Two of the three causes are now MEASURED (`openssl` absent from the restricted `PATH`, confirmed by
+adding it back and watching both suites go green), not merely plausible. The third
+(`project-onboarding-v3-tests`) is still open — its cause is not "probably also `openssl`"; the measured
+local runs directly show that suite passing under the restricted `PATH` with and without `openssl`, so
+that explanation is already ruled out for it. Whoever picks this item up next should reproduce the
+`project-onboarding-v3-tests` CI failure from scratch (the 74s CI timing is a possible lead: it is fast,
+unlike the unrelated local hang) rather than assuming it shares either of the other two suites' cause.
 
 ### Release consequence
 
@@ -117,22 +114,22 @@ rather than being newly introduced by anything landing since.
 
 ## Acceptance
 
-This item is settled once someone has:
+Reproduction against the restricted-`PATH`/fresh-`HOME` environment is DONE (see "Per-suite analysis"
+above) for two of the three suites. This item is settled once someone has, in addition:
 
-1. Reproduced (or failed to reproduce) each of the three suites' CI-only failure locally under the same
-   restricted environment the workflow step constructs: a `PATH` containing only symlinks to `node`,
-   `git`, `bash`, `sh` (no `openssl`, no other binary), `HOME` pointed at a fresh, empty directory (no
-   pre-existing `.agent-pipeline/machine.json`), and `PIPELINE_LIVE_CERTIFICATION=disabled` set.
-2. For `trust-anchor-bootstrap-circularity-repro-tests`: confirmed whether the missing `openssl` binary
-   is in fact the cause (the suite should fail identically once `openssl` is removed from `PATH` locally,
-   and pass again once it is restored, or `fakeOpensslSpawn` is extended to intercept the `pkey -pubout`
-   subcommand too).
-3. For `project-onboarding-v3-tests` and `onboarding-init-tests`: identified the actual dependency (or
-   ruled out the restricted `PATH`/fresh `HOME` shape entirely and found a different cause), citing the
-   exact line(s) responsible, the same way this item cites `po-human-approval.mjs:1238` for the repro
-   suite.
-4. Recorded the fix (or a scoped follow-up item per suite, if the fixes are independent) and re-run the
-   `verify` workflow to confirm all three go green in CI.
+1. Decided and implemented a fix for the `openssl` dependency in `po-human-approval.mjs`'s
+   `genpkey`/`pkey`/`pkeyutl` calls — either add `openssl` to the workflow step's synthetic `PATH`
+   (`.github/workflows/verify.yml:55`, owned by the Elephant, not this item) or make signature-mode
+   verification not require a real `openssl` subprocess in this offline lane — and confirmed
+   `trust-anchor-bootstrap-circularity-repro-tests` and `onboarding-init-tests` go green in actual CI, not
+   just locally.
+2. Identified `project-onboarding-v3-tests`' actual CI-only cause, citing the exact line(s) responsible
+   the same way this item now cites `po-human-approval.mjs` for the other two — the restricted-`PATH`/
+   fresh-`HOME` shape has already been ruled out for this suite specifically; a different environment
+   difference (or a CI-only timing/ordering effect, given its comparatively fast 74s CI runtime) must be
+   found instead.
+3. Recorded the fix(es) (a scoped follow-up item per suite is fine if the fixes are independent) and
+   re-run the `verify` workflow to confirm all three go green in CI.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
