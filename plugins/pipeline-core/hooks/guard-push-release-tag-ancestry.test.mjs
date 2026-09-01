@@ -22,7 +22,7 @@
  * Exit: 0 = all cases pass · 1 = at least one case failed (failure list on stdout).
  */
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -47,6 +47,22 @@ function freshRepo(prefix) {
 
 function gitAt(dir, ...args) {
   return spawnSync("git", args, { cwd: dir, encoding: "utf8" });
+}
+
+// Mirrors guard-push.test.mjs's own `writeManifest`/`manifestPush`/`writeEvidence` fixture
+// shape exactly (not imported from that file -- it is a protected test path, TP-5, and this
+// file already keeps its own independent fixture helpers per its header comment above).
+function writeManifest(dir, yamlText) {
+  mkdirSync(join(dir, ".claude"), { recursive: true });
+  writeFileSync(join(dir, ".claude", "pipeline.yaml"), yamlText);
+}
+function manifestPush({ mode = "blocking", approval = "required" } = {}) {
+  return `schema: pipeline.manifest.v0\ngates:\n  push:\n    mode: ${mode}\n    type: human\n    approval: ${approval}\n`;
+}
+function writeEvidence(dir, relPath, obj) {
+  const full = join(dir, relPath);
+  mkdirSync(join(full, ".."), { recursive: true });
+  writeFileSync(full, typeof obj === "string" ? obj : JSON.stringify(obj));
 }
 
 function runGuard(command, dir) {
@@ -126,22 +142,53 @@ const BLOCK = 2, ALLOW = 0, WARN = 1; // WARN = hooks.json's own "1 = allow + wa
 // locally is NOT refused: main is not necessarily the published line in every repository ---
 // this guard ships to, and ADR-0078 D5 only governs a repository where it is. AC-1/AC-2 -----
 // (NVA-B-TAGNOTICE, rework of a `major` review finding): the skip is no longer silent -- it -
-// now carries a NOTICE naming what was skipped, why, and the remedy, and the push still -----
-// succeeds (WARN = allow + message, never the BLOCK exit code). ----------------------------
+// now carries a NOTICE naming what was skipped, why, and the remedy. AC-1 (NVA-B-TAGNOTICE2,
+// rework of a `major` review finding): with NO manifest present in this fixture, the notice --
+// no longer terminates the hook at WARN=1 -- execution continues to the manifest-absent exit
+// just past the call site, which is what actually produces this exit 0. See TAGPROV3d below
+// for the case that proves execution continues into a check that is NOT a fast allow. --------
 {
   const { dir, head } = freshRepo("no-origin-main");
   gitAt(dir, "tag", "v1.0.0", head);
   check(
-    "TAGPROV3 warn  refs/remotes/origin/main missing locally is not refused, but is no longer silent",
+    "TAGPROV3 allow  refs/remotes/origin/main missing locally is not refused, but is no longer silent",
     "git push origin v1.0.0",
     dir,
-    WARN,
+    ALLOW,
     {
       stderrIncludes: [
         "release-tag ancestry check was skipped",
         "refs/tags/v1.0.0",
         "refs/remotes/origin/main is not present locally",
         "git fetch origin main",
+      ],
+    },
+  );
+}
+
+// ---- AC-3 (NVA-B-TAGNOTICE2) -- this is the assertion that actually pins the fix. -------
+// TAGPROV3 alone proves the notice text appears; it does not prove the hook kept running --
+// afterward (a defective `emit(1, ...)` skip would ALSO have printed the same text before --
+// terminating). Here the fixture combines the same origin/main-absent skip path with a -----
+// manifest that requires push approval and no recorded approval at all -- the downstream ---
+// approval gate (guard-push.mjs's check (c), chosen because it is the cheapest downstream ---
+// check to trigger in this fixture style: one manifest, one evidence file, no state file at
+// all) must still fire and BLOCK. A hook that terminated at the notice, as `emit(1, ...)` ---
+// used to, would exit WARN=1 here and never reach it. -----------------------------------------
+{
+  const { dir, head } = freshRepo("no-origin-main-approval-required");
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  gitAt(dir, "tag", "v1.0.0", head);
+  check(
+    "TAGPROV3d block  origin/main missing (notice fires) still reaches the downstream approval gate, which blocks",
+    "git push origin v1.0.0",
+    dir,
+    BLOCK,
+    {
+      stderrIncludes: [
+        "release-tag ancestry check was skipped",
+        "Push approval missing",
       ],
     },
   );

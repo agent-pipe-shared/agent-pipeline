@@ -1658,16 +1658,32 @@ function checkReleaseTagAncestry(binding, releaseSection) {
     // had no way to learn the check never ran at all. ADR-0078 D5 states this local check
     // is the only ancestry enforcement that exists, so a silent skip of it is worse than a
     // visible one -- warn (non-blocking, AC-2) instead of either refusing or staying silent.
-    emit(1, [
-      `[guard-push] NOTICE: the release-tag ancestry check was skipped for '${tagRef}' -- ` +
-        "refs/remotes/origin/main is not present locally, so ADR-0078 D5's reachability check " +
-        "did not run for this push.",
-      "This can mean main is not this repository's published line (nothing to check here), or " +
-        "it can mean this checkout has simply never fetched it -- the guard cannot tell these " +
-        "two readings apart.",
-      "If main is this repository's published line, run `git fetch origin main` to make the " +
-        "ancestry check active.",
-    ]);
+    // NVA-B-TAGNOTICE2 (rework): the NOTICE above used `emit(1, ...)`, and `emit`'s last
+    // statement is `process.exit(code)` -- so making the skip audible also, as an
+    // unintended side effect, TERMINATED the whole hook right here, before the manifest-
+    // absent exit, the push-gate resolution, `pushBinding.ok`, and the approval gate ever
+    // ran. On a repo running `gates.push_approval: signature`, that let a release-tag push
+    // through with the approval gate skipped entirely -- worse than the silent-skip defect
+    // this was meant to fix. Write directly to stderr (same shape `emit` uses, minus the
+    // exit) and `return` from THIS function only, so the caller (the unconditional call
+    // site above the manifest-absent exit) keeps running every check that follows it.
+    process.stderr.write(
+      [
+        `[guard-push] NOTICE: the release-tag ancestry check was skipped for '${tagRef}' -- ` +
+          "refs/remotes/origin/main is not present locally, so ADR-0078 D5's reachability check " +
+          "did not run for this push.",
+        "This can mean main is not this repository's published line (nothing to check here), or " +
+          "it can mean this checkout has simply never fetched it -- the guard cannot tell these " +
+          "two readings apart.",
+        "If main is this repository's published line, run `git fetch origin main` to make the " +
+          "ancestry check active.",
+      ].filter(Boolean).join("\n") + "\n",
+    );
+    // Also skips the merge-base ancestry test just below: it cannot run meaningfully
+    // without refs/remotes/origin/main, and falling through to it would hit the "any other
+    // exit status" fail-closed branch further down and BLOCK a push this same comment block
+    // just explained must not be refused (AC-2).
+    return;
   }
 
   const ancestry = spawnSync(
