@@ -51,6 +51,18 @@ tmp-inbounds.txt
 # via `git add -f`. Only the machine-generated root directory was ever meant.
 /evidence/
 
+# Dispatch records written to the repository ROOT instead of `evidence/`. Anchored,
+# so it never touches `evidence/dispatch-record-*.json`, which is where the template
+# (`templates/prompts/goldfish-task.md` field 6) says these belong. 26 of them were
+# tracked here until 2026-09-01: a dispatch wrote its record to the working directory
+# and a broad `git add` in the same commit swept it into unrelated feature work — the
+# clearest case being `55912293`, "per-task dispatch-record naming", which committed a
+# bare `dispatch-record.json` to the root in the very commit that introduced the naming
+# convention. None was ever cited as `closure_evidence`; they were archived, not deleted.
+# The rule exists so the same accident cannot re-enter history silently.
+/dispatch-record.json
+/dispatch-record-*.json
+
 # Bounded non-authoritative restart aid. It is local context, never project
 # authority or a deliverable, so it must not dirty a candidate or enter history.
 project/resume-hint.json

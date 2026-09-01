@@ -1,8 +1,0 @@
-{
-  "taskId": "PHX-WP-CLEAN-CANDIDATE-WRAPPER",
-  "model": "claude-sonnet-5",
-  "rulesetSha": "5fa52282cd58e6be5c04dceada78dda8c9dd072b7f2d4b4d833b5d2ab8a54af2",
-  "dispatcher": "elephant",
-  "outcome": "in-progress",
-  "log": []
-}
