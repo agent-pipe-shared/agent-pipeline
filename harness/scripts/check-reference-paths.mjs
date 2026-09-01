@@ -127,18 +127,6 @@ export const TEST_SUITE_PATTERN = /\.test\.mjs$/u;
 // unbroken concatenated string.
 export const ALLOWLIST = Object.freeze([
   {
-    file: "dispatch-record-PHX-WP-EPIC-FILE-CONTRACT.json",
-    match: "plugins/pipeline-core/lib/codex-host-plugin-list" +
-      ".test.mjs",
-    reason:
-      "VFX2-REFPATH (2026-08-26): closed dispatch record naming a suite " +
-      "this same record's own log documents deleting deliberately " +
-      "(retired by PO decision, superseded) -- a truthful historical " +
-      "citation, not a live pointer. Newly visible only because the " +
-      "Nova/Phoenix merge brought this Phoenix-only record into a tree " +
-      "scanned by Nova's reference-path checker.",
-  },
-  {
     file: "docs/doc-reconciliation.md",
     match: "evidence/acceptance-evidence-map" +
       ".mjs",
