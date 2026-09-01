@@ -215,6 +215,11 @@ export const EXCLUSIONS = Object.freeze({
     owner: "PO",
     expires: "2026-09-07",
   }),
+  "plugins/pipeline-core/hooks/guard-push-release-tag-ancestry.test.mjs": Object.freeze({
+    reason: "GREEN, not red: 10/10 passing (NVA-B-TAGFIX, 2026-09-01), covering checkReleaseTagAncestry (ADR-0078 D5): a release tag reachable from origin/main is allowed; an unreachable one is refused naming the tag, the commit, ADR-0078 D5 and a next step; refs/remotes/origin/main absent locally is no longer refused (the AC-2 correction this dispatch added, replacing the earlier permanent fail-closed refusal); non-release tags, branch pushes, tag deletes, and an explicit refs/tags/<name> destination are all unaffected; and an annotated tag is peeled to its target commit before the ancestry test, never the tag object's own sha. Parked solely because registering it edits verify.mjs, a protected test path (TP-3) whose maintenance window is closed and whose reopening needs a human signature. Register on the next window; this entry is a scheduling record, not a defect record.",
+    owner: "PO",
+    expires: "2026-09-07",
+  }),
 });
 
 function toPosix(rawPath) { return rawPath.split(sep).join("/"); }
