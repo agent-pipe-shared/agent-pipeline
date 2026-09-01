@@ -84,3 +84,58 @@ test("R-2: the shape has no field that could carry a portable correlator", () =>
     assert.ok(!keys.includes(forbidden), `payload must not carry ${forbidden}`);
   }
 });
+
+// Adversarial rationale variant coverage (privacy-review.md §4 bullet 2:
+// "nested, encoded, Unicode-confusable, multiline, oversized, malformed,
+// external-content, and error-path variants"). Oversized/malformed/error-path
+// are covered above ("rejects an empty, oversized, or non-scalar rationale"
+// and every assert.throws in this file exercises the typed error path). The
+// five below were previously uncovered
+// (backlog/items/2026-08-31-restricted-store-rationale-field-lacks-adversarial-variant-coverage.md).
+//
+// All five are ACCEPTED, and this is the module's correct, deliberate
+// behaviour, not a coverage gap disguised as a passing test: rationale is
+// documented (human-decision-attribution.mjs:78-80) to require only a
+// non-empty Unicode-scalar string of at most 4096 characters, and
+// privacy-review.md §1's "Restricted human decision" row is explicit that
+// free-form rationale belongs exactly here -- machine-local, encrypted,
+// owner-only, never portable -- unlike the "Portable human decision" row,
+// which structurally excludes free text instead of content-filtering it.
+// Confusable glyphs, encoded substrings, nested lookalike-shaped text,
+// multiline formatting, and pasted external-ticket text are all ordinary
+// free-form rationale content for this store; nothing in the design implies
+// they should be rejected here, so acceptance is not a divergence.
+
+test("accepts a Unicode-confusable rationale (homoglyph impersonation is a valid Unicode-scalar string; the restricted store does not content-filter free-form rationale, only its shape/length/encoding-validity)", () => {
+  const confusable = "Ѕecurity revіew аpproved by Аdmin"; // Cyrillic С/і/а/А standing in for Latin lookalikes
+  const validated = validateHumanDecisionAttribution(fixture({ rationale: confusable }));
+  assert.equal(validated.rationale, confusable);
+  assert.ok(Object.isFrozen(validated));
+});
+
+test("accepts an encoded rationale (base64 and percent-encoding); the validator checks Unicode-scalar validity and length, not content encoding", () => {
+  const base64 = "c3ludGhldGljIHRpY2tldCByZWZlcmVuY2UgZm9yIGVuY29kaW5nIHRlc3Q=";
+  const percentEncoded = "%2Fexample%2Fpath%2Fplaceholder.txt%3Fq%3D1";
+  assert.equal(validateHumanDecisionAttribution(fixture({ rationale: base64 })).rationale, base64);
+  assert.equal(validateHumanDecisionAttribution(fixture({ rationale: percentEncoded })).rationale, percentEncoded);
+});
+
+test("accepts a nested-payload rationale that tries to smuggle a portable-shaped object as free text; it stays an inert string, never parsed, and adds none of its keys to the record (R-2 stays structural)", () => {
+  const nested = JSON.stringify({ schema: "pipeline.human-governance-decision.v1", decisionId: "d-1", eventId: "e-1", outcome: "approved" });
+  const validated = validateHumanDecisionAttribution(fixture({ rationale: nested }));
+  assert.equal(validated.rationale, nested);
+  assert.ok(!Object.hasOwn(validated, "decisionId"));
+  assert.ok(!Object.hasOwn(validated, "eventId"));
+});
+
+test("accepts a multiline rationale", () => {
+  const multiline = "Lifting GS-6 for the release window.\nSecond line of context.\nThird line: ticket ref attached separately.";
+  const validated = validateHumanDecisionAttribution(fixture({ rationale: multiline }));
+  assert.equal(validated.rationale, multiline);
+});
+
+test("accepts an external-content rationale (pasted ITSM/ticket text); the restricted store is the design-sanctioned home for exactly this kind of free text (privacy-review.md §1)", () => {
+  const external = "Per ticket https://itsm.example.invalid/tickets/12345: customer requested emergency guard lift, approved by on-call.";
+  const validated = validateHumanDecisionAttribution(fixture({ rationale: external }));
+  assert.equal(validated.rationale, external);
+});
