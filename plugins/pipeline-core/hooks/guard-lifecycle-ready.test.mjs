@@ -7380,3 +7380,71 @@ test("NVA-B-DENIALTRIM AC-6: per-session denial-class state is written under the
     rmSync(commonDir, { recursive: true, force: true });
   }
 });
+
+// ---------------------------------------------------------------------------------------
+// NVA-B-TRIMKEY (backlog/items/2026-09-01-the-denial-trim-state-is-keyed-per-session-not-per-
+// agent-as-its-comment-claims.md): a dispatched subagent's PreToolUse payload carries its
+// orchestrating session's OWN session_id, never one of its own (measured live -- see this
+// item's resolution note). Pinning that a fresh subagent identity still gets the full text
+// on ITS OWN first denial of a class, even when the shared session_id already saw that class
+// via the orchestrator (or a sibling subagent).
+// ---------------------------------------------------------------------------------------
+
+test("NVA-B-TRIMKEY AC-4: a subagent's own first denial of a class renders full text even though its orchestrating session already saw that class", () => {
+  const path = root();
+  const commonDir = bootstrapCommonDirFixture();
+  writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+  const subagentTranscriptPath = subagentTranscript("trimkey-fresh-agent");
+  try {
+    const sharedSessionId = "trimkey-shared-session";
+    const deps = { projectDir: path, resolveGitCommonDirFn: () => commonDir };
+    const command = "rg -n lifecycle . | tee output.txt"; // GUARD-OPERATOR-UNAPPROVED
+
+    // The orchestrator's own first denial of this class under the shared session id -- no
+    // transcript_path at all, the same "unresolved identity, fall back to session_id" shape
+    // `bashWithSession()` already uses throughout this suite.
+    const orchestratorFirst = evaluateLifecycleReadyGuard(bashWithSession(command, sharedSessionId), deps);
+    assert.equal(orchestratorFirst.exitCode, 2);
+    assert.match(orchestratorFirst.stderr, /The complete admitted grammar, with bounds and exact spellings:/u);
+
+    // A second denial under the identical (session-id-only) scope DOES trim -- establishing,
+    // before the subagent call below, that this session id is genuinely already "seen".
+    const orchestratorSecond = evaluateLifecycleReadyGuard(bashWithSession(command, sharedSessionId), deps);
+    assert.equal(orchestratorSecond.exitCode, 2);
+    assert.doesNotMatch(orchestratorSecond.stderr, /The complete admitted grammar, with bounds and exact spellings:/u);
+
+    // A freshly dispatched subagent, carrying the SAME session id but its OWN resolvable
+    // transcript_path/agentId, hits the identical denial class for the first time in ITS OWN
+    // scope. Asserted on measured rendered length, never a marker-string grep (AC-4).
+    const subagentInputPayload = {
+      tool_name: "Bash",
+      tool_input: { command },
+      transcript_path: subagentTranscriptPath,
+      session_id: sharedSessionId,
+    };
+    const subagentFirst = evaluateLifecycleReadyGuard(subagentInputPayload, deps);
+    assert.equal(subagentFirst.exitCode, 2);
+    assert.match(subagentFirst.stderr, /The complete admitted grammar, with bounds and exact spellings:/u);
+    assert.equal(
+      subagentFirst.stderr.length,
+      orchestratorFirst.stderr.length,
+      "a fresh subagent's first denial of a class must render exactly as full as any other " +
+        "first denial, even though its orchestrator's session already saw this class",
+    );
+
+    // A second denial for that SAME subagent identity now trims, exactly like any other
+    // repeat within one scope.
+    const subagentSecond = evaluateLifecycleReadyGuard(subagentInputPayload, deps);
+    assert.equal(subagentSecond.exitCode, 2);
+    assert.ok(subagentSecond.stderr.length < subagentFirst.stderr.length);
+
+    // The two identities persist under DIFFERENT state files -- the orchestrator's own
+    // session-id-keyed file, and the subagent's own agentId-keyed file.
+    assert.ok(existsSync(guardDenialClassesPathFixture(commonDir, sharedSessionId)));
+    assert.ok(existsSync(join(commonDir, "agent-pipeline", "guard-denial-classes", "agent-trimkey-fresh-agent.json")));
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(commonDir, { recursive: true, force: true });
+    rmSync(dirname(dirname(subagentTranscriptPath)), { recursive: true, force: true });
+  }
+});
