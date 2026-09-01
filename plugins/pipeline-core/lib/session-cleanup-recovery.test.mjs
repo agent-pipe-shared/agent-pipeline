@@ -39,8 +39,10 @@ import test from "node:test";
 import {
   applySessionCleanupRecovery,
   planOrphanWorktreeDirectories,
+  planRegisteredWorktreeRetirement,
   planSessionCleanupRecovery,
   retireOrphanWorktreeDirectories,
+  retireRegisteredWorktrees,
   sessionCleanupRecoveryInternals,
 } from "./session-cleanup-recovery.mjs";
 import {
@@ -790,5 +792,182 @@ test("planOrphanWorktreeDirectories fails every entry closed when git worktree l
     const retired = retireOrphanWorktreeDirectories({ rootDir: root, deps: { spawn: brokenSpawn } });
     assert.equal(retired.retiredCount, 0);
     assert.equal(existsSync(worktreePath), true, "an unresolvable liveness check must never cause a removal");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// NVA-B-WTRETIRE: planRegisteredWorktreeRetirement / retireRegisteredWorktrees -- the REGISTERED
+// worktree half of the sweep (backlog: pipeline.a-registered-but-abandoned-worktree-is-never-
+// retired, 2026-08-28), the complement of the orphan-directory branch directly above. Every test
+// here uses its own throwaway fixture repository -- AC-6: no test may create, remove, or mutate a
+// real worktree of THIS repository.
+
+test("planRegisteredWorktreeRetirement always skips the main worktree", () => {
+  const root = freshWorktreeSweepRepo();
+  try {
+    const plan = planRegisteredWorktreeRetirement({ rootDir: root });
+    assert.equal(plan.status, "ready");
+    assert.equal(plan.entries.length, 1);
+    assert.equal(plan.entries[0].status, "skipped-main-worktree");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("a clean detached worktree whose HEAD is exactly a local branch tip is retirable, and plan performs no deletion (AC-1/AC-2/AC-3)", () => {
+  const root = freshWorktreeSweepRepo();
+  try {
+    const tip = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).stdout.trim();
+    const wt = join(root, ".claude", "worktrees", "tip-detached");
+    const add = spawnSync("git", ["worktree", "add", "--detach", wt, tip], { cwd: root, encoding: "utf8" });
+    assert.equal(add.status, 0, add.stderr);
+
+    const plan = planRegisteredWorktreeRetirement({ rootDir: root });
+    const entry = plan.entries.find((e) => e.status !== "skipped-main-worktree");
+    assert.equal(entry.status, "retirable");
+    assert.equal(existsSync(wt), true, "planning must never delete");
+
+    const retired = retireRegisteredWorktrees({ rootDir: root });
+    assert.equal(retired.retiredCount, 1);
+    assert.equal(existsSync(wt), false);
+    const list = spawnSync("git", ["worktree", "list", "--porcelain"], { cwd: root, encoding: "utf8" }).stdout;
+    assert.equal(list.includes(wt), false);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("a detached worktree whose HEAD is an older ancestor (not equal) of the current branch tip is retirable (AC-3)", () => {
+  const root = freshWorktreeSweepRepo();
+  try {
+    const firstTip = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).stdout.trim();
+    const wt = join(root, ".claude", "worktrees", "older-ancestor");
+    spawnSync("git", ["worktree", "add", "--detach", wt, firstTip], { cwd: root, encoding: "utf8" });
+
+    writeFileSync(join(root, "second.txt"), "second\n");
+    spawnSync("git", ["add", "second.txt"], { cwd: root, encoding: "utf8" });
+    const commit = spawnSync("git", ["commit", "--quiet", "-m", "second"], { cwd: root, encoding: "utf8" });
+    assert.equal(commit.status, 0, commit.stderr);
+
+    const plan = planRegisteredWorktreeRetirement({ rootDir: root });
+    const entry = plan.entries.find((e) => e.status !== "skipped-main-worktree");
+    assert.equal(entry.status, "retirable");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("a worktree holding a commit reachable from no local branch tip is declined, never retired (AC-3 core case)", () => {
+  const root = freshWorktreeSweepRepo();
+  try {
+    const wt = join(root, ".claude", "worktrees", "ahead-of-every-tip");
+    const add = spawnSync("git", ["worktree", "add", "-b", "throwaway", wt], { cwd: root, encoding: "utf8" });
+    assert.equal(add.status, 0, add.stderr);
+    writeFileSync(join(wt, "extra.txt"), "extra\n");
+    spawnSync("git", ["add", "extra.txt"], { cwd: wt, encoding: "utf8" });
+    const commit = spawnSync("git", ["commit", "--quiet", "-m", "extra"], { cwd: wt, encoding: "utf8" });
+    assert.equal(commit.status, 0, commit.stderr);
+    // Detach the worktree from its own branch, then delete that branch -- now no local branch
+    // tip contains this worktree's HEAD commit at all.
+    const detach = spawnSync("git", ["checkout", "--detach"], { cwd: wt, encoding: "utf8" });
+    assert.equal(detach.status, 0, detach.stderr);
+    const del = spawnSync("git", ["branch", "-D", "throwaway"], { cwd: root, encoding: "utf8" });
+    assert.equal(del.status, 0, del.stderr);
+
+    const plan = planRegisteredWorktreeRetirement({ rootDir: root });
+    const entry = plan.entries.find((e) => e.status !== "skipped-main-worktree");
+    assert.equal(entry.status, "declined-head-not-contained");
+
+    const retired = retireRegisteredWorktrees({ rootDir: root });
+    assert.equal(retired.retiredCount, 0);
+    assert.equal(existsSync(wt), true, "a worktree holding unreachable work must survive");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("a worktree with an uncommitted change is declined even though its HEAD is a branch tip (AC-2 clean)", () => {
+  const root = freshWorktreeSweepRepo();
+  try {
+    const tip = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).stdout.trim();
+    const wt = join(root, ".claude", "worktrees", "dirty-one");
+    spawnSync("git", ["worktree", "add", "--detach", wt, tip], { cwd: root, encoding: "utf8" });
+    writeFileSync(join(wt, "untracked.txt"), "dirty\n");
+
+    const plan = planRegisteredWorktreeRetirement({ rootDir: root });
+    const entry = plan.entries.find((e) => e.status !== "skipped-main-worktree");
+    assert.equal(entry.status, "declined-not-clean");
+
+    const retired = retireRegisteredWorktrees({ rootDir: root });
+    assert.equal(retired.retiredCount, 0);
+    assert.equal(existsSync(wt), true);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("a locked worktree is declined even though it is clean and its HEAD is a branch tip (AC-2 lock)", () => {
+  const root = freshWorktreeSweepRepo();
+  try {
+    const tip = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).stdout.trim();
+    const wt = join(root, ".claude", "worktrees", "locked-one");
+    spawnSync("git", ["worktree", "add", "--detach", wt, tip], { cwd: root, encoding: "utf8" });
+    const lock = spawnSync("git", ["worktree", "lock", wt, "--reason", "in-use"], { cwd: root, encoding: "utf8" });
+    assert.equal(lock.status, 0, lock.stderr);
+
+    const plan = planRegisteredWorktreeRetirement({ rootDir: root });
+    const entry = plan.entries.find((e) => e.status !== "skipped-main-worktree");
+    assert.equal(entry.status, "declined-locked");
+
+    const retired = retireRegisteredWorktrees({ rootDir: root });
+    assert.equal(retired.retiredCount, 0);
+    assert.equal(existsSync(wt), true);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("retireRegisteredWorktrees re-checks all four preconditions at apply time -- a worktree that becomes dirty between plan and apply is retained, not removed (AC-4)", () => {
+  const root = freshWorktreeSweepRepo();
+  try {
+    const tip = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).stdout.trim();
+    const wt = join(root, ".claude", "worktrees", "clean-then-dirty");
+    spawnSync("git", ["worktree", "add", "--detach", wt, tip], { cwd: root, encoding: "utf8" });
+
+    const plan = planRegisteredWorktreeRetirement({ rootDir: root });
+    const entry = plan.entries.find((e) => e.status !== "skipped-main-worktree");
+    assert.equal(entry.status, "retirable", "must be retirable at plan time");
+
+    // Becomes dirty AFTER the plan above was produced but BEFORE apply runs.
+    writeFileSync(join(wt, "late-change.txt"), "late\n");
+
+    const retired = retireRegisteredWorktrees({ rootDir: root });
+    assert.equal(retired.retiredCount, 0, "apply must re-check live state, not trust the stale plan");
+    assert.equal(existsSync(wt), true);
+    const retainedEntry = retired.retained.find((e) => e.path === entry.path);
+    assert.equal(retainedEntry.status, "declined-not-clean");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("planRegisteredWorktreeRetirement fails every entry closed when git worktree list itself is unavailable", () => {
+  const root = freshWorktreeSweepRepo();
+  try {
+    const tip = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).stdout.trim();
+    const wt = join(root, ".claude", "worktrees", "unresolvable");
+    spawnSync("git", ["worktree", "add", "--detach", wt, tip], { cwd: root, encoding: "utf8" });
+
+    const brokenSpawn = () => ({ status: 1, stdout: "", stderr: "simulated failure" });
+    const plan = planRegisteredWorktreeRetirement({ rootDir: root, deps: { spawn: brokenSpawn } });
+    assert.equal(plan.status, "unknown-git-worktree-list-unavailable");
+    assert.deepEqual(plan.entries, []);
+
+    const retired = retireRegisteredWorktrees({ rootDir: root, deps: { spawn: brokenSpawn } });
+    assert.equal(retired.retiredCount, 0);
+    assert.equal(existsSync(wt), true, "an unresolvable liveness check must never cause a removal");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("retireRegisteredWorktrees removes only the retirable candidate among several registered worktrees", () => {
+  const root = freshWorktreeSweepRepo();
+  try {
+    const tip = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).stdout.trim();
+    const retirable = join(root, ".claude", "worktrees", "retirable-one");
+    const locked = join(root, ".claude", "worktrees", "locked-two");
+    spawnSync("git", ["worktree", "add", "--detach", retirable, tip], { cwd: root, encoding: "utf8" });
+    spawnSync("git", ["worktree", "add", "--detach", locked, tip], { cwd: root, encoding: "utf8" });
+    const lock = spawnSync("git", ["worktree", "lock", locked], { cwd: root, encoding: "utf8" });
+    assert.equal(lock.status, 0, lock.stderr);
+
+    const retired = retireRegisteredWorktrees({ rootDir: root });
+    assert.equal(retired.retiredCount, 1);
+    assert.equal(existsSync(retirable), false);
+    assert.equal(existsSync(locked), true);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
