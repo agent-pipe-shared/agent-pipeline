@@ -494,4 +494,34 @@ check("combines structural Schema and canonical semantic admission over one requ
   }
 });
 
-console.log(`${passed}/13 checks passed.`);
+check("pins observeRunner's Codex --version and --help probe argument vectors to the host-boundary sandbox", () => {
+  const source = readFileSync(new URL("./local-worker-supervisor.mjs", import.meta.url), "utf8");
+  const start = source.indexOf("function observeRunner(");
+  const end = source.indexOf("function validatePoolBindings(");
+  assert.equal(start > -1, true);
+  assert.equal(end > start, true);
+  const observeRunnerSource = source.slice(start, end);
+  assert.deepEqual(
+    [...observeRunnerSource.matchAll(/execFileSync\(request\.runner\.executable, \[([\s\S]*?)\], \{/gu)].map(
+      (match) => [...match[1].matchAll(/"((?:[^"\\]|\\.)*)"/gu)].map((entry) => entry[1]),
+    ),
+    [
+      ["--version"],
+      [
+        "--ask-for-approval", "never",
+        "exec",
+        "--strict-config",
+        "--ignore-user-config",
+        "--sandbox", "danger-full-access",
+        "--ephemeral",
+        "--json",
+        "--help",
+      ],
+    ],
+  );
+  assert.equal(observeRunnerSource.includes("danger-full-access"), true);
+  assert.equal(observeRunnerSource.includes("workspace-write"), false);
+  assert.equal(observeRunnerSource.includes("sandbox_workspace_write.network_access"), false);
+});
+
+console.log(`${passed}/15 checks passed.`);
