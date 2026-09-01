@@ -5,7 +5,7 @@ type: defect
 owner: pipeline
 status: closed
 closed_at: 2026-09-01
-closure_commit: bd089964
+closure_commit: bd089964c8a5789860984ab75d93f3bcd17152ae
 closure_repository: "self"
 closure_evidence: plugins/pipeline-core/scripts/security-adapters/gitleaks.test.mjs
 created: 2026-08-27

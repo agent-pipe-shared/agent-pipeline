@@ -5,7 +5,7 @@ type: defect
 owner: pipeline
 status: closed
 closed_at: 2026-09-01
-closure_commit: 131a9901
+closure_commit: 131a990193853f425b11381c7f0c44d3ef6d77fe
 closure_repository: "self"
 closure_evidence: plugins/pipeline-core/lib/project-authority.test.mjs
 created: 2026-08-28

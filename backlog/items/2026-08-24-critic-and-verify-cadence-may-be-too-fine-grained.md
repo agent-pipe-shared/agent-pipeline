@@ -5,7 +5,7 @@ type: workflow-improvement
 owner: pipeline
 status: closed
 closed_at: 2026-09-01
-closure_commit: 9adf2592
+closure_commit: 9adf2592881666949a779caa9ed53a817c0c0207
 closure_repository: "self"
 closure_evidence: docs/operating-model.md
 created: 2026-08-24

@@ -5,7 +5,7 @@ type: defect
 owner: pipeline
 status: closed
 closed_at: 2026-09-01
-closure_commit: 67c160c4
+closure_commit: 67c160c47c3bfe418eeba57da6b1caabde1486c9
 closure_repository: "self"
 closure_evidence: plugins/pipeline-core/scripts/po-human-approval.test.mjs
 created: 2026-08-27
