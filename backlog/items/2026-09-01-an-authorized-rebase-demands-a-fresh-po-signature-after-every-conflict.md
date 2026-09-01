@@ -111,6 +111,44 @@ Full prohibition list:
 
 `git rebase --abort` keeps its existing narrow recovery semantics.
 
+## Requirement 5 — the authority must be discoverable at the point of denial
+
+PO decision, 2026-09-01, added after Requirement 3 landed and before the
+wiring package was briefed.
+
+A session that has never heard of the rebase authority must still be carried
+through a conflicted rebase by the guard itself. Two properties follow, and
+both are part of the wiring, not of the resolver:
+
+- **The authority is never opt-in.** It applies because the repository is
+  genuinely mid-rebase from a validly approved `orig-head`, never because the
+  session knew to ask for it, named a flag, set an environment variable, or
+  had read this item. A capability that only an informed session can reach is
+  the same blocker it replaces, moved one level down.
+- **Every denial that the authority could have permitted, or that occurs
+  inside an active rebase, names the route forward in its own denial text.**
+  The denial states what is permitted on the current conflict surface, which
+  paths that surface currently contains, and the exact next command — in the
+  machine-readable retry-action shape the guards already emit
+  (`pipeline.guard-retry-actions.v1`), not only in prose. An empty
+  `retryActions` array during an active rebase is itself a defect: it is
+  precisely the state in which a session is stranded with no named way on.
+
+The failure this closes is the one observed live: the guard refused, the
+refusal named no route, and the only path anyone found led back to a fresh PO
+signature. Correct narrow behaviour that cannot be discovered from the
+refusal is indistinguishable, to the session experiencing it, from no
+behaviour at all.
+
+Two test cases carry this, in addition to the twelve below:
+
+1. During an active rebase from a validly approved `orig-head`, a refused
+   command that lies outside the conflict surface produces a denial whose
+   `retryActions` is non-empty and names the conflict surface.
+2. A session with no prior knowledge of the authority — no flag, no
+   environment variable, no prior successful call — reaches a successful
+   `git rebase --continue` by following only what the denials told it.
+
 ## Test cases
 
 ### Positive (five)
