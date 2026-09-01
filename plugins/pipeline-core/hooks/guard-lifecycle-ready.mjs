@@ -360,6 +360,18 @@ const GRAMMAR_DENIAL_REMEDY = [
   "The complete admitted grammar, with bounds and exact spellings:",
   ...grammarShapeLines(),
 ];
+// NVA-B-DENIALTRIM: the trimmed rendering for the SECOND-OR-LATER denial of the SAME
+// grammar-denial class (code) within one session (blocked()'s `firstOccurrenceThisSession`
+// parameter, backed by isFirstDenialThisSession() below). Deliberately still two full,
+// actionable lines -- never a bare marker -- per AC-3: a denial that becomes unactionable is
+// a regression, not a trim. Everything else the full form prints (the leading `${code}: ...`
+// line, `Rejected element:`, `remediation`, the retryActions JSON envelope, and
+// `overrideGuidance`) is unchanged and still printed in both forms; only this 9-line grammar
+// listing shrinks to 2 lines.
+const GRAMMAR_DENIAL_REMEDY_SHORT = [
+  "Use one simple shell command per tool call; no ;, pipelines, redirects, or line continuation outside the admitted grammar.",
+  "The complete admitted grammar with exact spellings was already printed on the earlier denial of this kind this session; reuse one of the shapes shown there.",
+];
 
 /**
  * GRAMMARHINT-1 AC-1: name the specific construct the ALREADY-COMPLETED parse rejected,
@@ -415,7 +427,7 @@ function rejectedGrammarElement(code, command, parsed, root) {
 
 function blocked(
   code = "GUARD-LIFECYCLE-NOT-READY", lifecycleStatus = null, retryActions = [], overrideGuidance = "", rejectedElement = null,
-  remediation = null, nearMissHint = null, observationInvalid = false,
+  remediation = null, nearMissHint = null, observationInvalid = false, firstOccurrenceThisSession = true,
 ) {
   const typedLifecycleStatus = code === "GUARD-LIFECYCLE-NOT-READY"
     && CONTROLLING_NON_READY_STATUSES.has(lifecycleStatus)
@@ -427,13 +439,18 @@ function blocked(
       schema: "pipeline.guard-retry-actions.v1",
       retryActions,
     };
+    // NVA-B-DENIALTRIM: every other caller of blocked() (every non-grammar denial code, and
+    // every grammar-denial call site that does not compute a session-scoped first-occurrence
+    // check) keeps the parameter defaulted to `true` -- full text, unconditionally -- so this
+    // is additive only; nothing that does not opt in changes shape.
+    const remedyLines = firstOccurrenceThisSession ? GRAMMAR_DENIAL_REMEDY : GRAMMAR_DENIAL_REMEDY_SHORT;
     return verdict(
       2,
       "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
         + `${code}: ${grammarReason}\n`
         + (rejectedElement ? `Rejected element: ${rejectedElement}.\n` : "")
         + (remediation ? `${remediation}\n` : "")
-        + GRAMMAR_DENIAL_REMEDY.map((line) => `${line}\n`).join("")
+        + remedyLines.map((line) => `${line}\n`).join("")
         + `${JSON.stringify(retryEnvelope)}\n`
         + overrideGuidance,
     );
@@ -3720,6 +3737,67 @@ function evaluateBootstrapReceiptGate(input, root, toolName, dependencies) {
 }
 
 /**
+ * NVA-B-DENIALTRIM: the private, per-session, per-denial-class "have we already printed the
+ * full grammar listing once this session" record -- a sibling of bootstrapReceiptDir() above,
+ * under the same `<git-common-dir>/agent-pipeline/` tree, never under `scratch/` or the
+ * working tree (that private tree is already agent-write-refused as pipeline-owned state, the
+ * identical reasoning bootstrapReceiptDir()'s own header states).
+ */
+function guardDenialClassesDir(commonDir) {
+  return join(commonDir, "agent-pipeline", "guard-denial-classes");
+}
+
+function guardDenialClassesPath(commonDir, sessionId) {
+  return join(guardDenialClassesDir(commonDir), `${sessionId}.json`);
+}
+
+/**
+ * NVA-B-DENIALTRIM: true on the first denial of `classKey` (a grammar-denial `code`) within
+ * one session; false once that same class has already been recorded seen. Consulted ONLY on
+ * an actual denial (never on an admitted/lifted command) by the two grammar-denial call sites
+ * in evaluateLifecycleReadyGuard() below, and only within their `if (!route.admitted)` branch.
+ *
+ * This is a token-cost trim, never a correctness gate -- every failure mode below fails open
+ * to `true` (the full-length rendering), so a broken or unresolvable state store can only ever
+ * cost extra output, never silently drop an actionable denial down to the short form:
+ *  - no resolvable session id (mirrors onboardingConsentBlocked()'s own convention: a
+ *    non-string or empty `session_id` is treated as absent);
+ *  - no resolvable `<git-common-dir>` (mirrors evaluateBootstrapReceiptGate()'s own
+ *    fail-open-on-null-commonDir semantics);
+ *  - any read, parse, mkdir, or write error against the per-session state file.
+ */
+function isFirstDenialThisSession(input, root, classKey, dependencies) {
+  const sessionId = typeof input?.session_id === "string" && input.session_id !== ""
+    ? input.session_id
+    : null;
+  if (!sessionId) return true;
+  const commonDir = (dependencies.resolveGitCommonDirFn ?? resolveGitCommonDir)(root, dependencies);
+  if (commonDir === null) return true; // nowhere safe to persist -- fail open, full text every time
+  const existsSyncFn = dependencies.existsSyncFn ?? existsSync;
+  const readFileSyncFn = dependencies.readFileSyncFn ?? readFileSync;
+  const writeFileSyncFn = dependencies.writeFileSyncFn ?? writeFileSync;
+  const mkdirSyncFn = dependencies.mkdirSyncFn ?? mkdirSync;
+  const statePath = guardDenialClassesPath(commonDir, sessionId);
+  try {
+    let seenClasses = [];
+    if (existsSyncFn(statePath)) {
+      const parsed = JSON.parse(readFileSyncFn(statePath, "utf8"));
+      if (Array.isArray(parsed?.seenClasses)) seenClasses = parsed.seenClasses;
+    }
+    if (seenClasses.includes(classKey)) return false;
+    mkdirSyncFn(guardDenialClassesDir(commonDir), { recursive: true, mode: 0o700 });
+    const updated = {
+      schema: "pipeline.guard-denial-classes-seen.v1",
+      seenClasses: [...seenClasses, classKey],
+    };
+    writeFileSyncFn(statePath, `${JSON.stringify(updated, null, 2)}\n`, "utf8");
+    return true;
+  } catch {
+    return true; // never let a state-store failure trim an actionable denial -- fail open
+  }
+}
+
+/**
  * ADR-0059 Decision 5 / NOVA-LCR-HGO-2: everything below -- the LAUNCH_SCRIPT
  * external-restart refusal and the onboarding-readiness gate (denial code
  * GUARD-LIFECYCLE-NOT-READY) -- stays outside HGO's authority no matter how the
@@ -4084,6 +4162,9 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
         code, `${code}: ${GRAMMAR_DENIAL_GUIDANCE[code]}`, "command", root, toolName, input.tool_input, dependencies,
       );
       if (!route.admitted) {
+        // NVA-B-DENIALTRIM: consulted (and marked seen) ONLY on an actual denial, never on
+        // an admitted/lifted command -- computed here, inside this branch, not earlier.
+        const firstOccurrence = isFirstDenialThisSession(input, root, code, dependencies);
         return withLifts(lifts, blocked(
           code,
           null,
@@ -4091,6 +4172,9 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
           route.overrideGuidance,
           rejectedGrammarElement(code, (input.tool_input.command ?? input.tool_input.CommandLine), parsed, root),
           commitMessageFileRemediation((input.tool_input.command ?? input.tool_input.CommandLine)),
+          null,
+          false,
+          firstOccurrence,
         ));
       }
       lifts.push(route.admitted);
@@ -4109,8 +4193,10 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
         // character it scans (its per-part policy only ever recovers `;`/newline-joined
         // segments). Measured empirically across `&&`, `|`, `>`, `2>&1`, `| tee`: [] in
         // every case. Calling it here would be dead code, not a fix.
+        const firstOccurrence = isFirstDenialThisSession(input, root, code, dependencies);
         return withLifts(lifts, blocked(
           code, null, [], route.overrideGuidance, rejectedGrammarElement(code, (input.tool_input.command ?? input.tool_input.CommandLine), parsed),
+          null, null, false, firstOccurrence,
         ));
       }
       lifts.push(route.admitted);
