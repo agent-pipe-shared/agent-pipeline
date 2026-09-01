@@ -110,9 +110,10 @@ Rule IDs: `GIT-xx`.
 
 ## GIT-09 — GG-22: a commit may not leave a backlog status-flip unreconciled
 
-- **MUST NOT** stage any path outside `backlog/items/**` and the three ledger
-  projection files (`backlog/transitions.ndjson`, `backlog/STATUS.md`,
-  `backlog/index.json`) whenever an earlier commit already changed a
+- **MUST NOT** stage any path outside `backlog/items/**`, the append-only,
+  hash-chained source ledger `backlog/transitions.ndjson`, and its two
+  generated projections (`backlog/STATUS.md`, `backlog/index.json`)
+  whenever an earlier commit already changed a
   `backlog/items/*.md` file's `status:` line without a matching ledger
   reconciliation since the last commit that touched
   `backlog/transitions.ndjson`. The trigger is the unreconciled status-flip
@@ -142,10 +143,11 @@ Rule IDs: `GIT-xx`.
   alongside it. Concretely: several `backlog/items/*.md` status edits MAY be
   batched into one commit (or several separate commits) before reconciling —
   that is an established, legitimate pattern — but while the debt is
-  outstanding, `backlog/items/**` edits and the three ledger projection
-  files are the only paths that may be staged in any commit; anything else
-  staged alongside is blocked, in every commit made while the debt exists,
-  not only in the commit that eventually lands the reconciliation.
+  outstanding, `backlog/items/**` edits, the source ledger, and its two
+  generated projections are the only paths that may be staged in any
+  commit; anything else staged alongside is blocked, in every commit made
+  while the debt exists, not only in the commit that eventually lands the
+  reconciliation.
 - **Remediation order:** before closing an item, fill in its `closure_commit`
   (and the item's other closure fields) — `reconcile-backlog-ledger.mjs
   --activate` refuses to write anything while any closed item is missing a
