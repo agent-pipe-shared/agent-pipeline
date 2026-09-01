@@ -47,6 +47,108 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 8681046622dc23956b760ba93552793b3d983193 — 2026-09-01, range 56e91858..86810466, doc-reconciliation Governs-line repair (ADR-0077/0078/0079) clearing the push-gate path for the 0.6.0 candidate
+
+Fixing the three malformed `Governs:` lines (NVA-B-DOCRECON) made ADR-0077,
+ADR-0078 and ADR-0079 self-implicating for the first time — their own globs
+previously matched no tracked file, so `implicated` was empty for all three
+regardless of what changed. They are recorded here alongside the five ADRs
+the pre-fix failing run already named, for the same reason ADR-0066 was
+recorded once its own broken glob was repaired: silently never enforced
+before is not the same as unaffected now.
+
+- ADR-0012: checked, no change needed.
+
+  `docs/state.md` (this ADR's own governed artifact) changed in 12 commits
+  across this range: nine additive checkpoint appends and three rotations
+  (`a67b037e`, `43dac5c4`, `b3fcfcf1`), each via `handover-rotate.mjs` per
+  ADR-0073, archiving to `docs/state-archive/` rather than duplicating
+  content. No competing handover artifact was introduced and nothing was
+  moved out of the one canonical file. The canonicalization decision itself
+  is untouched.
+
+- ADR-0056: checked, no change needed.
+
+  `plugins/pipeline-core/hooks/guard-push.mjs` changed in 5 commits, all of
+  them ADR-0078 D5's new release-tag-ancestry check
+  (`checkReleaseTagAncestry()`, refusing a release tag not reachable from
+  `origin/main`) and its follow-up notice/warning fixes — confirmed by
+  reading the diffs directly, not inferred from commit subjects alone. None
+  touches the `pushApproval` state shape, the `approve-push` reader, or
+  `gates.push_approval`, the surface this ADR actually governs.
+  `project/pipeline-state.json` changed in exactly one commit (`ad13d3d3`,
+  "record the signed approval audit for the 0.6.0 candidate") — the same
+  `approve-push`-writes-its-own-audit-record pattern already reconciled for
+  this ADR in the `314a3282` entry above, not a schema or policy change.
+
+- ADR-0058: checked, no change needed.
+
+  `plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs` changed in 2
+  commits (`1314edec`, `15bb3599`), both the new per-session/per-agent
+  grammar-denial trim (a shorter 2-line remedy on a repeated same-class Bash
+  grammar refusal, keyed per dispatched-agent identity after a measured
+  cross-subagent leak). The commit message states its own scope directly:
+  "a token-cost trim, never a correctness gate." Neither commit touches the
+  GMW window, HGO override arming, or any other mechanism this ADR governs.
+
+- ADR-0069: checked, no change needed.
+
+  The three new ADR files (0077, 0078, 0079) and their `docs/adr/README.md`
+  index rows are each exactly what this ADR requires: numbered in the act of
+  acceptance, with the file (with its number, not its draft name), the
+  README row and the status change landing in one commit each (`442ba393`,
+  `c33d39ea`, `b15e2068` — confirmed by reading each commit's own file list).
+  The README diff itself is purely three additive rows in number order, no
+  reordering or renumbering of any existing row. The allocation-at-acceptance
+  rule is being followed, not amended.
+
+- ADR-0075: checked, no change needed.
+
+  Same `guard-push.mjs` finding as ADR-0056 above: the 5 commits in range are
+  entirely the release-tag-ancestry check and its notice fixes, confirmed by
+  reading the diffs — none touches `enforcePublicationAuthorization`,
+  `publication-approve`, or `state.publicationCriticalProofs`, the exact
+  surface this ADR names as its own. `pipeline-state.mjs` and
+  `publication-authority.mjs`, the other two paths this ADR governs, were not
+  touched anywhere in this range.
+
+- ADR-0077: checked, no change needed.
+
+  Same `guard-push.mjs` finding again: the release-tag-ancestry check is a
+  new, independent pre-check and never touches the `pushApproval` state shape
+  or the push-time approval reader this ADR governs.
+  `plugins/pipeline-core/scripts/pipeline-state.mjs` (`approve-push`, the
+  other file this ADR governs) was not touched anywhere in this range — the
+  per-destination storage this ADR decided is accepted but not yet
+  implemented; nothing here contradicts or amends that decision.
+  `project/pipeline-state.json`'s one change is the same audit-write pattern
+  reconciled under ADR-0056 above.
+
+- ADR-0078: checked, no change needed.
+
+  `SETUP.md`, `pipeline-update-channel.mjs` and `ruleset-freshness.mjs` all
+  changed as this ADR's own decision was implemented in this same range: the
+  alpha-ref persisted-write path (`bc348608`, `f8c85e09`, `2f1a4dc2`,
+  `36d2c0a5`, `023e54cb`) and the Codex marketplace pin to `main` (`f7f3cdc3`).
+  These commits execute the accepted decision; none is a deviation from it
+  requiring a fresh amendment.
+
+- ADR-0079: checked, no change needed.
+
+  `guardrails/git.md` changed in 6 commits in this range, all GIT-09/GIT-10
+  corrections and the new GG-22 rule — none touches GIT-07, the sentence this
+  ADR governs, confirmed by reading the current file: GIT-07 still states
+  verbatim "The GIT-04 double-confirmation override mechanism applies to
+  `GG-17`…`GG-20` exactly like every other rule id — no separate procedure,"
+  unchanged since before this ADR was accepted. That is not an oversight: the
+  ADR's own acceptance commit (`b15e2068`) states plainly that "Implementation
+  is deliberately NOT in this commit. It is guard code, so it owes a
+  mandatory T1 round, and a guard change immediately before a release
+  sequence is the wrong moment. Filed for the maintenance window." The
+  known-stale GIT-07 text and the corresponding `guard-git.mjs` override
+  eligibility for `GG-17`…`GG-20` remain open, tracked follow-up work, not a
+  gap this reconciliation record can or should paper over.
+
 ## Candidate 314a328293aa180c4a251c51f15c4724e58bcf30 — 2026-09-01, range 56e91858..314a3282, post-push release bookkeeping and the CI openssl finding
 
 - ADR-0012: checked, no change needed.
