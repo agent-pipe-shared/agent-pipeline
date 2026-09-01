@@ -8,6 +8,7 @@
 | pipeline.a-briefing-prohibition-on-advisor-consultation-is-unenforced | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.a-captured-resume-hint-card-reds-the-verify-gate-until-another-session-consumes-it | open | defect | pipeline | 2026-08-31 | — |
 | pipeline.a-checkout-that-cannot-be-clean-defeats-every-cleanliness-gate | closed | defect | pipeline | 2026-08-08 | — |
+| pipeline.a-critic-has-no-writable-location-for-its-own-report | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.a-deferred-item-is-terminal-so-a-live-defect-can-be-parked-invisibly | open | defect | pipeline | 2026-08-31 | — |
 | pipeline.a-dirty-claude-directory-blocks-verify-which-blocks-push-approval | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.a-doc-edit-silently-obligates-its-vendored-copy | open | defect | pipeline | 2026-09-01 | — |
@@ -201,6 +202,7 @@
 | pipeline.gate-strength-shell-comment-understates-its-own-scope | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.gate-strength-shell-lane-refuses-any-command-containing-a-quoted-wildcard | closed | defect | pipeline | 2026-08-27 | — |
 | pipeline.gg-22s-own-remediation-order-creates-unclearable-ledger-debt | closed | defect | pipeline | 2026-08-29 | — |
+| pipeline.git-09-still-calls-the-append-only-source-ledger-a-projection-file | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.git-appears-despite-initializes-git-false | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.git-identity-ask-step-unreachable-through-live-cli-path | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.git-identity-must-be-set-immediately-before-first-commit-not-at-setup-time | closed | defect | pipeline | 2026-08-17 | — |
@@ -527,6 +529,7 @@
 | pipeline.test-path-guard-blocks-the-briefed-edit-and-offers-no-route | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.test-suites-use-host-tmp-instead-of-the-repos-own-scratch-convention | closed | workflow-improvement | pipeline | 2026-08-17 | — |
 | pipeline.the-ai-hardening-gate-has-no-home-in-any-approved-feature-package | open | defect | pipeline | 2026-08-28 | Scheduled for Nova B (PO decision 2026-08-28) |
+| pipeline.the-denial-trim-state-is-keyed-per-session-not-per-agent-as-its-comment-claims | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.the-dispatch-record-field-enumeration-omits-a-field-the-checker-requires | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.the-handover-size-guard-only-sees-one-of-two-write-paths | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.the-ledger-commit-rule-was-given-a-second-home-in-a-different-voice | open | defect | pipeline | 2026-09-01 | — |
@@ -598,7 +601,7 @@
 
 ## Counts
 
-- open: 88
+- open: 91
 - in_progress: 0
 - closed: 484
 - rejected: 3

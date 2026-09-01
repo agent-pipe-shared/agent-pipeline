@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "d86a81f976fcb23b3eb3d2ba675e5d337fc676280f9097eb0cfc606c5443670b"
+    "transitionHead": "5918aedf5e2d5378f6949ef260b6542a1574cf1da04c8d60536b8e598b29c7d6"
   },
   "counts": {
-    "open": 88,
+    "open": 91,
     "in_progress": 0,
     "closed": 484,
     "rejected": 3,
@@ -43,6 +43,15 @@
       "closureRepository": "self",
       "closureCommit": "615bcd247ccc0f339102d669e5d78cd6e684d874",
       "closureEvidence": "backlog/items/2026-08-08-a-checkout-that-cannot-be-clean-defeats-every-cleanliness-gate.md"
+    },
+    {
+      "id": "pipeline.a-critic-has-no-writable-location-for-its-own-report",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-01",
+      "source": "Reported independently by both Critic rounds dispatched 2026-09-01 (NVA-CR-D and NVA-CR-E). Each disclosed under CR-06-D that report persistence was unavailable and emitted its findings directly instead.",
+      "deferred": false
     },
     {
       "id": "pipeline.a-deferred-item-is-terminal-so-a-live-defect-can-be-parked-invisibly",
@@ -2408,6 +2417,15 @@
       "closureRepository": "self",
       "closureCommit": "794fa61970ebaac3eb5969a4b38b67134dd98c65",
       "closureEvidence": "backlog/items/2026-08-29-gg-22s-own-remediation-order-creates-unclearable-ledger-debt.md"
+    },
+    {
+      "id": "pipeline.git-09-still-calls-the-append-only-source-ledger-a-projection-file",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-01",
+      "source": "Residual of Critic round NVA-CR-E finding F-2, reported by dispatch NVA-B-LEDGERRULE2-FIX as out of its own scope: the correction landed in GIT-10 (commit 1c2d2681) while GIT-09 keeps the same wrong phrase.",
+      "deferred": false
     },
     {
       "id": "pipeline.git-appears-despite-initializes-git-false",
@@ -6526,6 +6544,15 @@
       "source": "Re-Critic vtpgate2-368458af finding F5, re-measured and found wider than reported",
       "deferred": false,
       "tracking": "Scheduled for Nova B (PO decision 2026-08-28)"
+    },
+    {
+      "id": "pipeline.the-denial-trim-state-is-keyed-per-session-not-per-agent-as-its-comment-claims",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-01",
+      "source": "Critic round NVA-CR-D against commit 1314edec, 2026-09-01: finding F2 (minor), plus the candidate it dropped under CR-05 for want of primary evidence, which is the reason F2 matters.",
+      "deferred": false
     },
     {
       "id": "pipeline.the-dispatch-record-field-enumeration-omits-a-field-the-checker-requires",
