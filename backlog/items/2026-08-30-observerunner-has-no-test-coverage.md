@@ -3,7 +3,8 @@ schema: pipeline.backlog-item.v1
 id: pipeline.observerunner-has-no-test-coverage
 type: defect
 owner: pipeline
-status: open
+status: closed
+closure_evidence: plugins/pipeline-core/lib/local-worker-supervisor.test.mjs
 created: 2026-08-30
 sprint: nova-b
 tracking: "Nova B -- Critic finding (minor), NVA-CF-SANDBOXQUICKFIX delta review, not blocking"
@@ -45,3 +46,26 @@ used for `buildLocalWorkerLaunch()`.
 - **Rationale:** pre-existing gap surfaced by an unrelated Critic review; not
   urgent enough to block the Nova 0.6.0 candidate
 - **Date:** 2026-08-30
+
+## Closed, 2026-09-01 — coverage landed, verified live before closing
+
+Commit `d8465468` added check `LWS15` to
+`plugins/pipeline-core/lib/local-worker-supervisor.test.mjs`:
+"pins observeRunner's Codex --version and --help probe argument vectors to the
+host-boundary sandbox". It locates the `observeRunner(` function body, extracts
+every `execFileSync` argument vector inside it, and asserts
+`danger-full-access` present with `workspace-write` and
+`sandbox_workspace_write.network_access` absent.
+
+Re-checked live before closing rather than trusting the dispatch report: the
+`observeRunner` grep this item cites as returning zero matches now returns the
+assertions above, and the suite is registered and passed in the full verify at
+`0f0ed3f7` (`local-worker-supervisor-core-tests`, exit 0).
+
+The coverage is broader than the Proposal asked for — it pins the `--version`
+probe as well as `--help`. Stated plainly for the record: it is a source-text
+assertion over the built argument vector, in the `LWS05` pattern this item's own
+Proposal named, not a behavioural execution test. That is the right shape for
+pinning an argument literal against accidental revert, which is the risk this
+item describes, and it is not sufficient evidence that the probe works against a
+real runner. Nothing here claims otherwise.
