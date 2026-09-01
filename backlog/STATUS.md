@@ -524,6 +524,7 @@
 | pipeline.this-hosts-local-marketplace-copy-is-not-symlinked-to-source | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.three-doc-and-adr-checkers-never-run-in-verify | rejected | defect | pipeline | 2026-08-27 | — |
 | pipeline.three-independent-copies-of-the-wsl-windows-path-normalization | closed | defect | pipeline | 2026-08-27 | — |
+| pipeline.three-onboarding-suites-pass-locally-and-fail-in-ci | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.three-runners-showed-wide-pipeline-administration-overhead-variance | open | idea | pipeline | 2026-08-29 | — |
 | pipeline.three-smaller-greenfield-defects | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.tp-ceremony-denials-inline-a-150-line-multi-shell-block-by-default | closed | workflow-improvement | pipeline | 2026-08-30 | NOW / Nova A -- PO decision 2026-08-30, item #12 of a 12-point instruction list: implement the Elephant's own guard-verbosity-slimming proposal. |
@@ -582,7 +583,7 @@
 
 ## Counts
 
-- open: 80
+- open: 81
 - in_progress: 0
 - closed: 476
 - rejected: 3
