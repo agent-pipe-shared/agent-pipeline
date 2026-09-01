@@ -3194,7 +3194,8 @@ export function applyProjectOnboardingManifestRepair({ rootDir = process.cwd(), 
   const fs = deps(overrides); const plan = planProjectOnboardingManifestRepair({ rootDir, deps: fs });
   if (plan.status !== "ready" || plan.planSha256 !== planSha256) return { schema: MANIFEST_REPAIR_SCHEMA, status: "invalid-plan", root: plan.root, diagnostics: [diagnostic("$.planSha256", "plan_digest_mismatch", "the supplied plan digest is not current", "run plan-manifest-repair again")] };
   const root = safeRoot(rootDir, fs); const target = safePath(root, ".claude/pipeline.yaml", fs); const parentPath = dirname(target);
-  let temp = null; let published = null; let publishedIdentity = null;
+  let temp = null; let tempIdentity = null; let tempSha256 = null;
+  let published = null; let publishedIdentity = null;
   try {
     const sourceNow = fs.readFileSync(safePath(root, SOURCE, fs), "utf8");
     if (sha256(sourceNow) !== plan.source.sha256) throw new Error("source bytes changed since planning");
@@ -3206,6 +3207,12 @@ export function applyProjectOnboardingManifestRepair({ rootDir = process.cwd(), 
     if (canonical.status !== "ready" || canonical.sha256 !== plan.generated.sha256) throw new Error("generated manifest changed since planning");
     const generated = canonical.bytes;
     fs.writeFileSync(temp, generated, { encoding: "utf8", flag: "wx", mode: 0o600 });
+    // NVA-B-ROUNDN F-B: bind the temporary the moment it exists. `generated` is
+    // the exact byte string just written to it, so the rollback below can decide
+    // its delete on content instead of on the path alone.
+    tempIdentity = fileIdentity(fs.lstatSync(temp));
+    if (!tempIdentity) throw new Error("manifest temporary identity is unavailable");
+    tempSha256 = sha256(generated);
     const tempFd = fs.openSync(temp, "r");
     try { fs.fsyncSync(tempFd); } finally { fs.closeSync(tempFd); }
     fs.fsyncDirectory?.(parentPath);
@@ -3221,7 +3228,14 @@ export function applyProjectOnboardingManifestRepair({ rootDir = process.cwd(), 
     if (inspection.status !== "ready") throw new Error("post-apply V4 readback was not ready");
     return { schema: MANIFEST_REPAIR_SCHEMA, status: "ready", root, planSha256, readback: { schema: SCHEMA, status: inspection.status, manifestSha256: sha256(generated) }, diagnostics: inspection.diagnostics ?? [] };
   } catch (error) {
-    if (temp) { try { if (fs.existsSync(temp)) fs.unlinkSync(temp); } catch {} }
+    // NVA-B-ROUNDN F-B: this delete used to be decided by nothing at all -- not
+    // content, not even identity -- while the line below it already bound its
+    // own. Identity alone would not have been enough either: under inode reuse
+    // it is exactly what matches the file that replaced our temporary (see
+    // `ownsPublishedOutput()`'s docblock). The temporary's bytes are known
+    // exactly, so ownership is decided on content; anything else is foreign and
+    // is left in place.
+    if (temp && tempIdentity && tempSha256) { try { if (ownsPublishedOutput(tempIdentity, tempSha256, temp, fs)) fs.unlinkSync(temp); } catch {} }
     if (published && publishedIdentity) { try { if (ownsPublishedOutput(publishedIdentity, plan.generated.sha256, published, fs)) fs.unlinkSync(published); } catch {} }
     return { schema: MANIFEST_REPAIR_SCHEMA, status: "rolled-back", root, diagnostics: [diagnostic("$.transaction", "apply_failed", error.message, "repair the target and replan")] };
   }

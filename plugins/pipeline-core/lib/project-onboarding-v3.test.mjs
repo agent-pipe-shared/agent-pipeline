@@ -8427,6 +8427,96 @@ test("F4 manifest repair temporary cleanup preserves foreign content when the te
   } finally { dispose(owned); }
 });
 
+// NVA-B-ROUNDN F-B. `applyProjectOnboardingManifestRepair` is the V3 twin of
+// the V4 transaction above, and its catch block deleted the publication
+// temporary on NOTHING -- not content, not even identity -- on the line
+// directly above the site that already calls `ownsPublishedOutput()`. The
+// commit that claimed to "decide delete ownership by content at every rollback
+// site" left it untouched. Same injection as above, for the same reason: under
+// inode reuse the replacement file is reported under the temporary's own inode
+// number, so an identity check would necessarily pass and ownership has to be
+// decided on the bytes. Both directions are pinned, so the fix cannot trade a
+// data-destruction bug for a leak.
+test("F-B V3 manifest repair temporary cleanup preserves foreign content when the temporary inode number is reused", () => {
+  const repairTemporaries = (rootPath) => {
+    const directory = join(rootPath, ".claude");
+    if (!existsSync(directory)) return [];
+    return readdirSync(directory)
+      .filter((entry) => entry.includes(".pipeline-manifest-repair-") && entry.endsWith(".tmp")).sort();
+  };
+  const path = readyManifestFixture();
+  try {
+    const plan = planProjectOnboardingManifestRepair({ rootDir: path, deps: fakeDeps });
+    assert.equal(plan.status, "ready", JSON.stringify(plan));
+    const nativeLstat = lstatSync;
+    let temporaryPath = null; let swapped = false; let temporaryIno = null;
+    const reuse = {
+      ...fakeDeps,
+      writeFileSync(target, bytes, options) {
+        writeFileSync(target, bytes, options);
+        if (typeof target === "string" && target.includes(".pipeline-manifest-repair-") && target.endsWith(".tmp")) {
+          temporaryPath = target;
+        }
+      },
+      linkSync() {
+        // The temporary is fully written and identity-bound at this point, so
+        // the swap models a reuse race observed after the transaction's own
+        // last write to it and before the failure path deletes it.
+        swapped = true; temporaryIno = nativeLstat(temporaryPath).ino;
+        unlinkSync(temporaryPath);
+        writeFileSync(temporaryPath, "foreign temporary content\n");
+        throw new Error("synthetic publication failure");
+      },
+      lstatSync(candidate) {
+        const info = nativeLstat(candidate);
+        if (!swapped || candidate !== temporaryPath) return info;
+        return {
+          dev: info.dev, ino: temporaryIno, nlink: info.nlink, mode: info.mode, size: info.size,
+          isSymbolicLink: () => info.isSymbolicLink(),
+          isFile: () => info.isFile(),
+          isDirectory: () => info.isDirectory(),
+        };
+      },
+    };
+    const result = applyProjectOnboardingManifestRepair({
+      runner: "codex", rootDir: path, planSha256: plan.planSha256, activate: true, deps: reuse,
+    });
+    assert.equal(swapped, true, "the inode-reuse injection never fired");
+    assert.equal(result.status, "rolled-back", JSON.stringify(result));
+    const leftovers = repairTemporaries(path);
+    assert.equal(leftovers.length, 1,
+      `the temporary cleanup deleted foreign content it never wrote: ${JSON.stringify({ result, leftovers })}`);
+    assert.equal(readFileSync(join(path, ".claude", leftovers[0]), "utf8"), "foreign temporary content\n");
+    assert.equal(existsSync(join(path, ".claude", "pipeline.yaml")), false);
+  } finally { dispose(path); }
+  // Ordinary path: the same failure WITHOUT the reuse still removes the
+  // temporary this transaction wrote itself.
+  const owned = readyManifestFixture();
+  try {
+    const plan = planProjectOnboardingManifestRepair({ rootDir: owned, deps: fakeDeps });
+    assert.equal(plan.status, "ready", JSON.stringify(plan));
+    let observed = false;
+    const failing = {
+      ...fakeDeps,
+      writeFileSync(target, bytes, options) {
+        writeFileSync(target, bytes, options);
+        if (typeof target === "string" && target.includes(".pipeline-manifest-repair-") && target.endsWith(".tmp")) {
+          observed = true;
+        }
+      },
+      linkSync() { throw new Error("synthetic publication failure"); },
+    };
+    const result = applyProjectOnboardingManifestRepair({
+      runner: "codex", rootDir: owned, planSha256: plan.planSha256, activate: true, deps: failing,
+    });
+    assert.equal(observed, true, "the repair temporary was never written");
+    assert.equal(result.status, "rolled-back", JSON.stringify(result));
+    assert.deepEqual(repairTemporaries(owned), [],
+      "the failure path must still delete the temporary it wrote itself");
+    assert.equal(existsSync(join(owned, ".claude", "pipeline.yaml")), false);
+  } finally { dispose(owned); }
+});
+
 test("F4 portable rollback preserves foreign content when a created target's inode number is reused", () => {
   const path = root();
   const nativeLstat = lstatSync;
