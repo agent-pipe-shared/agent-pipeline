@@ -58,25 +58,48 @@ range remain implicated here, and their verdicts are carried forward
 unchanged — the reasoning is restated compactly below rather than
 re-derived; see the `86810466` section above for the full analysis.
 
-- ADR-0012: checked, no change needed. (`docs/state.md` — additive checkpoint
-  activity and rotations across the range; unchanged since `86810466`.)
-- ADR-0056: checked, no change needed. (`guard-push.mjs`'s release-tag-ancestry
-  check and its follow-ups; `project/pipeline-state.json`'s one audit-write
-  commit; neither touches the `pushApproval` shape or `gates.push_approval`.)
-- ADR-0058: checked, no change needed. (`guard-lifecycle-ready.mjs`'s
-  grammar-denial trim; touches no GMW/HGO mechanism.)
-- ADR-0069: checked, no change needed. (ADR-0077/0078/0079 and the
-  `docs/adr/README.md` index rows, each numbered and landed at acceptance.)
-- ADR-0075: checked, no change needed. (Same `guard-push.mjs` finding as
-  ADR-0056; `pipeline-state.mjs`/`publication-authority.mjs` untouched.)
-- ADR-0077: checked, no change needed. (Same `guard-push.mjs` finding again;
-  `pipeline-state.mjs`'s `approve-push` untouched.)
-- ADR-0078: checked, no change needed. (`SETUP.md`, `pipeline-update-channel.mjs`,
-  `ruleset-freshness.mjs` implement this ADR's own accepted decision.)
-- ADR-0079: checked, no change needed. (`guardrails/git.md`'s GIT-09/GIT-10
-  fixes and new GG-22 rule; GIT-07 itself, the sentence this ADR governs,
-  remains unchanged — implementation deliberately deferred per the ADR's own
-  acceptance commit.)
+- ADR-0012: checked, no change needed.
+
+  `docs/state.md` — additive checkpoint activity and rotations across the
+  range; unchanged since `86810466`.
+
+- ADR-0056: checked, no change needed.
+
+  `guard-push.mjs`'s release-tag-ancestry check and its follow-ups;
+  `project/pipeline-state.json`'s one audit-write commit; neither touches
+  the `pushApproval` shape or `gates.push_approval`.
+
+- ADR-0058: checked, no change needed.
+
+  `guard-lifecycle-ready.mjs`'s grammar-denial trim; touches no GMW/HGO
+  mechanism.
+
+- ADR-0069: checked, no change needed.
+
+  ADR-0077/0078/0079 and the `docs/adr/README.md` index rows, each
+  numbered and landed at acceptance.
+
+- ADR-0075: checked, no change needed.
+
+  Same `guard-push.mjs` finding as ADR-0056;
+  `pipeline-state.mjs`/`publication-authority.mjs` untouched.
+
+- ADR-0077: checked, no change needed.
+
+  Same `guard-push.mjs` finding again; `pipeline-state.mjs`'s
+  `approve-push` untouched.
+
+- ADR-0078: checked, no change needed.
+
+  `SETUP.md`, `pipeline-update-channel.mjs`, `ruleset-freshness.mjs`
+  implement this ADR's own accepted decision.
+
+- ADR-0079: checked, no change needed.
+
+  `guardrails/git.md`'s GIT-09/GIT-10 fixes and new GG-22 rule; GIT-07
+  itself, the sentence this ADR governs, remains unchanged —
+  implementation deliberately deferred per the ADR's own acceptance
+  commit.
 
 **The one additional commit `67bb5005` (untracking 26 root-level
 `dispatch-record*.json` files and adding a `.gitignore` rule) is governed by
