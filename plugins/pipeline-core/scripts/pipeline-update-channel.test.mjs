@@ -21,9 +21,12 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import {
+  applyPipelineUpdateAlphaRef,
   applyPipelineUpdateChannel,
   isPipelineUpdateAlphaRef,
+  PIPELINE_UPDATE_ALPHA_REF_PLAN_SCHEMA,
   PIPELINE_UPDATE_CHANNEL_PLAN_SCHEMA,
+  planPipelineUpdateAlphaRef,
   planPipelineUpdateChannel,
   readProjectPipelineUpdateAlphaRef,
   readProjectPipelineUpdateChannel,
@@ -60,6 +63,16 @@ function applyPlan(root, plan, deps = {}) {
 function transactionArtifacts(root) {
   return readdirSync(join(root, "project"))
     .filter((name) => name.includes("pipeline-update-channel"));
+}
+
+function applyAlphaRefPlan(root, plan, deps = {}) {
+  return applyPipelineUpdateAlphaRef(root, {
+    alphaRef: plan.alphaRef,
+    expectedCalibrationSha256: plan.preimageSha256,
+    expectedPostimageSha256: plan.postimageSha256,
+    planSha256: plan.planSha256,
+    activate: true,
+  }, deps);
 }
 
 test.after(() => {
@@ -468,4 +481,159 @@ test("CLI admits no configured-channel, ref, URL, or remote bypass", () => {
     });
     assert.notEqual(output.status, 0);
   }
+});
+
+test("alpha-ref writer plans, applies, and replays the way the channel writer does (AC-1)", () => {
+  const before = "{\n  \"project\": \"self\",\n  \"pipelineUpdateAlphaRef\": \"feat/old\"\n}\n";
+  const root = fixture("alpha-ref-write", before);
+  const plan = planPipelineUpdateAlphaRef(root, "feat/sprint-nova-codex-v046");
+  assert.equal(plan.schema, PIPELINE_UPDATE_ALPHA_REF_PLAN_SCHEMA);
+  assert.equal(plan.status, "ready");
+  assert.deepEqual(plan.applyAction, {
+    kind: "command",
+    executable: "node",
+    mutation: true,
+    requiresConfirmation: true,
+    executionBoundary: "host-authorized-wsl",
+    argv: [
+      fileURLToPath(new URL("./pipeline-update-channel.mjs", import.meta.url)),
+      "apply",
+      "--repo",
+      root,
+      "--alpha-ref",
+      "feat/sprint-nova-codex-v046",
+      "--expected-calibration-sha256",
+      plan.preimageSha256,
+      "--expected-postimage-sha256",
+      plan.postimageSha256,
+      "--plan-sha256",
+      plan.planSha256,
+      "--activate",
+    ],
+    expected: {
+      schema: PIPELINE_UPDATE_ALPHA_REF_PLAN_SCHEMA,
+      statuses: ["applied", "replayed"],
+    },
+  });
+
+  const applied = applyAlphaRefPlan(root, plan);
+  assert.equal(applied.status, "applied");
+  const after = readFileSync(join(root, "project", "pipeline.json"), "utf8");
+  assert.equal(after, before.replace('"feat/old"', '"feat/sprint-nova-codex-v046"'));
+  assert.deepEqual(readProjectPipelineUpdateAlphaRef(root), {
+    status: "ready", alphaRef: "feat/sprint-nova-codex-v046", source: "project-config", reason: null,
+  });
+
+  const replay = applyAlphaRefPlan(root, plan);
+  assert.equal(replay.status, "replayed");
+  assert.equal(readFileSync(join(root, "project", "pipeline.json"), "utf8"), after);
+
+  const currentPlan = planPipelineUpdateAlphaRef(root, "feat/sprint-nova-codex-v046");
+  assert.equal(currentPlan.status, "current");
+  assert.equal(currentPlan.applyAction.mutation, false);
+  assert.deepEqual(transactionArtifacts(root), []);
+});
+
+test("alpha-ref apply refuses calibration drift and a forged or stale plan without writing (AC-1)", () => {
+  const root = fixture("alpha-ref-drift", '{"pipelineUpdateAlphaRef":"feat/a"}\n');
+  const plan = planPipelineUpdateAlphaRef(root, "feat/b");
+  const drifted = "{\n  \"project\": \"consumer-drifted\"\n}\n";
+  writeFileSync(join(root, "project", "pipeline.json"), drifted);
+  assert.equal(applyAlphaRefPlan(root, plan).reason, "calibration-drift");
+  assert.equal(readFileSync(join(root, "project", "pipeline.json"), "utf8"), drifted);
+
+  const forged = applyPipelineUpdateAlphaRef(root, {
+    alphaRef: "feat/b",
+    expectedCalibrationSha256: plan.preimageSha256,
+    expectedPostimageSha256: plan.postimageSha256,
+    planSha256: "f".repeat(64),
+    activate: true,
+  });
+  assert.equal(forged.reason, "invalid-plan");
+  assert.equal(readFileSync(join(root, "project", "pipeline.json"), "utf8"), drifted);
+});
+
+test("writing one field never touches the other, in either direction (AC-4)", () => {
+  const before = '{"project":"self","pipelineUpdateChannel":"alpha","pipelineUpdateAlphaRef":"feat/keep"}\n';
+  const rootA = fixture("ac4-alpha-ref-write", before);
+  const alphaPlan = planPipelineUpdateAlphaRef(rootA, "feat/new");
+  assert.equal(applyAlphaRefPlan(rootA, alphaPlan).status, "applied");
+  assert.equal(readProjectPipelineUpdateChannel(rootA).updateChannel, "alpha");
+  const afterAlphaWrite = readFileSync(join(rootA, "project", "pipeline.json"), "utf8");
+  assert.match(afterAlphaWrite, /"pipelineUpdateChannel":"alpha"/);
+  assert.equal(afterAlphaWrite, before.replace('"feat/keep"', '"feat/new"'));
+
+  const rootB = fixture("ac4-channel-write", before);
+  const channelPlan = planPipelineUpdateChannel(rootB, "beta");
+  assert.equal(applyPlan(rootB, channelPlan).status, "applied");
+  assert.equal(readProjectPipelineUpdateAlphaRef(rootB).alphaRef, "feat/keep");
+  const afterChannelWrite = readFileSync(join(rootB, "project", "pipeline.json"), "utf8");
+  assert.match(afterChannelWrite, /"pipelineUpdateAlphaRef":"feat\/keep"/);
+  assert.equal(afterChannelWrite, before.replace('"pipelineUpdateChannel":"alpha"', '"pipelineUpdateChannel":"beta"'));
+});
+
+test("alpha-ref writer refuses empty, whitespace-only, and structurally invalid values with a distinct reason matching the reader (AC-5)", () => {
+  const root = fixture("ac5-invalid");
+  for (const badRef of ["", "   ", "/leading-slash", "trailing-slash/", "has space", "-leading-dash"]) {
+    assert.equal(isPipelineUpdateAlphaRef(badRef), false, `reader validator must already reject ${JSON.stringify(badRef)}`);
+    const plan = planPipelineUpdateAlphaRef(root, badRef);
+    assert.equal(plan.status, "unknown");
+    assert.equal(plan.reason, "invalid-alpha-ref");
+  }
+  assert.equal(readFileSync(join(root, "project", "pipeline.json"), "utf8"), "{\n  \"project\": \"consumer\"\n}\n");
+
+  const applyInvalid = applyPipelineUpdateAlphaRef(root, {
+    alphaRef: "",
+    expectedCalibrationSha256: "a".repeat(64),
+    expectedPostimageSha256: "b".repeat(64),
+    planSha256: "c".repeat(64),
+    activate: true,
+  });
+  assert.equal(applyInvalid.reason, "invalid-alpha-ref");
+  assert.equal(readFileSync(join(root, "project", "pipeline.json"), "utf8"), "{\n  \"project\": \"consumer\"\n}\n");
+});
+
+test("CLI rejects supplying both --channel and --alpha-ref, and accepts --alpha-ref alone (AC-2)", () => {
+  const root = fixture("ac2-cli");
+  const both = spawnSync(process.execPath, [
+    fileURLToPath(new URL("./pipeline-update-channel.mjs", import.meta.url)),
+    "plan", "--repo", root, "--channel", "beta", "--alpha-ref", "feat/x",
+  ], { encoding: "utf8" });
+  assert.notEqual(both.status, 0);
+
+  const alphaOnly = spawnSync(process.execPath, [
+    fileURLToPath(new URL("./pipeline-update-channel.mjs", import.meta.url)),
+    "plan", "--repo", root, "--alpha-ref", "feat/sprint-alfred",
+  ], { encoding: "utf8" });
+  assert.equal(alphaOnly.status, 0);
+  const parsed = JSON.parse(alphaOnly.stdout);
+  assert.equal(parsed.schema, PIPELINE_UPDATE_ALPHA_REF_PLAN_SCHEMA);
+  assert.equal(parsed.alphaRef, "feat/sprint-alfred");
+});
+
+test("CLI readback exposes alphaRef alongside channel, additive to the existing output contract (AC-3)", () => {
+  const root = fixture("ac3-readback", '{"pipelineUpdateChannel":"beta","pipelineUpdateAlphaRef":"feat/sprint-alfred"}\n');
+  const output = spawnSync(process.execPath, [
+    fileURLToPath(new URL("./pipeline-update-channel.mjs", import.meta.url)),
+    "readback", "--repo", root,
+  ], { encoding: "utf8" });
+  assert.equal(output.status, 0);
+  const parsed = JSON.parse(output.stdout);
+  // Existing top-level channel-readback contract is untouched.
+  assert.deepEqual(
+    { status: parsed.status, updateChannel: parsed.updateChannel, source: parsed.source, reason: parsed.reason },
+    { status: "ready", updateChannel: "beta", source: "project-config", reason: null },
+  );
+  // Additive: the full alpha-ref reader result nested under its own key.
+  assert.deepEqual(parsed.alphaRef, {
+    status: "ready", alphaRef: "feat/sprint-alfred", source: "project-config", reason: null,
+  });
+});
+
+test("finding: readCalibration's channel-specific validation is not field-agnostic -- an invalid pre-existing channel blocks an unrelated alpha-ref write (AC-7 override, reported)", () => {
+  const root = fixture("entangled-invalid-channel", '{"pipelineUpdateChannel":"main"}\n');
+  const plan = planPipelineUpdateAlphaRef(root, "feat/unrelated");
+  assert.equal(plan.status, "unknown");
+  assert.equal(plan.reason, "invalid-channel");
+  assert.equal(readFileSync(join(root, "project", "pipeline.json"), "utf8"), '{"pipelineUpdateChannel":"main"}\n');
 });
