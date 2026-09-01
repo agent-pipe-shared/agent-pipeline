@@ -37,6 +37,33 @@ every host-specific assurance is complete. Read [What's new in
   governance and external-action threat model.
 - [`nova-execution-plane-threat-model.md`](nova-execution-plane-threat-model.md)
   — execution-plane scope, evidence, and intentionally excluded claims.
+- [`change-control.md`](change-control.md) — promotion gate that reconciles
+  Pipeline human authority with an authenticated external change receipt.
+- [`organization-policy-packs.md`](organization-policy-packs.md) — governance
+  floors and document-publication rules an organization pack can add on top of
+  the Pipeline's own authority, without creating a second authority system.
+
+## Governance and audit evidence
+
+- [`audit-bundles.md`](audit-bundles.md) — create-only, offline-verifiable
+  copy of one completed Feature Package's validated artifacts; evidence, not
+  a compliance claim.
+- [`evidence-viewer.md`](evidence-viewer.md) — static, offline HTML
+  projection of one governed Feature Package for reading, not for granting or
+  changing authority.
+- [`agent-decision-journal.md`](agent-decision-journal.md) — canonical record
+  of material, closed agent observations (assumptions, selections,
+  verification scope); cannot grant, consume, revoke, or replace human
+  authority.
+- [`governance-replay.md`](governance-replay.md) — read-only local
+  reconstruction of the canonical lifecycle event stream into per-dispatch
+  timelines; non-authoritative.
+- [`governance-event-export.md`](governance-event-export.md) — one-way,
+  non-authoritative projection of governance events to an external
+  destination under an explicit, field-limited policy.
+- [`external-traceability.md`](external-traceability.md) — provider-neutral,
+  sanitized references binding a Pipeline artifact to an external system
+  object, with credentials and coordinates kept out of the reference.
 
 ## Operations and reference
 
