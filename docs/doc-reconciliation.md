@@ -47,6 +47,85 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 79c3cbe92fc1416dc65daeca36d419ece082861e — 2026-09-01, range 56e91858..79c3cbe9, re-head onto the final candidate: the one additional commit beyond 67bb5005 removes the now-dead reference-path allowlist entry
+
+This candidate is `67bb5005`'s immediate successor: the single additional
+commit `79c3cbe9` removes one dead `ALLOWLIST` entry from
+`harness/scripts/check-reference-paths.mjs` (the exception for
+`dispatch-record-PHX-WP-EPIC-FILE-CONTRACT.json`, which no longer matches
+any tracked file after `67bb5005` untracked that file). All eight ADRs
+implicated in the `67bb5005` range remain implicated here, and their
+verdicts are carried forward unchanged — the reasoning is restated
+compactly below rather than re-derived; see the `67bb5005` section above
+for the full analysis.
+
+- ADR-0012: checked, no change needed.
+
+  `docs/state.md` — additive checkpoint activity and rotations across the
+  range; unchanged since `67bb5005`.
+
+- ADR-0056: checked, no change needed.
+
+  `guard-push.mjs`'s release-tag-ancestry check and its follow-ups;
+  `project/pipeline-state.json`'s one audit-write commit; neither touches
+  the `pushApproval` shape or `gates.push_approval`.
+
+- ADR-0058: checked, no change needed.
+
+  `guard-lifecycle-ready.mjs`'s grammar-denial trim; touches no GMW/HGO
+  mechanism.
+
+- ADR-0069: checked, no change needed.
+
+  ADR-0077/0078/0079 and the `docs/adr/README.md` index rows, each
+  numbered and landed at acceptance.
+
+- ADR-0075: checked, no change needed.
+
+  Same `guard-push.mjs` finding as ADR-0056;
+  `pipeline-state.mjs`/`publication-authority.mjs` untouched.
+
+- ADR-0077: checked, no change needed.
+
+  Same `guard-push.mjs` finding again; `pipeline-state.mjs`'s
+  `approve-push` untouched.
+
+- ADR-0078: checked, no change needed.
+
+  `SETUP.md`, `pipeline-update-channel.mjs`, `ruleset-freshness.mjs`
+  implement this ADR's own accepted decision.
+
+- ADR-0079: checked, no change needed.
+
+  `guardrails/git.md`'s GIT-09/GIT-10 fixes and new GG-22 rule; GIT-07
+  itself, the sentence this ADR governs, remains unchanged —
+  implementation deliberately deferred per the ADR's own acceptance
+  commit.
+
+**The one additional commit `79c3cbe9` (removing one dead allowlist entry
+from `harness/scripts/check-reference-paths.mjs`) is governed by none of
+the eight ADRs above**, verified directly against each ADR's own
+`Governs:` line rather than assumed:
+
+- ADR-0012 governs `docs/state.md` only.
+- ADR-0056 governs `pipeline.user.yaml`, `project/critical-human-proof.json`,
+  `project/pipeline-state.json`, `plugins/pipeline-core/hooks/guard-push.mjs`.
+- ADR-0058 governs `guard-gate-strength.mjs`, `guard-testpath.mjs`,
+  `human-guard-override.mjs`, `po-approval-proof.mjs`, `tool-write-target.mjs`,
+  `guard-command-grammar.mjs`, `guard-lifecycle-ready.mjs`, `hooks.json`,
+  `docs/human-guard-override-threat-model.md`, `docs/po-approval-proof-contract.md`.
+- ADR-0069 governs `docs/adr/**`, `check-adr-consistency.mjs`, `verify.mjs`.
+- ADR-0075 governs `publication-authority.mjs`, `publication-executor.mjs`,
+  `guard-push.mjs`, `pipeline-state.mjs`.
+- ADR-0077 governs `pipeline-state.mjs`, `guard-push.mjs`, `push-prepare.mjs`.
+- ADR-0078 governs `ruleset-freshness.mjs`, `pipeline-update-channel.mjs`,
+  `staleness-check.mjs`, `SETUP.md`.
+- ADR-0079 governs `guardrails/git.md`, `guard-git.mjs`.
+
+None of these lists includes `harness/scripts/check-reference-paths.mjs`,
+so the allowlist-entry-removal commit does not implicate a ninth ADR and
+does not change any of the eight verdicts above.
+
 ## Candidate 67bb500564c116af7df37624137bb3e328374d57 — 2026-09-01, range 56e91858..67bb5005, re-head onto the final candidate: the one additional commit beyond 86810466 untracks 26 root-level dispatch-record files
 
 This candidate is `86810466`'s immediate successor: the single additional
