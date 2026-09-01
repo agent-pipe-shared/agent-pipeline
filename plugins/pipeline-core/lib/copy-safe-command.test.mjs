@@ -628,3 +628,83 @@ test("NVA-B-COPYSAFE: a single path segment wider than one whole line falls back
   assert.equal(tokens.pop(), "");
   assert.deepEqual(tokens, [`/root/${hugeFilename}`, "plan"]);
 });
+
+/**
+ * NVA-B-COPYSAFE-FIX (AC-1; scratch/findings-registry-round-H.md F-1): the
+ * delimiter predicate is three-armed (space, forward slash, backslash), but
+ * every NVA-B-COPYSAFE test above builds POSIX-only (forward-slash) inputs,
+ * so the backslash arm is never taken -- an edit that drops or mistypes it
+ * would restore the pre-fix defect on the Windows half of the documented
+ * dual-platform contract with every existing suite still green. This test
+ * builds the same Windows-launcher-path shape the reviewer measured
+ * (`C:\<root>\plugins\pipeline-core\scripts\guard-human-override.mjs`,
+ * scanned over root lengths 1..60, where the reviewer measured the
+ * space/forward-slash-only predicate re-splitting the filename at 23 of 60
+ * lengths) and pins contiguity across that exact range.
+ */
+test("NVA-B-COPYSAFE-FIX (AC-1): a Windows backslash-delimited script path stays contiguous across a range of root lengths -- pins the backslash arm of the delimiter predicate", () => {
+  const failures = [];
+  for (let rootLen = 1; rootLen <= 60; rootLen += 1) {
+    const root = `C:\\${"r".repeat(rootLen)}`;
+    const script = `${root}\\plugins\\pipeline-core\\scripts\\guard-human-override.mjs`;
+    const rendered = renderHumanCopySafeCommand({
+      label: "plan",
+      executable: "node",
+      argv: [
+        placeholder(JSON.stringify(script)), "plan", "--repo", placeholder(JSON.stringify(root)),
+        "--request-sha256", "a".repeat(64),
+      ],
+    });
+    if (!rendered.text.includes("guard-human-override.mjs")) failures.push(rootLen);
+    if (!rendered.text.split(/\r?\n/u).every((line) => line.length <= 72)) failures.push(`${rootLen}(bound)`);
+  }
+  assert.deepEqual(failures, [], `Windows-delimited script filename split or bound exceeded at root lengths: ${failures.join(", ")}`);
+});
+
+/**
+ * NVA-B-COPYSAFE-FIX (AC-2/AC-3; scratch/findings-registry-round-H.md F-2):
+ * the NVA-B-COPYSAFE contiguity pin above asserts against the CONCATENATED
+ * `rendered.text`. `renderHumanCopySafeCommand` assembles that text from
+ * three INDEPENDENTLY chunked blocks (posix/powershell/cmd), and those
+ * blocks do not share wrap points -- each renderer uses a different
+ * per-line prefix, so the same value chunks differently in each. A
+ * regression that re-splits the filename in exactly ONE renderer is
+ * therefore masked by `includes()` on the concatenated text, which is
+ * satisfied by any one surviving block. This test checks
+ * `copyCommand.posix` / `.powershell` / `.cmd` SEPARATELY, spanning
+ * checkout lengths 1..250 -- the same range the reviewer independently
+ * re-measured per renderer (empty failure set), and the same range the
+ * NVA-B-COPYSAFE test above spans for the concatenated property (two full
+ * measured wrap-point-sensitive bands plus a third partial band).
+ */
+test("NVA-B-COPYSAFE-FIX (AC-2/AC-3): the script filename stays contiguous in EACH renderer separately -- posix, powershell and cmd -- across a range of checkout lengths spanning the measured wrap-point-sensitive bands", () => {
+  const failures = [];
+  for (let checkoutLen = 1; checkoutLen <= 250; checkoutLen += 1) {
+    const checkout = "/" + "c".repeat(Math.max(0, checkoutLen - 1));
+    const script = `${checkout}/plugins/pipeline-core/scripts/guard-human-override.mjs`;
+    const rendered = renderHumanCopySafeCommand({
+      label: "plan",
+      executable: "node",
+      argv: [
+        placeholder(JSON.stringify(script)), "plan", "--repo", placeholder(JSON.stringify(checkout)),
+        "--request-sha256", "a".repeat(64),
+      ],
+    });
+    for (const [rendererLabel, block, lineSep] of [
+      ["posix", rendered.copyCommand.posix, "\n"],
+      ["powershell", rendered.copyCommand.powershell, "\n"],
+      ["cmd", rendered.copyCommand.cmd, "\r\n"],
+    ]) {
+      // A per-renderer block may legitimately be null (that renderer cannot
+      // safely represent this value at all) -- see the sibling suite's own
+      // "may legitimately be null" note; skip only the null block, never the
+      // whole checkoutLen iteration.
+      if (block === null) continue;
+      if (!block.includes("guard-human-override.mjs")) failures.push(`${checkoutLen}(${rendererLabel})`);
+      if (!block.split(lineSep).every((line) => line.length <= rendered.copyCommand.maxColumns)) {
+        failures.push(`${checkoutLen}(${rendererLabel},bound)`);
+      }
+    }
+  }
+  assert.deepEqual(failures, [], `script filename split or bound exceeded, per renderer, at: ${failures.join(", ")}`);
+});
