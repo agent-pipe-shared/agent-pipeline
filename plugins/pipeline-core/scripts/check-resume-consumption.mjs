@@ -73,6 +73,20 @@ import { anyResumeHintConsumptionReceipt, inspectResumeHint, queryResumeHintCons
 
 export const SCHEMA = "pipeline.check-resume-consumption.v1";
 
+// NVA-B-RHMSG AC-2/AC-3: the failure text below used to explain the rule but name no way
+// out. Appended verbatim to every FATAL message this script produces. Never phrased as a
+// recommendation -- `consume` is honest ONLY when THIS session genuinely re-grounded on the
+// card's content; `discard` is honest when the card's content is already durably recorded
+// elsewhere, or no longer wanted. A receipt written without genuine re-grounding is the exact
+// F12/F13 regression this check exists to catch, so this text deliberately does not present
+// `consume` as the default or the quicker path.
+const DISPOSITION_GUIDANCE =
+  " -- two dispositions are available: `resume-hint.mjs consume` (honest only when THIS " +
+  "session genuinely re-grounded on the card's content) or `resume-hint.mjs discard` " +
+  "(honest when the card's content is already durably recorded elsewhere, or no longer " +
+  "wanted). Do not default to `consume` for speed: a receipt written without genuine " +
+  "re-grounding is the exact F12/F13 regression this check exists to catch.";
+
 function value(args, flag) {
   const index = args.indexOf(flag);
   return index < 0 ? null : args[index + 1] ?? null;
@@ -109,7 +123,7 @@ export function checkResumeConsumption({
         "a Resume-Hint card was available at bootstrap but no card-digest record exists to verify " +
         "consumption against (captured outside the CLI capture path, or the digest record is " +
         "unavailable) -- this is the F12/F13 regression shape: the agent proceeded as if it had " +
-        "read the card, with no mechanical way to confirm it",
+        "read the card, with no mechanical way to confirm it" + DISPOSITION_GUIDANCE,
     };
   }
   // queried.outcome === "not-consumed": absent, corrupt, or digest-mismatched receipt --
@@ -121,7 +135,7 @@ export function checkResumeConsumption({
     message:
       `an available Resume-Hint card at bootstrap has no matching consumption receipt for session ` +
       `${JSON.stringify(sessionId)} (${queried.code}) -- this is the F12/F13 regression shape: the ` +
-      "agent proceeded as if it had read the card, with no mechanical way to confirm it",
+      "agent proceeded as if it had read the card, with no mechanical way to confirm it" + DISPOSITION_GUIDANCE,
   };
 }
 
@@ -159,7 +173,7 @@ export function checkResumeConsumptionAnySession({
         "a Resume-Hint card was available at bootstrap but no card-digest record exists to verify " +
         "consumption against (captured outside the CLI capture path, or the digest record is " +
         "unavailable) -- this is the F12/F13 regression shape: the agent proceeded as if it had " +
-        "read the card, with no mechanical way to confirm it",
+        "read the card, with no mechanical way to confirm it" + DISPOSITION_GUIDANCE,
     };
   }
   // queried.outcome === "not-found": a digest is recorded but no receipt anywhere matches it.
@@ -169,7 +183,7 @@ export function checkResumeConsumptionAnySession({
     message:
       "an available Resume-Hint card at bootstrap has no matching consumption receipt from ANY " +
       `session (${queried.receiptCount} receipt(s) inspected) -- this is the F12/F13 regression ` +
-      "shape, now checked repo-wide: no session anywhere consumed the currently-live card",
+      "shape, now checked repo-wide: no session anywhere consumed the currently-live card" + DISPOSITION_GUIDANCE,
   };
 }
 
