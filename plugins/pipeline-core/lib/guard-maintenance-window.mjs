@@ -61,7 +61,6 @@ import {
 } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
-import { isSuccessfulSpawn } from "./successful-spawn.mjs";
 
 import { createPoApprovalIntent } from "./po-approval-proof.mjs";
 import { USER_SOURCE_PATH, readCriticalHumanProofPolicy, readHumanApprovalMode, verifyAgainstTrustAnchors } from "./critical-human-proof-policy.mjs";
@@ -164,21 +163,9 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/continuity-host-adapter.mjs",
   "plugins/pipeline-core/lib/continuity-state.mjs",
   "plugins/pipeline-core/lib/continuity-status.mjs",
-  "plugins/pipeline-core/lib/commit-message-policy.mjs",
   "plugins/pipeline-core/lib/critic-export-policy.mjs",
-  // NVA-B-CRITIC-HEALTH-ROUTING-2: codex-app-server-health.mjs is already
-  // kernel-protected below and resolves its high-risk Critic model through this
-  // V3 authority. A GS-6 window must not be able to change the authority that
-  // determines which model the protected health route probes.
-  "plugins/pipeline-core/lib/critic-route-v3.mjs",
-  // NVA-B-GMW-CRITIC-DISPOSITION: dispatch-record.mjs is already kernel and
-  // delegates the required/skip/evidence decision for every dispatch record to
-  // this module. A GS-6 window must not be able to rewrite that decision while
-  // leaving the record validator itself unchanged.
-  "plugins/pipeline-core/lib/critic-skip-decision.mjs",
   "plugins/pipeline-core/lib/critical-action-approval-request.mjs",
   "plugins/pipeline-core/lib/document-hooks.mjs",
-  "plugins/pipeline-core/lib/dispatch-record.mjs",
   "plugins/pipeline-core/lib/entrypoint.mjs",
   // pipeline.gmw-kernel-closure-test-does-not-model-spawn-edges: GMWKC01 now also walks
   // process-spawn edges (a kernel file handing a first-party script path to
@@ -194,7 +181,6 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/manifest.mjs",
   "plugins/pipeline-core/lib/onboarding-continuity.mjs",
   "plugins/pipeline-core/lib/plan-spec-state-v2.mjs",
-  "plugins/pipeline-core/lib/po-key-directory.mjs",
   "plugins/pipeline-core/lib/po-gate-authority.mjs",
   "plugins/pipeline-core/lib/po-gate-profile-publisher.mjs",
   "plugins/pipeline-core/lib/private-boundary.mjs",
@@ -207,7 +193,6 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   // because GMWKC01 is one non-decomposable transitive-closure assertion over the whole
   // array, not a per-edge-type check. Neither import is spawn-related.
   "plugins/pipeline-core/lib/protected-test-paths.mjs",
-  "plugins/pipeline-core/lib/protected-baseline.mjs",
   // publication-authority.mjs/publication-bundle.mjs/publication-bundle-v2.mjs/
   // publication-capability-preflight.mjs/review-economy.mjs below: transitive closure of
   // scripts/pipeline-state.mjs (one of the two spawn-edge additions), not spawn edges
@@ -216,13 +201,6 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/publication-bundle.mjs",
   "plugins/pipeline-core/lib/publication-bundle-v2.mjs",
   "plugins/pipeline-core/lib/publication-capability-preflight.mjs",
-  // NVA-B-REBWIRE-1: the rebase-authority resolver. Both guard-lifecycle-ready.mjs and
-  // guard-devplan-policy.mjs -- already kernel paths above -- import it to decide whether
-  // an active rebase carries its own already-approved authority, so it is kernel by the
-  // same transitive rule GMWKC01 enforces. It is also kernel on the merits rather than
-  // only by closure: a GS-6 window that could rewrite this module could manufacture an
-  // authority that relieves the dev-plan gate without a human signature.
-  "plugins/pipeline-core/lib/rebase-authority.mjs",
   "plugins/pipeline-core/lib/recovery-preview-attestation.mjs",
   // NVA-PATHIDENT-1: the single definition of how two spellings of one physical
   // repository path fold into one identity, imported directly by THIS file (see
@@ -242,7 +220,6 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/schema-lite.mjs",
   "plugins/pipeline-core/lib/session-cleanup-recovery.mjs",
   "plugins/pipeline-core/lib/source-observation.mjs",
-  "plugins/pipeline-core/lib/successful-spawn.mjs",
   "plugins/pipeline-core/lib/windows-private-state.mjs",
   "plugins/pipeline-core/lib/worktree-lifecycle.mjs",
   "plugins/pipeline-core/lib/yaml-lite.mjs",
@@ -257,7 +234,6 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   // Pre-existing, unrelated static-import gap (see protected-test-paths.mjs note above):
   // guard-lifecycle-ready.mjs already imported this before this dispatch touched anything.
   "plugins/pipeline-core/scripts/project-onboarding-v3.mjs",
-  "plugins/pipeline-core/scripts/settings-allowlist-merge.mjs",
   "plugins/pipeline-core/scripts/publication-close-journal.mjs",
   "plugins/pipeline-core/scripts/v3-bootstrap-authority.mjs",
   // VFX2-GMW (sprint_phoenix merge, 2026-08-26): GMWKC01 found this second closure gap
@@ -272,10 +248,6 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/control-execution-lifecycle-event.mjs",
   "plugins/pipeline-core/lib/decision-reference-dual-evaluation.mjs",
   "plugins/pipeline-core/lib/external-push-ledger.mjs",
-  "plugins/pipeline-core/lib/governance-action-artifact.mjs",
-  "plugins/pipeline-core/lib/governance-action-events.mjs",
-  "plugins/pipeline-core/lib/governance-gate-action.mjs",
-  "plugins/pipeline-core/lib/governance-recovery-reconciliation-action.mjs",
   "plugins/pipeline-core/lib/governance-event-store.mjs",
   "plugins/pipeline-core/lib/governance-event.mjs",
   "plugins/pipeline-core/lib/guard-authority-ledger-intake.mjs",
@@ -298,12 +270,10 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   // found already open at this dispatch's base commit -- caught by the same
   // non-decomposable closure assertion, not by the dynamic-import fix.
   "plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
-  "plugins/pipeline-core/lib/dispatch-budget-core.mjs",
   "plugins/pipeline-core/lib/plan-authority-staging-guard.mjs",
   "plugins/pipeline-core/lib/security-completeness-gate.mjs",
   "plugins/pipeline-core/lib/security-evidence-evaluator.mjs",
   "plugins/pipeline-core/lib/verify-evidence-path.mjs",
-  "plugins/pipeline-core/lib/checkpoint-push-audit.mjs",
   "plugins/pipeline-core/scripts/pre-push-hook-install.mjs",
   // NVA-GS15-1: onboarding-staging-authoring.mjs is imported by both
   // guard-gate-strength.mjs and guard-lifecycle-ready.mjs (already kernel above), so it
@@ -335,14 +305,8 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/public-core-origin-allowlist.mjs",
   "plugins/pipeline-core/lib/ruleset-source.mjs",
   "plugins/pipeline-core/lib/self-application-attestation-gate.mjs",
-  "plugins/pipeline-core/lib/installed-plugin-attestation.mjs",
-  "plugins/pipeline-core/lib/provenance-attestation.mjs",
-  "plugins/pipeline-core/lib/provenance-envelope.mjs",
   "plugins/pipeline-core/lib/trusted-tool-resolution.mjs",
-  "plugins/pipeline-core/lib/verify-selection.mjs",
   "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
-  "plugins/pipeline-core/scripts/check-clone-provisioning.mjs",
-  "plugins/pipeline-core/scripts/installed-plugin-attestation-host.mjs",
   "plugins/pipeline-core/scripts/pipeline-update-channel.mjs",
   "plugins/pipeline-core/scripts/po-approval-request.mjs",
   "plugins/pipeline-core/scripts/po-human-approval.mjs",
@@ -369,7 +333,6 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   // rather than constructing any of the content itself, so it never sits upstream of a
   // human-signed approval ceremony the way push-init.mjs does.
   "plugins/pipeline-core/scripts/push-init.mjs",
-  "plugins/pipeline-core/lib/push-destination-policy.mjs",
   // NVA-V26-SIGNINGIMPORTERS (2026-08-29): an eighth gap, the same shape as the seventh
   // (importer, not import target -- the closure walk only follows edges FROM a kernel
   // file outward, so a module that instead IMPORTS a kernel module is structurally
@@ -410,11 +373,6 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   // (guard-gate-strength.mjs, protected-test-paths.mjs, entrypoint.mjs) are all already
   // kernel above, so no further hops are needed.
   "plugins/pipeline-core/scripts/pre-commit-hook-install.mjs",
-  // NVA-B-COMMITMSG: project-onboarding-v3.mjs installs the finished-message
-  // backstop. Its generated implementation dynamically imports the shared
-  // commit-message policy and project-authority resolver, declared in the
-  // closure test because both paths are install-time-bound.
-  "plugins/pipeline-core/scripts/commit-msg-hook-install.mjs",
   "plugins/pipeline-core/scripts/check-protected-path-integrity.mjs",
   // Unrelated pre-existing gap GMWKC01 found already open at this dispatch's base
   // commit (see the "unrelated pre-existing gap" notes above for the same pattern):
@@ -433,23 +391,6 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   // commit-size check. Its own only first-party import, lib/project-authority.mjs, is
   // already kernel above, so no further hops are needed.
   "plugins/pipeline-core/lib/handover-rotation.mjs",
-  // Consumer Verify is reached from the kernel evidence producer. Its generated
-  // adapter dynamically imports the fixed plugin dispatcher; both ends remain
-  // protected, and the closure suite binds that declared edge to the real URL.
-  "plugins/pipeline-core/lib/consumer-baseline-verify.mjs",
-  "plugins/pipeline-core/lib/consumer-verify.mjs",
-  "plugins/pipeline-core/scripts/consumer-verify-check.mjs",
-  // NVA-B-GMW-KERNEL-PRECEDENCE (2026-09-12): accepted Nova B packages added
-  // imports below already-kernel enforcement modules. The dispatch-budget guard
-  // now delegates its signed, serialized budget decision to dispatch-policy and
-  // dispatch-budget-binding; the HGO library/CLI now delegate their durable
-  // consumption event to the governance-HGO action/source pair. A window that
-  // could rewrite any delegate could change the decision or evidence while
-  // leaving the importing kernel byte-for-byte intact.
-  "plugins/pipeline-core/lib/dispatch-budget-binding.mjs",
-  "plugins/pipeline-core/lib/dispatch-policy.mjs",
-  "plugins/pipeline-core/lib/governance-hgo-consumption-action.mjs",
-  "plugins/pipeline-core/lib/governance-hgo-consumption-source.mjs",
 ]);
 
 // The "plugins/pipeline-core/..." entries above are written against whatever
@@ -516,7 +457,7 @@ function physicalRoot(root) {
 
 function git(root, args, spawn = spawnSync) {
   const result = spawn("git", args, { cwd: root, encoding: "utf8", shell: false, timeout: 5000 });
-  if (!isSuccessfulSpawn(result)) {
+  if (result?.status !== 0 || result?.error) {
     const operation = args.map((value) => String(value).replace(/[^A-Za-z0-9._=-]/gu, "_")).join("-").slice(0, 120);
     const outcome = result?.error?.code ?? result?.error?.name ?? result?.signal ?? `exit-${String(result?.status)}`;
     fail("GMW-GIT", `repository identity is unavailable (operation=${operation}, outcome=${outcome})`);
@@ -1118,10 +1059,10 @@ function intervenedCommitsStayWithinScope({ root, spawn, candidateCommit, curren
     const spawnGit = (args) => spawn("git", args, { cwd: root, encoding: "utf8", shell: false, timeout: 5000 });
 
     const ancestor = spawnGit(["merge-base", "--is-ancestor", candidateCommit, currentCommit]);
-    if (!isSuccessfulSpawn(ancestor)) return false; // not a strict ancestor, or uncertain
+    if (ancestor?.error || ancestor?.status !== 0) return false; // not a strict ancestor, or uncertain
 
     const revList = spawnGit(["rev-list", "--parents", "--reverse", `${candidateCommit}..${currentCommit}`]);
-    if (!isSuccessfulSpawn(revList)) return false;
+    if (revList?.error || revList?.status !== 0) return false;
     const lines = String(revList.stdout ?? "").split("\n").map((line) => line.trim()).filter((line) => line !== "");
     if (lines.length === 0) return false; // inconsistent with the caller's own currentCommit !== candidateCommit check
 
@@ -1146,7 +1087,7 @@ function intervenedCommitsStayWithinScope({ root, spawn, candidateCommit, curren
       if (parents.length !== 1) return false; // merge commit or root commit: fail closed
 
       const diff = spawnGit(["diff", "--name-status", "-M", parents[0], commit]);
-      if (!isSuccessfulSpawn(diff)) return false;
+      if (diff?.error || diff?.status !== 0) return false;
       const diffLines = String(diff.stdout ?? "").split("\n").map((entry) => entry.trim()).filter((entry) => entry !== "");
       if (diffLines.length === 0) return false; // empty/malformed diff: fail closed
 
