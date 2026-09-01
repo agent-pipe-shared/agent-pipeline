@@ -586,12 +586,40 @@ test("installed hook: the handover-size measurement module is broken -- commit r
   assert.match(stderr, /could not be loaded/);
 });
 
-test("installed hook: a staged handover file too large for git show's own output buffer cannot be measured -- commit refused, never silently allowed", () => {
-  // AC-4 (the file itself cannot be measured): `git cat-file -e` (existence only, tiny output)
-  // succeeds for the staged blob, but `git show` (full content) exceeds spawnSync's default
-  // 1 MiB stdout buffer and fails -- gitObjectBytes reports ok:false, and the whole commit
-  // fails closed rather than silently treating the unmeasurable content as within cap.
-  const { dir, git } = freshRepo("e2e-handover-unmeasurable-staged");
+test("installed hook: a commit shrinking a handover file whose COMMITTED (HEAD) version exceeds 1 MiB is admitted, not blocked by the inability to read HEAD's content", () => {
+  // AC-1/AC-3 (NVA-B-HANDOVERPATH-FIX): reproduces and then pins the fix for the defect this
+  // dispatch closes. handoverSizeFinding() reads the committed (HEAD) size FIRST, via
+  // gitObjectBytes(). Before this fix, that read went through `git show` piped through
+  // spawnSync's default 1 MiB stdout buffer -- a HEAD blob over 1 MiB therefore failed to be
+  // read at all, and the whole finding came back unmeasurable BEFORE the decrease check (the
+  // escape route the cap's own design depends on) was ever reached, so a shrinking commit had
+  // no way to unblock itself. The oversized HEAD blob is committed BEFORE the hook is
+  // installed, matching the realistic onboarding precondition the registry names: the cap is
+  // small (30,000 bytes in production) and the file that motivates installing the hook is the
+  // one most likely to already be pathological.
+  const { dir, git } = freshRepo("e2e-handover-head-oversized-shrink-allowed");
+  writeHandoverCalibration(dir, { path: "docs/state.md", maxBytes: 40 });
+  git("add", ".claude/pipeline.json");
+  mkdirSync(join(dir, "docs"), { recursive: true });
+  writeFileSync(join(dir, "docs", "state.md"), "Q".repeat(2 * 1024 * 1024)); // 2 MiB committed HEAD version
+  git("add", "docs/state.md");
+  git("commit", "-q", "-m", "seed calibration and an oversized committed handover file (no hook installed yet)");
+  installHook(dir);
+  writeFileSync(join(dir, "docs", "state.md"), "short\n"); // far below cap, and a genuine shrink
+  git("add", "docs/state.md");
+  const { code, stderr } = commit(dir, "shrink the oversized handover file");
+  assert.equal(code, 0, stderr);
+});
+
+test("installed hook: a staged handover file far larger than 1 MiB is measured EXACTLY (no output-buffer ceiling) and refused for genuinely being over cap", () => {
+  // AC-2/AC-3 (NVA-B-HANDOVERPATH-FIX): before the fix, this exact 2 MiB fixture exceeded
+  // spawnSync's default 1 MiB stdout buffer when read via `git show`, and gitObjectBytes()
+  // reported ok:false -- the commit failed closed as "could not have its size measured", NOT
+  // because the file was over cap but because the OLD implementation could not read it at all.
+  // `git cat-file -s` never emits the object's content, only its exact byte count, so a 2 MiB
+  // blob is now measured precisely (asserted below via the exact byte count in the refusal
+  // message) and refused for the real, correct reason: it is not a decrease and is over cap.
+  const { dir, git } = freshRepo("e2e-handover-large-staged-measured-exactly");
   writeHandoverCalibration(dir, { path: "docs/state.md", maxBytes: 40 });
   git("add", ".claude/pipeline.json");
   mkdirSync(join(dir, "docs"), { recursive: true });
@@ -599,10 +627,132 @@ test("installed hook: a staged handover file too large for git show's own output
   git("add", "docs/state.md");
   git("commit", "-q", "-m", "seed calibration and a small handover file (no hook installed yet)");
   installHook(dir);
-  writeFileSync(join(dir, "docs", "state.md"), "Q".repeat(2 * 1024 * 1024)); // 2 MiB > spawnSync's default 1 MiB maxBuffer
+  const oversized = "Q".repeat(2 * 1024 * 1024); // 2 MiB > spawnSync's default 1 MiB maxBuffer
+  writeFileSync(join(dir, "docs", "state.md"), oversized);
   git("add", "docs/state.md");
-  const { code, stderr } = commit(dir, "stage an oversized handover file git show cannot read back through the hook's default buffer");
+  const { code, stderr } = commit(dir, "stage a 2 MiB handover file, far past any output-buffer ceiling");
   assert.notEqual(code, 0);
   assert.match(stderr, /BLOCKED \(agent-pipeline pre-commit hook\)/);
-  assert.match(stderr, /could not have its size measured/);
+  assert.match(stderr, /hard size cap/);
+  assert.doesNotMatch(stderr, /could not have its size measured/, "must be refused for being over cap, not for being unmeasurable");
+  assert.match(stderr, new RegExp(`Staged size: ${Buffer.byteLength(oversized, "utf8")} bytes`), "the exact byte count must appear -- proves no truncation through any output buffer");
+});
+
+// AC-4's genuinely-unmeasurable case is pinned at the PURE-HELPER level (gitObjectBytes /
+// handoverSizeFinding), not as a full e2e `git commit` the way the buffer-artifact test used to
+// be: a direct probe (scratch/probe-corrupted-head-e2e.mjs, scratch/probe-corrupted-staged-e2e.mjs
+// during this dispatch) confirmed that git's OWN `add`/`commit` machinery already refuses a
+// corrupted object outright (exit 128, "loose object ... is corrupt", raised by git itself)
+// before this hook ever runs -- so a full e2e commit against a corrupted repository cannot
+// observe this hook's own BLOCKED output at all, only git's unrelated fatal error. The pure
+// helpers below call the identical `git cat-file -e`/`-s` sequence `gitObjectBytes` uses
+// WITHOUT going through `git add`/`git commit` again, which is exactly what still lets the
+// corrupted-object case be exercised deterministically.
+
+test("gitObjectBytes: present blob whose object is corrupted on disk -> ok:false (fail closed, never a silent measurement)", async () => {
+  const { gitObjectBytes } = await implModule();
+  const { dir, git } = freshRepo("handover-bytes-corrupted");
+  mkdirSync(join(dir, "docs"), { recursive: true });
+  writeFileSync(join(dir, "docs", "state.md"), "short\n");
+  git("add", "docs/state.md");
+  git("commit", "-q", "-m", "add docs/state.md");
+
+  const shaRes = spawnSync("git", ["rev-parse", "HEAD:docs/state.md"], { cwd: dir, encoding: "utf8" });
+  const sha = shaRes.stdout.trim();
+  const commonDir = commonDirOf(dir);
+  const objPath = join(commonDir, "objects", sha.slice(0, 2), sha.slice(2));
+  const before = readFileSync(objPath);
+  const corrupted = Buffer.from(before);
+  for (let i = 5; i < Math.min(15, corrupted.length); i++) corrupted[i] = corrupted[i] ^ 0xff;
+  chmodSync(objPath, 0o644);
+  writeFileSync(objPath, corrupted);
+
+  // Confirm the precondition this test depends on: the object is still reported PRESENT
+  // (existence does not require successfully inflating the zlib stream) even though it is
+  // corrupted -- this is what makes present:true, ok:false reachable at all.
+  const existsCheck = spawnSync("git", ["cat-file", "-e", "HEAD:docs/state.md"], { cwd: dir, encoding: "utf8" });
+  assert.equal(existsCheck.status, 0, "precondition: cat-file -e must still see the corrupted object as present");
+
+  const result = gitObjectBytes(dir, "HEAD:docs/state.md");
+  assert.deepEqual(result, { present: true, ok: false, bytes: null });
+});
+
+test("handoverSizeFinding: the committed (HEAD) blob is corrupted -> measurable:false, never a silent allow", async () => {
+  const { handoverSizeFinding } = await implModule();
+  const { dir, git } = freshRepo("handover-finding-head-corrupted");
+  mkdirSync(join(dir, "docs"), { recursive: true });
+  writeFileSync(join(dir, "docs", "state.md"), "short\n");
+  git("add", "docs/state.md");
+  git("commit", "-q", "-m", "add docs/state.md");
+
+  const shaRes = spawnSync("git", ["rev-parse", "HEAD:docs/state.md"], { cwd: dir, encoding: "utf8" });
+  const sha = shaRes.stdout.trim();
+  const commonDir = commonDirOf(dir);
+  const objPath = join(commonDir, "objects", sha.slice(0, 2), sha.slice(2));
+  const before = readFileSync(objPath);
+  const corrupted = Buffer.from(before);
+  for (let i = 5; i < Math.min(15, corrupted.length); i++) corrupted[i] = corrupted[i] ^ 0xff;
+  chmodSync(objPath, 0o644);
+  writeFileSync(objPath, corrupted);
+
+  const finding = handoverSizeFinding(dir, "docs/state.md", 40);
+  assert.equal(finding.measurable, false);
+  assert.match(finding.detail, /committed \(HEAD\) version/);
+});
+
+test("installed hook: non-UTF-8 content in the handover file is measured as its exact raw byte length, not as re-encoded characters", () => {
+  // AC-5: pins the encoding half of F-1. The OLD implementation decoded `git show`'s stdout
+  // with Node's `encoding: 'utf8'`, which replaces an invalid byte sequence with U+FFFD
+  // (re-encoding at 3 bytes) before `Buffer.byteLength` ever ran -- a byte-level measurement
+  // corrupted by decode-then-re-encode. `git cat-file -s` never decodes anything; it reports
+  // the object's own recorded size, so this fixture's raw byte count (computed from the exact
+  // bytes written, never from a decoded JS string) must match exactly.
+  const { dir, git } = freshRepo("e2e-handover-non-utf8-exact-bytes");
+  writeHandoverCalibration(dir, { path: "docs/state.md", maxBytes: 4 * 1024 * 1024 });
+  git("add", ".claude/pipeline.json");
+  mkdirSync(join(dir, "docs"), { recursive: true });
+  // Invalid UTF-8: a lone continuation byte (0x80) and a byte that can never start a valid
+  // UTF-8 sequence (0xFF), interleaved with ASCII so the fixture is not merely "all garbage".
+  const invalidBytes = Buffer.from([0x68, 0x69, 0x80, 0xff, 0x80, 0xff, 0x6a, 0x6b]);
+  writeFileSync(join(dir, "docs", "state.md"), invalidBytes);
+  git("add", "docs/state.md");
+  git("commit", "-q", "-m", "seed calibration and a non-UTF-8 handover file (no hook installed yet)");
+  installHook(dir);
+  // Grow it (still invalid UTF-8) so the commit-boundary check actually evaluates the cap
+  // rather than taking the always-admitted decrease branch.
+  const grownInvalid = Buffer.concat([invalidBytes, Buffer.from([0x80, 0xff, 0x80, 0xff])]);
+  writeFileSync(join(dir, "docs", "state.md"), grownInvalid);
+  git("add", "docs/state.md");
+  const { code, stderr } = commit(dir, "grow the non-UTF-8 handover file");
+  assert.equal(code, 0, stderr); // below the 4 MiB test cap -- this just proves measurement did not throw/misbehave on invalid UTF-8
+
+  // Directly assert the exact-byte-count property via `git cat-file -s`, against the raw buffer
+  // length of the now-committed (grown) content (never a decoded-and-re-encoded string).
+  const sizeRes = spawnSync("git", ["cat-file", "-s", "HEAD:docs/state.md"], { cwd: dir, encoding: "utf8" });
+  assert.equal(Number(sizeRes.stdout.trim()), grownInvalid.length);
+});
+
+test("installed hook: a non-canonical but valid calibration path spelling for the handover file is still matched at the commit boundary", () => {
+  // AC-6 (F-2): resolveHandoverConfig() applies no normalization to `handover.path`, so a
+  // calibration authored with a leading "./" must still resolve to the SAME absolute path as
+  // the canonical git-relative spelling the staged-paths list actually carries, matching
+  // guard-handover-size.mjs's own resolved-path comparison. Before the fix, raw string equality
+  // (`paths.includes(handoverConfig.path)`) silently never matched this spelling and the check
+  // was skipped entirely -- no block, no diagnostic.
+  const { dir, git } = freshRepo("e2e-handover-noncanonical-path-spelling");
+  writeHandoverCalibration(dir, { path: "./docs/state.md", maxBytes: 40 });
+  git("add", ".claude/pipeline.json");
+  mkdirSync(join(dir, "docs"), { recursive: true });
+  writeFileSync(join(dir, "docs", "state.md"), "short\n");
+  git("add", "docs/state.md");
+  git("commit", "-q", "-m", "seed calibration (non-canonical path spelling) and a small handover file (no hook installed yet)");
+  installHook(dir);
+  const target = join(dir, "docs", "state.md");
+  const bypass = spawnSync(process.execPath, ["-e", `require("fs").writeFileSync(${JSON.stringify(target)}, "X".repeat(80) + "\\n")`], { encoding: "utf8" });
+  assert.equal(bypass.status, 0, "the bypass write itself must succeed -- it never crosses any PreToolUse hook");
+  git("add", "docs/state.md");
+  const { code, stderr } = commit(dir, "attempt to grow the handover file past cap while calibration spells its path non-canonically");
+  assert.notEqual(code, 0, "must still be blocked -- a non-canonical calibration spelling must not silently escape the check");
+  assert.match(stderr, /BLOCKED \(agent-pipeline pre-commit hook\)/);
+  assert.match(stderr, /hard size cap/);
 });

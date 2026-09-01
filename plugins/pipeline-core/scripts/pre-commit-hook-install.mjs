@@ -436,20 +436,38 @@ function isTrustAnchorBootstrapUpgrade(projectRoot, relPath) {
 
 /**
  * HANDOVER-SIZE COMPANION CHECK (NVA-B-HANDOVERPATH, 2026-09-01, backlog/items/
- * 2026-09-01-the-handover-size-guard-only-sees-one-of-two-write-paths.md). Reads a git
- * object's raw content by REV-SPEC (\`HEAD:<path>\` for the last commit, \`:<path>\` for the
- * staged index) and reports its UTF-8 byte length -- or reports the object is simply ABSENT
- * at that point (never committed yet, or staged for deletion), which callers treat as zero
- * bytes, never as a measurement failure. \`present: true, ok: false\` is the one case that
- * must fail the caller CLOSED: the object is known to exist yet its content could not be
- * read, so its size genuinely cannot be established.
+ * 2026-09-01-the-handover-size-guard-only-sees-one-of-two-write-paths.md; buffer/encoding fix
+ * NVA-B-HANDOVERPATH-FIX, 2026-09-01, scratch/findings-registry-round-G.md F-1). Establishes a
+ * git object's exact byte count by REV-SPEC (\`HEAD:<path>\` for the last commit, \`:<path>\` for
+ * the staged index) WITHOUT ever reading its content: \`git cat-file -s <revspec>\` asks git
+ * for the object's own recorded size and prints only that decimal number, never the object's
+ * bytes -- so there is no content to decode, no encoding transform, and (since the printed
+ * number is always a handful of bytes regardless of how large the object itself is) no way for
+ * spawnSync's default 1 MiB stdout buffer to ever come into play. This replaces an earlier
+ * version of this function that ran \`git show <revspec>\` and measured the returned STRING with
+ * \`Buffer.byteLength\`: that both re-encoded non-UTF-8 content (an invalid byte sequence decodes
+ * to U+FFFD and re-encodes at 3 bytes, inflating the measured size) and, for any object whose
+ * content exceeded spawnSync's 1 MiB default buffer, failed outright -- HEAD is checked first by
+ * \`handoverSizeFinding()\` below, so a handover file that had ever grown past 1 MiB before this
+ * hook was installed made EVERY subsequent commit unmeasurable, including a shrink to one byte,
+ * because the decrease check was never reached (confirmed via a corrected test in
+ * pre-commit-hook-install.test.mjs; the buffer ceiling was proven with a direct probe: a
+ * corrupted-but-present blob still fails \`cat-file -s\`, so the fail-closed branch below stays
+ * reachable through a genuine unreadability, never through this file's own former buffer limit).
+ * The object is simply ABSENT at that revspec (never committed yet, or staged for deletion) is
+ * reported distinctly and callers treat it as zero bytes, never as a measurement failure.
+ * \`present: true, ok: false\` is the one case that must fail the caller CLOSED: the object is
+ * known to exist yet its size could not be established (a corrupted object store, for example),
+ * exercised directly by a test that flips bytes in a loose object file so \`cat-file -e\` still
+ * reports the object present while \`cat-file -s\` fails to inflate it.
  */
 export function gitObjectBytes(projectRoot, revSpec) {
   const exists = git(["cat-file", "-e", revSpec], projectRoot);
   if (exists.status !== 0) return { present: false, ok: true, bytes: 0 };
-  const show = git(["show", revSpec], projectRoot);
-  if (show.status !== 0) return { present: true, ok: false, bytes: null };
-  return { present: true, ok: true, bytes: Buffer.byteLength(show.stdout ?? "", "utf8") };
+  const size = git(["cat-file", "-s", revSpec], projectRoot);
+  const trimmed = (size.stdout ?? "").trim();
+  if (size.status !== 0 || !/^[0-9]+$/.test(trimmed)) return { present: true, ok: false, bytes: null };
+  return { present: true, ok: true, bytes: Number(trimmed) };
 }
 
 /**
@@ -467,11 +485,11 @@ export function gitObjectBytes(projectRoot, revSpec) {
 export function handoverSizeFinding(projectRoot, relPath, maxBytes) {
   const current = gitObjectBytes(projectRoot, \`HEAD:\${relPath}\`);
   if (!current.ok) {
-    return { measurable: false, detail: "the committed (HEAD) version of the handover file could not be read via \`git show\`" };
+    return { measurable: false, detail: "the committed (HEAD) version of the handover file's size could not be established via \`git cat-file -s\`" };
   }
   const proposed = gitObjectBytes(projectRoot, \`:\${relPath}\`);
   if (!proposed.ok) {
-    return { measurable: false, detail: "the staged (index) version of the handover file could not be read via \`git show\`" };
+    return { measurable: false, detail: "the staged (index) version of the handover file's size could not be established via \`git cat-file -s\`" };
   }
   if (proposed.bytes < current.bytes) return { measurable: true, blocked: false }; // net decrease -- always admitted
   if (proposed.bytes >= maxBytes) {
@@ -529,8 +547,18 @@ async function main() {
     block([\`the handover-file configuration could not be resolved (\${error?.name ?? "Error"}) -- cannot evaluate the handover size cap, failing closed.\`]);
     return;
   }
-  if (paths.includes(handoverConfig.path)) {
-    const handoverFinding = handoverSizeFinding(projectRoot, handoverConfig.path, handoverConfig.maxBytes);
+  // AC-6 (NVA-B-HANDOVERPATH-FIX, F-2): matched by RESOLVED absolute path, mirroring
+  // guard-handover-size.mjs's own \`resolve(root, filePath) === resolve(root, config.path)\`
+  // comparison exactly -- not by raw string equality against handoverConfig.path, which
+  // resolveHandoverConfig() never normalizes. \`paths\` entries are already git's own canonical,
+  // repo-relative spelling (from \`git diff --cached --name-only -z\`), so resolving each against
+  // projectRoot and comparing against the resolved calibration path catches a non-canonical but
+  // still-valid calibration spelling (\`./docs/state.md\`, \`docs//state.md\`) the guard already
+  // tolerates via its own \`resolve()\` call.
+  const handoverAbs = resolve(projectRoot, handoverConfig.path);
+  const matchedHandoverPath = paths.find((relPath) => resolve(projectRoot, relPath) === handoverAbs);
+  if (matchedHandoverPath) {
+    const handoverFinding = handoverSizeFinding(projectRoot, matchedHandoverPath, handoverConfig.maxBytes);
     if (!handoverFinding.measurable) {
       block([\`the handover file at \${handoverConfig.path} could not have its size measured at the commit boundary (\${handoverFinding.detail}) -- cannot evaluate the handover size cap, failing closed.\`]);
       return;
