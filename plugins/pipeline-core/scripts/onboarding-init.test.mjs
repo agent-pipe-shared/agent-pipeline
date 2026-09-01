@@ -104,8 +104,29 @@ const GREENFIELD_MACHINE_STATES = [
   { name: "valid-registered-key", env: FIXTURE_ENV_WITH_KEY, hasKey: true },
 ];
 
+// NVA-B-CIGREEN-1. The driver executes the selected runner's OWN executable, so
+// this fixture silently depended on the host having `codex`/`claude`/
+// `antigravity` installed: it isolated HOME and never isolated PATH. Under the
+// verify workflow's synthetic PATH (node, git, bash, sh, openssl and nothing
+// else) the runtime readback found no runner executable, reported
+// `runtime_executable_unavailable` / `runtime-readback-unavailable`, and the
+// suite failed on the CI runner while passing on any developer machine that
+// happens to have one installed -- a property of the host, not of the code
+// under test. The runners are stubbed into a test-local directory placed FIRST
+// on PATH (the shape trust-anchor-bootstrap-circularity.repro.test.mjs already
+// uses for `openssl`), so the lookup is decided by the fixture. `git` and the
+// rest of the ambient PATH stay reachable behind it.
+const RUNNER_STUB_DIR = mkdtempSync(join(tmpdir(), "onboarding-init-runner-stubs-"));
+for (const runner of GREENFIELD_RUNNERS) {
+  writeFileSync(join(RUNNER_STUB_DIR, runner), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+}
+const PATH_DELIMITER = process.platform === "win32" ? ";" : ":";
+const STUBBED_RUNNER_PATH = [RUNNER_STUB_DIR, process.env.PATH]
+  .filter((entry) => typeof entry === "string" && entry.length > 0)
+  .join(PATH_DELIMITER);
+
 function withConflictingAmbientRunner(env, runner) {
-  const conflicted = { ...env };
+  const conflicted = { ...env, PATH: STUBBED_RUNNER_PATH };
   for (const key of ["CLAUDECODE", "ANTIGRAVITY_AGENT", "AI_AGENT", "CODEX_SESSION_ID", "CODEX_THREAD_ID"]) delete conflicted[key];
   if (runner === "claude") conflicted.CODEX_THREAD_ID = "ambient-codex-fixture";
   else conflicted.CLAUDECODE = "1";
