@@ -2,14 +2,12 @@
 
 > Agent-Pipeline · Sprint Nova · as of 2026-09-01
 
-> **Draft — no ADR number yet.** Filed under [ADR-0069](0069-adr-numbers-are-allocated-at-acceptance.md)
-> Decision 2: a new ADR is written as `docs/adr/draft-<slug>.md` and receives its number only in
-> the act of being accepted into the trunk, in the same commit that renames the file and rewrites
-> its slug references. Until then it is referenced by slug
-> (`draft-push-approvals-per-destination`), and it carries no row in `docs/adr/README.md`'s index
-> — that row is added at acceptance (ADR-0069 D2), not at draft time.
+> **Accepted as ADR-0077 on 2026-09-01.** Written as `draft-push-approvals-per-destination.md`
+> and numbered in the act of acceptance, per [ADR-0069](0069-adr-numbers-are-allocated-at-acceptance.md)
+> Decision 2 — this file's rename, its index row in `docs/adr/README.md`, and this status change
+> are one commit.
 
-**Status:** proposed (2026-09-01) — awaiting PO acceptance. **Basis:**
+**Status:** accepted (2026-09-01, PO decision in session). **Basis:**
 `backlog/items/2026-09-01-a-push-approval-occupies-a-single-slot-so-destinations-cannot-be-prepared-together.md`,
 filed from a measured live release. **Refines** [ADR-0056](0056-push-approval-mode.md) (the push
 gate itself and its `signature`/`chat` clearance modes) without reopening it. **Leaves untouched**
@@ -124,7 +122,7 @@ enforcing single use, only the thing `guard-push.mjs` reads to find a currently-
 
 ### D1 — Additive schema: `pushApproval.byDestination`
 
-Add `pushApproval.byDestination`, a map keyed by the composite string `` `${remote} ${destination}` ``
+Add `pushApproval.byDestination`, a map keyed by the composite string `` `${remote}\0${destination}` ``
 (or equivalent unambiguous composite — the exact separator is an implementation detail, not a
 decision this ADR fixes) to `approvalRecord` values of the **same shape** `approve-push` already
 builds (`approvedBy`, `approvedAt`, `forCommit`, `criticalProof`, `remote`, `destination`,
@@ -222,7 +220,7 @@ finding it live.
 
 ## Alternatives considered
 
-### Considered and DEFERRED, not chosen: one signature over an enumerated destination set
+### Considered and REJECTED: one signature over an enumerated destination set
 
 The backlog item's second sketch: a single signed subject naming a SET of destinations —
 `{main, stable, feat/sprint-nova-codex-v046}` together — signed once, with each push consuming its
@@ -238,10 +236,11 @@ approve schreiben, pin eingeben") is written in terms of one clearance per act. 
 signed subject to a set is exactly the kind of trust-boundary question that deserves its own
 decision, deliberately, rather than arriving as a side effect of fixing a storage bug.
 
-**Deferred, not rejected:** the PO deferred this direction deliberately on 2026-09-01, alongside
-accepting the per-destination direction as the immediate fix for the measured defect. It remains
-available as a follow-up if the passphrase-count cost (not the storage-clobber cost, which this
-ADR fixes either way) is later judged worth its own trade-off.
+**Rejected, not deferred (PO, 2026-09-01):** a push to `main` is rare, so the passphrase-count
+saving is both small and rarely collected, while the widened trust boundary would be permanent.
+The PO weighed those against each other directly and chose the narrower boundary. Recorded as a
+closed question rather than a parked one: reopening it needs a new decision and a new reason, not
+merely a later appetite for fewer prompts.
 
 ### Considered and rejected: migrate `lastApproved` away instead of keeping it additive
 
@@ -280,7 +279,7 @@ approving two destinations in the same sitting could leave a second entry's `pen
 flag stuck `true` after the first is folded — an implementation defect to guard against at build
 time, not a design flaw in this decision. The set-subject alternative's passphrase-count benefit
 remains unrealized; this decision trades that benefit for a narrower, better-bounded trust
-boundary, deliberately.
+boundary, deliberately and permanently (PO, 2026-09-01).
 
 ## Follow-up
 
@@ -288,8 +287,6 @@ boundary, deliberately.
   together to have any effect; D5's fold-multiple-entries fix; negative-corpus coverage for a
   keyed entry whose `forCommit` no longer matches HEAD, and for the `lastApproved`-fallback path
   against a pre-existing state file with no `byDestination` map.
-- The set-subject alternative (deferred above) is available for a future ADR if the PO revisits
-  the passphrase-count cost specifically.
 - `backlog/items/2026-08-16-every-gate-binds-the-whole-tree-so-any-later-commit-voids-it.md`
   remains open and is not narrowed by this decision, beyond confirming (Context, above) that the
   push-approval slot defect was one specific, now-decided instance of that general shape.
