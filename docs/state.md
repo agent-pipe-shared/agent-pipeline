@@ -116,6 +116,66 @@ recovered by inspecting the tree directly and resuming with a
 closing-allowance-only message. The briefed tool budget is not a mechanism —
 `maxTurns` is. Treat a briefed cap as advisory and the cliff as real.
 
+**0.6.0 is pushed to `nova` and the release stopped one step short of `main`.**
+Candidate `56e91858` landed on `feat/sprint-nova-codex-v046` (`dfd26254..56e91858`)
+with a signed approval bound to that exact commit and tree `dc84c401`, signed
+with the pinned trust anchor `2de20a39`. Verify 505/505 `binding: "exact"`,
+security CLEAN, an independent Critic review run, Layer 1b reconciled. What is
+NOT done: `main`, `stable`, the `v0.6.0` tag and the release.
+
+**Two gate defects were repaired to get that far, both structural rather than
+incidental.** (1) `docs/adr/0076`'s `Governs:` line held prose where
+`check-doc-reconciliation.mjs` parses a comma-separated glob list, producing an
+`ORPHAN-GOVERNS-GLOB` that is a static corpus property — it blocked EVERY Layer 1b run in
+this repository regardless of range, and no record could clear it. (2) `.git/agent-pipeline/po-key-directory.json` (2026-08-11) outranks
+the machine plane in `parseHumanArgs`'s precedence, so `push-prepare` resolved a
+stale, unpinned key directory instead of the OneDrive one the repository actually
+pins. Removing the stale pointer made the trust-anchor check green. Both cost a
+live ceremony's worth of confusion before being diagnosed.
+
+**Push approvals occupy a SINGLE slot.** `pipeline-state.mjs` writes
+`pushApproval: { lastApproved: … }`, so a second `approve-push` overwrites the
+first. Signatures for `main` and `stable` cannot be taken in advance alongside
+one for `nova`; each destination is its own sign -> approve -> push cycle. The
+subject hash binds `{sourceCommit, remote, destination, threatModel}`, and
+`push-prepare` additionally refuses whenever `evidence.commit !== HEAD`, so every
+commit after a verify run forces a fresh ~10-minute verify before any signature.
+
+**CI executed the suites for the first time since 2026-08-02.** Run
+`33471808564` (`workflow_dispatch`, candidate `56e91858`) ran 6m37s and reached
+suite index 439/505 before failing, where every run since 2026-08-02 had aborted
+in 8-29s at `verify-journal` with zero suites started. `ed491309` is therefore
+confirmed against the real CI environment, not only against a local clone.
+
+**Exactly three suites failed there and pass locally**, and the cause is measured,
+not assumed. Three controlled local runs reproducing the workflow step's
+synthetic PATH establish: with only `node/git/bash/sh` all three fail; with a
+fresh `HOME` and a full PATH all three pass, so an absent
+`~/.agent-pipeline/machine.json` — the obvious first guess — is NOT the cause;
+adding a single `openssl` symlink turns `trust-anchor-bootstrap-circularity-repro-tests`
+and `onboarding-init-tests` green. Root cause: `po-human-approval.mjs` shells out
+to `openssl` for the entire signature-mode key chain (`genpkey -algorithm ED25519
+-aes-256-cbc`, `pkey -pubout`, `pkeyutl -sign -rawin`), while the step's own name
+asserts the core needs no such tooling. Fixed in `705b7cf3` by admitting
+`openssl` to that PATH, with the dependency stated in the workflow rather than
+hidden.
+
+**`project-onboarding-v3-tests` is NOT explained and must not be assumed fixed.**
+It failed in CI in 74s (05:01:34→05:02:48Z) but passes locally under the
+restricted PATH with a fresh HOME, with and without `openssl`. Its only local
+failure is a ~150s hang that occurs solely with this machine's real HOME, whose
+machine-plane `poKeyDirectory` sits on a slow `/mnt/c` Windows mount — a local
+artifact, not the CI cause. Open in
+`backlog/items/2026-09-01-three-onboarding-suites-pass-locally-and-fail-in-ci.md`.
+
+**The remaining release path, in order, none of it guesswork:** run a full verify
+at the final HEAD → one signature for `nova` and push (this carries the audit
+commit, the CI-failure item and the workflow fix) → re-run CI against the pushed
+ref and read what remains → resolve `project-onboarding-v3-tests` → then one
+signature each for `main` and `stable`, then the `v0.6.0` tag and the release.
+`protect-main` keeps `main` unreachable until that CI check is green for the
+exact commit being pushed, and that enforcement is server-side.
+
 ### Carried forward, because none of these has another home
 
 - **AK-6** is ready to re-dispatch against `pipeline-user-v3.schema.json` (the
