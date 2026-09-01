@@ -98,3 +98,37 @@ actually lies. Whether to amend is a PO decision, not an agent's.
 
 Direction 2 is the one that makes direction 1 unnecessary. They are not
 alternatives — a habit fix without a check is what produced the current state.
+
+## A seventh instance, two hours after filing — and it settles the direction
+
+`3047c9c8` was authored by a dispatch whose briefing carried this warning in the
+DoD, in these words: *"Put those two lines adjacent to each other with NO blank
+line between them — a blank line makes git's trailer parser read the first as
+body text, which is a defect filed today."* The briefing also required the
+dispatch to verify the result with the prescribed structural invocation and
+report what it printed.
+
+The dispatch followed both instructions. It placed the two trailer lines
+adjacently, ran the check, and reported honestly that it printed **nothing**.
+
+The cause was a different blank line: git requires a blank line **before** the
+trailer block, separating it from the body prose. The briefing warned about the
+separator *within* the block and said nothing about the one *before* it, because
+the person writing the briefing had only understood half the rule. So a dispatch
+that complied exactly with an explicit, freshly-written warning still produced a
+commit with no recognised assistance marker.
+
+Two things follow, and the second is the important one.
+
+First, the failure count is now seven, and the seventh happened under maximum
+attention — freshly documented, explicitly briefed, verified after the fact.
+
+Second, **direction 1 is refuted, not merely weak.** A habit fix cannot work here
+because the rule has two conditions and a person writing a commit message by hand
+reliably internalises one of them. The dispatch did everything right and still
+failed. What caught it was running the prescribed check afterwards — which is
+direction 2, performed manually. Making that check automatic at the commit
+boundary is the only direction that survives contact with this evidence.
+
+The commit is local and unpushed with nothing stacked on it, so amending remains
+available on the same PO decision as the other six.

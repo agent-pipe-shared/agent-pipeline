@@ -168,6 +168,22 @@ Dropped on rotation as genuinely resolved: the Antigravity hard-enforcement
 layer's two fail-open paths, closed by `ab347a74`, which built the self-check
 the item's own proposal named.
 
+### At the freeze — what the PO decides
+
+- **Seven local commits carry no recognised `AI-Assisted: true`.** Git's trailer
+  parser needs a blank line before the trailer block and none inside it; the
+  hand-composed stage-0 messages get one of those two right. All seven are
+  unpushed, so amending needs no force-push — but `CLAUDE.md` prohibits
+  rewriting history without an unpushed carve-out, so it was not done. Three
+  directions are in the item; the seventh instance, produced under an explicit
+  briefing warning, refutes the "fix the habit" direction outright.
+- **`GG-17` versus the PO's `--no-verify` instruction.** Recorded as a tension
+  in the carried-forward rules above, not resolved by an agent picking a side.
+
+The gate result for this candidate is in the machine-written
+`evidence/verify-latest.json`, which names its own candidate commit and tree —
+read that rather than trusting any prose claim about which HEAD was green.
+
 ### Owed, not started
 
 - An **ADR and register entry** for the marketplace-attestation narrowing
