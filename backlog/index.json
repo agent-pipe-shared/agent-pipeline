@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "8cb6c80fc7994c6bf412cf5db519e952c209b9b5454686d0cb44c1807e81cb91"
+    "transitionHead": "80adeb4329a4788cdfb0657051c195c1a5ab9d3f0097949e61a00ac16940d7f8"
   },
   "counts": {
-    "open": 80,
+    "open": 81,
     "in_progress": 0,
     "closed": 476,
     "rejected": 3,
@@ -6450,6 +6450,15 @@
       "closureRepository": "self",
       "closureCommit": "9d533fa5bfb7f15ffb41e2208b1ece01a0c3b972",
       "closureEvidence": "plugins/pipeline-core/lib/repository-path-identity.mjs"
+    },
+    {
+      "id": "pipeline.three-onboarding-suites-pass-locally-and-fail-in-ci",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-01",
+      "source": "GitHub Actions run 33471808564 (workflow_dispatch, feat/sprint-nova-codex-v046, candidate 56e91858), job verify, step Runner-free offline Core Verify",
+      "deferred": false
     },
     {
       "id": "pipeline.three-runners-showed-wide-pipeline-administration-overhead-variance",
