@@ -170,3 +170,20 @@ file) — folded into the session's single final Critic 1+1 round.
 This item still stays `status: open`: the "every emitter" repository-wide
 audit acceptance criterion remains unperformed, and the surfaced
 `human-guard-override.mjs` third-importer note above is still unactioned.
+
+## Re-verified, 2026-09-01 (NVA-B-STALECLOSE) — predicate satisfied, requirement not met, stays open
+
+`check-backlog-done-predicate.mjs` reports this item STALE-OPEN because
+`plugins/pipeline-core/lib/project-onboarding-v3.mjs` contains the literal
+string `copy-safe-command.mjs` (true — it is imported there as part of the
+landed `NVA-W12-COPYSAFE`/`NVA-CF-FORCEDQUOTE` work). That only satisfies the
+needle string, not this item's full "every emitter" acceptance criterion.
+Confirmed still open by direct check: `plugins/pipeline-core/lib/
+human-guard-override.mjs` (the actual current path — the item's own note
+named it without the `lib/` prefix) still imports and calls
+`boundedOpaqueCopyCommand` directly (line 46 import, line 1542 call site),
+not the shared `boundedCopySafeCommand()`/`copy-safe-command.mjs` renderer.
+This is exactly the third-importer gap the item's own 2026-08-29 progress
+note flagged as "surfaced ... not yet actioned," and it remains unactioned
+today. Left `status: open`. `done_when` predicate not amended per briefing
+prohibition.
