@@ -192,7 +192,7 @@ function selectedTagFromRemote(output, channel) {
 
 /**
  * `channel` here is the full resolved channel-config object (ADR-0078), not
- * a bare string: `alpha`'s resolution needs `alphaRef`/`alphaRefInvalid`
+ * a bare string: `alpha`'s resolution needs `alphaRef`/`alphaRefReason`
  * alongside `channel.channel`.
  */
 function selectedChannelTarget(remoteUrl, channel, options) {
@@ -214,8 +214,22 @@ function selectedChannelTarget(remoteUrl, channel, options) {
     // is configured -- or the configured value is malformed -- there is
     // nothing honest to compare against, so alpha reports a typed result
     // rather than fabricating a comparison against an arbitrary ref.
-    if (channel.alphaRefInvalid) {
+    if (channel.alphaRefReason === "channel-unavailable") {
+      // The calibration file itself could not be read at all -- genuinely
+      // transient/environmental (ADR-0078 D3), so this is the one alphaRef
+      // failure that legitimately shares channel-unavailable's meaning.
       return { selected: null, reason: "channel-unavailable" };
+    }
+    if (channel.alphaRefReason) {
+      // "malformed-configuration" (a duplicate `pipelineUpdateAlphaRef` key)
+      // or "invalid-alpha-ref" (a syntactically bad ref value): a
+      // persistent, operator-fixable configuration error, NOT a transient or
+      // environmental failure. Reporting it as channel-unavailable would
+      // invite a retry that a config fix -- not a retry -- can resolve. Keep
+      // this distinction: the same reasoning D4 already carries for
+      // channel-inactive vs channel-unavailable. Passing the computed reason
+      // straight through (rather than collapsing it again) is the fix.
+      return { selected: null, reason: channel.alphaRefReason };
     }
     if (!channel.alphaRef) {
       return { selected: null, reason: "local-no-remote-claim" };

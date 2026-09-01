@@ -437,18 +437,26 @@ export function resolvePipelineUpdateChannel(options = {}) {
   const projectConfig = options.projectConfig;
   const alphaRefConfig = options.alphaRefConfig;
   const alphaRef = alphaRefConfig?.status === "ready" ? alphaRefConfig.alphaRef : null;
-  const alphaRefInvalid = alphaRefConfig?.status === "unknown";
+  // Carry the DISTINCT reason `readProjectPipelineUpdateAlphaRef` already
+  // computed (`channel-unavailable` for an unreadable calibration -- a
+  // transient/environmental failure that invites a retry -- versus
+  // `malformed-configuration`/`invalid-alpha-ref` for a persistent,
+  // operator-fixable value) through to the caller, rather than collapsing
+  // all three into one boolean. A collapsed boolean is exactly what let a
+  // config typo get reported as transient in the first place: the resolver
+  // discarded the very reason it had just computed.
+  const alphaRefReason = alphaRefConfig?.status === "unknown" ? alphaRefConfig.reason : null;
   if (projectConfig?.status === "unknown") {
-    return { status: "unknown", channel: null, source: "project-config", topology: null, alphaRef, alphaRefInvalid, reason: "channel-unavailable" };
+    return { status: "unknown", channel: null, source: "project-config", topology: null, alphaRef, alphaRefReason, reason: "channel-unavailable" };
   }
   if (projectConfig?.status === "ready") {
     return isPipelineUpdateChannel(projectConfig.updateChannel)
-      ? { status: "ready", channel: projectConfig.updateChannel, source: "project-config", topology: null, alphaRef, alphaRefInvalid, reason: null }
-      : { status: "unknown", channel: null, source: "project-config", topology: null, alphaRef, alphaRefInvalid, reason: "channel-unavailable" };
+      ? { status: "ready", channel: projectConfig.updateChannel, source: "project-config", topology: null, alphaRef, alphaRefReason, reason: null }
+      : { status: "unknown", channel: null, source: "project-config", topology: null, alphaRef, alphaRefReason, reason: "channel-unavailable" };
   }
   const topology = trustedTopology(options);
   if (!topology) {
-    return { status: "unknown", channel: null, source: null, topology: null, alphaRef, alphaRefInvalid, reason: "channel-unavailable" };
+    return { status: "unknown", channel: null, source: null, topology: null, alphaRef, alphaRefReason, reason: "channel-unavailable" };
   }
   return {
     status: "ready",
@@ -456,7 +464,7 @@ export function resolvePipelineUpdateChannel(options = {}) {
     source: "distribution-default",
     topology,
     alphaRef,
-    alphaRefInvalid,
+    alphaRefReason,
     reason: null,
   };
 }
