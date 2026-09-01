@@ -74,7 +74,7 @@
 | pipeline.backlog-plan-writers-skip-drift-classification | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.backlog-readme-still-documents-rejected-and-deferred-as-status-values | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.backlog-status-drifts-from-code-across-compaction-with-no-hardening | closed | defect | pipeline | 2026-08-19 | — |
-| pipeline.backlog-strip-for-dispatch-drops-every-section-after-triage | open | defect | pipeline | 2026-08-25 | — |
+| pipeline.backlog-strip-for-dispatch-drops-every-section-after-triage | closed | defect | pipeline | 2026-08-25 | — |
 | pipeline.bare-branch-name-in-git-push-fails-approval-with-a-misleading-code | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.benchmark-fixture-digest-binding-does-not-cover-executed-workload-code | closed | workflow-improvement | pipeline | 2026-08-11 | — |
 | pipeline.blind-session-zero-followable-steps-on-push-path | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — measured, not argued: a fresh session gets 15 chained commands on the onboarding path and 0 on the feature/push path. PO 2026-08-28: the paths must be tested without the Pipeline's context knowledge, because a greenfield session does not have it. |
@@ -132,7 +132,7 @@
 | pipeline.control-path-invalid-misfires-on-a-transient-repository-discovery-race | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.copy-safe-renderer-wrap-point-is-path-length-sensitive | open | defect | pipeline | 2026-08-31 | — |
 | pipeline.core-verify-cannot-pass-under-the-ci-trimmed-path | closed | defect | pipeline | 2026-08-28 | — |
-| pipeline.critic-and-verify-cadence-may-be-too-fine-grained | open | workflow-improvement | pipeline | 2026-08-24 | — |
+| pipeline.critic-and-verify-cadence-may-be-too-fine-grained | closed | workflow-improvement | pipeline | 2026-08-24 | — |
 | pipeline.critic-context-isolation | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.critic-review-has-no-defined-path-for-a-root-commit | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.critic-review-round-cap-has-no-durable-home-and-two-inconsistent-values-circulate | closed | defect | pipeline | 2026-08-18 | — |
@@ -180,7 +180,7 @@
 | pipeline.evidence-gitignore-left-dozens-of-durable-artifacts-untracked | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.execution-model-switchback | closed | workflow-improvement | pipeline | 2026-07-19 | Closed 2026-08-28 by PO scope narrowing; candidate-binding out of scope. |
 | pipeline.existing-repos-drift-on-agy-pipeline-user-yaml-update-no-migration | open | defect | pipeline | 2026-08-26 | — |
-| pipeline.expires-at-rejects-a-non-round-trip-timestamp-and-the-doc-says-otherwise | open | defect | pipeline | 2026-08-27 | — |
+| pipeline.expires-at-rejects-a-non-round-trip-timestamp-and-the-doc-says-otherwise | closed | defect | pipeline | 2026-08-27 | — |
 | pipeline.explicit-final-acceptance-gate | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.external-public-json-cross-drive-windows-paths-are-not-recognized-as-outside-the-project-root | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.external-reference-adapter-has-no-typed-response-to-an-unreachable-external-system | closed | defect | pipeline | 2026-08-09 | — |
@@ -200,7 +200,7 @@
 | pipeline.git-identity-must-be-set-immediately-before-first-commit-not-at-setup-time | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.git-identity-warn-only-diagnostic-does-not-meet-po-expectation | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.gitignore-evidence-rule-swallows-durable-spec-artifacts | closed | defect | pipeline | 2026-08-16 | — |
-| pipeline.gitleaks-content-fingerprint-breaks-on-any-line-insertion-above-it | open | defect | pipeline | 2026-08-27 | — |
+| pipeline.gitleaks-content-fingerprint-breaks-on-any-line-insertion-above-it | closed | defect | pipeline | 2026-08-27 | — |
 | pipeline.gitleaks-false-positive-in-guard-maintenance-window-attribution-key-generation-tag | closed | defect | pipeline | 2026-08-19 | — |
 | pipeline.gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger | closed | requirement | pipeline | 2026-08-07 | — |
 | pipeline.gmw-install-never-recognizes-its-own-window-under-v3-multi-anchor-schema | closed | defect | pipeline | 2026-08-16 | — |
@@ -335,7 +335,7 @@
 | pipeline.nothing-connects-an-acceptance-criterion-to-a-check-that-runs | closed | workflow-improvement | pipeline | 2026-08-16 | — |
 | pipeline.observation-governance-bootstrap-false-positives-on-vendor-synced-consumer-projects | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.observation-intake-document-governance | closed | workflow-improvement | pipeline | 2026-07-20 | — |
-| pipeline.observerunner-has-no-test-coverage | open | defect | pipeline | 2026-08-30 | Nova B -- Critic finding (minor), NVA-CF-SANDBOXQUICKFIX delta review, not blocking |
+| pipeline.observerunner-has-no-test-coverage | closed | defect | pipeline | 2026-08-30 | Nova B -- Critic finding (minor), NVA-CF-SANDBOXQUICKFIX delta review, not blocking |
 | pipeline.onboarding-asks-published-in-one-window-only | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — happy-path blocking at the PO's second touch: the onboarding questions reach the human through exactly one command's response, so a run that passes that point never asks them again. |
 | pipeline.onboarding-continuity-assumes-calibration-handover-is-always-a-plain-string | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.onboarding-does-not-ignore-the-scratch-directory-it-mandates | closed | defect | pipeline | 2026-08-09 | — |
@@ -434,6 +434,7 @@
 | pipeline.push-release-flow-unusable-for-third-party-adopters | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.quote-style-fragility-in-shell-command-admission | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.raw-apply_patch-is-unconditionally-admitted-by-the-outer-lifecycle-gate | closed | defect | pipeline | 2026-08-09 | — |
+| pipeline.read-containment-removed-with-no-recorded-decision | open | defect | pipeline | 2026-09-01 | Nova B — the project-root containment check on read-only shell commands was added on 2026-08-29 to close a hole and removed wholesale on 2026-08-30. The removal is deliberate and undocumented outside its own commit message, and it silently invalidates a closed item's recorded remedy. |
 | pipeline.read-scope-guard-admits-single-command-but-blocks-the-piped-form | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.readiness-guard-blocks-its-own-recovery | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — a guard that refuses the exact command its own refusal prescribes is a deadlock, and it fired twice in one consumer session |
 | pipeline.readonly-and-chain-grep-pipe-trailing-stage-not-implemented | closed | requirement | pipeline | 2026-08-19 | — |
@@ -539,7 +540,7 @@
 | pipeline.trust-mismatch-names-neither-key-nor-directory | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.trust-policy-exact-key-shape-refuses-a-third-field-and-blames-the-key | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.trust-policy-shape-disagreement-between-sign-intent-and-verify-po-approval-proof | closed | defect | pipeline | 2026-08-17 | — |
-| pipeline.twin-manifest-files-can-drift-without-detection | open | defect | pipeline | 2026-08-28 | — |
+| pipeline.twin-manifest-files-can-drift-without-detection | closed | defect | pipeline | 2026-08-28 | — |
 | pipeline.two-guard-hook-test-files-unregistered-in-verify | closed | defect | pipeline | 2026-08-19 | — |
 | pipeline.two-guards-block-an-unrelated-file-via-substring-name-matching | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.two-handover-rotation-mechanisms-use-different-archive-conventions | closed | workflow-improvement | pipeline | 2026-08-17 | — |
@@ -568,6 +569,7 @@
 | pipeline.verify-placeholder-manual-check-required-accepted-by-gate | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.verify-range-mode-registration-for-orchestrator-commit-control | open | idea | pipeline | 2026-08-25 | — |
 | pipeline.verify-registration-check-fixtures-lack-real-git-topology | closed | defect | pipeline | 2026-08-19 | — |
+| pipeline.verify-runtime-concentrated-in-ten-suites | open | defect | pipeline | 2026-09-01 | Nova B — the parallelized verify has regressed from 419s to 571s in one week, and the single suite named as its next lever grew 35% in the same period. Also supplies the all-fresh full-run artifact two older items were blocked on. |
 | pipeline.verify-suite-reads-real-machine-state | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — a suite about to enter the verify gate whose outcome depends on unrelated per-machine state; found while diagnosing a one-off failure of exactly that suite |
 | pipeline.warn-security-gate-hard-blocks-every-push | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.wave5-scope-categorization-missed-triage-level-sprint-deferrals | closed | defect | pipeline | 2026-08-19 | — |
@@ -586,8 +588,8 @@
 
 ## Counts
 
-- open: 88
+- open: 84
 - in_progress: 0
-- closed: 476
+- closed: 482
 - rejected: 3
 - deferred: 11
