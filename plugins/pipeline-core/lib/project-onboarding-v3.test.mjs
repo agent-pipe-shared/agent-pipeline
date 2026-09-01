@@ -8266,6 +8266,221 @@ test("pipelineScriptsRunnerAllowlistEntries() covers both runner lanes, and both
   ]);
 });
 
+// NVA-B-ROUNDL-F4 regression, one test per remaining delete site. The
+// ownership predicate `ownsPublishedOutput()` was wired into the manifest
+// publication rollback only; three further sites still decided "this file is
+// mine, delete it" from `{dev, ino}` alone. Identity alone cannot carry that
+// decision: ext4 reallocates the lowest free inode number in the block group,
+// so a file created immediately after an `unlink` commonly inherits the freed
+// number, and the delete then destroys content the transaction never wrote.
+// tmpfs draws inode numbers from a monotonic counter and never reuses one --
+// which is exactly why this is invisible on a tmpfs `/tmp` and reproducible on
+// the CI runner. Note what is NOT being tested here: two of these sites throw
+// when the identity does not match, and that is no protection at all, because
+// under reuse the identity DOES match. Each test therefore injects the reuse --
+// the replacement file is reported under the inode number the transaction
+// wrote -- so the identity check necessarily passes and ownership has to be
+// decided on the bytes. Each test also pins the ordinary path: a file the site
+// genuinely did write is still cleaned up, so the fix cannot trade a
+// data-destruction bug for a leak.
+
+test("F4 runtime probe cleanup preserves foreign content when the probe inode number is reused", () => {
+  const path = root();
+  try {
+    const portable = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
+    assert.equal(applyProjectOnboardingV3(portable, { rootDir: path, activate: true, deps: fakeDeps }).status, "applied");
+    const runtime = planProjectOnboardingLifecycleV4({ rootDir: path, deps: fakeDeps, operation: "runtime", runner: "codex" });
+    const digest = runtime.nextAction.argv[runtime.nextAction.argv.indexOf("--plan-sha256") + 1];
+    const nativeLstat = lstatSync;
+    let probePath = null; let swapped = false; let probeIno = null;
+    const reuse = {
+      ...fakeDeps,
+      renameSync(from, to) {
+        renameSync(from, to);
+        if (probePath === null && typeof to === "string" && to.includes(".pipeline-runtime-capability-")) probePath = to;
+      },
+      lstatSync(candidate) {
+        const info = nativeLstat(candidate);
+        if (probePath === null || candidate !== probePath) return info;
+        if (!swapped) {
+          swapped = true; probeIno = info.ino;
+          unlinkSync(candidate);
+          writeFileSync(candidate, "foreign probe content\n");
+          return info;
+        }
+        return {
+          dev: info.dev, ino: probeIno, nlink: info.nlink, mode: info.mode, size: info.size,
+          isSymbolicLink: () => info.isSymbolicLink(),
+          isFile: () => info.isFile(),
+          isDirectory: () => info.isDirectory(),
+        };
+      },
+    };
+    const observed = applyProjectOnboardingLifecycleV4({
+      rootDir: path, deps: reuse, operation: "runtime", planSha256: digest, activate: true, runner: "codex",
+    });
+    assert.equal(swapped, true, "the inode-reuse injection never fired");
+    assert.equal(existsSync(probePath), true,
+      `the probe cleanup deleted foreign content it never wrote: ${JSON.stringify(observed)}`);
+    assert.equal(readFileSync(probePath, "utf8"), "foreign probe content\n");
+  } finally { dispose(path); }
+  // Ordinary path: a probe file this transaction really did write is still
+  // removed, in every selected runtime target parent.
+  const owned = root();
+  try {
+    initializeRuntimeProjectionRoot(owned);
+    for (const directory of [owned, join(owned, ".codex"), join(owned, ".claude")]) {
+      if (!existsSync(directory)) continue;
+      assert.deepEqual(readdirSync(directory).filter((entry) => entry.includes("pipeline-runtime-capability")), [],
+        `a runtime capability probe leaked into ${directory.slice(owned.length) || "the project root"}`);
+    }
+  } finally { dispose(owned); }
+});
+
+test("F4 manifest repair temporary cleanup preserves foreign content when the temporary inode number is reused", () => {
+  const repairTemporaries = (rootPath) => {
+    const directory = join(rootPath, ".claude");
+    if (!existsSync(directory)) return [];
+    return readdirSync(directory)
+      .filter((entry) => entry.includes(".pipeline-manifest-repair-") && entry.endsWith(".tmp")).sort();
+  };
+  const path = root();
+  try {
+    initializeRuntimeProjectionRoot(path);
+    const manifestPath = join(path, ".claude", "pipeline.yaml");
+    unlinkSync(manifestPath);
+    const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps, runner: "codex" });
+    assert.equal(plan.status, "ready", JSON.stringify(plan));
+    const nativeLstat = lstatSync;
+    let temporaryPath = null; let swapped = false; let temporaryIno = null;
+    const reuse = {
+      ...fakeDeps,
+      openSync(target, ...args) {
+        const fd = openSync(target, ...args);
+        if (typeof target === "string" && target.includes(".pipeline-manifest-repair-") && target.endsWith(".tmp")) {
+          temporaryPath = target;
+        }
+        return fd;
+      },
+      linkSync() {
+        // The temporary is fully written and identity-bound at this point, so
+        // the swap models a reuse race observed after the transaction's own
+        // last write to it and before the failure path deletes it.
+        swapped = true; temporaryIno = nativeLstat(temporaryPath).ino;
+        unlinkSync(temporaryPath);
+        writeFileSync(temporaryPath, "foreign temporary content\n");
+        throw new Error("synthetic publication failure");
+      },
+      lstatSync(candidate) {
+        const info = nativeLstat(candidate);
+        if (!swapped || candidate !== temporaryPath) return info;
+        return {
+          dev: info.dev, ino: temporaryIno, nlink: info.nlink, mode: info.mode, size: info.size,
+          isSymbolicLink: () => info.isSymbolicLink(),
+          isFile: () => info.isFile(),
+          isDirectory: () => info.isDirectory(),
+        };
+      },
+    };
+    const result = applyProjectOnboardingManifestRepairV4({
+      runner: "codex", rootDir: path, planSha256: plan.planSha256, activate: true, deps: reuse,
+    });
+    // The publication temporary is addressed fd-relatively
+    // (`/proc/self/fd/<n>/<name>`, see `boundDirectoryEntry`) and that
+    // directory fd is closed before the call returns, so `temporaryPath` is
+    // only usable DURING the transaction, for the injection above. Whether the
+    // file survived is asked of the real directory instead -- a stale
+    // fd-relative path answers "absent" for a file that is still on disk, and
+    // would make this assertion pass no matter what the rollback did.
+    assert.equal(swapped, true, "the inode-reuse injection never fired");
+    const leftovers = repairTemporaries(path);
+    assert.equal(leftovers.length, 1,
+      `the temporary cleanup deleted foreign content it never wrote: ${JSON.stringify({ result, leftovers })}`);
+    assert.equal(readFileSync(join(path, ".claude", leftovers[0]), "utf8"), "foreign temporary content\n");
+    assert.equal(existsSync(manifestPath), false);
+  } finally { dispose(path); }
+  // Ordinary path: the same failure without the reuse still removes the
+  // temporary this transaction wrote itself.
+  const owned = root();
+  try {
+    initializeRuntimeProjectionRoot(owned);
+    unlinkSync(join(owned, ".claude", "pipeline.yaml"));
+    const plan = planProjectOnboardingManifestRepairV4({ rootDir: owned, deps: fakeDeps, runner: "codex" });
+    let observed = false;
+    const failing = {
+      ...fakeDeps,
+      openSync(target, ...args) {
+        const fd = openSync(target, ...args);
+        if (typeof target === "string" && target.includes(".pipeline-manifest-repair-") && target.endsWith(".tmp")) {
+          observed = true;
+        }
+        return fd;
+      },
+      linkSync() { throw new Error("synthetic publication failure"); },
+    };
+    applyProjectOnboardingManifestRepairV4({
+      runner: "codex", rootDir: owned, planSha256: plan.planSha256, activate: true, deps: failing,
+    });
+    assert.equal(observed, true, "the repair temporary was never observed");
+    assert.deepEqual(repairTemporaries(owned), [],
+      "the failure path must still delete the temporary it wrote itself");
+  } finally { dispose(owned); }
+});
+
+test("F4 portable rollback preserves foreign content when a created target's inode number is reused", () => {
+  const path = root();
+  const nativeLstat = lstatSync;
+  let writes = 0; let firstTarget = null; let firstIno = null; let swapped = false;
+  const reuse = {
+    ...fakeDeps,
+    writeFileSync(target, bytes, options) {
+      writes += 1;
+      if (writes === 1) { firstTarget = target; writeFileSync(target, bytes, options); return; }
+      firstIno = nativeLstat(firstTarget).ino;
+      unlinkSync(firstTarget);
+      writeFileSync(firstTarget, "foreign target bytes\n");
+      swapped = true;
+      throw new Error("synthetic inode-reuse race");
+    },
+    lstatSync(candidate) {
+      const info = nativeLstat(candidate);
+      if (!swapped || candidate !== firstTarget) return info;
+      return {
+        dev: info.dev, ino: firstIno, nlink: info.nlink, mode: info.mode, size: info.size,
+        isSymbolicLink: () => info.isSymbolicLink(),
+        isFile: () => info.isFile(),
+        isDirectory: () => info.isDirectory(),
+      };
+    },
+  };
+  try {
+    const plan = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: reuse });
+    const applied = applyProjectOnboardingV3(plan, { rootDir: path, activate: true, deps: reuse });
+    assert.equal(swapped, true, "the inode-reuse injection never fired");
+    assert.equal(applied.status, "rollback-failed", JSON.stringify(applied));
+    assert.equal(existsSync(firstTarget), true, "the rollback deleted foreign content it never wrote");
+    assert.equal(readFileSync(firstTarget, "utf8"), "foreign target bytes\n");
+  } finally { dispose(path); }
+  // Ordinary path: a rollback over targets this transaction really did write
+  // still removes every one of them. (`post-git failure rolls every generated
+  // preimage back` above covers the same site from the other direction.)
+  const ownedRoot = root(); let ownedWrites = 0;
+  const failingLate = {
+    ...fakeDeps,
+    writeFileSync(target, bytes, options) {
+      ownedWrites += 1;
+      if (ownedWrites === 3) throw new Error("synthetic late write failure");
+      writeFileSync(target, bytes, options);
+    },
+  };
+  try {
+    const plan = planProjectOnboardingV3({ runner: "codex", rootDir: ownedRoot, deps: failingLate });
+    const applied = applyProjectOnboardingV3(plan, { rootDir: ownedRoot, activate: true, deps: failingLate });
+    assert.equal(applied.status, "rolled-back", JSON.stringify(applied));
+    assert.deepEqual(names(ownedRoot), [], "the rollback must still delete every target it wrote itself");
+  } finally { dispose(ownedRoot); }
+});
+
 if (RUNNING_AS_SUITE) {
   console.log(`\nproject-onboarding-v3: ${passed} passed, ${failures.length} failed`);
   if (failures.length) { console.error(failures.join("\n")); process.exitCode = 1; }
