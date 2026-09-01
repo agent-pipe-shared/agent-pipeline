@@ -22,8 +22,10 @@ import { fileURLToPath } from "node:url";
 
 import {
   applyPipelineUpdateChannel,
+  isPipelineUpdateAlphaRef,
   PIPELINE_UPDATE_CHANNEL_PLAN_SCHEMA,
   planPipelineUpdateChannel,
+  readProjectPipelineUpdateAlphaRef,
   readProjectPipelineUpdateChannel,
   resolvePipelineUpdateChannel,
 } from "./pipeline-update-channel.mjs";
@@ -70,6 +72,8 @@ test("closed defaults use only explicit trusted self-application authority", () 
     channel: "alpha",
     source: "distribution-default",
     topology: "local-self-development",
+    alphaRef: null,
+    alphaRefInvalid: false,
     reason: null,
   });
   assert.equal(resolvePipelineUpdateChannel({}).channel, "stable");
@@ -364,6 +368,69 @@ test("malformed calibration and invalid enum, URL, or ref values fail closed", (
 
   const duplicate = fixture("duplicate", '{"pipelineUpdateChannel":"beta","pipelineUpdateChannel":"stable"}\n');
   assert.equal(planPipelineUpdateChannel(duplicate, "stable").reason, "malformed-configuration");
+});
+
+test("alpha-ref field follows the channel field's read/validate/default pattern (ADR-0078 D3)", () => {
+  const absentRoot = fixture("alpha-ref-absent");
+  assert.deepEqual(readProjectPipelineUpdateAlphaRef(absentRoot), {
+    status: "absent", alphaRef: null, source: null, reason: null,
+  });
+
+  const readyRoot = fixture("alpha-ref-ready", '{"pipelineUpdateAlphaRef":"feat/sprint-nova-codex-v046"}\n');
+  assert.deepEqual(readProjectPipelineUpdateAlphaRef(readyRoot), {
+    status: "ready", alphaRef: "feat/sprint-nova-codex-v046", source: "project-config", reason: null,
+  });
+
+  const mainRoot = fixture("alpha-ref-main", '{"pipelineUpdateAlphaRef":"main"}\n');
+  assert.deepEqual(readProjectPipelineUpdateAlphaRef(mainRoot), {
+    status: "ready", alphaRef: "main", source: "project-config", reason: null,
+  });
+
+  const nonStringRoot = fixture("alpha-ref-non-string", '{"pipelineUpdateAlphaRef":123}\n');
+  assert.deepEqual(readProjectPipelineUpdateAlphaRef(nonStringRoot), {
+    status: "unknown", alphaRef: null, source: "project-config", reason: "invalid-alpha-ref",
+  });
+
+  const malformedRoot = fixture("alpha-ref-malformed", '{"pipelineUpdateAlphaRef":"not a valid ref"}\n');
+  assert.deepEqual(readProjectPipelineUpdateAlphaRef(malformedRoot), {
+    status: "unknown", alphaRef: null, source: "project-config", reason: "invalid-alpha-ref",
+  });
+
+  const duplicateRoot = fixture("alpha-ref-duplicate", '{"pipelineUpdateAlphaRef":"feat/a","pipelineUpdateAlphaRef":"feat/b"}\n');
+  assert.deepEqual(readProjectPipelineUpdateAlphaRef(duplicateRoot), {
+    status: "unknown", alphaRef: null, source: "project-config", reason: "malformed-configuration",
+  });
+
+  assert.equal(isPipelineUpdateAlphaRef("main"), true);
+  assert.equal(isPipelineUpdateAlphaRef("feat/sprint-alfred"), true);
+  assert.equal(isPipelineUpdateAlphaRef(""), false);
+  assert.equal(isPipelineUpdateAlphaRef(123), false);
+  assert.equal(isPipelineUpdateAlphaRef("/leading-slash"), false);
+  assert.equal(isPipelineUpdateAlphaRef("trailing-slash/"), false);
+  assert.equal(isPipelineUpdateAlphaRef("has space"), false);
+  assert.equal(isPipelineUpdateAlphaRef("has..dotdot"), false);
+  assert.equal(isPipelineUpdateAlphaRef("-leading-dash"), false);
+});
+
+test("resolvePipelineUpdateChannel threads alphaRef only when the config is ready, and never blocks an unrelated channel", () => {
+  assert.deepEqual(resolvePipelineUpdateChannel({
+    projectConfig: { status: "ready", updateChannel: "stable" },
+    alphaRefConfig: { status: "unknown", alphaRef: null, source: "project-config", reason: "invalid-alpha-ref" },
+  }), {
+    status: "ready", channel: "stable", source: "project-config", topology: null,
+    alphaRef: null, alphaRefInvalid: true, reason: null,
+  });
+  assert.deepEqual(resolvePipelineUpdateChannel({
+    projectConfig: { status: "ready", updateChannel: "alpha" },
+    alphaRefConfig: { status: "ready", alphaRef: "feat/sprint-alfred", source: "project-config", reason: null },
+  }), {
+    status: "ready", channel: "alpha", source: "project-config", topology: null,
+    alphaRef: "feat/sprint-alfred", alphaRefInvalid: false, reason: null,
+  });
+  assert.deepEqual(resolvePipelineUpdateChannel({
+    projectConfig: { status: "ready", updateChannel: "alpha" },
+    alphaRefConfig: { status: "absent", alphaRef: null, source: null, reason: null },
+  }).alphaRef, null);
 });
 
 test("CLI admits no configured-channel, ref, URL, or remote bypass", () => {
