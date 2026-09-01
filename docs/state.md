@@ -333,39 +333,37 @@ Ordered; the ordering is load-bearing where stated.
   `backlog/items/2026-08-31-copy-safe-renderer-wrap-point-is-path-length-sensitive.md`;
   the outside-repository short-path data point is still missing.
 
-## 2026-09-01 — autonomous Nova B block, six Critic rounds, all findings closed
+## 2026-09-01 — autonomous Nova B block: 8 Critic rounds, 7 items filed
 
 PO mandate: work items needing no PO until ~17:00, then verify and review.
 
-**Closed with evidence:** strip-for-dispatch, observeRunner and trust-anchor —
-all three resolved by commits that never closed them, surfaced by
-`check-backlog-done-predicate.mjs`. Four more by `NVA-B-STALECLOSE`, which left
-two open because their predicates passed while the requirement did not.
+**Landed:** `GIT-10`, the backlog-state-checker discipline, corrected after
+review (`6c9f581f`, `1c2d2681`); a per-session trim of repeated grammar denials
+(`1314edec`, 191/191). Vendored canon regenerated twice. Predicate campaign:
+findings 26 → 5. One REGRESSION is left standing on purpose — it is the only
+mechanical signal that a closed item's remedy no longer holds.
 
-**Predicate campaign (PO-approved 2026-08-29):** findings 26 → 5. malformed
-1 → 0, stale-open 6 → 0, open-undeclared 17 → 4. One REGRESSION is deliberately
-left standing — see the read-containment item; it is the only mechanical signal
-that a closed item's remedy no longer holds.
+**Eight Critic rounds.** Caught before shipping: a guardrail stating a trigger
+the code does not implement; an ADR asserting an enforcement the guard does not
+perform; a calibration path that commits while reporting failure; a
+push-approval-gate bypass; and a guardrail presenting an accepted DRIFT baseline
+that in fact contains a live open defect. Three findings were against acceptance
+criteria rather than implementations, and two suites reported green on
+properties they could not observe.
 
-**Six Critic rounds** (three initial, three re-review; every package's QG-13
-round is spent, so further rework is Elephant-self-verified). Findings that
-would otherwise have shipped: a guardrail rule stating a trigger the code does
-not implement; an ADR asserting an enforcement the guard does not perform; a
-calibration write path that commits while reporting failure; and — introduced
-and caught inside the same block — a push-approval-gate bypass.
+**Seven items filed**, each from measurement. Three matter beyond today: a
+Critic has no writable location for its own report, so findings survive only by
+hand-transcription; the `advisor` prohibition in briefings is unenforced and was
+breached three times in one session; ledger event 403 stores an abbreviated OID
+that the hash chain blocks repairing in place.
 
-**Method note:** three findings were against acceptance criteria, not
-implementations — naming `plan` where `apply` writes; "not blocked" where "keeps
-running" was meant; "emits a notice" without checking which exit code has a
-reader. Two suites reported green on properties they could not observe.
+**Parked, with the reason recorded in each item:** the denial-trim comment fix
+and the `GIT-09` wording residual — both guard or guardrail surfaces, so both
+owe a mandatory T1 round that did not fit the freeze. `goldfish-task.md`'s field
+enumeration omits `effort`, which fails the authorship check on honest commits.
 
-**Governance discoverability:** `governance/README.md` now exists and the
-documentation map reaches the eight audit-facing documents it never named. The
-reviewer-facing overview stays open — a PO decision.
-
-**Deliberately not done:** the CI failure reporter has no recorded requirement,
-so its Critic round cannot be dispatched without writing a spec to match
-existing code. Recorded as review-outstanding, neither reviewed nor exempt.
+**Owed:** an ADR-0066 rotation of the 2026-08-31 section. This file sits at its
+30000-byte cap, and today's entry was written to net zero because of it.
 
 ## Operational head
 
