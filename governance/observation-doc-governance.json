@@ -253,6 +253,7 @@
           "docs/adr/0076-global-chat-attributed-unattested-approval-mode.md",
           "docs/adr/0077-push-approvals-per-destination.md",
           "docs/adr/0078-distribution-channels-on-main.md",
+          "docs/adr/0079-hook-bypass-is-never-agent-overridable.md",
           "docs/adr/README.md"
         ]
       },
