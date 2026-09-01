@@ -23,6 +23,7 @@ import {
   readRulesetUpdatePolicy,
 } from "./ruleset-update-policy.mjs";
 import {
+  readProjectPipelineUpdateAlphaRef,
   readProjectPipelineUpdateChannel,
   resolvePipelineUpdateChannel,
 } from "./pipeline-update-channel.mjs";
@@ -189,8 +190,38 @@ function selectedTagFromRemote(output, channel) {
   return { selected: promoted ?? highestBeta, reason: null };
 }
 
+/**
+ * `channel` here is the full resolved channel-config object (ADR-0078), not
+ * a bare string: `alpha`'s resolution needs `alphaRef`/`alphaRefInvalid`
+ * alongside `channel.channel`.
+ */
 function selectedChannelTarget(remoteUrl, channel, options) {
-  const selector = channel === "alpha" ? "refs/heads/main" : "refs/tags/*";
+  if (channel.channel === "beta") {
+    // D4: beta is a reserved, currently-inactive update channel.
+    // `channel-inactive` is a deliberate, current product state -- distinct
+    // from `channel-unavailable` (a transient/environmental failure that
+    // invites a retry). It invites none, so no network call is ever
+    // attempted for it: collapsing the two into one reason would tell an
+    // operator to retry their way out of a decision. When beta activates,
+    // its mechanism is already implemented below (`selectedTagFromRemote`'s
+    // beta branch) -- activation only needs to stop short-circuiting here.
+    return { selected: null, reason: "channel-inactive" };
+  }
+  if (channel.channel === "alpha") {
+    // D3: alpha never resolves through a hardcoded refs/heads/main. It
+    // resolves only from the persisted project field naming a branch (any
+    // branch, `main` included, is a legitimate configuration). When no ref
+    // is configured -- or the configured value is malformed -- there is
+    // nothing honest to compare against, so alpha reports a typed result
+    // rather than fabricating a comparison against an arbitrary ref.
+    if (channel.alphaRefInvalid) {
+      return { selected: null, reason: "channel-unavailable" };
+    }
+    if (!channel.alphaRef) {
+      return { selected: null, reason: "local-no-remote-claim" };
+    }
+  }
+  const selector = channel.channel === "alpha" ? `refs/heads/${channel.alphaRef}` : "refs/tags/*";
   const remote = run("git", ["ls-remote", remoteUrl, selector], {
     ...options,
     timeout: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
@@ -199,13 +230,15 @@ function selectedChannelTarget(remoteUrl, channel, options) {
   if (remote.status !== 0) {
     return { selected: null, reason: remote.error?.code === "ETIMEDOUT" || remote.signal ? "timeout" : "remote-unavailable" };
   }
-  if (channel === "alpha") {
-    const line = String(remote.stdout ?? "").trim().match(/^([0-9a-f]{40})\s+refs\/heads\/main$/imu);
+  if (channel.channel === "alpha") {
+    const ref = `refs/heads/${channel.alphaRef}`;
+    const escapedRef = ref.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+    const line = String(remote.stdout ?? "").trim().match(new RegExp(`^([0-9a-f]{40})\\s+${escapedRef}$`, "imu"));
     return line
-      ? { selected: { ref: "refs/heads/main", version: null, commit: line[1].toLowerCase() }, reason: null }
+      ? { selected: { ref, version: null, commit: line[1].toLowerCase() }, reason: null }
       : { selected: null, reason: "channel-unavailable" };
   }
-  return selectedTagFromRemote(remote.stdout, channel);
+  return selectedTagFromRemote(remote.stdout, channel.channel);
 }
 
 /**
@@ -217,6 +250,7 @@ function selectedChannelTarget(remoteUrl, channel, options) {
 export function resolvePipelineUpdateChannelConfig(repoPath, options = {}) {
   return resolvePipelineUpdateChannel({
     projectConfig: options.projectConfig ?? readProjectPipelineUpdateChannel(repoPath),
+    alphaRefConfig: options.alphaRefConfig ?? readProjectPipelineUpdateAlphaRef(repoPath),
     distributionTopology: options.distributionTopology,
     selfApplication: options.selfApplication === true,
   });
@@ -307,7 +341,7 @@ export function inspectPipelineUpdateAvailability(repoPath, options = {}) {
     const policyDisposition = evaluateRulesetUpdatePolicy(policy, loaded);
     return result("unknown", { loaded, channel, policyDisposition, reason: "channel-unavailable" });
   }
-  const target = selectedChannelTarget(remoteUrl, channel.channel, options);
+  const target = selectedChannelTarget(remoteUrl, channel, options);
   if (!target.selected) {
     const policyDisposition = evaluateRulesetUpdatePolicy(policy, loaded);
     return result("unknown", {

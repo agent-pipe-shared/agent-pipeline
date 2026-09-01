@@ -162,6 +162,24 @@ export function isPipelineUpdateChannel(value) {
   return typeof value === "string" && PIPELINE_UPDATE_CHANNELS.includes(value);
 }
 
+// Defensive subset of `git check-ref-format --branch`, not a reimplementation
+// of it: rejects control characters, whitespace, glob/special git ref
+// characters, path traversal, the reflog `@{` form, and the `.lock` suffix.
+// Good enough to keep a malformed value from ever reaching a `git ls-remote`
+// argv, without claiming to be the authority on ref-name validity.
+const ALPHA_REF_UNSAFE = /[\x00-\x1F\x7F ~^:?*[\\]/u;
+
+export function isPipelineUpdateAlphaRef(value) {
+  if (typeof value !== "string" || value.length === 0 || value.length > 255) return false;
+  if (ALPHA_REF_UNSAFE.test(value)) return false;
+  if (value.startsWith("/") || value.endsWith("/") || value.includes("//")) return false;
+  if (value.startsWith(".") || value.endsWith(".") || value.includes("..")) return false;
+  if (value.includes("@{")) return false;
+  if (value.endsWith(".lock")) return false;
+  if (value.startsWith("-")) return false;
+  return true;
+}
+
 function neutralCalibrationAuthority(repoPath, readAuthority) {
   const root = resolve(repoPath);
   const path = join(root, NEUTRAL_CALIBRATION);
@@ -371,6 +389,34 @@ export function readProjectPipelineUpdateChannel(repoPath, deps = {}) {
   };
 }
 
+/**
+ * Read back the closed portable alpha-ref field (ADR-0078 D3). Same
+ * read/validate/default shape as `readProjectPipelineUpdateChannel`: only
+ * this persisted project field may name the branch alpha follows -- no
+ * caller-provided ref is ever accepted here or downstream.
+ */
+export function readProjectPipelineUpdateAlphaRef(repoPath, deps = {}) {
+  const observed = readCalibration(repoPath, deps);
+  if (observed.status === "absent") {
+    return { status: "absent", alphaRef: null, source: null, reason: null };
+  }
+  if (observed.status !== "ready") {
+    return { status: "unknown", alphaRef: null, source: "project-config", reason: "channel-unavailable" };
+  }
+  const entries = observed.layout.properties.filter((entry) => entry.key === "pipelineUpdateAlphaRef");
+  if (entries.length > 1) {
+    return { status: "unknown", alphaRef: null, source: "project-config", reason: "malformed-configuration" };
+  }
+  if (!Object.hasOwn(observed.value, "pipelineUpdateAlphaRef")) {
+    return { status: "absent", alphaRef: null, source: null, reason: null };
+  }
+  const raw = observed.value.pipelineUpdateAlphaRef;
+  if (!isPipelineUpdateAlphaRef(raw)) {
+    return { status: "unknown", alphaRef: null, source: "project-config", reason: "invalid-alpha-ref" };
+  }
+  return { status: "ready", alphaRef: raw, source: "project-config", reason: null };
+}
+
 function trustedTopology({ distributionTopology, selfApplication }) {
   if (distributionTopology !== undefined) {
     return TOPOLOGIES.has(distributionTopology) ? distributionTopology : null;
@@ -380,26 +426,37 @@ function trustedTopology({ distributionTopology, selfApplication }) {
   return selfApplication === true ? "local-self-development" : "installed-consumer";
 }
 
-/** Resolve project override or the trusted per-project default. */
+/**
+ * Resolve project override or the trusted per-project default. `alphaRef`
+ * (ADR-0078 D3) is carried alongside the channel string regardless of which
+ * channel is actually selected -- it is only consumed by the resolver when
+ * the selected channel is `alpha`, so a malformed or absent alpha-ref field
+ * never blocks resolving `beta` or `stable`.
+ */
 export function resolvePipelineUpdateChannel(options = {}) {
   const projectConfig = options.projectConfig;
+  const alphaRefConfig = options.alphaRefConfig;
+  const alphaRef = alphaRefConfig?.status === "ready" ? alphaRefConfig.alphaRef : null;
+  const alphaRefInvalid = alphaRefConfig?.status === "unknown";
   if (projectConfig?.status === "unknown") {
-    return { status: "unknown", channel: null, source: "project-config", topology: null, reason: "channel-unavailable" };
+    return { status: "unknown", channel: null, source: "project-config", topology: null, alphaRef, alphaRefInvalid, reason: "channel-unavailable" };
   }
   if (projectConfig?.status === "ready") {
     return isPipelineUpdateChannel(projectConfig.updateChannel)
-      ? { status: "ready", channel: projectConfig.updateChannel, source: "project-config", topology: null, reason: null }
-      : { status: "unknown", channel: null, source: "project-config", topology: null, reason: "channel-unavailable" };
+      ? { status: "ready", channel: projectConfig.updateChannel, source: "project-config", topology: null, alphaRef, alphaRefInvalid, reason: null }
+      : { status: "unknown", channel: null, source: "project-config", topology: null, alphaRef, alphaRefInvalid, reason: "channel-unavailable" };
   }
   const topology = trustedTopology(options);
   if (!topology) {
-    return { status: "unknown", channel: null, source: null, topology: null, reason: "channel-unavailable" };
+    return { status: "unknown", channel: null, source: null, topology: null, alphaRef, alphaRefInvalid, reason: "channel-unavailable" };
   }
   return {
     status: "ready",
     channel: topology === "local-self-development" ? "alpha" : "stable",
     source: "distribution-default",
     topology,
+    alphaRef,
+    alphaRefInvalid,
     reason: null,
   };
 }
