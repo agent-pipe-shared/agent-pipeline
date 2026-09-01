@@ -387,6 +387,22 @@ function alphaRefPostimage(observation, alphaRef) {
   return fieldPostimage(observation, "pipelineUpdateAlphaRef", alphaRef);
 }
 
+// `readCalibration` only detects a duplicated `pipelineUpdateChannel` key --
+// its one hardcoded field. A duplicated `pipelineUpdateAlphaRef` key reaches
+// the writer undetected: `fieldPostimage` resolves its write target via
+// `.find()` (the FIRST occurrence) while `JSON.parse` -- and therefore every
+// value comparison -- resolves to the LAST occurrence, so the byte edit and
+// the value check silently address two different properties (finding F1).
+// Mirrors the duplicate check `readProjectPipelineUpdateAlphaRef` already
+// performs on its own read path; kept local to the alpha-ref writer rather
+// than folded into `readCalibration` because generalizing it there would
+// also change what that reader returns for this exact case (its non-ready
+// branch collapses every reason to `channel-unavailable`, discarding the
+// `malformed-configuration` reason a pinned test requires).
+function duplicateAlphaRefKey(observed) {
+  return observed.layout.properties.filter((entry) => entry.key === "pipelineUpdateAlphaRef").length > 1;
+}
+
 /** Read back only the closed portable channel field. */
 export function readProjectPipelineUpdateChannel(repoPath, deps = {}) {
   const observed = readCalibration(repoPath, deps);
@@ -559,6 +575,9 @@ export function planPipelineUpdateAlphaRef(repoPath, alphaRef, deps = {}) {
   const observed = readCalibration(repoPath, deps);
   if (observed.status !== "ready") {
     return { schema: PIPELINE_UPDATE_ALPHA_REF_PLAN_SCHEMA, status: "unknown", reason: observed.reason };
+  }
+  if (duplicateAlphaRefKey(observed)) {
+    return { schema: PIPELINE_UPDATE_ALPHA_REF_PLAN_SCHEMA, status: "unknown", reason: "malformed-configuration" };
   }
   const postimage = alphaRefPostimage(observed, alphaRef);
   const binding = alphaRefPlanBinding(repoPath, alphaRef, observed.rawSha256, sha256(postimage));
@@ -889,5 +908,13 @@ if (isCli) {
         ? planPipelineUpdateChannel(parsed.repo, parsed.channel)
         : applyPipelineUpdateChannel(parsed.repo, parsed));
   process.stdout.write(`${JSON.stringify(result)}\n`);
-  process.exit(["unknown"].includes(result.status) ? 2 : 0);
+  // `readback` carries two independently-typed statuses in one JSON payload
+  // -- channel at top level, alphaRef nested -- but the exit code used to
+  // read only the top-level channel status, so a broken alpha-ref field
+  // (e.g. `unknown`) exited 0 (finding F2). `plan`/`apply` still expose
+  // exactly one status each, so their exit check is unchanged.
+  const failed = parsed.operation === "readback"
+    ? ["unknown"].includes(result.status) || ["unknown"].includes(result.alphaRef.status)
+    : ["unknown"].includes(result.status);
+  process.exit(failed ? 2 : 0);
 }

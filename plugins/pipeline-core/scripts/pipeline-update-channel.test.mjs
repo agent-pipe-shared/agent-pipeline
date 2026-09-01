@@ -553,6 +553,24 @@ test("alpha-ref apply refuses calibration drift and a forged or stale plan witho
   assert.equal(readFileSync(join(root, "project", "pipeline.json"), "utf8"), drifted);
 });
 
+test("alpha-ref writer refuses a duplicate top-level key before any write (F1, AC-1/AC-3)", () => {
+  const before = '{"pipelineUpdateAlphaRef":"feat/a","pipelineUpdateAlphaRef":"feat/b"}\n';
+  const root = fixture("alpha-ref-duplicate-write", before);
+  const plan = planPipelineUpdateAlphaRef(root, "feat/c");
+  assert.deepEqual(plan, {
+    schema: PIPELINE_UPDATE_ALPHA_REF_PLAN_SCHEMA,
+    status: "unknown",
+    reason: "malformed-configuration",
+  });
+  // AC-3: the return value alone is not proof -- a version that writes
+  // first and refuses second would report this same reason. The file's
+  // bytes must be provably untouched too (mirrors readCalibration's own
+  // pipelineUpdateChannel duplicate-key refusal, which never reaches a
+  // write either).
+  assert.equal(readFileSync(join(root, "project", "pipeline.json"), "utf8"), before);
+  assert.deepEqual(transactionArtifacts(root), []);
+});
+
 test("writing one field never touches the other, in either direction (AC-4)", () => {
   const before = '{"project":"self","pipelineUpdateChannel":"alpha","pipelineUpdateAlphaRef":"feat/keep"}\n';
   const rootA = fixture("ac4-alpha-ref-write", before);
@@ -627,6 +645,25 @@ test("CLI readback exposes alphaRef alongside channel, additive to the existing 
   // Additive: the full alpha-ref reader result nested under its own key.
   assert.deepEqual(parsed.alphaRef, {
     status: "ready", alphaRef: "feat/sprint-alfred", source: "project-config", reason: null,
+  });
+});
+
+test("CLI readback exits non-zero when the alpha ref is unknown even though the channel is valid (F2)", () => {
+  const root = fixture("readback-alpha-unknown", '{"pipelineUpdateChannel":"beta","pipelineUpdateAlphaRef":123}\n');
+  const output = spawnSync(process.execPath, [
+    fileURLToPath(new URL("./pipeline-update-channel.mjs", import.meta.url)),
+    "readback", "--repo", root,
+  ], { encoding: "utf8" });
+  assert.notEqual(output.status, 0);
+  // The JSON payload shape is unchanged -- only the exit code differs. The
+  // channel side stays fully valid; only the alpha-ref side is broken.
+  const parsed = JSON.parse(output.stdout);
+  assert.equal(parsed.status, "ready");
+  assert.equal(parsed.updateChannel, "beta");
+  assert.equal(parsed.source, "project-config");
+  assert.equal(parsed.reason, null);
+  assert.deepEqual(parsed.alphaRef, {
+    status: "unknown", alphaRef: null, source: "project-config", reason: "invalid-alpha-ref",
   });
 });
 
