@@ -218,6 +218,7 @@ check("EXCLUSIONS is exactly the 5 green suites parked on a closed maintenance w
     "harness/scripts/check-adr-consistency.test.mjs",
     "harness/scripts/check-critic-contract-citations.test.mjs",
     "harness/scripts/check-doc-reconciliation.test.mjs",
+    "harness/scripts/print-verify-failures.test.mjs",
     "plugins/pipeline-core/scripts/check-critic-skip-coverage.test.mjs",
     "plugins/pipeline-core/scripts/measure-tofu-push-e2e.test.mjs",
   ];
