@@ -111,3 +111,50 @@ test("extractShellWriteTargets: empty/blank command and a caller passing no argu
   assert.deepEqual(extractShellWriteTargets({ command: "   ", root: "/repo" }), []);
   assert.deepEqual(extractShellWriteTargets(), []);
 });
+
+// NVA-B-GITARGV (backlog:
+// 2026-09-01-an-authorized-rebase-demands-a-fresh-po-signature-after-every-conflict.md,
+// Requirement 3): git commands are parsed per subcommand rather than by the generic
+// `operands(argv)` walk, so a `-c` global option's value and the subcommand itself are never
+// mistaken for a path. Positive cases 3, 4, 5 from that item.
+
+test("NVA-B-GITARGV case 3: a global -c KEY=VALUE is never a candidate, even as a separate argv entry", () => {
+  assert.deepEqual(candidates("git -c core.editor=true rebase --continue"), []);
+  // The glued form was never actually buggy (it already starts with "-"), pinned here so a
+  // future change to the global-option skip cannot silently regress it either.
+  assert.deepEqual(candidates("git -ccore.editor=true rebase --continue"), []);
+});
+
+test("NVA-B-GITARGV: a -c value is excluded independent of the rebase-specific no-pathspec rule", () => {
+  // Case 3's own reproduction uses `rebase`, which is unconditionally candidate-free on its
+  // own (see the GIT_NO_PATHSPEC_VERBS test below) -- this uses `restore` instead, so the
+  // absence of "core.editor=true" here can only be explained by the global-option-value
+  // exclusion, not by rebase's separate blanket rule.
+  assert.deepEqual(candidates(`git -c core.editor=true restore -- ${TARGET}`), [TARGET]);
+});
+
+test("NVA-B-GITARGV case 4: git checkout --ours -- <path> yields only the real pathspec, never checkout/--ours/a revision", () => {
+  assert.deepEqual(candidates(`git checkout --ours -- ${TARGET}`), [TARGET]);
+  // The same shape with an explicit revision before "--" must drop the revision too.
+  assert.deepEqual(candidates(`git checkout HEAD --ours -- ${TARGET}`), [TARGET]);
+});
+
+test("NVA-B-GITARGV: without a \"--\" separator, checkout still yields the bare token as a candidate (no narrowing)", () => {
+  // git itself resolves this shape as a branch switch OR a restore-from-HEAD depending on
+  // repository state; treating it as never a pathspec would stop detecting the genuine
+  // "restore a protected file from HEAD without the safety --" bypass.
+  assert.deepEqual(candidates(`git checkout ${TARGET}`), [TARGET]);
+});
+
+test("NVA-B-GITARGV case 5: git rebase --show-current-patch is a repository-wide mutator with no real pathspec, so it yields no candidates", () => {
+  assert.deepEqual(candidates("git rebase --show-current-patch"), []);
+  // Every other ordinary rebase invocation is equally candidate-free -- rebase never takes a
+  // user-specified working-tree pathspec.
+  assert.deepEqual(candidates("git rebase --continue"), []);
+  assert.deepEqual(candidates("git rebase main"), []);
+});
+
+test("NVA-B-GITARGV: the git subcommand itself is never a candidate for any git write verb", () => {
+  assert.ok(!candidates(`git restore ${TARGET}`).includes("restore"));
+  assert.ok(candidates(`git restore ${TARGET}`).includes(TARGET));
+});

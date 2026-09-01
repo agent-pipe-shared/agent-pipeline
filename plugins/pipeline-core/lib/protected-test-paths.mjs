@@ -178,6 +178,49 @@ const GIT_WRITE_VERBS = Object.freeze(new Set([
 ]));
 
 /**
+ * Global git options that consume a following argv entry as their value (`-c KEY=VALUE`,
+ * `-C <path>`, ...) rather than naming a path themselves. Mirrors the exact set `gitVerb()`
+ * has always skipped past to find the subcommand -- reused here as the boundary for candidate
+ * extraction too, so a global option's VALUE (e.g. `core.editor=true`) can never be mistaken
+ * for a path the way it could when candidate extraction ran over the whole, unfiltered argv.
+ * A glued form (`-ccore.editor=true`, one argv token) needs no separate entry here: it already
+ * starts with `-`, so the generic "single dash-prefixed token, skip one" fallback below
+ * consumes it correctly without ever treating it as carrying a following value.
+ */
+const GIT_GLOBAL_OPTIONS_WITH_VALUE = Object.freeze(new Set(["-C", "-c", "--git-dir", "--work-tree", "--namespace"]));
+
+/**
+ * git subcommands whose arguments are refs/commits/flags only -- never a real working-tree
+ * pathspec -- so operand extraction must not invent a file candidate out of them at all.
+ * `rebase` is the confirmed case (backlog:
+ * 2026-09-01-an-authorized-rebase-demands-a-fresh-po-signature-after-every-conflict.md,
+ * Requirement 3): every one of its arguments (`--continue`, `--show-current-patch`, `--onto
+ * <ref>`, a branch/commit to rebase onto) is a flag or a revision, never a pathspec, so treating
+ * the bare `rebase` token (or anything else its argv carries) as a file candidate is inventing
+ * one where git's own grammar has none. This is deliberately NOT generalised to `merge`/
+ * `cherry-pick`/`revert`/`switch`, which share the same shape but are outside this
+ * requirement's stated scope and untested here.
+ */
+const GIT_NO_PATHSPEC_VERBS = Object.freeze(new Set(["rebase"]));
+
+/**
+ * git subcommands with the `[<tree-ish>] [--] <pathspec>...` grammar, where an explicit `--`
+ * unambiguously separates the (excluded) revision/tree-ish from the (included) pathspecs.
+ * `checkout` is the confirmed case (Requirement 3, positive case 4: `git checkout --ours --
+ * backlog/item.md` must extract only the real pathspec, never `checkout`, `--ours`, or a
+ * revision such as `HEAD`). Deliberately NOT extended to `reset`, which shares the identical
+ * grammar shape but is outside this requirement's stated scope and untested here -- left on the
+ * generic extraction path below, unchanged from before this fix.
+ *
+ * Without an explicit `--`, a bare `git checkout <token>` stays on the generic extraction path
+ * (every non-flag token is still a candidate): git itself resolves that shape as either a branch
+ * switch OR a path restore from HEAD depending on repository state, and treating it as never a
+ * pathspec would silently stop detecting the genuine "restore a protected file from HEAD without
+ * the safety `--`" bypass shape -- narrowing protection, which this fix must not do.
+ */
+const GIT_TREEISH_PATHSPEC_VERBS = Object.freeze(new Set(["checkout"]));
+
+/**
  * Interpreters whose payload is one opaque word. Token matching sees a single argument, so
  * these get the wider treatment: every path-shaped run inside the payload is tested, and so
  * is the literal-basename lane below. This is the exact shape the reported bypass used
@@ -319,6 +362,29 @@ function operands(argv) {
 }
 
 /**
+ * Real write-target operands for a git subcommand's OWN argv (the tokens after the
+ * subcommand), per-subcommand rather than generic -- Requirement 3 of the backlog item named
+ * on `GIT_NO_PATHSPEC_VERBS`/`GIT_TREEISH_PATHSPEC_VERBS` above. `verb` is never itself a
+ * candidate here because it is never part of `postVerbArgv` (the caller slices it off), which
+ * is what fixes the `checkout`/`rebase`-as-a-path defect for every verb, not only the two named
+ * subcommands below.
+ */
+function gitWriteTargetOperands(verb, postVerbArgv) {
+  if (GIT_NO_PATHSPEC_VERBS.has(verb)) return [];
+  if (GIT_TREEISH_PATHSPEC_VERBS.has(verb)) {
+    const dashDashIndex = postVerbArgv.indexOf("--");
+    // An explicit `--` is the unambiguous git-grammar boundary: everything at-or-after it is
+    // `operands()`'s ordinary "--"-aware walk, so passing the slice STARTING AT "--" both
+    // drops every pre-"--" tree-ish/revision token and keeps every post-"--" pathspec,
+    // including one that happens to start with "-".
+    if (dashDashIndex !== -1) return operands(postVerbArgv.slice(dashDashIndex));
+    // No "--" at all: stay on the generic path (see GIT_TREEISH_PATHSPEC_VERBS' own doc
+    // comment for why -- this ambiguous shape must not narrow detection).
+  }
+  return operands(postVerbArgv);
+}
+
+/**
  * PowerShell candidates: the raw write-cmdlet operand, plus any path-shaped sub-tokens
  * embedded inside it (an operand can carry characters PATH_TOKEN would otherwise split on,
  * e.g. a quoted argument with an inner separator) — the same coverage
@@ -388,10 +454,20 @@ export function extractShellWriteTargets({ command, root, toolName = "Bash", pla
 
       const inPlace = IN_PLACE_EXECUTABLES.has(executable)
         && argv.some((arg) => IN_PLACE_FLAGS.has(arg) || /^-[a-z]*i[a-z]*$/u.test(arg));
-      const gitWrite = ["git"].includes(executable) && GIT_WRITE_VERBS.has(gitVerb(argv) ?? "");
+      const isGit = executable === "git";
+      const verbIndex = isGit ? gitVerbIndex(argv) : 0;
+      const verb = isGit ? (argv[verbIndex] ?? null) : null;
+      const gitWrite = isGit && GIT_WRITE_VERBS.has(verb ?? "");
       if (!WRITE_EXECUTABLES.has(executable) && !inPlace && !gitWrite) continue;
 
-      for (const operand of operands(argv)) {
+      // Subcommand-aware for git (never the subcommand itself, never a global option's value --
+      // both excluded by starting AFTER verbIndex; per-verb pathspec rules beyond that live in
+      // gitWriteTargetOperands()); the prior whole-argv `operands()` walk stays exactly as
+      // before for every non-git writer.
+      const targetOperands = gitWrite
+        ? gitWriteTargetOperands(verb, argv.slice(verbIndex + 1))
+        : operands(argv);
+      for (const operand of targetOperands) {
         targets.push({ candidate: operand, lane: gitWrite ? "git-working-tree-write" : "write-command" });
       }
     }
@@ -456,11 +532,23 @@ export function protectedTestPathShellHit({ command, rules, root, toolName = "Ba
   return null;
 }
 
-/** The subcommand of a `git` invocation, skipping the recognised global options. */
-function gitVerb(argv) {
+/**
+ * The index of a `git` invocation's subcommand token in argv, skipping recognised global
+ * options -- `-c`/`-C`/`--git-dir`/`--work-tree`/`--namespace` each consume their own value as
+ * a SEPARATE following argv entry (also skipped); any other single dash-prefixed token
+ * (including a glued form like `-ccore.editor=true`, which carries no separate value entry) is
+ * skipped on its own. Returns `argv.length` when every token is a global option and no
+ * subcommand token exists.
+ */
+function gitVerbIndex(argv) {
   let index = 0;
   while (index < argv.length && argv[index].startsWith("-")) {
-    index += ["-C", "-c", "--git-dir", "--work-tree", "--namespace"].includes(argv[index]) ? 2 : 1;
+    index += GIT_GLOBAL_OPTIONS_WITH_VALUE.has(argv[index]) ? 2 : 1;
   }
-  return argv[index] ?? null;
+  return index;
+}
+
+/** The subcommand of a `git` invocation, skipping the recognised global options. */
+function gitVerb(argv) {
+  return argv[gitVerbIndex(argv)] ?? null;
 }
