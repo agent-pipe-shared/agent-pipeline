@@ -44,9 +44,18 @@ outside this file:
   `--expires-at` window. Re-run `push-prepare` immediately before signing;
   never reuse an earlier printout. `docs/push-release-flow.md` documents the
   field's parsing behaviour but not this warning.
-- The maintenance window's scope has grown beyond the TP-5 release-adapter
-  carve-out: it now also owes four suite registrations and the promotion of
-  `check-suite-registration.mjs` itself to a gate step. All TP-3.
+- The maintenance window owes four suite registrations plus the promotion of
+  `check-suite-registration.mjs` itself to a gate step. All TP-3 — editing
+  `harness/scripts/verify.mjs`, for which no in-session override exists in
+  signature mode. **A "TP-5 release-adapter carve-out" was carried in this
+  file's predecessor and in several session summaries; it could not be
+  substantiated on 2026-09-01.** No backlog item names it, the TP-5 window item
+  is closed, and the TP-3/4/5/6/7 restoration item is closed with the rules
+  confirmed `armed`. Treat TP-5 as owing nothing until something re-establishes
+  it. All four unregistered suites were measured green standalone the same day,
+  so the gap is that the gate does not re-run them, not that the behaviour is
+  unverified — and the guards themselves are armed regardless of whether their
+  suites are registered.
 
 ### The day's work
 
@@ -177,8 +186,25 @@ the item's own proposal named.
   rewriting history without an unpushed carve-out, so it was not done. Three
   directions are in the item; the seventh instance, produced under an explicit
   briefing warning, refutes the "fix the habit" direction outright.
-- **`GG-17` versus the PO's `--no-verify` instruction.** Recorded as a tension
-  in the carried-forward rules above, not resolved by an agent picking a side.
+- **`GG-17` versus the PO's `--no-verify` instruction — resolved the same day;
+  the carried-forward rule above states the question, this states the answer.**
+  It was surfaced by the rotation's extraction pass, then put to the PO rather
+  than settled by an agent picking a side. What the extraction pass got wrong on
+  first reading is worth keeping: it read `guardrails/git.md` as the authority
+  and reported an unresolved contradiction. `CLAUDE.md` already carried the
+  answer — forbidden "not by asking", "never skip hooks" — and it was the
+  guardrail that disagreed with it, not the other way round.
+- **Resolved 2026-09-01 (PO decision, in session): hook-bypass is never
+  agent-overridable ([ADR-0079](adr/0079-hook-bypass-is-never-agent-overridable.md)).**
+  Pushing through the Pipeline with `--no-verify` is never permitted for the
+  agent and carries no `OVERRIDE <rule-id>` route (`GG-17`…`GG-20`), following
+  the `GIT-03` non-overridable precedent. The PO's own manual `--no-verify`
+  push in their own terminal remains a documented human exception outside the
+  Pipeline's authority — never retroactively legitimised, never agent-arranged.
+  Implementation (correcting `guardrails/git.md` GIT-07 and moving `GG-17`…`GG-20`
+  out of the overridable union) is filed as
+  `backlog/items/2026-09-01-hook-bypass-rules-are-overridable-against-the-stated-policy.md`,
+  scheduled for the maintenance window, not immediate.
 
 The gate result for this candidate is in the machine-written
 `evidence/verify-latest.json`, which names its own candidate commit and tree —
