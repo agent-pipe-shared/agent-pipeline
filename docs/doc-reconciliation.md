@@ -47,6 +47,26 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 314a328293aa180c4a251c51f15c4724e58bcf30 — 2026-09-01, range 56e91858..314a3282, post-push release bookkeeping and the CI openssl finding
+
+- ADR-0012: checked, no change needed.
+
+  `docs/state.md` gained one status block recording the push of `56e91858`, the
+  first CI run since 2026-08-02 to execute any suite, the measured `openssl`
+  cause, and the remaining release path. Purely additive within the existing
+  current-handover section: no rotation, no archive row, no section removed, and
+  the file is 29984 bytes against this ADR's 30000-byte cap
+  (`guard-handover-size` passes). The canonicalization rule is unchanged.
+
+- ADR-0056: checked, no change needed.
+
+  `project/pipeline-state.json` changed because `approve-push` wrote its own
+  approval audit record for the signature bound to `56e91858` — that write IS the
+  mechanism this ADR specifies, exercised in `signature` mode against the pinned
+  trust anchor, not a change to it. The commit was deliberately made AFTER the
+  push, never between `approve-push` and `git push`, per the ordering rule in
+  `docs/push-release-flow.md`. No decision in ADR-0056 is affected.
+
 ## Candidate f8b7b441c00c4fc88924d45a6f0bd5834f9fc17a — 2026-09-01, range dfd26254..f8b7b441, the 0.6.0 interim-release preparation
 
 - ADR-0012: checked, no change needed.
