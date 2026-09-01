@@ -229,3 +229,69 @@ test("NVA-B-ROUNDK F2: the exec payload lane is only opened for the verb that ha
   assert.ok(!lanes(`git clean -x -d -f`).includes("opaque-interpreter-code"));
   assert.deepEqual(candidates("git clean -x -d -f"), []);
 });
+
+/**
+ * F1 (round L). git's `parse-options` resolves any UNAMBIGUOUS prefix of a long option, so a
+ * table keyed on the byte-identical spelling `--exec` was a bypass rather than a rule: the
+ * abbreviation missed the table, `rebase` yields no operand candidates by design, and the
+ * command was admitted with no candidate at all.
+ *
+ * MEASURED, not inferred -- real git executed in a throwaway fixture repository
+ * (`scratch/nva-roundl/measure-f1.mjs`, output `scratch/nva-roundl/evidence/f1-measurement.txt`,
+ * git 2.53.0): `git rebase --exe <cmd> main`, `--ex <cmd>`, `--exe=<cmd>` and `--ex=<cmd>` all
+ * exited 0 and EXECUTED the payload; `--e` was refused as ambiguous ("could be --empty or
+ * --exec"); `--execute` was refused as an unknown option. The finding is confirmed.
+ */
+test("NVA-B-ROUNDL F1: an abbreviated --exec spelling git actually accepts still yields the payload", () => {
+  for (const command of [
+    `git rebase --exe "sed -i s/a/b/ ${TARGET}" main`,
+    `git rebase --ex "sed -i s/a/b/ ${TARGET}" main`,
+    `git rebase --exe="sed -i s/a/b/ ${TARGET}" main`,
+    `git rebase --ex="sed -i s/a/b/ ${TARGET}" main`,
+    // Ambiguous for git itself, so this exact command never runs. Over-approximating git's
+    // ambiguity check is the fail-CLOSED direction and costs only a candidate on a command git
+    // already rejects -- the alternative is re-encoding git's ambiguity table here, which is
+    // the same enumeration mistake one layer down.
+    `git rebase --e "sed -i s/a/b/ ${TARGET}" main`,
+  ]) {
+    const targets = extractShellWriteTargets({ command, root: "/repo" });
+    assert.ok(
+      targets.some((t) => t.candidate === TARGET && t.lane === "opaque-interpreter-code"),
+      `abbreviated payload option not extracted: ${command}`,
+    );
+  }
+});
+
+test("NVA-B-ROUNDL F1: a rebase long option enumerated in NEITHER table still yields its argument as a payload", () => {
+  // The structural half of the finding, and the half a fix that merely adds `--exe` to a list
+  // would leave open: behind a verb with no other candidate source, an unrecognised option must
+  // fail CLOSED. None of these spellings is in the payload table or the known-option table --
+  // including one that is not even a prefix of `--exec`.
+  for (const command of [
+    `git rebase --frobnicate "rm ${TARGET}" main`,
+    `git rebase --run-command="rm ${TARGET}" main`,
+    `git rebase --exec-on-each "rm ${TARGET}" main`,
+  ]) {
+    const targets = extractShellWriteTargets({ command, root: "/repo" });
+    assert.ok(
+      targets.some((t) => t.candidate === TARGET && t.lane === "opaque-interpreter-code"),
+      `an unenumerated option's argument was not treated as a payload: ${command}`,
+    );
+  }
+});
+
+test("NVA-B-ROUNDL F1: closing the abbreviation hole narrows nothing -- ordinary rebase stays candidate-free", () => {
+  // The four shapes the finding's own scope names, re-asserted here so a future change to the
+  // payload lane cannot buy coverage by inventing revision candidates.
+  assert.deepEqual(candidates("git rebase main"), []);
+  assert.deepEqual(candidates("git rebase --continue"), []);
+  assert.deepEqual(candidates("git rebase --onto upstream topic"), []);
+  assert.deepEqual(candidates("git -c core.editor=true rebase --continue"), []);
+  // Abbreviations of a KNOWN non-payload option must stay non-payload as well, or every
+  // short-hand invocation starts inventing candidates out of its neighbours.
+  assert.deepEqual(candidates("git rebase --cont"), []);
+  assert.deepEqual(candidates("git rebase --ont upstream topic"), []);
+  assert.deepEqual(candidates("git rebase --no-autosquash main"), []);
+  // And the payload lane itself still contributes exactly the payload, nothing beside it.
+  assert.deepEqual(candidates('git rebase --exe "true" main'), ["true"]);
+});

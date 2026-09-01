@@ -222,9 +222,50 @@ const GIT_NO_PATHSPEC_VERBS = Object.freeze(new Set(["rebase"]));
  * tokens are the real targets -- rather than a third mechanism for the same job. This is also
  * strictly wider than the pre-NVA-B-GITARGV behaviour, which made the payload a single
  * whole-string candidate and therefore only matched when the payload ENDED in a protected path.
+ *
+ * These are the CANONICAL spellings, not the accepted ones: git's `parse-options` resolves any
+ * unambiguous abbreviation of a long option, so `gitShellPayloads()` matches the long entries
+ * by prefix rather than by equality (round-L finding F1).
  */
 const GIT_SHELL_PAYLOAD_OPTIONS = Object.freeze(new Map([
   ["rebase", Object.freeze(["--exec", "-x"])],
+]));
+
+/**
+ * The long options of a `GIT_NO_PATHSPEC_VERBS` subcommand that are KNOWN to carry no shell
+ * code -- a flag, a revision, a strategy name, a number. This table is the INVERSE of
+ * `GIT_SHELL_PAYLOAD_OPTIONS`, and the inversion is the whole point of round-L finding F1:
+ * behind a verb whose own operands yield no candidates at all, a table keyed on the PAYLOAD
+ * options fails OPEN for every spelling it does not enumerate, while a table keyed on the SAFE
+ * options fails CLOSED. An omission here costs one spurious candidate on an option nobody
+ * passes; an omission there cost the entire gate.
+ *
+ * Matching is by PREFIX, because git resolves any unambiguous abbreviation and a classifier
+ * that only recognises the full spelling is not reading the command git is reading. Measured,
+ * not inferred -- real git 2.53.0 in a throwaway fixture repository: `git rebase --exe <cmd>
+ * main`, `--ex <cmd>`, `--exe=<cmd>` and `--ex=<cmd>` each exited 0 and EXECUTED the payload;
+ * `--e` was refused as ambiguous ("could be --empty or --exec") and `--execute` as unknown.
+ *
+ * Two deliberate boundaries. `--no-<x>` needs no entry: a parse-options negation is a boolean's
+ * off switch and never takes a value. And this is long-option-only -- git abbreviates long
+ * options and nothing else, so the bypass class does not exist for short flags, while a
+ * fail-closed default for unrecognised SHORT options would invent a candidate out of every
+ * `-s <strategy>` and `-X <option>` without closing anything measured.
+ *
+ * `--exec` is absent on purpose: it is the payload option, and listing it here would restore
+ * the finding.
+ */
+const GIT_NO_PATHSPEC_VERB_KNOWN_OPTIONS = Object.freeze(new Map([
+  ["rebase", Object.freeze([
+    "--abort", "--allow-empty-message", "--apply", "--autosquash", "--autostash",
+    "--committer-date-is-author-date", "--context", "--continue", "--edit-todo", "--empty",
+    "--ff", "--force-rebase", "--fork-point", "--gpg-sign", "--help", "--ignore-date",
+    "--ignore-whitespace", "--interactive", "--keep-base", "--keep-empty", "--merge", "--onto",
+    "--quiet", "--quit", "--reapply-cherry-picks", "--rebase-merges", "--rerere-autoupdate",
+    "--reschedule-failed-exec", "--reset-author-date", "--root", "--show-current-patch",
+    "--signoff", "--skip", "--stat", "--strategy", "--strategy-option", "--update-refs",
+    "--verbose", "--verify", "--whitespace",
+  ])],
 ]));
 
 /**
@@ -415,25 +456,71 @@ function gitWriteTargetOperands(verb, postVerbArgv) {
  * The opaque shell payloads a git subcommand's OWN argv hands to a payload-carrying option
  * (`GIT_SHELL_PAYLOAD_OPTIONS`). Separate from `gitWriteTargetOperands()` on purpose: these are
  * not operands of the subcommand and are not pathspecs -- they are code, and the caller puts
- * their path-shaped runs on the `opaque-interpreter-code` lane. All three spellings git accepts
- * are covered, because covering only the spaced one is exactly the split that produced F1:
- * `--exec <cmd>`, `--exec=<cmd>`, `-x <cmd>` and the glued short form `-x<cmd>`.
+ * their path-shaped runs on the `opaque-interpreter-code` lane.
+ *
+ * Three rules for long options, applied in this order, and the order is load-bearing:
+ *
+ *   1. A name that is a PREFIX of a payload option (`--exec` -> `--exe`, `--ex`, `--e`) carries
+ *      a payload. git's `parse-options` resolves unambiguous abbreviations; so does this. The
+ *      over-approximation past git's own ambiguity check (`--e` is ambiguous for git, and
+ *      accepted as a payload option here) is deliberate: re-encoding git's ambiguity table
+ *      would repeat the enumeration mistake one layer down, and the cost is a candidate on a
+ *      command git already refuses.
+ *   2. A name that is a prefix of a `GIT_NO_PATHSPEC_VERB_KNOWN_OPTIONS` entry, or any `--no-`
+ *      negation, carries none.
+ *   3. Anything else, on a verb whose operands yield no candidates at all, is UNRECOGNISED and
+ *      its argument is treated as a payload -- the fail-closed default round-L finding F1 asks
+ *      for. The spelling nobody enumerated is caught here rather than admitted in silence.
+ *
+ * Short options are unchanged: `-x <cmd>`, the glued `-x<cmd>` and `-x=<cmd>`. No fail-closed
+ * default applies to them (see `GIT_NO_PATHSPEC_VERB_KNOWN_OPTIONS` for why).
+ *
+ * Both the earlier byte-identical-spelling behaviour and its docblock -- which claimed "all
+ * three spellings git accepts are covered" -- were measured wrong: git executed `--exe` and
+ * `--ex`, and the classifier produced no candidate at all for either.
  */
 function gitShellPayloads(verb, postVerbArgv) {
-  const flags = GIT_SHELL_PAYLOAD_OPTIONS.get(verb);
-  if (flags === undefined) return [];
+  const flags = GIT_SHELL_PAYLOAD_OPTIONS.get(verb) ?? [];
+  const knownOptions = GIT_NO_PATHSPEC_VERB_KNOWN_OPTIONS.get(verb);
+  // The fail-closed default is scoped to verbs that have no other candidate source at all; on
+  // any other verb an unrecognised option's argument is still reachable as an operand.
+  const failClosed = knownOptions !== undefined && GIT_NO_PATHSPEC_VERBS.has(verb);
+  if (flags.length === 0 && !failClosed) return [];
+  const longFlags = flags.filter((flag) => flag.startsWith("--"));
+  const shortFlags = flags.filter((flag) => !flag.startsWith("--"));
+
   const payloads = [];
   for (let index = 0; index < postVerbArgv.length; index += 1) {
     const arg = postVerbArgv[index];
-    if (flags.includes(arg)) {
+
+    if (arg.startsWith("--") && arg.length > 2) {
+      const equals = arg.indexOf("=");
+      const name = equals === -1 ? arg : arg.slice(0, equals);
+      const gluedValue = equals === -1 ? null : arg.slice(equals + 1);
+      const isPayloadOption = longFlags.some((flag) => flag.startsWith(name));
+      const isKnownOption = name.startsWith("--no-")
+        || (knownOptions ?? []).some((flag) => flag.startsWith(name));
+      if (!isPayloadOption && (isKnownOption || !failClosed)) continue;
+      if (gluedValue !== null) { payloads.push(gluedValue); continue; }
       const value = postVerbArgv[index + 1];
       // A trailing flag with no value carries no payload; consume the value so it can never be
       // read a second time as a bare operand.
+      if (value === undefined) continue;
+      // Rule 3 only: an unrecognised option followed by another option is a boolean next to its
+      // neighbour, not an option with an argument. Rule 1 consumes unconditionally, because a
+      // real shell payload may legitimately begin with "-".
+      if (!isPayloadOption && value.startsWith("-")) continue;
+      payloads.push(value);
+      index += 1;
+      continue;
+    }
+
+    if (shortFlags.includes(arg)) {
+      const value = postVerbArgv[index + 1];
       if (value !== undefined) { payloads.push(value); index += 1; }
       continue;
     }
-    const glued = flags.find((flag) => arg.startsWith(flag) && arg.length > flag.length
-      && (arg[flag.length] === "=" || !flag.startsWith("--")));
+    const glued = shortFlags.find((flag) => arg.startsWith(flag) && arg.length > flag.length);
     if (glued === undefined) continue;
     payloads.push(arg.slice(glued.length + (arg[glued.length] === "=" ? 1 : 0)));
   }
