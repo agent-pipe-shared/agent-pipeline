@@ -1643,16 +1643,31 @@ function checkReleaseTagAncestry(binding, releaseSection) {
   );
   if (originMain.status !== 0) {
     // AC-2 (ADR-0078 D5 correction, NVA-B-TAGFIX -- replaces the earlier fail-closed
-    // AC-3 comment here): absence of refs/remotes/origin/main means main is not the
-    // published line in THIS repository, and D5 governs a repository where it is. This
-    // hook ships in plugins/pipeline-core/ to every consumer project, and a guard must
-    // not impose one repository's branch topology on another -- failing closed made a
-    // legitimate release-tag push permanently impossible, with no working remedy, in
-    // any repository whose remote has no main branch at all. Returning here instead of
-    // refusing is the accepted trade, and its residual cost is recorded rather than
-    // hidden: an operator who has simply never fetched origin/main in a repository
-    // where main IS the published line loses this check for that one push.
-    return;
+    // refusal that used to live here). Absence of refs/remotes/origin/main is genuinely
+    // AMBIGUOUS and this guard cannot tell the two readings apart: it can mean main is
+    // not the published line in THIS repository (D5 does not govern here, nothing to
+    // check), OR it can mean main IS the published line but this checkout has simply
+    // never fetched it -- a `git clone --single-branch --branch <feature>` or a shallow
+    // clone of a repository where main IS the published line reaches the identical local
+    // state. This hook ships in plugins/pipeline-core/ to every consumer project, and a
+    // guard must not impose one repository's branch topology on another -- failing closed
+    // made a legitimate release-tag push permanently impossible, with no working remedy,
+    // in any repository whose remote has no main branch at all, so that trade-off stands.
+    // What changed (NVA-B-TAGNOTICE, rework of a `major` review finding): this used to be
+    // a bare `return`, so an operator in the second (ambiguous, silently-skipped) reading
+    // had no way to learn the check never ran at all. ADR-0078 D5 states this local check
+    // is the only ancestry enforcement that exists, so a silent skip of it is worse than a
+    // visible one -- warn (non-blocking, AC-2) instead of either refusing or staying silent.
+    emit(1, [
+      `[guard-push] NOTICE: the release-tag ancestry check was skipped for '${tagRef}' -- ` +
+        "refs/remotes/origin/main is not present locally, so ADR-0078 D5's reachability check " +
+        "did not run for this push.",
+      "This can mean main is not this repository's published line (nothing to check here), or " +
+        "it can mean this checkout has simply never fetched it -- the guard cannot tell these " +
+        "two readings apart.",
+      "If main is this repository's published line, run `git fetch origin main` to make the " +
+        "ancestry check active.",
+    ]);
   }
 
   const ancestry = spawnSync(
