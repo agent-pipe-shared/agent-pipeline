@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "9e9779f2250751cbccc7f2d54709ca898e9755bedd50b096b9893bd8ec15c79d"
+    "transitionHead": "ce47d20e597df0988d4a1c5fa6d6268560cf33d1298fd52afa2af958207ce800"
   },
   "counts": {
-    "open": 84,
+    "open": 85,
     "in_progress": 0,
     "closed": 483,
     "rejected": 3,
@@ -1075,6 +1075,16 @@
       "closureRepository": "self",
       "closureCommit": "589278edd930b14a9070d0f66481e2c5915a3b37",
       "closureEvidence": "backlog/items/2026-08-25-chat-mode-push-approval-has-no-enforced-human-turn-boundary.md"
+    },
+    {
+      "id": "pipeline.ci-failure-reporter-has-no-recorded-requirement",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-01",
+      "source": "Found on 2026-09-01 while constructing the Critic rounds for the day's wave: the round covering this component could not be dispatched.",
+      "deferred": false,
+      "tracking": "Nova B — print-verify-failures.mjs decides what a failing CI run writes into a public log, and no artifact anywhere states what it is required to do. A Critic dispatch against it is refused by its own fail-closed boundary for want of a spec."
     },
     {
       "id": "pipeline.ci-topology-preflight-cannot-pass-on-this-branch",

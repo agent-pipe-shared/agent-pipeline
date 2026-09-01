@@ -92,6 +92,7 @@
 | pipeline.capability-first-advisor-critic-dispatch | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.chat-gate-non-ascii-name-windows | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — delivered 2026-08-28, same session it was reported |
 | pipeline.chat-mode-push-approval-has-no-enforced-human-turn-boundary | closed | defect | pipeline | 2026-08-25 | — |
+| pipeline.ci-failure-reporter-has-no-recorded-requirement | open | defect | pipeline | 2026-09-01 | Nova B — print-verify-failures.mjs decides what a failing CI run writes into a public log, and no artifact anywhere states what it is required to do. A Critic dispatch against it is refused by its own fail-closed boundary for want of a spec. |
 | pipeline.ci-topology-preflight-cannot-pass-on-this-branch | closed | defect | pipeline | 2026-08-28 | — |
 | pipeline.citation-coordinate-checker-bare-basename | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.claude-code-has-no-mechanical-resume-hint-delivery-hook | open | defect | pipeline | 2026-08-29 | Nova B -- new hooks.json entry needed (TP-4 protected, PO signature ceremony), larger scope than the Codex-side fix; not this candidate. |
@@ -593,7 +594,7 @@
 
 ## Counts
 
-- open: 84
+- open: 85
 - in_progress: 0
 - closed: 483
 - rejected: 3
