@@ -173,7 +173,23 @@ artifact, not the CI cause. Open in
 ### PO terminal actions, parked for one sitting (2026-09-01)
 
 Everything below needs the human at a terminal. Nothing else in the current
-work does. Ordered; the ordering is load-bearing where stated.
+work does, and **none of it is doable from a phone** — stated explicitly
+because that is the constraint that parked this list rather than executing it.
+
+Two different kinds of access are mixed in here, and they can be obtained
+separately:
+
+- **Signing terminal** (the machine holding the Ed25519 private key outside the
+  repository): items 2, 3, 5, and the push halves of 6 and 7.
+- **GitHub write access** (repository administration and the release surface,
+  no signing key involved): item 8's ruleset creation, and the
+  `gh release create` half of item 6. These need no ceremony and no verify
+  evidence, so they can be done at any time from any machine that is logged in
+  — before or after the signing session, in either order.
+
+Item 1 needs neither: it is a local filesystem copy outside the repository.
+
+Ordered; the ordering is load-bearing where stated.
 
 1. **Marketplace re-sync — always first, before any ceremony.** Today's commits
    touch `plugins/pipeline-core/**`, so this machine's external marketplace copy
@@ -206,9 +222,17 @@ work does. Ordered; the ordering is load-bearing where stated.
    manifests at this step and no earlier
    (`docs/claude-local-plugin-development.md`).
 7. **Delete `refs/heads/stable`** (ADR-0078 D1; it is at `dd1eb9ee`, identical
-   to `main`). `guard-git` protects only `main|master` against `--delete`, so
-   this is not blocked there — but whether the push gate wants an approval for a
-   delete form is the same unknown as item 6, and the same free probe answers it.
+   to `main`, so nothing is lost). Two routes, and the second removes the
+   unknown rather than probing it:
+   - as a push, `git push origin --delete stable` — `guard-git` protects only
+     `main|master` against `--delete`, so it is not blocked there, but whether
+     the push gate wants an approval for a delete refspec is the same unknown
+     as item 6;
+   - **or as repository administration**,
+     `gh api --method DELETE repos/:owner/:repo/git/refs/heads/stable`, which
+     is GitHub write access rather than a push and therefore touches no
+     ceremony at all. Prefer this: it is the same outcome with one fewer
+     unknown, and it can be done in the same sitting as item 8.
 8. **Create the release-tag ruleset** —
    `gh api --method POST repos/:owner/:repo/rulesets --input scratch/tag-ruleset-payload.json`.
    Repository administration, not a push, so it needs no ceremony. It is ADR-0078
