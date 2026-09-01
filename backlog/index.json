@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "8a26b8572b2287e91686c0cf3a638fb59004fa0da805960d9f78eb98eebcd192"
+    "transitionHead": "7c3a3840d3745286e887b2b73393639ad5f591eefaa9d59332ed9492d3f97756"
   },
   "counts": {
-    "open": 84,
+    "open": 86,
     "in_progress": 0,
     "closed": 476,
     "rejected": 3,
@@ -1453,6 +1453,15 @@
       "closureRepository": "self",
       "closureCommit": "344b49620f2353749b8bb44fc0dc2889dbdc339c",
       "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-12-medium-low-triage-grouping.md"
+    },
+    {
+      "id": "pipeline.concurrent-dispatches-in-one-shared-checkout-collide-in-ways-no-guard-catches",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-01",
+      "source": "Direct measurement, 2026-09-01: two dispatches independently fixed the same file, a third spent budget confirming a fix already committed by another agent, and a full verify.mjs run failed on candidate-binding drift because the orchestrator committed mid-run.",
+      "deferred": false
     },
     {
       "id": "pipeline.concurrent-dispatches-share-one-index",
@@ -6425,6 +6434,15 @@
       "source": "Re-Critic vtpgate2-368458af finding F5, re-measured and found wider than reported",
       "deferred": false,
       "tracking": "Scheduled for Nova B (PO decision 2026-08-28)"
+    },
+    {
+      "id": "pipeline.the-handover-size-guard-only-sees-one-of-two-write-paths",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-01",
+      "source": "Direct measurement, 2026-09-01: docs/state.md found at 30115 bytes, already over the guard's own 30000-byte cap.",
+      "deferred": false
     },
     {
       "id": "pipeline.the-ledger-reconciler-writes-before-the-items-are-validated",

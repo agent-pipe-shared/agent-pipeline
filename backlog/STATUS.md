@@ -122,6 +122,7 @@
 | pipeline.compact-nudge-cadence-too-aggressive-and-not-configurable | open | idea | pipeline | 2026-08-26 | — |
 | pipeline.compaction-stable-bootstrap-lease | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.compare-three-parallel-happy-path-tests-in-detail | closed | idea | pipeline | 2026-08-10 | — |
+| pipeline.concurrent-dispatches-in-one-shared-checkout-collide-in-ways-no-guard-catches | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.concurrent-dispatches-share-one-index | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.concurrent-session-prevention-supersedes-a-ac-01 | closed | requirement | pipeline | 2026-08-18 | — |
 | pipeline.consumer-must-allowlist-every-runner-lane | open | workflow-improvement | pipeline | 2026-08-28 | Nova B — onboarding should write the permission entries a consumer needs, instead of leaving a second blocking layer undocumented |
@@ -519,6 +520,7 @@
 | pipeline.test-path-guard-blocks-the-briefed-edit-and-offers-no-route | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.test-suites-use-host-tmp-instead-of-the-repos-own-scratch-convention | closed | workflow-improvement | pipeline | 2026-08-17 | — |
 | pipeline.the-ai-hardening-gate-has-no-home-in-any-approved-feature-package | open | defect | pipeline | 2026-08-28 | Scheduled for Nova B (PO decision 2026-08-28) |
+| pipeline.the-handover-size-guard-only-sees-one-of-two-write-paths | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.the-ledger-reconciler-writes-before-the-items-are-validated | deferred | defect | pipeline | 2026-08-08 | — |
 | pipeline.the-marketplace-attestation-compares-more-than-the-property-it-protects | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.the-pipeline-cannot-merge-two-parallel-sprint-ledgers | closed | requirement | pipeline | 2026-08-27 | — |
@@ -586,7 +588,7 @@
 
 ## Counts
 
-- open: 84
+- open: 86
 - in_progress: 0
 - closed: 476
 - rejected: 3
