@@ -140,6 +140,29 @@ signature. Correct narrow behaviour that cannot be discovered from the
 refusal is indistinguishable, to the session experiencing it, from no
 behaviour at all.
 
+**Amendment, 2026-09-01, after the resolver landed.** Requirement 5 as first
+written asked for the exact next command to be carried *in* the retry-action
+envelope. That is not implementable: `pipeline.guard-retry-actions.v1` admits
+read-only diagnostics only — `human-guard-override.mjs` drops any action whose
+`mutation` is not `false`, and `guard-lifecycle-ready.mjs` cites AC-047-140 as
+the reason `git commit -F` ships as prose rather than as an action. `git rebase
+--continue` is a mutation, so it cannot ride in that envelope, and widening the
+envelope to admit mutations would be a security change made for a convenience
+reason.
+
+The requirement therefore splits, and both halves are mandatory:
+
+- `retryActions` is non-empty during an active rebase and carries the read-only
+  diagnostics that let a session *see* its own surface — at minimum a listing
+  of the current conflict paths and `git rebase --show-current-patch`.
+- The exact continuation is carried as data on the result and stated verbatim
+  in the denial prose. A denial that names the surface but not the command it
+  leads to has not satisfied this requirement.
+
+The intent is unchanged: the session learns the way forward from the refusal
+itself. Only the carrier for the mutating half changes, because the envelope
+is deliberately read-only.
+
 Two test cases carry this, in addition to the twelve below:
 
 1. During an active rebase from a validly approved `orig-head`, a refused
