@@ -112,27 +112,38 @@ Rule IDs: `GIT-xx`.
 
 - **MUST NOT** stage any path outside `backlog/items/**` and the three ledger
   projection files (`backlog/transitions.ndjson`, `backlog/STATUS.md`,
-  `backlog/index.json`) together with a change to one of those ledger files,
-  whenever an earlier commit already changed a `backlog/items/*.md` file's
-  `status:` line without a matching ledger reconciliation since the last
-  commit that touched `backlog/transitions.ndjson`. Enforced by the git-guard
-  union as `GG-22` — a plain deny with no override token (`OVERRIDE GG-22`):
-  the fix is always the same cheap, mechanical sequence, so there is no
-  legitimate reason to bypass it.
+  `backlog/index.json`) whenever an earlier commit already changed a
+  `backlog/items/*.md` file's `status:` line without a matching ledger
+  reconciliation since the last commit that touched
+  `backlog/transitions.ndjson`. The trigger is the unreconciled status-flip
+  debt alone — it fires whether or not a ledger file is also staged in the
+  same commit, and whether or not `reconcile-backlog-ledger.mjs --activate`
+  has ever been run in this working tree; GG-22 recomputes debt fresh from
+  repository history on every commit, it does not track whether the
+  reconciler was invoked. Enforced by the git-guard union as `GG-22` — a
+  plain deny with no override token (`OVERRIDE GG-22`): the fix is always
+  the same cheap, mechanical sequence, so there is no legitimate reason to
+  bypass it.
 - **This inverts the usual `git commit -- <exact paths>` discipline.**
   Everywhere else scoping a commit to exact paths is enough on its own; here
   it is not, because `GG-22` inspects the WHOLE staged index (`git diff
   --cached --name-only`), not the commit's pathspec — an unrelated staged
   file fails the commit regardless of how narrowly the commit command itself
-  names paths. Concretely: several `backlog/items/*.md` status edits MAY be
+  names paths, and regardless of whether a ledger file happens to be staged
+  alongside it. Concretely: several `backlog/items/*.md` status edits MAY be
   batched into one commit (or several separate commits) before reconciling —
-  that is an established, legitimate pattern — but once
-  `reconcile-backlog-ledger.mjs --activate` has run, its three projection
-  files (and any further `backlog/items/**` edits) are the only paths that
-  may be staged in the commit that lands them; anything else staged
-  alongside is blocked.
-- **Remediation order:** commit pending `backlog/items/` status edits first
-  (batching several closures into one commit is fine), run `node
+  that is an established, legitimate pattern — but while the debt is
+  outstanding, `backlog/items/**` edits and the three ledger projection
+  files are the only paths that may be staged in any commit; anything else
+  staged alongside is blocked, in every commit made while the debt exists,
+  not only in the commit that eventually lands the reconciliation.
+- **Remediation order:** before closing an item, fill in its `closure_commit`
+  (and the item's other closure fields) — `reconcile-backlog-ledger.mjs
+  --activate` refuses to write anything while any closed item is missing a
+  required closure field, so an incomplete closure blocks the reconciliation
+  step below, not just the item's own validity. Then commit pending
+  `backlog/items/` status edits first (batching several closures into one
+  commit is fine), run `node
   plugins/pipeline-core/scripts/reconcile-backlog-ledger.mjs --activate`
   once, then commit the resulting `backlog/STATUS.md` /
   `backlog/index.json` / `backlog/transitions.ndjson` changes last. Running
