@@ -3,16 +3,25 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "ce47d20e597df0988d4a1c5fa6d6268560cf33d1298fd52afa2af958207ce800"
+    "transitionHead": "d86a81f976fcb23b3eb3d2ba675e5d337fc676280f9097eb0cfc606c5443670b"
   },
   "counts": {
-    "open": 85,
+    "open": 88,
     "in_progress": 0,
-    "closed": 483,
+    "closed": 484,
     "rejected": 3,
     "deferred": 11
   },
   "items": [
+    {
+      "id": "pipeline.a-briefing-prohibition-on-advisor-consultation-is-unenforced",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-01",
+      "source": "Observed twice in one session, 2026-09-01: dispatches NVA-B-WFRECORD and NVA-B-DENIALTRIM each called the advisor tool although field 4 of their briefings forbade it. Both disclosed the call unprompted.",
+      "deferred": false
+    },
     {
       "id": "pipeline.a-captured-resume-hint-card-reds-the-verify-gate-until-another-session-consumes-it",
       "status": "open",
@@ -64,6 +73,15 @@
       "owner": "pipeline",
       "created": "2026-09-01",
       "source": "Measured live, twice, in the 2026-09-01 0.6.0 release range: docs/push-release-flow.md drift caught in commit 62ba638b, docs/adr/0076-global-chat-attributed-unattested-approval-mode.md drift caught in commit 56e91858.",
+      "deferred": false
+    },
+    {
+      "id": "pipeline.a-ledger-entry-stores-an-abbreviated-oid-the-hash-chain-blocks-repair",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-01",
+      "source": "Measured 2026-09-01 while running check-backlog-state.mjs before a ledger commit: two of its 22 DRIFT lines are one surviving violation of a rule backlog/README.md already documents as a class.",
       "deferred": false
     },
     {
@@ -3521,12 +3539,16 @@
     },
     {
       "id": "pipeline.ledger-commit-discipline-rules-live-only-in-checkpoint-prose",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-27",
       "source": "Handover-rotation extraction pass over Phoenix checkpoints 61-71, 2026-08-27 (ADR-0066 Decision 6/7)",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-09-01",
+      "closureRepository": "self",
+      "closureCommit": "6c9f581f83252755c69ce8b382dc8bfdde63fe98",
+      "closureEvidence": "guardrails/git.md"
     },
     {
       "id": "pipeline.ledger-drift-classification-has-no-reachability-cutoff",
@@ -6470,12 +6492,30 @@
       "tracking": "Scheduled for Nova B (PO decision 2026-08-28)"
     },
     {
+      "id": "pipeline.the-dispatch-record-field-enumeration-omits-a-field-the-checker-requires",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-01",
+      "source": "Found 2026-09-01 while verifying dispatch NVA-B-WFRECORD, which had to add the same missing field to a copy of this list in the Workflow-dispatch reference (commit 6ce146f4). The source list was left uncorrected.",
+      "deferred": false
+    },
+    {
       "id": "pipeline.the-handover-size-guard-only-sees-one-of-two-write-paths",
       "status": "open",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-01",
       "source": "Direct measurement, 2026-09-01: docs/state.md found at 30115 bytes, already over the guard's own 30000-byte cap.",
+      "deferred": false
+    },
+    {
+      "id": "pipeline.the-ledger-commit-rule-was-given-a-second-home-in-a-different-voice",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-01",
+      "source": "Reported 2026-09-01 by dispatch NVA-B-LEDGERRULE2 as a finding outside its own acceptance criteria: the rule it was briefed to home in guardrails/git.md had already been homed in backlog/README.md hours earlier by NVA-B-GG22.",
       "deferred": false
     },
     {
