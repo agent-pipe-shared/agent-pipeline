@@ -4,6 +4,9 @@ id: pipeline.backlog-strip-for-dispatch-drops-every-section-after-triage
 type: defect
 owner: pipeline
 status: closed
+closed_at: 2026-09-01
+closure_commit: 6da6d03a551b3ed649dcff098858e32ea9d3cbc3
+closure_repository: "self"
 closure_evidence: plugins/pipeline-core/lib/backlog-dispatch-reference.test.mjs
 created: 2026-08-25
 sprint: alfred
