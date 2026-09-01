@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 created: "2026-08-31"
 sprint: nova-b
+done_when: "contains plugins/pipeline-core/lib/human-decision-attribution.test.mjs Unicode-confusable"
 source: "Exhaustive privacy sweep Critic review, F3 (minor), specs/sprint-phoenix-epic/evidence/privacy-sweep-critic-review-4defe09e.md"
 due: "2026-10-31"
 ---

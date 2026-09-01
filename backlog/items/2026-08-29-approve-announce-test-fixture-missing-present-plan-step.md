@@ -10,7 +10,7 @@ closure_commit: dc53bd7922bf0492d1710fa812fcaa5e5c5b4a62
 closure_evidence: plugins/pipeline-core/scripts/pipeline-state-approve-announce.test.mjs
 created: 2026-08-29
 sprint: nova
-done_when: "script-exit-zero node --test plugins/pipeline-core/scripts/pipeline-state-approve-announce.test.mjs"
+done_when: "script-exit-zero plugins/pipeline-core/scripts/pipeline-state-approve-announce.test.mjs"
 source: "Found by NVA-R31-STATEPHASEDRIFT while verifying unrelated work (2026-08-29), independently re-confirmed by the Elephant. Not caused by that dispatch or by any 2026-08-29 change."
 ---
 
