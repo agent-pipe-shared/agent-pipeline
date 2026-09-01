@@ -6361,6 +6361,46 @@ test("TPSHELL-REBASE-EXEC: a git rebase --exec payload naming a protected test p
 });
 
 /**
+ * TPSHELL-REBASE-ABBREV (round-L finding F1). git's `parse-options` resolves any unambiguous
+ * PREFIX of a long option, so `TPSHELL-REBASE-EXEC`'s byte-identical `--exec` coverage was a
+ * bypass one abbreviation wide: `--exe` misses the payload table, `rebase` yields no operand
+ * candidates by design, and nothing is left to refuse.
+ *
+ * Measured against real git 2.53.0 in a throwaway fixture repository before this test existed
+ * (`scratch/nva-roundl/measure-f1.mjs`): `--exe`, `--ex` and their `=`-glued forms each exited
+ * 0 and executed the payload. This is the END-TO-END guard verdict for that measurement; the
+ * classifier-level proof lives in `lib/protected-test-paths.test.mjs`.
+ */
+test("TPSHELL-REBASE-ABBREV: an abbreviated or unenumerated rebase option carrying a write payload is refused", () => {
+  const path = tpShellFixture();
+  try {
+    for (const command of [
+      `git rebase --exe "sed -i s/a/b/ ${TPSHELL_TARGET}" main`,
+      `git rebase --ex="rm ${TPSHELL_TARGET}" main`,
+      // Not a prefix of `--exec` at all: the fail-closed direction for the NEXT unknown spelling.
+      `git rebase --frobnicate "rm ${TPSHELL_TARGET}" main`,
+    ]) {
+      const result = tpShellRun(path, command);
+      assert.equal(result.exitCode, 2, `admitted an abbreviated/unknown-option payload: ${command}`);
+      assert.match(result.stderr, new RegExp(TESTPATH_SHELL_DENIAL_CODE, "u"), command);
+    }
+    // Unchanged in the other direction: ordinary rebase steps, including abbreviated spellings
+    // of options that carry no shell code, stay unclaimed by this gate.
+    for (const command of [
+      "git rebase --continue",
+      "git rebase --cont",
+      "git rebase main",
+      "git rebase --onto upstream topic",
+      "git -c core.editor=true rebase --continue",
+    ]) {
+      assert.doesNotMatch(
+        tpShellRun(path, command).stderr, new RegExp(TESTPATH_SHELL_DENIAL_CODE, "u"), command,
+      );
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
  * TPSHELL-2. The lane is config-driven exactly like the write lane: a project that
  * protects nothing gets nothing new refused. Without this, TPSHELL-1 could be green on a
  * rule that refused those commands unconditionally.
@@ -7910,6 +7950,12 @@ test("rebwire negative-4: only -c core.editor=true is admitted, never an arbitra
     assert.ok(result.stderr.includes(REBWIRE_SHAPE_CODE), `${command}: ${result.stderr}`);
   }
   assert.equal(rbBash(dir, "git -c core.editor=true rebase --continue").exitCode, 0);
+  // ...and the prohibition is exactly "no arbitrary -c", never "no global git option": a read
+  // that was admitted a moment before the rebase started is still admitted during it.
+  for (const command of ["git --no-pager status", "git --no-pager log", "git -p log"]) {
+    const result = rbBash(dir, command);
+    assert.equal(result.exitCode, 0, `${command} was over-refused: ${result.stderr}`);
+  }
 });
 
 test("rebwire negative-5: no push authority is granted, implied or represented anywhere", () => {
