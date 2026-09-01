@@ -330,6 +330,42 @@ Ordered; the ordering is load-bearing where stated.
   `backlog/items/2026-08-31-copy-safe-renderer-wrap-point-is-path-length-sensitive.md`;
   the outside-repository short-path data point is still missing.
 
+## 2026-09-01 — autonomous Nova B block, six Critic rounds, all findings closed
+
+PO mandate: work items needing no PO until ~17:00, then verify and review.
+
+**Closed with evidence:** strip-for-dispatch, observeRunner and trust-anchor —
+all three resolved by commits that never closed them, surfaced by
+`check-backlog-done-predicate.mjs`. Four more by `NVA-B-STALECLOSE`, which left
+two open because their predicates passed while the requirement did not.
+
+**Predicate campaign (PO-approved 2026-08-29):** findings 26 → 5. malformed
+1 → 0, stale-open 6 → 0, open-undeclared 17 → 4. One REGRESSION is deliberately
+left standing — see the read-containment item; it is the only mechanical signal
+that a closed item's remedy no longer holds.
+
+**Six Critic rounds** (three initial, three re-review; every package's QG-13
+round is spent, so further rework is Elephant-self-verified). Findings that
+would otherwise have shipped: a guardrail rule stating a trigger the code does
+not implement; an ADR asserting an enforcement the guard does not perform; a
+calibration write path that commits while reporting failure; and — introduced
+and caught inside the same block — a push-approval-gate bypass.
+
+**Method note worth keeping:** three findings were against acceptance criteria,
+not implementations. Naming `plan` where `apply` writes; "not blocked" where
+"keeps running" was meant; "emits a notice" without checking which exit code has
+a reader. Two suites reported green on properties they could not observe. The AC
+is the specification.
+
+**Governance discoverability:** `governance/README.md` now exists and the
+documentation map reaches the eight audit-facing documents it never named. The
+reviewer-facing overview stays open — its form, and whether the documents an
+auditor needs stay `maintainer`-classified, are PO decisions.
+
+**Deliberately not done:** the CI failure reporter has no recorded requirement,
+so its Critic round cannot be dispatched without writing a spec to match
+existing code. Recorded as review-outstanding, neither reviewed nor exempt.
+
 ## Operational head
 
 - Project calibration: [`project/pipeline.json`](../project/pipeline.json).
