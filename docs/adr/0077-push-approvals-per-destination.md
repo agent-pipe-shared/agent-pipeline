@@ -16,7 +16,7 @@ and [ADR-0074](0074-port-authorize-critical-ceremony.md)'s `authorize-critical` 
 decision is about where an already-produced approval is *stored* after the ceremony completes,
 never about how the ceremony itself runs.
 
-**Governs:** plugins/pipeline-core/scripts/pipeline-state.mjs, plugins/pipeline-core/hooks/guard-push.mjs, plugins/pipeline-core/scripts/push-prepare.mjs
+**Governs:** plugins/pipeline-core/scripts/pipeline-state.mjs, plugins/pipeline-core/hooks/guard-push.mjs, plugins/pipeline-core/scripts/push-prepare.mjs, docs/push-release-flow.md
 
 Specifically: `pipeline-state.mjs`'s `approve-push` subcommand and its `pushApproval` state shape,
 `guard-push.mjs`'s push-time reader, and `push-prepare.mjs`'s `foldPendingPushApprovalWrite`.
@@ -281,6 +281,73 @@ flag stuck `true` after the first is folded — an implementation defect to guar
 time, not a design flaw in this decision. The set-subject alternative's passphrase-count benefit
 remains unrealized; this decision trades that benefit for a narrower, better-bounded trust
 boundary, deliberately and permanently (PO, 2026-09-01).
+
+## Amendment, 2026-09-01 — the release flow invalidates its own evidence
+
+**PO decision the same evening this ADR was accepted:** extend this decision to cover the
+self-invalidation subject rather than open a second ADR against it. The reason is that the half
+that matters most is already decided here — per-destination storage is precisely what stops one
+of the loops below — and splitting the subject across two records would leave neither one
+readable on its own. The implementation of everything in this amendment is scheduled for Nova B;
+nothing here is claimed as built.
+
+### The measurement
+
+Releasing 0.6.0/0.6.1 on 2026-09-01 ran `harness/scripts/verify.mjs` six times, roughly thirteen
+minutes each — about eighty minutes of gate time. **One** run was substantively necessary. The
+other five were consequences of the flow invalidating its own evidence.
+
+### D6 — The release order is normative, and it is the order that does not void its own evidence
+
+The sequence is: every content change first, each behind the fast pre-gate of D8; then the
+expensive gates **once**; then the reconciliation record as the final commit; then all
+signatures; then all pushes; then one audit commit. Documented in
+`docs/push-release-flow.md`, which this decision therefore also governs.
+
+The order matters because each of the four loops below is an ordering consequence, not a bug in
+any one component. A flow that interleaves content commits with gate runs re-earns the gate cost
+per commit; this order pays it once.
+
+### D7 — Gate evidence binds the test-relevant tree, not the commit
+
+`evidence/verify-latest.json` and `evidence/security-latest.json` record a candidate SHA, and
+`push-prepare` rejects them the moment `HEAD` differs. Any commit voids them, including one that
+provably cannot change a test outcome — measured live, where a commit touching only
+`project/pipeline-state.json` voided a 505/505 result.
+
+The decided shape: an explicit, short list of paths declared non-test-affecting, each carrying a
+stated reason, with everything else forcing a full re-run. It **fails closed** — an unlisted path
+means re-verify, always. The three paths observed to need it are
+`project/pipeline-state.json`, `docs/doc-reconciliation.md` and `docs/state.md`. The list is the
+risk surface of this decision, so it stays short and reasoned rather than convenient, and every
+addition to it is an amendment, not a configuration change.
+
+This is the largest single lever, and it closes the third loop below as a side effect.
+It does not narrow
+`backlog/items/2026-08-16-every-gate-binds-the-whole-tree-so-any-later-commit-voids-it.md`,
+which remains the general shape; this is its release-flow instance, now decided.
+
+### D8 — The cheap consistency checkers run as a fast pre-gate, not behind the expensive suites
+
+Four times in one day a change at one place created an obligation at another that only a full
+gate run revealed: the vendored canon copy after a `guardrails/`/`templates/` edit; the
+kernel-closure test's dynamic-import edge list after a new dynamic import; the
+observation-governance inventory after a new ADR; the reference-path allowlist after a file was
+untracked. Each cost a full run to surface a one-line omission.
+
+Every checker that finds this class runs in seconds — vendored-canon generation, reference paths,
+ADR classification, kernel edges, doc contracts, suite registration. Placing them behind 505
+suites is the waste. They run after every commit as their own fast gate; the expensive suites run
+once, at the end, per D6.
+
+### What this amendment does not decide
+
+The third loop — that a reconciliation record cannot live inside the commit whose hash it names —
+is **inherent, not a defect**: a commit's hash is a function of its own tree. `check-doc-
+reconciliation.mjs`'s own header already prescribes the correct shape, and
+`plugins/pipeline-core/scripts/push-init.mjs`'s inability to express it is a separate, filed
+defect with its own T1 obligation. D7 is what makes the record cheap; nothing here changes what
+the record is.
 
 ## Follow-up
 
