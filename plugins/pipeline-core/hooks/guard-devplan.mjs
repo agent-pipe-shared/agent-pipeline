@@ -148,6 +148,17 @@ import {
   validatePortablePipelineState,
 } from "../lib/project-authority.mjs";
 import { derivePlanLifecycle } from "../lib/plan-spec-state-v2.mjs";
+// NVA-B-REBWIRE-1 (backlog: 2026-09-01-an-authorized-rebase-demands-a-fresh-po-signature-
+// after-every-conflict.md): the dev-plan gate's ONE relief and its denial disclosure, owned by
+// the policy module both of this gate's lanes already share, never re-decided here. See that
+// module's "rebase authority" section for why it lives there and what it deliberately does not
+// widen.
+import {
+  rebaseAuthorityAdmissionNotice,
+  rebaseAuthorityDisclosure,
+  resolveActiveRebaseAuthority,
+} from "../lib/guard-devplan-policy.mjs";
+import { rebaseAuthorityPermitsPath } from "../lib/rebase-authority.mjs";
 import { writeTargetPath } from "../lib/tool-write-target.mjs";
 import { dualEvaluateDecisionReference } from "../lib/decision-reference-dual-evaluation.mjs";
 
@@ -328,8 +339,27 @@ function isSanctionedCloseArtifact(normalizedCandidatePath) {
     || CLOSE_ARTIFACT_PREFIXES.some((prefix) => normalizedCandidatePath.startsWith(prefix));
 }
 
+/**
+ * NVA-B-REBWIRE-1 / Requirement 5: every refusal this hook emits while an authorized rebase is
+ * in progress names the route forward — the current conflict surface, the exact continuation in
+ * prose, and a NON-EMPTY `pipeline.guard-retry-actions.v1` envelope of read-only diagnostics.
+ * Attached here, at the one place every exit-2 path funnels through, rather than at each verdict
+ * site: a denial this hook grows later inherits the disclosure instead of silently reintroducing
+ * the stranding this item was filed for. Deliberately NOT a relief — attaching text cannot turn
+ * a refusal into an admission, so the stricter neutral-State portability refusal below keeps
+ * refusing and merely explains itself.
+ */
 function emit(code, lines) {
-  process.stderr.write(lines.filter(Boolean).join("\n") + "\n");
+  let disclosure = "";
+  try {
+    if (code === 2) {
+      const active = resolveActiveRebaseAuthority(projectDir);
+      if (active !== null) disclosure = rebaseAuthorityDisclosure(active);
+    }
+  } catch {
+    disclosure = ""; // an advisory block must never change the verdict it annotates
+  }
+  process.stderr.write(lines.filter(Boolean).join("\n") + "\n" + disclosure);
   process.exit(code);
 }
 
@@ -496,6 +526,21 @@ const isExempt = isDraftAuthority
     && (exemptPrefixes.some((prefix) => normalizedPath.startsWith(normalize(prefix)))
       || isSanctionedCloseArtifact(normalizedPath)));
 if (isExempt) process.exit(0);
+
+// ---- rebase authority: the ONE relief, and it is narrower than the gate it relieves -----
+// NVA-B-REBWIRE-1. Consulted here and nowhere earlier, deliberately: this is the last line
+// before a refusal, so the authority can only ever turn a BLOCK into an ALLOW and can never
+// turn an allow into anything. It admits exactly the paths the resolver reports as currently
+// conflicted in a genuine rebase whose `orig-head` is validly approved and in implementation
+// (`rebaseAuthorityPermitsPath`, deny-by-default, no options bag) -- so an implementation file
+// untouched by a conflict stays blocked while a rebase is active somewhere, which is the
+// narrowness Requirement 2 demands and negative case 1 pins. The refusal path needs no code
+// here: emit() already attaches the surface, the exact continuation and the retry actions to
+// every exit-2 this hook produces.
+const activeRebase = resolveActiveRebaseAuthority(projectDir);
+if (activeRebase !== null && rebaseAuthorityPermitsPath(activeRebase, filePath)) {
+  emit(0, [rebaseAuthorityAdmissionNotice(activeRebase, "write")]);
+}
 
 // ---- verdict --------------------------------------------------------------------------
 const lifecycleReason = ledgerAuthorityUnresolved

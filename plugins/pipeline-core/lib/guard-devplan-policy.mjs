@@ -41,6 +41,11 @@ import {
   resolveProjectAuthorityPaths,
   validatePortablePipelineState,
 } from "./project-authority.mjs";
+import {
+  CONFLICT_PATH_PLACEHOLDER,
+  rebaseAuthorityRetryActions,
+  resolveRebaseAuthority,
+} from "./rebase-authority.mjs";
 
 /**
  * Why `scratch/` is here, and why it is the safest of the five rather than the
@@ -265,4 +270,144 @@ export function devPlanGateVerdict({ filePath, projectDir }) {
     planPath: typeof activeFeature.planPath === "string" ? activeFeature.planPath : null,
     lifecycleStatus: lifecycle.status ?? "invalid",
   };
+}
+
+// ---- rebase authority: the dev-plan gate's ONE relief, and its disclosure ----------------
+//
+// backlog: 2026-09-01-an-authorized-rebase-demands-a-fresh-po-signature-after-every-conflict.md
+//
+// WHY THIS LIVES NEXT TO THE DEV-PLAN GATE AND NOWHERE ELSE
+//   The refusal the live incident produced is this gate's: during a rebase the partially
+//   replayed working tree shows `planApproved: false`, so `devPlanGateVerdict()` above reads a
+//   draft lifecycle and blocks every conflict resolution. The authority that answers it is
+//   resolved entirely by `lib/rebase-authority.mjs` (a side-effect-free reader of `orig-head`);
+//   nothing here re-decides anything it decided. What lives here is the part BOTH of this
+//   gate's lanes need and neither may own privately: the block-to-allow relief, and the
+//   denial disclosure. `hooks/guard-devplan.mjs` (Edit|Write) and
+//   `hooks/guard-lifecycle-ready.mjs` (GUARD-DEVPLAN-SHELL) each call these; a second
+//   hand-written copy in either hook is exactly the drift this module's header exists to stop.
+//
+// WHAT IT DELIBERATELY DOES NOT DO (Requirement 4)
+//   It never widens anything but the dev-plan objection. It is not consulted for the
+//   gate-strength lane, the protected-test-path lane, the cross-repository lane or the
+//   readiness kernel, and it cannot be: it returns a relief for a PATH inside the resolved
+//   conflict surface, and a string. There is no flag, environment variable or argument that
+//   turns it on — `resolveActiveRebaseAuthority()` takes a project root and nothing else, and
+//   returns null unless the repository is genuinely mid-rebase from a validly approved
+//   `orig-head` (Requirement 5: the authority is never opt-in).
+
+/** Schema of the machine-readable surface block printed alongside every mid-rebase denial. */
+export const REBASE_AUTHORITY_SURFACE_SCHEMA = "pipeline.rebase-authority-surface.v1";
+
+/**
+ * The resolved authority for a project root, or null.
+ *
+ * Cheap by construction: with no injected resolver it first checks that a `.git` entry exists
+ * at all, so the overwhelmingly common "no rebase anywhere near this call" case costs one
+ * `existsSync` rather than a git spawn. Every failure mode — an unreadable root, a throw
+ * inside the resolver, a refusal — collapses to null, because a fault in an ADVISORY relief
+ * must leave the underlying refusal exactly as it stood.
+ *
+ * @param {string} projectDir resolved project root
+ * @param {{resolveRebaseAuthorityFn?: Function, existsSyncFn?: Function}} dependencies
+ * @returns {object|null} an `authorized` result from `resolveRebaseAuthority()`, or null
+ */
+export function resolveActiveRebaseAuthority(projectDir, dependencies = {}) {
+  if (typeof projectDir !== "string" || projectDir === "") return null;
+  const injected = dependencies.resolveRebaseAuthorityFn;
+  try {
+    if (injected === undefined && !(dependencies.existsSyncFn ?? existsSync)(join(projectDir, ".git"))) {
+      return null;
+    }
+    const result = (injected ?? resolveRebaseAuthority)({ rootDir: projectDir });
+    return result !== null && typeof result === "object" && result.status === "authorized" && result.authority
+      ? result
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The surface as machine-readable data, so a session can act on a denial without parsing prose.
+ *
+ * Deliberately a hand-picked projection, never a spread of `result.authority`: that object
+ * carries `repository.root`/`gitDir`/`commonDir`, which are absolute machine paths and must
+ * never reach a denial text (SEC/no-machine-paths). The three "no" facts are stated rather
+ * than omitted, for the same reason the resolver states them.
+ */
+export function rebaseAuthoritySurface(result) {
+  const authority = result.authority;
+  return {
+    schema: REBASE_AUTHORITY_SURFACE_SCHEMA,
+    headName: authority.headName,
+    origHead: authority.origHead,
+    onto: authority.onto,
+    feature: authority.originalFeature.id,
+    lifecycle: authority.lifecycle.status,
+    conflictPaths: [...authority.conflictPaths],
+    conflictPathPlaceholder: CONFLICT_PATH_PLACEHOLDER,
+    nextCommand: authority.nextCommand,
+    permittedContinuations: [...authority.permittedContinuations],
+    resolutionShapes: [...authority.resolutionShapes],
+    pushAuthority: false,
+    remoteAuthority: false,
+    sessionWide: false,
+  };
+}
+
+/**
+ * The block appended to EVERY denial a guard emits while an authorized rebase is in progress.
+ *
+ * Requirement 5, both halves, in one renderer: the exact continuation is stated verbatim in
+ * prose (`nextCommand` — a mutation, so it can never ride in the retry-action envelope, whose
+ * only in-repo consumer drops any action that is not `mutation: false`), and the read-only
+ * diagnostics that let a session SEE its own surface ride in the envelope, which is non-empty
+ * for every result carrying the resolver's schema. Both the prose and the envelope are derived
+ * from the resolver's own tables, so the advice can never drift from what is actually
+ * permitted.
+ *
+ * @param {object} result an `authorized` result from `resolveRebaseAuthority()`
+ * @returns {string} newline-terminated, or "" for anything that is not such a result
+ */
+export function rebaseAuthorityDisclosure(result) {
+  const authority = result?.authority;
+  if (!authority || !Array.isArray(authority.conflictPaths)) return "";
+  const paths = authority.conflictPaths.length > 0
+    ? authority.conflictPaths.join(", ")
+    : "(none right now — every replayed conflict is already resolved and staged)";
+  return [
+    `[rebase-authority] A genuine rebase of ${authority.headName} onto ${authority.onto} is in `
+      + `progress, and the state at its orig-head ${authority.origHead} (feature `
+      + `"${authority.originalFeature.id}", lifecycle ${authority.lifecycle.status}) is validly `
+      + "approved, so that approval carries the rebase to completion: finishing it needs no fresh "
+      + "human signature, and no session-wide exception exists or is needed.",
+    `Current conflict surface (${authority.conflictPaths.length}): ${paths}`,
+    `Permitted on that surface ONLY: Edit/Write/apply_patch on those exact paths, plus `
+      + `${authority.resolutionShapes.join(" ; ")} — substituting one of the paths above for `
+      + `${CONFLICT_PATH_PLACEHOLDER}.`,
+    `Exact next command once every conflict path above is resolved and staged: `
+      + `${authority.nextCommand}`,
+    `Also admitted while this rebase runs: ${authority.permittedContinuations.join(" ; ")} — and `
+      + `"git rebase --abort" through its own separate recovery lane.`,
+    "This authority is not session-wide, grants no push and no force-push, covers no path outside "
+      + "the surface listed above, and admits no --skip, no --edit-todo, no --exec and no "
+      + "arbitrary -c option.",
+    JSON.stringify(rebaseAuthoritySurface(result)),
+    JSON.stringify(rebaseAuthorityRetryActions(result)),
+    "",
+  ].join("\n");
+}
+
+/**
+ * The one line a guard prints when it ADMITS something it would otherwise have blocked. Kept
+ * as loud as the refusal it replaces: a lifecycle gate that suspends itself silently is
+ * indistinguishable, in an audit, from a gate that was never armed.
+ */
+export function rebaseAuthorityAdmissionNotice(result, subject) {
+  const authority = result.authority;
+  return `[rebase-authority] dev-plan gate suspended for this ${subject}: it lies inside the `
+    + `current conflict surface of the active rebase of ${authority.headName} onto `
+    + `${authority.onto}, whose orig-head ${authority.origHead} is validly approved and in `
+    + "implementation. Nothing else is lifted, and no push authority is granted.";
 }

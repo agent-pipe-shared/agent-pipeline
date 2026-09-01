@@ -59,7 +59,15 @@ import { machinePlaneFilePath } from "../lib/machine-plane.mjs";
 import {
   DEVPLAN_SHELL_DENIAL_CODE,
   devPlanGateVerdict,
+  rebaseAuthorityAdmissionNotice,
+  rebaseAuthorityDisclosure,
+  resolveActiveRebaseAuthority,
 } from "../lib/guard-devplan-policy.mjs";
+// NVA-B-REBWIRE-1 (backlog: 2026-09-01-an-authorized-rebase-demands-a-fresh-po-signature-
+// after-every-conflict.md): the command-side predicate, imported from the resolver that owns
+// it so this guard cannot disagree with the dev-plan gate's write lane about what the same
+// rebase permits. The resolver itself is never re-implemented or second-guessed here.
+import { rebaseAuthorityPermitsCommand } from "../lib/rebase-authority.mjs";
 import {
   extractShellWriteTargets,
   loadProtectedTestPathRules,
@@ -1234,6 +1242,115 @@ function devPlanShellFaultBlocked(error) {
       + "complete its evaluation.\n"
       + "No override route is offered for a classifier fault -- fix the command shape (or the "
       + "classifier, if the fault is a real defect) and retry.\n",
+  );
+}
+
+// ---- rebase authority (NVA-B-REBWIRE-1) -------------------------------------------------
+// backlog: 2026-09-01-an-authorized-rebase-demands-a-fresh-po-signature-after-every-conflict.md
+//
+// Three things, and deliberately not a fourth. (1) One memoized resolution per guard
+// invocation, so the shell lane and the denial disclosure below never pay for the same six
+// read-only git calls twice. (2) A relief that clears ONLY the dev-plan objection, expressed as
+// a LIFT rather than a `verdict(0)` return: the gate-strength lane and the protected-test-path
+// lane are evaluated before it and are unreachable from it, and every later check -- the
+// cross-repository refusal, the closed shell grammar, the readiness kernel -- still runs against
+// the lifted command exactly as NOVA-LCR-HGO-2 established for the grammar lift. (3) A refusal,
+// because Requirement 4's prohibitions have to be enforced somewhere and this is the layer that
+// sees the command: while an authorized rebase is in progress, a `git rebase` invocation the
+// resolved authority does not list, and any global git option other than the exact
+// `-c core.editor=true`, are refused outright rather than left to the pre-existing lanes.
+//
+// The fourth thing, stated so its absence is legible: no push lane. This guard has never
+// refused `git push` -- `guard-push.mjs` owns that gate -- and nothing here grants, implies or
+// represents push authority. `pushAuthority`/`remoteAuthority` are printed as false in every
+// disclosure, and the resolver's own predicate refuses every push shape.
+
+const REBASE_SHAPE_DENIAL_CODE = "GUARD-REBASE-AUTHORITY-SHAPE";
+
+/**
+ * The resolved rebase authority for this evaluation, at most once per guard invocation.
+ * `dependencies.rebaseAuthorityMemo` is created by the exported entry point; a caller that
+ * reaches an inner function without one still gets a correct (merely unmemoized) answer.
+ */
+function activeRebaseAuthority(root, dependencies = {}) {
+  const memo = dependencies.rebaseAuthorityMemo;
+  if (memo === undefined || memo === null) return resolveActiveRebaseAuthority(root, dependencies);
+  if (memo.resolved !== true) {
+    memo.value = resolveActiveRebaseAuthority(root, dependencies);
+    memo.resolved = true;
+  }
+  return memo.value;
+}
+
+/**
+ * Requirement 4 at the command layer: what an active, genuinely authorized rebase still refuses.
+ *
+ * Scoped to an ACTIVE authority on purpose -- with no rebase resolved this returns null and
+ * nothing about the guard's behaviour changes, so this can never become a new general refusal.
+ * The two pre-existing lanes it must not disturb are excluded first and by name: the narrow
+ * `git rebase --abort` recovery command keeps its own admission (positive case 5, independent of
+ * this authority), and anything the read-only diagnostic classifier already admits stays
+ * admitted -- refusing a read would be a regression, not a protection.
+ *
+ * The `git rebase` decision defers entirely to `rebaseAuthorityPermitsCommand()`, so `--skip`,
+ * `--edit-todo` and `--exec` are refused because they are absent from the resolver's admitted
+ * table, never because a second list here names them. A list here would be the copy that drifts.
+ *
+ * @returns {null|{element: string, why: string}}
+ */
+function rebaseAuthorityShapeRefusal(command, root, authority) {
+  if (authority === null || typeof command !== "string" || command === "") return null;
+  if (isNarrowRepositoryRecoveryCommand(command, root)) return null;
+  if (isReadOnlyDiagnosticCommand(command, root)) return null;
+  const parsed = parseGuardCommand(command, root, { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM });
+  if (parsed.parseStatus !== "accepted" || !Array.isArray(parsed.segments) || parsed.segments.length !== 1) {
+    return null; // the closed-grammar lane below owns every unparsed or composed command
+  }
+  const segment = parsed.segments[0];
+  const executable = basename(String(segment.executable ?? "").replace(/\\/gu, "/"))
+    .toLowerCase().replace(/\.exe$/u, "");
+  if (executable !== "git") return null;
+  const argv = Array.isArray(segment.argv) ? segment.argv : [];
+  let index = 0;
+  while (index < argv.length && String(argv[index]).startsWith("-")) {
+    if (argv[index] === "-c" && argv[index + 1] === "core.editor=true") {
+      index += 2;
+      continue;
+    }
+    return {
+      element: `the global git option "${argv[index]}"`,
+      why: "Requirement 4 admits no arbitrary -c and no other global git option while this "
+        + "authority is active. The only admitted spelling is \"-c core.editor=true\", and only "
+        + "directly in front of \"rebase --continue\".",
+    };
+  }
+  if (argv[index] !== "rebase") return null;
+  if (rebaseAuthorityPermitsCommand(authority, command)) return null;
+  return {
+    element: `"git ${argv.slice(index).join(" ")}"`,
+    why: "Only the exact continuations the resolved authority lists are admitted while a rebase "
+      + "is in progress. --skip, --edit-todo and --exec are absent from that table by "
+      + "construction rather than filtered out of it, and \"git rebase --abort\" keeps its own "
+      + "separate recovery lane.",
+  };
+}
+
+/**
+ * No override route is offered for this code, and that is the decision rather than an omission:
+ * Requirement 4 forbids a general exception, and a signable lift for exactly the shapes it
+ * prohibits would be that exception wearing a ceremony. The route forward is the disclosure
+ * block every mid-rebase denial carries.
+ */
+function rebaseAuthorityShapeBlocked(refusal) {
+  return verdict(
+    2,
+    "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
+      + `${REBASE_SHAPE_DENIAL_CODE}: ${refusal.element} is not admitted while an authorized `
+      + "rebase is in progress.\n"
+      + `Why: ${refusal.why}\n`
+      + "This refusal stands on the shape of the command alone. It is not a report that the "
+      + "rebase lacks authority -- it has one, described just below -- and no human signature "
+      + "lifts it.\n",
   );
 }
 
@@ -4032,7 +4149,40 @@ function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
   return exactReadyReceipt(receipt) ? verdict(0) : blocked();
 }
 
+/**
+ * NVA-B-REBWIRE-1 / Requirement 5, the half that is not a relief: EVERY refusal this guard
+ * emits while an authorized rebase is in progress names the route forward.
+ *
+ * Attached at the single exit rather than at each of the ~20 refusal sites, for the reason the
+ * item was filed: the live failure was not a wrong verdict, it was a correct verdict that named
+ * no route, and a per-site opt-in would reintroduce that the first time a new denial is added.
+ * "An empty `retryActions` array during an active rebase is itself a defect" is therefore a
+ * property of the exit, not of any one caller.
+ *
+ * It cannot change a verdict: only `exitCode === 2` is touched, and only by appending. Every
+ * failure mode of the resolution collapses to "append nothing", so a refusal is never softened,
+ * and a session with no rebase in progress sees byte-identical output to before.
+ */
+function withRebaseAuthorityDisclosure(result, dependencies, memo) {
+  if (result.exitCode !== 2) return result;
+  try {
+    const requestedRoot = dependencies.projectDir ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd();
+    const root = (dependencies.realpathSyncFn ?? realpathSync)(resolve(requestedRoot));
+    const active = activeRebaseAuthority(root, { ...dependencies, rebaseAuthorityMemo: memo });
+    if (active === null) return result;
+    return verdict(result.exitCode, `${result.stderr ?? ""}${rebaseAuthorityDisclosure(active)}`);
+  } catch {
+    return result;
+  }
+}
+
 export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
+  const memo = { resolved: false, value: null };
+  const scoped = { ...dependencies, rebaseAuthorityMemo: memo };
+  return withRebaseAuthorityDisclosure(evaluateLifecycleReadyGuardCore(input, scoped), dependencies, memo);
+}
+
+function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
   const toolName = String(input?.tool_name ?? "");
   // PowerShell is wired into the same PreToolUse matcher as Bash and was nevertheless
   // absent from this list, so every PowerShell call returned verdict(0) -- allow -- for
@@ -4117,12 +4267,31 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
       return devPlanShellFaultBlocked(devPlanHit.error);
     }
     if (devPlanHit !== null) {
-      const reason = `${DEVPLAN_SHELL_DENIAL_CODE}: ${devPlanHit.reason}`;
-      const route = humanOverrideRoute(
-        DEVPLAN_SHELL_DENIAL_CODE, reason, "command", root, toolName, input.tool_input, dependencies,
+      // NVA-B-REBWIRE-1: the ONE relief, consulted only once this lane has already decided to
+      // refuse -- so it can turn a block into an allow and can never turn an allow into
+      // anything. A lift rather than a return: every later check still runs.
+      const rebase = activeRebaseAuthority(root, dependencies);
+      const permitted = rebase !== null
+        && rebaseAuthorityPermitsCommand(rebase, (input.tool_input.command ?? input.tool_input.CommandLine));
+      if (permitted) {
+        shellLifts.push(verdict(0, `${rebaseAuthorityAdmissionNotice(rebase, "command")}\n`));
+      } else {
+        const reason = `${DEVPLAN_SHELL_DENIAL_CODE}: ${devPlanHit.reason}`;
+        const route = humanOverrideRoute(
+          DEVPLAN_SHELL_DENIAL_CODE, reason, "command", root, toolName, input.tool_input, dependencies,
+        );
+        if (!route.admitted) return devPlanShellBlocked(devPlanHit, route.overrideGuidance);
+        shellLifts.push(route.admitted);
+      }
+    }
+    // Fourth: Requirement 4's own refusals, and only while an authority is actually resolved.
+    // Ordered last in this block so a command already refused by a stricter sibling is never
+    // re-described by this narrower one.
+    if (toolName === "Bash") {
+      const shape = rebaseAuthorityShapeRefusal(
+        (input.tool_input.command ?? input.tool_input.CommandLine), root, activeRebaseAuthority(root, dependencies),
       );
-      if (!route.admitted) return devPlanShellBlocked(devPlanHit, route.overrideGuidance);
-      shellLifts.push(route.admitted);
+      if (shape !== null) return withLifts(shellLifts, rebaseAuthorityShapeBlocked(shape));
     }
   }
   // PowerShell reaches the gate-strength check above and nothing else, deliberately.
