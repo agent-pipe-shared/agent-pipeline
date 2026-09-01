@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "e40cc85dcfdc64fd04c9b89702dfc529b2e4f1b25cf37a826021e96108aea85a"
+    "transitionHead": "ccbdda38fcf0602f14e30003e1abd473c01ed4d90e07099f0b752902b5eab73e"
   },
   "counts": {
-    "open": 94,
+    "open": 95,
     "in_progress": 0,
     "closed": 488,
     "rejected": 3,
@@ -3340,6 +3340,15 @@
       "closureRepository": "self",
       "closureCommit": "5cb07a93377206f14ed4447fb03ba7e7687fad73",
       "closureEvidence": "plugins/pipeline-core/lib/human-guard-override.test.mjs"
+    },
+    {
+      "id": "pipeline.hook-bypass-rules-are-overridable-against-the-stated-policy",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-01",
+      "source": "ADR-0079 (docs/adr/0079-hook-bypass-is-never-agent-overridable.md), recording the PO decision (2026-09-01, in session) that hook-bypass has no agent-side override route.",
+      "deferred": false
     },
     {
       "id": "pipeline.host-managed-codex-apply-may-fail-its-own-target-boundary-invariant",
