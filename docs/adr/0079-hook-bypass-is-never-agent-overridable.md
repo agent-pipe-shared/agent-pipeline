@@ -8,10 +8,11 @@
 
 **Status:** accepted (2026-09-01, PO decision in session).
 
-**Governs:** `guardrails/git.md` GIT-07 (the sentence stating that GIT-04's double-confirmation
+**Governs:** guardrails/git.md, plugins/pipeline-core/hooks/guard-git.mjs
+
+Specifically: `guardrails/git.md` GIT-07 (the sentence stating that GIT-04's double-confirmation
 override applies to `GG-17`…`GG-20` "exactly like every other rule id"), and
-`plugins/pipeline-core/hooks/guard-git.mjs`'s treatment of `GG-17`/`GG-18`/`GG-19`/`GG-20` inside
-`UNION_BLOCKERS`.
+`guard-git.mjs`'s treatment of `GG-17`/`GG-18`/`GG-19`/`GG-20` inside `UNION_BLOCKERS`.
 
 ## Context
 

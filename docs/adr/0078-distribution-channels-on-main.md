@@ -11,10 +11,11 @@
 *mechanism*, and leaves that item's *requirement* (consumers follow the released version; the
 freshness check is fail-open but tells the user plainly) fully intact.
 
-**Governs:** `plugins/pipeline-core/scripts/ruleset-freshness.mjs` (`selectedChannelTarget`),
-`plugins/pipeline-core/scripts/pipeline-update-channel.mjs` (channel resolution and the
-distribution default), `plugins/pipeline-core/hooks/staleness-check.mjs` (the SessionStart
-observation), `SETUP.md` (the Codex marketplace pin).
+**Governs:** plugins/pipeline-core/scripts/ruleset-freshness.mjs, plugins/pipeline-core/scripts/pipeline-update-channel.mjs, plugins/pipeline-core/hooks/staleness-check.mjs, SETUP.md
+
+Specifically: `ruleset-freshness.mjs`'s `selectedChannelTarget`, `pipeline-update-channel.mjs`'s
+channel resolution and the distribution default, `staleness-check.mjs`'s SessionStart observation,
+and `SETUP.md`'s Codex marketplace pin.
 
 ## Context
 
