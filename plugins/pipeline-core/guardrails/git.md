@@ -107,3 +107,63 @@ Rule IDs: `GIT-xx`.
 - Enforced by the `guard-push` deploy branch: the deploy branch's approval check runs INDEPENDENT of `gates.push.approval`, so it is never satisfied by the standing approval — see `guardrails/deploy.md` DP-01 for the full rule and `docs/adr/0017-push-policy-standing-approval.md`'s follow-up note for the ADR-side carve-out.
 - **Why:** Without this carve-out, `git push origin v1.0.0` would auto-pass under the standing approval and silently fire a prod deploy in CI — a composition bypass. A blanket "pushing to main is fine" approval was never meant to also mean "promoting to prod is fine".
 - **Verification:** `plugins/pipeline-core/hooks/guard-push.test.mjs` carries a case where a deploy-triggering push is BLOCKED despite `gates.push.approval === "standing-approved"`; `node harness/scripts/verify.mjs` runs the full suite.
+
+## GIT-09 — GG-22: a commit may not leave a backlog status-flip unreconciled
+
+- **MUST NOT** stage any path outside `backlog/items/**` and the three ledger
+  projection files (`backlog/transitions.ndjson`, `backlog/STATUS.md`,
+  `backlog/index.json`) whenever an earlier commit already changed a
+  `backlog/items/*.md` file's `status:` line without a matching ledger
+  reconciliation since the last commit that touched
+  `backlog/transitions.ndjson`. The trigger is the unreconciled status-flip
+  debt alone — it fires whether or not a ledger file is also staged in the
+  same commit, and whether or not `reconcile-backlog-ledger.mjs --activate`
+  has ever been run in this working tree; GG-22 recomputes debt fresh from
+  repository history on every commit, it does not track whether the
+  reconciler was invoked.
+- **One precondition, and it is the only thing that switches GG-22 off
+  entirely:** the rule no-ops while `backlog/transitions.ndjson` has never
+  been committed in this repository's history. It has no earlier ledger
+  commit to measure debt against, so it declines rather than diffing against
+  an empty ref. A freshly onboarded project therefore has **no** GG-22
+  protection until its first ledger commit lands — stated here because the
+  population this affects is exactly the one least able to notice it, and
+  because a ruleset that claims more than the guard enforces is worse than
+  no rule at all (GIT-07). Enforced by the git-guard union as `GG-22` — a
+  plain deny with no override token (`OVERRIDE GG-22`): the fix is always
+  the same cheap, mechanical sequence, so there is no legitimate reason to
+  bypass it.
+- **This inverts the usual `git commit -- <exact paths>` discipline.**
+  Everywhere else scoping a commit to exact paths is enough on its own; here
+  it is not, because `GG-22` inspects the WHOLE staged index (`git diff
+  --cached --name-only`), not the commit's pathspec — an unrelated staged
+  file fails the commit regardless of how narrowly the commit command itself
+  names paths, and regardless of whether a ledger file happens to be staged
+  alongside it. Concretely: several `backlog/items/*.md` status edits MAY be
+  batched into one commit (or several separate commits) before reconciling —
+  that is an established, legitimate pattern — but while the debt is
+  outstanding, `backlog/items/**` edits and the three ledger projection
+  files are the only paths that may be staged in any commit; anything else
+  staged alongside is blocked, in every commit made while the debt exists,
+  not only in the commit that eventually lands the reconciliation.
+- **Remediation order:** before closing an item, fill in its `closure_commit`
+  (and the item's other closure fields) — `reconcile-backlog-ledger.mjs
+  --activate` refuses to write anything while any closed item is missing a
+  required closure field, so an incomplete closure blocks the reconciliation
+  step below, not just the item's own validity. Then commit pending
+  `backlog/items/` status edits first (batching several closures into one
+  commit is fine), run `node
+  plugins/pipeline-core/scripts/reconcile-backlog-ledger.mjs --activate`
+  once, then commit the resulting `backlog/STATUS.md` /
+  `backlog/index.json` / `backlog/transitions.ndjson` changes last. Running
+  reconciliation before every pending item edit is committed makes it
+  consume working-tree transitions that have not landed yet, creating fresh,
+  unreconcilable debt (confirmed live 2026-08-29,
+  `backlog/items/2026-08-29-gg-22s-own-remediation-order-creates-unclearable-ledger-debt.md`).
+- **Why:** Without this guard, closing a `backlog/items/*.md` item's
+  `status:` and reconciling the ledger stay two separate, manually-sequenced
+  steps; forgetting the second one is the recurring drift `GG-22` exists to
+  make structural rather than a habit `verify.mjs` only catches after the
+  fact (`backlog/README.md`, Ledger section).
+- **Verification:** `plugins/pipeline-core/hooks/guard-git.mjs` (search
+  `GG-22`); `node plugins/pipeline-core/hooks/guard-git.test.mjs`.
