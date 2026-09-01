@@ -200,7 +200,10 @@ Ordered; the ordering is load-bearing where stated.
 2. **Then, with no commit in between:** the agent runs a full verify and the
    security scan at the final HEAD, then `push-prepare`. `checkEvidenceFreshness`
    refuses whenever `evidence.commit !== HEAD`, so any commit after this point
-   voids it and the ten minutes are spent again.
+   voids it and the ten minutes are spent again. **Its printed
+   `authorize-critical` carries a 60-minute `--expires-at`: re-run
+   `push-prepare` right before signing, never reuse an earlier printout — an
+   expired window is refused and looks exactly like a signature failure.**
 3. **One signature for `nova`** (`authorize-critical`), then the agent does
    `approve-push` → push. Seed the request with the exact intended call and
    consume the signature immediately — never interleave other work between
@@ -351,16 +354,14 @@ not implement; an ADR asserting an enforcement the guard does not perform; a
 calibration write path that commits while reporting failure; and — introduced
 and caught inside the same block — a push-approval-gate bypass.
 
-**Method note worth keeping:** three findings were against acceptance criteria,
-not implementations. Naming `plan` where `apply` writes; "not blocked" where
-"keeps running" was meant; "emits a notice" without checking which exit code has
-a reader. Two suites reported green on properties they could not observe. The AC
-is the specification.
+**Method note:** three findings were against acceptance criteria, not
+implementations — naming `plan` where `apply` writes; "not blocked" where "keeps
+running" was meant; "emits a notice" without checking which exit code has a
+reader. Two suites reported green on properties they could not observe.
 
 **Governance discoverability:** `governance/README.md` now exists and the
 documentation map reaches the eight audit-facing documents it never named. The
-reviewer-facing overview stays open — its form, and whether the documents an
-auditor needs stay `maintainer`-classified, are PO decisions.
+reviewer-facing overview stays open — a PO decision.
 
 **Deliberately not done:** the CI failure reporter has no recorded requirement,
 so its Critic round cannot be dispatched without writing a spec to match
