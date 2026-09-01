@@ -200,17 +200,44 @@ const GIT_GLOBAL_OPTIONS_WITH_VALUE = Object.freeze(new Set(["-C", "-c", "--git-
  * one where git's own grammar has none. This is deliberately NOT generalised to `merge`/
  * `cherry-pick`/`revert`/`switch`, which share the same shape but are outside this
  * requirement's stated scope and untested here.
+ *
+ * The exclusion covers this subcommand's OWN OPERANDS only -- not every token its argv carries.
+ * A shell payload handed to an option (`rebase --exec <cmd>`) is a different token class and
+ * keeps its own lane, `GIT_SHELL_PAYLOAD_OPTIONS` below; an earlier wording of this comment
+ * claimed the wider exclusion and the code matched the claim, which silently admitted
+ * `git rebase --exec "<write to a protected path>"` (round-K finding F2).
  */
 const GIT_NO_PATHSPEC_VERBS = Object.freeze(new Set(["rebase"]));
 
 /**
+ * Options that hand a git subcommand an opaque SHELL COMMAND rather than a path or a revision,
+ * per subcommand because the same short flag means different things elsewhere (`git clean -x`
+ * is a boolean flag taking no value at all -- treating it as a payload option would invent
+ * candidates out of its neighbours). `rebase`'s `--exec`/`-x` is the confirmed case:
+ * Requirement 4 of the same backlog item lists `exec` among the shapes that must stay refused,
+ * and its argument is arbitrary code that runs against the working tree.
+ *
+ * The payload's path-shaped runs go on the SAME `opaque-interpreter-code` lane as `node -e` and
+ * `python3 -c` payloads, because it is the same class of input -- one opaque word whose inner
+ * tokens are the real targets -- rather than a third mechanism for the same job. This is also
+ * strictly wider than the pre-NVA-B-GITARGV behaviour, which made the payload a single
+ * whole-string candidate and therefore only matched when the payload ENDED in a protected path.
+ */
+const GIT_SHELL_PAYLOAD_OPTIONS = Object.freeze(new Map([
+  ["rebase", Object.freeze(["--exec", "-x"])],
+]));
+
+/**
  * git subcommands with the `[<tree-ish>] [--] <pathspec>...` grammar, where an explicit `--`
  * unambiguously separates the (excluded) revision/tree-ish from the (included) pathspecs.
- * `checkout` is the confirmed case (Requirement 3, positive case 4: `git checkout --ours --
- * backlog/item.md` must extract only the real pathspec, never `checkout`, `--ours`, or a
- * revision such as `HEAD`). Deliberately NOT extended to `reset`, which shares the identical
- * grammar shape but is outside this requirement's stated scope and untested here -- left on the
- * generic extraction path below, unchanged from before this fix.
+ * `checkout` and `restore` are the two Requirement 3 names (positive case 4: `git checkout
+ * --ours -- backlog/item.md` must extract only the real pathspec, never `checkout`, `--ours`, or
+ * a revision such as `HEAD`). `restore` was missing here at first while its tree-ish spelling
+ * `--source <rev>` -- a SEPARATE argv entry, unlike the glued `--source=<rev>` -- still reached
+ * the generic walk, so the two spellings of one flag disagreed (round-K finding F1).
+ * Deliberately NOT extended to `reset`, which shares the identical grammar shape but is outside
+ * this requirement's stated scope and untested here -- left on the generic extraction path
+ * below, unchanged from before this fix.
  *
  * Without an explicit `--`, a bare `git checkout <token>` stays on the generic extraction path
  * (every non-flag token is still a candidate): git itself resolves that shape as either a branch
@@ -218,7 +245,7 @@ const GIT_NO_PATHSPEC_VERBS = Object.freeze(new Set(["rebase"]));
  * pathspec would silently stop detecting the genuine "restore a protected file from HEAD without
  * the safety `--`" bypass shape -- narrowing protection, which this fix must not do.
  */
-const GIT_TREEISH_PATHSPEC_VERBS = Object.freeze(new Set(["checkout"]));
+const GIT_TREEISH_PATHSPEC_VERBS = Object.freeze(new Set(["checkout", "restore"]));
 
 /**
  * Interpreters whose payload is one opaque word. Token matching sees a single argument, so
@@ -385,6 +412,35 @@ function gitWriteTargetOperands(verb, postVerbArgv) {
 }
 
 /**
+ * The opaque shell payloads a git subcommand's OWN argv hands to a payload-carrying option
+ * (`GIT_SHELL_PAYLOAD_OPTIONS`). Separate from `gitWriteTargetOperands()` on purpose: these are
+ * not operands of the subcommand and are not pathspecs -- they are code, and the caller puts
+ * their path-shaped runs on the `opaque-interpreter-code` lane. All three spellings git accepts
+ * are covered, because covering only the spaced one is exactly the split that produced F1:
+ * `--exec <cmd>`, `--exec=<cmd>`, `-x <cmd>` and the glued short form `-x<cmd>`.
+ */
+function gitShellPayloads(verb, postVerbArgv) {
+  const flags = GIT_SHELL_PAYLOAD_OPTIONS.get(verb);
+  if (flags === undefined) return [];
+  const payloads = [];
+  for (let index = 0; index < postVerbArgv.length; index += 1) {
+    const arg = postVerbArgv[index];
+    if (flags.includes(arg)) {
+      const value = postVerbArgv[index + 1];
+      // A trailing flag with no value carries no payload; consume the value so it can never be
+      // read a second time as a bare operand.
+      if (value !== undefined) { payloads.push(value); index += 1; }
+      continue;
+    }
+    const glued = flags.find((flag) => arg.startsWith(flag) && arg.length > flag.length
+      && (arg[flag.length] === "=" || !flag.startsWith("--")));
+    if (glued === undefined) continue;
+    payloads.push(arg.slice(glued.length + (arg[glued.length] === "=" ? 1 : 0)));
+  }
+  return payloads;
+}
+
+/**
  * PowerShell candidates: the raw write-cmdlet operand, plus any path-shaped sub-tokens
  * embedded inside it (an operand can carry characters PATH_TOKEN would otherwise split on,
  * e.g. a quoted argument with an inner separator) — the same coverage
@@ -464,11 +520,20 @@ export function extractShellWriteTargets({ command, root, toolName = "Bash", pla
       // both excluded by starting AFTER verbIndex; per-verb pathspec rules beyond that live in
       // gitWriteTargetOperands()); the prior whole-argv `operands()` walk stays exactly as
       // before for every non-git writer.
-      const targetOperands = gitWrite
-        ? gitWriteTargetOperands(verb, argv.slice(verbIndex + 1))
-        : operands(argv);
+      const postVerbArgv = gitWrite ? argv.slice(verbIndex + 1) : [];
+      const targetOperands = gitWrite ? gitWriteTargetOperands(verb, postVerbArgv) : operands(argv);
       for (const operand of targetOperands) {
         targets.push({ candidate: operand, lane: gitWrite ? "git-working-tree-write" : "write-command" });
+      }
+      // A shell payload carried by a git option (`rebase --exec <cmd>`) is a different token
+      // class from the subcommand's own operands, in the same argv: the operands are revisions
+      // and stay non-candidates, while the payload is opaque interpreter code whose path-shaped
+      // runs are candidates -- the same lane the `node -e`/`python3 -c` branch above uses, reused
+      // rather than duplicated (round-K finding F2).
+      for (const payload of gitShellPayloads(verb, postVerbArgv)) {
+        for (const token of payload.match(PATH_TOKEN) ?? []) {
+          targets.push({ candidate: token, lane: "opaque-interpreter-code" });
+        }
       }
     }
     return targets;

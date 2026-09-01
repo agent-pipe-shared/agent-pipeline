@@ -158,3 +158,74 @@ test("NVA-B-GITARGV: the git subcommand itself is never a candidate for any git 
   assert.ok(!candidates(`git restore ${TARGET}`).includes("restore"));
   assert.ok(candidates(`git restore ${TARGET}`).includes(TARGET));
 });
+
+// NVA-B-ROUNDK (round-K review findings F1 and F2 against the NVA-B-GITARGV change above).
+// Both are regressions of Requirement 3/4 of the same backlog item, not new requirements.
+
+/**
+ * F1. Requirement 3 names `checkout` AND `restore` as the two subcommands whose real pathspecs
+ * must be determined; only `checkout` got the `[<tree-ish>] [--] <pathspec>` grammar, so
+ * `restore`'s tree-ish -- spelled `--source <rev>`, as a SEPARATE argv entry -- was still
+ * extracted as a file candidate. The glued `--source=<rev>` form was never affected (it starts
+ * with "-"), which is exactly why the defect survived: the two spellings disagreed.
+ */
+test("NVA-B-ROUNDK F1: git restore uses the same tree-ish/pathspec grammar as checkout", () => {
+  assert.deepEqual(candidates(`git restore --source HEAD -- ${TARGET}`), [TARGET]);
+  assert.deepEqual(candidates(`git restore --source=HEAD -- ${TARGET}`), [TARGET]);
+  // Both spellings must now agree, which is the property the defect broke.
+  assert.deepEqual(
+    candidates(`git restore --source HEAD -- ${TARGET}`),
+    candidates(`git restore --source=HEAD -- ${TARGET}`),
+  );
+  // No "--" at all: the bare "restore a protected file from HEAD without the safety --" bypass
+  // shape must STILL be detected. Narrowing detection is not an acceptable way to close F1.
+  assert.deepEqual(candidates(`git restore ${TARGET}`), [TARGET]);
+});
+
+/**
+ * F2. `rebase`'s own operands are revisions and must never become file candidates
+ * (Requirement 3), but the string argument of `--exec` is an opaque SHELL PAYLOAD, a different
+ * token class in the same argv -- and Requirement 4 lists `exec` among the shapes that must
+ * stay refused. The blanket `rebase -> []` rule dropped both classes at once. The payload is
+ * handled on the established `opaque-interpreter-code` lane, the same lane `node -e`/`python3
+ * -c` payloads already use, because it is the same kind of input: one opaque word whose
+ * path-shaped runs are the candidates.
+ */
+test("NVA-B-ROUNDK F2: a git rebase --exec payload contributes its path-shaped tokens", () => {
+  for (const command of [
+    `git rebase --exec "sed -i s/a/b/ ${TARGET}" main`,
+    `git rebase --exec="sed -i s/a/b/ ${TARGET}" main`,
+    `git rebase -x "sed -i s/a/b/ ${TARGET}" main`,
+    `git rebase --onto upstream --exec "rm ${TARGET}" main`,
+  ]) {
+    const targets = extractShellWriteTargets({ command, root: "/repo" });
+    assert.ok(
+      targets.some((t) => t.candidate === TARGET && t.lane === "opaque-interpreter-code"),
+      `payload path not extracted: ${command}`,
+    );
+  }
+});
+
+test("NVA-B-ROUNDK F2, other direction: rebase's own revisions stay non-candidates", () => {
+  // The whole point of the blanket rule stands: a revision is never a file candidate. Closing
+  // F2 must not buy the payload back by reintroducing invented revision candidates.
+  const withExec = candidates(`git rebase --exec "sed -i s/a/b/ ${TARGET}" main`);
+  assert.ok(!withExec.includes("main"), "reintroduced a revision candidate");
+  assert.ok(!withExec.includes("rebase"), "reintroduced the subcommand as a candidate");
+  assert.ok(!withExec.includes("--exec"), "reintroduced the flag itself as a candidate");
+  assert.deepEqual(candidates("git rebase main"), []);
+  assert.deepEqual(candidates("git rebase --continue"), []);
+  assert.deepEqual(candidates("git rebase --onto upstream topic"), []);
+  assert.deepEqual(candidates("git -c core.editor=true rebase --continue"), []);
+  // The payload's own tokens ARE contributed, unfiltered, exactly like every other opaque
+  // payload on this lane (a bare word is path-shaped too; the rule set filters, not this list).
+  // What must never appear beside them is a token from rebase's own operands -- here, `main`.
+  assert.deepEqual(candidates('git rebase --exec "true" main'), ["true"]);
+});
+
+test("NVA-B-ROUNDK F2: the exec payload lane is only opened for the verb that has one", () => {
+  // `git clean -x` is a real flag that takes NO value; treating "-x" as a payload option for
+  // every git write verb would invent candidates out of its neighbours.
+  assert.ok(!lanes(`git clean -x -d -f`).includes("opaque-interpreter-code"));
+  assert.deepEqual(candidates("git clean -x -d -f"), []);
+});

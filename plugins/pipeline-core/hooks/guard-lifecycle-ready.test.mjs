@@ -6324,6 +6324,43 @@ test("TPSHELL-1: a shell write to a protected test path is refused, while readin
 });
 
 /**
+ * TPSHELL-REBASE-EXEC (round-K finding F2). `git rebase`'s own operands are revisions and
+ * yield no candidates by design (NVA-B-GITARGV, Requirement 3) -- but `--exec`'s argument is
+ * an opaque shell payload, a different token class in the same argv, and Requirement 4 of the
+ * same item lists `exec` among the shapes that must stay refused. The classifier-level proof
+ * lives in `lib/protected-test-paths.test.mjs`; this is the END-TO-END guard verdict the
+ * finding recorded as its own scope limit, so the gap is closed here rather than inherited:
+ * a candidate that never reaches a denial is not a refusal.
+ */
+test("TPSHELL-REBASE-EXEC: a git rebase --exec payload naming a protected test path is refused, while ordinary rebase steps are not claimed", () => {
+  const path = tpShellFixture();
+  try {
+    for (const command of [
+      `git rebase --exec "sed -i s/a/b/ ${TPSHELL_TARGET}" main`,
+      `git rebase --exec="sed -i s/a/b/ ${TPSHELL_TARGET}" main`,
+      `git rebase -x "rm ${TPSHELL_TARGET}" main`,
+    ]) {
+      const result = tpShellRun(path, command);
+      assert.equal(result.exitCode, 2, `admitted an --exec payload write: ${command}`);
+      assert.match(result.stderr, new RegExp(TESTPATH_SHELL_DENIAL_CODE, "u"), command);
+    }
+    // The other direction, asserted on the LANE rather than on exit 0: an ordinary rebase step
+    // must not be claimed by this gate, and no revision may be turned into a file candidate.
+    for (const command of [
+      "git rebase --continue",
+      "git rebase main",
+      "git rebase --show-current-patch",
+      "git -c core.editor=true rebase --continue",
+      `git rebase --exec "sed -i s/a/b/ scratch/other.test.mjs" main`,
+    ]) {
+      assert.doesNotMatch(
+        tpShellRun(path, command).stderr, new RegExp(TESTPATH_SHELL_DENIAL_CODE, "u"), command,
+      );
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
  * TPSHELL-2. The lane is config-driven exactly like the write lane: a project that
  * protects nothing gets nothing new refused. Without this, TPSHELL-1 could be green on a
  * rule that refused those commands unconditionally.
