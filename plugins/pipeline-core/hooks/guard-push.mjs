@@ -202,9 +202,42 @@ function pipelineStateScriptRef() {
     : "pipeline-state.mjs (locate it under your installed pipeline-core plugin's scripts directory)";
 }
 
+// NVA-B-TAGNOTICE3: deferred release-tag-ancestry skip notice, set by
+// `checkReleaseTagAncestry()` further below when refs/remotes/origin/main is absent
+// locally. Declared here (module scope, next to `emit`) rather than local to that
+// function so both `emit` and `allowExit` can read it regardless of call order --
+// `checkReleaseTagAncestry` always runs, and therefore always has a chance to set it,
+// before any exit point that reads it. Mirrors `scratchAdvisory`'s own shape (build once,
+// consumed once at a terminal exit) without touching that variable or its call site.
+let releaseTagAncestryNotice = null;
+
 function emit(code, lines) {
-  process.stderr.write(lines.filter(Boolean).join("\n") + "\n");
+  // Any pending release-tag-ancestry notice rides along on the FIRST exit this process
+  // ever takes, whatever exit that is (block, another warn, or the plain allow routed
+  // through `allowExit` below) -- AC-3: this never suppresses, replaces, or duplicates
+  // the caller's own outcome, it only prepends one more line ahead of it in the same
+  // single stderr write.
+  const allLines = releaseTagAncestryNotice ? [releaseTagAncestryNotice, ...lines] : lines;
+  process.stderr.write(allLines.filter(Boolean).join("\n") + "\n");
   process.exit(code);
+}
+
+/**
+ * The ordinary "nothing failed" exit, used at every terminal allow point reachable AFTER
+ * `checkReleaseTagAncestry()` may have run. hooks.json's own exit-code contract assigns
+ * stderr NO reader at exit 0 ("0 allow" -- no "stderr to ..." clause, unlike exit 1 or 2).
+ * A bare `process.exit(0)` at any of those points would therefore silently discard a
+ * pending `releaseTagAncestryNotice`, on precisely the ordinary clean-allow path the
+ * notice exists to reach. When a notice is pending, route through `emit(1, [])` instead:
+ * exit 1 is STILL an allow under the same contract ("1 allow + config warning, stderr to
+ * the user"), and `emit` above already prepends the pending notice, so this stays a
+ * one-line call at every site that needs it -- the same deferred-build/emit(1)-at-the-end
+ * shape `scratchAdvisory` already uses, reused rather than duplicated as a second
+ * mechanism.
+ */
+function allowExit() {
+  if (releaseTagAncestryNotice) emit(1, []);
+  else process.exit(0);
 }
 
 /**
@@ -1664,21 +1697,35 @@ function checkReleaseTagAncestry(binding, releaseSection) {
     // absent exit, the push-gate resolution, `pushBinding.ok`, and the approval gate ever
     // ran. On a repo running `gates.push_approval: signature`, that let a release-tag push
     // through with the approval gate skipped entirely -- worse than the silent-skip defect
-    // this was meant to fix. Write directly to stderr (same shape `emit` uses, minus the
-    // exit) and `return` from THIS function only, so the caller (the unconditional call
-    // site above the manifest-absent exit) keeps running every check that follows it.
-    process.stderr.write(
-      [
-        `[guard-push] NOTICE: the release-tag ancestry check was skipped for '${tagRef}' -- ` +
-          "refs/remotes/origin/main is not present locally, so ADR-0078 D5's reachability check " +
-          "did not run for this push.",
-        "This can mean main is not this repository's published line (nothing to check here), or " +
-          "it can mean this checkout has simply never fetched it -- the guard cannot tell these " +
-          "two readings apart.",
-        "If main is this repository's published line, run `git fetch origin main` to make the " +
-          "ancestry check active.",
-      ].filter(Boolean).join("\n") + "\n",
-    );
+    // this was meant to fix. The fix that shipped instead: write directly to stderr (same
+    // shape `emit` uses, minus the exit) and `return` from THIS function only, so the
+    // caller (the unconditional call site above the manifest-absent exit) keeps running
+    // every check that follows it.
+    //
+    // NVA-B-TAGNOTICE3 (rework): a direct stderr write only reaches the OPERATOR when
+    // something downstream also exits non-zero and its own `emit()` call happens to share
+    // the same stderr stream -- hooks.json's exit-code contract assigns stderr NO reader
+    // at exit 0 ("0 allow", no "stderr to ..." clause, unlike 1 or 2). The ordinary case
+    // this notice exists for is exactly the opposite: nothing else is wrong, and the hook
+    // reaches one of its own plain `process.exit(0)` terminal allows further down, which
+    // discarded the bytes this write had already produced. Defer instead: stash the text
+    // in the module-level `releaseTagAncestryNotice` (declared next to `emit`) and `return`
+    // with no exit, exactly as before -- the caller keeps running every check that follows
+    // it, unchanged. Every terminal allow reachable from here now goes through `allowExit()`
+    // instead of a bare `process.exit(0)`, which emits this notice at WARN (exit 1, still an
+    // allow) instead of silently dropping it; every terminal block/warn already routes
+    // through `emit()`, which now prepends this notice ahead of its own message instead of
+    // losing it to whichever write happens to run first (AC-3).
+    releaseTagAncestryNotice = [
+      `[guard-push] NOTICE: the release-tag ancestry check was skipped for '${tagRef}' -- ` +
+        "refs/remotes/origin/main is not present locally, so ADR-0078 D5's reachability check " +
+        "did not run for this push.",
+      "This can mean main is not this repository's published line (nothing to check here), or " +
+        "it can mean this checkout has simply never fetched it -- the guard cannot tell these " +
+        "two readings apart.",
+      "If main is this repository's published line, run `git fetch origin main` to make the " +
+        "ancestry check active.",
+    ].filter(Boolean).join("\n");
     // Also skips the merge-base ancestry test just below: it cannot run meaningfully
     // without refs/remotes/origin/main, and falling through to it would hit the "any other
     // exit status" fail-closed branch further down and BLOCK a push this same comment block
@@ -1719,7 +1766,7 @@ const manifestResult = loadManifest(projectDir);
 // when the manifest is absent or carries no release section, which the function above
 // already treats as "no adapters declared, nothing to defer to".
 checkReleaseTagAncestry(pushBinding, manifestResult.manifest?.release);
-if (manifestResult.status === "absent") process.exit(0); // opt-in feature, nothing configured
+if (manifestResult.status === "absent") allowExit(); // opt-in feature, nothing configured
 
 const releaseSection = manifestResult.manifest?.release;
 const hasRelease = Boolean(releaseSection) && typeof releaseSection === "object" && !Array.isArray(releaseSection);
@@ -1735,7 +1782,7 @@ if (manifestResult.status === "invalid" && !hasRelease) {
 const manifest = manifestResult.manifest;
 const pushGate = gateConfig(manifest, "push");
 const guardActive = hasRelease || (pushGate && pushGate.mode !== "off");
-if (!guardActive) process.exit(0);
+if (!guardActive) allowExit();
 
 if (!pushBinding.ok) {
   emit(2, [
@@ -1862,7 +1909,7 @@ if (!pushGate || pushGate.mode === "off") {
   // an invalid manifest). `invalidityNote` is null on every non-case-B path, so a valid
   // manifest keeps exiting 0 unchanged.
   if (invalidityNote) emit(1, [invalidityNote]);
-  process.exit(0);
+  allowExit();
 }
 
 /** Reads + JSON-parses an evidence file; returns {ok:true, data} | {ok:false, reason}. */
@@ -2404,7 +2451,7 @@ if (allFailures.length === 0) {
   // is nothing to advise.
   const scratchAdvisory = buildScratchOrphanAdvisory(fallbackProjectDir());
   if (scratchAdvisory !== null) emit(1, [scratchAdvisory]);
-  process.exit(0); // all-green -- allow
+  allowExit(); // all-green -- allow (NVA-B-TAGNOTICE3: routes any pending ancestry notice through WARN=1 instead of discarding it at exit 0)
 }
 
 // PUSHWARN-1: each bucket's severity follows its OWN gate's mode, never the other
