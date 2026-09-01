@@ -170,13 +170,55 @@ machine-plane `poKeyDirectory` sits on a slow `/mnt/c` Windows mount — a local
 artifact, not the CI cause. Open in
 `backlog/items/2026-09-01-three-onboarding-suites-pass-locally-and-fail-in-ci.md`.
 
-**The remaining release path, in order, none of it guesswork:** run a full verify
-at the final HEAD → one signature for `nova` and push (this carries the audit
-commit, the CI-failure item and the workflow fix) → re-run CI against the pushed
-ref and read what remains → resolve `project-onboarding-v3-tests` → then one
-signature each for `main` and `stable`, then the `v0.6.0` tag and the release.
-`protect-main` keeps `main` unreachable until that CI check is green for the
-exact commit being pushed, and that enforcement is server-side.
+### PO terminal actions, parked for one sitting (2026-09-01)
+
+Everything below needs the human at a terminal. Nothing else in the current
+work does. Ordered; the ordering is load-bearing where stated.
+
+1. **Marketplace re-sync — always first, before any ceremony.** Today's commits
+   touch `plugins/pipeline-core/**`, so this machine's external marketplace copy
+   is stale and `guard-push.mjs`'s AGY-MKTATTEST-1 will refuse the push. It
+   fires AFTER the signature is consumed: on 2026-09-01 that cost a mid-ceremony
+   interruption with the proof already spent. The remedy is `rm -rf` + `cp -a`
+   outside the repository, where an agent may not write (GS-6).
+2. **Then, with no commit in between:** the agent runs a full verify and the
+   security scan at the final HEAD, then `push-prepare`. `checkEvidenceFreshness`
+   refuses whenever `evidence.commit !== HEAD`, so any commit after this point
+   voids it and the ten minutes are spent again.
+3. **One signature for `nova`** (`authorize-critical`), then the agent does
+   `approve-push` → push. Seed the request with the exact intended call and
+   consume the signature immediately — never interleave other work between
+   seeding and consuming (CLAUDE.md, the expired-capability incident).
+4. **No signature needed after that for CI.** `verify.yml` accepts
+   `workflow_dispatch`, and run 33471808564 proves a dispatch on the branch
+   executes that branch's own content. So one `nova` push unlocks an unlimited
+   CI loop, and `project-onboarding-v3-tests` can be diagnosed without further
+   PO time. The new failing-suite reporter (`b904c01d`) means that run will
+   carry the actual assertion text instead of only a `diagnosticDigest`.
+5. **`main`** — its own signature, and only once CI `verify` is green for that
+   exact commit. `protect-main` enforces this server-side with
+   `bypass_actors: []`; no local decision reaches it.
+6. **`v0.6.0` tag and the GitHub release.** Whether a tag push needs its own
+   push approval is NOT known — `guard-push.mjs` calls the delete/tag shorthand
+   "ambiguous, conservative" in its own comment. Attempt it once and read the
+   refusal: a blocked attempt is free, because PreToolUse blocks before
+   execution. Strip the `+claude.`/`+codex.` cachebuster from both plugin
+   manifests at this step and no earlier
+   (`docs/claude-local-plugin-development.md`).
+7. **Delete `refs/heads/stable`** (ADR-0078 D1; it is at `dd1eb9ee`, identical
+   to `main`). `guard-git` protects only `main|master` against `--delete`, so
+   this is not blocked there — but whether the push gate wants an approval for a
+   delete form is the same unknown as item 6, and the same free probe answers it.
+8. **Create the release-tag ruleset** —
+   `gh api --method POST repos/:owner/:repo/rulesets --input scratch/tag-ruleset-payload.json`.
+   Repository administration, not a push, so it needs no ceremony. It is ADR-0078
+   D5's remote half and makes a `v*` tag immutable. Untested against the API:
+   if a rule is rejected for `target: "tag"`, drop that rule. `bypass_actors` is
+   empty, which binds the PO too.
+9. **Optional, but due 2026-09-07:** a TP-3 maintenance window registering the
+   six suites parked in `check-verify-suite-registration.mjs`'s `EXCLUSIONS`.
+   Five of them already carry that expiry, so the window is owed regardless;
+   doing it once converts six debts into six registrations.
 
 ### Carried forward, because none of these has another home
 
