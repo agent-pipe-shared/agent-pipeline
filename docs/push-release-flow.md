@@ -40,14 +40,22 @@ signed for has been compared against the decisions that govern it.
 signature (NVA-V4-PUSHDRIVER):**
 
 ```
-node plugins/pipeline-core/scripts/push-init.mjs --root <repo> --by <name> --remote <remote> --destination refs/heads/<branch> [--base <ref>]
+node plugins/pipeline-core/scripts/push-init.mjs --root <repo> --by <name> --remote <remote> --destination refs/heads/<branch> [--base <ref> --candidate <ref> [--record-ref <ref>]]
 ```
 
 `push-init.mjs` chains Layer 1b (when `harness/scripts/check-doc-reconciliation.mjs`
-exists in the target project; `--base` becomes required the moment it does),
-the cheap satisfiability preflight, and the full `push-prepare.mjs` readiness
-report, in that fixed order, and reports the first precondition that is not
-green. This is the fast path over the per-layer commands below, not a
+exists in the target project; `--base` AND `--candidate` both become required
+the moment it does — this driver never invents either, since which commit is
+the candidate is exactly the same kind of domain decision as which commit is
+the base), the cheap satisfiability preflight, and the full `push-prepare.mjs`
+readiness report, in that fixed order, and reports the first precondition that
+is not green. `--record-ref` stays optional and defaults to `HEAD`, matching
+`check-doc-reconciliation.mjs`'s own default — the real flow commits the
+substantive work as `<candidate>` first and the reconciliation record on top
+as a later commit, which is where `HEAD` normally already points by the time
+this driver runs (`--candidate` and `--record-ref` must therefore usually name
+two DIFFERENT commits — see Layer 1b below for why). This is the fast path
+over the per-layer commands below, not a
 replacement for them — every step it runs is one of the same read-only
 scripts documented layer by layer in this file, still runnable and still
 documented individually for anyone who needs to run just one of them. **The
@@ -70,19 +78,28 @@ the agent is cryptographically incapable of producing this proof by design
 ### Layer 1b — reconcile the range against the decisions that govern it (agent work, before anything is signed)
 
 ```
-node harness/scripts/check-doc-reconciliation.mjs --base <base> --candidate <tip>
+node harness/scripts/check-doc-reconciliation.mjs --base <base> --candidate <tip> [--record-ref <ref>]
 ```
 
 Run this before preparing a request, not after. It fails when the range changed
 a path some ADR declares it governs and no entry in `docs/doc-reconciliation.md`
-names that exact candidate commit. Both arguments are required by design and
-every output repeats the resolved range: a reconciliation claim that does not
-say which range it covers is not a claim.
+names that exact candidate commit. `--base` and `--candidate` are both required
+by design and every output repeats the resolved range: a reconciliation claim
+that does not say which range it covers is not a claim.
 
-Resolve each finding either by amending the ADR or by recording it as checked,
-then **commit the record last** — writing it moves `HEAD`, so the record names
-the tip of the substantive work and the push carries one extra commit touching
-only that file. The format and this write-order rule are documented in the
+`--record-ref` (optional, defaults to `HEAD`) is a SEPARATE ref from
+`--candidate`, on purpose: the reconciliation record naming candidate `<tip>`
+cannot live inside `<tip>`'s own tree, because writing the record changes the
+tree, which changes `<tip>`'s own commit hash. So the shape is always: commit
+the substantive work as `<tip>`, run this check with `--candidate <tip>`
+against a `docs/doc-reconciliation.md` that does not exist yet, resolve every
+finding, **commit the record last** as a new commit naming `<tip>` — writing it
+moves `HEAD`, so the record names the tip of the substantive work below it and
+the push carries one extra commit touching only that file — and `--record-ref`
+then defaults to that new `HEAD`. `push-init.mjs` follows this exact contract
+(see above): it stopped inventing `--candidate` as the literal `HEAD` because
+that collapsed both refs onto the same commit and made the check unsatisfiable
+by construction. The format and this write-order rule are documented in the
 record file itself.
 
 Why this sits before the signature rather than in a checklist: the session that

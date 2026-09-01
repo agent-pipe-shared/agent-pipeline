@@ -66,9 +66,11 @@ test("buildPushInitArgv: omits --base when absent, includes it when supplied", (
   assert.deepEqual(withBase.slice(-2), ["--base", "HEAD~1"]);
 });
 
-test("buildReconciliationArgv: candidate is always the literal ref HEAD, never invented otherwise", () => {
-  const argv = buildReconciliationArgv({ scriptPath: "/x/check-doc-reconciliation.mjs", base: "HEAD~1", root: "/proj" });
-  assert.deepEqual(argv, ["/x/check-doc-reconciliation.mjs", "--base", "HEAD~1", "--candidate", "HEAD", "--root", "/proj"]);
+test("buildReconciliationArgv: candidate and record-ref are explicit caller inputs, never invented (NVA-B-PUSHINIT-1)", () => {
+  const withoutRecordRef = buildReconciliationArgv({ scriptPath: "/x/check-doc-reconciliation.mjs", base: "HEAD~1", candidate: "abc123", root: "/proj" });
+  assert.deepEqual(withoutRecordRef, ["/x/check-doc-reconciliation.mjs", "--base", "HEAD~1", "--candidate", "abc123", "--root", "/proj"]);
+  const withRecordRef = buildReconciliationArgv({ scriptPath: "/x/check-doc-reconciliation.mjs", base: "HEAD~1", candidate: "abc123", root: "/proj", recordRef: "HEAD" });
+  assert.deepEqual(withRecordRef, ["/x/check-doc-reconciliation.mjs", "--base", "HEAD~1", "--candidate", "abc123", "--root", "/proj", "--record-ref", "HEAD"]);
 });
 
 // ---------------------------------------------------------------------------
@@ -140,7 +142,7 @@ test("drivePushInit: chains all three steps (reconciliation, gate-satisfiability
       return { status: 0, stdout: "Doc reconciliation: fixture pass.\n", stderr: "" };
     };
     const result = drivePushInit({
-      rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main", base: "HEAD~1",
+      rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main", base: "HEAD~1", candidate: "HEAD",
       run, satisfiabilityDeps: satisfiabilityDepsAllGreen(), prepareDeps: prepareDepsAllGreen(),
     });
     assert.equal(result.outcome, "signature-required", JSON.stringify(result, null, 2));
@@ -173,6 +175,19 @@ test("drivePushInit: harness/scripts/check-doc-reconciliation.mjs present but --
     assert.equal(result.outcome, "precondition-unmet");
     assert.equal(result.checks[0].id, "doc-reconciliation");
     assert.equal(result.checks[0].status, "base-required");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("drivePushInit: harness/scripts/check-doc-reconciliation.mjs present, --base supplied but --candidate omitted stops with that precondition named, never invents HEAD (NVA-B-PUSHINIT-1)", () => {
+  const root = freshFixtureRoot();
+  try {
+    mkdirSync(join(root, "harness", "scripts"), { recursive: true });
+    writeFileSync(join(root, "harness", "scripts", "check-doc-reconciliation.mjs"), "// fixture\n");
+    const result = drivePushInit({ rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main", base: "HEAD~1" });
+    assert.equal(result.outcome, "precondition-unmet");
+    assert.equal(result.checks[0].id, "doc-reconciliation");
+    assert.equal(result.checks[0].status, "candidate-required");
+    assert.equal(result.steps.length, 0, "no subprocess must be spawned when candidate is missing");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -323,7 +338,7 @@ test("drivePushInit: re-entrant -- two consecutive calls from unchanged state pr
     let calls = 0;
     const run = () => { calls += 1; return { status: 0, stdout: "ok\n", stderr: "" }; };
     const args = {
-      rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main", base: "HEAD~1",
+      rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main", base: "HEAD~1", candidate: "HEAD",
       run, satisfiabilityDeps: satisfiabilityDepsAllGreen(), prepareDeps: prepareDepsAllGreen(),
     };
     const first = drivePushInit(args);
@@ -348,8 +363,35 @@ test("drivePushInit: re-entrant -- two consecutive calls from unchanged state pr
 // property of the driver -- it is not; only the follow-verdict behavior is.
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Reproduce-first regression: NVA-B-PUSHINIT-1. The checker's own contract requires
+// --candidate and --record-ref to be able to differ (a record naming candidate X cannot
+// live inside X's own tree). Before the fix, drivePushInit has no `candidate`/`recordRef`
+// input at all -- buildReconciliationArgv() always emits the literal "HEAD" and never
+// emits --record-ref, so the two collapse onto the same commit and the check is
+// unsatisfiable by construction. This fixture is a REAL, already-reconciled range in this
+// repository's own history (commit 8681046622... is the candidate named in an existing
+// docs/doc-reconciliation.md section, and it is an ancestor of the current real HEAD, which
+// serves as --record-ref by the checker's own default) -- proving the check CAN pass when
+// given the two refs it actually needs, which the driver could not previously supply.
+// ---------------------------------------------------------------------------
+
+test("drivePushInit: real repo -- an explicit candidate distinct from the record-ref lets layer 1b actually pass (NVA-B-PUSHINIT-1 regression)", () => {
+  const result = drivePushInit({
+    rootDir: REPO_ROOT, by: "tester", remote: "origin", destination: "refs/heads/main",
+    base: "56e91858d96f9d58db75c306424b79c256c1fe74",
+    candidate: "8681046622dc23956b760ba93552793b3d983193",
+    // record-ref intentionally omitted: defaults to HEAD, which descends from the candidate
+    // above and carries the already-reconciled record for it.
+  });
+  const reconciliationStep = result.steps[0];
+  assert.equal(reconciliationStep.id, "doc-reconciliation", JSON.stringify(result, null, 2));
+  assert.equal(reconciliationStep.exitCode, 0, JSON.stringify(reconciliationStep));
+  assert.equal(reconciliationStep.ok, true, JSON.stringify(reconciliationStep));
+});
+
 test("drivePushInit: real repo -- layer 1b actually spawns check-doc-reconciliation.mjs and surfaces ITS real verdict, never a guess", () => {
-  const result = drivePushInit({ rootDir: REPO_ROOT, by: "tester", remote: "origin", destination: "refs/heads/main", base: "HEAD~1" });
+  const result = drivePushInit({ rootDir: REPO_ROOT, by: "tester", remote: "origin", destination: "refs/heads/main", base: "HEAD~1", candidate: "HEAD" });
   // Layer 1b is always step 1, and it is a real spawn against the real script, not a guess --
   // true regardless of the reconciliation outcome.
   assert.ok(result.steps.length >= 1, "layer 1b must always run and be recorded as step 1");

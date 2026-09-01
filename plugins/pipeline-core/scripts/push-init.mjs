@@ -50,13 +50,29 @@
  * driver checks for its existence AT THE TARGET PROJECT ROOT (never the plugin's own
  * install directory) before attempting to run it; when absent, Layer 1b is skipped, not
  * failed -- a consumer project without this file has nothing to reconcile against by
- * construction. When present, `--base` becomes a required flag on THIS driver too: the
- * underlying tool declares "no default range" by design (its own header, point 2: "BOTH
- * REQUIRED, no defaults"), and inventing one here would be exactly the kind of
- * domain-knowledge decision ("which commit governs this candidate") this driver has no
- * business making on a human's behalf. `--candidate` is always the literal ref `"HEAD"` --
- * not invented, since it is definitionally the same candidate every other step below binds
- * to (the exact meaning `resolveHeadCommit()` in push-prepare.mjs already gives it).
+ * construction. When present, `--base` AND `--candidate` both become required flags on THIS
+ * driver too: the underlying tool declares "no default range" by design (its own header,
+ * point 2: "BOTH REQUIRED, no defaults"), and inventing either here would be exactly the kind
+ * of domain-knowledge decision ("which commit governs this candidate", "which commit IS the
+ * candidate") this driver has no business making on a human's behalf.
+ *
+ * WHY `--candidate` STOPPED BEING THE INVENTED LITERAL `"HEAD"` (NVA-B-PUSHINIT-1). An
+ * earlier version of this file hardcoded `--candidate` to the literal ref `"HEAD"`, reasoning
+ * it was "definitionally the same candidate every other step below binds to". That is true of
+ * every OTHER step, but check-doc-reconciliation.mjs's own contract (its header, point (ii))
+ * requires `--candidate` and `--record-ref` to be able to name DIFFERENT commits: a
+ * reconciliation record naming candidate X cannot live inside X's own tree, since writing the
+ * record changes the tree, which changes X's own hash. The real flow this must serve commits
+ * the substantive work as S, then commits a reconciliation record on top as R naming S -- so
+ * by the time this driver runs, S is an ANCESTOR of HEAD, not HEAD itself, and which ancestor
+ * it is is exactly the kind of domain fact this driver does not invent for `--base` either.
+ * `--candidate` is therefore now an explicit, required-when-Layer-1b-applies input, mirroring
+ * `--base` exactly (same "base-required"-shaped precondition, now "candidate-required" too).
+ * `--record-ref` stays OPTIONAL and defaults to HEAD when the caller omits it -- that default
+ * is not invented domain knowledge, it is inherited verbatim from check-doc-reconciliation.mjs's
+ * own documented default (its header, point (ii): "optional, defaults to HEAD"), and it matches
+ * the real flow above: the reconciliation record R that names candidate S is, by construction,
+ * committed last, so HEAD is where a caller normally expects to find it.
  *
  * THE SIGNATURE BOUNDARY (absolute; the one property this file must never lose). Once every
  * precondition is green, `pushPrepareReport()` already constructs the exact `authorize-
@@ -98,14 +114,14 @@ export const SCHEMA = "pipeline.push-init.v1";
 export const RECONCILIATION_SCRIPT_RELATIVE_PATH = "harness/scripts/check-doc-reconciliation.mjs";
 
 export function usage() {
-  return "Usage: node plugins/pipeline-core/scripts/push-init.mjs --root <project-dir> --by <name> --remote <remote> --destination refs/heads/<branch> [--base <ref>]";
+  return "Usage: node plugins/pipeline-core/scripts/push-init.mjs --root <project-dir> --by <name> --remote <remote> --destination refs/heads/<branch> [--base <ref> --candidate <ref> [--record-ref <ref>]]";
 }
 
 export function parseArgs(argv) {
   const output = {};
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
-    if (["--root", "--by", "--remote", "--destination", "--base"].includes(arg)) {
+    if (["--root", "--by", "--remote", "--destination", "--base", "--candidate", "--record-ref"].includes(arg)) {
       const value = argv[index + 1];
       if (typeof value !== "string" || value === "" || value.startsWith("--")) return { error: `${arg} requires a value` };
       output[arg.slice(2)] = value;
@@ -156,9 +172,17 @@ function runReconciliationStep({ argv, run }) {
   };
 }
 
-/** Exported for the same reason buildPushInitArgv() is: a real emitted argv for guard-admission tests. */
-export function buildReconciliationArgv({ scriptPath, base, root }) {
-  return [scriptPath, "--base", base, "--candidate", "HEAD", "--root", root];
+/**
+ * Exported for the same reason buildPushInitArgv() is: a real emitted argv for guard-admission
+ * tests. `candidate` is required by the caller (drivePushInit enforces this before calling
+ * here -- see the "candidate-required" precondition below); `recordRef` is optional and, when
+ * omitted, is left unset so check-doc-reconciliation.mjs's OWN default (HEAD) applies rather
+ * than this driver inventing or repeating that default itself.
+ */
+export function buildReconciliationArgv({ scriptPath, base, candidate, root, recordRef = null }) {
+  const argv = [scriptPath, "--base", base, "--candidate", candidate, "--root", root];
+  if (recordRef !== null) argv.push("--record-ref", recordRef);
+  return argv;
 }
 
 /**
@@ -171,7 +195,7 @@ export function buildReconciliationArgv({ scriptPath, base, root }) {
  * reason `deps.exists` is threaded through push-prepare.mjs itself.
  */
 export function drivePushInit({
-  rootDir, by, remote, destination, base = null,
+  rootDir, by, remote, destination, base = null, candidate = null, recordRef = null,
   run = spawnSync,
   exists = existsSync,
   assessPushGateSatisfiability = realAssessPushGateSatisfiability,
@@ -202,8 +226,14 @@ export function drivePushInit({
       message: `${RECONCILIATION_SCRIPT_RELATIVE_PATH} is present, but --base was not supplied. check-doc-reconciliation.mjs declares no default range by design.`,
       remedy: "re-run with --base <ref> naming the range this candidate must be reconciled against",
     };
+  } else if (candidate === null) {
+    reconciliationCheck = {
+      id: "doc-reconciliation", ok: false, status: "candidate-required",
+      message: `${RECONCILIATION_SCRIPT_RELATIVE_PATH} is present, but --candidate was not supplied. check-doc-reconciliation.mjs declares no default range by design, and this driver no longer invents "HEAD" for it -- a reconciliation record naming candidate X cannot live inside X's own tree.`,
+      remedy: "re-run with --candidate <ref> naming the substantive commit being reconciled (its own doc-reconciliation.md record must live at a LATER commit, named via --record-ref, which defaults to HEAD)",
+    };
   } else {
-    const argv = buildReconciliationArgv({ scriptPath: reconciliationScriptPath, base, root });
+    const argv = buildReconciliationArgv({ scriptPath: reconciliationScriptPath, base, candidate, root, recordRef });
     const stepResult = runReconciliationStep({ argv, run });
     steps.push({ id: "doc-reconciliation", executable: "node", argv, exitCode: stepResult.exitCode, ok: stepResult.ok });
     reconciliationCheck = stepResult.ok
@@ -283,7 +313,7 @@ export function main(args = process.argv.slice(2), {
   }
   const result = drivePushInit({
     rootDir: options.root, by: options.by, remote: options.remote, destination: options.destination,
-    base: options.base ?? null,
+    base: options.base ?? null, candidate: options.candidate ?? null, recordRef: options["record-ref"] ?? null,
   });
   write(`${JSON.stringify(result, null, 2)}\n`);
   return result.outcome === "signature-required" ? 0 : 1;
