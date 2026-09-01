@@ -166,12 +166,17 @@ for every `agent()` result naming a task id that landed a commit with a
 `evidence/dispatch-record-<TASK_ID>.json` exists in the Elephant's own
 working tree (not the dispatch's worktree, which is discarded) — if it does
 not, or the dispatch's worktree copy was never merged back, the Elephant
-writes it itself immediately, sourced from the dispatch's own final report
-(`taskId`, `agentType`, `model`, `outcome`, the landed `commits`,
-`report.changedFiles`), mirroring what the goldfish would have written for
-itself. This makes the artifact's existence an Elephant-owned guarantee
-independent of whether the dispatched subagent actually reached that step,
-rather than trusting compliance with an instruction it may never get to.
+writes it itself immediately, sourced from the dispatch's own final report,
+using the exact field set `templates/prompts/goldfish-task.md` field 6
+defines for this artifact (`taskId`, `agentType`, `model`, `effort`,
+`rulesetSha`, `dispatcher`, `outcome`, the landed `commits`,
+`report.changedFiles`) — omitting `effort` when `agentType` is declared
+fails `dispatch-authorship-verify.mjs`'s dimension-4 model/effort check
+(`lib/agent-model-registry.mjs`) even when the commit is genuinely
+authored, so do not drop it. This makes the artifact's existence an
+Elephant-owned guarantee independent of whether the dispatched subagent
+actually reached that step, rather than trusting compliance with an
+instruction it may never get to.
 
 ## `agentType` needs the `pipeline-core:` prefix
 
