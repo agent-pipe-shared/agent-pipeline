@@ -7,6 +7,7 @@
 | --- | --- | --- | --- | --- | --- |
 | pipeline.a-briefing-prohibition-on-advisor-consultation-is-unenforced | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.a-captured-resume-hint-card-reds-the-verify-gate-until-another-session-consumes-it | open | defect | pipeline | 2026-08-31 | — |
+| pipeline.a-change-creates-an-obligation-elsewhere-that-only-a-gate-run-reveals | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.a-checkout-that-cannot-be-clean-defeats-every-cleanliness-gate | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.a-critic-has-no-writable-location-for-its-own-report | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.a-deferred-item-is-terminal-so-a-live-defect-can-be-parked-invisibly | open | defect | pipeline | 2026-08-31 | — |
@@ -47,6 +48,7 @@
 | pipeline.agents-read-the-source-because-nothing-describes-the-interface | open | workflow-improvement | pipeline | 2026-08-09 | — |
 | pipeline.agents-talk-the-po-out-of-the-signature | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — the one control in the model that is actual protection is the one agents routinely lobby the PO to abandon. Reported by the PO 2026-08-28 as recurring behaviour across agents, not a single incident. |
 | pipeline.all-three-runners-should-install-against-the-stable-branch | open | requirement | pipeline | 2026-08-27 | — |
+| pipeline.an-authorized-rebase-demands-a-fresh-po-signature-after-every-conflict | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.an-expired-override-is-armed-instead-of-refused | closed | defect | pipeline | 2026-08-28 | — |
 | pipeline.an-onboarding-test-depends-on-a-clean-working-tree-through-a-security-scan-subprocess | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.an-orchestrator-write-into-a-running-dispatchs-tree-is-undetectable | open | defect | pipeline | 2026-08-28 | — |
@@ -440,6 +442,7 @@
 | pipeline.push-gate-reads-evidence-from-a-location-the-prescribed-verify-run-never-writes-to | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.push-gate-unsatisfiable-in-consumer-deployment | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — happy-path blocking, and the most severe finding of the day: a correctly-signed push cannot land in ANY consumer deployment. Also blocks the security-gate-ON decision, whose measurement was taken in the one environment where this defect does not fire. |
 | pipeline.push-guard-worktree-target | closed | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
+| pipeline.push-init-cannot-satisfy-its-own-doc-reconciliation-check | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.push-init-hardcodes-candidate-head-which-layer-1b-can-never-satisfy | open | defect | pipeline | 2026-08-31 | — |
 | pipeline.push-path-has-no-driver | closed | workflow-improvement | pipeline | 2026-08-28 | Nova B — PO-raised 2026-08-28 on seeing the guided onboarding reach ready: 'dann braucht der push pfad auch so was weil der kostet auch mega viel'. Deliberately NOT Nova A: the candidate must not grow a second driver before its first one is reviewed. |
 | pipeline.push-release-flow-unusable-for-third-party-adopters | closed | defect | pipeline | 2026-08-07 | — |
@@ -606,7 +609,7 @@
 
 ## Counts
 
-- open: 96
+- open: 99
 - in_progress: 0
 - closed: 488
 - rejected: 3

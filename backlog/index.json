@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "c093a480cc54df2d11e3a19ba9ef4c8e8d375f6ed242c879cf4154139dcb8d45"
+    "transitionHead": "33eb4b6f9c3c6e8f6d4bf37a131829d9e39c2f7eed7efae102e083cf0f3be01d"
   },
   "counts": {
-    "open": 96,
+    "open": 99,
     "in_progress": 0,
     "closed": 488,
     "rejected": 3,
@@ -29,6 +29,15 @@
       "owner": "pipeline",
       "created": "2026-08-31",
       "source": "Observed live on 2026-08-31 during release preparation. The Elephant captured a Resume-Hint card for compact safety; the next full verify.mjs run went red on resume-consumption-check, and push-prepare.mjs requires green candidate-bound verify evidence.",
+      "deferred": false
+    },
+    {
+      "id": "pipeline.a-change-creates-an-obligation-elsewhere-that-only-a-gate-run-reveals",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-01",
+      "source": "scratch/release-flow-self-invalidation-2026-09-01.md (loop 4).",
       "deferred": false
     },
     {
@@ -504,6 +513,15 @@
       "owner": "pipeline",
       "created": "2026-08-27",
       "source": "PO decision 2026-08-27, confirmed in session; distribution mapping performed the same day against the live installers and the update-channel resolver",
+      "deferred": false
+    },
+    {
+      "id": "pipeline.an-authorized-rebase-demands-a-fresh-po-signature-after-every-conflict",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-01",
+      "source": "PO handover received in session on 2026-09-01, transcribed faithfully from the live reproduction on the agent-pipeline-shared_alfred checkout.",
       "deferred": false
     },
     {
@@ -5441,6 +5459,15 @@
       "closureRepository": "self",
       "closureCommit": "81cc5f1a6cb384057fd49dd1a340e93c3aec3efb",
       "closureEvidence": "backlog/evidence/2026-07-24-po-sentinel-closure-disposition.md"
+    },
+    {
+      "id": "pipeline.push-init-cannot-satisfy-its-own-doc-reconciliation-check",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-01",
+      "source": "scratch/release-flow-self-invalidation-2026-09-01.md (loop 3), confirmed against plugins/pipeline-core/scripts/push-init.mjs (buildReconciliationArgv, parseArgs) and harness/scripts/check-doc-reconciliation.mjs's header contract.",
+      "deferred": false
     },
     {
       "id": "pipeline.push-init-hardcodes-candidate-head-which-layer-1b-can-never-satisfy",
