@@ -547,6 +547,7 @@
 | pipeline.the-ledger-commit-rule-was-given-a-second-home-in-a-different-voice | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.the-ledger-reconciler-writes-before-the-items-are-validated | deferred | defect | pipeline | 2026-08-08 | — |
 | pipeline.the-marketplace-attestation-compares-more-than-the-property-it-protects | open | defect | pipeline | 2026-09-01 | — |
+| pipeline.the-opaque-payload-lane-refuses-a-mention-not-a-write | open | defect | pipeline | 2026-09-02 | — |
 | pipeline.the-pipeline-cannot-merge-two-parallel-sprint-ledgers | closed | requirement | pipeline | 2026-08-27 | — |
 | pipeline.the-privacy-sign-off-is-bound-to-a-superseded-candidate | open | defect | pipeline | 2026-08-31 | — |
 | pipeline.the-push-authority-surface-cannot-be-bounded-by-static-enumeration | open | defect | pipeline | 2026-09-01 | — |
@@ -615,7 +616,7 @@
 
 ## Counts
 
-- open: 101
+- open: 102
 - in_progress: 0
 - closed: 488
 - rejected: 3

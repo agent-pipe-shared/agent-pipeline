@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "3e9677b5ae7cfef6b3c36b1c9c374bba10b3b2669ecb0285264056858956d3a8"
+    "transitionHead": "7482279a8f0a72ed9a25a51bef738b0cea9f8f7fb55fe7b220581b4b864ad533"
   },
   "counts": {
-    "open": 101,
+    "open": 102,
     "in_progress": 0,
     "closed": 488,
     "rejected": 3,
@@ -6721,6 +6721,15 @@
       "owner": "pipeline",
       "created": "2026-09-01",
       "source": "PO observation during the 0.6.0 release push, 2026-09-01: the AGY-MKTATTEST-1 push-time check fired on eight unrelated files immediately after `approve-push` signature consumption, forcing a manual external-marketplace sync inside the one window the documented ordering rule forbids any other change.",
+      "deferred": false
+    },
+    {
+      "id": "pipeline.the-opaque-payload-lane-refuses-a-mention-not-a-write",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-02",
+      "source": "Round-L Critic finding F3, observed first-hand by the reviewing dispatch when its own scratch-note write was refused, and anchored to plugins/pipeline-core/lib/protected-test-paths.mjs's opaque-interpreter-code lane.",
       "deferred": false
     },
     {
