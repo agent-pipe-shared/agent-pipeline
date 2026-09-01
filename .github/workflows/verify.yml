@@ -62,6 +62,15 @@ jobs:
         # runner-provided tooling, never free of the base system crypto binary this
         # repository's own signing path depends on.
         run: core_path="${RUNNER_TEMP}/pipeline-core-path" && mkdir -p "${core_path}" && ln -s "$(command -v node)" "${core_path}/node" && ln -s "$(command -v git)" "${core_path}/git" && ln -s "$(command -v bash)" "${core_path}/bash" && ln -s "$(command -v sh)" "${core_path}/sh" && ln -s "$(command -v openssl)" "${core_path}/openssl" && PATH="${core_path}" "${core_path}/node" harness/scripts/verify.mjs
+      - name: Surface failing suite diagnostics
+        if: failure()
+        # A reporter, never a gate (NVA-B-CIDIAG): reads evidence/verify-latest.json
+        # plus the private journal run directory the prior step just wrote and prints
+        # each failing suite's name, exit code, log path, and a bounded, redacted log
+        # tail, so this step's own output is self-explaining without re-running
+        # anything or downloading an artifact. Always exits 0 -- deliberately no
+        # `continue-on-error`, since there is nothing here that can fail the job.
+        run: node harness/scripts/print-verify-failures.mjs
 
   live-certification:
     if: github.event_name == 'workflow_dispatch' && inputs.live_certification
