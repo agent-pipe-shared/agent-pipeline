@@ -172,14 +172,14 @@ Rule IDs: `GIT-xx`.
 
 - **MUST** run `node plugins/pipeline-core/scripts/check-backlog-state.mjs`
   from the repository root before committing ANY change that touches a
-  `backlog/items/*.md` file's `status:`/closure metadata or any of the three
-  ledger projection files (`backlog/transitions.ndjson`, `backlog/STATUS.md`,
-  `backlog/index.json`) — never rely on `verify.mjs` to catch it later.
-  `reconcile-backlog-ledger.mjs`'s own item read (`readItems`) is not a
-  substitute: it only requires each item to parse to a usable `id` and never
-  checks `parsed.errors` (schema validity) before planning a transition, so a
-  schema-invalid item's own reconciliation run will not surface the defect —
-  only this checker does.
+  `backlog/items/*.md` file's `status:`/closure metadata, the append-only,
+  hash-chained source ledger `backlog/transitions.ndjson`, or either of its
+  two generated projections (`backlog/STATUS.md`, `backlog/index.json`) —
+  never rely on `verify.mjs` to catch it later. `reconcile-backlog-ledger.mjs`'s
+  own item read (`readItems`) is not a substitute: it only requires each item
+  to parse to a usable `id` and never checks `parsed.errors` (schema
+  validity) before planning a transition, so a schema-invalid item's own
+  reconciliation run will not surface the defect — only this checker does.
 - **What to read in the output before proceeding:** a line prefixed `DRIFT
   backlog state: ...` is printed unconditionally but never blocks. The
   script's own severity classifier (`classifyBacklogFindings`,
@@ -195,11 +195,24 @@ Rule IDs: `GIT-xx`.
   committed until it is fixed; a clean run prints `Backlog state, transition
   ledger, closure evidence, and generated projections are valid.` and exits
   `0` (no explicit `process.exit` call on that path — Node's default). This
-  repository's own run legitimately still prints a permanent, PO-accepted
-  batch of `DRIFT` lines (unreachable historical `evidence.commit` values
-  lost in the sanctioned 2026-08-01 history rewrite, plus the `closure_commit`
-  cross-check finding one of them causes) alongside that success line — their
-  presence alone is never a reason to stop.
+  repository's own run currently prints 22 `DRIFT` lines alongside that
+  success line, and they are not one uniform batch: 20 carry an explicit
+  `(known 2026-07-19..2026-07-22 historical batch)` suffix
+  (`isKnownHistoricalUnreachableFinding`, `check-backlog-state.mjs`) —
+  unreachable historical `evidence.commit` values lost in the sanctioned
+  2026-08-01 history rewrite, legitimately and permanently accepted. The
+  remaining 2 carry no such suffix and are NOT accepted: `ledger event 403:
+  evidence.commit must be a full lowercase Git commit OID` is a live, open
+  defect, a stored abbreviated OID
+  (`backlog/items/2026-09-01-a-ledger-entry-stores-an-abbreviated-oid-the-hash-chain-blocks-repair.md`),
+  and the `closure_commit` cross-check line is DRIFT only because
+  `classifyBacklogFindings` traces it to that same event 403 — the item it
+  names closed on event 403, not on any event in the annotated batch. A
+  reader separates the accepted batch from a new problem by the `(known ...
+  historical batch)` suffix, never by the total `DRIFT` line count: the
+  un-suffixed pair, like the annotated batch, never blocks a commit, but
+  unlike the annotated batch it is not this repository's settled baseline —
+  its presence is expected to end once that OID is repaired.
 - **Recovery for a bad reconciliation that is still UNCOMMITTED:** `git
   checkout -- backlog/transitions.ndjson backlog/index.json
   backlog/STATUS.md`, fix the offending item, and re-run
