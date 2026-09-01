@@ -104,6 +104,30 @@
  *   operator escape so a human is never stuck. An agent MUST NOT use it (the printed refusal
  *   says so, matching `pre-push-hook-install.mjs`'s own wording exactly).
  *
+ * HANDOVER-SIZE COMPANION CHECK (NVA-B-HANDOVERPATH, 2026-09-01, backlog/items/
+ * 2026-09-01-the-handover-size-guard-only-sees-one-of-two-write-paths.md) — a SECOND,
+ * independent check bolted onto this same commit-boundary hook, closing the identical
+ * write-path gap this file's own header already explains above, but for the handover file's
+ * SIZE CAP instead of protected-path identity: `guard-handover-size.mjs` (a PreToolUse hook)
+ * only ever sees an Edit/Write/NotebookEdit tool call, never a Bash-spawned Node script
+ * writing the handover file (`docs/state.md` by default, or whatever `handover.path`/
+ * `handover.maxBytes` a project's calibration names — resolved via the SAME
+ * `resolveHandoverConfig()` that guard already uses, never a second hand-maintained cap or
+ * path). Mirrors that guard's own admission rule exactly, computed at the commit boundary
+ * instead of the PreToolUse boundary: a commit whose staged handover-file content is a net
+ * size DECREASE relative to the last-committed (HEAD) content is always admitted, regardless
+ * of the absolute resulting size — an over-cap file must always stay repairable by shrinking
+ * it, from either write lane. A commit that is NOT a decrease and would leave the file at or
+ * over the cap is refused. Fails CLOSED (blocks the commit) whenever either the committed or
+ * the staged size cannot be established with confidence — see `handoverSizeFinding()` and
+ * `gitObjectBytes()` in the generated `renderImpl()` output; never a silent allow on "cannot
+ * measure", matching this hook's own overriding fail-closed doctrine below.
+ *
+ * NOT installed into this repository's own `.git/hooks/pre-commit` by this dispatch — that is
+ * a separate, machine-local deployment decision (onboarding's own `applyInstall` call, or an
+ * operator running `--install` directly), out of scope for a change to the generator itself;
+ * see this file's own test suite for the fixture-repo demonstrations of the new check.
+ *
  * NOT installed anywhere as a side effect of running this script directly — callers decide when
  * to `applyInstall`.
  */
@@ -410,6 +434,52 @@ function isTrustAnchorBootstrapUpgrade(projectRoot, relPath) {
   return true;
 }
 
+/**
+ * HANDOVER-SIZE COMPANION CHECK (NVA-B-HANDOVERPATH, 2026-09-01, backlog/items/
+ * 2026-09-01-the-handover-size-guard-only-sees-one-of-two-write-paths.md). Reads a git
+ * object's raw content by REV-SPEC (\`HEAD:<path>\` for the last commit, \`:<path>\` for the
+ * staged index) and reports its UTF-8 byte length -- or reports the object is simply ABSENT
+ * at that point (never committed yet, or staged for deletion), which callers treat as zero
+ * bytes, never as a measurement failure. \`present: true, ok: false\` is the one case that
+ * must fail the caller CLOSED: the object is known to exist yet its content could not be
+ * read, so its size genuinely cannot be established.
+ */
+export function gitObjectBytes(projectRoot, revSpec) {
+  const exists = git(["cat-file", "-e", revSpec], projectRoot);
+  if (exists.status !== 0) return { present: false, ok: true, bytes: 0 };
+  const show = git(["show", revSpec], projectRoot);
+  if (show.status !== 0) return { present: true, ok: false, bytes: null };
+  return { present: true, ok: true, bytes: Buffer.byteLength(show.stdout ?? "", "utf8") };
+}
+
+/**
+ * Closes the write-path gap backlog/items/2026-09-01-the-handover-size-guard-only-sees-
+ * one-of-two-write-paths.md reports for \`guard-handover-size.mjs\` (a PreToolUse hook, blind
+ * to a Bash-spawned Node script's own \`fs.writeFileSync\` against the handover file): the
+ * SAME size-cap rule, re-evaluated at the commit boundary, where every write lane converges
+ * regardless of which tool produced it. Mirrors that guard's own admission rule exactly --
+ * \`currentBytes\` is the last-COMMITTED (HEAD) size, \`proposedBytes\` is the STAGED (index)
+ * size about to become the new HEAD; a net decrease is always admitted regardless of the
+ * absolute resulting size, so an over-cap file always stays repairable by shrinking it, from
+ * either write lane. Returns \`measurable: false\` (never a silent allow) whenever either size
+ * could not be established with confidence.
+ */
+export function handoverSizeFinding(projectRoot, relPath, maxBytes) {
+  const current = gitObjectBytes(projectRoot, \`HEAD:\${relPath}\`);
+  if (!current.ok) {
+    return { measurable: false, detail: "the committed (HEAD) version of the handover file could not be read via \`git show\`" };
+  }
+  const proposed = gitObjectBytes(projectRoot, \`:\${relPath}\`);
+  if (!proposed.ok) {
+    return { measurable: false, detail: "the staged (index) version of the handover file could not be read via \`git show\`" };
+  }
+  if (proposed.bytes < current.bytes) return { measurable: true, blocked: false }; // net decrease -- always admitted
+  if (proposed.bytes >= maxBytes) {
+    return { measurable: true, blocked: true, currentBytes: current.bytes, proposedBytes: proposed.bytes, maxBytes };
+  }
+  return { measurable: true, blocked: false };
+}
+
 function block(lines) {
   process.stderr.write(
     [
@@ -441,13 +511,38 @@ async function main() {
   let loadProtectedTestPathRules;
   let protectedTestPathRuleFor;
   let defaultHasConsumedCapabilityForPath;
+  let resolveHandoverConfig;
   try {
     ({ gateStrengthRuleFor } = await import(pathToFileURL(resolve(PLUGIN_HOOKS_DIR, "guard-gate-strength.mjs")).href));
     ({ loadProtectedTestPathRules, protectedTestPathRuleFor } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "protected-test-paths.mjs")).href));
     ({ defaultHasConsumedCapabilityForPath } = await import(pathToFileURL(resolve(PLUGIN_SCRIPTS_DIR, "check-protected-path-integrity.mjs")).href));
+    ({ resolveHandoverConfig } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "handover-rotation.mjs")).href));
   } catch (error) {
     block([\`the pipeline's own protected-path rule modules could not be loaded from the installed plugin copy (\${error?.name ?? "Error"}) -- cannot evaluate protected-path enforcement.\`]);
     return;
+  }
+
+  let handoverConfig;
+  try {
+    handoverConfig = resolveHandoverConfig({ rootDir: projectRoot });
+  } catch (error) {
+    block([\`the handover-file configuration could not be resolved (\${error?.name ?? "Error"}) -- cannot evaluate the handover size cap, failing closed.\`]);
+    return;
+  }
+  if (paths.includes(handoverConfig.path)) {
+    const handoverFinding = handoverSizeFinding(projectRoot, handoverConfig.path, handoverConfig.maxBytes);
+    if (!handoverFinding.measurable) {
+      block([\`the handover file at \${handoverConfig.path} could not have its size measured at the commit boundary (\${handoverFinding.detail}) -- cannot evaluate the handover size cap, failing closed.\`]);
+      return;
+    }
+    if (handoverFinding.blocked) {
+      block([
+        \`the handover file at \${handoverConfig.path} would be committed at or over its hard size cap and this commit is not a net decrease.\`,
+        \`Current (HEAD) size: \${handoverFinding.currentBytes} bytes. Cap: \${handoverFinding.maxBytes} bytes. Staged size: \${handoverFinding.proposedBytes} bytes.\`,
+        "Rotate closed content out of the handover file first (see handover-rotate.mjs), or commit a version that is itself smaller than the current HEAD version -- a net decrease is always admitted regardless of the resulting size.",
+      ]);
+      return;
+    }
   }
 
   let testPathRules = [];

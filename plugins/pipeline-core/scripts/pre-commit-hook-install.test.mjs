@@ -14,7 +14,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, chmodSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, chmodSync, cpSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -87,6 +87,15 @@ function writeConsumedCapability(dir, eligiblePaths) {
   const capsDir = join(commonDir, "agent-pipeline", "human-guard-overrides", "capabilities");
   mkdirSync(capsDir, { recursive: true });
   writeFileSync(join(capsDir, "test-capability.json"), JSON.stringify({ status: "consumed", eligiblePaths }));
+}
+
+/** Writes the legacy-tier calibration file (`.claude/pipeline.json`) carrying a `handover`
+ * key -- the same shape `resolveHandoverConfig()` (`lib/handover-rotation.mjs`) reads for a
+ * project that has not migrated to `project/pipeline.json`, and the shape a fresh fixture
+ * repo (no `project/` dir) resolves to by default. */
+function writeHandoverCalibration(dir, handover) {
+  mkdirSync(join(dir, ".claude"), { recursive: true });
+  writeFileSync(join(dir, ".claude", "pipeline.json"), JSON.stringify({ handover }));
 }
 
 /** Installs the real hook into `dir`, then runs an actual `git commit` -- exactly the boundary
@@ -430,4 +439,170 @@ test("planInstall: a decline marker never suppresses an already-installed hook",
   const plan = planInstall({ rootDir: dir, ...PLUGIN_DIRS });
   assert.equal(plan.status, "ready-to-upgrade");
   assert.notEqual(plan.status, "declined");
+});
+
+// ---- handover-size companion check (NVA-B-HANDOVERPATH, 2026-09-01, backlog/items/
+// 2026-09-01-the-handover-size-guard-only-sees-one-of-two-write-paths.md) --------------------
+//
+// guard-handover-size.mjs (a PreToolUse hook) only ever sees an Edit/Write/NotebookEdit tool
+// call, never a Bash-spawned Node script writing the handover file directly. These tests
+// exercise the SAME size-cap rule re-evaluated at this hook's own commit boundary, where
+// every write lane converges regardless of which tool produced the staged content. All use a
+// small test-only `maxBytes` (via `.claude/pipeline.json`'s `handover` calibration key) to
+// keep fixture content short and readable -- never the real `HANDOVER_MAX_BYTES` constant.
+
+// ---- pure helpers (real generated impl) -----------------------------------------------
+
+test("gitObjectBytes: absent at HEAD (never committed) -> present:false, ok:true, bytes:0", async () => {
+  const { gitObjectBytes } = await implModule();
+  const { dir } = freshRepo("handover-bytes-absent-head");
+  const result = gitObjectBytes(dir, "HEAD:docs/state.md");
+  assert.deepEqual(result, { present: false, ok: true, bytes: 0 });
+});
+
+test("gitObjectBytes: present blob -> ok:true, bytes matches the exact utf8 byte length", async () => {
+  const { gitObjectBytes } = await implModule();
+  const { dir, git } = freshRepo("handover-bytes-present");
+  mkdirSync(join(dir, "docs"), { recursive: true });
+  writeFileSync(join(dir, "docs", "state.md"), "hällo\n"); // multi-byte utf8 on purpose
+  git("add", "docs/state.md");
+  git("commit", "-q", "-m", "add docs/state.md");
+  const result = gitObjectBytes(dir, "HEAD:docs/state.md");
+  assert.equal(result.present, true);
+  assert.equal(result.ok, true);
+  assert.equal(result.bytes, Buffer.byteLength("hällo\n", "utf8"));
+});
+
+test("handoverSizeFinding: a net decrease relative to HEAD is never blocked, regardless of absolute size", async () => {
+  const { handoverSizeFinding } = await implModule();
+  const { dir, git } = freshRepo("handover-finding-decrease");
+  mkdirSync(join(dir, "docs"), { recursive: true });
+  writeFileSync(join(dir, "docs", "state.md"), "Y".repeat(100));
+  git("add", "docs/state.md");
+  git("commit", "-q", "-m", "seed large handover file");
+  writeFileSync(join(dir, "docs", "state.md"), "Y".repeat(80));
+  git("add", "docs/state.md");
+  const finding = handoverSizeFinding(dir, "docs/state.md", 40);
+  assert.deepEqual(finding, { measurable: true, blocked: false });
+});
+
+test("handoverSizeFinding: at/over cap and not a decrease -> blocked, naming current/proposed/max bytes", async () => {
+  const { handoverSizeFinding } = await implModule();
+  const { dir, git } = freshRepo("handover-finding-blocked");
+  mkdirSync(join(dir, "docs"), { recursive: true });
+  writeFileSync(join(dir, "docs", "state.md"), "short\n");
+  git("add", "docs/state.md");
+  git("commit", "-q", "-m", "seed small handover file");
+  writeFileSync(join(dir, "docs", "state.md"), "Y".repeat(50));
+  git("add", "docs/state.md");
+  const finding = handoverSizeFinding(dir, "docs/state.md", 40);
+  assert.equal(finding.measurable, true);
+  assert.equal(finding.blocked, true);
+  assert.equal(finding.currentBytes, Buffer.byteLength("short\n", "utf8"));
+  assert.equal(finding.proposedBytes, 50);
+  assert.equal(finding.maxBytes, 40);
+});
+
+test("handoverSizeFinding: below cap and not a decrease -> not blocked (unaffected default behaviour)", async () => {
+  const { handoverSizeFinding } = await implModule();
+  const { dir, git } = freshRepo("handover-finding-below-cap");
+  mkdirSync(join(dir, "docs"), { recursive: true });
+  writeFileSync(join(dir, "docs", "state.md"), "short\n");
+  git("add", "docs/state.md");
+  git("commit", "-q", "-m", "seed small handover file");
+  writeFileSync(join(dir, "docs", "state.md"), "still short\n");
+  git("add", "docs/state.md");
+  const finding = handoverSizeFinding(dir, "docs/state.md", 40);
+  assert.deepEqual(finding, { measurable: true, blocked: false });
+});
+
+// ---- end-to-end: a real `git commit` against the installed hook -----------------------
+
+test("installed hook: a spawned Node process growing the handover file past its cap (never crossing any PreToolUse hook) is refused at commit", () => {
+  // AC-2: the Bash/Node lane the backlog item reports as unseen by guard-handover-size.mjs
+  // (a PreToolUse hook) is caught here instead, at the commit boundary.
+  const { dir, git } = freshRepo("e2e-handover-bash-lane-block");
+  writeHandoverCalibration(dir, { path: "docs/state.md", maxBytes: 40 });
+  git("add", ".claude/pipeline.json");
+  mkdirSync(join(dir, "docs"), { recursive: true });
+  writeFileSync(join(dir, "docs", "state.md"), "short\n");
+  git("add", "docs/state.md");
+  git("commit", "-q", "-m", "seed calibration and a small handover file (no hook installed yet)");
+  installHook(dir);
+  const target = join(dir, "docs", "state.md");
+  const bypass = spawnSync(process.execPath, ["-e", `require("fs").writeFileSync(${JSON.stringify(target)}, "X".repeat(80) + "\\n")`], { encoding: "utf8" });
+  assert.equal(bypass.status, 0, "the bypass write itself must succeed -- it never crosses any PreToolUse hook");
+  git("add", "docs/state.md");
+  const { code, stderr } = commit(dir, "attempt via spawned bypass growing past the handover cap");
+  assert.notEqual(code, 0);
+  assert.match(stderr, /BLOCKED \(agent-pipeline pre-commit hook\)/);
+  assert.match(stderr, /docs\/state\.md/);
+  assert.match(stderr, /hard size cap/);
+});
+
+test("installed hook: a commit that shrinks the handover file is allowed even while the file remains over its cap after the shrink", () => {
+  // AC-3: the escape route that makes an over-cap file repairable must survive -- a shrink is
+  // admitted even when the resulting size is STILL over the cap.
+  const { dir, git } = freshRepo("e2e-handover-shrink-allowed");
+  writeHandoverCalibration(dir, { path: "docs/state.md", maxBytes: 40 });
+  git("add", ".claude/pipeline.json");
+  mkdirSync(join(dir, "docs"), { recursive: true });
+  writeFileSync(join(dir, "docs", "state.md"), "Y".repeat(100) + "\n");
+  git("add", "docs/state.md");
+  git("commit", "-q", "-m", "seed an already-over-cap handover file (no hook installed yet)");
+  installHook(dir);
+  writeFileSync(join(dir, "docs", "state.md"), "Y".repeat(80) + "\n"); // smaller, still over the 40-byte cap
+  git("add", "docs/state.md");
+  const { code, stderr } = commit(dir, "shrink the handover file (still over cap, but smaller)");
+  assert.equal(code, 0, stderr);
+});
+
+test("installed hook: staged handover file below cap and not a decrease -- commit allowed (unaffected default behaviour)", () => {
+  const { dir, git } = freshRepo("e2e-handover-below-cap-allowed");
+  writeHandoverCalibration(dir, { path: "docs/state.md", maxBytes: 40 });
+  git("add", ".claude/pipeline.json");
+  installHook(dir);
+  mkdirSync(join(dir, "docs"), { recursive: true });
+  writeFileSync(join(dir, "docs", "state.md"), "short\n");
+  git("add", "docs/state.md");
+  const { code, stderr } = commit(dir, "genesis write of a small handover file");
+  assert.equal(code, 0, stderr);
+});
+
+test("installed hook: the handover-size measurement module is broken -- commit refused, never silently allowed", () => {
+  // AC-4 (module cannot be loaded): the same fail-closed doctrine this file's protected-path
+  // import already used before this dispatch, now also covering the handover-config import.
+  const { dir, git } = freshRepo("e2e-handover-module-broken");
+  const brokenLibDir = mkdtempSync(join(tmpdir(), "pre-commit-hook-broken-handover-lib-"));
+  cpSync(PLUGIN_LIB_DIR, brokenLibDir, { recursive: true });
+  writeFileSync(join(brokenLibDir, "handover-rotation.mjs"), "throw new Error('intentionally broken for NVA-B-HANDOVERPATH fail-closed test');\n");
+  const install = applyInstall({ rootDir: dir, pluginLibDir: brokenLibDir, pluginHooksDir: PLUGIN_HOOKS_DIR, pluginScriptsDir: PLUGIN_SCRIPTS_DIR });
+  assert.equal(install.status, "installed");
+  writeFileSync(join(dir, "notes.txt"), "anything, not even the handover file\n");
+  git("add", "notes.txt");
+  const { code, stderr } = commit(dir, "any commit while the handover-rotation module is broken");
+  assert.notEqual(code, 0);
+  assert.match(stderr, /BLOCKED \(agent-pipeline pre-commit hook\)/);
+  assert.match(stderr, /could not be loaded/);
+});
+
+test("installed hook: a staged handover file too large for git show's own output buffer cannot be measured -- commit refused, never silently allowed", () => {
+  // AC-4 (the file itself cannot be measured): `git cat-file -e` (existence only, tiny output)
+  // succeeds for the staged blob, but `git show` (full content) exceeds spawnSync's default
+  // 1 MiB stdout buffer and fails -- gitObjectBytes reports ok:false, and the whole commit
+  // fails closed rather than silently treating the unmeasurable content as within cap.
+  const { dir, git } = freshRepo("e2e-handover-unmeasurable-staged");
+  writeHandoverCalibration(dir, { path: "docs/state.md", maxBytes: 40 });
+  git("add", ".claude/pipeline.json");
+  mkdirSync(join(dir, "docs"), { recursive: true });
+  writeFileSync(join(dir, "docs", "state.md"), "short\n");
+  git("add", "docs/state.md");
+  git("commit", "-q", "-m", "seed calibration and a small handover file (no hook installed yet)");
+  installHook(dir);
+  writeFileSync(join(dir, "docs", "state.md"), "Q".repeat(2 * 1024 * 1024)); // 2 MiB > spawnSync's default 1 MiB maxBuffer
+  git("add", "docs/state.md");
+  const { code, stderr } = commit(dir, "stage an oversized handover file git show cannot read back through the hook's default buffer");
+  assert.notEqual(code, 0);
+  assert.match(stderr, /BLOCKED \(agent-pipeline pre-commit hook\)/);
+  assert.match(stderr, /could not have its size measured/);
 });
