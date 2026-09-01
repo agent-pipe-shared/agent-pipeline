@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "7482279a8f0a72ed9a25a51bef738b0cea9f8f7fb55fe7b220581b4b864ad533"
+    "transitionHead": "0b248aa766cd078217a874d75d088974df1e3e21cae7e721dafb640286ca9593"
   },
   "counts": {
-    "open": 102,
+    "open": 103,
     "in_progress": 0,
     "closed": 488,
     "rejected": 3,
@@ -223,6 +223,15 @@
       "owner": "pipeline",
       "created": "2026-08-27",
       "source": "Live observation, 2026-08-27: the PO caught a stale cachebuster in plugin.json after a block of work that included wiring a new PreToolUse hook; nothing in Verify compares the stamp against HEAD. Corrected in ruleset a49cd41a.",
+      "deferred": false
+    },
+    {
+      "id": "pipeline.a-throwing-temp-unlink-reports-rolled-back-while-the-target-stays-published",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-02",
+      "source": "Reported by the NVA-B-ROUNDN-FIX dispatch while binding the adjacent delete sites to content; seen in plugins/pipeline-core/lib/project-onboarding-v3.mjs's V3 manifest-repair transaction, not measured.",
       "deferred": false
     },
     {
