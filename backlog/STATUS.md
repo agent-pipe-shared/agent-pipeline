@@ -5,11 +5,13 @@
 
 | ID | Status | Type | Owner | Created | Tracking |
 | --- | --- | --- | --- | --- | --- |
+| pipeline.a-briefing-prohibition-on-advisor-consultation-is-unenforced | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.a-captured-resume-hint-card-reds-the-verify-gate-until-another-session-consumes-it | open | defect | pipeline | 2026-08-31 | — |
 | pipeline.a-checkout-that-cannot-be-clean-defeats-every-cleanliness-gate | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.a-deferred-item-is-terminal-so-a-live-defect-can-be-parked-invisibly | open | defect | pipeline | 2026-08-31 | — |
 | pipeline.a-dirty-claude-directory-blocks-verify-which-blocks-push-approval | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.a-doc-edit-silently-obligates-its-vendored-copy | open | defect | pipeline | 2026-09-01 | — |
+| pipeline.a-ledger-entry-stores-an-abbreviated-oid-the-hash-chain-blocks-repair | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.a-node-script-defeats-every-file-protection-guard | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.a-promoted-feature-can-never-pass-the-plan-gate | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.a-push-approval-occupies-a-single-slot-so-destinations-cannot-be-prepared-together | open | defect | pipeline | 2026-09-01 | — |
@@ -289,7 +291,7 @@
 | pipeline.kickoff-untracked-files-missing-from-commits | closed | defect | pipeline | 2026-08-21 | — |
 | pipeline.language-selection-scope-is-unclear-and-arrives-too-late | closed | workflow-improvement | pipeline | 2026-08-09 | — |
 | pipeline.ledger-backed-plan-and-push-authority-absent-on-merged-base | closed | defect | pipeline | 2026-08-07 | — |
-| pipeline.ledger-commit-discipline-rules-live-only-in-checkpoint-prose | open | workflow-improvement | pipeline | 2026-08-27 | — |
+| pipeline.ledger-commit-discipline-rules-live-only-in-checkpoint-prose | closed | workflow-improvement | pipeline | 2026-08-27 | — |
 | pipeline.ledger-drift-classification-has-no-reachability-cutoff | closed | defect | pipeline | 2026-08-16 | — |
 | pipeline.ledger-event-403-has-a-short-hash-evidence-commit | closed | defect | pipeline | 2026-08-12 | — |
 | pipeline.ledger-genesis-event-hash-rebind-has-no-amendment-mechanism | closed | defect | pipeline | 2026-08-19 | — |
@@ -525,7 +527,9 @@
 | pipeline.test-path-guard-blocks-the-briefed-edit-and-offers-no-route | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.test-suites-use-host-tmp-instead-of-the-repos-own-scratch-convention | closed | workflow-improvement | pipeline | 2026-08-17 | — |
 | pipeline.the-ai-hardening-gate-has-no-home-in-any-approved-feature-package | open | defect | pipeline | 2026-08-28 | Scheduled for Nova B (PO decision 2026-08-28) |
+| pipeline.the-dispatch-record-field-enumeration-omits-a-field-the-checker-requires | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.the-handover-size-guard-only-sees-one-of-two-write-paths | open | defect | pipeline | 2026-09-01 | — |
+| pipeline.the-ledger-commit-rule-was-given-a-second-home-in-a-different-voice | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.the-ledger-reconciler-writes-before-the-items-are-validated | deferred | defect | pipeline | 2026-08-08 | — |
 | pipeline.the-marketplace-attestation-compares-more-than-the-property-it-protects | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.the-pipeline-cannot-merge-two-parallel-sprint-ledgers | closed | requirement | pipeline | 2026-08-27 | — |
@@ -594,8 +598,8 @@
 
 ## Counts
 
-- open: 85
+- open: 88
 - in_progress: 0
-- closed: 483
+- closed: 484
 - rejected: 3
 - deferred: 11
