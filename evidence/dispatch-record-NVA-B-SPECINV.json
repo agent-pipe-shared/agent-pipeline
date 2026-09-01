@@ -1,0 +1,64 @@
+{
+  "briefing_id": "NVA-B-SPECINV",
+  "date": "2026-09-01",
+  "role": "goldfish",
+  "model": "claude-sonnet-5",
+  "effort": "xhigh",
+  "ruleset_sha": "b0f1dafc",
+  "project": "agent-pipeline-shared_nova",
+  "goal": "Make the privacy contract's inventory claim (privacy-review.md §3 rule 11) true of the repository as it actually stands -- reconcile the three restricted-storage files absent from the spec.md §7.3-7.4 inventory.",
+  "worktree": false,
+  "tool_budget": 45,
+  "closing_allowance": 5,
+  "outcome": "stop-condition -- AC-1 resolves to (b), reported per briefing stop condition 2; no files changed",
+  "log": [
+    "opened dispatch record before any other work",
+    "read privacy-review.md rule 11, spec.md SS7.3-7.4 (zero hits for human-decision-attribution), lifecycle.json (spec.md authority:true/immutable/digest-bound; privacy-review.md authority:false/mutable, still digest-tracked)",
+    "read gmw-hgo-evidence-intake-into-the-human-ledger.md SS5.4/S9: design author explicitly decided 'no spec.md amendment' for D-1, citing human-role-exception-decision.mjs as precedent",
+    "verified the precedent does not transfer: human-role-exception-decision.v1 is a PORTABLE schema-family member (governance-event.mjs:171, no storageProfile gate) while human-decision-attribution.v1 is gated restricted-machine-local-only (governance-event.mjs:180) -- rule 11's specific target class",
+    "verified zero mentions of 'privacy-review' or 'rule 11' anywhere in the design doc that authorized D-1 -- the skip-inventory decision was never checked against the privacy gate",
+    "read acceptance.md H-AC-11/O-4 PO amendments (2026-08-08/17/18): PO authorized building the FEATURE at acceptance-criteria/scope level; text never references privacy-review.md or rule 11",
+    "read privacy-sweep-critic-review-4defe09e.md F1 (this item's source) and F2 (sibling finding: privacy-review.md SS5 PASS is bound to a superseded commit/tree that predates D-1 entirely -- 'no valid privacy pass covers this candidate') -- confirms no independent privacy sign-off ever covered D-1",
+    "conclusion: AC-1 = (b) -- authorization gap at the privacy-review gate specifically, not inventory staleness or rule-11 overreach; stop condition 2 triggered, no file edits made",
+    "verification evidence: rg -n human-decision-attribution specs/sprint-phoenix-epic/spec.md -> zero matches (confirms F1's claim is still live)"
+  ],
+  "report": {
+    "dodResults": {
+      "AC-1": "passed -- established (b), not (a)/(c), with evidence (see log)",
+      "AC-2": "correctly withheld -- AC-1 resolved to (b), so per AC-2's own text and stop condition 2 no correction was implemented; this is the compliant outcome for a (b) finding",
+      "AC-3": "passed -- digest-bound status established before any edit was contemplated: spec.md authority:true/mutability:immutable (digest-bound authority, forbidden to touch); privacy-review.md authority:false/mutability:mutable but still digest-tracked in lifecycle.json. Neither was edited.",
+      "AC-4": "not applicable -- no change was made (stop condition). Current-state verification command stated and run instead: `rg -n \"human-decision-attribution\" specs/sprint-phoenix-epic/spec.md` -> zero matches, confirming F1's claim is still live. Once the PO's authorization decision (open item below) is made, the same command becomes the post-fix verification.",
+      "AC-5": "passed (trivially) -- no code/doc file was edited, so no suite needed re-running; the one check run was read-only evidence, not a repository mutation"
+    },
+    "evidence": [
+      "evidence/dispatch-record-NVA-B-SPECINV.json (this record, full evidence trail in `log`)",
+      "rg -n \"human-decision-attribution\" specs/sprint-phoenix-epic/spec.md -> zero matches (ran directly, output empty)",
+      "specs/sprint-phoenix-epic/design/privacy-review.md:116-120 (rule 11 text)",
+      "specs/sprint-phoenix-epic/spec.md:390-438 (SS7.3-7.4 inventory, no attribution rows) and :276-301 (S6.1 closed schema family, separate/narrower list)",
+      "specs/sprint-phoenix-epic/lifecycle.json (artifact authority/mutability flags)",
+      "specs/sprint-phoenix-epic/design/gmw-hgo-evidence-intake-into-the-human-ledger.md:506-519 (S5.4 'no spec.md amendment' decision) and :1417-1531 (S9 amendment enumeration; D-1's corrected bullet)",
+      "plugins/pipeline-core/lib/governance-event.mjs:171 (human-role-exception-decision.v1, no storageProfile gate -- portable) and :180 (human-decision-attribution.v1, restricted-machine-local gate)",
+      "plugins/pipeline-core/lib/human-role-exception-decision.mjs header (precedent file the design cites)",
+      "specs/sprint-phoenix-epic/acceptance.md:303-368 (H-AC-11/O-4 PO amendments, 2026-08-08/17/18 -- never mention privacy-review.md or rule 11)",
+      "backlog/items/2026-08-18-h-ac-11-restricted-profile-intake-record-is-design-increment-2.md (closed, tracks the PO-authorized build)",
+      "specs/sprint-phoenix-epic/evidence/privacy-sweep-critic-review-4defe09e.md F1 (:33-67, this item's source) and F2 (:69-85, sibling: privacy-review.md S5 PASS bound to a superseded commit/tree, 'no valid privacy pass covers this candidate') and PO disposition (:176-183)",
+      "backlog/items/2026-08-31-the-privacy-sign-off-is-bound-to-a-superseded-candidate.md (F2's own item, confirmed to exist)"
+    ],
+    "changedFiles": [
+      "evidence/dispatch-record-NVA-B-SPECINV.json -- created, this dispatch's own record; no other repository file changed"
+    ],
+    "deliberatelyNotChanged": [
+      "specs/sprint-phoenix-epic/spec.md -- digest-bound authority (AC-3); also not the right fix even absent that constraint, given the (b) finding",
+      "specs/sprint-phoenix-epic/design/privacy-review.md rule 11 -- considered as option (c)'s target and rejected: the finding is (b), not (c); editing rule 11 to retroactively permit the three files would itself be the 'widen a contract merely to make a violation disappear' the briefing's Forbidden section prohibits, especially since sibling finding F2 shows this document's own PASS has never covered the candidate that contains D-1 -- there is no independent privacy sign-off to encode, so a Goldfish edit to the rule's substance would be a self-issued exemption, which privacy-review.md's own opening paragraph explicitly disclaims",
+      "plugins/pipeline-core/lib/human-decision-attribution.mjs, its test, governance/schemas/human-decision-attribution.schema.json -- explicitly forbidden to touch per briefing; also not the source of the defect",
+      "the backlog item 2026-08-31-restricted-store-files-exceed-the-spec-inventory-... -- forbidden to close/edit per briefing",
+      "pre-existing unrelated pending changes already in this shared checkout at dispatch start (evidence/dispatch-record-NVA-B-COPYSAFE.json staged, plugins/pipeline-core/lib/copy-safe-command.test.mjs staged, plugins/pipeline-core/lib/project-onboarding-v3.mjs and plugins/pipeline-core/scripts/pre-commit-hook-install.mjs unstaged) -- belong to a different, concurrent dispatch in this shared (non-worktree) checkout; left completely untouched, unstaged and uncommitted by me"
+    ],
+    "deviationsFromSpec": "None. The briefing's own AC-1/AC-2/stop-conditions structure explicitly anticipates and instructs a stop-and-report outcome for a (b) finding; that is what happened.",
+    "openItems": [
+      "Stop condition 2 triggered: AC-1 resolves to (b), not (a) or (c). This is a design/authorization decision for the PO, not a documentation fix: whether to (i) commission an actual independent privacy re-review that either grants D-1's three files a scoped exemption from rule 11 and re-binds privacy-review.md's S5 PASS to the current candidate (which also closes sibling finding F2), or (ii) decide the files require remediation (relocation/rework) despite being functionally privacy-conservative.",
+      "Finding F2 (backlog/items/2026-08-31-the-privacy-sign-off-is-bound-to-a-superseded-candidate.md) is directly entangled with this decision: privacy-review.md's S5 PASS predates D-1 entirely, so no valid privacy pass covers the current candidate at all. Recommend resolving F1 and F2 together in one privacy-review pass rather than piecemeal -- fixing rule 11's text alone, without re-binding the PASS, would leave the document internally inconsistent in a different way.",
+      "The backlog item's own Proposal section and the prior Elephant/PO dispositions (2026-08-31) considered only 'amend spec.md's inventory' or 'relocate the files' as fix routes -- both touch the digest-bound spec.md/lifecycle.json. Neither considered that the true finding might be an authorization gap. This briefing's own instruction not to inherit the item's lean without checking is what surfaced the difference; the Elephant should update the item's own Triage to reflect it (out of scope for me -- 'do not close or edit any backlog item')."
+    ]
+  }
+}
