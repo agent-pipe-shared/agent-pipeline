@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "ccbdda38fcf0602f14e30003e1abd473c01ed4d90e07099f0b752902b5eab73e"
+    "transitionHead": "c093a480cc54df2d11e3a19ba9ef4c8e8d375f6ed242c879cf4154139dcb8d45"
   },
   "counts": {
-    "open": 95,
+    "open": 96,
     "in_progress": 0,
     "closed": 488,
     "rejected": 3,
@@ -2314,6 +2314,15 @@
       "closureRepository": "self",
       "closureCommit": "abf2e580e9a3ec422b375dffe4b4f352c9d204c3",
       "closureEvidence": "plugins/pipeline-core/lib/human-guard-override.test.mjs"
+    },
+    {
+      "id": "pipeline.fourteen-evidence-files-are-tracked-inside-a-gitignored-directory",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-01",
+      "source": "Surfaced during the 2026-09-01 pre-release cleanup attempt for the 0.6.0 release: the dispatcher moved files out of evidence/ by wildcard without first checking which were tracked, and restored them on discovering closure_evidence citations pointed at four of them.",
+      "deferred": false
     },
     {
       "id": "pipeline.fresh-repo-onboarding-intake-first-transaction",
