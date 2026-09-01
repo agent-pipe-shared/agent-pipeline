@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import {
   fsyncSync,
   linkSync,
@@ -15,7 +16,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -32,6 +33,7 @@ import {
   readProjectPipelineUpdateChannel,
   resolvePipelineUpdateChannel,
 } from "./pipeline-update-channel.mjs";
+import { NEUTRAL_CALIBRATION } from "../lib/project-authority.mjs";
 
 const roots = [];
 
@@ -73,6 +75,38 @@ function applyAlphaRefPlan(root, plan, deps = {}) {
     planSha256: plan.planSha256,
     activate: true,
   }, deps);
+}
+
+function sha256(value) {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+// Mirrors canonicalJson/alphaRefPlanBinding (both unexported, pipeline-update-channel.mjs)
+// to construct a genuinely self-consistent digest binding without going
+// through planPipelineUpdateAlphaRef -- which itself now refuses to plan
+// against a duplicate-key file, so it cannot be the source of a binding
+// that is meant to target one. This models AC-2's "a caller that builds
+// its own plan": independently-computed digests that still satisfy apply's
+// own invalid-plan self-consistency check, not a caller replaying the
+// sanctioned plan function's output.
+function canonicalJsonForTest(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalJsonForTest).join(",")}]`;
+  if (value !== null && typeof value === "object") {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJsonForTest(value[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function independentAlphaRefBinding(root, alphaRef, preimageSha256, postimageSha256) {
+  const binding = {
+    schema: PIPELINE_UPDATE_ALPHA_REF_PLAN_SCHEMA,
+    repo: resolve(root),
+    calibrationPath: NEUTRAL_CALIBRATION,
+    alphaRef,
+    preimageSha256,
+    postimageSha256,
+  };
+  return { ...binding, planSha256: sha256(canonicalJsonForTest(binding)) };
 }
 
 test.after(() => {
@@ -553,7 +587,7 @@ test("alpha-ref apply refuses calibration drift and a forged or stale plan witho
   assert.equal(readFileSync(join(root, "project", "pipeline.json"), "utf8"), drifted);
 });
 
-test("alpha-ref writer refuses a duplicate top-level key before any write (F1, AC-1/AC-3)", () => {
+test("alpha-ref plan refuses a duplicate top-level key without ever reaching a write (F1, AC-4)", () => {
   const before = '{"pipelineUpdateAlphaRef":"feat/a","pipelineUpdateAlphaRef":"feat/b"}\n';
   const root = fixture("alpha-ref-duplicate-write", before);
   const plan = planPipelineUpdateAlphaRef(root, "feat/c");
@@ -562,12 +596,62 @@ test("alpha-ref writer refuses a duplicate top-level key before any write (F1, A
     status: "unknown",
     reason: "malformed-configuration",
   });
-  // AC-3: the return value alone is not proof -- a version that writes
-  // first and refuses second would report this same reason. The file's
-  // bytes must be provably untouched too (mirrors readCalibration's own
-  // pipelineUpdateChannel duplicate-key refusal, which never reaches a
-  // write either).
+  // What this actually pins: unlike the analogous apply-path assertion below
+  // (AC-3), this byte-identity check does NOT discriminate a fixed version
+  // from a broken one -- `planPipelineUpdateAlphaRef` has no write path in
+  // ANY version of this module, guard or no guard, so the file is always
+  // left untouched here regardless of whether the duplicate-key check exists.
+  // It is a stable regression pin on plan's own no-write property (and on
+  // the refusal reason), not evidence that the write path is guarded --
+  // only `applyPipelineUpdateAlphaRef` can commit a write, so only its own
+  // test below can prove that path refuses before writing.
   assert.equal(readFileSync(join(root, "project", "pipeline.json"), "utf8"), before);
+  assert.deepEqual(transactionArtifacts(root), []);
+});
+
+test("alpha-ref apply refuses a duplicate top-level key before any write, even with a correctly-computed digest binding (F1, AC-1/AC-2/AC-3)", () => {
+  // applyPipelineUpdateAlphaRef is the only function in this module that can
+  // commit a write, so this test -- not the plan-path one above -- is the
+  // one that actually discriminates the fix from the pre-fix code. The
+  // digest binding below is computed independently of the sanctioned plan
+  // function (AC-2's "a caller that builds its own plan"): planPipelineUpdateAlphaRef
+  // itself now refuses to plan against a duplicate-key file, so it can never
+  // be the source of a binding that targets one. Both digests are real
+  // hashes of the exact bytes on disk and of the exact postimage
+  // fieldPostimage's first-occurrence splice would produce, so -- absent the
+  // guard -- execution would reach atomicReplaceCalibration, commit that
+  // splice, and only then compare readback.value.pipelineUpdateAlphaRef --
+  // which JSON.parse resolves to the LAST occurrence, still "feat/b" -- so it
+  // would return "readback-failed" with committed: true (finding F1's
+  // committed-write-on-a-failed-report shape). Confirmed by temporarily
+  // disabling the new guard: without it, this exact test fails with
+  // reason "readback-failed" and committed: true, not "malformed-configuration".
+  const duplicated = '{"pipelineUpdateAlphaRef":"feat/a","pipelineUpdateAlphaRef":"feat/b"}\n';
+  const root = fixture("alpha-ref-duplicate-apply", duplicated);
+  const postimage = duplicated.replace('"feat/a"', '"feat/c"');
+  const preimageSha256 = sha256(duplicated);
+  const postimageSha256 = sha256(postimage);
+  const { planSha256 } = independentAlphaRefBinding(root, "feat/c", preimageSha256, postimageSha256);
+
+  // AC-2: the refusal must happen even though this digest binding is
+  // correctly computed -- that is the whole point.
+  const applied = applyPipelineUpdateAlphaRef(root, {
+    alphaRef: "feat/c",
+    expectedCalibrationSha256: preimageSha256,
+    expectedPostimageSha256: postimageSha256,
+    planSha256,
+    activate: true,
+  });
+  assert.deepEqual(applied, {
+    schema: PIPELINE_UPDATE_ALPHA_REF_PLAN_SCHEMA,
+    status: "unknown",
+    alphaRef: "feat/c",
+    reason: "malformed-configuration",
+  });
+  // AC-3: the deliverable. The return value alone is not proof -- only the
+  // byte-identity check below actually distinguishes "refused before
+  // writing" from "wrote, then reported failure".
+  assert.equal(readFileSync(join(root, "project", "pipeline.json"), "utf8"), duplicated);
   assert.deepEqual(transactionArtifacts(root), []);
 });
 
