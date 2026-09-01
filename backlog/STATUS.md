@@ -25,6 +25,7 @@
 | pipeline.a-second-dispatch-claimed-an-evidence-artifact-it-never-wrote | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.a-stale-verify-opt-out-entry-costs-a-po-signature-for-work-already-done | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.a-stale-version-stamp-makes-a-plugin-reload-a-silent-no-op | open | defect | pipeline | 2026-08-27 | — |
+| pipeline.a-throwing-temp-unlink-reports-rolled-back-while-the-target-stays-published | open | defect | pipeline | 2026-09-02 | — |
 | pipeline.a7-gate-review-found-a-spec-plan-contradiction-and-a-lifecycle-admission-question | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.absent-runner-flag-silently-defaults-to-codex | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.acceptance-md-edits-repeatedly-drift-lifecycle-json-bound-digest | closed | defect | pipeline | 2026-08-17 | — |
@@ -616,7 +617,7 @@
 
 ## Counts
 
-- open: 102
+- open: 103
 - in_progress: 0
 - closed: 488
 - rejected: 3
