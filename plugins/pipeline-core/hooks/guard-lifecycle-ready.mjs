@@ -361,8 +361,9 @@ const GRAMMAR_DENIAL_REMEDY = [
   ...grammarShapeLines(),
 ];
 // NVA-B-DENIALTRIM: the trimmed rendering for the SECOND-OR-LATER denial of the SAME
-// grammar-denial class (code) within one session (blocked()'s `firstOccurrenceThisSession`
-// parameter, backed by isFirstDenialThisSession() below). Deliberately still two full,
+// grammar-denial class (code) within one scope -- per resolved dispatched subagent, or per
+// session_id absent one, NVA-B-TRIMKEY -- (blocked()'s `firstOccurrenceThisSession`
+// parameter, backed by isFirstDenialThisScope() below). Deliberately still two full,
 // actionable lines -- never a bare marker -- per AC-3: a denial that becomes unactionable is
 // a regression, not a trim. Everything else the full form prints (the leading `${code}: ...`
 // line, `Rejected element:`, `remediation`, the retryActions JSON envelope, and
@@ -3737,47 +3738,95 @@ function evaluateBootstrapReceiptGate(input, root, toolName, dependencies) {
 }
 
 /**
- * NVA-B-DENIALTRIM: the private, per-session, per-denial-class "have we already printed the
- * full grammar listing once this session" record -- a sibling of bootstrapReceiptDir() above,
- * under the same `<git-common-dir>/agent-pipeline/` tree, never under `scratch/` or the
- * working tree (that private tree is already agent-write-refused as pipeline-owned state, the
- * identical reasoning bootstrapReceiptDir()'s own header states).
+ * NVA-B-DENIALTRIM / NVA-B-TRIMKEY: the private, per-denial-class "have we already printed
+ * the full grammar listing once for this reader" record, under the same
+ * `<git-common-dir>/agent-pipeline/` tree bootstrapReceiptDir() above uses -- never under
+ * `scratch/` or the working tree (that private tree is already agent-write-refused as
+ * pipeline-owned state, the identical reasoning bootstrapReceiptDir()'s own header states).
+ *
+ * NOT keyed purely on `session_id`, and deliberately NOT full parity with
+ * bootstrapReceiptPath()'s pure per-agentId keying either -- see denialClassesScopeKey()
+ * immediately below for what it actually is: per-agent when a dispatched subagent is
+ * resolvable, per-session_id for everything else (the orchestrator itself, and any
+ * unresolved/invalid identity).
  */
 function guardDenialClassesDir(commonDir) {
   return join(commonDir, "agent-pipeline", "guard-denial-classes");
 }
 
-function guardDenialClassesPath(commonDir, sessionId) {
-  return join(guardDenialClassesDir(commonDir), `${sessionId}.json`);
+function guardDenialClassesPath(commonDir, scopeKey) {
+  return join(guardDenialClassesDir(commonDir), `${scopeKey}.json`);
 }
 
 /**
- * NVA-B-DENIALTRIM: true on the first denial of `classKey` (a grammar-denial `code`) within
- * one session; false once that same class has already been recorded seen. Consulted ONLY on
- * an actual denial (never on an admitted/lifted command) by the two grammar-denial call sites
- * in evaluateLifecycleReadyGuard() below, and only within their `if (!route.admitted)` branch.
+ * NVA-B-TRIMKEY (backlog/items/2026-09-01-the-denial-trim-state-is-keyed-per-session-not-per-
+ * agent-as-its-comment-claims.md): the scope key isFirstDenialThisScope() persists state
+ * under.
+ *
+ * Measured live, this dispatch, against this repository's own running harness (method:
+ * dispatched as a subagent, then cross-checked THREE already-live, session_id/agentId-keyed
+ * state trees this file and its siblings already write to on every real call --
+ * `.claude/.stop-suggest-<session_id>.json` (stop-suggest.mjs), the bootstrap-receipt gate,
+ * and guard-dispatch-budget.mjs's per-agent counter file -- rather than reading source and
+ * assuming; see that backlog item's own resolution note for the full method and observation):
+ * a dispatched subagent's PreToolUse (and Stop-hook) payloads carry the orchestrating
+ * session's OWN `session_id`, unchanged -- a subagent is never assigned one of its own.
+ * `.claude/.stop-suggest-<session_id>.json` exists ONLY for top-level orchestrating sessions,
+ * never for any of the dozens of subagent dispatches observed under them, and the
+ * orchestrator's own marker file was freshly rewritten DURING this very dispatch's turns.
+ *
+ * Keying purely on `session_id` therefore let a freshly dispatched subagent's FIRST denial of
+ * a class render TRIMMED whenever its orchestrator (or a sibling subagent dispatched earlier
+ * in the same session) had already triggered that class -- defeating the trim's own
+ * requirement that the first denial of a class renders in full, for exactly the reader who
+ * most needs it: a fresh-context subagent has no prior denial of its own to remember.
+ *
+ * The fix scopes state per DISPATCHED AGENT when subagentIdentity() resolves one -- the same
+ * agentId bootstrapReceiptPath() already keys on (NVA-BOOTRECEIPT-1) -- falling back to
+ * `session_id` for every shape that is not a resolved subagent:
+ *  - the orchestrator itself has no agentId of its own, and legitimately keeps ONE
+ *    session-wide trim scope across its own repeated denials -- this is unchanged behaviour,
+ *    not a new gap;
+ *  - an unresolved or invalid identity has no reliable per-agent key either; `session_id`
+ *    stays the best available scope, and the worst case, exactly as before, is only ever
+ *    extra full-text output, never a wrongly-trimmed denial.
+ */
+function denialClassesScopeKey(input, dependencies) {
+  const identity = (dependencies.subagentIdentityFn ?? subagentIdentity)(input, dependencies);
+  if (identity.kind === "subagent" && typeof identity.agentId === "string" && identity.agentId !== "") {
+    return `agent-${identity.agentId}`;
+  }
+  return typeof input?.session_id === "string" && input.session_id !== "" ? input.session_id : null;
+}
+
+/**
+ * NVA-B-DENIALTRIM / NVA-B-TRIMKEY: true on the first denial of `classKey` (a grammar-denial
+ * `code`) within one scope (see denialClassesScopeKey() above -- per resolved subagent, or
+ * per session_id when no subagent identity resolves); false once that same class has already
+ * been recorded seen for that same scope. Consulted ONLY on an actual denial (never on an
+ * admitted/lifted command) by the two grammar-denial call sites in
+ * evaluateLifecycleReadyGuard() below, and only within their `if (!route.admitted)` branch.
  *
  * This is a token-cost trim, never a correctness gate -- every failure mode below fails open
  * to `true` (the full-length rendering), so a broken or unresolvable state store can only ever
  * cost extra output, never silently drop an actionable denial down to the short form:
- *  - no resolvable session id (mirrors onboardingConsentBlocked()'s own convention: a
- *    non-string or empty `session_id` is treated as absent);
+ *  - no resolvable scope key at all (neither a resolved subagent's agentId, nor a usable
+ *    `session_id` -- mirrors onboardingConsentBlocked()'s own convention: a non-string or
+ *    empty `session_id` is treated as absent);
  *  - no resolvable `<git-common-dir>` (mirrors evaluateBootstrapReceiptGate()'s own
  *    fail-open-on-null-commonDir semantics);
- *  - any read, parse, mkdir, or write error against the per-session state file.
+ *  - any read, parse, mkdir, or write error against the per-scope state file.
  */
-function isFirstDenialThisSession(input, root, classKey, dependencies) {
-  const sessionId = typeof input?.session_id === "string" && input.session_id !== ""
-    ? input.session_id
-    : null;
-  if (!sessionId) return true;
+function isFirstDenialThisScope(input, root, classKey, dependencies) {
+  const scopeKey = denialClassesScopeKey(input, dependencies);
+  if (!scopeKey) return true;
   const commonDir = (dependencies.resolveGitCommonDirFn ?? resolveGitCommonDir)(root, dependencies);
   if (commonDir === null) return true; // nowhere safe to persist -- fail open, full text every time
   const existsSyncFn = dependencies.existsSyncFn ?? existsSync;
   const readFileSyncFn = dependencies.readFileSyncFn ?? readFileSync;
   const writeFileSyncFn = dependencies.writeFileSyncFn ?? writeFileSync;
   const mkdirSyncFn = dependencies.mkdirSyncFn ?? mkdirSync;
-  const statePath = guardDenialClassesPath(commonDir, sessionId);
+  const statePath = guardDenialClassesPath(commonDir, scopeKey);
   try {
     let seenClasses = [];
     if (existsSyncFn(statePath)) {
@@ -4164,7 +4213,7 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
       if (!route.admitted) {
         // NVA-B-DENIALTRIM: consulted (and marked seen) ONLY on an actual denial, never on
         // an admitted/lifted command -- computed here, inside this branch, not earlier.
-        const firstOccurrence = isFirstDenialThisSession(input, root, code, dependencies);
+        const firstOccurrence = isFirstDenialThisScope(input, root, code, dependencies);
         return withLifts(lifts, blocked(
           code,
           null,
@@ -4193,7 +4242,7 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
         // character it scans (its per-part policy only ever recovers `;`/newline-joined
         // segments). Measured empirically across `&&`, `|`, `>`, `2>&1`, `| tee`: [] in
         // every case. Calling it here would be dead code, not a fix.
-        const firstOccurrence = isFirstDenialThisSession(input, root, code, dependencies);
+        const firstOccurrence = isFirstDenialThisScope(input, root, code, dependencies);
         return withLifts(lifts, blocked(
           code, null, [], route.overrideGuidance, rejectedGrammarElement(code, (input.tool_input.command ?? input.tool_input.CommandLine), parsed),
           null, null, false, firstOccurrence,
