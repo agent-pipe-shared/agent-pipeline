@@ -1,0 +1,142 @@
+{
+  "schema": "pipeline.claims-evidence.v1",
+  "round": "NVA-B-ROUND-L",
+  "commits": [
+    "9a7c309b",
+    "8db2c988",
+    "e066a1b7",
+    "3f92cae8cdf5f75c75f6a223645e96481b40f174"
+  ],
+  "checks": [
+    {
+      "command": "node --test plugins/pipeline-core/lib/protected-test-paths.test.mjs",
+      "exitCode": 0,
+      "tests": 22,
+      "pass": 22,
+      "fail": 0,
+      "artifact": "scratch/roundk-final-protected-test-paths.txt"
+    },
+    {
+      "command": "node --test plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs",
+      "exitCode": 0,
+      "tests": 194,
+      "pass": 194,
+      "fail": 0,
+      "artifact": "scratch/roundk-final-guard-lifecycle-ready.txt"
+    },
+    {
+      "command": "node --test plugins/pipeline-core/scripts/push-init.test.mjs",
+      "exitCode": 0,
+      "tests": 18,
+      "pass": 18,
+      "fail": 0,
+      "artifact": "scratch/roundk-final-push-init.txt"
+    },
+    {
+      "command": "node --test harness/scripts/check-consumer-safe-paths.test.mjs",
+      "exitCode": 0,
+      "tests": 9,
+      "pass": 9,
+      "fail": 0,
+      "artifact": "scratch/roundk-final-consumer-safe-paths.txt"
+    },
+    {
+      "command": "node --test plugins/pipeline-core/scripts/check-vendored-template-sync.test.mjs",
+      "exitCode": 0,
+      "tests": 4,
+      "pass": 4,
+      "fail": 0,
+      "artifact": "scratch/roundk-final-vendored-template-sync.txt"
+    },
+    {
+      "command": "node --test plugins/pipeline-core/scripts/push-release-flow-docs-contract.test.mjs",
+      "exitCode": 0,
+      "tests": 6,
+      "pass": 6,
+      "fail": 0,
+      "artifact": "scratch/roundk-final-push-release-flow-docs-contract.txt"
+    },
+    {
+      "command": "reproduce-first RED before the round-K fixes",
+      "exitCode": 1,
+      "artifact": "scratch/roundk-red-f1-f2.txt"
+    },
+    {
+      "command": "break-and-restore proof, round-K pins",
+      "exitCode": 1,
+      "artifact": "scratch/roundk-break-f1-red.txt, scratch/roundk-break-f2-red.txt, scratch/roundk-restored-green.txt",
+      "note": "restoredByteIdentical true; re-run green at 216 pass"
+    },
+    {
+      "command": "node --test plugins/pipeline-core/lib/project-onboarding-v3.test.mjs, synthetic PATH + ext4 TMPDIR, before the fix",
+      "exitCode": 1,
+      "tests": 159,
+      "pass": 157,
+      "fail": 2,
+      "artifact": "scratch/logs/project-onboarding-v3-tests.synthetic.ext4tmp.pre-fix.log"
+    },
+    {
+      "command": "node --test plugins/pipeline-core/lib/project-onboarding-v3.test.mjs, synthetic PATH + ext4 TMPDIR, after the fix",
+      "exitCode": 0,
+      "tests": 159,
+      "pass": 159,
+      "fail": 0,
+      "artifact": "scratch/logs/project-onboarding-v3-tests.synthetic.ext4tmp.post-fix.log"
+    },
+    {
+      "command": "node --test plugins/pipeline-core/lib/project-onboarding-v3.test.mjs, ordinary PATH",
+      "exitCode": 0,
+      "tests": 159,
+      "pass": 159,
+      "fail": 0,
+      "artifact": "scratch/logs/project-onboarding-v3-tests.full.post-fix.log"
+    },
+    {
+      "command": "node --test plugins/pipeline-core/scripts/onboarding-init.test.mjs, synthetic PATH + ext4 TMPDIR, before the fix",
+      "exitCode": 1,
+      "fail": 1,
+      "artifact": "scratch/logs/onboarding-init-tests.synthetic.ext4tmp.log"
+    },
+    {
+      "command": "node --test plugins/pipeline-core/scripts/onboarding-init.test.mjs, after the fix",
+      "exitCode": 0,
+      "artifact": "scratch/logs/onboarding-init-tests.synthetic.log, scratch/logs/onboarding-init-tests.full.log"
+    },
+    {
+      "command": "node --test harness/scripts/print-verify-failures.test.mjs",
+      "exitCode": 0,
+      "tests": 18,
+      "pass": 18,
+      "fail": 0
+    },
+    {
+      "command": "node harness/scripts/check-adr-consistency.mjs",
+      "exitCode": 0,
+      "runBy": "dispatcher"
+    },
+    {
+      "command": "node harness/scripts/check-reference-paths.mjs",
+      "exitCode": 0,
+      "runBy": "dispatcher"
+    },
+    {
+      "command": "node harness/scripts/check-observation-governance.mjs",
+      "exitCode": 0,
+      "runBy": "dispatcher"
+    },
+    {
+      "command": "node plugins/pipeline-core/scripts/check-backlog-state.mjs",
+      "exitCode": 0,
+      "runBy": "dispatcher",
+      "note": "pre-existing drift only: abbreviated-OID event 403, the known 2026-07-19..2026-07-22 unreachable historical batch, and one closure-commit mismatch on an unrelated item"
+    }
+  ],
+  "deviations": [
+    "No pre-fix red run exists for the print-verify-failures regression test; it was written after the reporter change.",
+    "codex-onboarding-capabilities-tests is unresolved and unchanged. It was red in CI run 33551001455's first execution and green in a second execution of the same commit 266d691f, and green locally under an ordinary PATH, the synthetic PATH, tmpfs and ext4.",
+    "The temp-cleanup branch of the same catch in applyProjectOnboardingManifestRepair retains the identity-only shape, and the same pattern in codex-onboarding-capabilities.mjs (sameIdentity, removeRecordedTree) is untouched.",
+    "No suite asserts agreement between the root and plugin-shipped copies of docs/push-release-flow.md; TEMPLATE_PAIRS covers only goldfish-task.md and critic-review.md, and push-release-flow-docs-contract.test.mjs carries no push-init case.",
+    "harness/scripts/verify.mjs has not been run to a clean-candidate exit 0 against any of these four commits.",
+    "The round-K fix corrected the root copy's summary table in addition to the plugin copy the finding named."
+  ]
+}

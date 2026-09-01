@@ -1,0 +1,68 @@
+{
+  "schema": "pipeline.claims-evidence.v1",
+  "round": "NVA-B-ROUND-N",
+  "subject": "corrections to round-L findings F1, F4 and F7",
+  "commits": ["41dd0d8e", "b90640c2", "7eb9192c"],
+  "checks": [
+    {
+      "command": "git rebase --exe <cmd> main, --ex <cmd>, --exe=<cmd>, --ex=<cmd>, --e <cmd>, --execute <cmd>, in a throwaway fixture repository, git 2.53.0",
+      "artifact": "scratch/nva-roundl/evidence/f1-measurement.txt",
+      "result": "the four abbreviated spellings each exited 0 and executed the payload; --e was refused as ambiguous between --empty and --exec; --execute was refused as unknown"
+    },
+    {
+      "command": "node --test plugins/pipeline-core/lib/protected-test-paths.test.mjs",
+      "exitCode": 0,
+      "tests": 25,
+      "pass": 25,
+      "fail": 0,
+      "artifact": "scratch/nva-roundl/evidence/f1-green-classifier.txt",
+      "redBefore": "scratch/nva-roundl/evidence/f1-red-classifier.txt (exit 1)"
+    },
+    {
+      "command": "node --test plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs",
+      "exitCode": 0,
+      "tests": 210,
+      "pass": 210,
+      "fail": 0,
+      "artifact": "scratch/nva-roundl/evidence/f1-green-guard.txt",
+      "redBefore": "scratch/nva-roundl/evidence/f1-red-guard.txt (exit 1)"
+    },
+    {
+      "command": "node --test harness/scripts/print-verify-failures.test.mjs",
+      "exitCode": 0,
+      "tests": 21,
+      "pass": 21,
+      "fail": 0,
+      "artifact": "scratch/nva-roundl/evidence/f7-green.txt",
+      "redBefore": "scratch/nva-roundl/evidence/f7-red.txt (exit 1, 18 pass / 3 fail)"
+    },
+    {
+      "command": "node --test plugins/pipeline-core/lib/project-onboarding-v3.test.mjs",
+      "exitCode": 0,
+      "tests": 162,
+      "pass": 162,
+      "fail": 0,
+      "artifact": "scratch/f4-green-all-sites.txt",
+      "redBefore": "scratch/f4-red-before-fix.txt (exit 1, 159 pass / 3 fail) and scratch/f4-red-site-b-before-fix.txt (exit 1, 161 pass / 1 fail)"
+    },
+    {
+      "command": "node --test harness/scripts/check-consumer-safe-paths.test.mjs",
+      "exitCode": 0,
+      "tests": 9,
+      "pass": 9,
+      "fail": 0,
+      "artifact": "scratch/nva-roundl/evidence/consumer-safe-paths.txt"
+    }
+  ],
+  "deviations": [
+    "Commit 41dd0d8e also carries three assertion lines authored by the concurrent NVA-B-REBWIRE-1 dispatch, swept in by a pathspec wider than intended: a loop over [\"git --no-pager status\", \"git --no-pager log\", \"git -p log\"] asserting exit 0, inside the rebwire negative-4 test. The Dispatch: trailer on 41dd0d8e therefore attributes three lines to the wrong work package. Disclosed rather than corrected by rewriting history.",
+    "For F1 and F7 the break-and-restore proof was not run as a separate scripted process; the reproduce-first red-then-green pair was accepted as the binding evidence.",
+    "The F1 prefix rule deliberately over-approximates past git's own ambiguity check rather than re-encoding git's ambiguity table one layer down.",
+    "The first red run for the F4 rollback site was NOT discriminating: boundDirectoryEntry() hands out /proc/self/fd/<n>/<name> paths whose fd is closed in the function's own finally, so a post-return existsSync() checked a stale path and answered absent both before and after the fix. The assertion was rewritten against the real directory, the one-line fix temporarily reverted, a genuine red measured, and the fix restored. The final green run is against the fully restored tree.",
+    "plugins/pipeline-core/lib/project-onboarding-v3.mjs:3195 unlinks a temporary file with no identity and no content check at all. It sits adjacent to the corrected site, was outside the three named sites, and is untouched.",
+    "plugins/pipeline-core/lib/project-onboarding-v3.mjs:5276 unlinks inside a row.kind === \"file\" loop and was not measured.",
+    "plugins/pipeline-core/lib/codex-onboarding-capabilities.mjs carries the same identity-only ownership pattern and is untouched; it has its own filed item.",
+    "The suggested replace_all edit for the two rollback push sites was not used: the lines are byte-identical but their expected-bytes expressions differ, so they were edited separately.",
+    "harness/scripts/verify.mjs has not been run to a clean-candidate exit 0 against any of these commits."
+  ]
+}
