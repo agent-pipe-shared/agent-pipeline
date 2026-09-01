@@ -700,6 +700,48 @@ test("handoverSizeFinding: the committed (HEAD) blob is corrupted -> measurable:
   assert.match(finding.detail, /committed \(HEAD\) version/);
 });
 
+test("handoverSizeFinding: the staged (index) blob is corrupted -> measurable:false, never a silent allow (NVA-B-STAGEDPIN)", async () => {
+  // The HEAD-side branch is exercised by the corrupted-HEAD test above; this pins the sibling
+  // branch handoverSizeFinding() takes when HEAD reads fine but the STAGED (index) revspec
+  // (`:<relPath>`) cannot have its size established. HEAD must stay small and uncorrupted so
+  // the first `!current.ok` branch is never taken -- otherwise this test would silently pin the
+  // HEAD branch a second time instead of the staged branch it targets.
+  const { handoverSizeFinding } = await implModule();
+  const { dir, git } = freshRepo("handover-finding-staged-corrupted");
+  mkdirSync(join(dir, "docs"), { recursive: true });
+  writeFileSync(join(dir, "docs", "state.md"), "short\n");
+  git("add", "docs/state.md");
+  git("commit", "-q", "-m", "add docs/state.md"); // committed (HEAD) version stays small and clean
+
+  // Stage a DIFFERENT version so a new, distinct blob object is written for the index.
+  writeFileSync(join(dir, "docs", "state.md"), "a different staged version\n");
+  git("add", "docs/state.md");
+
+  const shaRes = spawnSync("git", ["rev-parse", ":docs/state.md"], { cwd: dir, encoding: "utf8" });
+  const sha = shaRes.stdout.trim();
+  const commonDir = commonDirOf(dir);
+  const objPath = join(commonDir, "objects", sha.slice(0, 2), sha.slice(2));
+  const before = readFileSync(objPath);
+  const corrupted = Buffer.from(before);
+  for (let i = 5; i < Math.min(15, corrupted.length); i++) corrupted[i] = corrupted[i] ^ 0xff;
+  chmodSync(objPath, 0o644);
+  writeFileSync(objPath, corrupted);
+
+  // Confirm the precondition this test depends on: the staged object is still reported PRESENT
+  // (existence does not require successfully inflating the zlib stream) even though it is
+  // corrupted -- this is what makes the staged-side present:true, ok:false branch reachable at
+  // all. Also confirm HEAD's own blob is untouched, so a future accident that corrupts the wrong
+  // object cannot make this test vacuously exercise the HEAD branch instead.
+  const stagedExistsCheck = spawnSync("git", ["cat-file", "-e", ":docs/state.md"], { cwd: dir, encoding: "utf8" });
+  assert.equal(stagedExistsCheck.status, 0, "precondition: cat-file -e must still see the corrupted staged object as present");
+  const headExistsCheck = spawnSync("git", ["cat-file", "-e", "HEAD:docs/state.md"], { cwd: dir, encoding: "utf8" });
+  assert.equal(headExistsCheck.status, 0, "precondition: the committed HEAD object must remain readable and uncorrupted");
+
+  const finding = handoverSizeFinding(dir, "docs/state.md", 40);
+  assert.equal(finding.measurable, false);
+  assert.match(finding.detail, /staged \(index\) version/, "detail must name the staged/index side specifically, not the HEAD side");
+});
+
 test("installed hook: non-UTF-8 content in the handover file is measured as its exact raw byte length, not as re-encoded characters", () => {
   // AC-5: pins the encoding half of F-1. The OLD implementation decoded `git show`'s stdout
   // with Node's `encoding: 'utf8'`, which replaces an invalid byte sequence with U+FFFD
