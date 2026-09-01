@@ -3,7 +3,8 @@ schema: pipeline.backlog-item.v1
 id: pipeline.backlog-strip-for-dispatch-drops-every-section-after-triage
 type: defect
 owner: pipeline
-status: open
+status: closed
+closure_evidence: plugins/pipeline-core/lib/backlog-dispatch-reference.test.mjs
 created: 2026-08-25
 sprint: alfred
 source: "Confirmed twice in one session, 2026-08-25: AGY-KICKOFFPOQ-1's own completion report (Deviations #1) and directly reproduced by the Elephant while preparing this item's own follow-up dispatch"
@@ -64,3 +65,36 @@ exclusion, not a side effect of appearing after `## Triage` in file order.
   blocking. Worth a small fix on its own later.
 - **Assignment (if accepted):** unscheduled.
 - **Date:** 2026-08-25
+
+## Closed, 2026-09-01 — fixed on the day it was filed, never closed
+
+Commit `6da6d03a` (2026-08-25 22:46, `AGY-SWEEP-backlog-strip-for-dispatch`)
+implements exactly this item's Proposal: `stripBacklogVerdictProse` removes each
+verdict-shaped heading's own bounded section, up to the next same-or-shallower
+heading, instead of everything from the first verdict heading to end-of-file. A
+later differently-named PO-decision section survives; a later section that is
+itself verdict-shaped is still removed. It additionally guards against a
+`#`-prefixed line inside a fenced code block being read as a section boundary —
+a case this item did not anticipate.
+
+Verified live before closing, not taken from the commit message: stripping
+`backlog/items/2026-08-21-enforce-kickoff-po-questions.md` — the exact item this
+defect was reproduced against — now preserves every `##` section after Triage,
+with only the Triage body replaced by the `SPEC-REFERENCE-STRIPPED-TRIAGE`
+marker. `node --test plugins/pipeline-core/lib/backlog-dispatch-reference.test.mjs`
+passes 12/12, including a case explicitly named for this regression.
+
+**How this stayed open for a week, recorded because the failure is the
+interesting part.** The fix landed hours after the Triage deferred the item, in
+a sweep dispatch that did not close what it fixed. Nothing then reconciled the
+two. On 2026-09-01 an Elephant re-read this item's own current text — which
+still said `open` and `deferred` — and briefed a dispatch against it. The
+dispatch stopped correctly on a briefing-vs-repo contradiction and cost a full
+run to discover what one `git log` on the affected file would have shown in
+seconds.
+
+The re-verification rule in `CLAUDE.md` names both halves: re-read the item's
+own current status **and** check `git log` for the area. The item text was
+checked and the log was not. Half the rule is not the rule — this is a concrete
+instance of `pipeline.resolved-backlog-items-can-keep-status-open-indefinitely`,
+which is a live open item and now has a third confirmed occurrence.
