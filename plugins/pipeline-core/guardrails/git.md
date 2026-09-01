@@ -167,3 +167,59 @@ Rule IDs: `GIT-xx`.
   fact (`backlog/README.md`, Ledger section).
 - **Verification:** `plugins/pipeline-core/hooks/guard-git.mjs` (search
   `GG-22`); `node plugins/pipeline-core/hooks/guard-git.test.mjs`.
+
+## GIT-10 — Run the backlog-state checker before committing any ledger change
+
+- **MUST** run `node plugins/pipeline-core/scripts/check-backlog-state.mjs`
+  from the repository root before committing ANY change that touches a
+  `backlog/items/*.md` file's `status:`/closure metadata or any of the three
+  ledger projection files (`backlog/transitions.ndjson`, `backlog/STATUS.md`,
+  `backlog/index.json`) — never rely on `verify.mjs` to catch it later.
+  `reconcile-backlog-ledger.mjs`'s own item read (`readItems`) is not a
+  substitute: it only requires each item to parse to a usable `id` and never
+  checks `parsed.errors` (schema validity) before planning a transition, so a
+  schema-invalid item's own reconciliation run will not surface the defect —
+  only this checker does.
+- **What to read in the output before proceeding:** a line prefixed `DRIFT
+  backlog state: ...` is printed unconditionally but never blocks. The
+  script's own severity classifier (`classifyBacklogFindings`,
+  `BACKLOG_FINDING_SEVERITY.DRIFT`,
+  `plugins/pipeline-core/lib/backlog-state.mjs`) assigns DRIFT only to an
+  `evidence.commit is not a reachable local Git commit` /
+  `must be a full lowercase Git commit OID` finding at or below a fixed
+  historical cutoff sequence (`LEDGER_DRIFT_CUTOFF_SEQUENCE`), plus a
+  `closure_commit` cross-check finding it can prove was caused by that same
+  drifted event; every other finding defaults to `INTEGRITY`. A line
+  prefixed `FAIL backlog state: ...` IS blocking — the script's `cli()`
+  exits `2` on any `INTEGRITY` finding (or on bad usage) and nothing may be
+  committed until it is fixed; a clean run prints `Backlog state, transition
+  ledger, closure evidence, and generated projections are valid.` and exits
+  `0` (no explicit `process.exit` call on that path — Node's default). This
+  repository's own run legitimately still prints a permanent, PO-accepted
+  batch of `DRIFT` lines (unreachable historical `evidence.commit` values
+  lost in the sanctioned 2026-08-01 history rewrite, plus the `closure_commit`
+  cross-check finding one of them causes) alongside that success line — their
+  presence alone is never a reason to stop.
+- **Recovery for a bad reconciliation that is still UNCOMMITTED:** `git
+  checkout -- backlog/transitions.ndjson backlog/index.json
+  backlog/STATUS.md`, fix the offending item, and re-run
+  `reconcile-backlog-ledger.mjs --activate`. Once the bad reconciliation has
+  been committed, that discard route is gone — the ledger is append-only and
+  hash-chained, so hand-patching it breaks the chain — and the only correct
+  repair is `planBacklogEvidenceAmendment`'s heavier evidence-amendment
+  machinery (`plugins/pipeline-core/lib/backlog-state.mjs`), never a manual
+  edit of the projection files.
+- **Why:** confirmed live 2026-08-27 — six backlog items were filed against
+  a schema they did not satisfy (`type: decision`, `owner: po`, neither in
+  the enum), and the violation surfaced only because
+  `check-backlog-state.mjs` was run afterwards; ten of thirteen findings in
+  that run were self-inflicted and would have been caught before committing.
+  This is a discipline the reader holds themselves: unlike GIT-09/`GG-22`
+  above, no guard invokes this checker at commit time, so nothing currently
+  blocks a commit that skips it.
+- **Verification:** run the command above from the repository root; `node
+  plugins/pipeline-core/scripts/check-backlog-state.mjs --write` regenerates
+  `backlog/STATUS.md`/`backlog/index.json` when projection drift is the only
+  remaining issue.
+  `plugins/pipeline-core/scripts/check-backlog-state.test.mjs` covers the
+  checker's own severity classification and exit behaviour.
