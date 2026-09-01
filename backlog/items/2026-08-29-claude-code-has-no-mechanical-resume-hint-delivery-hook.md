@@ -8,6 +8,7 @@ created: 2026-08-29
 sprint: nova-b
 tracking: "Nova B -- new hooks.json entry needed (TP-4 protected, PO signature ceremony), larger scope than the Codex-side fix; not this candidate."
 source: "Found while root-causing 2026-08-29-codex-restart-context-loss-needs-a-different-approach-not-harder-enforcement.md (point 5 of its root-cause note)."
+done_when: contains plugins/pipeline-core/hooks/hooks.json resume-hint
 ---
 
 # Claude Code has no mechanical SessionStart hook delivering the resume-hint card into context -- only Codex does

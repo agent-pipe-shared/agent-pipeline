@@ -8,6 +8,7 @@ created: 2026-08-29
 sprint: nova-b
 tracking: "Nova B -- PO decision 2026-08-29: real design work needed (detecting when a Critic review was DUE and never ran is not trivial), too large for this candidate."
 source: "Claude/Windows 060-78 greenfield retrospective (scratch/greenfield-reports/pipeline-retrospective-claude-060-78.md), section 5 point 8 and section 11: 'Kein technisches Gate erzwingt das Critic-Review selbst.'"
+done_when: manual
 ---
 
 # Nothing technically enforces "run Critic review before declaring done" -- unlike every other critical action, this is pure convention

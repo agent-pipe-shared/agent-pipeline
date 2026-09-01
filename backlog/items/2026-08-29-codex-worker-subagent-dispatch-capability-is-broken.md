@@ -8,6 +8,7 @@ created: 2026-08-29
 sprint: nova-b
 tracking: "Nova B -- needs deeper Codex-runner-side investigation, likely outside pure Pipeline-repo code; not a same-session fix."
 source: "Codex 060-77 greenfield retrospective (scratch/greenfield-reports/pipeline-retrospective-codex-060-77.md), section 'Root und Worker hatten unterschiedliche Funktionsfähigkeit'."
+done_when: manual
 ---
 
 # Codex: dispatched worker/subagent sessions cannot establish their own repository-control capability -- the Goldfish dispatch model is unusable on this runner
