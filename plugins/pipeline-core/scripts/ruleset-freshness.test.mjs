@@ -228,14 +228,14 @@ test("closed update-channel configuration defaults by distribution topology", ()
     selfApplication: true,
   }), {
     status: "ready", channel: "alpha", source: "distribution-default",
-    topology: "local-self-development", alphaRef: null, alphaRefInvalid: false, reason: null,
+    topology: "local-self-development", alphaRef: null, alphaRefReason: null, reason: null,
   });
   assert.deepEqual(resolvePipelineUpdateChannel({
     repoPath: "/tmp/consumer",
     pluginRoot: "/opt/pipeline-core",
   }), {
     status: "ready", channel: "stable", source: "distribution-default",
-    topology: "installed-consumer", alphaRef: null, alphaRefInvalid: false, reason: null,
+    topology: "installed-consumer", alphaRef: null, alphaRefReason: null, reason: null,
   });
   assert.equal(resolvePipelineUpdateChannel({ installedSource: "local-development" }).channel, "stable");
   assert.equal(resolvePipelineUpdateChannel({ updateChannel: "alpha" }).channel, "stable");
@@ -384,7 +384,7 @@ test("a configured alpha ref that does not exist on the remote is typed channel-
   assert.equal(value.ref, null);
 });
 
-test("a malformed or non-string configured alpha ref is typed channel-unavailable, distinct from an absent ref (ADR-0078 D3/AC-6)", () => {
+test("a malformed or non-string configured alpha ref is typed invalid-alpha-ref, a persistent config error distinct from channel-unavailable (finding 1 / AC-1)", () => {
   const { remote, source, pluginRoot } = fixture("alpha-malformed-ref");
   const value = inspectPipelineUpdateAvailability(source, {
     remoteUrl: remote,
@@ -393,6 +393,40 @@ test("a malformed or non-string configured alpha ref is typed channel-unavailabl
     projectConfig: { status: "ready", updateChannel: "alpha" },
     alphaRefConfig: {
       status: "unknown", alphaRef: null, source: "project-config", reason: "invalid-alpha-ref",
+    },
+  });
+  assert.equal(value.status, "unknown");
+  // Not channel-unavailable: a bad ref value is the operator's to fix, and
+  // channel-unavailable invites a retry that can never fix it.
+  assert.equal(value.reason, "invalid-alpha-ref");
+  assert.equal(value.ref, null);
+});
+
+test("a duplicate pipelineUpdateAlphaRef key is typed malformed-configuration, distinct from channel-unavailable (finding 1 / AC-1)", () => {
+  const { remote, source, pluginRoot } = fixture("alpha-duplicate-key");
+  const value = inspectPipelineUpdateAvailability(source, {
+    remoteUrl: remote,
+    pluginRoot,
+    policy: null,
+    projectConfig: { status: "ready", updateChannel: "alpha" },
+    alphaRefConfig: {
+      status: "unknown", alphaRef: null, source: "project-config", reason: "malformed-configuration",
+    },
+  });
+  assert.equal(value.status, "unknown");
+  assert.equal(value.reason, "malformed-configuration");
+  assert.equal(value.ref, null);
+});
+
+test("a genuinely unreadable calibration keeps reporting channel-unavailable for the alpha-ref path too (AC-2)", () => {
+  const { remote, source, pluginRoot } = fixture("alpha-ref-calibration-unreadable");
+  const value = inspectPipelineUpdateAvailability(source, {
+    remoteUrl: remote,
+    pluginRoot,
+    policy: null,
+    projectConfig: { status: "ready", updateChannel: "alpha" },
+    alphaRefConfig: {
+      status: "unknown", alphaRef: null, source: "project-config", reason: "channel-unavailable",
     },
   });
   assert.equal(value.status, "unknown");

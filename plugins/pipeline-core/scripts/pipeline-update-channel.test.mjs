@@ -73,7 +73,7 @@ test("closed defaults use only explicit trusted self-application authority", () 
     source: "distribution-default",
     topology: "local-self-development",
     alphaRef: null,
-    alphaRefInvalid: false,
+    alphaRefReason: null,
     reason: null,
   });
   assert.equal(resolvePipelineUpdateChannel({}).channel, "stable");
@@ -401,6 +401,14 @@ test("alpha-ref field follows the channel field's read/validate/default pattern 
     status: "unknown", alphaRef: null, source: "project-config", reason: "malformed-configuration",
   });
 
+  // AC-4: a genuinely unreadable calibration (not merely an absent or
+  // invalid field) is the one case that legitimately stays
+  // channel-unavailable -- distinct from the two config-error cases above.
+  const unreadableRoot = fixture("alpha-ref-calibration-unreadable", "{not json\n");
+  assert.deepEqual(readProjectPipelineUpdateAlphaRef(unreadableRoot), {
+    status: "unknown", alphaRef: null, source: "project-config", reason: "channel-unavailable",
+  });
+
   assert.equal(isPipelineUpdateAlphaRef("main"), true);
   assert.equal(isPipelineUpdateAlphaRef("feat/sprint-alfred"), true);
   assert.equal(isPipelineUpdateAlphaRef(""), false);
@@ -418,19 +426,34 @@ test("resolvePipelineUpdateChannel threads alphaRef only when the config is read
     alphaRefConfig: { status: "unknown", alphaRef: null, source: "project-config", reason: "invalid-alpha-ref" },
   }), {
     status: "ready", channel: "stable", source: "project-config", topology: null,
-    alphaRef: null, alphaRefInvalid: true, reason: null,
+    alphaRef: null, alphaRefReason: "invalid-alpha-ref", reason: null,
   });
   assert.deepEqual(resolvePipelineUpdateChannel({
     projectConfig: { status: "ready", updateChannel: "alpha" },
     alphaRefConfig: { status: "ready", alphaRef: "feat/sprint-alfred", source: "project-config", reason: null },
   }), {
     status: "ready", channel: "alpha", source: "project-config", topology: null,
-    alphaRef: "feat/sprint-alfred", alphaRefInvalid: false, reason: null,
+    alphaRef: "feat/sprint-alfred", alphaRefReason: null, reason: null,
   });
   assert.deepEqual(resolvePipelineUpdateChannel({
     projectConfig: { status: "ready", updateChannel: "alpha" },
     alphaRefConfig: { status: "absent", alphaRef: null, source: null, reason: null },
   }).alphaRef, null);
+});
+
+test("resolvePipelineUpdateChannel survives all three distinct alphaRefConfig reasons (finding: the resolver must not collapse them)", () => {
+  assert.equal(resolvePipelineUpdateChannel({
+    projectConfig: { status: "ready", updateChannel: "alpha" },
+    alphaRefConfig: { status: "unknown", alphaRef: null, source: "project-config", reason: "channel-unavailable" },
+  }).alphaRefReason, "channel-unavailable");
+  assert.equal(resolvePipelineUpdateChannel({
+    projectConfig: { status: "ready", updateChannel: "alpha" },
+    alphaRefConfig: { status: "unknown", alphaRef: null, source: "project-config", reason: "malformed-configuration" },
+  }).alphaRefReason, "malformed-configuration");
+  assert.equal(resolvePipelineUpdateChannel({
+    projectConfig: { status: "ready", updateChannel: "alpha" },
+    alphaRefConfig: { status: "unknown", alphaRef: null, source: "project-config", reason: "invalid-alpha-ref" },
+  }).alphaRefReason, "invalid-alpha-ref");
 });
 
 test("CLI admits no configured-channel, ref, URL, or remote bypass", () => {
