@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "7b725cdfc7fa7682c408e3c38b11ab5ba52e901e89fc36f5be12070ee4a1ad04"
+    "transitionHead": "7e5ed0ea7a0767217c462f2d30628eb7ad03d497204269dbf2120774310f78f6"
   },
   "counts": {
-    "open": 88,
+    "open": 84,
     "in_progress": 0,
-    "closed": 476,
+    "closed": 482,
     "rejected": 3,
     "deferred": 11
   },
@@ -865,12 +865,16 @@
     },
     {
       "id": "pipeline.backlog-strip-for-dispatch-drops-every-section-after-triage",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-25",
       "source": "Confirmed twice in one session, 2026-08-25: AGY-KICKOFFPOQ-1's own completion report (Deviations #1) and directly reproduced by the Elephant while preparing this item's own follow-up dispatch",
-      "deferred": true
+      "deferred": true,
+      "closedAt": "2026-09-01",
+      "closureRepository": "self",
+      "closureCommit": "6da6d03a551b3ed649dcff098858e32ea9d3cbc3",
+      "closureEvidence": "plugins/pipeline-core/lib/backlog-dispatch-reference.test.mjs"
     },
     {
       "id": "pipeline.bare-branch-name-in-git-push-fails-approval-with-a-misleading-code",
@@ -1585,12 +1589,16 @@
     },
     {
       "id": "pipeline.critic-and-verify-cadence-may-be-too-fine-grained",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-24",
       "source": "PO observation during the sprint-agy-runner D-fix wave, 2026-08-24 (\"seltener Critics und Verifys fahren und diese eher nur an große Sammelblöcke setzen ... dadurch dauern selbst kleine Fixes und kleine Erweiterungen immer viele Stunden\")",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-09-01",
+      "closureRepository": "self",
+      "closureCommit": "9adf2592881666949a779caa9ed53a817c0c0207",
+      "closureEvidence": "docs/operating-model.md"
     },
     {
       "id": "pipeline.critic-context-isolation",
@@ -2177,12 +2185,16 @@
     },
     {
       "id": "pipeline.expires-at-rejects-a-non-round-trip-timestamp-and-the-doc-says-otherwise",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-27",
       "source": "Handover-rotation extraction pass over Phoenix checkpoint 69, 2026-08-27; the defect itself was hit live during a push ceremony on 2026-08-19",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-09-01",
+      "closureRepository": "self",
+      "closureCommit": "67c160c47c3bfe418eeba57da6b1caabde1486c9",
+      "closureEvidence": "plugins/pipeline-core/scripts/po-human-approval.test.mjs"
     },
     {
       "id": "pipeline.explicit-final-acceptance-gate",
@@ -2426,12 +2438,16 @@
     },
     {
       "id": "pipeline.gitleaks-content-fingerprint-breaks-on-any-line-insertion-above-it",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-27",
       "source": "Hit twice in one session during the Phoenix merge, 2026-08-27",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-09-01",
+      "closureRepository": "self",
+      "closureCommit": "bd089964c8a5789860984ab75d93f3bcd17152ae",
+      "closureEvidence": "plugins/pipeline-core/scripts/security-adapters/gitleaks.test.mjs"
     },
     {
       "id": "pipeline.gitleaks-false-positive-in-guard-maintenance-window-attribution-key-generation-tag",
@@ -4136,13 +4152,17 @@
     },
     {
       "id": "pipeline.observerunner-has-no-test-coverage",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-30",
       "source": "Critic review, backlog/items/2026-08-30-codex-worker-supervisor-hardcodes-a-sandbox-mode-that-blocks-git-spawn.md, Finding 2",
       "deferred": false,
-      "tracking": "Nova B -- Critic finding (minor), NVA-CF-SANDBOXQUICKFIX delta review, not blocking"
+      "tracking": "Nova B -- Critic finding (minor), NVA-CF-SANDBOXQUICKFIX delta review, not blocking",
+      "closedAt": "2026-09-01",
+      "closureRepository": "self",
+      "closureCommit": "d8465468761105fe3a789a0ab89e409b26360a02",
+      "closureEvidence": "plugins/pipeline-core/lib/local-worker-supervisor.test.mjs"
     },
     {
       "id": "pipeline.onboarding-asks-published-in-one-window-only",
@@ -5397,6 +5417,16 @@
       "closureRepository": "self",
       "closureCommit": "7ceb8781a187310727c29b15a512bbce7e48a267",
       "closureEvidence": "backlog/evidence/2026-08-10-apply-patch-invariant-closure.md"
+    },
+    {
+      "id": "pipeline.read-containment-removed-with-no-recorded-decision",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-01",
+      "source": "Surfaced by check-backlog-done-predicate.mjs as a REGRESSION finding on 2026-09-01, then traced to commit c8c7f449 and confirmed empirically in the same session.",
+      "deferred": false,
+      "tracking": "Nova B — the project-root containment check on read-only shell commands was added on 2026-08-29 to close a hole and removed wholesale on 2026-08-30. The removal is deliberate and undocumented outside its own commit message, and it silently invalidates a closed item's recorded remedy."
     },
     {
       "id": "pipeline.read-scope-guard-admits-single-command-but-blocks-the-piped-form",
@@ -6701,12 +6731,16 @@
     },
     {
       "id": "pipeline.twin-manifest-files-can-drift-without-detection",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-28",
       "source": "Claude/Windows greenfield run, 2026-08-28, sections 7 and 11 of its own analysis (docs/pipeline-haertungstest-und-analyse.md).",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-09-01",
+      "closureRepository": "self",
+      "closureCommit": "131a990193853f425b11381c7f0c44d3ef6d77fe",
+      "closureEvidence": "plugins/pipeline-core/lib/project-authority.test.mjs"
     },
     {
       "id": "pipeline.two-guard-hook-test-files-unregistered-in-verify",
@@ -7053,6 +7087,16 @@
       "closureRepository": "self",
       "closureCommit": "e61b05924c38b246abee65ef2cb4d91dcee11c77",
       "closureEvidence": "backlog/items/2026-08-19-verify-registration-check-fixtures-lack-real-git-topology.md"
+    },
+    {
+      "id": "pipeline.verify-runtime-concentrated-in-ten-suites",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-01",
+      "source": "Full verify at commit 0f0ed3f7 on 2026-09-01, exit 0, all 505 steps green and every one of them fresh (reused: 0). Per-suite wall clock from the run's own pipeline.verify-progress.v1 stream; total wall clock computed from its first startedAt to its last completedAt.",
+      "deferred": false,
+      "tracking": "Nova B — the parallelized verify has regressed from 419s to 571s in one week, and the single suite named as its next lever grew 35% in the same period. Also supplies the all-fresh full-run artifact two older items were blocked on."
     },
     {
       "id": "pipeline.verify-suite-reads-real-machine-state",
