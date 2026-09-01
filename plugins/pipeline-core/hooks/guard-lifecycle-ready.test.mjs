@@ -7514,3 +7514,549 @@ test("NVA-B-TRIMKEY AC-4: a subagent's own first denial of a class renders full 
     rmSync(dirname(dirname(subagentTranscriptPath)), { recursive: true, force: true });
   }
 });
+
+// =========================================================================================
+// NVA-B-REBWIRE-1 — the rebase authority, wired into the guards
+//
+// backlog: 2026-09-01-an-authorized-rebase-demands-a-fresh-po-signature-after-every-conflict.md
+//
+// WHY THESE CASES BUILD A REAL REPOSITORY
+//   `lib/rebase-authority.test.mjs` drives the resolver through injected dependencies only,
+//   and says so in its own header: it proves the resolver's logic and refusals, but it does
+//   NOT prove that real `.git/rebase-merge` filenames match the ones its fake serves. Every
+//   case below runs against a genuine `git rebase` stopped on a genuine conflict, in a
+//   throwaway repository under `scratch/`, driving the actual hook entry points —
+//   `evaluateLifecycleReadyGuard()` in-process for the Bash lane, and `guard-devplan.mjs`
+//   spawned over stdin for the Edit/Write lane, which is that hook's only real entry point.
+//
+//   Both lanes are exercised from this one file because the fixture builder can live in
+//   exactly one tracked place: `scratch/` is git-ignored here, so a shared helper module
+//   under it would be missing for every other checkout.
+//
+// EVERY POSITIVE CARRIES A CONTROL IN ITS OWN FIXTURE
+//   A positive that passes because the gate never fired proves nothing, so each admission
+//   below is asserted next to a refusal in the SAME repository: the working tree of the
+//   partially replayed rebase genuinely carries `planApproved: false`, which is the live
+//   incident's state, so the dev-plan gate really is armed while these commands are admitted.
+// =========================================================================================
+
+import {
+  approveSubmittedPlan,
+  derivePlanLifecycle as rbDerivePlanLifecycle,
+  enterPlanImplementation,
+  sha256CanonicalJson,
+  submitPlan,
+} from "../lib/plan-spec-state-v2.mjs";
+import { LEGACY_STATE } from "../lib/project-authority.mjs";
+import { REBASE_AUTHORITY_SURFACE_SCHEMA } from "../lib/guard-devplan-policy.mjs";
+
+const REBWIRE_DEVPLAN_GUARD = fileURLToPath(new URL("./guard-devplan.mjs", import.meta.url));
+const REBWIRE_REPO_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
+const REBWIRE_SHAPE_CODE = "GUARD-REBASE-AUTHORITY-SHAPE";
+const REBWIRE_RETRY_SCHEMA = "pipeline.guard-retry-actions.v1";
+const REBWIRE_PLAN_PATH = "specs/feature/prd.md";
+const REBWIRE_SPEC_PATH = "specs/feature/spec.md";
+const REBWIRE_PLAN_BYTES = "# approved plan, as it stands at the original tip\n";
+const REBWIRE_SPEC_BYTES = "# approved spec, as it stands at the original tip\n";
+const REBWIRE_CONFLICT_PATH = "src/conflicted.mjs";
+const REBWIRE_UNTOUCHED_PATH = "src/untouched.mjs";
+const REBWIRE_MANIFEST = "schema: pipeline.manifest.v0\ngates:\n  dev-plan:\n    mode: blocking\n    type: human\n";
+const REBWIRE_READY_RECEIPT = Object.freeze({
+  intent: "session",
+  schema: "pipeline.project-onboarding-ready-gate.v1",
+  status: "ready",
+});
+const REBWIRE_FIXTURES = [];
+
+function rbSha256(value) {
+  return createHash("sha256").update(Buffer.from(value, "utf8")).digest("hex");
+}
+
+const REBWIRE_AUTHORITY = {
+  schema: "pipeline.po-gate-authority.v2",
+  humanFacing: "en",
+  sourceSha256: "4".repeat(64),
+  runtimeSha256: "5".repeat(64),
+  receiptSha256: "6".repeat(64),
+  repositoryFingerprint: "7".repeat(64),
+  planPath: REBWIRE_PLAN_PATH,
+  planSha256: rbSha256(REBWIRE_PLAN_BYTES),
+  specPath: REBWIRE_SPEC_PATH,
+  specSha256: rbSha256(REBWIRE_SPEC_BYTES),
+};
+
+function rbContinuity() {
+  return {
+    schema: "pipeline.continuity.v0",
+    featureId: "rebwire-feature",
+    revision: 0,
+    runtime: { humanFacingLanguage: "en", activeDuty: "Coordinator", sessionCleanup: null },
+    authority: {
+      prd: { path: REBWIRE_PLAN_PATH, sha256: "8".repeat(64) },
+      spec: { path: REBWIRE_SPEC_PATH, sha256: "9".repeat(64) },
+      result: null,
+    },
+    queueHead: {
+      packageId: "rebwire",
+      actionId: "review-active-feature",
+      nextAction: "review",
+      productRetryCount: 0,
+      environmentRerouteCount: 0,
+      dispatch: null,
+    },
+    blocker: null,
+    acknowledgedFinal: null,
+    resume: { mode: "immediate", sourceRevision: 0, reasonCode: "active-turn" },
+    recovery: null,
+    decisionTxn: null,
+    closeTransition: null,
+    capacity: { concurrencyLimit: 4, reservedCriticSlots: 1, reservedRecoverySlots: 1, fallbackPolicy: "defer" },
+  };
+}
+
+/** The draft state a partially replayed working tree shows — the live incident's condition. */
+function rbDraftState() {
+  return {
+    schema: "pipeline.state.v0",
+    activeFeature: { id: "rebwire-feature", planPath: REBWIRE_PLAN_PATH, phase: "design" },
+    planApproved: false,
+    continuity: rbContinuity(),
+  };
+}
+
+/** The validly approved, in-implementation state that must live at `orig-head`. */
+function rbImplementingState() {
+  const initial = rbDraftState();
+  const submitted = submitPlan({
+    state: initial,
+    expectedStateSha256: sha256CanonicalJson(initial),
+    poGateAuthority: REBWIRE_AUTHORITY,
+    profile: "epic",
+    profileSha256: "3".repeat(64),
+    by: "Coordinator",
+    at: "2026-09-01T20:00:00.000Z",
+  });
+  assert.equal(submitted.ok, true, JSON.stringify(submitted));
+  const approved = approveSubmittedPlan({
+    state: submitted.state,
+    expectedStateSha256: sha256CanonicalJson(submitted.state),
+    expectedSubmissionSha256: rbDerivePlanLifecycle(submitted.state).submissionSha256,
+    poGateAuthority: REBWIRE_AUTHORITY,
+    profileSha256: "3".repeat(64),
+    by: "PO",
+    at: "2026-09-01T20:05:00.000Z",
+  });
+  assert.equal(approved.ok, true, JSON.stringify(approved));
+  const implementing = enterPlanImplementation({
+    state: approved.state,
+    expectedStateSha256: sha256CanonicalJson(approved.state),
+    at: "2026-09-01T20:30:00.000Z",
+  });
+  assert.equal(implementing.ok, true, JSON.stringify(implementing));
+  return implementing.state;
+}
+
+function rbScratchBase() {
+  const candidate = join(REBWIRE_REPO_ROOT, "scratch");
+  try {
+    mkdirSync(candidate, { recursive: true });
+    return realpathSync(candidate);
+  } catch {
+    return realpathSync(tmpdir());
+  }
+}
+
+/**
+ * A throwaway repository standing in a genuine, conflicted `git rebase`.
+ *
+ * History, deliberately shaped so exactly ONE path conflicts:
+ *   A (main)     everything, including the pipeline State
+ *   B (feature)  changes only the conflicting file           <- becomes `orig-head`
+ *   C (main)     changes the same file, and (approved variant) rewrites the State to draft
+ * Rebasing B onto C stops on the single conflict, with a working tree whose State says
+ * `planApproved: false` while `orig-head` says the feature is approved and implementing.
+ *
+ * @param {{approvedAtOrigHead?: boolean}} options `false` builds negative case 7's repository:
+ *   the true starting point itself is not validly approved.
+ */
+function rbFixture({ approvedAtOrigHead = true } = {}) {
+  const dir = mkdtempSync(join(rbScratchBase(), "rebwire-"));
+  REBWIRE_FIXTURES.push(dir);
+  const run = (...args) => {
+    const result = spawnSync("git", args, { cwd: dir, encoding: "utf8" });
+    assert.equal(result.status, 0, `git ${args.join(" ")} failed: ${result.stderr}`);
+    return result.stdout;
+  };
+  const put = (relative, contents) => {
+    mkdirSync(dirname(join(dir, relative)), { recursive: true });
+    writeFileSync(join(dir, relative), contents);
+  };
+
+  run("init");
+  run("config", "user.name", "Rebase Fixture");
+  run("config", "user.email", "rebase-fixture@example.invalid");
+  run("config", "commit.gpgsign", "false");
+  run("checkout", "-b", "main");
+
+  put(".claude/pipeline.yaml", REBWIRE_MANIFEST);
+  put(REBWIRE_PLAN_PATH, REBWIRE_PLAN_BYTES);
+  put(REBWIRE_SPEC_PATH, REBWIRE_SPEC_BYTES);
+  put(REBWIRE_CONFLICT_PATH, "export const value = \"base\";\n");
+  put(REBWIRE_UNTOUCHED_PATH, "export const untouched = true;\n");
+  put(LEGACY_STATE, JSON.stringify(approvedAtOrigHead ? rbImplementingState() : rbDraftState()));
+  run("add", "-A");
+  run("commit", "-m", "base");
+
+  run("checkout", "-b", "feat/rebwire");
+  put(REBWIRE_CONFLICT_PATH, "export const value = \"feature\";\n");
+  run("commit", "-a", "-m", "feature change");
+
+  run("checkout", "main");
+  put(REBWIRE_CONFLICT_PATH, "export const value = \"upstream\";\n");
+  // The approved variant additionally moves the WORKING-TREE State back to draft, which is
+  // exactly what a partial replay shows and what made the live gate refuse every step.
+  if (approvedAtOrigHead) put(LEGACY_STATE, JSON.stringify(rbDraftState()));
+  run("commit", "-a", "-m", "upstream change");
+
+  run("checkout", "feat/rebwire");
+  const rebase = spawnSync("git", ["-c", "core.editor=true", "rebase", "main"], { cwd: dir, encoding: "utf8" });
+  assert.notEqual(rebase.status, 0, "the fixture rebase was expected to stop on a conflict");
+  assert.ok(
+    existsSync(join(dir, ".git", "rebase-merge")),
+    `this git built no .git/rebase-merge state (backend: ${existsSync(join(dir, ".git", "rebase-apply")) ? "rebase-apply" : "unknown"}); `
+      + "the resolver supports only the merge backend, so these cases cannot run here",
+  );
+  // The working tree really does look like a draft while the rebase is standing.
+  assert.equal(JSON.parse(readFileSync(join(dir, LEGACY_STATE), "utf8")).planApproved, false);
+  return dir;
+}
+
+function rbDeps(dir) {
+  return { projectDir: dir, runner: "claude", requireProjectOnboardingReadyFn: () => REBWIRE_READY_RECEIPT };
+}
+
+/** The Bash lane, through the guard's real evaluation entry point. */
+function rbBash(dir, command) {
+  return evaluateLifecycleReadyGuard({ tool_name: "Bash", tool_input: { command } }, rbDeps(dir));
+}
+
+/** The Edit/Write lane, through `guard-devplan.mjs`'s real stdin entry point. */
+function rbDevplan(dir, toolName, filePath) {
+  const result = spawnSync(process.execPath, [REBWIRE_DEVPLAN_GUARD], {
+    input: JSON.stringify({ tool_name: toolName, tool_input: { file_path: filePath, old_string: "a", new_string: "b" } }),
+    encoding: "utf8",
+    env: { ...process.env, CLAUDE_PROJECT_DIR: dir },
+  });
+  return { exitCode: result.status, stderr: result.stderr ?? "" };
+}
+
+function rbJsonLines(stderr, schema) {
+  const found = [];
+  for (const line of String(stderr).split("\n")) {
+    let value;
+    try { value = JSON.parse(line); } catch { continue; }
+    if (value !== null && typeof value === "object" && value.schema === schema) found.push(value);
+  }
+  return found;
+}
+
+function rbSurface(stderr) {
+  return rbJsonLines(stderr, REBASE_AUTHORITY_SURFACE_SCHEMA)[0] ?? null;
+}
+
+function rbRetryActions(stderr) {
+  return rbJsonLines(stderr, REBWIRE_RETRY_SCHEMA).flatMap((envelope) => envelope.retryActions ?? []);
+}
+
+test("rebwire fixture: a real conflicted rebase, and the guard reads its real .git/rebase-merge", () => {
+  const dir = rbFixture();
+  // Filenames the resolver depends on, observed on a repository this git actually built.
+  for (const name of ["head-name", "orig-head", "onto", "git-rebase-todo"]) {
+    assert.ok(existsSync(join(dir, ".git", "rebase-merge", name)), name);
+  }
+  const denial = rbDevplan(dir, "Edit", REBWIRE_UNTOUCHED_PATH);
+  assert.equal(denial.exitCode, 2);
+  const surface = rbSurface(denial.stderr);
+  assert.ok(surface !== null, denial.stderr);
+  const observed = spawnSync("git", ["diff", "--name-only", "--diff-filter=U"], { cwd: dir, encoding: "utf8" });
+  assert.equal(observed.status, 0);
+  assert.deepEqual(
+    surface.conflictPaths,
+    observed.stdout.split("\n").map((line) => line.trim()).filter(Boolean).sort(),
+  );
+  assert.deepEqual(surface.conflictPaths, [REBWIRE_CONFLICT_PATH]);
+  assert.equal(surface.headName, "refs/heads/feat/rebwire");
+  assert.match(surface.origHead, /^[0-9a-f]{40}$/u);
+  assert.equal(surface.origHead, readFileSync(join(dir, ".git", "rebase-merge", "orig-head"), "utf8").trim());
+  // No absolute machine path may reach a denial text.
+  assert.equal(denial.stderr.includes(dir), false, "the denial leaked the repository's absolute path");
+});
+
+test("rebwire positive-1: the exact continuations are admitted mid-rebase, with the gate armed", () => {
+  const dir = rbFixture();
+  for (const command of ["git -c core.editor=true rebase --continue", "git rebase --continue"]) {
+    const result = rbBash(dir, command);
+    assert.equal(result.exitCode, 0, `${command}: ${result.stderr}`);
+  }
+  // The control, in the same repository: the dev-plan gate genuinely refuses here.
+  assert.equal(rbBash(dir, `git checkout --ours -- ${REBWIRE_UNTOUCHED_PATH}`).exitCode, 2);
+  assert.equal(rbDevplan(dir, "Edit", REBWIRE_UNTOUCHED_PATH).exitCode, 2);
+});
+
+test("rebwire positive-2: an Edit/Write resolving a conflicted path is admitted, relative and absolute", () => {
+  const dir = rbFixture();
+  for (const [tool, path] of [
+    ["Edit", REBWIRE_CONFLICT_PATH],
+    ["Write", join(dir, "src", "conflicted.mjs")],
+    ["Edit", `./${REBWIRE_CONFLICT_PATH}`],
+  ]) {
+    const result = rbDevplan(dir, tool, path);
+    assert.equal(result.exitCode, 0, `${tool} ${path}: ${result.stderr}`);
+    assert.match(result.stderr, /\[rebase-authority\] dev-plan gate suspended for this write/u);
+  }
+  // Control, same repository, both path forms: an untouched implementation file stays refused.
+  assert.equal(rbDevplan(dir, "Edit", REBWIRE_UNTOUCHED_PATH).exitCode, 2);
+  assert.equal(rbDevplan(dir, "Write", join(dir, "src", "untouched.mjs")).exitCode, 2);
+});
+
+test("rebwire positive-3: git checkout --ours on a real conflict path is admitted, relative and absolute", () => {
+  const dir = rbFixture();
+  for (const path of [REBWIRE_CONFLICT_PATH, join(dir, "src", "conflicted.mjs")]) {
+    const result = rbBash(dir, `git checkout --ours -- ${path}`);
+    assert.equal(result.exitCode, 0, `${path}: ${result.stderr}`);
+    assert.match(result.stderr, /\[rebase-authority\] dev-plan gate suspended for this command/u);
+    // The Requirement 3 misclassification is gone: no operand is reported as a file.
+    assert.equal(result.stderr.includes("core.editor=true"), false);
+  }
+  assert.equal(rbBash(dir, `git checkout --theirs -- ${REBWIRE_CONFLICT_PATH}`).exitCode, 0);
+  assert.equal(rbBash(dir, `git checkout --ours -- ${REBWIRE_UNTOUCHED_PATH}`).exitCode, 2);
+});
+
+test("rebwire positive-4: git rebase --show-current-patch is admitted during an active rebase", () => {
+  const dir = rbFixture();
+  assert.equal(rbBash(dir, "git rebase --show-current-patch").exitCode, 0);
+  // And it is one of the read-only diagnostics a mid-rebase denial actually hands back.
+  const actions = rbRetryActions(rbDevplan(dir, "Edit", REBWIRE_UNTOUCHED_PATH).stderr);
+  assert.ok(
+    actions.some((action) => action.executable === "git" && action.argv.join(" ") === "rebase --show-current-patch"),
+    JSON.stringify(actions),
+  );
+});
+
+test("rebwire positive-5: git rebase --abort keeps its own recovery lane, independent of this authority", () => {
+  for (const approvedAtOrigHead of [true, false]) {
+    const dir = rbFixture({ approvedAtOrigHead });
+    for (const command of ["git rebase --abort", `git -C ${dir} rebase --abort`]) {
+      assert.equal(rbBash(dir, command).exitCode, 0, `${command} (approved=${approvedAtOrigHead})`);
+    }
+  }
+});
+
+test("rebwire negative-1: a file outside the conflict set stays blocked while a rebase is active", () => {
+  const dir = rbFixture();
+  const denial = rbDevplan(dir, "Edit", REBWIRE_UNTOUCHED_PATH);
+  assert.equal(denial.exitCode, 2);
+  assert.match(denial.stderr, /BLOCKED \(guard-devplan/u);
+  const surface = rbSurface(denial.stderr);
+  assert.deepEqual(surface.conflictPaths, [REBWIRE_CONFLICT_PATH]);
+  assert.equal(surface.conflictPaths.includes(REBWIRE_UNTOUCHED_PATH), false);
+  // ...and the same file under a nested, never-conflicted directory is refused too.
+  assert.equal(rbDevplan(dir, "Write", "src/nested/other.mjs").exitCode, 2);
+});
+
+test("rebwire negative-2 / negative-3: --edit-todo, --exec and --skip are refused under active authority", () => {
+  const dir = rbFixture();
+  for (const command of [
+    "git rebase --edit-todo",
+    "git rebase --exec 'touch marker'",
+    "git rebase --exec=./run.sh",
+    "git rebase --skip",
+    "git rebase --continue --autostash",
+  ]) {
+    const result = rbBash(dir, command);
+    assert.equal(result.exitCode, 2, `${command} was not refused`);
+    // Refused by a TYPED code, never by silence, and never by an admission this authority
+    // granted. `git rebase --exec '<shell payload>'` is refused one lane earlier than the
+    // others: `extractShellWriteTargets()` classifies the payload as opaque interpreter code,
+    // so the stricter GUARD-DEVPLAN-SHELL lane speaks first. Asserting the disjunction here
+    // rather than pinning one code keeps this case about the property Requirement 4 states —
+    // the shape is refused — instead of about which sibling gate happened to reach it first.
+    assert.ok(
+      result.stderr.includes(REBWIRE_SHAPE_CODE) || result.stderr.includes(DEVPLAN_SHELL_DENIAL_CODE),
+      `${command}: ${result.stderr}`,
+    );
+    assert.equal(result.stderr.includes("[rebase-authority] dev-plan gate suspended"), false, command);
+    // Requirement 5 again: even this refusal names the way on.
+    assert.ok(rbRetryActions(result.stderr).length > 0, command);
+    assert.ok(result.stderr.includes(rbSurface(result.stderr).nextCommand), command);
+  }
+  // The two shapes that reach this dispatch's own refusal are pinned to its typed code, so a
+  // later change that silently routes them elsewhere is visible rather than absorbed.
+  for (const command of ["git rebase --edit-todo", "git rebase --skip"]) {
+    assert.ok(rbBash(dir, command).stderr.includes(REBWIRE_SHAPE_CODE), command);
+  }
+});
+
+test("rebwire negative-4: only -c core.editor=true is admitted, never an arbitrary -c", () => {
+  const dir = rbFixture();
+  for (const command of [
+    "git -c core.hooksPath=none rebase --continue",
+    "git -ccore.editor=true rebase --continue",
+    "git -c core.editor=true -c core.hooksPath=none rebase --continue",
+    "git -c core.editor=true rebase --show-current-patch",
+  ]) {
+    const result = rbBash(dir, command);
+    assert.equal(result.exitCode, 2, `${command} was not refused`);
+    assert.ok(result.stderr.includes(REBWIRE_SHAPE_CODE), `${command}: ${result.stderr}`);
+  }
+  assert.equal(rbBash(dir, "git -c core.editor=true rebase --continue").exitCode, 0);
+});
+
+test("rebwire negative-5: no push authority is granted, implied or represented anywhere", () => {
+  const dir = rbFixture();
+  const denial = rbBash(dir, `git checkout --ours -- ${REBWIRE_UNTOUCHED_PATH}`);
+  assert.equal(denial.exitCode, 2);
+  const surface = rbSurface(denial.stderr);
+  assert.equal(surface.pushAuthority, false);
+  assert.equal(surface.remoteAuthority, false);
+  assert.equal(surface.sessionWide, false);
+  assert.match(denial.stderr, /grants no push and no force-push/u);
+  for (const advertised of [...surface.permittedContinuations, ...surface.resolutionShapes, surface.nextCommand]) {
+    assert.equal(/(?:^|\s)push(?:\s|$)/u.test(advertised), false, advertised);
+  }
+  for (const action of rbRetryActions(denial.stderr)) {
+    assert.equal(action.argv.includes("push"), false, action.argv.join(" "));
+    assert.equal(action.mutation, false);
+  }
+  // A push command receives no admission from this authority — it never lifts anything for it.
+  for (const command of ["git push origin HEAD", "git push --force origin main", "git push --force-with-lease"]) {
+    assert.equal(rbBash(dir, command).stderr.includes("[rebase-authority] dev-plan gate suspended"), false, command);
+  }
+});
+
+test("rebwire negative-6: a conflict command whose pathspec lies outside the surface is refused", () => {
+  const dir = rbFixture();
+  for (const command of [
+    `git checkout --ours -- ${REBWIRE_UNTOUCHED_PATH}`,
+    `git checkout --ours -- ${REBWIRE_CONFLICT_PATH} ${REBWIRE_UNTOUCHED_PATH}`,
+    `git restore --ours -- ${REBWIRE_UNTOUCHED_PATH}`,
+    `git checkout --ours ${REBWIRE_CONFLICT_PATH}`,
+  ]) {
+    const result = rbBash(dir, command);
+    assert.equal(result.exitCode, 2, `${command} was not refused`);
+    assert.equal(result.stderr.includes("[rebase-authority] dev-plan gate suspended"), false, command);
+  }
+});
+
+test("rebwire negative-7: a rebase whose orig-head is not validly approved gets no authority at all", () => {
+  const dir = rbFixture({ approvedAtOrigHead: false });
+  const write = rbDevplan(dir, "Edit", REBWIRE_CONFLICT_PATH);
+  assert.equal(write.exitCode, 2);
+  assert.equal(rbSurface(write.stderr), null, write.stderr);
+  assert.equal(write.stderr.includes("[rebase-authority]"), false, write.stderr);
+
+  const command = rbBash(dir, `git checkout --ours -- ${REBWIRE_CONFLICT_PATH}`);
+  assert.equal(command.exitCode, 2);
+  assert.equal(command.stderr.includes("[rebase-authority]"), false, command.stderr);
+
+  // The Requirement 4 shape refusals are scoped to a resolved authority: with none, this
+  // guard's behaviour is exactly what it was before the wiring existed.
+  assert.equal(rbBash(dir, "git rebase --edit-todo").stderr.includes(REBWIRE_SHAPE_CODE), false);
+});
+
+test("rebwire req5-1: a mid-rebase denial carries a non-empty read-only envelope naming the surface", () => {
+  const dir = rbFixture();
+  for (const denial of [
+    rbBash(dir, `git checkout --ours -- ${REBWIRE_UNTOUCHED_PATH}`),
+    rbDevplan(dir, "Edit", REBWIRE_UNTOUCHED_PATH),
+    rbBash(dir, "git rebase --edit-todo"),
+  ]) {
+    assert.equal(denial.exitCode, 2);
+    const actions = rbRetryActions(denial.stderr);
+    assert.ok(actions.length > 0, "an empty retryActions array during an active rebase is itself a defect");
+    for (const action of actions) {
+      assert.equal(action.mutation, false, action.argv.join(" "));
+      assert.equal(action.requiresConfirmation, false, action.argv.join(" "));
+      assert.equal(action.argv.includes("--continue"), false, action.argv.join(" "));
+    }
+    // The surface, and the exact continuation stated verbatim in the prose.
+    const surface = rbSurface(denial.stderr);
+    assert.deepEqual(surface.conflictPaths, [REBWIRE_CONFLICT_PATH]);
+    assert.ok(denial.stderr.includes(REBWIRE_CONFLICT_PATH));
+    assert.equal(surface.nextCommand, "git -c core.editor=true rebase --continue");
+    assert.ok(denial.stderr.includes(surface.nextCommand), denial.stderr);
+    assert.ok(actions.some((action) => action.argv.includes("--diff-filter=U")));
+  }
+});
+
+test("rebwire req5-2: an uninformed session reaches a finished rebase by following only the denials", () => {
+  const dir = rbFixture();
+  // The session has never heard of this authority: no flag, no environment variable, no prior
+  // call. Its first move is an ordinary implementation edit, and it is refused.
+  const first = rbDevplan(dir, "Edit", REBWIRE_UNTOUCHED_PATH);
+  assert.equal(first.exitCode, 2);
+  const surface = rbSurface(first.stderr);
+  assert.ok(surface !== null, "the refusal named no route at all");
+  const actions = rbRetryActions(first.stderr);
+
+  // 1. Run a diagnostic the refusal itself handed back — through the guard, then for real.
+  const listing = actions.find((action) => action.argv.includes("--diff-filter=U"));
+  assert.ok(listing !== undefined, JSON.stringify(actions));
+  assert.equal(rbBash(dir, [listing.executable, ...listing.argv].join(" ")).exitCode, 0);
+  const observed = spawnSync(listing.executable, listing.argv, { cwd: dir, encoding: "utf8" });
+  assert.equal(observed.status, 0, observed.stderr);
+  const conflicted = observed.stdout.split("\n").map((line) => line.trim()).filter(Boolean);
+  assert.deepEqual(conflicted.sort(), [...surface.conflictPaths].sort());
+
+  // 2. Resolve exactly the paths the refusal named. The guard now admits those writes.
+  for (const path of conflicted) {
+    assert.equal(rbDevplan(dir, "Edit", path).exitCode, 0, path);
+    writeFileSync(join(dir, path), "export const value = \"resolved by the session\";\n");
+  }
+
+  // 3. Stage them through a resolution shape the refusal listed, with the placeholder filled
+  //    from the surface it published.
+  const stageShape = surface.resolutionShapes.find((shape) => shape.startsWith("git add "));
+  assert.ok(stageShape !== undefined, JSON.stringify(surface.resolutionShapes));
+  for (const path of conflicted) {
+    const stage = stageShape.replace(surface.conflictPathPlaceholder, path);
+    assert.equal(rbBash(dir, stage).exitCode, 0, stage);
+    const staged = spawnSync("git", ["add", "--", path], { cwd: dir, encoding: "utf8" });
+    assert.equal(staged.status, 0, staged.stderr);
+  }
+
+  // 4. Run the exact continuation the refusal stated verbatim — admitted, then executed.
+  assert.ok(first.stderr.includes(surface.nextCommand));
+  assert.equal(rbBash(dir, surface.nextCommand).exitCode, 0);
+  const continued = spawnSync("git", ["-c", "core.editor=true", "rebase", "--continue"], { cwd: dir, encoding: "utf8" });
+  assert.equal(continued.status, 0, continued.stderr);
+  // The rebase really finished, and no fresh human signature was involved anywhere above.
+  assert.equal(existsSync(join(dir, ".git", "rebase-merge")), false);
+  assert.equal(
+    spawnSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: dir, encoding: "utf8" }).stdout.trim(),
+    "feat/rebwire",
+  );
+});
+
+test("rebwire regression: with no rebase in progress the guard's output is unchanged", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "gates: {}\n");
+    const denial = evaluateLifecycleReadyGuard(
+      { tool_name: "Bash", tool_input: { command: "echo hi > out.txt" } },
+      { projectDir: path, runner: "claude" },
+    );
+    assert.equal(denial.exitCode, 2);
+    assert.equal(denial.stderr.includes("[rebase-authority]"), false);
+    assert.equal(rbSurface(denial.stderr), null);
+    assert.equal(denial.stderr.includes(REBWIRE_SHAPE_CODE), false);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+  }
+});
+
+process.on("exit", () => {
+  for (const dir of REBWIRE_FIXTURES) {
+    try { rmSync(dir, { recursive: true, force: true }); } catch { /* a throwaway fixture */ }
+  }
+});
