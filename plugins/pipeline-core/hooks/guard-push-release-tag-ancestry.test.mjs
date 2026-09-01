@@ -80,7 +80,7 @@ function check(id, command, dir, expectExit, { stderrIncludes, stderrNotIncludes
     console.log(`FAIL  ${id} -- ${problems.join("; ")}`);
   }
 }
-const BLOCK = 2, ALLOW = 0;
+const BLOCK = 2, ALLOW = 0, WARN = 1; // WARN = hooks.json's own "1 = allow + warn" contract (guard-push.mjs).
 
 // ---- AC-1/AC-5 -- a release tag AT the same commit as origin/main is reachable (trivial
 // ancestor-of-itself case) -- ALLOWED, unchanged behaviour. -------------------------------
@@ -124,16 +124,26 @@ const BLOCK = 2, ALLOW = 0;
 
 // ---- AC-2 (ADR-0078 D5 correction, NVA-B-TAGFIX) -- refs/remotes/origin/main missing ----
 // locally is NOT refused: main is not necessarily the published line in every repository ---
-// this guard ships to, and ADR-0078 D5 only governs a repository where it is. ---------------
+// this guard ships to, and ADR-0078 D5 only governs a repository where it is. AC-1/AC-2 -----
+// (NVA-B-TAGNOTICE, rework of a `major` review finding): the skip is no longer silent -- it -
+// now carries a NOTICE naming what was skipped, why, and the remedy, and the push still -----
+// succeeds (WARN = allow + message, never the BLOCK exit code). ----------------------------
 {
   const { dir, head } = freshRepo("no-origin-main");
   gitAt(dir, "tag", "v1.0.0", head);
   check(
-    "TAGPROV3 allow  refs/remotes/origin/main missing locally is not refused",
+    "TAGPROV3 warn  refs/remotes/origin/main missing locally is not refused, but is no longer silent",
     "git push origin v1.0.0",
     dir,
-    ALLOW,
-    { stderrNotIncludes: ["release-tag ancestry"] },
+    WARN,
+    {
+      stderrIncludes: [
+        "release-tag ancestry check was skipped",
+        "refs/tags/v1.0.0",
+        "refs/remotes/origin/main is not present locally",
+        "git fetch origin main",
+      ],
+    },
   );
 }
 
@@ -163,6 +173,22 @@ const BLOCK = 2, ALLOW = 0;
         "Fix:",
       ],
     },
+  );
+}
+
+// ---- AC-3/AC-5 (NVA-B-TAGNOTICE) -- with refs/remotes/origin/main PRESENT, the skip ------
+// notice never fires: a repository with a normal remote sees no new output at all, whether -
+// the ancestry check itself then passes (reachable, like TAGPROV1) or fails (like TAGPROV3b).
+{
+  const { dir, head } = freshRepo("origin-main-present-notice-absent");
+  gitAt(dir, "update-ref", "refs/remotes/origin/main", head);
+  gitAt(dir, "tag", "v1.0.0", head);
+  check(
+    "TAGPROV3c allow  with origin/main present, the skip notice does not appear",
+    "git push origin v1.0.0",
+    dir,
+    ALLOW,
+    { stderrNotIncludes: ["release-tag ancestry check was skipped", "NOTICE"] },
   );
 }
 
