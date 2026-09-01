@@ -1556,8 +1556,135 @@ function runDeployBranch(release, manifestResult, cmd) {
   return { invalidityNote: null };
 }
 
+// ---- ADR-0078 D5: a release tag must be reachable from origin/main ------------------
+//
+// Deliberately UNCONDITIONAL -- evaluated for every recognized push regardless of
+// manifest/push-gate configuration, exactly like the main-publication-boundary check
+// above, and BEFORE the manifest-absent opt-in exit just below. `stable` (`ruleset-
+// freshness.mjs`) selects the highest final release tag in the whole repository with no
+// ancestry check of its own (that is D5's own reasoning for NOT adding one to the
+// resolver); this is the write-time half that makes that read-time trust legitimate. The
+// objects a release-tag push touches are already local, so this never costs a network
+// round trip.
+//
+// Mirrors ruleset-freshness.mjs's `validTag` grammar exactly (same numeric definition --
+// no leading zeros) so this hook and the channel resolver never drift into two different
+// definitions of "release tag".
+const RELEASE_TAG_NUMERIC = "(?:0|[1-9]\\d*)";
+const RELEASE_TAG_REF = new RegExp(
+  `^refs/tags/v${RELEASE_TAG_NUMERIC}\\.${RELEASE_TAG_NUMERIC}\\.${RELEASE_TAG_NUMERIC}(?:-beta\\.${RELEASE_TAG_NUMERIC})?$`,
+  "u",
+);
+
+/**
+ * `binding` is the module-level `pushBinding` (single, unambiguous remote+refspec).
+ * `releaseSection` is `manifestResult.manifest?.release` (possibly `undefined`/`null` --
+ * manifest absent, or absent/malformed release section; both mean "no adapters declared,
+ * nothing to defer to"). A multi-refspec push, a bulk `--tags` push, and a `--delete`
+ * push are all OUT OF SCOPE here for the same reason: `parsePushBinding` already refuses
+ * to set `binding.ok` for any of them (an option outside its narrow safe-flag allowlist,
+ * or more than one positional), so they fall through unaffected -- AC-4's branch/delete/
+ * non-release-tag "nothing else changes" is therefore automatic rather than something
+ * this function has to special-case.
+ */
+function checkReleaseTagAncestry(binding, releaseSection) {
+  if (!binding.ok) return;
+  const { dst } = parseRefspec(binding.refspec, false);
+  if (!dst) return;
+
+  let tagRef;
+  if (dst.startsWith(TAG_REF_PREFIX)) {
+    tagRef = dst;
+  } else if (dst.startsWith(HEAD_REF_PREFIX)) {
+    return; // explicit branch destination -- never a tag (AC-4).
+  } else {
+    // Bare name: git's own ref DWIM lookup for an unqualified push source checks
+    // refs/tags/<name> BEFORE refs/heads/<name> (resolveImplicitPushDestination's own
+    // docstring above records this precedence) -- mirror it instead of assuming branch.
+    const localTag = spawnSync(
+      "git", ["-C", binding.projectDir, "show-ref", "--verify", "--quiet", `${TAG_REF_PREFIX}${dst}`],
+      { timeout: 5000 },
+    );
+    if (localTag.status !== 0) return; // no local tag by this name -- not a tag push here.
+    tagRef = `${TAG_REF_PREFIX}${dst}`;
+  }
+  if (!RELEASE_TAG_REF.test(tagRef)) return; // AC-4: a non-release tag is unaffected.
+
+  // Defer entirely to the pre-existing deploy-trigger / deployApproval mechanism when
+  // this exact push ALSO matches a declared release adapter's trigger pattern: "who may
+  // push this artifact to which environment" is that mechanism's own, independently
+  // tested question, not this one, and D5 does not reach into it -- it only fills the gap
+  // that mechanism leaves for the plain channel-tag case (no adapter cares about this ref
+  // at all). This repo's own manifest (project/pipeline.yaml) declares no `release`
+  // section, so this carve-out never applies to the actual self-application case D5
+  // exists for; it only ever matters for a project that separately runs both mechanisms
+  // over the same ref name.
+  if (releaseSection) {
+    const { byAdapter } = collectTriggerPatterns(releaseSection);
+    if (matchAdapters([tagRef], byAdapter).length > 0) return;
+  }
+
+  // Peels an annotated tag object down to the commit it targets (AC-4) via the exact same
+  // helper the ordinary source-commit check further below reuses, so there is only ONE
+  // peeling rule in this file rather than two that could drift apart.
+  const tagCommit = resolveSourceCommit(binding);
+  if (!tagCommit) {
+    emit(2, [
+      `BLOCKED (guard-push release-tag ancestry, plugin pipeline-core): release tag '${tagRef}' does not resolve ` +
+        `to a commit locally, so its reachability from refs/remotes/origin/main (ADR-0078 D5) cannot be verified.`,
+      "A release-tag push whose own target cannot be established locally must never be waved through as if it had been checked.",
+      "Fix: confirm the tag/commit exists locally (run `git fetch origin main` first if it was only ever seen on the remote), then retry.",
+    ]);
+  }
+
+  const originMain = spawnSync(
+    "git", ["-C", binding.projectDir, "show-ref", "--verify", "--quiet", "refs/remotes/origin/main"],
+    { timeout: 5000 },
+  );
+  if (originMain.status !== 0) {
+    // AC-3: fail closed rather than silently pass when the comparison target itself is
+    // unavailable -- a release-tag push is rare enough that this one-command remedy is an
+    // acceptable cost, and an unfetched ref must never become an accidental bypass.
+    emit(2, [
+      `BLOCKED (guard-push release-tag ancestry, plugin pipeline-core): refs/remotes/origin/main does not exist ` +
+        `locally, so release tag '${tagRef}' (commit ${tagCommit}) cannot be checked for reachability under ADR-0078 D5.`,
+      "Fix: run `git fetch origin main` and retry.",
+    ]);
+  }
+
+  const ancestry = spawnSync(
+    "git", ["-C", binding.projectDir, "merge-base", "--is-ancestor", tagCommit, "refs/remotes/origin/main"],
+    { timeout: 5000 },
+  );
+  if (ancestry.status === 0) return; // reachable from main -- ALLOWED, unchanged behaviour.
+
+  if (ancestry.status === 1) {
+    emit(2, [
+      `BLOCKED (guard-push release-tag ancestry, plugin pipeline-core): release tag '${tagRef}' targets commit ` +
+        `${tagCommit}, which is not reachable from refs/remotes/origin/main.`,
+      "Under ADR-0078 D5, main is the only published channel and a release tag must sit on it -- otherwise " +
+        "`stable` would select a commit that was never actually released.",
+      "Fix: cut the tag from a commit that is already on main (land/merge it there first), then retag.",
+    ]);
+  }
+
+  // Any other exit status -- the ancestry command itself failed to run cleanly (e.g. a
+  // corrupted object). AC-3: the same fail-closed treatment as a missing origin/main,
+  // never a silent pass.
+  emit(2, [
+    `BLOCKED (guard-push release-tag ancestry, plugin pipeline-core): the reachability check for release tag ` +
+      `'${tagRef}' (commit ${tagCommit}) against refs/remotes/origin/main failed to run (ADR-0078 D5).`,
+    "Fix: run `git fetch origin main` and retry.",
+  ]);
+}
+
 // ---- manifest: gate config (fail-open on absent, WARN on genuinely unreadable) -----
 const manifestResult = loadManifest(projectDir);
+// Evaluated BEFORE the manifest-absent opt-in exit just below (unconditional, matching
+// the main-publication-boundary check) -- `manifestResult.manifest?.release` is `undefined`
+// when the manifest is absent or carries no release section, which the function above
+// already treats as "no adapters declared, nothing to defer to".
+checkReleaseTagAncestry(pushBinding, manifestResult.manifest?.release);
 if (manifestResult.status === "absent") process.exit(0); // opt-in feature, nothing configured
 
 const releaseSection = manifestResult.manifest?.release;
