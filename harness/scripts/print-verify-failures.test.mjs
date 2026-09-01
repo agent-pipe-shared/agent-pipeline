@@ -4,6 +4,78 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+// Round-L finding F7. Imported under their own names so these three tests bind to the module's
+// exported surface without depending on which identifiers the rest of this file already holds.
+import { test as roundLTest } from "node:test";
+import * as printVerifyFailures from "./print-verify-failures.mjs";
+
+/**
+ * F7a. The byte bound ran BEFORE failure-line recovery, and recovery then prepended a header
+ * plus up to 20 recovered lines and merely RECOMPUTED `keptBytes` instead of re-enforcing the
+ * cap. `keptBytes` is what the global gate consumes, so one suite whose omitted head carries
+ * many long failure-marker lines could exhaust MAX_TOTAL_BYTES on its own and silently omit
+ * every later failing suite's tail -- the exact outcome this reporter exists to prevent.
+ */
+roundLTest("NVA-B-ROUNDL F7: the per-suite byte bound is enforced AFTER failure-line recovery, not recomputed", () => {
+  const head = Array.from(
+    { length: 60 },
+    (_, index) => `not ok ${index} - a long failing test name ${"x".repeat(900)}`,
+  );
+  const tail = Array.from({ length: 300 }, (_, index) => `ok ${index} - passing ${"y".repeat(200)}`);
+  const bounded = printVerifyFailures.boundSuiteTail([...head, ...tail].join("\n"));
+  assert.ok(
+    bounded.keptBytes <= printVerifyFailures.MAX_BYTES_PER_SUITE,
+    `kept ${bounded.keptBytes} bytes, cap is ${printVerifyFailures.MAX_BYTES_PER_SUITE}`,
+  );
+  // The reported figure must be the real one: the global gate spends this number.
+  assert.equal(Buffer.byteLength(bounded.text, "utf8"), bounded.keptBytes);
+  // And the bound must be honoured by BUDGETING recovery, not by abandoning it.
+  assert.ok(
+    bounded.text.includes(printVerifyFailures.RECOVERED_FAILURE_HEADER),
+    "enforcing the bound must not throw the recovered failure lines away",
+  );
+});
+
+/**
+ * F7b. `FAILURE_LINE_RE`'s `AssertionError` alternative was unanchored, so it claimed passing
+ * test names and stack frames that merely mention the class -- inflating the recovered block
+ * with lines that are not failures.
+ */
+roundLTest("NVA-B-ROUNDL F7: FAILURE_LINE_RE claims failure markers, not passing names or stack frames", () => {
+  for (const line of [
+    "✔ rejects an AssertionError payload (1.2ms)",
+    "ok 12 - AssertionError is redacted",
+    "      at Test.run (node:internal/test_runner/test:1397:25) AssertionError",
+    "  # Subtest: AssertionError handling",
+  ]) {
+    assert.equal(printVerifyFailures.FAILURE_LINE_RE.test(line), false, `claimed a non-failure line: ${line}`);
+  }
+  for (const line of [
+    "not ok 3 - something",
+    "  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:",
+    "✖ a failing test (2ms)",
+    "FAIL  some-suite",
+    "# fail 1",
+  ]) {
+    assert.equal(printVerifyFailures.FAILURE_LINE_RE.test(line), true, `dropped a real failure line: ${line}`);
+  }
+});
+
+/**
+ * F7c. `!keptText.includes(line)` was a SUBSTRING test, so a short failure line that happens to
+ * occur inside any kept line was treated as already present and silently dropped from recovery.
+ */
+roundLTest("NVA-B-ROUNDL F7: a failure line merely CONTAINED in a kept line is still recovered", () => {
+  const failure = "not ok 7 - x";
+  const head = [failure, ...Array.from({ length: 250 }, (_, index) => `filler ${index}`)];
+  const tail = ["ok 1 - see also not ok 7 - x for context"];
+  const bounded = printVerifyFailures.boundSuiteTail([...head, ...tail].join("\n"));
+  assert.ok(
+    bounded.text.split("\n").includes(failure),
+    "a short failure line was dropped because a kept line contained it as a substring",
+  );
+});
+
 import {
   boundSuiteTail,
   buildFailureReport,
