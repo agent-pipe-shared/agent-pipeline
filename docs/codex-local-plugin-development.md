@@ -52,7 +52,10 @@ Distribution channels remain separate project authority: consumers default to
 `stable`, while the Agent-Pipeline self-repository explicitly selects `alpha`.
 An operator may opt a project into `beta` only by running the read-only
 `pipeline-update-channel.mjs plan --repo <project> --channel beta` operation and
-then explicitly confirming its returned digest-bound `applyAction`. Neither a
+then explicitly confirming its returned digest-bound `applyAction`. The
+working `alpha` channel names its own branch the same digest-bound way, via
+`pipeline-update-channel.mjs plan --repo <project> --alpha-ref <branch>`
+(ADR-0078 D3) — never both flags in the same call. Neither a
 local source switch nor SessionStart changes that channel automatically.
 
 ## Enter local test mode
