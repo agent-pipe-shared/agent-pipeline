@@ -180,7 +180,15 @@ below assumes it holds and is written to catch a change that would break it.
   `lib/onboarding-continuity.mjs` and `lib/project-onboarding-v3.mjs` (both
   already kernel above) already imported `lib/onboarding-language-correction.mjs`
   before this dispatch touched anything -- was closed alongside: added
-  `lib/onboarding-language-correction.mjs`.
+  `lib/onboarding-language-correction.mjs`. A tenth gap (NVA-B-KERNELEDGE,
+  2026-09-01): commit `54fb5006` gave `scripts/pre-commit-hook-install.mjs`
+  (already kernel above) a fourth dynamic `import()` call site resolving to
+  `lib/handover-rotation.mjs` (declared in `DYNAMIC_IMPORT_EDGES`, since
+  `PLUGIN_LIB_DIR` is an install-time-bound path, not a literal specifier the
+  static scanner can read), used to read the handover-file configuration ahead
+  of the commit-size check. Its own only first-party import,
+  `lib/project-authority.mjs`, is already kernel above, so no further hops are
+  needed. Added: `lib/handover-rotation.mjs`.
 - The window record's cryptographic integrity and its TTL.
 - The audit visibility of an open or recently-closed window (the bootstrap
   warning).

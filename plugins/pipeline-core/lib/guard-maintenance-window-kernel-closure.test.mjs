@@ -184,13 +184,16 @@ const DYNAMIC_IMPORT_EDGES = {
     "../lib/project-authority.mjs",
   ],
   // NVA-CF-GMWKC-RETRY: pre-commit-hook-install.mjs's renderImpl() template-string
-  // generator dynamically imports these three via `pathToFileURL(resolve(<dir>, "<name>")).href`
+  // generator dynamically imports these via `pathToFileURL(resolve(<dir>, "<name>")).href`
   // -- PLUGIN_HOOKS_DIR/PLUGIN_LIB_DIR/PLUGIN_SCRIPTS_DIR are install-time-bound absolute
-  // paths, not literal specifiers the static scanner can read.
+  // paths, not literal specifiers the static scanner can read. NVA-B-KERNELEDGE (2026-09-01):
+  // commit 54fb5006 added a fourth call site, `../lib/handover-rotation.mjs`, to read the
+  // handover-file configuration ahead of the commit-size check.
   "plugins/pipeline-core/scripts/pre-commit-hook-install.mjs": [
     "../hooks/guard-gate-strength.mjs",
     "../lib/protected-test-paths.mjs",
     "./check-protected-path-integrity.mjs",
+    "../lib/handover-rotation.mjs",
   ],
 };
 

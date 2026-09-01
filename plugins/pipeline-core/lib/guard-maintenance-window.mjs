@@ -382,6 +382,15 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   // project-authority.mjs, runner-profile-migration-v3.mjs) are all already kernel
   // above, so no further hops are needed.
   "plugins/pipeline-core/lib/onboarding-language-correction.mjs",
+  // NVA-B-KERNELEDGE (2026-09-01): a tenth gap -- commit 54fb5006 gave
+  // scripts/pre-commit-hook-install.mjs (already kernel above) a fourth dynamic
+  // `import()` call site resolving to lib/handover-rotation.mjs (declared in
+  // DYNAMIC_IMPORT_EDGES, guard-maintenance-window-kernel-closure.test.mjs, since
+  // PLUGIN_LIB_DIR is an install-time-bound path, not a literal specifier the static
+  // scanner can read), used to read the handover-file configuration ahead of the
+  // commit-size check. Its own only first-party import, lib/project-authority.mjs, is
+  // already kernel above, so no further hops are needed.
+  "plugins/pipeline-core/lib/handover-rotation.mjs",
 ]);
 
 // The "plugins/pipeline-core/..." entries above are written against whatever
