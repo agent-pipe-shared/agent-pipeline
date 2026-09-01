@@ -52,7 +52,16 @@ jobs:
       - name: Runner-free offline Core Verify
         env:
           PIPELINE_LIVE_CERTIFICATION: disabled
-        run: core_path="${RUNNER_TEMP}/pipeline-core-path" && mkdir -p "${core_path}" && ln -s "$(command -v node)" "${core_path}/node" && ln -s "$(command -v git)" "${core_path}/git" && ln -s "$(command -v bash)" "${core_path}/bash" && ln -s "$(command -v sh)" "${core_path}/sh" && PATH="${core_path}" "${core_path}/node" harness/scripts/verify.mjs
+        # `openssl` is in this allowlist because the product genuinely requires it, not to
+        # make a suite go green: po-human-approval.mjs shells out to it for the entire
+        # signature-mode key chain (`genpkey -algorithm ED25519 -aes-256-cbc`,
+        # `pkey -pubout`, `pkeyutl -sign -rawin`). Measured 2026-09-01 against run
+        # 33471808564: with only node/git/bash/sh, trust-anchor-bootstrap-circularity-repro
+        # and onboarding-init fail; adding this one symlink turns both green locally under
+        # an otherwise identical synthetic PATH. "Runner-free" therefore means free of
+        # runner-provided tooling, never free of the base system crypto binary this
+        # repository's own signing path depends on.
+        run: core_path="${RUNNER_TEMP}/pipeline-core-path" && mkdir -p "${core_path}" && ln -s "$(command -v node)" "${core_path}/node" && ln -s "$(command -v git)" "${core_path}/git" && ln -s "$(command -v bash)" "${core_path}/bash" && ln -s "$(command -v sh)" "${core_path}/sh" && ln -s "$(command -v openssl)" "${core_path}/openssl" && PATH="${core_path}" "${core_path}/node" harness/scripts/verify.mjs
 
   live-certification:
     if: github.event_name == 'workflow_dispatch' && inputs.live_certification
