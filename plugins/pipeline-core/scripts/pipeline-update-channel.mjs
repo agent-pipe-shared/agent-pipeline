@@ -841,6 +841,14 @@ export function applyPipelineUpdateAlphaRef(repoPath, options = {}, deps = {}) {
   if (sha256(canonicalJson(binding)) !== options.planSha256) return unknown("invalid-plan");
   const observed = readCalibration(repoPath, deps);
   if (observed.status !== "ready") return unknown(observed.reason);
+  // Mirrors planPipelineUpdateAlphaRef's own guard (finding F1): readCalibration
+  // does not detect a duplicated `pipelineUpdateAlphaRef` key, and this writer's
+  // postimage (`.find()`, first occurrence) and its own subsequent reads
+  // (`JSON.parse`, last occurrence) would otherwise silently address two
+  // different properties. Checked unconditionally, before the replay short
+  // circuit and before any digest comparison, so a caller cannot reach the
+  // write path on such a file even with a correctly-computed digest binding.
+  if (duplicateAlphaRefKey(observed)) return unknown("malformed-configuration");
   if (observed.rawSha256 === options.expectedPostimageSha256
     && observed.value.pipelineUpdateAlphaRef === options.alphaRef) {
     return { ...binding, status: "replayed", planSha256: options.planSha256, reason: null };
