@@ -7,6 +7,7 @@
 
 | Date range | Summary | Archive |
 |---|---|---|
+| 2026-09-01 | The 2026-08-31 interim-release handover: the 0.6.0 candidate pushed to nova and stopped one step short of main, the nine ordered PO terminal actions, the privacy sweep disposition, and the carried-forward open questions. Extraction pass performed first and recorded in the survey behind commit 53262b1d; its homeless durable rules and still-live carry-forwards were re-stated in the 2026-09-01 handover. | [docs/state-archive/2026-09-01--current-handover-0-6-0-is-an-interim-release-nova-b-continue.md](state-archive/2026-09-01--current-handover-0-6-0-is-an-interim-release-nova-b-continue.md) |
 | 2026-08-25 to 2026-08-26 | The 2026-08-25/26 chat-gate-ceremony standardization block: AGY-HGOFIX-2/3, the four chat-gate regressions and their closure, the Agent-tool worktree-isolation incident, the 17-agent AFK sweep and its reconciliation, and the 2026-08-26 sprint_agy push. Extraction pass performed first: every durable rule in it already lives in CLAUDE.md or its own backlog item; the single carry-forward with no home (GWM has no chat-mode activation path) was moved into the current handover before rotation. | [docs/state-archive/2026-09-01--chat-gate-standardization-and-afk-sweep.md](state-archive/2026-09-01--chat-gate-standardization-and-afk-sweep.md) |
 | 2026-08-23 | The Phoenix-line pointer block: a preamble stating that Nova became the authoritative line and that Phoenix's own checkpoints 61-71 are history. Its content was already archived separately and indexed; the block itself carried no live carry-forward. | [docs/state-archive/2026-09-01--phoenix-line-pointer-block.md](state-archive/2026-09-01--phoenix-line-pointer-block.md) |
 | 2026-08-31 | The CI release blocker: diagnosis, the measured repair at ed491309, the PO decision to repair rather than bypass, and the inverted push-before-CI sequencing. Its live carry-forwards were extracted into the 2026-08-31 release handover before rotation. | [docs/state-archive/2026-08-31--ci-release-blocker-diagnosed-and-repaired.md](state-archive/2026-08-31--ci-release-blocker-diagnosed-and-repaired.md) |
@@ -20,350 +21,162 @@
 | 2026-08-11 to 2026-08-19 | Checkpoints 1-60 (2026-08-11 through 2026-08-19 checkpoint 60): superseded session narrative; durable decisions already live in ADRs/backlog/guardrails per this repo's own standing convention, not uniquely in this prose. | [docs/state-archive/2026-08-19--checkpoints-1-through-60.md](state-archive/2026-08-19--checkpoints-1-through-60.md) |
 | 2026-08-26 | 2026-08-25 Antigravity chat-gate-ceremony standardization, verify-tuner stage 2 acceptance, sprint-agy-runner delta4 Critic fix and candidate status | [docs/state-archive/2026-08-26--agy-runner-2026-08-25-handover.md](state-archive/2026-08-26--agy-runner-2026-08-25-handover.md) |
 
-## Current handover — 0.6.0 is an interim release; Nova B continues after it (2026-08-31)
+## Current handover — 2026-09-01: the autonomous Nova B block
 
-**Sprint Nova is NOT closed.** The PO's explicit instruction this session:
-0.6.0 ships as an interim state so Nova B can continue on top of it. No
-`close-block`, no `close-feature`, no close coordinator — a release is a
-handover event here, not a lifecycle close.
+PO mandate for the day: work items needing no PO interaction until ~17:00, then
+freeze, verify, and hand back a push-ready HEAD. Sprint Nova is **not** closed —
+the release is being run as a handover event, not a lifecycle close. No
+`close-block` and no `close-feature` have been invoked, deliberately.
 
-**The backlog release condition is satisfied, and the earlier plan to reach it
-was wrong twice over.** Measured by cross-tabulating status against sprint (not
-inherited): open = alfred 19 · batman 2 · nightwing 26 · nova-b 26, i.e. exactly
-the four intended planning windows, with `check-backlog-sprint-assignment.mjs`
-reporting `undeclared and open (failing): 0`. Sprint Phoenix is already at 0.
+### Where the release stands
 
-The pass the prior session planned — close four 2026-07-19 placeholders, move
-six defects to `nova-b`, one to `alfred` — was **unnecessary** (all 11 items are
-already `status: deferred`, never `open`, so they never counted against the
-condition) and **impossible** (`FORWARD_TRANSITIONS`, `backlog-state.mjs:54`,
-defines successors only for `open` and `in_progress`, so `deferred` and
-`rejected` are terminal; and `open -> closed` is not a legal transition at all,
-while `closed` requires a `closure_commit` OID plus a tracked `closure_evidence`
-path that a never-implemented placeholder cannot honestly supply).
+0.6.0 is pushed to `nova` and stopped one step short of `main`. Verified
+directly: no local `main`, `remotes/origin/stable` still present, no `v0.6*`
+tag. **None of the nine ordered PO terminal actions has landed** — marketplace
+re-sync, verify + `push-prepare`, the `nova` signature, the CI loop, the `main`
+signature, tag + release, deleting `stable`, creating the release-tag ruleset,
+and the TP-5/TP-3 maintenance window, in that order.
 
-That has a consequence worth keeping: four defects re-verified as still present
-in code sit in terminal `deferred` and are invisible to every mechanical check,
-because the sprint gate only fails on `undeclared AND open`. Filed as
-`backlog/items/2026-08-31-a-deferred-item-is-terminal-so-a-live-defect-can-be-parked-invisibly.md`.
+Two operational warnings belong with that list, because neither has a home
+outside this file:
 
-**The exhaustive privacy sweep ran and returned FAIL; the PO disposed of it as
-disclosed-unremediated.** Verdict persisted as a tracked artifact at
-`specs/sprint-phoenix-epic/evidence/privacy-sweep-critic-review-4defe09e.md`.
+- `push-prepare`'s printed `authorize-critical` command carries an
+  `--expires-at` window. Re-run `push-prepare` immediately before signing;
+  never reuse an earlier printout. `docs/push-release-flow.md` documents the
+  field's parsing behaviour but not this warning.
+- The maintenance window's scope has grown beyond the TP-5 release-adapter
+  carve-out: it now also owes four suite registrations and the promotion of
+  `check-suite-registration.mjs` itself to a gate step. All TP-3.
 
-- **F1 (major):** `privacy-review.md` §3 rule 11 requires restricted-store
-  implementation to live only in files listed in Spec §§7.3-7.4 and states "No
-  separate restricted-store implementation file is authorized by this design",
-  yet `human-decision-attribution.mjs`, its test and its schema are absent from
-  that inventory. Contract drift, not rogue implementation: the increment was
-  authorized and closed, and the implementation itself is privacy-conservative.
-- **F2 (major):** §5's sign-off is bound to commit `643c7d06` / tree `449465e5`,
-  while the restricted-store surface has materially changed since.
-  **No valid privacy sign-off covers the 0.6.0 candidate.** Anyone reading §5's
-  Status line as satisfied is relying on a stale binding.
-
-**PO decision, 2026-08-31: disclose, do not remediate.** Both are filed as open
-`nova-b` items. Remediation would mean editing `specs/sprint-phoenix-epic/spec.md`
-and `design/privacy-review.md`, both of which are sha256-bound in that epic's
-`lifecycle.json` (the spec's recorded digest `5eeef75c…` matches its current
-bytes exactly), i.e. retroactively rewriting a closed epic's authority record
-plus its digest index. The release-preflight registers `critic` among its five
-`FINAL_GATES` as `pending` and reads no verdict artifact, so this is
-mechanically reachable — it is a recorded judgement, not a bypass.
-
-**The recorded release sequence was wrong about the manifest stamp, and this
-corrects it.** `release-preflight-cli.mjs:65` names three version surfaces —
-`VERSION`, `.codex-plugin/plugin.json`, `.claude-plugin/plugin.json` — and
-`observeVersion` requires every manifest to equal the literal contents of
-`VERSION` exactly. The local-candidate `+claude.…`/`+codex.…` build stamps
-therefore do NOT agree and would derive `version-decision-mismatch`. Stripping
-them is correct and safe: `git show v0.5.4:…/.claude-plugin/plugin.json` carries
-the bare `0.5.4`, and `codex-pretool-guard.test.mjs` only validates the stamp's
-shape `if (buildMetadata !== null)` while asserting `baseVersion === VERSION`.
-
-Both manifests are TRACKED, so stamping is a commit — and every commit voids
-both the candidate-bound verify evidence and the Critic's candidate binding.
-**The stamp belongs in the pre-verify batch, not after the Critic** as the
-2026-08-30 handover recorded. The corrected order is: all commits → security
-scan → full verify → Critic on the final candidate → signature ceremony → push
-the feature branch → CI against the pushed ref → `main`, tag, release.
-
-**The 2026-08-30 emergency push is disposed of as a documented waiver** (PO
-decision, 2026-08-31). Both branches were pushed with `--no-verify`, no
-`approve-push` and no Ed25519 proof. It left no trace in the hook's audit path
-for a structural reason: there was no pre-push hook at all — preflight reported
-`prePushHook: "absent"`, `unbackedGate: true` while the repository declared
-`gates.push: blocking`. The hook is installed since 2026-08-31 on the PO's
-explicit instruction, who also stated that `git push --no-verify` deliberately
-remains available as git's own escape. No retroactive approval record is
-created: an approval entry for an act that had none at execution time is exactly
-the shape `approve-push` exists to prevent.
-
-**A resume-hint trap, hit live and reversed.** A `--resume` restart PRESERVES the
-session id, so a card captured before the restart and consumed after it records
-capture and consumption under ONE session id — externally indistinguishable from
-the false F12/F13 case the check exists to catch, regardless of whether
-re-grounding genuinely happened. `consume` was recorded this session and then
-reversed to `discard`; `resume-consumption-check` is green via
-`RH-CHECK-NO-CARD`, which asserts nothing about any session having read
-anything. Note `resume-hint.mjs` documents the receipt more narrowly than the
-checker does: "A receipt below proves the card's bytes were READ; it never
-proves they were understood or acted on." Filed as
-`backlog/items/2026-08-31-a-captured-resume-hint-card-reds-the-verify-gate.md`.
-
-**Three consecutive Goldfish dispatches hit the harness `maxTurns: 50` cliff**,
-including one briefed with a deliberately reduced 30-call cap. In every case the
-work was substantially done and only the closing handover was lost; each was
-recovered by inspecting the tree directly and resuming with a
-closing-allowance-only message. The briefed tool budget is not a mechanism —
-`maxTurns` is. Treat a briefed cap as advisory and the cliff as real.
-
-**0.6.0 is pushed to `nova` and the release stopped one step short of `main`.**
-Candidate `56e91858` landed on `feat/sprint-nova-codex-v046` (`dfd26254..56e91858`)
-with a signed approval bound to that exact commit and tree `dc84c401`, signed
-with the pinned trust anchor `2de20a39`. Verify 505/505 `binding: "exact"`,
-security CLEAN, an independent Critic review run, Layer 1b reconciled. What is
-NOT done: `main`, `stable`, the `v0.6.0` tag and the release.
-
-**Two gate defects were repaired to get that far, both structural rather than
-incidental.** (1) `docs/adr/0076`'s `Governs:` line held prose where
-`check-doc-reconciliation.mjs` parses a comma-separated glob list, producing an
-`ORPHAN-GOVERNS-GLOB` that is a static corpus property — it blocked EVERY Layer 1b run in
-this repository regardless of range, and no record could clear it. (2) `.git/agent-pipeline/po-key-directory.json` (2026-08-11) outranks
-the machine plane in `parseHumanArgs`'s precedence, so `push-prepare` resolved a
-stale, unpinned key directory instead of the OneDrive one the repository actually
-pins. Removing the stale pointer made the trust-anchor check green. Both cost a
-live ceremony's worth of confusion before being diagnosed.
-
-**Push approvals occupy a SINGLE slot.** `pipeline-state.mjs` writes
-`pushApproval: { lastApproved: … }`, so a second `approve-push` overwrites the
-first. Signatures for `main` and `stable` cannot be taken in advance alongside
-one for `nova`; each destination is its own sign -> approve -> push cycle. The
-subject hash binds `{sourceCommit, remote, destination, threatModel}`, and
-`push-prepare` additionally refuses whenever `evidence.commit !== HEAD`, so every
-commit after a verify run forces a fresh ~10-minute verify before any signature.
-
-**CI executed the suites for the first time since 2026-08-02.** Run
-`33471808564` (`workflow_dispatch`, candidate `56e91858`) ran 6m37s and reached
-suite index 439/505 before failing, where every run since 2026-08-02 had aborted
-in 8-29s at `verify-journal` with zero suites started. `ed491309` is therefore
-confirmed against the real CI environment, not only against a local clone.
-
-**Exactly three suites failed there and pass locally**, and the cause is measured,
-not assumed. Three controlled local runs reproducing the workflow step's
-synthetic PATH establish: with only `node/git/bash/sh` all three fail; with a
-fresh `HOME` and a full PATH all three pass, so an absent
-`~/.agent-pipeline/machine.json` — the obvious first guess — is NOT the cause;
-adding a single `openssl` symlink turns `trust-anchor-bootstrap-circularity-repro-tests`
-and `onboarding-init-tests` green. Root cause: `po-human-approval.mjs` shells out
-to `openssl` for the entire signature-mode key chain (`genpkey -algorithm ED25519
--aes-256-cbc`, `pkey -pubout`, `pkeyutl -sign -rawin`), while the step's own name
-asserts the core needs no such tooling. Fixed in `705b7cf3` by admitting
-`openssl` to that PATH, with the dependency stated in the workflow rather than
-hidden.
-
-**`project-onboarding-v3-tests` is NOT explained and must not be assumed fixed.**
-It failed in CI in 74s (05:01:34→05:02:48Z) but passes locally under the
-restricted PATH with a fresh HOME, with and without `openssl`. Its only local
-failure is a ~150s hang that occurs solely with this machine's real HOME, whose
-machine-plane `poKeyDirectory` sits on a slow `/mnt/c` Windows mount — a local
-artifact, not the CI cause. Open in
-`backlog/items/2026-09-01-three-onboarding-suites-pass-locally-and-fail-in-ci.md`.
-
-### PO terminal actions, parked for one sitting (2026-09-01)
-
-Everything below needs the human at a terminal. Nothing else in the current
-work does, and **none of it is doable from a phone** — stated explicitly
-because that is the constraint that parked this list rather than executing it.
-
-Two different kinds of access are mixed in here, and they can be obtained
-separately:
-
-- **Signing terminal** (the machine holding the Ed25519 private key outside the
-  repository): items 2, 3, 5, and the push halves of 6 and 7.
-- **GitHub write access** (repository administration and the release surface,
-  no signing key involved): item 8's ruleset creation, and the
-  `gh release create` half of item 6. These need no ceremony and no verify
-  evidence, so they can be done at any time from any machine that is logged in
-  — before or after the signing session, in either order.
-
-Item 1 needs neither: it is a local filesystem copy outside the repository.
-
-Ordered; the ordering is load-bearing where stated.
-
-1. **Marketplace re-sync — always first, before any ceremony.** Today's commits
-   touch `plugins/pipeline-core/**`, so this machine's external marketplace copy
-   is stale and `guard-push.mjs`'s AGY-MKTATTEST-1 will refuse the push. It
-   fires AFTER the signature is consumed: on 2026-09-01 that cost a mid-ceremony
-   interruption with the proof already spent. The remedy is `rm -rf` + `cp -a`
-   outside the repository, where an agent may not write (GS-6).
-2. **Then, with no commit in between:** the agent runs a full verify and the
-   security scan at the final HEAD, then `push-prepare`. `checkEvidenceFreshness`
-   refuses whenever `evidence.commit !== HEAD`, so any commit after this point
-   voids it and the ten minutes are spent again. **Its printed
-   `authorize-critical` carries a 60-minute `--expires-at`: re-run
-   `push-prepare` right before signing, never reuse an earlier printout — an
-   expired window is refused and looks exactly like a signature failure.**
-3. **One signature for `nova`** (`authorize-critical`), then the agent does
-   `approve-push` → push. Seed the request with the exact intended call and
-   consume the signature immediately — never interleave other work between
-   seeding and consuming (CLAUDE.md, the expired-capability incident).
-4. **No signature needed after that for CI.** `verify.yml` accepts
-   `workflow_dispatch`, and run 33471808564 proves a dispatch on the branch
-   executes that branch's own content. So one `nova` push unlocks an unlimited
-   CI loop, and `project-onboarding-v3-tests` can be diagnosed without further
-   PO time. The new failing-suite reporter (`b904c01d`) means that run will
-   carry the actual assertion text instead of only a `diagnosticDigest`.
-5. **`main`** — its own signature, and only once CI `verify` is green for that
-   exact commit. `protect-main` enforces this server-side with
-   `bypass_actors: []`; no local decision reaches it.
-6. **`v0.6.0` tag and the GitHub release.** Whether a tag push needs its own
-   push approval is NOT known — `guard-push.mjs` calls the delete/tag shorthand
-   "ambiguous, conservative" in its own comment. Attempt it once and read the
-   refusal: a blocked attempt is free, because PreToolUse blocks before
-   execution. Strip the `+claude.`/`+codex.` cachebuster from both plugin
-   manifests at this step and no earlier
-   (`docs/claude-local-plugin-development.md`).
-7. **Delete `refs/heads/stable`** (ADR-0078 D1; it is at `dd1eb9ee`, identical
-   to `main`, so nothing is lost). Two routes, and the second removes the
-   unknown rather than probing it:
-   - as a push, `git push origin --delete stable` — `guard-git` protects only
-     `main|master` against `--delete`, so it is not blocked there, but whether
-     the push gate wants an approval for a delete refspec is the same unknown
-     as item 6;
-   - **or as repository administration**,
-     `gh api --method DELETE repos/:owner/:repo/git/refs/heads/stable`, which
-     is GitHub write access rather than a push and therefore touches no
-     ceremony at all. Prefer this: it is the same outcome with one fewer
-     unknown, and it can be done in the same sitting as item 8.
-8. **Create the release-tag ruleset** —
-   `gh api --method POST repos/:owner/:repo/rulesets --input scratch/tag-ruleset-payload.json`.
-   Repository administration, not a push, so it needs no ceremony. It is ADR-0078
-   D5's remote half and makes a `v*` tag immutable. Untested against the API:
-   if a rule is rejected for `target: "tag"`, drop that rule. `bypass_actors` is
-   empty, which binds the PO too.
-9. **One protected-test-path maintenance window, covering two debts at once
-   (PO decision 2026-09-01: do this tonight, not later).**
-   - **TP-5** — remove the release-adapter carve-out from
-     `checkReleaseTagAncestry` in `guard-push.mjs`, and correct the six
-     `guard-push.test.mjs` cases (`PGD02`, `PGD03`, `PGD04`, `PGD18b`, `PGD22`,
-     `PGD23`) that push `v1.0.0`/`v2.0.0`-shaped tags as deploy-artifact
-     identities with no `origin/main` fixture. Those six are why the carve-out
-     exists at all. Closing Critic finding F3: as written, any project
-     declaring a release adapter whose trigger matches `refs/tags/v*` gets zero
-     ancestry enforcement, and ADR-0078 D5's own enumerated limitations do not
-     include that case. The PO chose removal over documenting it as a named
-     limitation.
-   - **TP-3** — register the suites parked in
-     `check-verify-suite-registration.mjs`'s `EXCLUSIONS` directly in
-     `verify.mjs`. Those entries carry `expires: 2026-09-07`, so this window is
-     owed within the week regardless; doing both in one sitting converts every
-     parked debt into a registration and needs one ceremony instead of two.
-   Five of them already carry that expiry, so the window is owed regardless;
-   doing it once converts six debts into six registrations.
-
-### Carried forward, because none of these has another home
-
-- **GWM has no chat-mode activation path.** Started, reverted, never resumed;
-  not blocking anything in flight. Extracted from the 2026-08-25/26 block
-  before its rotation on 2026-09-01: checked against `backlog/items/` that
-  same day, and the only GWM item there
-  (`2026-08-25-gwm-kernel-doc-enumeration-diverges-from-the-code-array.md`)
-  is about doc/code enumeration drift, not this.
-- **AK-6** is ready to re-dispatch against `pipeline-user-v3.schema.json` (the
-  first attempt used the pre-v3 schema and would have flagged a correct
-  calibration as drifted; withdrawn `1d6dec55`, scaffolding kept at `8316dbd8`).
-- **A standing authorization the mechanism cannot honour.** Spec §8 grants a
-  standing Nova authorization to lift TP-1/TP-3/TP-5 for an exact task, but
-  `guard-testpath` reads `gates.push_approval`, this repository is on `signature`,
-  and that mode has no in-session activation step. Whether §8 promises more than
-  the guard delivers, or the guard should know about §8, is an open design
-  question that read as a blocker to three sessions in one night.
-- **BS25/BS26 durability** (ADR-0068 D6): three positional ledger lookups remain
-  (`backlog-state.mjs:1326`, `:1504`, the test fixture); two can bind by
-  `entryHash`, `amendsSequence` needs an additive `amendsEntryHash`, and the
-  fixture must stay positional, so the prefix invariant becomes a named check.
-- **The Antigravity hard-enforcement layer's two fail-open paths:** the layer is
-  inert whenever the daemon cannot resolve `node`, and it fails silently, because
-  the hook that would report it is the one that does not run.
-- **Two of the four documented reasons for `security: off` are stale**
-  (`c67397d7`). What actually blocks is the v2 verdict's three offending required
-  capabilities plus a license allowlist resolving only inside this repository.
-- **Codex restarts where a resume would do.** The barrier's contract requires "a
-  ticket proving a fresh *Codex* process re-read those bytes" — a new process, not
-  a new conversation — so by that contract a resume clears it and keeps context.
-  The one empirical fact it turns on is unmeasured: whether `codex resume`
-  re-reads `.codex/*`. Measure that before changing any instruction.
-- **The sibling defect shape, still unfiled:** *a change to A creates an obligation
-  at B, and only a later gate run reveals it.* Editing a doc staled its vendored
-  copy; regenerating that copy tripped the consumer-path scanner; extending the
-  Critic search surface invalidated a security baseline pinned to it; registering
-  five suites silently invalidated the capability inventory. Each is a missing
-  coupling, not carelessness. Its primary shape (*named but not admitted*,
-  *admitted but not named*, *published but not consumed*) is filed as `a33ea0cc`;
-  this sibling is not.
-- **The PO's acceptance bar, verbatim, because it is what "done" means:**
-  *"1. ich bestätige, dass die pipeline installiert werden soll 2. ich beantworte
-  eine reihe anfragen fürs onboarding (modus, author, etc.) 3. ich gebe PRD frei
-  4. ich verlange den push 5. ich signiere den push"*. Touch 3 carries an open
-  quality question, not a defect: what the PO releases is a staging draft that is a
-  verbatim intake transcript until an agent authors the product framing, and
-  nothing forces that authoring step.
-- **Retrospective follow-up items #7 and #8** stay deferred to Nova B per PO.
-- **The Critic 1+1 run on the sandbox-quickfix delta returned FAIL, unresolved,
-  with no Round 3 dispatched.** 1 major — `roles/elephant.md` stage-0 fast-path
-  violated by a self-committed fix to `check-consumer-safe-paths.mjs`; 1 minor —
-  `observeRunner()` untested, filed. Both were self-verified and documented, no
-  functional defect found, but the FAIL itself is still unresolved.
-- **`f7ab9b42` (NVA-DOC060) has had no independent Critic review.** Implementation
-  complete (user-facing documentation aligned with the real 0.6.0 three-runner
-  state); the diff has not been through an independent Critic pass.
-- **Two unanswered NVA-CIVERIFY questions, carried to the Critic and still open:**
-  (i) the change lets ANY session-less checkout self-provision a binding, a plain
-  local clone included, where the previous behaviour was an outright refusal —
-  intended, or to be narrowed? (ii) a `guard-lifecycle-ready.test.mjs` failure in
-  its own reproduction log whose expected paths point into `scratch/ci-repro/…` —
-  clone-nesting artifact, or real? The release review found no code defect in the
-  change itself, so (i) is the question that remains genuinely open.
-- **`guard-lifecycle-ready-tests` / `NOVA-LCR-HGO-1`:** the copy-safe renderer's
-  wrap column is path-length sensitive, so at a long enough checkout path a
-  denial no longer visibly names `guard-human-override.mjs` — possibly an
-  ADR-0059 Decision 4 violation in real consumer projects rather than a test
-  artifact. Two deep-path clones fail, three short-path runs pass. Filed as
-  `backlog/items/2026-08-31-copy-safe-renderer-wrap-point-is-path-length-sensitive.md`;
-  the outside-repository short-path data point is still missing.
-
-## 2026-09-01 — autonomous Nova B block: 8 Critic rounds, 7 items filed
-
-PO mandate: work items needing no PO until ~17:00, then verify and review.
+### The day's work
 
 **Landed:** `GIT-10`, the backlog-state-checker discipline, corrected after
 review (`6c9f581f`, `1c2d2681`); a per-session trim of repeated grammar denials
-(`1314edec`, 191/191). Vendored canon regenerated twice. Predicate campaign:
-findings 26 → 5. One REGRESSION is left standing on purpose — it is the only
-mechanical signal that a closed item's remedy no longer holds.
+(`1314edec`) and its per-subagent re-keying (`15bb3599`); `effort` added to two
+dispatch-record field enumerations (`6ce146f4`, `601dc035`); the copy-safe
+renderer's wrap point no longer splits a path (`6ea2add3`) with its pin
+strengthened after review (`e2b8afa1`); handover-size enforcement at the commit
+boundary (`54fb5006`) with its blob-size read repaired after review
+(`7bca7f5d`). Vendored canon regenerated four times by hand — every canon
+dispatch is forbidden to touch `plugins/pipeline-core/**`, so the obligation
+falls to the Elephant and skipping it reproduces a red gate.
 
-**Eight Critic rounds.** Caught before shipping: a guardrail stating a trigger
+**Nine Critic rounds.** Caught before shipping: a guardrail stating a trigger
 the code does not implement; an ADR asserting an enforcement the guard does not
 perform; a calibration path that commits while reporting failure; a
-push-approval-gate bypass; and a guardrail presenting an accepted DRIFT baseline
-that in fact contains a live open defect. Three findings were against acceptance
-criteria rather than implementations, and two suites reported green on
-properties they could not observe.
+push-approval-gate bypass; a guardrail presenting an accepted DRIFT baseline
+that in fact contains a live open defect; a size check that reads a blob's full
+content through a 1 MiB pipe and so blocks the very shrink it tells the reader
+to perform; and a test pin whose concatenated assertion masks a per-renderer
+regression.
 
-**Seven items filed**, each from measurement. Three matter beyond today: a
-Critic has no writable location for its own report, so findings survive only by
-hand-transcription; the `advisor` prohibition in briefings is unenforced and was
-breached three times in one session; ledger event 403 stores an abbreviated OID
-that the hash chain blocks repairing in place.
+**Twelve items filed**, each from measurement. Beyond today: a Critic has no
+writable location for its own report, so findings survive only by
+hand-transcription; the `advisor` prohibition in briefings is unenforced; ledger
+event 403 stores an abbreviated OID the hash chain blocks repairing in place;
+and the push-authority surface cannot be bounded by static enumeration — a
+114-file import closure was refuted by a `join()`-built spawn a `new URL(...)`
+regex cannot see.
 
-**Parked, with the reason recorded in each item:** the denial-trim comment fix
-and the `GIT-09` wording residual — both guard or guardrail surfaces, so both
-owe a mandatory T1 round that did not fit the freeze. `goldfish-task.md`'s field
-enumeration omits `effort`, which fails the authorship check on honest commits.
+One filed item records a **refutation**, not a defect: the hypothesis that an
+onboarding test depends on a clean outer working tree was measured directly and
+did not hold. It is filed so the question is not silently re-asked.
 
-**Owed:** an ADR-0066 rotation of the 2026-08-31 section. This file sits at its
-30000-byte cap, and today's entry was written to net zero because of it.
+### Recurring dispatcher errors, recorded because they recurred
+
+- **Contaminated Critic input, four rounds.** The implementor's dispatch record
+  embeds completion-report prose. Every round quarantined it and re-derived from
+  source. Remedy applied on the last round only: hand an authorship-only
+  projection (`taskId`, `agentType`, `dispatcher`, `commits`).
+- **Freehand dispatch briefings.** Two dispatches were built without filling
+  `critic-review.md` / `goldfish-task.md` and were refused by `guard-dispatch`.
+  The guard caught what the rule already forbids.
+- **A half-applied re-verification.** A rework was briefed after checking only
+  one of the two homes a rule could have landed in. It had landed in the other.
+- **An overstatement to the PO**, caught by a Critic: two findings were relayed
+  as independent when they are in tension.
+- **Three `maxTurns` cliffs.** Dispatches were cut off at their harness limit
+  mid-work. Briefed tool budgets are behaviour rules; `maxTurns` is a real cliff.
+
+### Durable rules carried forward — these have no other home
+
+Extracted from the 2026-08-31 section before its rotation. Each was searched for
+in `CLAUDE.md`, `docs/adr/`, `guardrails/` and `backlog/items/` and found in
+none of them.
+
+1. **The corrected release sequence:** all commits → security scan → full verify
+   → Critic on the final candidate → signature ceremony → push the feature
+   branch → CI against the pushed ref → `main`, tag, release. The
+   version-manifest stamp belongs in the pre-verify batch, not after the Critic.
+   `docs/push-release-flow.md` documents which layer runs as whom, never this
+   ordering.
+2. **`git push --no-verify` deliberately remains available** as git's own escape
+   route (PO instruction), and **no retroactive `approve-push` record is created
+   for a push that had none at execution time** — that is exactly the shape
+   `approve-push` exists to prevent. This sits in unresolved tension with
+   `guardrails/git.md` GG-17, which states the opposite as a guard-enforced MUST
+   NOT with no carve-out. The tension itself is unrecorded and needs a PO
+   decision.
+3. **A `resume-hint` receipt proves only that a card's bytes were read**, never
+   that they were understood or acted on — and a `--resume` restart preserves
+   the session id, so capture-then-consumption under one session id is
+   externally indistinguishable from the false re-grounding case the checker
+   exists to catch.
+4. **"GS-6" does not resolve.** The rule cited under that id — a
+   mutation-adjacent action inside a repository the agent may not write outside
+   of is a human-only step — has no text anywhere in `guardrails/`, `CLAUDE.md`
+   or `docs/adr/`. Either the id is stale or the rule was never given a home.
+
+### Still-live open questions carried forward
+
+Each was checked against `backlog/STATUS.md` and the git log; where liveness
+could not be positively established, that is said rather than glossed.
+
+- `project-onboarding-v3-tests` fails in CI and is **not explained**; its only
+  local failure is an unrelated slow-mount hang.
+- Four defects re-verified as still present sit in terminal `deferred` status,
+  invisible to every mechanical sprint-gate check.
+- The privacy sweep FAIL is disposed of as disclosed-unremediated; both findings
+  (contract drift, a sign-off bound to a superseded candidate) remain open. A
+  privacy re-review covering the current candidate is recommended after the
+  freeze and would resolve both.
+- GWM has no chat-mode activation path. **No item was ever filed** for this.
+- AK-6 is recorded as ready to re-dispatch against
+  `pipeline-user-v3.schema.json`. Nothing shows it ran; liveness established
+  only by absence of evidence — the weakest entry here.
+- The standing Nova authorization in Spec §8 to lift TP-1/TP-3/TP-5 for an exact
+  task **cannot be honoured**: `guard-testpath` reads `gates.push_approval`,
+  this repo is `signature`, and that mode has no in-session activation step.
+  Recorded only here; no filed item.
+- BS25/BS26 durability: three positional ledger lookups remain in
+  `backlog-state.mjs`; two can bind by `entryHash`, `amendsSequence` needs an
+  additive `amendsEntryHash`. The cited line numbers were not re-verified.
+- Two of the four documented reasons for `security: off` are stale; what
+  actually blocks is the v2 verdict's three offending required capabilities plus
+  a license allowlist resolving only inside this repository. No filed item.
+- Codex restarts: whether `codex resume` re-reads `.codex/*` is **unmeasured**.
+  Measure before changing any instruction.
+- The sibling defect shape — a change to A creates an obligation at B, revealed
+  only by a later gate run — is still unfiled as a general pattern.
+- Also live, established by keyword search only: the PO's acceptance-bar
+  question ("nothing forces the authoring step"); retrospective follow-up items
+  #7 and #8, deferred to Nova B; the sandbox-quickfix Critic FAIL (1 major, 1
+  minor) left unresolved; the `f7ab9b42`/NVA-DOC060 gap with no independent
+  Critic review; and the two open NVA-CIVERIFY questions.
+
+Dropped on rotation as genuinely resolved: the Antigravity hard-enforcement
+layer's two fail-open paths, closed by `ab347a74`, which built the self-check
+the item's own proposal named.
+
+### Owed, not started
+
+- An **ADR and register entry** for the marketplace-attestation narrowing
+  decision (EL-04). Not written today on purpose: the decision stands, but its
+  implementation route was refuted this session, and an ADR whose mechanism is
+  known broken would record a plan nobody can follow. The refutation is filed as
+  its own item; the ADR waits for a workable enumeration.
+- The authorship-only dispatch-record projection, applied once by hand, is not
+  yet a mechanism.
 
 ## Operational head
 
