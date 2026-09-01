@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "62d8540de913a7a7520b013081f2939f40b573f1bd3b1f5d511f701d5b3a36c7"
+    "transitionHead": "8a26b8572b2287e91686c0cf3a638fb59004fa0da805960d9f78eb98eebcd192"
   },
   "counts": {
-    "open": 83,
+    "open": 84,
     "in_progress": 0,
     "closed": 476,
     "rejected": 3,
@@ -6397,6 +6397,15 @@
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "Observed directly on 2026-08-08 while filing three items: reconcile-backlog-ledger.mjs --activate recorded transitions for two items whose frontmatter does not validate.",
+      "deferred": false
+    },
+    {
+      "id": "pipeline.the-marketplace-attestation-compares-more-than-the-property-it-protects",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-01",
+      "source": "PO observation during the 0.6.0 release push, 2026-09-01: the AGY-MKTATTEST-1 push-time check fired on eight unrelated files immediately after `approve-push` signature consumption, forcing a manual external-marketplace sync inside the one window the documented ordering rule forbids any other change.",
       "deferred": false
     },
     {
