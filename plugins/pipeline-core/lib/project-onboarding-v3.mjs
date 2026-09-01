@@ -586,6 +586,30 @@ function fileIdentity(info) {
     : null;
 }
 
+/**
+ * Ownership predicate for a rollback that DELETES a file it believes it
+ * published. `{dev, ino}` alone is not sufficient for that decision: an inode
+ * number freed by a concurrent `unlink` is routinely handed straight back to
+ * the next file created in the same directory (ext4 allocates the lowest free
+ * inode in the block group; tmpfs draws inode numbers from a monotonic counter
+ * and never reuses one -- which is exactly why this is invisible on a tmpfs
+ * `/tmp` and reproducible on an ext4-backed one). Under reuse `sameIdentity`
+ * cannot tell the output this transaction published from foreign content that
+ * replaced it, and the rollback then deletes bytes it never wrote.
+ *
+ * The published bytes are known exactly, so ownership additionally requires
+ * the file's current content to still BE those bytes. Anything else is foreign
+ * and is left in place; a rollback that cannot prove ownership must not delete.
+ */
+function ownsPublishedOutput(expectedIdentity, expectedSha256, path, fs) {
+  if (!sameIdentity(expectedIdentity, path, fs)) return false;
+  try {
+    return sha256(fs.readFileSync(path, "utf8")) === expectedSha256;
+  } catch {
+    return false;
+  }
+}
+
 function directoryIdentity(info) {
   return info && !info.isSymbolicLink() && info.isDirectory()
     ? { dev: String(info.dev), ino: String(info.ino) }
@@ -3169,7 +3193,7 @@ export function applyProjectOnboardingManifestRepair({ rootDir = process.cwd(), 
     return { schema: MANIFEST_REPAIR_SCHEMA, status: "ready", root, planSha256, readback: { schema: SCHEMA, status: inspection.status, manifestSha256: sha256(generated) }, diagnostics: inspection.diagnostics ?? [] };
   } catch (error) {
     if (temp) { try { if (fs.existsSync(temp)) fs.unlinkSync(temp); } catch {} }
-    if (published && publishedIdentity) { try { if (sameIdentity(publishedIdentity, published, fs)) fs.unlinkSync(published); } catch {} }
+    if (published && publishedIdentity) { try { if (ownsPublishedOutput(publishedIdentity, plan.generated.sha256, published, fs)) fs.unlinkSync(published); } catch {} }
     return { schema: MANIFEST_REPAIR_SCHEMA, status: "rolled-back", root, diagnostics: [diagnostic("$.transaction", "apply_failed", error.message, "repair the target and replan")] };
   }
 }
