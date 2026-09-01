@@ -28,14 +28,55 @@ freeze, verify, and hand back a push-ready HEAD. Sprint Nova is **not** closed �
 the release is being run as a handover event, not a lifecycle close. No
 `close-block` and no `close-feature` have been invoked, deliberately.
 
-### Where the release stands
+### Where the release stands — interim update, 2026-09-01 evening
 
-0.6.0 is pushed to `nova` and stopped one step short of `main`. Verified
-directly: no local `main`, `remotes/origin/stable` still present, no `v0.6*`
-tag. **None of the nine ordered PO terminal actions has landed** — marketplace
-re-sync, verify + `push-prepare`, the `nova` signature, the CI loop, the `main`
-signature, tag + release, deleting `stable`, creating the release-tag ruleset,
-and the TP-5/TP-3 maintenance window, in that order.
+**The version moved from 0.6.0 to 0.6.1 mid-evening. This is deliberate, not
+scope creep.** 0.6.0 was stripped of its build cachebuster for release
+(`9aa4c7ca`); once that landed, a local plugin reload became a silent no-op —
+the registry keys its install directory on the version string, and an
+unchanged string installs nothing. The PO needed the rebase-authority fix
+(below) to actually reach a running session, which is only possible under
+review, so the version moved forward and the cachebuster returned (`63fe8b64`).
+0.6.0 as a distinct release is superseded by this decision, not completed.
+
+**What landed, in order:**
+- `feat/sprint-nova-codex-v046` is pushed and signed at `266d691f`
+  (`56e91858..266d691f`), verified 505/505, security CLEAN. This is real and
+  durable regardless of what happens to `main` tonight.
+- A second, separate signature was obtained and verified for `refs/heads/main`
+  at `1e025ed5`, but the push was **refused server-side** by GitHub's own
+  ruleset on `main` (`GH013`, `required_status_checks` on context `verify`) —
+  not by anything in this repository. The approval record is committed anyway
+  (`a801e0fd`): the approval was genuinely given and verified; the ruleset,
+  not the approval, is what stopped the push. `main` needs a fresh ceremony
+  once CI is green, because the candidate will have moved.
+- The CI run that blocks it is red on three onboarding suites. Two of the
+  three (`project-onboarding-v3-tests`, `codex-onboarding-capabilities-tests`)
+  do **not** reproduce under a faithful local rebuild of the CI environment
+  (restricted `PATH`, fresh `HOME`) — they pass there, 158/158 and 23/23. The
+  third, `onboarding-init-tests`, **does** reproduce, via a distinct
+  mechanism: `onboarding-init.mjs` treats a `runtime_executable_unavailable`
+  diagnostic (no `codex` binary on `PATH`) as fatal at a step that records
+  initial identity answers and should not need that runtime at all. Whether
+  fixing that also explains the other two is not yet established — under
+  investigation.
+- A live PO handover, transcribed in full into
+  `backlog/items/2026-09-01-an-authorized-rebase-demands-a-fresh-po-signature-after-every-conflict.md`,
+  is now IN SCOPE and being built tonight, not deferred: an approved feature
+  branch cannot currently be rebased, because `guard-lifecycle-ready` reads a
+  partially-rebuilt working tree as current authority mid-rebase and demands
+  a fresh single-use Ed25519 signature after nearly every conflict. This
+  suspends a lifecycle gate during a bounded, well-defined window and
+  therefore owes a mandatory T1 Critic round before it ships.
+
+**None of the nine originally-ordered PO terminal actions for the 0.6.0
+release plan has completed as originally scoped** — the plan itself has
+changed. Original list, for continuity: marketplace re-sync (done), verify +
+`push-prepare` (done, superseded twice by re-verification), the feature-branch
+signature (done), the CI loop (in progress, red, being fixed), the `main`
+signature (done once, push refused, will need repeating), tag + release
+(blocked on `main`), deleting `stable`, creating the release-tag ruleset, and
+the TP-5/TP-3 maintenance window.
 
 Two operational warnings belong with that list, because neither has a home
 outside this file:
