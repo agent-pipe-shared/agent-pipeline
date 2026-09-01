@@ -67,10 +67,15 @@ export const REDACTION_MARKER = "[REDACTED-CREDENTIAL]";
 const GITHUB_TOKEN_RE = /\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{20,}\b/g;
 const GITHUB_PAT_RE = /\bgithub_pat_[A-Za-z0-9_]{20,}\b/g;
 const AKIA_RE = /\bAKIA[0-9A-Z]{16}\b/g;
-// Matches "-----BEGIN PRIVATE KEY-----", "-----BEGIN RSA PRIVATE KEY-----",
-// "-----BEGIN OPENSSH PRIVATE KEY-----", etc. (no `g` flag: used with .test()
-// per line, and a global-flag regex reused across .test() calls would leak
-// lastIndex state).
+// Matches a PEM key-block marker line: dashes, the word BEGIN or END, an
+// optional key-type word (RSA / EC / OPENSSH / ED25519 / ...), then the words
+// PRIVATE and KEY, then closing dashes. Deliberately not spelled out here as
+// one literal example string: a complete literal marker in a comment reads to
+// a secret scanner as an embedded key header (measured: gitleaks rule
+// "private-key" fired on exactly that literal in an earlier revision of this
+// comment). No `g` flag on either pattern below: used with .test() per line,
+// and a global-flag regex reused across .test() calls would leak lastIndex
+// state.
 const PRIVATE_KEY_BEGIN_RE = /-----BEGIN[\w ]*PRIVATE KEY-----/;
 const PRIVATE_KEY_END_RE = /-----END[\w ]*PRIVATE KEY-----/;
 
