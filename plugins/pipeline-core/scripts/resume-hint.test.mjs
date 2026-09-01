@@ -141,6 +141,29 @@ test("capture records a cardDigest, and inspect exposes the SAME value back", ()
   assert.equal(inspected.cardDigest, captured.cardDigest, "inspect must expose the exact digest capture recorded, not a recomputation");
 });
 
+// --- NVA-B-RHMSG AC-1/AC-5: capture's success output states the gate coupling and names
+// both exact command names; AC-4: exit code and existing fields stay unchanged.
+
+test("capture output states the verify-gate coupling and names both consume and discard", () => {
+  const root = freshRoot("gate-note");
+  const cardFile = join(root, "card.json");
+  writeFileSync(cardFile, JSON.stringify(VALID_CARD), "utf8");
+
+  const result = run(["capture", "--root", root, "--card-file", cardFile]);
+  assert.equal(result.status, 0, `capture must still exit 0 (AC-4); stderr: ${result.stderr}`);
+  const captured = JSON.parse(result.stdout);
+
+  // AC-4: pre-existing fields and exit behaviour are unchanged.
+  assert.equal(captured.context.intent, VALID_CARD.intent);
+  assert.equal(typeof captured.cardDigest, "string");
+
+  // AC-1: the gate coupling is stated, naming both exact command names.
+  assert.equal(typeof captured.verifyGateNote, "string");
+  assert.match(captured.verifyGateNote, /resume-consumption-check/u);
+  assert.match(captured.verifyGateNote, /`resume-hint\.mjs consume`/u);
+  assert.match(captured.verifyGateNote, /`resume-hint\.mjs discard`/u);
+});
+
 test("a materialInput chunk change alters the recorded cardDigest", () => {
   const rootA = freshRoot("digest-material-a");
   const cardFileA = join(rootA, "card.json");

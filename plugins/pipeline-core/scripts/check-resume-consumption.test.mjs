@@ -172,6 +172,78 @@ test("buildResumeHint import sanity: the fixture context this suite uses is itse
   assert.equal(buildResumeHint({ context: BASE_CONTEXT }).context.intent, BASE_CONTEXT.intent);
 });
 
+// --- NVA-B-RHMSG AC-2/AC-3/AC-5: FATAL text names both dispositions, says which is honest
+// when, and never nudges toward `consume` as the default/quicker path. AC-4: pass/fail
+// behaviour (ok, code, cardStatus, exit code) is asserted unchanged alongside the new text --
+// same assertions the pre-existing tests above already make, re-affirmed here on the same
+// fixtures that also check the message.
+
+test("FATAL message names both consume and discard, states which is honest when, and does not default to consume", () => {
+  const root = gitInitRoot("check-resume-consumption-msg-no-receipt-");
+  try {
+    captureWithDigest(root);
+    const result = checkResumeConsumption({ rootDir: root, sessionId: "session-a" });
+    // AC-4: pass/fail behaviour unchanged.
+    assert.equal(result.ok, false);
+    assert.equal(result.code, "RH-CHECK-RH-RECEIPT-ABSENT");
+    assert.equal(result.cardStatus, "available");
+    // AC-2: both dispositions named, exact command names.
+    assert.match(result.message, /`resume-hint\.mjs consume`/u);
+    assert.match(result.message, /`resume-hint\.mjs discard`/u);
+    // AC-2: which is honest when.
+    assert.match(result.message, /consume`[^]*honest only when[^]*genuinely re-grounded/u);
+    assert.match(result.message, /discard`[^]*honest when[^]*durably recorded elsewhere/u);
+    // AC-3: never presented as the default/quicker path.
+    assert.match(result.message, /do not default to `consume`/iu);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("FATAL message (no-digest-record shape) also names both dispositions", () => {
+  const root = gitInitRoot("check-resume-consumption-msg-nodigest-");
+  try {
+    captureResumeHint({ rootDir: root, context: BASE_CONTEXT }); // no recordResumeHintCardDigest call
+    const result = checkResumeConsumption({ rootDir: root, sessionId: "session-a" });
+    assert.equal(result.ok, false);
+    assert.equal(result.code, "RH-CHECK-NO-DIGEST-RECORD");
+    assert.match(result.message, /`resume-hint\.mjs consume`/u);
+    assert.match(result.message, /`resume-hint\.mjs discard`/u);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("checkResumeConsumptionAnySession FATAL message also names both dispositions and does not default to consume", () => {
+  const root = gitInitRoot("check-resume-consumption-any-msg-");
+  try {
+    captureWithDigest(root);
+    const result = checkResumeConsumptionAnySession({ rootDir: root });
+    assert.equal(result.ok, false);
+    assert.equal(result.code, "RH-CHECK-RH-RECEIPT-ABSENT-ANY");
+    assert.equal(result.receiptCount, 0);
+    assert.match(result.message, /`resume-hint\.mjs consume`/u);
+    assert.match(result.message, /`resume-hint\.mjs discard`/u);
+    assert.match(result.message, /do not default to `consume`/iu);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("CLI: FATAL stderr text also carries both dispositions (any-session mode)", () => {
+  const root = gitInitRoot("check-resume-consumption-cli-any-msg-");
+  try {
+    captureWithDigest(root);
+    const result = spawnSync(process.execPath, [script, "--root", root, "--any-session"], { encoding: "utf8" });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /^FATAL \(RH-CHECK-RH-RECEIPT-ABSENT-ANY\):/u);
+    assert.match(result.stderr, /`resume-hint\.mjs consume`/u);
+    assert.match(result.stderr, /`resume-hint\.mjs discard`/u);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 // --- CLI-level smoke tests --------------------------------------------------------------------
 
 test("CLI: usage error (exit 3) when --session-id is missing", () => {

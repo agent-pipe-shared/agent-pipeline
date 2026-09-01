@@ -161,7 +161,16 @@ function main() {
   // `fullCard` is the exact object this process parsed from `--card-file`, so the digest
   // covers `materialInput`/`values` too, not just the distilled fields `captured` carries.
   const { cardDigest } = recordResumeHintCardDigest({ rootDir, card: fullCard });
-  result = { ...result, cardDigest };
+  // NVA-B-RHMSG AC-1: the gate coupling is otherwise learned only by hitting the
+  // resulting FATAL (backlog/items/2026-08-31-a-captured-resume-hint-card-reds-the-
+  // verify-gate.md) -- state it at capture time instead, naming the two exact
+  // command names a later session will need.
+  result = {
+    ...result, cardDigest,
+    verifyGateNote:
+      "a live Resume-Hint card fails resume-consumption-check until a later session runs " +
+      "`resume-hint.mjs consume` or `resume-hint.mjs discard`",
+  };
   if (consumeCard) {
     try { unlinkSync(resolve(cardFile)); }
     catch (error) { if (error?.code !== "ENOENT") throw error; }
