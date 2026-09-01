@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 created: "2026-08-31"
 sprint: nova-b
+done_when: manual
 source: "Measured 2026-08-31 during 0.6.0 release preparation, while verifying that only Nova B / Alfred / Batman / Nightwing items remained open."
 ---
 

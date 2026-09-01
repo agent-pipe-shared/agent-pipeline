@@ -7,6 +7,7 @@ status: open
 created: 2026-08-31
 source: "Independent Critic privacy-sweep review (F1), specs/sprint-phoenix-epic/evidence/privacy-sweep-critic-review-4defe09e.md, candidate 4defe09ece85721747f039036356ef80aed1b084"
 sprint: nova-b
+done_when: manual
 ---
 
 # Restricted-store files exceed the Spec inventory the privacy contract asserts

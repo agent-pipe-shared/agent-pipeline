@@ -7,6 +7,7 @@ status: open
 created: 2026-08-31
 source: "Measured 2026-09-01 during 0.6.0 release preparation, when Layer 1b (check-doc-reconciliation.mjs) was run manually after push-init.mjs's driver contract was inspected."
 sprint: nova-b
+done_when: manual
 ---
 
 # `push-init.mjs` hardcodes `--candidate HEAD`, which Layer 1b's own record contract can never satisfy

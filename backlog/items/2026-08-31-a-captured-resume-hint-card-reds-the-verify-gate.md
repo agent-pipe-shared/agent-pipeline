@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 created: "2026-08-31"
 sprint: nova-b
+done_when: manual
 source: "Observed live on 2026-08-31 during release preparation. The Elephant captured a Resume-Hint card for compact safety; the next full verify.mjs run went red on resume-consumption-check, and push-prepare.mjs requires green candidate-bound verify evidence."
 ---
 

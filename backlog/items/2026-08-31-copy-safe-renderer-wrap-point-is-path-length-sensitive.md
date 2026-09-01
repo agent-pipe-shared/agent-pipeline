@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 created: "2026-08-31"
 sprint: nova-b
+done_when: manual
 source: "Found 2026-08-31 by the Nova Elephant while verifying dispatch NVA-CIVERIFY: a single-assertion regex failure (guard-lifecycle-ready.test.mjs, NOVA-LCR-HGO-1) reproduced identically in two independent clones at longer checkout paths, and did not reproduce in the shorter main checkout."
 ---
 
