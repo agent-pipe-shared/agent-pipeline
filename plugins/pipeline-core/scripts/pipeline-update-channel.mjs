@@ -32,6 +32,8 @@ import {
 export const PIPELINE_UPDATE_CHANNELS = Object.freeze(["alpha", "beta", "stable"]);
 export const PIPELINE_UPDATE_CHANNEL_PLAN_SCHEMA =
   "pipeline.pipeline-update-channel-plan.v1";
+export const PIPELINE_UPDATE_ALPHA_REF_PLAN_SCHEMA =
+  "pipeline.pipeline-update-alpha-ref-plan.v1";
 
 const SHA256 = /^[a-f0-9]{64}$/u;
 const TOPOLOGIES = new Set(["local-self-development", "installed-consumer"]);
@@ -345,11 +347,19 @@ function topLevelLayout(raw) {
   return { properties, close: index };
 }
 
-function channelPostimage(observation, channel) {
+// Field-agnostic byte-surgical postimage: replaces or appends exactly one
+// top-level `key` without reserializing or reordering anything else. Shared
+// by the channel and alpha-ref writers -- the channel wrapper below produces
+// byte-identical output to the pre-refactor implementation (verified by the
+// unchanged channel-writer test suite), so this is a pure extraction, not a
+// behaviour change.
+function fieldPostimage(observation, key, value) {
   const raw = observation.raw;
-  const existing = observation.layout.properties.find((entry) => entry.key === "pipelineUpdateChannel");
+  const jsonKey = JSON.stringify(key);
+  const jsonValue = JSON.stringify(value);
+  const existing = observation.layout.properties.find((entry) => entry.key === key);
   if (existing) {
-    return `${raw.slice(0, existing.valueStart)}${JSON.stringify(channel)}${raw.slice(existing.valueEnd)}`;
+    return `${raw.slice(0, existing.valueStart)}${jsonValue}${raw.slice(existing.valueEnd)}`;
   }
   const last = observation.layout.properties.at(-1);
   const newline = raw.includes("\r\n") ? "\r\n" : "\n";
@@ -358,15 +368,23 @@ function channelPostimage(observation, channel) {
     const indent = raw.slice(lineStart, last.keyStart);
     const multiline = raw.slice(last.valueEnd, observation.layout.close).includes("\n");
     const addition = multiline
-      ? `,${newline}${indent}"pipelineUpdateChannel": ${JSON.stringify(channel)}`
-      : `,"pipelineUpdateChannel":${JSON.stringify(channel)}`;
+      ? `,${newline}${indent}${jsonKey}: ${jsonValue}`
+      : `,${jsonKey}:${jsonValue}`;
     return `${raw.slice(0, last.valueEnd)}${addition}${raw.slice(last.valueEnd)}`;
   }
   const inside = raw.slice(skipWhitespace(raw, 0) + 1, observation.layout.close);
   const addition = inside.includes("\n")
-    ? `  "pipelineUpdateChannel": ${JSON.stringify(channel)}${newline}`
-    : `"pipelineUpdateChannel":${JSON.stringify(channel)}`;
+    ? `  ${jsonKey}: ${jsonValue}${newline}`
+    : `${jsonKey}:${jsonValue}`;
   return `${raw.slice(0, observation.layout.close)}${addition}${raw.slice(observation.layout.close)}`;
+}
+
+function channelPostimage(observation, channel) {
+  return fieldPostimage(observation, "pipelineUpdateChannel", channel);
+}
+
+function alphaRefPostimage(observation, alphaRef) {
+  return fieldPostimage(observation, "pipelineUpdateAlphaRef", alphaRef);
 }
 
 /** Read back only the closed portable channel field. */
@@ -480,6 +498,17 @@ function planBinding(repoPath, channel, preimageSha256, postimageSha256) {
   };
 }
 
+function alphaRefPlanBinding(repoPath, alphaRef, preimageSha256, postimageSha256) {
+  return {
+    schema: PIPELINE_UPDATE_ALPHA_REF_PLAN_SCHEMA,
+    repo: resolve(repoPath),
+    calibrationPath: NEUTRAL_CALIBRATION,
+    alphaRef,
+    preimageSha256,
+    postimageSha256,
+  };
+}
+
 export function planPipelineUpdateChannel(repoPath, channel, deps = {}) {
   if (!isPipelineUpdateChannel(channel)) {
     return { schema: PIPELINE_UPDATE_CHANNEL_PLAN_SCHEMA, status: "unknown", reason: "invalid-channel" };
@@ -510,6 +539,49 @@ export function planPipelineUpdateChannel(repoPath, channel, deps = {}) {
       ],
       expected: {
         schema: PIPELINE_UPDATE_CHANNEL_PLAN_SCHEMA,
+        statuses: current ? ["replayed"] : ["applied", "replayed"],
+      },
+    },
+  };
+}
+
+/**
+ * Plan/apply pair for the alpha-ref field (ADR-0078 D3), mirroring
+ * `planPipelineUpdateChannel`/`applyPipelineUpdateChannel` exactly: same
+ * digest binding, same drift/forgery refusal, same shared transaction
+ * (`atomicReplaceCalibration`, the writer lock pair, `readCalibration`).
+ * Only the postimage and plan binding are field-specific.
+ */
+export function planPipelineUpdateAlphaRef(repoPath, alphaRef, deps = {}) {
+  if (!isPipelineUpdateAlphaRef(alphaRef)) {
+    return { schema: PIPELINE_UPDATE_ALPHA_REF_PLAN_SCHEMA, status: "unknown", reason: "invalid-alpha-ref" };
+  }
+  const observed = readCalibration(repoPath, deps);
+  if (observed.status !== "ready") {
+    return { schema: PIPELINE_UPDATE_ALPHA_REF_PLAN_SCHEMA, status: "unknown", reason: observed.reason };
+  }
+  const postimage = alphaRefPostimage(observed, alphaRef);
+  const binding = alphaRefPlanBinding(repoPath, alphaRef, observed.rawSha256, sha256(postimage));
+  const planSha256 = sha256(canonicalJson(binding));
+  const current = observed.raw === postimage;
+  return {
+    ...binding,
+    status: current ? "current" : "ready",
+    planSha256,
+    applyAction: {
+      kind: "command",
+      executable: "node",
+      mutation: !current,
+      requiresConfirmation: !current,
+      executionBoundary: "host-authorized-wsl",
+      argv: [
+        SCRIPT_PATH, "apply", "--repo", binding.repo, "--alpha-ref", alphaRef,
+        "--expected-calibration-sha256", binding.preimageSha256,
+        "--expected-postimage-sha256", binding.postimageSha256,
+        "--plan-sha256", planSha256, "--activate",
+      ],
+      expected: {
+        schema: PIPELINE_UPDATE_ALPHA_REF_PLAN_SCHEMA,
         statuses: current ? ["replayed"] : ["applied", "replayed"],
       },
     },
@@ -728,6 +800,46 @@ export function applyPipelineUpdateChannel(repoPath, options = {}, deps = {}) {
   return { ...binding, status: "applied", planSha256: options.planSha256, reason: null };
 }
 
+export function applyPipelineUpdateAlphaRef(repoPath, options = {}, deps = {}) {
+  const unknown = (reason, committed) => ({
+    schema: PIPELINE_UPDATE_ALPHA_REF_PLAN_SCHEMA,
+    status: "unknown",
+    alphaRef: isPipelineUpdateAlphaRef(options.alphaRef) ? options.alphaRef : null,
+    reason,
+    ...(committed === undefined ? {} : { committed }),
+  });
+  if (options.activate !== true) return unknown("activation-required");
+  if (!isPipelineUpdateAlphaRef(options.alphaRef)) return unknown("invalid-alpha-ref");
+  if (![options.expectedCalibrationSha256, options.expectedPostimageSha256, options.planSha256].every((value) => SHA256.test(value ?? ""))) {
+    return unknown("invalid-plan");
+  }
+  const binding = alphaRefPlanBinding(
+    repoPath,
+    options.alphaRef,
+    options.expectedCalibrationSha256,
+    options.expectedPostimageSha256,
+  );
+  if (sha256(canonicalJson(binding)) !== options.planSha256) return unknown("invalid-plan");
+  const observed = readCalibration(repoPath, deps);
+  if (observed.status !== "ready") return unknown(observed.reason);
+  if (observed.rawSha256 === options.expectedPostimageSha256
+    && observed.value.pipelineUpdateAlphaRef === options.alphaRef) {
+    return { ...binding, status: "replayed", planSha256: options.planSha256, reason: null };
+  }
+  if (observed.rawSha256 !== options.expectedCalibrationSha256) return unknown("calibration-drift");
+  const postimage = alphaRefPostimage(observed, options.alphaRef);
+  if (sha256(postimage) !== options.expectedPostimageSha256) return unknown("plan-drift");
+  const transaction = atomicReplaceCalibration(repoPath, observed, postimage, options, deps);
+  if (!transaction.ok) return unknown(transaction.reason, transaction.committed);
+  const readback = readCalibration(repoPath, deps);
+  if (readback.status !== "ready"
+    || readback.rawSha256 !== options.expectedPostimageSha256
+    || readback.value.pipelineUpdateAlphaRef !== options.alphaRef) {
+    return unknown("readback-failed", true);
+  }
+  return { ...binding, status: "applied", planSha256: options.planSha256, reason: null };
+}
+
 function parseCli(argv) {
   const operation = argv[0];
   if (!["plan", "apply", "readback"].includes(operation)) return null;
@@ -737,27 +849,45 @@ function parseCli(argv) {
     if (token === "--activate" && operation === "apply") parsed.activate = true;
     else if (token === "--repo" && argv[index + 1]) parsed.repo = argv[++index];
     else if (token === "--channel" && argv[index + 1] && operation !== "readback") parsed.channel = argv[++index];
+    else if (token === "--alpha-ref" && argv[index + 1] && operation !== "readback") parsed.alphaRef = argv[++index];
     else if (token === "--expected-calibration-sha256" && argv[index + 1] && operation === "apply") parsed.expectedCalibrationSha256 = argv[++index];
     else if (token === "--expected-postimage-sha256" && argv[index + 1] && operation === "apply") parsed.expectedPostimageSha256 = argv[++index];
     else if (token === "--plan-sha256" && argv[index + 1] && operation === "apply") parsed.planSha256 = argv[++index];
     else return null;
   }
-  if (operation !== "readback" && parsed.channel === undefined) return null;
+  if (operation !== "readback") {
+    // `--channel` and `--alpha-ref` select two different writer pairs; a
+    // caller supplying both gets an error, never silent precedence.
+    if (parsed.channel === undefined && parsed.alphaRef === undefined) return null;
+    if (parsed.channel !== undefined && parsed.alphaRef !== undefined) return null;
+  }
   return parsed;
+}
+
+/** Combined CLI readback: channel and alpha-ref side by side (ADR-0078 D3). */
+function readbackResult(repoPath) {
+  return {
+    ...readProjectPipelineUpdateChannel(repoPath),
+    alphaRef: readProjectPipelineUpdateAlphaRef(repoPath),
+  };
 }
 
 const isCli = process.argv[1] && resolve(process.argv[1]) === SCRIPT_PATH;
 if (isCli) {
   const parsed = parseCli(process.argv.slice(2));
   if (!parsed) {
-    process.stderr.write("pipeline-update-channel: use readback, plan --channel <alpha|beta|stable>, or the exact digest-bound apply action\n");
+    process.stderr.write("pipeline-update-channel: use readback, plan (--channel <alpha|beta|stable> | --alpha-ref <ref>), or the exact digest-bound apply action -- never both --channel and --alpha-ref together\n");
     process.exit(64);
   }
   const result = parsed.operation === "readback"
-    ? readProjectPipelineUpdateChannel(parsed.repo)
-    : parsed.operation === "plan"
-      ? planPipelineUpdateChannel(parsed.repo, parsed.channel)
-      : applyPipelineUpdateChannel(parsed.repo, parsed);
+    ? readbackResult(parsed.repo)
+    : parsed.alphaRef !== undefined
+      ? (parsed.operation === "plan"
+        ? planPipelineUpdateAlphaRef(parsed.repo, parsed.alphaRef)
+        : applyPipelineUpdateAlphaRef(parsed.repo, parsed))
+      : (parsed.operation === "plan"
+        ? planPipelineUpdateChannel(parsed.repo, parsed.channel)
+        : applyPipelineUpdateChannel(parsed.repo, parsed));
   process.stdout.write(`${JSON.stringify(result)}\n`);
   process.exit(["unknown"].includes(result.status) ? 2 : 0);
 }
