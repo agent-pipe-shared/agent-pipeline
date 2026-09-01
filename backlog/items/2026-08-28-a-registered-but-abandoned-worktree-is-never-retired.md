@@ -6,7 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-28
 sprint: nightwing
-done_when: contains plugins/pipeline-core/lib/session-cleanup-recovery.mjs planRegisteredWorktreeRetirement
+done_when: contains plugins/pipeline-core/scripts/pipeline-start-preflight.mjs retireRegisteredWorktrees
 source: "NVA-VTPGATE-1 stopped on it live, 2026-08-28"
 ---
 
@@ -79,3 +79,30 @@ likely.
   picks up `pipeline.stale-worktree-directories-accumulate-with-no-sweep`'s
   successor work should take this branch with it; the two belong in one sweep
   even though the closed item's fix deliberately does not cover this case.
+
+## Mechanism landed, wiring deliberately withheld — 2026-09-01
+
+Commit `c352528f` (`NVA-B-WTRETIRE`) implements this item's Proposal:
+`planRegisteredWorktreeRetirement` plans without mutating,
+`retireRegisteredWorktrees` re-derives its own candidates and re-evaluates the
+four conditions immediately before each `git worktree remove`, and a declined
+worktree reports which condition failed (`declined-locked`,
+`declined-not-clean`, `declined-head-not-contained`, or `unknown-*` where a step
+could not be determined). Ten new tests, all against throwaway fixture
+repositories; the suite passes 25/25, and the adjacent worktree-lifecycle suite
+stays green at 42/42.
+
+**The sweep is not wired into `runBootstrapWorktreeSweep`, and that is the
+correct outcome, not an unfinished one.** The dispatch found that a
+just-provisioned Agent-tool worktree satisfies all four conditions identically
+to an abandoned one — it is not the main worktree, it is clean, its HEAD is a
+branch tip, and nothing locks it, because nothing in this codebase locks a fresh
+worktree at creation. It only becomes distinguishable once its owning dispatch
+commits. Wiring today would let one session's bootstrap delete another session's
+worktree in that window.
+
+That gap is filed as its own item,
+`pipeline.fresh-worktree-indistinguishable-from-abandoned`, with two candidate
+remedies. This item's `done_when` is therefore retargeted from the planner's
+existence — which is now satisfied and would have read as completion — to the
+wiring itself, which is what the item actually asks for.
