@@ -103,6 +103,23 @@ export function redactText(text) {
   return redacted.join("\n");
 }
 
+// NVA-B-CIGREEN-1. A pure TAIL bound is exactly the wrong bound for the one
+// line this reporter exists to surface. `node:test` emits `not ok N - <name>`
+// in test order, so a failure EARLY in a long suite is the first thing dropped,
+// and the tail that survives carries only the summary counts. Measured: CI run
+// 33551001455 reported codex-onboarding-capabilities-tests red with 22 of 23
+// tests passing, and which test failed was unrecoverable from the step log —
+// its line had fallen into the omitted head. Failure-marker lines are therefore
+// recovered out of the omitted portion and re-attached ahead of the tail,
+// bounded by their own count so this cannot become an unbounded second copy of
+// the log.
+export const MAX_RECOVERED_FAILURE_LINES = 20;
+export const RECOVERED_FAILURE_HEADER = "--- failing lines recovered from the omitted head ---";
+// Deliberately broad across reporters: TAP (`not ok`), this repo's own
+// hand-rolled suites (`FAIL  <name>`), the node:test spec reporter (`✖`), and
+// the assertion class name that carries the message itself.
+export const FAILURE_LINE_RE = /^\s*(?:not ok\b|FAIL\b|✖|✗|×)|^\s*#\s*fail\b|AssertionError/;
+
 /**
  * AC-2 per-suite bounding: at most MAX_LINES_PER_SUITE lines, then at most
  * MAX_BYTES_PER_SUITE bytes of that line-bounded tail. Both bounds keep the
@@ -111,6 +128,11 @@ export function redactText(text) {
  * last MAX_BYTES_PER_SUITE bytes of the already line-bounded text, not by
  * dropping whole lines, so one line longer than the byte cap still yields a
  * useful (if partial) tail instead of being dropped entirely.
+ *
+ * Whatever both bounds drop is then re-scanned for failure-marker lines, and
+ * up to MAX_RECOVERED_FAILURE_LINES of them are re-attached ahead of the tail
+ * under RECOVERED_FAILURE_HEADER: a truncation that hides the failing test's
+ * own line defeats the whole reporter.
  */
 export function boundSuiteTail(text) {
   const originalBytes = Buffer.byteLength(text, "utf8");
@@ -128,6 +150,15 @@ export function boundSuiteTail(text) {
     byteTruncated = true;
     const buffer = Buffer.from(keptText, "utf8");
     keptText = buffer.subarray(buffer.length - MAX_BYTES_PER_SUITE).toString("utf8");
+    keptBytes = Buffer.byteLength(keptText, "utf8");
+  }
+  const recoveredFailureLines = (lineTruncated || byteTruncated)
+    ? allLines
+      .filter((line) => FAILURE_LINE_RE.test(line) && !keptText.includes(line))
+      .slice(0, MAX_RECOVERED_FAILURE_LINES)
+    : [];
+  if (recoveredFailureLines.length > 0) {
+    keptText = [RECOVERED_FAILURE_HEADER, ...recoveredFailureLines, keptText].join("\n");
     keptBytes = Buffer.byteLength(keptText, "utf8");
   }
   const keptLineCount = keptText.length === 0 ? 0 : keptText.split("\n").length;
