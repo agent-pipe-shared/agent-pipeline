@@ -12,7 +12,7 @@ closure_evidence: backlog/items/2026-08-28-agents-talk-the-po-out-of-the-signatu
 sprint: nova
 tracking: "NOW / Nova A — the one control in the model that is actual protection is the one agents routinely lobby the PO to abandon. Reported by the PO 2026-08-28 as recurring behaviour across agents, not a single incident."
 source: "PO report 2026-08-28: 'aktuell jeder agent mich als PO erstmal zu überreden lieber selber zu pushen oder die config auf chat zu ändern weil signature zu kompliziert ist - und so ist das ja nicht gedacht'. Clarified by the PO: the agent is not able to change the setting, and that is not the problem -- it simply does not want to walk the path."
-done_when: contains plugins/pipeline-core/scripts/pipeline-state.mjs one passphrase
+done_when: contains plugins/pipeline-core/scripts/pipeline-state.mjs then their passphrase
 ---
 
 # Agents talk the PO out of the signature instead of walking it

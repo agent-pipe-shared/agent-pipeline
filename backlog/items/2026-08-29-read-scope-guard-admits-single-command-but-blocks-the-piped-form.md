@@ -103,3 +103,30 @@ against elsewhere.
   group. Should land alongside or after F01, since both are gaps in the same
   read/write boundary the guard layer is meant to enforce.
 - **Date:** 2026-08-29
+
+## The REGRESSION finding on this item is TRUE — do not quiet it, 2026-09-01
+
+`check-backlog-done-predicate.mjs` reports this closed item as REGRESSION: its
+predicate names `pipeline.read-scope-single-command-root-check` in
+`plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs`, and neither that marker
+nor any `isOutsideRoot*` function is in that file today.
+
+**The predicate is correct and the finding is real.** Commit `c8c7f449`
+(2026-08-30, one day after this item's own `closure_commit` `9639d91e`) states
+in its first bullet: "Remove project-root containment from the closed read-only
+command lane." A different dispatch deliberately reversed the containment this
+item's fix introduced. Confirmed empirically on 2026-09-01: reads of paths
+outside the project root are admitted, in both single-command and piped shapes.
+
+The predicate was deliberately left unchanged when three sibling predicates were
+retargeted the same day. Retargeting this one to something currently satisfied
+would silence the only mechanical signal that a closed item's remedy no longer
+holds — turning a working detector into a formality. The REGRESSION line stays
+until the underlying question is answered.
+
+That question is tracked as
+`pipeline.read-containment-removed-with-no-recorded-decision`, which offers two
+directions without choosing: restore containment with enumerated external read
+roots, or accept the open read lane and record the reasoning in an ADR. Whichever
+is chosen, this item's status and predicate are settled as part of that decision
+— not before, and not by editing this line to make a checker quiet.
