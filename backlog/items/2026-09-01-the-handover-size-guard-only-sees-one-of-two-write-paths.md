@@ -3,11 +3,43 @@ schema: pipeline.backlog-item.v1
 id: pipeline.the-handover-size-guard-only-sees-one-of-two-write-paths
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-01
+closure_repository: self
+closure_commit: 7e929b6a1a1606530dff0307cd89f47467981d1f
+closure_evidence: plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs
 created: 2026-09-01
 source: "Direct measurement, 2026-09-01: docs/state.md found at 30115 bytes, already over the guard's own 30000-byte cap."
 sprint: nova-b
 ---
+
+## Closure, 2026-09-01
+
+Closed after three commits and two independent Critic rounds.
+
+`54fb5006` added the commit-boundary check, closing the Bash/Node write-path gap
+the item describes. The first Critic round found that the check established a
+blob's size by reading its full content through a pipe with Node's default 1 MiB
+buffer, and read HEAD before the shrink escape route — so a committed handover
+over 1 MiB blocked every commit that staged the file, including a shrink to one
+byte. The message the design offered for the blocked case was unreachable exactly
+when it was needed.
+
+`7bca7f5d` repaired that by measuring with `git cat-file -s`, which returns the
+recorded byte count without emitting content, and by matching the configured path
+by resolved absolute path rather than by raw string equality — the way the
+mirrored PreToolUse guard matches it.
+
+The second Critic round returned a consistent trajectory with no blocker. It
+verified rather than accepted the mirroring claim, confirmed the fix lands in the
+emitted hook and not only in the installer, and found one real gap: coverage of
+the staged fail-closed branch had gone from one test to zero on a line the fix
+edited. `7e929b6a` restores it, proven by inverting the production branch and
+measuring the new test red before restoring.
+
+Both halves of the original defect are now pinned end to end: a 2 MiB committed
+blob shrinking to six bytes is admitted, and neither fail-closed branch can be
+loosened without the suite going red. Suite 39 → 45.
 
 # The handover size guard only sees one of two write paths, and once over its cap it blocks the shrink that would fix it too
 
