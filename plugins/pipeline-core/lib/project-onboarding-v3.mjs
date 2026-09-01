@@ -1993,6 +1993,33 @@ function boundedAssignmentLines(name, value, renderer = "posix") {
       length -= 1;
     }
     if (length === 0 && remaining.length > 0) throw new TypeError("copy command value cannot be bounded");
+    // NVA-B-COPYSAFE (backlog/items/2026-08-31-copy-safe-renderer-wrap-point-
+    // is-path-length-sensitive.md): the greedy column-fit loop above chunks
+    // purely by character count, so a filesystem path or script filename
+    // embedded in the opaque value can land astride a wrap boundary --
+    // whether that happens depended only on the value's total length modulo
+    // the per-line budget, i.e. on checkout path length, not on anything a
+    // human did wrong. Prefer to back the cut off to the nearest preceding
+    // DELIMITER -- a space (the boundary between two space-separated command
+    // tokens) or a path separator ("/" or "\\", the boundary between two
+    // path segments) -- so a command token, and separately the FILENAME
+    // segment of a longer path that itself does not fit on one line, both
+    // stay contiguous, greppable strings wherever a delimiter-aligned break
+    // makes that possible. This can only shrink the chunk (never grow it
+    // past the already-verified bound) and strictly reduces `length`, so
+    // termination is unaffected. Only a single path segment WIDER than one
+    // whole line (no delimiter anywhere in the reachable prefix) falls back
+    // to the prior mid-token split, unavoidably: reconstruction still stays
+    // byte-exact via plain concatenation either way (copy-safe-command.test.mjs
+    // pins both the common case and this fallback).
+    const isDelimiter = (ch) => ch === " " || ch === "/" || ch === "\\";
+    if (length < remaining.length && !isDelimiter(remaining[length - 1]) && !isDelimiter(remaining[length])) {
+      let delimiterIndex = -1;
+      for (let index = length - 1; index >= 0; index -= 1) {
+        if (isDelimiter(remaining[index])) { delimiterIndex = index; break; }
+      }
+      if (delimiterIndex !== -1) length = delimiterIndex + 1;
+    }
     const chunk = remaining.slice(0, length);
     lines.push(`${prefix}${cmd ? chunk : singleQuoted(chunk, powershell)}${cmd ? "\"" : ""}`);
     remaining = remaining.slice(length);

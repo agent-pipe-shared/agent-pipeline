@@ -530,3 +530,101 @@ test("test-path default chat hand-off includes cmd.exe when the exact argv is re
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+/**
+ * NVA-B-COPYSAFE (backlog/items/2026-08-31-copy-safe-renderer-wrap-point-is-
+ * path-length-sensitive.md): before this fix, boundedAssignmentLines()
+ * (project-onboarding-v3.mjs) chunked the already-assembled opaque command
+ * string purely by column count, with no notion of token or path-segment
+ * boundaries -- so whether "guard-human-override.mjs" survived as one
+ * contiguous, greppable string in the rendered denial depended only on the
+ * incidental total length of the embedded absolute paths (i.e. the checkout
+ * path length), not on anything a human did. Measured live: a single-assertion
+ * regex failure (guard-lifecycle-ready.test.mjs, NOVA-LCR-HGO-1) reproduced at
+ * ~60/~63-char checkout paths and NOT at a 41-char checkout path. Direct
+ * measurement at the renderer level (never a whole clone) showed the effect
+ * is periodic, not a simple "long path" threshold: splits occurred in bands
+ * roughly every 62 characters of embedded path length. This test spans two
+ * full such bands (synthetic checkout lengths 1..150) plus a third partial
+ * band up to 250, so a future regression in the wrap point fails at EVERY
+ * checkout depth in that range, not only in a deep checkout that happens to
+ * fall inside one particular band.
+ */
+test("NVA-B-COPYSAFE: a script filename embedded in the copy-safe plan command stays one contiguous, greppable string across a range of checkout path lengths spanning the measured wrap-point-sensitive bands", () => {
+  const failures = [];
+  for (let checkoutLen = 1; checkoutLen <= 250; checkoutLen += 1) {
+    const checkout = "/" + "c".repeat(Math.max(0, checkoutLen - 1));
+    const script = `${checkout}/plugins/pipeline-core/scripts/guard-human-override.mjs`;
+    const rendered = renderHumanCopySafeCommand({
+      label: "plan",
+      executable: "node",
+      argv: [
+        placeholder(JSON.stringify(script)), "plan", "--repo", placeholder(JSON.stringify(checkout)),
+        "--request-sha256", "a".repeat(64),
+      ],
+    });
+    if (!rendered.text.includes("guard-human-override.mjs")) failures.push(checkoutLen);
+    // The bound itself must never be violated as a side effect of preferring
+    // a delimiter-aligned wrap point.
+    if (!rendered.text.split(/\r?\n/u).every((line) => line.length <= 72)) failures.push(`${checkoutLen}(bound)`);
+  }
+  assert.deepEqual(failures, [], `script filename split or bound exceeded at checkout lengths: ${failures.join(", ")}`);
+});
+
+/**
+ * NVA-B-COPYSAFE, round-trip half of the same fix: the delimiter-preferring
+ * wrap point must still reconstruct the EXACT original argv through a real
+ * shell eval, at a checkout length previously inside a failing band (~60
+ * chars measured live -- backlog item's own second data point).
+ */
+test("NVA-B-COPYSAFE: the delimiter-aligned wrap point still round-trips the exact argv through a real bash eval at a previously-splitting checkout length", () => {
+  if (process.platform === "win32") return;
+  const checkout = "/" + "c".repeat(59);
+  const script = `${checkout}/plugins/pipeline-core/scripts/guard-human-override.mjs`;
+  const rendered = renderHumanCopySafeCommand({
+    label: "plan",
+    executable: "node",
+    argv: [
+      placeholder(JSON.stringify(script)), "plan", "--repo", placeholder(JSON.stringify(checkout)),
+      "--request-sha256", "a".repeat(64),
+    ],
+  });
+  assert.ok(rendered.text.includes("guard-human-override.mjs"), rendered.text);
+  const lines = rendered.copyCommand.posix.split("\n");
+  assert.equal(lines.at(-1), 'eval "$CMD"');
+  const assignments = lines.slice(0, -1).join("\n");
+  const script2 = `node() { printf '%s\\0' "$@"; }\n${assignments}\neval "$CMD"`;
+  const probe = spawnSync("bash", ["-c", script2], { encoding: "utf8" });
+  assert.equal(probe.status, 0, probe.stderr);
+  const tokens = probe.stdout.split("\0");
+  assert.equal(tokens.pop(), "");
+  assert.deepEqual(tokens, [script, "plan", "--repo", checkout, "--request-sha256", "a".repeat(64)]);
+});
+
+/**
+ * NVA-B-COPYSAFE, the AC-3 fallback: a single path SEGMENT (no "/", no " ")
+ * wider than one entire physical line has no delimiter to back off to, so it
+ * still gets split mid-token -- this is the one case the column bound makes
+ * avoidance genuinely impossible. That fallback stays DEFINED and TESTED
+ * here (bound still holds; reconstruction stays byte-exact) rather than
+ * incidental, per this backlog item's own AC-3.
+ */
+test("NVA-B-COPYSAFE: a single path segment wider than one whole line falls back to a mid-token split, defined and tested rather than incidental -- the bound still holds and reconstruction stays byte-exact", () => {
+  const hugeFilename = `${"a".repeat(120)}.mjs`;
+  const built = boundedCopySafeCommand({ executable: "node", argv: [`/root/${hugeFilename}`, "plan"] });
+  assert.equal(typeof built.copyCommand.posix, "string");
+  const lines = built.copyCommand.posix.split("\n");
+  assert.equal(lines.every((line) => line.length <= 72), true, built.copyCommand.posix);
+  // The huge segment does NOT survive as one contiguous string -- documented,
+  // expected fallback behaviour, not a silent readability regression (there
+  // was no shorter filename available to preserve).
+  assert.ok(!built.copyCommand.posix.includes(hugeFilename), built.copyCommand.posix);
+  if (process.platform === "win32") return;
+  const assignments = lines.slice(0, -1).join("\n");
+  const script = `node() { printf '%s\\0' "$@"; }\n${assignments}\neval "$CMD"`;
+  const probe = spawnSync("bash", ["-c", script], { encoding: "utf8" });
+  assert.equal(probe.status, 0, probe.stderr);
+  const tokens = probe.stdout.split("\0");
+  assert.equal(tokens.pop(), "");
+  assert.deepEqual(tokens, [`/root/${hugeFilename}`, "plan"]);
+});
