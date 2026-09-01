@@ -96,6 +96,35 @@ project document — deliberately left open above) and an acceptance criterion
 requiring a real greenfield run, so it cannot close in a session that has no
 greenfield project in hand.
 
+## The hardest part of Gap A is a classification decision, not an index
+
+Found while closing Gap B, and it changes what Gap A has to answer. The
+documents an external reviewer would most need are classified
+`audience: maintainer` in `governance/observation-doc-governance.json`, which
+is why no public map reaches them — the map is not missing them by oversight,
+it is correctly excluding them:
+
+- `docs/governance-events.md` — the Human Governance Decision Ledger, which
+  [ADR-0071](../../docs/adr/0071-governance-event-kernel.md) names as the
+  historical source of human authority. The generic event kernel under
+  `governance/events/` is explicitly NOT that source, and a chain there proves
+  only internal prefix integrity; completeness needs a candidate-bound
+  retained checkpoint. A reviewer who found only the event log would be
+  reading the wrong artifact and would not know it.
+- `docs/po-human-approval.md` and `docs/po-approval-proof-contract.md` — what
+  a human approval is and what a proof of one actually asserts.
+- `docs/human-guard-override-threat-model.md` — the exception path, which is
+  precisely what an auditor asks about first.
+
+So Gap A cannot be closed by adding links. It has to answer a prior question:
+which control documents must an external reviewer be able to read, and does
+that make them `public-user`, or does it call for a third audience for
+review-facing material that is neither everyday user documentation nor
+maintainer-internal? Today that decision is being made implicitly by an
+audience label chosen for a different purpose. Deciding it is a PO/ADR act,
+not an implementation detail — which is a second reason, beyond the form
+question already recorded above, that this item does not close in a dispatch.
+
 ## Scope includes this repository
 
 The requirement above says "a project built with Agent-Pipeline". Per
