@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "5918aedf5e2d5378f6949ef260b6542a1574cf1da04c8d60536b8e598b29c7d6"
+    "transitionHead": "18cda6fe5946fad55c69ef0a529b6a5a86e1babec921b0d2277def5079e35859"
   },
   "counts": {
-    "open": 91,
+    "open": 96,
     "in_progress": 0,
     "closed": 484,
     "rejected": 3,
@@ -518,6 +518,15 @@
       "closureRepository": "self",
       "closureCommit": "621a19c68649787b20886bbcfd998a7516afb75f",
       "closureEvidence": "backlog/items/2026-08-28-an-expired-override-is-armed-instead-of-refused.md"
+    },
+    {
+      "id": "pipeline.an-onboarding-test-depends-on-a-clean-working-tree-through-a-security-scan-subprocess",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-01",
+      "source": "Hypothesis raised in scratch/critic-contract-round-H.md, D-2 (an unrelated pre-existing security-scan.mjs subprocess failure with exit code 2, observed during unrelated work, established not to be caused by that diff). Investigated live 2026-09-01 against plugins/pipeline-core/lib/project-onboarding-v3.test.mjs and plugins/pipeline-core/scripts/security-scan.mjs; refuted by direct measurement.",
+      "deferred": false
     },
     {
       "id": "pipeline.an-orchestrator-write-into-a-running-dispatchs-tree-is-undetectable",
@@ -6415,6 +6424,15 @@
       "tracking": "Sentinel recovery baseline; deferred per PO triage 2026-08-23."
     },
     {
+      "id": "pipeline.subagent-identity-may-never-resolve-so-per-agent-scoping-is-inert",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-01",
+      "source": "Round-F Critic finding F-1 (scratch/findings-registry-round-F.md), corroborated by an independent live investigation dispatched as NVA-B-SUBIDENT (scratch/subagent-identity-investigation.md); both verified against plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs live source.",
+      "deferred": false
+    },
+    {
       "id": "pipeline.sweep-remaining-guards-for-fail-open-identity-and-pipe-unpiped-scope-asymmetry",
       "status": "closed",
       "type": "workflow-improvement",
@@ -6537,6 +6555,15 @@
       "deferred": false
     },
     {
+      "id": "pipeline.the-handover-size-guards-header-comment-contradicts-its-own-registration",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-01",
+      "source": "scratch/critic-contract-round-G.md, D-2 (declared deviation: the header comment is stale and known false, correcting it out of that package's scope). Verified live 2026-09-01 against plugins/pipeline-core/hooks/guard-handover-size.mjs and plugins/pipeline-core/hooks/hooks.json.",
+      "deferred": false
+    },
+    {
       "id": "pipeline.the-ledger-commit-rule-was-given-a-second-home-in-a-different-voice",
       "status": "open",
       "type": "defect",
@@ -6586,6 +6613,15 @@
       "deferred": false
     },
     {
+      "id": "pipeline.the-push-authority-surface-cannot-be-bounded-by-static-enumeration",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-01",
+      "source": "Stashed draft, NVA-B-MKTATTEST (git stash list, stash@{0}: \"push-authority surface narrowing, enumeration proven INCOMPLETE (session-power.mjs missed via join()), do not trust without a sound dynamic-reference detector\"). Verified live 2026-09-01 against plugins/pipeline-core/scripts/session-cleanup.mjs and plugins/pipeline-core/lib/session-cleanup-recovery.mjs.",
+      "deferred": false
+    },
+    {
       "id": "pipeline.the-two-suite-registration-checkers-disagree",
       "status": "closed",
       "type": "defect",
@@ -6597,6 +6633,15 @@
       "closureRepository": "self",
       "closureCommit": "d38f65df9457f6c6ca32c87c2a7c2fb9b15d9d2f",
       "closureEvidence": "plugins/pipeline-core/scripts/check-suite-registration.mjs"
+    },
+    {
+      "id": "pipeline.the-unregistered-suite-detector-is-not-itself-a-gate-step",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-01",
+      "source": "Drafted in scratch/pending-item-suite-registration.md, held there because five dispatches shared the checkout; filed once free. Verified live 2026-09-01 against harness/scripts/verify.mjs and a fresh run of plugins/pipeline-core/scripts/check-suite-registration.mjs.",
+      "deferred": false
     },
     {
       "id": "pipeline.this-hosts-local-marketplace-copy-is-not-symlinked-to-source",

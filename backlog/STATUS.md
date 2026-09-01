@@ -48,6 +48,7 @@
 | pipeline.agents-talk-the-po-out-of-the-signature | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — the one control in the model that is actual protection is the one agents routinely lobby the PO to abandon. Reported by the PO 2026-08-28 as recurring behaviour across agents, not a single incident. |
 | pipeline.all-three-runners-should-install-against-the-stable-branch | open | requirement | pipeline | 2026-08-27 | — |
 | pipeline.an-expired-override-is-armed-instead-of-refused | closed | defect | pipeline | 2026-08-28 | — |
+| pipeline.an-onboarding-test-depends-on-a-clean-working-tree-through-a-security-scan-subprocess | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.an-orchestrator-write-into-a-running-dispatchs-tree-is-undetectable | open | defect | pipeline | 2026-08-28 | — |
 | pipeline.an-unparseable-done-when-is-counted-as-undeclared-not-malformed | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.anchor-check-passes-on-wrong-language-content | closed | defect | pipeline | 2026-08-07 | — |
@@ -517,6 +518,7 @@
 | pipeline.stale-worktree-directories-accumulate-with-no-sweep | closed | defect | pipeline | 2026-08-27 | — |
 | pipeline.staleness-check-unsettled-top-level-await-warning | closed | defect | pipeline | 2026-08-19 | — |
 | pipeline.stateful-design-contract-template | deferred | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; deferred per PO triage 2026-08-23. |
+| pipeline.subagent-identity-may-never-resolve-so-per-agent-scoping-is-inert | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.sweep-remaining-guards-for-fail-open-identity-and-pipe-unpiped-scope-asymmetry | closed | workflow-improvement | pipeline | 2026-08-29 | — |
 | pipeline.t1-governance-path-preflight | closed | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.technical-lock-for-pipeline-consent-before-onboarding-complete | closed | workflow-improvement | pipeline | 2026-08-07 | — |
@@ -528,12 +530,15 @@
 | pipeline.the-denial-trim-state-is-keyed-per-session-not-per-agent-as-its-comment-claims | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.the-dispatch-record-field-enumeration-omits-a-field-the-checker-requires | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.the-handover-size-guard-only-sees-one-of-two-write-paths | open | defect | pipeline | 2026-09-01 | — |
+| pipeline.the-handover-size-guards-header-comment-contradicts-its-own-registration | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.the-ledger-commit-rule-was-given-a-second-home-in-a-different-voice | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.the-ledger-reconciler-writes-before-the-items-are-validated | deferred | defect | pipeline | 2026-08-08 | — |
 | pipeline.the-marketplace-attestation-compares-more-than-the-property-it-protects | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.the-pipeline-cannot-merge-two-parallel-sprint-ledgers | closed | requirement | pipeline | 2026-08-27 | — |
 | pipeline.the-privacy-sign-off-is-bound-to-a-superseded-candidate | open | defect | pipeline | 2026-08-31 | — |
+| pipeline.the-push-authority-surface-cannot-be-bounded-by-static-enumeration | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.the-two-suite-registration-checkers-disagree | closed | defect | pipeline | 2026-08-27 | — |
+| pipeline.the-unregistered-suite-detector-is-not-itself-a-gate-step | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.this-hosts-local-marketplace-copy-is-not-symlinked-to-source | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.three-doc-and-adr-checkers-never-run-in-verify | rejected | defect | pipeline | 2026-08-27 | — |
 | pipeline.three-independent-copies-of-the-wsl-windows-path-normalization | closed | defect | pipeline | 2026-08-27 | — |
@@ -597,7 +602,7 @@
 
 ## Counts
 
-- open: 91
+- open: 96
 - in_progress: 0
 - closed: 484
 - rejected: 3
