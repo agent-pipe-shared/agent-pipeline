@@ -1,0 +1,73 @@
+{
+  "schema": "pipeline.claims-evidence.v1",
+  "round": "NVA-B-ROUND-K",
+  "commits": [
+    "a4786d52a82483bfcc4e8953f6e722f7b8ec3c73",
+    "7d56917c"
+  ],
+  "checks": [
+    {
+      "command": "node --test plugins/pipeline-core/lib/protected-test-paths.test.mjs",
+      "exitCode": 0,
+      "tests": 18,
+      "pass": 18,
+      "fail": 0,
+      "runBy": "dispatcher"
+    },
+    {
+      "command": "node --test plugins/pipeline-core/scripts/push-init.test.mjs",
+      "exitCode": 0,
+      "tests": 18,
+      "pass": 18,
+      "fail": 0,
+      "runBy": "dispatch NVA-B-PUSHINIT-1"
+    },
+    {
+      "command": "node --test harness/scripts/check-consumer-safe-paths.test.mjs",
+      "exitCode": 0,
+      "tests": 9,
+      "pass": 9,
+      "fail": 0,
+      "runBy": "dispatcher"
+    },
+    {
+      "command": "node --test plugins/pipeline-core/scripts/push-release-flow-docs-contract.test.mjs",
+      "exitCode": 0,
+      "tests": 6,
+      "pass": 6,
+      "fail": 0,
+      "runBy": "dispatcher"
+    },
+    {
+      "command": "node --test harness/scripts/check-doc-reconciliation.test.mjs",
+      "exitCode": 0,
+      "tests": 22,
+      "pass": 22,
+      "fail": 0,
+      "runBy": "dispatcher"
+    },
+    {
+      "command": "node --test plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs",
+      "exitCode": 0,
+      "tests": 193,
+      "pass": 193,
+      "fail": 0,
+      "runBy": "dispatch NVA-B-GITARGV"
+    },
+    {
+      "command": "node harness/scripts/verify.mjs",
+      "exitCode": 1,
+      "artifact": "evidence/nva-b-gitargv-verify.log",
+      "note": "all 505 named suites reported =0; the sole non-zero entry is candidate-binding=1 (VERIFY-CANDIDATE-DRIFT), HEAD having moved from a4786d52 to 7d56917c during the run",
+      "runBy": "dispatch NVA-B-GITARGV"
+    }
+  ],
+  "deviations": [
+    "evidence/dispatch-record-NVA-B-GITARGV.json records agentType \"goldfish\" and model \"claude-sonnet-5\"; the dispatched subagent type was goldfish-deep, whose definition frontmatter pins model: sonnet.",
+    "evidence/dispatch-record-NVA-B-GITARGV.json records rulesetSha 87bed8b7; the dispatch briefing stated a different value.",
+    "The NVA-B-PUSHINIT-1 run reached the harness maxTurns limit before committing and was resumed with a procedural closing message; the commit was produced in the resumed run.",
+    "isReadOnlyGitSubcommand() in plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs still does not list rebase; the change was applied at the candidate-extraction and dev-plan-shell layer only.",
+    "git reset, git switch, git merge, git cherry-pick and git revert were left on generic candidate extraction.",
+    "The NVA-B-GITARGV run exceeded its briefed tool budget."
+  ]
+}

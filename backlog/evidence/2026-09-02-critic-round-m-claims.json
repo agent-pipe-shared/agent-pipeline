@@ -1,0 +1,94 @@
+{
+  "schema": "pipeline.claims-evidence.v1",
+  "round": "NVA-B-ROUND-M",
+  "subject": "the rebase authority: resolver and guard wiring",
+  "commits": ["95f16466", "103463a3", "2f59b2bd"],
+  "checks": [
+    {
+      "command": "node --test plugins/pipeline-core/lib/rebase-authority.test.mjs",
+      "exitCode": 0,
+      "tests": 13,
+      "pass": 13,
+      "fail": 0,
+      "artifact": "scratch/evidence-NVA-B-REBAUTH-1/summary.json, scratch/evidence-rebwire/rebase-authority.txt"
+    },
+    {
+      "command": "node --test plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs",
+      "exitCode": 0,
+      "tests": 210,
+      "pass": 210,
+      "fail": 0,
+      "runBy": "dispatcher, re-run at commit 6ef20144",
+      "note": "194 before this package. CORRECTION: the artifact scratch/evidence-rebwire/guard-lifecycle-ready.txt records tests 210 / pass 209 / fail 1, not the 209/209/0 this record previously claimed. The single failure was TPSHELL-REBASE-ABBREV, a test authored by a concurrent dispatch and red while its production fix was still in flight; it is foreign to this package and all fifteen rebwire cases were green in that same artifact. That fix landed at 41dd0d8e and the suite is 210/210 green in the dispatcher's own re-run above. The earlier green sweep's artifact was overwritten in place by the red re-run, so the original claim is not reproducible from the artifact set; this re-run replaces it."
+    },
+    {
+      "command": "node --test plugins/pipeline-core/hooks/guard-devplan.test.mjs",
+      "exitCode": 0,
+      "artifact": "scratch/evidence-rebwire/guard-devplan.txt"
+    },
+    {
+      "command": "node --test plugins/pipeline-core/lib/protected-test-paths.test.mjs",
+      "exitCode": 0,
+      "tests": 25,
+      "pass": 25,
+      "fail": 0,
+      "runBy": "dispatcher, re-run at commit 6ef20144",
+      "note": "CORRECTION: the artifact scratch/evidence-rebwire/protected-test-paths.txt records fail 3, not the 22/22/0 this record previously claimed. Those three failures belonged to a concurrent dispatch's in-flight work on the same file and are foreign to this package; they were closed at 41dd0d8e. The dispatcher's re-run above measures 25/25 at HEAD."
+    },
+    {
+      "command": "node --test harness/scripts/check-consumer-safe-paths.test.mjs",
+      "exitCode": 0,
+      "tests": 9,
+      "pass": 9,
+      "fail": 0,
+      "artifact": "scratch/evidence-rebwire/check-consumer-safe-paths.txt"
+    },
+    {
+      "command": "break-and-restore proof, resolver pins A/B/C",
+      "artifact": "scratch/evidence-NVA-B-REBAUTH-1/break-*.log, restore-*.log",
+      "note": "allProofsBehavedAsPinned true; moduleRestoredByteIdentical true; pin C reddened only the unapproved-orig-head direction"
+    },
+    {
+      "command": "break-and-restore proof, wiring pins permits-path / permits-command / disclosure",
+      "artifact": "scratch/evidence-rebwire/break-1-permits-path, break-2-permits-command, break-3-disclosure",
+      "note": "each red=1 then green=0, restore byte-verified in a finally"
+    }
+  ],
+  "testCaseCoverage": {
+    "note": "all fourteen cases are real guard-level tests against a genuine conflicted rebase fixture; none dependency-injection-only, none absent",
+    "positive": [
+      "1 continuations",
+      "2 Edit/Write on a conflicted path, relative and absolute",
+      "3 git checkout --ours on a real conflict path, relative and absolute",
+      "4 git rebase --show-current-patch",
+      "5 git rebase --abort via its pre-existing lane, asserted in both fixtures"
+    ],
+    "negative": [
+      "1 file outside the conflict set",
+      "2 --edit-todo",
+      "3 --exec, --skip, --continue --autostash",
+      "4 arbitrary -c",
+      "5 no push authority",
+      "6 pathspec outside the surface",
+      "7 unapproved orig-head"
+    ],
+    "requirement5": [
+      "1 non-empty retry-action envelope naming the conflict surface",
+      "2 an uninformed session driven to a finished rebase by parsing only the denials"
+    ]
+  },
+  "deviations": [
+    "Negative case 3's --exec payload is refused one lane earlier, by GUARD-DEVPLAN-SHELL's opaque-interpreter classification; the test asserts the two-code disjunction plus no admission, rather than pinning one code.",
+    "Negative case 5 asserts the property this hook owns; guard-push.mjs is what refuses pushes.",
+    "main()'s two malformed-invocation denials bypass the disclosure wrapper.",
+    "Requirement 4's refusals do not bypass the readiness kernel: git rebase --continue and --show-current-patch are still admitted by the pre-existing readiness lane, and the new authority only relieves the dev-plan gate.",
+    "plugins/pipeline-core/lib/rebase-authority.test.mjs is pure dependency injection and does not prove real .git/rebase-merge filenames; the guard-level suite carries the real-git coverage.",
+    "The rebase-authority-tests suite is NOT registered in harness/scripts/verify.mjs. The registration line is `  { name: \"rebase-authority-tests\", file: join(libDir, \"rebase-authority.test.mjs\") },`; verify.mjs is a protected test path (TP-3) with no in-session override in signature mode.",
+    "One comment in the resolver's purity test overstates its adjacent assertion; the property itself is proven by the argv-audit loop above it.",
+    "The rebase-apply backend is refused with REBASE-AUTHORITY-BACKEND-UNSUPPORTED rather than served an invented todo/done mapping.",
+    "harness/scripts/verify.mjs has not been run to a clean-candidate exit 0 against any of these commits.",
+    "The fix is not present in the plugin copy that executes in live sessions; no install or readback step has been performed.",
+    "2f59b2bd relaxed the mid-rebase global-option refusal from every leading option to -c shapes only and shipped with no assertion of its own, because the paired assertions belonged in a test file a concurrent dispatch was editing. Those three assertions did land, in commit 41dd0d8e, inside the rebwire negative-4 test: a loop over [\"git --no-pager status\", \"git --no-pager log\", \"git -p log\"] asserting exit 0. The relaxation is therefore pinned, but by a commit carrying a different work package's Dispatch: trailer.",
+    "Every artifact this record cites lives under the gitignored scratch/ directory, and the green sweep's copies were overwritten in place by a later red sweep. Two claims in this record were consequently unsupportable from their own artifacts until the dispatcher re-measured them."
+  ]
+}
