@@ -3,7 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.trust-anchor-bootstrap-test-never-registered-in-verify
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-01
+closure_commit: 7660b30bde221c1a40c9ac27a0e8ede733b79bda
+closure_repository: "self"
+closure_evidence: harness/scripts/verify.mjs
+done_when: contains harness/scripts/verify.mjs pre-commit-hook-install-trust-anchor-bootstrap-tests
 created: 2026-08-30
 sprint: nova-b
 tracking: "Nova B — pre-existing gap found while registering an unrelated verify.mjs suite; not introduced by this session's own work."
@@ -64,3 +69,28 @@ does not cover this edit.
   at its own closure; this is about making it actually run in the gate,
   not about a suspected regression.
 - **Date:** 2026-08-30
+
+## Closed, 2026-09-01 — registered, and observed running in the gate
+
+`harness/scripts/verify.mjs:752` registers
+`pre-commit-hook-install-trust-anchor-bootstrap-tests` against
+`plugins/pipeline-core/scripts/pre-commit-hook-install.trust-anchor-bootstrap.test.mjs`,
+added by commit `7660b30b` ("test(pipeline): register greenfield regressions").
+
+Verified in both directions rather than from the registration line alone, since
+this item is specifically about a suite that exists and passes without running
+in the gate — a registration entry is exactly the kind of evidence that can look
+sufficient and not be. The suite ran in the full verify at `0f0ed3f7` and
+reported `pre-commit-hook-install-trust-anchor-bootstrap-tests=0` among the 505
+steps, every one of them fresh (`reused: 0`). So it is registered AND observed
+executing, which is what the item asked for.
+`check-verify-suite-registration.mjs` reports zero unregistered suites.
+
+The item is retro-declared with a `done_when` naming the registration entry, so
+the record carries a falsifiable predicate rather than closing on prose alone.
+
+Noted for whoever reads this later: the item was resolved by a commit that did
+not reference it, and stayed open until a mechanical predicate check surfaced
+it. That is the same shape as
+`pipeline.resolved-backlog-items-can-keep-status-open-indefinitely`, and this is
+a further occurrence of it.
