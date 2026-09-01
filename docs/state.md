@@ -239,8 +239,23 @@ Ordered; the ordering is load-bearing where stated.
    D5's remote half and makes a `v*` tag immutable. Untested against the API:
    if a rule is rejected for `target: "tag"`, drop that rule. `bypass_actors` is
    empty, which binds the PO too.
-9. **Optional, but due 2026-09-07:** a TP-3 maintenance window registering the
-   six suites parked in `check-verify-suite-registration.mjs`'s `EXCLUSIONS`.
+9. **One protected-test-path maintenance window, covering two debts at once
+   (PO decision 2026-09-01: do this tonight, not later).**
+   - **TP-5** — remove the release-adapter carve-out from
+     `checkReleaseTagAncestry` in `guard-push.mjs`, and correct the six
+     `guard-push.test.mjs` cases (`PGD02`, `PGD03`, `PGD04`, `PGD18b`, `PGD22`,
+     `PGD23`) that push `v1.0.0`/`v2.0.0`-shaped tags as deploy-artifact
+     identities with no `origin/main` fixture. Those six are why the carve-out
+     exists at all. Closing Critic finding F3: as written, any project
+     declaring a release adapter whose trigger matches `refs/tags/v*` gets zero
+     ancestry enforcement, and ADR-0078 D5's own enumerated limitations do not
+     include that case. The PO chose removal over documenting it as a named
+     limitation.
+   - **TP-3** — register the suites parked in
+     `check-verify-suite-registration.mjs`'s `EXCLUSIONS` directly in
+     `verify.mjs`. Those entries carry `expires: 2026-09-07`, so this window is
+     owed within the week regardless; doing both in one sitting converts every
+     parked debt into a registration and needs one ceremony instead of two.
    Five of them already carry that expiry, so the window is owed regardless;
    doing it once converts six debts into six registrations.
 
