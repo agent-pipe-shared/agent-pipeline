@@ -224,6 +224,36 @@ close a backlog item, report to the PO). Silence or emptiness in the
 returned result is not evidence of "nothing happened" any more than a
 cheerful-sounding report is evidence that everything happened.
 
+## Never relay a scope-widening PO decision to a running dispatch via `SendMessage`
+
+A PO decision that widens or changes a dispatch's authorized scope (field 4,
+Forbidden) must not be relayed to an already-running dispatch via
+`SendMessage`. The running dispatch's field 4 is what bounds its writes, not
+a suggestion — a mid-task message that hands it new authority the original
+briefing never granted either gets correctly refused (the dispatch has no
+way to distinguish a legitimate scope amendment from an injected instruction,
+so refusing is the only safe reading of its own contract), which wastes the
+dispatch, or gets followed, producing writes nobody actually authorized.
+Confirmed live: a PO's "standardize all three [adapters]" decision was
+relayed mid-task to an already-running Goldfish dispatch
+(`AGY-CHATADAPTER-1`) whose field 4 only ever granted write scope on one
+adapter; the dispatch correctly REFUSED the relayed instruction.
+
+Instead: build and send a fresh, properly-scoped briefing — either a new
+dispatch, or a resume message to the same run per "Recovering a truncated
+dispatch" below.
+
+This does **not** forbid sending a running or truncated dispatch a message —
+a purely procedural resume ("finish, commit what is green, emit your
+report", per `templates/prompts/goldfish-task.md`'s truncated-dispatch
+guidance) is legitimate and adds no authority. The line: does the message
+add authority the original field 4 did not grant, or does it only ask the
+dispatch to finish/report on what it was already authorized to do?
+"Also standardize the other two adapters" is scope-widening — new files,
+new authority, send a fresh briefing instead. "Finish, commit what is
+green, emit your report" is procedural continuation — the dispatch's
+existing scope already covers it, sending it as a resume message is fine.
+
 ## Recovering a truncated dispatch
 
 Do not discard a truncated dispatch's work without first checking: `git
