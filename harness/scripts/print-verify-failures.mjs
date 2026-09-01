@@ -118,21 +118,47 @@ export const RECOVERED_FAILURE_HEADER = "--- failing lines recovered from the om
 // Deliberately broad across reporters: TAP (`not ok`), this repo's own
 // hand-rolled suites (`FAIL  <name>`), the node:test spec reporter (`✖`), and
 // the assertion class name that carries the message itself.
-export const FAILURE_LINE_RE = /^\s*(?:not ok\b|FAIL\b|✖|✗|×)|^\s*#\s*fail\b|AssertionError/;
+//
+// Every alternative is anchored to the start of the line (round-L finding F7).
+// The `AssertionError` alternative used to be unanchored, so it claimed any
+// line that merely MENTIONS the class -- a passing test whose name contains it,
+// a stack frame, a `# Subtest:` header -- and those lines then competed for the
+// bounded recovery budget with the actual failures. node:test prints the real
+// one as `  AssertionError [ERR_ASSERTION]: ...`, at the start of its own line,
+// so anchoring costs no genuine detection; the `[A-Za-z]*` prefix keeps the
+// subclasses (`RangeError`-style wrappers, `TypeAssertionError`) that reporters
+// emit in the same position.
+export const FAILURE_LINE_RE = /^\s*(?:not ok\b|FAIL\b|✖|✗|×|#\s*fail\b|[A-Za-z]*AssertionError\b)/u;
+
+// The share of MAX_BYTES_PER_SUITE the recovered-failure block may occupy. It
+// has to be a RESERVE rather than a remainder: the tail is bounded first, so
+// without a reserve the recovered lines would have nothing left to fit into on
+// exactly the suites that need them most.
+const RECOVERED_BLOCK_BYTE_SHARE = 0.5;
 
 /**
  * AC-2 per-suite bounding: at most MAX_LINES_PER_SUITE lines, then at most
- * MAX_BYTES_PER_SUITE bytes of that line-bounded tail. Both bounds keep the
- * TAIL (the end of the content — where an assertion failure's own message
- * lives), never the head: a byte-bound overflow is resolved by slicing the
- * last MAX_BYTES_PER_SUITE bytes of the already line-bounded text, not by
+ * MAX_BYTES_PER_SUITE bytes — for the WHOLE returned text, recovered failure
+ * lines included. Both bounds keep the TAIL (the end of the content — where an
+ * assertion failure's own message lives), never the head: a byte-bound overflow
+ * is resolved by slicing the last bytes of the already line-bounded text, not by
  * dropping whole lines, so one line longer than the byte cap still yields a
  * useful (if partial) tail instead of being dropped entirely.
  *
- * Whatever both bounds drop is then re-scanned for failure-marker lines, and
- * up to MAX_RECOVERED_FAILURE_LINES of them are re-attached ahead of the tail
- * under RECOVERED_FAILURE_HEADER: a truncation that hides the failing test's
- * own line defeats the whole reporter.
+ * Whatever both bounds drop is then re-scanned for failure-marker lines, and up
+ * to MAX_RECOVERED_FAILURE_LINES of them are re-attached ahead of the tail under
+ * RECOVERED_FAILURE_HEADER: a truncation that hides the failing test's own line
+ * defeats the whole reporter.
+ *
+ * Round-L finding F7: recovery used to run AFTER the byte bound and merely
+ * recompute `keptBytes`, so the returned text could exceed MAX_BYTES_PER_SUITE
+ * by the size of the recovered block. `keptBytes` is what the global gate
+ * spends, so a single suite whose omitted head carried many long failure-marker
+ * lines could exhaust MAX_TOTAL_BYTES and omit every LATER failing suite's tail
+ * entirely. The bound is now ENFORCED across both parts: the recovered block is
+ * admitted line by line within its own byte reserve, and the tail is then shrunk
+ * to whatever the cap leaves, so `keptBytes <= MAX_BYTES_PER_SUITE` always holds
+ * and is always the true byte length of `text`.
  */
 export function boundSuiteTail(text) {
   const originalBytes = Buffer.byteLength(text, "utf8");
@@ -152,14 +178,41 @@ export function boundSuiteTail(text) {
     keptText = buffer.subarray(buffer.length - MAX_BYTES_PER_SUITE).toString("utf8");
     keptBytes = Buffer.byteLength(keptText, "utf8");
   }
+  // Line EQUALITY, not `includes`: a short failure line that happens to occur
+  // inside any kept line was previously treated as already present and dropped
+  // from recovery (round-L finding F7).
+  const keptLines = new Set(keptText.split("\n"));
   const recoveredFailureLines = (lineTruncated || byteTruncated)
     ? allLines
-      .filter((line) => FAILURE_LINE_RE.test(line) && !keptText.includes(line))
+      .filter((line) => FAILURE_LINE_RE.test(line) && !keptLines.has(line))
       .slice(0, MAX_RECOVERED_FAILURE_LINES)
     : [];
   if (recoveredFailureLines.length > 0) {
-    keptText = [RECOVERED_FAILURE_HEADER, ...recoveredFailureLines, keptText].join("\n");
-    keptBytes = Buffer.byteLength(keptText, "utf8");
+    const headerBytes = Buffer.byteLength(RECOVERED_FAILURE_HEADER, "utf8") + 1;
+    const reserve = Math.min(
+      Math.floor(MAX_BYTES_PER_SUITE * RECOVERED_BLOCK_BYTE_SHARE),
+      MAX_BYTES_PER_SUITE,
+    );
+    const admitted = [];
+    let blockBytes = headerBytes;
+    for (const line of recoveredFailureLines) {
+      const cost = Buffer.byteLength(line, "utf8") + 1;
+      if (blockBytes + cost > reserve) break;
+      admitted.push(line);
+      blockBytes += cost;
+    }
+    if (admitted.length > 0) {
+      // Enforce, don't recompute: the tail gives up exactly what the recovered
+      // block takes, so the joined text is bounded by MAX_BYTES_PER_SUITE.
+      const tailBudget = Math.max(0, MAX_BYTES_PER_SUITE - blockBytes);
+      if (Buffer.byteLength(keptText, "utf8") > tailBudget) {
+        byteTruncated = true;
+        const buffer = Buffer.from(keptText, "utf8");
+        keptText = buffer.subarray(buffer.length - tailBudget).toString("utf8");
+      }
+      keptText = [RECOVERED_FAILURE_HEADER, ...admitted, keptText].join("\n");
+      keptBytes = Buffer.byteLength(keptText, "utf8");
+    }
   }
   const keptLineCount = keptText.length === 0 ? 0 : keptText.split("\n").length;
   return {
