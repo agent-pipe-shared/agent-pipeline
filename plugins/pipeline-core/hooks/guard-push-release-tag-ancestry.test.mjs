@@ -145,16 +145,23 @@ const BLOCK = 2, ALLOW = 0, WARN = 1; // WARN = hooks.json's own "1 = allow + wa
 // now carries a NOTICE naming what was skipped, why, and the remedy. AC-1 (NVA-B-TAGNOTICE2,
 // rework of a `major` review finding): with NO manifest present in this fixture, the notice --
 // no longer terminates the hook at WARN=1 -- execution continues to the manifest-absent exit
-// just past the call site, which is what actually produces this exit 0. See TAGPROV3d below
-// for the case that proves execution continues into a check that is NOT a fast allow. --------
+// just past the call site. See TAGPROV3d below for the case that proves execution continues
+// into a check that is NOT a fast allow. AC-1/AC-4 (NVA-B-TAGNOTICE3, rework of a `major` ----
+// finding from an independent re-review): that manifest-absent exit used to be a bare -------
+// `process.exit(0)`, and hooks.json's own exit-code contract assigns stderr NO reader at ----
+// exit 0 -- so the notice text landed on the child process's fd 2 but the host never showed
+// it to the operator, on exactly the ordinary clean-allow path the notice exists for. The ---
+// notice is now deferred and emitted at that same terminal allow via `emit(1, ...)` (WARN, --
+// still an allow under the contract's own "1 = allow + config warning, stderr to the user"),
+// so this case now asserts WARN=1, the exit the code actually produces on this path. --------
 {
   const { dir, head } = freshRepo("no-origin-main");
   gitAt(dir, "tag", "v1.0.0", head);
   check(
-    "TAGPROV3 allow  refs/remotes/origin/main missing locally is not refused, but is no longer silent",
+    "TAGPROV3 warn-allow  refs/remotes/origin/main missing locally is not refused, and the notice reaches the operator (exit 1, not silently discarded at exit 0)",
     "git push origin v1.0.0",
     dir,
-    ALLOW,
+    WARN,
     {
       stderrIncludes: [
         "release-tag ancestry check was skipped",
