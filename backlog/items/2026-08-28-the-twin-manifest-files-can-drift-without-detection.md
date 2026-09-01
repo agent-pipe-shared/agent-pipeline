@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.twin-manifest-files-can-drift-without-detection
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-01
+closure_commit: 131a9901
+closure_repository: "self"
+closure_evidence: plugins/pipeline-core/lib/project-authority.test.mjs
 created: 2026-08-28
 sprint: nightwing
 source: "Claude/Windows greenfield run, 2026-08-28, sections 7 and 11 of its own analysis (docs/pipeline-haertungstest-und-analyse.md)."
@@ -37,3 +41,20 @@ someone compares the files by hand.
 
 - A divergence between the two files is reported by the drift check.
 - The check names which file is authoritative for the diverging field.
+
+## Closed, 2026-09-01 (NVA-B-STALECLOSE)
+
+Re-verified independently, both halves of AC-1: (1) read this item's own
+text in full — both Acceptance bullets ask only for detection + naming the
+authoritative file, nothing more; (2) `git log --oneline -S
+"PA-CALIBRATION-DRIFT" -- plugins/pipeline-core/lib/project-authority.mjs`
+resolves to commit `131a9901` ("fix(project-authority): detect twin
+calibration drift in classification"), and reading the current code confirms
+`calibrationDriftDiagnostics()` (`project-authority.mjs` lines ~354–364)
+compares the two calibration files' sha256, emits `code: "PA-CALIBRATION-
+DRIFT"` on divergence, and names `authoritative` (the resolved source tier)
+in the finding — satisfying both Acceptance bullets directly, not merely
+matching the `done_when` needle string. `plugins/pipeline-core/lib/
+project-authority.test.mjs` carries a dedicated `PA-CALIBRATION-DRIFT` test
+case; re-ran the full suite: `node --test
+plugins/pipeline-core/lib/project-authority.test.mjs` — 36/36 pass.

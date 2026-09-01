@@ -398,3 +398,22 @@ dispatch's own stop condition for this sub-part.
 
 **Still not yet dispatched:** (C) the PRD/Spec plan-approval
 standardization. Item stays `open`.
+
+## Re-verified, 2026-09-01 (NVA-B-STALECLOSE) — predicate satisfied, requirement not met, stays open
+
+`check-backlog-done-predicate.mjs` reports this item STALE-OPEN because
+`plugins/pipeline-core/scripts/pipeline-state.mjs` now contains
+`requireAttendedChatGateConfirmation` (confirmed by direct read: the import
+at line 445 and two call sites at ~6379/~8948, landed by the (A) push-half
+dispatch `AGY-CHATADAPTER-1`). That satisfies only the `done_when` needle
+string, not this item's actual requirement. The item's own history above
+records three parts: (A) push self-approval — done; (B) kickoff
+`--language`/`--profile` gating — done (`AGY-CHATADAPTER-2`); (C) the
+PRD/Spec plan-approval standardization the PO explicitly widened scope to
+cover (2026-08-25 "Scope widened" / "PO product decision" sections) — **not
+yet dispatched**. `git log --oneline -S "PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER"
+-- plugins/pipeline-core/lib/po-gate-authority.mjs` shows no commit
+superseding that marker mechanism with the new chat-gate registry, matching
+the item's own "Still not yet dispatched" line. Left `status: open`; (C)
+remains the blocking remainder. `done_when` predicate not amended per
+briefing prohibition (predicate fixes are a separate package).

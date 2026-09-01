@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.expires-at-rejects-a-non-round-trip-timestamp-and-the-doc-says-otherwise
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-01
+closure_commit: 67c160c4
+closure_repository: "self"
+closure_evidence: plugins/pipeline-core/scripts/po-human-approval.test.mjs
 created: 2026-08-27
 sprint: alfred
 source: "Handover-rotation extraction pass over Phoenix checkpoint 69, 2026-08-27; the defect itself was hit live during a push ceremony on 2026-08-19"
@@ -58,3 +62,22 @@ still be wrong about the flow.
 
 - **Decision:** open, unassigned. Half of it is a one-line documentation fix on
   a path that has already cost one live PO ceremony attempt.
+
+## Closed, 2026-09-01 (NVA-B-STALECLOSE)
+
+Re-verified independently, both halves of AC-1: (1) read this item's own
+text — the Proposal names two independent halves, both required for full
+closure ("Fixing only (2) is not [a legitimate outcome]: the doc would still
+be wrong about the flow"); (2) `git log --oneline -S "GF-080 Gap B:
+--expires-at accepts any parseable" -- plugins/pipeline-core/scripts/
+po-human-approval.test.mjs` resolves to commit `67c160c4` ("fix
+(pipeline-core): normalize --expires-at instead of rejecting valid
+ISO-8601"). Confirmed both halves landed by direct read: (2) the CLI
+normalizes rather than rejects (`prepare-critical` accepts a non-canonical
+but parseable timestamp and stores/digests the canonical
+`Date#toISOString()` form — `po-human-approval.test.mjs`'s "GF-080 Gap B"
+test, re-run as part of the full suite); (1)
+`docs/push-release-flow.md:184` now states verbatim "`--expires-at` is
+normalized, not rejected", matching the corrected behavior. Re-ran:
+`node --test plugins/pipeline-core/scripts/po-human-approval.test.mjs` —
+109/109 pass.

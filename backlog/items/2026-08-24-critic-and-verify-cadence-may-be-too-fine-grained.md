@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.critic-and-verify-cadence-may-be-too-fine-grained
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-01
+closure_commit: 9adf2592
+closure_repository: "self"
+closure_evidence: docs/operating-model.md
 created: 2026-08-24
 sprint: alfred
 source: "PO observation during the sprint-agy-runner D-fix wave, 2026-08-24 (\"seltener Critics und Verifys fahren und diese eher nur an große Sammelblöcke setzen ... dadurch dauern selbst kleine Fixes und kleine Erweiterungen immer viele Stunden\")"
@@ -163,3 +167,24 @@ gain a cross-reference pointer to the new operating-model.md paragraph
 (a documentation-polish nicety, not required by the Acceptance criteria,
 which names `docs/operating-model.md`-shaped policy encoding, not a
 specific file).
+
+## Closed, 2026-09-01 (NVA-B-STALECLOSE)
+
+Re-verified independently, both halves of AC-1: (1) read this item's own
+current text in full — all three Acceptance criteria bullets are satisfied
+by the 2026-08-25 Triage/analysis pass above (documented analysis with
+evidence, a concrete boundable policy, and an explicit "no change" call on
+the correction-wave lever with its own rationale); (2) `git log --oneline -S
+"Collection-block batching" -- docs/operating-model.md` resolves to commit
+`9adf2592` ("docs(operating-model): codify collection-block batching for
+independent Goldfish dispatches") — the policy text is live at
+`docs/operating-model.md` §4 step 7, matching the item's own quoted excerpt
+verbatim (the item's cited SHA `9e68599d67c5dc...` does not resolve to any
+commit in this repository; `9adf2592` is the correct, verified commit).
+Re-ran the cited verification suite:
+`node --test harness/scripts/check-reference-paths.test.mjs
+harness/scripts/check-doc-contracts.test.mjs
+harness/scripts/check-language-canon.test.mjs` — 60/60 pass. No open remainder
+found: this item's `done_when` needle is present, the analysis is real (not
+just a matched string), and the policy is a genuine, concrete, boundable rule
+rather than a vague instruction.

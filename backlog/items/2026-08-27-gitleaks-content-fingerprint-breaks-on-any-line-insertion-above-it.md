@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.gitleaks-content-fingerprint-breaks-on-any-line-insertion-above-it
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-01
+closure_commit: bd089964
+closure_repository: "self"
+closure_evidence: plugins/pipeline-core/scripts/security-adapters/gitleaks.test.mjs
 created: 2026-08-27
 sprint: alfred
 source: "Hit twice in one session during the Phoenix merge, 2026-08-27"
@@ -63,3 +67,31 @@ Not yet decided; options seen so far, none of them free:
 - **Decision:** open, unassigned. Not blocking — the workaround is known and
   mechanical — but it will recur for anyone who edits a file carrying a
   suppression, and the failure presents as an unexplained blocking secret scan.
+
+## Closed, 2026-09-01 (NVA-B-STALECLOSE)
+
+Per this briefing's AC-4, judged on the code, not the `path-exists` predicate
+(a file merely existing proves nothing about the defect). Re-verified both
+halves of AC-1: (1) read this item's own text — "What could close it" names
+three non-exclusive options, none mandatory together; (2) `git log --oneline
+-1 -- plugins/pipeline-core/scripts/gitleaks-repair-ignore.mjs` resolves to
+commit `bd089964` ("fix(security): diagnose stale .gitleaksignore line-bound
+entries"). Direct code read confirms TWO of the three named options are
+genuinely implemented, not merely a file that exists: (a) the diagnostic —
+`security-adapters/gitleaks.mjs`'s `run()` appends a near-miss message
+naming both the old/new line and the literal `gitleaks-repair-ignore.mjs`
+repair command to a blocked finding whose path+rule+column match an entry at
+a different line; (b) the repair helper —
+`gitleaks-repair-ignore.mjs`'s `repairStaleIgnoreEntry()` recomputes and
+rewrites exactly the one named stale entry using the same
+`gitleaksContentAuthorityLine()` digest arithmetic the scan itself uses,
+touching no other entry. Both are covered by dedicated tests in
+`security-adapters/gitleaks.test.mjs` ("flags a near-miss...",
+"gitleaks-repair-ignore.mjs's repairStaleIgnoreEntry() recomputes...",
+"...refuses when no entry matches..."). Re-ran: `node --test
+plugins/pipeline-core/scripts/security-adapters/gitleaks.test.mjs` — 23/23
+pass. The third option (binding to surrounding content instead of the line
+index) was NOT built and is not required — the diagnostic + repair-helper
+pair turns the original "costs a verify round to notice" failure into a
+one-line, pointed-to fix, which is what the item's own Description names as
+the actual cost worth removing.
