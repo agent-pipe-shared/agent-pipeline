@@ -120,7 +120,16 @@ Rule IDs: `GIT-xx`.
   same commit, and whether or not `reconcile-backlog-ledger.mjs --activate`
   has ever been run in this working tree; GG-22 recomputes debt fresh from
   repository history on every commit, it does not track whether the
-  reconciler was invoked. Enforced by the git-guard union as `GG-22` — a
+  reconciler was invoked.
+- **One precondition, and it is the only thing that switches GG-22 off
+  entirely:** the rule no-ops while `backlog/transitions.ndjson` has never
+  been committed in this repository's history. It has no earlier ledger
+  commit to measure debt against, so it declines rather than diffing against
+  an empty ref. A freshly onboarded project therefore has **no** GG-22
+  protection until its first ledger commit lands — stated here because the
+  population this affects is exactly the one least able to notice it, and
+  because a ruleset that claims more than the guard enforces is worse than
+  no rule at all (GIT-07). Enforced by the git-guard union as `GG-22` — a
   plain deny with no override token (`OVERRIDE GG-22`): the fix is always
   the same cheap, mechanical sequence, so there is no legitimate reason to
   bypass it.
