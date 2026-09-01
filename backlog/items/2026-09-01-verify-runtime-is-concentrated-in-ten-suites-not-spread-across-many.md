@@ -1,88 +1,103 @@
 ---
 schema: pipeline.backlog-item.v1
 id: pipeline.verify-runtime-concentrated-in-ten-suites
-type: requirement
+type: defect
 owner: pipeline
 status: open
 created: 2026-09-01
 sprint: nova-b
-tracking: "Nova B — PO observation that verify has grown too long. Measured: the cost is concentrated in ten integration-heavy suites and the run is fully sequential, so removing test cases is not the lever it appears to be."
-source: "Full verify at commit 0f0ed3f7 on 2026-09-01, exit 0, all 505 steps green. Per-suite wall clock taken from the run's own pipeline.verify-progress.v1 stream, which records startedAt/completedAt for every suite."
+tracking: "Nova B — the parallelized verify has regressed from 419s to 571s in one week, and the single suite named as its next lever grew 35% in the same period. Also supplies the all-fresh full-run artifact two older items were blocked on."
+source: "Full verify at commit 0f0ed3f7 on 2026-09-01, exit 0, all 505 steps green and every one of them fresh (reused: 0). Per-suite wall clock from the run's own pipeline.verify-progress.v1 stream; total wall clock computed from its first startedAt to its last completedAt."
 done_when: manual
 ---
 
-# Verify's runtime is concentrated in ten suites, not spread across many
+# The parallelized verify has regressed 36% in one week
 
-## The measurement
+## Correcting the framing first
 
-One full verify, 505 steps, all green. Summed suite wall clock: **1459.6s
-(24.3 minutes)**, executed strictly sequentially.
+This item was originally filed on 2026-09-01 claiming `verify.mjs` had no
+concurrency at all. That was wrong, and the error is recorded rather than
+quietly edited away because it is instructive: the grep that produced it
+searched `harness/scripts/verify.mjs`, and the worker pool does not live there.
+It lives in `plugins/pipeline-core/scripts/verify-journal.mjs`
+(`DEFAULT_VERIFY_CONCURRENCY = 8`, `runSuitePool`, a 60-member serial lane and
+an exclusive pre-phase). Searching the orchestrator for a mechanism that lives
+in the library it calls is a cheap mistake to make and an expensive one to act
+on.
 
-| Rank | Suite | Time | Share |
-|---|---|---|---|
-| 1 | `project-onboarding-v3-tests` | 157.0s | 10.8% |
-| 2 | `guard-push-tests` | 77.7s | 5.3% |
-| 3 | `doc-contract-tests` | 71.4s | 4.9% |
-| 4 | `onboarding-init-tests` | 59.7s | 4.1% |
-| 5 | `codex-pretool-guard-tests` | 56.8s | 3.9% |
-| 6 | `gate-strength-guard-tests` | 49.3s | 3.4% |
-| 7 | `local-worker-supervisor-cli-tests` | 38.7s | 2.6% |
-| 8 | `codex-critic-host-tests` | 38.1s | 2.6% |
-| 9 | `onboarding-continuity-tests` | 34.7s | 2.4% |
-| 10 | `human-guard-override-tests` | 33.2s | 2.3% |
+## Measured, 2026-09-01
 
-**Ten suites carry 42.2% of the runtime.** The distribution underneath is the
-opposite shape: **360 of 505 suites finish in under one second**, 453 under five
-seconds, and everything below rank 25 — some 480 suites — sums to 520s.
+| | |
+|---|---|
+| Steps | 505, all exit 0 |
+| Fresh vs. reused | **505 fresh, 0 reused** |
+| Candidate binding | exact, `0f0ed3f7` |
+| Summed suite time | 1459.6s |
+| **Actual wall clock** | **571.4s (9m 31s)** — effective speedup 2.55x |
 
-## Why this matters for the obvious remedy
+Ten suites carry 42.2% of the summed time; 360 of 505 finish under one second
+and 453 under five. The top five:
 
-The intuitive fix for "verify takes too long" is to remove old or redundant test
-cases. The measurement says that will not work: the many small suites are not
-where the time is. Deleting a hundred sub-second suites would save under two
-minutes and would spend real review effort — and each deletion carries the risk
-of removing a case that still pins live behaviour, in a repository whose whole
+| Suite | 2026-09-01 | 2026-08-25 |
+|---|---|---|
+| `project-onboarding-v3-tests` | **157.0s** | 116.5s |
+| `guard-push-tests` | 77.7s | — |
+| `doc-contract-tests` | 71.4s | — |
+| `onboarding-init-tests` | 59.7s | — |
+| `codex-pretool-guard-tests` | 56.8s | — |
+
+## The regression
+
+`2026-08-24-verify-mjs-runs-385-suites-strictly-sequentially.md` was closed on
+2026-08-25 by PO decision, accepting a measured clean full run of **419s** and
+naming `project-onboarding-v3-tests` (then 116.5s) as the concrete next lever if
+anyone picked it up.
+
+One week later the same gate takes **571.4s** — 36% slower — and that named
+suite has grown to **157.0s**, up 35%. It is in the serial lane, so it cannot
+overlap with the other 59 lane members, and it alone is now more than a quarter
+of the summed suite cost.
+
+Neither number was going to surface on its own. The closed item's own next-lever
+note was left as an unblocking observation rather than a tracked condition, and
+nothing measures wall clock between releases.
+
+## Why "sort out old test cases" is not the remedy
+
+Raised by the PO on 2026-09-01 as the intuitive fix. The distribution rules it
+out: everything below rank 25 — roughly 480 suites — sums to 520s of *summed*
+time, which under concurrency is a far smaller share of the 571s wall clock.
+Deleting a hundred sub-second suites would buy very little, while spending real
+review effort on correctness-sensitive deletions in a repository whose stated
 discipline is that tests are the contract.
 
-This is not an argument against tidying obsolete tests. Maintenance burden is a
-real and separate cost, and an obsolete test that pins a mechanism which no
-longer exists is worth removing on its own merits. It is an argument against
-expecting that work to make verify meaningfully faster, and against letting a
-runtime complaint drive a correctness-sensitive deletion pass.
+That is not an argument against removing obsolete tests. A test pinning a
+mechanism that no longer exists should go on maintenance grounds, regardless of
+its runtime. It is an argument against letting a runtime complaint choose which
+tests get deleted, because it would select the cheap ones and leave the
+expensive ones untouched.
 
-## The actual lever, and its cost
+## Relationship to the two existing items — neither is a duplicate
 
-`harness/scripts/verify.mjs` contains no concurrency whatsoever — no worker
-pool, no `Promise.all` over suites, no CPU-count awareness. Every suite runs to
-completion before the next starts. On a multi-core machine most of the wall
-clock is idle capacity.
-
-Parallelizing is therefore the lever, but it is not free and must not be
-attempted as a quick change:
-
-- Suite isolation is unproven at this scale. The repository already carries
-  `test-tmpdir-budget-tests`, `test-tmpdir-tests` and `tmp-leak-guard-tests`,
-  which exist precisely because temp-directory discipline has been a problem.
-  Two suites sharing a fixture path would fail non-deterministically under
-  concurrency and pass on a re-run — the worst failure mode a gate can have.
-- Several suites exercise guards, hooks and git state. Whether any of them
-  mutate shared repository state must be established per suite, not assumed.
-- The candidate-binding check (`VERIFY-CANDIDATE-DRIFT`) and the progress/
-  journal receipts assume an ordered stream; concurrency changes what "step N"
-  means for resume.
-
-A staged approach is likely right: prove isolation for the ten expensive suites
-first and parallelize only those, keeping the long tail sequential. That
-captures most of the available saving against the smallest isolation surface.
+- `pipeline.verify-has-grown-to-269-suites-with-no-recorded-cost` (open): its
+  lever is **selective execution**. Its 2026-08-20 design pass states that its
+  smallest safe next step is "one successful stable full Verify run at the
+  intended candidate baseline with every suite fresh (`reused: false`)". **That
+  artifact now exists** — the run above, 505/505 fresh, exit 0, exact binding.
+  Whoever picks that item up should not commission another one.
+- `pipeline.verify-mjs-runs-385-suites-strictly-sequentially` (closed): its
+  lever was **parallelizing the same suite set**, and it delivered. This item
+  does not reopen it or dispute its result; it records that the result has
+  since decayed.
 
 ## Acceptance criteria
 
-- A decision is recorded on whether verify parallelizes, and at what scope.
-- If it does, suite isolation is demonstrated rather than assumed, with a
-  documented method for deciding whether a given suite is safe to run
-  concurrently.
-- A run under concurrency produces the same step results as a sequential run
-  across repeated executions — non-determinism is the failure this must exclude.
-- Candidate binding, the progress stream, and verify resume keep working.
-- Any separate obsolete-test cleanup is tracked on its own, with per-suite
-  justification, and is not justified by runtime.
+- The cause of the 419s → 571s regression is identified, distinguishing suites
+  that grew from suites that were added.
+- `project-onboarding-v3-tests`'s internal cost is profiled — subprocess and
+  fixture count inside that one file — since the closed item already
+  established that no concurrency-cap change moves it.
+- A decision is recorded on whether wall clock is measured at any regular
+  boundary, so the next regression is noticed rather than re-discovered.
+- Any obsolete-test cleanup is tracked separately, justified per suite, and
+  never on runtime grounds.
