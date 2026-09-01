@@ -8,6 +8,7 @@ created: 2026-08-30
 sprint: nova-b
 tracking: "Nova B -- Nova A's danger-full-access quick fix is landed and re-verified; the remaining scope is the PO-recalled custom, safer sandbox profile with bootstrap-time selection."
 source: "PO, 2026-08-30: 'das hatten wir ja schon bei vielen themen mit codex und da sollte dann aber immer automatisch als folge schritt eine anweisung sein, dass bei diesen fehler eine andere art der sandbox nötig ist! dazu hatten wir eigentlich schon mal ein extra profil konfiguriert aber das muss halt auch im bootstrap abgefragt werden und dann anders starten.'"
+done_when: manual
 ---
 
 # Codex worker dispatch hardcodes `--sandbox workspace-write`, which blocks the child-process spawns the Pipeline's own repository validation needs
