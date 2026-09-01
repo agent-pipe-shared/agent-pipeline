@@ -122,22 +122,45 @@ const BLOCK = 2, ALLOW = 0;
   );
 }
 
-// ---- AC-3 -- refs/remotes/origin/main absent locally fails closed, naming `git fetch ----
-// origin main` as the remedy -- never a silent pass. ---------------------------------------
+// ---- AC-2 (ADR-0078 D5 correction, NVA-B-TAGFIX) -- refs/remotes/origin/main missing ----
+// locally is NOT refused: main is not necessarily the published line in every repository ---
+// this guard ships to, and ADR-0078 D5 only governs a repository where it is. ---------------
 {
   const { dir, head } = freshRepo("no-origin-main");
   gitAt(dir, "tag", "v1.0.0", head);
   check(
-    "TAGPROV3 block  refs/remotes/origin/main missing locally fails closed with the fetch remedy",
+    "TAGPROV3 allow  refs/remotes/origin/main missing locally is not refused",
+    "git push origin v1.0.0",
+    dir,
+    ALLOW,
+    { stderrNotIncludes: ["release-tag ancestry"] },
+  );
+}
+
+// ---- AC-3 -- with refs/remotes/origin/main PRESENT, an unreachable release tag is still --
+// refused exactly as before -- the new early-return above must not affect this path. --------
+{
+  const { dir, head } = freshRepo("origin-main-present-unreachable");
+  gitAt(dir, "update-ref", "refs/remotes/origin/main", head);
+  gitAt(dir, "checkout", "-q", "-b", "feature");
+  writeFileSync(join(dir, "feature.txt"), "divergent work, present origin/main\n");
+  gitAt(dir, "add", "feature.txt");
+  gitAt(dir, "commit", "-q", "-m", "feature work");
+  const featureHead = gitAt(dir, "rev-parse", "HEAD").stdout.trim();
+  gitAt(dir, "tag", "v1.0.0", featureHead);
+  check(
+    "TAGPROV3b block  with origin/main present, an unreachable release tag is still refused",
     "git push origin v1.0.0",
     dir,
     BLOCK,
     {
       stderrIncludes: [
         "BLOCKED (guard-push release-tag ancestry, plugin pipeline-core)",
-        "refs/remotes/origin/main does not exist locally",
+        "refs/tags/v1.0.0",
+        featureHead,
+        "not reachable from refs/remotes/origin/main",
         "ADR-0078 D5",
-        "git fetch origin main",
+        "Fix:",
       ],
     },
   );
