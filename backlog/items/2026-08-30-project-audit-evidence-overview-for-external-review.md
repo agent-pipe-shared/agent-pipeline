@@ -60,6 +60,51 @@ when local-only records are unavailable (for example in a fresh clone or a
 remote review). It must not turn `.git/agent-pipeline/` into an agent scratch
 area or publish raw audit logs merely to make them visible.
 
+## Measured 2026-09-01: two gaps, not one
+
+Re-checked live before any dispatch (item still `open`, one filing commit
+`587b6f20`, nothing moved since). The measurement splits this item into two
+gaps with different costs, and the second was not visible when it was filed.
+
+**Gap A — the reviewer-facing map (this item, unchanged).** Nothing below
+shrinks it. In particular `plugins/pipeline-core/scripts/audit-bundle.mjs`
+does NOT already satisfy it: an Audit Bundle is per-Feature-Package,
+create-only and candidate-bound — an assembly tool for one reviewed
+candidate, not a "where does the evidence live, and which half is local-only"
+map across a project.
+
+**Gap B — the Phoenix governance layer that already exists is unreachable.**
+The machinery was built and is documented, but no entry point names it.
+`docs/README.md` is the documentation map, and its `Product and governance`
+section lists the three threat models and the operating model only. Eight
+documents classified `audience: public-user`, `lifecycle: maintained` in
+`governance/observation-doc-governance.json` are named by that inventory and
+by no navigable index: `audit-bundles.md`, `agent-decision-journal.md`,
+`change-control.md`, `governance-event-export.md`, `governance-replay.md`,
+`external-traceability.md`, `evidence-viewer.md`,
+`organization-policy-packs.md`. Likewise `governance/` has no `README.md`,
+so the hash-chained human-decision event log (`governance/events/human/`,
+`heads.json`, `registry.json`, ADR-0071) and the twenty-one schemas beside it
+are reachable only by already knowing they are there. The repository's own
+`README.md` links `governance/examples/` — the advisory policy examples — and
+nothing else under `governance/`.
+
+Gap B is a wiring job with a fully determined shape and can close well before
+Gap A's form is decided. Gap A carries a form decision that is the PO's
+(generated document vs. machine-readable index with a renderer vs. a stable
+project document — deliberately left open above) and an acceptance criterion
+requiring a real greenfield run, so it cannot close in a session that has no
+greenfield project in hand.
+
+## Scope includes this repository
+
+The requirement above says "a project built with Agent-Pipeline". Per
+[ADR-0015](../../docs/adr/0015-self-application.md) that includes the Pipeline
+repository itself, and the PO named it explicitly (2026-09-01: the governance
+and audit trails are not findable "in einem User repo oder auch hier").
+Recorded here because self-application makes it true but does not make it
+discoverable to whoever picks this item up.
+
 ## Related work, not a duplicate
 
 `2026-08-07-gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger.md` concerns
