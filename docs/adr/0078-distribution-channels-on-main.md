@@ -122,6 +122,25 @@ neither available mechanism can carry it alone:
    `refs/tags/v*` must additionally require that the tagged commit is reachable from
    `origin/main`, and refuse otherwise. The objects are already local, so this costs no network
    round trip, and it refuses before the tag exists on the remote.
+
+   **Amended 2026-09-01, during implementation — the check is skipped, not enforced, when
+   `refs/remotes/origin/main` is absent locally.** As first written this decision said "refuse
+   otherwise" without qualification, and the first implementation did exactly that. That was
+   wrong for a guard which ships in `plugins/pipeline-core/` to every consumer project: a
+   repository whose remote has no `main` branch could then never push a `vX.Y.Z` tag at all,
+   and the emitted remedy (`git fetch origin main`) could not succeed there. The guard now
+   returns without refusing in that case.
+
+   The residual cost is real and is recorded here rather than left in a code comment. Absence
+   of `refs/remotes/origin/main` has **two** causes the guard cannot tell apart: `main` genuinely
+   is not the published line in that repository, or it is and this checkout has simply never
+   fetched it — a `git clone --single-branch --branch <feature>` or a shallow clone reaches the
+   identical state. In the second case the only ancestry enforcement in the system is inactive,
+   because (2) below cannot express ancestry at all. The guard therefore **emits a notice** on
+   that path naming the skip, its cause, and `git fetch origin main` as the remedy: a push that
+   loses this check must say so, since an operator cannot act on a check they never learn was
+   skipped. Recorded after an independent review found the original correction silent
+   (2026-09-01).
 2. **Remotely, as the backstop.** A tag ruleset on `v*` restricting who may create, update or
    delete matching tags. **A GitHub ruleset cannot express an ancestry condition** — this is
    stated explicitly so a future reader does not assume the remote is checking what only (1)
@@ -134,10 +153,12 @@ read, over the network, a property that is established once at write time — th
 lifecycle, and the reason D2 leaves the resolver alone.
 
 The honest limitation, recorded rather than glossed: (1) binds only sessions that run the
-Pipeline's guards, and (2) cannot see ancestry. Together they cover the realistic failure — an
-accidental tag from a working branch by someone using the Pipeline, and a deliberate tag by
-someone who is not permitted to release. Neither covers a permitted human who bypasses their own
-local guards.
+Pipeline's guards, **and is skipped entirely — with a notice — in any checkout that has not
+fetched `origin/main`, whatever the reason**; and (2) cannot see ancestry. Together they cover
+the realistic failure — an accidental tag from a working branch by someone using the Pipeline,
+and a deliberate tag by someone who is not permitted to release. Neither covers a permitted
+human who bypasses their own local guards, and neither covers a tag pushed from a
+single-branch or shallow clone.
 
 ## What this decision does NOT do
 
