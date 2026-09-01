@@ -16,9 +16,10 @@ and [ADR-0074](0074-port-authorize-critical-ceremony.md)'s `authorize-critical` 
 decision is about where an already-produced approval is *stored* after the ceremony completes,
 never about how the ceremony itself runs.
 
-**Governs:** `plugins/pipeline-core/scripts/pipeline-state.mjs` (`approve-push`, the
-`pushApproval` state shape), `plugins/pipeline-core/hooks/guard-push.mjs` (the push-time reader),
-`plugins/pipeline-core/scripts/push-prepare.mjs` (`foldPendingPushApprovalWrite`).
+**Governs:** plugins/pipeline-core/scripts/pipeline-state.mjs, plugins/pipeline-core/hooks/guard-push.mjs, plugins/pipeline-core/scripts/push-prepare.mjs
+
+Specifically: `pipeline-state.mjs`'s `approve-push` subcommand and its `pushApproval` state shape,
+`guard-push.mjs`'s push-time reader, and `push-prepare.mjs`'s `foldPendingPushApprovalWrite`.
 
 ## Context
 
