@@ -7287,6 +7287,51 @@ test("H3 manifest repair rolls back only owned output on fsync and publication r
   } finally { dispose(raceRoot); }
 });
 
+// NVA-B-CIGREEN-1 regression. The publication race above is only detectable by
+// `{dev, ino}` while the replacement file happens to get a DIFFERENT inode
+// number. On tmpfs it always does (inode numbers come from a monotonic
+// counter), on ext4 it commonly does not (the lowest free inode in the block
+// group is reallocated immediately) -- which is why the test above passed on a
+// tmpfs `/tmp` and failed on the CI runner with `ENOENT` on its own closing
+// read: the rollback had deleted the foreign file. This test removes the
+// filesystem from the question by injecting the reuse: the replacement is
+// reported under the published file's inode number, so the identity check
+// necessarily matches and ownership has to be decided on something else.
+test("H3 manifest repair preserves foreign content when the published inode number is reused", () => {
+  const reuseRoot = readyManifestFixture();
+  try {
+    const plan = planProjectOnboardingManifestRepair({ rootDir: reuseRoot, deps: fakeDeps });
+    assert.equal(plan.status, "ready", JSON.stringify(plan));
+    const nativeLink = linkSync; const nativeLstat = lstatSync;
+    const target = join(reuseRoot, ".claude", "pipeline.yaml");
+    let linked = false; let swapped = false; let publishedIno = null;
+    const reuse = {
+      ...fakeDeps,
+      linkSync(temp, destination) { nativeLink(temp, destination); linked = true; },
+      lstatSync(candidate) {
+        const info = nativeLstat(candidate);
+        if (!linked || candidate !== target) return info;
+        if (!swapped) {
+          swapped = true; publishedIno = info.ino;
+          unlinkSync(candidate);
+          writeFileSync(candidate, "foreign publication\n");
+          return info;
+        }
+        return {
+          dev: info.dev, ino: publishedIno, nlink: info.nlink, mode: info.mode, size: info.size,
+          isSymbolicLink: () => info.isSymbolicLink(),
+          isFile: () => info.isFile(),
+          isDirectory: () => info.isDirectory(),
+        };
+      },
+    };
+    const result = applyProjectOnboardingManifestRepair({ runner: "codex", rootDir: reuseRoot, planSha256: plan.planSha256, activate: true, deps: reuse });
+    assert.equal(swapped, true);
+    assert.equal(result.status, "rolled-back", JSON.stringify(result));
+    assert.equal(readFileSync(target, "utf8"), "foreign publication\n");
+  } finally { dispose(reuseRoot); }
+});
+
 test("H3 manifest repair fails closed on V4 readback failure and physical-root symlink", () => {
   const path = readyManifestFixture();
   try {
