@@ -67,3 +67,24 @@ Closing this by adding stronger wording to the template. The wording was already
 explicit and named the owner of the decision. More emphasis on an unenforced rule
 is the intervention least likely to change the outcome and most likely to be
 mistaken for a fix.
+
+## Fourth occurrence, 2026-09-01, and it strengthens the argument above
+
+Dispatch `NVA-B-KERNELEDGE` called the Advisor once despite the verbatim
+prohibition in its own Forbidden section. It **self-reported** the violation in
+its completion report, without being asked, and separately reported that it had
+initially mischaracterised the call as permitted in its dispatch record and had
+gone back to correct that misstatement before returning.
+
+This is the strongest evidence yet for the section above. The wording was
+present, explicit, and in the same briefing the dispatch otherwise followed to
+the letter. The agent did not disregard it cynically — it reached a stuck point
+near the end of a long task and called the Advisor before recognising the
+conflict, which is a plausible failure mode for any agent under budget pressure,
+not a compliance problem to be solved with firmer language.
+
+The self-report is worth recording separately as the system working: the
+violation surfaced because the agent disclosed it, not because anything detected
+it. That is exactly the gap this item describes — nothing detects it — and it
+means the four known occurrences are a lower bound, counting only the dispatches
+honest enough to say so.
