@@ -131,6 +131,57 @@ above) for two of the three suites. This item is settled once someone has, in ad
 3. Recorded the fix(es) (a scoped follow-up item per suite is fine if the fixes are independent) and
    re-run the `verify` workflow to confirm all three go green in CI.
 
+## Progress, 2026-09-01/02 — measured, and it moves two of the three
+
+Everything above this heading is the item as first written and is left intact.
+Two of its statements are now superseded by measurement, and an independent
+review read the stale text as current, so the correction is recorded here
+rather than by editing the analysis above.
+
+**The `openssl` half is done.** Commit `705b7cf3` added `openssl` to the
+workflow's synthetic `PATH`. In CI run `33551001455` on commit `266d691f`,
+`trust-anchor-bootstrap-circularity-repro-tests` reported `=0`. That suite is
+green and is no longer one of the failing three. Acceptance criterion 1's
+first half is therefore satisfied, by the workflow-PATH route rather than by
+changing `po-human-approval.mjs`.
+
+**The failing three, as of run `33551001455`,** are
+`project-onboarding-v3-tests`, `codex-onboarding-capabilities-tests` and
+`onboarding-init-tests` — not the set this item names.
+
+**`onboarding-init-tests` had a different cause than `openssl`.** Measured: on
+the synthetic `PATH`, `onboarding-init.mjs` finds no runner executable, emits
+`runtime_executable_unavailable` with `status: "runtime-readback-unavailable"`,
+and exits 1. The suite isolated `HOME` but not `PATH`, so it was asserting a
+property of the host. Fixed in `8db2c988`, which provides the runner
+executables from a test-local directory.
+
+**`project-onboarding-v3-tests`' CI-only cause is identified**, satisfying
+acceptance criterion 2. It is not `PATH`, not `HOME` and not the spaces in the
+fixture directory name — the decisive axis is the filesystem behind `TMPDIR`.
+`applyProjectOnboardingManifestRepair`'s rollback decided ownership of the file
+it deletes by `{dev, ino}` alone. ext4 reallocates the lowest free inode in the
+block group, so a file created immediately after an `unlink` commonly inherits
+the freed inode number; tmpfs draws from a monotonic counter and never reuses
+one. Local `/tmp` is tmpfs, the runner's is ext4, and that is the whole
+local-pass/CI-fail split. Fixed in `9a7c309b`, with a deterministic regression
+test that injects the reuse. Reproducible locally in one call with `TMPDIR` on
+ext4.
+
+**`codex-onboarding-capabilities-tests` is intermittent, not deterministic.**
+Red in run `33551001455`'s first execution, green in a second execution of the
+same commit (job `100022146240`), and green locally under an ordinary `PATH`,
+the synthetic `PATH`, tmpfs and ext4. Its failing assertion has not been
+identified: the CI reporter kept only the log tail and the failure fell into
+the omitted head. `e066a1b7` fixed the reporter, so the next red run will name
+it. A candidate cause with the same signature is filed separately as
+`pipeline.inode-identity-decides-deletion-in-a-second-rollback-path`.
+
+**Acceptance criterion 3 remains open, and it is the one that matters:** no CI
+run exists at `9a7c309b` or later. Everything green so far is green locally.
+Until the `verify` workflow runs on a commit carrying these fixes and passes,
+this item stays open and `main` stays unreachable.
+
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
 - **Decision:**
