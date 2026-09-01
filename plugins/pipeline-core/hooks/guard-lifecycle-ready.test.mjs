@@ -6629,6 +6629,35 @@ test("DEVPLANSHELL-4: a classifier fault fails closed (GL-09), never silently ad
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
+/**
+ * NVA-B-GITARGV case 5 (backlog:
+ * 2026-09-01-an-authorized-rebase-demands-a-fresh-po-signature-after-every-conflict.md,
+ * Requirement 3, positive case 5): `git rebase --show-current-patch` stays read-only and is
+ * not blocked as a dev-plan write. Under the PRE-FIX classifier, `rebase`'s own subcommand
+ * token survived whole-argv `operands()` as an invented candidate `"rebase"`, which
+ * `devPlanGateVerdict()` then blocked (it does not start with any exempt prefix) -- exactly
+ * the live incident's shape, reproduced here with the same unapproved/draft fixture
+ * DEVPLANSHELL-1 uses, so this test genuinely goes red against the unfixed classifier.
+ */
+test("NVA-B-GITARGV case 5: git rebase --show-current-patch is not blocked as a dev-plan write", () => {
+  const path = devPlanShellFixture();
+  try {
+    for (const command of [
+      "git rebase --show-current-patch",
+      "git rebase --continue",
+      "git -c core.editor=true rebase --continue",
+      // A bare ref target, so this line specifically pins the "rebase never yields a pathspec
+      // candidate" rule -- the flag-only commands above stay candidate-free even without that
+      // rule (a leading "-" already excludes them from the generic operand walk).
+      "git rebase main",
+    ]) {
+      const result = devPlanShellRun(path, command);
+      assert.equal(result.exitCode, 0, `blocked a repository-wide mutator with no real pathspec: ${command} -- ${result.stderr}`);
+      assert.doesNotMatch(result.stderr, new RegExp(DEVPLAN_SHELL_DENIAL_CODE, "u"), command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
 // ---------------------------------------------------------------------------------------
 // NVA-BOOTRECEIPT-1: makes a dispatched subagent's preflight obligation mechanically
 // checkable. Fixtures below build REAL directories (never an in-memory fake store) so the
