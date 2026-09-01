@@ -9,8 +9,10 @@
 | pipeline.a-checkout-that-cannot-be-clean-defeats-every-cleanliness-gate | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.a-deferred-item-is-terminal-so-a-live-defect-can-be-parked-invisibly | open | defect | pipeline | 2026-08-31 | — |
 | pipeline.a-dirty-claude-directory-blocks-verify-which-blocks-push-approval | closed | defect | pipeline | 2026-08-29 | — |
+| pipeline.a-doc-edit-silently-obligates-its-vendored-copy | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.a-node-script-defeats-every-file-protection-guard | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.a-promoted-feature-can-never-pass-the-plan-gate | closed | defect | pipeline | 2026-08-07 | — |
+| pipeline.a-push-approval-occupies-a-single-slot-so-destinations-cannot-be-prepared-together | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.a-read-only-command-is-refused-for-naming-a-protected-path | open | defect | pipeline | 2026-08-27 | — |
 | pipeline.a-registered-but-abandoned-worktree-is-never-retired | open | defect | pipeline | 2026-08-28 | — |
 | pipeline.a-runner-improvised-the-po-signature-instructions | open | defect | pipeline | 2026-08-27 | — |
@@ -583,7 +585,7 @@
 
 ## Counts
 
-- open: 81
+- open: 83
 - in_progress: 0
 - closed: 476
 - rejected: 3

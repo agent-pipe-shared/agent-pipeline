@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "80adeb4329a4788cdfb0657051c195c1a5ab9d3f0097949e61a00ac16940d7f8"
+    "transitionHead": "62d8540de913a7a7520b013081f2939f40b573f1bd3b1f5d511f701d5b3a36c7"
   },
   "counts": {
-    "open": 81,
+    "open": 83,
     "in_progress": 0,
     "closed": 476,
     "rejected": 3,
@@ -58,6 +58,15 @@
       "closureEvidence": "backlog/items/2026-08-29-a-dirty-claude-directory-blocks-verify-which-blocks-push-approval.md"
     },
     {
+      "id": "pipeline.a-doc-edit-silently-obligates-its-vendored-copy",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-01",
+      "source": "Measured live, twice, in the 2026-09-01 0.6.0 release range: docs/push-release-flow.md drift caught in commit 62ba638b, docs/adr/0076-global-chat-attributed-unattested-approval-mode.md drift caught in commit 56e91858.",
+      "deferred": false
+    },
+    {
       "id": "pipeline.a-node-script-defeats-every-file-protection-guard",
       "status": "closed",
       "type": "defect",
@@ -82,6 +91,15 @@
       "closureRepository": "self",
       "closureCommit": "72a293d59694e6184f190bb3c141f7b2d509b8da",
       "closureEvidence": "plugins/pipeline-core/lib/po-gate-authority.test.mjs"
+    },
+    {
+      "id": "pipeline.a-push-approval-occupies-a-single-slot-so-destinations-cannot-be-prepared-together",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-01",
+      "source": "Measured live during the 2026-09-01 0.6.0 release: three-destination push (feat/sprint-nova-codex-v046, main, stable) required three fully separate sign -> approve-push -> push cycles.",
+      "deferred": false
     },
     {
       "id": "pipeline.a-read-only-command-is-refused-for-naming-a-protected-path",
