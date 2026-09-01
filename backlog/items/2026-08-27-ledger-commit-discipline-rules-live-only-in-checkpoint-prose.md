@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.ledger-commit-discipline-rules-live-only-in-checkpoint-prose
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-01
+closure_commit: 6c9f581f83252755c69ce8b382dc8bfdde63fe98
+closure_repository: "self"
+closure_evidence: guardrails/git.md
 created: 2026-08-27
 sprint: alfred
 source: "Handover-rotation extraction pass over Phoenix checkpoints 61-71, 2026-08-27 (ADR-0066 Decision 6/7)"
