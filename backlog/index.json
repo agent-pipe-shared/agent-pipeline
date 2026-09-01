@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "7e5ed0ea7a0767217c462f2d30628eb7ad03d497204269dbf2120774310f78f6"
+    "transitionHead": "9e9779f2250751cbccc7f2d54709ca898e9755bedd50b096b9893bd8ec15c79d"
   },
   "counts": {
     "open": 84,
     "in_progress": 0,
-    "closed": 482,
+    "closed": 483,
     "rejected": 3,
     "deferred": 11
   },
@@ -2281,6 +2281,16 @@
       "closureRepository": "self",
       "closureCommit": "b045e391513de1b2d16083ba2fe2dfc6b07f9061",
       "closureEvidence": "backlog/evidence/2026-08-09-git-identity-onboarding-already-resolved.md"
+    },
+    {
+      "id": "pipeline.fresh-worktree-indistinguishable-from-abandoned",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-01",
+      "source": "NVA-B-WTRETIRE, 2026-09-01: the dispatch that built planRegisteredWorktreeRetirement declined to wire it into the bootstrap sweep and named this as the reason (commit c352528f).",
+      "deferred": false,
+      "tracking": "Nova B — a just-provisioned Agent-tool worktree satisfies every retirement condition identically to a genuinely abandoned one, so the retirement sweep cannot be wired into bootstrap until the two are distinguishable."
     },
     {
       "id": "pipeline.full-push-preflight-before-signature",
@@ -6646,13 +6656,17 @@
     },
     {
       "id": "pipeline.trust-anchor-bootstrap-test-never-registered-in-verify",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-30",
       "source": "Found by check-verify-suite-registration.mjs while preparing the TP-3 ceremony for NVA-CF-RESUMECHECKANYSESSION's own verify.mjs registration, 2026-08-30.",
       "deferred": false,
-      "tracking": "Nova B — pre-existing gap found while registering an unrelated verify.mjs suite; not introduced by this session's own work."
+      "tracking": "Nova B — pre-existing gap found while registering an unrelated verify.mjs suite; not introduced by this session's own work.",
+      "closedAt": "2026-09-01",
+      "closureRepository": "self",
+      "closureCommit": "7660b30bde221c1a40c9ac27a0e8ede733b79bda",
+      "closureEvidence": "harness/scripts/verify.mjs"
     },
     {
       "id": "pipeline.trust-mismatch-names-neither-key-nor-directory",

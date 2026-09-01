@@ -189,6 +189,7 @@
 | pipeline.four-human-guard-override-tests-leak-into-the-real-host-marketplace-registry | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.fresh-repo-onboarding-intake-first-transaction | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.fresh-repo-onboarding-never-asks-for-git-identity | closed | defect | pipeline | 2026-08-09 | — |
+| pipeline.fresh-worktree-indistinguishable-from-abandoned | open | defect | pipeline | 2026-09-01 | Nova B — a just-provisioned Agent-tool worktree satisfies every retirement condition identically to a genuinely abandoned one, so the retirement sweep cannot be wired into bootstrap until the two are distinguishable. |
 | pipeline.full-push-preflight-before-signature | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.gate-should-not-demand-a-human-name | open | workflow-improvement | pipeline | 2026-08-28 | Nova B — the encoding half is fixed; this is the design half that made the encoding fragile in the first place |
 | pipeline.gate-strength-override-route-advertised-not-offered | deferred | defect | pipeline | 2026-08-08 | — |
@@ -536,7 +537,7 @@
 | pipeline.transactional-readbacks-not-status-cascades | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.triage-verdict-text-can-contaminate-a-backlog-item-as-a-later-spec-reference | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.trust-anchor-bootstrap-confirmed-still-circular-live | closed | defect | pipeline | 2026-08-29 | NOW / Nova A -- happy-path blocker, confirmed live by 2 of 3 independent runners against the exact candidate the PO tested with. |
-| pipeline.trust-anchor-bootstrap-test-never-registered-in-verify | open | defect | pipeline | 2026-08-30 | Nova B — pre-existing gap found while registering an unrelated verify.mjs suite; not introduced by this session's own work. |
+| pipeline.trust-anchor-bootstrap-test-never-registered-in-verify | closed | defect | pipeline | 2026-08-30 | Nova B — pre-existing gap found while registering an unrelated verify.mjs suite; not introduced by this session's own work. |
 | pipeline.trust-mismatch-names-neither-key-nor-directory | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.trust-policy-exact-key-shape-refuses-a-third-field-and-blames-the-key | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.trust-policy-shape-disagreement-between-sign-intent-and-verify-po-approval-proof | closed | defect | pipeline | 2026-08-17 | — |
@@ -590,6 +591,6 @@
 
 - open: 84
 - in_progress: 0
-- closed: 482
+- closed: 483
 - rejected: 3
 - deferred: 11
