@@ -4,6 +4,9 @@ id: pipeline.observerunner-has-no-test-coverage
 type: defect
 owner: pipeline
 status: closed
+closed_at: 2026-09-01
+closure_commit: d8465468761105fe3a789a0ab89e409b26360a02
+closure_repository: "self"
 closure_evidence: plugins/pipeline-core/lib/local-worker-supervisor.test.mjs
 created: 2026-08-30
 sprint: nova-b
