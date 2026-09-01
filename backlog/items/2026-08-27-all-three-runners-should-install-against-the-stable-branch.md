@@ -102,3 +102,28 @@ branch.
   **Gap 1 is a PO action and carries no window** — it should not sit in a sprint
   waiting for an agent that cannot perform it.
 - **Date:** 2026-08-28
+
+## Update 2026-09-01 — gap 1's mechanism superseded by ADR-0078, requirement retained
+
+- **Decision:** merged-into-adr-0078 (gap 1 only); the item as a whole stays
+  `open` — gaps 2 and 3 are untouched by this update.
+- **Rationale:** [ADR-0078](../../docs/adr/0078-distribution-channels-on-main.md)
+  (accepted 2026-09-01, PO decision in session) resolves gap 1 by a different
+  mechanism than the one this item proposed. This item's gap 1 asked for
+  `stable` to become the distribution repository's default branch, so that a
+  plain `marketplace add` (no `--ref` flag) would land a consumer on `stable`.
+  ADR-0078 instead retires the `stable` *branch* outright: `main` is the only
+  published channel, `main` carries releases, and the `stable` *update
+  channel* (unchanged) resolves through the highest final `vX.Y.Z` tag, not
+  through any branch — it never depended on the `stable` branch existing.
+  `SETUP.md`'s Codex marketplace pin now targets `main`.
+  This item's underlying *requirement* is unaffected and remains fully live:
+  a default installation must land a consumer on the released version, the
+  freshness check must compare against that same released line, and the
+  behaviour must stay fail-open (newer-than-released tolerated and reported,
+  older-than-released tolerated but flagged plainly). ADR-0078 changes only
+  which ref carries "released" — from a `stable` branch to `main` — not
+  whether the requirement holds. Gaps 2 (the Antigravity remote installer)
+  and 3 (the update flow) are untouched by this decision and remain exactly
+  as triaged on 2026-08-28.
+- **Date:** 2026-09-01
