@@ -1801,7 +1801,15 @@ const SAFE_WORKTREE_DIR_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
  * "git knows about nothing"), exactly the same discipline `recoveryJournalPaths` already
  * applies to its own `git rev-parse --git-common-dir` call.
  */
-function listRegisteredGitWorktrees(root, deps) {
+/**
+ * Shared low-level spawn: raw `git worktree list --porcelain` stdout for `root`'s repository, or
+ * `null` on any command failure. Both `listRegisteredGitWorktrees` (orphan-directory sweep,
+ * unchanged below) and `planRegisteredWorktreeRetirement` (registered-worktree retirement,
+ * further below) parse this same raw text independently -- extracting the SPAWN call as the one
+ * shared helper, deliberately NOT a shared parser, keeps each branch's own admission logic
+ * untouched by the other's needs.
+ */
+function spawnWorktreeListPorcelain(root, deps) {
   const spawn = deps.spawn ?? spawnSync;
   const result = spawn("git", ["worktree", "list", "--porcelain"], {
     cwd: root,
@@ -1810,8 +1818,14 @@ function listRegisteredGitWorktrees(root, deps) {
     timeout: 5000,
   });
   if (result?.status !== 0 || result?.error || typeof result.stdout !== "string") return null;
+  return result.stdout;
+}
+
+function listRegisteredGitWorktrees(root, deps) {
+  const stdout = spawnWorktreeListPorcelain(root, deps);
+  if (stdout === null) return null;
   const registered = new Set();
-  for (const line of result.stdout.split("\n")) {
+  for (const line of stdout.split("\n")) {
     if (!line.startsWith("worktree ")) continue;
     const raw = line.slice("worktree ".length).trim();
     if (raw === "") continue;
@@ -1958,6 +1972,232 @@ export function retireOrphanWorktreeDirectories({ rootDir, deps = {} } = {}) {
     retired += 1;
   }
   return { retiredCount: retired, retained };
+}
+
+export const REGISTERED_WORKTREE_RETIREMENT_PLAN_SCHEMA = "pipeline.registered-worktree-retirement-plan.v1";
+
+const HEAD_SHA_SHAPE = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/iu;
+
+/**
+ * Parses `git worktree list --porcelain` stdout into one record per worktree block (blocks are
+ * blank-line separated per git-worktree(1)). Pure text parsing -- never resolves a path or
+ * spawns anything -- kept separate from spawnWorktreeListPorcelain so a test can feed it captured
+ * porcelain text directly. A block with no recognizable `worktree <path>` header line is dropped
+ * rather than guessed at.
+ */
+function parseWorktreeListPorcelain(stdout) {
+  const entries = [];
+  for (const block of stdout.split("\n\n")) {
+    const lines = block.split("\n").filter((line) => line !== "");
+    if (lines.length === 0 || !lines[0].startsWith("worktree ")) continue;
+    const rawPath = lines[0].slice("worktree ".length).trim();
+    if (rawPath === "") continue;
+    let headSha = null;
+    let locked = false;
+    for (const line of lines.slice(1)) {
+      if (line.startsWith("HEAD ")) headSha = line.slice("HEAD ".length).trim();
+      else if (line === "locked" || line.startsWith("locked ")) locked = true;
+    }
+    entries.push({ rawPath, headSha, locked });
+  }
+  return entries;
+}
+
+/**
+ * Read-only: the repository's own main-worktree path (`git rev-parse --show-toplevel`, run from
+ * `root`), resolved through realpathSync. `null` on any command failure -- callers MUST fail
+ * closed, exactly like spawnWorktreeListPorcelain's own null contract. Used to identify the main
+ * worktree by DIRECT comparison against every candidate's own resolved path, rather than by
+ * trusting `git worktree list --porcelain`'s documented main-worktree-first ordering --
+ * misidentifying the main worktree here is the one mistake this module cannot afford.
+ */
+function resolveMainWorktreePath(root, deps) {
+  const spawn = deps.spawn ?? spawnSync;
+  const result = spawn("git", ["rev-parse", "--path-format=absolute", "--show-toplevel"], {
+    cwd: root,
+    encoding: "utf8",
+    shell: false,
+    timeout: 5000,
+  });
+  if (result?.status !== 0 || result?.error || typeof result.stdout !== "string") return null;
+  const raw = result.stdout.trim();
+  if (raw === "") return null;
+  try { return realpathSync(raw); } catch { return null; }
+}
+
+/**
+ * Read-only: `git status --porcelain` output for the worktree at `worktreePath`, or `null` on
+ * any command failure (fail-closed: an unreadable status is never treated as "clean").
+ */
+function spawnWorktreeStatusPorcelain(worktreePath, deps) {
+  const spawn = deps.spawn ?? spawnSync;
+  const result = spawn("git", ["status", "--porcelain"], {
+    cwd: worktreePath,
+    encoding: "utf8",
+    shell: false,
+    timeout: 5000,
+  });
+  if (result?.status !== 0 || result?.error || typeof result.stdout !== "string") return null;
+  return result.stdout;
+}
+
+/**
+ * Read-only: whether `headSha` is contained in (an ancestor of, or equal to) at least one LOCAL
+ * branch tip -- `git branch --contains` is exactly this relation by definition (git-branch(1)).
+ * `null` on any command failure (fail-closed: an unreadable answer is never treated as "yes").
+ */
+function spawnHeadContainedInLocalBranch(root, headSha, deps) {
+  const spawn = deps.spawn ?? spawnSync;
+  const result = spawn("git", ["branch", "--format=%(refname:short)", "--contains", headSha], {
+    cwd: root,
+    encoding: "utf8",
+    shell: false,
+    timeout: 5000,
+  });
+  if (result?.status !== 0 || result?.error || typeof result.stdout !== "string") return null;
+  return result.stdout.trim() !== "";
+}
+
+/**
+ * Evaluates exactly ONE registered worktree entry against the four AC-2 admission conditions, in
+ * cheapest-first order (no subprocess spawned before one is actually needed), stopping at the
+ * first one that fails or is undeterminable. Shared by planRegisteredWorktreeRetirement and
+ * retireRegisteredWorktrees's own pre-mutation re-check, so both ever apply exactly one
+ * definition of "retirable" (AC-4: reuse the mechanism rather than inventing a second one). Any
+ * undeterminable step ("unknown-...") declines exactly like a failed condition -- ambiguity is
+ * never treated as permission.
+ */
+function evaluateWorktreeCandidate({ root, mainWorktreePath, item, deps }) {
+  let realPath;
+  try { realPath = realpathSync(item.rawPath); }
+  catch { return { path: item.rawPath, status: "unknown-path-unavailable" }; }
+  if (realPath === mainWorktreePath) {
+    return { path: realPath, status: "skipped-main-worktree" };
+  }
+  if (item.headSha === null || !HEAD_SHA_SHAPE.test(item.headSha)) {
+    return { path: realPath, status: "unknown-head-unavailable" };
+  }
+  if (item.locked) {
+    return { path: realPath, headSha: item.headSha, status: "declined-locked" };
+  }
+  const statusOutput = spawnWorktreeStatusPorcelain(realPath, deps);
+  if (statusOutput === null) {
+    return { path: realPath, headSha: item.headSha, status: "unknown-status-unavailable" };
+  }
+  if (statusOutput !== "") {
+    return { path: realPath, headSha: item.headSha, status: "declined-not-clean" };
+  }
+  const contains = spawnHeadContainedInLocalBranch(root, item.headSha, deps);
+  if (contains === null) {
+    return { path: realPath, headSha: item.headSha, status: "unknown-branch-containment-unavailable" };
+  }
+  if (!contains) {
+    return { path: realPath, headSha: item.headSha, status: "declined-head-not-contained" };
+  }
+  return { path: realPath, headSha: item.headSha, status: "retirable" };
+}
+
+/**
+ * Plans retirement of every REGISTERED worktree `git worktree list --porcelain` reports for
+ * `rootDir`'s repository -- the complement of planOrphanWorktreeDirectories above, which only
+ * ever considers a directory `git worktree list` no longer knows about at all. Backlog:
+ * pipeline.a-registered-but-abandoned-worktree-is-never-retired (2026-08-28).
+ *
+ * Read-only: performs no deletion. A worktree is admitted (`status: "retirable"`) only when ALL
+ * FOUR of these hold (AC-2), each checked by evaluateWorktreeCandidate above:
+ *   1. it is not the main worktree (resolveMainWorktreePath, direct path comparison -- never
+ *      inferred from list ordering);
+ *   2. its working tree is clean (`git status --porcelain` empty, run inside the worktree);
+ *   3. its HEAD is an ancestor of, or equal to, a local branch tip (`git branch --contains`);
+ *   4. it carries no `locked` entry in `git worktree list --porcelain`.
+ * Anything short of all four is returned with a distinct declined-/unknown- status naming which
+ * check stopped it -- fail-open by design, exactly the orphan branch's own posture: ambiguity
+ * always resolves to leaving the worktree alone, never to retiring it.
+ *
+ * `status: "unknown-git-worktree-list-unavailable"` at the top level (empty `entries`) is
+ * returned when the underlying `git worktree list`/`git rev-parse --show-toplevel` calls
+ * themselves fail -- there is no candidate list to evaluate at all in that case, unlike the
+ * orphan branch above, which already has an independent directory listing to fall back on.
+ */
+export function planRegisteredWorktreeRetirement({ rootDir, deps = {} } = {}) {
+  const root = realpathSync(resolve(rootDir));
+  const stdout = spawnWorktreeListPorcelain(root, deps);
+  const mainWorktreePath = resolveMainWorktreePath(root, deps);
+  if (stdout === null || mainWorktreePath === null) {
+    return {
+      schema: REGISTERED_WORKTREE_RETIREMENT_PLAN_SCHEMA,
+      status: "unknown-git-worktree-list-unavailable",
+      entries: [],
+    };
+  }
+  const entries = parseWorktreeListPorcelain(stdout)
+    .map((item) => evaluateWorktreeCandidate({ root, mainWorktreePath, item, deps }));
+  return {
+    schema: REGISTERED_WORKTREE_RETIREMENT_PLAN_SCHEMA,
+    status: "ready",
+    entries,
+  };
+}
+
+/**
+ * Retires every REGISTERED worktree planRegisteredWorktreeRetirement marks "retirable", via
+ * `git worktree remove` (never a raw filesystem delete -- a registered worktree carries
+ * administrative state under the Git common dir that only `git worktree remove` cleans up
+ * correctly).
+ *
+ * AC-4: never acts on an externally supplied plan -- this function only ever derives its OWN
+ * plan (there is no plan parameter to accept), so it structurally cannot act on a plan it did not
+ * produce. Immediately before EACH removal it re-derives fresh porcelain/status/branch state and
+ * re-runs evaluateWorktreeCandidate on that exact candidate again (the same single evaluator
+ * planRegisteredWorktreeRetirement itself uses, per AC-4's "reuse the mechanism" instruction) --
+ * a worktree that became dirty, gained a lock, or moved its HEAD between the plan above and this
+ * exact moment is caught here and retained, never removed.
+ */
+export function retireRegisteredWorktrees({ rootDir, deps = {} } = {}) {
+  const root = realpathSync(resolve(rootDir));
+  const plan = planRegisteredWorktreeRetirement({ rootDir: root, deps });
+  if (plan.status !== "ready") {
+    return { status: plan.status, retiredCount: 0, retained: plan.entries };
+  }
+  let retired = 0;
+  const retained = [];
+  for (const entry of plan.entries) {
+    if (entry.status !== "retirable") {
+      retained.push(entry);
+      continue;
+    }
+    const stdout = spawnWorktreeListPorcelain(root, deps);
+    const mainWorktreePath = resolveMainWorktreePath(root, deps);
+    if (stdout === null || mainWorktreePath === null) {
+      retained.push({ ...entry, status: "unknown-git-worktree-list-unavailable" });
+      continue;
+    }
+    const fresh = parseWorktreeListPorcelain(stdout).find((item) => {
+      try { return realpathSync(item.rawPath) === entry.path; } catch { return false; }
+    });
+    if (!fresh) {
+      retained.push({ ...entry, status: "changed" });
+      continue;
+    }
+    const recheck = evaluateWorktreeCandidate({ root, mainWorktreePath, item: fresh, deps });
+    if (recheck.status !== "retirable") {
+      retained.push(recheck);
+      continue;
+    }
+    const spawn = deps.spawn ?? spawnSync;
+    const result = spawn("git", ["worktree", "remove", entry.path], {
+      cwd: root,
+      encoding: "utf8",
+      shell: false,
+      timeout: 15000,
+    });
+    if (result?.status !== 0 || result?.error) {
+      retained.push({ ...entry, status: "removal-failed" });
+      continue;
+    }
+    retired += 1;
+  }
+  return { status: "ready", retiredCount: retired, retained };
 }
 
 export const sessionCleanupRecoveryInternals = {
