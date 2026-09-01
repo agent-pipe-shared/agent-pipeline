@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "7c3a3840d3745286e887b2b73393639ad5f591eefaa9d59332ed9492d3f97756"
+    "transitionHead": "7b725cdfc7fa7682c408e3c38b11ab5ba52e901e89fc36f5be12070ee4a1ad04"
   },
   "counts": {
-    "open": 86,
+    "open": 88,
     "in_progress": 0,
     "closed": 476,
     "rejected": 3,
@@ -981,6 +981,16 @@
       "closureRepository": "self",
       "closureCommit": "563be0260c3a256969a3452cd44a4a5d10726ece",
       "closureEvidence": "backlog/items/2026-08-23-briefed-tool-budget-sits-below-an-unannounced-harness-maxturns-cliff.md"
+    },
+    {
+      "id": "pipeline.briefing-bundling-two-findings-asks-for-two-dispatches",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-01",
+      "source": "Measured on 2026-09-01 across four dispatches in one session, with the decisive case a bundled two-finding briefing whose second half later needed a full dispatch of its own.",
+      "deferred": false,
+      "tracking": "Nova B — dispatcher-side scoping defect: bundling two independent review findings into one briefing produced a package that could not fit any single tool budget, and the overrun was read as an agent problem rather than a briefing problem."
     },
     {
       "id": "pipeline.briefing-model-field-contradicts-agent-definition",
@@ -3393,6 +3403,16 @@
       "closureRepository": "self",
       "closureCommit": "59253fb0d19f336ebc59029a231dfaa4cd7a3d6e",
       "closureEvidence": "backlog/items/2026-08-18-intake-values-restart-resilient-immediately.md"
+    },
+    {
+      "id": "pipeline.invalid-channel-value-blocks-unrelated-alpha-ref-write",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-01",
+      "source": "Found and proven by the NVA-B-ALPHAWRITE dispatch while building the alpha-ref writer (commit f8c85e09). Documented and covered by a test in the same commit rather than fixed, because the fix touches a read path that was deliberately protected in that briefing.",
+      "deferred": false,
+      "tracking": "Nova B — cross-field coupling in the calibration reader: a broken pipelineUpdateChannel value makes the unrelated pipelineUpdateAlphaRef field unwritable, with a reason code that names the wrong field."
     },
     {
       "id": "pipeline.kickoff-apply-action-drops-runner",
