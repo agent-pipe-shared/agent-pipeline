@@ -76,6 +76,100 @@ roundLTest("NVA-B-ROUNDL F7: a failure line merely CONTAINED in a kept line is s
   );
 });
 
+/**
+ * Round-N finding F-C. The recovered-failure admission loop BROKE on the first line that did not
+ * fit its byte reserve. `recoveredFailureLines` is in file order, so one failure line longer than
+ * the reserve emptied `admitted` entirely, and the `admitted.length > 0` guard then suppressed the
+ * header and every shorter failure line behind it -- the suite whose earliest omitted failure line
+ * is a long assertion diff got no recovered block at all, the exact outcome recovery exists to
+ * prevent.
+ */
+roundLTest("NVA-B-ROUNDN F-C: a recovered failure line too long for the reserve does not suppress the shorter ones behind it", () => {
+  // Longer than the reserve whatever share of MAX_BYTES_PER_SUITE the reserve is.
+  const oversized = `not ok 1 - ${"D".repeat(printVerifyFailures.MAX_BYTES_PER_SUITE)}`;
+  const shortFailures = [
+    "not ok 2 - a short failure behind the long one",
+    "not ok 3 - a second short failure behind the long one",
+  ];
+  const filler = Array.from(
+    { length: printVerifyFailures.MAX_LINES_PER_SUITE + 50 },
+    (_, index) => `ok ${index + 4} - filler-${index}`,
+  );
+  const bounded = printVerifyFailures.boundSuiteTail([oversized, ...shortFailures, ...filler].join("\n"));
+  const kept = bounded.text.split("\n");
+  assert.ok(
+    kept.includes(printVerifyFailures.RECOVERED_FAILURE_HEADER),
+    "one oversized failure line suppressed the whole recovered block",
+  );
+  for (const line of shortFailures) {
+    assert.ok(kept.includes(line), `a failure line behind an oversized one was dropped: ${line}`);
+  }
+  assert.ok(bounded.keptBytes <= printVerifyFailures.MAX_BYTES_PER_SUITE);
+  assert.equal(Buffer.byteLength(bounded.text, "utf8"), bounded.keptBytes);
+});
+
+/**
+ * Round-N finding F-D. `keptLines` was computed from the tail BEFORE that tail was re-shrunk to
+ * `tailBudget` inside the `admitted.length > 0` branch. A failure line present at that moment was
+ * excluded from `recoveredFailureLines` as "already kept", and the re-shrink could then cut it
+ * away -- leaving it in neither the tail nor the recovered block, where the pre-recovery code
+ * would have printed it.
+ */
+roundLTest("NVA-B-ROUNDN F-D: a failure line the tail re-shrink cuts away still survives in one place or the other", () => {
+  const MAX = printVerifyFailures.MAX_BYTES_PER_SUITE;
+  const headerBytes = Buffer.byteLength(printVerifyFailures.RECOVERED_FAILURE_HEADER, "utf8") + 1;
+  const headFailures = [1, 2, 3, 4].map((n) => `not ok ${n} - head failure ${"h".repeat(60)}`);
+  const blockBytes = headFailures.reduce((sum, line) => sum + Buffer.byteLength(line, "utf8") + 1, headerBytes);
+  const victim = "not ok 99 - the victim line the re-shrink cuts away";
+  const pad = (base, length) => (base.length >= length ? base.slice(0, length) : base + "p".repeat(length - base.length));
+  const tailLines = [
+    victim,
+    ...Array.from({ length: printVerifyFailures.MAX_LINES_PER_SUITE - 1 }, (_, index) => pad(`ok ${index} - filler`, 99)),
+  ];
+  const last = tailLines.length - 1;
+  tailLines[last] = pad(tailLines[last], tailLines[last].length + (MAX - Buffer.byteLength(tailLines.join("\n"), "utf8")));
+  // Preconditions this fixture stands on -- asserted, never assumed, so a changed bound makes the
+  // test loud rather than silently vacuous.
+  assert.equal(tailLines.length, printVerifyFailures.MAX_LINES_PER_SUITE);
+  assert.equal(Buffer.byteLength(tailLines.join("\n"), "utf8"), MAX, "the line-bounded tail must sit exactly on the byte cap");
+  assert.ok(Buffer.byteLength(victim, "utf8") + 1 <= blockBytes, "the re-shrink must be big enough to cut the victim away");
+
+  const bounded = printVerifyFailures.boundSuiteTail([...headFailures, ...tailLines].join("\n"));
+  const kept = bounded.text.split("\n");
+  assert.ok(kept.includes(victim), "the re-shrink cut a failure line the recovery had already excluded: it survives nowhere");
+  assert.ok(bounded.keptBytes <= MAX);
+  assert.equal(Buffer.byteLength(bounded.text, "utf8"), bounded.keptBytes);
+});
+
+/**
+ * Round-N finding F-E. Both byte-bound slices decoded with `buffer.subarray(...).toString("utf8")`.
+ * A cut inside a multi-byte sequence orphans continuation bytes, each decoding to U+FFFD -- three
+ * bytes for one -- so the decoded string can be LONGER in bytes than the slice it came from, and
+ * the documented `keptBytes <= MAX_BYTES_PER_SUITE` invariant did not hold. Every other fixture in
+ * this file is ASCII-only and structurally cannot see it.
+ */
+roundLTest("NVA-B-ROUNDN F-E: a byte bound falling inside a multi-byte sequence still honours the per-suite cap", () => {
+  const MAX = printVerifyFailures.MAX_BYTES_PER_SUITE;
+  assert.equal(Buffer.byteLength("あ", "utf8"), 3);
+  // MAX_BYTES_PER_SUITE % 3 === 2, so against a body of 3-byte characters the cut offset
+  // (length - MAX) is never a character boundary: it always lands one byte into a character.
+  assert.equal(MAX % 3, 2);
+  const single = printVerifyFailures.boundSuiteTail("あ".repeat(7000));
+  assert.equal(single.truncated, true);
+  assert.ok(single.keptBytes <= MAX, `kept ${single.keptBytes} bytes, cap is ${MAX}`);
+  assert.equal(Buffer.byteLength(single.text, "utf8"), single.keptBytes);
+  assert.equal(single.text.includes("�"), false, "the byte bound cut inside a character and manufactured replacement characters");
+
+  // The SECOND slice, on the same kind of content: a recovered block forces the already
+  // multi-byte tail to be re-shrunk to `tailBudget`.
+  const failure = "not ok 1 - multibyte head failure";
+  const both = printVerifyFailures.boundSuiteTail([failure, "あ".repeat(7000)].join("\n"));
+  assert.ok(both.text.split("\n").includes(failure), "the head failure line must still be recovered");
+  assert.ok(both.keptBytes <= MAX, `kept ${both.keptBytes} bytes, cap is ${MAX}`);
+  assert.equal(Buffer.byteLength(both.text, "utf8"), both.keptBytes);
+  assert.equal(both.text.includes("�"), false, "the re-shrink cut inside a character");
+});
+
 import {
   boundSuiteTail,
   buildFailureReport,
