@@ -21,7 +21,9 @@
 | 2026-08-11 to 2026-08-19 | Checkpoints 1-60 (2026-08-11 through 2026-08-19 checkpoint 60): superseded session narrative; durable decisions already live in ADRs/backlog/guardrails per this repo's own standing convention, not uniquely in this prose. | [docs/state-archive/2026-08-19--checkpoints-1-through-60.md](state-archive/2026-08-19--checkpoints-1-through-60.md) |
 | 2026-08-26 | 2026-08-25 Antigravity chat-gate-ceremony standardization, verify-tuner stage 2 acceptance, sprint-agy-runner delta4 Critic fix and candidate status | [docs/state-archive/2026-08-26--agy-runner-2026-08-25-handover.md](state-archive/2026-08-26--agy-runner-2026-08-25-handover.md) |
 
-## Current handover — 2026-09-01: the autonomous Nova B block
+## Current handover — 2026-09-01/02: the autonomous Nova B block
+
+**Lifecycle phase:** feature `sprint-nova-epic` · phase `implementation`
 
 PO mandate for the day: work items needing no PO interaction until ~17:00, then
 freeze, verify, and hand back a push-ready HEAD. Sprint Nova is **not** closed —
@@ -50,24 +52,62 @@ review, so the version moved forward and the cachebuster returned (`63fe8b64`).
   (`a801e0fd`): the approval was genuinely given and verified; the ruleset,
   not the approval, is what stopped the push. `main` needs a fresh ceremony
   once CI is green, because the candidate will have moved.
-- The CI run that blocks it is red on three onboarding suites. Two of the
-  three (`project-onboarding-v3-tests`, `codex-onboarding-capabilities-tests`)
-  do **not** reproduce under a faithful local rebuild of the CI environment
-  (restricted `PATH`, fresh `HOME`) — they pass there, 158/158 and 23/23. The
-  third, `onboarding-init-tests`, **does** reproduce, via a distinct
-  mechanism: `onboarding-init.mjs` treats a `runtime_executable_unavailable`
-  diagnostic (no `codex` binary on `PATH`) as fatal at a step that records
-  initial identity answers and should not need that runtime at all. Whether
-  fixing that also explains the other two is not yet established — under
-  investigation.
-- A live PO handover, transcribed in full into
+- The CI failures are diagnosed and fixed. See the next section.
+- The rebase work package, transcribed in full into
   `backlog/items/2026-09-01-an-authorized-rebase-demands-a-fresh-po-signature-after-every-conflict.md`,
-  is now IN SCOPE and being built tonight, not deferred: an approved feature
-  branch cannot currently be rebased, because `guard-lifecycle-ready` reads a
-  partially-rebuilt working tree as current authority mid-rebase and demands
-  a fresh single-use Ed25519 signature after nearly every conflict. This
-  suspends a lifecycle gate during a bounded, well-defined window and
-  therefore owes a mandatory T1 Critic round before it ships.
+  is built and has had its mandatory T1 round. See the next section.
+
+### The overnight block, 2026-09-01/02 — what was built and what it cost
+
+**The CI diagnosis, and it was not what it looked like.** Three suites were red
+in run `33551001455` on `266d691f`. The decisive environment axis is neither
+`PATH` nor `HOME` nor the spaces in a fixture directory name — an outside
+analysis proposed the last of these twice and it is refuted by the suite
+passing locally 158/158 with that identical name. It is the filesystem behind
+`TMPDIR`. `applyProjectOnboardingManifestRepair`'s rollback decided ownership
+of the file it deletes by `{dev, ino}` alone; ext4 reallocates the lowest free
+inode in the block group, so a file created immediately after an `unlink`
+commonly inherits the freed number, while tmpfs draws from a monotonic counter
+and never reuses one. Local `/tmp` is tmpfs, the runner's is ext4. Fixed at
+`9a7c309b` with a deterministic reuse-injection test. `onboarding-init-tests`
+had a different cause — the suite isolated `HOME` but not `PATH` and was
+asserting a property of the host — fixed at `8db2c988`.
+`codex-onboarding-capabilities-tests` is **intermittent**: red once and green
+once on the same commit, green locally in four environments. Unresolved, with a
+filed candidate cause (`pipeline.inode-identity-decides-deletion-in-a-second-rollback-path`).
+
+**The rebase authority is built and reviewed.** `95f16466` is the resolver:
+authority read only from `orig-head`, never from the partially replayed working
+tree, with every binding Requirement 1 names. `103463a3` wires it in and
+`2f59b2bd` narrows an over-refusal found while wiring. All fourteen test cases —
+five positive, seven negative, two from Requirement 5 — are real guard-level
+tests against a genuinely conflicted rebase fixture, none dependency-injection
+only. The T1 round found nothing in the mechanism: the relief sits at the final
+verdict so it can only turn a block into an allow, and Requirement 4 is enforced
+by absence from an allowlist rather than by a second list that can drift.
+
+**Requirement 5 is a PO decision taken during the block** and is the reason the
+package is usable at all: the authority is never opt-in, and every denial during
+an active rebase names the route forward in its own text. Its carrier had to
+split (`b5937a09`) — `pipeline.guard-retry-actions.v1` admits read-only
+diagnostics only, so the mutating continuation rides as data and prose while
+`retryActions` carries the read-only diagnostics that let a session see its own
+conflict surface. Widening that envelope for convenience was rejected.
+
+**Four Critic rounds ran (K, L, M, N).** Their measuring stick is tracked at
+`backlog/evidence/2026-09-02-critic-rounds-k-to-n-index.md` — this was itself a
+finding: gate-cited evidence had been living in gitignored `scratch/`, and a
+green artifact was overwritten in place by a later red re-run, leaving a true
+claim unsupportable. Findings closed across `3f92cae8`, `41dd0d8e`, `b90640c2`,
+`7eb9192c`, `97d24673`, `9284f4b8`.
+
+**One finding was a bypass this block itself introduced**, and it is the reason
+to keep running these rounds: the `--exec` payload table keyed on exact literal
+spellings sitting behind a verb that yields no other candidates, so
+`git rebase --exe '<write command>'` produced no candidate at all. Measured with
+real git 2.53.0 — `--exe`, `--ex`, `--exe=`, `--ex=` all execute the payload.
+Fixed at `41dd0d8e` by inverting the table: the *safe* options are enumerated, so
+an unknown one fails closed.
 
 **None of the nine originally-ordered PO terminal actions for the 0.6.0
 release plan has completed as originally scoped** — the plan itself has
@@ -217,6 +257,32 @@ could not be positively established, that is said rather than glossed.
 Dropped on rotation as genuinely resolved: the Antigravity hard-enforcement
 layer's two fail-open paths, closed by `ab347a74`, which built the self-check
 the item's own proposal named.
+
+### What the PO owes this candidate — two signatures, in this order
+
+Both are structurally closed to an agent. Nothing else in the release sequence
+is waiting on a human.
+
+1. **A human-guard override to register one suite in `harness/scripts/verify.mjs`.**
+   `plugins/pipeline-core/lib/rebase-authority.test.mjs` exists, is green, and
+   is not in the gate, so no CI or stop-hook run executes it. The line is
+   `  { name: "rebase-authority-tests", file: join(libDir, "rebase-authority.test.mjs") },`.
+   `verify.mjs` is TP-3 with no in-session override in signature mode. Seed the
+   request with the exact intended Edit, build `plan`/`prepare-authorization`
+   from that same request digest, and consume the signature the moment it
+   arrives — no other tree mutation in between, or the bound `statusSha256`
+   drifts and the signature is burned for nothing.
+2. **The push approval for the candidate**, after the gates have run on it.
+   `main`'s ruleset requires a green `verify` status check, so CI must be green
+   on the pushed commit first; the previous attempt was refused server-side with
+   `GH013` and cost a signature.
+
+Two consequences of the release itself, worth stating so they are not
+rediscovered: the build cachebuster is stripped when the tag is cut (the
+convention and its cost are in `docs/claude-local-plugin-development.md`), and
+installing the released `0.6.1` is what finally puts tonight's guard fixes into
+the copy that actually executes. Two Critic rounds recorded that gap — the fixes
+live in this checkout, not in the running plugin — and the release closes it.
 
 ### At the freeze — what the PO decides
 
