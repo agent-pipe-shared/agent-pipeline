@@ -47,6 +47,77 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 6a44b15213c025a10e111ebd48ba173765810494 — 2026-09-02, range 266d691f..6a44b152, the overnight Nova B block: CI diagnosis and fixes, the rebase authority, four Critic rounds, and the 0.6.1 release stamp
+
+- ADR-0012: checked, no change needed.
+
+  `docs/state.md` was renewed. One subsection of the current handover was
+  replaced — the interim release status, which had become false: it described a
+  CI failure as undiagnosed and the rebase package as about to be built, and
+  both had landed. The replacement is a current account of the same subject in
+  the same section. A lifecycle-phase projection marker was added, because the
+  file carried none at all and `check-state-phase-consistency.mjs` requires one;
+  it now reports `consistent`. No rotation, no archive row, no section removed,
+  and the file is 26527 bytes against this ADR's 30000-byte cap
+  (`guard-handover-size` passes). The canonicalization rule is unchanged.
+
+- ADR-0056: checked, no change needed.
+
+  `project/pipeline-state.json` changed in `1e025ed5` and `a801e0fd`, both of
+  which are `approve-push` writing its own approval audit record — for the
+  feature-branch signature and for the `main`-destination signature. That write
+  IS the mechanism this ADR specifies, exercised in `signature` mode against the
+  pinned trust anchor, not a change to it. The second record is committed even
+  though its push did not land: GitHub's own ruleset refused it under
+  `required_status_checks`, not the approval, and a record that kept only
+  approvals whose pushes succeeded would be a worse record. No decision in
+  ADR-0056 is affected.
+
+- ADR-0058: checked, no change needed.
+
+  `plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs` gained the rebase
+  authority (`103463a3`) and one narrowing of an over-refusal (`2f59b2bd`).
+  Neither touches the guard maintenance window. The work package's own
+  Requirement 4 prohibits, in terms, "no extension of the guard-maintenance
+  window to the lifecycle kernel", and the implementation honours it
+  structurally rather than by intention: the new authority is consulted at the
+  final verdict of the dev-plan lane only, so it can turn a block into an allow
+  and never the reverse, and the readiness kernel still runs — `git rebase
+  --continue` and `--show-current-patch` remain admitted by the pre-existing
+  readiness lane, not by this authority. `NEVER_LIFTABLE_KERNEL_PATHS` is
+  untouched. The mandatory T1 round examined this specifically and reported
+  nothing in the mechanism.
+
+- ADR-0069: checked, no change needed.
+
+  `docs/adr/0077-push-approvals-per-destination.md` was **amended**, not
+  renumbered and not superseded, so no number was allocated and this ADR's
+  allocation-at-acceptance rule was not exercised. `harness/scripts/verify.mjs`
+  gained one suite-registration line through the human-guard-override ceremony
+  (`5a10702b`); it contains no ADR reference and allocates no number.
+  `check-adr-consistency.mjs` passes: 79 numbered files, no duplicate numbers,
+  no dangling supersession target, every index row resolving.
+
+- ADR-0077: amended in 8efa47264e2cff22c9f1064c16c17b83cb997d6a
+
+  That amendment is why this ADR now governs this path at all.
+
+  `docs/push-release-flow.md` changed twice — `7d56917c` corrected the
+  documented `push-init` invocation to match what its parser actually accepts,
+  and `3f92cae8` corrected the two plugin-shipped copies plus the root summary
+  table that had drifted from it. Separately, `8efa4726` extended ADR-0077 with
+  the release flow's self-invalidation, adding D6 (the normative release order),
+  D7 (gate evidence binds the test-relevant tree, fail-closed) and D8 (the cheap
+  consistency checkers as a fast pre-gate), and added `docs/push-release-flow.md`
+  to its `Governs:` line because D6 places the normative order there. All three
+  decisions are recorded as scheduled for Nova B and none is claimed as built.
+  The measurement behind them is in the ADR: six full verify runs on 2026-09-01,
+  about eighty minutes, of which one was substantively necessary.
+
+  Stated plainly because it is this ADR's own subject: **this candidate does not
+  yet follow D6.** The order it prescribes is what the remaining steps of this
+  release will attempt, not what the whole overnight block did.
+
 ## Candidate 79c3cbe92fc1416dc65daeca36d419ece082861e — 2026-09-01, range 56e91858..79c3cbe9, re-head onto the final candidate: the one additional commit beyond 67bb5005 removes the now-dead reference-path allowlist entry
 
 This candidate is `67bb5005`'s immediate successor: the single additional
