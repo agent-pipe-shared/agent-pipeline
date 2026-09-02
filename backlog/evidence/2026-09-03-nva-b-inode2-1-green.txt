@@ -1,0 +1,41 @@
+command: node --test plugins/pipeline-core/lib/codex-onboarding-capabilities.test.mjs
+exit code: 0
+
+--- stdout ---
+✔ onboarding observes an empty root as local-uninitialized and binds only a reviewed Git-init claim (13.054898ms)
+✔ bootstrap observes a local-uninitialized root without claiming a Git-init mutation (6.806521ms)
+✔ a fresh Codex root with only an empty read-only .git mount is host-managed (1.739061ms)
+✔ the WSL cross-view recognizer distinguishes an existing protected Git tree from a fresh empty mount (26.872202ms)
+✔ a restarted Codex session accepts only a kickoff-bound initialized host Git mount (59.154998ms)
+✔ initialized host projection remains observable from a read-only hook without a root write probe (16.746395ms)
+✔ local repository capability accepts a physical .git directory and a registered .git file worktree (82.709572ms)
+✔ host-managed observation requires exact empty non-writable physical controls and never invokes Git (3.203502ms)
+✔ host-managed is observed but remains unqualified for session and dispatch (2.563035ms)
+✔ a writable, nonempty, symlinked, or incomplete declared host-control layout fails closed (4.086959ms)
+✔ missing and too-old Git map exactly to git-unavailable before session side effects (4.023663ms)
+✔ treeSnapshot tolerates an entry that vanishes between readdirSync and lstatSync (1.035675ms)
+✔ treeSnapshot excludes only named Git lock files, not .git/ wholesale (2.42854ms)
+✔ root and Git-control write probes map to distinct closed statuses and leave no bytes (45.719913ms)
+✔ root aliases, .git symlinks, and unregistered escaping .git files are rejected before probes (133.39111ms)
+✔ a one-off transient repository-discovery failure is retried and recovers (96.471557ms)
+✔ a persistent repository-discovery failure still reports control-path-invalid after the bounded retry (90.65734ms)
+✔ session intent performs and fully rolls back one real cleanup-descriptor probe (77.379043ms)
+✔ dispatch intent performs real session and detached-worktree probes with zero refs, bytes, or descriptors left (136.161654ms)
+✔ fault injection after session creation rolls back the exact descriptor and reports session unavailable (87.80981ms)
+✔ session capability diagnosis redacts the failed descriptor lifecycle stage (87.749551ms)
+✔ fault injection after worktree creation rolls back the exact worktree and reports worktree unavailable (133.013887ms)
+✔ foreign target and administration content is preserved instead of recursively removed (103.987515ms)
+✔ an entry replaced after validation is atomically captured, rejected, and restored (102.523987ms)
+✔ injected root-probe failure rolls back its exact temporary paths and stops before Git (26.863026ms)
+✔ NVA-B-INODE2-1 root capability probe cleanup preserves foreign content written under the same identity (135.846926ms)
+ℹ tests 26
+ℹ suites 0
+ℹ pass 26
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1662.025356
+
+--- stderr ---
+

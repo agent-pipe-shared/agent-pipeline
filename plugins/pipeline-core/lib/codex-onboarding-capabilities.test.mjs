@@ -857,3 +857,43 @@ test("injected root-probe failure rolls back its exact temporary paths and stops
   assert.equal(gitCalls, 0);
   assert.deepEqual(treeSnapshot(root), before);
 });
+
+// NVA-B-INODE2-1. `cleanupProbeFile` decided its `unlinkSync` on identity
+// alone ({dev, ino, mode} via `sameIdentity`, plus nlink === 1) -- the same
+// shape 9a7c309b closed in project-onboarding-v3.mjs's manifest-repair
+// rollback (an inode freed by a concurrent unlink can be handed straight back
+// to the next file created at the same path, so identity alone cannot tell a
+// foreign file from the one this transaction wrote). This test does not wait
+// for the kernel to hand back a freed inode: an in-place `writeFileSync` on
+// the probe's own path rewrites its content while genuinely keeping the same
+// {dev, ino} (no unlink, no new file, no allocator dependence), which is a
+// strictly stronger identity guarantee than an injected `lstatSync` double
+// would give and holds on every filesystem.
+test("NVA-B-INODE2-1 root capability probe cleanup preserves foreign content written under the same identity", () => {
+  const root = localRepository("root probe same-identity content race");
+  let probePath = null;
+  const observed = observeCodexOnboardingCapabilities({
+    rootDir: root,
+    intent: "dispatch",
+    faultInjector(step) {
+      if (step !== "root-probe-renamed" || probePath) return;
+      const renamed = readdirSync(root)
+        .filter((name) => name.startsWith(".pipeline-capability-") && name.endsWith(".renamed"));
+      assert.equal(renamed.length, 1, `expected exactly one renamed root capability probe: ${JSON.stringify(renamed)}`);
+      probePath = join(root, renamed[0]);
+      writeFileSync(probePath, "foreign capability content\n");
+    },
+  });
+  assert.equal(typeof probePath, "string", "the fault injector never fired");
+  assert.equal(existsSync(probePath), true,
+    `the probe cleanup deleted foreign content it never wrote: ${JSON.stringify(observed)}`);
+  assert.equal(readFileSync(probePath, "utf8"), "foreign capability content\n");
+  // Ordinary path: a probe file this transaction really did write, with its
+  // own untouched content, is still cleaned up -- the fix cannot trade a
+  // data-destruction bug for a leak.
+  const owned = localRepository("root probe ordinary cleanup");
+  const before = treeSnapshot(owned);
+  const ordinary = observeCodexOnboardingCapabilities({ rootDir: owned, intent: "dispatch" });
+  assert.equal(ordinary.rootWritable, "passed", JSON.stringify(ordinary));
+  assert.deepEqual(treeSnapshot(owned), before);
+});

@@ -48,6 +48,11 @@ import {
 const INTENTS = new Set(["onboarding", "bootstrap", "session", "dispatch"]);
 const MODES = new Set(["auto", "local", "host-managed"]);
 const GIT_VERSION = /^git version (\d+)\.(\d+)(?:\.(\d+))?((?:[.-][0-9A-Za-z]+)*)/u;
+// Content written by `disposableWriteProbe`'s single fixed probe body, bound
+// once at module load. `cleanupProbeFile` uses this to decide ownership by
+// content, not identity alone -- see its own docblock.
+const PROBE_BODY = Buffer.from("capability-probe", "utf8");
+const PROBE_SHA256 = sha256(PROBE_BODY);
 
 function isInside(root, target) {
   const rel = relative(root, target);
@@ -100,11 +105,21 @@ function fsyncDirectory(path) {
   }
 }
 
+// NVA-B-INODE2-1. An inode number freed by a concurrent unlink is routinely
+// handed straight back to the next file created at the same path (ext4
+// allocates the lowest free inode in the block group -- the mechanism
+// 9a7c309b closed for project-onboarding-v3.mjs's manifest-repair rollback),
+// so `sameIdentity` (dev/ino/mode) alone cannot tell this transaction's own
+// probe file from foreign content that replaced it at the same path.
+// Ownership additionally requires the file's current bytes to still be the
+// fixed probe body this function wrote; anything else is foreign and is left
+// in place.
 function cleanupProbeFile(path, expectedIdentity) {
   if (!existsSync(path)) return;
   const info = lstatSync(path);
   if (!expectedIdentity || !sameIdentity(expectedIdentity, path)
-    || !info.isFile() || info.isSymbolicLink() || info.nlink !== 1) {
+    || !info.isFile() || info.isSymbolicLink() || info.nlink !== 1
+    || sha256(readFileSync(path)) !== PROBE_SHA256) {
     throw new Error("disposable capability path changed identity");
   }
   unlinkSync(path);
@@ -124,7 +139,7 @@ function disposableWriteProbe(directory, label, faultInjector) {
       0o600);
     const opened = fstatSync(fd);
     probeIdentity = { dev: String(opened.dev), ino: String(opened.ino), mode: opened.mode };
-    writeFileSync(fd, Buffer.from("capability-probe", "utf8"));
+    writeFileSync(fd, PROBE_BODY);
     fsyncSync(fd);
     closeSync(fd);
     fd = undefined;
