@@ -101,6 +101,53 @@ differed.
 4. `local-worker-supervisor-cli-tests` reports `=0` in an actual CI run, and the check is no longer
    sensitive to machine speed — demonstrated, not assumed.
 
+## Measurement, 2026-09-02 — the hypothesis is confirmed, and it grows
+
+The Proposal above asks one decisive question: does `recordSha256` cover
+`lease.lastHeartbeatMonotonicMs`? It does. Four lines of
+`plugins/pipeline-core/lib/local-worker-supervisor.mjs` settle it by reading,
+with no run required:
+
+- **line 267** — the record's exact key set includes `"lease"`, and
+  `record.recordSha256 = unsignedDigest(record, "recordSha256")` (lines 887,
+  892, 902) digests the entire record except that one field. The lease is inside
+  the digest.
+- **line 277** — `lease`'s own exact key set includes
+  `lastHeartbeatMonotonicMs`. It is a validated part of the record, not a field
+  the digest incidentally reaches.
+- **line 1018** — `record.lease.lastHeartbeatMonotonicMs = now`, written by the
+  heartbeat at `lease.heartbeatMs`, which the fixture sets to 1000 ms.
+- **line 1224** — the `cancel` route refuses unless
+  `record.recordSha256 === expectedRecordSha256`.
+
+So a caller's digest is invalidated once per second by a heartbeat the caller
+cannot pause, and the `LWS-CANCEL-DENIED` seen in CI is the route behaving
+exactly as written. `LWSC04` loses a race it was always going to lose on a
+sufficiently slow machine. Acceptance criteria 1 and 2 are met by the four line
+citations above.
+
+**The consequence is larger than the flaky test, and this is where the item
+changes shape.** The Proposal offered a product change only as a conditional
+second half, to be considered "only if no realistic client can win this race".
+That condition is now met by construction rather than by measurement of luck: a
+compare-and-swap whose expected value changes on a timer cannot be won reliably
+by any caller that has to spawn a process between reading the digest and acting
+on it, which is what the CLI does and what any real client would do. Fixing only
+the test — re-read plus bounded retry — turns the suite green and leaves every
+client retrying a CAS in a loop against a 1 Hz invalidator.
+
+The design question to answer before choosing a fix: what is the heartbeat doing
+inside the digest that `cancel` compares? It carries liveness, not identity. The
+dispatch, candidate, plan, pool and worker set are each separately digested
+already, and a cancel route comparing a digest over the identity fields alone
+would be exactly as safe against cancelling the wrong record while not being
+invalidated by the mere passage of time.
+
+That is a change to a safety-relevant compare-and-swap. It belongs to a briefed
+dispatch with its own independent review, not to a fix whose goal is a green
+suite — which is why this item is NOT being folded into the two CI test-fix
+dispatches (`NVA-CIGREEN-1`, `NVA-CIGREEN-2`) alongside it.
+
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
 - **Decision:**
