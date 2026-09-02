@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "1d7e702541521920b82471e9cc480f8e91be8c68e0028e428d5621e8bd6b36e1"
+    "transitionHead": "40ade5839ba96e358dc21b78f0f79e367e74a46301d6425d037f3853d3c28a00"
   },
   "counts": {
-    "open": 108,
+    "open": 109,
     "in_progress": 0,
     "closed": 488,
     "rejected": 3,
@@ -2104,6 +2104,15 @@
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
       "deferred": true,
       "tracking": "Sentinel recovery baseline; deferred per PO triage 2026-08-23."
+    },
+    {
+      "id": "pipeline.documenting-the-maxturns-cliff-did-not-stop-dispatches-falling-off-it",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-02",
+      "source": "Direct measurement, 2026-09-02 session: three Goldfish dispatches hit maxTurns in one block, one of them losing all of its work",
+      "deferred": false
     },
     {
       "id": "pipeline.dual-channel-publication",
