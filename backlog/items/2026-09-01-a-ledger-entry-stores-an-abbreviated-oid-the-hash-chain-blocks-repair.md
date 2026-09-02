@@ -73,3 +73,42 @@ things somebody decided to accept deliberately.
 It must not weaken the check. A checker taught to accept abbreviated OIDs
 generally would stop catching the class of error that produced this one — which
 is the class `backlog/README.md` exists to warn about.
+
+## Triage, 2026-09-03 — the question is answered by measurement; the item stays open, narrowed
+
+Direction 1 is established as unavailable, by live invocation rather than by
+reading the schema (`NVA-B-LEDGEROID-1`, commit `75312525`; transcript at
+`backlog/evidence/2026-09-02-nva-b-ledgeroid-1-amendment-dryrun.txt`):
+
+- `planBacklogEvidenceAmendment` refuses this item outright.
+  `plugins/pipeline-core/lib/backlog-state.mjs:1292` hard-codes
+  `id !== "pipeline.source-available-commercial-licensing"` as a blocking
+  error, evaluated **before** any OID-shape reasoning. A dry-run with both
+  commits set to the full, correct OID returned that single error.
+- Even a widened authorization could not clear the finding.
+  `validateTransitionLedger` checks every non-`hashRescope` event's own
+  `evidence.commit` format unconditionally, and the planner only ever appends
+  a trailing event — it never edits an existing one. Sequence 403's abbreviated
+  value is therefore permanent. That is the append-only hash chain working as
+  designed, not a second defect.
+
+Two corrections to the record, both surfaced by that dispatch:
+
+1. The prior **closed** item
+   `pipeline.ledger-event-403-has-a-short-hash-evidence-commit` (2026-08-12)
+   already covers this exact entry. This item is a re-filing of it. Its Triage
+   attributed the gap to `closure_repository: self` vs `project:` scope; that
+   is wrong — the refusal is a single hard-coded item-id allowlist, unrelated
+   to `closure_repository`.
+2. A second, more general amendment shape exists
+   (`pipeline.backlog-evidence-amendment.v1`, validated by
+   `validateBacklogEvidenceAmendment`) but **no planner anywhere constructs
+   one** for this ledger. Direction 1 therefore fails for two independent
+   reasons, not one.
+
+**Why this stays open:** the two DRIFT lines are still printed on every
+`check-backlog-state.mjs` run and still have to be read past by every human and
+agent who runs it. What remains is Direction 3 alone — teach the checker to
+classify this entry as known-accepted, the way the 20-line 2026-07-19..22
+historical batch already is. The item is narrowed to that; Directions 1 and 2
+are closed as unavailable.

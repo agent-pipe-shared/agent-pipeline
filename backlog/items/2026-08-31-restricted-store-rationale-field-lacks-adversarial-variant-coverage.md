@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.restricted-store-rationale-field-lacks-adversarial-variant-coverage
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-03
+closure_repository: self
+closure_commit: 3a6ceaf7d2fe14f71fa0230bb7a089ec7db02c9f
+closure_evidence: backlog/evidence/2026-09-02-nva-b-rstore-1-after.txt
 created: "2026-08-31"
 sprint: nova-b
 done_when: "contains plugins/pipeline-core/lib/human-decision-attribution.test.mjs Unicode-confusable"
@@ -62,3 +66,26 @@ is precisely what this finding was filed to establish.
 - **Rationale:** {{mandatory for rejected/deferred; optional for accepted}}
 - **Assignment (if accepted):** {{phase/release}}
 - **Date:**
+
+## Triage, 2026-09-03 — closed, and a note on why it stayed open a day too long
+
+The five variant categories were already covered by `b0f1dafc`
+(`NVA-B-RATIONALEVAR`, 2026-09-01), which satisfied this item's own
+`done_when` predicate. The item nevertheless still read `status: open` with an
+empty Triage block, and a dispatch was briefed against it on that basis on
+2026-09-02. The dispatch verified the premise against primary source before
+touching anything, found the work already done, and salvaged the one genuine
+remaining gap instead: no test passed a non-string `rationale`, so the
+`typeof payload.rationale !== "string"` arm of the `HDA-RATIONALE` check
+(`human-decision-attribution.mjs:78`) was unreached. `3a6ceaf7` closes it —
+distinct from the existing "non-scalar" case, which rejects an ill-formed
+*string* and never reaches that arm.
+
+The dispatcher's own error is recorded here rather than left implicit: the
+item file was read, but `git log` over the affected path was not, which
+CLAUDE.md requires before briefing a dispatch on an inherited "still open"
+claim. One command would have shown `b0f1dafc`.
+
+This is a live, measured instance of
+`pipeline.resolved-backlog-items-can-keep-status-open-indefinitely` — the cost
+is no longer hypothetical: a stale `open` status spent a full dispatch.

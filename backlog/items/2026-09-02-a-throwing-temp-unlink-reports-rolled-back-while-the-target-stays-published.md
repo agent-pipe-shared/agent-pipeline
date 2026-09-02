@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.a-throwing-temp-unlink-reports-rolled-back-while-the-target-stays-published
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-03
+closure_repository: self
+closure_commit: 2067900e83a9f2a3869fd0976ecffcb1aa365957
+closure_evidence: backlog/evidence/2026-09-03-nva-b-unlink-1-green.txt
 created: 2026-09-02
 sprint: nova-b
 done_when: manual
