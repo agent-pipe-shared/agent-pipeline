@@ -56,7 +56,7 @@ is unfixed on that lane.
 - `plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs:1562-1572` and `:1602` — the same trap and its remedy, already documented and implemented in this file for the restart-required lane
 - No `apply_patch` case exists among `rebdead positive-1..5`
 
-## F5 — Readiness is lifted, not re-based on `orig-head` (major) — OPEN, rework rejected
+## F5 — Readiness is lifted, not re-based on `orig-head` (major) — CLOSED 2026-09-02
 
 The specification states the framing decision explicitly: readiness for these
 actions resolves against `orig-head` rather than against the conflicted
@@ -129,6 +129,52 @@ nor `absent-pristine`", digest disagreements included, not conflict markers
 alone. The admission stays bounded by `activeRebaseAuthority()` plus
 `rebaseAuthorityPermitsPath()`'s deny-by-default `conflictPaths` membership, but
 the widening is real and is named here rather than left to be discovered.
+
+### Rework round 2 ACCEPTED 2026-09-02 — `79bc79b8` (+ `68c164e8`) closes F5
+
+Verified independently by the dispatcher, not taken from the report:
+
+- `plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs` now gates on
+  `REBASE_READINESS_LIFECYCLE_STATUSES.has(error.lifecycleStatus)` — a two-value
+  Set holding exactly `continuity-damaged` and
+  `continuity-observation-unavailable`. Read at the diff, not the summary.
+- The duplicated six-line comment block `8f1c0737` introduced is gone, replaced
+  by one block that names the widening honestly: `continuity-observation-
+  unavailable` is a catch-all covering digest disagreements, not conflict
+  markers alone, bounded only by `activeRebaseAuthority()` and
+  `rebaseAuthorityPermitsPath()`'s deny-by-default `conflictPaths` membership.
+- `rbdReadinessFn` now throws `continuity-observation-unavailable` for an
+  unparseable state file, mirroring the production chain instead of
+  contradicting it; `rebdead positive-6` covers the `continuity-damaged` lane.
+- `rebdead negative-5` still passes with its assertion unchanged —
+  `restart-required` gets no readiness relief, so F5's original over-breadth
+  stays closed.
+- `node plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs`: **221/221,
+  exit 0**, re-run by the dispatcher.
+
+F5 is closed. F7 and F8 remain open.
+
+#### One defect this rework introduced and could not fully undo
+
+`79bc79b8`'s RED evidence artifact carried this machine's absolute repository
+path seven times, leaked through Node's own `file://` assertion stack traces in
+the failing-test output the artifact captures verbatim. The dispatch found this
+itself and sanitized the working-tree copy in `68c164e8`, disclosing it rather
+than hiding it — the right call, and the reason it is recorded here rather than
+discovered later.
+
+What the fixup could not do is remove the bytes from `79bc79b8`. Amending was
+forbidden by the briefing and rewriting history is forbidden outright
+(CLAUDE.md, guard union). So a machine-specific absolute path remains reachable
+in this public repository's history, in violation of the hard rule that forbids
+exactly that in commits. It is recorded as a known, accepted-by-necessity
+exposure rather than silently carried: the remedy available (history rewrite) is
+itself prohibited, which makes this a PO-facing fact, not an open task.
+
+The generalisable part — that any RED artifact captured from a failing
+`node --test` run embeds the absolute repository path, so redaction must happen
+at capture time and never as a follow-up commit — is filed as its own backlog
+item.
 
 ## F7 — Shipped guard source cites a gitignored, unresolvable path (minor)
 
