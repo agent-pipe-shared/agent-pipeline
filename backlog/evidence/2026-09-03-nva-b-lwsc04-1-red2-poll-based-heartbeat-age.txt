@@ -1,0 +1,51 @@
+# capture: RED (poll-based precondition, advisor-corrected): heartbeat aging denies a legitimate cancellation
+# started: 2026-09-02T23:20:54.321Z
+# command: node --test plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs
+# exitCode: 1
+# signal: null
+
+## stdout
+PASS LWSC01 plans and runs two overlapping real child processes in separate no-hardlink Git clones
+PASS LWSC02 returns serial-fallback-required before creating a workspace when recovery reserve is exhausted
+PASS LWSC03 times out and signals only the exact observed child, then permits exact cleanup
+PASS LWSC04 accepts an exact cancellation intent, drains the owned child, and permits cleanup
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: {"schema":"pipeline.local-worker-supervisor-cli.v1","ok":false,"code":"LWS-CANCEL-DENIED","record":{"schema":"pipeline.local-worker-supervisor-record.v1","repositoryFingerprint":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","sourceRootSha256":"922028915a402a130697a8a87a55d9d3b620e5afd9420ff80ff6edbc9bc714e5","sourceStatusSha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","candidate":{"baseCommit":"b0856afd8c38c342b9614a4a077c83de2af7a83f","candidateCommit":"b0856afd8c38c342b9614a4a077c83de2af7a83f","candidateSha256":"dd2df22b3724a414c1285f38f0852e97f9b86861a4e0f3888530eb2312a5ae65"},"dispatch":{"dispatchId":"dispatch-cancel-heartbeat-age","attempt":1,"queueRevision":7,"packageSha256":"a595d93eb9e69bd4d1bb54d52bfdd844f15091112d5b50567336e4f3167b9689"},"requestSha256":"aab75aec44ac8eb47b29966e1e34fdba4340d95e8eb1c46b1faf74647ed5b73c","planSha256":"423bfc95a4f0a4912e0c5355b38244809b1c93d7a3ef4b182e5729329b3b0dce","poolSha256":"3f990cd3306f3fa6798bd85a30788303c5921ac8fea909ccbefc2146914b40fb","status":"running","owner":{"nonce":"supervisor-owner","pid":476611,"processStartSha256":"5f49099156de51a3fe64be8b07c99721599fc0a7ffffa7ce132a5f132e43f478","bootSha256":"c12869e601c1ee88fa862ccda0c1c3ded0e384c24c53d6d082d04ad7560ba074","executableSha256":"bc17c508ffeed0ec622934f9b7fa72f8e78da65350e63c3eceb56fa688aa5e12"},"lease":{"heartbeatMs":1000,"orphanAfterMs":3000,"lastHeartbeatMonotonicMs":5716100,"cleanupExpiresMonotonicMs":5775580},"effectiveCapacity":4,"workers":[{"taskId":"task-a","subjectSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","leaseId":"lease-a","writePathsSha256":"74fdefe2abd04011d4f52035d22665cf8d7dd4fa5330b425175cd1174078bb4f","workspaceMember":"lease-a","workspacePathSha256":"31bc4030dee01df57fdf87c13fc4a21973f88c9b15e20845a76155efebcaff3c","state":"running","cleanupState":"active","process":{"nonce":"124260527297f96fd477a10bf4642aa0","pid":476628,"processStartSha256":"11e77474aef84b3e8d3c7294fb2443d50343459cbd867b814c65b3cb78981902","bootSha256":"c12869e601c1ee88fa862ccda0c1c3ded0e384c24c53d6d082d04ad7560ba074","executableSha256":"bc17c508ffeed0ec622934f9b7fa72f8e78da65350e63c3eceb56fa688aa5e12"},"startedMonotonicMs":5715690,"completedMonotonicMs":null,"result":null}],"recordSha256":"5ae138bc9d7cc6fb8d33662845b11a6f27be943a096c9609ade8a1ce38bc633f"},"intent":null}
+
+
+2 !== 0
+
+    at file://<REPO_ROOT>/plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs:519:12
+    at async check (file://<REPO_ROOT>/plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs:361:3)
+    at async file://<REPO_ROOT>/plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs:494:1 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 2,
+  expected: 0,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.19.0
+✖ plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs (17933.451954ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 17949.972966
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs:1:1
+✖ plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs (17933.451954ms)
+  'test failed'
+
+
+## stderr
+

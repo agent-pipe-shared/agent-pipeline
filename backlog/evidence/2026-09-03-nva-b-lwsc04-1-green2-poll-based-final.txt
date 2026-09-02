@@ -1,0 +1,31 @@
+# capture: GREEN (poll-based precondition, advisor-corrected, final): recordSha256 excludes lease.lastHeartbeatMonotonicMs
+# started: 2026-09-02T23:21:29.493Z
+# command: node --test plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs
+# exitCode: 0
+# signal: null
+
+## stdout
+PASS LWSC01 plans and runs two overlapping real child processes in separate no-hardlink Git clones
+PASS LWSC02 returns serial-fallback-required before creating a workspace when recovery reserve is exhausted
+PASS LWSC03 times out and signals only the exact observed child, then permits exact cleanup
+PASS LWSC04 accepts an exact cancellation intent, drains the owned child, and permits cleanup
+PASS LWSC05 does not deny cancellation of a healthy worker purely because a heartbeat aged the record digest
+PASS LWSC06 keeps a failed real child attributable and does not convert nonzero exit into success
+PASS LWSC07 classifies an ignored unauthorized write and source-checkout drift as recovery-required
+PASS LWSC08 reports a killed supervisor with a still-attributable worker as recovery-required
+PASS LWSC09 admits only one of two concurrent starts for the same exact plan
+PASS LWSC10 denies replayed cleanup and foreign workspace marker without broad deletion
+10/10 checks passed.
+✔ plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs (35630.700676ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 35647.481681
+
+
+## stderr
+
