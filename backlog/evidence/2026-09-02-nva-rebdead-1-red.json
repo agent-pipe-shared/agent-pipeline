@@ -1,0 +1,101 @@
+{
+  "fixtureDir": "/home/skar667/src/agent-pipeline-shared_nova/scratch/nva-rebdead-red-1tbrhg",
+  "cases": [
+    {
+      "label": "edit-conflict-path-relative",
+      "filePath": "project/pipeline-state.json",
+      "exitCode": 0,
+      "stderrHead": "[rebase-authority] the protected-State writer-only refusal is suspended for this write: it lies inside the current conflict surface of the active rebase of refs/heads/feat/rebdead onto 9727533bb0a52fa5304e8cd2cba2dcced1c1046a, whose orig-head f0934e6db3a5e89d101b1e466a3645ec67aa81ac is validly approved and in implementation. Nothing else is lifted, and no push authority is granted.\n[rebase-authori"
+    },
+    {
+      "label": "edit-conflict-path-absolute",
+      "filePath": "/home/skar667/src/agent-pipeline-shared_nova/scratch/nva-rebdead-red-1tbrhg/project/pipeline-state.json",
+      "exitCode": 0,
+      "stderrHead": "[rebase-authority] the protected-State writer-only refusal is suspended for this write: it lies inside the current conflict surface of the active rebase of refs/heads/feat/rebdead onto 9727533bb0a52fa5304e8cd2cba2dcced1c1046a, whose orig-head f0934e6db3a5e89d101b1e466a3645ec67aa81ac is validly approved and in implementation. Nothing else is lifted, and no push authority is granted.\n[rebase-authori"
+    },
+    {
+      "label": "checkout-ours",
+      "command": "git checkout --ours -- project/pipeline-state.json",
+      "exitCode": 0,
+      "stderrHead": "[rebase-authority] the onboarding-readiness gate is suspended for this command: it lies inside the current conflict surface of the active rebase of refs/heads/feat/rebdead onto 9727533bb0a52fa5304e8cd2cba2dcced1c1046a, whose orig-head f0934e6db3a5e89d101b1e466a3645ec67aa81ac is validly approved and in implementation. Nothing else is lifted, and no push authority is granted.\n"
+    },
+    {
+      "label": "restore-ours",
+      "command": "git restore --ours -- project/pipeline-state.json",
+      "exitCode": 0,
+      "stderrHead": "[rebase-authority] the onboarding-readiness gate is suspended for this command: it lies inside the current conflict surface of the active rebase of refs/heads/feat/rebdead onto 9727533bb0a52fa5304e8cd2cba2dcced1c1046a, whose orig-head f0934e6db3a5e89d101b1e466a3645ec67aa81ac is validly approved and in implementation. Nothing else is lifted, and no push authority is granted.\n"
+    },
+    {
+      "label": "add-conflict-path",
+      "command": "git add -- project/pipeline-state.json",
+      "exitCode": 0,
+      "stderrHead": "[rebase-authority] the onboarding-readiness gate is suspended for this command: it lies inside the current conflict surface of the active rebase of refs/heads/feat/rebdead onto 9727533bb0a52fa5304e8cd2cba2dcced1c1046a, whose orig-head f0934e6db3a5e89d101b1e466a3645ec67aa81ac is validly approved and in implementation. Nothing else is lifted, and no push authority is granted.\n"
+    },
+    {
+      "label": "rebase-continue",
+      "command": "git rebase --continue",
+      "exitCode": 0,
+      "stderrHead": "[rebase-authority] the onboarding-readiness gate is suspended for this command: it lies inside the current conflict surface of the active rebase of refs/heads/feat/rebdead onto 9727533bb0a52fa5304e8cd2cba2dcced1c1046a, whose orig-head f0934e6db3a5e89d101b1e466a3645ec67aa81ac is validly approved and in implementation. Nothing else is lifted, and no push authority is granted.\n"
+    },
+    {
+      "label": "rebase-show-current-patch",
+      "command": "git rebase --show-current-patch",
+      "exitCode": 0,
+      "stderrHead": "[rebase-authority] the onboarding-readiness gate is suspended for this command: it lies inside the current conflict surface of the active rebase of refs/heads/feat/rebdead onto 9727533bb0a52fa5304e8cd2cba2dcced1c1046a, whose orig-head f0934e6db3a5e89d101b1e466a3645ec67aa81ac is validly approved and in implementation. Nothing else is lifted, and no push authority is granted.\n"
+    },
+    {
+      "label": "status-short-control",
+      "command": "git status --short",
+      "exitCode": 0,
+      "stderrHead": ""
+    },
+    {
+      "label": "diff-name-only-control",
+      "command": "git diff --name-only --diff-filter=U",
+      "exitCode": 0,
+      "stderrHead": ""
+    },
+    {
+      "label": "edit-other-state-path-negative-control",
+      "filePath": ".claude/pipeline-state.json",
+      "exitCode": 2,
+      "stderrHead": "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): Pipeline State is writer-owned and must not be edited directly.\nUse the exact sanctioned State or digest-bound lifecycle writer action.\n[rebase-authority] A genuine rebase of refs/heads/feat/rebdead onto 9727533bb0a52fa5304e8cd2cba2dcced1c1046a is in progress, and the state at its orig-head f0934e6db3a5e89d101b1e466a3645ec67aa81ac (feature \"re"
+    },
+    {
+      "label": "skip-negative",
+      "command": "git rebase --skip",
+      "exitCode": 2,
+      "stderrHead": "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-REBASE-AUTHORITY-SHAPE: \"git rebase --skip\" is not admitted while an authorized rebase is in progress.\nWhy: Only the exact continuations the resolved authority lists are admitted while a rebase is in progress. --skip, --edit-todo and --exec are absent from that table by construction rather than filtered out of it, and \"git rebase --abort"
+    },
+    {
+      "label": "edit-todo-negative",
+      "command": "git rebase --edit-todo",
+      "exitCode": 2,
+      "stderrHead": "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-REBASE-AUTHORITY-SHAPE: \"git rebase --edit-todo\" is not admitted while an authorized rebase is in progress.\nWhy: Only the exact continuations the resolved authority lists are admitted while a rebase is in progress. --skip, --edit-todo and --exec are absent from that table by construction rather than filtered out of it, and \"git rebase --"
+    },
+    {
+      "label": "exec-negative",
+      "command": "git rebase --exec 'touch marker'",
+      "exitCode": 2,
+      "stderrHead": "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-REBASE-AUTHORITY-SHAPE: \"git rebase --exec touch marker\" is not admitted while an authorized rebase is in progress.\nWhy: Only the exact continuations the resolved authority lists are admitted while a rebase is in progress. --skip, --edit-todo and --exec are absent from that table by construction rather than filtered out of it, and \"git r"
+    },
+    {
+      "label": "arbitrary-c-negative",
+      "command": "git -c core.hooksPath=none rebase --continue",
+      "exitCode": 2,
+      "stderrHead": "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-REBASE-AUTHORITY-SHAPE: the global git config option \"-c\" is not admitted while an authorized rebase is in progress.\nWhy: Requirement 4 admits no arbitrary -c while this authority is active. The only admitted spelling is \"-c core.editor=true\" as two separate tokens, and only directly in front of \"rebase --continue\".\nThis refusal stands o"
+    },
+    {
+      "label": "push-negative",
+      "command": "git push origin HEAD",
+      "exitCode": 2,
+      "stderrHead": "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-LIFECYCLE-NOT-READY: Pipeline session readiness is continuity-damaged.\nRe-run the typed project-onboarding-v3 inspection with intent session and use only its returned nextAction.\n[rebase-authority] A genuine rebase of refs/heads/feat/rebdead onto 9727533bb0a52fa5304e8cd2cba2dcced1c1046a is in progress, and the state at its orig-head f093"
+    },
+    {
+      "label": "force-push-negative",
+      "command": "git push --force origin main",
+      "exitCode": 2,
+      "stderrHead": "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-LIFECYCLE-NOT-READY: Pipeline session readiness is continuity-damaged.\nRe-run the typed project-onboarding-v3 inspection with intent session and use only its returned nextAction.\n[rebase-authority] A genuine rebase of refs/heads/feat/rebdead onto 9727533bb0a52fa5304e8cd2cba2dcced1c1046a is in progress, and the state at its orig-head f093"
+    }
+  ]
+}

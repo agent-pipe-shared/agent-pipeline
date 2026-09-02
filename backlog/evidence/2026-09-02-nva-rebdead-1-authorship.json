@@ -1,0 +1,9 @@
+{
+  "schema": "pipeline.dispatch-authorship-projection.v1",
+  "taskId": "NVA-REBDEAD-1",
+  "agentType": "goldfish-deep",
+  "dispatcher": "elephant",
+  "commits": [
+    "10d11e588f9c5ced9b3334afe1c2007f2ee0c0ea"
+  ]
+}
