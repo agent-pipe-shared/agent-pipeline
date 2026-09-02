@@ -3216,7 +3216,14 @@ export function applyProjectOnboardingManifestRepair({ rootDir = process.cwd(), 
     const tempFd = fs.openSync(temp, "r");
     try { fs.fsyncSync(tempFd); } finally { fs.closeSync(tempFd); }
     fs.fsyncDirectory?.(parentPath);
-    fs.linkSync(temp, target); fs.unlinkSync(temp); temp = null; published = target;
+    fs.linkSync(temp, target);
+    // NVA-B-UNLINK-1: assigned the instant the target is live, not after the
+    // temporary's own removal succeeds. A throwing `unlinkSync(temp)` below
+    // must not leave the catch believing nothing was published while the
+    // target is in fact live at `target` -- the defect this binds shut.
+    published = target;
+    fs.unlinkSync(temp);
+    temp = null;
     publishedIdentity = fileIdentity(fs.lstatSync(target));
     if (!publishedIdentity) throw new Error("published manifest identity unavailable");
     if (sha256(fs.readFileSync(safePath(root, SOURCE, fs), "utf8")) !== plan.source.sha256) throw new Error("source bytes changed after publication");
@@ -3237,7 +3244,32 @@ export function applyProjectOnboardingManifestRepair({ rootDir = process.cwd(), 
     // is left in place.
     if (temp && tempIdentity && tempSha256) { try { if (ownsPublishedOutput(tempIdentity, tempSha256, temp, fs)) fs.unlinkSync(temp); } catch {} }
     if (published && publishedIdentity) { try { if (ownsPublishedOutput(publishedIdentity, plan.generated.sha256, published, fs)) fs.unlinkSync(published); } catch {} }
-    return { schema: MANIFEST_REPAIR_SCHEMA, status: "rolled-back", root, diagnostics: [diagnostic("$.transaction", "apply_failed", error.message, "repair the target and replan")] };
+    // NVA-B-UNLINK-1: a throwing `unlinkSync(temp)` right above (immediately
+    // after a successful `linkSync`) leaves `published` set but
+    // `publishedIdentity` unavailable -- nlink is still 2 while the temporary
+    // stays linked, so `ownsPublishedOutput()` above correctly refuses to
+    // delete it (that refusal is the existing content-bound delete discipline,
+    // untouched). What must not stay hardcoded is the status: it is read off
+    // the target's own current bytes rather than assumed from merely having
+    // reached this catch. Only when the target no longer holds this
+    // transaction's own generated content is "rolled-back" true.
+    let stillPublished = false;
+    if (published) {
+      try {
+        stillPublished = fs.existsSync(published) && sha256(fs.readFileSync(published, "utf8")) === plan.generated.sha256;
+      } catch { stillPublished = false; }
+    }
+    return {
+      schema: MANIFEST_REPAIR_SCHEMA,
+      status: stillPublished ? "rollback-failed" : "rolled-back",
+      root,
+      diagnostics: [diagnostic(
+        "$.transaction",
+        stillPublished ? "rollback_failed" : "apply_failed",
+        stillPublished ? `${error.message} (the manifest target is still published; rollback could not confirm removal)` : error.message,
+        stillPublished ? "inspect the published manifest target directly before any readiness claim" : "repair the target and replan",
+      )],
+    };
   }
 }
 
