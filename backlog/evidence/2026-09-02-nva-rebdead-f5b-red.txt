@@ -251,7 +251,7 @@ test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:8302:1
   
   2 !== 0
   
-      at TestContext.<anonymous> (file:///home/skar667/src/agent-pipeline-shared_nova/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:8310:12)
+      at TestContext.<anonymous> (file:///<repo>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:8310:12)
       at Test.runInAsyncScope (node:async_hooks:227:14)
       at Test.run (node:internal/test_runner/test:1397:25)
       at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
@@ -282,7 +282,7 @@ test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:8317:1
   
   2 !== 0
   
-      at TestContext.<anonymous> (file:///home/skar667/src/agent-pipeline-shared_nova/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:8327:12)
+      at TestContext.<anonymous> (file:///<repo>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:8327:12)
       at Test.runInAsyncScope (node:async_hooks:227:14)
       at Test.run (node:internal/test_runner/test:1397:25)
       at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
@@ -313,7 +313,7 @@ test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:8332:1
   
   2 !== 0
   
-      at TestContext.<anonymous> (file:///home/skar667/src/agent-pipeline-shared_nova/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:8335:10)
+      at TestContext.<anonymous> (file:///<repo>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:8335:10)
       at Test.runInAsyncScope (node:async_hooks:227:14)
       at Test.run (node:internal/test_runner/test:1397:25)
       at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
@@ -334,7 +334,7 @@ test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:8338:1
   
   2 !== 0
   
-      at TestContext.<anonymous> (file:///home/skar667/src/agent-pipeline-shared_nova/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:8342:10)
+      at TestContext.<anonymous> (file:///<repo>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:8342:10)
       at Test.runInAsyncScope (node:async_hooks:227:14)
       at Test.run (node:internal/test_runner/test:1397:25)
       at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
@@ -355,7 +355,7 @@ test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:8361:1
   
   2 !== 0
   
-      at TestContext.<anonymous> (file:///home/skar667/src/agent-pipeline-shared_nova/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:8366:10)
+      at TestContext.<anonymous> (file:///<repo>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:8366:10)
       at Test.runInAsyncScope (node:async_hooks:227:14)
       at Test.run (node:internal/test_runner/test:1397:25)
       at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
@@ -376,7 +376,7 @@ test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:8416:1
   
   2 !== 0
   
-      at TestContext.<anonymous> (file:///home/skar667/src/agent-pipeline-shared_nova/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:8418:10)
+      at TestContext.<anonymous> (file:///<repo>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:8418:10)
       at Test.runInAsyncScope (node:async_hooks:227:14)
       at Test.run (node:internal/test_runner/test:1397:25)
       at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
@@ -408,7 +408,7 @@ test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:8431:1
   
   2 !== 0
   
-      at TestContext.<anonymous> (file:///home/skar667/src/agent-pipeline-shared_nova/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:8440:12)
+      at TestContext.<anonymous> (file:///<repo>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:8440:12)
       at Test.runInAsyncScope (node:async_hooks:227:14)
       at Test.run (node:internal/test_runner/test:1397:25)
       at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
