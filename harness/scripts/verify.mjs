@@ -615,6 +615,7 @@ const TEST_SUITES = [
   { name: "onboarding-consent-marker-tests", file: join(libDir, "onboarding-consent-marker.test.mjs") },
   { name: "onboarding-consent-guard-tests", file: join(hooksDir, "onboarding-consent-guard.test.mjs") },
   { name: "protected-test-paths-tests", file: join(libDir, "protected-test-paths.test.mjs") },
+  { name: "rebase-authority-tests", file: join(libDir, "rebase-authority.test.mjs") },
   { name: "onboarding-consent-mark-tests", file: join(pluginScriptsDir, "onboarding-consent-mark.test.mjs") },
   { name: "clean-candidate-run-tests", file: join(pluginScriptsDir, "clean-candidate-run.test.mjs") },
   { name: "verify-evidence-root-tests", file: join(scriptDir, "verify-evidence-root.test.mjs") },
