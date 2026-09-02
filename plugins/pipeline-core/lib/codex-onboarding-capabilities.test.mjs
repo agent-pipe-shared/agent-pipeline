@@ -85,13 +85,36 @@ function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-function treeSnapshot(root) {
+// A `*.lock` file directly under `.git/` or `.git/objects/` is Git's own
+// transient background-maintenance state, not a byte a probe wrote. Matched
+// on path SEGMENTS (not a raw-string regex) so it is separator-safe on both
+// POSIX and win32; the exclusion is deliberately narrow -- it must not catch
+// a `.lock` file anywhere deeper under `.git/` (e.g. `.git/refs/heads/*`),
+// nor any non-`.lock` file directly under `.git/`.
+function isTransientGitLockPath(rel) {
+  const segments = rel.split(/[\\/]/u);
+  if (segments.length === 2 && segments[0] === ".git" && segments[1].endsWith(".lock")) return true;
+  if (segments.length === 3 && segments[0] === ".git" && segments[1] === "objects" && segments[2].endsWith(".lock")) return true;
+  return false;
+}
+
+function treeSnapshot(root, lstatSyncImpl = lstatSync) {
   const rows = [];
   function visit(directory) {
     for (const name of readdirSync(directory).sort()) {
       const path = join(directory, name);
       const rel = relative(root, path);
-      const info = lstatSync(path);
+      if (isTransientGitLockPath(rel)) continue;
+      let info;
+      try {
+        info = lstatSyncImpl(path);
+      } catch (error) {
+        // An entry that vanished between readdirSync and lstatSync (e.g. a
+        // transient Git maintenance lock) is, for "leave no bytes", a file
+        // that is not there -- skip the row rather than crashing the walk.
+        if (error && (error.code === "ENOENT" || error.code === "ENOTDIR")) continue;
+        throw error;
+      }
       if (info.isSymbolicLink()) rows.push([rel, "symlink", readlinkSync(path)]);
       else if (info.isDirectory()) {
         rows.push([rel, "directory", info.mode & 0o777]);
@@ -478,6 +501,54 @@ test("missing and too-old Git map exactly to git-unavailable before session side
       worktreeCapability: "not-required",
     });
     assert.equal(nonVersionCalls, 0, `${label} performed repository/session Git calls`);
+  }
+});
+
+test("treeSnapshot tolerates an entry that vanishes between readdirSync and lstatSync", () => {
+  const root = makeRoot("vanishing entry");
+  writeFileSync(join(root, "steady.txt"), "keep\n");
+  const vanishing = join(root, "vanishing.txt");
+  writeFileSync(vanishing, "gone\n");
+  let unlinked = false;
+  const rows = treeSnapshot(root, (path) => {
+    if (!unlinked && path === vanishing) {
+      unlinked = true;
+      unlinkSync(path);
+    }
+    return lstatSync(path);
+  });
+  assert.equal(unlinked, true, "the injected race must actually fire");
+  assert.deepEqual(rows.map((row) => row[0]), ["steady.txt"]);
+});
+
+test("treeSnapshot excludes only named Git lock files, not .git/ wholesale", () => {
+  const root = makeRoot("git lock exclusion");
+  mkdirSync(join(root, ".git", "objects"), { recursive: true });
+  mkdirSync(join(root, ".git", "refs", "heads"), { recursive: true });
+  writeFileSync(join(root, ".git", "HEAD"), "ref: refs/heads/main\n");
+  const before = treeSnapshot(root);
+
+  writeFileSync(join(root, ".git", "config.lock"), "");
+  writeFileSync(join(root, ".git", "objects", "maintenance.lock"), "");
+  assert.deepEqual(
+    treeSnapshot(root),
+    before,
+    "a transient lock present in only one snapshot must not surface as leftover bytes",
+  );
+
+  writeFileSync(join(root, ".git", "config.lock.bak"), "not itself a lock file");
+  writeFileSync(join(root, "top.lock"), "not under .git/ at all");
+  writeFileSync(join(root, ".git", "refs", "heads", "foo.lock"), "four segments deep, not .git/objects/");
+  const afterOtherFiles = treeSnapshot(root);
+  for (const rel of [
+    join(".git", "config.lock.bak"),
+    "top.lock",
+    join(".git", "refs", "heads", "foo.lock"),
+  ]) {
+    assert.ok(
+      afterOtherFiles.some((row) => row[0] === rel),
+      `the exclusion is narrow by name and by path shape -- ${rel} must still be seen`,
+    );
   }
 });
 
