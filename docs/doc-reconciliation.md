@@ -47,6 +47,47 @@ something to do here without review.
 
 ## Entries
 
+## Candidate e7233fe618d6f3fa442e5630e9cbdb536c41c611 — 2026-09-02, range 266d691f..e7233fe6, re-head onto the final candidate: the one additional commit beyond 6a44b152 answers four obligations the full verify surfaced
+
+The five ADRs implicated by this range are the same five, for the same changed
+paths, as the entry for `6a44b152` below; that reasoning is unchanged and is not
+restated. Recorded here is only what the additional commit `e7233fe6` changes
+about it.
+
+- ADR-0012: checked, no change needed.
+
+  `docs/state.md` is untouched by the additional commit.
+
+- ADR-0056: checked, no change needed.
+
+  `project/pipeline-state.json` is untouched by the additional commit.
+
+- ADR-0058: checked, no change needed.
+
+  The additional commit adds `plugins/pipeline-core/lib/rebase-authority.mjs` to
+  `NEVER_LIFTABLE_KERNEL_PATHS` and names it in the threat model's own
+  Protected-assets prose. That **strengthens** this ADR's protection rather than
+  altering its decision: the resolver is imported by two existing kernel paths,
+  so GMWKC01's transitive closure required it, and it belongs there on the merits
+  too — a GS-6 window able to rewrite it could manufacture an authority that
+  relieves the dev-plan gate without a human signature. No liftable rule gained a
+  path, no kernel path was removed, and the window mechanism itself is unchanged
+  (`guard-maintenance-window` 62/62, `guard-maintenance-window-kernel-closure`
+  5/5).
+
+- ADR-0069: checked, no change needed.
+
+  The additional commit allocates no ADR number and references none.
+
+- ADR-0077: checked, no change needed.
+
+  `plugins/pipeline-core/docs/push-release-flow.md` is regenerated from its
+  repo-root origin by `generate-vendored-canon.mjs` rather than edited. An
+  earlier commit in this candidate had corrected the vendored copy by hand, which
+  is exactly why it drifted; the regeneration restores byte-identity with the
+  origin whose content this ADR's D6 governs. The root document is unchanged by
+  this commit.
+
 ## Candidate 6a44b15213c025a10e111ebd48ba173765810494 — 2026-09-02, range 266d691f..6a44b152, the overnight Nova B block: CI diagnosis and fixes, the rebase authority, four Critic rounds, and the 0.6.1 release stamp
 
 - ADR-0012: checked, no change needed.
