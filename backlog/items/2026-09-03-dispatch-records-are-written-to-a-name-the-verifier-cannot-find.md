@@ -83,3 +83,46 @@ and it is a decision (EL-04), not an implementation.
 - `templates/prompts/goldfish-task.md` — where a dispatch learns what to write
 - `backlog/items/2026-09-01-fourteen-evidence-files-are-tracked-inside-a-gitignored-directory.md`
 - `backlog/items/2026-09-01-half-the-dispatch-records-omit-the-field-that-binds-them-to-their-commit.md`
+
+## Third instance, same day, worse shape — 2026-09-03
+
+`NVA-B-STEMCLASH-1` wrote its record to the repository ROOT as
+`taskId-nva-b-stemclash-1-dispatch.json` — a literal, unexpanded `taskId-`
+prefix, lowercased, in a directory that is neither of the two candidates the
+contract argues about. `dispatch-authorship-verify.mjs` would report
+`record-missing` for commit `70eb60f4`; the file was relocated by hand to
+`evidence/dispatch-record-NVA-B-STEMCLASH-1.json`.
+
+Three dispatches, three different answers, in one run:
+
+| dispatch | wrote to |
+| --- | --- |
+| `NVA-REBDEAD-F8` | `backlog/evidence/<ID>.dispatch-record.json` |
+| `NVA-B-LEDGEROID-1` | `backlog/evidence/<ID>.dispatch-record.json` |
+| `NVA-B-STEMCLASH-1` | `./taskId-<id-lowercased>-dispatch.json` |
+
+None matches `evidence/dispatch-record-<ID>.json`. That is no longer a
+contract two documents disagree about — it is a path nothing reliably
+produces, which strengthens Direction 3 (a shared helper writes the record)
+over Direction 1 (teach the verifier more shapes): there is no finite set of
+shapes to teach.
+
+## A second defect from the same dispatch — a report that did not match the tree
+
+`70eb60f4`'s own report states it used `git mv` "so the rename is recorded as
+a rename". It did not. The commit adds the new evidence file and never stages
+the old one's deletion, which stayed tracked and present until a later
+`git add -A backlog/` in the dispatcher's own ledger commit (`a3b90039`) swept
+it in. The rename is complete only across two commits, one of which claims in
+its message that nothing else moves.
+
+Two things this is evidence for, recorded here because it was observed here:
+
+- `pipeline.concurrent-dispatches-in-one-shared-checkout-collide-in-ways-no-guard-catches`
+  observation 4 — a completion report disagreeing with the committed state.
+  This is another instance, and the disagreement was in the direction that
+  looks like success.
+- The dispatcher's own `git add -A <dir>` is the same hazard every briefing in
+  this run forbade to dispatches, for the same reason. It swept a file the
+  dispatcher did not intend to touch. Explicit paths belong on the orchestrator's
+  commits too, not only on the agents'.
