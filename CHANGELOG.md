@@ -35,10 +35,19 @@ not.
   and `--edit-todo`, `--exec`, `--skip`, an arbitrary `-c`, shell chaining and
   anything push-shaped stay refused by absence from an allowlist. It states
   `pushAuthority: false` and `remoteAuthority: false` as fields, not omissions.
-- Every denial raised during an active rebase now names the route forward — the
+- Every denial raised during an active rebase names the route forward — the
   conflict surface as data, the read-only diagnostics that reveal it, and the
-  exact continuation — so a session that has never heard of this authority is
-  carried through by the refusals themselves.
+  exact continuation.
+  - **Correction, 2026-09-02.** This entry originally closed with "so a session
+    that has never heard of this authority is carried through by the refusals
+    themselves". That is true of the refusal *text* and false of the
+    *behaviour*, and the claim is withdrawn rather than left standing. In
+    `0.6.1` two later checks contradict the authority the resolver grants: the
+    writer-owned-State refusal returns without consulting it, and the shell
+    admission is a lift rather than a return, so lifecycle readiness still runs
+    afterwards — against a conflicted state file that is not valid JSON. A
+    rebase whose conflict lands on that file deadlocks. Tracked in `backlog/`
+    and fixed after `0.6.1`; the resolver itself was never implicated.
 
 ### Fixed
 

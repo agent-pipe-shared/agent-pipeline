@@ -15,9 +15,25 @@ dispatch's own run.
 Pre-change the same suite carried 210 tests. The nine added cases are named
 `rebdead positive-1..5` and `rebdead negative-1..4`.
 
-`2026-09-02-nva-rebdead-1-red.json` is the pre-fix machine capture, produced by
-driving `evaluateLifecycleReadyGuard()` against a fixture whose conflict path is
-`project/pipeline-state.json`, with a non-stubbed readiness function.
+**Correction, 2026-09-02 — the pre-fix capture does not survive, and the earlier
+wording here was wrong.** This record previously named
+`2026-09-02-nva-rebdead-1-red.json` "the pre-fix machine capture". That file
+records `exitCode: 0` on every case, carrying an admission notice whose string is
+introduced by the fix commit itself and does not exist at its parent — so it is
+the POST-fix re-run, written over the pre-fix capture in place by the same probe
+script. It is renamed to `2026-09-02-nva-rebdead-1-postfix.json`, which is what
+it is, and its two machine-specific absolute paths are replaced by a `<repo>/`
+placeholder (CLAUDE.md hard rule; the originals named an operator home
+directory).
+
+Consequence stated plainly rather than left to inference: **no red-state
+evidence exists for this change.** The implementing dispatch reported capturing
+one before writing the fix; that capture was overwritten and cannot be produced
+after the fact from this artifact. Whether reproduce-first was actually followed
+is therefore unevidenced, not proven and not disproven.
+
+This is the second instance in one day of gate-cited evidence being overwritten
+in place by a later re-run of the same script.
 
 `2026-09-02-nva-rebdead-1-authorship.json` is an authorship-only projection of
 the dispatch record (`taskId`, `agentType`, `dispatcher`, `commits`).
