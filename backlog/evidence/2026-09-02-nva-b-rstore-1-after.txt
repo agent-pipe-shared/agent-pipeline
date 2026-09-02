@@ -1,27 +1,28 @@
 mode=after exitCode=0
 command: node --test plugins/pipeline-core/lib/human-decision-attribution.test.mjs
 
-accepts a well-formed attribution payload and freezes the result
-isHumanDecisionAttribution tags before validation
-rejects an unknown or missing key with HDA-SHAPE
-rejects a packageId outside the closed producer set
-rejects an authorityClass or identityAssurance outside the kernel's own sets
-rejects a reasonCode that is not a stable upper-case code
-rejects an empty, oversized, or non-scalar rationale
-rejects a keyReference outside the trust anchor's pattern
-rejects a publicKeySha256 that is not a sha-256 hex digest
-rejects a timeBucketEpochMs that is negative, not an integer, or not bucket-aligned
-R-2: the shape has no field that could carry a portable correlator
-accepts a Unicode-confusable rationale (homoglyph impersonation is a valid Unicode-scalar string; the restricted store does not content-filter free-form rationale, only its shape/length/encoding-validity)
-accepts an encoded rationale (base64 and percent-encoding); the validator checks Unicode-scalar validity and length, not content encoding
-accepts a nested-payload rationale that tries to smuggle a portable-shaped object as free text; it stays an inert string, never parsed, and adds none of its keys to the record (R-2 stays structural)
-accepts a multiline rationale
-accepts an external-content rationale (pasted ITSM/ticket text); the restricted store is the design-sanctioned home for exactly this kind of free text (privacy-review.md §1)
-rejects a malformed (non-string) rationale -- a number, a plain object, an array, and null [NEW: NVA-B-RSTORE-1]
-
-tests 17
-pass 17
-fail 0
-cancelled 0
-skipped 0
-todo 0
+✔ accepts a well-formed attribution payload and freezes the result (7.083716ms)
+✔ isHumanDecisionAttribution tags before validation (0.31636ms)
+✔ rejects an unknown or missing key with HDA-SHAPE (1.023633ms)
+✔ rejects a packageId outside the closed producer set (0.395962ms)
+✔ rejects an authorityClass or identityAssurance outside the kernel's own sets (0.404298ms)
+✔ rejects a reasonCode that is not a stable upper-case code (0.388357ms)
+✔ rejects an empty, oversized, or non-scalar rationale (0.701161ms)
+✔ rejects a keyReference outside the trust anchor's pattern (0.646107ms)
+✔ rejects a publicKeySha256 that is not a sha-256 hex digest (0.662298ms)
+✔ rejects a timeBucketEpochMs that is negative, not an integer, or not bucket-aligned (1.378356ms)
+✔ R-2: the shape has no field that could carry a portable correlator (0.386273ms)
+✔ accepts a Unicode-confusable rationale (homoglyph impersonation is a valid Unicode-scalar string; the restricted store does not content-filter free-form rationale, only its shape/length/encoding-validity) (0.345205ms)
+✔ accepts an encoded rationale (base64 and percent-encoding); the validator checks Unicode-scalar validity and length, not content encoding (0.302033ms)
+✔ accepts a nested-payload rationale that tries to smuggle a portable-shaped object as free text; it stays an inert string, never parsed, and adds none of its keys to the record (R-2 stays structural) (0.260154ms)
+✔ accepts a multiline rationale (0.246278ms)
+✔ accepts an external-content rationale (pasted ITSM/ticket text); the restricted store is the design-sanctioned home for exactly this kind of free text (privacy-review.md §1) (0.308165ms)
+✔ rejects a malformed (non-string) rationale -- a number, a plain object, an array, and null (0.530467ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 17
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 141.520435
