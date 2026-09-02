@@ -90,7 +90,7 @@ of the real gate's failure mode". It is not a mirror; it names the wrong branch.
 
 Measured against the production classifier
 (`plugins/pipeline-core/lib/onboarding-continuity.mjs`,
-`classifyOnboardingContinuity`) — `backlog/evidence/2026-09-02-nva-rebdead-f5-continuity-status.json`:
+`classifyOnboardingContinuity`) — `backlog/evidence/2026-09-02-nva-rebdead-f5-lifecycle-status-measurement.json`:
 
 | state file | continuity status |
 | --- | --- |

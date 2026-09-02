@@ -1,0 +1,15 @@
+{
+  "schema": "pipeline.f5-continuity-classification-measurement.v1",
+  "subject": "classifyOnboardingContinuity (plugins/pipeline-core/lib/onboarding-continuity.mjs)",
+  "question": "which continuity status does an unparseable lifecycle state file produce?",
+  "cases": [
+    {
+      "case": "conflict-markers-unparseable",
+      "continuityStatus": "unavailable"
+    },
+    {
+      "case": "parseable-but-inconsistent",
+      "continuityStatus": "damaged"
+    }
+  ]
+}

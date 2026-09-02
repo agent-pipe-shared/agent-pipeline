@@ -8263,7 +8263,7 @@ function rbdFixture(statePath = NEUTRAL_STATE) {
  * (:2885 requires "damaged"; :2904 catches everything else that is not "valid") yields
  * lifecycleStatus "continuity-observation-unavailable" for that continuity status -- this is
  * the exact status the live incident (real conflict markers) produces. Measured in
- * backlog/evidence/2026-09-02-nva-rebdead-f5-continuity-status.json.
+ * backlog/evidence/2026-09-02-nva-rebdead-f5-lifecycle-status-measurement.json.
  * "continuity-damaged" is a SEPARATE, genuinely reachable lane -- a state file that parses
  * but fails its own projection -- covered by rbdContinuityDamagedReadinessFn below.
  */

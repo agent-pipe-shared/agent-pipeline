@@ -265,7 +265,7 @@ const HOST_INIT_CROSS_VIEW_STATUSES = new Set([
 ]);
 // NVA-REBDEAD-F5B: the measured set of lifecycleStatus values an unparseable-or-
 // inconsistent lifecycle state file actually produces (backlog/evidence/2026-09-02-
-// nva-rebdead-f5-continuity-status.json). "continuity-damaged" is reachable when the state
+// nva-rebdead-f5-lifecycle-status-measurement.json). "continuity-damaged" is reachable when the state
 // file PARSES and then fails its own projection; "continuity-observation-unavailable" is
 // reachable when it does not parse at all (parseJsonObject() in lib/onboarding-continuity.mjs
 // raises KICKOFF-READ-MALFORMED, observeDetailed()'s own catch returns continuity.status =
@@ -4045,7 +4045,7 @@ function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
     // NVA-REBDEAD-F5B: widened to the MEASURED set of lifecycleStatus values an
     // unparseable-or-inconsistent lifecycle state file actually produces
     // (REBASE_READINESS_LIFECYCLE_STATUSES above; backlog/evidence/2026-09-02-nva-rebdead-f5-
-    // continuity-status.json). The prior narrowing (8f1c0737) admitted only
+    // lifecycle-status-measurement.json). The prior narrowing (8f1c0737) admitted only
     // "continuity-damaged", which excludes "continuity-observation-unavailable" -- the status
     // the live incident this whole package exists for (real conflict markers, an unparseable
     // state file) actually produces, re-opening the deadlock 10d11e58 closed. Read
