@@ -1592,6 +1592,58 @@ function applyPatchTargetsResumeHintInput(command, root) {
   return false;
 }
 
+/**
+ * NVA-REBDEAD-F1: the same GF-078 bug 1 gap (comment above), now against the rebase
+ * authority's own conflictPaths predicate instead of the fixed resume-hint path. Every
+ * "Add File"/"Update File" header in the envelope must resolve inside `conflictPaths` --
+ * ALL, not ANY: an apply_patch envelope can touch several files in one call, and admitting
+ * on any single permitted header would let an out-of-conflictPaths write ride along inside
+ * an otherwise-permitted patch, which is exactly the widening the resolver's deny-by-default
+ * predicate exists to prevent. "Delete File" and a bare "Move to" destination are excluded
+ * for the same reason applyPatchTargetsResumeHintInput() excludes them: neither is a header
+ * this function needs to reason about for its own narrow admission.
+ *
+ * Exported for the same reason isRestartResumeHintInputWrite() already is: direct,
+ * regression-testable coverage of this function's own decision, independent of whatever a
+ * given caller's own tool-name gate happens to admit further up the call chain.
+ */
+export function applyPatchTargetsPermittedByRebaseAuthority(command, root, rebase) {
+  if (typeof command !== "string") return false;
+  const lines = command.replace(/\r\n/gu, "\n").split("\n");
+  let sawHeader = false;
+  for (const line of lines) {
+    const header = line.match(/^\*\*\* (?:Add File|Update File): (.*)$/u);
+    if (!header) continue;
+    const filePath = header[1];
+    if (typeof filePath !== "string" || filePath === "") return false;
+    sawHeader = true;
+    if (!rebaseAuthorityPermitsPath(rebase, resolve(root, filePath))) return false;
+  }
+  return sawHeader;
+}
+
+/**
+ * NVA-REBDEAD-F1: decides whether an apply_patch envelope's writer-owned-State refusal
+ * applies at all -- the apply_patch-shaped sibling of the WRITE_TOOLS branch's own
+ * `resolve(root, target) === <protected path>` test, generalized to "any header" since one
+ * envelope can touch several files. Membership only; permission is
+ * applyPatchTargetsPermittedByRebaseAuthority()'s decision, not this function's.
+ */
+function applyPatchTargetsProtectedState(command, root) {
+  if (typeof command !== "string") return false;
+  const lines = command.replace(/\r\n/gu, "\n").split("\n");
+  for (const line of lines) {
+    const header = line.match(/^\*\*\* (?:Add File|Update File): (.*)$/u);
+    if (!header) continue;
+    const filePath = header[1];
+    if (typeof filePath !== "string" || filePath === "") continue;
+    const requested = resolve(root, filePath);
+    if (requested === join(root, ".claude", "pipeline-state.json")
+      || requested === join(root, "project", "pipeline-state.json")) return true;
+  }
+  return false;
+}
+
 export function isRestartResumeHintInputWrite(input, root) {
   const toolName = String(input?.tool_name ?? "");
   if (WRITE_TOOLS.includes(toolName)) {
@@ -4034,13 +4086,21 @@ function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
     if (sessionNotReady) {
       const rebase = activeRebaseAuthority(root, dependencies);
       if (rebase !== null) {
+        // NVA-REBDEAD-F1: apply_patch is a separate branch, never a WRITE_TOOLS member (see
+        // the GF-078 bug 1 docstring above applyPatchTargetsPermittedByRebaseAuthority()) --
+        // WRITE_TOOLS itself stays untouched.
         const admitted = WRITE_TOOLS.includes(toolName)
           ? rebaseAuthorityPermitsPath(rebase, writeTargetPath(input.tool_input, toolName))
-          : toolName === "Bash"
-            && rebaseAuthorityPermitsCommand(rebase, (input.tool_input.command ?? input.tool_input.CommandLine));
+          : toolName === "apply_patch"
+            ? applyPatchTargetsPermittedByRebaseAuthority(
+              (input.tool_input?.command ?? input.tool_input?.CommandLine), root, rebase,
+            )
+            : toolName === "Bash"
+              && rebaseAuthorityPermitsCommand(rebase, (input.tool_input.command ?? input.tool_input.CommandLine));
         if (admitted) {
           return verdict(0, `${lifecycleRebaseAdmissionNotice(
-            rebase, "the onboarding-readiness gate", WRITE_TOOLS.includes(toolName) ? "write" : "command",
+            rebase, "the onboarding-readiness gate",
+            WRITE_TOOLS.includes(toolName) || toolName === "apply_patch" ? "write" : "command",
           )}\n`);
         }
       }
@@ -4416,6 +4476,20 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
       if (boundAuthority !== null) {
         return withLifts(lifts, protectedAuthorityDocumentWriteOnly(boundAuthority));
       }
+    }
+  } else if (toolName === "apply_patch") {
+    // NVA-REBDEAD-F1: sibling of the WRITE_TOOLS branch immediately above, for the tool
+    // whose target that branch's `writeTargetPath()` extraction cannot see (GF-078 bug 1).
+    // Scoped to exactly the same one check that branch runs against `conflictPaths` --
+    // the protected-State writer-only refusal -- never the cross-repository or
+    // bound-authority checks, which stay WRITE_TOOLS/Bash-only and untouched here.
+    const command = input.tool_input?.command ?? input.tool_input?.CommandLine;
+    if (applyPatchTargetsProtectedState(command, root)) {
+      const rebase = activeRebaseAuthority(root, dependencies);
+      if (rebase === null || !applyPatchTargetsPermittedByRebaseAuthority(command, root, rebase)) {
+        return withLifts(lifts, protectedStateWriterOnly());
+      }
+      lifts.push(verdict(0, `${lifecycleRebaseAdmissionNotice(rebase, "the protected-State writer-only refusal", "write")}\n`));
     }
   }
   if (toolName === "Bash"
