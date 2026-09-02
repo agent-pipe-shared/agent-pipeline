@@ -201,6 +201,13 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/publication-bundle.mjs",
   "plugins/pipeline-core/lib/publication-bundle-v2.mjs",
   "plugins/pipeline-core/lib/publication-capability-preflight.mjs",
+  // NVA-B-REBWIRE-1: the rebase-authority resolver. Both guard-lifecycle-ready.mjs and
+  // guard-devplan-policy.mjs -- already kernel paths above -- import it to decide whether
+  // an active rebase carries its own already-approved authority, so it is kernel by the
+  // same transitive rule GMWKC01 enforces. It is also kernel on the merits rather than
+  // only by closure: a GS-6 window that could rewrite this module could manufacture an
+  // authority that relieves the dev-plan gate without a human signature.
+  "plugins/pipeline-core/lib/rebase-authority.mjs",
   "plugins/pipeline-core/lib/recovery-preview-attestation.mjs",
   // NVA-PATHIDENT-1: the single definition of how two spellings of one physical
   // repository path fold into one identity, imported directly by THIS file (see

@@ -545,6 +545,7 @@
         "verify-phase:harness/scripts/verify.mjs:push-init-tests",
         "verify-phase:harness/scripts/verify.mjs:push-prepare-tests",
         "verify-phase:harness/scripts/verify.mjs:push-release-flow-docs-contract-tests",
+        "verify-phase:harness/scripts/verify.mjs:rebase-authority-tests",
         "verify-phase:harness/scripts/verify.mjs:recovery-bridge-approval-tests",
         "verify-phase:harness/scripts/verify.mjs:recovery-preview-attestation-tests",
         "verify-phase:harness/scripts/verify.mjs:reference-catalog-tests",
