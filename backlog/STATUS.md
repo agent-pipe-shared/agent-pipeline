@@ -27,6 +27,7 @@
 | pipeline.a-stale-version-stamp-makes-a-plugin-reload-a-silent-no-op | open | defect | pipeline | 2026-08-27 | — |
 | pipeline.a-throwing-temp-unlink-reports-rolled-back-while-the-target-stays-published | open | defect | pipeline | 2026-09-02 | — |
 | pipeline.a-torn-audit-append-has-disabled-every-human-guard-override-since-august-20 | open | defect | pipeline | 2026-09-02 | — |
+| pipeline.a-tree-snapshot-races-gits-own-background-maintenance-lock | open | defect | pipeline | 2026-09-02 | — |
 | pipeline.a7-gate-review-found-a-spec-plan-contradiction-and-a-lifecycle-admission-question | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.absent-runner-flag-silently-defaults-to-codex | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.acceptance-md-edits-repeatedly-drift-lifecycle-json-bound-digest | closed | defect | pipeline | 2026-08-17 | — |
@@ -100,6 +101,7 @@
 | pipeline.chat-gate-non-ascii-name-windows | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — delivered 2026-08-28, same session it was reported |
 | pipeline.chat-mode-push-approval-has-no-enforced-human-turn-boundary | closed | defect | pipeline | 2026-08-25 | — |
 | pipeline.ci-failure-reporter-has-no-recorded-requirement | open | defect | pipeline | 2026-09-01 | Nova B — print-verify-failures.mjs decides what a failing CI run writes into a public log, and no artifact anywhere states what it is required to do. A Critic dispatch against it is refused by its own fail-closed boundary for want of a spec. |
+| pipeline.ci-path-allowlist-omits-the-editor-the-guards-own-continuation-names | open | defect | pipeline | 2026-09-02 | — |
 | pipeline.ci-topology-preflight-cannot-pass-on-this-branch | closed | defect | pipeline | 2026-08-28 | — |
 | pipeline.citation-coordinate-checker-bare-basename | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.claude-code-has-no-mechanical-resume-hint-delivery-hook | open | defect | pipeline | 2026-08-29 | Nova B -- new hooks.json entry needed (TP-4 protected, PO signature ceremony), larger scope than the Codex-side fix; not this candidate. |
@@ -607,6 +609,7 @@
 | pipeline.windows-trusted-tool-resolution | closed | defect | pipeline | 2026-07-22 | PO-approved Sentinel scope extension; no implementation or closure claim. |
 | pipeline.windows-verify-brittle-test-hygiene | closed | defect | pipeline | 2026-07-25 | — |
 | pipeline.windows-verify-reproducibility | closed | defect | pipeline | 2026-07-22 | PO-approved Sentinel scope extension; no implementation or closure claim. |
+| pipeline.worker-cancellation-is-denied-when-the-record-digest-ages-between-read-and-cancel | open | defect | pipeline | 2026-09-02 | — |
 | pipeline.workflow-tool-dispatches-produce-no-dispatch-record-artifact | open | defect | pipeline | 2026-08-24 | Reassigned from phoenix to nova on 2026-08-28 by PO decision, after the Phoenix line was intaked into Nova |
 | pipeline.workflow-tool-isolation-worktree-never-created-a-worktree-this-session | open | defect | pipeline | 2026-08-25 | — |
 | pipeline.worktree-hygiene-flags-onboardings-own-generated-files-as-dirty | closed | defect | pipeline | 2026-08-17 | — |
@@ -614,7 +617,7 @@
 
 ## Counts
 
-- open: 104
+- open: 107
 - in_progress: 0
 - closed: 488
 - rejected: 3

@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "d98fbc3f906609a4165589931372e1cdf731f297e6c6b11e905fcffab936acbf"
+    "transitionHead": "f0c7770947238c6e4ea300bf88ba58adf587d419b8285de41648174f78c1c387"
   },
   "counts": {
-    "open": 104,
+    "open": 107,
     "in_progress": 0,
     "closed": 488,
     "rejected": 3,
@@ -241,6 +241,15 @@
       "owner": "pipeline",
       "created": "2026-09-02",
       "source": "Measured live 2026-09-02 during a human-guard-override ceremony for a TP-3 edit: sign-intent succeeded, authorize-by-signature failed with HGO-AUDIT, and verify-audit fails identically with no ceremony in flight.",
+      "deferred": false
+    },
+    {
+      "id": "pipeline.a-tree-snapshot-races-gits-own-background-maintenance-lock",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-02",
+      "source": "GitHub Actions run 33595311782 (push to main, commit 6262d408), job verify, suite codex-onboarding-capabilities-tests, test 12",
       "deferred": false
     },
     {
@@ -1148,6 +1157,15 @@
       "source": "Found on 2026-09-01 while constructing the Critic rounds for the day's wave: the round covering this component could not be dispatched.",
       "deferred": false,
       "tracking": "Nova B — print-verify-failures.mjs decides what a failing CI run writes into a public log, and no artifact anywhere states what it is required to do. A Critic dispatch against it is refused by its own fail-closed boundary for want of a spec."
+    },
+    {
+      "id": "pipeline.ci-path-allowlist-omits-the-editor-the-guards-own-continuation-names",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-02",
+      "source": "GitHub Actions run 33595311782 (push to main, commit 6262d408), job verify, step Runner-free offline Core Verify, suite guard-lifecycle-ready-tests",
+      "deferred": false
     },
     {
       "id": "pipeline.ci-topology-preflight-cannot-pass-on-this-branch",
@@ -7470,6 +7488,15 @@
       "closureRepository": "self",
       "closureCommit": "81cc5f1a6cb384057fd49dd1a340e93c3aec3efb",
       "closureEvidence": "backlog/evidence/2026-07-24-po-sentinel-closure-disposition.md"
+    },
+    {
+      "id": "pipeline.worker-cancellation-is-denied-when-the-record-digest-ages-between-read-and-cancel",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-02",
+      "source": "GitHub Actions run 33595311782 (push to main, commit 6262d408), job verify, suite local-worker-supervisor-cli-tests, check LWSC04",
+      "deferred": false
     },
     {
       "id": "pipeline.workflow-tool-dispatches-produce-no-dispatch-record-artifact",
