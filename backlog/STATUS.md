@@ -468,6 +468,7 @@
 | pipeline.reconcile-lock-reuse-regression-test-needs-a-tp5-window | closed | requirement | pipeline | 2026-08-18 | — |
 | pipeline.recovery-preview-ack-unstable-getter-poisons-replay-ledger | closed | defect | pipeline | 2026-07-27 | — |
 | pipeline.recovery-preview-callback-attestation | closed | defect | pipeline | 2026-07-20 | — |
+| pipeline.red-evidence-from-node-test-embeds-the-absolute-repository-path | open | defect | pipeline | 2026-09-02 | Nova B — reproduce-first RED evidence is required by briefings and by ADR-0063, and the standard way to capture it embeds a machine-specific absolute path that a hard rule forbids in commits. The fixup always arrives one commit too late, and history cannot be rewritten. |
 | pipeline.registering-a-verify-suite-silently-invalidates-the-capability-inventory | closed | defect | pipeline | 2026-08-27 | — |
 | pipeline.regulated-document-hooks | deferred | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; deferred per PO triage 2026-08-23. |
 | pipeline.relative-commit-message-file-unreadable-from-a-worktree | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — blocks the Pipeline's own worktree-isolated dispatch pattern; fix dispatched as NVA-B-GUARDF in the same session it was found |
@@ -616,10 +617,11 @@
 | pipeline.workflow-tool-isolation-worktree-never-created-a-worktree-this-session | open | defect | pipeline | 2026-08-25 | — |
 | pipeline.worktree-hygiene-flags-onboardings-own-generated-files-as-dirty | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.worktree-isolated-dispatch-leaves-an-untracked-dir-that-blocks-verify | closed | defect | pipeline | 2026-08-11 | — |
+| pipeline.worktree-isolation-hook-matcher-omits-the-agent-tool-name | open | defect | pipeline | 2026-09-02 | Nova B — the worktree-isolation count check registers its baseline on the dispatch call itself, but its hooks.json matcher names Task and not Agent. guard-dispatch.mjs's own stanza names both and says in those words that naming the wrong tool is a silent no-op. |
 
 ## Counts
 
-- open: 109
+- open: 111
 - in_progress: 0
 - closed: 488
 - rejected: 3
