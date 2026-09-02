@@ -291,10 +291,16 @@ approval storage is accepted and **not implemented**: a second `approve-push`
 overwrites the first. `deletion`, `non_fast_forward` and the status requirement
 remain active for everyone else.
 
-**The bypass is still in place and must come out** once the CI run the push
-itself triggered (`verify` on `6262d408`) is green — at that point the released
-commit carries the status check retroactively and nothing hangs on it. Removing
-it while that run is red or unfinished re-seals `main` against the next push.
+**The bypass stays for 0.6.1 — PO decision, 2026-09-02 — and the circle behind
+it must be closed before the next release.** The reason first given for keeping
+it does not hold, and is corrected here rather than left standing: a
+`workflow_dispatch` run attaches a check named exactly `verify` to the head
+commit of the ref it runs on (measured — `266d691f` carries one). The bypass-free
+route therefore exists and is the intended gate: push the candidate to a feature
+branch, dispatch `verify` on it, then push that same SHA to `main` with the
+status already on it. What the bypass buys is one signature per release, not
+access. It is a standing admin-only weakening of the `verify` requirement, held
+deliberately, not an open task waiting on a green run.
 
 The tag was cut with `gh release create`, not a tag push: `approve-push`'s
 destination regex only matches `refs/heads/*`, so `git push origin <tag>` is
@@ -302,11 +308,20 @@ refused however it is signed, and `docs/push-release-flow.md`'s release addendum
 names `gh release create` as the agent-executable route because it calls the API
 and structurally is not a push.
 
-Still open: `CHANGELOG.md` still calls 0.6.0 the current release candidate; the
-`stable` branch (at `dd1eb9ee`, now an ancestor of `main`, carrying nothing
-uncollected) is the PO's to delete, because deleting it via the API would be an
-agent walking around a push guard on its own judgment; and the release-tag
-ruleset is not created.
+Closed since: `CHANGELOG.md` records 0.6.1 (`f0290fe8`); `stable` is deleted;
+and ruleset `protect-release-tags` (id 22072995) blocks deletion and
+non-fast-forward on `refs/tags/v*` with **no bypass actor at all** — not even an
+admin can move a release tag without editing that ruleset first.
+
+**CI is red on the released commit, and the release notes now say so.** Run
+`33595311782` on `6262d408` failed on three suites, all green locally, each
+filed as its own item (`5bbf1517`): the workflow's synthetic `PATH` holds five
+symlinks and no `true`, so the guard's own published rebase continuation cannot
+start its editor; a test tree-snapshot races git's background
+`.git/objects/maintenance.lock`; and `LWSC04` cancellation is denied under
+runner load, cause not established. The first of those is the third instance of
+one pattern — `openssl`, the runner executables, now `true` — and its item asks
+for a single sweep rather than a fourth discovery one CI run at a time.
 
 ### At the freeze — what the PO decides
 
