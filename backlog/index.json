@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "ae3a25a5dbed3ca251748ffc6a0cfaf1407ed297d97efa76dff449a1c7075678"
+    "transitionHead": "b5ba88f1362bec5e2f04ac43becace1dea3964bb0a4747e0d23283f4f94b7a9e"
   },
   "counts": {
-    "open": 111,
+    "open": 109,
     "in_progress": 0,
-    "closed": 488,
+    "closed": 490,
     "rejected": 3,
     "deferred": 11
   },
@@ -227,12 +227,16 @@
     },
     {
       "id": "pipeline.a-throwing-temp-unlink-reports-rolled-back-while-the-target-stays-published",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-02",
       "source": "Reported by the NVA-B-ROUNDN-FIX dispatch while binding the adjacent delete sites to content; seen in plugins/pipeline-core/lib/project-onboarding-v3.mjs's V3 manifest-repair transaction, not measured.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-09-03",
+      "closureRepository": "self",
+      "closureCommit": "2067900e83a9f2a3869fd0976ecffcb1aa365957",
+      "closureEvidence": "backlog/evidence/2026-09-03-nva-b-unlink-1-green.txt"
     },
     {
       "id": "pipeline.a-torn-audit-append-has-disabled-every-human-guard-override-since-august-20",
@@ -5939,12 +5943,16 @@
     },
     {
       "id": "pipeline.restricted-store-rationale-field-lacks-adversarial-variant-coverage",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-31",
       "source": "Exhaustive privacy sweep Critic review, F3 (minor), specs/sprint-phoenix-epic/evidence/privacy-sweep-critic-review-4defe09e.md",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-09-03",
+      "closureRepository": "self",
+      "closureCommit": "3a6ceaf7d2fe14f71fa0230bb7a089ec7db02c9f",
+      "closureEvidence": "backlog/evidence/2026-09-02-nva-b-rstore-1-after.txt"
     },
     {
       "id": "pipeline.resume-hint-capture-consumes-card-that-failed-schema-validation",

@@ -25,7 +25,7 @@
 | pipeline.a-second-dispatch-claimed-an-evidence-artifact-it-never-wrote | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.a-stale-verify-opt-out-entry-costs-a-po-signature-for-work-already-done | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.a-stale-version-stamp-makes-a-plugin-reload-a-silent-no-op | open | defect | pipeline | 2026-08-27 | — |
-| pipeline.a-throwing-temp-unlink-reports-rolled-back-while-the-target-stays-published | open | defect | pipeline | 2026-09-02 | — |
+| pipeline.a-throwing-temp-unlink-reports-rolled-back-while-the-target-stays-published | closed | defect | pipeline | 2026-09-02 | — |
 | pipeline.a-torn-audit-append-has-disabled-every-human-guard-override-since-august-20 | open | defect | pipeline | 2026-09-02 | — |
 | pipeline.a-tree-snapshot-races-gits-own-background-maintenance-lock | open | defect | pipeline | 2026-09-02 | — |
 | pipeline.a7-gate-review-found-a-spec-plan-contradiction-and-a-lifecycle-admission-question | closed | defect | pipeline | 2026-08-17 | — |
@@ -483,7 +483,7 @@
 | pipeline.restart-launch-is-codex-only-for-every-runner | closed | defect | pipeline | 2026-08-06 | — |
 | pipeline.restart-resume-hint-write-misses-the-project-prefix | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.restricted-store-files-exceed-the-spec-inventory-the-privacy-contract-asserts | open | defect | pipeline | 2026-08-31 | — |
-| pipeline.restricted-store-rationale-field-lacks-adversarial-variant-coverage | open | defect | pipeline | 2026-08-31 | — |
+| pipeline.restricted-store-rationale-field-lacks-adversarial-variant-coverage | closed | defect | pipeline | 2026-08-31 | — |
 | pipeline.resume-hint-capture-consumes-card-that-failed-schema-validation | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.resume-hint-opaque-token-rejects-hyphenated-english | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.resume-hint-test-unregistered-in-verify-gate | closed | defect | pipeline | 2026-08-18 | — |
@@ -621,8 +621,8 @@
 
 ## Counts
 
-- open: 111
+- open: 109
 - in_progress: 0
-- closed: 488
+- closed: 490
 - rejected: 3
 - deferred: 11
