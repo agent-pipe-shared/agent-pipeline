@@ -16,7 +16,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { delimiter, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
@@ -7707,6 +7707,30 @@ function rbScratchBase() {
 }
 
 /**
+ * A directory containing an executable `true`, for the one real (non-guard-mediated) spawn below
+ * that actually needs `core.editor=true` to resolve. `.github/workflows/verify.yml`'s "Runner-free
+ * offline Core Verify" step runs this whole suite under a synthetic `PATH` admitting only
+ * node/git/bash/sh/openssl -- `true` is deliberately not among them, so a bare `git rebase
+ * --continue` there cannot start its editor and the spawn fails with "cannot run true: No such file
+ * or directory". The assertion under test is that the guard's own PUBLISHED continuation really
+ * finishes a rebase, not that the host provides coreutils, so the fix supplies `true` to the spawn's
+ * own `PATH` rather than widening the workflow's allowlist -- the command string handed to git stays
+ * byte-identical to the continuation the guard published. The shim's shebang names the exact running
+ * Node binary (`process.execPath`) directly, never a bare `env`/`sh` name resolved through PATH, so it
+ * has no dependency of its own on what the caller's PATH admits. Cached module-wide: content never
+ * varies by fixture.
+ */
+let rbTrueShimDirCache;
+function rbTrueShimDir() {
+  if (rbTrueShimDirCache !== undefined) return rbTrueShimDirCache;
+  const bin = mkdtempSync(join(rbScratchBase(), "rebwire-true-"));
+  REBWIRE_FIXTURES.push(bin);
+  writeFileSync(join(bin, "true"), `#!${process.execPath}\nprocess.exit(0);\n`, { mode: 0o755 });
+  rbTrueShimDirCache = bin;
+  return bin;
+}
+
+/**
  * A throwaway repository standing in a genuine, conflicted `git rebase`.
  *
  * History, deliberately shaped so exactly ONE path conflicts:
@@ -8071,10 +8095,16 @@ test("rebwire req5-2: an uninformed session reaches a finished rebase by followi
     assert.equal(staged.status, 0, staged.stderr);
   }
 
-  // 4. Run the exact continuation the refusal stated verbatim — admitted, then executed.
+  // 4. Run the exact continuation the refusal stated verbatim — admitted, then executed. Only
+  //    the spawn's own PATH is widened (with a self-supplied `true`, see rbTrueShimDir); the argv
+  //    reaching git is byte-identical to the continuation the guard published.
   assert.ok(first.stderr.includes(surface.nextCommand));
   assert.equal(rbBash(dir, surface.nextCommand).exitCode, 0);
-  const continued = spawnSync("git", ["-c", "core.editor=true", "rebase", "--continue"], { cwd: dir, encoding: "utf8" });
+  const continued = spawnSync("git", ["-c", "core.editor=true", "rebase", "--continue"], {
+    cwd: dir,
+    encoding: "utf8",
+    env: { ...process.env, PATH: `${rbTrueShimDir()}${delimiter}${process.env.PATH ?? ""}` },
+  });
   assert.equal(continued.status, 0, continued.stderr);
   // The rebase really finished, and no fresh human signature was involved anywhere above.
   assert.equal(existsSync(join(dir, ".git", "rebase-merge")), false);
