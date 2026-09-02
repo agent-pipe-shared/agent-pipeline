@@ -147,3 +147,42 @@ agree this Nova copy is authoritative. Resolved during the
 traceability detail (commit `cacb9fb5`, the Merge-duplicates convention) in
 here rather than discarding it.
 - **Date:** 2026-08-19
+
+## Triage, 2026-09-03 — not dispatchable as implementation; it is an Elephant decision first
+
+Examined during the autonomous Nova-B run and deliberately NOT briefed to a
+Goldfish. The item does not describe work with a determined shape; it describes
+a choice, and it states the two horns itself: representing a non-dispatch
+governance action through the current schema means either fabricating dispatch
+identity that does not exist — the caller-invented-to-satisfy-a-criterion
+anti-pattern this campaign already reverted once in `cc43a182` — or extending
+the schema.
+
+Dispatching that as implementation would hand a Goldfish the decision under the
+guise of a task, and the likely outcome is the first horn, because it is the one
+that needs no new schema. That is exactly the failure the reverted commit
+records.
+
+**What it actually needs, in order:**
+
+1. A decision on whether `correlation` gains a second, non-dispatch shape (a
+   discriminated union keyed on the trigger) or whether non-dispatch governance
+   actions get their own event schema beside this one. Foundational, so EL-04
+   applies: register entry in `docs/state.md` plus an ADR, before any code.
+2. Only then, implementation against that decision.
+
+**A structural note that should survive into the decision**, from the item's own
+analysis: the seven remaining triggers are not one problem. `verification`,
+`review`, `gate`, `recovery` and `reconciliation` are genuinely not
+dispatch-queue concepts and are what the decision above is about.
+`candidate-invalidation` and `status-cancellation-variant` ARE queue concepts
+and are blocked on something else entirely — no code path constructs them,
+because `planInvalidation` is only ever read and deleted and
+`LIFECYCLE_TERMINAL_STATUS` knows no cancel state. Solving the schema question
+does nothing for those two, and a decision that treats all seven as one set will
+produce a shape for two events nothing can emit.
+
+Not blocked on the PO: this is the Elephant's decision to make and record. It is
+held here rather than made in passing because a schema shape for a governance
+audit trail deserves its own pass, not a paragraph written between two
+dispatches.
