@@ -258,31 +258,55 @@ Dropped on rotation as genuinely resolved: the Antigravity hard-enforcement
 layer's two fail-open paths, closed by `ab347a74`, which built the self-check
 the item's own proposal named.
 
-### What the PO owes this candidate — two signatures, in this order
+### 0.6.1 is released — 2026-09-02
 
-Both are structurally closed to an agent. Nothing else in the release sequence
-is waiting on a human.
+`main` moved `dd1eb9ee..6262d408`. Tag `v0.6.1` and the GitHub release both
+point at `6262d408`. The approval audit is committed at `57235b83`, after the
+push, never between `approve-push` and `git push`.
 
-1. **A human-guard override to register one suite in `harness/scripts/verify.mjs`.**
-   `plugins/pipeline-core/lib/rebase-authority.test.mjs` exists, is green, and
-   is not in the gate, so no CI or stop-hook run executes it. The line is
-   `  { name: "rebase-authority-tests", file: join(libDir, "rebase-authority.test.mjs") },`.
-   `verify.mjs` is TP-3 with no in-session override in signature mode. Seed the
-   request with the exact intended Edit, build `plan`/`prepare-authorization`
-   from that same request digest, and consume the signature the moment it
-   arrives — no other tree mutation in between, or the bound `statusSha256`
-   drifts and the signature is burned for nothing.
-2. **The push approval for the candidate**, after the gates have run on it.
-   `main`'s ruleset requires a green `verify` status check, so CI must be green
-   on the pushed commit first; the previous attempt was refused server-side with
-   `GH013` and cost a signature.
+Three PO signatures were spent getting here, and two of them are worth
+remembering:
 
-Two consequences of the release itself, worth stating so they are not
-rediscovered: the build cachebuster is stripped when the tag is cut (the
-convention and its cost are in `docs/claude-local-plugin-development.md`), and
-installing the released `0.6.1` is what finally puts tonight's guard fixes into
-the copy that actually executes. Two Critic rounds recorded that gap — the fixes
-live in this checkout, not in the running plugin — and the release closes it.
+1. **The audit ledger had to be repaired before any override could work at
+   all.** A torn append on 2026-08-20 left `audit.head.json` covering 282
+   entries against a ledger of 283, so `verifiedAuditEntries()` refused, and
+   every human-guard-override route in this repository had been failing closed
+   for thirteen days. Nothing announced it: the denial text said
+   `code=HGO-AUDIT` under every refusal, in a line that reads as boilerplate.
+   The first signature of the night was spent on a ceremony that could not
+   complete, because `prepare-for-signature` built a full, valid ceremony while
+   the code already knew the ledger would not authenticate. Filed as
+   `pipeline.a-torn-audit-append-has-disabled-every-human-guard-override-since-august-20`.
+2. **The second registered the rebase-authority suite in `verify.mjs`** (TP-3,
+   no in-session route), and **the third approved the push to `main`.**
+
+**`main` was pushed under an explicit repository-admin bypass**, added by the PO
+to the `protect-main` ruleset, and GitHub recorded it rather than admitting it
+silently. The circle it broke: `main` requires a passing `verify` status check on
+the pushed commit, and the workflow triggers only on a push to `main`, a PR
+against `main`, or an explicit dispatch — so a commit that has never reached a
+remote ref cannot acquire the status it needs to reach one. Breaking it without
+the bypass costs two further signatures, because ADR-0077's per-destination
+approval storage is accepted and **not implemented**: a second `approve-push`
+overwrites the first. `deletion`, `non_fast_forward` and the status requirement
+remain active for everyone else.
+
+**The bypass is still in place and must come out** once the CI run the push
+itself triggered (`verify` on `6262d408`) is green — at that point the released
+commit carries the status check retroactively and nothing hangs on it. Removing
+it while that run is red or unfinished re-seals `main` against the next push.
+
+The tag was cut with `gh release create`, not a tag push: `approve-push`'s
+destination regex only matches `refs/heads/*`, so `git push origin <tag>` is
+refused however it is signed, and `docs/push-release-flow.md`'s release addendum
+names `gh release create` as the agent-executable route because it calls the API
+and structurally is not a push.
+
+Still open: `CHANGELOG.md` still calls 0.6.0 the current release candidate; the
+`stable` branch (at `dd1eb9ee`, now an ancestor of `main`, carrying nothing
+uncollected) is the PO's to delete, because deleting it via the API would be an
+agent walking around a push guard on its own judgment; and the release-tag
+ruleset is not created.
 
 ### At the freeze — what the PO decides
 
