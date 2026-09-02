@@ -167,6 +167,7 @@
 | pipeline.dispatch-provenance | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.dispatch-record-contaminates-every-critic-review | deferred | defect | pipeline | 2026-08-09 | — |
 | pipeline.dispatch-record-does-not-bind-to-its-commit | closed | defect | pipeline | 2026-08-09 | — |
+| pipeline.dispatch-records-are-written-to-a-name-the-verifier-cannot-find | open | defect | pipeline | 2026-09-03 | Nova B — the authorship verifier reads exactly one filename shape in exactly one directory; two dispatches in one day wrote their records under a different name in a different directory, in good faith, following the directory contract. |
 | pipeline.dispatch-reported-creating-a-record-it-never-created | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.dispatch-templates-cite-restructured-operating-model-sections | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.dispatch-text-model-field-loses-to-a-subagent-definitions-own-frontmatter-pin | closed | defect | pipeline | 2026-08-18 | — |
@@ -185,6 +186,7 @@
 | pipeline.elephant-notes-and-critic-scratch-share-one-directory | closed | defect | pipeline | 2026-08-23 | — |
 | pipeline.elephant-writes-production-code-directly-without-a-goldfish-dispatch | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.enforce-kickoff-po-questions | open | workflow-improvement | pipeline | 2026-08-21 | — |
+| pipeline.entry-point-reachability-check-substring-matches-whole-source-files | open | defect | pipeline | 2026-09-03 | Nova B — the reachability check decides whether a guard admits a script by testing whether the guard's source text contains the script's stem anywhere, comments included. A comment citing an evidence file whose name happens to contain a script stem is read as an admission. |
 | pipeline.epic-file-contract-has-no-drift-check | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.every-gate-binds-the-whole-tree-so-any-later-commit-voids-it | open | workflow-improvement | pipeline | 2026-08-16 | — |
 | pipeline.every-small-correction-costs-a-new-human-interaction | open | idea | pipeline | 2026-08-28 | — |
@@ -621,7 +623,7 @@
 
 ## Counts
 
-- open: 109
+- open: 111
 - in_progress: 0
 - closed: 490
 - rejected: 3

@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "b5ba88f1362bec5e2f04ac43becace1dea3964bb0a4747e0d23283f4f94b7a9e"
+    "transitionHead": "6d901c5fe302569831e935ee20af794dede0bf91051f2b8165fe123165e812a4"
   },
   "counts": {
-    "open": 109,
+    "open": 111,
     "in_progress": 0,
     "closed": 490,
     "rejected": 3,
@@ -1983,6 +1983,16 @@
       "closureEvidence": "backlog/items/2026-08-09-the-dispatch-record-does-not-bind-to-the-commit-it-vouches-for.md"
     },
     {
+      "id": "pipeline.dispatch-records-are-written-to-a-name-the-verifier-cannot-find",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-03",
+      "source": "Measured 2026-09-03 during the autonomous Nova-B run: NVA-REBDEAD-F8 and NVA-B-LEDGEROID-1 each wrote backlog/evidence/<TASK_ID>.dispatch-record.json, and evidence/dispatch-record-<TASK_ID>.json did not exist for either, so dispatch-authorship-verify.mjs would have reported record-missing for commits d08ca247 and 75312525.",
+      "deferred": false,
+      "tracking": "Nova B — the authorship verifier reads exactly one filename shape in exactly one directory; two dispatches in one day wrote their records under a different name in a different directory, in good faith, following the directory contract."
+    },
+    {
       "id": "pipeline.dispatch-reported-creating-a-record-it-never-created",
       "status": "closed",
       "type": "defect",
@@ -2201,6 +2211,16 @@
       "created": "2026-08-21",
       "source": "Manual observation during sprint_agy kickoff testing (Rune_Test1_Agy_060_59)",
       "deferred": true
+    },
+    {
+      "id": "pipeline.entry-point-reachability-check-substring-matches-whole-source-files",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-03",
+      "source": "Measured 2026-09-03: a full verify.mjs run went red on its only failing suite because commit 79bc79b8's comments cite an evidence file named 2026-09-02-nva-rebdead-f5-continuity-status.json, and safeStem reduces plugins/pipeline-core/scripts/continuity-status.mjs to the bare needle continuity-status.",
+      "deferred": false,
+      "tracking": "Nova B — the reachability check decides whether a guard admits a script by testing whether the guard's source text contains the script's stem anywhere, comments included. A comment citing an evidence file whose name happens to contain a script stem is read as an admission."
     },
     {
       "id": "pipeline.epic-file-contract-has-no-drift-check",
