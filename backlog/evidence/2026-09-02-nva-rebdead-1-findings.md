@@ -56,7 +56,7 @@ is unfixed on that lane.
 - `plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs:1562-1572` and `:1602` — the same trap and its remedy, already documented and implemented in this file for the restart-required lane
 - No `apply_patch` case exists among `rebdead positive-1..5`
 
-## F5 — Readiness is lifted, not re-based on `orig-head` (major)
+## F5 — Readiness is lifted, not re-based on `orig-head` (major) — OPEN, rework rejected
 
 The specification states the framing decision explicitly: readiness for these
 actions resolves against `orig-head` rather than against the conflicted
@@ -76,6 +76,59 @@ onboarding readiness — continuity, kickoff, repository control, runtime.
 
 - `plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs:4031-4047` — the condition and the return
 - `plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs:4074-4081` — the `restartRequired` sibling
+
+### Rework round 1 REJECTED 2026-09-02, by measurement — `8f1c0737` does not fix F5
+
+The rework narrowed the condition to `error.lifecycleStatus === "continuity-damaged"`.
+That value is wrong, and the commit message's justification for it is false.
+
+The narrowing was measured against the guard test's own stub, `rbdReadinessFn`
+(`plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs`), which throws
+`lifecycleStatus: "continuity-damaged"` whenever `JSON.parse` of the state file
+fails. `8f1c0737`'s message calls that stub "the fixture's own committed mirror
+of the real gate's failure mode". It is not a mirror; it names the wrong branch.
+
+Measured against the production classifier
+(`plugins/pipeline-core/lib/onboarding-continuity.mjs`,
+`classifyOnboardingContinuity`) — `backlog/evidence/2026-09-02-nva-rebdead-f5-continuity-status.json`:
+
+| state file | continuity status |
+| --- | --- |
+| real conflict markers (unparseable) | `unavailable` |
+| parseable but inconsistent | `damaged` |
+
+`parseJsonObject()` (`onboarding-continuity.mjs:461-470`) raises
+`KICKOFF-READ-MALFORMED` on unparseable bytes; `observeDetailed()`'s own catch
+returns `continuity.status = "unavailable"`. Only a state file that *parses* and
+then fails its projection reaches `"damaged"`.
+
+The step from that classification to the guard-visible `lifecycleStatus` is
+deterministic in an otherwise-healthy repository, established by branch order in
+`plugins/pipeline-core/lib/project-onboarding-v3.mjs`: the App-Server branch
+(`:2721`) is skipped when the App-Server is healthy; the whole intake/kickoff
+block (`:2755`–`:2867`) is gated on `continuity.status === "absent-pristine"`;
+`:2885` requires `"damaged"`; so `"unavailable"` falls through to
+`:2904`'s `if (continuity.status !== "valid")` and yields lifecycleStatus
+**`continuity-observation-unavailable`**.
+
+Consequence: the live incident this whole package exists for — a rebase
+conflicting on `project/pipeline-state.json`, leaving real conflict markers —
+produces `continuity-observation-unavailable`, which `8f1c0737`'s condition
+excludes. The rework re-opens the deadlock `10d11e58` closed, while the guard
+test keeps passing because the stub asserts a status the real chain never
+produces for that input.
+
+The finding F5 itself stands: the original condition was over-broad and did
+swallow `restart-required`. The correction is the measured set
+`{continuity-damaged, continuity-observation-unavailable}`, not a revert — and
+the stub must be corrected too, or the entire `rebdead` family keeps testing a
+fiction. Note when reading the widened set that
+`continuity-observation-unavailable` is a **catch-all**: per `:2905`'s own
+docstring it covers "every classification that is neither `valid`, `damaged`,
+nor `absent-pristine`", digest disagreements included, not conflict markers
+alone. The admission stays bounded by `activeRebaseAuthority()` plus
+`rebaseAuthorityPermitsPath()`'s deny-by-default `conflictPaths` membership, but
+the widening is real and is named here rather than left to be discovered.
 
 ## F7 — Shipped guard source cites a gitignored, unresolvable path (minor)
 
