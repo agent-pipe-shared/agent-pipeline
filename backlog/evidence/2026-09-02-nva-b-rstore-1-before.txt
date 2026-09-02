@@ -1,0 +1,17 @@
+mode=before exitCode=0
+command: node --test plugins/pipeline-core/lib/human-decision-attribution.test.mjs
+context: state at dispatch start -- the five named adversarial rationale
+variant categories (Unicode-confusable, encoded, nested, multiline,
+external-content) were already present, added by prior commit b0f1dafc
+(Dispatch: NVA-B-RATIONALEVAR). This capture is the BEFORE state relative to
+this dispatch's own addition below (a "malformed"/non-string rationale case),
+not relative to the five named categories, which needed no new work.
+
+TAP summary (full test names omitted here; identical to AFTER minus the one
+new case; see NVA-B-RSTORE-1 dispatch record log for the full pre-edit run):
+tests 16
+pass 16
+fail 0
+cancelled 0
+skipped 0
+todo 0

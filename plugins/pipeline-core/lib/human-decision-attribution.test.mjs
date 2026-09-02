@@ -139,3 +139,17 @@ test("accepts an external-content rationale (pasted ITSM/ticket text); the restr
   const validated = validateHumanDecisionAttribution(fixture({ rationale: external }));
   assert.equal(validated.rationale, external);
 });
+
+// §4 bullet 2's "malformed" variant, distinct from the "non-scalar" case
+// above: "non-scalar" (human-decision-attribution.mjs:63) rejects an
+// ill-formed *string* (a lone UTF-16 surrogate); it never exercises the
+// `typeof payload.rationale !== "string"` arm of the HDA-RATIONALE check
+// (human-decision-attribution.mjs:78), which is the guard against a rationale
+// that is not even string-shaped -- a number, boolean, array, plain object,
+// or null. No existing test in this file passes a non-string rationale, so
+// that arm was untested before this case.
+test("rejects a malformed (non-string) rationale -- a number, a plain object, an array, and null", () => {
+  for (const malformed of [42, { note: "not a string" }, ["a", "b"], null]) {
+    assert.throws(() => validateHumanDecisionAttribution(fixture({ rationale: malformed })), (error) => error instanceof HumanGovernanceLedgerError && error.code === "HDA-RATIONALE");
+  }
+});
