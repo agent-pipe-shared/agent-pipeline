@@ -292,7 +292,7 @@
 | pipeline.identity-attestation-fails-open-on-unresolved-transcript-path | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.immutable-manifest-entries-can-be-rebound-with-no-amendment-record | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.inherited-still-open-claims-need-a-re-check-before-dispatch-no-durable-home | closed | workflow-improvement | pipeline | 2026-08-18 | — |
-| pipeline.inode-identity-decides-deletion-in-a-second-rollback-path | open | defect | pipeline | 2026-09-01 | — |
+| pipeline.inode-identity-decides-deletion-in-a-second-rollback-path | closed | defect | pipeline | 2026-09-01 | — |
 | pipeline.installed-marketplace-guard-copy-drifts-silently-from-repo-source | closed | defect | pipeline | 2026-08-29 | PO decision 2026-08-29: candidate 3 (accept as inherent), documented permanently. |
 | pipeline.installed-plugin-gmw-hgo-v3-anchor-gap-blocks-all-protected-edits | closed | defect | pipeline | 2026-08-16 | — |
 | pipeline.installing-consumer-is-never-asked-any-setup-decision | closed | defect | pipeline | 2026-08-08 | — |
@@ -623,8 +623,8 @@
 
 ## Counts
 
-- open: 109
+- open: 108
 - in_progress: 0
-- closed: 492
+- closed: 493
 - rejected: 3
 - deferred: 11

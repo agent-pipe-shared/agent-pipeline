@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "b0f5a4997bb154ca9a72a642e4d3ce60c08c00b3d41b504802c1800193209780"
+    "transitionHead": "b5b39e86f05c3260b42dd6d3f71e138bd7b8434c21110c685f46d8421a899103"
   },
   "counts": {
-    "open": 109,
+    "open": 108,
     "in_progress": 0,
-    "closed": 492,
+    "closed": 493,
     "rejected": 3,
     "deferred": 11
   },
@@ -3538,12 +3538,16 @@
     },
     {
       "id": "pipeline.inode-identity-decides-deletion-in-a-second-rollback-path",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-01",
       "source": "NVA-B-CIGREEN-1's own follow-up recommendation after fixing the same shape in plugins/pipeline-core/lib/project-onboarding-v3.mjs at 9a7c309b; the second occurrence is named as sameIdentity and removeRecordedTree in plugins/pipeline-core/lib/codex-onboarding-capabilities.mjs.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-09-03",
+      "closureRepository": "self",
+      "closureCommit": "ee5b72050ed1fd897c1b1e22f733dd2f80127211",
+      "closureEvidence": "backlog/evidence/2026-09-03-nva-b-inode2-1-green.txt"
     },
     {
       "id": "pipeline.installed-marketplace-guard-copy-drifts-silently-from-repo-source",
