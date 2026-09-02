@@ -8132,7 +8132,7 @@ test("rebwire regression: with no rebase in progress the guard's output is uncha
 });
 
 // =========================================================================================
-// NVA-REBDEAD-1 (scratch/spec-rebase-deadlock.md): the conflict path IS the lifecycle state
+// NVA-REBDEAD-1 (backlog/items/2026-09-02-the-rebase-authority-is-resolved-and-advertised-but-not-executable.md): the conflict path IS the lifecycle state
 // file itself, and readiness is a REAL function rather than a constant.
 //
 // WHY A SECOND FIXTURE, RATHER THAN REUSING rbFixture()

@@ -67,7 +67,7 @@ import {
 // after-every-conflict.md): the command-side predicate, imported from the resolver that owns
 // it so this guard cannot disagree with the dev-plan gate's write lane about what the same
 // rebase permits. The resolver itself is never re-implemented or second-guessed here.
-// NVA-REBDEAD-1 (scratch/spec-rebase-deadlock.md): `rebaseAuthorityPermitsPath` is the SAME
+// NVA-REBDEAD-1 (backlog/items/2026-09-02-the-rebase-authority-is-resolved-and-advertised-but-not-executable.md): `rebaseAuthorityPermitsPath` is the SAME
 // path-side predicate `guard-devplan.mjs`'s Edit|Write lane already uses -- reused here
 // unmodified for this guard's own writer-owned-State and readiness reliefs, so all three
 // admissions can never disagree about which paths a rebase's conflict surface covers.
@@ -4029,7 +4029,7 @@ function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
       runner: dependencies.runner,
     });
   } catch (error) {
-    // NVA-REBDEAD-1 (scratch/spec-rebase-deadlock.md, decision 2): readiness for the resolved
+    // NVA-REBDEAD-1 (backlog/items/2026-09-02-the-rebase-authority-is-resolved-and-advertised-but-not-executable.md, decision 2): readiness for the resolved
     // rebase authority's own narrow surface is RE-BASED on orig-head, never lifted outright.
     // The resolver already proved orig-head is validly approved and implementing (Requirement
     // 1, lib/rebase-authority.mjs) before it ever named a conflict path or a permitted
@@ -4429,7 +4429,7 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
       const requested = resolve(root, target);
       if (requested === join(root, ".claude", "pipeline-state.json")
         || requested === join(root, "project", "pipeline-state.json")) {
-        // NVA-REBDEAD-1 (scratch/spec-rebase-deadlock.md, decision 1): the ONE relief, keyed
+        // NVA-REBDEAD-1 (backlog/items/2026-09-02-the-rebase-authority-is-resolved-and-advertised-but-not-executable.md, decision 1): the ONE relief, keyed
         // on `conflictPaths` membership -- never on "a rebase is active". A rebase conflicting
         // on the OTHER lifecycle state file must not make THIS one writable, so the resolved
         // authority's own predicate decides, not a fixed-path carve-out like memoryWrite/
