@@ -7,6 +7,7 @@
 
 | Date range | Summary | Archive |
 |---|---|---|
+| 2026-09-02 | The 0.6.0-to-0.6.1 release run, the overnight Nova B block, and the four dispatcher errors it recurred: superseded by the 0.6.1 release entry. | [docs/state-archive/2026-09-02--where-the-release-stands-interim-update-2026-09-01-evening.md](state-archive/2026-09-02--where-the-release-stands-interim-update-2026-09-01-evening.md) |
 | 2026-09-01 | The 2026-08-31 interim-release handover: the 0.6.0 candidate pushed to nova and stopped one step short of main, the nine ordered PO terminal actions, the privacy sweep disposition, and the carried-forward open questions. Extraction pass performed first and recorded in the survey behind commit 53262b1d; its homeless durable rules and still-live carry-forwards were re-stated in the 2026-09-01 handover. | [docs/state-archive/2026-09-01--current-handover-0-6-0-is-an-interim-release-nova-b-continue.md](state-archive/2026-09-01--current-handover-0-6-0-is-an-interim-release-nova-b-continue.md) |
 | 2026-08-25 to 2026-08-26 | The 2026-08-25/26 chat-gate-ceremony standardization block: AGY-HGOFIX-2/3, the four chat-gate regressions and their closure, the Agent-tool worktree-isolation incident, the 17-agent AFK sweep and its reconciliation, and the 2026-08-26 sprint_agy push. Extraction pass performed first: every durable rule in it already lives in CLAUDE.md or its own backlog item; the single carry-forward with no home (GWM has no chat-mode activation path) was moved into the current handover before rotation. | [docs/state-archive/2026-09-01--chat-gate-standardization-and-afk-sweep.md](state-archive/2026-09-01--chat-gate-standardization-and-afk-sweep.md) |
 | 2026-08-23 | The Phoenix-line pointer block: a preamble stating that Nova became the authoritative line and that Phoenix's own checkpoints 61-71 are history. Its content was already archived separately and indexed; the block itself carried no live carry-forward. | [docs/state-archive/2026-09-01--phoenix-line-pointer-block.md](state-archive/2026-09-01--phoenix-line-pointer-block.md) |
@@ -30,165 +31,7 @@ freeze, verify, and hand back a push-ready HEAD. Sprint Nova is **not** closed �
 the release is being run as a handover event, not a lifecycle close. No
 `close-block` and no `close-feature` have been invoked, deliberately.
 
-### Where the release stands — interim update, 2026-09-01 evening
-
-**The version moved from 0.6.0 to 0.6.1 mid-evening. This is deliberate, not
-scope creep.** 0.6.0 was stripped of its build cachebuster for release
-(`9aa4c7ca`); once that landed, a local plugin reload became a silent no-op —
-the registry keys its install directory on the version string, and an
-unchanged string installs nothing. The PO needed the rebase-authority fix
-(below) to actually reach a running session, which is only possible under
-review, so the version moved forward and the cachebuster returned (`63fe8b64`).
-0.6.0 as a distinct release is superseded by this decision, not completed.
-
-**What landed, in order:**
-- `feat/sprint-nova-codex-v046` is pushed and signed at `266d691f`
-  (`56e91858..266d691f`), verified 505/505, security CLEAN. This is real and
-  durable regardless of what happens to `main` tonight.
-- A second, separate signature was obtained and verified for `refs/heads/main`
-  at `1e025ed5`, but the push was **refused server-side** by GitHub's own
-  ruleset on `main` (`GH013`, `required_status_checks` on context `verify`) —
-  not by anything in this repository. The approval record is committed anyway
-  (`a801e0fd`): the approval was genuinely given and verified; the ruleset,
-  not the approval, is what stopped the push. `main` needs a fresh ceremony
-  once CI is green, because the candidate will have moved.
-- The CI failures are diagnosed and fixed. See the next section.
-- The rebase work package, transcribed in full into
-  `backlog/items/2026-09-01-an-authorized-rebase-demands-a-fresh-po-signature-after-every-conflict.md`,
-  is built and has had its mandatory T1 round. See the next section.
-
-### The overnight block, 2026-09-01/02 — what was built and what it cost
-
-**The CI diagnosis, and it was not what it looked like.** Three suites were red
-in run `33551001455` on `266d691f`. The decisive environment axis is neither
-`PATH` nor `HOME` nor the spaces in a fixture directory name — an outside
-analysis proposed the last of these twice and it is refuted by the suite
-passing locally 158/158 with that identical name. It is the filesystem behind
-`TMPDIR`. `applyProjectOnboardingManifestRepair`'s rollback decided ownership
-of the file it deletes by `{dev, ino}` alone; ext4 reallocates the lowest free
-inode in the block group, so a file created immediately after an `unlink`
-commonly inherits the freed number, while tmpfs draws from a monotonic counter
-and never reuses one. Local `/tmp` is tmpfs, the runner's is ext4. Fixed at
-`9a7c309b` with a deterministic reuse-injection test. `onboarding-init-tests`
-had a different cause — the suite isolated `HOME` but not `PATH` and was
-asserting a property of the host — fixed at `8db2c988`.
-`codex-onboarding-capabilities-tests` is **intermittent**: red once and green
-once on the same commit, green locally in four environments. Unresolved, with a
-filed candidate cause (`pipeline.inode-identity-decides-deletion-in-a-second-rollback-path`).
-
-**The rebase authority is built and reviewed.** `95f16466` is the resolver:
-authority read only from `orig-head`, never from the partially replayed working
-tree, with every binding Requirement 1 names. `103463a3` wires it in and
-`2f59b2bd` narrows an over-refusal found while wiring. All fourteen test cases —
-five positive, seven negative, two from Requirement 5 — are real guard-level
-tests against a genuinely conflicted rebase fixture, none dependency-injection
-only. The T1 round found nothing in the mechanism: the relief sits at the final
-verdict so it can only turn a block into an allow, and Requirement 4 is enforced
-by absence from an allowlist rather than by a second list that can drift.
-
-**Requirement 5 is a PO decision taken during the block** and is the reason the
-package is usable at all: the authority is never opt-in, and every denial during
-an active rebase names the route forward in its own text. Its carrier had to
-split (`b5937a09`) — `pipeline.guard-retry-actions.v1` admits read-only
-diagnostics only, so the mutating continuation rides as data and prose while
-`retryActions` carries the read-only diagnostics that let a session see its own
-conflict surface. Widening that envelope for convenience was rejected.
-
-**Four Critic rounds ran (K, L, M, N).** Their measuring stick is tracked at
-`backlog/evidence/2026-09-02-critic-rounds-k-to-n-index.md` — this was itself a
-finding: gate-cited evidence had been living in gitignored `scratch/`, and a
-green artifact was overwritten in place by a later red re-run, leaving a true
-claim unsupportable. Findings closed across `3f92cae8`, `41dd0d8e`, `b90640c2`,
-`7eb9192c`, `97d24673`, `9284f4b8`.
-
-**One finding was a bypass this block itself introduced**, and it is the reason
-to keep running these rounds: the `--exec` payload table keyed on exact literal
-spellings sitting behind a verb that yields no other candidates, so
-`git rebase --exe '<write command>'` produced no candidate at all. Measured with
-real git 2.53.0 — `--exe`, `--ex`, `--exe=`, `--ex=` all execute the payload.
-Fixed at `41dd0d8e` by inverting the table: the *safe* options are enumerated, so
-an unknown one fails closed.
-
-**None of the nine originally-ordered PO terminal actions for the 0.6.0
-release plan has completed as originally scoped** — the plan itself has
-changed. Original list, for continuity: marketplace re-sync (done), verify +
-`push-prepare` (done, superseded twice by re-verification), the feature-branch
-signature (done), the CI loop (in progress, red, being fixed), the `main`
-signature (done once, push refused, will need repeating), tag + release
-(blocked on `main`), deleting `stable`, creating the release-tag ruleset, and
-the TP-5/TP-3 maintenance window.
-
-Two operational warnings belong with that list, because neither has a home
-outside this file:
-
-- `push-prepare`'s printed `authorize-critical` command carries an
-  `--expires-at` window. Re-run `push-prepare` immediately before signing;
-  never reuse an earlier printout. `docs/push-release-flow.md` documents the
-  field's parsing behaviour but not this warning.
-- The maintenance window owes four suite registrations plus the promotion of
-  `check-suite-registration.mjs` itself to a gate step. All TP-3 — editing
-  `harness/scripts/verify.mjs`, for which no in-session override exists in
-  signature mode. **A "TP-5 release-adapter carve-out" was carried in this
-  file's predecessor and in several session summaries; it could not be
-  substantiated on 2026-09-01.** No backlog item names it, the TP-5 window item
-  is closed, and the TP-3/4/5/6/7 restoration item is closed with the rules
-  confirmed `armed`. Treat TP-5 as owing nothing until something re-establishes
-  it. All four unregistered suites were measured green standalone the same day,
-  so the gap is that the gate does not re-run them, not that the behaviour is
-  unverified — and the guards themselves are armed regardless of whether their
-  suites are registered.
-
-### The day's work
-
-**Landed:** `GIT-10`, the backlog-state-checker discipline, corrected after
-review (`6c9f581f`, `1c2d2681`); a per-session trim of repeated grammar denials
-(`1314edec`) and its per-subagent re-keying (`15bb3599`); `effort` added to two
-dispatch-record field enumerations (`6ce146f4`, `601dc035`); the copy-safe
-renderer's wrap point no longer splits a path (`6ea2add3`) with its pin
-strengthened after review (`e2b8afa1`); handover-size enforcement at the commit
-boundary (`54fb5006`) with its blob-size read repaired after review
-(`7bca7f5d`). Vendored canon regenerated four times by hand — every canon
-dispatch is forbidden to touch `plugins/pipeline-core/**`, so the obligation
-falls to the Elephant and skipping it reproduces a red gate.
-
-**Nine Critic rounds.** Caught before shipping: a guardrail stating a trigger
-the code does not implement; an ADR asserting an enforcement the guard does not
-perform; a calibration path that commits while reporting failure; a
-push-approval-gate bypass; a guardrail presenting an accepted DRIFT baseline
-that in fact contains a live open defect; a size check that reads a blob's full
-content through a 1 MiB pipe and so blocks the very shrink it tells the reader
-to perform; and a test pin whose concatenated assertion masks a per-renderer
-regression.
-
-**Twelve items filed**, each from measurement. Beyond today: a Critic has no
-writable location for its own report, so findings survive only by
-hand-transcription; the `advisor` prohibition in briefings is unenforced; ledger
-event 403 stores an abbreviated OID the hash chain blocks repairing in place;
-and the push-authority surface cannot be bounded by static enumeration — a
-114-file import closure was refuted by a `join()`-built spawn a `new URL(...)`
-regex cannot see.
-
-One filed item records a **refutation**, not a defect: the hypothesis that an
-onboarding test depends on a clean outer working tree was measured directly and
-did not hold. It is filed so the question is not silently re-asked.
-
-### Recurring dispatcher errors, recorded because they recurred
-
-- **Contaminated Critic input, four rounds.** The implementor's dispatch record
-  embeds completion-report prose. Every round quarantined it and re-derived from
-  source. Remedy applied on the last round only: hand an authorship-only
-  projection (`taskId`, `agentType`, `dispatcher`, `commits`).
-- **Freehand dispatch briefings.** Two dispatches were built without filling
-  `critic-review.md` / `goldfish-task.md` and were refused by `guard-dispatch`.
-  The guard caught what the rule already forbids.
-- **A half-applied re-verification.** A rework was briefed after checking only
-  one of the two homes a rule could have landed in. It had landed in the other.
-- **An overstatement to the PO**, caught by a Critic: two findings were relayed
-  as independent when they are in tension.
-- **Three `maxTurns` cliffs.** Dispatches were cut off at their harness limit
-  mid-work. Briefed tool budgets are behaviour rules; `maxTurns` is a real cliff.
-
-### Durable rules carried forward — these have no other home
+## Durable rules carried forward — these have no other home
 
 Extracted from the 2026-08-31 section before its rotation. Each was searched for
 in `CLAUDE.md`, `docs/adr/`, `guardrails/` and `backlog/items/` and found in
@@ -203,10 +46,14 @@ none of them.
 2. **`git push --no-verify` deliberately remains available** as git's own escape
    route (PO instruction), and **no retroactive `approve-push` record is created
    for a push that had none at execution time** — that is exactly the shape
-   `approve-push` exists to prevent. This sits in unresolved tension with
+   `approve-push` exists to prevent. This sat in unresolved tension with
    `guardrails/git.md` GG-17, which states the opposite as a guard-enforced MUST
-   NOT with no carve-out. The tension itself is unrecorded and needs a PO
-   decision.
+   NOT with no carve-out. **That tension is resolved — 2026-09-01, PO decision,
+   [ADR-0079](adr/0079-hook-bypass-is-never-agent-overridable.md)** — and this
+   entry's former closing line ("unrecorded and needs a PO decision") was stale.
+   A PO's own deliberate `--no-verify` push in their own terminal remains a
+   conscious human exception outside Pipeline authority; through the Pipeline it
+   is never permitted and the guard must catch it.
 3. **A `resume-hint` receipt proves only that a card's bytes were read**, never
    that they were understood or acted on — and a `--resume` restart preserves
    the session id, so capture-then-consumption under one session id is
@@ -217,13 +64,44 @@ none of them.
    of is a human-only step — has no text anywhere in `guardrails/`, `CLAUDE.md`
    or `docs/adr/`. Either the id is stale or the rule was never given a home.
 
+Extracted 2026-09-02 from the section rotated that day, each re-checked against
+its candidate home before being carried rather than assumed homeless.
+
+5. **`push-prepare`'s printed `authorize-critical` command carries an
+   `--expires-at` window: re-run `push-prepare` immediately before signing, and
+   never reuse an earlier printout.** Verified 2026-09-02:
+   `docs/push-release-flow.md` names the flag three times and documents that the
+   value is normalized rather than rejected (line 201), but states this
+   operational warning nowhere.
+6. **TP-5 owes nothing until something re-establishes it.** A "TP-5
+   release-adapter carve-out" was carried in this file's predecessor and in
+   several session summaries and could not be substantiated on 2026-09-01: no
+   backlog item names it, the TP-5 window item is closed, and the TP-3/4/5/6/7
+   restoration item is closed with the rules confirmed `armed`. What the
+   maintenance window still owes is four suite registrations plus promoting
+   `check-suite-registration.mjs` itself to a gate step — all TP-3, i.e. editing
+   `harness/scripts/verify.mjs`, for which signature mode admits no in-session
+   override. All four suites were measured green standalone, so the gap is that
+   the gate does not re-run them, not that the behaviour is unverified; the
+   guards are armed regardless of whether their suites are registered.
+7. **A Critic's input must be an authorship-only projection of a dispatch
+   record**, never the record itself: `taskId`, `agentType`, `dispatcher`,
+   `commits` and nothing more. An implementor's record embeds its own
+   completion-report prose, which contaminated four consecutive Critic rounds
+   before the projection was applied. Verified 2026-09-02: neither `CLAUDE.md`
+   nor `templates/prompts/critic-review.md` nor `roles/critic.md` contains this
+   rule in any form.
+
 ### Still-live open questions carried forward
 
 Each was checked against `backlog/STATUS.md` and the git log; where liveness
 could not be positively established, that is said rather than glossed.
 
-- `project-onboarding-v3-tests` fails in CI and is **not explained**; its only
-  local failure is an unrelated slow-mount hang.
+- ~~`project-onboarding-v3-tests` fails in CI and is not explained.~~ **Closed
+  2026-09-02.** The cause was inode reuse on ext4 versus tmpfs, fixed at
+  `9a7c309b`; the suite reported zero in CI run `33595311782`. Struck rather
+  than deleted, because this line stood as "not explained" through several
+  handovers and a later reader should see that it was answered, not dropped.
 - Four defects re-verified as still present sit in terminal `deferred` status,
   invisible to every mechanical sprint-gate check.
 - The privacy sweep FAIL is disposed of as disclosed-unremediated; both findings
@@ -313,15 +191,36 @@ and ruleset `protect-release-tags` (id 22072995) blocks deletion and
 non-fast-forward on `refs/tags/v*` with **no bypass actor at all** — not even an
 admin can move a release tag without editing that ruleset first.
 
-**CI is red on the released commit, and the release notes now say so.** Run
-`33595311782` on `6262d408` failed on three suites, all green locally, each
-filed as its own item (`5bbf1517`): the workflow's synthetic `PATH` holds five
-symlinks and no `true`, so the guard's own published rebase continuation cannot
-start its editor; a test tree-snapshot races git's background
-`.git/objects/maintenance.lock`; and `LWSC04` cancellation is denied under
-runner load, cause not established. The first of those is the third instance of
-one pattern — `openssl`, the runner executables, now `true` — and its item asks
-for a single sweep rather than a fourth discovery one CI run at a time.
+**CI was red on the released commit. Two of the three are fixed on `nova`, and
+`main` still carries the failing status.** Run `33595311782` on `6262d408`
+failed on three suites, all green locally, each filed as its own item
+(`5bbf1517`).
+
+- `guard-lifecycle-ready` — fixed at `216ff054`. The test now supplies its own
+  `true`; the workflow's five-symlink `PATH` was deliberately NOT widened a
+  sixth time, because the assertion under test is that the guard's published
+  continuation finishes a rebase, not that the host ships coreutils. The argv
+  reaching git is byte-identical to before. Route chosen by the Elephant, not
+  left to the dispatch.
+- `codex-onboarding-capabilities` — fixed at `ae8da7b8`. `treeSnapshot`
+  tolerates an entry that vanishes between `readdirSync` and `lstatSync`, and
+  excludes `*.lock` narrowly under `.git/` and `.git/objects/` — proven narrow
+  by three boundary shapes, not asserted in a comment. Both defects were fixed,
+  because tolerating the crash alone leaves a lock file in one snapshot of a
+  before/after pair and the comparison still fails.
+- `LWSC04` — **deliberately not fixed** (`7cc0b649` records why). Measured by
+  reading: `lease` sits inside `recordSha256`, `lastHeartbeatMonotonicMs` inside
+  `lease`, the heartbeat rewrites it every second, and `cancel` demands digest
+  equality. No caller that must spawn a process can win that compare-and-swap,
+  so repairing only the test would turn the suite green and hide the problem
+  from every real client. Needs its own briefed dispatch with independent review.
+
+Both fixes were verified independently of the dispatch reports; full verify is
+green at `7cc0b649` — 506 suites, exit 0, security scan included.
+
+The `PATH` finding is the third instance of one pattern — `openssl`, the runner
+executables, now `true` — and its item asks for one sweep rather than a fourth
+discovery one CI run at a time.
 
 ### At the freeze — what the PO decides
 
