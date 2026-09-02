@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "f0c7770947238c6e4ea300bf88ba58adf587d419b8285de41648174f78c1c387"
+    "transitionHead": "1d7e702541521920b82471e9cc480f8e91be8c68e0028e428d5621e8bd6b36e1"
   },
   "counts": {
-    "open": 107,
+    "open": 108,
     "in_progress": 0,
     "closed": 488,
     "rejected": 3,
@@ -6761,6 +6761,15 @@
       "owner": "pipeline",
       "created": "2026-09-01",
       "source": "Stashed draft, NVA-B-MKTATTEST (git stash list, stash@{0}: \"push-authority surface narrowing, enumeration proven INCOMPLETE (session-power.mjs missed via join()), do not trust without a sound dynamic-reference detector\"). Verified live 2026-09-01 against plugins/pipeline-core/scripts/session-cleanup.mjs and plugins/pipeline-core/lib/session-cleanup-recovery.mjs.",
+      "deferred": false
+    },
+    {
+      "id": "pipeline.the-rebase-authority-is-resolved-and-advertised-but-not-executable",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-02",
+      "source": "Field report from a second session (sprint-alfred) blocked mid-rebase on Pipeline 0.6.1, cross-checked against guard-lifecycle-ready.mjs by direct reading",
       "deferred": false
     },
     {

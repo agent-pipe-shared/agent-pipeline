@@ -551,6 +551,7 @@
 | pipeline.the-pipeline-cannot-merge-two-parallel-sprint-ledgers | closed | requirement | pipeline | 2026-08-27 | — |
 | pipeline.the-privacy-sign-off-is-bound-to-a-superseded-candidate | open | defect | pipeline | 2026-08-31 | — |
 | pipeline.the-push-authority-surface-cannot-be-bounded-by-static-enumeration | open | defect | pipeline | 2026-09-01 | — |
+| pipeline.the-rebase-authority-is-resolved-and-advertised-but-not-executable | open | defect | pipeline | 2026-09-02 | — |
 | pipeline.the-two-suite-registration-checkers-disagree | closed | defect | pipeline | 2026-08-27 | — |
 | pipeline.the-unregistered-suite-detector-is-not-itself-a-gate-step | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.this-hosts-local-marketplace-copy-is-not-symlinked-to-source | closed | defect | pipeline | 2026-08-17 | — |
@@ -617,7 +618,7 @@
 
 ## Counts
 
-- open: 107
+- open: 108
 - in_progress: 0
 - closed: 488
 - rejected: 3
