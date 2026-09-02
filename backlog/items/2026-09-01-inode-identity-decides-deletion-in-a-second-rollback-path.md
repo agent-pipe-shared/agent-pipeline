@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.inode-identity-decides-deletion-in-a-second-rollback-path
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-03
+closure_repository: self
+closure_commit: ee5b72050ed1fd897c1b1e22f733dd2f80127211
+closure_evidence: backlog/evidence/2026-09-03-nva-b-inode2-1-green.txt
 created: 2026-09-01
 sprint: nova-b
 done_when: manual
@@ -93,3 +97,41 @@ that suite's intermittent CI failure.
   actual cause is recorded.
 - A full verify runs green on a clean candidate across two consecutive CI
   runs of the same commit.
+
+## Triage, 2026-09-03 — one site closed, the other measured NOT exposed
+
+`NVA-B-INODE2-1` executed Direction step 2. Step 1 (identify the failing test
+from the next red CI run) was deliberately skipped: it is blocked on a red run
+that has not happened, and step 2 depends on nothing.
+
+**`cleanupProbeFile` was exposed and is fixed.** It deleted the disposable
+capability write-probe whenever `sameIdentity` (dev/ino/mode) still matched and
+`nlink === 1`. Ownership now additionally requires the file's current bytes to
+be the fixed probe body the function itself wrote; anything else is foreign and
+is left in place. Same remedy shape as `9a7c309b`.
+
+**`removeRecordedTree` was audited and measured NOT exposed** — half this item
+refuted, which is the more useful half of the outcome. Its file-row deletion
+(`removeCapturedEntry`) already required the current bytes to match the
+recorded sha256 before unlinking, and its directory-row deletion only ever
+removes an already-verified-empty directory. Both predate `9a7c309b`; they were
+correct from this file's original authorship. Per this item's own guidance, no
+test was added there rather than one that cannot fail.
+
+**The test technique is stronger than the one this item proposed.** Instead of
+an injected `lstatSync` returning a colliding `{dev, ino}`, the regression case
+overwrites the probe in place — truncate and rewrite of the SAME inode, no
+unlink, no new file. That is a real identity guarantee rather than a simulated
+one, holds on every filesystem, and cannot pass by accident on a machine where
+the allocator happens not to reuse. Both directions are pinned: an untouched
+probe carrying its own genuine content is still cleaned up, so the fix does not
+trade a data-destruction bug for a leak.
+
+**What this does NOT establish.** The `codex-onboarding-capabilities-tests` CI
+intermittency this item names as a *plausible* cause remains undiagnosed. The
+dispatch could not observe a red run and did not claim to explain one. If the
+suite goes red again, the reporter fix `e066a1b7` will now name the failing
+assertion, and that is where the diagnosis starts — not here.
+
+`node --test plugins/pipeline-core/lib/codex-onboarding-capabilities.test.mjs`:
+26/26, re-run by the dispatcher.
