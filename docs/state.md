@@ -265,6 +265,57 @@ read that rather than trusting any prose claim about which HEAD was green.
 - The authorship-only dispatch-record projection, applied once by hand, is not
   yet a mechanism.
 
+### In flight — the rebase deadlock, reported from a second session
+
+A session rebasing `feat/sprint-alfred` onto `6262d408` is deadlocked: the
+resolved rebase authority names `project/pipeline-state.json` as its conflict
+path and advertises the resolution shapes, then two later checks in the same
+evaluation refuse every one of them. Filed as
+`pipeline.the-rebase-authority-is-resolved-and-advertised-but-not-executable`
+(`26ce76a9`). **The PO wants only the Pipeline defect fixed and a new candidate
+on `main`; the Alfred checkout and its running rebase are not to be touched.**
+
+Landed: `10d11e58` — both reliefs keyed on the resolver's own
+`conflictPaths`/command predicates, and an admission notice, because a lifecycle
+gate that suspends itself silently is indistinguishable in an audit from one
+that was never armed. 219/219, re-measured by the Elephant, not taken from the
+dispatch report.
+
+Critic round 1 (guardrail class, higher-capability model) returned eight
+findings. Three were dispatcher-side and are closed in `e67968f0`; the registry
+is `backlog/evidence/2026-09-02-nva-rebdead-1-findings.md` (`508211f9`).
+
+**F1 is refuted and its fix reverted (`43413349`).** `apply_patch` was never
+blocked: `evaluateLifecycleReadyGuardCore:4311` admits any tool name outside
+`SHELL_TOOLS`/`WRITE_TOOLS` unconditionally, and `guard-apply-patch.mjs` closes
+that by never forwarding a raw `apply_patch` — it synthesizes an `Edit` per
+touched path, which the pre-existing relief already admitted. The revert is
+deliberate rather than tidiness: the reverted code added branches no call can
+reach, presenting a second apparent enforcement boundary in a file whose
+companion documents its translation loop as the sole one.
+
+**Still open: F5, F7, F8, then a second Critic round and full verify.** F5 is the
+substantive one and its design decision is already made and recorded in the
+rework briefing: narrow the readiness relief to the exact `lifecycleStatus` an
+unparseable state file produces — measured, not guessed — instead of the whole
+`PORG-NOT-READY` + `intent: "session"` family. As shipped it silently makes the
+narrower `restart-required` sibling unreachable. The earlier wording
+"re-base readiness on `orig-head`" named the goal, not the mechanism.
+
+Two process facts belong with this, both measured today:
+
+- **`docs/push-release-flow.md`'s GIT-01 admitted-type list has no `revert`,**
+  though Conventional Commits defines it. The revert above is typed `fix` and
+  says so in its own message. Not filed as an item pending a PO word.
+- **Three dispatches hit the `maxTurns: 80` cliff in one block, one losing every
+  trace of its work** — clean tree, no commit, no artifact, one log entry, ~193k
+  tokens. Filed as
+  `pipeline.documenting-the-maxturns-cliff-did-not-stop-dispatches-falling-off-it`
+  (`02303be0`), deliberately a new item rather than reopening the 2026-08-25
+  closure whose remedy was documentary and demonstrably does not hold. The
+  session's own correction — one concern per dispatch, budget 25 — is applied
+  from `NVA-REBDEAD-F1` onward.
+
 ## Operational head
 
 - Project calibration: [`project/pipeline.json`](../project/pipeline.json).
