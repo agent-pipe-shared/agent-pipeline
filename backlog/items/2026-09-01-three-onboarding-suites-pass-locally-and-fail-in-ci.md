@@ -182,6 +182,46 @@ run exists at `9a7c309b` or later. Everything green so far is green locally.
 Until the `verify` workflow runs on a commit carrying these fixes and passes,
 this item stays open and `main` stays unreachable.
 
+## Result, 2026-09-02 — the CI run this item was waiting for exists, and the three fixes hold
+
+CI run `33595311782` ran the `verify` workflow on commit `6262d408`, the released
+`0.6.1` commit, which carries `705b7cf3`, `8db2c988` and `9a7c309b`. **All three
+suites this item is named for reported zero:** `project-onboarding-v3-tests`,
+`trust-anchor-bootstrap-circularity-repro-tests` and `onboarding-init-tests`.
+
+That satisfies acceptance criterion 3 for this item's own scope, and with it
+criteria 1 and 2 — each named cause was fixed and each fix is now confirmed in
+actual CI rather than only locally.
+
+**The run still failed, on three different suites.** They are not this item's
+subject and are filed separately, so that this item can close on what it
+actually established rather than becoming a standing container for "CI is red":
+
+- `guard-lifecycle-ready-tests` →
+  `pipeline.ci-path-allowlist-omits-the-editor-the-guards-own-continuation-names`.
+  The same class as this item's `openssl` and runner-executable findings: the
+  synthetic `PATH` omits a binary the product genuinely names — here `true`, the
+  editor in the guard's own published rebase continuation. That is the third
+  instance of one pattern, and the new item asks for a single sweep instead of a
+  fourth discovery.
+- `codex-onboarding-capabilities-tests` →
+  `pipeline.a-tree-snapshot-races-gits-own-background-maintenance-lock`. This
+  closes the "intermittent, assertion not identified" gap left above: the
+  reporter fix in `e066a1b7` did its job on the first red run since, and named
+  the failure as a `readdir`→`lstat` race against `.git/objects/maintenance.lock`.
+  The candidate cause filed alongside it,
+  `pipeline.inode-identity-decides-deletion-in-a-second-rollback-path`, is NOT
+  the cause here and must not be closed on the strength of this result.
+- `local-worker-supervisor-cli-tests` →
+  `pipeline.worker-cancellation-is-denied-when-the-record-digest-ages-between-read-and-cancel`.
+  Cause not established; filed as a hypothesis with the measurement that settles it.
+
+**One statement in this item is now stale and is corrected rather than edited
+above:** "`main` stays unreachable while these three suites fail in CI" no longer
+holds. `main` was reached at `6262d408` under an explicit repository-admin
+ruleset bypass, recorded in `docs/state.md`. The `verify` requirement was not
+weakened for anyone else, and the bypass is tracked as open.
+
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
 - **Decision:**
