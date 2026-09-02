@@ -81,7 +81,7 @@ below assumes it holds and is written to catch a change that would break it.
   `lib/project-onboarding-ready-gate.mjs`, `lib/project-onboarding-v3.mjs`,
   `lib/protected-test-paths.mjs`, `lib/publication-authority.mjs`,
   `lib/publication-bundle.mjs`, `lib/publication-bundle-v2.mjs`,
-  `lib/publication-capability-preflight.mjs`,
+  `lib/publication-capability-preflight.mjs`, `lib/rebase-authority.mjs`,
   `lib/recovery-preview-attestation.mjs`,
   `lib/repository-path-identity.mjs`, `lib/review-economy.mjs`,
   `lib/runner-native-continuation.mjs`,
