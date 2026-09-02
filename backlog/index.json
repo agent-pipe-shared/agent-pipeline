@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "12dd04344bb012957e2e53fc0f8f832f3d7555e44c72d2d1da0910e426913c29"
+    "transitionHead": "b0f5a4997bb154ca9a72a642e4d3ce60c08c00b3d41b504802c1800193209780"
   },
   "counts": {
-    "open": 110,
+    "open": 109,
     "in_progress": 0,
-    "closed": 491,
+    "closed": 492,
     "rejected": 3,
     "deferred": 11
   },
@@ -7551,12 +7551,16 @@
     },
     {
       "id": "pipeline.worker-cancellation-is-denied-when-the-record-digest-ages-between-read-and-cancel",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-02",
       "source": "GitHub Actions run 33595311782 (push to main, commit 6262d408), job verify, suite local-worker-supervisor-cli-tests, check LWSC04",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-09-03",
+      "closureRepository": "self",
+      "closureCommit": "fc04dbc82118a9e5c201fbe05ef92965b7ab2576",
+      "closureEvidence": "backlog/evidence/2026-09-03-nva-b-lwsc04-1-green-heartbeat-excluded-from-digest.txt"
     },
     {
       "id": "pipeline.workflow-tool-dispatches-produce-no-dispatch-record-artifact",

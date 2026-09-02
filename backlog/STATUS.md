@@ -614,7 +614,7 @@
 | pipeline.windows-trusted-tool-resolution | closed | defect | pipeline | 2026-07-22 | PO-approved Sentinel scope extension; no implementation or closure claim. |
 | pipeline.windows-verify-brittle-test-hygiene | closed | defect | pipeline | 2026-07-25 | — |
 | pipeline.windows-verify-reproducibility | closed | defect | pipeline | 2026-07-22 | PO-approved Sentinel scope extension; no implementation or closure claim. |
-| pipeline.worker-cancellation-is-denied-when-the-record-digest-ages-between-read-and-cancel | open | defect | pipeline | 2026-09-02 | — |
+| pipeline.worker-cancellation-is-denied-when-the-record-digest-ages-between-read-and-cancel | closed | defect | pipeline | 2026-09-02 | — |
 | pipeline.workflow-tool-dispatches-produce-no-dispatch-record-artifact | open | defect | pipeline | 2026-08-24 | Reassigned from phoenix to nova on 2026-08-28 by PO decision, after the Phoenix line was intaked into Nova |
 | pipeline.workflow-tool-isolation-worktree-never-created-a-worktree-this-session | open | defect | pipeline | 2026-08-25 | — |
 | pipeline.worktree-hygiene-flags-onboardings-own-generated-files-as-dirty | closed | defect | pipeline | 2026-08-17 | — |
@@ -623,8 +623,8 @@
 
 ## Counts
 
-- open: 110
+- open: 109
 - in_progress: 0
-- closed: 491
+- closed: 492
 - rejected: 3
 - deferred: 11
