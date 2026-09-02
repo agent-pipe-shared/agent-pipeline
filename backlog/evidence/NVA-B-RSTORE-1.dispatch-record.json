@@ -6,7 +6,7 @@
   "rulesetSha": "b6fb9c4e",
   "dispatcher": "elephant",
   "outcome": "completed",
-  "commits": ["3a6ceaf7", "<fix-evidence-commit, filled after this write>"],
+  "commits": ["3a6ceaf7", "09275bc4"],
   "log": [
     {"phase": "opening", "toolUseCount": 1},
     {"phase": "context-read", "toolUseCount": 5, "note": "backlog item + test file read; five named variant tests already present in test file at HEAD"},
