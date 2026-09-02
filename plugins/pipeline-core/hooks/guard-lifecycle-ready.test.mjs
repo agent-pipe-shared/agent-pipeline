@@ -41,7 +41,6 @@ import {
   isNarrowRepositoryRecoveryCommand,
   isProjectWritePath,
   isReadOnlyDiagnosticCommand,
-  applyPatchTargetsPermittedByRebaseAuthority,
   isRestartResumeHintInputWrite,
   isSanctionedGhReadOnlyDiagnostic,
   isSanctionedLifecycleCommand,
@@ -7589,7 +7588,7 @@ import {
   submitPlan,
 } from "../lib/plan-spec-state-v2.mjs";
 import { LEGACY_STATE, NEUTRAL_STATE } from "../lib/project-authority.mjs";
-import { REBASE_AUTHORITY_SURFACE_SCHEMA, resolveActiveRebaseAuthority } from "../lib/guard-devplan-policy.mjs";
+import { REBASE_AUTHORITY_SURFACE_SCHEMA } from "../lib/guard-devplan-policy.mjs";
 
 const REBWIRE_DEVPLAN_GUARD = fileURLToPath(new URL("./guard-devplan.mjs", import.meta.url));
 const REBWIRE_REPO_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
@@ -8353,32 +8352,6 @@ test("rebdead negative-1: a path outside conflictPaths stays refused, including 
   const outside = rbdEdit(dir, "Edit", "src/genuinely-unrelated.mjs");
   assert.equal(outside.exitCode, 2);
   assert.equal(outside.stderr.includes("is suspended for this"), false, outside.stderr);
-});
-
-// NVA-REBDEAD-F1: apply_patch (Codex's own write-capable tool) never reaches this file's
-// two WRITE_TOOLS-keyed reliefs through evaluateLifecycleReadyGuard() itself -- its outer
-// tool-name gate (`![...SHELL_TOOLS, ...WRITE_TOOLS].includes(toolName)`) does not recognize
-// "apply_patch" and returns verdict(0) before either relief runs, exactly as it does for
-// isRestartResumeHintInputWrite()'s own apply_patch branch (comment above that function).
-// These two cases therefore drive applyPatchTargetsPermittedByRebaseAuthority() directly --
-// the same predicate both reliefs now call -- against a REAL resolved authority from
-// rbdFixture(), mirroring the isRestartResumeHintInputWrite() apply_patch coverage above.
-test("rebdead apply_patch-1: an apply_patch write on the exact conflict path is admitted", () => {
-  const dir = rbdFixture();
-  const root = realpathSync(dir);
-  const rebase = resolveActiveRebaseAuthority(root, rbdDeps(dir));
-  const command = `*** Begin Patch\n*** Update File: ${NEUTRAL_STATE}\n@@\n-old\n+new\n*** End Patch`;
-  assert.equal(applyPatchTargetsPermittedByRebaseAuthority(command, root, rebase), true);
-});
-
-test("rebdead apply_patch-2: an apply_patch write on a path outside conflictPaths stays refused", () => {
-  const dir = rbdFixture();
-  const root = realpathSync(dir);
-  const rebase = resolveActiveRebaseAuthority(root, rbdDeps(dir));
-  // The same discriminating case as rebdead negative-1: the OTHER lifecycle state file, not
-  // a conflict path in this fixture, must not be admitted just because a rebase is active.
-  const command = `*** Begin Patch\n*** Update File: ${LEGACY_STATE}\n@@\n-old\n+new\n*** End Patch`;
-  assert.equal(applyPatchTargetsPermittedByRebaseAuthority(command, root, rebase), false);
 });
 
 test("rebdead negative-2: --skip, --edit-todo, --exec, an arbitrary -c, push and force-push all stay refused", () => {

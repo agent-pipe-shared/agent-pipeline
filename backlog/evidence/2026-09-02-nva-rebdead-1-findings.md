@@ -4,7 +4,42 @@ Independent Critic review of commit `10d11e588f9c5ced9b3334afe1c2007f2ee0c0ea`.
 Eight findings. F2, F4 and F6 were dispatcher-side and are closed in `e67968f0`.
 The four below are against the diff and are open.
 
-## F1 — `apply_patch` on the conflict path remains deadlocked (major)
+## F1 — REFUTED 2026-09-02, by measurement. Not a defect.
+
+The finding's mechanism does not exist. `evaluateLifecycleReadyGuardCore`'s
+first check is
+`if (![...SHELL_TOOLS, ...WRITE_TOOLS].includes(toolName)) return verdict(0);`
+(`plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs:4311`), with
+`SHELL_TOOLS = ["Bash", "PowerShell"]` and
+`WRITE_TOOLS = ["Edit", "Write", "NotebookEdit"]`. A literal `apply_patch` tool
+name is therefore **admitted unconditionally at line 4311**, before either
+relief and before the writer-owned-State refusal. It is never refused, so there
+is nothing for the reliefs to fail to admit.
+
+That unconditional admission is a known, PO-decided architectural invariant, not
+a hole: `plugins/pipeline-core/hooks/guard-apply-patch.mjs:120-145` states it
+verbatim and closes it by never forwarding a raw `apply_patch` — for every
+touched path it synthesizes a `{tool_name: "Edit", tool_input: {file_path}}`
+shape, spawned with an explicit `--runner codex`, and calls that loop "the SOLE
+enforcement boundary". Widening the outer gate is that file's named "option B",
+explicitly deferred.
+
+Consequence: a Codex `apply_patch` write on the conflict path reaches this guard
+as `Edit` and was already admitted by the relief `10d11e58` added. The finding's
+risk statement — "the reported deadlock is unfixed for that runner" — is false.
+
+A fix was implemented against this finding (`d244c19c`) and then reverted. It
+was careful in itself, but it added apply_patch branches at both reliefs that no
+call can reach, plus tests exercising the new predicate only by direct call. In
+a security-critical guard that is worse than absent: it presents a second,
+apparent enforcement boundary that never runs, contradicting the invariant
+`guard-apply-patch.mjs` documents as permanent. If option B is ever taken, this
+logic should be designed together with the outer-gate change, not pre-placed
+against it.
+
+### Original text, kept verbatim for the record
+
+## F1 (as filed) — `apply_patch` on the conflict path remains deadlocked (major)
 
 The specification requires admitting `Edit`/`Write`/`apply_patch` on a path in
 `conflictPaths`. Both new reliefs are keyed on `WRITE_TOOLS`, which is
