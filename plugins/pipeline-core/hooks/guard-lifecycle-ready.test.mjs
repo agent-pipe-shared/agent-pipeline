@@ -8183,13 +8183,23 @@ function rbdMarkedState(marker) {
 }
 
 /**
- * A real conflicted rebase whose ONLY conflict path is `project/pipeline-state.json`, with a
- * validly approved `orig-head`. History shape mirrors rbFixture(): A (base) / B (feature,
- * becomes orig-head) / C (upstream) -- but here EVERY commit edits NEUTRAL_STATE's marker
- * line, so B and C's edits collide and git stops with real conflict markers in the JSON,
- * exactly the live incident's own precondition.
+ * A real conflicted rebase whose ONLY conflict path is `statePath`, with a validly approved
+ * `orig-head`. History shape mirrors rbFixture(): A (base) / B (feature, becomes orig-head) /
+ * C (upstream) -- but here EVERY commit edits statePath's marker line, so B and C's edits
+ * collide and git stops with real conflict markers in the JSON, exactly the live incident's
+ * own precondition.
+ *
+ * NVA-REBDEAD-F8: parameterised over which lifecycle state file conflicts -- NEUTRAL_STATE
+ * (`project/pipeline-state.json`, the default) or LEGACY_STATE (`.claude/pipeline-state.json`)
+ * -- rather than a second, drifting copy of this fixture. The resolved rebase authority
+ * decides admission by `conflictPaths` membership, never a fixed path
+ * (lib/rebase-authority.mjs `rebaseAuthorityPermitsPath`), so the two lifecycle state files
+ * are meant to be interchangeable here; this parameter is how that symmetry gets proven
+ * rather than assumed.
+ *
+ * @param {string} statePath NEUTRAL_STATE (default) or LEGACY_STATE.
  */
-function rbdFixture() {
+function rbdFixture(statePath = NEUTRAL_STATE) {
   const dir = mkdtempSync(join(rbScratchBase(), "rebdead-"));
   REBWIRE_FIXTURES.push(dir);
   const run = (...args) => {
@@ -8211,16 +8221,16 @@ function rbdFixture() {
   put(".claude/pipeline.yaml", REBWIRE_MANIFEST);
   put(REBWIRE_PLAN_PATH, REBWIRE_PLAN_BYTES);
   put(REBWIRE_SPEC_PATH, REBWIRE_SPEC_BYTES);
-  put(NEUTRAL_STATE, `${JSON.stringify(rbdMarkedState("base"), null, 2)}\n`);
+  put(statePath, `${JSON.stringify(rbdMarkedState("base"), null, 2)}\n`);
   run("add", "-A");
   run("commit", "-m", "base");
 
   run("checkout", "-b", "feat/rebdead");
-  put(NEUTRAL_STATE, `${JSON.stringify(rbdMarkedState("feature"), null, 2)}\n`);
+  put(statePath, `${JSON.stringify(rbdMarkedState("feature"), null, 2)}\n`);
   run("commit", "-a", "-m", "feature change");
 
   run("checkout", "main");
-  put(NEUTRAL_STATE, `${JSON.stringify(rbdMarkedState("upstream"), null, 2)}\n`);
+  put(statePath, `${JSON.stringify(rbdMarkedState("upstream"), null, 2)}\n`);
   run("commit", "-a", "-m", "upstream change");
 
   run("checkout", "feat/rebdead");
@@ -8228,17 +8238,23 @@ function rbdFixture() {
   assert.notEqual(rebase.status, 0, "the fixture rebase was expected to stop on a conflict");
   assert.ok(existsSync(join(dir, ".git", "rebase-merge")));
   const conflicted = spawnSync("git", ["diff", "--name-only", "--diff-filter=U"], { cwd: dir, encoding: "utf8" }).stdout.trim();
-  assert.equal(conflicted, NEUTRAL_STATE, "the fixture must conflict on the lifecycle state file itself");
+  assert.equal(conflicted, statePath, "the fixture must conflict on the lifecycle state file itself");
   // The live incident's own precondition: real conflict markers, not valid JSON.
-  assert.throws(() => JSON.parse(readFileSync(join(dir, NEUTRAL_STATE), "utf8")));
+  assert.throws(() => JSON.parse(readFileSync(join(dir, statePath), "utf8")));
   return dir;
 }
 
 /**
- * Mirrors requireProjectOnboardingReady()'s actual failure mode for this ONE file -- reads
- * the real working-tree NEUTRAL_STATE and fails closed exactly as the production gate does on
- * invalid JSON -- instead of the unconditional-constant stub every rbDeps() caller above uses.
- * That constant is precisely why the deadlock this section reproduces went uncaught.
+ * Mirrors requireProjectOnboardingReady()'s actual failure mode for the given lifecycle state
+ * file -- reads the real working-tree state file and fails closed exactly as the production
+ * gate does on invalid JSON -- instead of the unconditional-constant stub every rbDeps()
+ * caller above uses. That constant is precisely why the deadlock this section reproduces went
+ * uncaught.
+ *
+ * NVA-REBDEAD-F8: parameterised over `statePath` (NEUTRAL_STATE default, or LEGACY_STATE) for
+ * the same reason rbdFixture() above is -- the mirrored LEGACY_STATE fixture needs the
+ * readiness stub to genuinely observe the file that is actually conflicted, not to pass only
+ * because NEUTRAL_STATE happens to be absent from that fixture's working tree.
  *
  * NVA-REBDEAD-F5B: throws "continuity-observation-unavailable", not "continuity-damaged" --
  * unparseable bytes make parseJsonObject() raise KICKOFF-READ-MALFORMED
@@ -8251,22 +8267,24 @@ function rbdFixture() {
  * "continuity-damaged" is a SEPARATE, genuinely reachable lane -- a state file that parses
  * but fails its own projection -- covered by rbdContinuityDamagedReadinessFn below.
  */
-function rbdReadinessFn({ rootDir, intent }) {
-  let bytes = null;
-  try { bytes = readFileSync(join(rootDir, NEUTRAL_STATE), "utf8"); } catch { /* absent */ }
-  let ok = false;
-  if (bytes !== null) { try { JSON.parse(bytes); ok = true; } catch { /* real conflict markers */ } }
-  if (!ok) {
-    throw new ProjectOnboardingReadyError(
-      "PORG-NOT-READY", `Project onboarding lifecycle is not ready for intent ${intent}.`,
-      { intent, lifecycleStatus: "continuity-observation-unavailable" },
-    );
-  }
-  return { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent };
+function rbdReadinessFnFor(statePath) {
+  return function rbdReadinessFn({ rootDir, intent }) {
+    let bytes = null;
+    try { bytes = readFileSync(join(rootDir, statePath), "utf8"); } catch { /* absent */ }
+    let ok = false;
+    if (bytes !== null) { try { JSON.parse(bytes); ok = true; } catch { /* real conflict markers */ } }
+    if (!ok) {
+      throw new ProjectOnboardingReadyError(
+        "PORG-NOT-READY", `Project onboarding lifecycle is not ready for intent ${intent}.`,
+        { intent, lifecycleStatus: "continuity-observation-unavailable" },
+      );
+    }
+    return { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent };
+  };
 }
 
-function rbdDeps(dir) {
-  return { projectDir: dir, runner: "claude", requireProjectOnboardingReadyFn: rbdReadinessFn };
+function rbdDeps(dir, statePath = NEUTRAL_STATE) {
+  return { projectDir: dir, runner: "claude", requireProjectOnboardingReadyFn: rbdReadinessFnFor(statePath) };
 }
 
 /** NVA-REBDEAD-F5B: an unconditional stub proving the relief also admits "continuity-damaged"
@@ -8284,18 +8302,20 @@ function rbdContinuityDamagedDeps(dir) {
   return { projectDir: dir, runner: "claude", requireProjectOnboardingReadyFn: rbdContinuityDamagedReadinessFn };
 }
 
-/** The Bash lane, through the guard's real evaluation entry point -- rbdReadinessFn stands in
- * for rbBash()'s constant. */
-function rbdBash(dir, command) {
-  return evaluateLifecycleReadyGuard({ tool_name: "Bash", tool_input: { command } }, rbdDeps(dir));
+/** The Bash lane, through the guard's real evaluation entry point -- the readiness stub
+ * stands in for rbBash()'s constant. `statePath` (NVA-REBDEAD-F8) defaults to NEUTRAL_STATE,
+ * matching every pre-existing caller unchanged; the LEGACY_STATE mirror passes it explicitly. */
+function rbdBash(dir, command, statePath = NEUTRAL_STATE) {
+  return evaluateLifecycleReadyGuard({ tool_name: "Bash", tool_input: { command } }, rbdDeps(dir, statePath));
 }
 
 /** The Edit/Write lane, through THIS guard directly (never guard-devplan.mjs -- see the
- * section header above). */
-function rbdEdit(dir, toolName, filePath) {
+ * section header above). `statePath` (NVA-REBDEAD-F8) defaults to NEUTRAL_STATE, matching
+ * every pre-existing caller unchanged; the LEGACY_STATE mirror passes it explicitly. */
+function rbdEdit(dir, toolName, filePath, statePath = NEUTRAL_STATE) {
   return evaluateLifecycleReadyGuard(
     { tool_name: toolName, tool_input: { file_path: filePath, old_string: "a", new_string: "b" } },
-    rbdDeps(dir),
+    rbdDeps(dir, statePath),
   );
 }
 
@@ -8395,6 +8415,42 @@ test("rebdead negative-1: a path outside conflictPaths stays refused, including 
   const outside = rbdEdit(dir, "Edit", "src/genuinely-unrelated.mjs");
   assert.equal(outside.exitCode, 2);
   assert.equal(outside.stderr.includes("is suspended for this"), false, outside.stderr);
+});
+
+// =========================================================================================
+// NVA-REBDEAD-F8 (Critic finding against 10d11e58): the pair above (positive-1/negative-1)
+// only proves the relief for NEUTRAL_STATE as the conflict path. The guard's own admission
+// checks membership in the resolved authority's `conflictPaths`, never a fixed path -- see
+// guard-lifecycle-ready.mjs ~4429-4443 and rebaseAuthorityPermitsPath() in
+// lib/rebase-authority.mjs -- so the SAME relief must also admit LEGACY_STATE
+// (.claude/pipeline-state.json) when IT is the conflict path, with NEUTRAL_STATE refused as
+// the mirrored discriminating case. Only the pair below is a symmetry proof, not either half
+// alone. rbdFixture()/rbdReadinessFnFor() are parameterised (not duplicated) for exactly this.
+// =========================================================================================
+
+test("rebdead positive-1 (LEGACY_STATE conflict): Edit/Write on the exact conflict path is admitted, relative and absolute -- the same relief on the OTHER lifecycle state file", () => {
+  const dir = rbdFixture(LEGACY_STATE);
+  for (const [tool, path] of [
+    ["Edit", LEGACY_STATE],
+    ["Write", join(dir, LEGACY_STATE)],
+    ["Edit", `./${LEGACY_STATE}`],
+  ]) {
+    const result = rbdEdit(dir, tool, path, LEGACY_STATE);
+    assert.equal(result.exitCode, 0, `${tool} ${path}: ${result.stderr}`);
+    assert.match(result.stderr, /\[rebase-authority\] the protected-State writer-only refusal is suspended for this write/u);
+    // SEC/no-machine-paths: the absolute form must never leak the fixture's own absolute root.
+    assert.equal(result.stderr.includes(dir), false, result.stderr);
+  }
+});
+
+test("rebdead negative-1 (LEGACY_STATE conflict): NEUTRAL_STATE stays refused in the same fixture -- the exact mirror of rebdead negative-1", () => {
+  const dir = rbdFixture(LEGACY_STATE);
+  // The discriminating case, mirrored: a rebase conflicting on LEGACY_STATE must not make
+  // NEUTRAL_STATE writable.
+  const other = rbdEdit(dir, "Edit", NEUTRAL_STATE, LEGACY_STATE);
+  assert.equal(other.exitCode, 2);
+  assert.match(other.stderr, /Pipeline State is writer-owned/u);
+  assert.equal(other.stderr.includes("is suspended for this"), false, other.stderr);
 });
 
 test("rebdead negative-2: --skip, --edit-todo, --exec, an arbitrary -c, push and force-push all stay refused", () => {
