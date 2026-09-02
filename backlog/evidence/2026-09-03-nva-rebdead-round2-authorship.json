@@ -1,0 +1,70 @@
+{
+  "schema": "pipeline.critic-authorship-projection.v1",
+  "note": "Authorship only. Carries no rationale, no mechanism, no justification -- those are outside the Critic's reference boundary.",
+  "dispatcher": "elephant",
+  "commits": [
+    {
+      "commit": "10d11e588f9c5ced9b3334afe1c2007f2ee0c0ea",
+      "subjectType": "fix",
+      "taskId": "NVA-REBDEAD-1",
+      "agentType": "goldfish",
+      "authoredBy": "goldfish-dispatch"
+    },
+    {
+      "commit": "d244c19ccb8642dd49340dafab4fb7e6b9813605",
+      "subjectType": "fix",
+      "taskId": "NVA-REBDEAD-F1",
+      "agentType": "goldfish",
+      "authoredBy": "goldfish-dispatch"
+    },
+    {
+      "commit": "43413349e103d61cee7beffaa944f9fd16015083",
+      "subjectType": "fix",
+      "taskId": null,
+      "agentType": null,
+      "authoredBy": "elephant-direct"
+    },
+    {
+      "commit": "8f1c07378d096da3651627557e805c3c158be65f",
+      "subjectType": "fix",
+      "taskId": "NVA-REBDEAD-F5",
+      "agentType": "goldfish",
+      "authoredBy": "goldfish-dispatch"
+    },
+    {
+      "commit": "79bc79b88412b76a60a819fd6cbcab44e989f070",
+      "subjectType": "fix",
+      "taskId": "NVA-REBDEAD-F5B",
+      "agentType": "goldfish",
+      "authoredBy": "goldfish-dispatch"
+    },
+    {
+      "commit": "68c164e88d4f3a2bd96b8e763acfb42a7f29a082",
+      "subjectType": "fix",
+      "taskId": "NVA-REBDEAD-F5B",
+      "agentType": "goldfish",
+      "authoredBy": "goldfish-dispatch"
+    },
+    {
+      "commit": "b6fb9c4ed89ba9a79238f6f5a35f79b3ba400dc1",
+      "subjectType": "docs",
+      "taskId": "NVA-REBDEAD-F7",
+      "agentType": "goldfish",
+      "authoredBy": "goldfish-dispatch"
+    },
+    {
+      "commit": "d08ca247b7fbefb8439cd49c4cae54983dbcbdd5",
+      "subjectType": "test",
+      "taskId": "NVA-REBDEAD-F8",
+      "agentType": "goldfish",
+      "authoredBy": "goldfish-dispatch"
+    },
+    {
+      "commit": "70eb60f41128cd93da9896042557726448ef1fea",
+      "subjectType": "fix",
+      "taskId": "NVA-B-STEMCLASH-1",
+      "agentType": "goldfish",
+      "authoredBy": "goldfish-dispatch"
+    }
+  ]
+}

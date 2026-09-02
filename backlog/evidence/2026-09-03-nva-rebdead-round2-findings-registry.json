@@ -1,0 +1,39 @@
+{
+  "schema": "pipeline.critic-findings-registry-projection.v1",
+  "note": "Round-1 finding IDs and their current disposition only. Deliberately carries no reason, no mechanism and no fix description: CR-02/EL-09 place the implementor's justification outside the Critic's input.",
+  "round": 1,
+  "findings": [
+    {
+      "id": "F1",
+      "status": "refuted"
+    },
+    {
+      "id": "F2",
+      "status": "closed"
+    },
+    {
+      "id": "F3",
+      "status": "closed"
+    },
+    {
+      "id": "F4",
+      "status": "closed"
+    },
+    {
+      "id": "F5",
+      "status": "closed"
+    },
+    {
+      "id": "F6",
+      "status": "closed"
+    },
+    {
+      "id": "F7",
+      "status": "closed"
+    },
+    {
+      "id": "F8",
+      "status": "closed"
+    }
+  ]
+}
