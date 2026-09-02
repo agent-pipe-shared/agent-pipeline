@@ -8401,6 +8401,56 @@ test("rebdead negative-4: no human signature is demanded anywhere in the admitte
   assert.equal(existsSync(requestsDir), false);
 });
 
+/** NVA-REBDEAD-F5: an unconditional stub standing in for a `restart-required` session -- the
+ * narrower sibling exemption's own status -- never the `continuity-damaged` an unparseable
+ * lifecycle state file actually produces (rbdReadinessFn above). */
+function rbdRestartRequiredReadinessFn({ intent }) {
+  throw new ProjectOnboardingReadyError(
+    "PORG-NOT-READY", `Project onboarding lifecycle is not ready for intent ${intent}.`,
+    { intent, lifecycleStatus: "restart-required" },
+  );
+}
+
+function rbdRestartRequiredDeps(dir) {
+  return { projectDir: dir, runner: "claude", requireProjectOnboardingReadyFn: rbdRestartRequiredReadinessFn };
+}
+
+test("rebdead negative-5: a restart-required session with a validly-resolved active rebase does not receive the rebase relief, only its own narrower sibling exemption where it applies", () => {
+  const dir = rbdFixture();
+  const deps = rbdRestartRequiredDeps(dir);
+
+  // The READINESS-GATE relief (the one narrowed here) admits Edit on the conflict path for
+  // continuity-damaged (positive-1); it must NOT admit it for restart-required, even though the
+  // same validly-resolved rebase exists and the SEPARATE, independent protected-State writer-
+  // only relief (guard-lifecycle-ready.mjs ~4420, keyed only on conflictPaths membership, never
+  // on lifecycleStatus, and out of this fix's scope) still lifts its own, different refusal --
+  // its notice text can legitimately survive inside an overall denial. The readiness gate's OWN
+  // admission phrase must be absent, and the overall write must stay refused.
+  const conflictWrite = evaluateLifecycleReadyGuard(
+    { tool_name: "Edit", tool_input: { file_path: NEUTRAL_STATE, old_string: "a", new_string: "b" } },
+    deps,
+  );
+  assert.equal(conflictWrite.exitCode, 2, conflictWrite.stderr);
+  assert.equal(/the onboarding-readiness gate is suspended/u.test(conflictWrite.stderr), false, conflictWrite.stderr);
+
+  // Same for the Bash lane (git add on the conflict path is admitted for continuity-damaged in
+  // positive-3; it must stay refused here).
+  const addResult = evaluateLifecycleReadyGuard(
+    { tool_name: "Bash", tool_input: { command: `git add -- ${NEUTRAL_STATE}` } },
+    deps,
+  );
+  assert.equal(addResult.exitCode, 2, addResult.stderr);
+  assert.equal(/the onboarding-readiness gate is suspended/u.test(addResult.stderr), false, addResult.stderr);
+
+  // restart-required's OWN narrower sibling exemption (guard-lifecycle-ready.mjs:4074-4081)
+  // still admits the one resume-hint-input write it exists for.
+  const resumeHintWrite = evaluateLifecycleReadyGuard(
+    { tool_name: "Edit", tool_input: { file_path: "project/.resume-hint-input.json", old_string: "a", new_string: "b" } },
+    deps,
+  );
+  assert.equal(resumeHintWrite.exitCode, 0, resumeHintWrite.stderr);
+});
+
 process.on("exit", () => {
   for (const dir of REBWIRE_FIXTURES) {
     try { rmSync(dir, { recursive: true, force: true }); } catch { /* a throwaway fixture */ }

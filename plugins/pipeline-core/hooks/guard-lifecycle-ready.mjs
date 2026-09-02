@@ -4028,9 +4028,22 @@ function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
     // predicates -- never to "a rebase is active" (see activeRebaseAuthority()'s own header
     // and rebaseAuthorityPermitsPath()'s deny-by-default docstring). Neither predicate is
     // re-decided here; both are the resolver's, imported unmodified.
+    // NVA-REBDEAD-F5: narrowed to the exact lifecycleStatus an unparseable/conflicted
+    // lifecycle state file actually produces -- measured against rbdFixture():
+    // continuity.status === "damaged" in project-onboarding-v3.mjs yields lifecycleStatus
+    // "continuity-damaged", and no other status is reachable from that one failure mode. No
+    // other not-ready status, including restart-required, is swallowed here any longer;
+    // restart-required keeps its own narrower sibling exemption below, now reachable again.
+    // NVA-REBDEAD-F5: narrowed to the exact lifecycleStatus an unparseable/conflicted
+    // lifecycle state file actually produces -- measured against rbdFixture():
+    // continuity.status === "damaged" in project-onboarding-v3.mjs yields lifecycleStatus
+    // "continuity-damaged", and no other status is reachable from that one failure mode. No
+    // other not-ready status, including restart-required, is swallowed here any longer;
+    // restart-required keeps its own narrower sibling exemption below, now reachable again.
     const sessionNotReady = error instanceof ProjectOnboardingReadyError
       && error.code === "PORG-NOT-READY"
-      && error.intent === "session";
+      && error.intent === "session"
+      && error.lifecycleStatus === "continuity-damaged";
     if (sessionNotReady) {
       const rebase = activeRebaseAuthority(root, dependencies);
       if (rebase !== null) {
