@@ -67,7 +67,11 @@ import {
 // after-every-conflict.md): the command-side predicate, imported from the resolver that owns
 // it so this guard cannot disagree with the dev-plan gate's write lane about what the same
 // rebase permits. The resolver itself is never re-implemented or second-guessed here.
-import { rebaseAuthorityPermitsCommand } from "../lib/rebase-authority.mjs";
+// NVA-REBDEAD-1 (scratch/spec-rebase-deadlock.md): `rebaseAuthorityPermitsPath` is the SAME
+// path-side predicate `guard-devplan.mjs`'s Edit|Write lane already uses -- reused here
+// unmodified for this guard's own writer-owned-State and readiness reliefs, so all three
+// admissions can never disagree about which paths a rebase's conflict surface covers.
+import { rebaseAuthorityPermitsCommand, rebaseAuthorityPermitsPath } from "../lib/rebase-authority.mjs";
 import {
   extractShellWriteTargets,
   loadProtectedTestPathRules,
@@ -1280,6 +1284,25 @@ function activeRebaseAuthority(root, dependencies = {}) {
     memo.resolved = true;
   }
   return memo.value;
+}
+
+/**
+ * The one line THIS guard prints when IT admits something it would otherwise have blocked --
+ * this file's own twin of `lib/guard-devplan-policy.mjs`'s `rebaseAuthorityAdmissionNotice()`.
+ * Deliberately NOT reused: that text hardcodes "dev-plan gate suspended", which is correct for
+ * its own two callers (the dev-plan gate's Edit|Write and shell lanes) and would be a FALSE
+ * audit line here -- the writer-owned-State refusal and the onboarding-readiness kernel are
+ * two different gates this file owns itself, and guard-devplan-policy.mjs is out of scope for
+ * this change (NVA-REBDEAD-1). Kept as loud as the refusal it replaces, for the identical
+ * reason that module states: a lifecycle gate that suspends itself silently is
+ * indistinguishable, in an audit, from a gate that was never armed.
+ */
+function lifecycleRebaseAdmissionNotice(result, gate, subject) {
+  const authority = result.authority;
+  return `[rebase-authority] ${gate} is suspended for this ${subject}: it lies inside the `
+    + `current conflict surface of the active rebase of ${authority.headName} onto `
+    + `${authority.onto}, whose orig-head ${authority.origHead} is validly approved and in `
+    + "implementation. Nothing else is lifted, and no push authority is granted.";
 }
 
 /**
@@ -3992,6 +4015,36 @@ function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
       runner: dependencies.runner,
     });
   } catch (error) {
+    // NVA-REBDEAD-1 (scratch/spec-rebase-deadlock.md, decision 2): readiness for the resolved
+    // rebase authority's own narrow surface is RE-BASED on orig-head, never lifted outright.
+    // The resolver already proved orig-head is validly approved and implementing (Requirement
+    // 1, lib/rebase-authority.mjs) before it ever named a conflict path or a permitted
+    // command; an action already inside that narrow, deny-by-default surface therefore needs
+    // no fresh observation of the CONFLICTED working tree, which is exactly the file this
+    // authority exists to let a session repair -- that circularity is the whole defect. Scoped
+    // twice over: to a genuine PORG-NOT-READY session-intent refusal (never a
+    // PORG-INVALID-OBSERVATION/PORG-INTENT/PORG-RUNNER/PORG-OBSERVATION-UNAVAILABLE fault,
+    // which all stay hard failures), and to the resolver's own conflictPaths/command
+    // predicates -- never to "a rebase is active" (see activeRebaseAuthority()'s own header
+    // and rebaseAuthorityPermitsPath()'s deny-by-default docstring). Neither predicate is
+    // re-decided here; both are the resolver's, imported unmodified.
+    const sessionNotReady = error instanceof ProjectOnboardingReadyError
+      && error.code === "PORG-NOT-READY"
+      && error.intent === "session";
+    if (sessionNotReady) {
+      const rebase = activeRebaseAuthority(root, dependencies);
+      if (rebase !== null) {
+        const admitted = WRITE_TOOLS.includes(toolName)
+          ? rebaseAuthorityPermitsPath(rebase, writeTargetPath(input.tool_input, toolName))
+          : toolName === "Bash"
+            && rebaseAuthorityPermitsCommand(rebase, (input.tool_input.command ?? input.tool_input.CommandLine));
+        if (admitted) {
+          return verdict(0, `${lifecycleRebaseAdmissionNotice(
+            rebase, "the onboarding-readiness gate", WRITE_TOOLS.includes(toolName) ? "write" : "command",
+          )}\n`);
+        }
+      }
+    }
     // Codex 0.145 may execute PreToolUse against the physical host Git
     // directory while the successful bootstrap command sees protected virtual
     // control mounts. Accept only the explicit host-init admission written by
@@ -4346,7 +4399,18 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
       const requested = resolve(root, target);
       if (requested === join(root, ".claude", "pipeline-state.json")
         || requested === join(root, "project", "pipeline-state.json")) {
-        return withLifts(lifts, protectedStateWriterOnly());
+        // NVA-REBDEAD-1 (scratch/spec-rebase-deadlock.md, decision 1): the ONE relief, keyed
+        // on `conflictPaths` membership -- never on "a rebase is active". A rebase conflicting
+        // on the OTHER lifecycle state file must not make THIS one writable, so the resolved
+        // authority's own predicate decides, not a fixed-path carve-out like memoryWrite/
+        // machineWrite above. A lift rather than a return: the cross-repository check already
+        // ran, and every later check -- the readiness kernel included -- still runs against
+        // the lifted write exactly as the pre-existing dev-plan-shell relief does.
+        const rebase = activeRebaseAuthority(root, dependencies);
+        if (rebase === null || !rebaseAuthorityPermitsPath(rebase, requested)) {
+          return withLifts(lifts, protectedStateWriterOnly());
+        }
+        lifts.push(verdict(0, `${lifecycleRebaseAdmissionNotice(rebase, "the protected-State writer-only refusal", "write")}\n`));
       }
       const boundAuthority = boundAuthorityDocumentPath(root, requested);
       if (boundAuthority !== null) {

@@ -7587,7 +7587,7 @@ import {
   sha256CanonicalJson,
   submitPlan,
 } from "../lib/plan-spec-state-v2.mjs";
-import { LEGACY_STATE } from "../lib/project-authority.mjs";
+import { LEGACY_STATE, NEUTRAL_STATE } from "../lib/project-authority.mjs";
 import { REBASE_AUTHORITY_SURFACE_SCHEMA } from "../lib/guard-devplan-policy.mjs";
 
 const REBWIRE_DEVPLAN_GUARD = fileURLToPath(new URL("./guard-devplan.mjs", import.meta.url));
@@ -8129,6 +8129,276 @@ test("rebwire regression: with no rebase in progress the guard's output is uncha
   } finally {
     rmSync(path, { recursive: true, force: true });
   }
+});
+
+// =========================================================================================
+// NVA-REBDEAD-1 (scratch/spec-rebase-deadlock.md): the conflict path IS the lifecycle state
+// file itself, and readiness is a REAL function rather than a constant.
+//
+// WHY A SECOND FIXTURE, RATHER THAN REUSING rbFixture()
+//   rbFixture() conflicts on REBWIRE_CONFLICT_PATH -- an ordinary implementation file, never
+//   NEUTRAL_STATE -- and every rbDeps() caller stubs readiness to the constant
+//   REBWIRE_READY_RECEIPT. Both choices are exactly why the fourteen rebwire cases above all
+//   pass while the reported deadlock is fully live (spec Finding 4): the writer-owned-State
+//   refusal (Finding 1) only fires for Edit/Write on project/pipeline-state.json or
+//   .claude/pipeline-state.json, which rbFixture() never touches; and the readiness
+//   circularity (Finding 2) can only be observed with a readiness function that actually
+//   reads the CONFLICTED working tree, which the constant stub never does.
+//
+// WHY THE EDIT/WRITE LANE GOES THROUGH evaluateLifecycleReadyGuard() DIRECTLY
+//   rbDevplan() above spawns guard-devplan.mjs, a SEPARATE hook whose own rebase relief
+//   (guard-devplan.mjs lines 540-543) was already correct and proves nothing about this fix.
+//   Every case below drives THIS guard's real entry point instead.
+// =========================================================================================
+
+/** Same shape as rbDraftState()/rbImplementingState() above, plus one field derivePlanLifecycle
+ * never inspects -- so B and C can each edit the SAME line differently and force a real merge
+ * conflict on NEUTRAL_STATE without touching anything the resolver's Requirement 1 checks. */
+function rbdMarkedState(marker) {
+  const draft = {
+    schema: "pipeline.state.v0",
+    // NOTE: rbContinuity() above hardcodes featureId "rebwire-feature" -- activeFeature.id
+    // here has to match it exactly, or submitPlan() refuses with PLAN-SUBMIT-CONTINUITY-INVALID.
+    activeFeature: { id: "rebwire-feature", planPath: REBWIRE_PLAN_PATH, phase: "design" },
+    planApproved: false,
+    continuity: rbContinuity(),
+    _rebdeadMarker: marker,
+  };
+  const submitted = submitPlan({
+    state: draft, expectedStateSha256: sha256CanonicalJson(draft), poGateAuthority: REBWIRE_AUTHORITY,
+    profile: "epic", profileSha256: "3".repeat(64), by: "Coordinator", at: "2026-09-01T20:00:00.000Z",
+  });
+  assert.equal(submitted.ok, true, JSON.stringify(submitted));
+  const approved = approveSubmittedPlan({
+    state: submitted.state, expectedStateSha256: sha256CanonicalJson(submitted.state),
+    expectedSubmissionSha256: rbDerivePlanLifecycle(submitted.state).submissionSha256,
+    poGateAuthority: REBWIRE_AUTHORITY, profileSha256: "3".repeat(64), by: "PO", at: "2026-09-01T20:05:00.000Z",
+  });
+  assert.equal(approved.ok, true, JSON.stringify(approved));
+  const implementing = enterPlanImplementation({
+    state: approved.state, expectedStateSha256: sha256CanonicalJson(approved.state), at: "2026-09-01T20:30:00.000Z",
+  });
+  assert.equal(implementing.ok, true, JSON.stringify(implementing));
+  return implementing.state;
+}
+
+/**
+ * A real conflicted rebase whose ONLY conflict path is `project/pipeline-state.json`, with a
+ * validly approved `orig-head`. History shape mirrors rbFixture(): A (base) / B (feature,
+ * becomes orig-head) / C (upstream) -- but here EVERY commit edits NEUTRAL_STATE's marker
+ * line, so B and C's edits collide and git stops with real conflict markers in the JSON,
+ * exactly the live incident's own precondition.
+ */
+function rbdFixture() {
+  const dir = mkdtempSync(join(rbScratchBase(), "rebdead-"));
+  REBWIRE_FIXTURES.push(dir);
+  const run = (...args) => {
+    const result = spawnSync("git", args, { cwd: dir, encoding: "utf8" });
+    assert.equal(result.status, 0, `git ${args.join(" ")} failed: ${result.stderr}`);
+    return result.stdout;
+  };
+  const put = (relative, contents) => {
+    mkdirSync(dirname(join(dir, relative)), { recursive: true });
+    writeFileSync(join(dir, relative), contents);
+  };
+
+  run("init");
+  run("config", "user.name", "Rebdead Fixture");
+  run("config", "user.email", "rebdead-fixture@example.invalid");
+  run("config", "commit.gpgsign", "false");
+  run("checkout", "-b", "main");
+
+  put(".claude/pipeline.yaml", REBWIRE_MANIFEST);
+  put(REBWIRE_PLAN_PATH, REBWIRE_PLAN_BYTES);
+  put(REBWIRE_SPEC_PATH, REBWIRE_SPEC_BYTES);
+  put(NEUTRAL_STATE, `${JSON.stringify(rbdMarkedState("base"), null, 2)}\n`);
+  run("add", "-A");
+  run("commit", "-m", "base");
+
+  run("checkout", "-b", "feat/rebdead");
+  put(NEUTRAL_STATE, `${JSON.stringify(rbdMarkedState("feature"), null, 2)}\n`);
+  run("commit", "-a", "-m", "feature change");
+
+  run("checkout", "main");
+  put(NEUTRAL_STATE, `${JSON.stringify(rbdMarkedState("upstream"), null, 2)}\n`);
+  run("commit", "-a", "-m", "upstream change");
+
+  run("checkout", "feat/rebdead");
+  const rebase = spawnSync("git", ["-c", "core.editor=true", "rebase", "main"], { cwd: dir, encoding: "utf8" });
+  assert.notEqual(rebase.status, 0, "the fixture rebase was expected to stop on a conflict");
+  assert.ok(existsSync(join(dir, ".git", "rebase-merge")));
+  const conflicted = spawnSync("git", ["diff", "--name-only", "--diff-filter=U"], { cwd: dir, encoding: "utf8" }).stdout.trim();
+  assert.equal(conflicted, NEUTRAL_STATE, "the fixture must conflict on the lifecycle state file itself");
+  // The live incident's own precondition: real conflict markers, not valid JSON.
+  assert.throws(() => JSON.parse(readFileSync(join(dir, NEUTRAL_STATE), "utf8")));
+  return dir;
+}
+
+/**
+ * Mirrors requireProjectOnboardingReady()'s actual failure mode for this ONE file -- reads
+ * the real working-tree NEUTRAL_STATE and fails closed exactly as the production gate does on
+ * invalid JSON -- instead of the unconditional-constant stub every rbDeps() caller above uses.
+ * That constant is precisely why the deadlock this section reproduces went uncaught.
+ */
+function rbdReadinessFn({ rootDir, intent }) {
+  let bytes = null;
+  try { bytes = readFileSync(join(rootDir, NEUTRAL_STATE), "utf8"); } catch { /* absent */ }
+  let ok = false;
+  if (bytes !== null) { try { JSON.parse(bytes); ok = true; } catch { /* real conflict markers */ } }
+  if (!ok) {
+    throw new ProjectOnboardingReadyError(
+      "PORG-NOT-READY", `Project onboarding lifecycle is not ready for intent ${intent}.`,
+      { intent, lifecycleStatus: "continuity-damaged" },
+    );
+  }
+  return { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent };
+}
+
+function rbdDeps(dir) {
+  return { projectDir: dir, runner: "claude", requireProjectOnboardingReadyFn: rbdReadinessFn };
+}
+
+/** The Bash lane, through the guard's real evaluation entry point -- rbdReadinessFn stands in
+ * for rbBash()'s constant. */
+function rbdBash(dir, command) {
+  return evaluateLifecycleReadyGuard({ tool_name: "Bash", tool_input: { command } }, rbdDeps(dir));
+}
+
+/** The Edit/Write lane, through THIS guard directly (never guard-devplan.mjs -- see the
+ * section header above). */
+function rbdEdit(dir, toolName, filePath) {
+  return evaluateLifecycleReadyGuard(
+    { tool_name: toolName, tool_input: { file_path: filePath, old_string: "a", new_string: "b" } },
+    rbdDeps(dir),
+  );
+}
+
+test("rebdead positive-1: Edit/Write on the exact conflict path (the lifecycle state file itself) is admitted, relative and absolute", () => {
+  const dir = rbdFixture();
+  for (const [tool, path] of [
+    ["Edit", NEUTRAL_STATE],
+    ["Write", join(dir, NEUTRAL_STATE)],
+    ["Edit", `./${NEUTRAL_STATE}`],
+  ]) {
+    const result = rbdEdit(dir, tool, path);
+    assert.equal(result.exitCode, 0, `${tool} ${path}: ${result.stderr}`);
+    assert.match(result.stderr, /\[rebase-authority\] the protected-State writer-only refusal is suspended for this write/u);
+    // SEC/no-machine-paths: the absolute form must never leak the fixture's own absolute root.
+    assert.equal(result.stderr.includes(dir), false, result.stderr);
+  }
+});
+
+test("rebdead positive-2: checkout --ours/--theirs and restore are admitted on the conflict path", () => {
+  const dir = rbdFixture();
+  for (const command of [
+    `git checkout --ours -- ${NEUTRAL_STATE}`,
+    `git checkout --theirs -- ${NEUTRAL_STATE}`,
+    `git restore --ours -- ${NEUTRAL_STATE}`,
+    `git restore --theirs -- ${NEUTRAL_STATE}`,
+    `git restore --worktree --ours -- ${NEUTRAL_STATE}`,
+  ]) {
+    const result = rbdBash(dir, command);
+    assert.equal(result.exitCode, 0, `${command}: ${result.stderr}`);
+    assert.match(result.stderr, /\[rebase-authority\] the onboarding-readiness gate is suspended for this command/u);
+  }
+});
+
+test("rebdead positive-3: git add on the conflict path is admitted", () => {
+  const dir = rbdFixture();
+  const result = rbdBash(dir, `git add -- ${NEUTRAL_STATE}`);
+  assert.equal(result.exitCode, 0, result.stderr);
+});
+
+test("rebdead positive-4: git rebase --continue is admitted, and once the conflict path is actually resolved and staged the rebase genuinely finishes", () => {
+  const dir = rbdFixture();
+  // Admitted even before resolution -- this guard's job is admission, not re-deriving git's
+  // own precondition for a real continue.
+  assert.equal(rbdBash(dir, "git rebase --continue").exitCode, 0);
+  assert.equal(rbdBash(dir, "git -c core.editor=true rebase --continue").exitCode, 0);
+
+  assert.equal(rbdEdit(dir, "Edit", NEUTRAL_STATE).exitCode, 0);
+  writeFileSync(join(dir, NEUTRAL_STATE), `${JSON.stringify(rbdMarkedState("resolved"), null, 2)}\n`);
+  assert.equal(rbdBash(dir, `git add -- ${NEUTRAL_STATE}`).exitCode, 0);
+  const staged = spawnSync("git", ["add", "--", NEUTRAL_STATE], { cwd: dir, encoding: "utf8" });
+  assert.equal(staged.status, 0, staged.stderr);
+
+  assert.equal(rbdBash(dir, "git -c core.editor=true rebase --continue").exitCode, 0);
+  const continued = spawnSync("git", ["-c", "core.editor=true", "rebase", "--continue"], {
+    cwd: dir,
+    encoding: "utf8",
+    env: { ...process.env, PATH: `${rbTrueShimDir()}${delimiter}${process.env.PATH ?? ""}` },
+  });
+  assert.equal(continued.status, 0, continued.stderr);
+  assert.equal(existsSync(join(dir, ".git", "rebase-merge")), false);
+});
+
+test("rebdead positive-5: all three read-only diagnostics are reachable despite the invalid conflict JSON", () => {
+  const dir = rbdFixture();
+  assert.equal(rbdBash(dir, "git status --short").exitCode, 0);
+  assert.equal(rbdBash(dir, "git diff --name-only --diff-filter=U").exitCode, 0);
+  // The one of the three that actually needed this fix (spec Finding 3).
+  assert.equal(rbdBash(dir, "git rebase --show-current-patch").exitCode, 0);
+});
+
+test("rebdead negative-1: a path outside conflictPaths stays refused, including the OTHER lifecycle state file", () => {
+  const dir = rbdFixture();
+  // The discriminating case for decision 1: a rebase conflicting on NEUTRAL_STATE must not
+  // make LEGACY_STATE writable.
+  const other = rbdEdit(dir, "Edit", LEGACY_STATE);
+  assert.equal(other.exitCode, 2);
+  assert.match(other.stderr, /Pipeline State is writer-owned/u);
+  assert.equal(other.stderr.includes("is suspended for this"), false, other.stderr);
+
+  const outside = rbdEdit(dir, "Edit", "src/genuinely-unrelated.mjs");
+  assert.equal(outside.exitCode, 2);
+  assert.equal(outside.stderr.includes("is suspended for this"), false, outside.stderr);
+});
+
+test("rebdead negative-2: --skip, --edit-todo, --exec, an arbitrary -c, push and force-push all stay refused", () => {
+  const dir = rbdFixture();
+  for (const command of [
+    "git rebase --skip",
+    "git rebase --edit-todo",
+    "git rebase --exec 'touch marker'",
+    "git -c core.hooksPath=none rebase --continue",
+    "git push origin HEAD",
+    "git push --force origin main",
+  ]) {
+    const result = rbdBash(dir, command);
+    assert.equal(result.exitCode, 2, `${command} was not refused`);
+    assert.equal(result.stderr.includes("is suspended for this"), false, `${command}: ${result.stderr}`);
+  }
+});
+
+test("rebdead negative-3: the admission disappears entirely once the rebase is aborted", () => {
+  const dir = rbdFixture();
+  assert.equal(rbdEdit(dir, "Edit", NEUTRAL_STATE).exitCode, 0);
+  const abort = spawnSync("git", ["rebase", "--abort"], { cwd: dir, encoding: "utf8" });
+  assert.equal(abort.status, 0, abort.stderr);
+
+  const after = rbdEdit(dir, "Edit", NEUTRAL_STATE);
+  assert.equal(after.exitCode, 2);
+  assert.equal(after.stderr.includes("[rebase-authority]"), false, after.stderr);
+  // The two pre-existing read-only diagnostics never depended on this relief in the first
+  // place -- proven here with no authority resolved at all.
+  assert.equal(rbdBash(dir, "git status --short").exitCode, 0);
+  assert.equal(rbdBash(dir, "git diff --name-only --diff-filter=U").exitCode, 0);
+});
+
+test("rebdead negative-4: no human signature is demanded anywhere in the admitted path", () => {
+  const dir = rbdFixture();
+  for (const result of [
+    rbdEdit(dir, "Edit", NEUTRAL_STATE),
+    rbdBash(dir, `git checkout --ours -- ${NEUTRAL_STATE}`),
+    rbdBash(dir, `git add -- ${NEUTRAL_STATE}`),
+    rbdBash(dir, "git rebase --continue"),
+    rbdBash(dir, "git rebase --show-current-patch"),
+  ]) {
+    assert.equal(result.exitCode, 0, result.stderr);
+    assert.equal(/signature/iu.test(result.stderr), false, result.stderr);
+  }
+  const requestsDir = join(dir, ".git", "agent-pipeline", "human-guard-overrides", "requests");
+  assert.equal(existsSync(requestsDir), false);
 });
 
 process.on("exit", () => {
