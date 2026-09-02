@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.worker-cancellation-is-denied-when-the-record-digest-ages-between-read-and-cancel
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-03
+closure_repository: self
+closure_commit: fc04dbc82118a9e5c201fbe05ef92965b7ab2576
+closure_evidence: backlog/evidence/2026-09-03-nva-b-lwsc04-1-green-heartbeat-excluded-from-digest.txt
 created: 2026-09-02
 source: "GitHub Actions run 33595311782 (push to main, commit 6262d408), job verify, suite local-worker-supervisor-cli-tests, check LWSC04"
 sprint: nova-b
@@ -154,3 +158,46 @@ dispatches (`NVA-CIGREEN-1`, `NVA-CIGREEN-2`) alongside it.
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:**
+
+## Triage, 2026-09-03 — hypothesis confirmed by measurement, then narrowed rather than weakened
+
+This item filed a hypothesis, not a finding, and named the measurement that
+would settle it. The measurement was taken (`NVA-B-LWSC04-1`) and the
+hypothesis holds.
+
+**How it was established.** A new regression case (`LWSC05`) waits past one real
+heartbeat tick, asserts that the heartbeat advanced while `status` and worker
+state did not, and only then cancels using the pre-heartbeat digest. Against the
+unfixed code that cancellation was denied with `LWS-CANCEL-DENIED` *after* the
+prior assertions had already proven nothing about identity or intent had
+changed. RED capture:
+`backlog/evidence/2026-09-03-nva-b-lwsc04-1-red-heartbeat-ages-digest.txt`.
+
+**The fix, and why it is a narrowing and not a weakening.** `unsignedDigest()`
+now excludes `lease.lastHeartbeatMonotonicMs` — one leaf field, rewritten once
+per `lease.heartbeatMs` by the supervisor itself, independent of anything the
+record's holder decided. Verified at the dispatcher's side rather than taken
+from the report:
+
+- `lease` is constructed at exactly one place in the module and lives only on
+  the record, so no other digested shape (`resultSha256`, `planSha256`,
+  `markerSha256`, `cancelSha256`) is silently narrowed by the same edit.
+- The heartbeat writer touches only that field. `cleanupExpiresMonotonicMs`
+  stays inside the digest — and that is the lease field the cancel and cleanup
+  routes actually gate expiry on, so the security-relevant part of the lease is
+  still covered by the compare-and-swap.
+- The same heartbeat block can flip `record.status` to `recovery-required` and
+  move a worker's state. Those stay in the digest, so a cancellation issued
+  against a digest that missed such a change is still correctly denied.
+
+The digest now covers identity and intent, not the tick. Neither of the two
+shapes the briefing forbade — relaxing the equality check, or papering over the
+race with a retry or tolerance window — was used; a retry would have
+reintroduced the same failure on a loaded runner, which is exactly where it was
+first observed.
+
+`91f9bc45` carries the fix; `fc04dbc8` replaces a fixed sleep margin in the new
+case with a poll for the actual tick, so the regression test does not itself
+depend on runner speed — the property that made the original failure CI-only.
+`node --test plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs`:
+10/10, re-run by the dispatcher.
