@@ -212,3 +212,57 @@ a mismatch" — the second half is unmet: Claude Code hooks enforce only
 after a plugin-cache refresh and session reload (this repo's own
 cache-enforcement-latency discipline, `docs/state.md`), which has not
 happened yet this session. Close only after that live observation.
+
+### Progress note, 2026-09-02 — the failure did NOT reproduce, and the closing bar turns out to be unobservable as written
+
+A deliberate low-stakes probe of exactly the kind this item's own Proposal 1
+asks for was run this session: a single read-only Agent-tool dispatch carrying
+`isolation: "worktree"`, briefed with no self-heal step at all and an absolute
+prohibition on `checkout --detach`, so that a non-isolated outcome could only be
+reported, never acted on.
+
+**Isolation was granted.** Two independent observations, not one:
+
+- The dispatcher's `git worktree list` went from one entry before the launch to
+  two immediately after, the new one being
+  `.claude/worktrees/agent-<id>`, `locked`.
+- The dispatch's own `git rev-parse --show-toplevel`, reported from inside,
+  resolved to that same worktree path — not to the shared checkout.
+
+So the 2026-08-25 incident did not reproduce. That does not weaken the original
+finding; "silently not granted" is by nature intermittent, which is precisely
+why a count-based detector was built rather than a paragraph of prose.
+
+**A second CLAUDE.md behaviour reproduced exactly.** The fresh worktree's HEAD
+was the stale `refs/remotes/origin/HEAD` target, hundreds of commits behind the
+session's actual working tip — the base-staleness this repository already
+documents. The probe was briefed to report and stop, so nothing was detached.
+
+**Registration fired.** `.git/agent-pipeline/worktree-count-checks/` came into
+existence at the moment of that launch, and `mkdirSync` in
+`lib/worktree-count-check.mjs` runs only inside the baseline writer, so a
+baseline was written. Whether the writing event was the `Agent` call itself is
+NOT established — see the matcher item below.
+
+**Why this still does not close the item.** This item's bar is "at least one
+live run has been observed to surface (or correctly not surface) a mismatch."
+The first half is observable: a mismatch exits 1 and writes stderr. The second
+half is not. On a successful run the hook produces silence, and silence is
+indistinguishable from the hook never having fired — the check writes no durable
+record of its own verdict, and the baseline it does write is deleted by the
+resolving event before anything can read it. A dispatched subagent sent to read
+the record while it should still have been pending found the directory already
+empty.
+
+So "correctly not surface a mismatch" cannot be evidenced as written, by any
+probe. Closing this item needs either a durable verdict record (an append to the
+existing observation lane, not a new one) or a bar rewritten to something
+observable. That is a better-founded reason to stay `open` than "the live run
+has not happened yet" — the live run has now happened, and it is the bar that
+does not hold.
+
+**Filed separately rather than folded in:**
+`backlog/items/2026-09-02-the-worktree-isolation-hook-matcher-omits-the-agent-tool-name.md`
+— the stanza's matcher names `Task` but not `Agent`, while `guard-dispatch.mjs`'s
+own stanza names both and documents omitting one as a silent no-op. Mechanical,
+TP-4 protected, and narrower than this item.
