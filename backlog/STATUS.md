@@ -27,7 +27,7 @@
 | pipeline.a-stale-version-stamp-makes-a-plugin-reload-a-silent-no-op | open | defect | pipeline | 2026-08-27 | — |
 | pipeline.a-throwing-temp-unlink-reports-rolled-back-while-the-target-stays-published | closed | defect | pipeline | 2026-09-02 | — |
 | pipeline.a-torn-audit-append-has-disabled-every-human-guard-override-since-august-20 | open | defect | pipeline | 2026-09-02 | — |
-| pipeline.a-tree-snapshot-races-gits-own-background-maintenance-lock | open | defect | pipeline | 2026-09-02 | — |
+| pipeline.a-tree-snapshot-races-gits-own-background-maintenance-lock | closed | defect | pipeline | 2026-09-02 | — |
 | pipeline.a7-gate-review-found-a-spec-plan-contradiction-and-a-lifecycle-admission-question | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.absent-runner-flag-silently-defaults-to-codex | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.acceptance-md-edits-repeatedly-drift-lifecycle-json-bound-digest | closed | defect | pipeline | 2026-08-17 | — |
@@ -623,8 +623,8 @@
 
 ## Counts
 
-- open: 111
+- open: 110
 - in_progress: 0
-- closed: 490
+- closed: 491
 - rejected: 3
 - deferred: 11

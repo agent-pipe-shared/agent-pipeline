@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "6d901c5fe302569831e935ee20af794dede0bf91051f2b8165fe123165e812a4"
+    "transitionHead": "12dd04344bb012957e2e53fc0f8f832f3d7555e44c72d2d1da0910e426913c29"
   },
   "counts": {
-    "open": 111,
+    "open": 110,
     "in_progress": 0,
-    "closed": 490,
+    "closed": 491,
     "rejected": 3,
     "deferred": 11
   },
@@ -249,12 +249,16 @@
     },
     {
       "id": "pipeline.a-tree-snapshot-races-gits-own-background-maintenance-lock",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-02",
       "source": "GitHub Actions run 33595311782 (push to main, commit 6262d408), job verify, suite codex-onboarding-capabilities-tests, test 12",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-09-03",
+      "closureRepository": "self",
+      "closureCommit": "ae8da7b8913bccfc34497aeb6dce3013c4204903",
+      "closureEvidence": "plugins/pipeline-core/lib/codex-onboarding-capabilities.test.mjs"
     },
     {
       "id": "pipeline.a7-gate-review-found-a-spec-plan-contradiction-and-a-lifecycle-admission-question",
