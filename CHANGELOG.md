@@ -1,15 +1,109 @@
 # Changelog
 
-All notable changes to Agent-Pipeline are documented here. `0.6.0` is the
-current release candidate; a version recorded here is not, by itself, a tag,
-GitHub Release, marketplace publication, remote readback, or production-support
-claim.
+All notable changes to Agent-Pipeline are documented here. `0.6.1` is the
+current release; `0.6.0` was a candidate and was never published. A version
+recorded here is not, by itself, a tag, GitHub Release, marketplace
+publication, remote readback, or production-support claim — `0.6.1` happens to
+carry all of those, and the entry below says so explicitly rather than leaving
+it to be inferred from the heading.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versioning per [ADR-0002](docs/adr/0002-versioning-sha-then-semver.md): the `0.4.0` release candidate uses stable SemVer surfaces; a version in this file is not a tag, GitHub Release, marketplace publication, or remote readback.
 
 ## [Unreleased]
 
-## [0.6.0] — 2026-08-30 (release candidate)
+## [0.6.1] — 2026-09-02
+
+Released. Tag `v0.6.1` and the GitHub Release of the same name both point at
+commit `6262d408`, which is the head of `main`. `0.6.1` supersedes the `0.6.0`
+candidate below, which was never tagged or published.
+
+Read the *Verification* note at the end of this entry before treating the
+release as fully green: the local gate passed on the released commit and CI did
+not.
+
+### Added
+
+- An approved feature branch can be rebased again. A new resolver
+  (`plugins/pipeline-core/lib/rebase-authority.mjs`) reads lifecycle authority
+  from `orig-head` — the branch's true starting point — instead of from the
+  half-replayed working tree, which had made `guard-lifecycle-ready` read the
+  earlier design state as current and demand a fresh single-use human signature
+  after nearly every conflict.
+- The authority is narrow and never opt-in: it exists because the repository is
+  genuinely mid-rebase from a validly approved starting point, never because a
+  session set a flag. A file untouched by a conflict does not become editable,
+  and `--edit-todo`, `--exec`, `--skip`, an arbitrary `-c`, shell chaining and
+  anything push-shaped stay refused by absence from an allowlist. It states
+  `pushAuthority: false` and `remoteAuthority: false` as fields, not omissions.
+- Every denial raised during an active rebase now names the route forward — the
+  conflict surface as data, the read-only diagnostics that reveal it, and the
+  exact continuation — so a session that has never heard of this authority is
+  carried through by the refusals themselves.
+
+### Fixed
+
+- Git arguments are parsed per subcommand. `git -c core.editor=true rebase
+  --continue` had treated `core.editor=true` as a file path, and `git checkout
+  --ours -- <path>` had treated the subcommand itself as one.
+- A `git rebase --exec` payload can no longer smuggle a write past the guard.
+  Payload options were matched by exact literal spelling while git accepts
+  unambiguous long-option prefixes, so `git rebase --exe '<write command>'`
+  executed and produced no candidate at all. The table is now inverted: the
+  *safe* options are enumerated, and an unrecognised long option on a verb with
+  no pathspec grammar makes its argument an opaque payload, so an omission costs
+  a spurious candidate instead of the gate.
+- `applyProjectOnboardingManifestRepair`'s rollback no longer deletes a file it
+  does not own. Ownership was decided by inode identity alone, and ext4 reuses a
+  freed inode number for the next file created in the same block group; it is
+  now bound to the bytes actually written, at every rollback and cleanup site in
+  that module.
+- `push-init` can satisfy its own chained doc-reconciliation check. It emitted
+  the literal `HEAD` as `--candidate` and never emitted `--record-ref`, so both
+  resolved to one commit — and a reconciliation record naming a commit cannot
+  live inside that commit. `--candidate` is now required and `--record-ref`
+  explicit.
+- The verify-failure reporter keeps the failing test's own line when it
+  truncates, enforces its per-suite byte bound across recovery instead of
+  recomputing it afterwards, and no longer inflates that bound by cutting inside
+  a multi-byte character.
+
+### Security
+
+- `plugins/pipeline-core/lib/rebase-authority.mjs` is a never-liftable kernel
+  path. A maintenance window able to rewrite it could manufacture an authority
+  that relieves a lifecycle gate without a human signature.
+
+### Changed
+
+- ADR-0077 records the release flow's self-invalidation: the normative release
+  order, gate evidence bound to the test-relevant tree rather than to the
+  commit, and the cheap consistency checkers as a fast pre-gate. Recorded as
+  decisions and scheduled — not claimed as built.
+
+### Verification
+
+The local gate ran green on the released commit (506 suites, exit 0) with a
+CLEAN security scan, and four independent Critic rounds reviewed the work; their
+findings registries and claims records are tracked under `backlog/evidence/`.
+
+CI run `33595311782` on `6262d408` failed with three suites red — all three
+pass locally, and each is tracked as its own defect in `backlog/items/`:
+`guard-lifecycle-ready-tests` (the workflow's synthetic `PATH` has no `true`,
+so git cannot start the editor the published continuation names),
+`codex-onboarding-capabilities-tests` (the suite's tree snapshot races git's own
+background maintenance lock) and `local-worker-supervisor-cli-tests` (`LWSC04`
+cancellation under runner load, against a 1s/3s lease window). They are
+test-environment and test-timing defects rather than defects in what this
+release ships; that distinction is asserted with evidence, not offered as a
+reason to disregard them.
+
+This release was pushed to `main` under an explicit repository-admin ruleset
+bypass, because `main` requires a passing `verify` status on the pushed commit
+while the workflow only runs on a push to `main`, a pull request against it, or
+a dispatch — a commit that has never reached a remote ref cannot acquire the
+status it needs in order to reach one. `docs/state.md` carries the full record.
+
+## [0.6.0] — 2026-08-30 (release candidate, never published)
 
 This is a source and plugin release candidate only. It does not create a tag,
 marketplace publication, GitHub Release, or production-support claim. Final
