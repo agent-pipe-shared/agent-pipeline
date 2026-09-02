@@ -1,0 +1,14 @@
+command: node scratch/nva-b-ledgeroid-1-probe.mjs
+purpose: live dry-run invocation of planBacklogEvidenceAmendment against ledger sequence 403 / item pipeline.codex-read-only-steps-escalate-individually-instead-of-once, testing whether the machinery admits an abbreviated-but-correct-OID amendment
+exitCode: 0
+--- stdout ---
+loadBacklogState ok: true
+target item found: true
+target item metadata: {"status":"closed","closure_repository":"self","closure_commit":"181b7730c9d6a7ca87a5df108a5b4da3447aa0e6","closure_evidence":"backlog/items/2026-08-09-codex-read-only-steps-escalate-individually-instead-of-once.md"}
+event 403: {"actor":"backlog-reconciliation","at":"2026-08-11","entryHash":"cebb80de1690b19e03b5a5fb196e1ba6cab8328cb07c859e67b6a3851a7a8861","evidence":{"commit":"181b7730","kind":"item-file-reconciliation","reference":"backlog/items/2026-08-09-codex-read-only-steps-escalate-individually-instead-of-once.md"},"from":"in_progress","id":"pipeline.codex-read-only-steps-escalate-individually-instead-of-once","previousHash":"2cf371ccf4aca78f1a9257c4259c3943fdc04f4c1b46bcc170e2db2eaf25cc3f","reason":"Record in the ledger the closure this backlog item file's own frontmatter already documents (closed_at, closure_repository, closure_commit, closure_evidence). This entry attests the sync to that pre-existing closure record, not a new implementation or review of its own.","schema":"pipeline.backlog-transition.v1","sequence":403,"to":"closed"}
+planBacklogEvidenceAmendment ok: false
+planBacklogEvidenceAmendment errors: [
+  "evidence amendment: only the SNT-1 licensing item is authorized"
+]
+
+--- stderr ---

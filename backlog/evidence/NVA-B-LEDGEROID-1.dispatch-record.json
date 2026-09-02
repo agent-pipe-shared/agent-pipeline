@@ -1,0 +1,18 @@
+{
+  "taskId": "NVA-B-LEDGEROID-1",
+  "agentType": "goldfish-deep",
+  "model": "claude-sonnet-5",
+  "effort": "xhigh",
+  "rulesetSha": "b6fb9c4e",
+  "dispatcher": "elephant",
+  "outcome": "in-progress",
+  "commits": [],
+  "log": [
+    { "phase": "opening: dispatch record created", "toolUseCount": 1 },
+    { "phase": "context read: item, backlog/README.md, backlog-state.mjs, check-backlog-state.mjs; found a prior closed item (pipeline.ledger-event-403-has-a-short-hash-evidence-commit) that already investigated this exact defect and triaged it as deliberately not fixed", "toolUseCount": 12 },
+    { "phase": "code read: planBacklogEvidenceAmendment (backlog-state.mjs:1286) hard-codes id !== 'pipeline.source-available-commercial-licensing' as a blocking error; validateTransitionLedger (line 702) checks evidence.commit OID format on every non-hashRescope event unconditionally, so an appended amendment event can never silence the historical event 403's own OID-format finding", "toolUseCount": 16 },
+    { "phase": "live dry-run: planBacklogEvidenceAmendment invoked against real loaded state with id=pipeline.codex-read-only-steps-escalate-individually-instead-of-once and a well-formed amendment input (full OID both sides) -> ok:false, errors:['evidence amendment: only the SNT-1 licensing item is authorized']; evidence at backlog/evidence/2026-09-02-nva-b-ledgeroid-1-amendment-dryrun.txt", "toolUseCount": 19 },
+    { "phase": "verify: node plugins/pipeline-core/scripts/check-backlog-state.mjs captured before and after investigation, byte-identical apart from the label field, exit 0 both times, 22 DRIFT lines unchanged; evidence at backlog/evidence/2026-09-02-nva-b-ledgeroid-1-check-backlog-state-before.txt and -after.txt", "toolUseCount": 21 }
+  ],
+  "report": ""
+}

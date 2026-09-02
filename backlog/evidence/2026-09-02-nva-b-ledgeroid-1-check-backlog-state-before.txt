@@ -1,0 +1,29 @@
+command: node plugins/pipeline-core/scripts/check-backlog-state.mjs
+label: before
+exitCode: 0
+--- stdout ---
+Backlog state, transition ledger, closure evidence, and generated projections are valid.
+
+--- stderr ---
+DRIFT backlog state: ledger event 403: evidence.commit must be a full lowercase Git commit OID
+DRIFT backlog state: ledger event 645: evidence.commit is not a reachable local Git commit (known 2026-07-19..2026-07-22 historical batch)
+DRIFT backlog state: ledger event 646: evidence.commit is not a reachable local Git commit (known 2026-07-19..2026-07-22 historical batch)
+DRIFT backlog state: ledger event 647: evidence.commit is not a reachable local Git commit (known 2026-07-19..2026-07-22 historical batch)
+DRIFT backlog state: ledger event 648: evidence.commit is not a reachable local Git commit (known 2026-07-19..2026-07-22 historical batch)
+DRIFT backlog state: ledger event 649: evidence.commit is not a reachable local Git commit (known 2026-07-19..2026-07-22 historical batch)
+DRIFT backlog state: ledger event 650: evidence.commit is not a reachable local Git commit (known 2026-07-19..2026-07-22 historical batch)
+DRIFT backlog state: ledger event 651: evidence.commit is not a reachable local Git commit (known 2026-07-19..2026-07-22 historical batch)
+DRIFT backlog state: ledger event 652: evidence.commit is not a reachable local Git commit (known 2026-07-19..2026-07-22 historical batch)
+DRIFT backlog state: ledger event 653: evidence.commit is not a reachable local Git commit (known 2026-07-19..2026-07-22 historical batch)
+DRIFT backlog state: ledger event 654: evidence.commit is not a reachable local Git commit (known 2026-07-19..2026-07-22 historical batch)
+DRIFT backlog state: ledger event 655: evidence.commit is not a reachable local Git commit (known 2026-07-19..2026-07-22 historical batch)
+DRIFT backlog state: ledger event 656: evidence.commit is not a reachable local Git commit (known 2026-07-19..2026-07-22 historical batch)
+DRIFT backlog state: ledger event 657: evidence.commit is not a reachable local Git commit (known 2026-07-19..2026-07-22 historical batch)
+DRIFT backlog state: ledger event 658: evidence.commit is not a reachable local Git commit (known 2026-07-19..2026-07-22 historical batch)
+DRIFT backlog state: ledger event 659: evidence.commit is not a reachable local Git commit (known 2026-07-19..2026-07-22 historical batch)
+DRIFT backlog state: ledger event 660: evidence.commit is not a reachable local Git commit (known 2026-07-19..2026-07-22 historical batch)
+DRIFT backlog state: ledger event 661: evidence.commit is not a reachable local Git commit (known 2026-07-19..2026-07-22 historical batch)
+DRIFT backlog state: ledger event 662: evidence.commit is not a reachable local Git commit (known 2026-07-19..2026-07-22 historical batch)
+DRIFT backlog state: ledger event 663: evidence.commit is not a reachable local Git commit (known 2026-07-19..2026-07-22 historical batch)
+DRIFT backlog state: ledger event 664: evidence.commit is not a reachable local Git commit (known 2026-07-19..2026-07-22 historical batch)
+DRIFT backlog state: items: pipeline.codex-read-only-steps-escalate-individually-instead-of-once closure_commit must equal its final ledger evidence.commit
