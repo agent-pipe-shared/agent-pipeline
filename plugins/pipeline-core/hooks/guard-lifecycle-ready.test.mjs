@@ -8239,6 +8239,17 @@ function rbdFixture() {
  * the real working-tree NEUTRAL_STATE and fails closed exactly as the production gate does on
  * invalid JSON -- instead of the unconditional-constant stub every rbDeps() caller above uses.
  * That constant is precisely why the deadlock this section reproduces went uncaught.
+ *
+ * NVA-REBDEAD-F5B: throws "continuity-observation-unavailable", not "continuity-damaged" --
+ * unparseable bytes make parseJsonObject() raise KICKOFF-READ-MALFORMED
+ * (lib/onboarding-continuity.mjs), observeDetailed()'s own catch returns
+ * continuity.status = "unavailable", and lib/project-onboarding-v3.mjs's branch order
+ * (:2885 requires "damaged"; :2904 catches everything else that is not "valid") yields
+ * lifecycleStatus "continuity-observation-unavailable" for that continuity status -- this is
+ * the exact status the live incident (real conflict markers) produces. Measured in
+ * backlog/evidence/2026-09-02-nva-rebdead-f5-continuity-status.json.
+ * "continuity-damaged" is a SEPARATE, genuinely reachable lane -- a state file that parses
+ * but fails its own projection -- covered by rbdContinuityDamagedReadinessFn below.
  */
 function rbdReadinessFn({ rootDir, intent }) {
   let bytes = null;
@@ -8248,7 +8259,7 @@ function rbdReadinessFn({ rootDir, intent }) {
   if (!ok) {
     throw new ProjectOnboardingReadyError(
       "PORG-NOT-READY", `Project onboarding lifecycle is not ready for intent ${intent}.`,
-      { intent, lifecycleStatus: "continuity-damaged" },
+      { intent, lifecycleStatus: "continuity-observation-unavailable" },
     );
   }
   return { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent };
@@ -8256,6 +8267,21 @@ function rbdReadinessFn({ rootDir, intent }) {
 
 function rbdDeps(dir) {
   return { projectDir: dir, runner: "claude", requireProjectOnboardingReadyFn: rbdReadinessFn };
+}
+
+/** NVA-REBDEAD-F5B: an unconditional stub proving the relief also admits "continuity-damaged"
+ * -- the PARSEABLE-but-inconsistent lane (continuity.status === "damaged" in
+ * lib/project-onboarding-v3.mjs, reachable when the state file parses but fails its own
+ * projection), distinct from the unparseable lane rbdReadinessFn above mirrors. */
+function rbdContinuityDamagedReadinessFn({ intent }) {
+  throw new ProjectOnboardingReadyError(
+    "PORG-NOT-READY", `Project onboarding lifecycle is not ready for intent ${intent}.`,
+    { intent, lifecycleStatus: "continuity-damaged" },
+  );
+}
+
+function rbdContinuityDamagedDeps(dir) {
+  return { projectDir: dir, runner: "claude", requireProjectOnboardingReadyFn: rbdContinuityDamagedReadinessFn };
 }
 
 /** The Bash lane, through the guard's real evaluation entry point -- rbdReadinessFn stands in
@@ -8340,6 +8366,23 @@ test("rebdead positive-5: all three read-only diagnostics are reachable despite 
   assert.equal(rbdBash(dir, "git rebase --show-current-patch").exitCode, 0);
 });
 
+test("rebdead positive-6: continuity-damaged (the parseable-but-inconsistent lane) also receives the rebase relief", () => {
+  const dir = rbdFixture();
+  const editResult = evaluateLifecycleReadyGuard(
+    { tool_name: "Edit", tool_input: { file_path: NEUTRAL_STATE, old_string: "a", new_string: "b" } },
+    rbdContinuityDamagedDeps(dir),
+  );
+  assert.equal(editResult.exitCode, 0, editResult.stderr);
+  assert.match(editResult.stderr, /\[rebase-authority\] the protected-State writer-only refusal is suspended for this write/u);
+
+  const addResult = evaluateLifecycleReadyGuard(
+    { tool_name: "Bash", tool_input: { command: `git add -- ${NEUTRAL_STATE}` } },
+    rbdContinuityDamagedDeps(dir),
+  );
+  assert.equal(addResult.exitCode, 0, addResult.stderr);
+  assert.match(addResult.stderr, /\[rebase-authority\] the onboarding-readiness gate is suspended for this command/u);
+});
+
 test("rebdead negative-1: a path outside conflictPaths stays refused, including the OTHER lifecycle state file", () => {
   const dir = rbdFixture();
   // The discriminating case for decision 1: a rebase conflicting on NEUTRAL_STATE must not
@@ -8402,8 +8445,8 @@ test("rebdead negative-4: no human signature is demanded anywhere in the admitte
 });
 
 /** NVA-REBDEAD-F5: an unconditional stub standing in for a `restart-required` session -- the
- * narrower sibling exemption's own status -- never the `continuity-damaged` an unparseable
- * lifecycle state file actually produces (rbdReadinessFn above). */
+ * narrower sibling exemption's own status -- never the `continuity-observation-unavailable`
+ * an unparseable lifecycle state file actually produces (rbdReadinessFn above). */
 function rbdRestartRequiredReadinessFn({ intent }) {
   throw new ProjectOnboardingReadyError(
     "PORG-NOT-READY", `Project onboarding lifecycle is not ready for intent ${intent}.`,
@@ -8419,11 +8462,12 @@ test("rebdead negative-5: a restart-required session with a validly-resolved act
   const dir = rbdFixture();
   const deps = rbdRestartRequiredDeps(dir);
 
-  // The READINESS-GATE relief (the one narrowed here) admits Edit on the conflict path for
-  // continuity-damaged (positive-1); it must NOT admit it for restart-required, even though the
-  // same validly-resolved rebase exists and the SEPARATE, independent protected-State writer-
-  // only relief (guard-lifecycle-ready.mjs ~4420, keyed only on conflictPaths membership, never
-  // on lifecycleStatus, and out of this fix's scope) still lifts its own, different refusal --
+  // The READINESS-GATE relief (the one widened here) admits Edit on the conflict path for
+  // continuity-observation-unavailable (positive-1) and continuity-damaged (positive-6); it
+  // must NOT admit it for restart-required, even though the same validly-resolved rebase
+  // exists and the SEPARATE, independent protected-State writer-only relief
+  // (guard-lifecycle-ready.mjs ~4443, keyed only on conflictPaths membership, never on
+  // lifecycleStatus, and out of this fix's scope) still lifts its own, different refusal --
   // its notice text can legitimately survive inside an overall denial. The readiness gate's OWN
   // admission phrase must be absent, and the overall write must stay refused.
   const conflictWrite = evaluateLifecycleReadyGuard(
@@ -8433,8 +8477,8 @@ test("rebdead negative-5: a restart-required session with a validly-resolved act
   assert.equal(conflictWrite.exitCode, 2, conflictWrite.stderr);
   assert.equal(/the onboarding-readiness gate is suspended/u.test(conflictWrite.stderr), false, conflictWrite.stderr);
 
-  // Same for the Bash lane (git add on the conflict path is admitted for continuity-damaged in
-  // positive-3; it must stay refused here).
+  // Same for the Bash lane (git add on the conflict path is admitted for
+  // continuity-observation-unavailable in positive-3; it must stay refused here).
   const addResult = evaluateLifecycleReadyGuard(
     { tool_name: "Bash", tool_input: { command: `git add -- ${NEUTRAL_STATE}` } },
     deps,

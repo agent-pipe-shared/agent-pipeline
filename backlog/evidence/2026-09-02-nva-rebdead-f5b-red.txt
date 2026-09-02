@@ -1,0 +1,427 @@
+COMMAND: node plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+EXIT CODE: 1
+
+--- stdout ---
+✔ ordinary non-governed repositories remain untouched and never inspect lifecycle (9.704508ms)
+✔ ungoverned write tools require one session consent record, while Bash and missing sessions fail open (5.642161ms)
+✔ source, calibration, lock, and runtime-only markers activate exact session readiness (47.639551ms)
+✔ governanceMarkers() fails open to the fixed base markers, with an explicit warning, when the runtime-projection loader throws (0.573741ms)
+✔ governanceMarkers() returns the real runtime-projection-derived markers, with no warning, when the loader succeeds (0.624939ms)
+✔ evaluateLifecycleReadyGuard threads its own dependencies into governanceMarkers() and stays fail-open, not fail-closed, on a throwing loader (6.478452ms)
+✔ evaluateLifecycleReadyGuard stays admit-open on a throwing loader when no governance marker at all is present (1.03073ms)
+✔ exact session readiness allows the governed project write and threads the caller-supplied runner explicitly (7.156411ms)
+✔ direct State edits remain blocked even when session readiness is exact (21.583943ms)
+✔ writes to the currently bound PRD, Spec, or design input are blocked even when session readiness is exact, and name the rebind route (17.865921ms)
+✔ Write and NotebookEdit are refused for a bound authority document exactly like Edit (11.505965ms)
+✔ a reopened design (planInvalidation recorded) releases the authority-document write refusal (16.730842ms)
+✔ a file beside the bound documents is not blocked by the authority-document refusal (6.303108ms)
+✔ an absent, malformed, or authority-less Pipeline State is not treated as a bound authority document (17.26096ms)
+✔ governed consumer edits cannot escape their physical project root (85.833352ms)
+✔ a host-temp-style scratchpad path is refused exactly like any other cross-repo target, and ADR-0059 documents that consequence (33.506694ms)
+✔ consumer sessions cannot mutate Pipeline sources, cachebusters or plugin installations (262.965663ms)
+✔ agents prepare and verify only public PO artifacts while human signing stays external (7.471381ms)
+✔ newly-recognized human-signing commands (approve-critical, authorize-critical, sign-intent) stay external (2.257353ms)
+✔ po-approval-gate --help and --version are read-only, never a forbidden cross-repository mutation (3.490509ms)
+✔ cachebuster is source-root scoped while plugin installation remains operator-only (0.95132ms)
+✔ confirmed host-init admission or exact existing protected Git mount handles only repository cross-view failures (63.046635ms)
+✔ host-init admission never masks App Server, runtime, continuity, or malformed readiness failures (69.948408ms)
+✔ exact session readiness allows an arbitrary Bash command while non-ready Bash writes are denied (3.654386ms)
+✔ non-ready governed roots retain a narrow simple-command read-only diagnostic lane (91.759141ms)
+✔ non-ready write denials surface only the typed lifecycle status and recovery route (180.32536ms)
+✔ NVA-W4-READYGUARDTEST: the recovery inspection named by a non-ready denial is admitted at every controlling status (37.498613ms)
+✔ PORG-INVALID-OBSERVATION is named as an invalid observation, distinct from both a typed not-ready status and the generic unresolved-cause denial (12.680419ms)
+✔ closed command grammar preserves native Windows paths and direct node.exe identity (0.761228ms)
+✔ Claude/Bash-path command parsing ignores a win32 host: $PWD expands and POSIX grammar governs (21.891247ms)
+✔ NVA-R15-ROOTADMIT: a --root value that does not resolve at all stays refused, and carries no root-identity-mismatch hint (3.887684ms)
+✔ NVA-R15-ROOTADMIT: a --root value that resolves to a DIFFERENT real directory stays refused, and the denial names it a root-identity mismatch, not an unadmitted shape (2.398802ms)
+✔ NVA-R15-ROOTADMIT: a symlinked parent resolving to the exact same project root is admitted regardless of which spelling was typed (0.874303ms)
+✔ NVA-R15-ROOTADMIT: differing separator and differing drive-letter case admit the same logical Windows root (0.560636ms)
+✔ only bounded rg search pipelines and platform null redirect are read-only (3.376181ms)
+✔ bounded rg pipeline admits closed read-only diagnostics outside the project root (1.917167ms)
+✔ bounded rg-to-head pipeline accepts both head -n N and combined head -N (0.491464ms)
+✔ NVA-CATPIPE-1: cat-sourced bounded pipeline -- single-path grep and head sinks are admitted, the exact live GUARD-OPERATOR-UNAPPROVED refusal (1.55659ms)
+✔ NVA-CATPIPE-1: a multi-path cat source piped into grep -E is admitted -- the exact live multi-file refusal shape (0.956609ms)
+✔ NVA-CATPIPE-1: a cat pipeline naming a gate-strength file is classified as a read, never GUARD-GATE-STRENGTH-SHELL (4.183077ms)
+✔ NVA-CATPIPE-1: exactness -- external reads are admitted while unsupported composition, sinks, counts, and redirects stay refused (1.050468ms)
+✔ NVA-CATPIPE-1: a recognised display-only cat flag is admitted, an unrecognised flag fails closed (0.612806ms)
+✔ NVA-CF-GITPIPEALLOWLIST: git-sourced bounded pipeline into head is admitted, both head forms (1.799744ms)
+✔ NVA-CF-GITPIPEALLOWLIST: exactness -- external path arguments are admitted while counts and non-read-only subcommands stay refused (0.727313ms)
+✔ NVA-CF-GITPIPEALLOWLIST: the admitted grammar shapes include the git-to-head pipeline, and its example is genuinely admitted (0.418896ms)
+✔ the &&-chain union (read-only classifier plus the small always-safe-write allowlist) and trailing 2>/dev/null admit exactly the backlog's triggering shapes, widened per NVA-I-GRAMMAR, and nothing more (3.709024ms)
+✔ the narrowed mkdir chain predicate (F1) still admits scratch/ and refuses an arbitrary in-repo path on a genuinely governed, not-yet-ready root (43.213542ms)
+✔ redirect-looking quoted data stays argv while hostile composition is typed and denied (91.617499ms)
+✔ grammar denials return closed typed retries only for independent read diagnostics (23.877084ms)
+✔ GRAMMARHINT-1 AC-1: the rejected element is named from what the parser already determined (76.535622ms)
+✔ GRAMMARHINT-1 AC-2 / AC-047-140: a git commit -m value with an embedded newline yields no typed action (36.637946ms)
+✔ GUARDFIX-2: the newline-in--m refusal carries no mutating action, and states the -F shape as text (37.609564ms)
+✔ GRAMMARHINT-1 AC-4: GUARD-OPERATOR-UNAPPROVED and GUARD-PARSE-UNSUPPORTED stay distinct, own codes never conflated (267.896686ms)
+✔ non-ready Bash permits only exact plugin-local lifecycle remediation argv (249.388559ms)
+✔ greenfield verify transition admits only the exact non-placeholder set-phase argv (8.770883ms)
+✔ GF-097: bare `gh --version` and `gh auth status` are admitted while lifecycle is not-ready, and no other `gh` shape is (8.375241ms)
+✔ OBLIGROUTE-1: the non-ready lane admits the repair map by exact argv, and nothing beside it (149.620393ms)
+✔ NVA-K-DRIVERREACH: the guided driver is admitted at every non-ready readiness status, in its exact argv shape and no wider one (132.071996ms)
+✔ non-ready Bash admits the repair script's own --human-facing argv, positionally and closed (172.886227ms)
+✔ signature mode's authorize-by-signature is admitted in exactly its printed shape and refused when mutated (23.711284ms)
+✔ plan-runtime family accepts the runner-plus-intent argv lifecycleArgv actually emits for non-default intents (3.621383ms)
+✔ GUARDALLOW-1: plan-partial-authority is admitted with the same shape as its plan* siblings (1.302838ms)
+✔ GUARDDERIVE-1: the guard's admitted plan* set is the CLI table's derivation, and admits exactly that set (3.674108ms)
+✔ GUARDDERIVE-1: the derivation keys on the declared properties, never on the plan name prefix (0.372028ms)
+✔ GUARDDERIVE-1: every registered onboarding subcommand declares both properties explicitly (0.340267ms)
+✔ NVA-LCGUARD-1: apply-partial-authority admits exactly the applyAction shape and no wider one (1.680256ms)
+✔ NVA-LCGUARD-1: adopt-remote admits exactly the plan and apply shapes and no third subcommand (1.69264ms)
+✔ NVA-W5-GUARDADMIT-1: intake-consent-apply admits exactly the full-bundle shape and no wider one (1.991518ms)
+✔ NVA-V10B-INTAKEONEROUND: intake-consent-apply admits the same optional --text/--text-file material intake-capture-apply accepts, order-insensitively with the other four optional flags, and refuses a duplicated or malformed value (0.969193ms)
+✔ NVA-VERIFYGREEN-1: intake-consent-apply admits consent alone (--granted/--activate, no optional value flags) and refuses a duplicated flag (1.447914ms)
+✔ NVA-VERIFYGREEN-1: runner-profile-migration apply admits --activate before --root, and stays exact everywhere else (1.027034ms)
+✔ NVA-W5-GUARDADMIT-1: intake-capture-apply admits exactly the --text/--activate shape and no wider one (0.871097ms)
+✔ NVA-W5-GUARDADMIT-1: intake-design-questions-apply admits exactly the --answers-json/--activate shape and no wider one (0.82553ms)
+✔ NVA-W5-GUARDADMIT-1: intake-generate-apply admits exactly the --plan-sha256/--activate shape and no wider one (0.913628ms)
+✔ NVA-W5-COORD-STEP5-2: bootstrap-bind-apply admits exactly the --plan-sha256/--activate shape and no wider one, under exact session readiness (1.092088ms)
+✔ NVA-W5-COORD-STEP5-2: bootstrap-bind-plan admits the bare lifecycle argv via GUARDDERIVE-1's derived admission (0.510381ms)
+✔ NVA-CODEXARGV-1 (AC-3): automatedMutatingApplyArgv's own emitted argv is admitted by the guard's real admission function, for every declared mutating subcommand (1.10439ms)
+✔ NVA-CODEXARGV-1 (AC-4): the same emitted mutating-apply argv, with --activate removed, stays refused for every declared subcommand (0.931762ms)
+✔ NVA-V4-PUSHDRIVER: push-init.mjs is admitted in exactly its own argv shape and nothing wider (65.340628ms)
+✔ NVA-V4-PUSHDRIVER: buildPushInitArgv's own emitted argv is admitted by the guard's real admission function (0.83092ms)
+✔ NVA-V4-PUSHDRIVER: the presented authorize-critical signature command is refused for a Bash tool call, real argv from po-human-approval.mjs (9.763621ms)
+✔ NVA-LCGUARD-3: plan-repair and apply-repair admit exactly the operator-authority shape (3.069679ms)
+✔ GUARDFIX-1: the apply family admits exactly the runner-plus-intent argv the planner returns and no wider shape (66.111815ms)
+✔ GUARDFIX-1: a null-device stderr suppressor is never itself a cross-repository mutation while every real redirect keeps its own code (284.455132ms)
+✔ partial PO authority rebind admits only the exact read-only planner (5.267829ms)
+✔ non-ready cleanup recovery and privatization admit only exact closed argv (53.808167ms)
+✔ non-ready session-cleanup admits the documented optional --runner tail on every subcommand this allowlist covers (75.335099ms)
+✔ partial lifecycle admits only exact rebase abort plus ordinary readback (58.292306ms)
+✔ restart-required admits only the consumed bounded resume-hint input and capture (30.928768ms)
+✔ RESTART_LIFECYCLE_SCRATCH_WRITE: restart-required admits any resolved scratch/ write and matching mkdir, nothing wider (53.040414ms)
+✔ NVA-LCREADONLY-1: partial lifecycle admits exactly mkdir scratch and the fixed incident-report write, nothing wider (76.696551ms)
+✔ NVA-LCREADONLY-2: partial denial names the diagnosis lane; other statuses stay unchanged (21.477598ms)
+✔ NVA-GF-SCRATCH: intake statuses admit any resolved scratch/ write and matching mkdir, nothing wider (205.476906ms)
+✔ NVA-BL-INTAKEBIND-1: bootstrap-binding-required admits exactly the staging PRD/spec authoring writes, nothing wider (93.270273ms)
+✔ NVA-MICRO-1: a near-miss resume-hint-input write names the correct path and does not escalate (37.066953ms)
+✔ isRestartResumeHintInputWrite recognizes an apply_patch write to the resume-hint input file (0.979353ms)
+✔ restart-process launcher is always rejected as an external user-copy-only action (1.648466ms)
+✔ every controlling non-ready status denies before the governed implementation write (203.990203ms)
+✔ guard exceptions and malformed ready receipts fail closed with sanitized output (21.739659ms)
+✔ every in-root Edit or Write requires readiness while outside targets stop before readiness (184.80133ms)
+✔ H3 recovery commands admit only exact plugin-local argv and reject lookalikes (1.110402ms)
+✔ main() reads --runner from its own argv and reaches the gate with codex even when CLAUDECODE=1 is present in its environment (regression pin for ready-gate-env-var-runner-authority) (7.367564ms)
+✔ main() fails closed on an absent or invalid --runner without ever inspecting lifecycle readiness (0.717374ms)
+✔ NOVA-LCR-HGO-1: a chat-armed capability admits the exact denied grammar command, for all three codes (1744.743319ms)
+✔ NOVA-LCR-HGO-1: a signature-armed capability admits the denied grammar command, regardless of the committed mode (667.677419ms)
+✔ NOVA-LCR-HGO-1: with nothing armed, the grammar denial names the mode-appropriate next command (ADR-0059 Decision 4) (312.962322ms)
+✔ NVA-GF-COPYSAFE: lifecycle denials default to bounded POSIX and PowerShell command blocks without an unsafe primary command or rendering prerequisite (313.844286ms)
+✔ NOVA-LCR-HGO-1: an unusable override store leaves the plain grammar refusal exactly as it was (22.552886ms)
+✔ NOVA-XREPO-HGO-1: with nothing armed a cross-repo denial still refuses, and names the mode-appropriate next command (309.223614ms)
+✔ NOVA-XREPO-HGO-2: a signature-armed capability admits the exact cross-repo command, and only once (435.908671ms)
+✔ NOVA-XREPO-HGO-3: a chat-armed capability admits the exact cross-repo command in a chat-mode repository (341.726719ms)
+✔ NOVA-XREPO-HGO-4: a capability armed for a different command does not admit this one (444.982972ms)
+✔ NOVA-XREPO-HGO-5: GUARD-LIFECYCLE-NOT-READY is never liftable, armed capability or not (475.539419ms)
+✔ NOVA-XREPO-HGO-6: an out-of-root target is refused but routable on narrowed terms, while a still-unroutable one reports why instead of falling silent (894.574185ms)
+✔ NOVA-XREPO-HGO-7: the guard union's absolute prohibitions gain no admission path here (179.170005ms)
+✔ NVA-BL-75: the guard-classification corpus measures override reachability, not only the verdict (1943.451535ms)
+✔ NVA-BL-75: the reachability labels are proven against a real capability, not read off the message (560.873307ms)
+✔ NOVA-LCR-HGO-2: a consumed grammar capability admits the composed command only once the readiness tail also admits it (343.082117ms)
+✔ NOVA-LCR-HGO-2: an armed matching capability does not bypass GUARD-LIFECYCLE-NOT-READY (458.839592ms)
+✔ NOVA-HGOSIG-ROUTE-1: a grammar denial whose route planning throws prints a typed reason, not silence (23.060423ms)
+✔ NOVA-HGOSIG-ROUTE-1: a grammar denial whose route planning returns a non-planned status reports that status (412.346108ms)
+✔ NOVA-HGOSIG-ROUTE-1: the printed reason is bounded to typed tokens, whatever planning returns or throws (32.526177ms)
+✔ NOVA-LCR-HGO-2: an armed matching capability for a command naming LAUNCH_SCRIPT still requires externalRestartOnly() (349.089604ms)
+✔ MEMPATH-1: a governed session admits its own derived Claude memory directory, and only that directory (2.249648ms)
+✔ MEMPATH-1: the derived memory admission still requires session readiness, not a substitute for it (1.073392ms)
+✔ MEMPATH-1: a symlink planted inside the derived memory directory cannot redirect a write outside it (32.853585ms)
+✔ MEMPATH-1: an absent, empty, relative, or not-yet-materialized transcript_path fails closed rather than guessing (0.967451ms)
+✔ MEMPATH-1: a not-yet-materialized memory directory is refused end to end by the guard, not just by the helper (26.401167ms)
+✔ MEMPATH-1: every other standard-Claude-path shape stays refused -- settings, agents, plugins, marketplace, another repository, and a merely-similarly-named directory (209.876264ms)
+✔ MACHPATH-1: a governed session admits the exact machine-plane file, for every write-capable tool (22.860984ms)
+✔ MACHPATH-1: nothing else under the derived home directory is admitted -- the directory itself, a sibling, a nested file, a similarly-named neighbour, and a bare-home file (442.50927ms)
+✔ MACHPATH-1: a lexical escape through the derived file path is refused (35.623223ms)
+✔ MACHPATH-1: a symlinked .agent-pipeline ancestor cannot redirect the write outside the derived home directory (172.601049ms)
+✔ MACHPATH-1: a symlinked .agent-pipeline that redirects INSIDE the same home directory is a pinned, accepted limit -- the write is admitted, not refused (12.239531ms)
+✔ MACHPATH-1: machine.json planted as a symlink to another existing file inside the same home directory is refused -- closed, not pinned (171.867524ms)
+✔ MACHPATH-1: machine.json planted as a symlink to a path outside the home directory is refused -- closed, not pinned (169.354054ms)
+✔ MACHPATH-1: an absent, empty, relative, or unresolvable home directory fails closed rather than guessing (0.810301ms)
+✔ MACHPATH-1: the machine-plane admission still requires session readiness, not a substitute for it (8.873227ms)
+✔ MACHPATH-1: the shell lane stays unchanged -- a Bash write to the same machine-plane path is still refused as a cross-repository mutation, with the same code as before this change (28.285531ms)
+✔ MACHPATH-1/AC-10: the path the guard admits is exactly the path the machine-plane writer writes to -- proven via the library's own writer and resolver, not the guard's re-export (10.551741ms)
+✔ GSSHELL-STAGE-1: staging and committing a gate-strength file is admitted, while every verb that can rewrite it stays refused (11.16696ms)
+✔ NVA-LCGUARD-4 gap 1: a backup-style filename sharing a protected name as a substring is admitted, while the real protected file stays refused (9.625789ms)
+✔ NVA-STARNEEDLE-1: a command whose text merely quotes an asterisk is never refused by this lane (59.485516ms)
+✔ NVA-STARNEEDLE-1: a shell command naming a real file under the GS-15 staging directory stays refused (4.723886ms)
+✔ NVA-STARNEEDLE-1 AC-3: every configured gate-strength path still refuses a shell command naming a real instance of it (6.378332ms)
+✔ NVA-STARNEEDLE-1 AC-4: the needle-derivation rule and its defensive filter, pinned directly (0.34676ms)
+✔ NVA-GF-GREENFIELD-READONLY-1: the complete closed read-only lane admits external JSON/JSONL diagnostics in ready and non-ready states without HGO (775.476381ms)
+✔ NVA-BL-76 policy reversal: the exact external rg-to-head reproduction is admitted directly (57.437513ms)
+✔ NVA-BL-76 policy reversal: piped and unpiped external reads have the same direct admission (111.315886ms)
+✔ NVA-BL-76 policy reversal: rg-to-rg external targets are admitted in either segment (108.692195ms)
+✔ NVA-GF-GREENFIELD-READONLY-1: removing read containment does not weaken other grammar and write refusals (776.101017ms)
+✔ NVA-GF-GREENFIELD-READONLY-1: external reads are admitted, not classified into an override class (86.188462ms)
+✔ NVA-GF-GREENFIELD-READONLY-1: external read admission never invokes HGO consumption or planning (58.080558ms)
+✔ NVA-GF-GREENFIELD-READONLY-1: single unpiped external reads are admitted under the same policy as pipelines (82.560516ms)
+✔ NVA-GF-GREENFIELD-READONLY-1: in-root and external read locations are admission-equivalent (110.768795ms)
+✔ NVA-GF-GREENFIELD-READONLY-1: plugin and unrelated external files use the same read admission (68.580136ms)
+✔ NVA-GF-GREENFIELD-READONLY-1: non-read-only shapes keep their lifecycle and mutation refusals (180.246349ms)
+✔ NVA-GF-GREENFIELD-READONLY-1: only read containment is relaxed; writes, scripts, and unsupported composition remain refused (303.094618ms)
+✔ TPSHELL-1: a shell write to a protected test path is refused, while reading and running it stay admitted (294.865635ms)
+✔ TPSHELL-REBASE-EXEC: a git rebase --exec payload naming a protected test path is refused, while ordinary rebase steps are not claimed (63.658459ms)
+✔ TPSHELL-REBASE-ABBREV: an abbreviated or unenumerated rebase option carrying a write payload is refused (64.495782ms)
+✔ TPSHELL-2: with no protectedTestPaths configured the shell lane claims nothing (6.166349ms)
+✔ TPSHELL-3: a PowerShell write cmdlet naming a protected test path is refused, Get-Content is not (82.520758ms)
+✔ TPSHELL-4: the shell-lane refusal is liftable by a real chat- and signature-armed capability, once (1119.566799ms)
+✔ TPSHELL-5: the shell lane and the write lane resolve the same rules from the same committed config (1.836233ms)
+✔ TPSHELL-6: literal basenames are derived from the configured patterns, alternation included (2.148076ms)
+✔ TPSHELL-7: a classifier fault fails closed (GL-09), never silently admits the command (2.015163ms)
+✔ DEVPLANSHELL-1: a shell write to a dev-plan-gated path is refused, while reading stays admitted (170.393185ms)
+✔ DEVPLANSHELL-2: a target under an exempt prefix is not blocked by this lane (9.62005ms)
+✔ DEVPLANSHELL-3: a PowerShell write cmdlet naming a dev-plan-gated path is refused, Get-Content is not (82.037188ms)
+✔ DEVPLANSHELL-4: a classifier fault fails closed (GL-09), never silently admits the command (2.019602ms)
+✔ NVA-B-GITARGV case 5: git rebase --show-current-patch is not blocked as a dev-plan write (5.803839ms)
+✔ isSanctionedStartPreflightInvocation: matches only the exact zero-argument preflight invocation, never a looser shape (0.419979ms)
+✔ NVA-BOOTRECEIPT-1: a subagent's sanctioned preflight Bash call writes a receipt, and a subsequent Edit then passes (3.556967ms)
+✔ NVA-BOOTRECEIPT-1: near-miss Bash commands do not write a receipt (2.346865ms)
+✔ NVA-BOOTRECEIPT-1: a subagent's first Edit/Write/NotebookEdit with no receipt is denied, naming the exact preflight command (2.522608ms)
+✔ NVA-BOOTRECEIPT-1 / pipeline.identity-attestation-fail-closed-fallback: a transcript_path that is present but relative is denied, never fail-open (0.989091ms)
+✔ NVA-BOOTRECEIPT-1: a subagent's Edit WITH a receipt is allowed (1.587831ms)
+✔ NVA-BOOTRECEIPT-1: the orchestrating session is never gated, whatever the receipt state (1.00407ms)
+✔ NVA-BOOTRECEIPT-1: Read, Grep and Glob are never gated for a subagent with no receipt (0.781957ms)
+✔ NVA-BOOTRECEIPT-1: an unresolved subagent identity (missing meta.json) allows the call and appends an observation line (1.947194ms)
+✔ NVA-BOOTRECEIPT-1: an unreadable/corrupt receipt file allows the call and appends an observation line (1.728768ms)
+✔ NVA-BOOTRECEIPT-1: a thrown filesystem error while checking the receipt allows the call and appends an observation line (1.811626ms)
+✔ NVA-BOOTRECEIPT-1: every gate decision is observed, and the guard writes nothing outside bootstrap-receipt/ (2.127066ms)
+✔ NVA-INTAKEARGV-1: the agent-facing command hint names every flag its own shape requires (0.643133ms)
+✔ NVA-INTAKEARGV-1: the one-of text routes admit exactly one alternative, and every mandatory flag is load-bearing (2.262143ms)
+✔ NVA-INTAKESPECS-1: the bootstrap-binding authoring admission covers specs/<featureId>/, and a PRD in a foreign feature's directory is refused (72.427749ms)
+✔ NVA-I-GRAMMAR DoD 1: quoted operator-looking characters are read as data, never as shell syntax, for all three backlog reproductions (44.765137ms)
+✔ NVA-I-GRAMMAR DoD 2: head -N is admitted wherever head -n N is, for grep-to-head and cat-to-head, with the same 1..500 bound (1.380275ms)
+✔ NVA-I-GRAMMAR DoD 5: every admitted-grammar-shape example is printed in the refusal AND independently admitted when submitted (20.521796ms)
+✔ NVA-I-GRAMMAR DoD 6: negative regression -- no mutating, protected-path, or cross-repo-mutating segment is admitted by composition with an admitted one (986.235746ms)
+✔ NVA-B-DENIALTRIM AC-1/AC-2/AC-3: a second same-class denial in one session renders shorter, the first stays full, and both stay actionable (76.928321ms)
+✔ NVA-B-DENIALTRIM AC-4: with no resolvable session identity, the guard renders full text every time and never throws (77.472215ms)
+✔ NVA-B-DENIALTRIM AC-6: per-session denial-class state is written under the git common dir's agent-pipeline/ tree, never scratch/ or the working tree (39.871092ms)
+✔ NVA-B-TRIMKEY AC-4: a subagent's own first denial of a class renders full text even though its orchestrating session already saw that class (82.812689ms)
+✔ rebwire fixture: a real conflicted rebase, and the guard reads its real .git/rebase-merge (394.279171ms)
+✔ rebwire positive-1: the exact continuations are admitted mid-rebase, with the gate armed (659.696412ms)
+✔ rebwire positive-2: an Edit/Write resolving a conflicted path is admitted, relative and absolute (1089.417977ms)
+✔ rebwire positive-3: git checkout --ours on a real conflict path is admitted, relative and absolute (512.141914ms)
+✔ rebwire positive-4: git rebase --show-current-patch is admitted during an active rebase (438.658412ms)
+✔ rebwire positive-5: git rebase --abort keeps its own recovery lane, independent of this authority (529.654748ms)
+✔ rebwire negative-1: a file outside the conflict set stays blocked while a rebase is active (596.479868ms)
+✔ rebwire negative-2 / negative-3: --edit-todo, --exec and --skip are refused under active authority (769.047453ms)
+✔ rebwire negative-4: only -c core.editor=true is admitted, never an arbitrary -c (614.942606ms)
+✔ rebwire negative-5: no push authority is granted, implied or represented anywhere (495.983019ms)
+✔ rebwire negative-6: a conflict command whose pathspec lies outside the surface is refused (789.414211ms)
+✔ rebwire negative-7: a rebase whose orig-head is not validly approved gets no authority at all (509.253509ms)
+✔ rebwire req5-1: a mid-rebase denial carries a non-empty read-only envelope naming the surface (593.818653ms)
+✔ rebwire req5-2: an uninformed session reaches a finished rebase by following only the denials (807.74259ms)
+✔ rebwire regression: with no rebase in progress the guard's output is unchanged (20.789379ms)
+✖ rebdead positive-1: Edit/Write on the exact conflict path (the lifecycle state file itself) is admitted, relative and absolute (238.80226ms)
+✖ rebdead positive-2: checkout --ours/--theirs and restore are admitted on the conflict path (229.789852ms)
+✖ rebdead positive-3: git add on the conflict path is admitted (230.221503ms)
+✖ rebdead positive-4: git rebase --continue is admitted, and once the conflict path is actually resolved and staged the rebase genuinely finishes (232.127596ms)
+✖ rebdead positive-5: all three read-only diagnostics are reachable despite the invalid conflict JSON (326.232907ms)
+✔ rebdead positive-6: continuity-damaged (the parseable-but-inconsistent lane) also receives the rebase relief (279.006797ms)
+✔ rebdead negative-1: a path outside conflictPaths stays refused, including the OTHER lifecycle state file (286.075508ms)
+✔ rebdead negative-2: --skip, --edit-todo, --exec, an arbitrary -c, push and force-push all stay refused (461.781298ms)
+✖ rebdead negative-3: the admission disappears entirely once the rebase is aborted (243.395835ms)
+✖ rebdead negative-4: no human signature is demanded anywhere in the admitted path (434.255937ms)
+✔ rebdead negative-5: a restart-required session with a validly-resolved active rebase does not receive the rebase relief, only its own narrower sibling exemption where it applies (285.011059ms)
+ℹ tests 221
+ℹ suites 0
+ℹ pass 214
+ℹ fail 7
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 33880.870977
+
+✖ failing tests:
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:8302:1
+✖ rebdead positive-1: Edit/Write on the exact conflict path (the lifecycle state file itself) is admitted, relative and absolute (238.80226ms)
+  AssertionError [ERR_ASSERTION]: Edit project/pipeline-state.json: [rebase-authority] the protected-State writer-only refusal is suspended for this write: it lies inside the current conflict surface of the active rebase of refs/heads/feat/rebdead onto d7342c2bfd2022f340ff89082c7c2fb7340a799b, whose orig-head e1699166c8704d88e93da87703645324a797f3e6 is validly approved and in implementation. Nothing else is lifted, and no push authority is granted.
+  BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-LIFECYCLE-NOT-READY: Pipeline session readiness is continuity-observation-unavailable.
+  Re-run the typed project-onboarding-v3 inspection with intent session and use only its returned nextAction.
+  [rebase-authority] A genuine rebase of refs/heads/feat/rebdead onto d7342c2bfd2022f340ff89082c7c2fb7340a799b is in progress, and the state at its orig-head e1699166c8704d88e93da87703645324a797f3e6 (feature "rebwire-feature", lifecycle implementing) is validly approved, so that approval carries the rebase to completion: finishing it needs no fresh human signature, and no session-wide exception exists or is needed.
+  Current conflict surface (1): project/pipeline-state.json
+  Permitted on that surface ONLY: Edit/Write/apply_patch on those exact paths, plus git checkout --ours -- <conflict-path> ; git checkout --theirs -- <conflict-path> ; git restore --ours -- <conflict-path> ; git restore --theirs -- <conflict-path> ; git restore --worktree -- <conflict-path> ; git add -- <conflict-path> — substituting one of the paths above for <conflict-path>.
+  Exact next command once every conflict path above is resolved and staged: git -c core.editor=true rebase --continue
+  Also admitted while this rebase runs: git -c core.editor=true rebase --continue ; git rebase --continue ; git rebase --show-current-patch — and "git rebase --abort" through its own separate recovery lane.
+  This authority is not session-wide, grants no push and no force-push, covers no path outside the surface listed above, and admits no --skip, no --edit-todo, no --exec and no arbitrary -c option.
+  {"schema":"pipeline.rebase-authority-surface.v1","headName":"refs/heads/feat/rebdead","origHead":"e1699166c8704d88e93da87703645324a797f3e6","onto":"d7342c2bfd2022f340ff89082c7c2fb7340a799b","feature":"rebwire-feature","lifecycle":"implementing","conflictPaths":["project/pipeline-state.json"],"conflictPathPlaceholder":"<conflict-path>","nextCommand":"git -c core.editor=true rebase --continue","permittedContinuations":["git -c core.editor=true rebase --continue","git rebase --continue","git rebase --show-current-patch"],"resolutionShapes":["git checkout --ours -- <conflict-path>","git checkout --theirs -- <conflict-path>","git restore --ours -- <conflict-path>","git restore --theirs -- <conflict-path>","git restore --worktree -- <conflict-path>","git add -- <conflict-path>"],"pushAuthority":false,"remoteAuthority":false,"sessionWide":false}
+  {"schema":"pipeline.guard-retry-actions.v1","retryActions":[{"executable":"git","argv":["rebase","--show-current-patch"],"mutation":false,"requiresConfirmation":false},{"executable":"git","argv":["diff","--name-only","--diff-filter=U"],"mutation":false,"requiresConfirmation":false},{"executable":"git","argv":["status","--short"],"mutation":false,"requiresConfirmation":false}]}
+  
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file:///home/skar667/src/agent-pipeline-shared_nova/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:8310:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:8317:1
+✖ rebdead positive-2: checkout --ours/--theirs and restore are admitted on the conflict path (229.789852ms)
+  AssertionError [ERR_ASSERTION]: git checkout --ours -- project/pipeline-state.json: BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-LIFECYCLE-NOT-READY: Pipeline session readiness is continuity-observation-unavailable.
+  Re-run the typed project-onboarding-v3 inspection with intent session and use only its returned nextAction.
+  [rebase-authority] A genuine rebase of refs/heads/feat/rebdead onto d7342c2bfd2022f340ff89082c7c2fb7340a799b is in progress, and the state at its orig-head e1699166c8704d88e93da87703645324a797f3e6 (feature "rebwire-feature", lifecycle implementing) is validly approved, so that approval carries the rebase to completion: finishing it needs no fresh human signature, and no session-wide exception exists or is needed.
+  Current conflict surface (1): project/pipeline-state.json
+  Permitted on that surface ONLY: Edit/Write/apply_patch on those exact paths, plus git checkout --ours -- <conflict-path> ; git checkout --theirs -- <conflict-path> ; git restore --ours -- <conflict-path> ; git restore --theirs -- <conflict-path> ; git restore --worktree -- <conflict-path> ; git add -- <conflict-path> — substituting one of the paths above for <conflict-path>.
+  Exact next command once every conflict path above is resolved and staged: git -c core.editor=true rebase --continue
+  Also admitted while this rebase runs: git -c core.editor=true rebase --continue ; git rebase --continue ; git rebase --show-current-patch — and "git rebase --abort" through its own separate recovery lane.
+  This authority is not session-wide, grants no push and no force-push, covers no path outside the surface listed above, and admits no --skip, no --edit-todo, no --exec and no arbitrary -c option.
+  {"schema":"pipeline.rebase-authority-surface.v1","headName":"refs/heads/feat/rebdead","origHead":"e1699166c8704d88e93da87703645324a797f3e6","onto":"d7342c2bfd2022f340ff89082c7c2fb7340a799b","feature":"rebwire-feature","lifecycle":"implementing","conflictPaths":["project/pipeline-state.json"],"conflictPathPlaceholder":"<conflict-path>","nextCommand":"git -c core.editor=true rebase --continue","permittedContinuations":["git -c core.editor=true rebase --continue","git rebase --continue","git rebase --show-current-patch"],"resolutionShapes":["git checkout --ours -- <conflict-path>","git checkout --theirs -- <conflict-path>","git restore --ours -- <conflict-path>","git restore --theirs -- <conflict-path>","git restore --worktree -- <conflict-path>","git add -- <conflict-path>"],"pushAuthority":false,"remoteAuthority":false,"sessionWide":false}
+  {"schema":"pipeline.guard-retry-actions.v1","retryActions":[{"executable":"git","argv":["rebase","--show-current-patch"],"mutation":false,"requiresConfirmation":false},{"executable":"git","argv":["diff","--name-only","--diff-filter=U"],"mutation":false,"requiresConfirmation":false},{"executable":"git","argv":["status","--short"],"mutation":false,"requiresConfirmation":false}]}
+  
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file:///home/skar667/src/agent-pipeline-shared_nova/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:8327:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:8332:1
+✖ rebdead positive-3: git add on the conflict path is admitted (230.221503ms)
+  AssertionError [ERR_ASSERTION]: BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-LIFECYCLE-NOT-READY: Pipeline session readiness is continuity-observation-unavailable.
+  Re-run the typed project-onboarding-v3 inspection with intent session and use only its returned nextAction.
+  [rebase-authority] A genuine rebase of refs/heads/feat/rebdead onto 23b054447e73cdc5963e959c2fd89496d2eb75fb is in progress, and the state at its orig-head ae588ddd0d7496b97ca472843269f73811996cc4 (feature "rebwire-feature", lifecycle implementing) is validly approved, so that approval carries the rebase to completion: finishing it needs no fresh human signature, and no session-wide exception exists or is needed.
+  Current conflict surface (1): project/pipeline-state.json
+  Permitted on that surface ONLY: Edit/Write/apply_patch on those exact paths, plus git checkout --ours -- <conflict-path> ; git checkout --theirs -- <conflict-path> ; git restore --ours -- <conflict-path> ; git restore --theirs -- <conflict-path> ; git restore --worktree -- <conflict-path> ; git add -- <conflict-path> — substituting one of the paths above for <conflict-path>.
+  Exact next command once every conflict path above is resolved and staged: git -c core.editor=true rebase --continue
+  Also admitted while this rebase runs: git -c core.editor=true rebase --continue ; git rebase --continue ; git rebase --show-current-patch — and "git rebase --abort" through its own separate recovery lane.
+  This authority is not session-wide, grants no push and no force-push, covers no path outside the surface listed above, and admits no --skip, no --edit-todo, no --exec and no arbitrary -c option.
+  {"schema":"pipeline.rebase-authority-surface.v1","headName":"refs/heads/feat/rebdead","origHead":"ae588ddd0d7496b97ca472843269f73811996cc4","onto":"23b054447e73cdc5963e959c2fd89496d2eb75fb","feature":"rebwire-feature","lifecycle":"implementing","conflictPaths":["project/pipeline-state.json"],"conflictPathPlaceholder":"<conflict-path>","nextCommand":"git -c core.editor=true rebase --continue","permittedContinuations":["git -c core.editor=true rebase --continue","git rebase --continue","git rebase --show-current-patch"],"resolutionShapes":["git checkout --ours -- <conflict-path>","git checkout --theirs -- <conflict-path>","git restore --ours -- <conflict-path>","git restore --theirs -- <conflict-path>","git restore --worktree -- <conflict-path>","git add -- <conflict-path>"],"pushAuthority":false,"remoteAuthority":false,"sessionWide":false}
+  {"schema":"pipeline.guard-retry-actions.v1","retryActions":[{"executable":"git","argv":["rebase","--show-current-patch"],"mutation":false,"requiresConfirmation":false},{"executable":"git","argv":["diff","--name-only","--diff-filter=U"],"mutation":false,"requiresConfirmation":false},{"executable":"git","argv":["status","--short"],"mutation":false,"requiresConfirmation":false}]}
+  
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file:///home/skar667/src/agent-pipeline-shared_nova/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:8335:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:8338:1
+✖ rebdead positive-4: git rebase --continue is admitted, and once the conflict path is actually resolved and staged the rebase genuinely finishes (232.127596ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file:///home/skar667/src/agent-pipeline-shared_nova/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:8342:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:8361:1
+✖ rebdead positive-5: all three read-only diagnostics are reachable despite the invalid conflict JSON (326.232907ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file:///home/skar667/src/agent-pipeline-shared_nova/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:8366:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:8416:1
+✖ rebdead negative-3: the admission disappears entirely once the rebase is aborted (243.395835ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file:///home/skar667/src/agent-pipeline-shared_nova/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:8418:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:8431:1
+✖ rebdead negative-4: no human signature is demanded anywhere in the admitted path (434.255937ms)
+  AssertionError [ERR_ASSERTION]: [rebase-authority] the protected-State writer-only refusal is suspended for this write: it lies inside the current conflict surface of the active rebase of refs/heads/feat/rebdead onto 498ea301b1e0e688b9c8892b711b16f59a1c653d, whose orig-head 57861a625f6b1b7316061124d3c4669bbbf3490c is validly approved and in implementation. Nothing else is lifted, and no push authority is granted.
+  BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-LIFECYCLE-NOT-READY: Pipeline session readiness is continuity-observation-unavailable.
+  Re-run the typed project-onboarding-v3 inspection with intent session and use only its returned nextAction.
+  [rebase-authority] A genuine rebase of refs/heads/feat/rebdead onto 498ea301b1e0e688b9c8892b711b16f59a1c653d is in progress, and the state at its orig-head 57861a625f6b1b7316061124d3c4669bbbf3490c (feature "rebwire-feature", lifecycle implementing) is validly approved, so that approval carries the rebase to completion: finishing it needs no fresh human signature, and no session-wide exception exists or is needed.
+  Current conflict surface (1): project/pipeline-state.json
+  Permitted on that surface ONLY: Edit/Write/apply_patch on those exact paths, plus git checkout --ours -- <conflict-path> ; git checkout --theirs -- <conflict-path> ; git restore --ours -- <conflict-path> ; git restore --theirs -- <conflict-path> ; git restore --worktree -- <conflict-path> ; git add -- <conflict-path> — substituting one of the paths above for <conflict-path>.
+  Exact next command once every conflict path above is resolved and staged: git -c core.editor=true rebase --continue
+  Also admitted while this rebase runs: git -c core.editor=true rebase --continue ; git rebase --continue ; git rebase --show-current-patch — and "git rebase --abort" through its own separate recovery lane.
+  This authority is not session-wide, grants no push and no force-push, covers no path outside the surface listed above, and admits no --skip, no --edit-todo, no --exec and no arbitrary -c option.
+  {"schema":"pipeline.rebase-authority-surface.v1","headName":"refs/heads/feat/rebdead","origHead":"57861a625f6b1b7316061124d3c4669bbbf3490c","onto":"498ea301b1e0e688b9c8892b711b16f59a1c653d","feature":"rebwire-feature","lifecycle":"implementing","conflictPaths":["project/pipeline-state.json"],"conflictPathPlaceholder":"<conflict-path>","nextCommand":"git -c core.editor=true rebase --continue","permittedContinuations":["git -c core.editor=true rebase --continue","git rebase --continue","git rebase --show-current-patch"],"resolutionShapes":["git checkout --ours -- <conflict-path>","git checkout --theirs -- <conflict-path>","git restore --ours -- <conflict-path>","git restore --theirs -- <conflict-path>","git restore --worktree -- <conflict-path>","git add -- <conflict-path>"],"pushAuthority":false,"remoteAuthority":false,"sessionWide":false}
+  {"schema":"pipeline.guard-retry-actions.v1","retryActions":[{"executable":"git","argv":["rebase","--show-current-patch"],"mutation":false,"requiresConfirmation":false},{"executable":"git","argv":["diff","--name-only","--diff-filter=U"],"mutation":false,"requiresConfirmation":false},{"executable":"git","argv":["status","--short"],"mutation":false,"requiresConfirmation":false}]}
+  
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file:///home/skar667/src/agent-pipeline-shared_nova/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:8440:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---
+

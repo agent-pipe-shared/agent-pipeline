@@ -263,6 +263,20 @@ const HOST_INIT_CROSS_VIEW_STATUSES = new Set([
   "repository-mount-read-only",
   "repository-control-path-invalid",
 ]);
+// NVA-REBDEAD-F5B: the measured set of lifecycleStatus values an unparseable-or-
+// inconsistent lifecycle state file actually produces (backlog/evidence/2026-09-02-
+// nva-rebdead-f5-continuity-status.json). "continuity-damaged" is reachable when the state
+// file PARSES and then fails its own projection; "continuity-observation-unavailable" is
+// reachable when it does not parse at all (parseJsonObject() in lib/onboarding-continuity.mjs
+// raises KICKOFF-READ-MALFORMED, observeDetailed()'s own catch returns continuity.status =
+// "unavailable", and lib/project-onboarding-v3.mjs's branch order at :2885/:2904-2905 then
+// yields this lifecycleStatus for that continuity status -- the App-Server and intake/kickoff
+// branches above it are skipped in an otherwise-healthy repository). See the usage site in
+// evaluateAfterGrammarAdmission() for why both, and only both, are admitted.
+const REBASE_READINESS_LIFECYCLE_STATUSES = new Set([
+  "continuity-damaged",
+  "continuity-observation-unavailable",
+]);
 const CONTROLLING_NON_READY_STATUSES = new Set(
   PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES,
 );
@@ -4028,22 +4042,25 @@ function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
     // predicates -- never to "a rebase is active" (see activeRebaseAuthority()'s own header
     // and rebaseAuthorityPermitsPath()'s deny-by-default docstring). Neither predicate is
     // re-decided here; both are the resolver's, imported unmodified.
-    // NVA-REBDEAD-F5: narrowed to the exact lifecycleStatus an unparseable/conflicted
-    // lifecycle state file actually produces -- measured against rbdFixture():
-    // continuity.status === "damaged" in project-onboarding-v3.mjs yields lifecycleStatus
-    // "continuity-damaged", and no other status is reachable from that one failure mode. No
-    // other not-ready status, including restart-required, is swallowed here any longer;
-    // restart-required keeps its own narrower sibling exemption below, now reachable again.
-    // NVA-REBDEAD-F5: narrowed to the exact lifecycleStatus an unparseable/conflicted
-    // lifecycle state file actually produces -- measured against rbdFixture():
-    // continuity.status === "damaged" in project-onboarding-v3.mjs yields lifecycleStatus
-    // "continuity-damaged", and no other status is reachable from that one failure mode. No
-    // other not-ready status, including restart-required, is swallowed here any longer;
-    // restart-required keeps its own narrower sibling exemption below, now reachable again.
+    // NVA-REBDEAD-F5B: widened to the MEASURED set of lifecycleStatus values an
+    // unparseable-or-inconsistent lifecycle state file actually produces
+    // (REBASE_READINESS_LIFECYCLE_STATUSES above; backlog/evidence/2026-09-02-nva-rebdead-f5-
+    // continuity-status.json). The prior narrowing (8f1c0737) admitted only
+    // "continuity-damaged", which excludes "continuity-observation-unavailable" -- the status
+    // the live incident this whole package exists for (real conflict markers, an unparseable
+    // state file) actually produces, re-opening the deadlock 10d11e58 closed. Read
+    // "continuity-observation-unavailable" as a catch-all, not as "conflict markers"
+    // specifically: per project-onboarding-v3.mjs:2905's own docstring it covers every
+    // classification that is neither valid, damaged, nor absent-pristine, digest disagreements
+    // included -- the admission surface named here is genuinely wider than "a rebase
+    // conflict", bounded only by activeRebaseAuthority() and
+    // rebaseAuthorityPermitsPath()'s deny-by-default conflictPaths membership below. No other
+    // not-ready status, including restart-required, is swallowed here; restart-required keeps
+    // its own narrower sibling exemption further down.
     const sessionNotReady = error instanceof ProjectOnboardingReadyError
       && error.code === "PORG-NOT-READY"
       && error.intent === "session"
-      && error.lifecycleStatus === "continuity-damaged";
+      && REBASE_READINESS_LIFECYCLE_STATUSES.has(error.lifecycleStatus);
     if (sessionNotReady) {
       const rebase = activeRebaseAuthority(root, dependencies);
       if (rebase !== null) {
