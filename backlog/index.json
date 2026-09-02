@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "0b248aa766cd078217a874d75d088974df1e3e21cae7e721dafb640286ca9593"
+    "transitionHead": "d98fbc3f906609a4165589931372e1cdf731f297e6c6b11e905fcffab936acbf"
   },
   "counts": {
-    "open": 103,
+    "open": 104,
     "in_progress": 0,
     "closed": 488,
     "rejected": 3,
@@ -232,6 +232,15 @@
       "owner": "pipeline",
       "created": "2026-09-02",
       "source": "Reported by the NVA-B-ROUNDN-FIX dispatch while binding the adjacent delete sites to content; seen in plugins/pipeline-core/lib/project-onboarding-v3.mjs's V3 manifest-repair transaction, not measured.",
+      "deferred": false
+    },
+    {
+      "id": "pipeline.a-torn-audit-append-has-disabled-every-human-guard-override-since-august-20",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-02",
+      "source": "Measured live 2026-09-02 during a human-guard-override ceremony for a TP-3 edit: sign-intent succeeded, authorize-by-signature failed with HGO-AUDIT, and verify-audit fails identically with no ceremony in flight.",
       "deferred": false
     },
     {
