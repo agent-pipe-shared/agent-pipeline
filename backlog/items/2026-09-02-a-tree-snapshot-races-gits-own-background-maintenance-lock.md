@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.a-tree-snapshot-races-gits-own-background-maintenance-lock
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-03
+closure_repository: self
+closure_commit: ae8da7b8913bccfc34497aeb6dce3013c4204903
+closure_evidence: plugins/pipeline-core/lib/codex-onboarding-capabilities.test.mjs
 created: 2026-09-02
 source: "GitHub Actions run 33595311782 (push to main, commit 6262d408), job verify, suite codex-onboarding-capabilities-tests, test 12"
 sprint: nova-b
@@ -101,3 +105,19 @@ and should be fixed together, not one red CI run at a time.
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:**
+
+## Triage, 2026-09-03 — closed against the fix that already landed
+
+`ae8da7b8` ("tolerate a vanishing entry and exclude transient Git locks in
+treeSnapshot") closed this on 2026-09-02, in the same session that filed it.
+`treeSnapshot` now skips `ENOENT`/`ENOTDIR` and excludes the two transient
+lock paths Git's own background maintenance writes
+(`.git/*.lock`, `.git/objects/*.lock`), which is what the race actually
+produced.
+
+Closed here rather than dispatched: the item was re-checked against
+`git log` over its own affected path before any work was briefed against it.
+That check is what CLAUDE.md requires and what a sibling item
+(`pipeline.resolved-backlog-items-can-keep-status-open-indefinitely`) exists
+because sessions skip — one skipped it earlier the same day and spent a full
+dispatch on work that was already done.
