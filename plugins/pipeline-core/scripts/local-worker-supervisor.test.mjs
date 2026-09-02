@@ -491,6 +491,43 @@ await check("accepts an exact cancellation intent, drains the owned child, and p
   }
 });
 
+await check("does not deny cancellation of a healthy worker purely because a heartbeat aged the record digest", async () => {
+  const context = fixture();
+  try {
+    const request = createRequest(context.sourceRoot, context.stateRoot, context.commit, {
+      count: 1,
+      delayMs: 5_000,
+      behavior: "none",
+      dispatchId: "dispatch-cancel-heartbeat-age",
+    });
+    const active = startWaveAsync(context, request, "request-cancel-heartbeat-age.json");
+    const running = await waitForRecord(context, (record) => record.status === "running");
+    // heartbeatMs is 1_000 in this fixture (createRequest); wait past it so at least
+    // one real heartbeat tick lands between this snapshot and the cancel below, exactly
+    // as a real client must, since it spawns a process between reading the digest and
+    // acting on it.
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 1_200));
+    const aged = JSON.parse(readFileSync(join(context.stateRoot, "supervisor.json"), "utf8"));
+    assert.equal(aged.lease.lastHeartbeatMonotonicMs > running.lease.lastHeartbeatMonotonicMs, true);
+    assert.equal(aged.status, running.status);
+    assert.equal(aged.workers[0].state, running.workers[0].state);
+    const cancelled = invoke([
+      "cancel",
+      "--state-root", context.stateRoot,
+      "--record-sha256", running.recordSha256,
+      "--activate",
+    ], context);
+    assert.equal(cancelled.status, 0, cancelled.stdout);
+    assert.equal(cancelled.json.code, "LWS-CANCEL-REQUESTED");
+    const completed = await active.completed;
+    assert.equal(completed.status, 2, completed.stdout);
+    assert.equal(completed.json.code, "LWS-CANCELLED");
+    assert.equal(cleanup(context, completed.json.record.recordSha256).status, 0);
+  } finally {
+    rmSync(context.root, { recursive: true, force: true });
+  }
+});
+
 await check("keeps a failed real child attributable and does not convert nonzero exit into success", () => {
   const context = fixture();
   try {
@@ -632,4 +669,4 @@ await check("denies replayed cleanup and foreign workspace marker without broad 
   }
 });
 
-console.log(`${passed}/9 checks passed.`);
+console.log(`${passed}/10 checks passed.`);

@@ -138,6 +138,16 @@ export function localWorkerSupervisorPackageSha256({ dispatchId, attempt, queueR
 function unsignedDigest(value, digestField) {
   const copy = clone(value);
   delete copy[digestField];
+  // `lease.lastHeartbeatMonotonicMs` is liveness, not identity or intent: the
+  // heartbeat rewrites it once per `lease.heartbeatMs` while a wave runs,
+  // independent of anything the record's holder has decided or requested.
+  // The record is the only digested shape carrying a `lease`, so excluding
+  // this one leaf field here keeps every digest that covers a record (today,
+  // only `recordSha256`) a compare-and-swap over identity/intent alone,
+  // instead of one a heartbeat the caller cannot pause invalidates once a
+  // second. This narrows what the digest covers; the strict equality checks
+  // at the cancel/cleanup routes are unchanged (NVA-B-LWSC04-1).
+  if (copy.lease && typeof copy.lease === "object") delete copy.lease.lastHeartbeatMonotonicMs;
   return localWorkerSupervisorSha256(copy);
 }
 
