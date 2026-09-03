@@ -122,31 +122,10 @@ from `open` to `closed` in its own file still gets TWO chained ledger
 entries (open→in_progress, then in_progress→closed) to preserve that order —
 this is expected, not a bug.
 
-**Run `node plugins/pipeline-core/scripts/check-backlog-state.mjs` BEFORE
-committing any ledger change, always** — never rely on `verify.mjs` catching
-it later. Confirmed live 2026-08-27: six items were filed against a schema
-they did not satisfy (`type: decision`, `owner: po` — neither in the enum),
-and the violation surfaced only because `check-backlog-state.mjs` was run
-afterwards; ten of thirteen findings in that run were self-inflicted and
-would have been caught before committing.
-
-**Recovery — an uncommitted bad reconciliation vs. a committed one are not
-the same repair.** While `backlog/transitions.ndjson`, `backlog/index.json`,
-and `backlog/STATUS.md` are still UNCOMMITTED, undo a bad
-`--activate` run with `git checkout -- backlog/transitions.ndjson
-backlog/index.json backlog/STATUS.md`, fix the offending item, and re-run.
-Once the bad reconciliation has been committed, that discard route is gone —
-the chain is append-only and hand-patching it breaks the hash chain — and
-the only correct repair is `planBacklogEvidenceAmendment`'s heavier
-evidence-amendment machinery (`plugins/pipeline-core/lib/backlog-state.mjs`,
-`EVIDENCE_AMENDMENT_SCHEMA`), not a manual edit of the projection files.
-
-**`closure_commit` must be a full lowercase Git commit OID (40 hex
-characters), never an abbreviated SHA.** Enforced by `backlog-state.mjs`'s
-`OID` pattern (`/^[a-f0-9]{40}$/u`), checked by `check-backlog-state.mjs`. An
-abbreviated SHA looks correct to a human reviewer and bakes a schema
-violation straight into the hash chain; catch it by running the checker
-above before committing, not after.
+**Run the backlog-state checker before committing any ledger change — full
+rule, recovery split, and OID requirement live in one place:**
+[`guardrails/git.md` `GIT-10`](../guardrails/git.md#git-10--run-the-backlog-state-checker-before-committing-any-ledger-change),
+not restated here.
 
 **The recurring failure mode this exists to name:** closing an item (flipping
 `status:` in its file) and reconciling the ledger are two separate,

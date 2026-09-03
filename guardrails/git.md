@@ -215,6 +215,12 @@ Rule IDs: `GIT-xx`.
   un-suffixed pair, like the annotated batch, never blocks a commit, but
   unlike the annotated batch it is not this repository's settled baseline —
   its presence is expected to end once that OID is repaired.
+- **`closure_commit` must be a full lowercase Git commit OID (40 hex
+  characters), never an abbreviated SHA.** Enforced by `backlog-state.mjs`'s
+  `OID` pattern (`/^[a-f0-9]{40}$/u`), checked by `check-backlog-state.mjs`. An
+  abbreviated SHA looks correct to a human reviewer and bakes a schema
+  violation straight into the hash chain; catch it by running the checker
+  above before committing, not after.
 - **Recovery for a bad reconciliation that is still UNCOMMITTED:** `git
   checkout -- backlog/transitions.ndjson backlog/index.json
   backlog/STATUS.md`, fix the offending item, and re-run
