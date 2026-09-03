@@ -122,6 +122,10 @@ function safeStem(path) {
   return path.slice(path.lastIndexOf("/") + 1).replace(/\.md$/, "").replace(/\.mjs$/, "");
 }
 
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function hookMembers(path, contents) {
   const parsed = JSON.parse(contents);
   const members = [];
@@ -287,6 +291,33 @@ function agentReadableCorpus(root) {
  * it rather than reimplementing it, so a script the guard does not yet know how to admit is
  * never mistaken for one it does.
  *
+ * "Admitted" is deliberately NOT a bare-stem substring test over the whole guard file.
+ * pipeline.entry-point-reachability-check-substring-matches-whole-source-files (measured
+ * 2026-09-03) showed a comment citing an evidence filename that merely CONTAINS a script's
+ * stem (`...-f5-continuity-status.json` against `continuity-status.mjs`) read as a phantom
+ * admission. Every real admission in this guard follows one fixed code idiom, confirmed by
+ * reading every `..._SCRIPT` constant in guard-lifecycle-ready.mjs: a `const X_SCRIPT =
+ * fileURLToPath(new URL("../scripts/<name>.mjs", import.meta.url))` declaration, later
+ * compared with `script === X_SCRIPT` inside `isSanctionedLifecycleCommand()`. The declaration
+ * line always contains the literal substring `scripts/<name>.mjs`, so requiring that
+ * path-shaped needle -- not just the bare stem -- rules out a same-stem citation in a comment
+ * or an unrelated identifier while still matching every genuine admission (verified against
+ * this repository's own guard, see HAW-B01 and check 2 below). This is narrower than fully
+ * sound (a prose comment that happens to cite the real `scripts/<name>.mjs` path without
+ * actually admitting it would still match), but it closes the measured false-positive shape;
+ * full soundness needs the guard to declare its admitted set structurally (backlog item
+ * option 3), which is out of scope here.
+ *
+ * `named`/`namedInBootstrap` stay bare-stem substring tests deliberately, not because the
+ * risk is absent but because the corpus is different in kind: unconstrained prose (skill
+ * bodies, typed reference docs, other guards' refusal text) that legitimately cites a script
+ * many ways -- a backticked bare filename, a full repo-relative path, or an inline mention --
+ * with no single idiom to anchor a stricter regex on the way the guard-admission idiom
+ * has. Narrowing here trades a low-probability same-stem false positive for a real risk of
+ * false negatives (missing a genuine citation phrased differently), each of which would
+ * manufacture ITS OWN spurious finding. The guard-admission corpus admits exactly one code
+ * idiom we could enumerate; the prose corpus does not.
+ *
  * A consumer-shaped root (no `plugins/pipeline-core` source tree, e.g. an installed-plugin
  * layout) simply discovers zero entry points and zero corpus text -- `ok: true`, no
  * findings, never a false failure from a self-checkout-only path. This mirrors the
@@ -315,7 +346,8 @@ export function checkEntryPointReachability({ root }) {
   for (const entryPoint of entryPoints) {
     const namedInBootstrap = bootstrapCorpus.includes(entryPoint.basename);
     const named = corpus.includes(entryPoint.basename);
-    const admitted = guardSource.includes(entryPoint.basename);
+    // Path-shaped, not a bare-stem substring: see the function docstring above for why.
+    const admitted = new RegExp(`scripts/${escapeRegExp(entryPoint.basename)}\\.mjs\\b`).test(guardSource);
     // named-but-refused: an entry point the bootstrap docs themselves point an agent at,
     // for the exact non-ready phase those docs govern, yet the guard that decides
     // pre-readiness admission has never heard of it -- instance 1 of the backlog item,

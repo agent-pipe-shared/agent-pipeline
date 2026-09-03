@@ -262,10 +262,19 @@ check("HAW-B03 a driver the bootstrap docs name but the readiness guard never ad
   });
 });
 
+// The guard fixture text below deliberately mirrors the real admission idiom
+// (const X_SCRIPT = fileURLToPath(new URL("../scripts/<name>.mjs", import.meta.url));
+// ... script === X_SCRIPT ...), not a bare-stem comment -- see
+// NVA-B-ENTRYSTEM-1: a bare-stem comment is exactly the shape that used to produce a
+// phantom admission and must NOT be read as "admitted" any more.
+const REALISTIC_ADMISSION_GUARD =
+  "const EXAMPLE_DRIVER_SCRIPT = fileURLToPath(new URL(\"../scripts/example-driver.mjs\", import.meta.url));\n"
+  + "if (script === EXAMPLE_DRIVER_SCRIPT) return sanctioned(args, root);\n";
+
 check("HAW-B04 a script the readiness guard admits but no skill or guard names fails as admitted-but-unnamed", () => {
   withFixtureRoot({
     "plugins/pipeline-core/scripts/example-driver.mjs": "#!/usr/bin/env node\n// Usage: node plugins/pipeline-core/scripts/example-driver.mjs --root <dir>\n",
-    "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs": "if (script === EXAMPLE_DRIVER) return sanctioned(args, root); // example-driver\n",
+    "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs": REALISTIC_ADMISSION_GUARD,
   }, (root) => {
     const result = checkEntryPointReachability({ root });
     assert.equal(result.ok, false);
@@ -277,7 +286,7 @@ check("HAW-B05 named in the bootstrap docs AND admitted by the guard passes -- r
   const files = {
     "plugins/pipeline-core/scripts/example-driver.mjs": "#!/usr/bin/env node\n// Usage: node plugins/pipeline-core/scripts/example-driver.mjs --root <dir>\n",
     "plugins/pipeline-core/skills/pipeline-start/SKILL.md": "Run `example-driver.mjs` to walk the chain.\n",
-    "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs": "// admits example-driver explicitly\n",
+    "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs": REALISTIC_ADMISSION_GUARD,
   };
   withFixtureRoot(files, (root) => {
     assert.deepEqual(checkEntryPointReachability({ root }), { ok: true, findings: [] });
@@ -290,6 +299,31 @@ check("HAW-B05 named in the bootstrap docs AND admitted by the guard passes -- r
   // admitted-but-guard-known script with no skill naming it is still undiscoverable.
   withFixtureRoot({ ...files, "plugins/pipeline-core/skills/pipeline-start/SKILL.md": "unrelated skill body\n" }, (root) => {
     assert.equal(checkEntryPointReachability({ root }).ok, false);
+  });
+});
+
+check("HAW-B06 a comment citing an evidence filename that merely contains a script's stem is not read as an admission (NVA-B-ENTRYSTEM-1)", () => {
+  const files = {
+    "plugins/pipeline-core/scripts/continuity-status.mjs": "#!/usr/bin/env node\n// Usage: node plugins/pipeline-core/scripts/continuity-status.mjs --root <dir>\n",
+    "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs":
+      "// see evidence/2026-09-02-nva-rebdead-f5-continuity-status.json for the RED capture\n",
+  };
+  withFixtureRoot(files, (root) => {
+    // No admission rule exists for this script, so the false-positive "admitted-but-unnamed"
+    // finding must not fire, and (nothing names it either) the check is clean.
+    assert.deepEqual(checkEntryPointReachability({ root }), { ok: true, findings: [] });
+  });
+  // Paired positive: the SAME stem, but with the guard actually carrying the real admission
+  // idiom instead of a comment that merely contains the stem, DOES produce the
+  // admitted-but-unnamed finding -- proving the tightened match still detects a real admission
+  // rather than having been disabled outright.
+  withFixtureRoot({
+    ...files,
+    "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs": REALISTIC_ADMISSION_GUARD.replace(/example-driver/g, "continuity-status").replace(/EXAMPLE_DRIVER_SCRIPT/g, "CONTINUITY_STATUS_SCRIPT"),
+  }, (root) => {
+    const result = checkEntryPointReachability({ root });
+    assert.equal(result.ok, false);
+    assert.match(result.findings.join("\n"), /admitted by .*guard-lifecycle-ready\.mjs but named by no skill or guard/);
   });
 });
 
