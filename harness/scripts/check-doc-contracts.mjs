@@ -351,6 +351,53 @@ function normalizeReferenceId(value) {
   return value.trim().replace(/\s+/g, " ").toLocaleLowerCase("en-US");
 }
 
+// This evidence snapshot intentionally preserves issue headings in the
+// `[heading][plain-tag]` form. The tags are not reference definitions: they
+// are historical issue taxonomy, so the otherwise fail-closed reference-link
+// scanner must not reinterpret these nine known occurrences as broken links.
+//
+// Keep this contract occurrence-specific. In particular, neither an identical
+// tag on a different line nor a tag in a different source is evidence that it
+// belongs to this immutable snapshot exception.
+export const IMMUTABLE_SNAPSHOT_MISSING_REFERENCE_EXCLUSIONS = Object.freeze([
+  { source: "specs/sprint-alfred-epic/evidence/issues-snapshot-2026-08-27.md", line: 10, referenceId: "architecture" },
+  { source: "specs/sprint-alfred-epic/evidence/issues-snapshot-2026-08-27.md", line: 229, referenceId: "security" },
+  { source: "specs/sprint-alfred-epic/evidence/issues-snapshot-2026-08-27.md", line: 304, referenceId: "lifecycle" },
+  { source: "specs/sprint-alfred-epic/evidence/issues-snapshot-2026-08-27.md", line: 377, referenceId: "telemetry" },
+  { source: "specs/sprint-alfred-epic/evidence/issues-snapshot-2026-08-27.md", line: 475, referenceId: "architecture" },
+  { source: "specs/sprint-alfred-epic/evidence/issues-snapshot-2026-08-27.md", line: 758, referenceId: "governance" },
+  { source: "specs/sprint-alfred-epic/evidence/issues-snapshot-2026-08-27.md", line: 918, referenceId: "architecture" },
+  { source: "specs/sprint-alfred-epic/evidence/issues-snapshot-2026-08-27.md", line: 1187, referenceId: "integration" },
+  { source: "specs/sprint-alfred-epic/evidence/issues-snapshot-2026-08-27.md", line: 1318, referenceId: "adoption" },
+]);
+
+/**
+ * Suppress only a configured missing-reference occurrence, recording the
+ * precise entry that was used so repaired snapshot text makes its exception
+ * stale rather than silently leaving an inert allowance behind.
+ */
+export function isImmutableSnapshotMissingReferenceExcluded(exclusions, source, line, referenceId, used) {
+  const normalizedReferenceId = normalizeReferenceId(referenceId);
+  const entry = exclusions.find(
+    (candidate) =>
+      candidate.source === source && candidate.line === line && candidate.referenceId === normalizedReferenceId,
+  );
+  if (!entry) return false;
+  used.add(entry);
+  return true;
+}
+
+function staleImmutableSnapshotMissingReferenceExclusionFindings(exclusions, scannedSources, used) {
+  const findings = [];
+  for (const entry of exclusions) {
+    if (!scannedSources.has(entry.source) || used.has(entry)) continue;
+    findings.push(
+      `immutable-snapshot-missing-reference-exclusion: ${entry.source}:${entry.line} -> ${entry.referenceId}: exclusion no longer suppresses a "missing reference definition" finding -- remove it`,
+    );
+  }
+  return findings;
+}
+
 function unwrapDestination(value) {
   return value.startsWith("<") && value.endsWith(">") ? value.slice(1, -1) : value;
 }
@@ -540,13 +587,17 @@ export function checkRepository(rootInput, options = {}) {
     .sort();
   const trackedPaths = new Set((options.trackedPaths ?? gitList(root)).map(posixPath));
   const vendoredLinkExclusions = options.vendoredLinkExclusions ?? VENDORED_LINK_EXCLUSIONS;
+  const immutableSnapshotMissingReferenceExclusions =
+    options.immutableSnapshotMissingReferenceExclusions ?? IMMUTABLE_SNAPSHOT_MISSING_REFERENCE_EXCLUSIONS;
   const usedVendoredExclusions = new Map();
+  const usedImmutableSnapshotMissingReferenceExclusions = new Set();
   const findings = [];
   const cache = new Map();
   let linksChecked = 0;
   let anchorsChecked = 0;
   let excludedLinks = 0;
   let vendoredExcludedLinks = 0;
+  let immutableSnapshotExcludedMissingReferences = 0;
 
   const readRepoText = (repoPath) => {
     if (isExcludedRepoPath(repoPath)) return null;
@@ -568,6 +619,18 @@ export function checkRepository(rootInput, options = {}) {
     if (text === null) continue;
     for (const link of extractMarkdownLinks(text)) {
       if (link.kind === "missing-reference") {
+        if (
+          isImmutableSnapshotMissingReferenceExcluded(
+            immutableSnapshotMissingReferenceExclusions,
+            source,
+            link.line,
+            link.referenceId,
+            usedImmutableSnapshotMissingReferenceExclusions,
+          )
+        ) {
+          immutableSnapshotExcludedMissingReferences += 1;
+          continue;
+        }
         findings.push(finding(source, link.line, link.referenceId, "missing reference definition"));
         continue;
       }
@@ -624,6 +687,13 @@ export function checkRepository(rootInput, options = {}) {
   }
 
   findings.push(...staleVendoredExclusionFindings(vendoredLinkExclusions, new Set(markdownPaths), usedVendoredExclusions));
+  findings.push(
+    ...staleImmutableSnapshotMissingReferenceExclusionFindings(
+      immutableSnapshotMissingReferenceExclusions,
+      new Set(markdownPaths),
+      usedImmutableSnapshotMissingReferenceExclusions,
+    ),
+  );
 
   // Whichever tier the project's authority actually resolves to (ADR-0054).
   const calibrationPath = resolveAuthorityArtifactPath("calibration", { rootDir: root }).relPath;
@@ -697,6 +767,7 @@ export function checkRepository(rootInput, options = {}) {
       anchorsChecked,
       excludedLinks,
       vendoredExcludedLinks,
+      immutableSnapshotExcludedMissingReferences,
       observationGovernance: observationGovernance.applicable ? "checked" : "not-applicable",
       statefulDesignContracts,
     },

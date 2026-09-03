@@ -8,6 +8,7 @@ import { dirname, join, relative, resolve } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import {
+  IMMUTABLE_SNAPSHOT_MISSING_REFERENCE_EXCLUSIONS,
   VENDORED_LINK_EXCLUSIONS,
   checkRepository,
   collectAnchors,
@@ -595,7 +596,63 @@ test("current repository integration passes and excludes the instruction path", 
   const result = checkRepository(REPO);
   assert.deepEqual(result.findings, []);
   assert(result.stats.markdownFiles > 100);
+  assert.equal(result.stats.immutableSnapshotExcludedMissingReferences, 9);
   assert.equal(result.stats.observationGovernance, "checked");
+});
+
+function missingReferenceAtLine(line, referenceId) {
+  return `${"\n".repeat(line - 1)}[Historical issue][${referenceId}]\n`;
+}
+
+function runImmutableSnapshotFixture(root, files, immutableSnapshotMissingReferenceExclusions) {
+  const trackedPaths = [".claude/pipeline.json", "CLAUDE.md", "docs/state.md", "README.md", ...files];
+  return checkRepository(root, {
+    trackedPaths,
+    markdownPaths: trackedPaths.filter((path) => path.endsWith(".md")),
+    immutableSnapshotMissingReferenceExclusions,
+  });
+}
+
+test("each immutable snapshot exclusion suppresses its own exact normalized missing-reference occurrence", () => {
+  for (const entry of IMMUTABLE_SNAPSHOT_MISSING_REFERENCE_EXCLUSIONS) {
+    const { root } = fixture({ [entry.source]: missingReferenceAtLine(entry.line, entry.referenceId.toUpperCase()) });
+    const result = runImmutableSnapshotFixture(root, [entry.source], [entry]);
+    assert.deepEqual(result.findings, [], `${entry.source}:${entry.line} -> ${entry.referenceId}`);
+    assert.equal(result.stats.immutableSnapshotExcludedMissingReferences, 1);
+  }
+});
+
+test("an immutable snapshot exclusion does not suppress the same reference id at another line", () => {
+  const entry = { source: "specs/immutable-snapshot.md", line: 3, referenceId: "plain tag" };
+  const { root } = fixture({ [entry.source]: "# Snapshot\n\n[Known][plain tag]\n[New][plain tag]\n" });
+  const result = runImmutableSnapshotFixture(root, [entry.source], [entry]);
+  assert.deepEqual(result.findings, [`${entry.source}:4 -> plain tag: missing reference definition`]);
+  assert.equal(result.stats.immutableSnapshotExcludedMissingReferences, 1);
+});
+
+test("an immutable snapshot exclusion does not suppress the same line and id in another source", () => {
+  const entry = { source: "specs/immutable-snapshot.md", line: 3, referenceId: "plain tag" };
+  const otherSource = "specs/other-snapshot.md";
+  const { root } = fixture({ [otherSource]: "# Other\n\n[Unexpected][plain tag]\n" });
+  const result = runImmutableSnapshotFixture(root, [otherSource], [entry]);
+  assert.deepEqual(result.findings, [`${otherSource}:3 -> plain tag: missing reference definition`]);
+  assert.equal(result.stats.immutableSnapshotExcludedMissingReferences, 0);
+});
+
+test("a stale immutable snapshot exclusion is reported deterministically", () => {
+  const entry = { source: "specs/immutable-snapshot.md", line: 3, referenceId: "plain tag" };
+  const { root } = fixture({ [entry.source]: "# Snapshot\n\n[Defined][plain tag]\n\n[plain tag]: docs/state.md\n" });
+  const result = runImmutableSnapshotFixture(root, [entry.source], [entry]);
+  assert.deepEqual(result.findings, [
+    `immutable-snapshot-missing-reference-exclusion: ${entry.source}:3 -> plain tag: exclusion no longer suppresses a "missing reference definition" finding -- remove it`,
+  ]);
+});
+
+test("ordinary broken reference-style links still fail with immutable snapshot exclusions configured", () => {
+  const entry = { source: "specs/immutable-snapshot.md", line: 3, referenceId: "plain tag" };
+  const { root } = fixture({ "README.md": "# Home\n\n[Broken][ordinary missing reference]\n" });
+  const result = runImmutableSnapshotFixture(root, [], [entry]);
+  assert.deepEqual(result.findings, ["README.md:3 -> ordinary missing reference: missing reference definition"]);
 });
 
 const VENDORING_BACKLOG_ITEM = "backlog/items/2026-08-10-plugin-package-should-vendor-canon-references-via-build-step.md";
