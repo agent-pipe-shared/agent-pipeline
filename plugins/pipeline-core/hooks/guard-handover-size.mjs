@@ -17,12 +17,10 @@
  * the Phoenix-line alternative checked only the pre-write on-disk size,
  * so it never caught the crossing edit itself).
  *
- * NOT wired into `hooks.json` by this dispatch (that file is TP-4 protected,
- * `.claude/guard-config.json` -- no ad-hoc edit is possible, and there is no
- * in-session override for this class of protected file). This file is
- * built and fully unit-tested, ready for an authorized session to wire in;
- * see the exact matcher/command snippet in the NVA-HANDOVER-ROT-1 dispatch
- * report.
+ * Registered in `hooks.json` as a PreToolUse hook on the `Edit|Write|
+ * NotebookEdit` matcher (see the `guard-handover-size.mjs` entry there) --
+ * this guard is live on every Edit/Write/NotebookEdit call in this
+ * repository, not merely built and awaiting wiring.
  *
  * Mirrors `guard-lifecycle-ready.mjs`'s PreToolUse input contract (stdin
  * JSON carrying `tool_name`/`tool_input`) and exit-code convention (0
