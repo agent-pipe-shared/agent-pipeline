@@ -99,3 +99,37 @@ protected test path (TP-3), for which no in-session override exists in
 signature mode. This registration work belongs in a maintenance window
 already scheduled with the PO, alongside the deferred directions 1/2 of the
 sibling item above.
+
+## 2026-09-03 — measured and prepared, still blocked on the same signature
+
+Dispatch `NVA-B-SUITEREG-1` changed nothing and stopped on the TP-3 wall, which
+this item had already named. It did the measurement first, so the maintenance
+window is now a single step rather than an investigation. The full package —
+per-suite results, the exact contiguous diff, the runtime delta, and the two
+workarounds that were deliberately not taken — is in
+`backlog/evidence/2026-09-03-suite-registration-ceremony-package.md`, tracked,
+because the dispatch's own record lives in the gitignored `evidence/` tree and
+would not survive a fresh checkout.
+
+The four suites are unchanged and **all four pass standalone**: 0.4 s, 4.58 s,
+0.15 s and 14.08 s. Suite count would go 506 → 511, adding ≈19.2 s to a ~23
+minute gate.
+
+One briefed assumption was refuted by measurement. `measure-tofu-push-e2e` was
+briefed as the likely exception, on the reasoning that an end-to-end push
+measurement does not belong in a gate. Reading its source: no remote, no URL, no
+network call; a disposable temp repository, locally generated keys in a temp
+HOME, and scripted answers instead of a human. It is a defensible gate candidate,
+and the dispatch was explicitly told to conclude from running it rather than from
+its name.
+
+Two workarounds were available and both were correctly refused. Running the
+signature ceremony unprompted — nothing authorized spending a PO signature, and
+CLAUDE.md forbids seeding one unless the PO can sign immediately. And entering
+the four suites into the detector's `DELIBERATELY_UNREGISTERED` opt-out, which
+would have turned the detector green by recording a false claim about four
+passing suites, and which the detector treats as fatal once stale. Silencing the
+detector to make its output green would have inverted this item's whole purpose.
+
+The gap therefore stands exactly as described above, with the cost of closing it
+now known and the change ready to apply.
