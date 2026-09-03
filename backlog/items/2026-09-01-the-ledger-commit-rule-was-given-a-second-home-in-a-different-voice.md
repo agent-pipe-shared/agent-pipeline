@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.the-ledger-commit-rule-was-given-a-second-home-in-a-different-voice
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-03
+closure_repository: self
+closure_commit: 232eb5b0f98df987ca4801d437d7fc8bae010438
+closure_evidence: backlog/evidence/2026-09-03-nova-b-batch-2-closure-verification.md
 created: 2026-09-01
 sprint: nova-b
 done_when: manual

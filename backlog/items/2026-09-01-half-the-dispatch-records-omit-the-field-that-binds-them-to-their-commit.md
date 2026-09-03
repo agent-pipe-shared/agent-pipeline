@@ -79,3 +79,63 @@ strictly in the template than the implementation enforces.
 3. Narrow the template's claim to what is actually enforced, if the checker turns
    out to treat the field as optional — the gap would then be in the documentation
    rather than in the corpus.
+
+## Direction 1 is done, 2026-09-03 — and it turned the item's own numbers over
+
+`1c2425f190d5e4a540cccc58fd41a082a4225341` (`NVA-B-RECSHAPE-1`) added
+`checkDispatchRecordShape` to `harness/scripts/check-dispatch-provenance.mjs`,
+validating all three conditions `agent-obligations.md` §6 entails: the record
+exists at the canonical path, its `outcome` is terminal, and `report.changedFiles`
+covers the commit's own paths. Three distinct finding classes, judged per commit
+against that commit's own diff.
+
+**Reported, not fatal**, with a named graduation marker
+(`pipeline.dispatch-record-shape-is-fatal`) at the point where that flips. A
+falsifier test pins the non-fatality directly: a valid trailer naming a missing
+record produces a finding while `ok` stays true and the exit code stays 0. The
+existing 23 tests pass unmodified, and a dedicated test proves the stage-0
+exemption still clears a commit with no record at all. 32/32, re-run
+independently by the dispatcher.
+
+**The measurement, over `HEAD~500..HEAD`** — 500 commits, 462 touching source,
+205 carrying a valid trailer:
+
+| Class | Count |
+|---|---|
+| `DISPATCH-RECORD-MISSING` | 160 (159 absent, 1 unreadable) |
+| `DISPATCH-RECORD-NOT-TERMINAL` | 4 |
+| `DISPATCH-RECORD-PATHS-UNCOVERED` | 9 (7 absent, 2 incomplete) |
+
+This item was filed on "roughly 60 of about 130 records carry the field". The
+dominant failure is not a missing field at all — it is a missing **record**, 160
+against 9.
+
+## Why the graduation is blocked on a different item
+
+The reason 160 records are absent is that `evidence/` is gitignored. The records
+were written; they do not travel. In a fresh checkout or a CI run, every
+trailer-bearing commit reports `DISPATCH-RECORD-MISSING` regardless of how
+disciplined the authoring dispatch was.
+
+So flipping the marker is not a matter of corpus quality or of a backfill
+campaign. It requires deciding first whether durable provenance belongs in a
+gitignored directory — which is
+`backlog/items/2026-09-01-fourteen-evidence-files-are-tracked-inside-a-gitignored-directory.md`,
+and which `bb079c96` explicitly declined to settle when it pointed every rule at
+`evidence/dispatch-record-<TASK_ID>.json`. Three items now converge on that one
+question.
+
+Direction 2 (backfill) would be wasted work until it is answered, and direction 3
+is refuted: the checker does not treat the field as optional, so the gap is in the
+corpus and its storage, not in the documentation.
+
+## Residual, reported by the implementing dispatch against its own work
+
+`DISPATCH_LINE_RE` matches `Dispatch:` anywhere in the raw message text rather
+than through git's trailer-block parser. Consequences in both directions: a
+commit whose trailer block was swallowed into the body — the defect recorded in
+`backlog/items/2026-09-01-every-stage-0-commit-loses-its-assistance-marker-to-a-blank-line.md`,
+eight instances — is still seen here, where git itself sees nothing; and body
+prose merely mentioning `Dispatch:` would be accepted. This is pre-existing
+behaviour, not introduced by that commit, and changing it would alter an existing
+finding class, which the briefing forbade. It stays open as a follow-up.
