@@ -7,6 +7,7 @@ status: open
 created: 2026-09-02
 source: "Direct measurement, 2026-09-02 session: three Goldfish dispatches hit maxTurns in one block, one of them losing all of its work"
 sprint: nova-b
+done_when: contains templates/prompts/goldfish-task.md pipeline.maxturns-budget-direction-decided
 ---
 
 # Documenting the `maxTurns` cliff did not stop dispatches falling off it — three more today, one a total loss
@@ -99,6 +100,25 @@ first is a real capability question and the other two are cheap.
 2. Whichever of directions 2 and 3 are accepted are implemented, with tests.
 3. The closed predecessor item is annotated to point here, so a reader who
    finds it does not conclude the problem was solved on 2026-08-25.
+
+### Predicate note, 2026-09-03 — anchored to criterion 1, not criterion 3
+
+`done_when: contains templates/prompts/goldfish-task.md
+pipeline.maxturns-budget-direction-decided`. Acceptance criterion 1
+("Direction 1 is decided: either an enforcing counter exists, or the budget
+field is removed and the template says plainly that only `maxTurns`
+binds") is the load-bearing criterion: both of its branches force this
+exact file to change — an enforcing counter falsifies the template's own
+current honesty note ("no automated per-subagent tool-call counter exists
+(yet)"), and removing the budget field edits the same tool-budget section.
+Criterion 3 (annotating the closed 2026-08-23 predecessor item) was
+considered and rejected as the anchor: it is independently satisfiable
+without fixing anything the item is actually about, so it would be a weak
+falsifier for this item's real ask. False today: the marker string does not
+appear anywhere in `goldfish-task.md` (checked by direct grep before writing
+this predicate), and Direction 1 remains undecided per this item's own
+Proposal section. No `Decision:` value is set here; that choice belongs to
+whoever triages this item next.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
