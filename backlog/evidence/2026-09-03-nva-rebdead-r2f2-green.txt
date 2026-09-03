@@ -1,0 +1,13 @@
+NVA-REBDEAD-R2F2 GREEN evidence -- real committed guard-lifecycle-ready.test.mjs, full suite, including the new "rebdead positive-1 (apply_patch)" case.
+command: node plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+
+✔ isRestartResumeHintInputWrite recognizes an apply_patch write to the resume-hint input file (0.920598ms)
+✔ rebdead positive-1 (apply_patch): a raw apply_patch call naming the conflict path is admitted, through the guard's real evaluation entry point, because the outer tool-name gate does not recognize apply_patch at all (178.17216ms)
+ℹ tests 224
+ℹ suites 0
+ℹ pass 224
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 34705.31113

@@ -8334,6 +8334,31 @@ test("rebdead positive-1: Edit/Write on the exact conflict path (the lifecycle s
   }
 });
 
+// NVA-REBDEAD-R2F2 (round-2 Critic finding F2 against the package): acceptance criterion 2
+// names three tools -- Edit, Write, apply_patch -- and positive-1 above only locks the first
+// two. Coverage for apply_patch existed briefly (10d11e58), was reverted alongside the code
+// it accompanied (43413349), and nothing replaced it; guard-apply-patch.test.mjs pins the
+// SAME architectural invariant generically (against an arbitrary governed path) but never
+// against this suite's own rebase-conflict fixture. This asserts the property the acceptance
+// criterion names -- admission -- not the mechanism: a raw, untranslated apply_patch call
+// reaches evaluateLifecycleReadyGuard's outer tool-name gate (~line 4281), which recognizes
+// only SHELL_TOOLS/WRITE_TOOLS and returns verdict(0) for anything else, before either rebase
+// relief is ever reached. guard-apply-patch.mjs documents why production never sends this raw
+// shape (it translates apply_patch into a per-path `{tool_name: "Edit", tool_input:
+// {file_path}}` call instead) -- that per-path translation is the real enforcement boundary
+// for apply_patch, and is out of scope for this test on purpose. What this test pins is the
+// premise that translation relies on: the outer gate itself must keep admitting apply_patch
+// unconditionally, on this suite's own conflict-path fixture, not just on an arbitrary path.
+test("rebdead positive-1 (apply_patch): a raw apply_patch call naming the conflict path is admitted, through the guard's real evaluation entry point, because the outer tool-name gate does not recognize apply_patch at all", () => {
+  const dir = rbdFixture();
+  const patch = `*** Begin Patch\n*** Update File: ${NEUTRAL_STATE}\n@@\n-a\n+b\n*** End Patch`;
+  const result = evaluateLifecycleReadyGuard(
+    { tool_name: "apply_patch", tool_input: { command: patch } },
+    rbdDeps(dir),
+  );
+  assert.equal(result.exitCode, 0, `apply_patch naming the conflict path: ${result.stderr}`);
+});
+
 test("rebdead positive-2: checkout --ours/--theirs and restore are admitted on the conflict path", () => {
   const dir = rbdFixture();
   for (const command of [

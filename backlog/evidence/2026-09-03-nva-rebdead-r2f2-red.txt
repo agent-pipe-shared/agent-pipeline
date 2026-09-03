@@ -1,0 +1,8 @@
+NVA-REBDEAD-R2F2 RED evidence -- the new test's assertion (apply_patch on the conflict path is admitted) fails once the admission is removed. The tracked guard-lifecycle-ready.mjs was never edited; a locally modified copy was written into scratch/ (ignored, deleted immediately after this capture) with "apply_patch" added to WRITE_TOOLS and no relief.
+
+{
+  "schema": "pipeline.nva-rebdead-r2f2-red-evidence.v1",
+  "methodology": "the new test's exact call shape (tool_name apply_patch, tool_input.command naming NEUTRAL_STATE) against evaluateLifecycleReadyGuard from a locally modified COPY of guard-lifecycle-ready.mjs (written into scratch/, never the tracked file) with apply_patch added to WRITE_TOOLS and no relief. dependencies={} because this code path (writeTargetPath returns \"\" for an apply_patch tool_input with no file_path -> blocked()) is reached before root resolution or governance markers are ever consulted -- dir/deps genuinely do not affect this outcome.",
+  "exitCode": 2,
+  "stderr": "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-LIFECYCLE-NOT-READY: Pipeline-governed project writes require an exact V4 ready result for session intent.\nRe-run the typed project-onboarding-v3 session inspection and use only its returned nextAction.\n"
+}
