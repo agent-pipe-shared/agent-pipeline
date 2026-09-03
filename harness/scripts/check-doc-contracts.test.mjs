@@ -641,7 +641,7 @@ test("an immutable snapshot exclusion does not suppress the same line and id in 
 
 test("a stale immutable snapshot exclusion is reported deterministically", () => {
   const entry = { source: "specs/immutable-snapshot.md", line: 3, referenceId: "plain tag" };
-  const { root } = fixture({ [entry.source]: "# Snapshot\n\n[Defined][plain tag]\n\n[plain tag]: docs/state.md\n" });
+  const { root } = fixture({ [entry.source]: "# Snapshot\n\n[Defined][plain tag]\n\n[plain tag]: ../docs/state.md\n" });
   const result = runImmutableSnapshotFixture(root, [entry.source], [entry]);
   assert.deepEqual(result.findings, [
     `immutable-snapshot-missing-reference-exclusion: ${entry.source}:3 -> plain tag: exclusion no longer suppresses a "missing reference definition" finding -- remove it`,
