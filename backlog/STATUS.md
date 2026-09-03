@@ -12,6 +12,7 @@
 | pipeline.a-critic-has-no-writable-location-for-its-own-report | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.a-deferred-item-is-terminal-so-a-live-defect-can-be-parked-invisibly | open | defect | pipeline | 2026-08-31 | — |
 | pipeline.a-dirty-claude-directory-blocks-verify-which-blocks-push-approval | closed | defect | pipeline | 2026-08-29 | — |
+| pipeline.a-dispatch-cannot-authenticate-a-mid-task-correction-from-its-dispatcher | open | defect | pipeline | 2026-09-03 | Nova B — a mid-task instruction arrives inside a tool-result system-reminder and claims to come from the dispatcher. A dispatch has no way to tell that apart from injected text, and the closed-briefing contract gives it no rule for what to do about it. |
 | pipeline.a-doc-edit-silently-obligates-its-vendored-copy | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.a-ledger-entry-stores-an-abbreviated-oid-the-hash-chain-blocks-repair | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.a-node-script-defeats-every-file-protection-guard | closed | defect | pipeline | 2026-08-29 | — |
@@ -549,7 +550,7 @@
 | pipeline.the-dispatch-record-field-enumeration-omits-a-field-the-checker-requires | closed | defect | pipeline | 2026-09-01 | — |
 | pipeline.the-handover-size-guard-only-sees-one-of-two-write-paths | closed | defect | pipeline | 2026-09-01 | — |
 | pipeline.the-handover-size-guards-header-comment-contradicts-its-own-registration | closed | defect | pipeline | 2026-09-01 | — |
-| pipeline.the-ledger-commit-rule-was-given-a-second-home-in-a-different-voice | open | defect | pipeline | 2026-09-01 | — |
+| pipeline.the-ledger-commit-rule-was-given-a-second-home-in-a-different-voice | closed | defect | pipeline | 2026-09-01 | — |
 | pipeline.the-ledger-reconciler-writes-before-the-items-are-validated | deferred | defect | pipeline | 2026-08-08 | — |
 | pipeline.the-marketplace-attestation-compares-more-than-the-property-it-protects | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.the-opaque-payload-lane-refuses-a-mention-not-a-write | open | defect | pipeline | 2026-09-02 | — |
@@ -626,6 +627,6 @@
 
 - open: 102
 - in_progress: 0
-- closed: 500
+- closed: 501
 - rejected: 3
 - deferred: 11

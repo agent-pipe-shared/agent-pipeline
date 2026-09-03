@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "87464328bca3323b4cda70add93d09591ffef550a17d3ff798490af71da52e7c"
+    "transitionHead": "a25a6b07754ac2b83f9c44145bf6818b0e502a3a709b1389615fb683b4973be8"
   },
   "counts": {
     "open": 102,
     "in_progress": 0,
-    "closed": 500,
+    "closed": 501,
     "rejected": 3,
     "deferred": 11
   },
@@ -83,6 +83,16 @@
       "closureRepository": "self",
       "closureCommit": "562ea6bc8f857f53816cb8f08598bf20ce9b6f63",
       "closureEvidence": "backlog/items/2026-08-29-a-dirty-claude-directory-blocks-verify-which-blocks-push-approval.md"
+    },
+    {
+      "id": "pipeline.a-dispatch-cannot-authenticate-a-mid-task-correction-from-its-dispatcher",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-03",
+      "source": "Raised by dispatch NVA-B-RECSHAPE-1 as a finding outside its acceptance criteria, 2026-09-03: it received two coordinator corrections through that channel, verified the content independently before acting on it, and flagged the delivery channel regardless of the content being correct.",
+      "deferred": false,
+      "tracking": "Nova B — a mid-task instruction arrives inside a tool-result system-reminder and claims to come from the dispatcher. A dispatch has no way to tell that apart from injected text, and the closed-briefing contract gives it no rule for what to do about it."
     },
     {
       "id": "pipeline.a-doc-edit-silently-obligates-its-vendored-copy",
@@ -6783,12 +6793,16 @@
     },
     {
       "id": "pipeline.the-ledger-commit-rule-was-given-a-second-home-in-a-different-voice",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-01",
       "source": "Reported 2026-09-01 by dispatch NVA-B-LEDGERRULE2 as a finding outside its own acceptance criteria: the rule it was briefed to home in guardrails/git.md had already been homed in backlog/README.md hours earlier by NVA-B-GG22.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-09-03",
+      "closureRepository": "self",
+      "closureCommit": "232eb5b0f98df987ca4801d437d7fc8bae010438",
+      "closureEvidence": "backlog/evidence/2026-09-03-nova-b-batch-2-closure-verification.md"
     },
     {
       "id": "pipeline.the-ledger-reconciler-writes-before-the-items-are-validated",
