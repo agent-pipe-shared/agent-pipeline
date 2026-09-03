@@ -95,6 +95,43 @@ rather than fixed here — the item is worded around the opaque lane throughout,
 and widening the diff to a second lane would have been undisclosed scope creep in
 the opposite direction from the one this repository usually worries about.
 
+## `pipeline.briefing-bundling-two-findings-asks-for-two-dispatches`
+
+Closed against `9da139201379cf53a4d83613258ce9b6806bfc7a`.
+
+The one-briefing-one-package rule is now USAGE item 1 of
+`templates/prompts/goldfish-task.md` — ahead of "Fill ALL six fields" and ahead
+of the field-1 text, so a dispatcher reads it before writing a Goal rather than
+after an overrun. It is stated as an observable test ("can this briefing's Goal
+be delivered and committed independently of every other goal you are tempted to
+fold into the same briefing?"), carries the measured incident that produced it,
+and says in its own words that it argues for no budget change and leaves the
+closed `maxTurns` item closed.
+
+Verified in the dispatcher's own session:
+
+- `diff templates/prompts/goldfish-task.md plugins/pipeline-core/templates/prompts/goldfish-task.md`
+  → empty. The vendored copy was carried in the same commit.
+- `node harness/scripts/check-doc-contracts.mjs` → valid, 1279 files, 1236 links.
+- Trailers parse: `AI-Assisted: true` and `Dispatch: NVA-B-BUNDLESCOPE-1 (goldfish)`.
+
+**The dispatch declined to mirror the rule into the Critic template, and its
+reasoning is better than the instruction it was given.** The briefing told it to
+decide and justify either way rather than assume symmetry. It found two
+independent reasons not to: `critic-review.md`'s own USAGE bars the dispatcher
+from characterising the reviewed work at all — "never add an 'expected'/'none
+expected here' aside" — and a per-finding cost or split statement is exactly that
+kind of characterisation, so the rule would have contradicted the boundary the
+template exists to protect. And the measured blow-up was implementation cost,
+which does not transfer: Critic cost is driven by diff size and hunt categories,
+not by whether goals are independently deliverable.
+
+It also declined to touch `docs/operating-model.md`, on the ground that its
+"Dispatch briefing fields" section enumerates which fields exist rather than
+giving construction-time guidance. That keeps the rule in one place instead of
+two, which is the same principle the template's own USAGE item 0 states about
+not retyping generated rules.
+
 ## Note on a dispatcher error in this run: a briefing cited a file that was never created
 
 Recorded here rather than as its own item, because it is a compliance lapse

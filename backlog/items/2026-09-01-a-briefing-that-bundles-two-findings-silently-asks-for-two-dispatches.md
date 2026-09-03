@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.briefing-bundling-two-findings-asks-for-two-dispatches
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-03
+closure_repository: self
+closure_commit: 9da139201379cf53a4d83613258ce9b6806bfc7a
+closure_evidence: backlog/evidence/2026-09-03-nova-b-batch-2-closure-verification.md
 created: 2026-09-01
 sprint: nova-b
 tracking: "Nova B — dispatcher-side scoping defect: bundling two independent review findings into one briefing produced a package that could not fit any single tool budget, and the overrun was read as an agent problem rather than a briefing problem."
