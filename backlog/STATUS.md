@@ -508,7 +508,7 @@
 | pipeline.self-application-integrity-check-absent | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.self-healing-local-cleanup-recovery | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.semgrep-timeout-oversized-pipeline-state-test | closed | defect | pipeline | 2026-08-11 | — |
-| pipeline.sendmessage-mid-task-scope-relay-rule-has-no-durable-home | open | workflow-improvement | pipeline | 2026-08-26 | — |
+| pipeline.sendmessage-mid-task-scope-relay-rule-has-no-durable-home | closed | workflow-improvement | pipeline | 2026-08-26 | — |
 | pipeline.sentinel-epic-acceptance-matrix-archive-drift | closed | defect | pipeline | 2026-08-19 | — |
 | pipeline.sentinel-go-live-completion | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.session-keep-awake | closed | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
@@ -623,8 +623,8 @@
 
 ## Counts
 
-- open: 106
+- open: 105
 - in_progress: 0
-- closed: 495
+- closed: 496
 - rejected: 3
 - deferred: 11
