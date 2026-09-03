@@ -7,6 +7,7 @@ status: open
 created: 2026-09-02
 source: "GitHub Actions run 33595311782 (push to main, commit 6262d408), job verify, step Runner-free offline Core Verify, suite guard-lifecycle-ready-tests"
 sprint: nova-b
+done_when: contains plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs pipeline.rebwire-req5-2-supplies-its-own-true
 ---
 
 # The CI `PATH` allowlist omits `true`, so the guard's own published continuation cannot execute in CI
@@ -100,6 +101,28 @@ which is the pattern this repository has now repeated three times (`openssl`, th
 2. `guard-lifecycle-ready-tests` reports `=0` in an actual CI run, not only locally.
 3. The broader sweep question in the Proposal is either answered or explicitly deferred with a reason —
    not left silently unasked.
+
+### Predicate note, 2026-09-03 — Route 2, and what the predicate does not cover
+
+`done_when: contains plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+pipeline.rebwire-req5-2-supplies-its-own-true`. The item states a preference
+for Route 2 ("preferred: the assertion under test is about the guard's
+published route, not about the host's coreutils") with a stated reason, so
+anchoring the predicate to the test fixture file does not pre-decide a
+question the item left open — it follows the item's own stated preference.
+Route 1 (adding `true` to the workflow's synthetic `PATH`) would land in
+`.github/workflows/verify.yml` instead and would not satisfy this predicate;
+if Route 1 is chosen instead, this predicate needs retargeting at that time.
+**What this predicate does NOT cover:** Acceptance criterion 2
+("`guard-lifecycle-ready-tests` reports `=0` in an actual CI run, not only
+locally") is unreachable by any local machine predicate available to this
+closed vocabulary — there is no repo-relative script that can query GitHub
+Actions. The predicate here only expresses criterion 1 (a route implemented
+in the fixture); criteria 2 and 3 stay a human/CI-observation judgment.
+False today: the marker string does not appear anywhere in
+`guard-lifecycle-ready.test.mjs` (checked by direct grep before writing this
+predicate). No `Decision:` value is set here; that choice belongs to
+whoever triages this item next.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
