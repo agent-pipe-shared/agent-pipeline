@@ -86,21 +86,95 @@
  *     `diff-tree --numstat`); a rename shows as a delete + an add of the
  *     full file, which is the more conservative (larger) count for the
  *     stage-0 caps, never the more lenient one.
+ *   - `DISPATCH_LINE_RE` matches `/^Dispatch:[ \t]*(.*)$/m` ANYWHERE in the
+ *     message, not git's own trailer block (contrast
+ *     `dispatch-authorship-verify.mjs`'s `parseTrailerBlock`, which walks
+ *     backward from the last non-blank line and stops at the first line that
+ *     is not `Key: value` shaped). This cuts both ways and neither is fixed
+ *     here — doing so would change an EXISTING finding class's behaviour,
+ *     which this briefing forbids: (a) a trailer block separated from the
+ *     body by a blank line — invisible to git's own
+ *     `%(trailers:only=true,unfold=true)`, see `backlog/items/2026-09-01-
+ *     every-stage-0-commit-loses-its-assistance-marker-to-a-blank-line.md` —
+ *     is STILL FOUND by this module, unlike by git itself; (b) a `Dispatch:`
+ *     line appearing in ordinary body prose, never intended as a trailer, is
+ *     ACCEPTED by this module as if it were one.
+ *
+ * DISPATCH-RECORD SHAPE (briefing NVA-B-RECSHAPE-1; `templates/prompts/
+ * agent-obligations.md` §6, the entailment a `Dispatch: <TASK_ID> (goldfish|
+ * critic)` trailer states in bold: the record must exist, its `outcome` must
+ * be terminal, and its `report.changedFiles` must cover the commit's own
+ * changed paths). Every commit that reaches a VALID trailer above — so
+ * already past the file-type filter and never a stage-0-exempt commit, which
+ * carries no trailer and therefore no task id to resolve a record for — is
+ * ALSO checked against its named record, ONE finding class per §6 condition:
+ *
+ *   - `DISPATCH-RECORD-MISSING` — `reason=record-absent` (no
+ *     `evidence/dispatch-record-<TASK_ID>.json`), `reason=record-unreadable`
+ *     (exists but is not parseable JSON), or `reason=taskid-unsafe` (the
+ *     trailer's id is not a safe filename fragment, so no path is even
+ *     attempted — mirrors `isSafeTaskId` in dispatch-authorship-verify.mjs).
+ *   - `DISPATCH-RECORD-NOT-TERMINAL` — the record exists but `outcome` is
+ *     one of `NON_TERMINAL_OUTCOMES` (`isTerminalOutcome`, imported).
+ *   - `DISPATCH-RECORD-PATHS-UNCOVERED` — `reason=changedfiles-absent` (no
+ *     machine-readable `report.changedFiles` at all — `declaredPaths` returns
+ *     null) or `reason=changedfiles-incomplete` (declared, but at least one
+ *     of the commit's OWN changed paths — the same per-commit numstat list
+ *     the stage-0 caps are checked against, never an aggregate range diff —
+ *     is not covered by `coveringPath`, an exact match or a declared
+ *     directory-prefix match, never a basename match).
+ *
+ * All three conditions are checked independently once a record is found (a
+ * record can be simultaneously non-terminal AND incomplete; both findings are
+ * reported), so `checkDispatchProvenance` returns them in a SEPARATE
+ * `recordShapeFindings` array — deliberately never merged into `findings`.
+ * **THESE FINDINGS ARE REPORTED, NOT FATAL.** They do not affect `ok` or the
+ * exit code (`pipeline.dispatch-record-shape-is-fatal`, near the `ok:` line
+ * below, names the precondition for flipping that — a precondition already
+ * known NOT to hold today: `evidence/` is gitignored, so this check applied
+ * in CI or a fresh checkout finds ZERO records for every trailer-bearing
+ * commit, unconditionally, independent of corpus quality).
+ *
+ * `evidenceDir` (default `DEFAULT_EVIDENCE_DIR`, imported) is resolved from
+ * THIS PLUGIN'S OWN FILE LOCATION, never from `--root`/`root` — a `--root
+ * <other-checkout>` run still reads THIS repository's `evidence/` directory.
+ * Test fixtures therefore pass `evidenceDir` explicitly rather than relying
+ * on the default, which points at nothing meaningful for a throwaway root.
  *
  * Exit 0: every commit touching a tracked source file (per the filter
  * above) in the given range carries either a valid `Dispatch:` trailer or a
  * recognized stage-0 exemption. Exit 2: at least one
  * `MISSING-DISPATCH-PROVENANCE` finding, or an infrastructure error
  * (`GIT-REF-ERROR`, `GIT-LOG-ERROR`, `GIT-SHOW-ERROR`, `GIT-DIFF-TREE-ERROR`,
- * `USAGE-ERROR`). `--root <dir>` resolves the git range against another
+ * `USAGE-ERROR`). A `DISPATCH-RECORD-*` finding never changes the exit code
+ * (see above). `--root <dir>` resolves the git range against another
  * checkout (test-fixture convention, matches check-doc-reconciliation.mjs).
  *
  * Read-only: this module only inspects git history via `git log`/`git
- * diff-tree`/`git rev-parse`; it never writes, stages, or commits anything.
+ * diff-tree`/`git rev-parse`, plus a read of `evidence/dispatch-record-
+ * <TASK_ID>.json` for the new check; it never writes, stages, or commits
+ * anything.
  */
 import { spawnSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
+// Reused, not reimplemented (briefing NVA-B-RECSHAPE-1): `readRecordFile` /
+// `DEFAULT_EVIDENCE_DIR` are the one canonical record-path resolution
+// (`dispatch-record-<TASK_ID>.json` under `evidence/`); `declaredPaths` /
+// `coveringPath` / `isTerminalOutcome` are the SAME "covers" reading the
+// existing corpus is already judged by in `dispatch-authorship-verify.mjs`
+// (exact-match or declared-directory-prefix, never a basename match). Using a
+// second, independently-invented definition of "covers" here would let this
+// module and that one disagree about the same commit — read-only import,
+// this file is never modified by this module.
+import {
+  DEFAULT_EVIDENCE_DIR,
+  coveringPath,
+  declaredPaths,
+  isTerminalOutcome,
+  readRecordFile,
+} from "../../plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_ROOT = resolve(HERE, "..", "..");
@@ -229,19 +303,88 @@ export function formatRange(range) {
   return `${range.base}..${range.candidate} (resolved ${resolvedBase}..${resolvedCandidate})`;
 }
 
+// ------------------------------------------------- dispatch-record shape
+
+/**
+ * The §6 entailment check for ONE commit that already carries a VALID
+ * `Dispatch: <TASK_ID> (goldfish|critic)` trailer (module header,
+ * "DISPATCH-RECORD SHAPE"). `commitPaths` is the SAME per-commit numstat
+ * path list the caller already computed for the stage-0 caps — this
+ * function never re-derives or aggregates a diff of its own (DoD: "judged
+ * against the commit's OWN diff, per commit, never an aggregate range
+ * diff"). Returns an array of finding strings (zero, one, two, or three —
+ * every condition is checked independently; a record can be simultaneously
+ * non-terminal AND path-incomplete, and both are reported).
+ */
+export function checkDispatchRecordShape(sha, taskId, commitPaths, { evidenceDir = DEFAULT_EVIDENCE_DIR } = {}) {
+  const findings = [];
+
+  let record;
+  try {
+    record = readRecordFile(evidenceDir, taskId);
+  } catch (error) {
+    // `readRecordFile` throws both for an unsafe task id (never attempts a
+    // path) and for a record that exists but fails to parse as JSON --
+    // distinguished by `reason=` so the two are still greppable apart, even
+    // though the briefing's three finding classes fold both into MISSING.
+    const reason = /unsafe task id/u.test(error.message) ? "taskid-unsafe" : "record-unreadable";
+    findings.push(
+      `DISPATCH-RECORD-MISSING ${sha} taskId=${taskId} reason=${reason} -- ${error.message} (reported, not yet ` +
+      `fatal: pipeline.dispatch-record-shape-is-fatal)`,
+    );
+    return findings;
+  }
+  if (record === null) {
+    findings.push(
+      `DISPATCH-RECORD-MISSING ${sha} taskId=${taskId} reason=record-absent -- no evidence/dispatch-record-` +
+      `${taskId}.json exists (reported, not yet fatal: pipeline.dispatch-record-shape-is-fatal)`,
+    );
+    return findings;
+  }
+
+  if (!isTerminalOutcome(record.outcome)) {
+    findings.push(
+      `DISPATCH-RECORD-NOT-TERMINAL ${sha} taskId=${taskId} outcome=${JSON.stringify(record.outcome ?? null)} -- ` +
+      `expected a terminal outcome; the record still vouches for nothing (reported, not yet fatal: ` +
+      `pipeline.dispatch-record-shape-is-fatal)`,
+    );
+  }
+
+  const declared = declaredPaths(record);
+  if (declared === null) {
+    findings.push(
+      `DISPATCH-RECORD-PATHS-UNCOVERED ${sha} taskId=${taskId} reason=changedfiles-absent -- record declares no ` +
+      `machine-readable report.changedFiles (reported, not yet fatal: pipeline.dispatch-record-shape-is-fatal)`,
+    );
+  } else {
+    const uncovered = commitPaths.filter((path) => coveringPath(path, declared) === null);
+    if (uncovered.length > 0) {
+      findings.push(
+        `DISPATCH-RECORD-PATHS-UNCOVERED ${sha} taskId=${taskId} reason=changedfiles-incomplete -- changedFiles ` +
+        `does not cover ${uncovered.length} changed path(s): ${uncovered.join(", ")} (reported, not yet fatal: ` +
+        `pipeline.dispatch-record-shape-is-fatal)`,
+      );
+    }
+  }
+
+  return findings;
+}
+
 // -------------------------------------------------------------------- entry
 
-export function checkDispatchProvenance({ root = DEFAULT_ROOT, base, candidate } = {}) {
+export function checkDispatchProvenance({ root = DEFAULT_ROOT, base, candidate, evidenceDir = DEFAULT_EVIDENCE_DIR } = {}) {
   if (!base || !candidate) {
     return {
       ok: false,
       findings: ["USAGE-ERROR -- both --base <ref> and --candidate <ref> are required; there is no default range."],
+      recordShapeFindings: [],
       range: null,
       coverage: null,
     };
   }
 
   const findings = [];
+  const recordShapeFindings = [];
   const baseSha = gitResolveCommit(root, base);
   const candidateSha = gitResolveCommit(root, candidate);
   const range = { base, candidate, baseSha, candidateSha };
@@ -249,13 +392,13 @@ export function checkDispatchProvenance({ root = DEFAULT_ROOT, base, candidate }
   if (baseSha === null || candidateSha === null) {
     const which = baseSha === null ? `base "${base}"` : `candidate "${candidate}"`;
     findings.push(`GIT-REF-ERROR ${formatRange(range)} -- could not resolve ${which} to a commit`);
-    return { ok: false, findings, range, coverage: null };
+    return { ok: false, findings, recordShapeFindings, range, coverage: null };
   }
 
   const listResult = gitCommitList(root, baseSha, candidateSha);
   if (!listResult.ok) {
     findings.push(`GIT-LOG-ERROR ${formatRange(range)} -- git log failed: ${listResult.error}`);
-    return { ok: false, findings, range, coverage: null };
+    return { ok: false, findings, recordShapeFindings, range, coverage: null };
   }
 
   let commitsTouchingSource = 0;
@@ -283,7 +426,14 @@ export function checkDispatchProvenance({ root = DEFAULT_ROOT, base, candidate }
     const message = msgResult.text;
     const trailer = parseDispatchTrailer(message);
 
-    if (trailer.present && trailer.valid) continue; // valid Dispatch: trailer -- OK
+    if (trailer.present && trailer.valid) {
+      // Trailer-level provenance is satisfied; the §6 entailment behind it
+      // is a SEPARATE, non-fatal check (module header, "DISPATCH-RECORD
+      // SHAPE"). `taskId`/`role` were already restricted to `(goldfish|
+      // critic)` by `DISPATCH_VALUE_RE`, so no role gate is needed here.
+      recordShapeFindings.push(...checkDispatchRecordShape(sha, trailer.taskId, paths, { evidenceDir }));
+      continue; // valid Dispatch: trailer -- OK
+    }
 
     if (trailer.present && !trailer.valid) {
       findings.push(
@@ -322,8 +472,29 @@ export function checkDispatchProvenance({ root = DEFAULT_ROOT, base, candidate }
     commitsTouchingSource,
     commitsExempt,
     findingCount: findings.length,
+    recordShapeFindingCount: recordShapeFindings.length,
   };
-  return { ok: findings.length === 0, findings, range, coverage };
+  // pipeline.dispatch-record-shape-is-fatal -- TWO PRECONDITIONS, both
+  // currently false, mirroring check-backlog-done-predicate.mjs's own
+  // "reported, not yet enforced" posture for its UNDECLARED class:
+  //   1. `evidence/` must stop being gitignored for a check run in CI or a
+  //      fresh checkout to see ANY record at all. Today it does not
+  //      (`dispatch-authorship-verify.mjs`'s own LIMITS section says so of
+  //      its identical resolution), so folding `recordShapeFindings` into
+  //      `ok` today would report `DISPATCH-RECORD-MISSING` for EVERY
+  //      trailer-bearing commit in a fresh clone, unconditionally --
+  //      regardless of how compliant the corpus actually is. This is not a
+  //      corpus-quality question; it is a precondition this checker cannot
+  //      satisfy on its own.
+  //   2. Once (1) holds, the existing corpus must actually be assessed:
+  //      `backlog/items/2026-09-01-half-the-dispatch-records-omit-the-
+  //      field-that-binds-them-to-their-commit.md` measured roughly 60 of
+  //      ~130 records missing `report.changedFiles` alone: making this
+  //      fatal today would break the gate for a backlog nobody has decided
+  //      whether to backfill, narrow the template's claim, or both.
+  // Neither precondition is this script's to satisfy; this is the flip
+  // point, not a place this script changes itself.
+  return { ok: findings.length === 0, findings, recordShapeFindings, range, coverage };
 }
 
 /**
@@ -336,7 +507,9 @@ export function summaryLine({ range, coverage }) {
   return [
     `Dispatch provenance: range ${formatRange(range)} -- ${coverage.commitsInRange} commit(s) in range, ` +
       `${coverage.commitsTouchingSource} touching a tracked source file (docs/, scratch/ excluded), ` +
-      `${coverage.commitsExempt} recognized stage-0 exemption(s), ${coverage.findingCount} finding(s).`,
+      `${coverage.commitsExempt} recognized stage-0 exemption(s), ${coverage.findingCount} finding(s), ` +
+      `${coverage.recordShapeFindingCount ?? 0} dispatch-record-shape finding(s) (reported, not yet fatal -- ` +
+      `pipeline.dispatch-record-shape-is-fatal).`,
     "WHAT THIS CHECK CANNOT DO: it cannot verify EL-01's semantic criteria (no architecture/schema/public-API/test/" +
       "guardrail-hook-CI/dependency/security-surface change) or the undefined \"risk flag\" EL-01 names but nowhere " +
       "defines a location/format for; the \"stage-0 fast path\" phrase match is a self-declaration read from commit " +
@@ -365,11 +538,16 @@ if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import
   }
 
   const result = checkDispatchProvenance({ root, base, candidate });
+  // DISPATCH-RECORD-* findings are printed either way (reported, not yet
+  // fatal) but never gate `process.exit` -- only `result.findings.length`
+  // (the pre-existing, unchanged exit-status source) does that.
   if (result.ok) {
     console.log(summaryLine(result));
+    for (const finding of result.recordShapeFindings) console.error(finding);
     process.exit(0);
   }
   for (const finding of result.findings) console.error(finding);
+  for (const finding of result.recordShapeFindings) console.error(finding);
   const rangeText = result.range ? formatRange(result.range) : `${base}..${candidate} (unresolved)`;
   console.error(`Dispatch provenance check failed: ${result.findings.length} finding(s) over range ${rangeText}.`);
   process.exit(2);

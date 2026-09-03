@@ -20,6 +20,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   checkDispatchProvenance,
+  checkDispatchRecordShape,
   formatRange,
   hasStage0Phrase,
   parseDispatchTrailer,
@@ -74,9 +75,17 @@ function nLines(n, tag) {
   return `${lines.join("\n")}\n`;
 }
 
-function run(root, base, candidate) { return checkDispatchProvenance({ root, base, candidate }); }
+function run(root, base, candidate, evidenceDir) { return checkDispatchProvenance({ root, base, candidate, evidenceDir }); }
 
 function findingsOf(result, code) { return result.findings.filter((f) => f.startsWith(code)); }
+
+// --------------------------------------------------- dispatch-record fixtures
+
+function buildEvidenceDir() { return mkdtempSync(join(tmpdir(), "dispatch-record-shape-test-")); }
+
+function writeRecord(evidenceDir, taskId, record) {
+  writeFileSync(join(evidenceDir, `dispatch-record-${taskId}.json`), JSON.stringify(record, null, 2));
+}
 
 // -------------------------------------------------------------- unit-level
 
@@ -273,6 +282,123 @@ check("behaviour: a mixed docs/+source commit IS examined (touches a tracked sou
   assert.equal(result.ok, false);
   assert.equal(result.coverage.commitsTouchingSource, 1);
   cleanup(root);
+});
+
+// ---------------------------------------------- dispatch-record shape (NVA-B-RECSHAPE-1)
+// agent-obligations.md §6's three entailments of a valid `Dispatch:` trailer. REPORTED,
+// NOT FATAL: every case below asserts `result.ok` and the CLI exit code are unaffected,
+// alongside asserting the specific `recordShapeFindings` entry the case is about.
+
+check("checkDispatchRecordShape: a compliant record (terminal outcome, changedFiles covers the path) -> no finding", () => {
+  const evidenceDir = buildEvidenceDir();
+  writeRecord(evidenceDir, "WP-COMPLIANT", { outcome: "completed", report: { changedFiles: ["src/alpha.txt"] } });
+  const findings = checkDispatchRecordShape("deadbeef", "WP-COMPLIANT", ["src/alpha.txt"], { evidenceDir });
+  assert.deepEqual(findings, []);
+  cleanup(evidenceDir);
+});
+
+check("checkDispatchRecordShape: record absent -> DISPATCH-RECORD-MISSING reason=record-absent", () => {
+  const evidenceDir = buildEvidenceDir();
+  const findings = checkDispatchRecordShape("deadbeef", "WP-NO-RECORD", ["src/alpha.txt"], { evidenceDir });
+  assert.equal(findings.length, 1);
+  assert.match(findings[0], /^DISPATCH-RECORD-MISSING deadbeef taskId=WP-NO-RECORD reason=record-absent/);
+  cleanup(evidenceDir);
+});
+
+check("checkDispatchRecordShape: non-terminal outcome -> DISPATCH-RECORD-NOT-TERMINAL", () => {
+  const evidenceDir = buildEvidenceDir();
+  writeRecord(evidenceDir, "WP-INPROGRESS", { outcome: "in-progress", report: { changedFiles: ["src/alpha.txt"] } });
+  const findings = checkDispatchRecordShape("deadbeef", "WP-INPROGRESS", ["src/alpha.txt"], { evidenceDir });
+  assert.equal(findings.length, 1);
+  assert.match(findings[0], /^DISPATCH-RECORD-NOT-TERMINAL deadbeef taskId=WP-INPROGRESS outcome="in-progress"/);
+  cleanup(evidenceDir);
+});
+
+check("checkDispatchRecordShape: changedFiles absent -> DISPATCH-RECORD-PATHS-UNCOVERED reason=changedfiles-absent", () => {
+  const evidenceDir = buildEvidenceDir();
+  writeRecord(evidenceDir, "WP-NOFILES", { outcome: "completed" });
+  const findings = checkDispatchRecordShape("deadbeef", "WP-NOFILES", ["src/alpha.txt"], { evidenceDir });
+  assert.equal(findings.length, 1);
+  assert.match(findings[0], /^DISPATCH-RECORD-PATHS-UNCOVERED deadbeef taskId=WP-NOFILES reason=changedfiles-absent/);
+  cleanup(evidenceDir);
+});
+
+check("checkDispatchRecordShape: changedFiles present but does not cover a touched path -> reason=changedfiles-incomplete", () => {
+  const evidenceDir = buildEvidenceDir();
+  writeRecord(evidenceDir, "WP-PARTIAL", { outcome: "completed", report: { changedFiles: ["src/other.txt"] } });
+  const findings = checkDispatchRecordShape("deadbeef", "WP-PARTIAL", ["src/alpha.txt"], { evidenceDir });
+  assert.equal(findings.length, 1);
+  assert.match(findings[0], /^DISPATCH-RECORD-PATHS-UNCOVERED deadbeef taskId=WP-PARTIAL reason=changedfiles-incomplete/);
+  assert.ok(findings[0].includes("src/alpha.txt"));
+  cleanup(evidenceDir);
+});
+
+check("checkDispatchRecordShape: a record can fail two conditions at once, and both are reported", () => {
+  const evidenceDir = buildEvidenceDir();
+  writeRecord(evidenceDir, "WP-BOTH", { outcome: "in-progress" });
+  const findings = checkDispatchRecordShape("deadbeef", "WP-BOTH", ["src/alpha.txt"], { evidenceDir });
+  assert.equal(findings.length, 2);
+  assert.ok(findings.some((f) => f.startsWith("DISPATCH-RECORD-NOT-TERMINAL")));
+  assert.ok(findings.some((f) => f.startsWith("DISPATCH-RECORD-PATHS-UNCOVERED")));
+  cleanup(evidenceDir);
+});
+
+check("behaviour: a stage-0-exempt commit with no record at all produces NO dispatch-record-shape finding", () => {
+  const root = buildRoot();
+  const evidenceDir = buildEvidenceDir();
+  writeFile(root, "src/seed.txt", "seed\n");
+  const base = commit(root, "base");
+  writeFile(root, "src/alpha.txt", nLines(10, "alpha"));
+  const candidate = commit(root, "fix(x): small repair\n\nAuthored within the stage-0 fast path.\n\nAI-Assisted: true\n");
+
+  const result = run(root, base, candidate, evidenceDir);
+  assert.equal(result.ok, true, result.findings.join("\n"));
+  assert.deepEqual(result.recordShapeFindings, []);
+  cleanup(root);
+  cleanup(evidenceDir);
+});
+
+check("behaviour (falsifier): a valid trailer naming a MISSING record is reported, but never fatal -- ok stays true, exit stays 0", () => {
+  const root = buildRoot();
+  const evidenceDir = buildEvidenceDir(); // deliberately empty -- no dispatch-record-WP-A-AC08.json
+  writeFile(root, "src/seed.txt", "seed\n");
+  const base = commit(root, "base");
+  writeFile(root, "src/alpha.txt", "changed\n");
+  const candidate = commit(root, "feat(x): thing\n\nDispatch: WP-A-AC08 (goldfish)\nAI-Assisted: true\n");
+
+  const result = run(root, base, candidate, evidenceDir);
+  assert.equal(result.ok, true, result.findings.join("\n")); // pre-existing findings/exit unchanged by the new class
+  assert.equal(result.findings.length, 0);
+  assert.equal(result.recordShapeFindings.length, 1);
+  assert.match(result.recordShapeFindings[0], /^DISPATCH-RECORD-MISSING/);
+
+  const cliResult = spawnSync(
+    process.execPath,
+    [checkerPath, "--root", root, "--base", base, "--candidate", candidate],
+    { encoding: "utf8", env: { ...process.env } },
+  );
+  // The real CLI run (no --evidence-dir flag) resolves against THIS repository's own
+  // evidence/ directory (module header: evidenceDir is never derived from --root), so it
+  // is not asserted against here -- only the exit code, which is `ok`-driven either way.
+  assert.equal(cliResult.status, 0, `stderr: ${cliResult.stderr}`);
+  cleanup(root);
+  cleanup(evidenceDir);
+});
+
+check("behaviour: a compliant record via the full checkDispatchProvenance path produces no dispatch-record-shape finding", () => {
+  const root = buildRoot();
+  const evidenceDir = buildEvidenceDir();
+  writeFile(root, "src/seed.txt", "seed\n");
+  const base = commit(root, "base");
+  writeFile(root, "src/alpha.txt", "changed\n");
+  const candidate = commit(root, "feat(x): thing\n\nDispatch: WP-FULL-PASS (goldfish)\nAI-Assisted: true\n");
+  writeRecord(evidenceDir, "WP-FULL-PASS", { outcome: "completed", report: { changedFiles: ["src/alpha.txt"] } });
+
+  const result = run(root, base, candidate, evidenceDir);
+  assert.equal(result.ok, true, result.findings.join("\n"));
+  assert.deepEqual(result.recordShapeFindings, []);
+  cleanup(root);
+  cleanup(evidenceDir);
 });
 
 // -------------------------------------------------------------------- usage
