@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.the-denial-trim-state-is-keyed-per-session-not-per-agent-as-its-comment-claims
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-03
+closure_repository: self
+closure_commit: 15bb35994d83b8147b22c9316561c3767ef81037
+closure_evidence: backlog/evidence/2026-09-03-nva-b-trimkey-stale-open-measurement.md
 created: 2026-09-01
 sprint: nova-b
 done_when: manual
@@ -66,5 +70,24 @@ the no-throw path; the first-denial guarantee holding structurally rather than
 only by test; the override ceremony text identical in both renderings. The
 non-atomic read-modify-write and a torn state file both fail open, worst case a
 redundant full rendering.
+
+## Closure
+
+Closed 2026-09-03 against `15bb35994d83b8147b22c9316561c3767ef81037`, which
+landed 2026-09-01 — two days before this item was picked up, while the item's own
+`status:` field still read `open`.
+
+The deciding question this item posed was answered by measurement, not inference:
+a dispatched subagent's PreToolUse payload carries its orchestrator's
+`session_id` and never one of its own. So the item's first branch applied — this
+was a real scoping error whose visible symptom was the comment, not a comment
+defect standing alone. The fix keys the state per resolved subagent `agentId`
+with a `session_id` fallback, corrects the header to describe that keying, and
+pins the first-denial guarantee for a fresh subagent with a regression test.
+
+Nothing was dispatched for this item. The measurement is in
+`backlog/evidence/2026-09-03-nva-b-trimkey-stale-open-measurement.md`, and the
+stale-status mechanism it exhibits is recorded as a second instance in
+`backlog/items/2026-08-27-resolved-backlog-items-can-keep-status-open-indefinitely.md`.
 
 ## Placeholder-marker-for-append
