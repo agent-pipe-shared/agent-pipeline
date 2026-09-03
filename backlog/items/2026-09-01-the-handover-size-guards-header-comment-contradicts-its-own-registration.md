@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.the-handover-size-guards-header-comment-contradicts-its-own-registration
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-03
+closure_repository: self
+closure_commit: 3c7c5d5f38e44afd54af8005960144bb965b0785
+closure_evidence: backlog/evidence/2026-09-03-nova-b-batch-1-closure-verification.md
 created: 2026-09-01
 sprint: nova-b
 done_when: manual

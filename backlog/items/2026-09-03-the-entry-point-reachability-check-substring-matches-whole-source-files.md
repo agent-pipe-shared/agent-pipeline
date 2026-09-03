@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.entry-point-reachability-check-substring-matches-whole-source-files
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-03
+closure_repository: self
+closure_commit: 4a9a40d60aa7ff069ed0d27cb944f504b758fb4f
+closure_evidence: backlog/evidence/2026-09-03-nova-b-batch-1-closure-verification.md
 created: 2026-09-03
 sprint: nova-b
 tracking: "Nova B — the reachability check decides whether a guard admits a script by testing whether the guard's source text contains the script's stem anywhere, comments included. A comment citing an evidence file whose name happens to contain a script stem is read as an admission."

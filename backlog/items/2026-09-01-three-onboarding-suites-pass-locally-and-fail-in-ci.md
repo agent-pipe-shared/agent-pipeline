@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.three-onboarding-suites-pass-locally-and-fail-in-ci
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-03
+closure_repository: self
+closure_commit: 6262d408aa616651232b46ab8ecbfd88ce4055b0
+closure_evidence: backlog/evidence/2026-09-03-nova-b-batch-1-closure-verification.md
 created: 2026-09-01
 source: "GitHub Actions run 33471808564 (workflow_dispatch, feat/sprint-nova-codex-v046, candidate 56e91858), job verify, step Runner-free offline Core Verify"
 sprint: nova-b

@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.dispatch-records-are-written-to-a-name-the-verifier-cannot-find
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-03
+closure_repository: self
+closure_commit: bb079c96f8e56531635cfc0d1c3385fbd3536156
+closure_evidence: backlog/evidence/2026-09-03-nova-b-batch-1-closure-verification.md
 created: 2026-09-03
 sprint: nova-b
 tracking: "Nova B — the authorship verifier reads exactly one filename shape in exactly one directory; two dispatches in one day wrote their records under a different name in a different directory, in good faith, following the directory contract."
