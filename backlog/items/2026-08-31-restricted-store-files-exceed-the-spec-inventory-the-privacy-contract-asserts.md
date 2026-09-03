@@ -124,6 +124,67 @@ again, whichever route is chosen. The contrast is drawn in the same document: th
 kernel's `storageProfile` check is a predicate evaluated on every event, and does
 not decay the way a table a human must remember to update does.
 
+## PO decision, 2026-09-03 — routes A and C, both
+
+The PO chose route A **and** route C, after being shown the costed routes above.
+Not one or the other: fix the inventory so it is true, and stop the contract from
+resting on an inventory that decays.
+
+### Why both, and why A is not made redundant by C
+
+A first reading suggested C might make A optional — if rule 11 no longer keys on
+the file enumeration, why spend a PO signature correcting that enumeration on a
+closed epic? That reading is wrong, and it was checked before being acted on.
+`§§7.3–7.4` is load-bearing for **three** design documents, not one:
+
+- `design/privacy-review.md:119` — rule 11, the claim this item is about.
+- `design/architecture.md:1050` — "the files already authorized by bound Spec
+  §§7.3–7.4. Architecture narrows…".
+- `design/critic-review.md:129` and `:154`.
+
+Narrowing rule 11 alone would therefore leave two other documents resting on an
+inventory nobody intends to keep accurate.
+
+### The finding that settles the ordering
+
+`design/critic-review.md:113` records **PHX-PR-05 as a *major* Critic finding** —
+"the architecture added five restricted-store files" — and `:154` records that a
+later Critic cleared it "through ownership solely in Spec §§7.3–7.4 inventory
+files".
+
+That recorded PASS rests on exactly the claim this item shows to be false again.
+So the sequence is not arbitrary:
+
+1. **A restores the factual basis** of a clearance that is currently standing on
+   a false statement.
+2. **C then changes what the contract rests on going forward**, so the same
+   clearance does not decay a third time.
+
+Doing C alone would leave a recorded major-finding clearance justified by a claim
+the repository had just decided to stop maintaining. Doing A alone repairs this
+instance and guarantees the fourth recurrence.
+
+### What C must therefore say
+
+C is not "lower the bar". The defensible form is to restate rule 11 in terms of
+what is actually enforced — the kernel's `storageProfile` /schema discrimination
+at `governance-event.mjs:171,180`, a predicate evaluated on every event — instead
+of a file-location enumeration no mechanism checks. And because C edits
+`privacy-review.md`, it reopens the §5 requirement for a fresh bounded privacy
+re-review before the design reaches the PO gate; the open F2 sign-off item
+(`pipeline.the-privacy-sign-off-is-bound-to-a-superseded-candidate`) should ride
+on that same reopening rather than be handled separately.
+
+### Gates, unchanged by this decision
+
+- A: `spec.md` is `authority: true`, `mutability: immutable` → PO-signed
+  `feature-package-reconcile`. `ALWAYS_REQUIRED_KINDS`; no profile lowers it.
+- C: `privacy-review.md` is `mutability: mutable` → Elephant-invokable
+  `feature-package-rebind-mutable` for the digest step; the content decision was
+  the PO's and is recorded here.
+
+Neither is seeded. A ceremony is seeded only when the PO can sign immediately.
+
 **Flagged, unresolved:** `specs/sprint-phoenix-epic/lifecycle.json` records
 `state: "draft"` although the epic is described as closed in `docs/state.md`, in
 this item, and in the Critic review. It does not change route 1's gate, which

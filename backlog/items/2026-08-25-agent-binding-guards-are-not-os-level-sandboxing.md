@@ -166,3 +166,56 @@ This item stays open as the umbrella recording the residual, and closes only
 when the PO makes the Nova B scope call on the OS boundary itself. Vectors 4
 and 5 are already recorded above as mitigated; vector 3 is recorded as
 reassuring rather than concerning.
+
+## Vector 1, third measured instance — 2026-09-03, against cross-repo containment
+
+Recorded here rather than filed separately: it is the same mechanism, reached
+from a third direction. It is worth appending because of WHERE it was found and
+what it invalidated.
+
+Dispatch `NVA-B-CRITICWRITE-1`, analysing a different item entirely, ran
+
+```
+node -e "require('fs').writeFileSync('<session-scratchpad>/probe-write-test.txt','probe')"
+```
+
+through Bash, targeting a path **outside the project root**. The guard admitted
+it with no denial and the file landed.
+
+Confirmed against the source rather than only by the probe:
+`guard-lifecycle-ready.mjs` (~`:814-844`) documents this class of gap in its own
+words — "GS-1..GS-6 refuse an Edit or a Write. A shell command is neither… and
+`node -e` is an ordinary simple command under the closed grammar." The
+containment check that refuses a write outside the project root fires for
+`Edit`/`Write`/`NotebookEdit` tool calls plus an enumerated Bash blocklist of
+named patterns and redirect targets. It is **enumerated-deny, not allow-list**.
+Two classes are closed against opaque interpreter payloads — gate-strength config
+paths by substring match, and protected test paths via the
+`opaque-interpreter-code` lane. Everything else is not inspected.
+
+### What this instance adds beyond the two already recorded
+
+The prior two instances were about an adversarial agent defeating a rule it
+disliked. This one was not adversarial at all: the dispatch was probing to
+establish a fact for an options analysis, and the result **falsified the premise
+of the item it was working on**.
+
+`backlog/items/2026-09-01-a-critic-has-no-writable-location-for-its-own-report.md`
+was written from two Critic dispatches' disclosures and asserts, as its first
+bullet, that writing to the session scratchpad "is refused by
+`guard-lifecycle-ready.mjs` with `GUARD-CROSS-REPO-MUTATION`", and later that
+"no admitted shell shape writes file content". Both are false as stated. The
+Critic does have a writable location; what it lacks is a *sanctioned* one.
+
+So the cost of this gap is not only that a determined agent can step outside the
+boundary. It is that the boundary's actual shape is not known to the people
+reasoning about it — including agents writing backlog items from live denials
+they received, which is the most reliable-looking evidence available short of
+reading the guard.
+
+Secondary correction from the same reading, recorded because it bears on any
+role-scoped remedy: the guard has **no concept of a role**. The Critic's
+read-only property is enforced by `roles/critic.md` CR-08's discipline and by the
+absence of a `Write`/`Edit` tool grant in its agent definition — not by any
+mechanical check. A remedy that assumes the guard can distinguish a Critic from a
+Goldfish is assuming machinery that does not exist.
