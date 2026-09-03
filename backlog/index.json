@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "b5b39e86f05c3260b42dd6d3f71e138bd7b8434c21110c685f46d8421a899103"
+    "transitionHead": "09dda69d0ee23ea46ae1450ffab4b6bae4237eb16fc6a41da4e60df00d7f2a90"
   },
   "counts": {
-    "open": 108,
+    "open": 107,
     "in_progress": 0,
-    "closed": 493,
+    "closed": 494,
     "rejected": 3,
     "deferred": 11
   },
@@ -6820,12 +6820,16 @@
     },
     {
       "id": "pipeline.the-rebase-authority-is-resolved-and-advertised-but-not-executable",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-02",
       "source": "Field report from a second session (sprint-alfred) blocked mid-rebase on Pipeline 0.6.1, cross-checked against guard-lifecycle-ready.mjs by direct reading",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-09-03",
+      "closureRepository": "self",
+      "closureCommit": "afb2e3c0f11f7bb0f6af31bec94a376616d31cb4",
+      "closureEvidence": "backlog/evidence/2026-09-03-nva-rebdead-round2-findings.md"
     },
     {
       "id": "pipeline.the-two-suite-registration-checkers-disagree",
