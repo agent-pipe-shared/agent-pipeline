@@ -265,56 +265,53 @@ read that rather than trusting any prose claim about which HEAD was green.
 - The authorship-only dispatch-record projection, applied once by hand, is not
   yet a mechanism.
 
-### In flight — the rebase deadlock, reported from a second session
+### Closed — the rebase deadlock reported from a second session
 
-A session rebasing `feat/sprint-alfred` onto `6262d408` is deadlocked: the
-resolved rebase authority names `project/pipeline-state.json` as its conflict
-path and advertises the resolution shapes, then two later checks in the same
-evaluation refuse every one of them. Filed as
-`pipeline.the-rebase-authority-is-resolved-and-advertised-but-not-executable`
-(`26ce76a9`). **The PO wants only the Pipeline defect fixed and a new candidate
-on `main`; the Alfred checkout and its running rebase are not to be touched.**
+Fixed, reviewed and closed 2026-09-03 (`e152183e`). Nine commits, two
+independent Critic rounds, full verify green across 506 suites. Detail lives in
+`backlog/items/2026-09-02-the-rebase-authority-is-resolved-and-advertised-but-not-executable.md`
+and the two findings registries under `backlog/evidence/`.
 
-Landed: `10d11e58` — both reliefs keyed on the resolver's own
-`conflictPaths`/command predicates, and an admission notice, because a lifecycle
-gate that suspends itself silently is indistinguishable in an audit from one
-that was never armed. 219/219, re-measured by the Elephant, not taken from the
-dispatch report.
+Three results worth carrying, because a green suite would have hidden all three:
 
-Critic round 1 (guardrail class, higher-capability model) returned eight
-findings. Three were dispatcher-side and are closed in `e67968f0`; the registry
-is `backlog/evidence/2026-09-02-nva-rebdead-1-findings.md` (`508211f9`).
+- **Round-1 F1 was refuted by measurement.** `apply_patch` was never blocked —
+  the outer tool-name gate admits any tool outside `SHELL_TOOLS`/`WRITE_TOOLS`
+  before either relief, and `guard-apply-patch.mjs` closes that by never
+  forwarding a raw `apply_patch`. The fix built against the finding was reverted.
+- **F5's first rework was rejected.** It pinned the relief to
+  `continuity-damaged`, measured against the guard test's own stub rather than
+  the production chain. An unparseable state file yields
+  `continuity-observation-unavailable`, so that narrowing would have re-opened
+  this exact deadlock with the suite still green.
+- **Round-2 F1 is an unremedied lifecycle violation of mine.** `43413349` was
+  written by the orchestrating session instead of dispatched, breaking three of
+  EL-01's five stage-0 conditions. Deliberately not "fixed": re-doing the revert
+  through a dispatch would churn a guardrail hook to launder authorship.
 
-**F1 is refuted and its fix reverted (`43413349`).** `apply_patch` was never
-blocked: `evaluateLifecycleReadyGuardCore:4311` admits any tool name outside
-`SHELL_TOOLS`/`WRITE_TOOLS` unconditionally, and `guard-apply-patch.mjs` closes
-that by never forwarding a raw `apply_patch` — it synthesizes an `Edit` per
-touched path, which the pre-existing relief already admitted. The revert is
-deliberate rather than tidiness: the reverted code added branches no call can
-reach, presenting a second apparent enforcement boundary in a file whose
-companion documents its translation loop as the sole one.
+## PO decisions and todos — collected during the autonomous run, not waited on
 
-**Still open: F5, F7, F8, then a second Critic round and full verify.** F5 is the
-substantive one and its design decision is already made and recorded in the
-rework briefing: narrow the readiness relief to the exact `lifecycleStatus` an
-unparseable state file produces — measured, not guessed — instead of the whole
-`PORG-NOT-READY` + `intent: "session"` family. As shipped it silently makes the
-narrower `restart-required` sibling unreachable. The earlier wording
-"re-base readiness on `orig-head`" named the goal, not the mechanism.
+Per the PO's 2026-09-02 instruction. None blocks further Nova-B work.
 
-Two process facts belong with this, both measured today:
-
-- **`docs/push-release-flow.md`'s GIT-01 admitted-type list has no `revert`,**
-  though Conventional Commits defines it. The revert above is typed `fix` and
-  says so in its own message. Not filed as an item pending a PO word.
-- **Three dispatches hit the `maxTurns: 80` cliff in one block, one losing every
-  trace of its work** — clean tree, no commit, no artifact, one log entry, ~193k
-  tokens. Filed as
-  `pipeline.documenting-the-maxturns-cliff-did-not-stop-dispatches-falling-off-it`
-  (`02303be0`), deliberately a new item rather than reopening the 2026-08-25
-  closure whose remedy was documentary and demonstrably does not hold. The
-  session's own correction — one concern per dispatch, budget 25 — is applied
-  from `NVA-REBDEAD-F1` onward.
+1. **A machine-specific path is in published history.** `79bc79b8` carries this
+   machine's repository path seven times in an evidence artifact; the working
+   tree was sanitised in `68c164e8` but the bytes remain. The only remedy is a
+   history rewrite, which the guard union forbids — so this is a PO call on an
+   accepted exposure, not a task. Prevention is filed as its own item.
+2. **Hook-bypass override removal (ADR-0079) needs one PO sentence:** does the
+   decision cover `git commit` and `git push`, or push only? Also scheduled for
+   the maintenance window, and its test file is TP-1 protected.
+3. **Vendored-canon drift** names two options and decides neither. The effective
+   one is a pre-commit hook — new enforcement surface, which a standing
+   constraint holds back until the current diff is reviewed.
+4. **Three `hooks.json` edits await one shared TP-4 ceremony** rather than three:
+   the worktree-isolation matcher, the resume-hint delivery hook, and the
+   handover-size guard's registration. Deliberately not seeded — a ceremony is
+   seeded only when the PO can sign immediately.
+5. **GIT-01 does not admit `revert`.** Deliberate or oversight? Two reverts this
+   week were committed as `fix` with the reason in the body.
+6. **Nova B is 68 open items, not the 19 the STATUS.md tracking column shows.**
+   The authoritative field is `sprint: nova-b` in frontmatter. Recorded because
+   "work the Nova B backlog" and "work 68 items" are different asks.
 
 ## Operational head
 
