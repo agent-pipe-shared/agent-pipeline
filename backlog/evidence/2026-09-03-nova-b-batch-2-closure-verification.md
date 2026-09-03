@@ -42,6 +42,59 @@ inside a discussion of one historical event. That bullet was folded in from the
 vendored copies. This is the one place where the removed text contained something
 the survivor lacked, and it was preserved rather than discarded.
 
+## `pipeline.the-opaque-payload-lane-refuses-a-mention-not-a-write`
+
+Closed against `e52e5373` (second of two commits; `6ce13d26` carries the parser).
+
+The item required resolution 1 — teach the lane to tell a write from a mention —
+and recorded that correcting the denial text alone would NOT close it. Both were
+done, in that order.
+
+Re-run by the dispatcher after both commits landed:
+
+- `node --test plugins/pipeline-core/lib/protected-test-paths.test.mjs` → **29/29**,
+  exit 0.
+- `node --test plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs` →
+  **225/225**, exit 0.
+
+The four assertions that carry the closure are named for the task and cover both
+directions:
+
+- a protected path merely mentioned in a write call's *content* argument is
+  admitted, for `node -e` and `python3 -c` alike;
+- `python3 -c` `open()` without a write-capable mode is never a target, so
+  reading is unaffected;
+- `git rebase --exec "node --test <protected suite>"` — running a suite, not
+  writing to it — is admitted, which was the item's headline regression;
+- **variable indirection stays refused.** This is the important one: it proves
+  the fail-closed default survived the change rather than being traded away for
+  the admissions above.
+
+`TPSHELL-OPAQUEMENTION` pins the same three behaviours end to end through the
+guard, and the pre-existing `TPSHELL-REBASE-EXEC` refuse-direction assertions
+still pass unchanged.
+
+**Residual scope, reported by the dispatch rather than left to be discovered.**
+These shapes still refuse a mere mention, because the parser cannot resolve them:
+a write sink whose target is its second argument (`renameSync`, `copyFileSync`
+destinations; `os.rename`, `shutil.copy`, `shutil.rmtree`, `os.rmdir` are not in
+the sink set at all); `pwsh`/`powershell -c` payloads, a different grammar left
+untouched; Perl and Ruby written without parentheses; free text outside any
+recognised call, variable indirection included; and a write performed by a script
+the command merely names instead of embedding, which is a pre-existing gap stated
+in the module's own header.
+
+**The denial text is now true where it fires, and the dispatch said plainly where
+it does not.** The new caveat is scoped to `lane === "opaque-interpreter-code"`
+and correctly states there that an unresolvable payload is refused whether or not
+it writes, naming the route forward. It deliberately does not fire for the
+sibling `unparsed-command` lane, where the same false "only a detected write is
+refused" claim still stands. That gap is filed as
+`backlog/items/2026-09-03-the-unparsed-command-lane-still-carries-the-false-denial-claim.md`
+rather than fixed here — the item is worded around the opaque lane throughout,
+and widening the diff to a second lane would have been undisclosed scope creep in
+the opposite direction from the one this repository usually worries about.
+
 ## Note on a dispatcher error in this run: a briefing cited a file that was never created
 
 Recorded here rather than as its own item, because it is a compliance lapse

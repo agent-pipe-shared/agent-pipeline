@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.the-opaque-payload-lane-refuses-a-mention-not-a-write
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-03
+closure_repository: self
+closure_commit: e52e5373d81afde912ff35df043aade44ee7c073
+closure_evidence: backlog/evidence/2026-09-03-nova-b-batch-2-closure-verification.md
 created: 2026-09-02
 sprint: nova-b
 done_when: manual
