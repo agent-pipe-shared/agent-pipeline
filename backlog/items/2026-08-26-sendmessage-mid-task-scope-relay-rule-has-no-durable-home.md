@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.sendmessage-mid-task-scope-relay-rule-has-no-durable-home
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-03
+closure_repository: self
+closure_commit: 7a7428c7739afb47c9c0ad0f3898b1306889dae0
+closure_evidence: plugins/pipeline-core/skills/pipeline-start/references/workflow-dispatch.md
 created: 2026-08-26
 sprint: alfred
 source: "Handover-rotation extraction pass (ADR-0066 Decision 6/7) over docs/state.md's 2026-08-25 'Antigravity CLI 3rd Runner Integration & Hardening' section, before rotating it to archive"
@@ -42,3 +46,17 @@ continuation, never new authority).
 
 - **Decision:** open, unassigned — filed during a handover-rotation
   extraction pass, not evaluated for priority yet.
+
+## Closure
+
+Closed 2026-09-03 against `7a7428c7739afb47c9c0ad0f3898b1306889dae0`, which gave
+the rule the durable home this item asked for: `workflow-dispatch.md:232`, under
+the heading "Never relay a scope-widening PO decision to a running dispatch via
+`SendMessage`" — the reference file the Proposal named as the most likely home,
+in the style it named.
+
+The item's own `done_when` predicate went from false to true when that commit
+landed, and `check-backlog-done-predicate.mjs` reported it as STALE-OPEN on
+2026-09-03. That is the mechanism working exactly as intended: the item's
+`status:` field was wrong, and a machine caught it rather than a person
+remembering. Verified by hand before closing rather than on the checker's word.
