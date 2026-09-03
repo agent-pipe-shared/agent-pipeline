@@ -298,3 +298,48 @@ test("NVA-B-ROUNDL F1: closing the abbreviation hole narrows nothing -- ordinary
   // writes nothing, so recursive write-target extraction on the payload correctly finds none.
   assert.deepEqual(candidates('git rebase --exe "true" main'), []);
 });
+
+// NVA-B-OPAQUELANE-1 (backlog:
+// 2026-09-02-the-opaque-payload-lane-refuses-a-mention-not-a-write.md). The lane's own denial
+// text claimed a mention was admitted and only a detected write refused, but the classifier
+// could not tell the two apart. These pin resolution 1: the write/mention distinction for the
+// shapes the lane can resolve into a call structure, and the fail-closed default for the rest.
+
+test("NVA-B-OPAQUELANE-1: a protected path merely MENTIONED in a write call's content argument is admitted -- node -e and python3 -c both", () => {
+  // The round-L case: prose written to an UNPROTECTED scratch note happens to name the
+  // protected suite. The write target is scratch/note.txt; the protected name is only in the
+  // content being written, never itself a write call's own first argument. Harmless glue tokens
+  // (the "-e"/"-c" flag, a bare ".") and the genuine, unprotected "scratch/note.txt" target are
+  // still legitimately extracted -- this asserts the PROTECTED name specifically is absent, the
+  // same convention every other "not claimed" assertion in this file already uses.
+  assert.ok(
+    !candidates(`node -e "require('fs').writeFileSync('scratch/note.txt','mentions ${TARGET}')"`)
+      .includes(TARGET),
+  );
+  assert.ok(
+    !candidates(`python3 -c "open('scratch/note.txt','w').write('mentions ${TARGET}')"`)
+      .includes(TARGET),
+  );
+});
+
+test("NVA-B-OPAQUELANE-1: python3 -c open() with no write-capable mode is never a target -- reading is unaffected", () => {
+  assert.ok(!candidates(`python3 -c "open('${TARGET}').read()"`).includes(TARGET));
+  assert.ok(!candidates(`python3 -c "open('${TARGET}','r').read()"`).includes(TARGET));
+});
+
+test("NVA-B-OPAQUELANE-1: git rebase --exec RUNNING a protected suite (node --test, no eval flag) is admitted, not refused as a write", () => {
+  assert.deepEqual(candidates(`git rebase --exec "node --test ${TARGET}" main`), []);
+  assert.deepEqual(candidates(`git rebase -x "node --test ${TARGET}" main`), []);
+});
+
+test("NVA-B-OPAQUELANE-1: a shape this lane cannot resolve into a call structure stays refused (fail-closed) -- variable indirection", () => {
+  // A realistic bypass attempt, not a contrived parse failure: the protected path is assigned
+  // to a variable first, so it is never itself a recognised call's own literal argument. The
+  // lane cannot follow the indirection and must not guess it is safe.
+  const command = `node -e "var p='${TARGET}'; require('fs').writeFileSync(p,'x')"`;
+  const targets = extractShellWriteTargets({ command, root: "/repo" });
+  assert.ok(
+    targets.some((t) => t.candidate === TARGET && t.lane === "opaque-interpreter-code"),
+    `an unresolved shape was silently admitted: ${command}`,
+  );
+});

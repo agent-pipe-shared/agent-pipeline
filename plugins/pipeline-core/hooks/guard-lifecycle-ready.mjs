@@ -1139,6 +1139,31 @@ function protectedTestPathShellRefusalHit(command, root, dependencies = {}, tool
   }
 }
 
+/**
+ * NVA-B-OPAQUELANE-1: "only a detected write is refused" is not true, unqualified, for the
+ * `opaque-interpreter-code` lane -- it can only tell a write target from a mention for the
+ * shapes it resolves into a known call structure (`lib/protected-test-paths.mjs`'s
+ * `opaqueLanguagePayloadRegions()`/git-rebase-exec recursion); anything it cannot resolve into
+ * that structure is refused whether or not it actually writes, because the lane cannot prove
+ * otherwise. This caveat states that plainly and names the route forward (restructure the
+ * payload so it resolves, or use a plain write tool instead of opaque interpreter code) rather
+ * than leaving the unqualified claim false for this one lane, as it was found to be (backlog:
+ * 2026-09-02-the-opaque-payload-lane-refuses-a-mention-not-a-write.md).
+ */
+function protectedTestPathShellOpaqueCaveat(lane) {
+  if (lane !== "opaque-interpreter-code") return "";
+  return "This lane cannot parse arbitrary interpreter code: for a node -e/python3 -c/git "
+    + "rebase --exec payload it tells a write TARGET from a mere mention only for the shapes it "
+    + "can resolve into a call structure (a known write-sink call's own first argument, or a "
+    + "git --exec payload treated as its own shell command). Anything it cannot resolve -- free "
+    + "text outside a recognised call, the protected path assembled via a variable rather than "
+    + "written as a literal, or a malformed payload -- is refused whether or not it actually "
+    + "writes, because the lane cannot prove otherwise. Route forward: restructure the payload "
+    + "into a directly-resolvable shape (the protected path as a literal argument to a "
+    + "recognised call, or plain shell syntax), or make the change through a plain Edit/Write/"
+    + "git command instead of opaque interpreter code.\n";
+}
+
 function protectedTestPathShellBlocked(hit, overrideGuidance) {
   return verdict(
     2,
@@ -1153,6 +1178,7 @@ function protectedTestPathShellBlocked(hit, overrideGuidance) {
       + "Reading and RUNNING the suite are unaffected: node --test, node <suite>, cat, rg, "
       + "git add/commit/diff/log/show on this path are all admitted. Only a detected write is "
       + "refused.\n"
+      + protectedTestPathShellOpaqueCaveat(hit.lane)
       + (overrideGuidance ?? ""),
   );
 }

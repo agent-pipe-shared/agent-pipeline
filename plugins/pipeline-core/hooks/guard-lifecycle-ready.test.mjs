@@ -6401,6 +6401,52 @@ test("TPSHELL-REBASE-ABBREV: an abbreviated or unenumerated rebase option carryi
 });
 
 /**
+ * TPSHELL-OPAQUEMENTION (NVA-B-OPAQUELANE-1, backlog:
+ * 2026-09-02-the-opaque-payload-lane-refuses-a-mention-not-a-write.md). The END-TO-END guard
+ * verdict for resolution 1: this lane's own denial text claimed a mention was admitted and only
+ * a detected write refused; that was false for exactly this lane. The classifier-level proof
+ * lives in `lib/protected-test-paths.test.mjs`; this proves the real guard actually admits/
+ * refuses these shapes, not merely that the classifier's candidate list is correct in isolation
+ * (the same distinction TPSHELL-REBASE-EXEC's own header states for its sibling finding).
+ */
+test("TPSHELL-OPAQUEMENTION: a mere mention is admitted, running a protected suite via rebase --exec is admitted, an unresolved indirection stays refused", () => {
+  const path = tpShellFixture();
+  try {
+    for (const command of [
+      // The round-L case itself: prose written to an unprotected scratch note happens to name
+      // the protected suite. The write target is scratch/note.txt, not the protected path.
+      `node -e "require('fs').writeFileSync('scratch/note.txt','mentions ${TPSHELL_TARGET}')"`,
+      `python3 -c "open('scratch/note.txt','w').write('mentions ${TPSHELL_TARGET}')"`,
+      // Reading a protected suite through python's open() (no write-capable mode) stays admitted.
+      `python3 -c "open('${TPSHELL_TARGET}').read()"`,
+      // Running a protected suite via git rebase --exec carries no eval flag -- it is a run, not
+      // a write, exactly like the already-admitted `node --test <suite>` shape TPSHELL-1 pins.
+      `git rebase --exec "node --test ${TPSHELL_TARGET}" main`,
+    ]) {
+      const result = tpShellRun(path, command);
+      assert.equal(result.exitCode, 0, `refused a mention/run command: ${command} -- ${result.stderr}`);
+    }
+    // A realistic bypass attempt this lane genuinely cannot follow: the protected path is
+    // assigned to a variable before the write call, so it is never itself a recognised call's
+    // own literal argument -- fail-closed, still refused, and the denial names the route forward.
+    const indirect = tpShellRun(
+      path, `node -e "var p='${TPSHELL_TARGET}'; require('fs').writeFileSync(p,'x')"`,
+    );
+    assert.equal(indirect.exitCode, 2, "an unresolved indirection was silently admitted");
+    assert.match(indirect.stderr, new RegExp(TESTPATH_SHELL_DENIAL_CODE, "u"));
+    assert.match(
+      indirect.stderr, /cannot parse arbitrary interpreter code/u,
+      "the denial text does not name the opaque-lane caveat / route forward",
+    );
+    // The caveat is scoped to the opaque-interpreter-code lane -- an ordinary shell writer's
+    // refusal must not carry it (the claim "only a detected write is refused" IS true there).
+    const plain = tpShellRun(path, `rm ${TPSHELL_TARGET}`);
+    assert.equal(plain.exitCode, 2);
+    assert.doesNotMatch(plain.stderr, /cannot parse arbitrary interpreter code/u);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
  * TPSHELL-2. The lane is config-driven exactly like the write lane: a project that
  * protects nothing gets nothing new refused. Without this, TPSHELL-1 could be green on a
  * rule that refused those commands unconditionally.
