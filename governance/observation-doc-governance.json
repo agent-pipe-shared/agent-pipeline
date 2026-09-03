@@ -277,6 +277,7 @@
         "audience": "maintainer",
         "lifecycle": "review-candidate",
         "paths": [
+          "docs/adr/draft-critic-report-durable-write-location.md",
           "docs/codex-isolated-critic-foundation.md",
           "docs/handover-0.5.2-findings.md",
           "docs/human-authorization-inventory.md",
