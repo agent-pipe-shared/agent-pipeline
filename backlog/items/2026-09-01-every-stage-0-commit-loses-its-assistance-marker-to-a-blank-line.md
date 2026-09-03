@@ -132,3 +132,41 @@ boundary is the only direction that survives contact with this evidence.
 
 The commit is local and unpushed with nothing stacked on it, so amending remains
 available on the same PO decision as the other six.
+
+## Instance eight, 2026-09-03 — the briefing encoded half the rule as a prohibition
+
+Commit `3c7c5d5f` (`docs(guard-handover-size): correct header comment ...`) returns
+**nothing** from the prescribed check. It was authored by a dispatch that followed
+its briefing exactly.
+
+The briefing was mine, and its trailer instruction read:
+
+> Trailers are exactly `AI-Assisted: true` and `Dispatch: <TASK_ID> (goldfish)`,
+> adjacent, no blank line between them **and no blank line separating them from
+> the body's last paragraph**
+
+The clause in bold forbids the blank line git actually requires. This is worse
+than the seventh instance, which this item already records: there the briefing was
+merely silent about the separator before the block, so a dispatch could still get
+it right by habit. Here the briefing affirmatively instructed the failure, and
+five concurrent dispatches received the same wrong instruction. Four other
+commits in the same run carry correct trailers only because their messages were
+composed from files that happened to have the blank line.
+
+What makes this worth appending rather than filing separately: the dispatcher who
+wrote that instruction had this item in the backlog, had read the section above,
+and still encoded half the rule. That is now the second consecutive instance where
+the failure survived direct, recent, explicit knowledge of it — which is the
+strongest available evidence for this item's own conclusion that **direction 1 is
+refuted**. A rule that two attentive readers in three days each internalised half
+of is not a rule that better documentation or a better habit will fix.
+
+One thing that was available for instance seven is not available here: `3c7c5d5f`
+has eight commits stacked on it, so amending is out regardless of the PO decision.
+The marker is absent from published-in-branch history and stays absent.
+
+The correction that was sent to the three still-running dispatches, and that any
+future briefing should carry verbatim, states both conditions:
+
+> Blank line BEFORE the trailer block; no blank line BETWEEN the trailers;
+> nothing after them.
