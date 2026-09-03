@@ -551,6 +551,189 @@ function powershellWriteTargets(command) {
 }
 
 /**
+ * NVA-B-OPAQUELANE-1. The `opaque-interpreter-code` lane used to contribute every path-shaped
+ * token anywhere in a `node -e`/`python3 -c`-style payload, so a protected path merely MENTIONED
+ * in a string a write call is writing ELSEWHERE (prose into a scratch note, say) was refused
+ * exactly like a real write target — contradicting this module's own denial text ("only a
+ * detected write is refused"). The functions below distinguish the two for the shapes this
+ * module can actually parse: a small, explicit set of known write-sink calls (JS `fs`-style
+ * `writeFileSync`/`writeFile`/`appendFileSync`/`appendFile`/`unlinkSync`/`unlink`/`rmSync`/`rm`/
+ * `remove`, and Python's `open(path, mode)` gated on the mode containing w/a/x/+), where the
+ * FIRST argument is the write target and every later argument is content, never scanned.
+ *
+ * This is bounded, not a language parser: it finds top-level `name(arg0, arg1, ...)` calls,
+ * quote- and nesting-aware, so a target assembled via a nested call (`join(dir, 'x.test.mjs')`,
+ * the TPSHELL-1 shape) still yields its literal basename from inside that span. Anything the
+ * payload's text is NOT attributable to a recognised call's own span — free-standing text
+ * between/around calls, a whole payload with zero calls, or a payload with an unbalanced paren
+ * or unterminated quote — falls back to the pre-fix blind scan over exactly that text, which is
+ * the fail-closed half of resolution 1: a shape this lane cannot resolve into a call structure
+ * stays refused if it names a protected path anywhere in that unresolved text (this is also what
+ * keeps a variable-indirection bypass attempt, `var p = '<path>'; writeFileSync(p, 'x')`,
+ * refused — `p` is not a literal, so the assignment statement is unresolved free text).
+ *
+ * NOT reached by this: a write sink whose target is its SECOND argument (`renameSync`/
+ * `copyFileSync`'s destination), `pwsh`/`powershell -c` payloads (a different grammar), Perl/
+ * Ruby code that omits parens, and — as already stated in this module's own header — a write
+ * performed by a script the command merely names rather than embeds inline.
+ */
+const OPAQUE_LANGUAGE_WRITE_SINKS = Object.freeze(new Set([
+  "writefilesync", "writefile", "appendfilesync", "appendfile",
+  "unlinksync", "unlink", "rmsync", "rm", "remove",
+]));
+
+/** The index of `text[start]`'s matching closing quote, escape-aware, or -1 if unterminated. */
+function skipQuoted(text, start) {
+  const quote = text[start];
+  let i = start + 1;
+  while (i < text.length) {
+    if (text[i] === "\\") { i += 2; continue; }
+    if (text[i] === quote) return i;
+    i += 1;
+  }
+  return -1;
+}
+
+/** The index of the `(` at `openIndex`'s matching `)`, quote- and nesting-aware, or -1. */
+function findMatchingParen(text, openIndex) {
+  let depth = 0;
+  let i = openIndex;
+  while (i < text.length) {
+    const char = text[i];
+    if (char === "'" || char === "\"") {
+      const close = skipQuoted(text, i);
+      if (close === -1) return -1;
+      i = close + 1;
+      continue;
+    }
+    if (char === "(") { depth += 1; i += 1; continue; }
+    if (char === ")") {
+      depth -= 1;
+      if (depth === 0) return i;
+      i += 1;
+      continue;
+    }
+    i += 1;
+  }
+  return -1;
+}
+
+/** `inner`'s top-level comma-separated argument spans (raw text, quotes kept), or null on any
+ * unbalanced paren / unterminated quote inside it. */
+function splitTopLevelArgs(inner) {
+  if (inner.trim() === "") return [];
+  const args = [];
+  let depth = 0;
+  let last = 0;
+  let i = 0;
+  while (i < inner.length) {
+    const char = inner[i];
+    if (char === "'" || char === "\"") {
+      const close = skipQuoted(inner, i);
+      if (close === -1) return null;
+      i = close + 1;
+      continue;
+    }
+    if (char === "(") { depth += 1; i += 1; continue; }
+    if (char === ")") {
+      if (depth === 0) return null;
+      depth -= 1;
+      i += 1;
+      continue;
+    }
+    if (char === "," && depth === 0) {
+      args.push(inner.slice(last, i));
+      last = i + 1;
+      i += 1;
+      continue;
+    }
+    i += 1;
+  }
+  args.push(inner.slice(last));
+  return args;
+}
+
+/**
+ * `text`'s TOP-LEVEL calls only — a call nested inside another call's own argument list (the
+ * `join(...)` inside `writeFileSync(join(...), 'x')`) is never reported separately; its text is
+ * part of that argument's span, which the caller scans as raw text. Returns null on any
+ * unbalanced paren or unterminated quote anywhere in `text` (the whole payload is then
+ * unresolved). Returns `[]`, not null, for cleanly-parsing text with no call at all.
+ */
+function parseTopLevelCalls(text) {
+  const calls = [];
+  let i = 0;
+  while (i < text.length) {
+    const char = text[i];
+    if (char === "'" || char === "\"") {
+      const close = skipQuoted(text, i);
+      if (close === -1) return null;
+      i = close + 1;
+      continue;
+    }
+    if (char === "(") {
+      let j = i - 1;
+      while (j >= 0 && /[\w$]/u.test(text[j])) j -= 1;
+      const nameStart = j + 1;
+      const name = text.slice(nameStart, i);
+      const close = findMatchingParen(text, i);
+      if (close === -1) return null;
+      if (name !== "") {
+        const argSpans = splitTopLevelArgs(text.slice(i + 1, close));
+        if (argSpans === null) return null;
+        calls.push({ name: name.toLowerCase(), argSpans, start: nameStart, end: close + 1 });
+      }
+      i = close + 1;
+      continue;
+    }
+    if (char === ")") return null; // an unmatched close paren -> the whole payload is unresolved
+    i += 1;
+  }
+  return calls;
+}
+
+/** Whether `call` is a known write sink, and therefore whether its FIRST argument is a target. */
+function isOpaqueWriteSinkCall(call) {
+  if (call.name === "open") return call.argSpans.length >= 2 && /[wax+]/iu.test(call.argSpans[1]);
+  return OPAQUE_LANGUAGE_WRITE_SINKS.has(call.name);
+}
+
+/**
+ * The path-relevant TEXT REGIONS of a JS/Python-shaped opaque interpreter payload — used by
+ * BOTH the candidate extraction below and the basename-needle fallback in
+ * `protectedTestPathShellHit()`, so a protected path excluded from one is excluded from the
+ * other too (fixing both halves of the same defect with one function rather than two).
+ *
+ * `parsed: false` (unresolved payload: no call found at all, or an unbalanced paren/unterminated
+ * quote) leaves `regions` as `[payload]` verbatim — byte-identical to this lane's pre-fix blind
+ * scan, the fail-closed default this item requires for shapes it cannot resolve.
+ *
+ * `parsed: true` narrows `regions` to: a known write sink's first-argument span (the target,
+ * however it is itself expressed — see the nested-call note on `OPAQUE_LANGUAGE_WRITE_SINKS`
+ * above); plus any text NOT attributable to any top-level call at all (glue between calls, and
+ * text before/after every call) — still scanned, still fail-closed, because this function only
+ * narrows what it positively resolved as a call's own argument list. A non-sink call's arguments
+ * (`.write(prose)`, `console.log(prose)`, `require('fs')`) are excluded from `regions` entirely:
+ * this function only ever calls SUCH a call's OWN args "unrecognised" up to a point, but a call
+ * we identified and determined is NOT a write sink is a positive, not a gap — scanning its
+ * content anyway would reopen the exact defect this item exists to close.
+ */
+function opaqueLanguagePayloadRegions(payload) {
+  const calls = parseTopLevelCalls(payload);
+  if (calls === null || calls.length === 0) return { parsed: false, regions: [payload] };
+  const regions = [];
+  const sorted = [...calls].sort((a, b) => a.start - b.start);
+  let cursor = 0;
+  for (const call of sorted) {
+    if (call.start > cursor) regions.push(payload.slice(cursor, call.start));
+    if (isOpaqueWriteSinkCall(call) && call.argSpans.length > 0) regions.push(call.argSpans[0]);
+    cursor = call.end;
+  }
+  if (cursor < payload.length) regions.push(payload.slice(cursor));
+  return { parsed: true, regions };
+}
+
+/**
  * Extract every write-target CANDIDATE a shell command's syntax shows it touching —
  * redirect targets, write-capable-executable/git-write-verb operands, and path-shaped tokens
  * inside an opaque interpreter payload or an unparseable command — unfiltered by any
@@ -589,8 +772,11 @@ export function extractShellWriteTargets({ command, root, toolName = "Bash", pla
       const codeFlags = OPAQUE_CODE_FLAGS.get(executable);
       if (codeFlags !== undefined && argv.some((arg) => codeFlags.includes(arg.toLowerCase()))) {
         const payload = argv.join(" ");
-        for (const token of payload.match(PATH_TOKEN) ?? []) {
-          targets.push({ candidate: token, lane: "opaque-interpreter-code" });
+        const { regions } = opaqueLanguagePayloadRegions(payload);
+        for (const region of regions) {
+          for (const token of region.match(PATH_TOKEN) ?? []) {
+            targets.push({ candidate: token, lane: "opaque-interpreter-code" });
+          }
         }
         continue;
       }
@@ -617,9 +803,20 @@ export function extractShellWriteTargets({ command, root, toolName = "Bash", pla
       // and stay non-candidates, while the payload is opaque interpreter code whose path-shaped
       // runs are candidates -- the same lane the `node -e`/`python3 -c` branch above uses, reused
       // rather than duplicated (round-K finding F2).
+      //
+      // NVA-B-OPAQUELANE-1: the payload IS a shell command in its own right (git runs it via the
+      // shell after each commit), so it gets the SAME write-target extraction this function
+      // itself performs -- recursion, not a second blind-scan mechanism. This is what tells
+      // `node --test <suite>` (running the suite: no candidate, `node` carries no eval flag)
+      // from `sed -i <suite>`/`rm <suite>` (a genuine write: still a candidate). An unparseable
+      // nested payload (one this recursive call cannot classify either) still falls through to
+      // ITS OWN unparsed-command fallback below, so the fail-closed default is inherited, not
+      // dropped. Every resulting candidate is relabelled onto this lane regardless of what the
+      // nested call itself found, because from this payload's own perspective it is still one
+      // opaque interpreter payload, whatever write shape recursion found inside it.
       for (const payload of gitShellPayloads(verb, postVerbArgv)) {
-        for (const token of payload.match(PATH_TOKEN) ?? []) {
-          targets.push({ candidate: token, lane: "opaque-interpreter-code" });
+        for (const nested of extractShellWriteTargets({ command: payload, root, toolName: "Bash", platform })) {
+          targets.push({ candidate: nested.candidate, lane: "opaque-interpreter-code" });
         }
       }
     }
@@ -664,6 +861,13 @@ export function protectedTestPathShellHit({ command, rules, root, toolName = "Ba
   // catches TPSHELL-1's `join(dir,'guard-push.test.mjs')` case — the embedded-path loop above
   // sees only the bare basename token, which the full protected-path regex never matches on
   // its own.
+  //
+  // NVA-B-OPAQUELANE-1: the haystack is built from `opaqueLanguagePayloadRegions()`'s narrowed
+  // `regions` — the SAME regions extractShellWriteTargets() itself scans above — rather than the
+  // raw payload text. Building it from the raw text would silently re-widen this fallback back to
+  // "any mention anywhere", defeating the write/mention distinction the extraction loop just
+  // enforced: a basename sitting only in a write call's CONTENT argument must stay excluded here
+  // too, not merely from the candidate list.
   if (toolName !== "PowerShell") {
     const parsed = parseGuardCommand(command, root, { platform });
     if (parsed.parseStatus === "accepted") {
@@ -673,7 +877,8 @@ export function protectedTestPathShellHit({ command, rules, root, toolName = "Ba
         if (codeFlags === undefined) continue;
         const argv = [...segment.argv];
         if (!argv.some((arg) => codeFlags.includes(arg.toLowerCase()))) continue;
-        const haystack = argv.join(" ").replace(/\\/gu, "/").toLowerCase();
+        const { regions } = opaqueLanguagePayloadRegions(argv.join(" "));
+        const haystack = regions.join(" ").replace(/\\/gu, "/").toLowerCase();
         for (const { rule, needle } of protectedTestPathBasenameNeedles(rules)) {
           if (containsWholeToken(haystack, needle)) return hit(rule, needle, "opaque-interpreter-code");
         }

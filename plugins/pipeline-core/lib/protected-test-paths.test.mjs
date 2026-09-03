@@ -217,10 +217,12 @@ test("NVA-B-ROUNDK F2, other direction: rebase's own revisions stay non-candidat
   assert.deepEqual(candidates("git rebase --continue"), []);
   assert.deepEqual(candidates("git rebase --onto upstream topic"), []);
   assert.deepEqual(candidates("git -c core.editor=true rebase --continue"), []);
-  // The payload's own tokens ARE contributed, unfiltered, exactly like every other opaque
-  // payload on this lane (a bare word is path-shaped too; the rule set filters, not this list).
-  // What must never appear beside them is a token from rebase's own operands -- here, `main`.
-  assert.deepEqual(candidates('git rebase --exec "true" main'), ["true"]);
+  // NVA-B-OPAQUELANE-1: before this fix, the payload's own tokens were contributed unfiltered
+  // (a bare word is path-shaped too), which is exactly the over-broad "mention, not write"
+  // behaviour that item corrects -- the payload now gets the SAME write-target extraction this
+  // module performs on any shell command, recursively, and `true` writes nothing. What must
+  // still never appear is a token from rebase's own operands -- here, `main`.
+  assert.deepEqual(candidates('git rebase --exec "true" main'), []);
 });
 
 test("NVA-B-ROUNDK F2: the exec payload lane is only opened for the verb that has one", () => {
@@ -292,6 +294,7 @@ test("NVA-B-ROUNDL F1: closing the abbreviation hole narrows nothing -- ordinary
   assert.deepEqual(candidates("git rebase --cont"), []);
   assert.deepEqual(candidates("git rebase --ont upstream topic"), []);
   assert.deepEqual(candidates("git rebase --no-autosquash main"), []);
-  // And the payload lane itself still contributes exactly the payload, nothing beside it.
-  assert.deepEqual(candidates('git rebase --exe "true" main'), ["true"]);
+  // And the payload lane still contributes nothing beside `main` -- NVA-B-OPAQUELANE-1: `true`
+  // writes nothing, so recursive write-target extraction on the payload correctly finds none.
+  assert.deepEqual(candidates('git rebase --exe "true" main'), []);
 });
