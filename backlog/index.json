@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "82f81096a167c21126f55f112d6f16fe57a0ec49ac2eaa92cec3a9125dfbab4d"
+    "transitionHead": "d8a58b871dfe24a0b252c06d2090f4b7918dd4b968148da0badc745fd867d986"
   },
   "counts": {
-    "open": 102,
+    "open": 101,
     "in_progress": 0,
-    "closed": 502,
+    "closed": 503,
     "rejected": 3,
     "deferred": 11
   },
@@ -1078,13 +1078,17 @@
     },
     {
       "id": "pipeline.briefing-bundling-two-findings-asks-for-two-dispatches",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-01",
       "source": "Measured on 2026-09-01 across four dispatches in one session, with the decisive case a bundled two-finding briefing whose second half later needed a full dispatch of its own.",
       "deferred": false,
-      "tracking": "Nova B — dispatcher-side scoping defect: bundling two independent review findings into one briefing produced a package that could not fit any single tool budget, and the overrun was read as an agent problem rather than a briefing problem."
+      "tracking": "Nova B — dispatcher-side scoping defect: bundling two independent review findings into one briefing produced a package that could not fit any single tool budget, and the overrun was read as an agent problem rather than a briefing problem.",
+      "closedAt": "2026-09-03",
+      "closureRepository": "self",
+      "closureCommit": "9da139201379cf53a4d83613258ce9b6806bfc7a",
+      "closureEvidence": "backlog/evidence/2026-09-03-nova-b-batch-2-closure-verification.md"
     },
     {
       "id": "pipeline.briefing-model-field-contradicts-agent-definition",
