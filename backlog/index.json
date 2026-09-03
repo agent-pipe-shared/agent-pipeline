@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "09dda69d0ee23ea46ae1450ffab4b6bae4237eb16fc6a41da4e60df00d7f2a90"
+    "transitionHead": "c36f67a48eb45441bce31d00654e2c3b84c63a406cb2949b2db75f2cdf54f9f2"
   },
   "counts": {
-    "open": 107,
+    "open": 106,
     "in_progress": 0,
-    "closed": 494,
+    "closed": 495,
     "rejected": 3,
     "deferred": 11
   },
@@ -6709,12 +6709,16 @@
     },
     {
       "id": "pipeline.the-denial-trim-state-is-keyed-per-session-not-per-agent-as-its-comment-claims",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-01",
       "source": "Critic round NVA-CR-D against commit 1314edec, 2026-09-01: finding F2 (minor), plus the candidate it dropped under CR-05 for want of primary evidence, which is the reason F2 matters.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-09-03",
+      "closureRepository": "self",
+      "closureCommit": "15bb35994d83b8147b22c9316561c3767ef81037",
+      "closureEvidence": "backlog/evidence/2026-09-03-nva-b-trimkey-stale-open-measurement.md"
     },
     {
       "id": "pipeline.the-dispatch-record-field-enumeration-omits-a-field-the-checker-requires",
