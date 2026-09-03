@@ -7,6 +7,7 @@ status: open
 created: 2026-09-01
 source: "Direct measurement, 2026-09-01: two dispatches independently fixed the same file, a third spent budget confirming a fix already committed by another agent, and a full verify.mjs run failed on candidate-binding drift because the orchestrator committed mid-run."
 sprint: nova-b
+done_when: manual
 ---
 
 # Concurrent dispatches in one shared checkout collide in ways no guard catches
@@ -95,3 +96,17 @@ or verify-run-lock mechanism was found.
    completion report to reveal the collision after the fact.
 
 None of these three is recommended over another here.
+
+## Triage
+
+### Predicate note, 2026-09-03 — manual, and why
+
+`done_when: manual`. The three proposed remedies (a file-scope lease/claim
+mechanism, a verify-in-progress commit lock, and briefing-time scope-overlap
+detection) touch three disjoint candidate surfaces — no existing file-scope
+lease or verify-run-lock mechanism was found anywhere in the repository, and
+the item explicitly declines to rank the three — so there is no single
+change surface a `contains`/`script-exit-zero` predicate could name without
+also silently pre-deciding which of the three remedies is chosen, which is
+exactly the design decision this item leaves open. No `Decision:` value is
+set here; that choice belongs to whoever triages this item next.
