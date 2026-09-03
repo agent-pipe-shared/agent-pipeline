@@ -22,14 +22,31 @@ USAGE (Elephant)
    learned them by being refused, and each refusal cost a retry out of the
    budget that is also the stop condition. Do not retype the rules here — the
    copy drifts, which is the defect the generated file exists to remove.
-1. Fill ALL six fields. An incomplete briefing is not dispatchable — the
+1. **One briefing, one independently-deliverable package — this is a scoping
+   rule, checked before field 1 is written, not advice to be careful.** The
+   observable test: can this briefing's Goal (field 1) be delivered and
+   committed independently of every other goal you are tempted to fold into
+   the same briefing? If the honest answer names a second, separable goal,
+   split into a second briefing instead of bundling — bundling two
+   independent findings/goals into one briefing is a scoping defect on the
+   DISPATCHER's side, not something an agent's tool budget is meant to
+   absorb. This is derived from a measured incident, not invented: one
+   2026-09-01 briefing closed two Critic findings from the same report; the
+   second finding alone, dispatched on its own afterward, needed a ~57-tool-use
+   run to close — no single budget could have covered both under one cap.
+   This does NOT argue for a larger tool budget or a higher `maxTurns`, and
+   does not reopen or amend
+   `backlog/items/2026-08-23-briefed-tool-budget-sits-below-an-unannounced-harness-maxturns-cliff.md`
+   (left closed); the fix here is upstream of the cap, in how the briefing is
+   scoped before it is written.
+2. Fill ALL six fields. An incomplete briefing is not dispatchable — the
    briefing-format check (`roles/goldfish.md` GF-01/GF-02; `docs/operating-model.md`
    — The lifecycle, step 5) fails.
-2. This text plus the files listed in field 2 are the Goldfish's ENTIRE input.
+3. This text plus the files listed in field 2 are the Goldfish's ENTIRE input.
    Never paste chat history, never paste your reasoning about alternatives.
-3. Dispatch as subagent (default: `goldfish-implementor`, effort `medium` per MP-27).
+4. Dispatch as subagent (default: `goldfish-implementor`, effort `medium` per MP-27).
    Deviation from the role default REQUIRES the model justification in field 6.
-4. Writing tasks: worktree per project calibration (`project/pipeline.json`, else `.claude/pipeline.json`).
+5. Writing tasks: worktree per project calibration (`project/pipeline.json`, else `.claude/pipeline.json`).
    A worktree-isolated dispatch's briefing MUST supply, in field 6, both the
    exact expected SHA AND the expected worktree path the dispatch was asked
    to be provisioned into. The dispatch's mandatory first step is a
@@ -49,16 +66,16 @@ USAGE (Elephant)
    default-branch ref) and the full pattern, including the containment
    check and the `git worktree list` failure branch; copy it into field
    5/6 of the briefing, do not re-derive it.
-5. Light profile (stage-0 / bounded implementation ONLY): set field 6 `Profile: light` for a
+6. Light profile (stage-0 / bounded implementation ONLY): set field 6 `Profile: light` for a
    condensed 3-field report, reference-inlining, no baseline verify. Route mechanical work to
    `goldfish-mechanic`/`low` and bounded implementation to `goldfish-implementor`/`medium`. Use
    the standard profile (6-field report, full references) for class-high / guardrail work.
-6. Briefing language is English (ADR-0011) — confirm before dispatch; this is a
+7. Briefing language is English (ADR-0011) — confirm before dispatch; this is a
    checklist item, not an assumed default.
-7. Normative value lists in the briefing (enums, schema fields, gate modes) are
+8. Normative value lists in the briefing (enums, schema fields, gate modes) are
    spelled out VERBATIM — never paraphrased (a paraphrased enum has caused a
    briefing-defect stop).
-8. A final message that does not match the mandatory report shape is a TRUNCATED
+9. A final message that does not match the mandatory report shape is a TRUNCATED
    dispatch, not a finished one. Recovery that worked: first read the dispatch
    record (its `log`/`report` fields survive the truncation, GF-09-D); if the
    report is not there, resume the run with a PURELY PROCEDURAL message naming
@@ -66,13 +83,13 @@ USAGE (Elephant)
    every claim to what was actually run, state what was not reached. Never let
    the resume message evaluate the work. Where the dispatcher re-runs the suites
    anyway, re-running them itself can be cheaper than the resume.
-9. **Commit as soon as green, not only at the end.** A dispatch that holds every
-   change uncommitted until its last DoD check is one truncation away from
-   losing all of it — observed repeatedly in one block (sixteen truncations).
-   Tell the goldfish (see the field-4/field-6 text below) to split its work into
-   commits as each piece is verified, instead of a single commit at the very
-   end.
-10. **This template applies VERBATIM inside a Workflow-tool `agent()` prompt
+10. **Commit as soon as green, not only at the end.** A dispatch that holds every
+    change uncommitted until its last DoD check is one truncation away from
+    losing all of it — observed repeatedly in one block (sixteen truncations).
+    Tell the goldfish (see the field-4/field-6 text below) to split its work into
+    commits as each piece is verified, instead of a single commit at the very
+    end.
+11. **This template applies VERBATIM inside a Workflow-tool `agent()` prompt
     string too** — do not hand-build the 6-field shape from memory for that
     execution mode; it is the identical freehand failure via a different
     mechanism (CLAUDE.md, "Dispatch from the template, never freehand").
@@ -81,7 +98,7 @@ USAGE (Elephant)
     `pipeline-core:` `agentType` prefix, a stated tool-call budget, the
     worktree self-heal block where isolation is used) — read it before
     building a Workflow dispatch; it does not replace this template.
-11. **Checking current phase/approval state while composing a briefing:** run
+12. **Checking current phase/approval state while composing a briefing:** run
     `node plugins/pipeline-core/scripts/pipeline-state.mjs inspect` (read-only,
     zero writes) rather than hand-reading `docs/state.md`'s "## Next action"
     section or re-deriving phase/approval from
