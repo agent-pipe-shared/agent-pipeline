@@ -7,6 +7,7 @@ status: open
 created: 2026-09-01
 source: "PO observation during the 0.6.0 release push, 2026-09-01: the AGY-MKTATTEST-1 push-time check fired on eight unrelated files immediately after `approve-push` signature consumption, forcing a manual external-marketplace sync inside the one window the documented ordering rule forbids any other change."
 sprint: nova-b
+done_when: contains plugins/pipeline-core/hooks/guard-push.mjs pipeline.marketplace-attestation-remedy-landed
 ---
 
 # The marketplace attestation compares more than the property it protects, making a manual sync structurally mandatory on every release push
@@ -132,3 +133,21 @@ files that cannot affect the authorization outcome it protects.
 None of these three is recommended over another here; a design decision
 needs the same Advisor-designed, PO-accepted shape the closed item used for
 its own directions.
+
+## Triage
+
+### Predicate note, 2026-09-03 — a route-neutral marker
+
+`done_when: contains plugins/pipeline-core/hooks/guard-push.mjs
+pipeline.marketplace-attestation-remedy-landed`. All three proposed routes
+(narrow the comparison, replace equality with provenance, or move the check
+earlier) modify the same function, `checkMarketplaceAttestation()` in this
+file, so a marker predicate anchored there does not favor any one of the
+three the item declines to rank. Whoever implements the chosen route is
+expected to add this marker as a comment next to the landed change, the same
+way `pipeline.read-scope-single-command-root-check` and
+`pipeline.undeclared-is-fatal` mark their own fixes elsewhere in this
+backlog. False today: the marker string does not appear anywhere in
+`guard-push.mjs` (checked by direct grep before writing this predicate). No
+`Decision:` value is set here; that choice belongs to whoever triages this
+item next.
