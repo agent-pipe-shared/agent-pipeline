@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "a25a6b07754ac2b83f9c44145bf6818b0e502a3a709b1389615fb683b4973be8"
+    "transitionHead": "82f81096a167c21126f55f112d6f16fe57a0ec49ac2eaa92cec3a9125dfbab4d"
   },
   "counts": {
     "open": 102,
     "in_progress": 0,
-    "closed": 501,
+    "closed": 502,
     "rejected": 3,
     "deferred": 11
   },
@@ -6824,12 +6824,16 @@
     },
     {
       "id": "pipeline.the-opaque-payload-lane-refuses-a-mention-not-a-write",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-02",
       "source": "Round-L Critic finding F3, observed first-hand by the reviewing dispatch when its own scratch-note write was refused, and anchored to plugins/pipeline-core/lib/protected-test-paths.mjs's opaque-interpreter-code lane.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-09-03",
+      "closureRepository": "self",
+      "closureCommit": "e52e5373d81afde912ff35df043aade44ee7c073",
+      "closureEvidence": "backlog/evidence/2026-09-03-nova-b-batch-2-closure-verification.md"
     },
     {
       "id": "pipeline.the-pipeline-cannot-merge-two-parallel-sprint-ledgers",
@@ -6887,6 +6891,16 @@
       "closureRepository": "self",
       "closureCommit": "d38f65df9457f6c6ca32c87c2a7c2fb9b15d9d2f",
       "closureEvidence": "plugins/pipeline-core/scripts/check-suite-registration.mjs"
+    },
+    {
+      "id": "pipeline.the-unparsed-command-lane-still-carries-the-false-denial-claim",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-03",
+      "source": "Reported by dispatch NVA-B-OPAQUELANE-1, 2026-09-03, as a finding outside its own acceptance criteria, with a live reproduction: protectedTestPathShellHit() returns lane 'unparsed-command' for the reproducing command shape.",
+      "deferred": false,
+      "tracking": "Nova B — the sibling of the opaque-interpreter-code lane. Same blind-scan fallback, same fail-closed refusal of a mere mention, and the guard still tells the reader that only a detected write is refused."
     },
     {
       "id": "pipeline.the-unregistered-suite-detector-is-not-itself-a-gate-step",
