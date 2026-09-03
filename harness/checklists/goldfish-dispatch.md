@@ -22,7 +22,7 @@
 - [ ] 3 DoD checks: EARS acceptance criteria (rigor ≥ 1) + `{{VERIFY_COMMAND}}` — fixed BEFORE the run; test fixtures mirror the real harness contract — hook-input fixtures include ABSOLUTE paths alongside relative (fixture-blindness)
 - [ ] 4 Prohibitions: scope limits, no-go paths, "do not change tests of your own implementation", project denies; sanitization DoD (if applicable) as a concrete grep-pattern list — repo-root/scratchpad/user-dir/secret-format patterns, never principle-prose
 - [ ] 5 Stop conditions: > 2 failed attempts, spec contradiction, scope burst, missing access, ambiguity
-- [ ] 6 Dispatch metadata: regelwerk SHA (always); model named EXPLICITLY in every dispatch — default the implement-tier model, a higher-capability tier only with a model justification (MP-05/MP-07), never a bottom-tier model below the mechanic tier (MP-03); packages expected >~25 tool uses carry the report-early duty — running report skeleton in `dispatch-record.json`, final report = condensate
+- [ ] 6 Dispatch metadata: regelwerk SHA (always); model named EXPLICITLY in every dispatch — default the implement-tier model, a higher-capability tier only with a model justification (MP-05/MP-07), never a bottom-tier model below the mechanic tier (MP-03); packages expected >~25 tool uses carry the report-early duty — running report skeleton in `evidence/dispatch-record-<TASK_ID>.json`, final report = condensate
 - [ ] Briefing language confirmed English (ADR-0011) — checklist point, not assumed default
 - [ ] Normative value lists (enums, schema fields, gate modes) spelled out VERBATIM in the briefing — never paraphrased
 
