@@ -1,0 +1,443 @@
+{
+  "schema": "pipeline.alfred-contract-freeze.v1",
+  "freezeRevision": 1,
+  "digestRule": {
+    "algorithm": "SHA-256",
+    "encoding": "lowercase hexadecimal",
+    "contractPayloadSchema": "pipeline.alfred-contract-family.v1",
+    "identifierPayloadSchema": "pipeline.alfred-identifier-family.v1",
+    "canonicalJson": "Recursively sort object keys by Unicode code point, preserve array order, encode JSON scalars per RFC 8259, and emit no insignificant whitespace.",
+    "preimage": "UTF-8(payload schema + U+0000 + canonical JSON payload). For contracts the payload is the exact contracts[] item with digest omitted. For identifiers it is the exact identifiers[] item with definitionDigest omitted.",
+    "persistedBytes": "The artifact is UTF-8 JSON with two-space indentation and exactly one trailing LF. Indentation and the trailing LF are excluded from item digests."
+  },
+  "ordering": {
+    "contracts": "spec.md section 3 table order",
+    "identifiers": "design/issue-intake.md shared-identifier order",
+    "schemaId": "source order, left to right",
+    "consumers": "work-package order A1-A5, B1-B3, C1-C3, D1-D4, E1-E2, with duplicates removed",
+    "contractFamilies": "contracts[] order, with duplicates removed"
+  },
+  "contracts": [
+    {
+      "family": "Enforcement conformance record",
+      "schemaId": [
+        "pipeline.enforcement-conformance.v1"
+      ],
+      "revision": 1,
+      "digest": "7dd7b4cd542dfdd0778efa0d2a2c1cdb7acbfbbd3c6d3c5b9d38dad910adb5f7",
+      "owner": "A1",
+      "consumers": [
+        "A2",
+        "A3",
+        "A4",
+        "A5",
+        "B1",
+        "D3",
+        "E2"
+      ]
+    },
+    {
+      "family": "Control placement table",
+      "schemaId": [
+        "pipeline.control-placement.v1"
+      ],
+      "revision": 1,
+      "digest": "45239e2dc1f43f3c71f4fc94c3a1ea05f04ce911016c53c99f03d984c702b8f7",
+      "owner": "A2",
+      "consumers": [
+        "A3",
+        "A4",
+        "A5",
+        "B2",
+        "D3"
+      ]
+    },
+    {
+      "family": "Protected-surface baseline",
+      "schemaId": [
+        "pipeline.protected-baseline.v1"
+      ],
+      "revision": 1,
+      "digest": "5ce4878be34b802b3f0d9dc61a1f12a9d86b7ed5a4eadfd05f94719ce8d2b9ce",
+      "owner": "A3",
+      "consumers": [
+        "A4",
+        "A5",
+        "B1",
+        "D3"
+      ]
+    },
+    {
+      "family": "Interruption receipt + registry",
+      "schemaId": [
+        "pipeline.interruption-receipt.v1",
+        "pipeline.interruption-registry.v1"
+      ],
+      "revision": 1,
+      "digest": "e60c80dd242b9d4dde5fd3b035b4ad56671c10117568f82b31d77d430fe12ff5",
+      "owner": "C1",
+      "consumers": [
+        "B1",
+        "C2",
+        "C3",
+        "D2"
+      ]
+    },
+    {
+      "family": "Architecture profile",
+      "schemaId": [
+        "pipeline.architecture-profile.v1"
+      ],
+      "revision": 1,
+      "digest": "43efa96b5d9ea1395f7e9fdaa34c072e610f5897efd29a17205af9a3e97bd8d7",
+      "owner": "D2",
+      "consumers": [
+        "B1",
+        "D3",
+        "D4"
+      ]
+    },
+    {
+      "family": "Architecture decision record",
+      "schemaId": [
+        "pipeline.architecture-decision.v1"
+      ],
+      "revision": 1,
+      "digest": "b8d9da31b2a9da25bbbf23bcb86ee3178c174a40761c30cb0271113954ca532c",
+      "owner": "D1",
+      "consumers": [
+        "D2",
+        "D3",
+        "D4"
+      ]
+    },
+    {
+      "family": "Fitness evidence",
+      "schemaId": [
+        "pipeline.fitness-evidence.v1"
+      ],
+      "revision": 1,
+      "digest": "adee95ca8d05b5f618bcc5673bfbd49e49492eca54b823aae36524d607311ef4",
+      "owner": "D3",
+      "consumers": [
+        "B1",
+        "D4",
+        "E2"
+      ]
+    },
+    {
+      "family": "Module/contract receipt",
+      "schemaId": [
+        "pipeline.module-interaction-receipt.v1"
+      ],
+      "revision": 1,
+      "digest": "0dc6021d6c30d6b983e5590f9ee52bdfa288cf9ab8e3404aac14b7487f9e7e0c",
+      "owner": "D2",
+      "consumers": [
+        "B1",
+        "D3"
+      ]
+    },
+    {
+      "family": "Rigor derivation",
+      "schemaId": [
+        "pipeline.rigor-derivation.v1"
+      ],
+      "revision": 1,
+      "digest": "bf39bd73f388c98fbe796c1372da5fbd235fa80b7b2bf421dd9142bd703800d8",
+      "owner": "B1",
+      "consumers": [
+        "E2"
+      ]
+    },
+    {
+      "family": "Adoption state + proposal",
+      "schemaId": [
+        "pipeline.adoption-state.v1",
+        "pipeline.adoption-proposal.v1"
+      ],
+      "revision": 1,
+      "digest": "ffc65a6acba8191b1ff8857be3c762f2ba186855acda409cf149354d2d5b2050",
+      "owner": "D4",
+      "consumers": [
+        "B1",
+        "E2"
+      ]
+    },
+    {
+      "family": "Verify-suite registration",
+      "schemaId": [
+        "pipeline.verify-suite-registration.v1"
+      ],
+      "revision": 1,
+      "digest": "6e097f6057a6a33a88d432379a0eced636a4af88ddc65e009c4b2fe0b31ea97a",
+      "owner": "B2-ii",
+      "consumers": [
+        "A1",
+        "A2",
+        "A3",
+        "A4",
+        "A5",
+        "B1",
+        "B2",
+        "B3",
+        "C1",
+        "C2",
+        "C3",
+        "D1",
+        "D2",
+        "D3",
+        "D4",
+        "E1",
+        "E2"
+      ]
+    }
+  ],
+  "identifiers": [
+    {
+      "family": "profile identity",
+      "revision": 1,
+      "definitionDigest": "c5286f24681690166998b9f5d61f854f089b87006377f63e798d93ce9b82909d",
+      "shape": {
+        "kind": "record",
+        "fields": [
+          "profileId",
+          "source",
+          "revision",
+          "digest"
+        ],
+        "allowedValues": {
+          "source": [
+            "inherited-agent-first",
+            "accepted-custom"
+          ]
+        }
+      },
+      "consumers": [
+        "B1",
+        "D2",
+        "D3",
+        "D4"
+      ],
+      "contractFamilies": [
+        "Architecture profile",
+        "Fitness evidence",
+        "Rigor derivation",
+        "Adoption state + proposal"
+      ]
+    },
+    {
+      "family": "finding/coverage outcome enum",
+      "revision": 1,
+      "definitionDigest": "ab48e3eaedfa1fe9c129f8f2ceaf4120f184294de5ca3a4b9fb6a59498290844",
+      "shape": {
+        "kind": "enum",
+        "values": [
+          "pass",
+          "finding",
+          "unavailable",
+          "unsupported",
+          "unknown",
+          "excepted"
+        ]
+      },
+      "consumers": [
+        "B1",
+        "C1",
+        "D3",
+        "D4"
+      ],
+      "contractFamilies": [
+        "Interruption receipt + registry",
+        "Fitness evidence",
+        "Rigor derivation",
+        "Adoption state + proposal"
+      ]
+    },
+    {
+      "family": "decision identity",
+      "revision": 1,
+      "definitionDigest": "297f75532173948d0b4867755b4075b9570788eb1df7023fcb606fe6a5e90111",
+      "shape": {
+        "kind": "record",
+        "fields": [
+          "id",
+          "digest",
+          "status",
+          "supersedes",
+          "scope"
+        ],
+        "allowedValues": {
+          "status": [
+            "proposed",
+            "accepted",
+            "superseded",
+            "waived"
+          ]
+        }
+      },
+      "consumers": [
+        "D1",
+        "D2",
+        "D3",
+        "D4"
+      ],
+      "contractFamilies": [
+        "Architecture profile",
+        "Architecture decision record",
+        "Fitness evidence",
+        "Adoption state + proposal"
+      ]
+    },
+    {
+      "family": "candidate binding",
+      "revision": 1,
+      "definitionDigest": "6b6df2f984e3e50aa5e95947fef1b1aa0be6b0808b3a4bfc396d28d4b1766fb6",
+      "shape": {
+        "kind": "record",
+        "fields": [
+          "commit",
+          "tree",
+          "artifactDigests"
+        ],
+        "arrayFields": [
+          "artifactDigests"
+        ]
+      },
+      "consumers": [
+        "A1",
+        "A2",
+        "A3",
+        "A4",
+        "A5",
+        "B1",
+        "B2",
+        "B3",
+        "C1",
+        "C2",
+        "C3",
+        "D1",
+        "D2",
+        "D3",
+        "D4",
+        "E1",
+        "E2"
+      ],
+      "contractFamilies": [
+        "Enforcement conformance record",
+        "Control placement table",
+        "Protected-surface baseline",
+        "Interruption receipt + registry",
+        "Architecture profile",
+        "Architecture decision record",
+        "Fitness evidence",
+        "Module/contract receipt",
+        "Rigor derivation",
+        "Adoption state + proposal",
+        "Verify-suite registration"
+      ]
+    },
+    {
+      "family": "interruption lineage",
+      "revision": 1,
+      "definitionDigest": "8f4bc582b8d6b1f9d7bf1fd855aa21498209c10f3a6c9d1b4cf2c463d84b75d2",
+      "shape": {
+        "kind": "record",
+        "fields": [
+          "eventId",
+          "lineageId",
+          "classification",
+          "derivationRevision"
+        ]
+      },
+      "consumers": [
+        "B1",
+        "C1",
+        "D2"
+      ],
+      "contractFamilies": [
+        "Interruption receipt + registry",
+        "Module/contract receipt",
+        "Rigor derivation"
+      ]
+    },
+    {
+      "family": "protected-surface identity",
+      "revision": 1,
+      "definitionDigest": "8027077e5bb86955f1433ec2c631d638f28f7912668e239fad0b2c32e60dc979",
+      "shape": {
+        "kind": "record",
+        "fields": [
+          "revision",
+          "digest",
+          "entries"
+        ],
+        "arrayFields": [
+          "entries"
+        ]
+      },
+      "consumers": [
+        "A3",
+        "B1",
+        "D3"
+      ],
+      "contractFamilies": [
+        "Protected-surface baseline",
+        "Fitness evidence",
+        "Rigor derivation"
+      ]
+    }
+  ],
+  "consumerPinning": {
+    "pin": [
+      "family",
+      "revision",
+      "digest"
+    ],
+    "rule": "Each listed consumer records the exact contract family, revision, and digest used to build its artifact. E2 rejects qualification if pins for the same family disagree."
+  },
+  "revisions": [
+    {
+      "sequence": 1,
+      "status": "landed",
+      "kind": "initial-freeze",
+      "freezeRevision": 1,
+      "contractFamilies": [
+        "Enforcement conformance record",
+        "Control placement table",
+        "Protected-surface baseline",
+        "Interruption receipt + registry",
+        "Architecture profile",
+        "Architecture decision record",
+        "Fitness evidence",
+        "Module/contract receipt",
+        "Rigor derivation",
+        "Adoption state + proposal",
+        "Verify-suite registration"
+      ],
+      "identifierFamilies": [
+        "profile identity",
+        "finding/coverage outcome enum",
+        "decision identity",
+        "candidate binding",
+        "interruption lineage",
+        "protected-surface identity"
+      ],
+      "summary": "Initial E1 freeze of the approved shared contract and identifier families."
+    },
+    {
+      "sequence": 2,
+      "status": "predeclared",
+      "kind": "planned-contract-revision",
+      "contractFamily": "Verify-suite registration",
+      "owner": "C2",
+      "requiredFields": [
+        "invariantPinned",
+        "nonOverlapNote"
+      ],
+      "landedRevision": null,
+      "landedDigest": null,
+      "summary": "C2 must add both consolidation fields through a later revision bump and a new landed ledger entry; this predeclaration does not change revision 1."
+    }
+  ]
+}
