@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "06edbd571121734378588011963f266dbfe046bb659a61695a4be6eae6f7585e"
+    "transitionHead": "87464328bca3323b4cda70add93d09591ffef550a17d3ff798490af71da52e7c"
   },
   "counts": {
-    "open": 105,
+    "open": 102,
     "in_progress": 0,
-    "closed": 496,
+    "closed": 500,
     "rejected": 3,
     "deferred": 11
   },
@@ -1988,13 +1988,17 @@
     },
     {
       "id": "pipeline.dispatch-records-are-written-to-a-name-the-verifier-cannot-find",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-03",
       "source": "Measured 2026-09-03 during the autonomous Nova-B run: NVA-REBDEAD-F8 and NVA-B-LEDGEROID-1 each wrote backlog/evidence/<TASK_ID>.dispatch-record.json, and evidence/dispatch-record-<TASK_ID>.json did not exist for either, so dispatch-authorship-verify.mjs would have reported record-missing for commits d08ca247 and 75312525.",
       "deferred": false,
-      "tracking": "Nova B — the authorship verifier reads exactly one filename shape in exactly one directory; two dispatches in one day wrote their records under a different name in a different directory, in good faith, following the directory contract."
+      "tracking": "Nova B — the authorship verifier reads exactly one filename shape in exactly one directory; two dispatches in one day wrote their records under a different name in a different directory, in good faith, following the directory contract.",
+      "closedAt": "2026-09-03",
+      "closureRepository": "self",
+      "closureCommit": "bb079c96f8e56531635cfc0d1c3385fbd3536156",
+      "closureEvidence": "backlog/evidence/2026-09-03-nova-b-batch-1-closure-verification.md"
     },
     {
       "id": "pipeline.dispatch-reported-creating-a-record-it-never-created",
@@ -2218,13 +2222,17 @@
     },
     {
       "id": "pipeline.entry-point-reachability-check-substring-matches-whole-source-files",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-03",
       "source": "Measured 2026-09-03: a full verify.mjs run went red on its only failing suite because commit 79bc79b8's comments cite an evidence file named 2026-09-02-nva-rebdead-f5-continuity-status.json, and safeStem reduces plugins/pipeline-core/scripts/continuity-status.mjs to the bare needle continuity-status.",
       "deferred": false,
-      "tracking": "Nova B — the reachability check decides whether a guard admits a script by testing whether the guard's source text contains the script's stem anywhere, comments included. A comment citing an evidence file whose name happens to contain a script stem is read as an admission."
+      "tracking": "Nova B — the reachability check decides whether a guard admits a script by testing whether the guard's source text contains the script's stem anywhere, comments included. A comment citing an evidence file whose name happens to contain a script stem is read as an admission.",
+      "closedAt": "2026-09-03",
+      "closureRepository": "self",
+      "closureCommit": "4a9a40d60aa7ff069ed0d27cb944f504b758fb4f",
+      "closureEvidence": "backlog/evidence/2026-09-03-nova-b-batch-1-closure-verification.md"
     },
     {
       "id": "pipeline.epic-file-contract-has-no-drift-check",
@@ -2508,6 +2516,16 @@
       "closureRepository": "self",
       "closureCommit": "a80236d874b214f14593f1504ba9c4e7c3171234",
       "closureEvidence": "backlog/items/2026-08-27-gate-strength-shell-lane-refuses-any-command-containing-a-quoted-wildcard.md"
+    },
+    {
+      "id": "pipeline.gg-22-reads-the-shared-index-so-a-concurrent-dispatch-blocks-an-unrelated-ledger-commit",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-03",
+      "source": "Measured live 2026-09-03 during the autonomous Nova-B run: the dispatcher's ledger commit for the scope-relay closure (573df491) was refused by GG-22 while a concurrent goldfish dispatch held harness/scripts/check-product-capability-inventory.{mjs,test.mjs} staged in the shared index.",
+      "deferred": false,
+      "tracking": "Nova B — GG-22's disallowed-path check reads `git diff --cached`, the shared index, rather than the paths the blocked commit actually names. Under parallel dispatch that makes an unrelated agent's staged work block a correct ledger commit, with a denial text that names neither the real cause nor a route forward."
     },
     {
       "id": "pipeline.gg-22s-own-remediation-order-creates-unclearable-ledger-debt",
@@ -6752,12 +6770,16 @@
     },
     {
       "id": "pipeline.the-handover-size-guards-header-comment-contradicts-its-own-registration",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-01",
       "source": "scratch/critic-contract-round-G.md, D-2 (declared deviation: the header comment is stale and known false, correcting it out of that package's scope). Verified live 2026-09-01 against plugins/pipeline-core/hooks/guard-handover-size.mjs and plugins/pipeline-core/hooks/hooks.json.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-09-03",
+      "closureRepository": "self",
+      "closureCommit": "3c7c5d5f38e44afd54af8005960144bb965b0785",
+      "closureEvidence": "backlog/evidence/2026-09-03-nova-b-batch-1-closure-verification.md"
     },
     {
       "id": "pipeline.the-ledger-commit-rule-was-given-a-second-home-in-a-different-voice",
@@ -6898,12 +6920,16 @@
     },
     {
       "id": "pipeline.three-onboarding-suites-pass-locally-and-fail-in-ci",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-01",
       "source": "GitHub Actions run 33471808564 (workflow_dispatch, feat/sprint-nova-codex-v046, candidate 56e91858), job verify, step Runner-free offline Core Verify",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-09-03",
+      "closureRepository": "self",
+      "closureCommit": "6262d408aa616651232b46ab8ecbfd88ce4055b0",
+      "closureEvidence": "backlog/evidence/2026-09-03-nova-b-batch-1-closure-verification.md"
     },
     {
       "id": "pipeline.three-runners-showed-wide-pipeline-administration-overhead-variance",

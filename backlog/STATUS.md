@@ -167,7 +167,7 @@
 | pipeline.dispatch-provenance | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.dispatch-record-contaminates-every-critic-review | deferred | defect | pipeline | 2026-08-09 | — |
 | pipeline.dispatch-record-does-not-bind-to-its-commit | closed | defect | pipeline | 2026-08-09 | — |
-| pipeline.dispatch-records-are-written-to-a-name-the-verifier-cannot-find | open | defect | pipeline | 2026-09-03 | Nova B — the authorship verifier reads exactly one filename shape in exactly one directory; two dispatches in one day wrote their records under a different name in a different directory, in good faith, following the directory contract. |
+| pipeline.dispatch-records-are-written-to-a-name-the-verifier-cannot-find | closed | defect | pipeline | 2026-09-03 | Nova B — the authorship verifier reads exactly one filename shape in exactly one directory; two dispatches in one day wrote their records under a different name in a different directory, in good faith, following the directory contract. |
 | pipeline.dispatch-reported-creating-a-record-it-never-created | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.dispatch-templates-cite-restructured-operating-model-sections | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.dispatch-text-model-field-loses-to-a-subagent-definitions-own-frontmatter-pin | closed | defect | pipeline | 2026-08-18 | — |
@@ -186,7 +186,7 @@
 | pipeline.elephant-notes-and-critic-scratch-share-one-directory | closed | defect | pipeline | 2026-08-23 | — |
 | pipeline.elephant-writes-production-code-directly-without-a-goldfish-dispatch | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.enforce-kickoff-po-questions | open | workflow-improvement | pipeline | 2026-08-21 | — |
-| pipeline.entry-point-reachability-check-substring-matches-whole-source-files | open | defect | pipeline | 2026-09-03 | Nova B — the reachability check decides whether a guard admits a script by testing whether the guard's source text contains the script's stem anywhere, comments included. A comment citing an evidence file whose name happens to contain a script stem is read as an admission. |
+| pipeline.entry-point-reachability-check-substring-matches-whole-source-files | closed | defect | pipeline | 2026-09-03 | Nova B — the reachability check decides whether a guard admits a script by testing whether the guard's source text contains the script's stem anywhere, comments included. A comment citing an evidence file whose name happens to contain a script stem is read as an admission. |
 | pipeline.epic-file-contract-has-no-drift-check | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.every-gate-binds-the-whole-tree-so-any-later-commit-voids-it | open | workflow-improvement | pipeline | 2026-08-16 | — |
 | pipeline.every-small-correction-costs-a-new-human-interaction | open | idea | pipeline | 2026-08-28 | — |
@@ -211,6 +211,7 @@
 | pipeline.gate-strength-override-route-advertised-not-offered | deferred | defect | pipeline | 2026-08-08 | — |
 | pipeline.gate-strength-shell-comment-understates-its-own-scope | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.gate-strength-shell-lane-refuses-any-command-containing-a-quoted-wildcard | closed | defect | pipeline | 2026-08-27 | — |
+| pipeline.gg-22-reads-the-shared-index-so-a-concurrent-dispatch-blocks-an-unrelated-ledger-commit | open | defect | pipeline | 2026-09-03 | Nova B — GG-22's disallowed-path check reads `git diff --cached`, the shared index, rather than the paths the blocked commit actually names. Under parallel dispatch that makes an unrelated agent's staged work block a correct ledger commit, with a denial text that names neither the real cause nor a route forward. |
 | pipeline.gg-22s-own-remediation-order-creates-unclearable-ledger-debt | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.git-09-still-calls-the-append-only-source-ledger-a-projection-file | closed | defect | pipeline | 2026-09-01 | — |
 | pipeline.git-appears-despite-initializes-git-false | closed | defect | pipeline | 2026-08-08 | — |
@@ -547,7 +548,7 @@
 | pipeline.the-denial-trim-state-is-keyed-per-session-not-per-agent-as-its-comment-claims | closed | defect | pipeline | 2026-09-01 | — |
 | pipeline.the-dispatch-record-field-enumeration-omits-a-field-the-checker-requires | closed | defect | pipeline | 2026-09-01 | — |
 | pipeline.the-handover-size-guard-only-sees-one-of-two-write-paths | closed | defect | pipeline | 2026-09-01 | — |
-| pipeline.the-handover-size-guards-header-comment-contradicts-its-own-registration | open | defect | pipeline | 2026-09-01 | — |
+| pipeline.the-handover-size-guards-header-comment-contradicts-its-own-registration | closed | defect | pipeline | 2026-09-01 | — |
 | pipeline.the-ledger-commit-rule-was-given-a-second-home-in-a-different-voice | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.the-ledger-reconciler-writes-before-the-items-are-validated | deferred | defect | pipeline | 2026-08-08 | — |
 | pipeline.the-marketplace-attestation-compares-more-than-the-property-it-protects | open | defect | pipeline | 2026-09-01 | — |
@@ -561,7 +562,7 @@
 | pipeline.this-hosts-local-marketplace-copy-is-not-symlinked-to-source | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.three-doc-and-adr-checkers-never-run-in-verify | rejected | defect | pipeline | 2026-08-27 | — |
 | pipeline.three-independent-copies-of-the-wsl-windows-path-normalization | closed | defect | pipeline | 2026-08-27 | — |
-| pipeline.three-onboarding-suites-pass-locally-and-fail-in-ci | open | defect | pipeline | 2026-09-01 | — |
+| pipeline.three-onboarding-suites-pass-locally-and-fail-in-ci | closed | defect | pipeline | 2026-09-01 | — |
 | pipeline.three-runners-showed-wide-pipeline-administration-overhead-variance | open | idea | pipeline | 2026-08-29 | — |
 | pipeline.three-smaller-greenfield-defects | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.tp-ceremony-denials-inline-a-150-line-multi-shell-block-by-default | closed | workflow-improvement | pipeline | 2026-08-30 | NOW / Nova A -- PO decision 2026-08-30, item #12 of a 12-point instruction list: implement the Elephant's own guard-verbosity-slimming proposal. |
@@ -623,8 +624,8 @@
 
 ## Counts
 
-- open: 105
+- open: 102
 - in_progress: 0
-- closed: 496
+- closed: 500
 - rejected: 3
 - deferred: 11
