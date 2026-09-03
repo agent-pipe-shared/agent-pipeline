@@ -7,6 +7,7 @@ status: open
 created: 2026-09-01
 source: "GitHub Actions run 33471808564 (workflow_dispatch, feat/sprint-nova-codex-v046, candidate 56e91858), job verify, step Runner-free offline Core Verify"
 sprint: nova-b
+done_when: manual
 ---
 
 # Three onboarding/trust-anchor suites fail in CI-only, pass locally, and block `main`
@@ -221,6 +222,25 @@ above:** "`main` stays unreachable while these three suites fail in CI" no longe
 holds. `main` was reached at `6262d408` under an explicit repository-admin
 ruleset bypass, recorded in `docs/state.md`. The `verify` requirement was not
 weakened for anyone else, and the bypass is tracked as open.
+
+### Predicate note, 2026-09-03 — manual, and why
+
+`done_when: manual`. This item's own "Result, 2026-09-02" section above
+records that all three of its own Acceptance criteria are already
+satisfied: CI run `33595311782` reported zero for all three named suites
+(`project-onboarding-v3-tests`, `trust-anchor-bootstrap-circularity-repro-tests`,
+`onboarding-init-tests`) on the released `0.6.1` commit. Any faithful
+machine predicate of this item's own ask (those three suites passing in
+actual CI) would therefore already be satisfied today — the exact
+already-true-at-declaration-time shape the 2026-08-29 predicate note warns
+against, and it would also immediately trip the STALE-OPEN finding this
+task is forbidden from causing (status is still `open`). `manual` is the
+only declaration that satisfies zero-UNDECLARED without falsely asserting
+an unfalsified predicate or reporting STALE-OPEN. This item therefore reads
+as already resolved, pending the Elephant's own closure judgment below —
+see this dispatch's completion report for the same flag. No `Decision:`
+value is set here; that closure call belongs to whoever triages this item
+next.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
