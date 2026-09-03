@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.the-rebase-authority-is-resolved-and-advertised-but-not-executable
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-03
+closure_repository: self
+closure_commit: afb2e3c0f11f7bb0f6af31bec94a376616d31cb4
+closure_evidence: backlog/evidence/2026-09-03-nva-rebdead-round2-findings.md
 created: 2026-09-02
 source: "Field report from a second session (sprint-alfred) blocked mid-rebase on Pipeline 0.6.1, cross-checked against guard-lifecycle-ready.mjs by direct reading"
 sprint: nova-b
@@ -177,3 +181,50 @@ No new human signature may be required anywhere in this path.
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:**
+
+## Triage, 2026-09-03 — closed after two Critic rounds
+
+The reported deadlock is fixed and the fix is reviewed. Nine commits, two
+independent Critic rounds, and a full `verify.mjs` run green across all 506
+suites.
+
+**Round 1** returned eight findings. Three were dispatcher-side and closed
+separately. F1 was **refuted by measurement** — `apply_patch` was never blocked,
+because the outer tool-name gate admits any tool outside `SHELL_TOOLS`/
+`WRITE_TOOLS` before either relief; the fix built against it was reverted. F5's
+first rework was **rejected**: it pinned the relief to `continuity-damaged`,
+measured against the test's own stub rather than the production chain, and an
+unparseable state file actually yields `continuity-observation-unavailable` —
+so the narrowing would have re-opened this very deadlock while the suite stayed
+green. The second rework admits the measured two-value set. F7 and F8 closed.
+
+**Round 2** (higher-capability review model at max, MP-07: guardrail diff)
+returned two findings and two briefing violations against the dispatcher, all
+four recorded in
+`backlog/evidence/2026-09-03-nva-rebdead-round2-findings.md`:
+
+- **F1 (major), a lifecycle violation, not a code defect.** `43413349` was
+  written by the orchestrating session rather than dispatched, breaking three of
+  EL-01's five stage-0 conditions independently. Recorded rather than remedied:
+  re-doing the revert through a dispatch would churn a guardrail hook to launder
+  authorship. It stands as the violation it was.
+- **F2 (minor), fixed.** After that revert took code and tests together, nothing
+  asserted acceptance criterion 2's third named tool. `afb2e3c0` adds
+  `rebdead positive-1 (apply_patch)`, asserting the admission itself rather than
+  the mechanism that currently provides it — so it survives a refactor and fails
+  if the admission disappears.
+
+**Acceptance criteria.** 1, 3, 4 and 5 were verified met by the Critic against
+artifacts; 2 is now met in full. Criterion 5's release-notes correction was
+already satisfied outside the reviewed diff — `CHANGELOG.md` withdraws the
+discoverability claim verbatim and states that it was true of the refusal text
+and false of the behaviour.
+
+**One limitation is carried forward rather than buried.** Two package commits
+modify the round-1 findings registry, which the round-2 dispatch excluded as
+dispatcher rationale. The Critic honoured the exclusion, so 38 lines of the
+reviewed diff went unreviewed. A findings registry is both the honest record of
+a round and, once committed, part of the next round's diff; excluding it keeps
+the review independent and leaves part of the diff unseen. The tension has no
+resolution inside a single round and is named so a later one does not
+rediscover it as a gap.
