@@ -235,14 +235,15 @@ function readCalibration(repoPath, {
       return { status: "unknown", path, raw: null, value: null, rawSha256: null, reason: "malformed-configuration" };
     }
     const layout = topLevelLayout(raw);
-    const entries = layout.properties.filter((entry) => entry.key === "pipelineUpdateChannel");
-    if (entries.length > 1) {
-      return { status: "unknown", path, raw: null, value: null, rawSha256: null, reason: "malformed-configuration" };
-    }
-    if (Object.hasOwn(value, "pipelineUpdateChannel")
-      && !isPipelineUpdateChannel(value.pipelineUpdateChannel)) {
-      return { status: "unknown", path, raw: null, value: null, rawSha256: null, reason: "invalid-channel" };
-    }
+    // Field-agnostic on purpose: readCalibration is shared by both fields'
+    // read/plan/apply paths, so it must never gate on one field's value or
+    // duplicate-key state -- that is exactly the coupling this function used
+    // to carry (a broken pipelineUpdateChannel value or duplicate key used to
+    // fail the whole read here, silently refusing an unrelated
+    // pipelineUpdateAlphaRef operation with a reason naming the wrong field).
+    // Each field's own value validity and duplicate-key check now live next
+    // to that field's own readers/planners/appliers (duplicateFieldKey,
+    // below), so validation of one field gates only operations on that field.
     return {
       status: "ready",
       path,
@@ -387,20 +388,18 @@ function alphaRefPostimage(observation, alphaRef) {
   return fieldPostimage(observation, "pipelineUpdateAlphaRef", alphaRef);
 }
 
-// `readCalibration` only detects a duplicated `pipelineUpdateChannel` key --
-// its one hardcoded field. A duplicated `pipelineUpdateAlphaRef` key reaches
-// the writer undetected: `fieldPostimage` resolves its write target via
-// `.find()` (the FIRST occurrence) while `JSON.parse` -- and therefore every
-// value comparison -- resolves to the LAST occurrence, so the byte edit and
-// the value check silently address two different properties (finding F1).
-// Mirrors the duplicate check `readProjectPipelineUpdateAlphaRef` already
-// performs on its own read path; kept local to the alpha-ref writer rather
-// than folded into `readCalibration` because generalizing it there would
-// also change what that reader returns for this exact case (its non-ready
-// branch collapses every reason to `channel-unavailable`, discarding the
-// `malformed-configuration` reason a pinned test requires).
-function duplicateAlphaRefKey(observed) {
-  return observed.layout.properties.filter((entry) => entry.key === "pipelineUpdateAlphaRef").length > 1;
+// Shared duplicate-top-level-key check, applied symmetrically to both
+// fields by their own readers/planners/appliers rather than centrally in
+// `readCalibration` (which stays field-agnostic; see the comment there). A
+// duplicated key reaches the writer undetected without this check:
+// `fieldPostimage` resolves its write target via `.find()` (the FIRST
+// occurrence) while `JSON.parse` -- and therefore every value comparison --
+// resolves to the LAST occurrence, so the byte edit and the value check
+// would silently address two different properties (finding F1, originally
+// caught for `pipelineUpdateAlphaRef`; the same failure mode applies
+// identically to `pipelineUpdateChannel`).
+function duplicateFieldKey(observed, key) {
+  return observed.layout.properties.filter((entry) => entry.key === key).length > 1;
 }
 
 /** Read back only the closed portable channel field. */
@@ -412,8 +411,14 @@ export function readProjectPipelineUpdateChannel(repoPath, deps = {}) {
   if (observed.status !== "ready") {
     return { status: "unknown", updateChannel: null, source: "project-config", reason: "channel-unavailable" };
   }
+  if (duplicateFieldKey(observed, "pipelineUpdateChannel")) {
+    return { status: "unknown", updateChannel: null, source: "project-config", reason: "malformed-configuration" };
+  }
   if (!Object.hasOwn(observed.value, "pipelineUpdateChannel")) {
     return { status: "absent", updateChannel: null, source: null, reason: null };
+  }
+  if (!isPipelineUpdateChannel(observed.value.pipelineUpdateChannel)) {
+    return { status: "unknown", updateChannel: null, source: "project-config", reason: "invalid-channel" };
   }
   return {
     status: "ready",
@@ -437,8 +442,7 @@ export function readProjectPipelineUpdateAlphaRef(repoPath, deps = {}) {
   if (observed.status !== "ready") {
     return { status: "unknown", alphaRef: null, source: "project-config", reason: "channel-unavailable" };
   }
-  const entries = observed.layout.properties.filter((entry) => entry.key === "pipelineUpdateAlphaRef");
-  if (entries.length > 1) {
+  if (duplicateFieldKey(observed, "pipelineUpdateAlphaRef")) {
     return { status: "unknown", alphaRef: null, source: "project-config", reason: "malformed-configuration" };
   }
   if (!Object.hasOwn(observed.value, "pipelineUpdateAlphaRef")) {
@@ -533,6 +537,20 @@ export function planPipelineUpdateChannel(repoPath, channel, deps = {}) {
   if (observed.status !== "ready") {
     return { schema: PIPELINE_UPDATE_CHANNEL_PLAN_SCHEMA, status: "unknown", reason: observed.reason };
   }
+  // Mirrors planPipelineUpdateAlphaRef's own field-local guards (finding F1,
+  // decoupled here): checked unconditionally, before any digest comparison,
+  // so a caller cannot plan against a duplicated or already-invalid channel
+  // key even with a correctly-computed target channel. Symmetric with the
+  // alpha-ref path -- and, unlike the alpha-ref path, deliberately still
+  // blocks THIS field's own plan (an invalid existing channel value staying
+  // a channel-operation refusal is the one coupling worth keeping).
+  if (duplicateFieldKey(observed, "pipelineUpdateChannel")) {
+    return { schema: PIPELINE_UPDATE_CHANNEL_PLAN_SCHEMA, status: "unknown", reason: "malformed-configuration" };
+  }
+  if (Object.hasOwn(observed.value, "pipelineUpdateChannel")
+    && !isPipelineUpdateChannel(observed.value.pipelineUpdateChannel)) {
+    return { schema: PIPELINE_UPDATE_CHANNEL_PLAN_SCHEMA, status: "unknown", reason: "invalid-channel" };
+  }
   const postimage = channelPostimage(observed, channel);
   const binding = planBinding(repoPath, channel, observed.rawSha256, sha256(postimage));
   const planSha256 = sha256(canonicalJson(binding));
@@ -576,7 +594,7 @@ export function planPipelineUpdateAlphaRef(repoPath, alphaRef, deps = {}) {
   if (observed.status !== "ready") {
     return { schema: PIPELINE_UPDATE_ALPHA_REF_PLAN_SCHEMA, status: "unknown", reason: observed.reason };
   }
-  if (duplicateAlphaRefKey(observed)) {
+  if (duplicateFieldKey(observed, "pipelineUpdateAlphaRef")) {
     return { schema: PIPELINE_UPDATE_ALPHA_REF_PLAN_SCHEMA, status: "unknown", reason: "malformed-configuration" };
   }
   const postimage = alphaRefPostimage(observed, alphaRef);
@@ -801,6 +819,12 @@ export function applyPipelineUpdateChannel(repoPath, options = {}, deps = {}) {
   if (sha256(canonicalJson(binding)) !== options.planSha256) return unknown("invalid-plan");
   const observed = readCalibration(repoPath, deps);
   if (observed.status !== "ready") return unknown(observed.reason);
+  // Mirrors applyPipelineUpdateAlphaRef's own field-local guards, checked
+  // unconditionally before the replay short circuit and before any digest
+  // comparison -- see the identical comment on planPipelineUpdateChannel.
+  if (duplicateFieldKey(observed, "pipelineUpdateChannel")) return unknown("malformed-configuration");
+  if (Object.hasOwn(observed.value, "pipelineUpdateChannel")
+    && !isPipelineUpdateChannel(observed.value.pipelineUpdateChannel)) return unknown("invalid-channel");
   if (observed.rawSha256 === options.expectedPostimageSha256
     && observed.value.pipelineUpdateChannel === options.channel) {
     return { ...binding, status: "replayed", planSha256: options.planSha256, reason: null };
@@ -848,7 +872,7 @@ export function applyPipelineUpdateAlphaRef(repoPath, options = {}, deps = {}) {
   // different properties. Checked unconditionally, before the replay short
   // circuit and before any digest comparison, so a caller cannot reach the
   // write path on such a file even with a correctly-computed digest binding.
-  if (duplicateAlphaRefKey(observed)) return unknown("malformed-configuration");
+  if (duplicateFieldKey(observed, "pipelineUpdateAlphaRef")) return unknown("malformed-configuration");
   if (observed.rawSha256 === options.expectedPostimageSha256
     && observed.value.pipelineUpdateAlphaRef === options.alphaRef) {
     return { ...binding, status: "replayed", planSha256: options.planSha256, reason: null };
