@@ -19,7 +19,7 @@ No findings.
 
 ## Trajectory check
 
-**not verifiable** for the original E1 focused validator and `git diff --check`: their referenced dispatch record was not supplied. The supplied [verify evidence](evidence/verify-latest.json) does exactly bind this candidate and tree to `node harness/scripts/verify.mjs`, exit 0, including doc-contract tests and check.
+**not verifiable** for the original E1 focused validator and `git diff --check`: their referenced dispatch record was not supplied. The supplied `verify evidence (evidence/verify-latest.json)` does exactly bind this candidate and tree to `node harness/scripts/verify.mjs`, exit 0, including doc-contract tests and check.
 
 ## Briefing violations observed
 
