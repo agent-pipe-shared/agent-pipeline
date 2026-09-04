@@ -42,7 +42,6 @@ export const DISPATCH_RECORD_SAFE_TOP_LEVEL_FIELDS = Object.freeze([
   "effort",
   "rulesetSha",
   "commits",
-  "outcome",
 ]);
 
 /**
@@ -56,9 +55,12 @@ const RATIONALE_SEPARATOR = " - ";
 
 /**
  * Reduce one `report.changedFiles` entry to a bare repo-relative path string,
- * or `null` when the entry's shape carries no recognisable path (dropped by
- * the caller rather than passed through as-is — an unrecognised shape is
- * exactly the kind of thing this module exists to keep out).
+ * or `null` when the entry's shape carries no recognisable path. The caller
+ * treats `null` as a hard failure of the whole strip operation, never a
+ * silently dropped entry — an unrecognised shape is exactly the kind of thing
+ * this module exists to keep out, and a Critic reading a silently shortened
+ * `changedFiles` list has no way to know a file went missing, which defeats
+ * the authorship-verification purpose of the field.
  *
  * @param {unknown} entry
  * @returns {string|null}
@@ -76,18 +78,30 @@ function normalizeChangedFileEntry(entry) {
 }
 
 /**
- * Normalize a whole `report.changedFiles` array to bare path strings,
- * dropping any entry whose shape does not resolve to a non-empty path.
+ * Normalize a whole `report.changedFiles` array to bare path strings.
+ *
+ * Throws when any entry's shape falls outside the three contracted
+ * `changedFiles` entry shapes named in `templates/prompts/goldfish-task.md`
+ * (a bare path string, `"<path> - why it changed"`, or `{ "path": "<path>" }`)
+ * — naming the offending index and value — rather than silently shortening
+ * the list.
  *
  * @param {unknown[]} changedFiles
  * @returns {string[]}
  */
 function normalizeChangedFiles(changedFiles) {
   const normalized = [];
-  for (const entry of changedFiles) {
+  changedFiles.forEach((entry, index) => {
     const path = normalizeChangedFileEntry(entry);
-    if (typeof path === "string" && path !== "") normalized.push(path);
-  }
+    if (typeof path !== "string" || path === "") {
+      throw new TypeError(
+        `report.changedFiles[${index}] has an out-of-contract shape (${JSON.stringify(entry)}); ` +
+          "refusing to silently drop it. Expected a bare path string, " +
+          '"<path> - why it changed", or { "path": "<path>" }.',
+      );
+    }
+    normalized.push(path);
+  });
   return normalized;
 }
 
@@ -113,10 +127,15 @@ function stripModelOverride(modelOverride) {
 /**
  * Reduce a full, already-parsed dispatch-record object to the strictly
  * bounded safe field set: `taskId`, `agentType`, `model`, `effort`,
- * `rulesetSha`, `commits`, `outcome`, `report.changedFiles` (normalized to
- * bare path strings), and `modelOverride.{model,effort}` when present.
- * Everything else — `report.text`, `log`, `dispatcher`, `criticSkip`,
- * `modelOverride.rationale`, and any other field — is dropped.
+ * `rulesetSha`, `commits`, `report.changedFiles` (normalized to bare path
+ * strings), and `modelOverride.{model,effort}` when present. Everything
+ * else — `report.text`, `log`, `dispatcher`, `criticSkip`, `outcome`,
+ * `modelOverride.rationale`, and any other field — is dropped. `outcome` is
+ * deliberately excluded even though it looks bounded: the real corpus carries
+ * free-form implementor self-assessment prose there (e.g.
+ * `"stopped-mechanism-established-no-fix-applied"`), not an enum, and it has
+ * no machine consumer in the stripped copy — `dispatch-authorship-verify.mjs`
+ * reads the RAW record, never the stripped one.
  *
  * Pure function: never touches the filesystem, never mutates its input.
  *

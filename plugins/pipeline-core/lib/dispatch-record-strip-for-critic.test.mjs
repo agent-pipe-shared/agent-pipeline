@@ -77,13 +77,27 @@ test("stripDispatchRecordForCritic passes the declared safe top-level fields thr
   assert.equal(stripped.effort, "xhigh");
   assert.equal(stripped.rulesetSha, "5b2ce43");
   assert.deepEqual(stripped.commits, ["a1b2c3d4"]);
-  assert.equal(stripped.outcome, "completed");
   // Nothing beyond the declared safe set (plus report/modelOverride) survives.
   for (const key of Object.keys(stripped)) {
     assert.ok(
       DISPATCH_RECORD_SAFE_TOP_LEVEL_FIELDS.includes(key) || key === "report" || key === "modelOverride",
       `unexpected surviving top-level key: ${key}`,
     );
+  }
+});
+
+test("stripDispatchRecordForCritic drops outcome entirely, even when it carries real-corpus free-text prose", () => {
+  assert.equal(stripDispatchRecordForCritic(FULL_RECORD).outcome, undefined);
+  assert.ok(!("outcome" in stripDispatchRecordForCritic(FULL_RECORD)));
+
+  for (const outcome of [
+    "committed-not-fully-verified",
+    "stopped-mechanism-established-no-fix-applied",
+    "completed-with-open-items",
+  ]) {
+    const record = { taskId: "NVA-X-OUTCOME-1", outcome };
+    const stripped = stripDispatchRecordForCritic(record);
+    assert.ok(!("outcome" in stripped), `outcome "${outcome}" must not survive the strip`);
   }
 });
 
@@ -112,20 +126,16 @@ test("stripDispatchRecordForCritic omits report when report.changedFiles is abse
   assert.equal(stripped.taskId, "NVA-X-NOREPORT-1");
 });
 
-test("stripDispatchRecordForCritic drops a changedFiles entry whose shape carries no recognisable path", () => {
-  const record = {
-    taskId: "NVA-X-MALFORMED-1",
-    report: {
-      changedFiles: [
-        "plugins/pipeline-core/scripts/real-path.mjs",
-        42,
-        null,
-        { rationale: "no path field on this entry" },
-      ],
-    },
-  };
-  const stripped = stripDispatchRecordForCritic(record);
-  assert.deepEqual(stripped.report.changedFiles, ["plugins/pipeline-core/scripts/real-path.mjs"]);
+test("stripDispatchRecordForCritic throws (not silently drops) on a changedFiles entry with an out-of-contract shape", () => {
+  for (const malformed of [42, null, { rationale: "no path field on this entry" }]) {
+    const record = {
+      taskId: "NVA-X-MALFORMED-1",
+      report: {
+        changedFiles: ["plugins/pipeline-core/scripts/real-path.mjs", malformed],
+      },
+    };
+    assert.throws(() => stripDispatchRecordForCritic(record), TypeError);
+  }
 });
 
 test("stripDispatchRecordForCritic rejects a non-object record", () => {
