@@ -6,7 +6,8 @@
  * evidence artifact, with this machine's absolute repository path (and home directory) replaced
  * by a stable placeholder BEFORE the bytes reach disk.
  *
- * WHY. `scratch/strip-redevidence.md` (NVA-B-REDCAPTURE-1): reproduce-first RED evidence is
+ * WHY. `backlog/items/2026-09-02-red-evidence-captured-from-node-test-embeds-the-absolute-repository-path.md`
+ * (NVA-B-REDCAPTURE-1): reproduce-first RED evidence is
  * required by briefings and ADR-0063, and a failing `node --test` run embeds Node's own assertion
  * stack traces, which carry the repository's absolute path in `file://` URL form. A GREEN capture
  * never does, because a passing run prints no stack traces -- so the trap fires only on the
@@ -96,6 +97,17 @@ export function redactText(text, repoRoot, homeDir) {
  *   - POSIX user-home path:      /home/<name>/...
  *   - macOS user-home path:      /Users/<name>/...
  *   - Windows drive-letter path: C:\...  and the C:/... forward-slash spelling
+ *
+ * The word-boundary lookbehind on both drive-letter patterns exists to avoid a false positive on
+ * the "e:/" tail of an ordinary URL scheme like `file://` (a real false positive found empirically
+ * against this file's own existing test fixtures). For the percent-encoded drive-letter pattern
+ * specifically (NVA-B-REDFIX-1 F4), a plain word-character lookbehind alone made a REAL shape
+ * unreachable: in a fully percent-encoded file URL (`file://%2FC%3A%2F...`), the drive letter is
+ * legitimately preceded by the trailing `F` of the encoded path separator `%2F`, which the plain
+ * lookbehind excluded identically to an ordinary mid-word letter. The pattern below therefore also
+ * permits a match immediately after `%2F`/`%5C` (the encoded `/` and `\` separators) while still
+ * excluding an ordinary mid-word letter -- see `capture-evidence.test.mjs` for both the
+ * false-negative repro this replaces and the false-positive guard it must not reopen.
  */
 const RESIDUAL_HOST_PATH_PATTERNS = Object.freeze([
   { name: "posix-home", regex: /\/home\/[^\s"'<>]+/gu },
@@ -106,7 +118,9 @@ const RESIDUAL_HOST_PATH_PATTERNS = Object.freeze([
   // this does not fire on the "e:/" tail of an ordinary URL scheme like "file://" or "https://"
   // (a real false positive found empirically against this file's own existing test fixtures).
   { name: "windows-drive-letter", regex: /(?<![A-Za-z0-9_%])[A-Za-z]:[\\/][^\s"'<>]*/gu },
-  { name: "windows-drive-letter-percent-encoded", regex: /(?<![A-Za-z0-9_%])[A-Za-z]%3[aA][%\\/][^\s"'<>]*/gu },
+  // See the doc comment above: also permits the match right after an encoded `/` or `\`
+  // separator (`%2F`/`%5C`), which a plain word-character lookbehind alone silently excluded.
+  { name: "windows-drive-letter-percent-encoded", regex: /(?:(?<![A-Za-z0-9_%])|(?<=%2[fF])|(?<=%5[cC]))[A-Za-z]%3[aA][%\\/][^\s"'<>]*/gu },
 ]);
 
 /**
@@ -192,7 +206,7 @@ export function captureEvidence({
   return { exitCode, out: resolvedOut };
 }
 
-function parseArgs(argv) {
+export function parseArgs(argv) {
   const sepIndex = argv.indexOf("--");
   if (sepIndex < 0) {
     throw new Error("usage: capture-evidence.mjs --out <path> --label <label> -- <command> [args...]");
@@ -220,6 +234,13 @@ function parseArgs(argv) {
   return { out, label, command };
 }
 
+// F2 (NVA-B-REDFIX-1): captureEvidence() redacts the artifact BODY, but resolvedOut/error messages
+// on the CLI's own stdout/stderr are a separate channel this tool used not to touch -- exactly
+// the absolute-host-path leak this tool exists to prevent, one layer up, on the channel a dispatch
+// pastes verbatim into a report. repoRoot/homeDir are resolved once here (and handed to
+// captureEvidence explicitly) so both the success line and every error path redact against the
+// same values, instead of leaving a gap where captureEvidence's own internal resolution and this
+// function's redaction could silently disagree.
 function runCli() {
   let parsed;
   try {
@@ -229,12 +250,24 @@ function runCli() {
     process.exitCode = 1;
     return;
   }
+  const cwd = process.cwd();
+  const homeDir = homedir();
+  let repoRoot;
   try {
-    const { exitCode, out } = captureEvidence(parsed);
-    process.stdout.write(`capture-evidence: wrote ${out} (wrapped exit code ${exitCode})\n`);
+    repoRoot = findRepoRoot(cwd);
+  } catch (error) {
+    // repoRoot is not known yet here -- redact against cwd (the closest stand-in) and homeDir.
+    process.stderr.write(`capture-evidence: ${redactText(error.message, cwd, homeDir)}\n`);
+    process.exitCode = 1;
+    return;
+  }
+  try {
+    const { exitCode, out } = captureEvidence({ ...parsed, cwd, repoRoot, homeDir });
+    const reportedOut = redactText(out, repoRoot, homeDir);
+    process.stdout.write(`capture-evidence: wrote ${reportedOut} (wrapped exit code ${exitCode})\n`);
     process.exitCode = exitCode;
   } catch (error) {
-    process.stderr.write(`capture-evidence: ${error.message}\n`);
+    process.stderr.write(`capture-evidence: ${redactText(error.message, repoRoot, homeDir)}\n`);
     process.exitCode = 1;
   }
 }

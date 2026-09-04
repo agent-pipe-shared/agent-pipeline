@@ -1,12 +1,27 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { test } from "node:test";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
 import { existsSync } from "node:fs";
-import { captureEvidence, findResidualHostPath, formatArtifact, HOME_PLACEHOLDER, redactText, REPO_ROOT_PLACEHOLDER } from "./capture-evidence.mjs";
+import {
+  captureEvidence,
+  findRepoRoot,
+  findResidualHostPath,
+  formatArtifact,
+  HOME_PLACEHOLDER,
+  parseArgs,
+  redactText,
+  REPO_ROOT_PLACEHOLDER,
+} from "./capture-evidence.mjs";
+
+// The actual CLI entry point, invoked as a subprocess (F2/F6): the CLI is the documented
+// consumption path, and F2's stdout/stderr redaction can only be pinned end-to-end this way.
+const CLI_PATH = fileURLToPath(new URL("./capture-evidence.mjs", import.meta.url));
 
 // Synthetic, never-real absolute-looking paths, constructed at runtime -- never a hard-coded
 // machine path (this is the easiest place in the repository to leak the exact string a redactor
@@ -279,6 +294,117 @@ test("captureEvidence: the refusal error names the pattern and offset but never 
     assert.match(caught.message, /macos-home/, "message must name the matched pattern");
     assert.match(caught.message, /offset \d+/, "message must name the character offset");
     assert.ok(!caught.message.includes(stray), "message must never contain the offending path itself");
+  } finally {
+    rmSync(workDir, { recursive: true, force: true });
+  }
+});
+
+// --- NVA-B-REDFIX-1 F4: the percent-encoded drive-letter pattern's word-boundary lookbehind made
+// a real shape unreachable (a drive letter right after an encoded path separator). ---
+
+test("findResidualHostPath: catches a percent-encoded Windows drive-letter path immediately after an encoded path separator (F4 false-negative repro)", () => {
+  const user = `synthetic-user-${process.pid}-${Date.now()}`;
+  const encoded = `file://%2FC%3A%2F${user}%2Fproject%2Ffile.mjs`;
+  const hit = findResidualHostPath(`boom at ${encoded}`);
+  assert.ok(hit, "must detect the percent-encoded drive-letter path even right after an encoded separator");
+  assert.equal(hit.name, "windows-drive-letter-percent-encoded");
+});
+
+test("findResidualHostPath: catches a percent-encoded macOS user-home path (AC-3, previously untested)", () => {
+  const user = `synthetic-user-${process.pid}-${Date.now()}`;
+  const encoded = `file://%2FUsers%2F${user}%2Fproject%2Ffile.mjs`;
+  assert.ok(!encoded.includes("/Users/"), "fixture must contain no literal /Users/ substring");
+  const hit = findResidualHostPath(`boom at ${encoded}`);
+  assert.ok(hit, "must detect the percent-encoded /Users/ path");
+  assert.equal(hit.name, "macos-home-percent-encoded");
+});
+
+test("findResidualHostPath: the F4 fix does not reopen a false positive on a fully percent-encoded URL scheme", () => {
+  const text = "at file%3A%2F%2Fexample.invalid%2Fdocs (fully percent-encoded scheme, no real host path)";
+  assert.equal(findResidualHostPath(text), null);
+});
+
+// --- NVA-B-REDFIX-1 F6: direct coverage for findRepoRoot and parseArgs (previously untested). ---
+
+test("findRepoRoot: resolves the actual repository root for a cwd inside this checkout", () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const root = findRepoRoot(here);
+  assert.ok(existsSync(join(root, "CLAUDE.md")), "resolved root must contain this repository's own CLAUDE.md");
+});
+
+test("findRepoRoot: throws a hard stop (never guesses) for a cwd outside any Git working tree", () => {
+  const workDir = mkdtempSync(join(tmpdir(), "capture-evidence-test-"));
+  try {
+    assert.throws(() => findRepoRoot(workDir), /could not determine the repository root/);
+  } finally {
+    rmSync(workDir, { recursive: true, force: true });
+  }
+});
+
+test("parseArgs: throws when the -- separator is absent", () => {
+  assert.throws(() => parseArgs(["--out", "x", "--label", "y"]), /usage: capture-evidence\.mjs/);
+});
+
+test("parseArgs: throws when no command follows --", () => {
+  assert.throws(() => parseArgs(["--out", "x", "--label", "y", "--"]), /usage: capture-evidence\.mjs/);
+});
+
+test("parseArgs: throws when --out is missing", () => {
+  assert.throws(() => parseArgs(["--label", "y", "--", "node", "-v"]), /requires --out/);
+});
+
+test("parseArgs: throws when --label is missing", () => {
+  assert.throws(() => parseArgs(["--out", "x", "--", "node", "-v"]), /requires --label/);
+});
+
+test("parseArgs: throws on an unrecognized flag", () => {
+  assert.throws(() => parseArgs(["--out", "x", "--label", "y", "--weird", "z", "--", "node", "-v"]), /unrecognized flag --weird/);
+});
+
+test("parseArgs: parses a valid invocation, and everything after -- is the command verbatim (including tokens that look like flags)", () => {
+  const parsed = parseArgs(["--out", "evidence.txt", "--label", "green", "--", "node", "-e", "console.log('--out')"]);
+  assert.deepEqual(parsed, { out: "evidence.txt", label: "green", command: ["node", "-e", "console.log('--out')"] });
+});
+
+// --- NVA-B-REDFIX-1 F2 + F6: runCli, exercised as the actual CLI process (the documented
+// consumption path) -- pins that the success line and the error line both redact the resolved
+// absolute host path before it reaches stdout/stderr. ---
+
+test("runCli (CLI process): the success line names the artifact path with the repo root redacted, never the absolute host path (F2)", () => {
+  const workDir = mkdtempSync(join(tmpdir(), "capture-evidence-cli-test-"));
+  try {
+    spawnSync("git", ["init"], { cwd: workDir, encoding: "utf8" });
+    const root = findRepoRoot(workDir);
+    const result = spawnSync(
+      process.execPath,
+      [CLI_PATH, "--out", "evidence.txt", "--label", "cli-green", "--", "node", "-e", "console.log('ok'); process.exit(0);"],
+      { cwd: workDir, encoding: "utf8" },
+    );
+    assert.equal(result.status, 0);
+    assert.ok(!result.stdout.includes(root), "stdout must not leak the absolute repo-root path");
+    assert.ok(result.stdout.includes(REPO_ROOT_PLACEHOLDER), "stdout must render the redacted placeholder instead");
+    assert.match(result.stdout, /wrapped exit code 0/);
+  } finally {
+    rmSync(workDir, { recursive: true, force: true });
+  }
+});
+
+test("runCli (CLI process): an fs error on the write path is redacted on stderr too, never the absolute host path (F2)", () => {
+  const workDir = mkdtempSync(join(tmpdir(), "capture-evidence-cli-test-"));
+  try {
+    spawnSync("git", ["init"], { cwd: workDir, encoding: "utf8" });
+    const root = findRepoRoot(workDir);
+    const blockerPath = join(workDir, "blocker");
+    writeFileSync(blockerPath, "");
+    const result = spawnSync(
+      process.execPath,
+      [CLI_PATH, "--out", "blocker/nested/evidence.txt", "--label", "cli-error", "--", "node", "-e", "process.exit(0);"],
+      { cwd: workDir, encoding: "utf8" },
+    );
+    assert.equal(result.status, 1);
+    assert.ok(!result.stderr.includes(root), "stderr must not leak the absolute repo-root path");
+    assert.ok(result.stderr.includes(REPO_ROOT_PLACEHOLDER), "stderr must render the redacted placeholder instead");
+    assert.match(result.stderr, /ENOTDIR/);
   } finally {
     rmSync(workDir, { recursive: true, force: true });
   }

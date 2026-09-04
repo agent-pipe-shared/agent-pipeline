@@ -200,7 +200,14 @@ Fixed BEFORE this run — they are the contract, not negotiable during the run.
 - Acceptance criteria (EARS, from the spec): {{AC_IDS e.g. "AC-1, AC-2, AC-3"}}
 - Verify command: `{{VERIFY_COMMAND}}` — must exit 0; its machine-written output
   is your evidence artifact (file/log written by the script, never prose you
-  compose).
+  compose). Capture it with `node plugins/pipeline-core/scripts/capture-evidence.mjs
+  --out <path> --label <label> -- <command> [args...]` rather than hand-rolling a
+  shell redirect (which the closed grammar refuses outright, see
+  `agent-obligations.md` §1) — it redacts this machine's absolute repo-root and
+  home-directory paths out of the captured stdout/stderr BEFORE the bytes reach
+  disk, and refuses to write anything at all (fail-closed) if a known host-path
+  shape survives redaction. This matters most for RED evidence: a failing
+  `node --test` run embeds the absolute path in its own `file://` stack traces.
 - Long-running suites/scans (>~60s) SHOULD run via background execution,
   checking results before writing the final report — keeps turns responsive.
 - Test fixtures MUST mirror the real harness contract: hook-input fixtures
