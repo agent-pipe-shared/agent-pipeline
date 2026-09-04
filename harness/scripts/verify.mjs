@@ -752,6 +752,13 @@ const TEST_SUITES = [
   { name: "manual-check-logic-tests", file: join(repoRoot, "harness", "scripts", "manual-check-logic.test.mjs") },
   { name: "pre-commit-hook-install-trust-anchor-bootstrap-tests", file: join(pluginScriptsDir, "pre-commit-hook-install.trust-anchor-bootstrap.test.mjs") },
   { name: "project-onboarding-v3-unborn-head-tests", file: join(pluginScriptsDir, "project-onboarding-v3-unborn-head.test.mjs") },
+  { name: "print-verify-failures-tests", file: join(scriptDir, "print-verify-failures.test.mjs") },
+  { name: "guard-push-release-tag-ancestry-tests", file: join(hooksDir, "guard-push-release-tag-ancestry.test.mjs") },
+  { name: "check-critic-skip-coverage-tests", file: join(pluginScriptsDir, "check-critic-skip-coverage.test.mjs") },
+  { name: "measure-tofu-push-e2e-tests", file: join(pluginScriptsDir, "measure-tofu-push-e2e.test.mjs") },
+  { name: "suite-registration-check", file: join(pluginScriptsDir, "check-suite-registration.mjs") },
+  { name: "pre-gate-tests", file: join(scriptDir, "pre-gate.test.mjs") },
+  { name: "capture-evidence-tests", file: join(pluginScriptsDir, "capture-evidence.test.mjs") },
 ];
 
 // Manifest-gated phase steps: see header — only projects that carry a manifest at
