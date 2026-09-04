@@ -167,3 +167,61 @@ against, not as a list to fix in that dispatch):
 No `status:` or `Decision:` value changed by this update. This item's own
 text still declines to rank its three proposed remedies; that determination
 remains open for whoever triages it next.
+
+## Triage decision, 2026-09-04 — the three ranked, and a fourth the list does not name
+
+Taken by the dispatching Elephant of the session that produced the four events
+above, on the evidence they provide. The item stays **open**.
+
+**A fourth remedy outranks all three, and it is the one the list misses.** The
+`git add -A` capture (event 2) is not prevented by any of the three options. Its
+actual cause is that `guard-git.mjs` **admits `git add -A`** — confirmed by
+inspection and by a bounded repro under `NVA-B-COLLIDE-1`, exit 0, evidence in
+`backlog/evidence/2026-09-04-nva-b-collide-1-addall-capture-red.txt`.
+
+`templates/prompts/goldfish-task.md` already forbids it in those words: "NEVER
+`git add -A` or `git add .` — in a shared working tree a wildcard add lets
+another parallel goldfish's files ride along on your commit." So the rule exists,
+is stated, and is enforced by nothing. That is this repository's own
+best-understood failure class: a process rule no guard enforces, learned only by
+the incident it was written to prevent.
+
+Cost: a new rule in `guard-git.mjs` needs coverage in `guard-git.test.mjs`, which
+is **TP-1-protected**. So it is a signature-window change, not a dispatch — the
+same window that already carries the `verify.mjs` registration lines, the
+`hooks.json` comment and the evidence-slot hardening. Recorded as a candidate for
+that window rather than a commitment, because widening what a guard refuses is a
+PO-level call.
+
+**Ranking of the item's own three, by measured harm against cost:**
+
+1. **Option 3, briefing-time scope-overlap detection — first.** Cheapest, needs
+   no protected path, and it addresses what actually went wrong: overlapping file
+   scopes assigned by hand across up to four concurrent dispatches. Every
+   briefing already states its scope in field 4, so the input exists; comparing
+   the new briefing's scope against live dispatches' scopes is dispatcher-side
+   tooling with no guard surface. It also acts at the cheapest moment — before
+   any work is done rather than after two commits collide.
+2. **Option 2, a verify-in-progress marker — second.** Real and measured: this
+   session bound a verify run to a HEAD, needed to commit, stopped the run; and
+   separately committed after a completed run and voided its binding. But
+   `verify.mjs` is TP-3, so it costs a signature, and the drift is already
+   *detected* (`VERIFY-CANDIDATE-DRIFT`) — the gap is prevention, not blindness.
+   Discipline covered it today; a marker would make the discipline unnecessary.
+3. **Option 1, a file-path lease — last.** Disproportionate to the measured harm.
+   It needs shared state, a lifecycle, and stale-lease recovery — a subsystem —
+   to formalise something the dispatcher already does by hand in every field 4.
+   Revisit only if option 3 lands and overlaps still occur.
+
+**Event 4, coordinator-message staleness, is recorded here rather than filed
+separately.** A dispatch reported a mid-task message from its dispatcher as
+inaccurate; the message was true when written and false by the time it arrived,
+because the dispatch had resumed work in between. That is a property of
+concurrent work in one checkout, which is this item's own subject, so it belongs
+here rather than in a fourth item. The nearest existing item
+(`backlog/items/2026-09-03-a-dispatch-cannot-authenticate-a-mid-task-correction-from-its-dispatcher.md`)
+covers message *identity*, not *staleness*, and the two should not be conflated.
+
+The practical consequence is a dispatcher-side one and needs no mechanism: a
+mid-task message must not assert present-tense facts about a shared tree. State
+what was observed and when, not what is true now.
