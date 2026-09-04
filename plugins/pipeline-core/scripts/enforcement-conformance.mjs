@@ -1,18 +1,16 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 
-import { createHash } from "node:crypto";
-
 const TOP_LEVEL_KEYS = Object.freeze([
-  "schema", "recordId", "candidate", "runner", "layer", "probeSurfaces",
-  "measurement", "observations", "evaluator", "staleness", "sanitization",
+  "schema", "recordId", "candidate", "runner", "layer", "probeSurface",
+  "measurement", "observation", "evaluator", "staleness", "sanitization",
   "provenance", "measuredAt",
 ]);
 const NESTED_KEYS = Object.freeze({
   candidate: ["commit", "tree", "artifactSha256"],
   runner: ["name", "version", "pluginVersion"],
   measurement: ["status", "values"],
-  observation: ["probeSurface", "hookObservation", "evidenceKind", "exitCode", "markerSha256"],
+  observation: ["hookObservation", "evidenceKind", "exitCode", "markerSha256"],
   evaluator: ["outcome", "basis", "acceptanceSha256"],
   staleness: ["status", "runnerVersion", "pluginVersion", "invalidatedBy"],
   sanitization: ["policy", "redactions"],
@@ -30,9 +28,6 @@ const HEX64 = /^[0-9a-f]{64}$/;
 const GIT_OID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
 const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 const RUNNER_NAME = /^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$/;
-const PROBE_REQUEST_SCHEMA = "pipeline.enforcement-probe-request.v1";
-const PROBE_RECEIPT_SCHEMA = "pipeline.enforcement-probe-receipt.v1";
-const ARTIFACT_PREIMAGE_HEADER = "pipeline.enforcement-conformance.v1/a1-2-artifact-preimage";
 
 function exactKeys(value, keys, label) {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new TypeError(`${label} must be an object`);
@@ -76,18 +71,7 @@ export function validateRecord(record) {
   string(record.runner.pluginVersion, "runner.pluginVersion");
   if (record.recordId !== createRecordId(record.runner.name, record.layer)) throw new TypeError("recordId mismatch");
   enumValue(record.layer, ENFORCEMENT_LAYERS, "layer");
-  if (!Array.isArray(record.probeSurfaces) || record.probeSurfaces.length === 0) {
-    throw new TypeError("probeSurfaces must be a non-empty array");
-  }
-  let previousSurfaceIndex = -1;
-  for (const [index, probeSurface] of record.probeSurfaces.entries()) {
-    enumValue(probeSurface, PROBE_SURFACES, `probeSurfaces[${index}]`);
-    const surfaceIndex = PROBE_SURFACES.indexOf(probeSurface);
-    if (surfaceIndex <= previousSurfaceIndex) {
-      throw new TypeError("probeSurfaces must be unique and in canonical order");
-    }
-    previousSurfaceIndex = surfaceIndex;
-  }
+  enumValue(record.probeSurface, PROBE_SURFACES, "probeSurface");
 
   exactKeys(record.measurement, NESTED_KEYS.measurement, "measurement");
   enumValue(record.measurement.status, MEASUREMENT_STATUSES, "measurement.status");
@@ -102,41 +86,29 @@ export function validateRecord(record) {
     throw new TypeError("absent telemetry must not be represented as values");
   }
 
-  if (!Array.isArray(record.observations) || record.observations.length !== record.probeSurfaces.length) {
-    throw new TypeError("observations must exactly match probeSurfaces");
-  }
-  for (const [index, observation] of record.observations.entries()) {
-    exactKeys(observation, NESTED_KEYS.observation, `observations[${index}]`);
-    if (observation.probeSurface !== record.probeSurfaces[index]) {
-      throw new TypeError("observations must correlate to probeSurfaces in order");
-    }
-    enumValue(observation.hookObservation, HOOK_OBSERVATIONS, `observations[${index}].hookObservation`);
-    enumValue(observation.evidenceKind, EVIDENCE_KINDS, `observations[${index}].evidenceKind`);
-    if (!Number.isInteger(observation.exitCode) && observation.exitCode !== null) throw new TypeError(`observations[${index}].exitCode must be an integer or null`);
-    hash(observation.markerSha256, `observations[${index}].markerSha256`, { nullable: true });
-  }
+  exactKeys(record.observation, NESTED_KEYS.observation, "observation");
+  enumValue(record.observation.hookObservation, HOOK_OBSERVATIONS, "observation.hookObservation");
+  enumValue(record.observation.evidenceKind, EVIDENCE_KINDS, "observation.evidenceKind");
+  if (!Number.isInteger(record.observation.exitCode) && record.observation.exitCode !== null) throw new TypeError("observation.exitCode must be an integer or null");
+  hash(record.observation.markerSha256, "observation.markerSha256", { nullable: true });
 
   exactKeys(record.evaluator, NESTED_KEYS.evaluator, "evaluator");
   enumValue(record.evaluator.outcome, EVALUATOR_OUTCOMES, "evaluator.outcome");
   string(record.evaluator.basis, "evaluator.basis");
   hash(record.evaluator.acceptanceSha256, "evaluator.acceptanceSha256", { nullable: true });
-  const evidenceKinds = record.observations.map((observation) => observation.evidenceKind);
-  const hasHumanAcceptance = evidenceKinds.includes("human-acceptance");
-  if (hasHumanAcceptance && record.evaluator.acceptanceSha256 === null) {
-    throw new TypeError("human acceptance requires bound acceptance");
+  if (record.evaluator.outcome === "pass" &&
+      !(record.observation.evidenceKind === "deterministic-execution" ||
+        (record.observation.evidenceKind === "human-acceptance" && record.evaluator.acceptanceSha256 !== null))) {
+    throw new TypeError("pass requires deterministic execution or bound human acceptance");
   }
-  if (!hasHumanAcceptance && record.evaluator.acceptanceSha256 !== null) {
+  if (record.observation.evidenceKind === "human-acceptance" &&
+      ["pass", "excepted"].includes(record.evaluator.outcome) && record.evaluator.acceptanceSha256 === null) {
+    throw new TypeError("human acceptance pass/excepted requires bound acceptance");
+  }
+  if (record.observation.evidenceKind !== "human-acceptance" && record.evaluator.acceptanceSha256 !== null) {
     throw new TypeError("acceptance hash requires human acceptance evidence");
   }
-  if (record.evaluator.outcome === "pass" &&
-      evidenceKinds.some((evidenceKind) => !["deterministic-execution", "human-acceptance"].includes(evidenceKind))) {
-    throw new TypeError("pass requires deterministic execution or bound human acceptance for every observation");
-  }
-  if (record.evaluator.outcome === "excepted" &&
-      (!hasHumanAcceptance || evidenceKinds.some((evidenceKind) => ["model-attestation", "self-attestation", "unavailable"].includes(evidenceKind)))) {
-    throw new TypeError("excepted requires bound human acceptance without model, self, or unavailable evidence");
-  }
-  if (evidenceKinds.some((evidenceKind) => ["model-attestation", "self-attestation"].includes(evidenceKind)) &&
+  if (["model-attestation", "self-attestation"].includes(record.observation.evidenceKind) &&
       ["pass", "excepted"].includes(record.evaluator.outcome)) {
     throw new TypeError("model and self-attestation cannot produce pass or excepted");
   }
@@ -168,218 +140,6 @@ export function classifyHookObservation({ fired, markerAvailable = false } = {})
   return "unknown";
 }
 
-function sha256(bytes) {
-  return createHash("sha256").update(bytes, "utf8").digest("hex");
-}
-
-function canonicalSurfaces(surfaces) {
-  if (!Array.isArray(surfaces) || surfaces.length === 0) throw new TypeError("probe surfaces must be a non-empty array");
-  const canonical = [...surfaces].sort((left, right) => PROBE_SURFACES.indexOf(left) - PROBE_SURFACES.indexOf(right));
-  if (canonical.some((surface, index) => !PROBE_SURFACES.includes(surface) || canonical.indexOf(surface) !== index)) {
-    throw new TypeError("probe surfaces must be approved and unique");
-  }
-  return canonical;
-}
-
-function requireAdapter(adapters, name) {
-  const adapter = adapters?.[name];
-  if (!adapter || typeof adapter !== "object") throw new TypeError(`missing ${name} adapter`);
-  return adapter;
-}
-
-function requireMethod(adapter, method, adapterName) {
-  if (typeof adapter[method] !== "function") throw new TypeError(`${adapterName}.${method} must be a function`);
-  return adapter[method].bind(adapter);
-}
-
-function validateRunner(runner) {
-  exactKeys(runner, NESTED_KEYS.runner, "runner metadata");
-  string(runner.name, "runner metadata name");
-  string(runner.version, "runner metadata version");
-  string(runner.pluginVersion, "runner metadata plugin version");
-  createRecordId(runner.name, "runner-hook");
-  return runner;
-}
-
-function validateCandidate(candidate) {
-  exactKeys(candidate, NESTED_KEYS.candidate, "candidate binding");
-  hash(candidate.commit, "candidate binding commit", { oid: true });
-  hash(candidate.tree, "candidate binding tree", { oid: true });
-  hash(candidate.artifactSha256, "candidate binding artifact", { oid: false });
-  return candidate;
-}
-
-function commandIdForSurface(surface) {
-  if (surface === "git-hook") return "guarded-push-refusal";
-  return surface === "payload-indirection" ? "compound-shell-payload" : "compound-shell-refusal";
-}
-
-function safeExitCode(result) {
-  return Number.isInteger(result?.exitCode) ? result.exitCode : null;
-}
-
-function observationFromReceipt(receipt, marker) {
-  const covered = marker?.status === "covered";
-  const markerSha256 = covered && typeof marker.markerSha256 === "string" ? marker.markerSha256 : null;
-  if (markerSha256 !== null) hash(markerSha256, "marker markerSha256");
-  const executionAvailable = ["allowed", "refused"].includes(receipt.executionStatus);
-  return {
-    probeSurface: receipt.probeSurface,
-    hookObservation: classifyHookObservation({ fired: markerSha256 !== null, markerAvailable: covered }),
-    evidenceKind: executionAvailable && covered ? receipt.executionEvidenceKind : "unavailable",
-    exitCode: receipt.exitCode,
-    markerSha256,
-  };
-}
-
-export function digestProbeReceipt(receipt) {
-  return sha256(JSON.stringify(receipt));
-}
-
-function markerBoundToReceipt(marker, receipt) {
-  if (!marker || marker.status !== "covered") return { status: marker?.status ?? "unavailable", markerSha256: null };
-  if (marker.receiptSha256 !== digestProbeReceipt(receipt)) return { status: "unknown", markerSha256: null };
-  return { status: "covered", markerSha256: marker.markerSha256 ?? null };
-}
-
-function evaluatorFor(observations, evidenceScope, executionStatuses, markerStatuses) {
-  if (evidenceScope !== "native") return { outcome: "unavailable", basis: "fixture-only simulation is not live enforcement", acceptanceSha256: null };
-  if (executionStatuses.includes("unsupported")) {
-    return { outcome: "unsupported", basis: "native adapter does not support this surface", acceptanceSha256: null };
-  }
-  if (markerStatuses.includes("unknown")) {
-    return { outcome: "unknown", basis: "marker adapter could not classify coverage", acceptanceSha256: null };
-  }
-  if (observations.some((observation) => observation.evidenceKind === "unavailable")) {
-    return { outcome: "unavailable", basis: "adapter or marker evidence unavailable", acceptanceSha256: null };
-  }
-  if (observations.some((observation) => observation.hookObservation === "fires-not")) {
-    return { outcome: "finding", basis: "native marker coverage confirms a hook did not fire", acceptanceSha256: null };
-  }
-  if (executionStatuses.includes("allowed")) {
-    return { outcome: "finding", basis: "canonical refused shape was allowed", acceptanceSha256: null };
-  }
-  return { outcome: "unavailable", basis: "injected adapter evidence is not a live native runner measurement", acceptanceSha256: null };
-}
-
-/**
- * Hashes the exact A1-2 artifact preimage: UTF-8 of the fixed header, then every
- * caller-supplied relative artifact path and its exact bytes, each byte-length-framed.
- * The conformance record is deliberately not an input, so artifactSha256 cannot
- * hash the record which contains it. Callers bind module/fixture bytes before
- * constructing a record and never include generated evidence records here.
- */
-export function digestArtifactPreimage(artifacts) {
-  if (!Array.isArray(artifacts) || artifacts.length === 0) throw new TypeError("artifact preimage needs at least one artifact");
-  const chunks = [ARTIFACT_PREIMAGE_HEADER];
-  for (const artifact of artifacts) {
-    if (!artifact || typeof artifact.path !== "string" || artifact.path.length === 0 || artifact.path.includes("\u0000") || artifact.path.startsWith("/") || artifact.path.startsWith("\\") || artifact.path.includes("\\") || /^[A-Za-z]:[\\/]/u.test(artifact.path) || artifact.path.split("/").includes("..")) {
-      throw new TypeError("artifact path must be a relative non-traversing path");
-    }
-    if (typeof artifact.bytes !== "string") throw new TypeError("artifact bytes must be a string");
-    chunks.push(`${Buffer.byteLength(artifact.path, "utf8")}:${artifact.path}`, `${Buffer.byteLength(artifact.bytes, "utf8")}:${artifact.bytes}`);
-  }
-  return sha256(chunks.join("\u0000"));
-}
-
-export function createProbeRequest({ candidate, runner, layer, probeSurface, fixtureId }) {
-  validateCandidate(candidate);
-  validateRunner(runner);
-  enumValue(layer, ENFORCEMENT_LAYERS, "probe layer");
-  enumValue(probeSurface, PROBE_SURFACES, "probe surface");
-  string(fixtureId, "fixture id");
-  return Object.freeze({
-    schema: PROBE_REQUEST_SCHEMA,
-    candidate: { ...candidate },
-    runner: { ...runner },
-    layer,
-    probeSurface,
-    fixtureId,
-    commandId: commandIdForSurface(probeSurface),
-  });
-}
-
-/**
- * Executes only through injected adapters. Native runner bridges intentionally do
- * not exist here: a caller without one must report adapter evidence unavailable.
- */
-export async function runProbeMatrix({ layer = "runner-hook", surfaces = PROBE_SURFACES, adapters, fixtureIds = {}, evidenceScope = "fixture" } = {}) {
-  enumValue(layer, ENFORCEMENT_LAYERS, "probe layer");
-  if (!["fixture", "native"].includes(evidenceScope)) throw new TypeError("evidence scope must be fixture or native");
-  const runnerMetadata = requireMethod(requireAdapter(adapters, "runnerMetadata"), "read", "runnerMetadata");
-  const readBinding = requireMethod(requireAdapter(adapters, "gitBinding"), "read", "gitBinding");
-  const now = requireMethod(requireAdapter(adapters, "clock"), "now", "clock");
-  const execute = requireMethod(requireAdapter(adapters, "execution"), "execute", "execution");
-  const readMarker = requireMethod(requireAdapter(adapters, "observationMarkers"), "read", "observationMarkers");
-  const allocate = requireMethod(requireAdapter(adapters, "scratch"), "allocate", "scratch");
-  const runner = Object.freeze({ ...validateRunner(await runnerMetadata()) });
-  const candidate = Object.freeze({ ...validateCandidate(await readBinding()) });
-  const probeSurfaces = canonicalSurfaces(surfaces);
-  const observations = [];
-  const commandIds = [];
-  const executionStatuses = [];
-  const markerStatuses = [];
-  for (const probeSurface of probeSurfaces) {
-    const fixtureId = fixtureIds[probeSurface] ?? `a1-2-${probeSurface.replaceAll("/", "-")}`;
-    const request = createProbeRequest({ candidate, runner, layer, probeSurface, fixtureId });
-    const scratch = probeSurface === "payload-indirection" ? await allocate({ request, disposable: true }) : null;
-    let result;
-    try {
-      result = await execute({ request, scratch });
-    } catch {
-      result = { status: "error", exitCode: null };
-    }
-    const receipt = Object.freeze({
-      schema: PROBE_RECEIPT_SCHEMA,
-      candidate: { ...candidate },
-      runner: { ...runner },
-      layer,
-      probeSurface,
-      executionStatus: ["allowed", "refused", "error", "unavailable", "unsupported"].includes(result?.status) ? result.status : "error",
-      executionEvidenceKind: EVIDENCE_KINDS.includes(result?.evidenceKind) ? result.evidenceKind : "unavailable",
-      exitCode: safeExitCode(result),
-    });
-    let marker;
-    try {
-      marker = await readMarker({ request, receipt });
-    } catch {
-      marker = { status: "unavailable", markerSha256: null };
-    }
-    marker = markerBoundToReceipt(marker, receipt);
-    observations.push(observationFromReceipt(receipt, marker));
-    commandIds.push(request.commandId);
-    executionStatuses.push(receipt.executionStatus);
-    markerStatuses.push(typeof marker?.status === "string" ? marker.status : "unavailable");
-  }
-  const unavailable = observations.some((observation) => observation.evidenceKind === "unavailable");
-  const finalRunner = Object.freeze({ ...validateRunner(await runnerMetadata()) });
-  const finalCandidate = Object.freeze({ ...validateCandidate(await readBinding()) });
-  const candidateChanged = ["commit", "tree", "artifactSha256"].some((field) => candidate[field] !== finalCandidate[field]);
-  const runnerChanged = ["name", "version", "pluginVersion"].some((field) => runner[field] !== finalRunner[field]);
-  const invalidatedBy = candidateChanged ? "candidate-binding-changed-during-probe" : runnerChanged ? "runner-metadata-changed-during-probe" : null;
-  const measurement = unavailable
-    ? { status: "unavailable", values: [] }
-    : { status: "measured", values: [] };
-  const sourceSha256 = candidate.artifactSha256;
-  const record = {
-    schema: "pipeline.enforcement-conformance.v1",
-    recordId: createRecordId(runner.name, layer),
-    candidate,
-    runner,
-    layer,
-    probeSurfaces,
-    measurement,
-    observations,
-    evaluator: evaluatorFor(observations, evidenceScope, executionStatuses, markerStatuses),
-    staleness: { status: invalidatedBy === null ? "current" : "stale", runnerVersion: runner.version, pluginVersion: runner.pluginVersion, invalidatedBy },
-    sanitization: { policy: "redact-sensitive-shapes-v1", redactions: ["raw-stdout-omitted", "private-paths-omitted"] },
-    provenance: { commandSha256: sha256(commandIds.join("\u0000")), fixtureIds: probeSurfaces.map((surface) => fixtureIds[surface] ?? `a1-2-${surface.replaceAll("/", "-")}`), sourceSha256 },
-    measuredAt: now(),
-  };
-  validateRecord(record);
-  return sanitizeRecord(record);
-}
-
 export function checkCandidateBinding(record, expected) {
   // This function validates and qualifies a complete record; malformed input throws, while
   // a well-formed but non-qualifying record returns a typed false reason.
@@ -394,8 +154,8 @@ export function checkCandidateBinding(record, expected) {
   const mismatch = fields.find((field) => record.candidate[field] !== expected[field]);
   if (mismatch) return { qualifies: false, reason: `candidate.${mismatch}-mismatch` };
   if (record.runner.version !== expected.runnerVersion || record.runner.pluginVersion !== expected.pluginVersion) return { qualifies: false, reason: "runner-or-plugin-version-mismatch" };
-  if (record.staleness.status !== "current") return { qualifies: false, reason: "stale-record" };
   if (record.staleness.runnerVersion !== expected.runnerVersion || record.staleness.pluginVersion !== expected.pluginVersion) return { qualifies: false, reason: "staleness-version-mismatch" };
+  if (record.staleness.status !== "current") return { qualifies: false, reason: "stale-record" };
   return { qualifies: true, reason: null };
 }
 
@@ -403,21 +163,13 @@ export function sanitizeValue(value) {
   if (Array.isArray(value)) return value.map(sanitizeValue);
   if (!value || typeof value !== "object") {
     if (typeof value !== "string") return value;
-    let safe = value.normalize("NFKC");
-    safe = safe.replace(/-{5}BEGIN[\w ]*PRIVATE KEY-{5}[\s\S]*?-{5}END[\w ]*PRIVATE KEY-{5}/giu, "[REDACTED-CREDENTIAL]");
-    safe = safe.replace(/[^\n]*[\u0000-\u0009\u000b\u000c\u000e-\u001f\u007f-\u009f\u2028\u2029][^\n]*/gu, "[REDACTED-CONTROL]");
-    safe = safe.replace(/(?<![A-Za-z0-9])(?:authorization|x[-_]?api[-_]?key|api[-_ ]?key|access[-_]?token|refresh[-_]?token|client[-_]?secret|token|secret|password|passwd|pwd|set[-_]?cookie|cookie)\b["']?\s*[:=]\s*(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|(?:bearer|basic)\s+[^\s,;}\]]+|[^\s,;}\]]+)/giu, "[REDACTED-CREDENTIAL]");
-    safe = safe.replace(/(?<![A-Za-z0-9])(?:authorization|x[-_]?api[-_]?key|api[-_ ]?key|access[-_]?token|refresh[-_]?token|client[-_]?secret|token|secret|password|passwd|pwd|set[-_]?cookie|cookie)\b\s+(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s,;}\]]+)/giu, "[REDACTED-CREDENTIAL]");
-    safe = safe.replace(/(?<![A-Za-z0-9])bearer\s+[^\s,;}\]]+/giu, "[REDACTED-CREDENTIAL]");
-    safe = safe.replace(/(?<![A-Za-z0-9])basic\s+[A-Za-z0-9+/]{8,}={0,2}(?![A-Za-z0-9+/=])/giu, "[REDACTED-CREDENTIAL]");
-    safe = safe.replace(/\b[a-z][a-z0-9+.-]*:\/\/[^\s"'<>]*/giu, "[REDACTED-ORG-COORDINATE]");
-    safe = safe.replace(/(?<![A-Za-z0-9])(?:[A-Za-z0-9._-]+@)?[A-Za-z0-9.-]+\.[a-z]{2,63}:[^\s"'<>]+/giu, "[REDACTED-ORG-COORDINATE]");
-    safe = safe.replace(/(?<![A-Za-z0-9_-])(?:sk-[A-Za-z0-9_-]{8,16384}|gh[pousr]_[A-Za-z0-9]{8,16384}|github_pat_[A-Za-z0-9_]{8,16384}|AKIA[0-9A-Z]{16})(?![A-Za-z0-9_-])/gu, "[REDACTED-CREDENTIAL]");
-    safe = safe.replace(/(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{1,16384}\.[A-Za-z0-9_-]{4,16384}\.[A-Za-z0-9_-]{4,16384}(?![A-Za-z0-9_-])/gu, "[REDACTED-CREDENTIAL]");
-    safe = safe.replace(/(?:^|\s)(?:assistant|user|system|tool)\s*:\s*[^\n]*/giu, " [REDACTED-TRANSCRIPT]");
-    safe = safe.replace(/(?<![A-Za-z0-9\\])\\\\[^\\/\s"'<>|?*\u0000-\u001f]+\\[^\\/\s"'<>|?*\u0000-\u001f]+(?:\\[^\\/\s"'<>|?*\u0000-\u001f]+)*/gu, "[REDACTED-PATH]");
-    safe = safe.replace(/(?<![A-Za-z0-9])(?:[A-Za-z]:[\\/])(?:[^\s\\/"'<>|?*\u0000-\u001f]+[\\/])*[^\s\\/"'<>|?*\u0000-\u001f]*/gu, "[REDACTED-PATH]");
-    safe = safe.replace(/(?<![A-Za-z0-9.:/\\])\/(?:[^\s/\\:"'<>|?*\u0000-\u001f]+\/)*[^\s/\\:"'<>|?*\u0000-\u001f]*/gu, "[REDACTED-PATH]");
+    let safe = value;
+    safe = safe.replace(/-----BEGIN[\s\S]*?-----END[^-]*-----/gi, "[REDACTED-CREDENTIAL]");
+    safe = safe.replace(/\bbearer\s+[^\s,;]+/gi, "[REDACTED-CREDENTIAL]");
+    safe = safe.replace(/\b(?:token|password|passwd|secret|api[_-]?key)\s*[:=]\s*[^\s,;]+/gi, "[REDACTED-CREDENTIAL]");
+    safe = safe.replace(/(?:^|\s)(?:[A-Za-z]:[\\/]|\/)(?:Users|home|private|tmp|var|root)(?:[\\/][^\s]*)?/gi, " [REDACTED-PATH]");
+    safe = safe.replace(/(?:git@|https?:\/\/)?github\.com[:/][^\s]+/gi, "[REDACTED-ORG-COORDINATE]");
+    safe = safe.replace(/(?:^|\s)(?:assistant|user|system)\s*:/gi, " [REDACTED-TRANSCRIPT]:");
     return safe;
   }
   return Object.fromEntries(Object.entries(value).map(([key, nested]) => [key, sanitizeValue(nested)]));
