@@ -102,3 +102,49 @@ test("captureEvidence: a command that writes nothing still produces a well-forme
     rmSync(workDir, { recursive: true, force: true });
   }
 });
+
+test("captureEvidence: a spawn failure (command not found) throws and writes no artifact -- never collapsed into a fabricated exit code", () => {
+  const workDir = mkdtempSync(join(tmpdir(), "capture-evidence-test-"));
+  try {
+    const outPath = join(workDir, "evidence.txt");
+    const nonExistentCommand = `capture-evidence-test-nonexistent-command-${process.pid}-${Date.now()}`;
+    assert.throws(
+      () =>
+        captureEvidence({
+          command: [nonExistentCommand],
+          label: "spawn-failure",
+          out: outPath,
+          repoRoot: syntheticRoot("repo"),
+          homeDir: syntheticRoot("home"),
+        }),
+      /did not run to completion/,
+    );
+    assert.throws(() => readFileSync(outPath, "utf8"), "a spawn failure must not write any artifact");
+  } finally {
+    rmSync(workDir, { recursive: true, force: true });
+  }
+});
+
+test("captureEvidence: a maxBuffer overflow throws (fails loudly) instead of writing a silently truncated artifact", () => {
+  const workDir = mkdtempSync(join(tmpdir(), "capture-evidence-test-"));
+  try {
+    const outPath = join(workDir, "evidence.txt");
+    // Print far more than a deliberately tiny maxBuffer can hold.
+    const script = "process.stdout.write('x'.repeat(4096));";
+    assert.throws(
+      () =>
+        captureEvidence({
+          command: ["node", "-e", script],
+          label: "overflow",
+          out: outPath,
+          repoRoot: syntheticRoot("repo"),
+          homeDir: syntheticRoot("home"),
+          maxBuffer: 16,
+        }),
+      /did not run to completion/,
+    );
+    assert.throws(() => readFileSync(outPath, "utf8"), "a maxBuffer overflow must not write a silently truncated artifact");
+  } finally {
+    rmSync(workDir, { recursive: true, force: true });
+  }
+});

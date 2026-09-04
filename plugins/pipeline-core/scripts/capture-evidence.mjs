@@ -30,7 +30,15 @@
  *   <command> [args...]`
  * Exit code: the WRAPPED command's own exit code, always -- capturing a RED run must not look
  * green. A failure inside this script itself (cannot determine repo root, cannot write the
- * artifact) exits 1 and never silently reports a wrapped exit code it never observed.
+ * artifact, the wrapped command never ran to completion) exits 1 and never silently reports a
+ * wrapped exit code it never observed.
+ *
+ * SPAWN FAILURE AND OVERFLOW. A non-zero exit and a spawn failure are different things and must
+ * never collapse into the same reported outcome. `spawnSync` reports both an ordinary ENOENT
+ * (command not found) AND a `maxBuffer` overflow (output larger than the buffer) the same way:
+ * `result.error` set, `status: null`, `stdout`/`stderr` truncated or absent. Both cases throw
+ * here and write NO artifact at all -- never a truncated-but-plausible-looking capture, never a
+ * fabricated exit code. `maxBuffer` defaults to 64 MiB and is caller-overridable.
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -86,7 +94,15 @@ export function formatArtifact({ command, label, exitCode, stdout, stderr }) {
  * (0 for a signal-terminated child is never reported -- a killed child reports exit code 1, since
  * "no observed exit code" must never render as green).
  */
-export function captureEvidence({ command, label, out, cwd = process.cwd(), repoRoot, homeDir = homedir() }) {
+export function captureEvidence({
+  command,
+  label,
+  out,
+  cwd = process.cwd(),
+  repoRoot,
+  homeDir = homedir(),
+  maxBuffer = 64 * 1024 * 1024,
+}) {
   if (!Array.isArray(command) || command.length === 0) {
     throw new Error("capture-evidence: command must be a non-empty argv array");
   }
@@ -94,7 +110,16 @@ export function captureEvidence({ command, label, out, cwd = process.cwd(), repo
   if (!out) throw new Error("capture-evidence: out is required");
 
   const root = repoRoot ?? findRepoRoot(cwd);
-  const result = spawnSync(command[0], command.slice(1), { cwd, encoding: "utf8" });
+  const result = spawnSync(command[0], command.slice(1), { cwd, encoding: "utf8", maxBuffer });
+  if (result.error) {
+    // The wrapped command never produced a real exit code -- a spawn failure (e.g. ENOENT), or a
+    // `maxBuffer` overflow (Node reports this as an ENOBUFS-shaped `error`, with `status: null`
+    // and truncated/absent `stdout`/`stderr`). Writing an artifact in either case would report a
+    // plausible-looking exit code and a plausible-looking (but silently truncated) transcript for
+    // a run that never actually completed -- the same "confident-wrong evidence" class this tool
+    // exists to prevent, just in the other direction. Fail loudly instead: throw, write nothing.
+    throw new Error(`capture-evidence: the wrapped command did not run to completion (${result.error.message}).`);
+  }
   const exitCode = result.status === null ? 1 : result.status;
   const stdout = redactText(result.stdout ?? "", root, homeDir);
   const stderr = redactText(result.stderr ?? "", root, homeDir);
