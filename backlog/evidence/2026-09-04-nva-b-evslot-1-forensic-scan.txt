@@ -1,0 +1,39 @@
+command: node scratch/forensic-verify-runs.mjs
+label: NVA-B-EVSLOT-1 forensic scan: today's production verify runs under .git/agent-pipeline/verify/runs, overlap check
+exitCode: 0
+--- stdout ---
+[
+  {
+    "runId": "verify-1788502771789-06b8b8a88dc7a8f9",
+    "startedAt": "2026-09-04T06:19:33.674Z",
+    "completedAt": "2026-09-04T06:30:11.194Z",
+    "commit": "2aeeaa6872fd10af053eca35f4eee13c8d6f44d8",
+    "status": "failed"
+  },
+  {
+    "runId": "verify-1788504434851-73539f6eb0d5222c",
+    "startedAt": "2026-09-04T06:47:15.634Z",
+    "completedAt": "2026-09-04T06:57:40.643Z",
+    "commit": "3f33186a2b7403a5d80f0a83836e8260d16099bd",
+    "status": "failed"
+  },
+  {
+    "runId": "verify-1788505200469-5138f4384a9a86fa",
+    "startedAt": "2026-09-04T07:00:01.115Z",
+    "completedAt": null,
+    "commit": "d2fda7ea03c0d66d89b9ab5ca69b9f45794983f8",
+    "status": "no-terminal"
+  },
+  {
+    "runId": "verify-1788505827409-de86c8de3e622d3f",
+    "startedAt": "2026-09-04T07:10:28.058Z",
+    "completedAt": "2026-09-04T07:20:59.078Z",
+    "commit": "be4539dc3a5b640cca26708babd833372d36861a",
+    "status": "failed"
+  }
+]
+
+--- overlap check ---
+OVERLAP: verify-1788505200469-5138f4384a9a86fa [2026-09-04T07:00:01.115Z -> null] vs verify-1788505827409-de86c8de3e622d3f [2026-09-04T07:10:28.058Z -> 2026-09-04T07:20:59.078Z] sameCommit=false
+
+--- stderr ---
