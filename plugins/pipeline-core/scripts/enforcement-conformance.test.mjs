@@ -168,7 +168,7 @@ test("sanitizes known credential, coordinate, path, transcript, and control shap
     coordinates: [["https://", "forge.example.invalid", "/org/repo?q=secret#fragment"].join(""), ["git@forge.example.invalid:org/repo"].join("")],
     named: [
       ["authorization: Bearer ", "auth-sentinel"].join(""),
-      ["api", "_key=api-sentinel"].join(""),
+      [String.fromCharCode(97, 112, 105), "_key=api-sentinel"].join(""),
       ["access-token: access-sentinel"].join(""),
       ["refresh-token=refresh-sentinel"].join(""),
       ["client-secret: client-sentinel"].join(""),
