@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.the-denial-trim-state-is-keyed-per-session-not-per-agent-as-its-comment-claims
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-03
+closure_repository: self
+closure_commit: 15bb35994d83b8147b22c9316561c3767ef81037
+closure_evidence: backlog/evidence/2026-09-03-nva-b-trimkey-stale-open-measurement.md
 created: 2026-09-01
 sprint: nova-b
 done_when: manual
@@ -86,7 +90,7 @@ Nothing was dispatched for this item. The measurement is in
 stale-status mechanism it exhibits is recorded as a second instance in
 `backlog/items/2026-08-27-resolved-backlog-items-can-keep-status-open-indefinitely.md`.
 
-## Correction, 2026-09-03 — this closure was premature and the item is being reopened
+## Correction, 2026-09-03 — this closure was premature; the live defect is tracked elsewhere
 
 The closure above is wrong on the merits, and this section records why rather
 than quietly amending it.
@@ -119,11 +123,34 @@ cannot detect a fix that landed and is inert. That is a distinct failure mode
 from the stale-open one, and it is the more dangerous of the two: a stale-open
 item wastes a dispatch, an inert fix closes a live defect.
 
-**Reopening is deferred by minutes, not declined.** A status flip creates
-unreconciled ledger debt, and a concurrent dispatch is working inside
-`backlog/transitions.ndjson` right now; interleaving a reconcile with it would
-risk the hash chain. The reopen and its ledger reconciliation follow immediately
-once that dispatch reports. Until then this section, not the `status:` field, is
-the accurate record.
+**Reopening was attempted and is not available — the ledger refused it, correctly.**
+The status was flipped back to `open` and `reconcile-backlog-ledger.mjs` blocked:
+
+    BLOCKED …: file status open is BEHIND the ledger's closed;
+    a ledger entry is never rewound
+
+Closure is terminal in an append-only ledger. That is the same property recorded
+from a different angle in
+`backlog/items/2026-08-31-a-deferred-item-is-terminal-so-a-live-defect-can-be-parked-invisibly.md`,
+and this is a live instance of it: a closure made in good faith on evidence that
+was real but measured the wrong layer cannot be withdrawn.
+
+The flip was reverted so the file and the ledger agree rather than leaving the
+frontmatter asserting something the ledger contradicts. **This item stays closed,
+and the closure is wrong.** The correction is this section.
+
+**The live defect is tracked in**
+`backlog/items/2026-09-01-subagent-identity-may-never-resolve-so-per-agent-scoping-is-inert.md`,
+which is open and now carries the confirming measurement, including the
+reproduction described above. No new item was filed: that one already names the
+mechanism, and a third item restating it would be the duplication this repository
+spent a separate dispatch removing today.
+
+This follows the precedent already set by
+`backlog/items/2026-08-29-read-scope-guard-admits-single-command-but-blocks-the-piped-form.md`,
+which likewise stayed closed after a later decision invalidated its remedy, with
+the live consequence carried by its own item. Both cases produce the same
+residue: a `closed` record whose stated remedy no longer holds, discoverable only
+by reading the item rather than its status.
 
 ## Placeholder-marker-for-append
