@@ -101,6 +101,10 @@ export function validateRecord(record) {
         (record.observation.evidenceKind === "human-acceptance" && record.evaluator.acceptanceSha256 !== null))) {
     throw new TypeError("pass requires deterministic execution or bound human acceptance");
   }
+  if (record.evaluator.outcome === "excepted" &&
+      !(record.observation.evidenceKind === "human-acceptance" && record.evaluator.acceptanceSha256 !== null)) {
+    throw new TypeError("excepted requires bound human acceptance");
+  }
   if (record.observation.evidenceKind === "human-acceptance" &&
       ["pass", "excepted"].includes(record.evaluator.outcome) && record.evaluator.acceptanceSha256 === null) {
     throw new TypeError("human acceptance pass/excepted requires bound acceptance");
