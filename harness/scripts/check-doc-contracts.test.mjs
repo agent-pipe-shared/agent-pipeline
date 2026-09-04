@@ -639,6 +639,14 @@ test("an immutable snapshot exclusion does not suppress the same line and id in 
   assert.equal(result.stats.immutableSnapshotExcludedMissingReferences, 0);
 });
 
+test("an immutable snapshot exclusion suppresses only one same-line occurrence", () => {
+  const entry = { source: "specs/immutable-snapshot.md", line: 3, referenceId: "plain tag", occurrence: 0 };
+  const { root } = fixture({ [entry.source]: "# Snapshot\n\n[Known][plain tag] [New][plain tag]\n" });
+  const result = runImmutableSnapshotFixture(root, [entry.source], [entry]);
+  assert.deepEqual(result.findings, [`${entry.source}:3 -> plain tag: missing reference definition`]);
+  assert.equal(result.stats.immutableSnapshotExcludedMissingReferences, 1);
+});
+
 test("a stale immutable snapshot exclusion is reported deterministically", () => {
   const entry = { source: "specs/immutable-snapshot.md", line: 3, referenceId: "plain tag" };
   const { root } = fixture({ [entry.source]: "# Snapshot\n\n[Defined][plain tag]\n\n[plain tag]: ../docs/state.md\n" });
@@ -653,6 +661,12 @@ test("ordinary broken reference-style links still fail with immutable snapshot e
   const { root } = fixture({ "README.md": "# Home\n\n[Broken][ordinary missing reference]\n" });
   const result = runImmutableSnapshotFixture(root, [], [entry]);
   assert.deepEqual(result.findings, ["README.md:3 -> ordinary missing reference: missing reference definition"]);
+});
+
+test("successful CLI output exposes the immutable snapshot exclusion count", () => {
+  const result = spawnSync(process.execPath, [SCRIPT, "--root", REPO], { encoding: "utf8" });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /9 immutable snapshot missing-reference exclusion\(s\) accepted/);
 });
 
 const VENDORING_BACKLOG_ITEM = "backlog/items/2026-08-10-plugin-package-should-vendor-canon-references-via-build-step.md";

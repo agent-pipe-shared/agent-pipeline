@@ -86,6 +86,15 @@ A contract change after E1 requires a PO-visible decision. Its owner must:
 4. update or requalify every listed consumer pin; and
 5. let E2 prove that all pins agree on the qualification candidate.
 
+If any post-landing validation, E2 qualification, or consumer-pin
+revalidation fails, the owning E1 maintainer (with PO authority for the
+contract decision) rolls back by reverting the single E1 landing commit. The
+trigger is a failed validation or disagreement that cannot be corrected as a
+forward revision without changing the approved freeze. After the revert, the
+maintainer reruns the focused validator, `check-doc-contracts.mjs`, and E2's
+pin check against the pre-E1 candidate, then records the rollback decision
+before attempting a new revision.
+
 For C2 specifically, the existing sequence-2 predeclaration remains
 unchanged. When C2 adds required registration fields `invariantPinned` and
 `nonOverlapNote`, it bumps the Verify-suite registration row and appends a

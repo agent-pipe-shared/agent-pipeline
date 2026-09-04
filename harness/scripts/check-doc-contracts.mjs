@@ -360,15 +360,15 @@ function normalizeReferenceId(value) {
 // tag on a different line nor a tag in a different source is evidence that it
 // belongs to this immutable snapshot exception.
 export const IMMUTABLE_SNAPSHOT_MISSING_REFERENCE_EXCLUSIONS = Object.freeze([
-  { source: "specs/sprint-alfred-epic/evidence/issues-snapshot-2026-08-27.md", line: 10, referenceId: "architecture" },
-  { source: "specs/sprint-alfred-epic/evidence/issues-snapshot-2026-08-27.md", line: 229, referenceId: "security" },
-  { source: "specs/sprint-alfred-epic/evidence/issues-snapshot-2026-08-27.md", line: 304, referenceId: "lifecycle" },
-  { source: "specs/sprint-alfred-epic/evidence/issues-snapshot-2026-08-27.md", line: 377, referenceId: "telemetry" },
-  { source: "specs/sprint-alfred-epic/evidence/issues-snapshot-2026-08-27.md", line: 475, referenceId: "architecture" },
-  { source: "specs/sprint-alfred-epic/evidence/issues-snapshot-2026-08-27.md", line: 758, referenceId: "governance" },
-  { source: "specs/sprint-alfred-epic/evidence/issues-snapshot-2026-08-27.md", line: 918, referenceId: "architecture" },
-  { source: "specs/sprint-alfred-epic/evidence/issues-snapshot-2026-08-27.md", line: 1187, referenceId: "integration" },
-  { source: "specs/sprint-alfred-epic/evidence/issues-snapshot-2026-08-27.md", line: 1318, referenceId: "adoption" },
+  { source: "specs/sprint-alfred-epic/evidence/issues-snapshot-2026-08-27.md", line: 10, referenceId: "architecture", occurrence: 0 },
+  { source: "specs/sprint-alfred-epic/evidence/issues-snapshot-2026-08-27.md", line: 229, referenceId: "security", occurrence: 0 },
+  { source: "specs/sprint-alfred-epic/evidence/issues-snapshot-2026-08-27.md", line: 304, referenceId: "lifecycle", occurrence: 0 },
+  { source: "specs/sprint-alfred-epic/evidence/issues-snapshot-2026-08-27.md", line: 377, referenceId: "telemetry", occurrence: 0 },
+  { source: "specs/sprint-alfred-epic/evidence/issues-snapshot-2026-08-27.md", line: 475, referenceId: "architecture", occurrence: 0 },
+  { source: "specs/sprint-alfred-epic/evidence/issues-snapshot-2026-08-27.md", line: 758, referenceId: "governance", occurrence: 0 },
+  { source: "specs/sprint-alfred-epic/evidence/issues-snapshot-2026-08-27.md", line: 918, referenceId: "architecture", occurrence: 0 },
+  { source: "specs/sprint-alfred-epic/evidence/issues-snapshot-2026-08-27.md", line: 1187, referenceId: "integration", occurrence: 0 },
+  { source: "specs/sprint-alfred-epic/evidence/issues-snapshot-2026-08-27.md", line: 1318, referenceId: "adoption", occurrence: 0 },
 ]);
 
 /**
@@ -376,11 +376,14 @@ export const IMMUTABLE_SNAPSHOT_MISSING_REFERENCE_EXCLUSIONS = Object.freeze([
  * precise entry that was used so repaired snapshot text makes its exception
  * stale rather than silently leaving an inert allowance behind.
  */
-export function isImmutableSnapshotMissingReferenceExcluded(exclusions, source, line, referenceId, used) {
+export function isImmutableSnapshotMissingReferenceExcluded(exclusions, source, line, referenceId, occurrence, used) {
   const normalizedReferenceId = normalizeReferenceId(referenceId);
   const entry = exclusions.find(
     (candidate) =>
-      candidate.source === source && candidate.line === line && candidate.referenceId === normalizedReferenceId,
+      candidate.source === source &&
+      candidate.line === line &&
+      candidate.referenceId === normalizedReferenceId &&
+      (candidate.occurrence ?? 0) === occurrence,
   );
   if (!entry) return false;
   used.add(entry);
@@ -598,6 +601,7 @@ export function checkRepository(rootInput, options = {}) {
   let excludedLinks = 0;
   let vendoredExcludedLinks = 0;
   let immutableSnapshotExcludedMissingReferences = 0;
+  const missingReferenceOccurrences = new Map();
 
   const readRepoText = (repoPath) => {
     if (isExcludedRepoPath(repoPath)) return null;
@@ -619,12 +623,16 @@ export function checkRepository(rootInput, options = {}) {
     if (text === null) continue;
     for (const link of extractMarkdownLinks(text)) {
       if (link.kind === "missing-reference") {
+        const occurrenceKey = `${source}\0${link.line}\0${normalizeReferenceId(link.referenceId)}`;
+        const occurrence = missingReferenceOccurrences.get(occurrenceKey) ?? 0;
+        missingReferenceOccurrences.set(occurrenceKey, occurrence + 1);
         if (
           isImmutableSnapshotMissingReferenceExcluded(
             immutableSnapshotMissingReferenceExclusions,
             source,
             link.line,
             link.referenceId,
+            occurrence,
             usedImmutableSnapshotMissingReferenceExclusions,
           )
         ) {
@@ -794,7 +802,7 @@ function runCli() {
       `Documentation contracts valid: ${result.stats.markdownFiles} Markdown file(s), ${result.stats.linksChecked} link(s), ${result.stats.anchorsChecked} anchor check(s)` +
         // Printed rather than silent: an accepted gap that leaves no trace in the
         // gate's own output is indistinguishable from one nobody remembers.
-        `, ${result.stats.vendoredExcludedLinks} known vendored-copy link(s) excluded.\n`,
+        `, ${result.stats.vendoredExcludedLinks} known vendored-copy link(s) excluded, ${result.stats.immutableSnapshotExcludedMissingReferences} immutable snapshot missing-reference exclusion(s) accepted.\n`,
     );
   } catch (error) {
     process.stderr.write(`Documentation contracts unavailable: ${error.message}\n`);
