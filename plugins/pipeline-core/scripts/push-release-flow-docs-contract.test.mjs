@@ -18,13 +18,17 @@
 // one, and so the wrong one is proven wrong by the same harness rather than by inspection.
 
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 import { run } from "./pipeline-state.mjs";
 import { parseHumanArgs } from "./po-human-approval.mjs";
+import { parseArgs as parsePushInitArgs, usage as pushInitUsage } from "./push-init.mjs";
+
+const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
 const NOW = () => "2026-08-18T00:00:00.000Z";
 const COMMIT = "a".repeat(40);
@@ -155,3 +159,77 @@ test("the historical drifted `materialize-push-threat-model --dir <repo>` argv i
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// --- push-init: cross-check every documented invocation against the real usage()/parseArgs() -
+// pipeline.no-check-holds-the-shipped-copies-of-push-release-flow-in-agreement (Direction option
+// 2): `docs/push-release-flow.md` exists three times (the root copy, the vendored plugin copy,
+// and the `push-approval.md` skill reference's own restatement of the same invocation), plus a
+// fourth, abbreviated shape in the root doc's own summary table. `7d56917c` changed
+// `push-init.mjs`'s argument contract and updated only the root copy; a full verify ran green
+// because nothing here read the driver's own `usage()`/`parseArgs()`. This does: it extracts
+// every documented `push-init.mjs` invocation, builds a concrete argv from its flags, and
+// asserts (a) the real parser accepts it and (b) every flag it names is one `usage()` itself
+// advertises -- so a doc that invents a flag the driver never had (the `--dir` incident's shape)
+// or drops a flag the driver requires is refused here, even if the copies agree with each other
+// and are both wrong. NOTE: byte-identity between the root and vendored `push-release-flow.md`
+// copies is already enforced separately by
+// `harness/scripts/generate-vendored-canon.mjs --check` (docs/push-release-flow.md is a
+// UNIVERSAL_STANDALONE_FILE there); this suite is the one piece that mechanism does not cover.
+
+const PUSH_INIT_DOC_SOURCES = [
+  { label: "docs/push-release-flow.md (root)", path: join(REPO_ROOT, "docs", "push-release-flow.md") },
+  {
+    label: "plugins/pipeline-core/docs/push-release-flow.md (vendored)",
+    path: join(REPO_ROOT, "plugins", "pipeline-core", "docs", "push-release-flow.md"),
+  },
+  {
+    label: "plugins/pipeline-core/skills/pipeline-start/references/push-approval.md",
+    path: join(REPO_ROOT, "plugins", "pipeline-core", "skills", "pipeline-start", "references", "push-approval.md"),
+  },
+];
+
+// Real flags `push-init.mjs`'s own `usage()` advertises, derived once from the driver rather
+// than hand-copied -- so this suite itself cannot silently drift from the parser it checks.
+const REAL_PUSH_INIT_FLAGS = new Set([...pushInitUsage().matchAll(/--[a-z-]+/g)].map((m) => m[0]));
+const REQUIRED_PUSH_INIT_FLAGS = ["--root", "--by", "--remote", "--destination"];
+
+/** Every line in `text` that names a `push-init.mjs` invocation, flags extracted in order. */
+function extractPushInitInvocations(text) {
+  const invocations = [];
+  for (const line of text.split("\n")) {
+    if (!line.includes("push-init.mjs")) continue;
+    const afterCommand = line.slice(line.indexOf("push-init.mjs") + "push-init.mjs".length);
+    const flags = [...afterCommand.matchAll(/--[a-z-]+/g)].map((m) => m[0]);
+    if (flags.length > 0) invocations.push({ line, flags });
+  }
+  return invocations;
+}
+
+for (const source of PUSH_INIT_DOC_SOURCES) {
+  test(`every documented push-init.mjs invocation in ${source.label} matches the real usage()/parseArgs()`, () => {
+    const text = readFileSync(source.path, "utf8");
+    const invocations = extractPushInitInvocations(text);
+    assert.ok(invocations.length > 0, `expected at least one push-init.mjs invocation line in ${source.label}`);
+    for (const { line, flags } of invocations) {
+      for (const flag of flags) {
+        assert.ok(
+          REAL_PUSH_INIT_FLAGS.has(flag),
+          `${source.label} documents flag ${flag} that push-init.mjs's own usage() does not advertise: ${line}`,
+        );
+      }
+      for (const required of REQUIRED_PUSH_INIT_FLAGS) {
+        assert.ok(
+          flags.includes(required),
+          `${source.label} documents an invocation missing required flag ${required}: ${line}`,
+        );
+      }
+      // Build a concrete argv (dummy values) from the documented flags and feed it to the real
+      // parser -- catches a renamed/removed flag even when it happens to still be a substring of
+      // usage() (e.g. a typo that still matches `--[a-z-]+`).
+      const argv = [];
+      for (const flag of flags) argv.push(flag, `test-value-${flag.replace(/^--/, "")}`);
+      const parsed = parsePushInitArgs(argv);
+      assert.equal(parsed.error, undefined, `${source.label}'s documented argv was rejected by the real parser: ${parsed.error} (line: ${line})`);
+    }
+  });
+}
