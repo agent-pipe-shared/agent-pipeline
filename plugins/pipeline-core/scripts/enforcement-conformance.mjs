@@ -167,13 +167,21 @@ export function sanitizeValue(value) {
   if (Array.isArray(value)) return value.map(sanitizeValue);
   if (!value || typeof value !== "object") {
     if (typeof value !== "string") return value;
-    let safe = value;
-    safe = safe.replace(/-----BEGIN[\s\S]*?-----END[^-]*-----/gi, "[REDACTED-CREDENTIAL]");
-    safe = safe.replace(/\bbearer\s+[^\s,;]+/gi, "[REDACTED-CREDENTIAL]");
-    safe = safe.replace(/\b(?:token|password|passwd|secret|api[_-]?key)\s*[:=]\s*[^\s,;]+/gi, "[REDACTED-CREDENTIAL]");
-    safe = safe.replace(/(?:^|\s)(?:[A-Za-z]:[\\/]|\/)(?:Users|home|private|tmp|var|root)(?:[\\/][^\s]*)?/gi, " [REDACTED-PATH]");
-    safe = safe.replace(/(?:git@|https?:\/\/)?github\.com[:/][^\s]+/gi, "[REDACTED-ORG-COORDINATE]");
-    safe = safe.replace(/(?:^|\s)(?:assistant|user|system)\s*:/gi, " [REDACTED-TRANSCRIPT]:");
+    let safe = value.normalize("NFKC");
+    safe = safe.replace(/-{5}BEGIN[\w ]*PRIVATE KEY-{5}[\s\S]*?-{5}END[\w ]*PRIVATE KEY-{5}/giu, "[REDACTED-CREDENTIAL]");
+    safe = safe.replace(/[^\n]*[\u0000-\u0009\u000b\u000c\u000e-\u001f\u007f-\u009f\u2028\u2029][^\n]*/gu, "[REDACTED-CONTROL]");
+    safe = safe.replace(/(?<![A-Za-z0-9])(?:authorization|x[-_]?api[-_]?key|api[-_ ]?key|access[-_]?token|refresh[-_]?token|client[-_]?secret|token|secret|password|passwd|pwd|set[-_]?cookie|cookie)\b["']?\s*[:=]\s*(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|(?:bearer|basic)\s+[^\s,;}\]]+|[^\s,;}\]]+)/giu, "[REDACTED-CREDENTIAL]");
+    safe = safe.replace(/(?<![A-Za-z0-9])(?:authorization|x[-_]?api[-_]?key|api[-_ ]?key|access[-_]?token|refresh[-_]?token|client[-_]?secret|token|secret|password|passwd|pwd|set[-_]?cookie|cookie)\b\s+(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s,;}\]]+)/giu, "[REDACTED-CREDENTIAL]");
+    safe = safe.replace(/(?<![A-Za-z0-9])bearer\s+[^\s,;}\]]+/giu, "[REDACTED-CREDENTIAL]");
+    safe = safe.replace(/(?<![A-Za-z0-9])basic\s+[A-Za-z0-9+/]{8,}={0,2}(?![A-Za-z0-9+/=])/giu, "[REDACTED-CREDENTIAL]");
+    safe = safe.replace(/\b[a-z][a-z0-9+.-]*:\/\/[^\s"'<>]*/giu, "[REDACTED-ORG-COORDINATE]");
+    safe = safe.replace(/(?<![A-Za-z0-9])(?:[A-Za-z0-9._-]+@)?[A-Za-z0-9.-]+\.[a-z]{2,63}:[^\s"'<>]+/giu, "[REDACTED-ORG-COORDINATE]");
+    safe = safe.replace(/(?<![A-Za-z0-9_-])(?:sk-[A-Za-z0-9_-]{8,16384}|gh[pousr]_[A-Za-z0-9]{8,16384}|github_pat_[A-Za-z0-9_]{8,16384}|AKIA[0-9A-Z]{16})(?![A-Za-z0-9_-])/gu, "[REDACTED-CREDENTIAL]");
+    safe = safe.replace(/(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{1,16384}\.[A-Za-z0-9_-]{4,16384}\.[A-Za-z0-9_-]{4,16384}(?![A-Za-z0-9_-])/gu, "[REDACTED-CREDENTIAL]");
+    safe = safe.replace(/(?:^|\s)(?:assistant|user|system|tool)\s*:\s*[^\n]*/giu, " [REDACTED-TRANSCRIPT]");
+    safe = safe.replace(/(?<![A-Za-z0-9\\])\\\\[^\\/\s"'<>|?*\u0000-\u001f]+\\[^\\/\s"'<>|?*\u0000-\u001f]+(?:\\[^\\/\s"'<>|?*\u0000-\u001f]+)*/gu, "[REDACTED-PATH]");
+    safe = safe.replace(/(?<![A-Za-z0-9])(?:[A-Za-z]:[\\/])(?:[^\s\\/"'<>|?*\u0000-\u001f]+[\\/])*[^\s\\/"'<>|?*\u0000-\u001f]*/gu, "[REDACTED-PATH]");
+    safe = safe.replace(/(?<![A-Za-z0-9.:/\\])\/(?:[^\s/\\:"'<>|?*\u0000-\u001f]+\/)*[^\s/\\:"'<>|?*\u0000-\u001f]*/gu, "[REDACTED-PATH]");
     return safe;
   }
   return Object.fromEntries(Object.entries(value).map(([key, nested]) => [key, sanitizeValue(nested)]));
