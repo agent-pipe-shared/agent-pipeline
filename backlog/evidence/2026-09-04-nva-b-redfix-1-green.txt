@@ -1,0 +1,44 @@
+command: node --test plugins/pipeline-core/scripts/capture-evidence.test.mjs
+label: NVA-B-REDFIX-1-green-f794a6f9
+exitCode: 0
+--- stdout ---
+✔ redactText strips a plain-path occurrence and a file:// occurrence of the repo root, and a separate home-dir occurrence (2.48136ms)
+✔ formatArtifact matches the de facto backlog/evidence/ shape (0.674791ms)
+✔ captureEvidence: a failing command with the repo root in both plain and file:// form is fully redacted, and the exit code is recorded and preserved (54.174032ms)
+✔ captureEvidence: a passing command is captured with exit code 0 (60.272192ms)
+✔ captureEvidence: a command that writes nothing still produces a well-formed artifact with the recorded exit code (48.899425ms)
+✔ captureEvidence: a spawn failure (command not found) throws and writes no artifact -- never collapsed into a fabricated exit code (97.714054ms)
+✔ captureEvidence: a maxBuffer overflow throws (fails loudly) instead of writing a silently truncated artifact (52.580803ms)
+✔ findResidualHostPath: returns null when no covered shape is present (0.369932ms)
+✔ findResidualHostPath: catches a POSIX user-home path (0.643902ms)
+✔ findResidualHostPath: catches a macOS user-home path (0.653401ms)
+✔ findResidualHostPath: catches a Windows drive-letter path, backslash spelling (0.50011ms)
+✔ findResidualHostPath: catches a Windows drive-letter path, forward-slash spelling (0.297485ms)
+✔ findResidualHostPath: does NOT false-positive on an ordinary URL scheme like file:// or https:// (0.186844ms)
+✔ findResidualHostPath: catches a percent-encoded POSIX user-home path (AC-3, the mandatory half) when the literal /home/ separator never appears (0.213466ms)
+✔ captureEvidence: refuses to write when a surviving /home/ path is present -- no partial file, no empty file, no directory created (AC-1) (54.472267ms)
+✔ captureEvidence: refuses to write when a surviving Windows drive-letter path is present (AC-1, AC-2) (55.807419ms)
+✔ captureEvidence: the refusal error names the pattern and offset but never the offending path itself (AC-4) (55.515784ms)
+✔ findResidualHostPath: catches a percent-encoded Windows drive-letter path immediately after an encoded path separator (F4 false-negative repro) (0.296473ms)
+✔ findResidualHostPath: catches a percent-encoded macOS user-home path (AC-3, previously untested) (0.241769ms)
+✔ findResidualHostPath: the F4 fix does not reopen a false positive on a fully percent-encoded URL scheme (0.2214ms)
+✔ findRepoRoot: resolves the actual repository root for a cwd inside this checkout (6.242599ms)
+✔ findRepoRoot: throws a hard stop (never guesses) for a cwd outside any Git working tree (5.434645ms)
+✔ parseArgs: throws when the -- separator is absent (0.420358ms)
+✔ parseArgs: throws when no command follows -- (0.195171ms)
+✔ parseArgs: throws when --out is missing (0.209518ms)
+✔ parseArgs: throws when --label is missing (0.214978ms)
+✔ parseArgs: throws on an unrecognized flag (0.323945ms)
+✔ parseArgs: parses a valid invocation, and everything after -- is the command verbatim (including tokens that look like flags) (1.593024ms)
+✔ runCli (CLI process): the success line names the artifact path with the repo root redacted, never the absolute host path (F2) (133.864199ms)
+✔ runCli (CLI process): an fs error on the write path is redacted on stderr too, never the absolute host path (F2) (127.328483ms)
+ℹ tests 30
+ℹ suites 0
+ℹ pass 30
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 900.727416
+
+--- stderr ---
