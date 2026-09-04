@@ -180,3 +180,42 @@ as answered so it is not re-raised as a finding. It belongs to dimension 4
 
 **Status: open, blocked on the gitignored-corpus item.** Not a candidate for a
 dispatch until that one moves.
+
+## A new, distinct failure mode, 2026-09-04 — task-ID reuse permanently orphans one of two commits
+
+Found operating this session's own dispatch practice, not by a dispatch. Not the
+blank-line spacing defect (`2026-09-01-every-stage-0-commit-loses-its-assistance-marker-to-a-blank-line.md`)
+and not the gitignored-corpus problem this item names — a third mechanism on the
+same record↔commit binding surface.
+
+The Elephant issued the task id `NVA-B-CRITICWRITE-1` twice, three days apart,
+for two genuinely unrelated work packages: once on 2026-09-03 (an ADR draft,
+commit `f262a5c7`), once on 2026-09-04 (implementing the write location the ADR
+proposed, commit `b72e22b2`). Both commits carry the identical, correctly-formed
+trailer `Dispatch: NVA-B-CRITICWRITE-1 (goldfish)`. Because
+`evidence/dispatch-record-<TASK_ID>.json` is a single file per task id, only one
+commit can ever be bound through it.
+
+`dispatch-authorship-verify.mjs --commit f262a5c7` now `PASS`es (the record was
+restored to describe it, since it was chronologically first). The same check
+against `b72e22b2` **fails permanently**: `record-names-different-commit`. No
+record content can fix this — the trailer itself, in immutable history, names a
+task id whose evidence slot the earlier commit already owns. This is the same
+"amending is unavailable, the defect stays" shape as the trailer-spacing
+instances, reached by a different route: not a malformed trailer, but two
+well-formed ones colliding on one task id.
+
+**Cause, stated plainly:** nothing checks a task id for uniqueness before a
+dispatch is issued under it. The dispatcher (the Elephant) is the only party who
+could catch this, and did not, on either occasion — the second dispatch's own
+briefing named a task id already used by a completed, unrelated package three
+days earlier in the same session's own history, and nothing surfaced the
+collision until the record file was about to be overwritten.
+
+**Not filed as a fourth item.** The mechanism is close enough to this item's own
+subject (record↔commit binding integrity) to belong here, and the remedy is the
+same shape a directory-contract check already applies elsewhere: before writing
+`evidence/dispatch-record-<TASK_ID>.json` as the opening act, a dispatch could
+check whether the file already exists and belongs to a different, completed
+package — refusing to silently overwrite it is cheaper than the check this item
+already asks for on the read side.
