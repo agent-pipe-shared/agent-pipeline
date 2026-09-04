@@ -211,7 +211,7 @@
 | pipeline.fresh-repo-onboarding-never-asks-for-git-identity | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.fresh-worktree-indistinguishable-from-abandoned | open | defect | pipeline | 2026-09-01 | Nova B — a just-provisioned Agent-tool worktree satisfies every retirement condition identically to a genuinely abandoned one, so the retirement sweep cannot be wired into bootstrap until the two are distinguishable. |
 | pipeline.full-push-preflight-before-signature | closed | workflow-improvement | pipeline | 2026-08-18 | — |
-| pipeline.gate-should-not-demand-a-human-name | open | workflow-improvement | pipeline | 2026-08-28 | Nova B — the encoding half is fixed; this is the design half that made the encoding fragile in the first place |
+| pipeline.gate-should-not-demand-a-human-name | closed | workflow-improvement | pipeline | 2026-08-28 | Nova B — the encoding half is fixed; this is the design half that made the encoding fragile in the first place |
 | pipeline.gate-strength-override-route-advertised-not-offered | deferred | defect | pipeline | 2026-08-08 | — |
 | pipeline.gate-strength-shell-comment-understates-its-own-scope | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.gate-strength-shell-lane-refuses-any-command-containing-a-quoted-wildcard | closed | defect | pipeline | 2026-08-27 | — |
@@ -629,8 +629,8 @@
 
 ## Counts
 
-- open: 97
+- open: 96
 - in_progress: 0
-- closed: 510
+- closed: 511
 - rejected: 3
 - deferred: 11

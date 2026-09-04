@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "fab85c211b695981669cd6f7e8c6fdb8371fe4741cee45e88ad63ab8e76aee09"
+    "transitionHead": "d9749d13e2120a3b7332a1c37e2ea3d271832b874f7fbf6e53616650def7ef74"
   },
   "counts": {
-    "open": 97,
+    "open": 96,
     "in_progress": 0,
-    "closed": 510,
+    "closed": 511,
     "rejected": 3,
     "deferred": 11
   },
@@ -2530,13 +2530,17 @@
     },
     {
       "id": "pipeline.gate-should-not-demand-a-human-name",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-28",
       "source": "Follow-up from 2026-08-28-a-chat-gate-is-unusable-with-a-non-ascii-name-on-windows.md, consumer incident report S56 finding B1's own second suggestion.",
       "deferred": false,
-      "tracking": "Nova B — the encoding half is fixed; this is the design half that made the encoding fragile in the first place"
+      "tracking": "Nova B — the encoding half is fixed; this is the design half that made the encoding fragile in the first place",
+      "closedAt": "2026-09-04",
+      "closureRepository": "self",
+      "closureCommit": "4f09b2b0023d1e2cfbefa0610992e500e96df666",
+      "closureEvidence": "backlog/items/2026-08-28-a-gate-should-not-demand-a-human-name-typed-byte-exactly.md"
     },
     {
       "id": "pipeline.gate-strength-override-route-advertised-not-offered",
