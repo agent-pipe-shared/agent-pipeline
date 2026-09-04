@@ -3,11 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.the-denial-trim-state-is-keyed-per-session-not-per-agent-as-its-comment-claims
 type: defect
 owner: pipeline
-status: closed
-closed_at: 2026-09-03
-closure_repository: self
-closure_commit: 15bb35994d83b8147b22c9316561c3767ef81037
-closure_evidence: backlog/evidence/2026-09-03-nva-b-trimkey-stale-open-measurement.md
+status: open
 created: 2026-09-01
 sprint: nova-b
 done_when: manual
