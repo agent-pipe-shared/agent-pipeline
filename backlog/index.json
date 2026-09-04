@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "91d9c657e146d9e311b2bba7dc0bb9da42c008b8030d91a2ddc46a4c78177e6c"
+    "transitionHead": "9be02884e9f30a2470ab9363ffa8fb555420db319ea5e40639ce66add6fe9911"
   },
   "counts": {
-    "open": 99,
+    "open": 98,
     "in_progress": 0,
-    "closed": 508,
+    "closed": 509,
     "rejected": 3,
     "deferred": 11
   },
@@ -6958,12 +6958,16 @@
     },
     {
       "id": "pipeline.the-unregistered-suite-detector-is-not-itself-a-gate-step",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-01",
       "source": "Drafted in scratch/pending-item-suite-registration.md, held there because five dispatches shared the checkout; filed once free. Verified live 2026-09-01 against harness/scripts/verify.mjs and a fresh run of plugins/pipeline-core/scripts/check-suite-registration.mjs.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-09-04",
+      "closureRepository": "self",
+      "closureCommit": "777ee9c5e5916b6b2f8e784bf3fc0b32d9124f90",
+      "closureEvidence": "backlog/evidence/2026-09-03-suite-registration-ceremony-package.md"
     },
     {
       "id": "pipeline.this-hosts-local-marketplace-copy-is-not-symlinked-to-source",

@@ -563,7 +563,7 @@
 | pipeline.the-rebase-authority-is-resolved-and-advertised-but-not-executable | closed | defect | pipeline | 2026-09-02 | — |
 | pipeline.the-two-suite-registration-checkers-disagree | closed | defect | pipeline | 2026-08-27 | — |
 | pipeline.the-unparsed-command-lane-still-carries-the-false-denial-claim | open | defect | pipeline | 2026-09-03 | Nova B — the sibling of the opaque-interpreter-code lane. Same blind-scan fallback, same fail-closed refusal of a mere mention, and the guard still tells the reader that only a detected write is refused. |
-| pipeline.the-unregistered-suite-detector-is-not-itself-a-gate-step | open | defect | pipeline | 2026-09-01 | — |
+| pipeline.the-unregistered-suite-detector-is-not-itself-a-gate-step | closed | defect | pipeline | 2026-09-01 | — |
 | pipeline.this-hosts-local-marketplace-copy-is-not-symlinked-to-source | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.three-doc-and-adr-checkers-never-run-in-verify | rejected | defect | pipeline | 2026-08-27 | — |
 | pipeline.three-independent-copies-of-the-wsl-windows-path-normalization | closed | defect | pipeline | 2026-08-27 | — |
@@ -629,8 +629,8 @@
 
 ## Counts
 
-- open: 99
+- open: 98
 - in_progress: 0
-- closed: 508
+- closed: 509
 - rejected: 3
 - deferred: 11
