@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.invalid-channel-value-blocks-unrelated-alpha-ref-write
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-04
+closure_repository: self
+closure_commit: e07082b66bba6406b9a4ababb79c003655bbea0d
+closure_evidence: backlog/evidence/2026-09-04-nova-b-batch-3-closure-verification.md
 created: 2026-09-01
 sprint: nova-b
 tracking: "Nova B — cross-field coupling in the calibration reader: a broken pipelineUpdateChannel value makes the unrelated pipelineUpdateAlphaRef field unwritable, with a reason code that names the wrong field."
@@ -73,3 +77,25 @@ asymmetry with the channel field is unintended.
   minimum.
 - The test that currently pins the coupled behaviour is updated to assert the
   decoupled behaviour, not deleted.
+
+## Closure
+
+Closed 2026-09-04 against `e07082b66bba6406b9a4ababb79c003655bbea0d`
+(NVA-B-ALPHADECOUPLE-1). Verification is in
+`backlog/evidence/2026-09-04-nova-b-batch-3-closure-verification.md`.
+
+`readCalibration` was made field-agnostic and validation moved into the
+field-specific read/plan/apply functions, so neither field's validity gates the
+other's write. Duplicate detection now runs through one shared helper and
+applies symmetrically. `node --test plugins/pipeline-core/scripts/pipeline-update-channel.test.mjs`
+passes 36/36, exit 0, re-run independently by the dispatcher.
+
+The acceptance bullet about the pinned test was met by replacement rather than
+deletion, and the suite additionally pins the property most easily lost while
+decoupling — that an invalid channel value still blocks a *channel* operation at
+plan, readback and apply — together with its converse, that a genuine alpha-ref
+problem still refuses with an alpha-ref reason code.
+
+`readProjectPipelineUpdateAlphaRef`'s own reason codes were left untouched. They
+had landed hours earlier against a Critic finding, and reopening them inside this
+change would have made both unreviewable.

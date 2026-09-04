@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.guard-denial-messages-repeat-70-lines-of-boilerplate
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-04
+closure_repository: self
+closure_commit: 6bfb9c3e1a8d96648e35365fb316ee73b2dd51b9
+closure_evidence: backlog/evidence/2026-09-04-nova-b-batch-3-closure-verification.md
 created: 2026-08-29
 sprint: nova-b
 done_when: manual
@@ -93,3 +97,48 @@ wrapped posix/powershell/cmd forms only when the inline command actually
 exceeds the column bound, instead of always producing all three. Part 2 (a
 first-denial-full / repeat-denial-short session-scoped trim) remains
 unaddressed, explicitly out of scope for that dispatch by design.
+
+## Closure
+
+Closed 2026-09-04 against `6bfb9c3e1a8d96648e35365fb316ee73b2dd51b9`
+(NVA-B-DENIALBOILER-1). Verification is in
+`backlog/evidence/2026-09-04-nova-b-batch-3-closure-verification.md`.
+
+All three Acceptance bullets are met: the first two by the session-scoped
+denial trim and by `b6d81f42`, the third by this commit. Measured reduction:
+signature-mode denial 110 → 71 lines, chat-mode 90 → 50.
+
+Platform is now chosen per STEP rather than per denial. The in-session steps
+(`plan`, `prepare-authorization`, `emit-signature-digest`, and chat mode's
+`authorize`) run through the same tool that produced the denial, so the platform
+is determined rather than guessed and one rendering suffices.
+`authorize-by-signature` keeps both renderings: it runs outside the session on a
+machine nobody here can observe. That is this item's own stop condition
+resolving as a finding rather than a bug — where the platform genuinely cannot
+be determined at render time, the duplication is load-bearing.
+`boundedCopySafeCommand` still computes all three forms; the renderer only
+selects, so no reconstruction path was removed.
+
+`node --test plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs` passes
+226/226 and `node --test plugins/pipeline-core/lib/copy-safe-command.test.mjs`
+31/31, both re-run independently by the dispatcher. The `NOVA-LCR-HGO-1`
+assertions were not modified and still pin the four-step order, `--repo`,
+`--request-sha256`, and the in-session-versus-outside labelling — the check that
+mattered most, since a shorter denial that no longer tells the operator what to
+do would be worse than the duplication.
+
+**Correction to this item's own "Where it is" section.** The remediation block
+is emitted by `plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs`'s
+`humanOverrideRoute()`, not by
+`plugins/pipeline-core/scripts/guard-human-override.mjs`. This item declined to
+pin the emitting function within its investigation budget and named the script
+anyway; the dispatch briefing then carried that unpinned claim forward as if it
+were settled. The dispatch located the real emitter and changed the right file.
+
+**What this closure does not cover.** Four other renderer callers
+(`guard-testpath.mjs`, `guard-gate-strength.mjs`, and the Codex and Antigravity
+pretool guards) still emit unconditionally duplicated blocks. They were verified
+non-regressed through the renderer's own default-path tests rather than by
+re-running their suites, and the same trim there is separate work.
+`guard-human-override.mjs`'s own `render-copy-safe` CLI is deliberately left
+alone — its own comment calls it a give-me-everything escape hatch.

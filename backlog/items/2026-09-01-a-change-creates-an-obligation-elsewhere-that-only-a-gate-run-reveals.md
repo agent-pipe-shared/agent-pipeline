@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.a-change-creates-an-obligation-elsewhere-that-only-a-gate-run-reveals
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-04
+closure_repository: self
+closure_commit: a64b09eafb3986ae1259806f01d7321b638897e2
+closure_evidence: backlog/evidence/2026-09-04-nova-b-batch-3-closure-verification.md
 created: 2026-09-01
 sprint: nova-b
 done_when: manual
@@ -40,3 +44,35 @@ that first reveals a one-line omission.
 
 This item is the general pattern behind the four instances above. A prior
 handover recorded the same shape as unfiled.
+
+## Closure
+
+Closed 2026-09-04 against `a64b09eafb3986ae1259806f01d7321b638897e2`
+(NVA-B-PREGATE-1). Verification is in
+`backlog/evidence/2026-09-04-nova-b-batch-3-closure-verification.md`.
+
+`harness/scripts/pre-gate.mjs` runs exactly the six checkers named in the
+Direction above and measures 4.147 s against the ~13-minute gate — half the
+estimate. `node --test harness/scripts/pre-gate.test.mjs` passes 5/5.
+
+Two properties decided whether this was worth having, and both were established
+by running rather than by reading the report:
+
+- **It cannot silently drift from the gate.** Its first test parses
+  `harness/scripts/verify.mjs`'s own source and asserts every pre-gate entry is
+  still registered there. A pre-gate holding its own copy of the list would
+  eventually disagree with the gate, which is worse than having none.
+- **It repairs nothing.** Confirmed by source read of the script and all six
+  checkers. A pre-gate that silently regenerated the vendored copy would remove
+  the signal it exists to give.
+
+`pre-gate.mjs` currently exits 1, on one cause: two genuinely unregistered test
+suites, both waiting on the TP-3 signature ceremony that `verify.mjs` requires.
+Both lines are staged in
+`backlog/evidence/2026-09-03-suite-registration-ceremony-package.md`. Until that
+window runs it is adoptable as a per-check report rather than a clean exit-code
+gate — which does not affect this closure, because the item asked for the fast
+signal and the fast signal exists.
+
+Whether this becomes automatic — a pre-commit hook, or wired into CI — was
+deliberately left undecided; the deliverable is the command.
