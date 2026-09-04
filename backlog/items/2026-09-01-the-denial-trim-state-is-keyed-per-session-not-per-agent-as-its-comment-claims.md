@@ -90,4 +90,44 @@ Nothing was dispatched for this item. The measurement is in
 stale-status mechanism it exhibits is recorded as a second instance in
 `backlog/items/2026-08-27-resolved-backlog-items-can-keep-status-open-indefinitely.md`.
 
+## Correction, 2026-09-03 — this closure was premature and the item is being reopened
+
+The closure above is wrong on the merits, and this section records why rather
+than quietly amending it.
+
+`15bb3599` implements per-agent keying correctly. It never executes.
+`NVA-B-SUBIDENT-2`, dispatched later the same day and measuring through its own
+live calls, established that `subagentIdentity()` does not return
+`kind: "subagent"` for a real dispatched subagent's PreToolUse payload — so
+`denialClassesScopeKey()` always falls back to the orchestrator's `session_id`,
+which is precisely the pre-fix behaviour. Evidence is in
+`backlog/items/2026-09-01-subagent-identity-may-never-resolve-so-per-agent-scoping-is-inert.md`.
+
+**The defect this item names is therefore still live, and was reproduced after
+the closure.** That dispatch's own first-ever Bash call was denied
+`GUARD-PARSE-UNSUPPORTED` and rendered with the trimmed remedy text — a
+fresh-context subagent receiving the short form on its first encounter with a
+class, which is the exact scenario this item's "open question" section predicted
+and the exact reader the first-denial-renders-full guarantee exists for.
+
+**What went wrong in my own reasoning.** The closure rested on the fix's commit
+message, its code, and a passing regression test. All three are genuine, and all
+three are about the same layer: whether the scope key is *selected* correctly
+once a subagent identity exists. None of them touches whether that identity is
+ever *produced*. The AC-4 test in particular manufactures the transcript shape it
+needs, so it proves the branch is right without proving the branch is reached.
+
+The `git log` check I applied that morning — verify the premise against the paths
+the item names before dispatching — worked as intended and found the fix. It
+cannot detect a fix that landed and is inert. That is a distinct failure mode
+from the stale-open one, and it is the more dangerous of the two: a stale-open
+item wastes a dispatch, an inert fix closes a live defect.
+
+**Reopening is deferred by minutes, not declined.** A status flip creates
+unreconciled ledger debt, and a concurrent dispatch is working inside
+`backlog/transitions.ndjson` right now; interleaving a reconcile with it would
+risk the hash chain. The reopen and its ledger reconciliation follow immediately
+once that dispatch reports. Until then this section, not the `status:` field, is
+the accurate record.
+
 ## Placeholder-marker-for-append

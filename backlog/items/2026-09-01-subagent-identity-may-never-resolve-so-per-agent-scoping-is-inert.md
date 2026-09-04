@@ -91,3 +91,52 @@ scoping should be treated as unconfirmed in production, and the sibling
 `bootstrapReceiptPath()`/`GUARD-BOOTSTRAP-RECEIPT-MISSING` mechanism (which keys
 on the same `agentId` resolution) should be treated as carrying the identical
 open question.
+
+## CONFIRMED by direct self-observation, 2026-09-03 — no probe was needed
+
+The finding is confirmed, and the confirming evidence is stronger than the
+instrumented probe this item was waiting for. `NVA-B-SUBIDENT-2` was dispatched
+as a subagent precisely so that its own calls would be the measurement.
+
+**The proof is positive, not an absence argument.** The dispatch's own
+first-ever Bash call was denied `GUARD-PARSE-UNSUPPORTED` and rendered with the
+**trimmed** remedy text rather than the full grammar. That short form is
+`GRAMMAR_DENIAL_REMEDY_SHORT`, selected only when `isFirstDenialThisScope()`
+returns false — impossible on a first call unless the scope the payload resolved
+to had already seen that class. The only state file present was keyed on the
+**orchestrator's** `session_id`, with an mtime predating the dispatch, and it
+already listed `GUARD-PARSE-UNSUPPORTED`. No `agent-*.json` file exists.
+
+So `kind !== "subagent"` for a real dispatched subagent's payload, and
+`15bb3599`'s per-agent branch never executes. Its scoping is a no-op in
+production today, not merely at round-F's time.
+
+This is also a live reproduction of the exact failure the original denial-trim
+item predicted: a fresh-context subagent receiving a trimmed denial on its first
+encounter with a class — for the reader who most needs the full text and has no
+prior denial to remember.
+
+**Two corroborating observations**, secondary to the above:
+`dispatch-budget/` holds only an `orchestrator-seen/` entry for the orchestrating
+session, with zero `agent-*.json` counters and zero `unresolved.jsonl` entries
+across 15+ matched calls — which eliminates "unresolved" and "invalid identity"
+and leaves "orchestrator" by elimination. And no `bootstrap-receipt/` directory
+exists at all, which is the sibling mechanism this item flagged as carrying the
+identical question; it does.
+
+**Why the AC-4 regression test passes anyway, which is the methodological point.**
+`guard-lifecycle-ready.test.mjs`'s `NVA-B-TRIMKEY AC-4` synthesises the subagent
+identity through a fixture that manufactures a nested `subagents/agent-<id>.jsonl`
+transcript path — a shape never observed live. The test validates the scope-key
+selection logic and nothing about production. A test that constructs the input it
+needs proves the branch is correct, not that the branch is reached.
+
+**One process note worth keeping.** The dispatch's first reads were against the
+repository checkout rather than the installed marketplace copy that actually
+fires. An advisor call caught it, and it then confirmed the two byte-identical
+and confirmed the installed copy already carries `15bb3599`. Measuring the guard
+that runs, rather than the guard in the tree, is what made this evidence hold.
+
+**No fix.** The stop condition applied: the remedy needs harness instrumentation
+or an attended operator, which is a design decision rather than a small
+correction. Nothing was changed.
