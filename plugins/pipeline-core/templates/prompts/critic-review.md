@@ -71,6 +71,21 @@ USAGE (Elephant)
    `backlog/items/2026-08-18-triage-verdict-text-can-contaminate-a-backlog-item-as-a-later-spec-reference.md`).
    The stripping is the Elephant's job before dispatch, not a disregard
    instruction asked of the Critic.
+   **Dispatch-record citation rule (dispatch-construction side):** a
+   dispatch-record path handed to a Critic as authorship evidence MUST be a
+   STRIPPED projection, produced via `node
+   plugins/pipeline-core/scripts/dispatch-record-strip-for-critic.mjs
+   --record <path> --out <stripped-path>`, never the raw
+   `evidence/dispatch-record-*.json` path — for the same underlying reason as
+   the backlog-item rule above: the raw record's `report.text` is
+   implementor narrative, exactly what CR-02/EL-09 forbid as Critic input
+   (confirmed live 2026-09-04, `backlog/items/2026-09-04-a-dispatch-record-
+   carries-implementor-prose-into-a-critic-that-must-not-read-it.md`). The
+   stripped copy carries only `taskId`, `agentType`, `model`, `effort`,
+   `rulesetSha`, `commits`, `outcome`, `report.changedFiles` (normalized to
+   bare paths) and `modelOverride.{model,effort}` — enough to verify
+   authorship, never the "why". The stripping is the Elephant's job before
+   dispatch, not a disregard instruction asked of the Critic.
    <!-- CRITIC-FAIL-CLOSED: reference-only-stop -->
    The only admissible material is a reference to the spec, an enumerated
    diff or archived diff snapshot, guardrails/constraints, machine evidence,
@@ -193,7 +208,11 @@ review, or issue a substantive pass/fail judgment.
   snapshot stored with the review evidence) so the review stays reproducible
   and A/B-testable — snapshot path: {{REVIEWED_DIFF_SNAPSHOT_PATH}}.
 - Dispatch-record evidence (authorship evidence — the Critic can only verify
-  diff authorship when dispatch records are in the evidence set):
+  diff authorship when dispatch records are in the evidence set): a STRIPPED
+  projection's path, produced via `node
+  plugins/pipeline-core/scripts/dispatch-record-strip-for-critic.mjs --record
+  <raw-record-path> --out <stripped-path>` per the Dispatch-record citation
+  rule above — never the raw `evidence/dispatch-record-<TASK_ID>.json` path:
   {{DISPATCH_LIST_PATH}}
 - Guardrails/constraints (the law): {{GUARDRAILS_PATHS e.g. "CLAUDE.md constraints block, the project calibration, relevant policy file"}}
 - Evidence artifact(s) of the submission: {{EVIDENCE_PATHS e.g. "verify output log written by the script"}}
