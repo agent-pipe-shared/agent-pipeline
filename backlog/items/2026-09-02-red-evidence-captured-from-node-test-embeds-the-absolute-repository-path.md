@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.red-evidence-from-node-test-embeds-the-absolute-repository-path
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-02
+closed_at: 2026-09-04
+closure_repository: self
+closure_commit: ddd356698f39bc3c4934ae97109290ba910b8385
+closure_evidence: plugins/pipeline-core/scripts/capture-evidence.test.mjs
 sprint: nova-b
 tracking: "Nova B — reproduce-first RED evidence is required by briefings and by ADR-0063, and the standard way to capture it embeds a machine-specific absolute path that a hard rule forbids in commits. The fixup always arrives one commit too late, and history cannot be rewritten."
 source: "NVA-REBDEAD-F5B, 2026-09-02: the dispatch's RED artifact carried this machine's absolute repository path seven times; the dispatch found it itself and sanitized the working-tree copy in a second commit (68c164e8), but the bytes remain in 79bc79b8. Second machine-path incident in the same session (the first, NVA-REBDEAD-1 finding F6, was dispatcher-side)."
@@ -82,3 +86,28 @@ path in evidence would look like, if such a case exists at all.
 - `CLAUDE.md` — the hard rule this violates
 - `docs/adr/0063-repository-directory-contract.md` — the rule that puts tracked
   evidence in the repository in the first place
+
+## Closure, 2026-09-04
+
+Direction 1 shipped: `plugins/pipeline-core/scripts/capture-evidence.mjs`
+(NVA-B-REDCAPTURE-1, 2026-09-03/04, hardened through two follow-up rounds —
+NVA-B-REDFIX-1 and NVA-B-REDFIX-2 — plus a same-day pass closing review
+findings F1/F2/F4/F5/F6). It redacts the repository root and home directory
+from a wrapped command's stdout/stderr (plain-path and `file://`/percent-encoded
+forms alike) BEFORE the bytes reach disk, and refuses to write anything at all
+— artifact body or its own CLI output — if a known host-path shape (POSIX
+home, macOS home, Windows drive letter, each in literal and percent-encoded
+form) survives redaction. `templates/prompts/goldfish-task.md`'s standard DoD
+checks already mandate this tool for capturing evidence, so a briefed dispatch
+following the template gets the fix by default. `node --test
+plugins/pipeline-core/scripts/capture-evidence.test.mjs` — 35/35 pass, exit 0
+(re-verified 2026-09-04 before closing this item).
+
+Direction 2 (a `PreToolUse` guard catching a HAND-written evidence artifact,
+which a capture tool structurally cannot reach) was deliberately split out
+before this closure rather than folded in or dropped:
+`backlog/items/2026-09-04-a-hand-written-evidence-artifact-can-still-carry-an-absolute-host-path.md`,
+still open, three of its own design questions unanswered. This item closes on
+Direction 1 alone, which is what it was actually filed for (a `node --test`
+RED capture's `file://` stack-trace path) — Direction 2 was always framed as
+"alternatively or additionally," never as a joint precondition for closing.
