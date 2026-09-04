@@ -288,6 +288,66 @@ Three results worth carrying, because a green suite would have hidden all three:
   EL-01's five stage-0 conditions. Deliberately not "fixed": re-doing the revert
   through a dispatch would churn a guardrail hook to launder authorship.
 
+### 2026-09-04: verify.mjs evidence-slot fix — ceremony status (NVA-B-EVSLOTFIX-1)
+
+The atomic-write fix for the shared `evidence/verify-latest.json` slot
+(`backlog/items/2026-08-12-shared-verify-evidence-slot-corrupted-by-concurrent-dispatches.md`)
+is split into five TP-3 blocks on `harness/scripts/verify.mjs`, each landed via
+its own PO Ed25519 signature ceremony (ADR-0059) because a single Edit call
+covers only one contiguous region.
+
+- **Blocks A (imports) and B (evidencePath/writeEvidence/runId) landed and
+  committed at `61dc7fc5`.** Both ceremonies completed end-to-end; the commit
+  message records their request/plan hashes.
+- **Block C is prepared but unsigned.** Wires the new `runId` into the
+  `runVerifyJournal` call site (around line 851):
+  ```js
+  // old:
+            verifyRun = await runVerifyJournal({
+              gitCommonDir: gitCommonDirectory(),
+              repoRoot,
+  // new:
+            verifyRun = await runVerifyJournal({
+              gitCommonDir: gitCommonDirectory(),
+              runId,
+              repoRoot,
+  ```
+  The request was seeded and re-seeded 8 times between 11:24 and 16:29 UTC on
+  2026-09-04 (window 8 expired at 16:29:08Z), each window closing with no PO
+  signature — `proof-manual.json` stayed frozen at 12:52:50 the entire time.
+  Re-seeding was stopped after window 8 per the "seed a ceremony only when the
+  PO can sign immediately" rule (CLAUDE.md, `guard-testpath.mjs`
+  admission-failure note): seeding a 9th window with the PO unavailable only
+  risks a stale-window signature burning a passphrase entry for nothing.
+  Resumes on the PO's say-so — start with a fresh denied Edit (the block above
+  is the exact old/new text) to seed a new request, never reuse
+  `fc296c8f30133f8cd399ef4b45f08ff843aaecf42fa4c22d37cc46022f94ad18`.
+- **Block D is drafted, not yet seeded.** Extends the final log line:
+  ```js
+  // old:
+  console.log(`\nEvidence written: ${evidencePath}`);
+  // new:
+  console.log(`\nEvidence written: ${evidencePath} (run record: ${runEvidencePath})`);
+  ```
+- **Block E is drafted, not yet seeded.** Registers the new suite in
+  `TEST_SUITES`:
+  ```js
+  // old:
+    { name: "pre-gate-tests", file: join(scriptDir, "pre-gate.test.mjs") },
+    { name: "capture-evidence-tests", file: join(pluginScriptsDir, "capture-evidence.test.mjs") },
+  ];
+  // new:
+    { name: "pre-gate-tests", file: join(scriptDir, "pre-gate.test.mjs") },
+    { name: "capture-evidence-tests", file: join(pluginScriptsDir, "capture-evidence.test.mjs") },
+    { name: "verify-evidence-writer-tests", file: join(scriptDir, "verify-evidence-writer.test.mjs") },
+  ];
+  ```
+
+Tree is clean at `61dc7fc5` with no outstanding ceremony. After C/D/E land:
+`node --test harness/scripts/verify-evidence-writer.test.mjs`, then a full
+`node harness/scripts/verify.mjs` run bound to the final HEAD, then close the
+2026-08-12 backlog item above.
+
 ## PO decisions and todos — collected during the autonomous run, not waited on
 
 Per the PO's 2026-09-02 instruction. None blocks further Nova-B work.
