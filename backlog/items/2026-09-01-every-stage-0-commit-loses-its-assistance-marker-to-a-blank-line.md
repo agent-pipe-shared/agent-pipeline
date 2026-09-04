@@ -170,3 +170,50 @@ future briefing should carry verbatim, states both conditions:
 
 > Blank line BEFORE the trailer block; no blank line BETWEEN the trailers;
 > nothing after them.
+
+## Instance nine, 2026-09-04 — the same surface, the opposite failure, ten in a row
+
+The correction above worked: every commit built with it parses. And the defect
+moved.
+
+Ten orchestrator-authored commits landed on 2026-09-04 whose trailer block parses
+perfectly and says nothing:
+
+    7e08073a  28a8d44d  2a461b2d  1ed85a91  44af9a14  2aeeaa68
+    cb0223f9  4047d7d2  dfc747e3  2c0edb6a
+
+`git log -10 --format='%h %s' --grep='Dispatch:' --invert-grep` returns all ten.
+Each carries `AI-Assisted: true` and **no `Dispatch:` line at all** — neither
+`stage-0 (elephant)` nor a task id. Under
+`templates/prompts/agent-obligations.md` §6 that is "a commit with neither form",
+which `dispatch-authorship-verify` reports `UNVERIFIABLE`, never a pass.
+
+This is not the blank-line defect. It is the same commit-binding surface failing
+one step earlier: the earlier instances wrote the right trailer and lost it to
+git's parser; these never wrote it.
+
+**Found by a Critic, not by a check.** The round-2 reviewer on the
+capture-evidence package flagged `44af9a14` as finding F-D. The other nine were
+found only because that finding prompted the dispatcher to sweep its own
+commits. Ten unbound commits landed across a full working day and nothing in the
+gate chain, the hooks, or the ledger noticed — which is this item's own
+"and no check catches it" clause, confirmed at a scale the original measurement
+did not reach.
+
+**The dispatcher-side cause, stated plainly.** `Dispatch: stage-0 (elephant)` is
+documented explicitly, in the same paragraph the dispatcher had already read and
+quoted into three briefings that same day. It was applied to none of its own
+commits. On one of them the dispatcher actively considered `Commit-Act:
+orchestrator`, reasoned that it only applies alongside a `Dispatch:` line, and
+removed it — arriving at the correct sub-conclusion and stopping one step short
+of the rule it implies.
+
+**Bearing on the direction question.** Instance seven refuted direction 1
+(better documentation) for the spacing rule. This instance extends the same
+verdict to the presence rule, and adds something the earlier ones could not: the
+failure is not confined to one spelling. Whatever a mechanical check ends up
+enforcing has to answer "is this commit bound to evidence at all", not merely
+"do these two lines sit adjacent".
+
+Amending is unavailable — the ten are stacked, and history rewriting is
+prohibited outright. They stay unbound.
