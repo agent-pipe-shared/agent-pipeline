@@ -67,9 +67,16 @@ function replaceAll(text, needle, replacement) {
 }
 
 /**
- * Redact `repoRoot` (plain-path and `file://`-prefixed occurrences alike -- a `file://` URL
- * simply contains the repo-root string as a substring after its scheme) and, separately,
+ * Redact `repoRoot` (plain-path and `file://`-prefixed occurrences alike) and, separately,
  * `homeDir` occurrences that survive that first pass (i.e. outside the repository path).
+ *
+ * BOUNDED CLAIM, not a general one: a `file://` URL contains the repo-root string as a plain
+ * substring after its scheme only when the path itself needs no percent-encoding. A path
+ * containing a character a URL must encode (a space becomes `%20`, for example -- and this
+ * repository is stated to run on two machines with different local paths, so this is not a
+ * hypothetical) breaks that substring match, and the literal `repoRoot`/`homeDir` replace below
+ * silently fails to find it. `findResidualHostPath` below exists precisely because this function
+ * cannot be trusted to be complete on its own -- it is the fail-closed backstop, not this pass.
  */
 export function redactText(text, repoRoot, homeDir) {
   if (typeof text !== "string" || text === "") return text;
@@ -78,6 +85,47 @@ export function redactText(text, repoRoot, homeDir) {
     result = replaceAll(result, homeDir, HOME_PLACEHOLDER);
   }
   return result;
+}
+
+/**
+ * Covered shapes (AC-2), each as a literal spelling and a percent-encoded-separator spelling
+ * (AC-3 -- catches the case where a path was run through a generic URI-component encoder that
+ * percent-encodes `/` and `\` themselves, rather than `pathToFileURL`'s narrower per-character
+ * encoding that leaves ordinary separators alone):
+ *
+ *   - POSIX user-home path:      /home/<name>/...
+ *   - macOS user-home path:      /Users/<name>/...
+ *   - Windows drive-letter path: C:\...  and the C:/... forward-slash spelling
+ */
+const RESIDUAL_HOST_PATH_PATTERNS = Object.freeze([
+  { name: "posix-home", regex: /\/home\/[^\s"'<>]+/gu },
+  { name: "posix-home-percent-encoded", regex: /%2[fF]home%2[fF][^\s"'<>]*/gu },
+  { name: "macos-home", regex: /\/Users\/[^\s"'<>]+/gu },
+  { name: "macos-home-percent-encoded", regex: /%2[fF]Users%2[fF][^\s"'<>]*/gu },
+  // Excludes a drive letter immediately preceded by another letter/digit/underscore/percent so
+  // this does not fire on the "e:/" tail of an ordinary URL scheme like "file://" or "https://"
+  // (a real false positive found empirically against this file's own existing test fixtures).
+  { name: "windows-drive-letter", regex: /(?<![A-Za-z0-9_%])[A-Za-z]:[\\/][^\s"'<>]*/gu },
+  { name: "windows-drive-letter-percent-encoded", regex: /(?<![A-Za-z0-9_%])[A-Za-z]%3[aA][%\\/][^\s"'<>]*/gu },
+]);
+
+/**
+ * Scan `text` for the earliest (lowest character-offset) surviving absolute host path among the
+ * covered shapes. Returns `{ name, offset }` for the first match found, or `null` when none
+ * survive. Deliberately returns only the pattern's NAME and OFFSET, never the matched substring
+ * itself (AC-4) -- callers use this to build a refusal message, and a message carrying the
+ * matched path would reproduce the exact defect this tool exists to prevent, one layer up.
+ */
+export function findResidualHostPath(text) {
+  let earliest = null;
+  for (const { name, regex } of RESIDUAL_HOST_PATH_PATTERNS) {
+    regex.lastIndex = 0;
+    const match = regex.exec(text);
+    if (match && (earliest === null || match.index < earliest.offset)) {
+      earliest = { name, offset: match.index };
+    }
+  }
+  return earliest;
 }
 
 function quoteIfNeeded(token) {
@@ -125,6 +173,17 @@ export function captureEvidence({
   const stderr = redactText(result.stderr ?? "", root, homeDir);
   const commandLine = redactText(command.map(quoteIfNeeded).join(" "), root, homeDir);
   const artifactText = formatArtifact({ command: commandLine, label, exitCode, stdout, stderr });
+
+  // Fail-closed backstop (sibling of the spawn-failure throw above): redaction is a best-effort
+  // string replace, not a proof. Refuse to write anything -- no partial file, no empty file, no
+  // directory created that did not already exist -- if a known host-path shape survived it.
+  const residual = findResidualHostPath(artifactText);
+  if (residual) {
+    throw new Error(
+      `capture-evidence: refused to write -- a surviving absolute host path (shape: ${residual.name}) was ` +
+        `found in the assembled artifact at character offset ${residual.offset}. No file was written.`,
+    );
+  }
 
   const resolvedOut = resolve(out);
   mkdirSync(dirname(resolvedOut), { recursive: true });
