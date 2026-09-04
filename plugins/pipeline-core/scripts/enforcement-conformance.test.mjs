@@ -102,8 +102,11 @@ test("allows deterministic pass but refuses model and self-attestation pass", ()
     observation: { evidenceKind: "human-acceptance" },
     evaluator: { outcome: "pass", acceptanceSha256: sha },
   })), true);
+  assert.throws(() => validateRecord(validRecord({ observation: { evidenceKind: "unavailable" }, evaluator: { outcome: "excepted" } })));
+  assert.throws(() => validateRecord(validRecord({ observation: { evidenceKind: "deterministic-execution" }, evaluator: { outcome: "excepted" } })));
   assert.throws(() => validateRecord(validRecord({ observation: { evidenceKind: "human-acceptance" }, evaluator: { outcome: "excepted" } })));
   assert.equal(validateRecord(validRecord({ observation: { evidenceKind: "human-acceptance" }, evaluator: { outcome: "excepted", acceptanceSha256: sha } })), true);
+  assert.throws(() => validateRecord(validRecord({ observation: { evidenceKind: "human-acceptance" }, evaluator: { outcome: "excepted", acceptanceSha256: "bad" } })));
   assert.throws(() => validateRecord(validRecord({ observation: { evidenceKind: "deterministic-execution" }, evaluator: { acceptanceSha256: sha } })));
   for (const evidenceKind of ["model-attestation", "self-attestation"]) {
     assert.throws(() => validateRecord(validRecord({ observation: { evidenceKind }, evaluator: { outcome: "excepted" } })));
