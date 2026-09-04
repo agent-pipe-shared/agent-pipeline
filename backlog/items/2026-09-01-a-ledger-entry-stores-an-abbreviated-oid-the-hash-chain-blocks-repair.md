@@ -112,3 +112,42 @@ agent who runs it. What remains is Direction 3 alone — teach the checker to
 classify this entry as known-accepted, the way the 20-line 2026-07-19..22
 historical batch already is. The item is narrowed to that; Directions 1 and 2
 are closed as unavailable.
+
+## 2026-09-03 — the amendment route is measured and closed, with one question left open
+
+Dispatch `NVA-B-LEDGEROID-2` was sent to answer one question first: can the
+repository's own append-based amendment mechanism express this repair? It reached
+that answer and was then lost to a machine outage before reporting. Its raw
+captures survived and are tracked; the determination written from them is
+`backlog/evidence/2026-09-03-ledger-oid-403-determination.md`. **No ledger write
+was made.**
+
+**The answer is no, and it is authorization rather than mechanism.**
+`planBacklogEvidenceAmendment` refuses event 403 with "evidence amendment: only
+the SNT-1 licensing item is authorized", and the source confirms it —
+`plugins/pipeline-core/lib/backlog-state.mjs:1292` compares the item id against a
+single hard-coded value.
+
+That closes the route as a matter of fact and reframes it as a decision. An
+append-based path that can amend what a hash-chained event attests is an
+integrity escape hatch; widening its authorization from one item to a class is a
+PO-level call, not a repair, and doing it inside the record whose whole value is
+that it cannot be quietly rewritten is the least appropriate place to do it
+casually.
+
+**One question is open and was never reached.** The suite output names a second,
+different path — `applyBacklogItemHashRescopeAmendment`, covered by `CBS09` and
+`CBS10`. Whether it applies to an abbreviated `evidence.commit` or only to the
+archival-pin defect its tests describe is unestablished. `CBS10`'s own shape is a
+caution: that path refuses while any unrelated finding is outstanding, and this
+ledger carries twenty accepted historical ones. Any resumption starts there.
+
+**Confirmed along the way:** the two OIDs are the same commit, so this is a
+formatting defect inside a valid chain rather than a mismatch. `CBS08` shows a
+tampered `previousHash` is classified `INTEGRITY` and blocks — the chain's
+tamper-evidence is intact.
+
+**Named so nobody reaches for it:** setting the item's `closure_commit` to the
+abbreviated value would turn both DRIFT lines green by corrupting the correct
+record to match the incorrect one. It is the cheapest-looking fix and the only
+destructive one.

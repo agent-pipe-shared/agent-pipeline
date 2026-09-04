@@ -1,0 +1,31 @@
+command: node --test plugins/pipeline-core/scripts/check-backlog-state.test.mjs
+label: test
+exitCode: 0
+--- stdout ---
+PASS CBS01 the known 2026-07-20 baseline-migration commit is an accepted historical exception
+PASS CBS02 an unrelated unreachable evidence commit is drift, not blocking, and is NOT labelled the known historical batch
+PASS CBS03 the exact known commit under a different actor/kind is drift, but not labelled known — the triple must match exactly
+PASS CBS04 each of the seven additional NVA-BLDRIFT-02 historical triples is an accepted exception
+PASS CBS05 an unreachable commit outside the pinned set is drift, but not labelled known, under a newly pinned actor/kind — never a blanket waiver
+PASS CBS06 a newly pinned commit value under a different actor is drift, but not labelled known
+PASS CBS07 the pinned e21933be commit/actor pair under a third, non-pinned kind is drift, but not labelled known — kind is part of the triple too
+PASS CBS08 a tampered previousHash is INTEGRITY — it still blocks and never appears as drift
+PASS CBS09 applyBacklogItemHashRescopeAmendment succeeds when the only outstanding finding is the stale pin it resolves
+PASS CBS10 applyBacklogItemHashRescopeAmendment still refuses when an unrelated finding is also outstanding
+PASS CBS11 checkPhoenixHistoryImmutable stands down cleanly when the archival path is absent
+PASS CBS12 checkPhoenixHistoryImmutable blocks as INTEGRITY when the archived bytes drift from the pin
+PASS CBS13 checkPhoenixHistoryImmutable holds when the archived bytes match the real, currently-pinned copy
+PASS CBS14 an item carrying a valid done_when value validates cleanly
+PASS CBS15 an item carrying a genuinely unsupported field is still rejected -- widened by exactly one key, not disabled
+15 passed, 0 failed
+✔ plugins/pipeline-core/scripts/check-backlog-state.test.mjs (985.064143ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1008.671948
+
+--- stderr ---
