@@ -267,26 +267,12 @@ read that rather than trusting any prose claim about which HEAD was green.
 
 ### Closed — the rebase deadlock reported from a second session
 
-Fixed, reviewed and closed 2026-09-03 (`e152183e`). Nine commits, two
-independent Critic rounds, full verify green across 506 suites. Detail lives in
+Fixed, reviewed and closed 2026-09-03 (`e152183e`), verify green 506/506. Its
+own Triage section already carries the three findings worth remembering
+(F1 refuted by measurement, F5's first rework rejected, Round-2 F1 an
+unremedied lifecycle violation of mine) — read
 `backlog/items/2026-09-02-the-rebase-authority-is-resolved-and-advertised-but-not-executable.md`
-and the two findings registries under `backlog/evidence/`.
-
-Three results worth carrying, because a green suite would have hidden all three:
-
-- **Round-1 F1 was refuted by measurement.** `apply_patch` was never blocked —
-  the outer tool-name gate admits any tool outside `SHELL_TOOLS`/`WRITE_TOOLS`
-  before either relief, and `guard-apply-patch.mjs` closes that by never
-  forwarding a raw `apply_patch`. The fix built against the finding was reverted.
-- **F5's first rework was rejected.** It pinned the relief to
-  `continuity-damaged`, measured against the guard test's own stub rather than
-  the production chain. An unparseable state file yields
-  `continuity-observation-unavailable`, so that narrowing would have re-opened
-  this exact deadlock with the suite still green.
-- **Round-2 F1 is an unremedied lifecycle violation of mine.** `43413349` was
-  written by the orchestrating session instead of dispatched, breaking three of
-  EL-01's five stage-0 conditions. Deliberately not "fixed": re-doing the revert
-  through a dispatch would churn a guardrail hook to launder authorship.
+rather than this pointer.
 
 ### 2026-09-04: verify.mjs evidence-slot fix — ceremony status (NVA-B-EVSLOTFIX-1)
 
@@ -342,8 +328,25 @@ covers only one contiguous region.
     { name: "verify-evidence-writer-tests", file: join(scriptDir, "verify-evidence-writer.test.mjs") },
   ];
   ```
+- **Block F is drafted, not yet seeded — added 2026-09-04, unrelated to the
+  evidence-slot fix.** A Critic finding (F2) on a separate package
+  (`NVA-B-CRITICINPUT-1/2`, `plugins/pipeline-core/lib/dispatch-record-strip-for-critic.mjs`)
+  found its test suite unregistered here; the rework dispatch correctly
+  stopped rather than route around TP-3. Registers
+  `dispatch-record-strip-for-critic.test.mjs`:
+  ```js
+  // old:
+  { name: "backlog-dispatch-reference-tests", file: join(libDir, "backlog-dispatch-reference.test.mjs") },
+  // new:
+  { name: "backlog-dispatch-reference-tests", file: join(libDir, "backlog-dispatch-reference.test.mjs") },
+  { name: "dispatch-record-strip-for-critic-tests", file: join(libDir, "dispatch-record-strip-for-critic.test.mjs") },
+  ```
+  Package (commits `a5e264a8`, `fa8362a2`, `00036dcf`, `d2fb4495`, `4e204dae`)
+  is one correction commit into its one allowed rework round
+  (`harness/review-protocol.md`) — F1/F3/F4 fixed and re-verified; F2 needs
+  Block F landed before the remaining fresh re-Critic round runs.
 
-Tree is clean at `61dc7fc5` with no outstanding ceremony. After C/D/E land:
+Tree is clean at `4e204dae` with no outstanding ceremony. After C/D/E/F land:
 `node --test harness/scripts/verify-evidence-writer.test.mjs`, then a full
 `node harness/scripts/verify.mjs` run bound to the final HEAD, then close the
 2026-08-12 backlog item above.
