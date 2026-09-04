@@ -126,7 +126,63 @@ whoever triages this item next.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted. Route 2 implemented. Two of three acceptance criteria
+  are met; the third is not satisfiable from inside a session.
+- **Rationale:** see the triage record below.
+- **Assignment (if accepted):** Nova B. Stays open on acceptance criterion 2.
+- **Date:** 2026-09-04
+
+### Triage record, 2026-09-04
+
+**Criterion 1 — route chosen and implemented: met.** `5b2ce433`. Route 2, as this
+item prefers. NVA-B-CIALLOW-1 found the mechanism itself already present — the
+`rbTrueShimDir()` shim, the PATH prepend, and the command byte-identical to the
+guard's published continuation. Only the predicate anchor string was missing, so
+the change is a doc-comment tag and no logic. `guard-lifecycle-ready.test.mjs`
+runs 226/226.
+
+The dispatch explicitly did **not** take Route 1: `.github/workflows/verify.yml`'s
+synthetic PATH still admits only node, git, bash, sh and openssl. Widening an
+allowlist is a security-relevant act, and this item's own reasoning — the
+assertion under test is about the guard's published route, not the host's
+coreutils — decides against it.
+
+**Criterion 3 — the sweep question: answered.** NVA-B-PATHSWEEP-1 ran it in one
+pass, which is what this item argued for: cheaper than discovering the cases one
+CI run each, the pattern already repeated three times. Artifact:
+`backlog/evidence/2026-09-04-nva-b-pathsweep-1-allowlist-sweep.md`, commit
+`bf7fb42b`.
+
+- The allowlist is **exactly** the five this item assumes — measured from the
+  workflow, not inherited. Not stale.
+- **502** unique registered suite files swept, enumerated mechanically via
+  `parseAllRegisteredSuiteFiles` rather than sampled.
+- **Four suites execute a binary outside the allowlist:**
+  `guard-lifecycle-ready.test.mjs` → `true` (this item's own case, reached
+  through `git -c core.editor=true`, which first-argument scanning does not
+  catch); `semgrep-default-rules.test.mjs` → `semgrep`;
+  `security-adapters/gitleaks.test.mjs` → `gitleaks`; `copy-safe-command.test.mjs`
+  → `pwsh` and `cmd.exe`. The middle two are probe-gated.
+- **33 suites could not be determined statically** and are listed by name in the
+  artifact rather than silently resolved.
+
+The same two-route choice this item faced now applies to those cases. It is named
+in the artifact and deliberately not decided there.
+
+Two limits the sweep states about itself, recorded so they are not read as
+stronger than they are: the git-config-mediated pattern was spot-checked rather
+than re-verified exhaustively across all 502 files, and `cmd.exe`'s guard status
+in `copy-safe-command.test.mjs` was not independently confirmed.
+
+**Criterion 2 — `guard-lifecycle-ready-tests` reporting `=0` in an actual CI run:
+not met, and not reachable from a session.** It needs a push, the push gate is
+`approval: required` in `signature` mode, and no approval exists for this branch.
+
+**This item therefore stays open**, and the predicate is not the thing to close it
+on. `check-backlog-done-predicate.mjs` reports it STALE-OPEN — predicate
+satisfied, status open — which is correct and insufficient: the predicate note
+above already says which criteria it does not cover. Closing on a satisfied
+predicate while a stated acceptance criterion is unmet is the exact premature
+closure this repository paid for on 2026-09-03
+(`backlog/items/2026-09-01-the-denial-trim-state-is-keyed-per-session-not-per-agent-as-its-comment-claims.md`,
+correction section), and closure there proved terminal.
