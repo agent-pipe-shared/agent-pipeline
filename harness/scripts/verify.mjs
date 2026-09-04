@@ -47,12 +47,13 @@
  * machine-readable start/terminal progress records.
  */
 import { spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createHash, randomBytes } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { duplicateSuiteIds } from "./check-verify-suite-registration.mjs";
 import { UNREPLACED_MANUAL_CHECK_PLACEHOLDER, computeManualVerifyStep } from "./manual-check-logic.mjs";
+import { writeEvidenceAtomic } from "./verify-evidence-writer.mjs";
 import {
   NOVA_APPROVAL_PENDING_BINDING,
   NOVA_APPROVAL_PENDING_STATUS,
@@ -121,10 +122,12 @@ const command = "node harness/scripts/verify.mjs";
 const primaryRoot = dirname(gitCommonDirectory());
 const evidenceDir = join(primaryRoot, "evidence");
 const evidencePath = join(evidenceDir, "verify-latest.json");
+const runId = `verify-${Date.now()}-${randomBytes(8).toString("hex")}`;
+const runEvidencePath = join(evidenceDir, `${runId}.json`);
 const verifyStartedAt = new Date().toISOString();
 function writeEvidence(evidence) {
-  mkdirSync(evidenceDir, { recursive: true });
-  writeFileSync(evidencePath, JSON.stringify(evidence, null, 2) + "\n");
+  writeEvidenceAtomic(runEvidencePath, evidence);
+  writeEvidenceAtomic(evidencePath, evidence);
 }
 // Invalidate an older result before any suite can begin.  If this process is
 // killed, crashes, or loses its host while a suite is running, a later reader
