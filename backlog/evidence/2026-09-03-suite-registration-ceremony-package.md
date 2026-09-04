@@ -162,3 +162,50 @@ That run is also the item's own thesis demonstrated on itself. The
 suite-registration check found, in 95 ms, an obligation created elsewhere by the
 very deliverable it was checking — the kind of omission that otherwise surfaces
 only after the full ~13-minute gate, if it surfaces at all.
+
+## Addendum (NVA-B-NOCOMPACT-1, 2026-09-04) — a TP-4 edit for the same window
+
+This one is not a `verify.mjs` line and not TP-3. It is recorded here because it
+needs the same maintenance window and would otherwise have no home.
+
+`plugins/pipeline-core/hooks/hooks.json` is TP-4-protected and its top-level
+`$comment` documents all nine wired hooks. Its description of **hook 6** now
+misdescribes the code, because the mechanism it names was removed on 2026-09-04
+by PO decision (commit `868ee755`). The stale sentence reads:
+
+> "(6) Stop stop-suggest — reads manifest+state and suggests the next phase/gate
+> as a systemMessage, plus staged context-budget warnings from the statusline
+> usage file (warn >=100k / overdue >=150k / emergency block >=170k with nag-cap
+> <=2 consecutive blocks then downgrade, dedup marker against repeat chatter —
+> plan 2026-07-07-retro-speed); the block tier is the ONLY decision-block this
+> hook can emit and is persistence-guarded fail-open (write-then-emit)."
+
+Everything from "plus staged context-budget warnings" to the end is now false.
+The hook no longer reads the statusline usage file, no longer tiers, emits no
+line mentioning context usage in any form, and no code path in it can produce a
+`decision` field at all. The dedup marker survives, narrowed to
+`{lastFingerprint}`, because it belongs to the surviving phase-suggestion
+feature rather than to the removed tiering.
+
+Replacement text for that entry:
+
+> "(6) Stop stop-suggest — reads manifest+state and suggests the next phase/gate
+> as a systemMessage, deduped against a session-keyed marker so an unchanged
+> suggestion does not re-fire every turn (live chatter finding, plan
+> 2026-07-07-retro-speed). It emits no decision of any kind and can never block:
+> the staged context-budget tiering it used to carry (warn/overdue/emergency
+> block, nag-cap, statusline usage read) was removed 2026-09-04 by PO decision —
+> its thresholds were calibrated for a 200k window, sessions now run a 1M window
+> with a one-hour prompt cache, and a forced compaction destroys the cached
+> prefix and loses in-flight working state."
+
+**Why this is not merely cosmetic.** This `$comment` is the only place the wiring
+of all nine hooks is described in one piece, and it is TP-4-protected precisely
+because it is load-bearing for a reader deciding what the guard family does. A
+comment that describes an emergency brake which no longer exists is the same
+defect class this repository has filed items about, in the one file an agent
+cannot correct without a signature.
+
+Nothing here blocks anything: the code is correct and its own header now carries
+the accurate description. This is a documentation debt with a known route,
+recorded so the window closes it rather than leaving it to be rediscovered.
