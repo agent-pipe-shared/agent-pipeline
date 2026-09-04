@@ -1,0 +1,49 @@
+command: node --test plugins/pipeline-core/scripts/capture-evidence.test.mjs
+label: NVA-B-REDFIX-2-green
+exitCode: 0
+--- stdout ---
+✔ redactText strips a plain-path occurrence and a file:// occurrence of the repo root, and a separate home-dir occurrence (3.084525ms)
+✔ formatArtifact matches the de facto backlog/evidence/ shape (0.548481ms)
+✔ captureEvidence: a failing command with the repo root in both plain and file:// form is fully redacted, and the exit code is recorded and preserved (54.268785ms)
+✔ captureEvidence: a passing command is captured with exit code 0 (52.853989ms)
+✔ captureEvidence: a command that writes nothing still produces a well-formed artifact with the recorded exit code (43.632715ms)
+✔ captureEvidence: a spawn failure (command not found) throws and writes no artifact -- never collapsed into a fabricated exit code (96.027463ms)
+✔ captureEvidence: a maxBuffer overflow throws (fails loudly) instead of writing a silently truncated artifact (52.473257ms)
+✔ findResidualHostPath: returns null when no covered shape is present (0.313796ms)
+✔ findResidualHostPath: catches a POSIX user-home path (0.433964ms)
+✔ findResidualHostPath: catches a macOS user-home path (4.438636ms)
+✔ findResidualHostPath: catches a Windows drive-letter path, backslash spelling (0.384059ms)
+✔ findResidualHostPath: catches a Windows drive-letter path, forward-slash spelling (0.29507ms)
+✔ findResidualHostPath: does NOT false-positive on an ordinary URL scheme like file:// or https:// (0.193488ms)
+✔ findResidualHostPath: catches a percent-encoded POSIX user-home path (AC-3, the mandatory half) when the literal /home/ separator never appears (0.263941ms)
+✔ captureEvidence: refuses to write when a surviving /home/ path is present -- no partial file, no empty file, no directory created (AC-1) (56.137317ms)
+✔ captureEvidence: refuses to write when a surviving Windows drive-letter path is present (AC-1, AC-2) (51.497454ms)
+✔ captureEvidence: the refusal error names the pattern and offset but never the offending path itself (AC-4) (50.470044ms)
+✔ findResidualHostPath: catches a percent-encoded Windows drive-letter path immediately after an encoded path separator (F4 false-negative repro) (0.406862ms)
+✔ findResidualHostPath: catches a percent-encoded macOS user-home path (AC-3, previously untested) (0.27891ms)
+✔ findResidualHostPath: the F4 fix does not reopen a false positive on a fully percent-encoded URL scheme (0.176565ms)
+✔ findRepoRoot: resolves the actual repository root for a cwd inside this checkout (6.100345ms)
+✔ findRepoRoot: throws a hard stop (never guesses) for a cwd outside any Git working tree (5.990161ms)
+✔ parseArgs: throws when the -- separator is absent (0.474701ms)
+✔ parseArgs: throws when no command follows -- (0.288338ms)
+✔ parseArgs: throws when --out is missing (0.297766ms)
+✔ parseArgs: throws when --label is missing (0.207845ms)
+✔ parseArgs: throws on an unrecognized flag (0.201222ms)
+✔ parseArgs: parses a valid invocation, and everything after -- is the command verbatim (including tokens that look like flags) (1.635264ms)
+✔ runCli (CLI process): the success line names the artifact path with the repo root redacted, never the absolute host path (F2) (134.274359ms)
+✔ runCli (CLI process): an fs error on the write path is redacted on stderr too, never the absolute host path (F2) (127.31585ms)
+✔ runCli (CLI process): an unrecognized-flag error carrying a covered-shape absolute path is never printed raw on stderr (F-A) (61.197092ms)
+✔ runCli (CLI process): an ordinary unrecognized-flag error with no embedded host path still surfaces its usual diagnostic detail (F-A, no-overreach guard) (60.593958ms)
+✔ runCli (CLI process): the success line refuses to print an --out path that resolves outside repoRoot/homeDir and matches a covered shape, but preserves the wrapped exit code (F-B) (132.598307ms)
+✔ runCli (CLI process): a filesystem error naming an out-of-root path matching a covered shape is never printed raw on stderr (F-B, error-channel backstop) (122.590822ms)
+✔ captureEvidence: a relative `out` resolves against the given `cwd`, not the implicit process.cwd() (F-E) (53.508853ms)
+ℹ tests 35
+ℹ suites 0
+ℹ pass 35
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1326.471196
+
+--- stderr ---

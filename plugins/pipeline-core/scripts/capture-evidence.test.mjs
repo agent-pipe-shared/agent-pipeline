@@ -409,3 +409,98 @@ test("runCli (CLI process): an fs error on the write path is redacted on stderr 
     rmSync(workDir, { recursive: true, force: true });
   }
 });
+
+// --- NVA-B-REDFIX-2 F-A: the argument-error channel (parseArgs' own catch in runCli) used to
+// write error.message raw, with no redaction and no backstop -- an unsupported flag spelling such
+// as `--out=<path>` interpolates the whole offending argv token into that message. ---
+
+test("runCli (CLI process): an unrecognized-flag error carrying a covered-shape absolute path is never printed raw on stderr (F-A)", () => {
+  const stray = syntheticHostPath("/home/");
+  const result = spawnSync(process.execPath, [CLI_PATH, `--out=${stray}`, "--label", "probe", "--", "node", "-v"], { encoding: "utf8" });
+  assert.equal(result.status, 1);
+  assert.ok(!result.stderr.includes(stray), "stderr must not leak the raw absolute host path from argv");
+  assert.match(result.stderr, /refused to print the argument error/);
+});
+
+test("runCli (CLI process): an ordinary unrecognized-flag error with no embedded host path still surfaces its usual diagnostic detail (F-A, no-overreach guard)", () => {
+  const result = spawnSync(process.execPath, [CLI_PATH, "--weird", "z", "--label", "probe", "--", "node", "-v"], { encoding: "utf8" });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /unrecognized flag --weird/, "an ordinary (non-leaking) parse error must still be shown, not swallowed by the new redaction path");
+});
+
+// --- NVA-B-REDFIX-2 F-B: the fail-closed backstop (findResidualHostPath) used to cover only the
+// artifact BODY written by captureEvidence -- every message runCli() prints on its own (the
+// success line and all three error paths) bypassed it, so an --out resolving outside both
+// repoRoot and homeDir (and matching a covered shape) rendered unredacted on the CLI channel. ---
+
+test("runCli (CLI process): the success line refuses to print an --out path that resolves outside repoRoot/homeDir and matches a covered shape, but preserves the wrapped exit code (F-B)", () => {
+  const repoDir = mkdtempSync(join(tmpdir(), "capture-evidence-fb-repo-"));
+  const outsideDir = mkdtempSync(join(tmpdir(), "capture-evidence-fb-outside-"));
+  try {
+    spawnSync("git", ["init"], { cwd: repoDir, encoding: "utf8" });
+    // Embeds a literal "/home/" segment inside an otherwise ordinary tmp path -- entirely
+    // synthetic, never a real host path, but shaped to match the posix-home backstop pattern
+    // while staying outside both repoRoot (repoDir) and the real process homeDir.
+    const outPath = join(outsideDir, "home", "nested", "evidence.txt");
+    const result = spawnSync(
+      process.execPath,
+      [CLI_PATH, "--out", outPath, "--label", "probe-fb-success", "--", "node", "-e", "console.log('ok'); process.exit(0);"],
+      { cwd: repoDir, encoding: "utf8" },
+    );
+    assert.equal(result.status, 0, "the wrapped command's own exit code must survive even when its path cannot be safely printed");
+    assert.ok(!result.stdout.includes(outPath), "stdout must not leak the raw out-of-root absolute path");
+    assert.match(result.stdout, /cannot be safely printed/);
+    assert.match(result.stdout, /wrapped exit code 0/);
+    assert.ok(existsSync(outPath), "the artifact must still have been written to disk -- only the PRINTED line is refused, not the write");
+  } finally {
+    rmSync(repoDir, { recursive: true, force: true });
+    rmSync(outsideDir, { recursive: true, force: true });
+  }
+});
+
+test("runCli (CLI process): a filesystem error naming an out-of-root path matching a covered shape is never printed raw on stderr (F-B, error-channel backstop)", () => {
+  const repoDir = mkdtempSync(join(tmpdir(), "capture-evidence-fb-repo-"));
+  const outsideDir = mkdtempSync(join(tmpdir(), "capture-evidence-fb-outside-"));
+  try {
+    spawnSync("git", ["init"], { cwd: repoDir, encoding: "utf8" });
+    // A FILE (not a directory) sitting where captureEvidence needs to mkdir a directory forces an
+    // ENOTDIR whose message names the failing absolute path -- again shaped with a literal
+    // "/home/" segment, outside both repoRoot and the real process homeDir.
+    const blockerPath = join(outsideDir, "home");
+    writeFileSync(blockerPath, "");
+    const outPath = join(blockerPath, "nested", "evidence.txt");
+    const result = spawnSync(
+      process.execPath,
+      [CLI_PATH, "--out", outPath, "--label", "probe-fb-error", "--", "node", "-e", "process.exit(0);"],
+      { cwd: repoDir, encoding: "utf8" },
+    );
+    assert.equal(result.status, 1);
+    assert.ok(!result.stderr.includes(outPath), "stderr must not leak the raw out-of-root absolute path");
+    assert.match(result.stderr, /refused to print the error/);
+  } finally {
+    rmSync(repoDir, { recursive: true, force: true });
+    rmSync(outsideDir, { recursive: true, force: true });
+  }
+});
+
+// --- NVA-B-REDFIX-2 F-E: captureEvidence() resolved `out` against the implicit process.cwd(),
+// ignoring its own `cwd` parameter -- a caller whose `cwd` differs from the running process's own
+// directory got a relative `out` silently placed in the wrong location. ---
+
+test("captureEvidence: a relative `out` resolves against the given `cwd`, not the implicit process.cwd() (F-E)", () => {
+  const workDir = mkdtempSync(join(tmpdir(), "capture-evidence-fe-cwd-"));
+  try {
+    const { out } = captureEvidence({
+      command: ["node", "-e", "console.log('ok'); process.exit(0);"],
+      label: "fe-relative-out",
+      out: "evidence.txt",
+      cwd: workDir,
+      repoRoot: syntheticRoot("repo"),
+      homeDir: syntheticRoot("home"),
+    });
+    assert.equal(out, join(workDir, "evidence.txt"), "a relative out must resolve against the caller's cwd, not process.cwd()");
+    assert.ok(existsSync(join(workDir, "evidence.txt")), "the artifact must land inside the caller's cwd");
+  } finally {
+    rmSync(workDir, { recursive: true, force: true });
+  }
+});

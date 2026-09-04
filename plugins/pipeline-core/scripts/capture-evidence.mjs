@@ -199,7 +199,14 @@ export function captureEvidence({
     );
   }
 
-  const resolvedOut = resolve(out);
+  // F-E (NVA-B-REDFIX-2): resolve `out` against the CALLER'S `cwd`, not the implicit
+  // `process.cwd()` -- `cwd` is an explicit, documented parameter of this function's call shape
+  // (spawnSync above already uses it), so a caller whose `cwd` differs from the running process's
+  // own directory previously got a silent divergence: the wrapped command ran in `cwd`, but a
+  // relative `out` landed relative to `process.cwd()` instead. `resolve(cwd, out)` is a no-op for
+  // an already-absolute `out` (every existing call site, including the CLI, passes one), so this
+  // only changes behavior for a relative `out` combined with a non-default `cwd`.
+  const resolvedOut = resolve(cwd, out);
   mkdirSync(dirname(resolvedOut), { recursive: true });
   writeFileSync(resolvedOut, artifactText);
 
@@ -234,40 +241,92 @@ export function parseArgs(argv) {
   return { out, label, command };
 }
 
-// F2 (NVA-B-REDFIX-1): captureEvidence() redacts the artifact BODY, but resolvedOut/error messages
-// on the CLI's own stdout/stderr are a separate channel this tool used not to touch -- exactly
-// the absolute-host-path leak this tool exists to prevent, one layer up, on the channel a dispatch
-// pastes verbatim into a report. repoRoot/homeDir are resolved once here (and handed to
-// captureEvidence explicitly) so both the success line and every error path redact against the
-// same values, instead of leaving a gap where captureEvidence's own internal resolution and this
-// function's redaction could silently disagree.
+/**
+ * Redact `text` against `repoRoot`/`homeDir`, then run the fail-closed backstop
+ * (`findResidualHostPath`) on the REDACTED result before it is allowed to reach a CLI output
+ * channel (F-B, NVA-B-REDFIX-2). `captureEvidence`'s backstop above only ever covered the
+ * artifact BODY written to disk -- every message this CLI prints on its own (three error paths,
+ * one success line) bypassed it entirely, so an `--out` resolving outside both `repoRoot` and
+ * `homeDir` (a second checkout under another account, a `homedir()` that differs from the one
+ * that produced a stray path, a symlink-resolved temp root) rendered a raw absolute host path on
+ * stdout/stderr with nothing to catch it -- `redactText` is a prefix-exact string replace (see
+ * its own header) and is silently incomplete on anything outside those two prefixes.
+ *
+ * Returns the redacted text when clean, or `null` when a residual host-path shape survives.
+ * `null`, never the offending text, mirrors `findResidualHostPath`'s own AC-4 contract: a caller
+ * building a fallback message names what happened, never repeats the leaking substring one layer
+ * up in its own fallback string.
+ */
+function redactedOrNull(text, repoRoot, homeDir) {
+  const redacted = redactText(text, repoRoot, homeDir);
+  return findResidualHostPath(redacted) ? null : redacted;
+}
+
+// F2 (NVA-B-REDFIX-1) + F-A/F-B (NVA-B-REDFIX-2): captureEvidence() redacts the artifact BODY, but
+// this CLI's own stdout/stderr are a separate channel -- exactly the absolute-host-path leak this
+// tool exists to prevent, one layer up, on the channel a dispatch pastes verbatim into a report.
+// repoRoot/homeDir are now resolved BEFORE parseArgs runs (F-A: parseArgs can itself throw, and
+// its message interpolates the raw argv token verbatim -- an unsupported flag spelling such as
+// `--out=<path>` puts a whole absolute path into that message, so this channel needs the same
+// treatment as the other two, not none at all; repoRoot is not known yet at this point, so this
+// path redacts against cwd, same as the findRepoRoot catch below already did). Every one of the
+// four write sites below now goes through `redactedOrNull`, applying BOTH `redactText` and the
+// `findResidualHostPath` backstop (F-B) -- never just the best-effort string replace alone.
+//
+// Design decision on a backstop hit: the exit-code contract (this file's header: "always the
+// WRAPPED command's own exit code... never masked") is preserved without exception in both
+// directions. The three error paths already set exitCode=1 regardless of message content, so a
+// hit there only swaps the message text, never the code. The success line is different: by the
+// time it runs, captureEvidence() has ALREADY written the artifact to disk, past its own
+// redaction-plus-backstop check on the artifact body -- refusing to PRINT this line is not the
+// same claim as refusing to TRUST that completed, already-checked write, and forcing exitCode=1
+// here would misreport a wrapped command that actually ran to completion as an internal tool
+// failure. So the success path keeps reporting the real wrapped exit code even when the artifact's
+// own path cannot be safely printed; the operator is told a file WAS written and what it reported,
+// just not exactly where, and can still locate it via the (redacted, known-safe) --out argument
+// they supplied on the command line.
 function runCli() {
+  const cwd = process.cwd();
+  const homeDir = homedir();
   let parsed;
   try {
     parsed = parseArgs(process.argv.slice(2));
   } catch (error) {
-    process.stderr.write(`${error.message}\n`);
+    const safe = redactedOrNull(error.message, cwd, homeDir);
+    process.stderr.write(
+      `${safe ?? "capture-evidence: refused to print the argument error -- it contains an absolute host path outside the redaction boundary. Re-run with a shorter --out value to diagnose."}\n`,
+    );
     process.exitCode = 1;
     return;
   }
-  const cwd = process.cwd();
-  const homeDir = homedir();
   let repoRoot;
   try {
     repoRoot = findRepoRoot(cwd);
   } catch (error) {
     // repoRoot is not known yet here -- redact against cwd (the closest stand-in) and homeDir.
-    process.stderr.write(`capture-evidence: ${redactText(error.message, cwd, homeDir)}\n`);
+    const safe = redactedOrNull(error.message, cwd, homeDir);
+    process.stderr.write(
+      `capture-evidence: ${safe ?? "refused to print the repository-root error -- it contains an absolute host path outside the redaction boundary."}\n`,
+    );
     process.exitCode = 1;
     return;
   }
   try {
     const { exitCode, out } = captureEvidence({ ...parsed, cwd, repoRoot, homeDir });
-    const reportedOut = redactText(out, repoRoot, homeDir);
-    process.stdout.write(`capture-evidence: wrote ${reportedOut} (wrapped exit code ${exitCode})\n`);
+    const safeOut = redactedOrNull(out, repoRoot, homeDir);
+    if (safeOut === null) {
+      process.stdout.write(
+        `capture-evidence: wrote the artifact (wrapped exit code ${exitCode}); its path cannot be safely printed -- it contains an absolute host path outside the redaction boundary.\n`,
+      );
+    } else {
+      process.stdout.write(`capture-evidence: wrote ${safeOut} (wrapped exit code ${exitCode})\n`);
+    }
     process.exitCode = exitCode;
   } catch (error) {
-    process.stderr.write(`capture-evidence: ${redactText(error.message, repoRoot, homeDir)}\n`);
+    const safe = redactedOrNull(error.message, repoRoot, homeDir);
+    process.stderr.write(
+      `capture-evidence: ${safe ?? "refused to print the error -- it contains an absolute host path outside the redaction boundary."}\n`,
+    );
     process.exitCode = 1;
   }
 }
