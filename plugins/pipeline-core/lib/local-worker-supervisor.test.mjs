@@ -151,6 +151,12 @@ function request(kind = "fixture") {
 function finalize(value, field) {
   const copy = structuredClone(value);
   delete copy[field];
+  // Mirrors unsignedDigest() in local-worker-supervisor.mjs: recordSha256 is
+  // the only digested shape carrying a `lease`, and that digest excludes
+  // lease.lastHeartbeatMonotonicMs (liveness, not identity or intent; fixed
+  // by NVA-B-LWSC04-1 / commit 91f9bc45). A fixture that hashed the full
+  // clone here would compute a recordSha256 the validator never accepts.
+  if (field === "recordSha256" && copy.lease && typeof copy.lease === "object") delete copy.lease.lastHeartbeatMonotonicMs;
   value[field] = localWorkerSupervisorSha256(copy);
   return value;
 }

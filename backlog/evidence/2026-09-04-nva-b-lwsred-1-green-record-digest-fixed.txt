@@ -1,0 +1,31 @@
+command: node --test plugins/pipeline-core/lib/local-worker-supervisor.test.mjs
+label: NVA-B-LWSRED-1 GREEN: local-worker-supervisor.test.mjs fixed
+exitCode: 0
+--- stdout ---
+PASS LWS01 accepts one closed request bound to pool, runner, instructions, Git, and recovery reserve
+PASS LWS02 rejects unknown fields, path escape, instruction drift, malformed runner, and missing Git identity
+PASS LWS03 builds only the fixed fixture launch with shell false and a bounded nonce environment
+PASS LWS04 builds a fixed Codex exec adapter without arbitrary argv, web, network, or interactive approval
+PASS LWS05 uses the host-boundary sandbox for real Codex worker dispatch, never workspace-write
+PASS LWS06 observes the live Linux owner with PID, start, boot, and executable digests
+PASS LWS07 validates closed terminal result and supervisor record digests
+PASS LWS08 keeps representable terminal result combinations in JSON Schema parity with runtime admission
+PASS LWS09 rejects unavailable or missing exact state rather than inferring recovery success
+PASS LWS10 canonical digest is key-order independent and sensitive to semantic drift
+PASS LWS11 validates a digest-bound cancellation intent and rejects a drifted nonce
+PASS LWS12 ships one closed JSON Schema for request, plan, record, result, and cancel
+PASS LWS13 keeps JSON Schema safe relative paths in parity with runtime admission
+PASS LWS14 combines structural Schema and canonical semantic admission over one request corpus
+PASS LWS15 pins observeRunner's Codex --version and --help probe argument vectors to the host-boundary sandbox
+15/15 checks passed.
+✔ plugins/pipeline-core/lib/local-worker-supervisor.test.mjs (963.543826ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 979.75631
+
+--- stderr ---

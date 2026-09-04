@@ -1,0 +1,50 @@
+command: node --test plugins/pipeline-core/lib/local-worker-supervisor.test.mjs
+label: NVA-B-LWSRED-1 RED: local-worker-supervisor.test.mjs LWS record digest mismatch
+exitCode: 1
+--- stdout ---
+PASS LWS01 accepts one closed request bound to pool, runner, instructions, Git, and recovery reserve
+PASS LWS02 rejects unknown fields, path escape, instruction drift, malformed runner, and missing Git identity
+PASS LWS03 builds only the fixed fixture launch with shell false and a bounded nonce environment
+PASS LWS04 builds a fixed Codex exec adapter without arbitrary argv, web, network, or interactive approval
+PASS LWS05 uses the host-boundary sandbox for real Codex worker dispatch, never workspace-write
+PASS LWS06 observes the live Linux owner with PID, start, boot, and executable digests
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+false !== true
+
+    at file://<repo-root>/plugins/pipeline-core/lib/local-worker-supervisor.test.mjs:349:10
+    at check (file://<repo-root>/plugins/pipeline-core/lib/local-worker-supervisor.test.mjs:226:3)
+    at file://<repo-root>/plugins/pipeline-core/lib/local-worker-supervisor.test.mjs:300:1
+    at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
+    at async node:internal/modules/esm/loader:643:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.19.0
+✖ plugins/pipeline-core/lib/local-worker-supervisor.test.mjs (1008.571049ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1025.815403
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/local-worker-supervisor.test.mjs:1:1
+✖ plugins/pipeline-core/lib/local-worker-supervisor.test.mjs (1008.571049ms)
+  'test failed'
+
+--- stderr ---
