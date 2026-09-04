@@ -4515,7 +4515,18 @@ test("NOVA-LCR-HGO-1: with nothing armed, the grammar denial names the mode-appr
   } finally { for (const entry of roots) rmSync(entry, { recursive: true, force: true }); }
 });
 
-test("NVA-GF-COPYSAFE: lifecycle denials default to bounded POSIX and PowerShell command blocks without an unsafe primary command or rendering prerequisite", () => {
+// NVA-B-DENIALBOILER-1: this test used to assert POSIX+PowerShell unconditionally for BOTH
+// modes. That was the pre-existing shape, not a deliberate "every step needs every platform"
+// requirement -- scratch/strip-boilerplate.md measured it as pure duplication cost. The code
+// now distinguishes a determined shell (an in-session step, re-run through the SAME tool
+// that produced this denial -- here always Bash, via bash()) from a genuinely unknown one
+// (authorize-by-signature, which a human runs later on a machine this code never observes).
+// Chat mode has no out-of-session step at all (its `authorize` also runs in-session, per the
+// "the human confirms in-session" label), so chat mode's denial now carries POSIX only, with
+// no reconstruction: PowerShell was never computed away, it was never the determined answer
+// for this mode in the first place. Signature mode keeps both, for authorize-by-signature
+// alone -- that assertion is unchanged from before.
+test("NVA-GF-COPYSAFE: lifecycle denials default to a bounded, platform-determined command block without an unsafe primary command or rendering prerequisite", () => {
   const roots = [];
   try {
     const command = "rg -n lifecycle . && touch output.txt";
@@ -4525,9 +4536,20 @@ test("NVA-GF-COPYSAFE: lifecycle denials default to bounded POSIX and PowerShell
       const result = evaluateLifecycleReadyGuard(bash(command), { projectDir: projectRoot });
       assert.equal(result.exitCode, 2);
       assert.match(result.stderr, /Step: plan\nPOSIX:/u);
-      assert.match(result.stderr, /PowerShell:/u);
       assert.match(result.stderr, /eval "\$CMD"/u);
-      assert.match(result.stderr, /Invoke-Expression \$CMD/u);
+      if (mode === "signature") {
+        // Only authorize-by-signature is out-of-session; it alone keeps both renderings.
+        assert.match(result.stderr, /Step: authorize-by-signature\nPOSIX:/u);
+        assert.match(result.stderr, /PowerShell:/u);
+        assert.match(result.stderr, /Invoke-Expression \$CMD/u);
+      } else {
+        // Chat mode: every step (plan/prepare-authorization/authorize) runs in-session
+        // through the same Bash tool that produced this denial -- POSIX is determined, and
+        // no step ever reaches the "outside this session" label that would justify a second
+        // platform.
+        assert.doesNotMatch(result.stderr, /PowerShell:/u);
+        assert.doesNotMatch(result.stderr, /Invoke-Expression \$CMD/u);
+      }
       assert.doesNotMatch(result.stderr, /available on demand|render-copy-safe/u);
       assert.doesNotMatch(
         result.stderr,
@@ -4539,6 +4561,27 @@ test("NVA-GF-COPYSAFE: lifecycle denials default to bounded POSIX and PowerShell
       assert.ok(commandLines.length > 10, result.stderr);
       assert.equal(commandLines.every((line) => line.length <= 72), true, commandLines.join("\n"));
     }
+  } finally { for (const entry of roots) rmSync(entry, { recursive: true, force: true }); }
+});
+
+// NVA-B-DENIALBOILER-1: each remediation command appears exactly ONCE in a denial whose
+// ceremony steps are all in-session (chat mode) -- the DoD's own measured claim, pinned as a
+// regression guard rather than left to the prose assertions above alone.
+test("NVA-B-DENIALBOILER-1: chat-mode denial renders each of its three ceremony commands exactly once", () => {
+  const roots = [];
+  try {
+    const command = "rg -n lifecycle . && touch output.txt";
+    const projectRoot = hgoGitFixture("chat");
+    roots.push(projectRoot);
+    const result = evaluateLifecycleReadyGuard(bash(command), { projectDir: projectRoot });
+    assert.equal(result.exitCode, 2);
+    for (const label of ["Step: plan", "Step: prepare-authorization", "Step: authorize\n"]) {
+      const first = result.stderr.indexOf(label);
+      assert.notEqual(first, -1, `${label} missing`);
+      const second = result.stderr.indexOf(label, first + 1);
+      assert.equal(second, -1, `${label} appeared more than once`);
+    }
+    assert.doesNotMatch(result.stderr, /cmd\.exe:/u);
   } finally { for (const entry of roots) rmSync(entry, { recursive: true, force: true }); }
 });
 

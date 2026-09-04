@@ -309,10 +309,30 @@ export function boundedCopySafeCommand({ executable, argv, forceCopyCommand = fa
  * PowerShell blocks and emits cmd.exe only when the exact argv is representable
  * without cmd-specific ambiguity. The unbounded `command` remains available to
  * machine consumers but is deliberately absent from `text`.
+ *
+ * NVA-B-DENIALBOILER-1 (backlog/items/2026-08-29-guard-denial-messages-repeat-70-lines-of-
+ * boilerplate.md): optional, additive `platform` narrows `text` to exactly ONE rendering --
+ * "posix" keeps only the POSIX block, "powershell" keeps only the PowerShell block, and
+ * NEITHER is reconstructed from the other: `boundedCopySafeCommand()` still computes all
+ * three forms exactly as before (posix/powershell/cmd), this function only SELECTS which of
+ * the already-computed, byte-identical blocks to include. cmd.exe is never emitted with an
+ * explicit `platform` -- it is a bonus third rendering, not a platform this parameter names.
+ * A caller that never passes `platform` (every pre-existing caller) gets byte-identical
+ * output to before this parameter existed -- this is the load-bearing compatibility
+ * guarantee that keeps every other emitter's own pinned test suite green untouched.
+ * `platform` exists precisely because the reader for a given command line is sometimes
+ * knowable at render time (an in-session ceremony step re-run through the SAME tool that
+ * produced the denial -- see guard-lifecycle-ready.mjs's `inSessionPlatform`) and sometimes
+ * is not (a step a human runs later, outside this session, on a machine this code never
+ * observes) -- the caller decides which case it is in per command, this function never
+ * guesses.
  */
-export function renderHumanCopySafeCommand({ label, executable, argv } = {}) {
+export function renderHumanCopySafeCommand({ label, executable, argv, platform } = {}) {
   if (typeof label !== "string" || label.length === 0 || /[\r\n]/u.test(label)) {
     throw new TypeError("renderHumanCopySafeCommand requires a non-empty single-line label");
+  }
+  if (platform !== undefined && platform !== "posix" && platform !== "powershell") {
+    throw new TypeError('renderHumanCopySafeCommand platform must be "posix", "powershell", or omitted');
   }
   const built = boundedCopySafeCommand({ executable, argv, forceCopyCommand: true });
   const { copyCommand } = built;
@@ -323,8 +343,12 @@ export function renderHumanCopySafeCommand({ label, executable, argv } = {}) {
   if (copyCommand.posix === null || copyCommand.powershell === null) {
     throw new TypeError("copy-safe command could not be rendered for POSIX and PowerShell");
   }
-  const sections = [heading, "POSIX:", copyCommand.posix, "PowerShell:", copyCommand.powershell];
-  if (copyCommand.cmd !== null) sections.push("cmd.exe:", copyCommand.cmd);
+  const sections = platform === "posix"
+    ? [heading, "POSIX:", copyCommand.posix]
+    : platform === "powershell"
+      ? [heading, "PowerShell:", copyCommand.powershell]
+      : [heading, "POSIX:", copyCommand.posix, "PowerShell:", copyCommand.powershell];
+  if (platform === undefined && copyCommand.cmd !== null) sections.push("cmd.exe:", copyCommand.cmd);
   const text = sections.join("\n");
   if (!text.split(/\r?\n/u).every((line) => line.length <= copyCommand.maxColumns)) {
     throw new TypeError("copy-safe command text exceeds the shared column bound");

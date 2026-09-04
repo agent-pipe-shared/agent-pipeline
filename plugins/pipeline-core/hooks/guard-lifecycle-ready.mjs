@@ -612,7 +612,21 @@ function humanOverrideRoute(code, reason, subject, root, toolName, toolInput, de
         // JSON.stringify() wrapping is harmless but no longer changes the
         // rendered shape -- kept only so a future path containing a shell-special
         // character still round-trips through shellWord() correctly.
-        const ceremonyCommand = (label, subcommand, ...extraArgv) =>
+        // NVA-B-DENIALBOILER-1: every step below except authorize-by-signature is labelled
+        // "in this session" (or, for chat mode, "the human confirms in-session") -- it runs
+        // through the SAME tool that produced this very denial, so that tool's dialect is
+        // determined, not guessed: the PowerShell tool renders PowerShell, anything else
+        // (including Edit/Write/NotebookEdit, which never runs a shell command itself but
+        // whose remediation still runs through this session's own Bash-equivalent tool)
+        // renders POSIX -- mirroring CLAUDE_BASH_SHELL_DIALECT_PLATFORM above ("Claude's Bash
+        // tool always executes through Git-Bash/POSIX, on every host including Windows").
+        // authorize-by-signature runs OUTSIDE this session, on a human's own machine this
+        // code never observes -- no signal here determines its shell, so it alone keeps the
+        // full POSIX+PowerShell rendering (platform omitted below); this is deliberate and
+        // load-bearing, not an oversight (see scratch/strip-boilerplate.md's own stop
+        // condition for this exact case).
+        const inSessionPlatform = toolName === "PowerShell" ? "powershell" : "posix";
+        const ceremonyCommand = (label, subcommand, platform, ...extraArgv) =>
           renderHumanCopySafeCommand({
             label,
             executable: process.execPath,
@@ -620,21 +634,22 @@ function humanOverrideRoute(code, reason, subject, root, toolName, toolInput, de
               placeholder(JSON.stringify(script)), subcommand, "--repo", placeholder(JSON.stringify(root)),
               "--request-sha256", planned.requestSha256, ...extraArgv,
             ],
+            platform,
           });
-        const planCommand = ceremonyCommand("plan", "plan");
+        const planCommand = ceremonyCommand("plan", "plan", inSessionPlatform);
         const prepareAuthorizationChat = ceremonyCommand(
-          "prepare-authorization", "prepare-authorization", "--plan-sha256", placeholder("<plan-sha256-from-plan>"), "--reason", placeholder('"<human-reason>"'),
+          "prepare-authorization", "prepare-authorization", inSessionPlatform, "--plan-sha256", placeholder("<plan-sha256-from-plan>"), "--reason", placeholder('"<human-reason>"'),
         );
         const authorizeChat = ceremonyCommand(
-          "authorize", "authorize", "--plan-sha256", placeholder("<plan-sha256>"), "--selection-sha256", placeholder("<selection-sha256>"),
+          "authorize", "authorize", inSessionPlatform, "--plan-sha256", placeholder("<plan-sha256>"), "--selection-sha256", placeholder("<selection-sha256>"),
           "--reason", placeholder('"<human-reason>"'), "--reason-sha256", placeholder("<reason-sha256>"), "--activate",
         );
         const prepareAuthorizationSignature = ceremonyCommand(
-          "prepare-authorization", "prepare-authorization", "--plan-sha256", placeholder("<plan-sha256-from-plan>"), "--reason", placeholder('"<fixed HGO_SIGNATURE_REASON text>"'),
+          "prepare-authorization", "prepare-authorization", inSessionPlatform, "--plan-sha256", placeholder("<plan-sha256-from-plan>"), "--reason", placeholder('"<fixed HGO_SIGNATURE_REASON text>"'),
         );
-        const emitSignatureDigest = ceremonyCommand("emit-signature-digest", "emit-signature-digest", "--plan-sha256", placeholder("<plan-sha256>"));
+        const emitSignatureDigest = ceremonyCommand("emit-signature-digest", "emit-signature-digest", inSessionPlatform, "--plan-sha256", placeholder("<plan-sha256>"));
         const authorizeBySignature = ceremonyCommand(
-          "authorize-by-signature", "authorize-by-signature", "--plan-sha256", placeholder("<plan-sha256>"), "--proof", placeholder("<external-proof.json>"),
+          "authorize-by-signature", "authorize-by-signature", undefined, "--plan-sha256", placeholder("<plan-sha256>"), "--proof", placeholder("<external-proof.json>"),
         );
         // ADR-0059 Decision 4: name the exact next command for the CURRENTLY CONFIGURED
         // mode -- mirrors guard-testpath.mjs's own continuation exactly in shape.
