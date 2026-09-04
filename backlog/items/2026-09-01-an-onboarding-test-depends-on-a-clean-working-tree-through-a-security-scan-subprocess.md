@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.an-onboarding-test-depends-on-a-clean-working-tree-through-a-security-scan-subprocess
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-04
+closure_repository: self
+closure_commit: 08d4eb85d43aecd50c64f8d56470d354e8681754
+closure_evidence: backlog/evidence/2026-09-04-nva-onboarding-cleantree-triage.md
 created: 2026-09-01
 sprint: nova-b
 done_when: manual
@@ -91,3 +95,14 @@ hypothesis did not hold against direct measurement, and no residual defect
 is proposed), moving `status:` to `closed` with the rationale recorded in its
 own `## Triage` section at that time — this item does not pre-empt that
 decision by setting `closed` itself.
+
+## Triage
+
+- **Decision:** rejected. Per `backlog/README.md`'s Triage rules there is no
+  `status: rejected` value in the ledger enum; a reject moves `status:` to
+  `closed`, exactly as this item's own Recommendation asked for.
+- **Rationale:** the hypothesis this item was filed to test did not hold
+  against direct live measurement, and no residual defect is proposed in its
+  place. Nothing to fix. Verification is in
+  `backlog/evidence/2026-09-04-nva-onboarding-cleantree-triage.md`.
+- **Date:** 2026-09-04
