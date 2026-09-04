@@ -194,11 +194,48 @@ later Critic round the source item's own acceptance criteria call for.
 
 ## Confirmed satisfiable by reading the current implementation
 
-*(Not yet performed. R1–R4 above are the complete, self-contained
-requirement, drafted and committed before the implementation was opened. This
-section is added in a follow-up edit, after that commit, once the
-implementation and its test are read for a satisfiability check only — no AC
-above will be written or altered because of what that check finds.)*
+*(Added in a follow-up edit after the requirement above was drafted and
+committed at `32213a0a`. `harness/scripts/print-verify-failures.mjs` was read
+at this point for the first time in this dispatch; its test file was not
+opened, since the main script already answers the one question this section
+exists to answer — is R1–R4 achievable in principle, not "does the current
+code already pass it." No AC above was written or altered by this reading.)*
+
+**Achievable, yes — but the current implementation's architecture is the
+opposite shape from R1/AC4's default-deny model, which is exactly the kind of
+gap a requirement written from the problem is supposed to surface, not
+paper over.** The script redacts four specific credential *shapes*
+(`ghp_`/`gho_`/etc. GitHub tokens, `github_pat_` tokens, AWS `AKIA` keys, and
+PEM private-key blocks) out of an otherwise-unfiltered suite-log tail, and
+emits everything else that survives its byte/line bounds — including, by
+construction, absolute filesystem paths, email addresses, and any other
+value a suite happened to print. That is a **blocklist** (emit by default,
+strip four known-bad shapes) where AC1–AC4 specify an **allowlist** (withhold
+by default, emit only classified-safe fields). Nothing about that makes
+AC1–AC11 unachievable — a default-deny redesign is a real, buildable change,
+not a contradiction in terms — but it does mean the current implementation
+would not, as it stands, satisfy AC2 (machine-identifying paths), AC3
+(personal identifiers), or AC4/AC7 (default-withhold on anything
+unclassified) if checked against them today. That gap is exactly what the
+forthcoming Critic round is for; this section names it as an observation for
+that round to weigh, not as a finding this dispatch is authorized to act on
+(briefing NVA-B-CIREPSPEC-1, field 4: no edits to the reporter or its test).
+
+One further concrete point worth flagging for that Critic round specifically:
+the top-level `catch` at the CLI entrypoint
+(`print-verify-failures.mjs:446-450`) prints `error.message` (truncated to
+200 characters) directly to `console.log`, with no pass through `redactText`
+first. An exception message is exactly the kind of unclassified value AC1/
+AC9 are about, and this path bypasses the script's own redaction function
+entirely — worth the Critic round's attention against AC1/AC9 specifically.
+
+AC5/AC6 (positive allow-list, same classification for excerpts), AC10 (does
+not gate — the script always exits 0, degrading every failure mode to one
+diagnostic line, matching AC10 exactly), and AC9/AC11's "never throws, always
+degrades to a bounded diagnostic line" framing are all already structurally
+present in the current code's design intent, even though AC9's specific
+"exception path must not skip redaction" requirement is not, per the point
+above.
 
 ## Follow-up
 
