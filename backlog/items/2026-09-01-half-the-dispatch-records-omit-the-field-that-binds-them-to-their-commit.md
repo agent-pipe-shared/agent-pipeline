@@ -139,3 +139,44 @@ eight instances — is still seen here, where git itself sees nothing; and body
 prose merely mentioning `Dispatch:` would be accepted. This is pre-existing
 behaviour, not introduced by that commit, and changing it would alter an existing
 finding class, which the briefing forbade. It stays open as a follow-up.
+
+## Progress note, 2026-09-04 — dispatched, nothing to build, and why it stays open
+
+NVA-B-RECBIND-1 was dispatched against this item and **made no change, correctly**.
+It is recorded here so the next session does not spend a second run rediscovering
+the same thing — the stale-premise cost this repository has already measured three
+times in one block.
+
+**Direction 1 is implemented.** The record-shape checker landed as `1c2425f1`
+(NVA-B-RECSHAPE-1, 2026-09-03). What remains is its graduation to fatal, and that
+is blocked — not on effort, but on
+`backlog/items/2026-09-01-fourteen-evidence-files-are-tracked-inside-a-gitignored-directory.md`:
+a checker cannot be made fatal against a corpus that lives in a gitignored
+directory, because the corpus a gate sees is not the corpus anyone else has. That
+dependency was already stated in this item and is confirmed live.
+
+**The stated proportion no longer holds, in the good direction.** "Roughly half"
+was the original figure; measured against the live corpus on 2026-09-04,
+**49 of 65 records (75%) carry `report.changedFiles`**. The figure moved because
+`evidence/` is gitignored, so no two checkouts share a corpus — which is the same
+property that blocks graduation, seen from the other side.
+
+**One thing the dispatcher raised and that turned out not to be a defect.** The
+briefing pointed at an asymmetry in `dispatch-authorship-verify.mjs`: a record
+omitting `agentType` entirely scores PASS, while one declaring `agentType` without
+`effort` is downgraded to FAIL as `model-mismatch` — omitting more information
+scoring better than omitting less. Both halves are deliberate and documented in
+canon, in two separate places:
+
+- `plugins/pipeline-core/lib/agent-model-registry.mjs`, `CORPUS COMPATIBILITY`
+  docstring: every record predating the mechanism has no `agentType`, so its
+  absence is silent by design, never a mismatch.
+- `templates/prompts/goldfish-task.md` field 6: `effort` is not optional once
+  `agentType` is declared, with the empirical confirmation named.
+
+It also barely bites: of 50 records carrying `agentType`, 3 lack `effort`. Recorded
+as answered so it is not re-raised as a finding. It belongs to dimension 4
+(record↔agent-definition), not to this item's dimension 1/3 (record↔commit).
+
+**Status: open, blocked on the gitignored-corpus item.** Not a candidate for a
+dispatch until that one moves.

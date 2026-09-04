@@ -153,3 +153,42 @@ is the concrete version of that risk — a five-minute wildcard move nearly did
 exactly this by accident. This item exists so the fix is deliberate, briefed,
 and re-verified rather than done in the margins of an unrelated release
 cleanup.
+
+## Progress, 2026-09-04 — four resolved, four correctly excluded, six genuinely open
+
+NVA-B-TRACKEV-1 worked this item file by file, as it insisted on being worked.
+Commit `43434158`.
+
+**Four untracked, none deleted.** The three `NVA-R18-SCANBOOT-*.txt` captures and
+`cb-1a-measurement.md` carry no `closure_evidence` citation, are not dispatch
+records, and no ADR-0063 carve-out reaches them. They were removed from the index
+with `git rm --cached` and remain on disk — confirmed present afterwards. That is
+the ADR-0063 "Evidence, machine-regenerated" row applied literally.
+
+**Four left tracked, deliberately.** The dispatch records for `NVA-BL-24`, `-25`,
+`-28` and `-32` are cited as `closure_evidence` by closed items. ADR-0063's own
+carve-out keeps them at `evidence/`, and a citation the backlog checker enforces
+requires the file to be tracked. Untracking them would break a closed item's
+citation — the exact accident this item was filed to prevent.
+
+**Six are a genuine open design question, and the dispatch stopped rather than
+guess.** `NVA-B-SCANNER`, `NVA-GF-PREPUSH`, `NVA-GF-SCRATCH`, `NVA-GF-TWINDRIFT`,
+`NVA-J-PROFILERECEIPT` and `NVA-R18-SCANBOOT` are dispatch records that carry no
+`closure_evidence` citation but are each referenced by a `Dispatch: <TASK_ID>
+(goldfish)` trailer on a substantive commit. ADR-0063's carve-out settles where
+they live and explicitly declines to settle whether they are tracked.
+
+So the question is real and it is not a dispatch's to answer: **is a commit's
+`Dispatch:` trailer a citation?** If it is, these six must stay tracked for the
+same reason the other four do, and the carve-out needs widening to say so. If it
+is not, they can be untracked and the trailer's binding rests on the commit alone.
+Answering it needs an ADR-level decision.
+
+**This item stays open on those six.** It is also the blocker on
+`backlog/items/2026-09-01-half-the-dispatch-records-omit-the-field-that-binds-them-to-their-commit.md`,
+whose record-shape checker cannot be made fatal while the corpus it checks lives
+in a directory no two checkouts share — so the two move together, and this one
+moves first.
+
+`node plugins/pipeline-core/scripts/check-backlog-state.mjs` still ends "valid."
+after the change, with only pre-existing unrelated DRIFT warnings.
