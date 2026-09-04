@@ -130,3 +130,35 @@ unregistered (committed at `327db477`, unrelated to this dispatch,
 `plugins/pipeline-core/scripts/capture-evidence.mjs` itself was mid-edit by a
 concurrent dispatch in the same checkout at measurement time). Left for whoever
 owns that file to add its own line; not measured or verified here.
+
+## Addendum (NVA-B-REDCAPTURE-1, 2026-09-04) — the third and last line for this window
+
+This is the line the addendum above left for its owner. Same TP-3 wall, same
+maintenance window, same reason it is a separate block rather than an edit to
+the "exact change" section: that section's anchor stays a precise, directly
+appliable diff.
+
+```js
+  { name: "capture-evidence-tests", file: join(pluginScriptsDir, "capture-evidence.test.mjs") },
+```
+
+Note the binding differs from the `pre-gate-tests` line above and that is not a
+typo: `pre-gate.test.mjs` lives in `harness/scripts/`, so it uses `scriptDir`,
+while `capture-evidence.test.mjs` lives in `plugins/pipeline-core/scripts/` and
+uses `pluginScriptsDir`. Both bindings exist in `verify.mjs` (lines 68 and 76,
+read 2026-09-04). Name checked for collisions the same day:
+`rg -n 'capture-evidence' harness/scripts/verify.mjs` returned no hits.
+
+**Why all three lines belong to one window.** A live `node harness/scripts/pre-gate.mjs`
+run on 2026-09-04 reported exactly two unregistered suites — `pre-gate.test.mjs`
+and `capture-evidence.test.mjs` — alongside four honoured exclusions, zero
+malformed and zero expired, and exited 1 on that cause alone with its other five
+checks green (total 4147 ms). So these two lines plus the `verify.mjs` promotion
+of the detector in the "exact change" block are the complete set: applying all
+three in one ceremony takes the pre-gate from a red exit to a clean one, and
+applying any subset leaves it red.
+
+That run is also the item's own thesis demonstrated on itself. The
+suite-registration check found, in 95 ms, an obligation created elsewhere by the
+very deliverable it was checking — the kind of omission that otherwise surfaces
+only after the full ~13-minute gate, if it surfaces at all.
