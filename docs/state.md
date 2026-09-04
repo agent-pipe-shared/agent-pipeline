@@ -315,8 +315,15 @@ covers only one contiguous region.
   // new:
   console.log(`\nEvidence written: ${evidencePath} (run record: ${runEvidencePath})`);
   ```
-- **Block E is drafted, not yet seeded.** Registers the new suite in
-  `TEST_SUITES`:
+- **Block E is drafted, not yet seeded.** Registers two new suites in the
+  same `TEST_SUITES` array (confirmed one contiguous array, lines 199-765 —
+  merged 2026-09-04 from a separate Block F to save a PO passphrase entry,
+  since array order is confirmed irrelevant to `duplicateSuiteIds`/
+  `check-verify-suite-registration.mjs`): `verify-evidence-writer.test.mjs`
+  (the runId wiring, Blocks A-C) and `dispatch-record-strip-for-critic.test.mjs`
+  (a Critic finding, F2, on the unrelated `NVA-B-CRITICINPUT-1/2` package —
+  its rework dispatch correctly stopped at this same TP-3 boundary rather
+  than route around it):
   ```js
   // old:
     { name: "pre-gate-tests", file: join(scriptDir, "pre-gate.test.mjs") },
@@ -326,27 +333,18 @@ covers only one contiguous region.
     { name: "pre-gate-tests", file: join(scriptDir, "pre-gate.test.mjs") },
     { name: "capture-evidence-tests", file: join(pluginScriptsDir, "capture-evidence.test.mjs") },
     { name: "verify-evidence-writer-tests", file: join(scriptDir, "verify-evidence-writer.test.mjs") },
+    { name: "dispatch-record-strip-for-critic-tests", file: join(libDir, "dispatch-record-strip-for-critic.test.mjs") },
   ];
   ```
-- **Block F is drafted, not yet seeded — added 2026-09-04, unrelated to the
-  evidence-slot fix.** A Critic finding (F2) on a separate package
-  (`NVA-B-CRITICINPUT-1/2`, `plugins/pipeline-core/lib/dispatch-record-strip-for-critic.mjs`)
-  found its test suite unregistered here; the rework dispatch correctly
-  stopped rather than route around TP-3. Registers
-  `dispatch-record-strip-for-critic.test.mjs`:
-  ```js
-  // old:
-  { name: "backlog-dispatch-reference-tests", file: join(libDir, "backlog-dispatch-reference.test.mjs") },
-  // new:
-  { name: "backlog-dispatch-reference-tests", file: join(libDir, "backlog-dispatch-reference.test.mjs") },
-  { name: "dispatch-record-strip-for-critic-tests", file: join(libDir, "dispatch-record-strip-for-critic.test.mjs") },
-  ```
-  Package (commits `a5e264a8`, `fa8362a2`, `00036dcf`, `d2fb4495`, `4e204dae`)
-  is one correction commit into its one allowed rework round
-  (`harness/review-protocol.md`) — F1/F3/F4 fixed and re-verified; F2 needs
-  Block F landed before the remaining fresh re-Critic round runs.
+  `NVA-B-CRITICINPUT-1/2` (commits `a5e264a8`, `fa8362a2`, `00036dcf`,
+  `d2fb4495`, `4e204dae`) is one correction commit into its one allowed
+  rework round (`harness/review-protocol.md`) — F1/F3/F4 fixed and
+  re-verified; F2 needs this registration landed before the remaining
+  fresh re-Critic round runs. Neutral findings registry for that round:
+  `backlog/evidence/2026-09-04-nva-b-criticinput-findings.md`.
 
-Tree is clean at `4e204dae` with no outstanding ceremony. After C/D/E/F land:
+Tree is clean at `4e204dae` (or later — check `git rev-parse HEAD`) with no
+outstanding ceremony. After C/D/E land:
 `node --test harness/scripts/verify-evidence-writer.test.mjs`, then a full
 `node harness/scripts/verify.mjs` run bound to the final HEAD, then close the
 2026-08-12 backlog item above.
