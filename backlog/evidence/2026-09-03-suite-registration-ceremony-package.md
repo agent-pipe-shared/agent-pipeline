@@ -209,3 +209,46 @@ cannot correct without a signature.
 Nothing here blocks anything: the code is correct and its own header now carries
 the accurate description. This is a documentation debt with a known route,
 recorded so the window closes it rather than leaving it to be rediscovered.
+
+## Addendum (NVA-B-EVSLOT-1, 2026-09-04) — a second TP-3 change, this one behavioural
+
+Unlike the three registration lines above, this is not a list entry. It changes
+what `harness/scripts/verify.mjs` does, and it is recorded here because it needs
+the same signature window and would otherwise have no home.
+
+**The defect, reproduced rather than argued.** `evidence/verify-latest.json` is a
+single slot written by `writeEvidence()` as a bare `mkdirSync` + `writeFileSync`
+— no run identity, no lock, no compare-and-swap. `verify.mjs`'s own header says
+so: "ONE canonical path, overwritten each run — no registry (#2 CUT)." Two
+concurrent runs therefore race, and the slower writer wins regardless of which
+run the reader thinks it is looking at.
+
+NVA-B-EVSLOT-1 built a bounded synthetic repro — two real child processes
+performing that exact write shape against a scratch fixture — and it reproduces:
+writer A exits 0 while the shared slot ends up holding writer B's commit. RED
+capture: `backlog/evidence/2026-09-04-nva-b-evslot-1-repro-red.txt`.
+
+**A forensic scan bounds how often it has actually bitten.** Of the four real
+`verify.mjs` runs recorded under `.git/agent-pipeline/verify/runs/` for
+2026-09-04, none overlapped in wall-clock time — they read as sequential, one
+interrupted mid-flight. So the defect is live by construction but was not hit
+today. Scan: `backlog/evidence/2026-09-04-nva-b-evslot-1-forensic-scan.txt`.
+
+**What it does not endanger, established by grep rather than assumed.** The only
+real consumers are `guard-push.mjs` and `push-prepare.mjs`, and both re-check
+`commit` against the actual target on read. So a raced slot does not slip a stale
+verdict past the push gate; the cost is a dispatcher trusting the file mid-run
+and reading another run's result. That bounds the severity — it is confusing and
+wasteful, not a security hole — and it is the reason this sits in a maintenance
+window rather than demanding an urgent ceremony of its own.
+
+**The exact change, narrowed from the item's candidate 1.** At both
+`writeEvidence()` call sites, write `evidence/verify-<runId>.json` using a
+per-run id — one is already available as `runVerifyJournal`'s default `runId`
+parameter — and perform the write atomically as temp-file-plus-rename, matching
+`verify-journal.mjs`'s own `atomicJson` helper rather than inventing a second
+mechanism. `evidence/verify-latest.json` keeps its schema unchanged.
+
+The dispatch that established all of the above changed nothing in `verify.mjs`
+and stopped at the protected boundary, which is why the change is described here
+instead of applied.

@@ -90,3 +90,57 @@ Not designed here. Candidates worth considering, not a commitment:
   defect in front of anyone today.
 - **Assignment (if accepted):** next available Alfred slot, unassigned.
 - **Date:** 2026-08-17
+
+## Progress, 2026-09-04 — reproduced, severity bounded, blocked on TP-3
+
+NVA-B-EVSLOT-1 was dispatched against this item under a reproduce-first
+instruction. It reproduced the defect, bounded its severity, and then stopped at
+the protected boundary without changing `verify.mjs`. Commit `d27edb7a` carries
+the evidence only.
+
+**Reproduced.** A bounded synthetic repro — two real child processes performing
+`writeEvidence()`'s exact write shape against a scratch fixture — ends with the
+shared slot holding writer B's commit while writer A's own process has already
+exited 0. RED capture:
+`backlog/evidence/2026-09-04-nva-b-evslot-1-repro-red.txt`.
+
+The premise is confirmed at source rather than inferred: `writeEvidence()` is a
+bare `mkdirSync` + `writeFileSync` with no run identity, no lock and no
+compare-and-swap, and `verify.mjs`'s own header states the design outright —
+"ONE canonical path, overwritten each run — no registry (#2 CUT)".
+
+**How often it has actually bitten, measured.** Four real `verify.mjs` runs are
+recorded under `.git/agent-pipeline/verify/runs/` for 2026-09-04. None overlap
+in wall-clock time; they read as sequential with one interrupted mid-flight. So
+the defect is live by construction and was not hit today. That is a bound, not
+an all-clear. Scan:
+`backlog/evidence/2026-09-04-nva-b-evslot-1-forensic-scan.txt`.
+
+**What it does not endanger, established by grep.** The only real consumers are
+`guard-push.mjs` and `push-prepare.mjs`, and both re-check `commit` against the
+actual target when they read. A raced slot therefore cannot slip a stale verdict
+past the push gate. The cost is a dispatcher trusting the file mid-run and
+reading another run's result — confusing and wasteful, not a security hole.
+
+That bound matters for triage: this stays infrastructure hardening rather than
+becoming urgent, which is what the 2026-08-17 decision above already assumed
+without yet having the measurement.
+
+**Blocked on TP-3, with the exact change recorded.** `verify.mjs` is the sole
+owner of the single-slot write and is protected with no in-session override.
+`verify-journal.mjs` was read and is *not* the corrupted layer — it already
+isolates per-suite evidence under unique-runId private directories.
+
+The narrowed change is staged in
+`backlog/evidence/2026-09-03-suite-registration-ceremony-package.md` for the same
+signature window as the three registration lines and the `hooks.json` comment:
+write `evidence/verify-<runId>.json` at both `writeEvidence()` call sites using
+the run id already available as `runVerifyJournal`'s default `runId`, with an
+atomic temp-file-plus-rename write matching `verify-journal.mjs`'s own
+`atomicJson` rather than a second mechanism, leaving
+`evidence/verify-latest.json`'s schema unchanged.
+
+**One unrelated finding, recorded rather than dropped:** a TOCTOU
+check-then-write on `listActiveSessionDescriptors` in
+`establishSessionLessCleanupBinding`. Outside this item's scope, not filed
+separately yet.
