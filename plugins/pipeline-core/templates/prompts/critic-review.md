@@ -79,9 +79,8 @@ USAGE (Elephant)
    `evidence/dispatch-record-*.json` path — for the same underlying reason as
    the backlog-item rule above: the raw record's `report.text` is
    implementor narrative, exactly what CR-02/EL-09 forbid as Critic input
-   (confirmed live 2026-09-04, `backlog/items/2026-09-04-a-dispatch-record-
-   carries-implementor-prose-into-a-critic-that-must-not-read-it.md`). The
-   stripped copy carries only `taskId`, `agentType`, `model`, `effort`,
+   (confirmed live 2026-09-04, `backlog/items/2026-09-04-a-dispatch-record-carries-implementor-prose-into-a-critic-that-must-not-read-it.md`).
+   The stripped copy carries only `taskId`, `agentType`, `model`, `effort`,
    `rulesetSha`, `commits`, `outcome`, `report.changedFiles` (normalized to
    bare paths) and `modelOverride.{model,effort}` — enough to verify
    authorship, never the "why". The stripping is the Elephant's job before
