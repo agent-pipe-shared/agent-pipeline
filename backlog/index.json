@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "ef50a7ed39fa60b3c2c77820ffdf98359f04d4b6ee6c930dd7997cee77300ffc"
+    "transitionHead": "df5630f284f55e7514083058b71f10d21262d44577a8988bf462af5af6eaad98"
   },
   "counts": {
-    "open": 101,
+    "open": 100,
     "in_progress": 0,
-    "closed": 506,
+    "closed": 507,
     "rejected": 3,
     "deferred": 11
   },
@@ -59,12 +59,16 @@
     },
     {
       "id": "pipeline.a-critic-has-no-writable-location-for-its-own-report",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-01",
       "source": "Reported independently by both Critic rounds dispatched 2026-09-01 (NVA-CR-D and NVA-CR-E). Each disclosed under CR-06-D that report persistence was unavailable and emitted its findings directly instead.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-09-04",
+      "closureRepository": "self",
+      "closureCommit": "b72e22b2cccfb49a9d4b74131b7b3f55518befca",
+      "closureEvidence": "backlog/evidence/2026-09-04-nva-b-criticwrite-1-closure-verification.md"
     },
     {
       "id": "pipeline.a-deferred-item-is-terminal-so-a-live-defect-can-be-parked-invisibly",
