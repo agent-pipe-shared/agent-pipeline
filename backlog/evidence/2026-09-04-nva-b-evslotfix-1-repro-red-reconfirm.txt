@@ -1,0 +1,27 @@
+command: node scratch/repro-evslot.mjs
+label: NVA-B-EVSLOTFIX-1 independent re-confirmation of NVA-B-EVSLOT-1's race repro (same mechanism, rerun this session)
+exitCode: 1
+--- stdout ---
+Final shared slot contents:
+{
+  "schema": "pipeline.verify-evidence.v0",
+  "commit": "BBBB",
+  "candidate": {
+    "start": {
+      "commit": "BBBB"
+    },
+    "finish": {
+      "commit": "BBBB"
+    },
+    "binding": "exact"
+  },
+  "startedAt": "2026-09-04T09:19:00.752Z",
+  "finishedAt": "2026-09-04T09:19:00.752Z",
+  "exitCode": 0
+}
+
+Slot's final commit: BBBB
+Writer A's own commit was: AAAA (A's local process exited 0 at t=300ms, before B's t=450ms write)
+RED: reproduced -- the shared slot silently reflects writer B's later result, not writer A's own completed run.
+
+--- stderr ---
