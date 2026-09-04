@@ -100,3 +100,33 @@ its output green would have inverted the item's entire purpose.
 The gap the item names is unchanged: the detector's own tests are a gate step,
 its result against the real tree is not, so the next unregistered suite is still
 invisible to the gate. That stays true until the ceremony runs.
+
+## Addendum (NVA-B-PREGATE-1, 2026-09-04) — one more suite for the same ceremony
+
+`harness/scripts/pre-gate.mjs` (NVA-B-PREGATE-1, backlog
+`pipeline.a-change-creates-an-obligation-elsewhere-that-only-a-gate-run-reveals`)
+needed a companion test at `harness/scripts/pre-gate.test.mjs`. Editing
+`verify.mjs` to register it was out of scope for that dispatch (same TP-3 wall
+as above, same "no ceremony without an immediately-available PO signature"
+rule), so this is a second, independent line for the same maintenance window
+rather than a rewrite of the "exact change" block above — that block's anchor
+(`project-onboarding-v3-unborn-head-tests`, still `verify.mjs`'s last
+`TEST_SUITES` entry as of 2026-09-04) is left untouched so it stays a precise,
+directly-appliable diff on its own.
+
+```js
+  { name: "pre-gate-tests", file: join(scriptDir, "pre-gate.test.mjs") },
+```
+
+Insert it anywhere in `TEST_SUITES` (order does not matter to the gate); after
+the block already staged above is the natural spot. Name checked against
+`verify.mjs` for collisions on 2026-09-04 (`rg -n 'pre-gate' harness/scripts/verify.mjs`
+— no hits).
+
+**Incidental finding, explicitly out of this dispatch's scope, not folded into
+the line above:** the same live run that found `pre-gate.test.mjs` unregistered
+also found `plugins/pipeline-core/scripts/capture-evidence.test.mjs`
+unregistered (committed at `327db477`, unrelated to this dispatch,
+`plugins/pipeline-core/scripts/capture-evidence.mjs` itself was mid-edit by a
+concurrent dispatch in the same checkout at measurement time). Left for whoever
+owns that file to add its own line; not measured or verified here.
