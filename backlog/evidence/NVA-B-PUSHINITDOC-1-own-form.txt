@@ -1,0 +1,10 @@
+command: node harness/scripts/check-doc-reconciliation.mjs --base HEAD~50 --candidate HEAD --root <repo-root>
+label: fail-case
+exitCode: 2
+--- stdout ---
+
+--- stderr ---
+UNRECONCILED-ADR 0058-guard-maintenance-window.md:14 -- implicated by changed path(s) "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs" but has no reconciliation record entry for candidate 6e5506e439df9f593dd7f5d1ca935192a5559de0 in docs/doc-reconciliation.md
+UNRECONCILED-ADR 0069-adr-numbers-are-allocated-at-acceptance.md:13 -- implicated by changed path(s) "docs/adr/draft-critic-report-durable-write-location.md", "docs/adr/draft-session-cut-recommended-by-readiness.md" but has no reconciliation record entry for candidate 6e5506e439df9f593dd7f5d1ca935192a5559de0 in docs/doc-reconciliation.md
+UNRECONCILED-ADR 0078-distribution-channels-on-main.md:14 -- implicated by changed path(s) "plugins/pipeline-core/scripts/pipeline-update-channel.mjs" but has no reconciliation record entry for candidate 6e5506e439df9f593dd7f5d1ca935192a5559de0 in docs/doc-reconciliation.md
+Doc reconciliation check failed: 3 finding(s) over range HEAD~50..HEAD (resolved c3b8578ec27cb4f5901fec4d14b995d0876a0ae6..6e5506e439df9f593dd7f5d1ca935192a5559de0), record-ref HEAD (resolved 6e5506e439df9f593dd7f5d1ca935192a5559de0).

@@ -1,0 +1,7 @@
+command: node harness/scripts/check-doc-reconciliation.mjs --base 56e91858d96f9d58db75c306424b79c256c1fe74 --candidate 8681046622dc23956b760ba93552793b3d983193 --record-ref HEAD --root <repo-root>
+label: pass-case
+exitCode: 0
+--- stdout ---
+Doc reconciliation: range 56e91858d96f9d58db75c306424b79c256c1fe74..8681046622dc23956b760ba93552793b3d983193 (resolved 56e91858d96f9d58db75c306424b79c256c1fe74..8681046622dc23956b760ba93552793b3d983193), record-ref HEAD (resolved 6e5506e439df9f593dd7f5d1ca935192a5559de0) -- 110 changed path(s), 12/79 ADRs carry a Governs: line, 8 implicated by this range, all reconciled. NOT checked: whether anyone actually looked -- this check makes omission impossible, it does not make diligence certain; a "checked, no change needed" entry is accepted on its stated shape alone, never on the quality of the reasoning behind it; a resolved "amended in <commit>" entry only proves the cited commit is real, an ancestor of the candidate, and that it touched the named ADR file -- not that the amendment addressed the governed change correctly. ADR bodies and Governs: lines are read from the candidate commit itself; the reconciliation record is read from --record-ref (a separate ref from candidate, by construction -- see module header) -- never from the working tree, either way. It covers docs/adr/ only, never any other documentation (specs/, backlog/, guardrails/, roles/, templates/, or prose that carries no Governs: line).
+
+--- stderr ---
