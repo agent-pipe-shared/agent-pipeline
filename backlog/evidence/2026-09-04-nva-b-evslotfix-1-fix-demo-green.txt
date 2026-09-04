@@ -1,0 +1,68 @@
+command: node scratch/repro-evslotfix.mjs
+label: NVA-B-EVSLOTFIX-1: fix design (runId-threaded, per-run path + atomic shared pointer) resolves the lost-write; shared pointer stays disclosed last-writer-wins
+exitCode: 0
+--- stdout ---
+Writer A's own per-run evidence (RUN-A.json):
+{
+  "schema": "pipeline.verify-evidence.v0",
+  "commit": "AAAA",
+  "runId": "RUN-A",
+  "candidate": {
+    "start": {
+      "commit": "AAAA"
+    },
+    "finish": {
+      "commit": "AAAA"
+    },
+    "binding": "exact"
+  },
+  "startedAt": "2026-09-04T09:21:36.723Z",
+  "finishedAt": "2026-09-04T09:21:36.724Z",
+  "exitCode": 0
+}
+
+Writer B's own per-run evidence (RUN-B.json):
+{
+  "schema": "pipeline.verify-evidence.v0",
+  "commit": "BBBB",
+  "runId": "RUN-B",
+  "candidate": {
+    "start": {
+      "commit": "BBBB"
+    },
+    "finish": {
+      "commit": "BBBB"
+    },
+    "binding": "exact"
+  },
+  "startedAt": "2026-09-04T09:21:36.865Z",
+  "finishedAt": "2026-09-04T09:21:36.865Z",
+  "exitCode": 0
+}
+
+Shared 'latest' pointer final contents:
+{
+  "schema": "pipeline.verify-evidence.v0",
+  "commit": "BBBB",
+  "runId": "RUN-B",
+  "candidate": {
+    "start": {
+      "commit": "BBBB"
+    },
+    "finish": {
+      "commit": "BBBB"
+    },
+    "binding": "exact"
+  },
+  "startedAt": "2026-09-04T09:21:36.865Z",
+  "finishedAt": "2026-09-04T09:21:36.865Z",
+  "exitCode": 0
+}
+
+A's own per-run evidence intact: true
+B's own per-run evidence intact: true
+Shared pointer shows B (expected last-writer-wins, disclosed & unchanged): true
+
+GREEN: both runs' own evidence survives uncorrupted at its own path; the shared pointer's last-writer-wins behavior is preserved and disclosed, not silently changed.
+
+--- stderr ---
