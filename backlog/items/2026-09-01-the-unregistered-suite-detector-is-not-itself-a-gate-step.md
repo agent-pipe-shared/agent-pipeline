@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.the-unregistered-suite-detector-is-not-itself-a-gate-step
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-04
+closure_repository: self
+closure_commit: 777ee9c5e5916b6b2f8e784bf3fc0b32d9124f90
+closure_evidence: backlog/evidence/2026-09-03-suite-registration-ceremony-package.md
 created: 2026-09-01
 sprint: nova-b
 done_when: manual
@@ -133,3 +137,24 @@ detector to make its output green would have inverted this item's whole purpose.
 
 The gap therefore stands exactly as described above, with the cost of closing it
 now known and the change ready to apply.
+
+## Closure
+
+Closed 2026-09-04 against `777ee9c5`, a signed PO Ed25519 ceremony (ADR-0059)
+applying exactly the block staged in the evidence file above, unchanged. Seven
+`TEST_SUITES` entries landed: the four previously-unregistered suites this item
+names, plus `pre-gate-tests` and `capture-evidence-tests` from two later
+addenda to the same package, plus — the point of this item — `suite-registration-check`,
+promoting the detector itself to a gate step.
+
+Verified after the ceremony, not accepted on the commit message alone:
+`node --check` on the edited file; `node harness/scripts/pre-gate.mjs` now
+passes all six checks, `verify-suite-registration-check` included — the only
+recurring failure across every pre-gate run this session, now gone; and
+`node plugins/pipeline-core/scripts/check-suite-registration.mjs` itself
+reports 511 entries, all registered or opted out with a reason.
+
+The gap this item names is closed by construction: the detector's own result
+against the real tree is now itself a gate step, so a future unregistered suite
+is caught by the gate rather than staying invisible until someone happens to run
+the detector by hand.
