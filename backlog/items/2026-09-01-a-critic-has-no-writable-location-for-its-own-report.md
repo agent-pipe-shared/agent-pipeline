@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.a-critic-has-no-writable-location-for-its-own-report
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-04
+closure_repository: self
+closure_commit: b72e22b2cccfb49a9d4b74131b7b3f55518befca
+closure_evidence: backlog/evidence/2026-09-04-nva-b-criticwrite-1-closure-verification.md
 created: 2026-09-01
 sprint: nova-b
 done_when: manual
@@ -69,3 +73,21 @@ claim from source instead, which is the contract working — but the exposure is
 avoidable. A dispatch could supply the record with `report` elided, so the
 authorship chain is available without the narrative the fail-closed boundary
 otherwise excludes.
+
+## Closure
+
+Closed 2026-09-04 against `b72e22b2` (NVA-B-CRITICWRITE-1). Verification is in
+`backlog/evidence/2026-09-04-nva-b-criticwrite-1-closure-verification.md`,
+including an independent re-run of the write probe, not just acceptance of the
+dispatch's own claim.
+
+Direction chosen: document the proven `node -e` write shape in `roles/critic.md`
+CR-06-D §5.5, rather than widening a guard admission or granting a new write
+capability — the cheapest of the item's three named directions that actually
+closes the gap, since the authorization already existed and only a working
+command shape was missing.
+
+The second, smaller finding above is **not closed by this** and is not
+duplicated: it is the same defect as
+`backlog/items/2026-09-04-a-dispatch-record-carries-implementor-prose-into-a-critic-that-must-not-read-it.md`,
+which stays open.
