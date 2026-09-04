@@ -56,7 +56,7 @@
 | pipeline.all-three-runners-should-install-against-the-stable-branch | open | requirement | pipeline | 2026-08-27 | — |
 | pipeline.an-authorized-rebase-demands-a-fresh-po-signature-after-every-conflict | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.an-expired-override-is-armed-instead-of-refused | closed | defect | pipeline | 2026-08-28 | — |
-| pipeline.an-onboarding-test-depends-on-a-clean-working-tree-through-a-security-scan-subprocess | open | defect | pipeline | 2026-09-01 | — |
+| pipeline.an-onboarding-test-depends-on-a-clean-working-tree-through-a-security-scan-subprocess | closed | defect | pipeline | 2026-09-01 | — |
 | pipeline.an-orchestrator-write-into-a-running-dispatchs-tree-is-undetectable | open | defect | pipeline | 2026-08-28 | — |
 | pipeline.an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run | open | defect | pipeline | 2026-09-04 | Nova B — a failing suite reports one failure and hides an unknown number of cases that never executed. The gate cannot distinguish 'one case failed' from 'one case failed and eight never ran'. |
 | pipeline.an-unparseable-done-when-is-counted-as-undeclared-not-malformed | closed | defect | pipeline | 2026-08-29 | — |
@@ -629,8 +629,8 @@
 
 ## Counts
 
-- open: 98
+- open: 97
 - in_progress: 0
-- closed: 509
+- closed: 510
 - rejected: 3
 - deferred: 11

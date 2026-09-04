@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "9be02884e9f30a2470ab9363ffa8fb555420db319ea5e40639ce66add6fe9911"
+    "transitionHead": "fab85c211b695981669cd6f7e8c6fdb8371fe4741cee45e88ad63ab8e76aee09"
   },
   "counts": {
-    "open": 98,
+    "open": 97,
     "in_progress": 0,
-    "closed": 509,
+    "closed": 510,
     "rejected": 3,
     "deferred": 11
   },
@@ -612,12 +612,16 @@
     },
     {
       "id": "pipeline.an-onboarding-test-depends-on-a-clean-working-tree-through-a-security-scan-subprocess",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-01",
       "source": "Hypothesis raised in scratch/critic-contract-round-H.md, D-2 (an unrelated pre-existing security-scan.mjs subprocess failure with exit code 2, observed during unrelated work, established not to be caused by that diff). Investigated live 2026-09-01 against plugins/pipeline-core/lib/project-onboarding-v3.test.mjs and plugins/pipeline-core/scripts/security-scan.mjs; refuted by direct measurement.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-09-04",
+      "closureRepository": "self",
+      "closureCommit": "08d4eb85d43aecd50c64f8d56470d354e8681754",
+      "closureEvidence": "backlog/evidence/2026-09-04-nva-onboarding-cleantree-triage.md"
     },
     {
       "id": "pipeline.an-orchestrator-write-into-a-running-dispatchs-tree-is-undetectable",
