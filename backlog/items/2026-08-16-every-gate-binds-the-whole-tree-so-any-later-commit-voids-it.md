@@ -196,3 +196,68 @@ verify-journal.mjs's TIER_B_DECLARATIONS (8th suite now Tier B).
 sdlc-run-graph-tests and stack-run-outcome-tests remain blocked on the
 harness/plugin-tree consumer-safe-paths constraint noted in this item's own
 2026-08-25 entry.
+
+## Progress note, 2026-09-04 — the premise splits into two already-tracked gaps
+
+NVA-B-GATEBIND-1 was dispatched against this item under a reproduce/probe-first
+instruction and **built nothing**, correctly: both remedies it identified are
+already designed elsewhere and both are blocked on a protected path or an open
+PO decision, not on a dispatch's effort. Classification evidence:
+`backlog/evidence/2026-09-04-nva-b-gatebind-1-classification.md`.
+
+**Process disclosure, not a defect in the conclusions.** The dispatch read this
+item's own un-stripped text via a `find` search, not only the stripped
+`scratch/` copy it was briefed with — the isolation the stripping step exists to
+provide was breached. Its conclusions are independently corroborated by the
+gate-machinery ADR's own text, live code in `verify-resume.mjs`/the verify
+gate's driver script, the sibling item's already-recorded ranking, and a
+bounded passing test probe, so they stand on their own evidence rather than on
+the contaminated read. Recorded so the pattern is visible if it recurs.
+
+**Four observations from concurrent 2026-09-04 dispatch work, classified:**
+
+1. **A run stopped mid-flight to let a commit land.** Splits in two.
+   Same-candidate restart (no commit before re-running) is **already solved** —
+   `planVerifyResume` reuses every receipted suite regardless of Tier, proven by
+   `verify-resume.test.mjs:41`. Restart *after* the commit is **prevention**, and
+   is the exact case the sibling item
+   (`2026-09-01-concurrent-dispatches-in-one-shared-checkout-collide-in-ways-no-guard-catches.md`)
+   already ranked as its own Option 2 (a verify-in-progress marker, on the
+   protected verify-gate driver) in its own 2026-09-04 triage. Not duplicated
+   here.
+2. **A completed run's binding voided by an unrelated docs-only commit.** This
+   item's actual core scenario. The mechanism that answers it — per-suite
+   declared-input receipts reused across an unrelated candidate change — is
+   **already accepted and partially built**: the gate-machinery ADR's Tier
+   A/Tier B classification, `allowCrossCandidateReuse` in `verify-resume.mjs`. A
+   live, ongoing promotion series already carries this forward suite by suite,
+   and extending it was explicitly outside this dispatch's briefed scope.
+
+   **The decisive finding beyond what either document states alone:** the
+   verify gate's own driver script's one production call site **never passes
+   `allowCrossCandidateReuse: true`** — grep-confirmed, no caller anywhere in
+   the repository passes `true`. So even a Tier-B-promoted suite gets no
+   benefit in production today; the granularity mechanism is built and inert.
+   That call site is protected, and the gate-machinery ADR's own Follow-up
+   names this exact activation as **Decision 8, explicitly reserved for the
+   PO** (conservative default already accepted: push/release-bound runs force
+   full re-execution).
+3. **A `scratch/`-not-`backlog/evidence/` workaround used today specifically to
+   avoid voiding a binding.** Not a separate gap — corroborating evidence that 1
+   and 2 are real and currently answered only by session discipline, matching
+   the sibling item's own line: "discipline covered it today; a marker would
+   make the discipline unnecessary."
+4. **The candidate-drift detector already present in the verify gate's driver,
+   and the freshness check in the push-prepare path.** Detection already
+   exists and was confirmed by direct reading. Not a gap; out of this item's
+   own scope as it frames the problem (granularity of the binding, not
+   detection of its violation).
+
+**Status: stays open.** Both paths forward are named, both are already ranked or
+accepted elsewhere, and both require either the pending signature window
+(prevention) or a PO answer to the gate-machinery ADR's Decision 8 (granularity
+— whether and when a Tier-B-promoted suite may actually reuse across candidates
+in production). Recommend Decision 8 be raised alongside the
+maintenance-window ceremony rather than deferred again: the mechanism it would
+activate is already built and tested, and the gap it closes is this item's own
+core scenario.

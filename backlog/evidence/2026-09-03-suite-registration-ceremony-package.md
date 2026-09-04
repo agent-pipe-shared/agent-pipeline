@@ -252,3 +252,32 @@ mechanism. `evidence/verify-latest.json` keeps its schema unchanged.
 The dispatch that established all of the above changed nothing in `verify.mjs`
 and stopped at the protected boundary, which is why the change is described here
 instead of applied.
+
+## Addendum (NVA-B-GATEBIND-1, 2026-09-04) — a PO decision to raise alongside this window, not a code change to make
+
+This is different in kind from everything above it in this package: it is a
+question for the PO, not a staged edit.
+
+`backlog/items/2026-08-16-every-gate-binds-the-whole-tree-so-any-later-commit-voids-it.md`'s
+own core scenario — a completed gate run's binding voided by an unrelated
+docs-only commit — already has an accepted, partially built answer: the
+gate-machinery ADR's Tier A/Tier B suite classification and
+`allowCrossCandidateReuse` in `verify-resume.mjs`. Measured 2026-09-04: the verify
+gate's own driver script's one production call site **never passes
+`allowCrossCandidateReuse: true`** — no caller anywhere in the repository does.
+So even a suite already promoted to Tier B gets no benefit today; the mechanism
+is built and inert.
+
+That ADR's own Follow-up names this exact activation as **Decision 8**, reserved
+for the PO, with a conservative default already accepted absent a more specific
+answer: push- and release-bound runs force full re-execution regardless.
+
+**If the PO answers Decision 8 by activating reuse**, the change is one flag at
+the verify gate's driver call site — flipping `allowCrossCandidateReuse` to
+`true` for the calls it should cover — and it would need the same signature
+window as the changes above, since the call site sits in the same protected
+file. **If the PO defers or declines**, nothing here needs to change, and the
+backlog item above stays open on its current, already-accurate basis.
+
+Recorded so the question reaches the PO alongside this window rather than
+requiring a second one later, whichever way it is answered.
