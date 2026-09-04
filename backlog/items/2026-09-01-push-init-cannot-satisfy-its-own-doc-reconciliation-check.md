@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.push-init-cannot-satisfy-its-own-doc-reconciliation-check
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-04
+closure_repository: self
+closure_commit: 7d56917c37344fb3750877c4e16787b0adb30943
+closure_evidence: backlog/evidence/2026-09-04-nva-b-pushinitdoc-1-closure-verification.md
 created: 2026-09-01
 sprint: nova-b
 done_when: manual
@@ -52,3 +56,21 @@ whenever any `**Governs:**`-annotated ADR is implicated.
 
 This touches the push-driver argv contract and its guard-admission tests. It
 owes a T1 Critic round.
+
+## Closure
+
+Closed 2026-09-04 against `7d56917c`, which had already landed 2026-09-01 —
+the defect was fixed the same day this item was filed, by a different, unaware
+dispatch (`NVA-B-PUSHINIT-1`). Both remedy options above are implemented as a
+superset: `--candidate` is now required, `--record-ref` optional and defaulting
+to the checker's own documented default.
+
+Full verification, including the T1 round this item requires, is in
+`backlog/evidence/2026-09-04-nva-b-pushinitdoc-1-closure-verification.md`. In
+short: reproduction re-established live (both directions, not trusted from the
+item's own three-day-old claim); the Critic's one major finding (three
+documented invocation surfaces left stale) turned out to be already resolved by
+a third, unrelated commit the same day, verified live rather than taken on the
+Critic's own disclaimer that this was outside its reviewed object; the Critic's
+one minor finding (a test pinned to two historical SHAs, a narrow false-red
+risk) is accepted as residual and recorded rather than dispatched for a fix.
