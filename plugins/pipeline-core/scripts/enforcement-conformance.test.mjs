@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 import test from "node:test";
 import assert from "node:assert/strict";
 
