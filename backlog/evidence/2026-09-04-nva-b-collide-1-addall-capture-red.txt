@@ -1,0 +1,12 @@
+NVA-B-COLLIDE-1 bounded repro: event 2 (`git add -A` capture), 2026-09-04.
+Command: node scratch/repro-addall-capture.mjs
+Exit code: 1
+
+--- stdout ---
+Files in dispatch A's commit: ["dispatch-a-file.txt","dispatch-b-file.txt"]
+RED: reproduced -- `git add -A` swept dispatch B's staged, unrelated file into dispatch A's commit.
+
+guard-git.mjs verdict on "git add -A": exit 0 (0 = admitted, 2 = blocked)
+
+Overall: RED (capture=true, guard-admitted=true)
+

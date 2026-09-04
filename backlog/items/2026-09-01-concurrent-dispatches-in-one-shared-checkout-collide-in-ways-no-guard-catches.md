@@ -110,3 +110,60 @@ change surface a `contains`/`script-exit-zero` predicate could name without
 also silently pre-deciding which of the three remedies is chosen, which is
 exactly the design decision this item leaves open. No `Decision:` value is
 set here; that choice belongs to whoever triages this item next.
+
+### Additional evidence, 2026-09-04 — NVA-B-COLLIDE-1
+
+Four further first-hand observations, 2026-09-04, from one shared checkout
+with up to four concurrent dispatches active, tested against this item by
+dispatch `NVA-B-COLLIDE-1` (given as facts to test the item's premise
+against, not as a list to fix in that dispatch):
+
+1. **A mutual GG-22 deadlock** (one session's ledger commit blocked by
+   another dispatch's staged files, and that dispatch's own commit blocked
+   in turn by the first session's unreconciled status flip). Already covered
+   by `backlog/items/2026-09-03-gg-22-reads-the-shared-index-so-a-concurrent-dispatch-blocks-an-unrelated-ledger-commit.md`,
+   which names a specific, narrow fix and already states its own
+   relationship to this item under its "Scope note". Not duplicated here.
+2. **A `git add -A` capture**: one dispatch's `git add -A` swept a
+   concurrent dispatch's already-staged, unrelated file into its own commit.
+   Falls within this item's own "overlapping FILE scopes" distinction above.
+   No existing item or guard covers it — confirmed by inspection: no GG rule
+   in `plugins/pipeline-core/hooks/guard-git.mjs` restricts `git add -A` or
+   an unqualified `git commit`; `templates/prompts/agent-obligations.md` §6
+   already forbids the practice as commit discipline, but nothing enforces
+   it mechanically. Bounded, measured repro:
+   `scratch/repro-addall-capture.mjs` (fixture built in an isolated
+   throwaway repo under `scratch/`, never this checkout's own index);
+   captured evidence
+   `backlog/evidence/2026-09-04-nva-b-collide-1-addall-capture-red.txt` —
+   RED: the capture reproduces, and `guard-git.mjs` admits the literal
+   `git add -A` command (exit 0) when fed the same tool-input JSON Claude
+   Code pipes to it. Every remedy this item's own Proposal section names for
+   this class is either the reserved ranking decision (options 1/3) or
+   names a change to `harness/scripts/verify.mjs`, a protected test path
+   (TP-3, option 2) — so no code fix is made here; this is new evidence for
+   the same open design decision, not a resolution of it.
+3. **A shared evidence-slot race** (`evidence/verify-latest.json`, a bare
+   `writeFileSync` with no run identity). Out of scope for this item — it is
+   `backlog/items/2026-08-12-shared-verify-evidence-slot-corrupted-by-concurrent-dispatches.md`'s
+   own defect, and a separate dispatch (`NVA-B-EVSLOT-1`) was reproducing
+   and working it concurrently with this one.
+4. **A dispatch reporting a coordinator message as inaccurate** because the
+   tree had changed between the message being written and being delivered.
+   Out of scope for this item: it fits neither of the two categories this
+   item's own "Distinction the evidence actually supports" section names
+   (overlapping file scopes; a commit landing during a full `verify.mjs`
+   run) — it is message staleness against a moving tree, not a git-index or
+   verify-candidate collision.
+   `backlog/items/2026-09-03-a-dispatch-cannot-authenticate-a-mid-task-correction-from-its-dispatcher.md`
+   is the nearest existing item but covers a different axis (whether a
+   mid-task message's claimed IDENTITY can be authenticated, not whether its
+   CONTENT stayed accurate against a moving tree) and does not claim this
+   ground. Left here as an unfiled finding for the next triage pass, not
+   filed as a new item by `NVA-B-COLLIDE-1` itself (a new item would need a
+   ledger reconciliation that dispatch was not positioned to commit safely
+   alongside the rest of its shared-checkout work).
+
+No `status:` or `Decision:` value changed by this update. This item's own
+text still declines to rank its three proposed remedies; that determination
+remains open for whoever triages it next.
