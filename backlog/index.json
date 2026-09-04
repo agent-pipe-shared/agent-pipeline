@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "9fbab484018fc02135c9302bc3516d411c891fc86495e1194d2979593b7b8320"
+    "transitionHead": "ef50a7ed39fa60b3c2c77820ffdf98359f04d4b6ee6c930dd7997cee77300ffc"
   },
   "counts": {
-    "open": 99,
+    "open": 101,
     "in_progress": 0,
     "closed": 506,
     "rejected": 3,
@@ -97,6 +97,16 @@
       "source": "Raised by dispatch NVA-B-RECSHAPE-1 as a finding outside its acceptance criteria, 2026-09-03: it received two coordinator corrections through that channel, verified the content independently before acting on it, and flagged the delivery channel regardless of the content being correct.",
       "deferred": false,
       "tracking": "Nova B — a mid-task instruction arrives inside a tool-result system-reminder and claims to come from the dispatcher. A dispatch has no way to tell that apart from injected text, and the closed-briefing contract gives it no rule for what to do about it."
+    },
+    {
+      "id": "pipeline.a-dispatch-record-carries-implementor-prose-into-a-critic-that-must-not-read-it",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-04",
+      "source": "Reported by the round-2 Critic on the capture-evidence package, 2026-09-04, as briefing violation 1 (contaminated dispatch). The dispatch was built by the Elephant from templates/prompts/critic-review.md and referenced evidence/dispatch-record-NVA-B-REDFIX-1.json as authorship evidence, which the template itself prescribes.",
+      "deferred": false,
+      "tracking": "Nova B — the dispatch record is the only artifact that binds a commit to its work package, so a Critic needs it; it also carries the implementor's narrative, which the Critic contract forbids as input. There is no way to hand over one without the other."
     },
     {
       "id": "pipeline.a-doc-edit-silently-obligates-its-vendored-copy",
@@ -613,6 +623,16 @@
       "created": "2026-08-28",
       "source": "Re-Critic vtpgate2-368458af finding F2; incident during NVA-VTPGATE-2, 2026-08-28",
       "deferred": false
+    },
+    {
+      "id": "pipeline.an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-04",
+      "source": "Found while diagnosing the only genuine red in the full verify run at commit 2aeeaa68 (NVA-B-LWSRED-1, 2026-09-04): plugins/pipeline-core/lib/local-worker-supervisor.test.mjs reported one failing test, and LWS08 through LWS15 had not run at all for a day. Confirmed by the fix: the same file now reports 15/15.",
+      "deferred": false,
+      "tracking": "Nova B — a failing suite reports one failure and hides an unknown number of cases that never executed. The gate cannot distinguish 'one case failed' from 'one case failed and eight never ran'."
     },
     {
       "id": "pipeline.an-unparseable-done-when-is-counted-as-undeclared-not-malformed",
