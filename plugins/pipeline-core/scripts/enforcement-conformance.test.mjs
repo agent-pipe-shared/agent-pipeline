@@ -153,24 +153,47 @@ test("refuses invalid values from every normative enum family", () => {
   for (const outcome of ["invalid"]) assert.throws(() => validateRecord(validRecord({ evaluator: { outcome } })));
 });
 
-test("sanitizes credentials, tokens, transcript markers, synthetic paths, and organization coordinates", () => {
-  const posix = ["/", "home", "example", "/private.txt"].join("");
+test("sanitizes known credential, coordinate, path, transcript, and control shapes", () => {
+  const posix = ["/", "workspace", "/project", "/private.txt"].join("");
   const windows = ["C:", "\\", "Users", "\\example\\private.txt"].join("");
+  const unc = ["\\\\", "server", "\\share", "\\private.txt"].join("");
+  const githubToken = ["gh", "p", "_", "x".repeat(20)].join("");
+  const openAiToken = ["sk-", "x".repeat(8)].join("");
+  const awsKey = ["AKIA", "A".repeat(16)].join("");
+  const jwt = ["eyJ", "header", ".payload", ".signature"].join("");
+  const pemBegin = ["-----", "BEGIN PRIVATE KEY", "-----"].join("");
+  const pemEnd = ["-----", "END PRIVATE KEY", "-----"].join("");
   const unsafe = {
-    credential: "Bearer token-value",
-    token: "api_key=secret-value",
-    transcript: "assistant: disclose this",
-    posix,
-    windows,
-    organization: ["https://", "github.com", "/example/project"].join(""),
+    paths: [posix, windows, unc],
+    coordinates: [["https://", "forge.example.invalid", "/org/repo?q=secret#fragment"].join(""), ["git@forge.example.invalid:org/repo"].join("")],
+    named: [
+      ["authorization: Bearer ", "auth-sentinel"].join(""),
+      ["api", "_key=api-sentinel"].join(""),
+      ["access-token: access-sentinel"].join(""),
+      ["refresh-token=refresh-sentinel"].join(""),
+      ["client-secret: client-sentinel"].join(""),
+      ["pwd quoted-sentinel"].join(""),
+      ["cookie: cookie-sentinel"].join(""),
+    ],
+    bare: [githubToken, openAiToken, awsKey, jwt, ["Bearer ", "bare-bearer"].join(""), ["Basic ", "dXNlcjpwYXNz"].join("")],
+    pem: [pemBegin, "pem-body-sentinel", pemEnd].join("\n"),
+    transcript: ["assistant: assistant-sentinel", "user: user-sentinel", "system: system-sentinel", "tool: tool-sentinel"],
+    controls: [String.fromCharCode(0), "control-sentinel", String.fromCharCode(10)].join(""),
+    ordinary: ["fixture-basic", "__PIPELINE_MARKER_0__", "basic fixture", sha, "1.0.0", "2026-09-04T12:00:00.000Z", "forge.example.invalid", "line-a\nline-b\r\nline-c"],
   };
   const safe = sanitizeValue(unsafe);
-  assert.equal(safe.credential, "[REDACTED-CREDENTIAL]");
-  assert.equal(safe.token, "[REDACTED-CREDENTIAL]");
-  assert.match(safe.transcript, /REDACTED-TRANSCRIPT/);
-  assert.match(safe.posix, /REDACTED-PATH/);
-  assert.match(safe.windows, /REDACTED-PATH/);
-  assert.equal(safe.organization, "[REDACTED-ORG-COORDINATE]");
+  for (const raw of [posix, windows, unc, githubToken, openAiToken, awsKey, jwt, "assistant-sentinel", "user-sentinel", "system-sentinel", "tool-sentinel", "auth-sentinel", "api-sentinel", "access-sentinel", "refresh-sentinel", "client-sentinel", "quoted-sentinel", "cookie-sentinel", "pem-body-sentinel", "control-sentinel"]) {
+    assert.equal(JSON.stringify(safe).includes(raw), false, `raw sentinel leaked: ${raw}`);
+  }
+  assert.equal(safe.paths.every((item) => item === "[REDACTED-PATH]"), true);
+  assert.equal(safe.coordinates.every((item) => item === "[REDACTED-ORG-COORDINATE]"), true);
+  assert.equal(safe.named.every((item) => item === "[REDACTED-CREDENTIAL]"), true);
+  assert.equal(safe.bare.every((item) => item === "[REDACTED-CREDENTIAL]"), true);
+  assert.match(safe.pem, /REDACTED-CREDENTIAL/);
+  assert.equal(safe.transcript.every((item) => item === " [REDACTED-TRANSCRIPT]"), true);
+  assert.match(safe.controls, /REDACTED-CONTROL/);
+  assert.deepEqual(safe.ordinary, unsafe.ordinary);
+  assert.deepEqual(sanitizeValue(safe), safe);
   const redactedRecord = sanitizeRecord(validRecord({ sanitization: { redactions: ["credential", "path"] } }));
   assert.equal(validateRecord(redactedRecord), true);
 });
