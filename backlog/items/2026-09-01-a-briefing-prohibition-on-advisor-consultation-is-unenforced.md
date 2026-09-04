@@ -120,3 +120,61 @@ dispatch-record duty in every briefing that uses both — it is not specific to 
 one, and other briefings from the same session carry the same pair. And the
 occurrence count remains a lower bound for the reason already stated above: five
 is what was disclosed, not what happened.
+
+## Triage decision, 2026-09-04 — direction 2, conditional on its guard, with direction 3 as the stated fallback
+
+NVA-B-ADVPROHIB-1 was dispatched against this item and **built nothing**,
+triggering the stop condition for an item that names options without deciding
+between them. Correct: this item forbids the wording-only fix in those words, and
+choosing among three structural directions is the dispatcher's call.
+
+**The measurement that decides it.** The raw `advisor()` tool a dispatched
+Goldfish or Critic holds in-session leaves **no durable trace anywhere in this
+repository**. No hook intercepts it — confirmed by grep across
+`plugins/pipeline-core/hooks/` — and nothing writes a receipt for it. The only
+visibility is voluntary self-disclosure inside a dispatch's own report.
+
+A receipt-emitting path does exist, but it is a **different code path**: the
+demand-gated `consult-advisor` subagent
+(`plugins/pipeline-core/skills/advisor-consult/`,
+`plugins/pipeline-core/agents/consult-advisor.md`) emits
+`pipeline.advisory-receipt.v1` and `pipeline.advisory-consultation-record.v2`.
+It does not cover the raw tool at all.
+
+So the receipt pattern this repository would need already exists and is proven —
+just not on the surface that matters here.
+
+**Decision: direction 2, and only together with its guard.** Making consultation
+auditable is right, but the dispatch's own reasoning is the load-bearing part and
+it is adopted here: a dispatch-record field that nothing enforces is a *second*
+unenforced rule, which makes this item worse rather than closing it. The
+repository has paid for that shape repeatedly.
+
+So direction 2 means a `PreToolUse` guard on the Advisor surface plus the record
+field, not the field alone. The guard needs a matcher in
+`plugins/pipeline-core/hooks/hooks.json`, which is **TP-4-protected** — a
+signature-window change, not a dispatch. Recorded as a candidate for that window,
+not a commitment: widening what a guard intercepts is a PO call.
+
+**Fallback, stated now rather than discovered later: if the guard is declined,
+direction 3 is the honest outcome.** Dropping the rule concedes that MP-26(e)'s
+"judgment traceable to the Elephant" has no per-dispatch backing — but conceding
+it openly is better than leaving a rule standing that nothing enforces and
+everyone cites. What must not happen is the third state: the rule kept, the guard
+declined, and the gap papered over with a schema field.
+
+**Direction 1 is rejected on today's evidence.** Several dispatches on 2026-09-04
+consulted the Advisor and each consult visibly improved the outcome — one
+independently reached the same scope conclusion the dispatcher sent by message,
+another flagged a residual gap its briefing had not named. Removing the tool
+removes a demonstrably useful capability to enforce a rule whose own value is
+traceability, not abstinence.
+
+**A correction to the dispatcher's own framing of this item.** I supplied as an
+observation that a dispatch reported advisor-shaped work while its briefing
+carried no MP-26 line, implying a lapse. It is not one. The template's
+`{{ADVISOR_DEMAND_LINE}}` is **conditional by design** — "if the Elephant has a
+current bounded Advisor demand" — not a blanket per-dispatch ban. With no current
+demand, the line is correctly absent. That observation therefore corroborates the
+item's mechanism rather than adding a sixth occurrence, and the count stated
+above stands unchanged.
