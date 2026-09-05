@@ -1312,17 +1312,16 @@ test("only bounded rg search pipelines and platform null redirect are read-only"
       "rg -n lifecycle . | head -n 0",
       "rg -n lifecycle . | head -n 050",
       "rg -n lifecycle . | head -n 501",
+      "rg -n lifecycle .. | rg guard",
       "rg -n lifecycle . 2>diagnostic.log | head -n 20",
       "rg -n lifecycle . | tee output",
       "rg -n lifecycle . | head -n 20 | wc -l",
       "rg --pre worker lifecycle . | rg guard",
       "rg -n lifecycle . 2>diagnostic.log | rg guard",
       "rg --pre worker lifecycle . | head -n 20",
+      "rg -n lifecycle .. | head -n 20",
     ]) {
       assert.equal(isReadOnlyDiagnosticCommand(command, path), false, command);
-    }
-    for (const command of ["rg -n lifecycle .. | rg guard", "rg -n lifecycle .. | head -n 20"]) {
-      assert.equal(isReadOnlyDiagnosticCommand(command, path), true, command);
     }
     // NVA-I-GRAMMAR: `rg -n lifecycle . && head -n 20` used to be refused here -- not because
     // either side was unsafe, but because the OLD &&-chain admission only ever recognized a
@@ -1335,11 +1334,17 @@ test("only bounded rg search pipelines and platform null redirect are read-only"
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
-// The shared grammar module retains its project-root-only default, while this lifecycle
-// guard's read-only lane deliberately drops containment after the closed rg/head shape has
-// been validated. Both plugin self-inspection and any other external diagnostic read use the
-// same policy; location alone never creates write authority.
-test("bounded rg pipeline admits closed read-only diagnostics outside the project root", () => {
+// GF-078 bug 2 (root scope). Every single, non-piped read-only command
+// isReadOnlyDiagnosticCommand admits elsewhere in this file (rg, grep, cat, head, tail, wc,
+// stat, file) carries NO path restriction at all -- a single `rg pattern <plugin-install-path>`
+// self-inspection read was already unconditionally admitted before this fix. Only the
+// IDENTICAL read piped through a second rg or head was refused, purely for being a pipeline,
+// because isBoundedReadOnlyPipeline only ever knew the project root. This pins that the
+// plugin's own installed root (this file's own resolved location) is now a second approved
+// root for exactly that bounded pipeline shape -- narrower than the single-command allowance
+// above, never wider -- while the underlying grammar function's own two-argument, project-
+// root-only default stays byte-identical (asserted directly against guard-command-grammar.mjs).
+test("bounded rg pipeline admits self-inspection reads of the plugin's own installed root", () => {
   const path = root();
   const pluginRoot = fileURLToPath(new URL("../", import.meta.url));
   const hooksDir = join(pluginRoot, "hooks");
@@ -1361,7 +1366,7 @@ test("bounded rg pipeline admits closed read-only diagnostics outside the projec
     const foreign = mkdtempSync(join(tmpdir(), "guard-lifecycle-foreign-"));
     try {
       const command = `rg --files ${foreign} | rg 'x'`;
-      assert.equal(isReadOnlyDiagnosticCommand(command, path), true, command);
+      assert.equal(isReadOnlyDiagnosticCommand(command, path), false, command);
     } finally { rmSync(foreign, { recursive: true, force: true }); }
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
@@ -1455,17 +1460,17 @@ test("NVA-CATPIPE-1: a cat pipeline naming a gate-strength file is classified as
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
-// NVA-CATPIPE-1. Exactness: location is no longer a bound, while the existing structural
-// bounds (exactly two segments, grep/head sink, canonical 1..500 head count, null-device-only
-// redirect) remain unchanged.
-test("NVA-CATPIPE-1: exactness -- external reads are admitted while unsupported composition, sinks, counts, and redirects stay refused", () => {
+// NVA-CATPIPE-1. Exactness: the same closed bounds isBoundedGrepPipeline already enforces
+// (project-root-only read, exactly two segments, sink is grep or head only, canonical
+// 1..500 head count, only the 2>/dev/null redirect) all apply identically to the cat source.
+test("NVA-CATPIPE-1: exactness -- outside-root path, a third segment, a non-grep/head sink, an out-of-range head count, and a non-null-device redirect all stay refused", () => {
   const path = root();
   const outside = mkdtempSync(join(tmpdir(), "guard-lifecycle-catpipe-outside-"));
   try {
     writeFileSync(join(path, "notes.txt"), "keep this open line\n");
     writeFileSync(join(outside, "secret.txt"), "outside\n");
-    assert.equal(isReadOnlyDiagnosticCommand(`cat ${join(outside, "secret.txt")} | grep open`, path), true);
     for (const command of [
+      `cat ${join(outside, "secret.txt")} | grep open`,
       "cat notes.txt | grep open | wc -l",
       "cat notes.txt | wc -l",
       "cat notes.txt | head -n 0",
@@ -1522,20 +1527,20 @@ test("NVA-CF-GITPIPEALLOWLIST: git-sourced bounded pipeline into head is admitte
 });
 
 // NVA-CF-GITPIPEALLOWLIST. Exactness: the same closed bounds isBoundedGrepPipeline/
-// isBoundedCatPipeline already enforce (out-of-range head count and a non-read-only git
-// subcommand as the source) all apply identically to the git source. Filesystem location no
-// longer adds a separate refusal. `git commit ... | head` in particular must never be admitted
-// -- "commit" is not in the read-only subcommand set isReadOnlyGitSubcommand trusts.
-test("NVA-CF-GITPIPEALLOWLIST: exactness -- external path arguments are admitted while counts and non-read-only subcommands stay refused", () => {
+// isBoundedCatPipeline already enforce (out-of-range head count, a non-read-only git
+// subcommand as the source, an out-of-root path argument) all apply identically to the git
+// source. `git commit ... | head` in particular must never be admitted -- "commit" is not in
+// the read-only subcommand set isReadOnlyGitSubcommand trusts.
+test("NVA-CF-GITPIPEALLOWLIST: exactness -- out-of-range head count, a non-read-only git subcommand, and an outside-root path argument all stay refused", () => {
   const path = root();
   const outside = mkdtempSync(join(tmpdir(), "guard-lifecycle-gitpipe-outside-"));
   try {
-    assert.equal(isReadOnlyDiagnosticCommand(`git log ${join(outside, "secret.txt")} | head -5`, path), true);
     for (const command of [
       "git log | head -n 0",
       "git log | head -n 501",
       "git commit -m x | head -5",
       "git push origin main | head -5",
+      `git log ${join(outside, "secret.txt")} | head -5`,
       "git log | grep open",
       "git log | head -n 5 > output.txt",
     ]) {
@@ -4866,9 +4871,18 @@ test("NOVA-XREPO-HGO-7: the guard union's absolute prohibitions gain no admissio
 // the state of the boundary; they are not an endorsement of any single row.
 
 /** The exact denial reason text each refusal prints; the capability binds to it verbatim. */
+/**
+ * NVA-BL-76: the exact denial reason text the read-scope refusal binds into its HGO request.
+ * Kept out of HGO_GRAMMAR_REASON on purpose -- GUARD-READ-SCOPE-OUTSIDE-ROOT is not a grammar
+ * code, and the grammar remedy text is precisely what it must not print.
+ */
+const HGO_READ_SCOPE_REASON =
+  "GUARD-READ-SCOPE-OUTSIDE-ROOT: The bounded read-only diagnostic pipeline reads a path outside the project root.";
+
 const REACHABILITY_REASONS = {
   ...HGO_GRAMMAR_REASON,
   "GUARD-CROSS-REPO-MUTATION": XREPO_REASON,
+  "GUARD-READ-SCOPE-OUTSIDE-ROOT": HGO_READ_SCOPE_REASON,
 };
 
 /**
@@ -5981,11 +5995,18 @@ test("NVA-STARNEEDLE-1 AC-4: the needle-derivation rule and its defensive filter
 });
 
 // ---------------------------------------------------------------------------------
-// NVA-GF-GREENFIELD-READONLY-1. The PO explicitly replaced the earlier read-containment/HGO
-// policy: once a command passes the closed read-only grammar, target location is irrelevant.
-// These fixtures pin direct admission for prior-runner transcript JSON/JSONL reads in both
-// ready and onboarding/restart states, plus the unchanged refusal boundary for writes and
-// unsupported command shapes.
+// NVA-BL-76 (backlog: 2026-08-08-a-bounded-diagnostic-outside-the-repo-is-refused-under-
+// the-wrong-reason.md), restored by NVA-B-READCONTAIN-1 after a 2026-08-30 policy reversal
+// (NVA-GF-GREENFIELD-READONLY-1, commit c8c7f449) briefly admitted every read regardless of
+// target location. The PO reversed that reversal 2026-09-06 ("re-narrow, with explicit
+// exceptions"): the bounded rg-to-head / rg-to-rg pipeline -- and its single-command sibling,
+// pipeline.read-scope-single-command-root-check -- reading a path OUTSIDE the project root
+// (and outside this plugin's own installed root) is refused under its own code, its own true
+// remedy, and -- because reading is not the mutation risk the cross-repository family exists
+// to stop -- an override route a human signature can actually reach. The fixture below also
+// carries the prior-runner transcript fixtures (antigravity/codex/claude session files) the
+// reversed policy added; they are reused here to pin the restored refusal instead of the
+// admission they used to pin.
 // ---------------------------------------------------------------------------------
 
 /** The reproduction fixture: a governed repo plus a real file outside it. */
@@ -6021,12 +6042,21 @@ function readScopeRun(command, projectDir, { lifecycleStatus = "ready", hgoCalls
   return evaluateLifecycleReadyGuard(bash(command), { projectDir, ...readiness, ...hgoSpies });
 }
 
-test("NVA-GF-GREENFIELD-READONLY-1: the complete closed read-only lane admits external JSON/JSONL diagnostics in ready and non-ready states without HGO", () => {
+// Measured empirically against the restored code (scratch/probe-readscope.mjs, this dispatch):
+// every containment-checked read shape (single-command rg/grep/cat/head/tail/wc/stat/file, and
+// the bounded rg-to-rg/rg-to-head pipe) refuses an outside-root target under
+// GUARD-READ-SCOPE-OUTSIDE-ROOT in every lifecycle state this branch is reached in (it is
+// decided ahead of the lifecycle-readiness check itself). The shapes that never carried
+// containment even before c8c7f449 -- sed/find/git -C single-command reads, and the
+// grep-to-grep/grep-to-head pipeline family (isBoundedGrepPipeline was never touched by the
+// removal) -- stay admitted: this restoration narrows exactly the floor that commit removed,
+// nothing more.
+test("NVA-B-READCONTAIN-1: the restored read-scope refusal covers every containment-checked shape across ready and non-ready lifecycle states, and leaves the never-contained shapes admitted", () => {
   const {
     projectDir, outside, outsideFile, antigravityTranscript, codexTranscript, claudeTranscript,
   } = readScopeFixture();
   try {
-    const commands = [
+    const refusedCommands = [
       `rg -n 'antigravity' ${antigravityTranscript}`,
       `grep -n 'tool_call' ${codexTranscript}`,
       `cat ${claudeTranscript}`,
@@ -6035,27 +6065,29 @@ test("NVA-GF-GREENFIELD-READONLY-1: the complete closed read-only lane admits ex
       `wc -l ${codexTranscript}`,
       `stat ${antigravityTranscript}`,
       `file ${claudeTranscript}`,
+      `rg -n 'tool_call' ${codexTranscript} | head -n 5`,
+      `rg --files ${outside} | rg -n jsonl`,
+    ];
+    const stillAdmittedCommands = [
       `sed -n '1,2p' ${codexTranscript}`,
       `find ${outside} -maxdepth 1 -type f`,
       `git -C ${outside} status --short`,
-      `rg -n 'tool_call' ${codexTranscript} | head -n 5`,
-      `rg --files ${outside} | rg -n jsonl`,
       `grep -n 'assistant' ${claudeTranscript} | head -n 5`,
-      `cat ${antigravityTranscript} | head -n 5`,
-      `git log -- ${antigravityTranscript} | head -n 5`,
-      `cat ${antigravityTranscript} && tail -n 1 ${claudeTranscript}`,
-      `rg -n 'session_meta' ${codexTranscript} 2>/dev/null`,
     ];
     for (const lifecycleStatus of ["ready", "intake-required", "restart-required"]) {
-      for (const command of commands) {
-        const hgoCalls = [];
+      for (const command of refusedCommands) {
+        assert.equal(isReadOnlyDiagnosticCommand(command, projectDir), false, `${lifecycleStatus}: ${command}`);
+        const refused = readScopeRun(command, projectDir, { lifecycleStatus });
+        assert.equal(refused.exitCode, 2, `${lifecycleStatus}: ${command}`);
+        assert.match(refused.stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u, `${lifecycleStatus}: ${command}`);
+      }
+      for (const command of stillAdmittedCommands) {
         assert.equal(isReadOnlyDiagnosticCommand(command, projectDir), true, `${lifecycleStatus}: ${command}`);
         assert.deepEqual(
-          readScopeRun(command, projectDir, { lifecycleStatus, hgoCalls }),
+          readScopeRun(command, projectDir, { lifecycleStatus }),
           { exitCode: 0, stderr: "" },
           `${lifecycleStatus}: ${command}`,
         );
-        assert.deepEqual(hgoCalls, [], `HGO was consulted for an admitted read: ${lifecycleStatus}: ${command}`);
       }
     }
   } finally {
@@ -6064,36 +6096,65 @@ test("NVA-GF-GREENFIELD-READONLY-1: the complete closed read-only lane admits ex
   }
 });
 
-test("NVA-BL-76 policy reversal: the exact external rg-to-head reproduction is admitted directly", () => {
+test("NVA-BL-76: the exact reproduction is refused under its own read-scope code, never as an unapproved operator", () => {
   const { projectDir, outside, outsideFile } = readScopeFixture();
   try {
-    const hgoCalls = [];
-    const admitted = readScopeRun(`rg -n 'Overall' ${outsideFile} | head -n 5`, projectDir, { hgoCalls });
-    assert.deepEqual(admitted, { exitCode: 0, stderr: "" });
-    assert.deepEqual(hgoCalls, []);
+    const refused = readScopeRun(`rg -n 'Overall' ${outsideFile} | head -n 5`, projectDir);
+    assert.equal(refused.exitCode, 2);
+    assert.match(refused.stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT: The bounded read-only diagnostic pipeline reads a path outside the project root\./u);
+    // The false reason, and every trace of it, is gone.
+    assert.doesNotMatch(refused.stderr, /GUARD-OPERATOR-UNAPPROVED/u);
+    assert.doesNotMatch(refused.stderr, /unapproved shell operator/u);
+    assert.doesNotMatch(refused.stderr, /Rejected element/u,
+      "there is no rejected grammar element -- the grammar accepted this command");
+    // The self-contradiction: a refusal must not close by listing the shape it just refused.
+    assert.doesNotMatch(refused.stderr, /Only bounded rg-to-rg and rg-to-head diagnostic pipelines are admitted as exceptions/u);
+    // The advice that cannot work.
+    assert.doesNotMatch(refused.stderr, /Do not construct a new composed command/u);
+    assert.doesNotMatch(refused.stderr, /Use one simple shell command per tool call/u);
+    // AC-5 hygiene: an absolute, machine-specific path never appears in the message.
+    assert.ok(!refused.stderr.includes(outside), "the message disclosed the outside-root path");
   } finally {
     rmSync(projectDir, { recursive: true, force: true });
     rmSync(outside, { recursive: true, force: true });
   }
 });
 
-test("NVA-BL-76 policy reversal: piped and unpiped external reads have the same direct admission", () => {
+test("NVA-BL-76: the new remedy is true -- each line is executed, not merely matched", () => {
   const { projectDir, outside, outsideFile } = readScopeFixture();
   try {
-    for (const command of [
-      `rg -n 'Overall' ${outsideFile}`,
-      `cat ${outsideFile}`,
-      `head -n 5 ${outsideFile}`,
-      `rg -n 'Overall' ${outsideFile} | head -n 5`,
-      `rg -n 'Overall' ${outsideFile} | rg -n Overall`,
-    ]) assert.deepEqual(readScopeRun(command, projectDir), { exitCode: 0, stderr: "" }, command);
+    const refused = readScopeRun(`rg -n 'Overall' ${outsideFile} | head -n 5`, projectDir);
+
+    // Line 1 claims the identical pipeline is admitted with an in-root target. Run it.
+    assert.match(refused.stderr, /The pipeline is not the objection: the identical bounded rg-to-rg \/ rg-to-head pipeline is admitted when every read target resolves inside the project root\./u);
+    assert.equal(readScopeRun("rg -n 'Overall' verify-latest.json | head -n 5", projectDir).exitCode, 0,
+      "the remedy claims the in-root pipeline is admitted; it was not");
+
+    // Line 3 (as of pipeline.read-scope-single-command-root-check) no longer claims a single,
+    // un-piped read is admitted "without a path-location restriction" for any path -- that
+    // claim is now false, since the single-command shape is root-checked identically to the
+    // piped one. It claims re-targeting inside the project root is the way out for BOTH
+    // shapes; run the un-piped shape on the very path just refused and confirm it stays
+    // refused under the identical read-scope code, not silently exempted.
+    assert.match(refused.stderr, /Re-target the read inside the project root: the identical bounded pipeline AND the identical single, un-piped read are both admitted once every read target resolves inside the project root\./u);
+    for (const command of [`rg -n 'Overall' ${outsideFile}`, `cat ${outsideFile}`, `head -n 5 ${outsideFile}`]) {
+      const stillRefused = readScopeRun(command, projectDir);
+      assert.equal(stillRefused.exitCode, 2,
+        `the un-piped read of an outside-root path is refused, exactly like the piped shape: ${command}`);
+      assert.match(stillRefused.stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u, command);
+    }
+
+    // Line 2 warns that recomposition cannot help -- pinned as stated, and as measured:
+    // splitting the pipeline into a second piped stage still refuses.
+    assert.match(refused.stderr, /Recomposing the same read -- splitting it, adding operators, redirects or line continuation -- cannot lift this refusal\./u);
+    assert.equal(readScopeRun(`rg -n 'Overall' ${outsideFile} | rg -n Overall`, projectDir).exitCode, 2);
   } finally {
     rmSync(projectDir, { recursive: true, force: true });
     rmSync(outside, { recursive: true, force: true });
   }
 });
 
-test("NVA-BL-76 policy reversal: rg-to-rg external targets are admitted in either segment", () => {
+test("NVA-BL-76 audit: rg-to-rg carries the identical outside-root asymmetry, in either segment", () => {
   const { projectDir, outside, outsideFile } = readScopeFixture();
   try {
     for (const command of [
@@ -6101,32 +6162,40 @@ test("NVA-BL-76 policy reversal: rg-to-rg external targets are admitted in eithe
       `rg --files . | rg -n Overall ${outsideFile}`,
       `rg -n 'Overall' ${outsideFile} | rg -n pass`,
     ]) {
-      assert.deepEqual(readScopeRun(command, projectDir), { exitCode: 0, stderr: "" }, command);
+      const refused = readScopeRun(command, projectDir);
+      assert.equal(refused.exitCode, 2, command);
+      assert.match(refused.stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u, command);
+      assert.doesNotMatch(refused.stderr, /GUARD-OPERATOR-UNAPPROVED/u, command);
     }
     // The in-root control of the same exemption is still admitted, unchanged.
     assert.equal(readScopeRun("rg --files . | rg -n verify", projectDir).exitCode, 0);
 
+    // The admitted stderr suppressor is part of the bounded shape, so the outside-root
+    // variant is the same read-scope refusal -- previously mislabelled GUARD-REDIRECT-UNAPPROVED.
     const suppressed = readScopeRun(`rg -n 'Overall' ${outsideFile} 2>/dev/null | head -n 5`, projectDir);
-    assert.deepEqual(suppressed, { exitCode: 0, stderr: "" });
+    assert.equal(suppressed.exitCode, 2);
+    assert.match(suppressed.stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u);
+    assert.doesNotMatch(suppressed.stderr, /GUARD-REDIRECT-UNAPPROVED/u);
   } finally {
     rmSync(projectDir, { recursive: true, force: true });
     rmSync(outside, { recursive: true, force: true });
   }
 });
 
-test("NVA-GF-GREENFIELD-READONLY-1: removing read containment does not weaken other grammar and write refusals", () => {
+test("NVA-BL-76: nothing but the bounded diagnostic shape is reclassified", () => {
   const { projectDir, outside, outsideFile } = readScopeFixture();
   try {
-    assert.deepEqual(
-      readScopeRun(`cat ${outsideFile} | head -n 5`, projectDir),
-      { exitCode: 0, stderr: "" },
-      "the closed cat-to-head read is admitted independent of target location",
-    );
-    // Every non-location bound remains: an out-of-range head count, an unsupported/writing
-    // consumer, and a real output redirect all keep the code they had.
+    // Every other bound must still hold before the new code is reachable: an out-of-range
+    // head count, a non-rg producer, a writing consumer and a second real redirect all keep
+    // the code they had. A genuinely unbounded or writing outside-root command is untouched.
+    // The cat-to-head bounded pipe is a SEPARATE pipeline family whose own outside-root check
+    // (isBoundedCatPipeline / isApprovedCatPipelineReadPath) is not routed through
+    // isOutsideRootBoundedDiagnosticRead (rg-only) -- it keeps its pre-existing
+    // GUARD-OPERATOR-UNAPPROVED code, exactly as it did before this restoration.
     for (const [command, code] of [
       [`rg -n 'Overall' ${outsideFile} | head -n 9999`, "GUARD-OPERATOR-UNAPPROVED"],
       [`rg -n 'Overall' ${outsideFile} | tee out.txt`, "GUARD-OPERATOR-UNAPPROVED"],
+      [`cat ${outsideFile} | head -n 5`, "GUARD-OPERATOR-UNAPPROVED"],
       [`rg -n 'Overall' ${outsideFile} | xargs rm`, "GUARD-OPERATOR-UNAPPROVED"],
       [`rg -n 'Overall' ${outsideFile} > out.txt | head -n 5`, "GUARD-REDIRECT-UNAPPROVED"],
       [`rg -n 'Overall' ${outsideFile} | head -n 5 > ${join(outside, "captured.txt")}`, "GUARD-CROSS-REPO-MUTATION"],
@@ -6135,6 +6204,8 @@ test("NVA-GF-GREENFIELD-READONLY-1: removing read containment does not weaken ot
       const refused = readScopeRun(command, projectDir);
       assert.equal(refused.exitCode, 2, command);
       assert.match(refused.stderr, new RegExp(code, "u"), command);
+      assert.doesNotMatch(refused.stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u,
+        `a shape that is not the bounded read-only diagnostic was reclassified as one: ${command}`);
     }
   } finally {
     rmSync(projectDir, { recursive: true, force: true });
@@ -6142,15 +6213,25 @@ test("NVA-GF-GREENFIELD-READONLY-1: removing read containment does not weaken ot
   }
 });
 
-test("NVA-GF-GREENFIELD-READONLY-1: external reads are admitted, not classified into an override class", () => {
+test("NVA-BL-76: the read-scope refusal is override-REACHABLE, and is not the cross-repository-mutation class", () => {
   const { projectDir, outside, outsideFile } = readScopeFixture();
   try {
+    // Same instrument as the NVA-BL-75 corpus: not "was it admitted" but "who, if anyone,
+    // could subsequently admit it". The PO's classification decision for this item is that a
+    // human signature CAN authorize an outside-root READ -- unlike a never-liftable
+    // cross-repository mutation, which is what the old code implied by association.
     for (const command of [
       `rg -n 'Overall' ${outsideFile} | head -n 5`,
       `rg --files ${outside} | rg -n Overall`,
       `rg -n 'Overall' ${outsideFile} 2>/dev/null | head -n 5`,
     ]) {
-      assert.deepEqual(overrideReachability(command, projectDir), { code: "<admitted>", reach: "admitted" });
+      assert.deepEqual(
+        overrideReachability(command, projectDir),
+        { code: "GUARD-READ-SCOPE-OUTSIDE-ROOT", reach: "liftable-by-signature:cross-repository-target" },
+        "who may authorize an outside-root bounded read moved. This is the boundary NVA-BL-76 set "
+          + "deliberately (reading is not the mutation risk the cross-repository family exists to "
+          + "stop); record the decision before touching this expectation.",
+      );
     }
   } finally {
     rmSync(projectDir, { recursive: true, force: true });
@@ -6158,24 +6239,44 @@ test("NVA-GF-GREENFIELD-READONLY-1: external reads are admitted, not classified 
   }
 });
 
-test("NVA-GF-GREENFIELD-READONLY-1: external read admission never invokes HGO consumption or planning", () => {
+test("NVA-BL-76: a real signed capability reaches the read-scope denial end to end", () => {
   const { projectDir, outside, outsideFile } = readScopeFixture();
   try {
+    // overrideReachability() above only PLANS. This arms and consumes a genuine detached
+    // Ed25519 proof, which is also the only check that proves the reason string the denial
+    // prints is byte-identical to the one the capability is bound to -- a drift between them
+    // would leave the measured route unusable while every plan-level assertion stayed green.
     const command = `rg -n 'Overall' ${outsideFile} | head -n 5`;
-    const hgoCalls = [];
-    assert.deepEqual(readScopeRun(command, projectDir, { hgoCalls }), { exitCode: 0, stderr: "" });
-    assert.deepEqual(hgoCalls, []);
+    hgoArmBySignature(projectDir, { command }, [{ guard: "guard-lifecycle-ready.mjs", reason: HGO_READ_SCOPE_REASON }]);
+    const admitted = evaluateLifecycleReadyGuard(bash(command), { projectDir, ...hgoReadyDeps() });
+    assert.match(
+      admitted.stderr,
+      /\[pipeline-human-override\] guard-lifecycle-ready GUARD-READ-SCOPE-OUTSIDE-ROOT: exact one-time capability consumed/u,
+      "the read-scope denial measured as liftable-by-signature did not consume a genuine signed capability",
+    );
   } finally {
     rmSync(projectDir, { recursive: true, force: true });
     rmSync(outside, { recursive: true, force: true });
   }
 });
 
-test("NVA-GF-GREENFIELD-READONLY-1: single unpiped external reads are admitted under the same policy as pipelines", () => {
+// ---------------------------------------------------------------------------------
+// pipeline.read-scope-single-command-root-check (backlog: 2026-08-29-read-scope-guard-
+// admits-single-command-but-blocks-the-piped-form.md), restored by NVA-B-READCONTAIN-1. The
+// bounded rg-to-head/rg-to-rg pipeline was already root-checked (NVA-BL-76, above); the IDENTICAL
+// read issued as a single, un-piped command was not -- protection against reading outside the
+// project root depended on the shell shape of the command, not on the actual filesystem target
+// being read. This pins the single-command sibling of that same containment check.
+// ---------------------------------------------------------------------------------
+
+test("pipeline.read-scope-single-command-root-check: a single un-piped read outside the project root is refused under the same code as the piped shape", () => {
   const { projectDir, outside, outsideFile } = readScopeFixture();
   try {
     for (const command of [`rg -n 'Overall' ${outsideFile}`, `cat ${outsideFile}`, `head -n 5 ${outsideFile}`]) {
-      assert.deepEqual(readScopeRun(command, projectDir), { exitCode: 0, stderr: "" }, command);
+      const refused = readScopeRun(command, projectDir);
+      assert.equal(refused.exitCode, 2, command);
+      assert.match(refused.stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u, command);
+      assert.doesNotMatch(refused.stderr, /GUARD-LIFECYCLE-NOT-READY/u, command);
     }
   } finally {
     rmSync(projectDir, { recursive: true, force: true });
@@ -6183,42 +6284,54 @@ test("NVA-GF-GREENFIELD-READONLY-1: single unpiped external reads are admitted u
   }
 });
 
-test("NVA-GF-GREENFIELD-READONLY-1: in-root and external read locations are admission-equivalent", () => {
+test("pipeline.read-scope-single-command-root-check: an in-root single un-piped read is unaffected, and so is the piped shape", () => {
   const { projectDir, outside, outsideFile } = readScopeFixture();
   try {
     // The read-only working pattern most of a session's diagnostic activity depends on.
     for (const command of ["rg -n 'Overall' verify-latest.json", "cat verify-latest.json", "head -n 5 verify-latest.json"]) {
       assert.equal(readScopeRun(command, projectDir).exitCode, 0, command);
     }
-    assert.equal(readScopeRun(`rg -n 'Overall' ${outsideFile} | head -n 5`, projectDir).exitCode, 0);
-    assert.equal(readScopeRun("rg -n 'Overall' verify-latest.json | head -n 5", projectDir).exitCode, 0);
+    // The piped shape (NVA-BL-76) is unaffected by this single-command sibling check.
+    const pipedRefused = readScopeRun(`rg -n 'Overall' ${outsideFile} | head -n 5`, projectDir);
+    assert.equal(pipedRefused.exitCode, 2);
+    assert.match(pipedRefused.stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u);
   } finally {
     rmSync(projectDir, { recursive: true, force: true });
     rmSync(outside, { recursive: true, force: true });
   }
 });
 
-test("NVA-GF-GREENFIELD-READONLY-1: plugin and unrelated external files use the same read admission", () => {
+test("pipeline.read-scope-single-command-root-check: BOUNDED_PIPELINE_ADDITIONAL_ROOTS is honoured identically by the single-command check", () => {
   const { projectDir, outside, outsideFile } = readScopeFixture();
   try {
+    // A single un-piped read of this plugin's own installed root stays admitted, matching the
+    // piped shape's own allowance (the "bounded rg pipeline admits self-inspection reads of
+    // the plugin's own installed root" test above, single-command sibling of it).
     const pluginFile = fileURLToPath(new URL("./guard-lifecycle-ready.mjs", import.meta.url));
     assert.equal(readScopeRun(`cat ${pluginFile}`, projectDir).exitCode, 0);
-    assert.equal(readScopeRun(`cat ${outsideFile}`, projectDir).exitCode, 0);
+    // A genuinely foreign path is still refused -- BOUNDED_PIPELINE_ADDITIONAL_ROOTS did not
+    // become a blanket bypass.
+    assert.equal(readScopeRun(`cat ${outsideFile}`, projectDir).exitCode, 2);
   } finally {
     rmSync(projectDir, { recursive: true, force: true });
     rmSync(outside, { recursive: true, force: true });
   }
 });
 
-test("NVA-GF-GREENFIELD-READONLY-1: non-read-only shapes keep their lifecycle and mutation refusals", () => {
+test("pipeline.read-scope-single-command-root-check: a shape that is not solely a root-scope issue is not reclassified as one", () => {
   const { projectDir, outside, outsideFile } = readScopeFixture();
   try {
-    // grep --files-with-matches remains outside this guard's closed diagnostic grammar.
+    // grep --files-with-matches fails isReadOnlySimpleWords' own exclusion (checked before the
+    // new containment check, both in-root and out-of-root), so it is never the single-command
+    // read-only shape at all and isOutsideRootSingleCommandRead() must not reclassify it as a
+    // root-scope issue. It is not otherwise a recognized admission, so on a NOT-ready root it
+    // falls through to the generic not-ready refusal, never GUARD-READ-SCOPE-OUTSIDE-ROOT.
     const refused = evaluateLifecycleReadyGuard(bash(`grep --files-with-matches Overall ${outsideFile}`), {
       projectDir, requireProjectOnboardingReadyFn() { deny("partial"); },
     });
     assert.equal(refused.exitCode, 2);
     assert.match(refused.stderr, /GUARD-LIFECYCLE-NOT-READY/u);
+    assert.doesNotMatch(refused.stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u);
     // A mutating command outside root (never a read-only shape at all) keeps its own,
     // pre-existing cross-repository-mutation classification -- untouched by this fix.
     const mutating = readScopeRun(`cp ${outsideFile} ${join(outside, "copy.json")}`, projectDir);
@@ -6230,7 +6343,7 @@ test("NVA-GF-GREENFIELD-READONLY-1: non-read-only shapes keep their lifecycle an
   }
 });
 
-test("NVA-GF-GREENFIELD-READONLY-1: only read containment is relaxed; writes, scripts, and unsupported composition remain refused", () => {
+test("NVA-B-READCONTAIN-1: writes, scripts, and unsupported composition remain refused for their own pre-existing reasons, independent of read-scope containment", () => {
   const { projectDir, outside, outsideFile } = readScopeFixture();
   const dependencies = {
     projectDir,
