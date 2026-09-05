@@ -6096,6 +6096,34 @@ test("NVA-B-READCONTAIN-1: the restored read-scope refusal covers every containm
   }
 });
 
+// NVA-B-READCONTAIN-1 fix round, F2: before this fix, a symlink planted INSIDE the project
+// root pointing to a target OUTSIDE it satisfied isApprovedSingleCommandReadArg's and
+// isApprovedCatPipelineReadPath's lexical-only pathInside() check (the symlink's own path
+// string is inside root, regardless of what it points at) and was silently admitted as an
+// ordinary in-root read. Both containment checks now resolve through the realpath-walking
+// isRealpathedWithinBoundary(), the same ancestor-walk-then-realpath discipline
+// isPathWithinRealpathedRoot() already applies on the write lane.
+test("NVA-B-READCONTAIN-1 fix round, F2: a symlink planted inside the project root pointing outside it is refused by the single-command read shape and by the cat-pipeline bounded shape", () => {
+  const { projectDir, outside, outsideFile } = readScopeFixture();
+  const linkPath = join(projectDir, "linked-outside.json");
+  try {
+    symlinkSync(outsideFile, linkPath);
+    // Single-command shape -- isApprovedSingleCommandReadArg's containment check.
+    assert.equal(isReadOnlyDiagnosticCommand(`cat ${linkPath}`, projectDir), false);
+    const singleCommand = readScopeRun(`cat ${linkPath}`, projectDir, { lifecycleStatus: "ready" });
+    assert.equal(singleCommand.exitCode, 2, "the symlinked single-command read must be refused, not admitted");
+    assert.match(singleCommand.stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u);
+    // Bounded cat-pipeline shape -- isApprovedCatPipelineReadPath's containment check.
+    const pipelineCommand = `cat ${linkPath} | head -n 5`;
+    assert.equal(isReadOnlyDiagnosticCommand(pipelineCommand, projectDir), false);
+    const pipelineResult = readScopeRun(pipelineCommand, projectDir, { lifecycleStatus: "ready" });
+    assert.equal(pipelineResult.exitCode, 2, "the symlinked cat-pipeline read must be refused, not admitted");
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
 test("NVA-BL-76: the exact reproduction is refused under its own read-scope code, never as an unapproved operator", () => {
   const { projectDir, outside, outsideFile } = readScopeFixture();
   try {

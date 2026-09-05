@@ -344,10 +344,12 @@ const GRAMMAR_DENIAL_GUIDANCE = {
  * Deliberately NOT the cross-repository-mutation family: nothing here writes anywhere. It is
  * a narrower READ-scope refusal, and it is routed through humanOverrideRoute() exactly like
  * the grammar codes, so a human signature can authorize one exact outside-root read
- * (measured class `cross-repository-target`, ADR-0059 Decision 6). Distinguishing this from
- * a write is the whole point of giving it its own code: a signature that may authorize
- * reading a background job's log outside the checkout is not a signature that may authorize
- * mutating another repository.
+ * (measured class `cross-repository-target` -- eligibility()'s generic out-of-root-argv
+ * classification, reused here as-is; this read-scope code's own classification choice, not
+ * an authority the mutation-specific ADR-0059 amendment that built that machinery ever
+ * extended to reads). Distinguishing this from a write is the whole point of giving it its
+ * own code: a signature that may authorize reading a background job's log outside the
+ * checkout is not a signature that may authorize mutating another repository.
  */
 // backlog/items/2026-08-19-closed-shell-grammar-still-rejects-common-readonly-composition.md
 // Proposal point 1: a SMALL, explicit allowlist of read-only commands admitted when
@@ -1919,11 +1921,64 @@ const CAT_PIPELINE_DISPLAY_FLAGS = new Set([
   "-v", "--show-nonprinting",
 ]);
 
+/**
+ * NVA-B-READCONTAIN-1 (fix round, F2). Shared by isApprovedCatPipelineReadPath below and
+ * isApprovedSingleCommandReadArg (this file, further down): takes an ALREADY
+ * lexically-resolved absolute candidate and confirms it survives the identical
+ * ancestor-walk-then-realpath discipline isPathWithinRealpathedRoot() (this file, ~line
+ * 1520) applies on the write lane, so a symlink planted inside `boundary` pointing outside
+ * it is refused, not silently admitted by a lexical-only pathInside() check.
+ *
+ * Deliberately its OWN copy of that discipline, not a direct call into
+ * isPathWithinRealpathedRoot() itself, for two reasons. First, this dispatch's forbidden
+ * list excludes write-path logic from this round's changes, and isPathWithinRealpathedRoot()
+ * backs isProjectWritePath() directly. Second, and more than a scope courtesy:
+ * isPathWithinRealpathedRoot() re-resolves its own `filePath` argument AGAINST the boundary
+ * it is given (`resolve(root, filePath)`) -- correct for its single-boundary write-lane
+ * caller, but calling it once per candidate boundary here (root, then each of extraRoots)
+ * would silently reinterpret a RELATIVE read argument as relative to each extra boundary in
+ * turn, admitting shapes the lexical check never did. Taking an already-resolved absolute
+ * candidate and only re-deriving containment through realpath avoids that widening. This
+ * mirrors the same deliberate-separate-copy convention this function's own predecessor
+ * comment already states for the bounded-pipeline family (below).
+ *
+ * The `resolved === boundary` identity shortcut matters for a caller this function's own
+ * two consumers do not control: isOutsideRootSingleCommandRead()/isOutsideRootBoundedDiagnosticRead()'s
+ * own "was containment the only thing blocking this" re-check lifts a read argument's OWN
+ * resolved path into `extraRoots`, so the candidate and the boundary are the identical string
+ * by construction on that second call -- not a real, independently-realpathed root like
+ * `root` or BOUNDED_PIPELINE_ADDITIONAL_ROOTS. Without the shortcut, realpathing that
+ * self-referential boundary re-resolves the SAME symlink the candidate already carries,
+ * which then fails containment against its own un-realpathed string -- silently defeating the
+ * lift this classifier exists to perform and letting the command fall through past the
+ * READ-SCOPE branch entirely (measured live this dispatch: a plain symlinked single-command
+ * read fell through to unconditional admission in ready state instead of landing on
+ * GUARD-READ-SCOPE-OUTSIDE-ROOT). The shortcut costs nothing on the real-boundary path: a
+ * resolved file path equals a directory boundary only when the boundary itself is the exact
+ * thing being read, which needs no symlink walk to already be "inside itself".
+ */
+function isRealpathedWithinBoundary(resolved, boundary, dependencies = {}) {
+  if (resolved === boundary) return true;
+  if (!pathInside(boundary, resolved)) return false;
+  const exists = dependencies.existsSyncFn ?? existsSync;
+  const realpath = dependencies.realpathSyncFn ?? realpathSync;
+  let ancestor = resolved;
+  try {
+    while (ancestor !== boundary && !exists(ancestor)) ancestor = dirname(ancestor);
+    return pathInside(boundary, realpath(ancestor));
+  } catch {
+    return false;
+  }
+}
+
 // A local twin of guard-command-grammar.mjs's approvedReadPath(): resolve `value` against
-// `root` and require it to stay inside `root`. Not imported -- approvedReadPath is not
-// exported from that file (only parseGuardCommand and isBoundedReadOnlyPipeline are), and this
-// dispatch's briefed scope excludes editing it. Uses this file's own already-local
-// `pathInside` (below), the same containment logic guard-command-grammar.mjs's copy applies.
+// `root` and require it to stay inside `root`, through the realpath-resolving discipline
+// isRealpathedWithinBoundary() just above (NVA-B-READCONTAIN-1 fix round, F2 -- a symlink
+// inside `root` pointing outside it used to pass this check on lexical grounds alone). Not
+// imported -- approvedReadPath is not exported from that file (only parseGuardCommand and
+// isBoundedReadOnlyPipeline are), and this dispatch's briefed scope excludes editing it.
+// Uses this file's own already-local `pathInside` (below), the same containment logic
+// guard-command-grammar.mjs's copy applies.
 // A separate copy from isApprovedSingleCommandReadArg's near-identical containment check
 // (isReadOnlySimpleWords' single-command rule, above) on purpose -- this pipeline family
 // keeps its own copy rather than merging the two, a different pipeline family from the
@@ -1931,7 +1986,7 @@ const CAT_PIPELINE_DISPLAY_FLAGS = new Set([
 function isApprovedCatPipelineReadPath(value, root) {
   if (typeof value !== "string" || value === "" || value.includes("\0")) return false;
   try {
-    return pathInside(resolve(root), resolve(root, value));
+    return isRealpathedWithinBoundary(resolve(root, value), resolve(root));
   } catch {
     return false;
   }
@@ -2306,7 +2361,12 @@ function isReadOnlyDiagnosticCommandWithTrailingStderrRedirect(command, root) {
  * A single un-piped read command's path-taking argument, checked against the identical
  * containment rule isOutsideRootBoundedDiagnosticRead() already applies to the piped shape:
  * a flag (commandPath() returns null) is never a path token and is always approved; a real
- * path argument must resolve inside `root` or one of `extraRoots`. Reused rather than a
+ * path argument must resolve inside `root` or one of `extraRoots`, through the SAME
+ * ancestor-walk-then-realpath discipline isRealpathedWithinBoundary() applies for the cat
+ * pipeline lane above (NVA-B-READCONTAIN-1 fix round, F2 -- a symlink inside `root` or an
+ * extra root, pointing outside it, used to pass this check on lexical grounds alone). Also
+ * the sole containment check isBoundedGitPipeline's subargs loop reuses, so this one fix
+ * covers both the single-command and the bounded git-pipeline callers. Reused rather than a
  * second copy of the containment logic (see isOutsideRootBoundedDiagnosticRead's own
  * scopeLifted comment for why a second copy is exactly the drift this repository's
  * guardrails warn against).
@@ -2314,9 +2374,9 @@ function isReadOnlyDiagnosticCommandWithTrailingStderrRedirect(command, root) {
 function isApprovedSingleCommandReadArg(arg, root, extraRoots) {
   const resolved = commandPath(arg, root); // null for flags -> not a path token
   if (resolved === null) return true;
-  if (pathInside(root, resolved)) return true;
+  if (isRealpathedWithinBoundary(resolved, root)) return true;
   return extraRoots.some((extra) => {
-    try { return pathInside(resolve(extra), resolved); } catch { return false; }
+    try { return isRealpathedWithinBoundary(resolved, resolve(extra)); } catch { return false; }
   });
 }
 
