@@ -286,17 +286,34 @@ PO decided "re-narrow, with explicit exceptions" on
 `2026-08-29-read-scope-guard-admits-single-command-but-blocks-the-piped-form.md`'s
 regression (`c8c7f449` removed all project-root containment from the
 read-only Bash lane in `guard-lifecycle-ready.mjs` a day after it was added).
-Split into two dispatches: `NVA-B-READCONTAIN-1` (in progress) restores
-exactly the pre-`c8c7f449` mechanism (`BOUNDED_PIPELINE_ADDITIONAL_ROOTS`,
-`GUARD-READ-SCOPE-OUTSIDE-ROOT`, `isOutsideRootSingleCommandRead`/
-`isOutsideRootBoundedDiagnosticRead`) with no new exceptions;
-`NVA-B-READCONTAIN-2` (not yet dispatched) adds two new session-derived
-exception roots (transcript-adjacent tree, task-output tree — both resolved
-from the PreToolUse hook's `transcript_path` field the way
+Split into two dispatches. **`NVA-B-READCONTAIN-1` landed at `cbc30756`**:
+restored exactly the pre-`c8c7f449` mechanism
+(`BOUNDED_PIPELINE_ADDITIONAL_ROOTS`, `GUARD-READ-SCOPE-OUTSIDE-ROOT`,
+`isOutsideRootSingleCommandRead`/`isOutsideRootBoundedDiagnosticRead`) with
+no new exceptions — 226/226 tests (independently re-verified), the 2026-08-29
+item's mechanical `done_when` predicate no longer REGRESSION, generator
+byte-equality and consumer-safe-paths both green, authorship PASS. One
+resume needed (80-turn maxTurns cliff before its first commit, standard
+GF-09-D procedural resume). Disclosed, faithful-to-pre-removal-scope
+finding: the restored containment covers the single-command shape and the
+rg-pipe family only, exactly as `NVA-BL-76` originally scoped it — grep-pipe
+and cat-pipe/git-pipe outside-root reads were never covered by the
+read-scope code before OR after removal either (cat-pipe/git-pipe fall
+through to the pre-existing generic `GUARD-OPERATOR-UNAPPROVED` refusal,
+which still refuses them, just without the read-scope-specific override
+route; grep-pipe carries no location containment at all, in either state).
+Not a regression from this dispatch — worth naming in the ADR below as a
+known, pre-existing scope boundary rather than letting it stay implicit.
+
+T1 Critic (opus, max) dispatched next. `NVA-B-READCONTAIN-2` (not yet
+dispatched) adds two new session-derived exception roots
+(transcript-adjacent tree, task-output tree — both resolved from the
+PreToolUse hook's `transcript_path` field the way
 `claudeSessionMemoryDirectory`/MEMPATH-1 already does for the write side,
-never pattern-matched) on top of that floor. Both need a T1 Critic round
-(opus, max — A/G/S class). After both land, author the ADR the backlog
-item's acceptance criteria require and close both
+never pattern-matched) on top of the now-restored floor; it also needs its
+own T1 Critic round. After both land, author the ADR the backlog item's
+acceptance criteria require (recording both the restored boundary and the
+grep/cat/git-pipe scope gap above) and close both
 `2026-09-01-read-containment-was-removed-a-day-after-it-was-added-with-no-recorded-decision.md`
 and the 2026-08-29 item.
 
