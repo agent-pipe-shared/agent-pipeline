@@ -850,6 +850,7 @@ if (startedCandidate.status === "dirty") {
         try {
           verifyRun = await runVerifyJournal({
             gitCommonDir: gitCommonDirectory(),
+            runId,
             repoRoot,
             candidate: { commit: startedCandidate.commit, tree: startedCandidate.tree },
             suites: registeredSuites,
