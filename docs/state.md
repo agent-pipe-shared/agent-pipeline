@@ -305,8 +305,26 @@ route; grep-pipe carries no location containment at all, in either state).
 Not a regression from this dispatch — worth naming in the ADR below as a
 known, pre-existing scope boundary rather than letting it stay implicit.
 
-T1 Critic (opus, max) dispatched next. `NVA-B-READCONTAIN-2` (not yet
-dispatched) adds two new session-derived exception roots
+**T1 Critic round 1 (opus, max, functional-equivalent-read-only): FAIL
+(partial — 24-tool base budget exhausted before `guardrails/security.md`/
+`guardrails/global.md`; findings stand regardless).** Three findings, all
+disclosed and fixed via a correction dispatch (in progress): F1, a stale
+`ADR-0059 Decision 6` citation misattributing a mutation-only decision as
+authority for a read classification; F2 (the serious one) — the restored
+containment checks resolve targets lexically (`commandPath`/`pathInside`,
+no `realpathSync`), so a symlink planted inside the project root pointing
+outside it bypasses the boundary, unlike the same file's write lane
+(`isPathWithinRealpathedRoot`), which already closes exactly this; F3, two
+edge shapes (trailing `2>/dev/null` on a single read, the same via `&&`)
+lost test coverage and land on a technically-wrong denial code. Findings
+registry: `backlog/evidence/2026-09-06-nva-b-readcontain-1-findings.md`.
+Two minors also noted (no ADR/threat-model pointer yet — the Elephant
+authors this after both READCONTAIN dispatches land; evidence logs not
+bound to a commit SHA). Per the two-round cap, this is round 1 of 2; the
+correction commit gets one fresh re-Critic round next.
+
+`NVA-B-READCONTAIN-2` (not yet dispatched, after the correction round
+lands) adds two new session-derived exception roots
 (transcript-adjacent tree, task-output tree — both resolved from the
 PreToolUse hook's `transcript_path` field the way
 `claudeSessionMemoryDirectory`/MEMPATH-1 already does for the write side,
