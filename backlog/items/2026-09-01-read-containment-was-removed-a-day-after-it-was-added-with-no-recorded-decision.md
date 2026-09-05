@@ -97,17 +97,30 @@ that no longer exists.
 **PO decision: Re-narrow.** Restore project-root containment on the closed
 read-only Bash lane in `guard-lifecycle-ready.mjs`, admitting an explicit,
 resolved (never pattern-matched) set of external read roots rather than the
-blanket removal `c8c7f449` made. A dispatch implementing this is in progress
-(`NVA-B-READCONTAIN-1`); it restores the pre-`c8c7f449` mechanism
-(`GUARD-READ-SCOPE-OUTSIDE-ROOT`, `liftable-by-signature:cross-repository-target`
-reachability, `BOUNDED_PIPELINE_ADDITIONAL_ROOTS`) as the floor, then adds new
-session-derived exception roots (this session's own transcript-adjacent tree
-and task-output tree, both resolved from the PreToolUse hook's own
-`transcript_path` field the way `claudeSessionMemoryDirectory` already does
-for the write side, MEMPATH-1) so the legitimate need stays met without a
-blanket-open lane. An arbitrary external read outside every approved root
-stays refused, override-reachable by human signature, exactly as before
-`c8c7f449` removed it.
+blanket removal `c8c7f449` made. Split into two dispatches, tracked here so
+this item's own acceptance criterion 3 is not left resting only on
+`docs/state.md` prose:
+
+- **`NVA-B-READCONTAIN-1` (landed, `cbc30756`, T1 Critic round 1 = FAIL,
+  rework in progress).** Restores the pre-`c8c7f449` mechanism
+  (`GUARD-READ-SCOPE-OUTSIDE-ROOT`, `liftable-by-signature:cross-repository-target`
+  reachability, `BOUNDED_PIPELINE_ADDITIONAL_ROOTS`) as the floor, with no new
+  exception roots — deliberately, so its diff is independently reviewable.
+  This alone does NOT satisfy acceptance criterion 3 below; that is expected
+  and is `NVA-B-READCONTAIN-2`'s job, not a regression of this dispatch.
+  Findings registry: `backlog/evidence/2026-09-06-nva-b-readcontain-1-findings.md`.
+- **`NVA-B-READCONTAIN-2` (not yet dispatched, committed next step).** Adds
+  the two new session-derived exception roots this item's acceptance
+  criterion 3 requires — this session's own transcript-adjacent tree and
+  task-output tree, both resolved from the PreToolUse hook's own
+  `transcript_path` field the way `claudeSessionMemoryDirectory` already does
+  for the write side (MEMPATH-1) — so the legitimate need stays met without a
+  blanket-open lane. Dispatched immediately after `NVA-B-READCONTAIN-1`'s
+  correction round lands and passes its re-Critic.
+
+An arbitrary external read outside every approved root stays refused,
+override-reachable by human signature, exactly as before `c8c7f449` removed
+it.
 
 ## Acceptance criteria
 
