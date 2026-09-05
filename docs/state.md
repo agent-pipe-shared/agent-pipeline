@@ -282,16 +282,18 @@ outstanding ceremony. After C/D/E land:
 `node harness/scripts/verify.mjs` run bound to the final HEAD, then close the
 2026-08-12 backlog item above.
 
-### 2026-09-05: worktree-safety fix landed; its wiring was reverted (T1 FAIL)
+### 2026-09-05/06: worktree-liveness item closed, PO-decided scope
 
-`NVA-B-WTLIVE-1`: `1ebf80d5` (fifth liveness condition, gitdir reflog age;
-30/30 green) stands. `bb8347e4` (wiring into the unconditional-every-bootstrap
-`runBootstrapWorktreeSweep`) was **reverted** (`d818dcf1`) after a T1 Critic
-FAIL — F1 major: unattended `git worktree remove` reachable repo-wide, not
-scoped to `.claude/worktrees/`, could delete a human worktree's gitignored
-content. Two minors also open. Backlog item:
+`NVA-B-WTLIVE-1` (mechanism, `1ebf80d5`) → `bb8347e4` reverted (`d818dcf1`)
+after a T1 Critic FAIL (repo-wide unattended deletion) → PO decided the
+scope (Pipeline-owned paths only: `.claude/worktrees/`, `branch/`,
+`branch/detached/`) → `NVA-B-WTLIVE-2` (`baf1ad71`, `eca3e170`) → a second
+T1 finding (allowlist anchored to the running worktree, not the true
+primary checkout) → per the two-round cap, `NVA-B-WTLIVE-3` (`b2d8ccf1`,
+`05bdf6a9`) fixed it, self-verified by the Elephant (35/35 + 13/13 + 9/9
+green). Closed. F3 (`resolveMainWorktreePath` misidentification from a
+linked worktree) stays open, separately tracked, non-blocking. Full detail:
 `2026-09-01-a-fresh-worktree-is-indistinguishable-from-an-abandoned-one.md`.
-Follow-up needs the unattended call scoped before re-wiring.
 
 ## PO decisions and todos — collected during the autonomous run, not waited on
 
