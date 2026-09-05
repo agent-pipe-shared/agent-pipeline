@@ -75,3 +75,40 @@ mechanism, and licensing it to run on its own.
 - Only then is `planRegisteredWorktreeRetirement` wired into
   `runBootstrapWorktreeSweep`, with a test that a just-created worktree is
   declined.
+
+## Progress, 2026-09-05 (dispatch NVA-B-WTLIVE-1)
+
+**First two acceptance criteria met, landed, stands: `1ebf80d5`.** A fifth
+`evaluateWorktreeCandidate` condition (gitdir `logs/HEAD` reflog age,
+threshold derived from real `evidence/dispatch-record-*.json` inter-commit
+gaps with a stated safety multiplier) closes the gap this item's own framing
+undersold: the danger window is not only at creation, it recurs after every
+commit an attached-branch worktree makes, since a just-committed worktree is
+clean, unlocked and its HEAD is the branch tip by the pre-existing four
+conditions alone. Both creation paths (the `worktree-lifecycle.mjs`-recorded
+path and the record-less host-harness `isolation: "worktree"` path) are
+covered. 30/30 tests green, independently re-verified.
+
+**Third criterion (wiring) attempted and reverted, not met.** `bb8347e4`
+wired the mechanism into `runBootstrapWorktreeSweep`, which fires
+unconditionally on every `pipeline-start-preflight.mjs` bootstrap. A T1
+Critic review (opus, max) returned FAIL on F1 (major): the registered-worktree
+branch this wiring calls enumerates and can `git worktree remove` **any**
+registered worktree repository-wide — unlike the sibling orphan-directory
+branch, which is correctly scoped to `.claude/worktrees/` — so the unattended
+sweep could delete a human-created worktree elsewhere in the repository,
+including gitignored, unbacked-up content `git status --porcelain` never
+reports and `git worktree remove`'s own clean-check does not protect.
+Reverted (`d818dcf1`) the same session, before any bootstrap could exercise
+it. Two minor findings also open: a combined try/catch's doc comment claims
+a fault-isolation property the code does not actually have (low reachability,
+disclosed); `resolveMainWorktreePath` misidentifies the main worktree when
+run from inside a linked worktree (currently harmless by two accidental
+safety nets, not by the check the doc comment claims).
+
+**What remains:** scope the unattended call — options include restricting it
+to worktrees `worktree-lifecycle.mjs` itself provisioned/recorded, or an
+explicit PO-level decision on the acceptable population for automatic
+deletion (`harness/review-protocol.md`'s PO-escalation trigger for
+irreversible matters applies here) — then re-wire, gated on the same decline
+tests plus a repro of F1's exact reported scope gap.
