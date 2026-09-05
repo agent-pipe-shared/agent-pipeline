@@ -218,29 +218,14 @@ covers only one contiguous region.
 - **Blocks A (imports) and B (evidencePath/writeEvidence/runId) landed and
   committed at `61dc7fc5`.** Both ceremonies completed end-to-end; the commit
   message records their request/plan hashes.
-- **Block C is prepared but unsigned.** Wires the new `runId` into the
-  `runVerifyJournal` call site (around line 851):
-  ```js
-  // old:
-            verifyRun = await runVerifyJournal({
-              gitCommonDir: gitCommonDirectory(),
-              repoRoot,
-  // new:
-            verifyRun = await runVerifyJournal({
-              gitCommonDir: gitCommonDirectory(),
-              runId,
-              repoRoot,
-  ```
-  The request was seeded and re-seeded 8 times between 11:24 and 16:29 UTC on
-  2026-09-04 (window 8 expired at 16:29:08Z), each window closing with no PO
-  signature — `proof-manual.json` stayed frozen at 12:52:50 the entire time.
-  Re-seeding was stopped after window 8 per the "seed a ceremony only when the
-  PO can sign immediately" rule (CLAUDE.md, `guard-testpath.mjs`
-  admission-failure note): seeding a 9th window with the PO unavailable only
-  risks a stale-window signature burning a passphrase entry for nothing.
-  Resumes on the PO's say-so — start with a fresh denied Edit (the block above
-  is the exact old/new text) to seed a new request, never reuse
-  `fc296c8f30133f8cd399ef4b45f08ff843aaecf42fa4c22d37cc46022f94ad18`.
+- **Block C landed and committed at `d30273d3`.** Wired the new `runId` into
+  the `runVerifyJournal` call site. The prior request
+  (`fc296c8f30133f8cd399ef4b45f08ff843aaecf42fa4c22d37cc46022f94ad18`)
+  expired unsigned after 8 windows on 2026-09-04; a fresh request
+  (`c376b3fe34fd3c32707c427eeb3c22fc07b21a6a5fd5bcdbb45cb6a3c652899a`, plan
+  `b79e52e19f7e9311152977e5224338502415208ad385ba79c67bd194adfce1a5`) was
+  seeded and signed end-to-end on 2026-09-05/06 the moment the PO was
+  available to sign immediately.
 - **Block D is drafted, not yet seeded.** Extends the final log line:
   ```js
   // old:
