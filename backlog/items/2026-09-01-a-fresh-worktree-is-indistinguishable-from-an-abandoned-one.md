@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.fresh-worktree-indistinguishable-from-abandoned
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-01
+closed_at: 2026-09-06
+closure_repository: self
+closure_commit: 05bdf6a9c6d775c978a6db8f13a0636f3d439a8d
+closure_evidence: "backlog/items/2026-09-01-a-fresh-worktree-is-indistinguishable-from-an-abandoned-one.md"
 sprint: nova-b
 tracking: "Nova B — a just-provisioned Agent-tool worktree satisfies every retirement condition identically to a genuinely abandoned one, so the retirement sweep cannot be wired into bootstrap until the two are distinguishable."
 done_when: manual
@@ -112,3 +116,46 @@ explicit PO-level decision on the acceptable population for automatic
 deletion (`harness/review-protocol.md`'s PO-escalation trigger for
 irreversible matters applies here) — then re-wire, gated on the same decline
 tests plus a repro of F1's exact reported scope gap.
+
+## Closed, 2026-09-05 — PO decided the scope; landed, re-Critic'd, self-verified
+
+**PO decision:** the unattended sweep may automatically retire only worktrees
+under Pipeline-owned path prefixes (`.claude/worktrees/`, `branch/`,
+`branch/detached/`); a worktree anywhere else is never touched by the
+automatic sweep, though the pre-existing, separately-reviewed
+deliberate-invocation API (`c352528f`) keeps its repository-wide reach
+unchanged.
+
+`NVA-B-WTLIVE-2` (`baf1ad71`, `eca3e170`) implemented it: an opt-in
+`restrictToPipelineOwnedPaths` parameter, default `false` (zero behavior
+change for existing callers), requested only by the wired bootstrap sweep. A
+T1 re-Critic round found one further major: the allowlist anchored to
+`resolveMainWorktreePath`'s `--show-toplevel` result, which is the *running*
+worktree, not necessarily the true primary checkout — a false doc-comment
+claim and a silent no-op risk if bootstrap ever runs from a linked worktree,
+though never an incorrect deletion (every misidentified case over-declines).
+Per `harness/review-protocol.md`'s two-round cap, no third Critic round was
+dispatched; `NVA-B-WTLIVE-3` (`b2d8ccf1`, `05bdf6a9`) fixed it — the
+allowlist now anchors to a `--git-common-dir`-derived primary-checkout root,
+matching `worktree-lifecycle.mjs`'s own convention, plus an additive,
+unconditional `skipped-running-worktree` condition so the sweep can never
+retire the worktree it is itself running from. Self-verified by the
+Elephant directly (per the review-protocol's own instruction for a second
+blocking finding): `session-cleanup-recovery.test.mjs` 35/35,
+`pipeline-start-scratch-lifecycle.test.mjs` 13/13,
+`check-consumer-safe-paths.test.mjs` 9/9, all independently re-run; both
+commits' authorship confirmed via `dispatch-authorship-verify.mjs` (one
+UNVERIFIABLE-not-FAIL note: `NVA-B-WTLIVE-3`'s dispatch record wrote
+`report` as a bare string instead of the template's mandated
+`{text, changedFiles}` object — a record-shape defect, not a code defect,
+disclosed here rather than silently accepted).
+
+**F3 stays open, separately tracked, not blocking:** `resolveMainWorktreePath`
+still mislabels the main worktree when invoked from inside a linked
+worktree — harmless today (the new running-worktree condition and the
+corrected anchor both independently prevent any resulting misbehavior), but
+worth its own fix.
+
+Closing this item: all three acceptance criteria are met (liveness
+mechanism, truncated-dispatch handling via the reflog signal, and the
+wiring — now correctly scoped and anchored).

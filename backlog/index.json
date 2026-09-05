@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "38225f5bf6791c4fe185d9aef27064e107d43665465ae53b4646ebfb5188d534"
+    "transitionHead": "aa8c80084bf39c90aca36b38271dba705a077f1365a771901a178d723b44ea5b"
   },
   "counts": {
-    "open": 95,
+    "open": 94,
     "in_progress": 0,
-    "closed": 512,
+    "closed": 513,
     "rejected": 3,
     "deferred": 11
   },
@@ -2507,13 +2507,17 @@
     },
     {
       "id": "pipeline.fresh-worktree-indistinguishable-from-abandoned",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-01",
       "source": "NVA-B-WTRETIRE, 2026-09-01: the dispatch that built planRegisteredWorktreeRetirement declined to wire it into the bootstrap sweep and named this as the reason (commit c352528f).",
       "deferred": false,
-      "tracking": "Nova B — a just-provisioned Agent-tool worktree satisfies every retirement condition identically to a genuinely abandoned one, so the retirement sweep cannot be wired into bootstrap until the two are distinguishable."
+      "tracking": "Nova B — a just-provisioned Agent-tool worktree satisfies every retirement condition identically to a genuinely abandoned one, so the retirement sweep cannot be wired into bootstrap until the two are distinguishable.",
+      "closedAt": "2026-09-06",
+      "closureRepository": "self",
+      "closureCommit": "05bdf6a9c6d775c978a6db8f13a0636f3d439a8d",
+      "closureEvidence": "backlog/items/2026-09-01-a-fresh-worktree-is-indistinguishable-from-an-abandoned-one.md"
     },
     {
       "id": "pipeline.full-push-preflight-before-signature",
