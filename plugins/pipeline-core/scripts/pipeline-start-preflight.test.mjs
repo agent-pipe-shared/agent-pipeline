@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
-import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -16,7 +16,6 @@ import {
   installedPipelineIdentity, installedPipelineVersion, observePipelineStartPreflight,
   normalBootstrapPayloadReceipt, pipelineStartPreflightExitCode, freshnessHostActionForPreflight, SCHEMA,
   STATUS_SCOPE, CONCURRENT_SESSION_WARNING_SCHEMA, resolveActiveRunner,
-  runBootstrapWorktreeSweep, WORKTREE_SWEEP_SCHEMA,
 } from "./pipeline-start-preflight.mjs";
 import { formatOnboardingRerunCommand } from "./project-onboarding-v3.mjs";
 import { BOOTSTRAP_PAYLOAD_MAX_BYTES } from "../lib/bootstrap-payload-budget.mjs";
@@ -1322,74 +1321,4 @@ test("PHX-WP-AAC01-MULTISESSION: an unresolvable cwd (no repository at all) degr
   });
   assert.equal(result.concurrentSessionWarning, null);
   assert.equal(result.status, "ready");
-});
-
-// NVA-B-WTLIVE-1: runBootstrapWorktreeSweep's own wiring of retireRegisteredWorktrees. The
-// underlying five-condition safety predicate is unit-tested directly against
-// planRegisteredWorktreeRetirement/retireRegisteredWorktrees in lib/session-cleanup-recovery.
-// test.mjs; these two cases pin only that the bootstrap event actually reaches that mechanism
-// (not a no-op import) and reports it distinctly from the pre-existing orphan-directory branch.
-
-function worktreeSweepFixtureRoot() {
-  const root = mkdtempSync(join(tmpdir(), "preflight-registered-worktree-sweep-"));
-  const run = (args) => {
-    const result = spawnSync("git", args, { cwd: root, encoding: "utf8" });
-    assert.equal(result.status, 0, `fixture git ${args.join(" ")} failed: ${result.stderr}`);
-    return result;
-  };
-  run(["init", "--quiet"]);
-  run(["config", "user.email", "fixture@example.invalid"]);
-  run(["config", "user.name", "Fixture"]);
-  writeFileSync(join(root, "seed.txt"), "seed\n");
-  run(["add", "seed.txt"]);
-  run(["commit", "--quiet", "-m", "seed"]);
-  return root;
-}
-
-function backdateRegisteredWorktreeLiveness(wt, ageMs) {
-  const result = spawnSync(
-    "git",
-    ["rev-parse", "--path-format=absolute", "--git-path", "logs/HEAD"],
-    { cwd: wt, encoding: "utf8" },
-  );
-  assert.equal(result.status, 0, result.stderr);
-  const old = new Date(Date.now() - ageMs);
-  utimesSync(result.stdout.trim(), old, old);
-}
-
-test("runBootstrapWorktreeSweep declines a registered worktree with a fresh reflog, distinctly from the orphan-directory branch", () => {
-  const root = worktreeSweepFixtureRoot();
-  try {
-    const tip = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).stdout.trim();
-    const wt = join(root, ".claude", "worktrees", "fresh-registered");
-    const add = spawnSync("git", ["worktree", "add", "--detach", wt, tip], { cwd: root, encoding: "utf8" });
-    assert.equal(add.status, 0, add.stderr);
-
-    const result = runBootstrapWorktreeSweep({ rootDir: root });
-
-    assert.equal(result.schema, WORKTREE_SWEEP_SCHEMA);
-    assert.deepEqual(result.faults, []);
-    assert.equal(result.sweep.retiredCount, 0);
-    assert.equal(result.sweep.registered.retiredCount, 0);
-    assert.equal(existsSync(wt), true, "a freshly registered worktree must survive the bootstrap sweep");
-  } finally { rmSync(root, { recursive: true, force: true }); }
-});
-
-test("runBootstrapWorktreeSweep retires a registered worktree once its own reflog is genuinely stale -- proving the wiring actually reaches retireRegisteredWorktrees", () => {
-  const root = worktreeSweepFixtureRoot();
-  try {
-    const tip = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).stdout.trim();
-    const wt = join(root, ".claude", "worktrees", "stale-registered");
-    const add = spawnSync("git", ["worktree", "add", "--detach", wt, tip], { cwd: root, encoding: "utf8" });
-    assert.equal(add.status, 0, add.stderr);
-    backdateRegisteredWorktreeLiveness(wt, 48 * 60 * 60 * 1000);
-
-    const result = runBootstrapWorktreeSweep({ rootDir: root });
-
-    assert.equal(result.schema, WORKTREE_SWEEP_SCHEMA);
-    assert.deepEqual(result.faults, []);
-    assert.equal(result.sweep.retiredCount, 1);
-    assert.equal(result.sweep.registered.retiredCount, 1);
-    assert.equal(existsSync(wt), false);
-  } finally { rmSync(root, { recursive: true, force: true }); }
 });

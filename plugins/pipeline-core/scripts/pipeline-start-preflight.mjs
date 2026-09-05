@@ -31,7 +31,6 @@ import {
   bindScratchDescriptor,
   retireOrphanScratchDescriptors,
   retireOrphanWorktreeDirectories,
-  retireRegisteredWorktrees,
 } from "../lib/session-cleanup-recovery.mjs";
 import {
   inspectSessionOwnerRuntime,
@@ -1210,36 +1209,14 @@ export const WORKTREE_SWEEP_SCHEMA = "pipeline.bootstrap-worktree-sweep.v1";
  * still knows about (`git worktree list`) regardless of age, and never removes a directory
  * that does not carry a genuine worktree checkout's own `.git` pointer file -- see that
  * function's own doc comment in session-cleanup-recovery.mjs for the full safety predicate.
- *
- * NVA-B-WTLIVE-1: also runs `retireRegisteredWorktrees` -- the REGISTERED-worktree complement
- * (a worktree `git worktree list` still knows about, as opposed to the orphan-directory branch
- * above, which only ever considers one it no longer knows about at all). Wired in only once its
- * own fifth AC-2 condition (a liveness check against the worktree's own gitdir reflog) makes it
- * safe to run unattended: see session-cleanup-recovery.mjs's own doc comment on
- * `evaluateWorktreeCandidate`/`planRegisteredWorktreeRetirement` for the full five-condition
- * predicate and its evidence base. Combined into the SAME try/catch as the orphan branch above,
- * on purpose: a single fault from either branch must not mask or double-report against the
- * other, and the two branches' typed statuses are already namespaced by call site
- * (`retireOrphanWorktreeDirectories` / `retireRegisteredWorktrees`) inside their own `retained`
- * lists, so a combined fault code loses no diagnostic information a human would need.
  */
 export function runBootstrapWorktreeSweep({ rootDir = process.cwd(), deps = {} } = {}) {
   const faultCode = (error) => String(error?.code ?? "unknown");
   try {
-    const orphan = retireOrphanWorktreeDirectories({ rootDir, deps });
-    const registered = retireRegisteredWorktrees({ rootDir, deps });
+    const retired = retireOrphanWorktreeDirectories({ rootDir, deps });
     return {
       schema: WORKTREE_SWEEP_SCHEMA,
-      sweep: {
-        retiredCount: orphan.retiredCount + registered.retiredCount,
-        retainedCount: orphan.retained.length + registered.retained.length,
-        orphan: { retiredCount: orphan.retiredCount, retainedCount: orphan.retained.length },
-        registered: {
-          retiredCount: registered.retiredCount,
-          retainedCount: registered.retained.length,
-          status: registered.status,
-        },
-      },
+      sweep: { retiredCount: retired.retiredCount, retainedCount: retired.retained.length },
       faults: [],
     };
   } catch (error) {
