@@ -138,89 +138,22 @@ the item's own proposal named.
 
 ### 0.6.1 is released — 2026-09-02
 
-`main` moved `dd1eb9ee..6262d408`. Tag `v0.6.1` and the GitHub release both
-point at `6262d408`. The approval audit is committed at `57235b83`, after the
-push, never between `approve-push` and `git push`.
+`main` moved `dd1eb9ee..6262d408`, tag `v0.6.1`/GitHub release at `6262d408`,
+`CHANGELOG.md` records it (`f0290fe8`). Pushed under an explicit,
+PO-decided repository-admin bypass on `protect-main` (stays for 0.6.1; the
+bypass-free route — dispatch `verify` on a feature branch first, then push
+that same SHA to `main` — is the intended fix before the next release).
+`protect-release-tags` (id 22072995) has no bypass actor at all.
 
-Three PO signatures were spent getting here, and two of them are worth
-remembering:
-
-1. **The audit ledger had to be repaired before any override could work at
-   all.** A torn append on 2026-08-20 left `audit.head.json` covering 282
-   entries against a ledger of 283, so `verifiedAuditEntries()` refused, and
-   every human-guard-override route in this repository had been failing closed
-   for thirteen days. Nothing announced it: the denial text said
-   `code=HGO-AUDIT` under every refusal, in a line that reads as boilerplate.
-   The first signature of the night was spent on a ceremony that could not
-   complete, because `prepare-for-signature` built a full, valid ceremony while
-   the code already knew the ledger would not authenticate. Filed as
-   `pipeline.a-torn-audit-append-has-disabled-every-human-guard-override-since-august-20`.
-2. **The second registered the rebase-authority suite in `verify.mjs`** (TP-3,
-   no in-session route), and **the third approved the push to `main`.**
-
-**`main` was pushed under an explicit repository-admin bypass**, added by the PO
-to the `protect-main` ruleset, and GitHub recorded it rather than admitting it
-silently. The circle it broke: `main` requires a passing `verify` status check on
-the pushed commit, and the workflow triggers only on a push to `main`, a PR
-against `main`, or an explicit dispatch — so a commit that has never reached a
-remote ref cannot acquire the status it needs to reach one. Breaking it without
-the bypass costs two further signatures, because ADR-0077's per-destination
-approval storage is accepted and **not implemented**: a second `approve-push`
-overwrites the first. `deletion`, `non_fast_forward` and the status requirement
-remain active for everyone else.
-
-**The bypass stays for 0.6.1 — PO decision, 2026-09-02 — and the circle behind
-it must be closed before the next release.** The reason first given for keeping
-it does not hold, and is corrected here rather than left standing: a
-`workflow_dispatch` run attaches a check named exactly `verify` to the head
-commit of the ref it runs on (measured — `266d691f` carries one). The bypass-free
-route therefore exists and is the intended gate: push the candidate to a feature
-branch, dispatch `verify` on it, then push that same SHA to `main` with the
-status already on it. What the bypass buys is one signature per release, not
-access. It is a standing admin-only weakening of the `verify` requirement, held
-deliberately, not an open task waiting on a green run.
-
-The tag was cut with `gh release create`, not a tag push: `approve-push`'s
-destination regex only matches `refs/heads/*`, so `git push origin <tag>` is
-refused however it is signed, and `docs/push-release-flow.md`'s release addendum
-names `gh release create` as the agent-executable route because it calls the API
-and structurally is not a push.
-
-Closed since: `CHANGELOG.md` records 0.6.1 (`f0290fe8`); `stable` is deleted;
-and ruleset `protect-release-tags` (id 22072995) blocks deletion and
-non-fast-forward on `refs/tags/v*` with **no bypass actor at all** — not even an
-admin can move a release tag without editing that ruleset first.
-
-**CI was red on the released commit. Two of the three are fixed on `nova`, and
-`main` still carries the failing status.** Run `33595311782` on `6262d408`
-failed on three suites, all green locally, each filed as its own item
-(`5bbf1517`).
-
-- `guard-lifecycle-ready` — fixed at `216ff054`. The test now supplies its own
-  `true`; the workflow's five-symlink `PATH` was deliberately NOT widened a
-  sixth time, because the assertion under test is that the guard's published
-  continuation finishes a rebase, not that the host ships coreutils. The argv
-  reaching git is byte-identical to before. Route chosen by the Elephant, not
-  left to the dispatch.
-- `codex-onboarding-capabilities` — fixed at `ae8da7b8`. `treeSnapshot`
-  tolerates an entry that vanishes between `readdirSync` and `lstatSync`, and
-  excludes `*.lock` narrowly under `.git/` and `.git/objects/` — proven narrow
-  by three boundary shapes, not asserted in a comment. Both defects were fixed,
-  because tolerating the crash alone leaves a lock file in one snapshot of a
-  before/after pair and the comparison still fails.
-- `LWSC04` — **deliberately not fixed** (`7cc0b649` records why). Measured by
-  reading: `lease` sits inside `recordSha256`, `lastHeartbeatMonotonicMs` inside
-  `lease`, the heartbeat rewrites it every second, and `cancel` demands digest
-  equality. No caller that must spawn a process can win that compare-and-swap,
-  so repairing only the test would turn the suite green and hide the problem
-  from every real client. Needs its own briefed dispatch with independent review.
-
-Both fixes were verified independently of the dispatch reports; full verify is
-green at `7cc0b649` — 506 suites, exit 0, security scan included.
-
-The `PATH` finding is the third instance of one pattern — `openssl`, the runner
-executables, now `true` — and its item asks for one sweep rather than a fourth
-discovery one CI run at a time.
+Two incidents worth their own durable record, both filed as their own
+backlog items rather than restated here: a torn audit-ledger append had
+disabled every human-guard-override route for 13 days
+(`pipeline.a-torn-audit-append-has-disabled-every-human-guard-override-since-august-20`),
+and CI ran red on the released commit for three suites, two fixed since
+(`216ff054`, `ae8da7b8`), one deliberately not
+(`backlog/items/2026-09-02-worker-cancellation-is-denied-when-the-record-digest-ages-between-read-and-cancel.md`,
+LWSC04 — needs its own briefed dispatch with independent review). Full
+verify green at `7cc0b649`, 506 suites.
 
 ### At the freeze — what the PO decides
 
@@ -348,6 +281,17 @@ outstanding ceremony. After C/D/E land:
 `node --test harness/scripts/verify-evidence-writer.test.mjs`, then a full
 `node harness/scripts/verify.mjs` run bound to the final HEAD, then close the
 2026-08-12 backlog item above.
+
+### 2026-09-05: worktree-safety fix landed; its wiring was reverted (T1 FAIL)
+
+`NVA-B-WTLIVE-1`: `1ebf80d5` (fifth liveness condition, gitdir reflog age;
+30/30 green) stands. `bb8347e4` (wiring into the unconditional-every-bootstrap
+`runBootstrapWorktreeSweep`) was **reverted** (`d818dcf1`) after a T1 Critic
+FAIL — F1 major: unattended `git worktree remove` reachable repo-wide, not
+scoped to `.claude/worktrees/`, could delete a human worktree's gitignored
+content. Two minors also open. Backlog item:
+`2026-09-01-a-fresh-worktree-is-indistinguishable-from-an-abandoned-one.md`.
+Follow-up needs the unattended call scoped before re-wiring.
 
 ## PO decisions and todos — collected during the autonomous run, not waited on
 
