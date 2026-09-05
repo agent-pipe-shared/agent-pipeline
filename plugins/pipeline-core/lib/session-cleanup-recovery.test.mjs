@@ -29,6 +29,7 @@ import {
   rmSync,
   symlinkSync,
   unlinkSync,
+  utimesSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -703,6 +704,27 @@ function freshWorktreeSweepRepo() {
   return root;
 }
 
+// NVA-B-WTLIVE-1: the fifth AC-2 condition (below) reads the mtime of a worktree's own gitdir
+// reflog (`logs/HEAD`) as a liveness signal. Every worktree these fixtures create is brand new,
+// so its reflog is always fresher than WORKTREE_LIVENESS_THRESHOLD_MS -- any test asserting
+// "retirable" must backdate it explicitly (this is a real behavior change, not a fixture quirk:
+// the module is deliberately declining a just-touched worktree by design). Must run AFTER every
+// worktree-side git operation the fixture performs (a commit re-touches the reflog).
+function worktreeReflogPath(wt) {
+  const result = spawnSync(
+    "git",
+    ["rev-parse", "--path-format=absolute", "--git-path", "logs/HEAD"],
+    { cwd: wt, encoding: "utf8", shell: false },
+  );
+  assert.equal(result.status, 0, result.stderr);
+  return result.stdout.trim();
+}
+
+function backdateWorktreeLiveness(wt, ageMs) {
+  const old = new Date(Date.now() - ageMs);
+  utimesSync(worktreeReflogPath(wt), old, old);
+}
+
 test("planOrphanWorktreeDirectories reports nothing and creates nothing when .claude/worktrees does not exist", () => {
   const root = freshWorktreeSweepRepo();
   try {
@@ -818,6 +840,7 @@ test("a clean detached worktree whose HEAD is exactly a local branch tip is reti
     const wt = join(root, ".claude", "worktrees", "tip-detached");
     const add = spawnSync("git", ["worktree", "add", "--detach", wt, tip], { cwd: root, encoding: "utf8" });
     assert.equal(add.status, 0, add.stderr);
+    backdateWorktreeLiveness(wt, 7 * 60 * 60 * 1000);
 
     const plan = planRegisteredWorktreeRetirement({ rootDir: root });
     const entry = plan.entries.find((e) => e.status !== "skipped-main-worktree");
@@ -843,6 +866,7 @@ test("a detached worktree whose HEAD is an older ancestor (not equal) of the cur
     spawnSync("git", ["add", "second.txt"], { cwd: root, encoding: "utf8" });
     const commit = spawnSync("git", ["commit", "--quiet", "-m", "second"], { cwd: root, encoding: "utf8" });
     assert.equal(commit.status, 0, commit.stderr);
+    backdateWorktreeLiveness(wt, 7 * 60 * 60 * 1000);
 
     const plan = planRegisteredWorktreeRetirement({ rootDir: root });
     const entry = plan.entries.find((e) => e.status !== "skipped-main-worktree");
@@ -920,6 +944,7 @@ test("retireRegisteredWorktrees re-checks all four preconditions at apply time -
     const tip = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).stdout.trim();
     const wt = join(root, ".claude", "worktrees", "clean-then-dirty");
     spawnSync("git", ["worktree", "add", "--detach", wt, tip], { cwd: root, encoding: "utf8" });
+    backdateWorktreeLiveness(wt, 7 * 60 * 60 * 1000);
 
     const plan = planRegisteredWorktreeRetirement({ rootDir: root });
     const entry = plan.entries.find((e) => e.status !== "skipped-main-worktree");
@@ -964,10 +989,105 @@ test("retireRegisteredWorktrees removes only the retirable candidate among sever
     spawnSync("git", ["worktree", "add", "--detach", locked, tip], { cwd: root, encoding: "utf8" });
     const lock = spawnSync("git", ["worktree", "lock", locked], { cwd: root, encoding: "utf8" });
     assert.equal(lock.status, 0, lock.stderr);
+    backdateWorktreeLiveness(retirable, 7 * 60 * 60 * 1000);
 
     const retired = retireRegisteredWorktrees({ rootDir: root });
     assert.equal(retired.retiredCount, 1);
     assert.equal(existsSync(retirable), false);
     assert.equal(existsSync(locked), true);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// NVA-B-WTLIVE-1: the fifth AC-2 condition -- a live dispatch is not distinguishable from an
+// abandoned worktree by the original four conditions alone once it has made its own first commit
+// (clean + HEAD-at-branch-tip + unlocked, all at once, mid-dispatch). These tests exercise the
+// added liveness check on its own; the four retrofits above already prove it composes correctly
+// with the pre-existing four.
+
+test("a worktree that just committed (clean, unlocked, HEAD-at-branch-tip) is declined as recently active, not retired -- the exact case the original four conditions miss", () => {
+  const root = freshWorktreeSweepRepo();
+  try {
+    const wt = join(root, ".claude", "worktrees", "just-committed");
+    const add = spawnSync("git", ["worktree", "add", "-b", "live-feature", wt], { cwd: root, encoding: "utf8" });
+    assert.equal(add.status, 0, add.stderr);
+    writeFileSync(join(wt, "progress.txt"), "progress\n");
+    spawnSync("git", ["add", "progress.txt"], { cwd: wt, encoding: "utf8" });
+    const commit = spawnSync("git", ["commit", "--quiet", "-m", "progress"], { cwd: wt, encoding: "utf8" });
+    assert.equal(commit.status, 0, commit.stderr);
+    // No backdating: this worktree's reflog is as fresh as it gets -- exactly the danger window.
+
+    const plan = planRegisteredWorktreeRetirement({ rootDir: root });
+    const entry = plan.entries.find((e) => e.status !== "skipped-main-worktree");
+    assert.equal(entry.status, "declined-recent-activity");
+
+    const retired = retireRegisteredWorktrees({ rootDir: root });
+    assert.equal(retired.retiredCount, 0);
+    assert.equal(existsSync(wt), true, "a worktree a live dispatch just committed in must survive");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("a worktree meeting the existing four conditions is retirable once its own reflog is genuinely stale (fifth condition does not make the sweep more conservative than necessary)", () => {
+  const root = freshWorktreeSweepRepo();
+  try {
+    const tip = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).stdout.trim();
+    const wt = join(root, ".claude", "worktrees", "genuinely-stale");
+    spawnSync("git", ["worktree", "add", "--detach", wt, tip], { cwd: root, encoding: "utf8" });
+    // Comfortably past WORKTREE_LIVENESS_THRESHOLD_MS (6h): simulates the real 2026-08-28
+    // incident, stale by two days.
+    backdateWorktreeLiveness(wt, 48 * 60 * 60 * 1000);
+
+    const plan = planRegisteredWorktreeRetirement({ rootDir: root });
+    const entry = plan.entries.find((e) => e.status !== "skipped-main-worktree");
+    assert.equal(entry.status, "retirable");
+
+    const retired = retireRegisteredWorktrees({ rootDir: root });
+    assert.equal(retired.retiredCount, 1);
+    assert.equal(existsSync(wt), false);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("a freshly created ATTACHED-branch worktree (createBranchWorktree's own shape) is declined immediately after creation, before any commit", () => {
+  const root = freshWorktreeSweepRepo();
+  try {
+    const wt = join(root, ".claude", "worktrees", "fresh-attached");
+    const add = spawnSync("git", ["worktree", "add", "-b", "fresh-branch", wt], { cwd: root, encoding: "utf8" });
+    assert.equal(add.status, 0, add.stderr);
+
+    const plan = planRegisteredWorktreeRetirement({ rootDir: root });
+    const entry = plan.entries.find((e) => e.status !== "skipped-main-worktree");
+    assert.equal(entry.status, "declined-recent-activity");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("a freshly created DETACHED worktree (the host-harness Agent/Workflow-tool isolation shape, no worktree-lifecycle.mjs record at all) is declined immediately after creation, before any commit", () => {
+  const root = freshWorktreeSweepRepo();
+  try {
+    const tip = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).stdout.trim();
+    const wt = join(root, ".claude", "worktrees", "fresh-detached");
+    const add = spawnSync("git", ["worktree", "add", "--detach", wt, tip], { cwd: root, encoding: "utf8" });
+    assert.equal(add.status, 0, add.stderr);
+
+    const plan = planRegisteredWorktreeRetirement({ rootDir: root });
+    const entry = plan.entries.find((e) => e.status !== "skipped-main-worktree");
+    assert.equal(entry.status, "declined-recent-activity");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("an unresolvable liveness signal (gitdir reflog missing) declines rather than retires, matching every other unknown-... status", () => {
+  const root = freshWorktreeSweepRepo();
+  try {
+    const tip = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).stdout.trim();
+    const wt = join(root, ".claude", "worktrees", "reflog-missing");
+    const add = spawnSync("git", ["worktree", "add", "--detach", wt, tip], { cwd: root, encoding: "utf8" });
+    assert.equal(add.status, 0, add.stderr);
+    unlinkSync(worktreeReflogPath(wt));
+
+    const plan = planRegisteredWorktreeRetirement({ rootDir: root });
+    const entry = plan.entries.find((e) => e.status !== "skipped-main-worktree");
+    assert.equal(entry.status, "unknown-liveness-unavailable");
+
+    const retired = retireRegisteredWorktrees({ rootDir: root });
+    assert.equal(retired.retiredCount, 0);
+    assert.equal(existsSync(wt), true, "an unresolvable liveness check must never cause a removal");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

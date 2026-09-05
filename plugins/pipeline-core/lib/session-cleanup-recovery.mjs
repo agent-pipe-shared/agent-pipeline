@@ -13,6 +13,7 @@ import {
   realpathSync,
   renameSync,
   rmSync,
+  statSync,
   unlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -2059,7 +2060,62 @@ function spawnHeadContainedInLocalBranch(root, headSha, deps) {
 }
 
 /**
- * Evaluates exactly ONE registered worktree entry against the four AC-2 admission conditions, in
+ * How long (ms) since a worktree's own gitdir last recorded a REF-CHANGING git operation before
+ * the sweep will consider it a candidate at all (NVA-B-WTLIVE-1, fifth AC-2 condition, below).
+ *
+ * Evidence base (scratch/nva-b-wtlive-1-probe.mjs, run 2026-09-05, not committed -- see this
+ * file's own commit message and NVA-B-WTLIVE-1's dispatch record for the reproduced numbers):
+ *   - Real inter-commit gaps sampled from this repository's own committed
+ *     evidence/dispatch-record-*.json `commits` arrays (resolved to commit timestamps via
+ *     `git log`): 12 multi-commit dispatch records, 16 gaps total, max 361s, median 125s,
+ *     p90 356s between two consecutive commits made by the SAME live dispatch. That is the
+ *     fastest-moving legitimate signal this repository's own history can measure.
+ *   - But the reflog only advances on a REF-CHANGING operation (commit, checkout, merge, reset,
+ *     `worktree add` itself) -- a live dispatch reading, investigating, or running a long verify
+ *     pass between commits produces NO reflog activity at all, and this repository's dispatch
+ *     records track tool-use counts, not wall-clock time, so the true worst-case "live but
+ *     git-silent" stretch cannot be measured directly from repo data. That gap is disclosed, not
+ *     papered over: the threshold below carries a large safety multiplier over the measured
+ *     361s ceiling specifically to cover it.
+ *   - The one real abandonment this mechanism exists for (backlog:
+ *     pipeline.a-registered-but-abandoned-worktree-is-never-retired, 2026-08-28) was stale by
+ *     TWO DAYS (172800s) before anyone noticed. A threshold far below that still catches it.
+ * 6 hours (21600s) is ~60x the measured 361s worst-case commit-to-commit gap, and ~1/8 of the one
+ * measured real abandonment span -- comfortably on the decline side of "might still be live",
+ * comfortably on the retire side of "definitely abandoned by everyone".
+ */
+const WORKTREE_LIVENESS_THRESHOLD_MS = 6 * 60 * 60 * 1000;
+
+/**
+ * Read-only: milliseconds since `worktreePath`'s own linked gitdir (resolved via its `.git` FILE's
+ * `gitdir:` pointer, exactly like readWorktreeGitdirTarget above) last recorded a REF-CHANGING git
+ * operation, read from the mtime of `<gitdir>/logs/HEAD` -- the per-worktree HEAD reflog every
+ * linked worktree gets from `git worktree add` onward, for BOTH an attached-branch worktree
+ * (createBranchWorktree's shape) and a detached one (the shape `git worktree list --porcelain`
+ * itself reports "detached", and the shape the 2026-08-28 backlog incident actually found).
+ * Deliberately NOT the `.git/index` mtime: confirmed empirically
+ * (scratch/nva-b-wtlive-1-probe.mjs) that this module's OWN read-only admission checks
+ * (`git status --porcelain`, `git branch --contains`) refresh the index's mtime themselves, which
+ * would make every sweep run see its own immediately-prior sweep as "recent activity" and never
+ * retire anything. The reflog carries no such self-contamination: confirmed empirically that
+ * neither of those two calls ever touches it, while an actual commit always does, for both
+ * worktree shapes. `null` on any failure to resolve the gitdir or read the reflog's mtime --
+ * callers MUST fail closed (an undeterminable age is never "old enough to retire").
+ */
+function readWorktreeLivenessAgeMs(worktreePath) {
+  let gitdirTarget;
+  try { gitdirTarget = readWorktreeGitdirTarget(join(worktreePath, ".git"), worktreePath); }
+  catch { return null; }
+  if (gitdirTarget === null) return null;
+  let stat;
+  try { stat = statSync(join(gitdirTarget, "logs", "HEAD")); }
+  catch { return null; }
+  if (!stat.isFile()) return null;
+  return Date.now() - stat.mtimeMs;
+}
+
+/**
+ * Evaluates exactly ONE registered worktree entry against the five AC-2 admission conditions, in
  * cheapest-first order (no subprocess spawned before one is actually needed), stopping at the
  * first one that fails or is undeterminable. Shared by planRegisteredWorktreeRetirement and
  * retireRegisteredWorktrees's own pre-mutation re-check, so both ever apply exactly one
@@ -2094,6 +2150,13 @@ function evaluateWorktreeCandidate({ root, mainWorktreePath, item, deps }) {
   if (!contains) {
     return { path: realPath, headSha: item.headSha, status: "declined-head-not-contained" };
   }
+  const livenessAgeMs = readWorktreeLivenessAgeMs(realPath);
+  if (livenessAgeMs === null) {
+    return { path: realPath, headSha: item.headSha, status: "unknown-liveness-unavailable" };
+  }
+  if (livenessAgeMs < WORKTREE_LIVENESS_THRESHOLD_MS) {
+    return { path: realPath, headSha: item.headSha, status: "declined-recent-activity" };
+  }
   return { path: realPath, headSha: item.headSha, status: "retirable" };
 }
 
@@ -2104,13 +2167,18 @@ function evaluateWorktreeCandidate({ root, mainWorktreePath, item, deps }) {
  * pipeline.a-registered-but-abandoned-worktree-is-never-retired (2026-08-28).
  *
  * Read-only: performs no deletion. A worktree is admitted (`status: "retirable"`) only when ALL
- * FOUR of these hold (AC-2), each checked by evaluateWorktreeCandidate above:
+ * FIVE of these hold (AC-2), each checked by evaluateWorktreeCandidate above:
  *   1. it is not the main worktree (resolveMainWorktreePath, direct path comparison -- never
  *      inferred from list ordering);
  *   2. its working tree is clean (`git status --porcelain` empty, run inside the worktree);
  *   3. its HEAD is an ancestor of, or equal to, a local branch tip (`git branch --contains`);
- *   4. it carries no `locked` entry in `git worktree list --porcelain`.
- * Anything short of all four is returned with a distinct declined-/unknown- status naming which
+ *   4. it carries no `locked` entry in `git worktree list --porcelain`;
+ *   5. (NVA-B-WTLIVE-1) its own gitdir reflog (`logs/HEAD`) has recorded no ref-changing git
+ *      operation within WORKTREE_LIVENESS_THRESHOLD_MS -- the fifth, additive condition that
+ *      catches the case the first four alone cannot: a worktree a live dispatch is CURRENTLY
+ *      using, which becomes clean + HEAD-at-branch-tip + unlocked the moment that dispatch makes
+ *      its own first commit (recurs after every later commit too, not only once at creation).
+ * Anything short of all five is returned with a distinct declined-/unknown- status naming which
  * check stopped it -- fail-open by design, exactly the orphan branch's own posture: ambiguity
  * always resolves to leaving the worktree alone, never to retiring it.
  *
