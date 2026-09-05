@@ -92,6 +92,23 @@ Two candidate shapes, deliberately not pre-selected:
 Whichever is chosen, the 2026-08-29 item's status must stop claiming a remedy
 that no longer exists.
 
+## Triage, 2026-09-06 — PO decision
+
+**PO decision: Re-narrow.** Restore project-root containment on the closed
+read-only Bash lane in `guard-lifecycle-ready.mjs`, admitting an explicit,
+resolved (never pattern-matched) set of external read roots rather than the
+blanket removal `c8c7f449` made. A dispatch implementing this is in progress
+(`NVA-B-READCONTAIN-1`); it restores the pre-`c8c7f449` mechanism
+(`GUARD-READ-SCOPE-OUTSIDE-ROOT`, `liftable-by-signature:cross-repository-target`
+reachability, `BOUNDED_PIPELINE_ADDITIONAL_ROOTS`) as the floor, then adds new
+session-derived exception roots (this session's own transcript-adjacent tree
+and task-output tree, both resolved from the PreToolUse hook's own
+`transcript_path` field the way `claudeSessionMemoryDirectory` already does
+for the write side, MEMPATH-1) so the legitimate need stays met without a
+blanket-open lane. An arbitrary external read outside every approved root
+stays refused, override-reachable by human signature, exactly as before
+`c8c7f449` removed it.
+
 ## Acceptance criteria
 
 - The decision is recorded where a reader looking for the read-boundary would
