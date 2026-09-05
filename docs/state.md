@@ -215,17 +215,12 @@ is split into five TP-3 blocks on `harness/scripts/verify.mjs`, each landed via
 its own PO Ed25519 signature ceremony (ADR-0059) because a single Edit call
 covers only one contiguous region.
 
-- **Blocks A (imports) and B (evidencePath/writeEvidence/runId) landed and
-  committed at `61dc7fc5`.** Both ceremonies completed end-to-end; the commit
-  message records their request/plan hashes.
-- **Block C landed and committed at `d30273d3`.** Wired the new `runId` into
-  the `runVerifyJournal` call site. The prior request
-  (`fc296c8f30133f8cd399ef4b45f08ff843aaecf42fa4c22d37cc46022f94ad18`)
-  expired unsigned after 8 windows on 2026-09-04; a fresh request
-  (`c376b3fe34fd3c32707c427eeb3c22fc07b21a6a5fd5bcdbb45cb6a3c652899a`, plan
-  `b79e52e19f7e9311152977e5224338502415208ad385ba79c67bd194adfce1a5`) was
-  seeded and signed end-to-end on 2026-09-05/06 the moment the PO was
-  available to sign immediately.
+- **Blocks A, B, C all landed** (`61dc7fc5`, `d30273d3`) — imports,
+  `evidencePath`/`writeEvidence`/`runId`, and wiring `runId` into the
+  `runVerifyJournal` call site. Each ceremony's request/plan hashes are in
+  its own commit message. Block C's first request expired unsigned after 8
+  windows on 2026-09-04; the re-seeded request landed the moment the PO
+  could sign immediately, per the seeding rule (CLAUDE.md).
 - **Block D is drafted, not yet seeded.** Extends the final log line:
   ```js
   // old:
@@ -269,16 +264,11 @@ outstanding ceremony. After C/D/E land:
 
 ### 2026-09-05/06: worktree-liveness item closed, PO-decided scope
 
-`NVA-B-WTLIVE-1` (mechanism, `1ebf80d5`) → `bb8347e4` reverted (`d818dcf1`)
-after a T1 Critic FAIL (repo-wide unattended deletion) → PO decided the
-scope (Pipeline-owned paths only: `.claude/worktrees/`, `branch/`,
-`branch/detached/`) → `NVA-B-WTLIVE-2` (`baf1ad71`, `eca3e170`) → a second
-T1 finding (allowlist anchored to the running worktree, not the true
-primary checkout) → per the two-round cap, `NVA-B-WTLIVE-3` (`b2d8ccf1`,
-`05bdf6a9`) fixed it, self-verified by the Elephant (35/35 + 13/13 + 9/9
-green). Closed. F3 (`resolveMainWorktreePath` misidentification from a
-linked worktree) stays open, separately tracked, non-blocking. Full detail:
-`2026-09-01-a-fresh-worktree-is-indistinguishable-from-an-abandoned-one.md`.
+Closed — mechanism, an unsafe first wiring reverted after T1 Critic FAIL, PO
+scoped it to Pipeline-owned paths, a second T1 finding self-verified-fixed
+per the two-round cap (35/35+13/13+9/9 green). F3 stays open, non-blocking.
+Full narrative: `2026-09-01-a-fresh-worktree-is-indistinguishable-from-an-abandoned-one.md`
+(its own "Closed" section).
 
 ### 2026-09-06: read containment restoration in progress (NVA-B-READCONTAIN-1/2)
 
@@ -320,8 +310,28 @@ lost test coverage and land on a technically-wrong denial code. Findings
 registry: `backlog/evidence/2026-09-06-nva-b-readcontain-1-findings.md`.
 Two minors also noted (no ADR/threat-model pointer yet — the Elephant
 authors this after both READCONTAIN dispatches land; evidence logs not
-bound to a commit SHA). Per the two-round cap, this is round 1 of 2; the
-correction commit gets one fresh re-Critic round next.
+bound to a commit SHA). Per the two-round cap, this is round 1 of 2.
+
+**Correction landed, `bc00a861`.** F1 fixed (comment corrected after
+reading Decision 6 directly). F2 fixed (new `isRealpathedWithinBoundary`
+helper wired into `isApprovedSingleCommandReadArg`/`isApprovedCatPipelineReadPath`;
+a self-referential-boundary regression in the fix's own first draft was
+caught and corrected before commit; new symlink regression test, 226→227
+tests, independently re-verified 227/227 green). F3 NOT fixed — tool
+budget exhausted; diagnosed and disclosed for a future round
+(`isOutsideRootSingleCommandRead` excludes any redirect/operator, so a
+`2>/dev/null`-suppressed or `&&`-chained outside-root single read never
+reaches the read-scope classifier). Process fix: the rework wrote a
+separate `-rework`-suffixed dispatch record, which `dispatch-authorship-verify`
+could not resolve (`record-names-different-commit`) — merged `bc00a861`
+into the standard-named record; both commits now PASS authorship. The
+three DoD checks the rework couldn't run were completed independently by
+the Elephant: predicate regression still 0, generator still green,
+consumer-safe-paths still green. Re-Critic round 2 dispatched (bounded
+delta: base `cbc30756`, head `bc00a861`, plus the two guardrail files
+round 1 never reached) — the last allowed round per the two-round cap; a
+further blocking finding is self-verified by the Elephant, not a third
+round.
 
 `NVA-B-READCONTAIN-2` (not yet dispatched, after the correction round
 lands) adds two new session-derived exception roots
