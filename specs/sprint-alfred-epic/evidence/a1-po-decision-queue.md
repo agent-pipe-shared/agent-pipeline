@@ -1,8 +1,8 @@
-# A1 PO decision queue
+# A1 PO decisions
 
-Candidate context: `46f88880c36cc96b49aac89199527d83706948a0` (current
-starting HEAD). This queue records decisions still owned by the PO; it does
-not accept any option on the PO's behalf.
+Original analysis candidate: `46f88880c36cc96b49aac89199527d83706948a0`.
+The PO resolved both decisions in chat on 2026-09-05; this file records that
+authority without widening either decision.
 
 ## 1. Record cardinality versus probe surfaces
 
@@ -13,7 +13,8 @@ record has singular `probeSurface` and singular `observation`, so preserving
 both raw outcomes in one record is not honest: one observation would overwrite
 or ambiguously combine the other.
 
-Options (choose exactly one):
+Decision: **option 1 accepted**. The alternatives below remain as the reviewed
+trade-off record.
 
 1. Correct the frozen schema before A1-2: retain one record per
    `{runner, layer}`, replace `probeSurface` with `probeSurfaces[]` and
@@ -50,7 +51,9 @@ reports four paths from that baseline set because it has a separate explicit
 debt mechanism. These are pre-existing baseline debts, not suites created by
 Alfred or by this queue; the A1 suite is an additional new registration debt.
 
-Options (choose exactly one):
+Decision: **option 1 accepted**. Register the stabilized A1 suite and its
+capability surface together in one later TP-3 maintenance act. The alternatives
+below remain as the reviewed trade-off record.
 
 1. Register A1 only after A1-2 stabilizes (recommended), in the single PO
    TP-3 act with the matching capability-inventory surface.
@@ -62,8 +65,7 @@ Options (choose exactly one):
 
 Copyable PO decision line: `PO decision: register the A1 suite once A1-2 stabilizes, in one TP-3 maintenance act with its matching capability-inventory surface.`
 
-Can continue without PO: fixture work, the upstream reproduction, and
-registration-command preparation may continue. The frozen record-shape
-implementation, qualifying evidence, Critic review, and final A1 gate cannot
-continue past this queue until the PO resolves both decisions. No option above
-is accepted by this document.
+Authorized next work: land the atomic plural-schema revision described in
+`a1-schema-revision-blueprint.md`, then continue A1-2 against it. TP-3 remains
+deferred until A1-2 is stable; this decision does not authorize an earlier
+Verify or capability-inventory edit.
