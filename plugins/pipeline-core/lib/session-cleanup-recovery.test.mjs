@@ -1165,3 +1165,109 @@ test("a worktree under branch/, otherwise meeting all five conditions, is retira
     assert.equal(existsSync(wt), false);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+// NVA-B-WTLIVE-3 (T1 Critic finding, major): the allowlist anchor must be the repository's TRUE
+// primary checkout root (derived from --git-common-dir), never resolveMainWorktreePath's
+// --show-toplevel result -- which reports whichever worktree the sweep happens to be invoked
+// FROM. These tests deliberately pass `rootDir` as a LINKED worktree (never the primary root) to
+// reproduce the exact scenario the prior anchor silently mishandled.
+
+test("F-anchor (major): the Pipeline-owned-path allowlist anchors to the TRUE primary checkout even when the sweep is invoked with rootDir pointed at a linked worktree", () => {
+  const root = freshWorktreeSweepRepo();
+  try {
+    const tip = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).stdout.trim();
+    // The worktree the sweep is (for this test) pretending to be invoked from -- itself under the
+    // allowlisted "branch/" prefix, exactly the shape a live dispatch's own isolated worktree
+    // takes.
+    const invokedFrom = join(root, "branch", "invoked-from-here");
+    const addInvokedFrom = spawnSync("git", ["worktree", "add", "--detach", invokedFrom, tip], { cwd: root, encoding: "utf8" });
+    assert.equal(addInvokedFrom.status, 0, addInvokedFrom.stderr);
+    // A genuinely separate, Pipeline-owned candidate worktree, also under the primary checkout's
+    // OWN "branch/" prefix -- not `invokedFrom`'s.
+    const other = join(root, "branch", "other-candidate");
+    const addOther = spawnSync("git", ["worktree", "add", "--detach", other, tip], { cwd: root, encoding: "utf8" });
+    assert.equal(addOther.status, 0, addOther.stderr);
+    backdateWorktreeLiveness(other, 7 * 60 * 60 * 1000);
+
+    // Invoke with rootDir = invokedFrom (a LINKED worktree) -- exactly the shape
+    // resolveMainWorktreePath's own known-imperfect --show-toplevel identification takes (F3,
+    // separately tracked, unaffected by this dispatch): --show-toplevel run with cwd=invokedFrom
+    // reports invokedFrom itself, not the primary root, so `invokedFrom`'s own candidate entry is
+    // (still, unchanged) mislabelled "skipped-main-worktree" below -- that is disclosed, not
+    // asserted as correct, and is not what this test is proving. runningWorktreePath is left at
+    // its real default (this test process's own actual cwd, which matches none of these fixture
+    // paths) so the new running-worktree condition never interferes with isolating the anchor fix
+    // itself -- that condition gets its own dedicated test further below.
+    const realInvokedFrom = realpathSync(invokedFrom);
+    const realOther = realpathSync(other);
+    const plan = planRegisteredWorktreeRetirement({
+      rootDir: invokedFrom,
+      restrictToPipelineOwnedPaths: true,
+    });
+    assert.equal(plan.status, "ready");
+
+    const invokedFromEntry = plan.entries.find((e) => e.path === realInvokedFrom);
+    assert.ok(invokedFromEntry, "the worktree the sweep is invoked with as rootDir must appear as a candidate");
+    assert.equal(invokedFromEntry.status, "skipped-main-worktree", "F3's known mislabeling, disclosed and unchanged by this dispatch");
+
+    const otherEntry = plan.entries.find((e) => e.path === realOther);
+    assert.ok(otherEntry, "the sibling branch/-prefixed worktree must appear as a candidate");
+    assert.notEqual(
+      otherEntry.status,
+      "declined-outside-pipeline-paths",
+      "the allowlist must anchor to the TRUE primary checkout root, not the worktree the sweep happens to be invoked with as rootDir",
+    );
+    assert.equal(otherEntry.status, "retirable");
+
+    const retired = retireRegisteredWorktrees({
+      rootDir: invokedFrom,
+      restrictToPipelineOwnedPaths: true,
+    });
+    assert.equal(retired.retiredCount, 1);
+    assert.equal(existsSync(other), false, "the correctly-anchored candidate must actually be retired");
+    assert.equal(existsSync(invokedFrom), true, "the (mislabelled-main) rootDir worktree must survive via the pre-existing F3-coupled check");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// NVA-B-WTLIVE-3: the new, explicit "never retire the worktree the sweep is currently running
+// from" condition, independent of the (separately known-imperfect, F3) main-worktree check.
+
+test("the sweep never retires the worktree it is currently running from, even when that worktree meets every other condition and sits under an allowlisted prefix", () => {
+  const root = freshWorktreeSweepRepo();
+  try {
+    const tip = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).stdout.trim();
+    const runningWt = join(root, "branch", "currently-running");
+    const add = spawnSync("git", ["worktree", "add", "--detach", runningWt, tip], { cwd: root, encoding: "utf8" });
+    assert.equal(add.status, 0, add.stderr);
+    // Meets every OTHER condition: clean, HEAD at a branch tip, unlocked, and its own reflog is
+    // stale -- if the running-worktree condition did not exist, this candidate would be
+    // "retirable".
+    backdateWorktreeLiveness(runningWt, 7 * 60 * 60 * 1000);
+    const realRunningWt = realpathSync(runningWt);
+
+    const plan = planRegisteredWorktreeRetirement({
+      rootDir: root,
+      restrictToPipelineOwnedPaths: true,
+      runningWorktreePath: realRunningWt,
+    });
+    const entry = plan.entries.find((e) => e.path === realRunningWt);
+    assert.ok(entry);
+    assert.equal(entry.status, "skipped-running-worktree");
+    assert.notEqual(entry.status, "skipped-main-worktree", "must be a distinct, separate status from the main-worktree check");
+
+    const retired = retireRegisteredWorktrees({
+      rootDir: root,
+      restrictToPipelineOwnedPaths: true,
+      runningWorktreePath: realRunningWt,
+    });
+    assert.equal(retired.retiredCount, 0);
+    assert.equal(existsSync(runningWt), true, "the sweep's own running worktree must never be removed");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// NVA-B-WTLIVE-3 (T1 Critic finding, minor): a wiring-level regression test driving a real,
+// freshly-created worktree through the ACTUAL WIRED runBootstrapWorktreeSweep -- not just the
+// unwired mechanism-level tests above -- proving the spec's acceptance criterion 3 end to end.
+// Lives alongside the other bootstrap-wiring tests in pipeline-start-scratch-lifecycle.test.mjs
+// (see that file for the sibling case), so this file's own suite intentionally does not duplicate
+// it here.

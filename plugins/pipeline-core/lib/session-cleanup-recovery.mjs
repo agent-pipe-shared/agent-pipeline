@@ -17,7 +17,7 @@ import {
   unlinkSync,
   writeFileSync,
 } from "node:fs";
-import { isAbsolute, dirname, join, relative, resolve, sep } from "node:path";
+import { basename, isAbsolute, dirname, join, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
@@ -2027,6 +2027,72 @@ function resolveMainWorktreePath(root, deps) {
 }
 
 /**
+ * Read-only: the repository's own TRUE primary checkout root -- derived from `git rev-parse
+ * --path-format=absolute --git-common-dir`'s parent directory, mirroring
+ * `worktree-lifecycle.mjs`'s `discoverRepository()` (`primaryRoot =
+ * assertExistingDirectoryPhysical(dirname(commonDir), "primary checkout")`) -- NOT from
+ * `resolveMainWorktreePath` above, which is `--show-toplevel` run against `root` and therefore
+ * reports whichever worktree the CURRENT PROCESS happens to be running from.
+ *
+ * CORRECTED 2026-09-05 (NVA-B-WTLIVE-3, T1 Critic finding, major): `--git-common-dir` is shared by
+ * every linked worktree of the same repository and always points at the ONE `.git` directory the
+ * primary checkout physically owns, so its parent is stable no matter which worktree this process
+ * happens to be running inside. `isUnderPipelineOwnedWorktreePrefix`'s allowlist anchor MUST use
+ * this function, never `resolveMainWorktreePath`'s result -- a prior version of this module
+ * resolved the allowlist against `resolveMainWorktreePath` and silently degraded to a no-op
+ * (nothing under `branch/`-relative-to-the-linked-worktree ever matched the real `branch/`-
+ * relative-to-the-primary-root prefix) whenever the unattended bootstrap sweep ran from inside a
+ * linked worktree.
+ *
+ * `null` on any command failure or unsafe/aliased path (mirroring
+ * `worktree-lifecycle.mjs`'s own `assertExistingDirectoryPhysical` checks: must exist, must be a
+ * real directory, must not be a symlink, must not be a `.git` directory itself, and its physical
+ * (realpath) form must equal the resolved candidate) -- callers MUST fail closed, exactly like
+ * `resolveMainWorktreePath`'s own contract.
+ */
+function resolvePrimaryCheckoutRoot(root, deps) {
+  const spawn = deps.spawn ?? spawnSync;
+  const result = spawn("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], {
+    cwd: root,
+    encoding: "utf8",
+    shell: false,
+    timeout: 5000,
+  });
+  if (result?.status !== 0 || result?.error || typeof result.stdout !== "string") return null;
+  const raw = result.stdout.trim();
+  if (raw === "") return null;
+  let commonDir;
+  try { commonDir = realpathSync(raw); } catch { return null; }
+  let commonInfo;
+  try { commonInfo = lstatSync(commonDir); } catch { return null; }
+  if (!commonInfo.isDirectory() || commonInfo.isSymbolicLink() || basename(commonDir) !== ".git") return null;
+  const candidate = dirname(commonDir);
+  let candidateInfo;
+  try { candidateInfo = lstatSync(candidate); } catch { return null; }
+  if (!candidateInfo.isDirectory() || candidateInfo.isSymbolicLink()) return null;
+  let primaryRoot;
+  try { primaryRoot = realpathSync(candidate); } catch { return null; }
+  return primaryRoot === candidate ? primaryRoot : null;
+}
+
+/**
+ * Read-only: the realpath of the directory the CURRENT PROCESS is actually running from --
+ * `deps.cwdFn` (default `process.cwd`) resolved through `realpathSync`. Used only by the new,
+ * explicit "never retire the worktree the sweep is currently running from" safety condition in
+ * `evaluateWorktreeCandidate` below (NVA-B-WTLIVE-3): once the allowlist anchor above is corrected
+ * to the TRUE primary checkout, the session's own actively-running worktree is no longer protected
+ * by the accident of `resolveMainWorktreePath` mislabeling it "main" when it happens to sit under
+ * an allowlisted prefix (e.g. `branch/`). This condition is independent of, and additive to, that
+ * pre-existing (and separately known-imperfect, F3, out of scope here) main-worktree check.
+ * `null` on any failure -- callers MUST fail closed (an undeterminable "am I running from here?"
+ * answer is never treated as "no, safe to retire").
+ */
+function resolveRunningWorktreePath(deps) {
+  const cwdFn = deps.cwdFn ?? (() => process.cwd());
+  try { return realpathSync(cwdFn()); } catch { return null; }
+}
+
+/**
  * Read-only: `git status --porcelain` output for the worktree at `worktreePath`, or `null` on
  * any command failure (fail-closed: an unreadable status is never treated as "clean").
  */
@@ -2115,10 +2181,11 @@ function readWorktreeLivenessAgeMs(worktreePath) {
 }
 
 /**
- * The two path prefixes, resolved relative to the repository's own identified main worktree
- * root (never a candidate's own root, and never trusted from "git worktree list"'s ordering),
- * that the Pipeline itself provisions worktrees under. Confirmed by direct read (NVA-B-WTLIVE-2)
- * rather than assumed:
+ * The two path prefixes, resolved relative to the repository's own TRUE primary checkout root
+ * (`resolvePrimaryCheckoutRoot` above, derived from `--git-common-dir` -- NEVER a candidate's own
+ * root, NEVER trusted from "git worktree list"'s ordering, and NEVER the worktree the sweep
+ * happens to be running from), that the Pipeline itself provisions worktrees under. Confirmed by
+ * direct read (NVA-B-WTLIVE-2) rather than assumed:
  *   - ".claude/worktrees/" -- the exact prefix planOrphanWorktreeDirectories above already
  *     scopes its sibling orphan-directory sweep to (resolve(root, ".claude", "worktrees")).
  *   - "branch/" -- worktree-lifecycle.mjs's canonicalBranchTarget resolves every attached-branch
@@ -2129,6 +2196,14 @@ function readWorktreeLivenessAgeMs(worktreePath) {
  * Used ONLY by the opt-in Pipeline-path restriction the unattended bootstrap sweep requests
  * (NVA-B-WTLIVE-2, PO decision) -- never by the deliberate-invocation default path, which keeps
  * retiring any registered worktree regardless of location (c352528f, unchanged).
+ *
+ * CORRECTED 2026-09-05 (NVA-B-WTLIVE-3, T1 Critic finding, major): this comment (and the anchor
+ * `isUnderPipelineOwnedWorktreePrefix` below actually resolves against) used to name the
+ * "identified main worktree root" -- `resolveMainWorktreePath`'s `--show-toplevel` result, which
+ * reports whichever worktree the CURRENT PROCESS happens to be running from, not the repository's
+ * true primary checkout. That was a false claim: run from inside a linked worktree, the prefixes
+ * resolved relative to THAT worktree, silently degrading the restriction to a no-op. See
+ * `resolvePrimaryCheckoutRoot`'s own doc comment for the corrected anchor.
  */
 const PIPELINE_OWNED_WORKTREE_PREFIX_SEGMENTS = [
   [".claude", "worktrees"],
@@ -2137,14 +2212,17 @@ const PIPELINE_OWNED_WORKTREE_PREFIX_SEGMENTS = [
 
 /**
  * True when candidatePath (already realpath-resolved by the caller) resolves under one of
- * PIPELINE_OWNED_WORKTREE_PREFIX_SEGMENTS, computed relative to mainWorktreePath. Uses
- * path.relative rather than a raw startsWith string comparison so a sibling directory whose name
- * merely shares the prefix as a string (e.g. "branch-other/") is never misclassified as inside
- * "branch/", and so ".."-escaping or a different drive/root never matches either.
+ * PIPELINE_OWNED_WORKTREE_PREFIX_SEGMENTS, computed relative to primaryCheckoutRoot (the
+ * repository's TRUE primary checkout root, from `resolvePrimaryCheckoutRoot` -- never
+ * `resolveMainWorktreePath`'s result, which is the worktree the current process happens to be
+ * running from). Uses path.relative rather than a raw startsWith string comparison so a sibling
+ * directory whose name merely shares the prefix as a string (e.g. "branch-other/") is never
+ * misclassified as inside "branch/", and so ".."-escaping or a different drive/root never
+ * matches either.
  */
-function isUnderPipelineOwnedWorktreePrefix(mainWorktreePath, candidatePath) {
+function isUnderPipelineOwnedWorktreePrefix(primaryCheckoutRoot, candidatePath) {
   return PIPELINE_OWNED_WORKTREE_PREFIX_SEGMENTS.some((segments) => {
-    const base = resolve(mainWorktreePath, ...segments);
+    const base = resolve(primaryCheckoutRoot, ...segments);
     if (candidatePath === base) return true;
     const rel = relative(base, candidatePath);
     return rel !== "" && rel !== ".." && !rel.startsWith(".." + sep) && !isAbsolute(rel);
@@ -2163,20 +2241,46 @@ function isUnderPipelineOwnedWorktreePrefix(mainWorktreePath, candidatePath) {
  * restrictToPipelineOwnedPaths (NVA-B-WTLIVE-2, PO decision, default false): a SIXTH, additive,
  * OPT-IN condition requested only by the unattended bootstrap sweep -- never by the default,
  * deliberate-invocation path, whose behavior is byte-for-byte unchanged when this stays false.
- * Checked immediately after the main-worktree comparison, before either subprocess call, since it
- * is a pure path computation on an already-realpath-resolved value: cheapest-first, and it
- * short-circuits both "git status" and "git branch --contains" for every candidate outside the
- * allowlist. There is no "unknown-..." variant for this condition: by the point it runs, realPath
- * and mainWorktreePath are both already confirmed non-null, so the check is always determinable.
+ * Checked after the main-worktree and running-worktree comparisons, before either subprocess
+ * call, since it is a pure path computation on an already-realpath-resolved value: cheapest-first,
+ * and it short-circuits both "git status" and "git branch --contains" for every candidate outside
+ * the allowlist. Anchored to primaryCheckoutRoot (resolvePrimaryCheckoutRoot's result), never to
+ * mainWorktreePath -- see that function's own doc comment (NVA-B-WTLIVE-3).
+ *
+ * The running-worktree comparison (NVA-B-WTLIVE-3, additive safety condition, checked
+ * unconditionally regardless of restrictToPipelineOwnedPaths): the sweep must never retire the
+ * worktree the CURRENT PROCESS is actually running from, independent of the separately
+ * known-imperfect (F3, out of scope here) main-worktree check above. Before the allowlist-anchor
+ * fix this was accidentally covered whenever the running worktree also happened to be
+ * mislabeled "main" by resolveMainWorktreePath; now that the anchor is corrected, a running
+ * worktree that sits under an allowlisted prefix (e.g. branch/) is no longer protected by that
+ * accident, so this is now an explicit, separate condition. An undeterminable
+ * runningWorktreePath (null) declines every candidate for this condition, exactly like every
+ * other "unknown-..." status elsewhere in this evaluator -- ambiguity is never treated as
+ * permission to retire the worktree we might ourselves be running from.
  */
-function evaluateWorktreeCandidate({ root, mainWorktreePath, item, deps, restrictToPipelineOwnedPaths = false }) {
+function evaluateWorktreeCandidate({
+  root,
+  mainWorktreePath,
+  primaryCheckoutRoot,
+  runningWorktreePath,
+  item,
+  deps,
+  restrictToPipelineOwnedPaths = false,
+}) {
   let realPath;
   try { realPath = realpathSync(item.rawPath); }
   catch { return { path: item.rawPath, status: "unknown-path-unavailable" }; }
   if (realPath === mainWorktreePath) {
     return { path: realPath, status: "skipped-main-worktree" };
   }
-  if (restrictToPipelineOwnedPaths && !isUnderPipelineOwnedWorktreePrefix(mainWorktreePath, realPath)) {
+  if (runningWorktreePath === null) {
+    return { path: realPath, status: "unknown-running-worktree-unavailable" };
+  }
+  if (realPath === runningWorktreePath) {
+    return { path: realPath, status: "skipped-running-worktree" };
+  }
+  if (restrictToPipelineOwnedPaths && !isUnderPipelineOwnedWorktreePrefix(primaryCheckoutRoot, realPath)) {
     return { path: realPath, status: "declined-outside-pipeline-paths" };
   }
   if (item.headSha === null || !HEAD_SHA_SHAPE.test(item.headSha)) {
@@ -2239,14 +2343,31 @@ function evaluateWorktreeCandidate({ root, mainWorktreePath, item, deps, restric
  *
  * `status: "unknown-git-worktree-list-unavailable"` at the top level (empty `entries`) is
  * returned when the underlying `git worktree list`/`git rev-parse --show-toplevel` calls
- * themselves fail -- there is no candidate list to evaluate at all in that case, unlike the
- * orphan branch above, which already has an independent directory listing to fall back on.
+ * themselves fail (or, when restrictToPipelineOwnedPaths is requested, when
+ * resolvePrimaryCheckoutRoot itself fails) -- there is no candidate list to evaluate at all in
+ * that case, unlike the orphan branch above, which already has an independent directory listing
+ * to fall back on.
+ *
+ * runningWorktreePath (NVA-B-WTLIVE-3, default undefined -> resolveRunningWorktreePath(deps),
+ * i.e. the realpath of the current process's own cwd): the value evaluateWorktreeCandidate's new
+ * "never retire the worktree we are running from" condition compares every candidate against.
+ * Exposed as an explicit parameter (rather than only ever computed internally) so a test can pin
+ * it directly without needing to chdir the whole test process into a throwaway fixture worktree.
  */
-export function planRegisteredWorktreeRetirement({ rootDir, deps = {}, restrictToPipelineOwnedPaths = false } = {}) {
+export function planRegisteredWorktreeRetirement({
+  rootDir,
+  deps = {},
+  restrictToPipelineOwnedPaths = false,
+  runningWorktreePath,
+} = {}) {
   const root = realpathSync(resolve(rootDir));
   const stdout = spawnWorktreeListPorcelain(root, deps);
   const mainWorktreePath = resolveMainWorktreePath(root, deps);
-  if (stdout === null || mainWorktreePath === null) {
+  const primaryCheckoutRoot = restrictToPipelineOwnedPaths ? resolvePrimaryCheckoutRoot(root, deps) : null;
+  const resolvedRunningWorktreePath = runningWorktreePath !== undefined
+    ? runningWorktreePath
+    : resolveRunningWorktreePath(deps);
+  if (stdout === null || mainWorktreePath === null || (restrictToPipelineOwnedPaths && primaryCheckoutRoot === null)) {
     return {
       schema: REGISTERED_WORKTREE_RETIREMENT_PLAN_SCHEMA,
       status: "unknown-git-worktree-list-unavailable",
@@ -2254,7 +2375,15 @@ export function planRegisteredWorktreeRetirement({ rootDir, deps = {}, restrictT
     };
   }
   const entries = parseWorktreeListPorcelain(stdout)
-    .map((item) => evaluateWorktreeCandidate({ root, mainWorktreePath, item, deps, restrictToPipelineOwnedPaths }));
+    .map((item) => evaluateWorktreeCandidate({
+      root,
+      mainWorktreePath,
+      primaryCheckoutRoot,
+      runningWorktreePath: resolvedRunningWorktreePath,
+      item,
+      deps,
+      restrictToPipelineOwnedPaths,
+    }));
   return {
     schema: REGISTERED_WORKTREE_RETIREMENT_PLAN_SCHEMA,
     status: "ready",
@@ -2282,10 +2411,23 @@ export function planRegisteredWorktreeRetirement({ rootDir, deps = {}, restrictT
  * plan call was told to restrict. Default false leaves this function's own default behavior
  * byte-for-byte unchanged (c352528f, the already-reviewed deliberate-invocation design) -- only
  * the unattended bootstrap sweep passes true.
+ *
+ * runningWorktreePath (NVA-B-WTLIVE-3): forwarded unchanged to BOTH the initial plan above and the
+ * pre-mutation recheck below, resolved exactly ONCE up front (the current process does not move
+ * mid-sweep, so recomputing it per candidate would only add subprocess-free realpath calls without
+ * changing the answer) so both the plan and every recheck compare against the identical value.
  */
-export function retireRegisteredWorktrees({ rootDir, deps = {}, restrictToPipelineOwnedPaths = false } = {}) {
+export function retireRegisteredWorktrees({ rootDir, deps = {}, restrictToPipelineOwnedPaths = false, runningWorktreePath } = {}) {
   const root = realpathSync(resolve(rootDir));
-  const plan = planRegisteredWorktreeRetirement({ rootDir: root, deps, restrictToPipelineOwnedPaths });
+  const resolvedRunningWorktreePath = runningWorktreePath !== undefined
+    ? runningWorktreePath
+    : resolveRunningWorktreePath(deps);
+  const plan = planRegisteredWorktreeRetirement({
+    rootDir: root,
+    deps,
+    restrictToPipelineOwnedPaths,
+    runningWorktreePath: resolvedRunningWorktreePath,
+  });
   if (plan.status !== "ready") {
     return { status: plan.status, retiredCount: 0, retained: plan.entries };
   }
@@ -2298,7 +2440,8 @@ export function retireRegisteredWorktrees({ rootDir, deps = {}, restrictToPipeli
     }
     const stdout = spawnWorktreeListPorcelain(root, deps);
     const mainWorktreePath = resolveMainWorktreePath(root, deps);
-    if (stdout === null || mainWorktreePath === null) {
+    const primaryCheckoutRoot = restrictToPipelineOwnedPaths ? resolvePrimaryCheckoutRoot(root, deps) : null;
+    if (stdout === null || mainWorktreePath === null || (restrictToPipelineOwnedPaths && primaryCheckoutRoot === null)) {
       retained.push({ ...entry, status: "unknown-git-worktree-list-unavailable" });
       continue;
     }
@@ -2309,7 +2452,15 @@ export function retireRegisteredWorktrees({ rootDir, deps = {}, restrictToPipeli
       retained.push({ ...entry, status: "changed" });
       continue;
     }
-    const recheck = evaluateWorktreeCandidate({ root, mainWorktreePath, item: fresh, deps, restrictToPipelineOwnedPaths });
+    const recheck = evaluateWorktreeCandidate({
+      root,
+      mainWorktreePath,
+      primaryCheckoutRoot,
+      runningWorktreePath: resolvedRunningWorktreePath,
+      item: fresh,
+      deps,
+      restrictToPipelineOwnedPaths,
+    });
     if (recheck.status !== "retirable") {
       retained.push(recheck);
       continue;
