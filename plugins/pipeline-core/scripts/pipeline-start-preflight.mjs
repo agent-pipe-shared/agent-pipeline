@@ -31,6 +31,7 @@ import {
   bindScratchDescriptor,
   retireOrphanScratchDescriptors,
   retireOrphanWorktreeDirectories,
+  retireRegisteredWorktrees,
 } from "../lib/session-cleanup-recovery.mjs";
 import {
   inspectSessionOwnerRuntime,
@@ -1209,20 +1210,44 @@ export const WORKTREE_SWEEP_SCHEMA = "pipeline.bootstrap-worktree-sweep.v1";
  * still knows about (`git worktree list`) regardless of age, and never removes a directory
  * that does not carry a genuine worktree checkout's own `.git` pointer file -- see that
  * function's own doc comment in session-cleanup-recovery.mjs for the full safety predicate.
+ *
+ * NVA-B-WTLIVE-2 (PO decision, backlog: pipeline.a-registered-but-abandoned-worktree-is-never-
+ * retired): also wires `retireRegisteredWorktrees` -- the REGISTERED-worktree half of the sweep,
+ * a T1-reviewed prior attempt (`bb8347e4`) was reverted (`d818dcf1`) because it could retire ANY
+ * registered worktree repository-wide, unattended, including one a human created elsewhere. This
+ * wiring requests `restrictToPipelineOwnedPaths: true`, so the UNATTENDED sweep only ever retires
+ * a registered worktree under a path the Pipeline itself provisions (".claude/worktrees/" or
+ * "branch/") -- never elsewhere. The broader, repository-wide, deliberately-invoked API
+ * (`retireRegisteredWorktrees` called directly, without the restriction) keeps its own
+ * already-reviewed default behavior unchanged (`c352528f`) -- this wiring only ever passes the
+ * additive, opt-in restriction, never removes it as a default.
+ *
+ * Both sweeps run inside the SAME try/catch, exactly as the single orphan-only sweep did before:
+ * a fault in either one fails the WHOLE housekeeping event closed (`sweep`/`registeredWorktreeSweep`
+ * both null, one typed fault code) rather than reporting a partial result -- this is the same
+ * atomic-event posture the function already had, not a new design choice, and it keeps every
+ * existing caller's fault-handling assumptions intact.
  */
 export function runBootstrapWorktreeSweep({ rootDir = process.cwd(), deps = {} } = {}) {
   const faultCode = (error) => String(error?.code ?? "unknown");
   try {
     const retired = retireOrphanWorktreeDirectories({ rootDir, deps });
+    const retiredRegistered = retireRegisteredWorktrees({ rootDir, deps, restrictToPipelineOwnedPaths: true });
     return {
       schema: WORKTREE_SWEEP_SCHEMA,
       sweep: { retiredCount: retired.retiredCount, retainedCount: retired.retained.length },
+      registeredWorktreeSweep: {
+        status: retiredRegistered.status,
+        retiredCount: retiredRegistered.retiredCount,
+        retainedCount: retiredRegistered.retained.length,
+      },
       faults: [],
     };
   } catch (error) {
     return {
       schema: WORKTREE_SWEEP_SCHEMA,
       sweep: null,
+      registeredWorktreeSweep: null,
       faults: [`sweep:${faultCode(error)}`],
     };
   }

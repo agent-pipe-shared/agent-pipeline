@@ -16,7 +16,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -222,4 +222,64 @@ test("runBootstrapWorktreeSweep does nothing and creates nothing when .claude/wo
   assert.deepEqual(result.faults, []);
   assert.equal(result.sweep.retiredCount, 0);
   assert.equal(existsSync(join(root, ".claude", "worktrees")), false);
+});
+
+// NVA-B-WTLIVE-2 (PO decision): runBootstrapWorktreeSweep also wires retireRegisteredWorktrees
+// with restrictToPipelineOwnedPaths: true -- the redo of bb8347e4 (reverted d818dcf1 after a T1
+// Critic FAIL) now scoped to Pipeline-owned paths only. The mechanism's own admission predicate
+// (the five AC-2 conditions plus the sixth, opt-in path restriction) is unit-tested directly
+// against evaluateWorktreeCandidate/planRegisteredWorktreeRetirement/retireRegisteredWorktrees in
+// lib/session-cleanup-recovery.test.mjs; these two cases pin only the bootstrap wiring itself,
+// mirroring the orphan-directory wiring cases immediately above. Liveness-backdating helper
+// mirrored from lib/session-cleanup-recovery.test.mjs's own worktreeReflogPath/
+// backdateWorktreeLiveness rather than imported cross-file, matching that file's own disclosed
+// reasoning (avoiding a fixture-shape coupling between two independently-maintained test files).
+
+function worktreeReflogPath(wt) {
+  const result = spawnSync(
+    "git",
+    ["rev-parse", "--path-format=absolute", "--git-path", "logs/HEAD"],
+    { cwd: wt, encoding: "utf8", shell: false },
+  );
+  assert.equal(result.status, 0, result.stderr);
+  return result.stdout.trim();
+}
+
+function backdateWorktreeLiveness(wt, ageMs) {
+  const old = new Date(Date.now() - ageMs);
+  utimesSync(worktreeReflogPath(wt), old, old);
+}
+
+test("runBootstrapWorktreeSweep also retires a REGISTERED worktree under a Pipeline-owned prefix once it is stale (NVA-B-WTLIVE-2 wiring)", () => {
+  const root = freshRepo();
+  commitOne(root);
+  const tip = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).stdout.trim();
+  const worktreePath = join(root, ".claude", "worktrees", "stale-registered");
+  const add = spawnSync("git", ["worktree", "add", "--detach", worktreePath, tip], { cwd: root, encoding: "utf8" });
+  assert.equal(add.status, 0, `fixture git worktree add failed: ${add.stderr}`);
+  backdateWorktreeLiveness(worktreePath, 7 * 60 * 60 * 1000);
+
+  const result = runBootstrapWorktreeSweep({ rootDir: root });
+
+  assert.equal(result.schema, WORKTREE_SWEEP_SCHEMA);
+  assert.deepEqual(result.faults, []);
+  assert.equal(result.registeredWorktreeSweep.retiredCount, 1);
+  assert.equal(existsSync(worktreePath), false, "a stale registered worktree under a Pipeline-owned prefix must be retired by the wired sweep");
+});
+
+test("F1 regression (wired sweep): a stale registered worktree OUTSIDE any Pipeline-owned prefix is never retired by the unattended sweep", () => {
+  const root = freshRepo();
+  commitOne(root);
+  const tip = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).stdout.trim();
+  const worktreePath = join(root, "elsewhere", "stale-outside");
+  const add = spawnSync("git", ["worktree", "add", "--detach", worktreePath, tip], { cwd: root, encoding: "utf8" });
+  assert.equal(add.status, 0, `fixture git worktree add failed: ${add.stderr}`);
+  backdateWorktreeLiveness(worktreePath, 7 * 60 * 60 * 1000);
+
+  const result = runBootstrapWorktreeSweep({ rootDir: root });
+
+  assert.equal(result.schema, WORKTREE_SWEEP_SCHEMA);
+  assert.deepEqual(result.faults, []);
+  assert.equal(result.registeredWorktreeSweep.retiredCount, 0);
+  assert.equal(existsSync(worktreePath), true, "a stale registered worktree outside every Pipeline-owned prefix must survive the unattended sweep -- this is the exact bb8347e4/F1 gap");
 });
