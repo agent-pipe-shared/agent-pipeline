@@ -283,3 +283,32 @@ test("F1 regression (wired sweep): a stale registered worktree OUTSIDE any Pipel
   assert.equal(result.registeredWorktreeSweep.retiredCount, 0);
   assert.equal(existsSync(worktreePath), true, "a stale registered worktree outside every Pipeline-owned prefix must survive the unattended sweep -- this is the exact bb8347e4/F1 gap");
 });
+
+// NVA-B-WTLIVE-3 (T1 Critic finding, minor): the spec's acceptance criterion 3 ("wired... with a
+// test that a just-created worktree is declined") had no test driving an actual just-created
+// worktree through the WIRED runBootstrapWorktreeSweep path -- only through the unwired mechanism
+// (planRegisteredWorktreeRetirement, lib/session-cleanup-recovery.test.mjs) or through backdated
+// reflog wiring cases (the two tests directly above, both already-stale fixtures). This closes
+// that gap end to end: a real, freshly `git worktree add`-created registered worktree, still
+// brand new (no backdating -- its own reflog is as fresh as it gets), run through the ACTUAL wired
+// event, is declined immediately after creation, before any commit.
+
+test("runBootstrapWorktreeSweep declines a just-created registered worktree immediately after creation, before any commit (wiring-level, mirrors the mechanism-level fresh-worktree tests)", () => {
+  const root = freshRepo();
+  commitOne(root);
+  const tip = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).stdout.trim();
+  const worktreePath = join(root, ".claude", "worktrees", "just-created");
+  const add = spawnSync("git", ["worktree", "add", "--detach", worktreePath, tip], { cwd: root, encoding: "utf8" });
+  assert.equal(add.status, 0, `fixture git worktree add failed: ${add.stderr}`);
+  // Deliberately NO backdateWorktreeLiveness call: this worktree's own gitdir reflog is as fresh
+  // as `git worktree add` itself just left it, exactly the danger window the fifth AC-2 condition
+  // (NVA-B-WTLIVE-1) exists to catch -- proven at the mechanism level already; this test proves the
+  // WIRED bootstrap event reaches that same protection, not a second, differently-designed one.
+
+  const result = runBootstrapWorktreeSweep({ rootDir: root });
+
+  assert.equal(result.schema, WORKTREE_SWEEP_SCHEMA);
+  assert.deepEqual(result.faults, []);
+  assert.equal(result.registeredWorktreeSweep.retiredCount, 0);
+  assert.equal(existsSync(worktreePath), true, "a just-created registered worktree must survive the wired bootstrap sweep, before any commit");
+});
