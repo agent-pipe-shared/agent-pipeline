@@ -17,7 +17,7 @@ import {
   unlinkSync,
   writeFileSync,
 } from "node:fs";
-import { isAbsolute, dirname, join, resolve } from "node:path";
+import { isAbsolute, dirname, join, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
@@ -2115,20 +2115,69 @@ function readWorktreeLivenessAgeMs(worktreePath) {
 }
 
 /**
- * Evaluates exactly ONE registered worktree entry against the five AC-2 admission conditions, in
+ * The two path prefixes, resolved relative to the repository's own identified main worktree
+ * root (never a candidate's own root, and never trusted from "git worktree list"'s ordering),
+ * that the Pipeline itself provisions worktrees under. Confirmed by direct read (NVA-B-WTLIVE-2)
+ * rather than assumed:
+ *   - ".claude/worktrees/" -- the exact prefix planOrphanWorktreeDirectories above already
+ *     scopes its sibling orphan-directory sweep to (resolve(root, ".claude", "worktrees")).
+ *   - "branch/" -- worktree-lifecycle.mjs's canonicalBranchTarget resolves every attached-branch
+ *     worktree's target to resolve(primaryRoot, "branch", ...segments), and
+ *     canonicalDetachedTarget resolves every detached worktree's target one level further
+ *     nested, under resolve(primaryRoot, "branch", "detached", ...) -- so "branch/" alone
+ *     already covers both createBranchWorktree's and createDetachedWorktree's own shapes.
+ * Used ONLY by the opt-in Pipeline-path restriction the unattended bootstrap sweep requests
+ * (NVA-B-WTLIVE-2, PO decision) -- never by the deliberate-invocation default path, which keeps
+ * retiring any registered worktree regardless of location (c352528f, unchanged).
+ */
+const PIPELINE_OWNED_WORKTREE_PREFIX_SEGMENTS = [
+  [".claude", "worktrees"],
+  ["branch"],
+];
+
+/**
+ * True when candidatePath (already realpath-resolved by the caller) resolves under one of
+ * PIPELINE_OWNED_WORKTREE_PREFIX_SEGMENTS, computed relative to mainWorktreePath. Uses
+ * path.relative rather than a raw startsWith string comparison so a sibling directory whose name
+ * merely shares the prefix as a string (e.g. "branch-other/") is never misclassified as inside
+ * "branch/", and so ".."-escaping or a different drive/root never matches either.
+ */
+function isUnderPipelineOwnedWorktreePrefix(mainWorktreePath, candidatePath) {
+  return PIPELINE_OWNED_WORKTREE_PREFIX_SEGMENTS.some((segments) => {
+    const base = resolve(mainWorktreePath, ...segments);
+    if (candidatePath === base) return true;
+    const rel = relative(base, candidatePath);
+    return rel !== "" && rel !== ".." && !rel.startsWith(".." + sep) && !isAbsolute(rel);
+  });
+}
+
+/**
+ * Evaluates exactly ONE registered worktree entry against the AC-2 admission conditions, in
  * cheapest-first order (no subprocess spawned before one is actually needed), stopping at the
  * first one that fails or is undeterminable. Shared by planRegisteredWorktreeRetirement and
  * retireRegisteredWorktrees's own pre-mutation re-check, so both ever apply exactly one
  * definition of "retirable" (AC-4: reuse the mechanism rather than inventing a second one). Any
  * undeterminable step ("unknown-...") declines exactly like a failed condition -- ambiguity is
  * never treated as permission.
+ *
+ * restrictToPipelineOwnedPaths (NVA-B-WTLIVE-2, PO decision, default false): a SIXTH, additive,
+ * OPT-IN condition requested only by the unattended bootstrap sweep -- never by the default,
+ * deliberate-invocation path, whose behavior is byte-for-byte unchanged when this stays false.
+ * Checked immediately after the main-worktree comparison, before either subprocess call, since it
+ * is a pure path computation on an already-realpath-resolved value: cheapest-first, and it
+ * short-circuits both "git status" and "git branch --contains" for every candidate outside the
+ * allowlist. There is no "unknown-..." variant for this condition: by the point it runs, realPath
+ * and mainWorktreePath are both already confirmed non-null, so the check is always determinable.
  */
-function evaluateWorktreeCandidate({ root, mainWorktreePath, item, deps }) {
+function evaluateWorktreeCandidate({ root, mainWorktreePath, item, deps, restrictToPipelineOwnedPaths = false }) {
   let realPath;
   try { realPath = realpathSync(item.rawPath); }
   catch { return { path: item.rawPath, status: "unknown-path-unavailable" }; }
   if (realPath === mainWorktreePath) {
     return { path: realPath, status: "skipped-main-worktree" };
+  }
+  if (restrictToPipelineOwnedPaths && !isUnderPipelineOwnedWorktreePrefix(mainWorktreePath, realPath)) {
+    return { path: realPath, status: "declined-outside-pipeline-paths" };
   }
   if (item.headSha === null || !HEAD_SHA_SHAPE.test(item.headSha)) {
     return { path: realPath, status: "unknown-head-unavailable" };
@@ -2182,12 +2231,18 @@ function evaluateWorktreeCandidate({ root, mainWorktreePath, item, deps }) {
  * check stopped it -- fail-open by design, exactly the orphan branch's own posture: ambiguity
  * always resolves to leaving the worktree alone, never to retiring it.
  *
+ * restrictToPipelineOwnedPaths (NVA-B-WTLIVE-2, PO decision, default false): requests the SIXTH,
+ * additive, opt-in condition from evaluateWorktreeCandidate above -- a candidate outside both
+ * Pipeline-owned prefixes is declined as "declined-outside-pipeline-paths" regardless of how it
+ * scores on the other five. Default false leaves every existing caller's behavior byte-for-byte
+ * unchanged; only the unattended bootstrap sweep (runBootstrapWorktreeSweep) passes true.
+ *
  * `status: "unknown-git-worktree-list-unavailable"` at the top level (empty `entries`) is
  * returned when the underlying `git worktree list`/`git rev-parse --show-toplevel` calls
  * themselves fail -- there is no candidate list to evaluate at all in that case, unlike the
  * orphan branch above, which already has an independent directory listing to fall back on.
  */
-export function planRegisteredWorktreeRetirement({ rootDir, deps = {} } = {}) {
+export function planRegisteredWorktreeRetirement({ rootDir, deps = {}, restrictToPipelineOwnedPaths = false } = {}) {
   const root = realpathSync(resolve(rootDir));
   const stdout = spawnWorktreeListPorcelain(root, deps);
   const mainWorktreePath = resolveMainWorktreePath(root, deps);
@@ -2199,7 +2254,7 @@ export function planRegisteredWorktreeRetirement({ rootDir, deps = {} } = {}) {
     };
   }
   const entries = parseWorktreeListPorcelain(stdout)
-    .map((item) => evaluateWorktreeCandidate({ root, mainWorktreePath, item, deps }));
+    .map((item) => evaluateWorktreeCandidate({ root, mainWorktreePath, item, deps, restrictToPipelineOwnedPaths }));
   return {
     schema: REGISTERED_WORKTREE_RETIREMENT_PLAN_SCHEMA,
     status: "ready",
@@ -2220,10 +2275,17 @@ export function planRegisteredWorktreeRetirement({ rootDir, deps = {} } = {}) {
  * planRegisteredWorktreeRetirement itself uses, per AC-4's "reuse the mechanism" instruction) --
  * a worktree that became dirty, gained a lock, or moved its HEAD between the plan above and this
  * exact moment is caught here and retained, never removed.
+ *
+ * restrictToPipelineOwnedPaths (NVA-B-WTLIVE-2, PO decision, default false): forwarded unchanged
+ * to BOTH the initial plan above and the pre-mutation recheck below, so a caller requesting the
+ * restriction can never have a candidate slip past it at recheck time merely because only the
+ * plan call was told to restrict. Default false leaves this function's own default behavior
+ * byte-for-byte unchanged (c352528f, the already-reviewed deliberate-invocation design) -- only
+ * the unattended bootstrap sweep passes true.
  */
-export function retireRegisteredWorktrees({ rootDir, deps = {} } = {}) {
+export function retireRegisteredWorktrees({ rootDir, deps = {}, restrictToPipelineOwnedPaths = false } = {}) {
   const root = realpathSync(resolve(rootDir));
-  const plan = planRegisteredWorktreeRetirement({ rootDir: root, deps });
+  const plan = planRegisteredWorktreeRetirement({ rootDir: root, deps, restrictToPipelineOwnedPaths });
   if (plan.status !== "ready") {
     return { status: plan.status, retiredCount: 0, retained: plan.entries };
   }
@@ -2247,7 +2309,7 @@ export function retireRegisteredWorktrees({ rootDir, deps = {} } = {}) {
       retained.push({ ...entry, status: "changed" });
       continue;
     }
-    const recheck = evaluateWorktreeCandidate({ root, mainWorktreePath, item: fresh, deps });
+    const recheck = evaluateWorktreeCandidate({ root, mainWorktreePath, item: fresh, deps, restrictToPipelineOwnedPaths });
     if (recheck.status !== "retirable") {
       retained.push(recheck);
       continue;

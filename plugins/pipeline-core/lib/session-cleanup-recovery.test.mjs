@@ -1091,3 +1091,77 @@ test("an unresolvable liveness signal (gitdir reflog missing) declines rather th
     assert.equal(existsSync(wt), true, "an unresolvable liveness check must never cause a removal");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+// NVA-B-WTLIVE-2 (PO decision): the unattended bootstrap sweep's opt-in Pipeline-path
+// restriction, `restrictToPipelineOwnedPaths`. Never the default (every test above calls both
+// functions without it and must keep behaving exactly as before -- that is the regression bar).
+// A candidate outside both Pipeline-owned prefixes (".claude/worktrees/", "branch/") is declined
+// by the restriction alone, regardless of how it scores on the existing five AC-2 conditions; the
+// SAME candidate stays retirable through the default, deliberate-invocation path (c352528f,
+// unchanged), proving the restriction is genuinely additive/opt-in rather than a narrowing of
+// retireRegisteredWorktrees's own default contract.
+
+test("F1 regression: a worktree outside both Pipeline-owned prefixes, otherwise meeting all five existing conditions, is declined only by the restriction -- and stays retirable by default", () => {
+  const root = freshWorktreeSweepRepo();
+  try {
+    const tip = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).stdout.trim();
+    const wt = join(root, "elsewhere", "outside-pipeline-paths");
+    const add = spawnSync("git", ["worktree", "add", "--detach", wt, tip], { cwd: root, encoding: "utf8" });
+    assert.equal(add.status, 0, add.stderr);
+    backdateWorktreeLiveness(wt, 7 * 60 * 60 * 1000);
+
+    const restrictedPlan = planRegisteredWorktreeRetirement({ rootDir: root, restrictToPipelineOwnedPaths: true });
+    const restrictedEntry = restrictedPlan.entries.find((e) => e.status !== "skipped-main-worktree");
+    assert.equal(restrictedEntry.status, "declined-outside-pipeline-paths");
+
+    const restrictedRetired = retireRegisteredWorktrees({ rootDir: root, restrictToPipelineOwnedPaths: true });
+    assert.equal(restrictedRetired.retiredCount, 0);
+    assert.equal(existsSync(wt), true, "a worktree outside the Pipeline-owned prefixes must survive the restricted sweep");
+
+    const defaultPlan = planRegisteredWorktreeRetirement({ rootDir: root });
+    const defaultEntry = defaultPlan.entries.find((e) => e.status !== "skipped-main-worktree");
+    assert.equal(defaultEntry.status, "retirable", "the deliberate-invocation default path must remain unaffected by the restriction");
+
+    const defaultRetired = retireRegisteredWorktrees({ rootDir: root });
+    assert.equal(defaultRetired.retiredCount, 1);
+    assert.equal(existsSync(wt), false, "the default, unrestricted path must still retire it");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("a worktree under .claude/worktrees/, otherwise meeting all five conditions, is retirable under the restriction", () => {
+  const root = freshWorktreeSweepRepo();
+  try {
+    const tip = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).stdout.trim();
+    const wt = join(root, ".claude", "worktrees", "inside-claude-worktrees");
+    const add = spawnSync("git", ["worktree", "add", "--detach", wt, tip], { cwd: root, encoding: "utf8" });
+    assert.equal(add.status, 0, add.stderr);
+    backdateWorktreeLiveness(wt, 7 * 60 * 60 * 1000);
+
+    const plan = planRegisteredWorktreeRetirement({ rootDir: root, restrictToPipelineOwnedPaths: true });
+    const entry = plan.entries.find((e) => e.status !== "skipped-main-worktree");
+    assert.equal(entry.status, "retirable");
+
+    const retired = retireRegisteredWorktrees({ rootDir: root, restrictToPipelineOwnedPaths: true });
+    assert.equal(retired.retiredCount, 1);
+    assert.equal(existsSync(wt), false);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("a worktree under branch/, otherwise meeting all five conditions, is retirable under the restriction", () => {
+  const root = freshWorktreeSweepRepo();
+  try {
+    const tip = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).stdout.trim();
+    const wt = join(root, "branch", "inside-branch-prefix");
+    const add = spawnSync("git", ["worktree", "add", "--detach", wt, tip], { cwd: root, encoding: "utf8" });
+    assert.equal(add.status, 0, add.stderr);
+    backdateWorktreeLiveness(wt, 7 * 60 * 60 * 1000);
+
+    const plan = planRegisteredWorktreeRetirement({ rootDir: root, restrictToPipelineOwnedPaths: true });
+    const entry = plan.entries.find((e) => e.status !== "skipped-main-worktree");
+    assert.equal(entry.status, "retirable");
+
+    const retired = retireRegisteredWorktrees({ rootDir: root, restrictToPipelineOwnedPaths: true });
+    assert.equal(retired.retiredCount, 1);
+    assert.equal(existsSync(wt), false);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
