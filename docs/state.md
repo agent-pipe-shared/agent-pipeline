@@ -280,6 +280,26 @@ green). Closed. F3 (`resolveMainWorktreePath` misidentification from a
 linked worktree) stays open, separately tracked, non-blocking. Full detail:
 `2026-09-01-a-fresh-worktree-is-indistinguishable-from-an-abandoned-one.md`.
 
+### 2026-09-06: read containment restoration in progress (NVA-B-READCONTAIN-1/2)
+
+PO decided "re-narrow, with explicit exceptions" on
+`2026-08-29-read-scope-guard-admits-single-command-but-blocks-the-piped-form.md`'s
+regression (`c8c7f449` removed all project-root containment from the
+read-only Bash lane in `guard-lifecycle-ready.mjs` a day after it was added).
+Split into two dispatches: `NVA-B-READCONTAIN-1` (in progress) restores
+exactly the pre-`c8c7f449` mechanism (`BOUNDED_PIPELINE_ADDITIONAL_ROOTS`,
+`GUARD-READ-SCOPE-OUTSIDE-ROOT`, `isOutsideRootSingleCommandRead`/
+`isOutsideRootBoundedDiagnosticRead`) with no new exceptions;
+`NVA-B-READCONTAIN-2` (not yet dispatched) adds two new session-derived
+exception roots (transcript-adjacent tree, task-output tree — both resolved
+from the PreToolUse hook's `transcript_path` field the way
+`claudeSessionMemoryDirectory`/MEMPATH-1 already does for the write side,
+never pattern-matched) on top of that floor. Both need a T1 Critic round
+(opus, max — A/G/S class). After both land, author the ADR the backlog
+item's acceptance criteria require and close both
+`2026-09-01-read-containment-was-removed-a-day-after-it-was-added-with-no-recorded-decision.md`
+and the 2026-08-29 item.
+
 ## PO decisions and todos — collected during the autonomous run, not waited on
 
 Per the PO's 2026-09-02 instruction. None blocks further Nova-B work.
