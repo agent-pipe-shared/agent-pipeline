@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "2b5a5a46699a71098a5dcad2bd4f282e76857e3d0f6cc962568ce7adb015ffc6"
+    "transitionHead": "05ff710ebb8969f2b22d893c74740ff1545b7ede3449d4a717fee911cb269914"
   },
   "counts": {
-    "open": 100,
+    "open": 99,
     "in_progress": 0,
-    "closed": 519,
+    "closed": 520,
     "rejected": 3,
     "deferred": 11
   },
@@ -2648,13 +2648,17 @@
     },
     {
       "id": "pipeline.gg22-normalization-false-blocks-trailing-slash-pathspec",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-06",
       "source": "T1 Critic review (opus, max), closing round 2 for NVA-B-GG22FIX-2, finding F2.",
       "deferred": false,
-      "tracking": "Nova B -- T1 Critic closing round for NVA-B-GG22FIX-2 (F2, minor): normalizePathspecLexically() drops empty path segments, so a trailing-slash directory pathspec token (backlog/items/) normalizes to backlog/items, which then fails the backlog/items/ prefix check and is classed disallowed -- a legitimate git commit -F <msg> -- backlog/items/ is now blocked while GG-22 debt is outstanding. Fail-closed direction (a false block, not a false admission), so this is NOT a security regression, but it does regress the deadlock fix's own intent for the directory form of a pathspec."
+      "tracking": "Nova B -- T1 Critic closing round for NVA-B-GG22FIX-2 (F2, minor): normalizePathspecLexically() drops empty path segments, so a trailing-slash directory pathspec token (backlog/items/) normalizes to backlog/items, which then fails the backlog/items/ prefix check and is classed disallowed -- a legitimate git commit -F <msg> -- backlog/items/ is now blocked while GG-22 debt is outstanding. Fail-closed direction (a false block, not a false admission), so this is NOT a security regression, but it does regress the deadlock fix's own intent for the directory form of a pathspec.",
+      "closedAt": "2026-09-06",
+      "closureRepository": "self",
+      "closureCommit": "9c274f7b4ede225786432df23bfab2941ed71e95",
+      "closureEvidence": "backlog/items/2026-09-06-gg22-pathspec-normalization-false-blocks-a-trailing-slash-directory-pathspec.md"
     },
     {
       "id": "pipeline.gg22-pathspec-fix-lacks-permanent-test",

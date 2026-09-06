@@ -220,7 +220,7 @@
 | pipeline.gate-strength-shell-lane-refuses-any-command-containing-a-quoted-wildcard | closed | defect | pipeline | 2026-08-27 | — |
 | pipeline.gg-22-reads-the-shared-index-so-a-concurrent-dispatch-blocks-an-unrelated-ledger-commit | closed | defect | pipeline | 2026-09-03 | Nova B — GG-22's disallowed-path check reads `git diff --cached`, the shared index, rather than the paths the blocked commit actually names. Under parallel dispatch that makes an unrelated agent's staged work block a correct ledger commit, with a denial text that names neither the real cause nor a route forward. |
 | pipeline.gg-22s-own-remediation-order-creates-unclearable-ledger-debt | closed | defect | pipeline | 2026-08-29 | — |
-| pipeline.gg22-normalization-false-blocks-trailing-slash-pathspec | open | defect | pipeline | 2026-09-06 | Nova B -- T1 Critic closing round for NVA-B-GG22FIX-2 (F2, minor): normalizePathspecLexically() drops empty path segments, so a trailing-slash directory pathspec token (backlog/items/) normalizes to backlog/items, which then fails the backlog/items/ prefix check and is classed disallowed -- a legitimate git commit -F <msg> -- backlog/items/ is now blocked while GG-22 debt is outstanding. Fail-closed direction (a false block, not a false admission), so this is NOT a security regression, but it does regress the deadlock fix's own intent for the directory form of a pathspec. |
+| pipeline.gg22-normalization-false-blocks-trailing-slash-pathspec | closed | defect | pipeline | 2026-09-06 | Nova B -- T1 Critic closing round for NVA-B-GG22FIX-2 (F2, minor): normalizePathspecLexically() drops empty path segments, so a trailing-slash directory pathspec token (backlog/items/) normalizes to backlog/items, which then fails the backlog/items/ prefix check and is classed disallowed -- a legitimate git commit -F <msg> -- backlog/items/ is now blocked while GG-22 debt is outstanding. Fail-closed direction (a false block, not a false admission), so this is NOT a security regression, but it does regress the deadlock fix's own intent for the directory form of a pathspec. |
 | pipeline.gg22-pathspec-fix-lacks-permanent-test | open | defect | pipeline | 2026-09-06 | Nova B — NVA-B-GG22FIX-1 (commit fe2d7afe) fixed the GG-22 shared-index deadlock, but plugins/pipeline-core/hooks/guard-git.test.mjs is TP-1 protected with no in-session override route, so the dispatch could not add a permanent regression test there. The fix was proven RED-then-GREEN via an ephemeral scratch/ reproduction script instead, which is not committed and does not guard against a future regression of this exact scoping logic. |
 | pipeline.git-09-still-calls-the-append-only-source-ledger-a-projection-file | closed | defect | pipeline | 2026-09-01 | — |
 | pipeline.git-appears-despite-initializes-git-false | closed | defect | pipeline | 2026-08-08 | — |
@@ -641,8 +641,8 @@
 
 ## Counts
 
-- open: 100
+- open: 99
 - in_progress: 0
-- closed: 519
+- closed: 520
 - rejected: 3
 - deferred: 11
