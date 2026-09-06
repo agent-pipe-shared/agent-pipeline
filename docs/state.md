@@ -42,12 +42,15 @@ danach").
 
 ### Gate state
 
-`evidence/verify-latest.json` binds `a478b10c`: **514/515 green, one red**,
+`evidence/verify-latest.json` binds `fcaf8d5e`: **514/515 green, one red**,
 `suite-registration-check`, because `guard-slicing.test.mjs` is not in
 `verify.mjs`. Two lines behind a TP-3 signature (queue #1). The parking-entry
 route was deliberately not taken — a T1 finding the same day recorded that
-move as a QG-16 violation. Wall clock **485s**, down from 645.7s
-(`2026-09-06-lane-eviction-measured-result.md`).
+move as a QG-16 violation. Wall clock **454.9s**, down from 645.7s across
+two evictions (`2026-09-06-lane-eviction-measured-result.md`, trend rows in
+the 2026-09-01 regression item). Every `Dispatch:` trailer of the day binds
+to a terminal record — verified per commit with
+`dispatch-authorship-verify.mjs`, all PASS.
 
 ### In the candidate
 
