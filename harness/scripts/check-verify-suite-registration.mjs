@@ -161,6 +161,12 @@ export const REQUIRED_EXCLUSION_FIELDS = Object.freeze(["reason", "owner", "expi
  * with the rest deliberately, so that nothing here outlives a single review date, not
  * because they share the others' justification.
  *
+ * ADDED 2026-09-06 (NVA-B-SLICINGBUILD-2): `plugins/pipeline-core/hooks/guard-slicing.test.mjs`
+ * joined the green group below by the identical route -- 30/30 passing, parked solely because
+ * registering it edits verify.mjs while the window is closed. The paragraph above this one
+ * predates that addition and is not restated here; see the entry itself, and the test below
+ * that pins the current membership, for the up-to-date set.
+ *
  * The green group is growing, by two different routes. Three of its seven suites were
  * orphaned by the 0.5.2 integration and have since been repaired rather than deleted;
  * the other four are new checks written against a protected registration surface,
@@ -217,6 +223,11 @@ export const EXCLUSIONS = Object.freeze({
   }),
   "plugins/pipeline-core/hooks/guard-push-release-tag-ancestry.test.mjs": Object.freeze({
     reason: "GREEN, not red: 10/10 passing (NVA-B-TAGFIX, 2026-09-01), covering checkReleaseTagAncestry (ADR-0078 D5): a release tag reachable from origin/main is allowed; an unreachable one is refused naming the tag, the commit, ADR-0078 D5 and a next step; refs/remotes/origin/main absent locally is no longer refused (the AC-2 correction this dispatch added, replacing the earlier permanent fail-closed refusal); non-release tags, branch pushes, tag deletes, and an explicit refs/tags/<name> destination are all unaffected; and an annotated tag is peeled to its target commit before the ancestry test, never the tag object's own sha. Parked solely because registering it edits verify.mjs, a protected test path (TP-3) whose maintenance window is closed and whose reopening needs a human signature. Register on the next window; this entry is a scheduling record, not a defect record.",
+    owner: "PO",
+    expires: "2026-09-07",
+  }),
+  "plugins/pipeline-core/hooks/guard-slicing.test.mjs": Object.freeze({
+    reason: "GREEN, not red: 30/30 passing (NVA-B-SLICINGBUILD-2, 2026-09-06), covering guard-slicing.mjs's orchestrator/subagent targeting; trigger A's three-consecutive-single-dispatch backstop with in-flight-turn exclusion by canonical-hash identity (both write-timing possibilities); message.id and Workflow fan-out resets (the Workflow reset independent of extractWorkflowDispatches()'s recovered count, by design); trigger B's TodoWrite pending>=3 threshold with per-batch-hash rate limiting; the exact PreToolUse additionalContext stdout shape; the ledger record shape; and fail-open on each malformed-input class. Parked solely because registering it edits verify.mjs, a protected test path (TP-3) whose maintenance window is closed and whose reopening needs a human signature. Register on the next window; this entry is a scheduling record, not a defect record.",
     owner: "PO",
     expires: "2026-09-07",
   }),
