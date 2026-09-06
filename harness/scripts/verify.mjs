@@ -762,6 +762,8 @@ const TEST_SUITES = [
   { name: "suite-registration-check", file: join(pluginScriptsDir, "check-suite-registration.mjs") },
   { name: "pre-gate-tests", file: join(scriptDir, "pre-gate.test.mjs") },
   { name: "capture-evidence-tests", file: join(pluginScriptsDir, "capture-evidence.test.mjs") },
+  { name: "verify-evidence-writer-tests", file: join(scriptDir, "verify-evidence-writer.test.mjs") },
+  { name: "dispatch-record-strip-for-critic-tests", file: join(libDir, "dispatch-record-strip-for-critic.test.mjs") },
 ];
 
 // Manifest-gated phase steps: see header — only projects that carry a manifest at
