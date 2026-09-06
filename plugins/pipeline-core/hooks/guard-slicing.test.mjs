@@ -323,6 +323,117 @@ test("GS20: an already-completed Task/Agent fan-out is recognized on the NEXT ca
   assert.equal(record.event, LEDGER_EVENT_FANOUT);
 });
 
+// --- Run resets on an Antigravity invoke_subagent fan-out (NVA-B-SLICINGRUNNER-1,
+// ADR-0051 runner neutrality). Structurally simpler than Task/Agent: the fan-out width
+// is read directly from THIS call's own tool_input.Subagents array, with no transcript
+// grouping, no timing, and no in-flight ambiguity -- recognized unconditionally, exactly
+// like the Workflow tool name is (GS8 above). -------------------------------------------
+
+test("GS21: an invoke_subagent call with >=2 Subagents entries is a fan-out, recorded in the ledger like any other", () => {
+  const store = makeStore({});
+  const current = {
+    Subagents: [
+      { TypeName: "pipeline-core:goldfish-mechanic", Prompt: "one" },
+      { TypeName: "pipeline-core:critic", Prompt: "two" },
+    ],
+  };
+  const result = evaluateSlicingGuard(
+    { transcript_path: ORCH_TRANSCRIPT, session_id: "s21", tool_name: "invoke_subagent", tool_input: current },
+    baseOptions(store),
+  );
+  assert.equal(result.stdout, "", "a fan-out call with empty preceding history has runLength 0 -- no nudge");
+  const raw = store.files.get(ledgerPath(COMMON_DIR, "s21"));
+  const record = JSON.parse(raw.trim().split("\n").pop());
+  assert.equal(record.fanout, true, "a 2+ entry Subagents array must be recognized as a fan-out");
+  assert.equal(record.event, LEDGER_EVENT_FANOUT);
+  assert.equal(record.tool, "invoke_subagent");
+});
+
+test("GS22: an invoke_subagent call with EXACTLY ONE Subagents entry is NOT treated as a fan-out (the DoD-pinned single-entry case)", () => {
+  const store = makeStore({});
+  const current = { Subagents: [{ TypeName: "pipeline-core:goldfish-mechanic", Prompt: "solo" }] };
+  const result = evaluateSlicingGuard(
+    { transcript_path: ORCH_TRANSCRIPT, session_id: "s22", tool_name: "invoke_subagent", tool_input: current },
+    baseOptions(store),
+  );
+  assert.equal(result.stdout, "");
+  const raw = store.files.get(ledgerPath(COMMON_DIR, "s22"));
+  const record = JSON.parse(raw.trim().split("\n").pop());
+  assert.equal(record.fanout, false, "a single-entry Subagents array must not be recognized as a fan-out");
+  assert.equal(record.event, LEDGER_EVENT_DISPATCH);
+});
+
+test("GS23: an invoke_subagent fan-out is recognized regardless of an unrelated Task/Agent single-run in progress (mirrors GS8's Workflow-regardless-of-recovered-count decision)", () => {
+  const rows = [dispatchRow("m1", "Task"), dispatchRow("m2", "Task")];
+  const store = makeStore({ [ORCH_TRANSCRIPT]: transcriptText(rows) });
+  const current = { Subagents: [{ TypeName: "a", Prompt: "x" }, { TypeName: "b", Prompt: "y" }] };
+  const result = evaluateSlicingGuard(
+    { transcript_path: ORCH_TRANSCRIPT, session_id: "s23", tool_name: "invoke_subagent", tool_input: current },
+    baseOptions(store),
+  );
+  const raw = store.files.get(ledgerPath(COMMON_DIR, "s23"));
+  const record = JSON.parse(raw.trim().split("\n").pop());
+  assert.equal(record.fanout, true, "a genuine Antigravity fan-out must be recognized independent of unrelated Task/Agent transcript history");
+});
+
+test("GS24: a malformed Subagents entry (missing TypeName) does not inflate the recognized fan-out width -- reuses extractAntigravityDispatches's own validation rather than raw array length", () => {
+  const store = makeStore({});
+  const current = { Subagents: [{ TypeName: "real", Prompt: "x" }, { Prompt: "no TypeName here" }] };
+  const result = evaluateSlicingGuard(
+    { transcript_path: ORCH_TRANSCRIPT, session_id: "s24", tool_name: "invoke_subagent", tool_input: current },
+    baseOptions(store),
+  );
+  const raw = store.files.get(ledgerPath(COMMON_DIR, "s24"));
+  const record = JSON.parse(raw.trim().split("\n").pop());
+  assert.equal(record.fanout, false, "extractAntigravityDispatches recovers only ONE valid entry from this raw 2-entry array -- not a recognized fan-out");
+});
+
+test("GS25: a non-array Subagents value on an invoke_subagent call never throws and is not treated as a fan-out", () => {
+  const store = makeStore({});
+  const result = evaluateSlicingGuard(
+    { transcript_path: ORCH_TRANSCRIPT, session_id: "s25", tool_name: "invoke_subagent", tool_input: { Subagents: "not-an-array" } },
+    baseOptions(store),
+  );
+  assert.equal(result.exitCode, 0);
+  const raw = store.files.get(ledgerPath(COMMON_DIR, "s25"));
+  const record = JSON.parse(raw.trim().split("\n").pop());
+  assert.equal(record.fanout, false);
+});
+
+// --- Codex has no dispatch surface: pinned silence (NVA-B-SLICINGRUNNER-1, ADR-0051).
+//
+// Investigation (read-only per this dispatch's briefing): codex-pretool-guard.mjs is the
+// ONLY PreToolUse adapter Codex runs through in this repository, and it enumerates its own
+// `supportedTools` as an EXHAUSTIVE allowlist -- Bash, apply_patch, Edit, Write -- denying
+// anything else outright ("Unsupported or missing Codex tool_name") before this guard, or any
+// other, ever runs. None of those four names match "TodoWrite", "Task", "Agent", "Workflow",
+// or "invoke_subagent" -- Codex has no dispatch/subagent tool at all in this repository,
+// confirmed structurally rather than by a negative grep alone. evaluateSlicingGuard's routing
+// is a positive enumeration, not a blacklist, so every one of Codex's four possible tool names
+// already falls through to the silent no-opinion branch by construction. No recognizer was
+// built for Codex (per the briefing's explicit instruction); these cases only PIN that the
+// existing fallthrough is what actually happens for the shapes Codex's own adapter can produce.
+for (const codexToolName of ["Bash", "apply_patch", "Edit", "Write"]) {
+  test(`CODEX ${codexToolName}: a Codex-shaped payload produces no nudge, no ledger entry, exit 0`, () => {
+    const store = makeStore({});
+    const toolInput = codexToolName === "Bash" || codexToolName === "apply_patch"
+      ? { command: "echo hi" }
+      : { file_path: "/repo/some/file.mjs" };
+    const sessionId = `scodex-${codexToolName}`;
+    const result = evaluateSlicingGuard(
+      { transcript_path: ORCH_TRANSCRIPT, session_id: sessionId, tool_name: codexToolName, tool_input: toolInput },
+      baseOptions(store),
+    );
+    assert.equal(result.exitCode, 0);
+    assert.equal(result.stdout, "");
+    assert.equal(
+      store.files.has(ledgerPath(COMMON_DIR, sessionId)),
+      false,
+      `no ledger entry must be written for ${codexToolName} -- a tool Codex's own adapter admits but this guard has no opinion on`,
+    );
+  });
+}
+
 // --- Trigger B: TodoWrite >= threshold pending, rate-limited per batch ----
 
 test("GS9: fewer than SLICING_THRESHOLD pending items does not fire", () => {

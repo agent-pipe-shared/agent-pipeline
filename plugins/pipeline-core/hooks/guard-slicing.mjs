@@ -77,8 +77,9 @@
  *   ledger file for a prior `event: "todo-plan"` record carrying the same
  *   `batchHash` and `advisoryEmitted: true`. One batch never nudges twice.
  *
- * FAN-OUT RECOGNITION (resets trigger A's run). Two recognizers, per the
- * ADR's Decision 3/4 and the briefing's restatement:
+ * FAN-OUT RECOGNITION (resets trigger A's run). Three recognizers, per the
+ * ADR's Decision 3/4, the briefing's restatement, and NVA-B-SLICINGRUNNER-1
+ * (runner neutrality, ADR-0051):
  * - `Task`/`Agent`: dispatch `tool_use` blocks in the transcript are grouped
  *   by their row's `message.id` (an IDENTITY match, not a timestamp window --
  *   the ADR measured that a window cannot separate same-turn from cross-turn
@@ -91,6 +92,18 @@
  *   recovered count for the reset decision; it is used ONLY as an additional
  *   `workflowRecoveredCount` field on the ledger record, exactly the "you may
  *   call it for the ledger record" carve-out in the briefing.
+ * - `invoke_subagent` (the Antigravity runner's native dispatch tool): its
+ *   `tool_input.Subagents` array carries the fan-out width directly, with no
+ *   transcript grouping, no timing, and no in-flight ambiguity -- structurally
+ *   simpler than `Task`/`Agent`. >= 2 entries recovered by the exported
+ *   `extractAntigravityDispatches()` (guard-dispatch.mjs, never a second local
+ *   copy of that parsing) is a fan-out, recognized unconditionally from THIS
+ *   call's own shape alone, exactly like `Workflow` above -- never from
+ *   transcript history. Codex has no dispatch/subagent tool at all in this
+ *   repository (codex-pretool-guard.mjs's own `supportedTools` names only
+ *   Bash/apply_patch/Edit/Write), so it needs no recognizer here: every Codex
+ *   tool name already falls through the routing below to silence, pinned by
+ *   this file's CODEX test cases rather than by new code.
  *
  * IN-FLIGHT-TURN EXCLUSION (the correctness crux). The transcript's LATEST
  * `message.id` group may be the turn currently producing THIS hook's own
@@ -164,7 +177,7 @@ import { createHash } from "node:crypto";
 import { basename, dirname, join } from "node:path";
 
 import { resolveGitCommonDir, subagentIdentity } from "./guard-dispatch-budget.mjs";
-import { extractWorkflowDispatches } from "./guard-dispatch.mjs";
+import { extractAntigravityDispatches, extractWorkflowDispatches } from "./guard-dispatch.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 // PSP-0's N, and the single threshold this file uses everywhere a count is
@@ -177,6 +190,14 @@ export const NUDGE_CHANNEL = "PreToolUse.additionalContext";
 const TASK_AGENT_TOOL_NAMES = new Set(["Task", "Agent"]);
 const WORKFLOW_TOOL_NAME = "Workflow";
 export const DISPATCH_TOOL_NAMES = new Set([...TASK_AGENT_TOOL_NAMES, WORKFLOW_TOOL_NAME]);
+
+// The Antigravity runner's native subagent-dispatch tool (NVA-B-SLICINGRUNNER-1). Deliberately
+// NOT added to `DISPATCH_TOOL_NAMES` above -- that set is asserted elsewhere to name exactly
+// Task/Agent/Workflow, and its `message.id`-grouping consumers (groupDispatchMessages,
+// classifyGroup) stay untouched by this package. `invoke_subagent`'s fan-out is instead
+// recognized directly from THIS call's own `tool_input.Subagents` array (see evaluateTriggerA),
+// routed there by an explicit OR-check in evaluateSlicingGuard below.
+const ANTIGRAVITY_TOOL_NAME = "invoke_subagent";
 
 const LEDGER_SCHEMA = "pipeline.dispatch-slicing-ledger.v1";
 export const LEDGER_EVENT_TODO_PLAN = "todo-plan";
@@ -508,6 +529,27 @@ function evaluateTriggerA({ input, toolName, toolInput, sessionId, commonDir, no
     }
   }
 
+  // ANTIGRAVITY FAN-OUT (NVA-B-SLICINGRUNNER-1). The Antigravity runner's native
+  // `invoke_subagent` call carries its own fan-out width directly in THIS call's
+  // `tool_input.Subagents` array -- unlike Task/Agent, this needs no transcript
+  // grouping, no timing, and no in-flight ambiguity: the array length IS the fan-out
+  // width. Recognized unconditionally by structural shape of this call alone, exactly
+  // like the `toolName === WORKFLOW_TOOL_NAME` check above -- never by consulting
+  // transcript history (`lastCompletedGroupIsReset`, computed above, is untouched by
+  // this addition). Reuses the exported `extractAntigravityDispatches`
+  // (guard-dispatch.mjs) rather than a second, locally written copy of that parsing
+  // logic, so a malformed entry (missing `TypeName`) does not inflate the recognized
+  // width -- the same fail-open-on-garbage posture as every other count in this file.
+  let isAntigravityFanout = false;
+  if (toolName === ANTIGRAVITY_TOOL_NAME) {
+    try {
+      const subagents = Array.isArray(toolInput?.Subagents) ? toolInput.Subagents : [];
+      isAntigravityFanout = (options.extractAntigravityDispatchesFn ?? extractAntigravityDispatches)(subagents).length >= 2;
+    } catch {
+      isAntigravityFanout = false; // fail open -- never let a parse failure manufacture a fan-out
+    }
+  }
+
   // Exact equality, not >=: ADR Decision 4 -- "Fires once per run; any recognized
   // fan-out resets the run" and "Rate limiting is part of the trigger, not a
   // refinement. A nudge on every dispatch becomes ambient noise." Since runLength
@@ -531,7 +573,7 @@ function evaluateTriggerA({ input, toolName, toolInput, sessionId, commonDir, no
   // timing, where the in-flight call's own row is the one that legitimately
   // matches and the real preceding single survives untouched.)
   const advisoryEmitted = runLength === SLICING_THRESHOLD;
-  const fanout = toolName === WORKFLOW_TOOL_NAME || lastCompletedGroupIsReset;
+  const fanout = toolName === WORKFLOW_TOOL_NAME || isAntigravityFanout || lastCompletedGroupIsReset;
 
   const record = buildLedgerRecord({
     nowFn, sessionId, event: fanout ? LEDGER_EVENT_FANOUT : LEDGER_EVENT_DISPATCH, tool: toolName,
@@ -572,7 +614,15 @@ export function evaluateSlicingGuard(input, options = {}) {
     if (toolName === "TodoWrite") {
       return evaluateTriggerB({ toolInput, sessionId, commonDir, nowFn, options });
     }
-    if (DISPATCH_TOOL_NAMES.has(toolName)) {
+    // `invoke_subagent` (Antigravity's native dispatch tool, NVA-B-SLICINGRUNNER-1) is
+    // deliberately NOT a member of `DISPATCH_TOOL_NAMES` (see that constant's own
+    // comment) but is routed through the SAME trigger-A evaluator as Task/Agent/
+    // Workflow -- evaluateTriggerA is what recognizes its Subagents-array fan-out.
+    // Codex's own PreToolUse adapter (codex-pretool-guard.mjs) admits only
+    // Bash/apply_patch/Edit/Write -- none of which match any branch here, so every
+    // Codex call already falls through to the silent no-opinion return below by
+    // construction (pinned by this file's CODEX test cases; no code was added for it).
+    if (DISPATCH_TOOL_NAMES.has(toolName) || toolName === ANTIGRAVITY_TOOL_NAME) {
       return evaluateTriggerA({ input, toolName, toolInput, sessionId, commonDir, nowFn, options });
     }
     return { exitCode: 0, stdout: "" }; // a tool this hook has no opinion on
