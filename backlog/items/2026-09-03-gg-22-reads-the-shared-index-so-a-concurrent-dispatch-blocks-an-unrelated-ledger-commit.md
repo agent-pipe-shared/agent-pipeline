@@ -142,3 +142,20 @@ debt) already covers the no-pathspec regression and stayed green
 (232/232 full suite). Persisting the new pathspec cases into the committed
 suite via an `apply-pending-protected-edits.mjs` step remains open for a
 follow-up operator action.
+
+## Evidence-citation correction (2026-09-06, NVA-B-GG22FIX-2, F5)
+
+The closure note directly above cites its RED/GREEN reproduction at
+`scratch/gg22-pathspec-repro.mjs` and
+`evidence/NVA-B-GG22FIX-1-gg22-pathspec-{red,green}.txt` — both gitignored
+paths, unverifiable by any reader without that exact originating machine's
+local state (found by a T1 Critic review,
+`backlog/evidence/2026-09-06-nva-b-gg22fix-1-findings.md` F5). This note
+does not edit that closure note; it adds the durable, TRACKED pointers a
+reader can actually follow: the same round's own reproduction evidence
+lives at `backlog/evidence/2026-09-06-nva-b-gg22fix-1-{diff,green}.txt`.
+The follow-up correction (NVA-B-GG22FIX-2, commit `c6ef3425064e51a90709214219e904a8a51ef84a`, fixing the
+admission-widening defect F1 and the `../`-traversal gap F3 that the same
+Critic round found in the pathspec-scoping fix itself) captured its OWN
+RED/GREEN reproduction the same way, at
+`backlog/evidence/2026-09-06-nva-b-gg22fix-2-{red,green}.txt`.
