@@ -523,6 +523,7 @@
 | pipeline.sed-regex-address-is-misread-as-an-absolute-path | open | defect | pipeline | 2026-08-27 | — |
 | pipeline.seed-security-gate-on | closed | workflow-improvement | pipeline | 2026-08-28 | NOW / Nova A — PO decision 2026-08-28 stands, but BLOCKED: the measurement below was taken in this repository's own checkout, the one place the consumer-side defect does not fire. See 'Correction' before implementing. |
 | pipeline.seeded-verify-contract-is-always-green | closed | defect | pipeline | 2026-08-08 | — |
+| pipeline.selected-critic-lane-contracts-unpinned | open | defect | pipeline | 2026-09-06 | Nova B -- the selected-Codex-Critic lane (codex-critic-app-server.mjs) resolves roles/critic.md, templates/prompts/critic-review.md and the verdict schema against the live checkout with only an lstat, hands their paths into the child's prompt, and binds no digest of the briefed bytes into either receipt it constructs. The sibling native lane in codex-critic-host.mjs enforces pipelineRoot !== repoRoot, refuses a dirty ruleset checkout, and binds roleContractSha256/promptContractSha256/verdictSchemaSha256 into the prepared packet and the receipt. Under SEC-10's threat model an agent can edit roles/critic.md in the working tree, dispatch its own reviewer through the selected lane, and the tamper-evident execution receipt cannot show it. |
 | pipeline.self-application-integrity-check-absent | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.self-healing-local-cleanup-recovery | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.semgrep-timeout-oversized-pipeline-state-test | closed | defect | pipeline | 2026-08-11 | — |
@@ -647,7 +648,7 @@
 
 ## Counts
 
-- open: 104
+- open: 105
 - in_progress: 0
 - closed: 521
 - rejected: 3

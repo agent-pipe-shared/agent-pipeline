@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "50f3eb63c7872514c488ca76b3204dfc0de17cd740eb1cd7dc00ac73218e6004"
+    "transitionHead": "f4d6553871d2750a662202d5a5e820164531161d1d9a3f98119a54e160639b0b"
   },
   "counts": {
-    "open": 104,
+    "open": 105,
     "in_progress": 0,
     "closed": 521,
     "rejected": 3,
@@ -6476,6 +6476,16 @@
       "closureRepository": "self",
       "closureCommit": "674b1c0c85986a7d4a0aed0f8b1a124c99003d68",
       "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
+    },
+    {
+      "id": "pipeline.selected-critic-lane-contracts-unpinned",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-06",
+      "source": "T1 Critic finding F3 on aefe0e9c/6ca241f1, 2026-09-06, on the NVA-B-CRITICXPORT-1 transport. Filed late: the round-1 registry dispositioned it as 'filed, not fixed here' and no item existed; the closing round tested that claim and found nothing -- this item is the correction.",
+      "deferred": false,
+      "tracking": "Nova B -- the selected-Codex-Critic lane (codex-critic-app-server.mjs) resolves roles/critic.md, templates/prompts/critic-review.md and the verdict schema against the live checkout with only an lstat, hands their paths into the child's prompt, and binds no digest of the briefed bytes into either receipt it constructs. The sibling native lane in codex-critic-host.mjs enforces pipelineRoot !== repoRoot, refuses a dirty ruleset checkout, and binds roleContractSha256/promptContractSha256/verdictSchemaSha256 into the prepared packet and the receipt. Under SEC-10's threat model an agent can edit roles/critic.md in the working tree, dispatch its own reviewer through the selected lane, and the tamper-evident execution receipt cannot show it."
     },
     {
       "id": "pipeline.self-application-integrity-check-absent",
