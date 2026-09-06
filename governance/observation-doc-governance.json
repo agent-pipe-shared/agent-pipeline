@@ -277,6 +277,7 @@
         "audience": "maintainer",
         "lifecycle": "review-candidate",
         "paths": [
+          "docs/adr/draft-b1-worker-pool-superseded-by-workflow-tool.md",
           "docs/adr/draft-ci-failure-reporter-redaction-requirement.md",
           "docs/adr/draft-critic-report-durable-write-location.md",
           "docs/adr/draft-read-scope-containment-boundary.md",
