@@ -331,7 +331,7 @@ agent side never copies source). Filed:
 (also asks why `pipeline-start-preflight.mjs`'s freshness check reported
 `ready` despite this).
 
-`NVA-B-READCONTAIN-2` (next to dispatch) adds exactly two exception roots
+`NVA-B-READCONTAIN-2` (**dispatched, in flight**) adds exactly two exception roots
 from the PreToolUse hook's own `transcript_path`: the transcript file itself,
 and `dirname(transcript_path)/memory/` via `claudeSessionMemoryDirectory`/
 MEMPATH-1 — NOT the `/tmp` task-output dir (would guess Claude Code's
