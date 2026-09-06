@@ -42,63 +42,50 @@ danach").
 
 ### Gate state
 
-`evidence/verify-latest.json` binds `fcaf8d5e`: **514/515 green, one red**,
-`suite-registration-check`, because `guard-slicing.test.mjs` is not in
-`verify.mjs`. Two lines behind a TP-3 signature (queue #1). The parking-entry
-route was deliberately not taken — a T1 finding the same day recorded that
-move as a QG-16 violation. Wall clock **454.9s**, down from 645.7s across
-two evictions (`2026-09-06-lane-eviction-measured-result.md`, trend rows in
-the 2026-09-01 regression item). Every `Dispatch:` trailer of the day binds
-to a terminal record — verified per commit with
-`dispatch-authorship-verify.mjs`, all PASS.
+Last full run binds `2dca9b8d` exactly: **515/516, one red**,
+`product-capability-inventory-tests` — the signed registration `eecb4273`
+created a verify-phase surface no capability declared (the obligation
+`defe7013` met for two other suites that morning); fixed in `ec0b158c`,
+stage-0, RED/GREEN captured. The earlier red, `suite-registration-check`,
+is cleared by `eecb4273`. Run envelope 482.8s with a read-only subagent
+running concurrently — not a trend row; the stamped candidate's run, with
+nothing concurrent, is the measurement. Every `Dispatch:` trailer of the
+day binds to a terminal record (`dispatch-authorship-verify.mjs`, all PASS).
 
-### IN FLIGHT AT COMPACTION — 2026-09-06 late, read this before anything else
+### IN FLIGHT — 2026-09-06 evening, read this before anything else
 
-Written minutes before an auto-compact, because the previous compact lost
-the *idea* level (the verify lever was re-measured on the wrong axis
-afterwards). Commits survive compaction; intent does not — this block is
-the intent.
+Written across two compacts because the first one lost the *idea* level.
+Commits survive compaction; intent does not — this block is the intent.
 
-**Exact sequence, in order, nothing skipped:**
+**Sequence, with what is done:**
 
-1. **`NVA-B-XPORTFIX-2` IS DONE — `eb9c477f` (fix + test 110), `3f30b2c7`
-   (evidence). Use it; do NOT re-dispatch.** Self-verified after the spent
-   cap: both commits bind (authorship PASS ×2), two source files only, RED
-   is a real exit 1 at case 110, GREEN 110/110, cases 108/109 shown red
-   against pre-`70287f72`. Closes round-2 F-A/F-B. Open: the sibling
-   `advisory-host-bridge.mjs` has the same collapse (out of scope); both
-   transport dispatches force-added captures under `evidence/` against
-   `.gitignore`/ADR-0063 — decide once, don't revert twice.
-2. **SEQUENCE AMENDED after a resume-hint card was captured** (its own
-   note: *"a live Resume-Hint card fails resume-consumption-check until a
-   later session runs `resume-hint.mjs consume`"*). So the gate cannot be
-   green in the session that captured the card. **The final gate moves to
-   the next session**: bootstrap consumes the card (mandatory step), THEN
-   run `node harness/scripts/verify.mjs` at the candidate HEAD. The PO may
-   therefore restart as soon as step 1 has landed — the restart serves the
-   payload capture AND unblocks the gate. Expected **515/515 for the first time today** — the TP-3
-   registration landed under PO signature (`eecb4273`), both registration
-   checkers are green, the dead parking entry is removed (`8bd5eb21`).
-   Suite-span wall clock should be ≈455s (three lane evictions,
-   `f16ab254`+`fcaf8d5e`, −29.5% from 645.7s). If any suite is red, it is
-   new — nothing known is red.
-3. **Then update this file's Gate line and CHANGELOG `[Unreleased]`** with
-   the measured 515/515 and mark PO queue #1 done.
-4. **Then tell the PO "jetzt"** — they are waiting to restart Claude Code.
-   The restart IS PO-queue item #3, the payload capture: the PO has already
-   run `node scratch/payloadcapture-hook.mjs install` (a `PreToolUse`
-   `Bash|Read` hook in `~/.claude/settings.json`, verified installed, log
-   absent until a restart). **The new session must dispatch at least one
-   subagent** (any small Agent task), then the PO runs
-   `node scratch/payloadcapture-hook.mjs remove`, then read
-   `~/.claude/payload-capture-PAYLOADCAP-9Q2M.jsonl` — one JSON line per hook
-   call with `tool_name`, `transcript_path`, `session_id`. **The question:**
-   do lines from inside the subagent carry `…/subagents/agent-<id>.jsonl` or
-   the PARENT session's `<session>.jsonl`? The latter is the leading
-   hypothesis for why `guard-dispatch-budget.mjs` never fires (its logic is
-   proven by direct probe; only invocation is absent). Answering it unblocks
-   the ONE shared TP-4 `hooks.json` ceremony (queue #2) — do not seed that
-   ceremony before this is answered, or a second inert guard ships.
+1. DONE — `NVA-B-XPORTFIX-2` landed (`eb9c477f` fix + test 110, `3f30b2c7`
+   evidence), self-verified after the spent Critic cap; closes round-2
+   F-A/F-B. Open: the sibling `advisory-host-bridge.mjs` has the same
+   collapse (out of scope); both transport dispatches force-added captures
+   under `evidence/` against `.gitignore`/ADR-0063 — decide once, don't
+   revert twice.
+2. DONE — the resumed session consumed the resume-hint card, then ran the
+   gate at `2dca9b8d`: 515/516, one new red, fixed in `ec0b158c` (Gate
+   state above). PO queue #1 is done (`eecb4273`).
+3. DONE — this commit updates Gate state, CHANGELOG and the queue.
+4. IN PROGRESS — payload capture (queue #3): the PO restarted with the
+   `Bash|Read` capture hook installed; the read-only dispatch
+   `NVA-B-PENDINGDOC-CHECK-1` ran in the new session and generated subagent
+   tool calls. The PO now runs `node scratch/payloadcapture-hook.mjs remove`,
+   then `show`, and pastes the subagent lines. **The question:** do they
+   carry `…/subagents/agent-<id>.jsonl` or the PARENT `<session>.jsonl` as
+   `transcript_path`? The latter is the leading hypothesis for why
+   `guard-dispatch-budget.mjs` never fires (logic proven by probe;
+   invocation absent). Answer it BEFORE seeding the one shared TP-4
+   `hooks.json` ceremony (queue #2), or a second inert guard ships.
+5. NEXT — stamp 0.6.2 by goldfish-mechanic dispatch, as `63fe8b64` was:
+   `VERSION` → `0.6.2`; the three manifests →
+   `0.6.2+claude|codex|antigravity.<YYYYMMDDHHMMSS>.<7-hex oid of the
+   pre-stamp HEAD>`. Then, with nothing concurrent: full verify at the stamp
+   (expect 516/516), confirm `security-latest.json` binds it, a Critic on
+   the enumerated candidate range, then the PO's push-approval signature
+   (`docs/push-release-flow.md`; the handover commit lands BEFORE signing).
 
 **Idea-level facts that must not be re-derived wrongly:**
 
@@ -127,7 +114,7 @@ the intent.
 
 - **A — slicing:** `guard-slicing.mjs`, 42 tests, runner-neutral (Claude by
   `message.id`, Antigravity by `Subagents[]`, Codex silent by proof — its
-  adapter admits no dispatch tool). **Built, not gated, not wired.** Channel
+  adapter admits no dispatch tool). **Built, gated (`eecb4273`), not wired.** Channel
   proven three ways; design at `docs/adr/draft-parallel-dispatch-slicing-enforcement.md`,
   two T1 rounds, acceptance is queue #9. Wiring order is fixed: payload
   capture (#3) → TP-3 (#1) → `hooks.json` (#2), because the sibling

@@ -29,8 +29,9 @@ once.
   with two or more `Subagents`), and is deliberately silent on Codex, whose
   guard adapter admits no dispatch tool at all — pinned by test. Design:
   `docs/adr/draft-parallel-dispatch-slicing-enforcement.md`, two T1 rounds.
-  **Built. Not gated** (its suite is not in `verify.mjs`; TP-3 signature
-  pending). **Not wired** (`hooks.json` is kernel-protected; attended step
+  **Built. Gated** (registered in `verify.mjs` under a PO signature,
+  `eecb4273`; the inventory obligation that registration created is met in
+  `ec0b158c`). **Not wired** (`hooks.json` is kernel-protected; attended step
   pending). Whether a non-blocking nudge changes behaviour is unmeasured by
   design — the ledger it writes is the instrument for that.
 - **The delivery channel behind it is proven.** A `PreToolUse` hook's exit-0
@@ -97,10 +98,6 @@ once.
   harness truncations. Leading hypothesis: a subagent payload carries the
   parent's `transcript_path`. Needs a payload capture, which needs a
   user-level hook and a restart.
-- **The gate is red on one suite**, `suite-registration-check`, because
-  `guard-slicing.test.mjs` is not in `verify.mjs`. Two lines behind a TP-3
-  signature. The parking-entry route was deliberately not taken: a T1 finding
-  the same day recorded that move as a QG-16 violation.
 - **Verify optimisation ceiling, measured**: after the eviction, the twelve
   further eligible suites are 17.2% of the gate at most and eight of them
   8.8%; the five largest lane members (52%) are process-global and cannot be

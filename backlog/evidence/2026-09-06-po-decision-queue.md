@@ -11,6 +11,9 @@ skip any of them deliberately rather than by omission.
 
 ## 1. TP-3 signature: register `guard-slicing.test.mjs` in the verify gate
 
+**DONE 2026-09-06** — signed at the desk, landed as `eecb4273`; the
+inventory obligation the registration created is met in `ec0b158c`.
+
 **Needs:** an Ed25519 signature at a desktop, ~2 minutes.
 
 **Effect:** the gate goes from 514/515 to fully green. The 33 `guard-slicing`
@@ -47,6 +50,10 @@ fires risks a second registered, tested, silently inert guard.
 no data to be decided on.
 
 ## 3. Payload capture: why does `guard-dispatch-budget.mjs` never fire?
+
+**IN PROGRESS 2026-09-06** — hook installed, Claude Code restarted, one
+read-only subagent ran in the new session; awaiting the PO's `remove` and
+`show` of the capture log.
 
 **Needs:** a temporary hook in the user-level `~/.claude/settings.json` plus a
 Claude Code restart — the same cheap route the channel probe used, no
