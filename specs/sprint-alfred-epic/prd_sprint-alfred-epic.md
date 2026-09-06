@@ -1,7 +1,7 @@
 # Sprint Alfred Epic — Product Requirements
 
 <!-- po-language: en -->
-<!-- technical-spec-sha256: 6e6c871326747c7d6399181f23204a885ce95934693ce31e22dca07834207155 -->
+<!-- technical-spec-sha256: 301d04ee27007f8fb2e1b49b0242e1adfc82c7630bb96a393e532c3f3cb95953 -->
 
 **Feature ID:** `sprint-alfred-epic`
 **Profile / rigor / risk:** Epic / 2 / high (guard, canon, and authority
