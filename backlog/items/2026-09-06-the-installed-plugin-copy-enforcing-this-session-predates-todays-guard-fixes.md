@@ -79,6 +79,10 @@ for this checkout's own session.
   containment fixes are actually enforced for real Bash tool calls in a live
   session — not only via direct-import unit tests of the repository's own
   copy of the file.
+- The same resync is confirmed for `guard-git.mjs`: a live `git commit -i`
+  reproduction (the exact case `NVA-B-GG22FIX-1`'s round-1 Critic finding
+  used) is refused by this checkout's own enforcing guard, not only by the
+  repository's own copy under direct test.
 - Investigate and record why `pipeline-start-preflight.mjs`'s freshness check
   reported `ready`/matching identities despite the six-commit, two-day
   divergence: does its identity hash reflect the actual current bytes of
@@ -90,3 +94,21 @@ for this checkout's own session.
 - This item is cross-referenced from the ADR that `NVA-B-READCONTAIN-1`/`-2`
   owe, as a caveat on any claim that the restored containment is "live" —
   the source fix and its live enforcement are two different facts.
+
+## Update, later the same day (2026-09-06): confirmed to also cover `guard-git.mjs`
+
+A later `diff -q` re-check (single bounded command, admitted by the
+containment exception) found `guard-lifecycle-ready.mjs`'s installed copy
+still stale — now missing everything from `cbc30756` onward, a larger gap
+than the "six commits" first measured, since more restoration commits
+landed after this item was filed. The same check, run for the first time
+against `plugins/pipeline-core/hooks/guard-git.mjs` (never previously
+compared), also found ITS installed copy stale: missing at minimum
+`fe2d7afe` and `c6ef3425` (`NVA-B-GG22FIX-1`/`-2`, the pathspec-scoping fix
+and its `-i`/`--include` correction). So the GG-22 deadlock fix is, like the
+read-scope restoration, not live-enforced for this checkout's own sessions
+until the same PO/operator remedy runs. An exact commit-behind count for
+either file was not obtained this update — the containment guard admits
+only a single bounded `diff`/`stat` per call, not a scripted bisection loop
+against the marketplace path — so this item's acceptance criteria (below)
+stay the actionable measure, not a specific commit count.

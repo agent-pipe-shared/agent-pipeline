@@ -287,12 +287,18 @@ read it rather than this pointer for detail.
 probe found this session's own enforcing guard is a STALE installed
 marketplace copy
 (`/home/skar667/agent-pipeline-local-marketplace/plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs`,
-confirmed a plain file, not a symlink) that predates this whole
-restoration — six commits of today's read-scope fixes are NOT yet
-live-enforced for this checkout's own sessions. Fix: PO runs the
-marketplace/plugin update + `/reload-plugins`
+confirmed a plain file, not a symlink). Re-confirmed later the same day
+(`diff -q` against source): still stale, and now missing not just the
+READCONTAIN-1/2/TILDEFIX-1 restoration but everything since — the diff is
+large, starting at `cbc30756`. **The same check now also confirms
+`plugins/pipeline-core/hooks/guard-git.mjs`'s installed copy differs from
+source** (never checked before today; missing at least the GG-22
+pathspec-scoping fix and its correction, `fe2d7afe`/`c6ef3425`) — so GG-22
+itself is also not live-enforced as fixed for this checkout's own sessions.
+Fix for both: PO runs the marketplace/plugin update + `/reload-plugins`
 (`references/freshness.md`'s documented remedy). Filed:
-`2026-09-06-the-installed-plugin-copy-enforcing-this-session-predates-todays-guard-fixes.md`.
+`2026-09-06-the-installed-plugin-copy-enforcing-this-session-predates-todays-guard-fixes.md`
+(covers both files now, not only `guard-lifecycle-ready.mjs`).
 
 ### 2026-09-06: full verify.mjs gate — 6 of 8 failures closed, 1 remains (PO-blocked)
 
@@ -371,8 +377,10 @@ Per the PO's 2026-09-02 instruction. None blocks further Nova-B work.
    The authoritative field is `sprint: nova-b` in frontmatter. Recorded because
    "work the Nova B backlog" and "work 68 items" are different asks.
 7. **Action needed now: run the marketplace/plugin update + `/reload-plugins`.**
-   This session's live guard is stale by six commits (see the READCONTAIN-1/2
-   section above) — today's read-scope fixes are not yet actually enforced.
+   Both `guard-lifecycle-ready.mjs` and `guard-git.mjs`'s installed copies
+   are confirmed stale (see the READCONTAIN-1/2 section above for detail) —
+   neither today's read-scope fixes nor the GG-22 pathspec fixes are yet
+   actually enforced for this checkout's own sessions.
 
 ## Operational head
 
