@@ -129,25 +129,17 @@ Full verify green at `7cc0b649`, 506 suites.
   rewriting history without an unpushed carve-out, so it was not done. Three
   directions are in the item; the seventh instance, produced under an explicit
   briefing warning, refutes the "fix the habit" direction outright.
-- **`GG-17` versus the PO's `--no-verify` instruction — resolved the same day;
-  the carried-forward rule above states the question, this states the answer.**
-  It was surfaced by the rotation's extraction pass, then put to the PO rather
-  than settled by an agent picking a side. What the extraction pass got wrong on
-  first reading is worth keeping: it read `guardrails/git.md` as the authority
-  and reported an unresolved contradiction. `CLAUDE.md` already carried the
-  answer — forbidden "not by asking", "never skip hooks" — and it was the
-  guardrail that disagreed with it, not the other way round.
-- **Resolved 2026-09-01 (PO decision, in session): hook-bypass is never
-  agent-overridable ([ADR-0079](adr/0079-hook-bypass-is-never-agent-overridable.md)).**
-  Pushing through the Pipeline with `--no-verify` is never permitted for the
-  agent and carries no `OVERRIDE <rule-id>` route (`GG-17`…`GG-20`), following
-  the `GIT-03` non-overridable precedent. The PO's own manual `--no-verify`
-  push in their own terminal remains a documented human exception outside the
-  Pipeline's authority — never retroactively legitimised, never agent-arranged.
-  Implementation (correcting `guardrails/git.md` GIT-07 and moving `GG-17`…`GG-20`
-  out of the overridable union) is filed as
-  `backlog/items/2026-09-01-hook-bypass-rules-are-overridable-against-the-stated-policy.md`,
-  scheduled for the maintenance window, not immediate.
+- **`GG-17` vs. the PO's `--no-verify` instruction — RESOLVED 2026-09-01**
+  ([ADR-0079](adr/0079-hook-bypass-is-never-agent-overridable.md)):
+  hook-bypass is never agent-overridable, no `OVERRIDE` route, following the
+  `GIT-03` precedent; the PO's own manual `--no-verify` push in their own
+  terminal stays a human exception outside Pipeline authority, never
+  retroactively legitimised. Worth keeping from how it was found: the
+  extraction pass read `guardrails/git.md` as the authority and reported a
+  contradiction — `CLAUDE.md` already carried the answer, and it was the
+  guardrail that disagreed with it, not the reverse. Implementation filed at
+  `backlog/items/2026-09-01-hook-bypass-rules-are-overridable-against-the-stated-policy.md`
+  (maintenance window).
 
 The gate result for this candidate is in the machine-written
 `evidence/verify-latest.json`, which names its own candidate commit and tree —
@@ -168,55 +160,22 @@ read that rather than trusting any prose claim about which HEAD was green.
 Fixed, reviewed and closed 2026-09-03 (`e152183e`), verify green 506/506.
 Findings and history: `backlog/items/2026-09-02-the-rebase-authority-is-resolved-and-advertised-but-not-executable.md`.
 
-### 2026-09-04: verify.mjs evidence-slot fix — ceremony status (NVA-B-EVSLOTFIX-1)
+### 2026-09-04..06: verify.mjs evidence-slot fix (NVA-B-EVSLOTFIX-1) — ALL BLOCKS LANDED
 
 The atomic-write fix for the shared `evidence/verify-latest.json` slot
 (`backlog/items/2026-08-12-shared-verify-evidence-slot-corrupted-by-concurrent-dispatches.md`)
-is split into five TP-3 blocks on `harness/scripts/verify.mjs`, each landed via
-its own PO Ed25519 signature ceremony (ADR-0059) because a single Edit call
-covers only one contiguous region.
+was split into five TP-3 blocks on `harness/scripts/verify.mjs`, each needing
+its own PO Ed25519 ceremony (ADR-0059) since one Edit covers one contiguous
+region. A–C landed 2026-09-04 (`61dc7fc5`, `d30273d3`); D and E landed
+2026-09-06 (`caeb87c9`, `b464ba3c`) — see the gate section below for their
+request/plan hashes and the two follow-on obligations registering E created.
 
-- **Blocks A, B, C all landed** (`61dc7fc5`, `d30273d3`) — imports,
-  `evidencePath`/`writeEvidence`/`runId`, and wiring `runId` into
-  `runVerifyJournal`. Request/plan hashes are in each commit message.
-- **Block D is drafted, not yet seeded.** Extends the final log line:
-  ```js
-  // old:
-  console.log(`\nEvidence written: ${evidencePath}`);
-  // new:
-  console.log(`\nEvidence written: ${evidencePath} (run record: ${runEvidencePath})`);
-  ```
-- **Block E is drafted, not yet seeded.** Registers two new suites in the
-  same `TEST_SUITES` array (confirmed one contiguous array, lines 199-765 —
-  merged 2026-09-04 from a separate Block F to save a PO passphrase entry,
-  since array order is confirmed irrelevant to `duplicateSuiteIds`/
-  `check-verify-suite-registration.mjs`): `verify-evidence-writer.test.mjs`
-  (the runId wiring, Blocks A-C) and `dispatch-record-strip-for-critic.test.mjs`
-  (a Critic finding, F2, on the unrelated `NVA-B-CRITICINPUT-1/2` package —
-  its rework dispatch correctly stopped at this same TP-3 boundary rather
-  than route around it):
-  ```js
-  // old:
-    { name: "pre-gate-tests", file: join(scriptDir, "pre-gate.test.mjs") },
-    { name: "capture-evidence-tests", file: join(pluginScriptsDir, "capture-evidence.test.mjs") },
-  ];
-  // new:
-    { name: "pre-gate-tests", file: join(scriptDir, "pre-gate.test.mjs") },
-    { name: "capture-evidence-tests", file: join(pluginScriptsDir, "capture-evidence.test.mjs") },
-    { name: "verify-evidence-writer-tests", file: join(scriptDir, "verify-evidence-writer.test.mjs") },
-    { name: "dispatch-record-strip-for-critic-tests", file: join(libDir, "dispatch-record-strip-for-critic.test.mjs") },
-  ];
-  ```
-  `NVA-B-CRITICINPUT-1/2` (`a5e264a8`..`4e204dae`) is one correction commit
-  into its one allowed rework round — F1/F3/F4 fixed and re-verified; F2
-  needs this registration landed before the last, fresh re-Critic round runs.
-  Registry: `backlog/evidence/2026-09-04-nva-b-criticinput-findings.md`.
-
-Tree is clean at `4e204dae` (or later — check `git rev-parse HEAD`) with no
-outstanding ceremony. After C/D/E land:
-`node --test harness/scripts/verify-evidence-writer.test.mjs`, then a full
-`node harness/scripts/verify.mjs` run bound to the final HEAD, then close the
-2026-08-12 backlog item above.
+Still owed, now unblocked: `NVA-B-CRITICINPUT-1/2` (`a5e264a8`..`4e204dae`)
+is one correction commit into its one allowed rework round; its F2 was
+waiting on exactly this registration and can now have its last fresh
+re-Critic round. Registry:
+`backlog/evidence/2026-09-04-nva-b-criticinput-findings.md`. The 2026-08-12
+backlog item can be closed once that round passes.
 
 ### 2026-09-05/06: worktree-liveness item closed, PO-decided scope
 
@@ -263,15 +222,24 @@ Fix for both: PO runs the marketplace/plugin update + `/reload-plugins`
 `2026-09-06-the-installed-plugin-copy-enforcing-this-session-predates-todays-guard-fixes.md`
 (covers both files now, not only `guard-lifecycle-ready.mjs`).
 
-### 2026-09-06: full verify.mjs gate — 6 of 8 failures closed, 1 remains (PO-blocked)
+### 2026-09-06: full verify.mjs gate — all 8 failures closed, PO signature landed
 
-**Second full gate confirms: exactly one root cause left, all 513 suites
-otherwise green.** `verify-suite-registration-tests`/
-`verify-suite-registration-check`/`suite-registration-check` are the ONLY
-failures — Block D/E of `NVA-B-EVSLOTFIX-1` (two test files exist on disk,
-not yet registered in `harness/scripts/verify.mjs`'s `TEST_SUITES`, which
-needs the TP-3 signature ceremony). **This is the single remaining blocker
-for a fully green local candidate.**
+**The Block D/E blocker that stood all session is GONE.** The PO signed two
+Ed25519 ceremonies (ADR-0059) live on 2026-09-06; both TP-3 edits to
+`harness/scripts/verify.mjs` landed byte-identically on the retry:
+- **Block D** (`caeb87c9`) — the final log line now also names
+  `runEvidencePath`. Request `435d8975…`, plan `0f8c5d0c…`.
+- **Block E** (`b464ba3c`) — `verify-evidence-writer-tests` and
+  `dispatch-record-strip-for-critic-tests` registered in `TEST_SUITES`
+  (513 → 515 suites). Request `5224b30a…`, plan `50cc3123…`.
+
+Registering them surfaced two mechanical follow-on obligations, both closed
+by `NVA-B-BLOCKE-FOLLOWUP-1` (`defe7013`, `criticSkip` T5, independently
+re-verified): the two new surfaces needed
+`docs/product-capability-inventory.json` entries, and
+`check-verify-suite-registration.test.mjs`'s hand-enumerated
+`FIXTURE_MODULES` list was missing `verify-evidence-writer.mjs` (the third
+fixture of that same stale-copy-list class this session).
 
 Last known-green was `7cc0b649` (2026-09-02, 506 suites); only individual
 suites had been run since. First full gate this session (candidate
@@ -289,10 +257,8 @@ independently verified clean, base cap reached before the docs-only second
 commit, remainder self-verified by the Elephant — `roles/critic.md`'s
 pinned integrity digest re-pinned after independently confirming the one
 intervening commit was a narrow, already-dispatched, already-reviewed doc
-edit). **Remaining: `verify-suite-registration-check`/
-`suite-registration-check` — already known, PO-blocked** (Block D/E of
-`NVA-B-EVSLOTFIX-1`, see above). Next full verify attempt should be green
-except for that one, PO-signature-gated pair.
+edit). **Those last two are now closed too** (Block D/E above), so the gate
+has no known outstanding failure left.
 
 ### 2026-09-06: two backlog items — CLOSED, both hit and fixed real Critic findings
 
@@ -347,6 +313,38 @@ after Gap A; its own reproduction found the tracking item's claimed
 `GUARD-OPERATOR-UNAPPROVED` code is stale (actual:
 `GUARD-PARSE-UNSUPPORTED`), corrected in the item for a future pick.
 
+### 2026-09-06 (late): two design threads opened, neither built
+
+**B1 (`#21`) descoped by PO decision** — `docs/adr/draft-b1-worker-pool-superseded-by-workflow-tool.md`
+(`90405d8b`). The runner's Workflow tool supersedes the Pipeline's own
+parallel worker pool, so NVA-B21-1/6/9 are *withdrawn*, not merely unmet.
+Left open rather than assumed: whether the already-landed B1-I supervisor
+surface (~15 files) is retired or just left in place, and that the Workflow
+tool has NOT been certified against `#7` — "we need no pool" is not "the
+tool passed our bar".
+
+**Parallel-dispatch slicing enforcement — design drafted, NOT authorized**
+(`9e40548b`, opus/max). Answers the four open questions of
+`2026-08-29-the-pipeline-defaults-to-sequential-work-with-no-enforced-task-slicing.md`
+with a conjunctive Parallel-Safety Predicate and a staged notion of
+"enforced". **Two findings gate the PO's preferred lighter increment:**
+(a) every in-repo instance of decision-point delivery changing behaviour
+comes from *blocking* delivery — a non-blocking nudge has zero recorded
+evidence here, so delivery-only is an untested hypothesis by this repo's own
+standard; (b) `additionalContext` appears only under `SessionStart`, so a
+PreToolUse nudge may not reach the model at all here. A bounded channel
+probe is the next step, BEFORE advisor, Critic or build.
+
+**Verify runtime measured** (analysis only). Wall clock 674.6s; the
+60-member serial lane sums to 673.8s — the lane *is* the runtime, and 1091s
+of pool work runs in its shadow. Raising concurrency or deleting fast suites
+cannot help, by construction. `project-onboarding-v3-tests` alone is 174.1s
+(26%); the lane's top five are 59%. The lane was filled by a sweep flagging
+"plausibly unsafe", never "proven unsafe" — the lever is per-member eviction
+proofs, not deletion. Tracked at
+`2026-09-01-verify-runtime-is-concentrated-in-ten-suites-not-spread-across-many.md`
+(open; its 571s is now 674.6s, +18% in five days).
+
 ## PO decisions and todos — collected during the autonomous run, not waited on
 
 Per the PO's 2026-09-02 instruction. None blocks further Nova-B work.
@@ -376,6 +374,9 @@ Per the PO's 2026-09-02 instruction. None blocks further Nova-B work.
    are confirmed stale (see the READCONTAIN-1/2 section above for detail) —
    neither today's read-scope fixes nor the GG-22 pathspec fixes are yet
    actually enforced for this checkout's own sessions.
+8. **Two open questions from the 2026-09-06 design work**, recorded not
+   assumed: the fate of the existing B1-I supervisor surface, and whether
+   the slicing nudge stays non-blocking if the channel probe fails.
 
 ## Operational head
 
