@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.gg22-normalization-false-blocks-trailing-slash-pathspec
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-06
+closure_repository: self
+closure_commit: 9c274f7b4ede225786432df23bfab2941ed71e95
+closure_evidence: "backlog/items/2026-09-06-gg22-pathspec-normalization-false-blocks-a-trailing-slash-directory-pathspec.md"
 created: 2026-09-06
 sprint: nova-b
 done_when: manual
@@ -63,5 +67,14 @@ checks. `../`-traversal unaffected. Proven via scratch RED/GREEN
 reproduction (`backlog/evidence/2026-09-06-nva-b-gg22trailslash-1-{red,green}.txt`)
 since `guard-git.test.mjs` is TP-1 protected. Full suite 232/232 (unchanged
 case count), `check-consumer-safe-paths.test.mjs` 9/9, both independently
-re-verified. **T1 Critic review still owed before this item can close** —
-guardrail-hook file, mandatory regardless of dispatch-level `criticSkip`.
+re-verified.
+
+## Closed, 2026-09-06 — T1 Critic PASS
+
+Verdict: PASS (opus, max). AC-1 and AC-3 independently traced and confirmed
+by the Critic; AC-2 (a tracked-suite regression test) is not met and cannot
+be met in-session while `guard-git.test.mjs` stays TP-1 protected —
+deferred to the already-existing
+`backlog/items/2026-09-06-gg22-pathspec-fix-has-no-permanent-regression-test.md`,
+now given a `review_by` marker per the Critic's QG-06 note. No other
+findings.
