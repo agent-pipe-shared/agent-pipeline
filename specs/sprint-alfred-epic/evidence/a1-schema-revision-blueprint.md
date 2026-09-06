@@ -1,8 +1,15 @@
-# A1 schema-revision blueprint (conditional)
+# A1 schema-revision blueprint (implemented)
 
-Status: conditional planning only. This blueprint is executable only if the
-PO chooses option 1 in `a1-po-decision-queue.md`; no PO decision is recorded
-here and the current singular implementation remains authoritative until then.
+Status: option 1 was approved in `a1-po-decision-queue.md`; revision 2 landed
+in `33df8a4bf26f736a31f13303236e24bfac04d8e5`. The plural implementation is
+now authoritative. The proposal and conditional authorization template below
+are retained as design history; they are not additional approval requirements.
+
+Preparation checkpoint: the adapter/matrix kernel is implemented and tested;
+native runner bridges and live measurements are not yet evidenced. The exact
+freeze readback is `evidence/a1-schema-freeze-digest.json` (revision 2,
+expected and actual digest equal); this does not constitute native enforcement
+or full A1 acceptance.
 
 ## Proposed v1 revision shape
 
