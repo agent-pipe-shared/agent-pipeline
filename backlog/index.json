@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "22e086800e087564a9d11658054153cf907583904de230058a8c0cf15c784f3b"
+    "transitionHead": "7e37f48194791631791ea59a520993059e702bd0e0be34764050f6e2a5fd1a3b"
   },
   "counts": {
-    "open": 101,
+    "open": 100,
     "in_progress": 0,
-    "closed": 514,
+    "closed": 515,
     "rejected": 3,
     "deferred": 11
   },
@@ -5779,13 +5779,17 @@
     },
     {
       "id": "pipeline.read-scope-tilde-expansion-mismatch",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-06",
       "source": "Elephant, 2026-09-06, triaging NVA-B-READCONTAIN-1's closure (not a Critic finding; NVA-B-READCONTAIN-1 itself is closed and unaffected by this item).",
       "deferred": false,
-      "tracking": "Nova B — while triaging NVA-B-READCONTAIN-1's closure, the Elephant independently checked whether the restored read-scope containment accounts for shell tilde expansion. It does not: the guard's parser never expands a leading `~` in a path-taking argument, so it evaluates the LITERAL string `~/.ssh/id_rsa` as a (nonexistent) path under the project root, while the actual shell expands `~` to the real home directory before the command ever runs. Confirmed live via evaluateLifecycleReadyGuard() directly (never via an executed Bash cat of a real credential path)."
+      "tracking": "Nova B — while triaging NVA-B-READCONTAIN-1's closure, the Elephant independently checked whether the restored read-scope containment accounts for shell tilde expansion. It does not: the guard's parser never expands a leading `~` in a path-taking argument, so it evaluates the LITERAL string `~/.ssh/id_rsa` as a (nonexistent) path under the project root, while the actual shell expands `~` to the real home directory before the command ever runs. Confirmed live via evaluateLifecycleReadyGuard() directly (never via an executed Bash cat of a real credential path).",
+      "closedAt": "2026-09-06",
+      "closureRepository": "self",
+      "closureCommit": "1062b50a399958dfb91f079d53768d746f6fad15",
+      "closureEvidence": "backlog/items/2026-09-06-a-leading-tilde-path-argument-is-admitted-as-inside-the-project-root.md"
     },
     {
       "id": "pipeline.readiness-guard-blocks-its-own-recovery",
