@@ -588,11 +588,12 @@ function resolveDefaultConcurrency(repoRoot, environment) {
   return DEFAULT_VERIFY_CONCURRENCY;
 }
 
-// AGY-VERIFYTUNER-2: the serial lane, derived MECHANICALLY (scratch/derive-serial-lane.mjs, a
-// throwaway/gitignored script -- not committed; its exact patterns are reproduced in this
-// comment so the derivation is auditable without re-running anything) by scanning every suite
-// registered in the Pipeline-source Verify entrypoint for three risk signals named in the design doc
-// (scratch/stripped-verify-mjs-parallelization.md, "Serial lane"):
+// AGY-VERIFYTUNER-2: the serial lane. Its STARTING POINT was derived MECHANICALLY
+// (scratch/derive-serial-lane.mjs, a throwaway/gitignored script -- not committed; its exact
+// patterns are reproduced below so that starting point is auditable without re-running anything)
+// by scanning every suite registered in the Pipeline-source Verify entrypoint for three risk
+// signals named in the design doc (scratch/stripped-verify-mjs-parallelization.md, "Serial
+// lane"):
 //   (a) a child_process call invoking "git" with no sign of an isolated fixture directory of its
 //       own (mkdtempSync/tmpdir()) -- i.e. it can plausibly race the REAL repo's .git/index.lock;
 //   (b) a reference to one of the real production modules/helpers that write under
@@ -602,6 +603,30 @@ function resolveDefaultConcurrency(repoRoot, environment) {
 //   (c) `.listen(` or a hardcoded-port `listen({ port: ... })` shape.
 // This is a heuristic sweep, deliberately conservative: a suite the sweep flags is never proven
 // unsafe, only plausibly so, and every suite the sweep does NOT flag stays in the ordinary pool.
+//
+// The set below is NOT what re-running that sweep produces today (it would reproduce 60
+// members; the set below has 57). Re-running the sweep alone and trusting its output would
+// silently reinstate three members removed since by per-signal assessment, undoing the gate-time
+// win that removal bought:
+//   - `project-onboarding-v3-tests` (removed `f16ab254`) -- verdict and citations in
+//     `backlog/evidence/2026-09-06-nva-b-laneevict-1-signal-verdicts.md`.
+//   - `session-cleanup-binding-tests` and `worktree-lifecycle-tests` (removed `fcaf8d5e`) --
+//     verdicts and citations in
+//     `backlog/evidence/2026-09-06-nva-b-laneevict-2-signal-verdicts.md`.
+// One member, `guard-maintenance-window-tests`, clears all three signals and passes solo, but is
+// RETAINED anyway for a tooling reason, not a safety one: the evidence-capture tool used to prove
+// eviction refuses this suite's self-race output as if a fixture literal in its own test
+// description were a leaked host path -- see
+// `backlog/items/2026-09-06-the-evidence-capture-tool-refuses-a-fixture-literal-as-if-it-were-a-host-path.md`
+// and the per-signal verdict in the LANEEVICT-2 evidence file above.
+// Five members -- `codex-sandbox-runtime-tests`, `session-cleanup-power-tests`,
+// `session-power-cli-tests`, `session-cleanup-owner-nonce-tests`,
+// `lifecycle-ready-enforcement-tests` -- are in the lane UNASSESSED, not unsafe: only signal (c)
+// was checked for them (it does not hold), signals (a)/(b) were never evaluated (see the
+// LANEEVICT-2 evidence file's "Suites NOT assessed" section).
+// Going forward, a member leaves this lane only by per-signal assessment recorded under
+// `backlog/evidence/`, with this comment updated in the same commit -- never by re-deriving the
+// set from the sweep alone, which would just regenerate the 60-member starting point above.
 // Members of this lane run mutually exclusively of EACH OTHER (a dedicated 1-slot semaphore,
 // `laneSemaphore` below) but freely concurrently with the rest of the pool -- the risk the sweep
 // is defending against (two suites racing the same lock/port) is a risk between lane members,
