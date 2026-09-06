@@ -243,3 +243,14 @@ Critic review any guardrail-hook diff requires
 
 Gap (2), the repository-wide "every OTHER emitter" audit, remains
 unperformed — this item stays `status: open`.
+
+**T1 Critic round 1 (opus, max): FAIL.** Code confirmed correct and inert
+(byte-identical re-export, no behavior change); the verdict rested on two
+evidence gaps, not a code defect — F2 (no completed verify result bound to
+the commit was in the evidence set at review time) and F3 (the mandated
+`check-consumer-safe-paths.test.mjs` run was not evidenced). F1 (the commit
+was Elephant-authored, already self-disclosed before the review) was
+confirmed accurate and was not the basis for the verdict. Both evidence
+gaps remediated: a completed full `verify.mjs` run bound to a descendant
+commit and the consumer-safe-paths check, both captured durably. Registry:
+`backlog/evidence/2026-09-06-nva-b-codexguardimport-1-findings.md`.

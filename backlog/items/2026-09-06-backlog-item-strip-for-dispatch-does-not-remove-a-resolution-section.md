@@ -60,3 +60,17 @@ careful pass.
   section confirms it is stripped.
 - Existing strip-script tests/behavior for Triage/Closure headings are
   unchanged.
+
+## Recurred, 2026-09-06 (NVA-B-CODEXGUARDIMPORT-1 T1 Critic round 1) — this time NOT caught before dispatch
+
+The same gap, different heading name: the stripped spec handed to the
+Critic dispatch for `d398a662` still carried its own
+`## Progress note (2026-09-06, NVA-B-CODEXGUARDIMPORT-1)` section
+(implementor conclusions: "byte-identical function, zero behavior change",
+"38/38 pass, zero assertion changes") — unlike the `NVA-B-TILDEFIX-1` case
+above, this was NOT caught by the Elephant before dispatch; the Critic
+itself flagged it as a briefing violation and reported that no finding in
+its review rested on the contaminated text. Widens this item's acceptance
+criteria: the heading survey must also include `## Progress note (...)`,
+which is now confirmed as a second real, recurring instance of the same
+pattern, not a one-off.
