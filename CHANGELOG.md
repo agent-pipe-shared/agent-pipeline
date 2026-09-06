@@ -28,7 +28,8 @@ once.
   `message.id`, `Workflow` by script), for Antigravity (`invoke_subagent`
   with two or more `Subagents`), and is deliberately silent on Codex, whose
   guard adapter admits no dispatch tool at all — pinned by test. Design:
-  `docs/adr/0080-parallel-dispatch-slicing-enforcement.md`, two T1 rounds.
+  `docs/adr/0080-parallel-dispatch-slicing-enforcement.md`, two T1 rounds,
+  accepted by the PO on 2026-09-06.
   **Built. Gated** (registered in `verify.mjs` under a PO signature,
   `eecb4273`; the inventory obligation that registration created is met in
   `ec0b158c`). **Not wired** (`hooks.json` is kernel-protected; attended step
@@ -46,8 +47,13 @@ once.
   as an in-process bridge mirroring the working advisory precedent. **Built.
   Not exercised** against a real Codex — the runner's permission classifier
   denies the sandbox spawn, and one T1 review returned three major findings
-  (one falsified-receipt defect, fix in flight; one untested seam; one
-  unpinned contract briefing, filed).
+  (one falsified-receipt defect, fixed in `eb9c477f`; one untested seam; one
+  unpinned contract briefing, filed). A second defect was reported from an
+  installed copy: the adapter resolved its ruleset three levels above its own
+  file — the repository root in a source checkout, nothing at all in an
+  installed plugin. Fixed in `b5a181ce`: the ruleset is anchored at the
+  executing plugin root, with a regression check against a real installed
+  layout (red before, green after).
 - **A Critic preflight that enumerates the evidence that exists**
   (`critic-dispatch-preflight.mjs --sweep-evidence <task-id>`): case-
   insensitive, tolerant of date prefixes, across every evidence location

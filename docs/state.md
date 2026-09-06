@@ -79,7 +79,15 @@ Commits survive compaction; intent does not — this block is the intent.
    `guard-dispatch-budget.mjs` never fires (logic proven by probe;
    invocation absent). Answer it BEFORE seeding the one shared TP-4
    `hooks.json` ceremony (queue #2), or a second inert guard ships.
-5. NEXT — stamp 0.6.2 by goldfish-mechanic dispatch, as `63fe8b64` was:
+5. DONE — the Codex session's installed-root defect (`PIPELINE_ROOT` three
+   levels above the adapter file) is fixed in `b5a181ce` (`NVA-B-XPORTROOT-1`,
+   goldfish-deep; RED/GREEN captured, 111/111; the briefing carried one false
+   fixture-assertion cell, disclosed by the dispatch and left out). T1 Critic
+   (Opus, max) on it in flight. Also landed: ADR-0080 accepted (`07d6041f`);
+   the positioning inputs persisted verbatim to
+   `specs/sprint-nova-epic/design/2026-09-06-positioning-*` (`c90f9131`) —
+   the D block reads those, never `scratch/`.
+6. NEXT, after the Critic — stamp 0.6.2 by goldfish-mechanic dispatch, as `63fe8b64` was:
    `VERSION` → `0.6.2`; the three manifests →
    `0.6.2+claude|codex|antigravity.<YYYYMMDDHHMMSS>.<7-hex oid of the
    pre-stamp HEAD>`. Then, with nothing concurrent: full verify at the stamp
