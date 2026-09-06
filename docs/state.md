@@ -337,15 +337,18 @@ independently re-verified against live files. Registry:
 
 **`NVA-B-GG22FIX-1`** (`fe2d7afe` — pathspec-scoping fix, closed the
 2026-09-03 deadlock item): T1 Critic round 1 (partial) found a REAL
-admission-widening bug — the fix assumes an explicit `--` pathspec is
-always the commit's exclusive content, false for `git commit -i`/
-`--include`, which stages the pathspec IN ADDITION to whatever's already
-staged. Reachable with an ordinary git flag, no crafting. Plus `../`
-traversal (F3) and a non-durable evidence citation (F5). Registry:
-`backlog/evidence/2026-09-06-nva-b-gg22fix-1-findings.md`. Correction
-`NVA-B-GG22FIX-2` dispatched: default to the pre-fix full-index check
-unless the flag set is proven safe (allowlist, not denylist), plus F3/F5.
-Own fresh two-round cap; this is round 1 of it.
+admission-widening bug — `git commit -i`/`--include` stages the pathspec
+IN ADDITION to whatever's already staged, defeating the fix's "pathspec is
+exclusive" assumption. Plus `../` traversal (F3), non-durable evidence
+citation (F5). Registry:
+`backlog/evidence/2026-09-06-nva-b-gg22fix-1-findings.md`. **Correction
+`NVA-B-GG22FIX-2` landed** (`c6ef3425`/`316e16af`/`23672a96`): allowlist
+(not denylist) of message/authorship/signing-only flags proven exclusive
+from `git-commit(1)` itself; anything else (incl. `-i`, `-a`, `-p`,
+`--amend`) falls through to the full index check. Lexical `../`
+normalization for F3. Independently re-verified (232/232, allowlist logic
+traced by hand). Closing T1 Critic round 2 dispatched (last round for this
+package's own two-round cap).
 
 ## PO decisions and todos — collected during the autonomous run, not waited on
 
