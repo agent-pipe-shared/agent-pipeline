@@ -6622,6 +6622,82 @@ test("pipeline.read-scope-single-command-root-check: a shape that is not solely 
   }
 });
 
+// NVA-B-DENIALCODE-1 (backlog: 2026-09-06-suppressed-and-chained-outside-root-reads-land-on-
+// the-wrong-denial-code.md). Before this fix, isOutsideRootSingleCommandRead() excluded ANY
+// command carrying a redirect, so a single, un-piped outside-root read with the one admitted
+// trailing `2>/dev/null` suppressor never reached the read-scope classifier and fell through to
+// the earlier, less-specific "this command has a redirect" branch -- GUARD-REDIRECT-UNAPPROVED,
+// a true fact about the shape but a false reason (the redirect is independently admitted; the
+// read target is what is actually refused).
+test("NVA-B-DENIALCODE-1: a single, un-piped outside-root read with a trailing 2>/dev/null suppressor reports the true-reason read-scope code, not GUARD-REDIRECT-UNAPPROVED", () => {
+  const { projectDir, outside, outsideFile } = readScopeFixture();
+  try {
+    const command = `rg -n 'Overall' ${outsideFile} 2>/dev/null`;
+    assert.equal(isReadOnlyDiagnosticCommand(command, projectDir), false, command);
+    const refused = readScopeRun(command, projectDir);
+    assert.equal(refused.exitCode, 2);
+    assert.match(refused.stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u);
+    assert.doesNotMatch(refused.stderr, /GUARD-REDIRECT-UNAPPROVED/u);
+    // The identical in-root shape stays admitted, unchanged (isReadOnlyDiagnosticCommandWithTrailingStderrRedirect's pre-existing allowance).
+    assert.equal(readScopeRun("rg -n 'Overall' verify-latest.json 2>/dev/null", projectDir).exitCode, 0);
+    // A redirect that is NOT the admitted stderr-to-null suppressor keeps its own,
+    // pre-existing code -- this is a refinement of one exact redirect shape, not a blanket
+    // reclassification of every single-command-with-redirect denial.
+    const notAdmittedRedirect = readScopeRun(`rg -n 'Overall' ${outsideFile} 2>audit.log`, projectDir);
+    assert.equal(notAdmittedRedirect.exitCode, 2);
+    assert.match(notAdmittedRedirect.stderr, /GUARD-REDIRECT-UNAPPROVED/u);
+    assert.doesNotMatch(notAdmittedRedirect.stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u);
+    // Two redirects on a single command are never the admitted trailing-suppressor shape
+    // either, regardless of target -- stays on the pre-existing code.
+    const twoRedirects = readScopeRun(`rg -n 'Overall' ${outsideFile} 2>/dev/null > out.txt`, projectDir);
+    assert.equal(twoRedirects.exitCode, 2);
+    assert.match(twoRedirects.stderr, /GUARD-REDIRECT-UNAPPROVED/u);
+    assert.doesNotMatch(twoRedirects.stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u);
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+// NVA-B-DENIALCODE-1 (same backlog item, the `&&`-chain sibling shape). Before this fix, an
+// `&&`-chained outside-root read never reached "accepted" parseStatus at all (the shared
+// tokenizer denies a top-level `&&` outright), so it always printed the generic
+// GUARD-PARSE-UNSUPPORTED code, even when every segment would already be admitted by
+// isBoundedReadOnlyAndChain() except that one segment's own read target resolves outside the
+// project root.
+test("NVA-B-DENIALCODE-1: an &&-chained outside-root read reports the true-reason read-scope code, not GUARD-PARSE-UNSUPPORTED", () => {
+  const { projectDir, outside, outsideFile } = readScopeFixture();
+  try {
+    const command = `rg -n 'Overall' ${outsideFile} && git status`;
+    assert.equal(isReadOnlyDiagnosticCommand(command, projectDir), false, command);
+    const refused = readScopeRun(command, projectDir);
+    assert.equal(refused.exitCode, 2);
+    assert.match(refused.stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u);
+    assert.doesNotMatch(refused.stderr, /GUARD-PARSE-UNSUPPORTED/u);
+    assert.doesNotMatch(refused.stderr, /Rejected element/u,
+      "there is no rejected grammar element -- the chain is admitted in every respect but containment");
+    // The identical in-root chain stays admitted, unchanged.
+    assert.equal(readScopeRun("rg -n 'Overall' verify-latest.json && git status", projectDir).exitCode, 0);
+    // A chain that genuinely fails for an unrelated reason (a segment that is not
+    // independently admitted at all, regardless of root) keeps its existing
+    // GUARD-PARSE-UNSUPPORTED code -- this is a refinement, not a blanket reclassification of
+    // every denied `&&`-chain.
+    const notSolelyScope = readScopeRun(`rg -n 'Overall' ${outsideFile} && touch output.txt`, projectDir);
+    assert.equal(notSolelyScope.exitCode, 2);
+    assert.match(notSolelyScope.stderr, /GUARD-PARSE-UNSUPPORTED/u);
+    assert.doesNotMatch(notSolelyScope.stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u);
+    // A `;`-joined (not `&&`-joined) composition is a different, still-unbounded shape --
+    // untouched by this fix, stays GUARD-PARSE-UNSUPPORTED.
+    const semicolon = readScopeRun(`rg -n 'Overall' ${outsideFile} ; git status`, projectDir);
+    assert.equal(semicolon.exitCode, 2);
+    assert.match(semicolon.stderr, /GUARD-PARSE-UNSUPPORTED/u);
+    assert.doesNotMatch(semicolon.stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u);
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
 // ---------------------------------------------------------------------------------
 // NVA-B-TILDEFIX-1 (backlog: 2026-09-06-a-leading-tilde-path-argument-is-admitted-as-inside-
 // the-project-root.md). A leading `~` in a path-taking argument is expanded by the real shell

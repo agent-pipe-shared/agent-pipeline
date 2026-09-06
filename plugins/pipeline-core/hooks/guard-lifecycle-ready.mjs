@@ -2958,10 +2958,33 @@ export function isOutsideRootBoundedDiagnosticRead(parsed, root) {
  * result here is exactly what a wrongly-widened self-lift turns into an actual admission, not
  * merely a different denial code (the asymmetry with the piped sibling above, where every
  * path through that branch still ends in a refusal one way or another).
+ *
+ * NVA-B-DENIALCODE-1 (backlog: 2026-09-06-suppressed-and-chained-outside-root-reads-land-on-
+ * the-wrong-denial-code.md): a bare `redirects.length !== 0` exclusion used to reject this
+ * shape before it ever reached the read-scope check at all, so a single, un-piped outside-root
+ * read carrying the one admitted trailing `2>/dev/null`/`2>nul` stderr suppressor -- itself
+ * independently admitted for an IN-root read by
+ * isReadOnlyDiagnosticCommandWithTrailingStderrRedirect() -- fell through to the caller's
+ * earlier, less-specific "this command has a redirect" branch and printed
+ * GUARD-REDIRECT-UNAPPROVED instead of the true reason. Now tolerates EXACTLY that one
+ * redirect shape (the identical `fd === 2, direction === ">", target is the platform's null
+ * device` test simpleWordsAllowingTrailingStderrDevNullRedirect() already applies for
+ * admission, inlined here rather than re-parsing the command from a string -- this function is
+ * only ever handed the already-`accepted` `parsed` object, never the raw text) before falling
+ * through to the identical two-call scope-lift pattern below; any OTHER redirect shape (more
+ * than one redirect, or a single redirect that is not this exact suppressor) still returns
+ * false immediately, exactly as before.
  */
 export function isOutsideRootSingleCommandRead(parsed, root) {
   if (!parsed || parsed.parseStatus !== "accepted" || parsed.segments.length !== 1
-    || parsed.operators.length !== 0 || parsed.redirects.length !== 0) return false;
+    || parsed.operators.length !== 0 || parsed.redirects.length > 1) return false;
+  if (parsed.redirects.length === 1) {
+    const redirect = parsed.redirects[0];
+    const windows = parsed.dialect === "windows-direct";
+    const isAdmittedRedirect = redirect.fd === 2 && redirect.direction === ">"
+      && (windows ? redirect.target.toLowerCase() === "nul" : redirect.target === "/dev/null");
+    if (!isAdmittedRedirect) return false;
+  }
   const words = [parsed.segments[0].executable, ...parsed.segments[0].argv];
   if (isReadOnlySimpleWords(words, root)) return false;
   const scopeLifted = words.slice(1)
@@ -2971,6 +2994,52 @@ export function isOutsideRootSingleCommandRead(parsed, root) {
     })
     .filter((value) => value !== null);
   return isReadOnlySimpleWords(words, root, [...BOUNDED_PIPELINE_ADDITIONAL_ROOTS, ...scopeLifted]);
+}
+
+/**
+ * The `&&`-chain sibling of isOutsideRootSingleCommandRead() and
+ * isOutsideRootBoundedDiagnosticRead() above (NVA-B-DENIALCODE-1, same backlog item as the
+ * doc comment on isOutsideRootSingleCommandRead()). Is this command an `&&`-chain that
+ * isBoundedReadOnlyAndChain() would admit in every respect EXCEPT that a read target in one of
+ * its segments resolves outside the project root (and outside
+ * BOUNDED_PIPELINE_ADDITIONAL_ROOTS)?
+ *
+ * Unlike both siblings above, this one cannot be handed a `parsed` object from
+ * parseGuardCommand(): the shared tokenizer denies a top-level `&&` outright
+ * (guard-command-grammar.mjs's CONTROL set), so an `&&`-chain never reaches parseStatus
+ * "accepted" there -- the denied() object's segments/operators/redirects are always the empty,
+ * frozen arrays, with nothing left to classify. This function therefore works on the raw
+ * command STRING via splitTopLevelAndChain(), the identical boundary-finder
+ * isBoundedReadOnlyAndChain() itself already uses -- never a second, competing definition of
+ * where the chain's segments are.
+ *
+ * Answered by the identical two-call pattern as both siblings: the first call
+ * (isBoundedReadOnlyAndChain, with no extra roots) decides whether this shape is a bounded
+ * `&&`-chain AT ALL -- a chain already admitted this way returns false here and never needs
+ * this reclassification. The second call, with every segment's own read-target argv token
+ * lifted via rawReadCandidatePath() (round 2, F4 discipline -- see
+ * isOutsideRootSingleCommandRead()'s own doc comment above for why NOT `resolve(root, token)`)
+ * additionally approved as extra roots, answers "would every segment be admitted if the ONLY
+ * thing standing in its way were containment". This never admits anything by itself: its only
+ * consumer picks WHICH refusal is printed, never whether the command is admitted --
+ * isBoundedReadOnlyAndChain(), called with the real roots, is still the one that decides that.
+ */
+function isOutsideRootReadOnlyAndChain(command, root) {
+  const parts = splitTopLevelAndChain(command);
+  if (!parts) return false;
+  if (isBoundedReadOnlyAndChain(command, root)) return false;
+  const scopeLifted = parts.flatMap((part) => {
+    const parsedPart = parseGuardCommand(part, root);
+    if (parsedPart.parseStatus !== "accepted" || parsedPart.segments.length !== 1) return [];
+    return parsedPart.segments[0].argv
+      .filter((token) => typeof token === "string" && token !== "" && !token.includes("\0"))
+      .map((token) => {
+        try { return rawReadCandidatePath(token, root); } catch { return null; }
+      })
+      .filter((value) => value !== null);
+  });
+  const extraRoots = [...BOUNDED_PIPELINE_ADDITIONAL_ROOTS, ...scopeLifted];
+  return parts.every((part) => isChainSegmentAdmitted(part, root, extraRoots));
 }
 
 function poApprovalArgs(command, root, scriptPath) {
@@ -4931,9 +5000,28 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
   if (toolName === "Bash") {
     const parsed = parseGuardCommand((input.tool_input.command ?? input.tool_input.CommandLine), root, { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM });
     if (parsed.parseStatus !== "accepted") {
-      const code = "GUARD-PARSE-UNSUPPORTED";
+      // NVA-B-DENIALCODE-1 (backlog: 2026-09-06-suppressed-and-chained-outside-root-reads-
+      // land-on-the-wrong-denial-code.md): the shared tokenizer denies a top-level `&&`
+      // outright (guard-command-grammar.mjs's CONTROL set), so an `&&`-chained outside-root
+      // read never reaches an "accepted" parse and would otherwise always print the generic
+      // GUARD-PARSE-UNSUPPORTED code -- true of the SHAPE, false of the REASON when every
+      // segment would already be admitted by isBoundedReadOnlyAndChain() except that one
+      // segment's own read target resolves outside the project root.
+      // isOutsideRootReadOnlyAndChain() answers exactly that question on the raw command
+      // string (the only representation an `&&`-chain has here -- `parsed` itself carries no
+      // segments/operators/redirects to classify for a denied parse) and returns false for
+      // every other denied-parse shape (`;`-joined, an unbalanced quote, a raw control
+      // character, or an `&&`-chain that fails for an unrelated reason), leaving this branch's
+      // pre-existing behavior for all of those untouched.
+      const andChainReadScope = isOutsideRootReadOnlyAndChain(
+        (input.tool_input.command ?? input.tool_input.CommandLine), root,
+      );
+      const code = andChainReadScope ? READ_SCOPE_DENIAL_CODE : "GUARD-PARSE-UNSUPPORTED";
+      const reason = andChainReadScope
+        ? `${code}: ${READ_SCOPE_DENIAL_GUIDANCE}`
+        : `${code}: ${GRAMMAR_DENIAL_GUIDANCE[code]}`;
       const route = humanOverrideRoute(
-        code, `${code}: ${GRAMMAR_DENIAL_GUIDANCE[code]}`, "command", root, toolName, input.tool_input, dependencies,
+        code, reason, "command", root, toolName, input.tool_input, dependencies,
       );
       if (!route.admitted) {
         // NVA-B-DENIALTRIM: consulted (and marked seen) ONLY on an actual denial, never on
@@ -4956,7 +5044,16 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
       // NVA-BL-76 (restored by NVA-B-READCONTAIN-1): the read-scope refusal is decided
       // FIRST, because for this one shape the operator/redirect codes state a reason that is
       // demonstrably not the reason.
-      const readScope = isOutsideRootBoundedDiagnosticRead(parsed, root);
+      // NVA-B-DENIALCODE-1: isOutsideRootSingleCommandRead() is unioned in here too -- a
+      // single, un-piped command carrying its one admitted trailing `2>/dev/null` redirect
+      // reaches THIS branch (redirects.length > 0), never the isOutsideRootSingleCommandRead()
+      // branch below (which requires redirects.length === 0), so without this union that
+      // shape's own read-scope classifier would never run at all. No overlap risk with the
+      // piped sibling: isOutsideRootSingleCommandRead() returns false unconditionally whenever
+      // parsed.segments.length !== 1, which every command reaching this branch via operators
+      // (a `|`-joined pipeline) always is.
+      const readScope = isOutsideRootBoundedDiagnosticRead(parsed, root)
+        || isOutsideRootSingleCommandRead(parsed, root);
       const code = readScope
         ? READ_SCOPE_DENIAL_CODE
         : parsed.redirects.length > 0 ? "GUARD-REDIRECT-UNAPPROVED" : "GUARD-OPERATOR-UNAPPROVED";
