@@ -43,7 +43,15 @@ import {
   recordGuardHandoffOffer,
 } from "./guard-handoff-offer.mjs";
 import { createPoApprovalIntent, verifyPoApprovalProof } from "./po-approval-proof.mjs";
-import { boundedOpaqueCopyCommand } from "./project-onboarding-v3.mjs";
+// NVA-B-HGOCOPYSAFE-1: sourced from the shared renderer module rather than
+// project-onboarding-v3.mjs directly -- boundedOpaqueCopyCommand is the same
+// function (re-exported there, unchanged), so this file's bounded-rendering
+// output stays byte-identical. Mirrors the identical adoption already landed
+// in antigravity-pretool-guard.mjs (NVA-CF-BL19-COPYSAFEADOPT), and closes
+// this file's status as the last direct project-onboarding-v3.mjs importer of
+// this function named by backlog/items/2026-08-28-po-facing-commands-are-not-
+// uniformly-rendered-break-safe.md's 2026-09-01 re-verification note.
+import { boundedOpaqueCopyCommand } from "./copy-safe-command.mjs";
 import {
   LEGACY_STATE,
   NEUTRAL_STATE,

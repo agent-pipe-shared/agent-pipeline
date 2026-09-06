@@ -33,6 +33,35 @@ test("boundedOpaqueCopyCommand is re-exported unchanged -- the same function obj
   assert.strictEqual(boundedOpaqueCopyCommand, libBoundedOpaqueCopyCommand);
 });
 
+/**
+ * NVA-B-HGOCOPYSAFE-1 (backlog/items/2026-08-28-po-facing-commands-are-not-
+ * uniformly-rendered-break-safe.md): human-guard-override.mjs's disclosed-
+ * command lane hands an ALREADY-ASSEMBLED, arbitrary Bash command string
+ * (never an executable+argv pair) to this same re-exported function --
+ * distinct from every boundedCopySafeCommand() test above, which builds its
+ * opaque command line FROM an argv this module itself assembles. There is no
+ * shadowable executable name to capture argv through for an arbitrary opaque
+ * string (unlike the eval-based round-trip technique above), so this proves
+ * the $CMD shell variable itself reconstructs byte-identical to the original
+ * string -- the whole of what this renderer's contract promises for a value
+ * it never parses.
+ */
+test("NVA-B-HGOCOPYSAFE-1: boundedOpaqueCopyCommand round-trips an already-assembled opaque command string containing a space, $, and non-ASCII characters through a real shell reconstruction, unexpanded", () => {
+  const rawCommand = "node --check '/repo root/üöä-tool.mjs' --flag \"value with $HOME and a space\"";
+  const built = boundedOpaqueCopyCommand(rawCommand);
+  assert.equal(built.maxColumns, 72);
+  if (process.platform === "win32") return;
+  assert.ok(built.posix, "posix rendering must succeed for this input");
+  const lines = built.posix.split("\n");
+  assert.equal(lines.at(-1), 'eval "$CMD"');
+  const assignments = lines.slice(0, -1).join("\n");
+  const script = `${assignments}\nprintf '%s' "$CMD"`;
+  const probe = spawnSync("bash", ["-c", script], { encoding: "utf8" });
+  assert.equal(probe.status, 0, probe.stderr);
+  assert.equal(probe.stdout, rawCommand,
+    "the posix opaque-copy rendering does not reconstruct the exact original command string");
+});
+
 test("boundedCopySafeCommand assembles the exact executable+argv into one command line and a bounded copyCommand", () => {
   const built = boundedCopySafeCommand({
     executable: "node",
