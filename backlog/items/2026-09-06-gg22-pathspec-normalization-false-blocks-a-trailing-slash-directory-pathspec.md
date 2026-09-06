@@ -52,3 +52,16 @@ severity is minor rather than major.
 - The `../`-traversal fix (F3 of the prior round) is not weakened by this
   correction — a token that lexically resolves OUTSIDE `backlog/` must
   still be refused.
+
+## Progress note (2026-09-06, NVA-B-GG22TRAILSLASH-1, goldfish-deep)
+
+Fixed (commit `9c274f7b`): the disallowed-path filter now also admits an
+exact `backlog/items` match (the directory itself, with or without a
+trailing slash, since `normalizePathspecLexically` already collapses both
+forms to that string), alongside the existing prefix and `LEDGER_PATHS`
+checks. `../`-traversal unaffected. Proven via scratch RED/GREEN
+reproduction (`backlog/evidence/2026-09-06-nva-b-gg22trailslash-1-{red,green}.txt`)
+since `guard-git.test.mjs` is TP-1 protected. Full suite 232/232 (unchanged
+case count), `check-consumer-safe-paths.test.mjs` 9/9, both independently
+re-verified. **T1 Critic review still owed before this item can close** —
+guardrail-hook file, mandatory regardless of dispatch-level `criticSkip`.
