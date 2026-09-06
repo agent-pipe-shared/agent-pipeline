@@ -97,6 +97,7 @@
 | pipeline.bootstrap-skill-grows-by-budget-raise-instead-of-by-module | open | workflow-improvement | pipeline | 2026-08-08 | — |
 | pipeline.bounded-diagnostic-outside-repo-refused-under-wrong-reason | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.briefed-tool-budget-sits-below-an-unannounced-harness-maxturns-cliff | closed | defect | pipeline | 2026-08-23 | — |
+| pipeline.briefed-tool-budgets-are-estimated-too-low-and-nothing-enforces-them | open | workflow-improvement | pipeline | 2026-09-06 | — |
 | pipeline.briefing-bundling-two-findings-asks-for-two-dispatches | closed | defect | pipeline | 2026-09-01 | Nova B — dispatcher-side scoping defect: bundling two independent review findings into one briefing produced a package that could not fit any single tool budget, and the overrun was read as an agent problem rather than a briefing problem. |
 | pipeline.briefing-model-field-contradicts-agent-definition | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.budget-guard-test-suite-silent-pass | open | defect | pipeline | 2026-09-06 | Nova B -- guard-dispatch-budget.test.mjs imports its module at the test file's own module scope. If that guard's entrypoint gate ever regresses to an unconditional top-level body, the import calls process.exit at module-evaluation time and node --test reports the whole file as ONE PASSING TEST with no assertion having run. The sibling suite guard-dispatch.test.mjs had the identical shape and it was removed in e4aeb8fe; this one was on that package's no-go list and was carried forward in a commit message body, which is not a tracked mitigation. |
@@ -567,6 +568,7 @@
 | pipeline.test-suites-use-host-tmp-instead-of-the-repos-own-scratch-convention | closed | workflow-improvement | pipeline | 2026-08-17 | — |
 | pipeline.the-ai-hardening-gate-has-no-home-in-any-approved-feature-package | open | defect | pipeline | 2026-08-28 | Scheduled for Nova B (PO decision 2026-08-28) |
 | pipeline.the-denial-trim-state-is-keyed-per-session-not-per-agent-as-its-comment-claims | closed | defect | pipeline | 2026-09-01 | — |
+| pipeline.the-dispatch-budget-guard-identifies-a-subagent-by-a-path-no-payload-carries | open | defect | pipeline | 2026-09-06 | — |
 | pipeline.the-dispatch-record-field-enumeration-omits-a-field-the-checker-requires | closed | defect | pipeline | 2026-09-01 | — |
 | pipeline.the-handover-size-guard-only-sees-one-of-two-write-paths | closed | defect | pipeline | 2026-09-01 | — |
 | pipeline.the-handover-size-guards-header-comment-contradicts-its-own-registration | closed | defect | pipeline | 2026-09-01 | — |
@@ -650,7 +652,7 @@
 
 ## Counts
 
-- open: 107
+- open: 109
 - in_progress: 0
 - closed: 521
 - rejected: 3

@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "1885883fec72f55a8670632186dc0c7ba32a57f31e66eed5c0ef0146db86f6d8"
+    "transitionHead": "1280afcd586cd46c6d79e4a358604131f8e76e4c379511b27e2c8b4ca9f165e7"
   },
   "counts": {
-    "open": 107,
+    "open": 109,
     "in_progress": 0,
     "closed": 521,
     "rejected": 3,
@@ -1117,6 +1117,15 @@
       "closureRepository": "self",
       "closureCommit": "563be0260c3a256969a3452cd44a4a5d10726ece",
       "closureEvidence": "backlog/items/2026-08-23-briefed-tool-budget-sits-below-an-unannounced-harness-maxturns-cliff.md"
+    },
+    {
+      "id": "pipeline.briefed-tool-budgets-are-estimated-too-low-and-nothing-enforces-them",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-09-06",
+      "source": "four dispatches measured on 2026-09-06 against their own briefed caps; one was cut at the harness maxTurns limit mid-verification. Second instance of the class in backlog/items/2026-08-23-briefed-tool-budget-sits-below-an-unannounced-harness-maxturns-cliff.md",
+      "deferred": false
     },
     {
       "id": "pipeline.briefing-bundling-two-findings-asks-for-two-dispatches",
@@ -7017,6 +7026,15 @@
       "closureRepository": "self",
       "closureCommit": "15bb35994d83b8147b22c9316561c3767ef81037",
       "closureEvidence": "backlog/evidence/2026-09-03-nva-b-trimkey-stale-open-measurement.md"
+    },
+    {
+      "id": "pipeline.the-dispatch-budget-guard-identifies-a-subagent-by-a-path-no-payload-carries",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-06",
+      "source": "measured 2026-09-06 with a temporary user-level PreToolUse capture hook against two live goldfish dispatches; full record backlog/evidence/2026-09-06-dispatch-budget-guard-discriminator-measured.md, PO decision queue item 3",
+      "deferred": false
     },
     {
       "id": "pipeline.the-dispatch-record-field-enumeration-omits-a-field-the-checker-requires",
