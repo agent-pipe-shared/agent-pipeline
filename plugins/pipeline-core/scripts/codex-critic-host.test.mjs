@@ -1790,18 +1790,23 @@ await checkAsync("selectedCriticInProcessBridge carries the app server's own obs
 // its own vendored roles/critic.md, templates/prompts/critic-review.md and
 // scripts/critic-verdict.schema.json. ---
 
-await checkAsync("codex-critic-app-server resolves its ruleset against the executing plugin root, not the repository root, under an installed marketplace layout", async () => {
+await checkAsync("codex-critic-app-server resolves its ruleset against the executing plugin root, not the repository root, under an installed runner-cache layout", async () => {
   const fixtureRoot = mkdtempSync(join(tmpdir(), "codex-critic-app-server-installed-"));
   try {
-    const installedPluginRoot = join(fixtureRoot, "marketplace", "plugins", "pipeline-core");
+    const installedPluginRoot = join(fixtureRoot, "cache", "agent-pipeline", "pipeline-core", "0.6.1-local");
     mkdirSync(dirname(installedPluginRoot), { recursive: true });
     cpSync(join(DEFAULT_PIPELINE_ROOT, "plugins", "pipeline-core"), installedPluginRoot, { recursive: true });
-    // Sanity: this is genuinely an installed layout, not a repo checkout that
-    // happens to also carry these paths at its root -- the old three-levels-up
-    // anchor lands exactly on <tmp>/marketplace, which must not resolve them.
+    // Sanity: this layout mirrors the runner cache shape
+    // <cache>/<marketplace>/<plugin>/<version>/, with no plugins/pipeline-core
+    // segment above the plugin root -- the pre-fix three-levels-up anchor from
+    // <pluginRoot>/scripts is <tmp>/cache/agent-pipeline, where none of the
+    // three ruleset references exists, so the negative control covers all
+    // three.
+    const preFixAnchor = join(fixtureRoot, "cache", "agent-pipeline");
     for (const missing of [
-      join(fixtureRoot, "marketplace", "roles"),
-      join(fixtureRoot, "marketplace", "templates"),
+      join(preFixAnchor, "roles"),
+      join(preFixAnchor, "templates"),
+      join(preFixAnchor, "plugins", "pipeline-core", "scripts", "critic-verdict.schema.json"),
       join(fixtureRoot, "roles"),
       join(fixtureRoot, "templates"),
       join(fixtureRoot, "plugins", "pipeline-core", "scripts", "critic-verdict.schema.json"),
