@@ -138,19 +138,14 @@ the item's own proposal named.
 
 ### 0.6.1 is released — 2026-09-02
 
-`main` moved `dd1eb9ee..6262d408`, tag `v0.6.1`/GitHub release at `6262d408`,
-`CHANGELOG.md` records it (`f0290fe8`). Pushed under an explicit,
-PO-decided repository-admin bypass on `protect-main` (stays for 0.6.1; the
-bypass-free route — dispatch `verify` on a feature branch first, then push
-that same SHA to `main` — is the intended fix before the next release).
-`protect-release-tags` (id 22072995) has no bypass actor at all.
-
-Two incidents, both filed as their own backlog items, not restated here: a
-torn audit-ledger append disabled every human-guard-override route for 13
-days (`pipeline.a-torn-audit-append-has-disabled-every-human-guard-override-since-august-20`);
-CI ran red on the released commit for three suites, two fixed (`216ff054`,
-`ae8da7b8`), one deliberately not (LWSC04,
-`backlog/items/2026-09-02-worker-cancellation-is-denied-when-the-record-digest-ages-between-read-and-cancel.md`).
+`main` moved `dd1eb9ee..6262d408`, tag `v0.6.1` (`CHANGELOG.md`, `f0290fe8`),
+under an explicit PO-decided `protect-main` bypass (bypass-free route for
+next release: dispatch `verify` on a feature branch first, then push that
+SHA to `main`). Two incidents from this release, each its own backlog item,
+not restated here: the torn audit-ledger append
+(`pipeline.a-torn-audit-append-has-disabled-every-human-guard-override-since-august-20`)
+and the LWSC04 CI red
+(`backlog/items/2026-09-02-worker-cancellation-is-denied-when-the-record-digest-ages-between-read-and-cancel.md`).
 Full verify green at `7cc0b649`, 506 suites.
 
 ### At the freeze — what the PO decides
@@ -198,12 +193,8 @@ read that rather than trusting any prose claim about which HEAD was green.
 
 ### Closed — the rebase deadlock reported from a second session
 
-Fixed, reviewed and closed 2026-09-03 (`e152183e`), verify green 506/506. Its
-own Triage section already carries the three findings worth remembering
-(F1 refuted by measurement, F5's first rework rejected, Round-2 F1 an
-unremedied lifecycle violation of mine) — read
-`backlog/items/2026-09-02-the-rebase-authority-is-resolved-and-advertised-but-not-executable.md`
-rather than this pointer.
+Fixed, reviewed and closed 2026-09-03 (`e152183e`), verify green 506/506.
+Findings and history: `backlog/items/2026-09-02-the-rebase-authority-is-resolved-and-advertised-but-not-executable.md`.
 
 ### 2026-09-04: verify.mjs evidence-slot fix — ceremony status (NVA-B-EVSLOTFIX-1)
 
@@ -351,6 +342,13 @@ self-verified (232/232, doc-contract clean), no third round. Two minor
 follow-ups filed (trailing-slash over-block; evidence-durability
 recurrence, folded into the existing test-gap item). Registry:
 `backlog/evidence/2026-09-06-nva-b-gg22fix-1-findings.md`.
+
+**`NVA-B-CODEXGUARDIMPORT-1`** (`d398a662`): same fix as HGOCOPYSAFE-1, on
+`codex-pretool-guard.mjs` — self-disclosed EL-01 slip (Elephant-authored, no
+fast-path exception for a guardrail-hook file). Round 1 FAIL on two evidence
+gaps only, code confirmed correct; both remediated; round 2 (last allowed)
+in progress. Registry:
+`backlog/evidence/2026-09-06-nva-b-codexguardimport-1-findings.md`.
 
 ## PO decisions and todos — collected during the autonomous run, not waited on
 
