@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "077a8d19fd6661434a2bb55f4556042a14af454c3149e2ab8583f8d4a3867acc"
+    "transitionHead": "9ff31f2bf5167fb1aacc7344f2422956053b88d8f9717180d416252ca81bca9b"
   },
   "counts": {
-    "open": 100,
+    "open": 99,
     "in_progress": 0,
-    "closed": 517,
+    "closed": 518,
     "rejected": 3,
     "deferred": 11
   },
@@ -2621,13 +2621,17 @@
     },
     {
       "id": "pipeline.gg-22-reads-the-shared-index-so-a-concurrent-dispatch-blocks-an-unrelated-ledger-commit",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-03",
       "source": "Measured live 2026-09-03 during the autonomous Nova-B run: the dispatcher's ledger commit for the scope-relay closure (573df491) was refused by GG-22 while a concurrent goldfish dispatch held harness/scripts/check-product-capability-inventory.{mjs,test.mjs} staged in the shared index.",
       "deferred": false,
-      "tracking": "Nova B — GG-22's disallowed-path check reads `git diff --cached`, the shared index, rather than the paths the blocked commit actually names. Under parallel dispatch that makes an unrelated agent's staged work block a correct ledger commit, with a denial text that names neither the real cause nor a route forward."
+      "tracking": "Nova B — GG-22's disallowed-path check reads `git diff --cached`, the shared index, rather than the paths the blocked commit actually names. Under parallel dispatch that makes an unrelated agent's staged work block a correct ledger commit, with a denial text that names neither the real cause nor a route forward.",
+      "closedAt": "2026-09-06",
+      "closureRepository": "self",
+      "closureCommit": "fe2d7afe4eed421df1dffdaa94a485c631447d06",
+      "closureEvidence": "backlog/items/2026-09-03-gg-22-reads-the-shared-index-so-a-concurrent-dispatch-blocks-an-unrelated-ledger-commit.md"
     },
     {
       "id": "pipeline.gg-22s-own-remediation-order-creates-unclearable-ledger-debt",
