@@ -1,0 +1,54 @@
+command: node --test harness/scripts/check-verify-suite-registration.test.mjs
+label: suite-registration-tests
+exitCode: 0
+--- stdout ---
+ok 1 - an unregistered *.test.mjs file under a registered root is detected
+ok 2 - a registration entry naming a missing file is detected
+ok 3 - a duplicate suite name across arrays is detected and named
+ok 4 - a declared exclusion is accepted without a finding
+ok 5 - the checker exits 0 (well-formed, function level) on a well-formed fixture
+ok 6 - CLI: exits 0 against a well-formed fixture root
+ok 7 - CLI: exits non-zero (deliberate break) against an unregistered-file fixture root
+ok 8 - the checker's own two files are not declared exclusions
+ok 9 - EXCLUSIONS is exactly the 5 green suites parked on a closed maintenance window, each with reason, owner and expiry
+ok 10 - QG-06: a well-formed exclusion (reason, owner, expiry) is honoured before its expiry day
+ok 11 - QG-06: an exclusion missing "reason" is a finding naming the file and that field, and does not suppress
+ok 12 - QG-06: an exclusion missing "owner" is a finding naming the file and that field, and does not suppress
+ok 13 - QG-06: an exclusion missing "expires" is a finding naming the file and that field, and does not suppress
+ok 14 - QG-06: an empty-string field counts as missing, not as present-but-blank
+ok 15 - QG-06: the pre-QG-06 bare reason string is rejected, not grandfathered
+ok 16 - QG-06: an unparseable expiry ("soon") is a finding, not an open-ended exclusion
+ok 17 - QG-06: an unparseable expiry ("2026-9-7") is a finding, not an open-ended exclusion
+ok 18 - QG-06: an unparseable expiry ("2026-02-30") is a finding, not an open-ended exclusion
+ok 19 - QG-06: an unparseable expiry ("07.09.2026") is a finding, not an open-ended exclusion
+ok 20 - QG-06: an unparseable expiry ("2026-09-07T00:00:00Z") is a finding, not an open-ended exclusion
+ok 21 - QG-06: an unparseable expiry ("when R1.2 closes") is a finding, not an open-ended exclusion
+ok 22 - QG-06: parseExclusionDay rejects what Date() would silently reinterpret, and accepts a real day
+ok 23 - QG-06: an exclusion whose expiry has passed is a finding naming the file and the expiry date
+ok 24 - QG-06: an expiry in the future is accepted; the same entry one day past its expiry is not
+ok 25 - QG-06: the comparison uses the injected day, not the process clock
+ok 26 - QG-06: exclusion validation runs even when verify.mjs cannot be read at all
+ok 27 - QG-06: the real EXCLUSIONS table is self-clearing -- every entry expires on a stated day
+ok 28 - duplicateSuiteIds: an empty registration array reports no duplicates
+ok 29 - duplicateSuiteIds: a registration array with no repeated name reports no duplicates
+ok 30 - duplicateSuiteIds: one id registered twice is reported once, with count 2
+ok 31 - duplicateSuiteIds: one id registered three times reports a count of 3, not two findings
+ok 32 - duplicateSuiteIds: two distinct duplicated ids are both reported, sorted by id
+ok 33 - duplicateSuiteIds: entries sharing a name but naming different files are still duplicates
+ok 34 - duplicateSuiteIds: returns exactly the { id, count } shape the verify.mjs call site consumes
+ok 35 - duplicateSuiteIds: a duplicate spanning two of verify.mjs's registration arrays is found
+ok 36 - verify.mjs reports a duplicate registration as a failing step naming the id (AC-P3/R1.4)
+ok 37 - verify.mjs without a duplicate enters the journal branch — the duplicate step is discrimination, not a constant
+1..37
+# pass 37
+✔ harness/scripts/check-verify-suite-registration.test.mjs (635.236157ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 651.255
+
+--- stderr ---

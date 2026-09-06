@@ -508,6 +508,7 @@ const JOURNAL_STUB_TRIPWIRE = "PHX-FIXTURE-JOURNAL-STUB-CALLED";
 const FIXTURE_MODULES = Object.freeze([
   "harness/scripts/check-verify-suite-registration.mjs",
   "harness/scripts/manual-check-logic.mjs", // imported by verify.mjs for the manual-check step
+  "harness/scripts/verify-evidence-writer.mjs",
   "plugins/pipeline-core/lib/project-authority.mjs",
   "plugins/pipeline-core/lib/scoped-verify-registration.mjs",
   "plugins/pipeline-core/lib/verify-resume.mjs",

@@ -1,0 +1,7 @@
+command: node harness/scripts/check-product-capability-inventory.mjs
+label: inventory
+exitCode: 0
+--- stdout ---
+PASS: product capability inventory (inventory)
+
+--- stderr ---

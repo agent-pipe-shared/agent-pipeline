@@ -1,0 +1,41 @@
+command: node --test harness/scripts/check-product-capability-inventory.test.mjs
+label: inventory-tests
+exitCode: 0
+--- stdout ---
+ok 1 - HAW-A00 accepts only a status-zero Git EPERM false positive with observed output
+ok 2 - HAW-A01 discovers the complete current direct product surface
+ok 3 - HAW-A02 accepts an attested receipt and an honest inventory-phase pending gate
+ok 4 - HAW-A03 rejects a discovered surface no capability categorizes
+ok 5 - HAW-A03 rejects a re-declared surfaces array
+ok 6 - HAW-A03 rejects duplicate capability ID
+ok 7 - HAW-A03 rejects unmapped surface
+ok 8 - HAW-A03 rejects available capability without test evidence
+ok 9 - HAW-A03 rejects unsorted support matrix
+ok 10 - HAW-A03 rejects missing Codex disposition
+ok 11 - HAW-A03 rejects unexplained Codex unavailability
+ok 12 - HAW-A03 rejects Codex runner falsely marked unavailable
+ok 13 - HAW-A04 final phase rejects pending front-door claims before documentation authorship
+ok 14 - HAW-A05 accepts an ancestor baseline and still requires every discovered surface to be categorized
+ok 15 - HAW-A06 rejects a tree that does not belong to its commit
+ok 16 - HAW-A06 rejects a resolvable commit outside current HEAD ancestry
+ok 17 - HAW-A07 rejects an open-ended test Git adapter
+ok 18 - HAW-B00 discovers this repository's real entry points, including the bootstrap driver
+ok 19 - HAW-B01 this repository's own entry points are reachable: never named-but-refused, never admitted-but-unnamed
+ok 20 - HAW-B02 a consumer-shaped root with no plugins/pipeline-core tree degrades to zero findings, never a crash
+ok 21 - HAW-B03 a driver the bootstrap docs name but the readiness guard never admits fails as named-but-refused
+ok 22 - HAW-B04 a script the readiness guard admits but no skill or guard names fails as admitted-but-unnamed
+ok 23 - HAW-B05 named in the bootstrap docs AND admitted by the guard passes -- removing either makes it fail (AC3)
+ok 24 - HAW-B06 a comment citing an evidence filename that merely contains a script's stem is not read as an admission (NVA-B-ENTRYSTEM-1)
+1..24
+# pass 24
+✔ harness/scripts/check-product-capability-inventory.test.mjs (2960.684363ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2976.636284
+
+--- stderr ---
