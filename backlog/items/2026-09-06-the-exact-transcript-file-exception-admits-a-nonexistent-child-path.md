@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.transcript-root-child-path-admission
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-06
+closure_repository: self
+closure_commit: 571e67a820cdf6912b02e069c3c2d68c73a0f443
+closure_evidence: "backlog/items/2026-09-06-the-exact-transcript-file-exception-admits-a-nonexistent-child-path.md"
 created: 2026-09-06
 sprint: nova-b
 tracking: "Nova B — T1 Critic review of NVA-B-READCONTAIN-2 (PASS, 2 minor findings). F1: the transcript-file exception root's own doc comment claims 'admitted as an EXACT single-file match only -- never a directory-prefix admission', but isRealpathedWithinBoundary's ancestor-walk admits a candidate shaped <transcriptFile>/<child> anyway, since the walk climbs from the nonexistent child back up to the file itself (which equals the boundary). Not exploitable today (a real file has no children; the shell read fails ENOTDIR) but the code does not hold the invariant the comment asserts, and no test covers this shape."
@@ -70,6 +74,12 @@ when `extra` is a FILE and `raw` is not identical to it — before
 `isRealpathedWithinBoundary`'s ancestor walk ever runs. New regression test
 pins the `<transcriptFile>/<child>` shape (previously zero coverage). Full
 suite 239/239, `check-consumer-safe-paths` green, both independently
-re-verified. **T1 Critic review still owed before this item can close** —
-guardrail-hook file, mandatory regardless of dispatch-level `criticSkip`
-(none was set).
+re-verified. ## Closed, 2026-09-06 — T1 Critic PASS
+
+Verdict: PASS (opus, max), two minor findings. F1 (canon docs stale —
+`guardrails/security.md` SEC-11 and the read-scope ADR still claimed the
+hardening was "still owed") fixed directly. F2 (the exported
+`isRealpathedWithinBoundary` primitive itself stays unguarded for a future
+FILE-boundary caller beyond today's one guarded call site) filed as its own
+item:
+`2026-09-06-isrealpathedwithinboundary-keeps-unsafe-file-boundary-behavior-uncaveated.md`.
