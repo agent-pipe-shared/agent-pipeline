@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "fa16551f068240d66b5b79ae4c00f9cbdcbc9c93146ce5cc02b0049e128a32bc"
+    "transitionHead": "c917450eed60fee98f149528939bde3a3361b8cbc0db979538a3f52640ad7414"
   },
   "counts": {
-    "open": 99,
+    "open": 100,
     "in_progress": 0,
     "closed": 521,
     "rejected": 3,
@@ -7539,6 +7539,16 @@
       "closureRepository": "self",
       "closureCommit": "a655437ce8dbb785173b65961c60f1599670e92c",
       "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
+    },
+    {
+      "id": "pipeline.verify-cannot-rerun-fresh-at-unchanged-tree",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-06",
+      "source": "NVA-B-VERIFYLANE-1 dispatch, 2026-09-06: found while trying to satisfy a briefed race-evidence DoD ('run the full gate at least 3 times, all runs must agree'). The dispatch correctly stopped rather than produce evidence it had determined was meaningless.",
+      "deferred": false,
+      "tracking": "Nova B -- there is no way to force a fresh full verify run at an unchanged tree. candidateIdentity() keys on HEAD^{tree} and, with allowCrossCandidateReuse false (verify.mjs's real call shape), every suite's prior receipt is reused. Consequence: repeat-run evidence at an unchanged HEAD is vacuous -- it re-reports cached results, so it can never surface a race, a flake, or an environment-dependent failure. Every 'ran it twice, green both times' claim made at an unchanged HEAD in this repository proves nothing."
     },
     {
       "id": "pipeline.verify-contract-fails-until-configured-but-gs-10-blocks-configuring-it",
