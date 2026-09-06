@@ -24,7 +24,23 @@
 | 2026-08-11 to 2026-08-19 | Checkpoints 1-60 (2026-08-11 through 2026-08-19 checkpoint 60): superseded session narrative; durable decisions already live in ADRs/backlog/guardrails per this repo's own standing convention, not uniquely in this prose. | [docs/state-archive/2026-08-19--checkpoints-1-through-60.md](state-archive/2026-08-19--checkpoints-1-through-60.md) |
 | 2026-08-26 | 2026-08-25 Antigravity chat-gate-ceremony standardization, verify-tuner stage 2 acceptance, sprint-agy-runner delta4 Critic fix and candidate status | [docs/state-archive/2026-08-26--agy-runner-2026-08-25-handover.md](state-archive/2026-08-26--agy-runner-2026-08-25-handover.md) |
 
-## Current handover — sprint-alfred-epic: plan APPROVED, phase implementation (2026-08-28)
+## Current handover — sprint-alfred-epic: A1 schema recovery (2026-09-06)
+
+The PO approved plural `probeSurfaces[]` with correlated `observations[]`
+and deferred the combined suite/capability registration until A1-2 stabilizes
+(`specs/sprint-alfred-epic/evidence/a1-po-decision-queue.md`). The PO applied
+the current-spec authority selection; the sanctioned state writer then
+re-submitted the same accepted scope, recorded that approval, and returned
+Alfred to `implementation`, continuity revision 5. The current spec digest
+is `301d04ee27007f8fb2e1b49b0242e1adfc82c7630bb96a393e532c3f3cb95953`.
+
+Commit `33df8a4bf26f736a31f13303236e24bfac04d8e5` landed with 13 A1 tests and
+9 consumer-safe tests passing. Next: implement A1-2's four-surface probe
+matrix, then prepare the single TP-3 registration act. Full Verify and Critic
+remain outstanding; standalone tests do not resolve registration debt. The PO selected Astra for
+the Elephant; no comparative performance or token-cost result is established.
+
+### Original Alfred implementation entry (2026-08-28)
 
 **READ THIS FIRST on `feat/sprint-alfred`.** The design phase is closed. The
 PO approved the plan on 2026-08-28 (`approve-plan --by "PO"`, 11:29:48Z),
