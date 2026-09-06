@@ -1,10 +1,16 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { EventEmitter } from "node:events";
 import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
+import { PassThrough } from "node:stream";
+
+import { invokeCodexCriticAppServer } from "./codex-critic-app-server.mjs";
+import { runSelectedCriticHost, selectedCriticInProcessBridge } from "./codex-critic-selected-host.mjs";
+import { buildSandboxRequest, sandboxSelectionDigest } from "./codex-sandbox-select.mjs";
 
 import {
   ASSURANCE,
@@ -73,6 +79,12 @@ let symlinkCapable = true;
 }
 function check(name, fn) {
   fn();
+  passed += 1;
+  process.stdout.write(`ok ${passed} - ${name}\n`);
+}
+
+async function checkAsync(name, fn) {
+  await fn();
   passed += 1;
   process.stdout.write(`ok ${passed} - ${name}\n`);
 }
@@ -1303,6 +1315,243 @@ check("affected Codex Critic launches consume the generic selected read-only tra
   assert.equal(/execution receipt/ui.test(source), true, "Critic must bind execution evidence");
   assert.equal(source.includes("danger-full-access"), false, "Critic must not offer the prohibited mode");
   assert.equal(source.includes("technically-isolated"), false, "network-open transport must not claim strong isolation");
+});
+
+// --- NVA-B-CRITICXPORT-1: the selected-Codex-Critic in-process bridge/consumer ---
+
+function validCriticVerdict() {
+  return {
+    findings: [],
+    deliberately_not_flagged: ["fixture review"],
+    trajectory_verdict: "consistent",
+    trajectory_evidence: "fixture",
+    briefing_violations: [],
+    pass: true,
+  };
+}
+
+function criticPayload(overrides = {}) {
+  return {
+    sandboxTransport: {
+      selectionId: "css_test", selectionSha256: "a".repeat(64), repoFingerprint: "b".repeat(64), duty: "critic",
+      dispatch: { queueRevision: 1, candidateCommit: "c".repeat(40), candidateTree: "d".repeat(40), referenceSetSha256: "e".repeat(64), requestSha256: "f".repeat(64) },
+      requested: { runner: "codex", model: "gpt-5.6-sol" },
+      toolchain: { cliSha256: "1".repeat(64) },
+      profile: { base: ":read-only", network: { enabled: true }, sha256: "2".repeat(64), scratchRootSha256: "3".repeat(64) },
+      scratch: { path: "/tmp/critic-scratch", sha256: "3".repeat(64), sandboxStateJson: "{}", sandboxStateSha256: "4".repeat(64), repoRoot: DEFAULT_PIPELINE_ROOT, codexPath: "/codex" },
+    },
+    referencePaths: ["roles/critic.md"],
+    candidateCommit: "c".repeat(40),
+    candidateTree: "d".repeat(40),
+    reviewBase: "9".repeat(40),
+    ...overrides,
+  };
+}
+
+function fakeCriticSpawn(result, terminal = { code: 0, signal: null }, onRequest = () => {}) {
+  return () => {
+    const child = new EventEmitter();
+    child.stdin = new PassThrough(); child.stdout = new PassThrough(); child.stderr = new PassThrough();
+    const chunks = [];
+    child.stdin.on("data", (chunk) => chunks.push(chunk));
+    child.stdin.on("finish", () => {
+      onRequest(JSON.parse(Buffer.concat(chunks).toString("utf8")));
+      child.stdout.end(`${JSON.stringify(result)}\n`);
+      queueMicrotask(() => child.emit("close", terminal.code, terminal.signal));
+    });
+    return child;
+  };
+}
+
+function criticAnswered(overrides = {}) {
+  return {
+    schema: "pipeline.codex-critic-app-server-child.v1", ok: true, code: "answered",
+    answer: JSON.stringify(validCriticVerdict()),
+    observed: { provider: "openai", model: "gpt-5.6-sol", effort: "xhigh", initialized: true, threadStarted: true, turnStarted: true, turnCompleted: true, stdinEnded: true, exitCode: 0, signal: null, cleanup: "complete" },
+    ...overrides,
+  };
+}
+
+await checkAsync("codex-critic-app-server consumer accepts a complete, valid child turn bound to the selected profile", async () => {
+  let childRequest;
+  const result = await invokeCodexCriticAppServer(criticPayload(), {
+    buildSandboxInvocationFn: () => ({ command: "/codex", argv: ["sandbox"], options: { shell: false } }),
+    spawnFn: fakeCriticSpawn(criticAnswered(), { code: 0, signal: null }, (request) => { childRequest = request; }),
+  });
+  assert.equal(result.status, "reviewed");
+  assert.deepEqual(result.identity, { provider: "openai", modelId: "gpt-5.6-sol", effort: "xhigh" });
+  assert.deepEqual(result.verdict, validCriticVerdict());
+  assert.equal(result.sandboxExecution.terminal.cleanupStatus, "complete");
+  assert.deepEqual(childRequest.referencePaths, ["roles/critic.md"]);
+  assert.equal(childRequest.candidateCommit, "c".repeat(40));
+});
+
+await checkAsync("codex-critic-app-server consumer refuses before spawning on invalid selection, references or dispatch identity", async () => {
+  const cases = [
+    criticPayload({ sandboxTransport: { ...criticPayload().sandboxTransport, requested: { runner: "codex", model: "gpt-5.6-terra" } } }),
+    criticPayload({ sandboxTransport: { ...criticPayload().sandboxTransport, profile: { ...criticPayload().sandboxTransport.profile, network: { enabled: false } } } }),
+    criticPayload({ sandboxTransport: { ...criticPayload().sandboxTransport, profile: { ...criticPayload().sandboxTransport.profile, scratchRootSha256: "9".repeat(64) } } }),
+    criticPayload({ referencePaths: ["../outside"] }),
+    criticPayload({ referencePaths: ["roles/does-not-exist.md"] }),
+    criticPayload({ candidateCommit: "not-a-sha" }),
+  ];
+  for (const value of cases) {
+    let spawned = false;
+    await assert.rejects(invokeCodexCriticAppServer(value, { spawnFn: () => { spawned = true; } }));
+    assert.equal(spawned, false);
+  }
+});
+
+await checkAsync("codex-critic-app-server consumer never collapses a completed-but-invalid child into no-child evidence", async () => {
+  const cases = [
+    criticAnswered({ observed: { ...criticAnswered().observed, model: "gpt-5.6-terra" } }),
+    criticAnswered({ observed: { ...criticAnswered().observed, effort: "high" } }),
+    { ...criticAnswered(), ok: false, code: "protocol-error", answer: null },
+    { ...criticAnswered(), ok: false, code: "write-attempt", answer: null },
+    criticAnswered({ observed: { ...criticAnswered().observed, stdinEnded: false } }),
+    criticAnswered({ observed: { ...criticAnswered().observed, cleanup: "incomplete" } }),
+    criticAnswered({ answer: "not json" }),
+    criticAnswered({ answer: JSON.stringify(["not", "an", "object"]) }),
+    criticAnswered({ answer: JSON.stringify({ ...validCriticVerdict(), pass: "yes" }) }),
+  ];
+  for (const result of cases) {
+    const actual = await invokeCodexCriticAppServer(criticPayload(), {
+      buildSandboxInvocationFn: () => ({ command: "/codex", argv: ["sandbox"], options: { shell: false } }),
+      spawnFn: fakeCriticSpawn(result),
+    });
+    assert.deepEqual(actual, { status: "unavailable", childStarted: true });
+  }
+});
+
+check("selectedCriticInProcessBridge exposes exactly {launch, finalize} to the sandbox runtime's hostBridge contract", () => {
+  const built = selectedCriticInProcessBridge({
+    sandboxRuntime: { repoRoot: DEFAULT_PIPELINE_ROOT }, referencePaths: ["roles/critic.md"],
+    dispatch: { candidateCommit: "c".repeat(40), candidateTree: "d".repeat(40), referenceSetSha256: "e".repeat(64) },
+    reviewBase: "9".repeat(40),
+  });
+  assert.deepEqual(Object.keys(built.bridge).sort(), ["finalize", "launch"]);
+  assert.equal(typeof built.take, "function");
+  assert.equal(Object.hasOwn(built.bridge, "take"), false);
+});
+
+await checkAsync("selectedCriticInProcessBridge.launch refuses drifted references, repository root or dispatch identity before invoking the consumer", async () => {
+  const input = {
+    sandboxRuntime: { repoRoot: DEFAULT_PIPELINE_ROOT }, referencePaths: ["roles/critic.md"],
+    dispatch: { candidateCommit: "c".repeat(40), candidateTree: "d".repeat(40), referenceSetSha256: "e".repeat(64) },
+    reviewBase: "9".repeat(40),
+  };
+  const baseLaunchRequest = () => ({
+    selectionId: "css_test", duty: "critic",
+    selection: { dispatch: { ...input.dispatch }, repoFingerprint: "b".repeat(64), toolchain: { cliSha256: "1".repeat(64) } },
+    requested: { runner: "codex", model: "gpt-5.6-sol" },
+    references: [...input.referencePaths],
+    profile: { base: ":read-only", network: { enabled: true }, sha256: "2".repeat(64), scratchRootSha256: "3".repeat(64) },
+    scratch: { path: "/tmp/x", sha256: "3".repeat(64), sandboxStateJson: "{}", sandboxStateSha256: "4".repeat(64), repoRoot: input.sandboxRuntime.repoRoot, codexPath: "/codex" },
+  });
+  const drifted = [
+    { ...baseLaunchRequest(), references: ["templates/prompts/critic-review.md"] },
+    { ...baseLaunchRequest(), scratch: { ...baseLaunchRequest().scratch, repoRoot: "/tmp/somewhere-else" } },
+    { ...baseLaunchRequest(), selection: { ...baseLaunchRequest().selection, dispatch: { ...input.dispatch, candidateCommit: "9".repeat(40) } } },
+  ];
+  for (const request of drifted) {
+    let invoked = false;
+    const built = selectedCriticInProcessBridge(input, { invokeAppServer: async () => { invoked = true; return { status: "reviewed" }; } });
+    await assert.rejects(built.bridge.launch(request), /drifted/);
+    assert.equal(invoked, false);
+  }
+});
+
+function criticSelectionFixture(input) {
+  const requestSha256 = buildSandboxRequest({
+    repoFingerprint: "b".repeat(64), duty: "critic", queueRevision: 1, candidateCommit: input.dispatch.candidateCommit, candidateTree: input.dispatch.candidateTree,
+    referenceSetSha256: input.dispatch.referenceSetSha256, runner: "codex", model: "gpt-5.6-sol",
+  }).requestSha256;
+  return {
+    schema: "pipeline.codex-sandbox-selection.v1", selectionId: "css_aaaaaaaaaaaaaaaaaaaaaaaaae", repoFingerprint: "b".repeat(64), duty: "critic",
+    dispatch: { queueRevision: 1, candidateCommit: input.dispatch.candidateCommit, candidateTree: input.dispatch.candidateTree, referenceSetSha256: input.dispatch.referenceSetSha256, requestSha256 },
+    toolchain: { cliVersion: "0.144.6", cliSha256: "0".repeat(64), observedHelperSha256: "1".repeat(64), selectionSchemaSha256: "2".repeat(64) },
+    host: { platformClass: "linux-wsl2", kernel: { sysname: "Linux", release: "6", machine: "x86_64" }, filesystemClass: "wsl2-native", bootIdSha256: "3".repeat(64) },
+    profile: { id: "codex-critic-intermediate.v1", sha256: "4".repeat(64), base: ":read-only", network: { enabled: true }, writableRootClass: "coordinator-scratch-only", scratchRootSha256: "5".repeat(64) },
+    preflight: { receiptSha256: "6".repeat(64), eligibility: "intermediate", terminalCode: "eligible", observedAt: "2026-07-19T00:00:00.000Z" },
+    compatibilityReceiptSha256: "7".repeat(64), assurance: { class: "sandbox-read-only-except-coordinator-scratch-network-open", literal: "sandbox-read-only-except-coordinator-scratch; input/network isolation not asserted" },
+    status: "selected", failureClass: null, observedAt: "2026-07-19T00:00:00.000Z",
+  };
+}
+
+await checkAsync("runSelectedCriticHost composes the real in-process bridge and the real consumer end to end, faking only the child process and the generic selected-duty executor", async () => {
+  const input = {
+    repoFingerprint: "b".repeat(64),
+    dispatch: { queueRevision: 1, candidateCommit: "c".repeat(40), candidateTree: "d".repeat(40), referenceSetSha256: "e".repeat(64) },
+    referencePaths: ["roles/critic.md"],
+    reviewBase: "9".repeat(40),
+    sandboxRuntime: { repoRoot: DEFAULT_PIPELINE_ROOT },
+  };
+  const selection = criticSelectionFixture(input);
+  const transport = {
+    dependencies: {
+      async executeSandboxedReadonlyDuty(request, dependencies) {
+        const launched = await dependencies.bridge.launch({
+          selectionId: selection.selectionId, duty: "critic", selection, requested: request.requested, references: request.references, profile: selection.profile,
+          scratch: { path: "/tmp/critic-scratch", sha256: selection.profile.scratchRootSha256, sandboxStateJson: "{}", sandboxStateSha256: "8".repeat(64), repoRoot: input.sandboxRuntime.repoRoot, codexPath: "/codex" },
+        });
+        const execution = await dependencies.bridge.finalize({ selection, launched, requested: request.requested, profile: selection.profile });
+        return {
+          status: "reviewed", childStarted: true, selectionId: selection.selectionId, selectionSha256: sandboxSelectionDigest(selection),
+          executionReceiptSha256: sha256(JSON.stringify(execution)), dutyReceiptSha256: execution.dutyReceipt.sha256, assurance: selection.assurance,
+        };
+      },
+    },
+    invokeCodexCriticAppServer: (payload) => invokeCodexCriticAppServer(payload, {
+      buildSandboxInvocationFn: () => ({ command: "/codex", argv: ["sandbox"], options: { shell: false } }),
+      spawnFn: fakeCriticSpawn(criticAnswered()),
+    }),
+  };
+  const result = await runSelectedCriticHost(input, transport);
+  assert.equal(result.ok, true);
+  assert.equal(result.code, "reviewed");
+  assert.deepEqual(result.verdict, validCriticVerdict());
+  assert.equal(result.receipt.status, "reviewed");
+  assert.equal(result.execution.dutyReceipt.schema, "pipeline.critic-receipt.v1");
+  assert.equal(result.sandboxBinding.selectionId, selection.selectionId);
+});
+
+await checkAsync("runSelectedCriticHost reports selected-sandbox-required when no selection/child is available", async () => {
+  const input = {
+    repoFingerprint: "b".repeat(64),
+    dispatch: { queueRevision: 1, candidateCommit: "c".repeat(40), candidateTree: "d".repeat(40), referenceSetSha256: "e".repeat(64) },
+    referencePaths: ["roles/critic.md"],
+    reviewBase: "9".repeat(40),
+    sandboxRuntime: { repoRoot: DEFAULT_PIPELINE_ROOT },
+  };
+  const result = await runSelectedCriticHost(input, {
+    dependencies: { async executeSandboxedReadonlyDuty() { return { status: "unavailable", childStarted: false, selectionId: null }; } },
+  });
+  assert.deepEqual(result, { ok: false, code: "selected-sandbox-required", selectionId: null, sandboxBinding: null });
+});
+
+await checkAsync("runSelectedCriticHost reports selected-critic-transport-failed rather than collapsing a completed-but-invalid child into no-child evidence", async () => {
+  const input = {
+    repoFingerprint: "b".repeat(64),
+    dispatch: { queueRevision: 1, candidateCommit: "c".repeat(40), candidateTree: "d".repeat(40), referenceSetSha256: "e".repeat(64) },
+    referencePaths: ["roles/critic.md"],
+    reviewBase: "9".repeat(40),
+    sandboxRuntime: { repoRoot: DEFAULT_PIPELINE_ROOT },
+  };
+  const failedAssurance = { class: "sandbox-read-only-except-coordinator-scratch-network-open", literal: "sandbox-read-only-except-coordinator-scratch; input/network isolation not asserted" };
+  const result = await runSelectedCriticHost(input, {
+    dependencies: {
+      async executeSandboxedReadonlyDuty() {
+        return {
+          status: "error", childStarted: true, selectionId: "css_bbbbbbbbbbbbbbbbbbbbbbbbbi", selectionSha256: "1".repeat(64),
+          executionReceiptSha256: "2".repeat(64), dutyReceiptSha256: "3".repeat(64), assurance: failedAssurance,
+        };
+      },
+    },
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.code, "selected-critic-transport-failed");
+  assert.notEqual(result.sandboxBinding, null);
+  assert.equal(result.sandboxBinding.selectionId, "css_bbbbbbbbbbbbbbbbbbbbbbbbbi");
 });
 
 process.stdout.write(`1..${passed}\n# pass ${passed}\n`);
