@@ -488,6 +488,7 @@
 | pipeline.recovery-preview-ack-unstable-getter-poisons-replay-ledger | closed | defect | pipeline | 2026-07-27 | — |
 | pipeline.recovery-preview-callback-attestation | closed | defect | pipeline | 2026-07-20 | — |
 | pipeline.red-evidence-from-node-test-embeds-the-absolute-repository-path | closed | defect | pipeline | 2026-09-02 | Nova B — reproduce-first RED evidence is required by briefings and by ADR-0063, and the standard way to capture it embeds a machine-specific absolute path that a hard rule forbids in commits. The fixup always arrives one commit too late, and history cannot be rewritten. |
+| pipeline.registering-a-verify-suite-silently-creates-an-inventory-obligation | open | workflow-improvement | pipeline | 2026-09-06 | — |
 | pipeline.registering-a-verify-suite-silently-invalidates-the-capability-inventory | closed | defect | pipeline | 2026-08-27 | — |
 | pipeline.regulated-document-hooks | deferred | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; deferred per PO triage 2026-08-23. |
 | pipeline.relative-commit-message-file-unreadable-from-a-worktree | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — blocks the Pipeline's own worktree-isolated dispatch pattern; fix dispatched as NVA-B-GUARDF in the same session it was found |
@@ -648,7 +649,7 @@
 
 ## Counts
 
-- open: 105
+- open: 106
 - in_progress: 0
 - closed: 521
 - rejected: 3
