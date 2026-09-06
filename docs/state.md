@@ -81,14 +81,22 @@ Commits survive compaction; intent does not — this block is the intent.
    preflight code into `preflight-failed`, so the fallback's allowed codes
    never arrive, and the briefed composition point is bypassed by
    `runSelectedCriticHost`. `WIREAUDIT-1`: 415 modules, 202 reachable; the
-   pattern is cluster-shaped (`afk-*`, `advisory-*`, `control-*`), the count
-   is an upper bound (no spawn detection). `WRITECONTAIN-1`: the read lane's
-   symlink bypass does NOT reach the write lane — measured, case (a).
-   Six new backlog items filed and reconciled; PO queue at items 1–13.
-9. IN FLIGHT: `NVA-B-BUDGETGUARD-2` (suite hardening + `agent_id`
-   discriminator), `NVA-B-CLOSECOLLIDE-1` (a close refuses an evidence path
-   another closed feature holds — PO-approved prevention). **Critic rounds
-   pending on every commit of block 8 and 9; none has had one.**
+   pattern is cluster-shaped, the count an upper bound (no spawn detection).
+   `WRITECONTAIN-1`: the read lane's symlink bypass does NOT reach the write
+   lane — measured, case (a).
+9. DONE. `BUDGETGUARD-2` + `CLOSECOLLIDE-1` landed; T1 round 1 over
+   `b1ecbef2`/`6372b984`/`6677d70b` returned **FAIL** on one major — the
+   guard's implementor rewrote its own suite in the same commit and deleted a
+   prior fix's assertions, leaving an unattributable payload exempt AND
+   unrecorded. Rework `NVA-B-BUDGETVIS-1` (`0903b5d5` tests-red, `1c03ab9c`
+   guard) closed it; round 2 **PASS**, two minor residues filed. Two rounds
+   spent. Registry: `2026-09-06-nva-b-guardfix-critic-round1.md`.
+   **Gate 516/516 bound exactly at `1c03ab9c`.**
+10. NEXT. No Critic round exists for the D.1 documentation commits
+   (`94277a0b`, `a82a1415`, `9a3c188f`) or for the T1 CLI (`b3b7cb7e`) — both
+   packages unreviewed. PO queue at items 1–14; #14 (activate the GL-09
+   bootstrap-receipt gate) is the one that changes guard behaviour. D.2–D.6
+   unstarted; the reader's Critic findings are their input.
 
 **Idea-level facts that must not be re-derived wrongly:**
 
