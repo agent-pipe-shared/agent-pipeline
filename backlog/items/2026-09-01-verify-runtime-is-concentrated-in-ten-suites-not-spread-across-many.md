@@ -62,6 +62,35 @@ Neither number was going to surface on its own. The closed item's own next-lever
 note was left as an unblocking observation rather than a tracked condition, and
 nothing measures wall clock between releases.
 
+## Trend, continued — 2026-09-06
+
+| Date | Wall clock | Event |
+|---|---|---|
+| 2026-08-25 | 419s | closure measurement of the sequential-verify item |
+| 2026-09-01 | 571s | this item filed (+36%) |
+| 2026-09-06 | 646s | first full green since 2026-09-02 (+13% in five days) |
+| 2026-09-06 | **482s** | `f16ab254`: `project-onboarding-v3-tests` evicted from the serial lane (−25%) |
+| 2026-09-06 | 485s | re-measured at `a478b10c` after the day's remaining commits (+2.5s) |
+
+The named next lever was the right one, and it was a lane-membership question
+rather than a suite-cost question: the suite was a serial-lane false positive
+(each case owns a `mkdtemp` root; two full instances raced against each other
+164/164 green, `2026-09-06-onboarding-suite-lane-false-positive.md`). Moving
+it into the ordinary pool removed its 169.6s from the critical path without
+touching the suite.
+
+**The suite itself is still 169.6s and still growing**, now hidden inside the
+pool rather than dominating the lane. The intra-file concurrency lever remains
+untouched. And the lane is still 100% of wall clock: its new top five
+(`guard-lifecycle-ready`, `codex-pretool-guard`, `gate-strength-guard`,
+`human-guard-override`, `onboarding-continuity`) are 52% of the remaining
+gate and are **not** false positives on the same test — they exercise guards
+that write under `.git/agent-pipeline/**`
+(`2026-09-06-verify-lane-achievable-win.md`).
+
+This item stays open: the regression it names is measured, not resolved, and
+the between-releases wall-clock measurement it asks for still does not exist.
+
 ## Why "sort out old test cases" is not the remedy
 
 Raised by the PO on 2026-09-01 as the intuitive fix. The distribution rules it
