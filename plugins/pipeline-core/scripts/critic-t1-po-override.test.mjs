@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import {
   ALLOWED_PRE_VERDICT_CODES,
@@ -13,6 +16,27 @@ import {
   decideT1Fallback,
   validateT1PoOverride,
 } from "./critic-t1-po-override.mjs";
+
+const CLI_PATH = new URL("./critic-t1-po-override.mjs", import.meta.url);
+const H64 = (digit) => digit.repeat(64);
+const BUILD_ARGS = [
+  "build",
+  "--override-id", "batman-t1-candidate-1",
+  "--feature-id", "sprint-batman-epic",
+  "--candidate-commit", "1".repeat(40),
+  "--candidate-tree", "2".repeat(40),
+  "--candidate-diff-sha256", H64("3"),
+  "--packet-sha256", H64("4"),
+  "--preflight-receipt-sha256", H64("5"),
+  "--compatibility-projection-sha256", H64("8"),
+  "--compatibility-state", "intermediate-preflight-eligible",
+  "--terminal-code", "ok",
+  "--decision-id", "po-batman-t1-2026-07-18",
+  "--recorded-at-ms", "100",
+];
+function runCli(args) {
+  return spawnSync(process.execPath, [CLI_PATH.pathname, ...args], { encoding: "utf8" });
+}
 
 const H = (digit) => digit.repeat(64);
 function authorized(primaryDisposition = { compatibilityState: "intermediate-preflight-eligible", terminalCode: "ok" }) {
@@ -104,4 +128,49 @@ test("missing verdict remains no usable review and cannot pass T1", () => {
     lane: "intermediate", fallbackAttempts: 0, verdictStatus: "no-usable-review",
     verdictSha256: H("6"), receiptSha256: H("7"), consumedAtMs: 101,
   }), { code: "T1-OVERRIDE-RESULT" });
+});
+
+test("CLI refuses with no arguments and rejects an unknown flag, never doing something", () => {
+  const noArgs = runCli([]);
+  assert.notEqual(noArgs.status, 0);
+  assert.match(noArgs.stderr, /usage/i);
+  assert.equal(noArgs.stdout, "");
+  const unknownFlag = runCli([...BUILD_ARGS, "--danger-full-access", "true"]);
+  assert.notEqual(unknownFlag.status, 0);
+});
+
+test("CLI build without --confirm approve prints an explicitly unauthorized draft and never fabricates an approval", () => {
+  const refusal = runCli(BUILD_ARGS);
+  assert.notEqual(refusal.status, 0);
+  const draft = JSON.parse(refusal.stdout);
+  assert.equal(draft.authorized, false);
+  assert.equal(draft.reason, "po-confirmation-required");
+  assert.equal(draft.request.approval, undefined);
+
+  const authorizedRun = runCli([...BUILD_ARGS, "--confirm", "approve"]);
+  assert.equal(authorizedRun.status, 0);
+  const override = JSON.parse(authorizedRun.stdout);
+  assert.equal(validateT1PoOverride(override), override);
+  assert.equal(override.status, "authorized");
+  assert.equal(override.approval.attributionOnly, true);
+  assert.equal(override.approval.attributedTo, "PO");
+  assert.equal(override.primary.literal, INTERMEDIATE_LITERAL);
+  assert.equal(override.fallback.literal, WEAK_LITERAL);
+});
+
+test("CLI validate round-trips the built override and rejects a tampered one", () => {
+  const built = runCli([...BUILD_ARGS, "--confirm", "approve"]);
+  assert.equal(built.status, 0);
+  const override = JSON.parse(built.stdout);
+  const dir = mkdtempSync(join(tmpdir(), "t1-override-cli-"));
+  const recordPath = join(dir, "override.json");
+  writeFileSync(recordPath, built.stdout);
+  const validated = runCli(["validate", "--input", recordPath]);
+  assert.equal(validated.status, 0);
+  assert.deepEqual(JSON.parse(validated.stdout), override);
+
+  const tamperedPath = join(dir, "tampered.json");
+  writeFileSync(tamperedPath, JSON.stringify({ ...override, status: "bogus" }));
+  const rejected = runCli(["validate", "--input", tamperedPath]);
+  assert.notEqual(rejected.status, 0);
 });

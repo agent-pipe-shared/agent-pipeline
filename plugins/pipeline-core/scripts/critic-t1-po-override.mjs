@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 export const T1_PO_OVERRIDE_SCHEMA = "pipeline.critic-t1-po-override.v1";
 export const INTERMEDIATE_LITERAL = "sandbox-read-only-except-coordinator-scratch; input/network isolation not asserted";
@@ -194,3 +196,121 @@ export function validateT1PoOverride(value) {
   }
   return value;
 }
+
+/**
+ * Direct-invocation entry point. This CLI can only ever build the exact
+ * override request `createT1PoOverride` already validates, or validate/
+ * inspect an existing record; it never touches `decideT1Fallback`,
+ * `ALLOWED_PRE_VERDICT_CODES`, or any prohibition. Without an explicit
+ * `--confirm approve` it refuses to call `createT1PoOverride` at all and
+ * prints an explicitly unauthorized draft instead -- the human act of typing
+ * that exact token is the visible boundary; the record's own
+ * `attributionOnly: true` is what makes calling this an attribution, not a
+ * cryptographic proof.
+ */
+const CLI_TAKES_VALUE = new Set([
+  "--override-id", "--feature-id", "--candidate-commit", "--candidate-tree",
+  "--candidate-diff-sha256", "--packet-sha256", "--preflight-receipt-sha256",
+  "--compatibility-projection-sha256", "--compatibility-state", "--terminal-code",
+  "--decision-id", "--recorded-at-ms", "--confirm", "--input",
+]);
+const CLI_BUILD_REQUIRED = [
+  "overrideId", "featureId", "candidateCommit", "candidateTree", "candidateDiffSha256",
+  "packetSha256", "preflightReceiptSha256", "compatibilityProjectionSha256",
+  "compatibilityState", "terminalCode", "decisionId", "recordedAtMs",
+];
+
+export function parseCliArgs(argv) {
+  const command = argv[0];
+  if (!new Set(["build", "validate"]).has(command)) fail("T1-OVERRIDE-CLI", "first argument must be build or validate");
+  const values = { command };
+  for (let index = 1; index < argv.length; index += 1) {
+    const flag = argv[index];
+    if (!CLI_TAKES_VALUE.has(flag) || index + 1 >= argv.length) fail("T1-OVERRIDE-CLI", `unknown or incomplete argument: ${flag}`);
+    const value = argv[++index];
+    values[flag.slice(2).replace(/-([a-z])/g, (_, letter) => letter.toUpperCase())] = value;
+  }
+  return values;
+}
+
+function cliUsage() {
+  process.stderr.write(
+    "usage: critic-t1-po-override.mjs build --override-id <id> --feature-id sprint-batman-epic "
+    + "--candidate-commit <sha> --candidate-tree <sha> --candidate-diff-sha256 <sha256> "
+    + "--packet-sha256 <sha256> --preflight-receipt-sha256 <sha256> --compatibility-projection-sha256 <sha256> "
+    + "--compatibility-state <state> --terminal-code <code> --decision-id <id> --recorded-at-ms <ms> [--confirm approve]\n"
+    + "       critic-t1-po-override.mjs validate --input <path>\n",
+  );
+}
+
+function buildRequestFromCliValues(values) {
+  for (const key of CLI_BUILD_REQUIRED) {
+    if (values[key] === undefined) {
+      fail("T1-OVERRIDE-CLI", `missing required argument: --${key.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}`);
+    }
+  }
+  const recordedAtMs = Number(values.recordedAtMs);
+  if (!Number.isSafeInteger(recordedAtMs)) fail("T1-OVERRIDE-CLI", "recorded-at-ms must be an integer");
+  return {
+    overrideId: values.overrideId,
+    scope: {
+      featureId: values.featureId,
+      candidateCommit: values.candidateCommit,
+      candidateTree: values.candidateTree,
+      candidateDiffSha256: values.candidateDiffSha256,
+      packetSha256: values.packetSha256,
+    },
+    preflightReceiptSha256: values.preflightReceiptSha256,
+    compatibilityProjectionSha256: values.compatibilityProjectionSha256,
+    primaryDisposition: {
+      compatibilityState: values.compatibilityState,
+      terminalCode: values.terminalCode,
+    },
+    approval: {
+      decisionId: values.decisionId,
+      attributedTo: "PO",
+      attributionOnly: true,
+      recordedAtMs,
+    },
+  };
+}
+
+function runCli() {
+  let values;
+  try {
+    values = parseCliArgs(process.argv.slice(2));
+  } catch {
+    cliUsage();
+    process.exitCode = 2;
+    return;
+  }
+  try {
+    if (values.command === "build") {
+      const request = buildRequestFromCliValues(values);
+      if (values.confirm !== "approve") {
+        const { approval, ...withoutApproval } = request;
+        process.stdout.write(canonicalJson({
+          schema: "pipeline.critic-t1-po-override-cli-refusal.v1",
+          authorized: false,
+          reason: "po-confirmation-required",
+          request: withoutApproval,
+        }));
+        process.exitCode = 1;
+        return;
+      }
+      process.stdout.write(canonicalJson(createT1PoOverride(request)));
+      return;
+    }
+    if (values.command === "validate") {
+      if (!values.input) fail("T1-OVERRIDE-CLI", "missing required argument: --input");
+      const value = JSON.parse(readFileSync(values.input, "utf8"));
+      process.stdout.write(canonicalJson(validateT1PoOverride(value)));
+      return;
+    }
+  } catch (error) {
+    process.stderr.write(`critic-t1-po-override: ${error.message}\n`);
+    process.exitCode = 1;
+  }
+}
+
+if (isDirectInvocation(import.meta.url)) runCli();
