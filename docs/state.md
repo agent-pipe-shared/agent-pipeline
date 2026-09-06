@@ -42,15 +42,16 @@ danach").
 
 ### Gate state
 
-Last full run binds `2dca9b8d` exactly: **515/516, one red**,
-`product-capability-inventory-tests` — the signed registration `eecb4273`
-created a verify-phase surface no capability declared (the obligation
-`defe7013` met for two other suites that morning); fixed in `ec0b158c`,
-stage-0, RED/GREEN captured. The earlier red, `suite-registration-check`,
-is cleared by `eecb4273`. Run envelope 482.8s with a read-only subagent
-running concurrently — not a trend row; the stamped candidate's run, with
-nothing concurrent, is the measurement. Every `Dispatch:` trailer of the
-day binds to a terminal record (`dispatch-authorship-verify.mjs`, all PASS).
+`evidence/verify-latest.json` binds `c784a462` exactly: **516/516 green**
+(2026-09-06 17:49Z; envelope 454.7s at pool concurrency 4, nothing
+concurrent); `security-latest.json` binds the same commit. Local stamp
+`6565190d`: `0.6.1+claude|codex|antigravity.20260906172530.87af6b6`,
+`VERSION` stays 0.6.1; the plugin tree is unchanged since `87af6b6` except
+those three lines. Before it: two runs killed by the runner's low-memory
+heuristic at concurrency 8 (measured minimum 12.4 GB free — no real
+shortage), one run red on the ADR-0080 rename's doc-inventory obligation,
+fixed `c784a462` (stage-0); the 515/516 run at `2dca9b8d` was fixed by
+`ec0b158c`. All `Dispatch:` trailers of the day bind (authorship PASS).
 
 ### IN FLIGHT — 2026-09-06 evening, read this before anything else
 
@@ -86,14 +87,14 @@ Commits survive compaction; intent does not — this block is the intent.
    the positioning inputs persisted verbatim to
    `specs/sprint-nova-epic/design/2026-09-06-positioning-*` (`c90f9131`) —
    the D block reads those, never `scratch/`.
-6. NEXT, after the Critic — LOCAL re-stamp at base 0.6.1 by goldfish-mechanic
-   dispatch, as `331f3f7f` was: the three manifests →
-   `0.6.1+claude|codex|antigravity.<YYYYMMDDHHMMSS>.<7-hex oid of the
-   pre-stamp HEAD>`, `VERSION` untouched (PO 2026-09-06: the 0.6.2 bump comes
-   with the release, not with this local test candidate). Then, with nothing
-   concurrent: full verify at the stamp (expect 516/516), confirm
-   `security-latest.json` binds it. No push and no range Critic now — the
-   candidate serves a local test; the plugin update (#5) follows the stamp.
+6. DONE — Critic round 2 PASS (`87af6b67`); local re-stamp `6565190d`
+   (base 0.6.1 by PO decision, the 0.6.2 bump comes with the release); gate
+   **516/516 at `c784a462`** (Gate state above). No push, no range Critic:
+   the candidate serves a local test.
+7. NEXT — PO: plugin update + `/reload-plugins` (queue #5), then the local
+   install test; capture log (#3) still awaited. Then the D block from
+   `specs/sprint-nova-epic/design/2026-09-06-positioning-*` (D.1–D.6),
+   which later joins 0.6.2 with a re-stamp.
 
 **Idea-level facts that must not be re-derived wrongly:**
 

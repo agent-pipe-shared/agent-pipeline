@@ -74,6 +74,13 @@ once.
 
 ### Changed
 
+- **Local candidate stamped and green.** Commit `6565190d` carries
+  `0.6.1+claude.20260906172530.87af6b6` (Codex and Antigravity manifests
+  analogous); the base version stays `0.6.1` by PO decision — the `0.6.2`
+  bump belongs to the release, not to this local install test. The full gate
+  at `c784a462` is **516/516**, bound exactly, with the security scan bound
+  to the same commit; envelope 454.7s at pool concurrency 4 with nothing
+  concurrent.
 - **Verify gate wall clock 645.7s → 454.9s (−29.5%)** from three lines in
   `SERIAL_LANE_SUITES`. First `project-onboarding-v3-tests` (−25%), shown a
   false positive of the lane sweep — own `mkdtemp` root per case, zero

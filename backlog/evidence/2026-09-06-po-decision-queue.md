@@ -93,6 +93,11 @@ the conflict simply stays unresolved and will be rediscovered.
 
 ## 5. Stale installed plugin copy
 
+**READY 2026-09-06** — the local candidate is stamped (`6565190d`,
+`0.6.1+claude.20260906172530.87af6b6`) and green (516/516 at `c784a462`);
+the marketplace/plugin update can run now, followed by `/reload-plugins`
+and a readback of the loaded version.
+
 **Needs:** a marketplace/plugin update plus `/reload-plugins`.
 
 `docs/state.md` records that the installed copies of at least two guards are
