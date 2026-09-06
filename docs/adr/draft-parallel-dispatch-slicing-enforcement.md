@@ -287,6 +287,35 @@ dispatch — which the role definitions deliberately make impossible
   trigger and PSP-0 name the same threshold. The implementation must not
   re-introduce a second threshold: PSP-0's N is the single source.
 
+**Two build decisions taken 2026-09-06, after the first build dispatch
+stopped on them.** Recorded here rather than in a briefing so the next
+dispatch inherits them as design, not as an Elephant's aside.
+
+- **`extractWorkflowDispatches()` cannot be imported as it stands, and the
+  fix is an enabling change, not a workaround.** The function
+  (`guard-dispatch.mjs:59`) is not exported, and the module's top-level
+  reads stdin and calls `process.exit(0)` unguarded (`:100-105`) — importing
+  it kills the importing process. This was verified directly, not taken on
+  report. The resolution is to export it and gate the top-level with
+  `isDirectInvocation(import.meta.url)` from `lib/entrypoint.mjs`, exactly as
+  the sibling `guard-dispatch-budget.mjs:532` already does. A mirrored local
+  regex copy is **rejected**: two extractors for one grammar is the drift
+  this repository has been paying down elsewhere. That change ships as its
+  own package, before the slicing build, because it touches a live guard —
+  and `lib/entrypoint.mjs`'s own header records a measured incident where a
+  naive entrypoint check silently disarmed six hooks, so the enabling change
+  must prove the guard still fires, including through a symlinked
+  marketplace root.
+- **A `Workflow` tool call always resets trigger A's run, regardless of how
+  many dispatches are recovered from its script.** `extractWorkflowDispatches()`
+  is regex-based and under-recovers `${...}`-interpolated prompts, so a
+  recovered count of 0 or 1 does not mean the script fans out to fewer than
+  two agents. Counting it as sequential work would produce a *wrong nudge*;
+  over-resetting produces only a *missed* nudge. The design's whole posture
+  is to fail toward silence — a nudge that fires wrongly becomes noise the
+  model learns to skip, which is the failure this mechanism exists to avoid.
+  So the reset does not depend on the recovered count at all.
+
 **Open parameter — RESOLVED 2026-09-06, and not by fixing the number.**
 This section previously said fan-out recognition ("≥2 `Task`/`Agent`
 dispatch calls in the same turn") has no turn-boundary field available to a
