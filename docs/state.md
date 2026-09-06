@@ -263,82 +263,36 @@ per the two-round cap (35/35+13/13+9/9 green). F3 stays open, non-blocking.
 Full narrative: `2026-09-01-a-fresh-worktree-is-indistinguishable-from-an-abandoned-one.md`
 (its own "Closed" section).
 
-### 2026-09-06: read containment restoration in progress (NVA-B-READCONTAIN-1/2)
+### 2026-09-06: read containment restoration — CLOSED
 
-PO decided "re-narrow, with explicit exceptions" on
-`2026-08-29-read-scope-guard-admits-single-command-but-blocks-the-piped-form.md`'s
+PO decided "re-narrow, with explicit exceptions" on the 2026-08-29 item's
 regression (`c8c7f449` removed all project-root containment from the
-read-only Bash lane in `guard-lifecycle-ready.mjs` a day after it was added).
-Split into two dispatches. **`NVA-B-READCONTAIN-1` landed at `cbc30756`**:
-restored exactly the pre-`c8c7f449` mechanism
-(`BOUNDED_PIPELINE_ADDITIONAL_ROOTS`, `GUARD-READ-SCOPE-OUTSIDE-ROOT`,
-`isOutsideRootSingleCommandRead`/`isOutsideRootBoundedDiagnosticRead`) with
-no new exceptions — 226/226 tests (independently re-verified), the 2026-08-29
-item's mechanical `done_when` predicate no longer REGRESSION, generator
-byte-equality and consumer-safe-paths both green, authorship PASS. One
-resume needed (80-turn maxTurns cliff before its first commit, standard
-GF-09-D procedural resume). Disclosed, faithful-to-pre-removal-scope
-finding: the restored containment covers the single-command shape and the
-rg-pipe family only, exactly as `NVA-BL-76` originally scoped it — grep-pipe
-and cat-pipe/git-pipe outside-root reads were never covered by the
-read-scope code before OR after removal either (cat-pipe/git-pipe fall
-through to the pre-existing generic `GUARD-OPERATOR-UNAPPROVED` refusal,
-which still refuses them, just without the read-scope-specific override
-route; grep-pipe carries no location containment at all, in either state).
-Not a regression from this dispatch — worth naming in the ADR below as a
-known, pre-existing scope boundary rather than letting it stay implicit.
+read-only Bash lane a day after it was added). Landed as
+`NVA-B-READCONTAIN-1` (`cbc30756`/`bc00a861`/`177bf884`, two T1 Critic
+rounds, cap exhausted, self-verified 229/229) restoring the pre-removal
+floor, `NVA-B-TILDEFIX-1` (`afc6af70`/`c88c4f1f`/`aa389a17`, Critic PASS)
+fixing a live-confirmed leading-`~` admission gap, and `NVA-B-READCONTAIN-2`
+(`e183632f`/`3cbb7d2a`, Critic PASS) adding exactly two exception roots
+resolved from `transcript_path` (the transcript file, the memory
+directory) — deliberately NOT the `/tmp` task-output dir (would guess
+Claude Code's own tmp-layout). Both backlog items closed; decision
+recorded in `docs/adr/draft-read-scope-containment-boundary.md` +
+`guardrails/security.md` SEC-11. That ADR's own "current scope-gap
+inventory" section is the authoritative list of what remains open
+(rg-pipe/cat-pipe lexical gaps, denial-code accuracy, the transcript-file
+exact-match hardening, the write-lane's possible shared bypass shape) —
+read it rather than this pointer for detail.
 
-**Two T1 Critic rounds (opus, max), two-round cap then exhausted, closed
-self-verified by the Elephant, no third round:** round 1 FAIL (F1 stale ADR
-citation, F2 symlink bypass since `commandPath`/`pathInside` never realpath,
-F3 two edge-shape denial-codes) → correction 1 `bc00a861` (F1 fixed, F2
-direct-symlink case fixed) → round 2 found F2 only partial (a `..`-through-
-symlink shape still bypassed, live-reproduced) plus F5 minor → correction 2
-`177bf884` fixed both (raw, never lexically-collapsed candidate now feeds
-`existsSync`/`realpathSync`), self-verified: 229/229, authorship PASS on
-`cbc30756`/`bc00a861`/`177bf884`. Full detail:
-`backlog/evidence/2026-09-06-nva-b-readcontain-1-findings.md`. A same-shaped
-gap MAY also affect the WRITE lane's `isPathWithinRealpathedRoot`
-(unverified): `2026-09-06-the-write-lane-symlink-containment-check-may-share-the-read-lanes-dotdot-bypass.md`.
-
-Triaging -1's closure found three more gaps, each its own item, 2026-09-06: a
-leading-`~` argument was live-CONFIRMED admitted (literal-string mismatch, no
-tilde-expansion anywhere) in every read lane incl. the `rg`-pipe family
-(`2026-09-06-a-leading-tilde-path-argument-is-admitted-as-inside-the-project-root.md`);
-`rg`-to-`rg`/`rg`-to-`head`'s `approvedReadPath` stays fully lexical, weaker
-even than -1's round-1 fix
-(`...the-rg-pipe-family-stays-lexical-and-symlink-unaware-after-readcontain-1.md`,
-scheduled after -2); F3's denial-code gap has its own item too
-(`...suppressed-and-chained-outside-root-reads-land-on-the-wrong-denial-code.md`).
-
-**`NVA-B-TILDEFIX-1` landed** (`afc6af70`/`c88c4f1f`/`aa389a17`, one 80-turn
-resume for its ledger step) fixing the tilde gap in all four lanes; T1 Critic
-(opus, max) **PASS**, 4 minors, no correction round —
-`backlog/evidence/2026-09-06-nva-b-tildefix-1-findings.md`. Minors spawned
-two more items (`commandpath-and-two-lane-tests-still-carry-the-untreated-tilde-construction`,
-class-level-covered `F2`) plus fixed F4 (QG-06 owner/date) in place.
-
-**Urgent, needs PO/operator action — found by that Critic's live reachability
-probe, not by this diff:** this session's own enforcing guard is the
-INSTALLED marketplace copy
+**Urgent, still needs PO/operator action:** a Critic's live reachability
+probe found this session's own enforcing guard is a STALE installed
+marketplace copy
 (`/home/skar667/agent-pipeline-local-marketplace/plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs`,
-confirmed a plain file, not a symlink), which predates `NVA-B-READCONTAIN-1`
-entirely — six commits of today's read-scope fixes are NOT yet live-enforced
-for this checkout's own sessions. Fix: PO runs the marketplace/plugin update
-+ `/reload-plugins` (`references/freshness.md`'s own documented remedy — the
-agent side never copies source). Filed:
-`2026-09-06-the-installed-plugin-copy-enforcing-this-session-predates-todays-guard-fixes.md`
-(also asks why `pipeline-start-preflight.mjs`'s freshness check reported
-`ready` despite this).
-
-`NVA-B-READCONTAIN-2` (**dispatched, in flight**) adds exactly two exception roots
-from the PreToolUse hook's own `transcript_path`: the transcript file itself,
-and `dirname(transcript_path)/memory/` via `claudeSessionMemoryDirectory`/
-MEMPATH-1 — NOT the `/tmp` task-output dir (would guess Claude Code's
-tmp-layout rather than reuse a resolved value; that need routes via Read/
-signature ceremony, an accepted ADR scope limit, not solved here). Own fresh
-T1 Critic round. Then: author the ADR (boundary, all gaps above, this limit)
-and close both the 2026-09-01 and 2026-08-29 items.
+confirmed a plain file, not a symlink) that predates this whole
+restoration — six commits of today's read-scope fixes are NOT yet
+live-enforced for this checkout's own sessions. Fix: PO runs the
+marketplace/plugin update + `/reload-plugins`
+(`references/freshness.md`'s documented remedy). Filed:
+`2026-09-06-the-installed-plugin-copy-enforcing-this-session-predates-todays-guard-fixes.md`.
 
 ## PO decisions and todos — collected during the autonomous run, not waited on
 
