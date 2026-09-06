@@ -317,9 +317,12 @@ The first-core Critic review remains pending; its eventual completion does not
 automatically clear this new plan or aggregation code.
 The Elephant owns the required review route and candidate scope; this plan does
 not waive or silently batch A/G/S review. Full green Verify remains required
-for delivery and is currently blocked by outstanding TP-3 suite registrations;
-the authorized registration ceremony is separate work. Record those gates as
-pending until their actual candidate-bound results exist.
+for delivery. The TP-3 suite registrations have since completed and the
+first-core/exception candidate passed Full Verify; see the
+[registered Verify handoff](../evidence/registered-verify-gate-handoff.md)
+for exact bindings and the still-open installed Critic transport blocker.
+Those results do not verify future aggregation code. Record each remaining
+gate as pending until its actual candidate-bound result exists.
 
 Emission/local reports remain a separate step 3 delivery: validate actual source
 bytes, project safe identifiers, wire existing orchestrator observations, write
