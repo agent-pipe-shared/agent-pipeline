@@ -1,0 +1,11 @@
+command: node scratch/gg22trailslash-repro.mjs red
+label: gg22trailslash-1-red
+exitCode: 1
+--- stdout ---
+FAIL  GG22TRAILSLASH-1 bare-directory pathspec (no trailing slash) under backlog/items is admitted (expected exit 0, got 2)
+FAIL  GG22TRAILSLASH-2 trailing-slash directory pathspec (backlog/items/) is admitted (expected exit 0, got 2)
+PASS  GG22TRAILSLASH-3 ../ traversal escaping backlog/ is still refused (expected exit 2, got 2)
+
+[mode=red] 1/3 cases passed. guard=<repo-root>/scratch/gg22trailslash-pre-fix/guard-git-pre-fix.mjs
+
+--- stderr ---

@@ -1394,8 +1394,25 @@ if (inspection.message !== null) {
         const LEDGER_PATHS = new Set(["backlog/transitions.ndjson", "backlog/STATUS.md", "backlog/index.json"]);
         // Allowed set = every backlog/items/*.md path (any item, not just debtPaths -- batched
         // multi-item closures across several commits before one shared reconciliation commit
-        // are an established, legitimate pattern) UNION the ledger files themselves.
-        const disallowed = commitPaths.filter((path) => !path.startsWith("backlog/items/") && !LEDGER_PATHS.has(path));
+        // are an established, legitimate pattern) UNION the ledger files themselves UNION the
+        // backlog/items directory pathspec itself, named with or without a trailing slash.
+        //
+        // ALLOWED_ITEMS_DIR is ALLOWED_ITEMS_PREFIX with its trailing slash removed --
+        // normalizePathspecLexically (above) drops empty path segments during its `.`/`..`
+        // collapse, so a trailing-slash directory token ("backlog/items/") arrives here already
+        // stripped to "backlog/items", identically to the bare form. Before this exact-match
+        // admission existed, that collapse made the trailing-slash form fail the old
+        // startsWith-only check the same way the bare form always did -- a legitimate
+        // `git commit -F <msg> -- backlog/items/` was wrongly refused (2026-09-06,
+        // backlog/items/2026-09-06-gg22-pathspec-normalization-false-blocks-a-trailing-slash-
+        // directory-pathspec.md). A token that lexically resolves outside backlog/items (e.g.
+        // `backlog/items/../../src/x.js` -> "src/x.js") matches neither this exact-match nor
+        // the prefix check below, so the `../`-traversal fix (F3, NVA-B-GG22FIX-2) is unweakened.
+        const ALLOWED_ITEMS_PREFIX = "backlog/items/";
+        const ALLOWED_ITEMS_DIR = "backlog/items";
+        const disallowed = commitPaths.filter(
+          (path) => path !== ALLOWED_ITEMS_DIR && !path.startsWith(ALLOWED_ITEMS_PREFIX) && !LEDGER_PATHS.has(path),
+        );
         if (disallowed.length > 0) {
           // Remediation order (marker: pipeline.gg-22-remediation-order-is-reconcile-last;
           // backlog/items/2026-08-29-gg-22s-own-remediation-order-creates-unclearable-ledger-debt.md):

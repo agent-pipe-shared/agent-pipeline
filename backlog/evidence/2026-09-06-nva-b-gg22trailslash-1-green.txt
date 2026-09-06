@@ -1,0 +1,11 @@
+command: node scratch/gg22trailslash-repro.mjs green
+label: gg22trailslash-1-green
+exitCode: 0
+--- stdout ---
+PASS  GG22TRAILSLASH-1 bare-directory pathspec (no trailing slash) under backlog/items is admitted (expected exit 0, got 0)
+PASS  GG22TRAILSLASH-2 trailing-slash directory pathspec (backlog/items/) is admitted (expected exit 0, got 0)
+PASS  GG22TRAILSLASH-3 ../ traversal escaping backlog/ is still refused (expected exit 2, got 2)
+
+[mode=green] 3/3 cases passed. guard=<repo-root>/plugins/pipeline-core/hooks/guard-git.mjs
+
+--- stderr ---
