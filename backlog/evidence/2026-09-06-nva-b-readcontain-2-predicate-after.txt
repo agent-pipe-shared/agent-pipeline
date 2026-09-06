@@ -1,0 +1,15 @@
+command: node plugins/pipeline-core/scripts/check-backlog-done-predicate.mjs
+label: readcontain2-predicate-after
+exitCode: 1
+--- stdout ---
+backlog items enumerated: 628
+- malformed: 0
+- stale-open (status open/in_progress, predicate already satisfied): 2
+- regression (status closed, predicate not satisfied): 0
+- undeclared (no done_when at all, any status): 430
+- undeclared and open/in_progress (reported, not yet fatal): 0
+Findings (2):
+  - STALE-OPEN backlog/items/2026-08-28-a-registered-but-abandoned-worktree-is-never-retired.md: expected contains plugins/pipeline-core/scripts/pipeline-start-preflight.mjs "retireRegisteredWorktrees" to still be unsatisfied (status is open); observed already satisfied
+  - STALE-OPEN backlog/items/2026-09-02-the-ci-path-allowlist-omits-the-editor-the-guards-own-continuation-names.md: expected contains plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs "pipeline.rebwire-req5-2-supplies-its-own-true" to still be unsatisfied (status is open); observed already satisfied
+
+--- stderr ---

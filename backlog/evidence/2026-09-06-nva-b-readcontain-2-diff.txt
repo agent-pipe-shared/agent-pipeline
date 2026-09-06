@@ -1,0 +1,379 @@
+command: git show e183632fb154711cac2cb5fbde5a8ae0973863dc
+label: readcontain2-diff
+exitCode: 0
+--- stdout ---
+commit e183632fb154711cac2cb5fbde5a8ae0973863dc
+Author: The Agent-Pipeline Contributors <301875187+agent-pipe-shared@users.noreply.github.com>
+Date:   Sun Sep 6 04:05:12 2026 +0200
+
+    fix(guard-lifecycle-ready): admit two session-derived read exception roots
+    
+    NVA-B-READCONTAIN-2 (backlog: 2026-09-01-read-containment-was-removed-a-
+    day-after-it-was-added-with-no-recorded-decision.md). NVA-B-READCONTAIN-1
+    restored project-root read containment but left one legitimate need
+    unmet: an agent's own session transcript and per-session memory
+    directory are always outside the project root by construction.
+    
+    Adds exactly two new admitted read roots, resolved from the PreToolUse
+    hook's own `input.transcript_path`, never guessed or pattern-matched:
+    
+    1. The transcript file itself (`input.transcript_path`), realpathed via
+       a new claudeSessionTranscriptFilePath(), admitted as an EXACT
+       single-file match only -- never a directory-prefix admission.
+    2. `dirname(transcript_path)/memory/`, via claudeSessionMemoryDirectory()
+       (MEMPATH-1), reused directly rather than re-derived a second way.
+    
+    Both flow through the same realpath-safe containment discipline
+    (isRealpathedWithinBoundary / rawReadCandidatePath) NVA-B-READCONTAIN-1
+    hardened -- no new lexical-only check.
+    
+    Threaded an optional `extraRoots` parameter (default `[]`, additive to
+    BOUNDED_PIPELINE_ADDITIONAL_ROOTS, so every pre-existing call site is
+    unaffected) through isReadOnlyDiagnosticCommand and its own internal
+    composition: isBoundedReadOnlyAndChain/isChainSegmentAdmitted (the `&&`
+    chain recurses into isReadOnlyDiagnosticCommand itself), the git-pipeline
+    call, isReadOnlyDiagnosticCommandWithTrailingStderrRedirect, and
+    retryActionsForDeniedCommand (a different question -- per-segment
+    read-only classification for typed retry hints -- answered at a call
+    site that also has `input` in scope). sessionRoots is computed once in
+    evaluateLifecycleReadyGuardCore (Bash-only) and passed at the two
+    input-bearing call sites.
+    
+    Deliberately NOT threaded, each for a traced reason rather than a guess:
+    - gateStrengthShellRefusal / rebaseAuthorityShapeRefusal (both inside
+      evaluateAfterGrammarAdmission, reached only after the primary
+      isReadOnlyDiagnosticCommand fast path already returned false for the
+      identical command/root -- by determinism, threading here can never
+      observe a different result).
+    - isForbiddenCrossRepositoryMutation's `git -C` branch -- that branch's
+      containment question is answered by subcommand trust alone, never by
+      any root set; a plain single-command read never reaches its
+      mutatingTargets branches at all.
+    - isOutsideRootSingleCommandRead / isOutsideRootBoundedDiagnosticRead --
+      denial-code classifiers only, reached only once the command is already
+      refused; their own self-lift widening already makes the "shape-only"
+      question independent of which roots are in scope.
+    - guard-command-grammar.mjs's rg-to-rg/rg-to-head bounded pipeline --
+      lexical containment only (`pathInside`, no realpath); widening it here
+      would reintroduce exactly the lexical-only shortcut
+      NVA-B-READCONTAIN-1 closed.
+    - isBoundedCatPipeline -- would need a three-function signature change
+      not required by this task's DoD wording.
+    
+    Tests: 4 new (transcript-file admission, memory-dir admission, a sibling
+    negative case proving the exception stayed narrow, and a symlink-through-
+    memory-dir regression mirroring dotdotThroughSymlinkFixture). Reproduce-
+    first RED confirmed before this fix (238 tests, 235 pass, 3 fail -- the
+    negative case already passed pre-fix, as expected). Full suite green
+    after: 238/238, 0 fail, 0 skip.
+    
+    AI-Assisted: true
+    Dispatch: NVA-B-READCONTAIN-2 (goldfish)
+
+diff --git a/plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs b/plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs
+index 908eec97..d07047b5 100644
+--- a/plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs
++++ b/plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs
+@@ -1591,6 +1591,59 @@ export function isClaudeSessionMemoryWritePath(filePath, input, dependencies = {
+   return isPathWithinRealpathedRoot(filePath, memoryDir, dependencies);
+ }
+ 
++/**
++ * NVA-B-READCONTAIN-2 (backlog: 2026-09-01-read-containment-was-removed-a-day-after-it-was-
++ * added-with-no-recorded-decision.md). The READ-side twin of `claudeSessionMemoryDirectory()`
++ * just above: this session's own transcript file, exactly as the CLI's PreToolUse hook payload
++ * supplies it in `input.transcript_path`, never reconstructed, guessed, or pattern-matched from
++ * a sampled naming scheme. Admitted downstream as an EXACT single-file match only -- never a
++ * directory-prefix admission -- so a genuine agent need (reading its own session transcript) is
++ * met without reopening the boundary NVA-B-READCONTAIN-1 restored.
++ *
++ * Fails closed exactly like claudeSessionMemoryDirectory(): an absent, empty, relative, or
++ * null-byte-carrying transcript_path, or one that does not realpath to an existing plain FILE,
++ * returns null rather than guessing. realpathSync() resolves every symlinked ancestor (and the
++ * transcript_path itself, if it is a symlink) in one step, so a symlinked session directory
++ * cannot misdirect the boundary this function hands back.
++ */
++function claudeSessionTranscriptFilePath(input, dependencies = {}) {
++  const transcriptPath = input?.transcript_path;
++  if (typeof transcriptPath !== "string" || transcriptPath.trim() === ""
++    || transcriptPath.includes("\0") || !isAbsolute(transcriptPath)) return null;
++  const realpath = dependencies.realpathSyncFn ?? realpathSync;
++  const statFn = dependencies.statSyncFn ?? statSync;
++  try {
++    const real = realpath(transcriptPath);
++    return statFn(real).isFile() ? real : null;
++  } catch {
++    return null;
++  }
++}
++
++/**
++ * NVA-B-READCONTAIN-2. Exactly two session-derived read roots, no more: the transcript file
++ * itself (claudeSessionTranscriptFilePath() above) and this session's own memory directory
++ * (claudeSessionMemoryDirectory(), reused directly rather than re-derived a second way). Each
++ * entry is admitted or omitted independently -- a session with a materialized transcript but no
++ * memory/ directory yet still gets the transcript exception, and vice versa. Deliberately NOT a
++ * module-level constant (unlike BOUNDED_PIPELINE_ADDITIONAL_ROOTS): both roots vary per
++ * invocation with `input`, so this must be recomputed per call, never cached across commands.
++ *
++ * Deliberately excludes the `/tmp` task-output directory a dispatched subagent's own output
++ * lands in: that location is not carried in any PreToolUse hook field, and admitting it would
++ * mean pattern-matching Claude Code's own tmp-layout naming scheme (uid, encoded-cwd, session
++ * id, `tasks/`) -- the exact "guessed rather than resolved" shape this function, and MEMPATH-1
++ * before it, both refuse to do. That need stays out of scope for this function.
++ */
++function sessionReadScopeRoots(input, dependencies = {}) {
++  const roots = [];
++  const transcriptFile = claudeSessionTranscriptFilePath(input, dependencies);
++  if (transcriptFile !== null) roots.push(transcriptFile);
++  const memoryDir = claudeSessionMemoryDirectory(input, dependencies);
++  if (memoryDir !== null) roots.push(memoryDir);
++  return roots;
++}
++
+ /**
+  * MACHPATH-1 (PO decision, 2026-08-08 -- specs/sprint-nova-epic/plans/nova-setup-bootstrap.md
+  * SS6a, "Where the machine plane lives"). The second, and so far last, write surface this
+@@ -2368,14 +2421,14 @@ function isChainEligibleSegment(segment, root) {
+  * (guard-command-grammar.mjs, out of this dispatch's scope) -- GUARD-PARSE-UNSUPPORTED, with
+  * rejectedAndChainSegment() (below) naming which exact segment failed and why.
+  */
+-function isBoundedReadOnlyAndChain(command, root) {
++function isBoundedReadOnlyAndChain(command, root, extraRoots = []) {
+   const parts = splitTopLevelAndChain(command);
+   if (!parts) return false;
+-  return parts.every((part) => isChainSegmentAdmitted(part, root));
++  return parts.every((part) => isChainSegmentAdmitted(part, root, extraRoots));
+ }
+ 
+-function isChainSegmentAdmitted(part, root) {
+-  if (isReadOnlyDiagnosticCommand(part, root)) return true;
++function isChainSegmentAdmitted(part, root, extraRoots = []) {
++  if (isReadOnlyDiagnosticCommand(part, root, extraRoots)) return true;
+   const parsedPart = parseGuardCommand(part, root);
+   return parsedPart.parseStatus === "accepted"
+     && parsedPart.segments.length === 1
+@@ -2430,9 +2483,10 @@ function simpleWordsAllowingTrailingStderrDevNullRedirect(command, root) {
+   return [parsed.segments[0].executable, ...parsed.segments[0].argv];
+ }
+ 
+-function isReadOnlyDiagnosticCommandWithTrailingStderrRedirect(command, root) {
++function isReadOnlyDiagnosticCommandWithTrailingStderrRedirect(command, root, extraRoots = []) {
+   const words = simpleWordsAllowingTrailingStderrDevNullRedirect(command, root);
+-  return words !== null && isReadOnlySimpleWords(words, root);
++  return words !== null
++    && isReadOnlySimpleWords(words, root, [...BOUNDED_PIPELINE_ADDITIONAL_ROOTS, ...extraRoots]);
+ }
+ 
+ /**
+@@ -2567,15 +2621,28 @@ function isReadOnlyGitSubcommand(subcommand, subargs) {
+     && ["--get", "--get-all", "--get-regexp"].includes(subargs[0]);
+ }
+ 
+-export function isReadOnlyDiagnosticCommand(command, root) {
++/**
++ * `extraRoots` (NVA-B-READCONTAIN-2): zero or more additional, per-invocation resolved roots a
++ * read target may also fall under, ADDITIVE to BOUNDED_PIPELINE_ADDITIONAL_ROOTS -- never a
++ * replacement for it. Defaults to `[]` so every pre-existing call site naming only
++ * `(command, root)` is unaffected. Threaded only into the containment-checked lanes that
++ * already honor BOUNDED_PIPELINE_ADDITIONAL_ROOTS today (the single-command, git-pipeline, and
++ * `&&`-chain/trailing-stderr-redirect families); the rg-to-rg/rg-to-head bounded pipeline
++ * (guard-command-grammar.mjs's isBoundedReadOnlyPipeline) and the cat-pipeline family
++ * (isBoundedCatPipeline) are deliberately NOT widened here -- see this dispatch's own report
++ * for why (the former's containment is lexical-only, not realpath-safe; the latter would need a
++ * three-function signature change not required by this task's DoD).
++ */
++export function isReadOnlyDiagnosticCommand(command, root, extraRoots = []) {
+   const parsed = parseGuardCommand(command, root, { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM });
++  const pipelineRoots = [...BOUNDED_PIPELINE_ADDITIONAL_ROOTS, ...extraRoots];
+   if (isBoundedReadOnlyPipeline(parsed, root, BOUNDED_PIPELINE_ADDITIONAL_ROOTS)) return true;
+   if (isBoundedGrepPipeline(parsed, root)) return true;
+   if (isBoundedCatPipeline(parsed, root)) return true;
+-  if (isBoundedGitPipeline(parsed, root, BOUNDED_PIPELINE_ADDITIONAL_ROOTS)) return true;
+-  if (isBoundedReadOnlyAndChain(command, root)) return true;
+-  if (isReadOnlyDiagnosticCommandWithTrailingStderrRedirect(command, root)) return true;
+-  return isReadOnlySimpleWords(simpleWords(command, root), root);
++  if (isBoundedGitPipeline(parsed, root, pipelineRoots)) return true;
++  if (isBoundedReadOnlyAndChain(command, root, extraRoots)) return true;
++  if (isReadOnlyDiagnosticCommandWithTrailingStderrRedirect(command, root, extraRoots)) return true;
++  return isReadOnlySimpleWords(simpleWords(command, root), root, pipelineRoots);
+ }
+ 
+ /**
+@@ -2624,7 +2691,7 @@ function commitMessageFileRemediation(command) {
+  * add an entry past the per-part policy below: the returned list is the whole
+  * envelope, and every element of it has passed that policy.
+  */
+-export function retryActionsForDeniedCommand(command, root) {
++export function retryActionsForDeniedCommand(command, root, extraRoots = []) {
+   if (typeof command !== "string" || command.trim() === ""
+     || /[\0`]/u.test(command) || /\$\s*\(/u.test(command)) return [];
+   const parts = [];
+@@ -2667,7 +2734,7 @@ export function retryActionsForDeniedCommand(command, root) {
+     const parsed = parseGuardCommand(part, root, { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM });
+     if (parsed.parseStatus !== "accepted" || parsed.segments.length !== 1
+       || parsed.operators.length !== 0 || parsed.redirects.length !== 0
+-      || !isReadOnlyDiagnosticCommand(part, root)) return [];
++      || !isReadOnlyDiagnosticCommand(part, root, extraRoots)) return [];
+     actions.push({
+       executable: parsed.segments[0].executable,
+       argv: [...parsed.segments[0].argv],
+@@ -4796,6 +4863,11 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
+       }
+     }
+   }
++  // NVA-B-READCONTAIN-2: computed once, Bash-only (avoids the extra realpath/stat work for
++  // every Edit/Write/NotebookEdit call), and reused at every isReadOnlyDiagnosticCommand /
++  // retryActionsForDeniedCommand call site below that has `input` in scope. Never a module-
++  // level constant, unlike BOUNDED_PIPELINE_ADDITIONAL_ROOTS: both roots vary per invocation.
++  const sessionRoots = toolName === "Bash" ? sessionReadScopeRoots(input, dependencies) : [];
+   if (toolName === "Bash"
+     && isForbiddenCrossRepositoryMutation((input.tool_input.command ?? input.tool_input.CommandLine), root, dependencies)) {
+     const route = humanOverrideRoute(
+@@ -4804,7 +4876,8 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
+     if (!route.admitted) return crossRepositoryMutationBlocked(route.overrideGuidance);
+     lifts.push(route.admitted);
+   }
+-  if (toolName === "Bash" && isReadOnlyDiagnosticCommand((input.tool_input.command ?? input.tool_input.CommandLine), root)) {
++  if (toolName === "Bash"
++    && isReadOnlyDiagnosticCommand((input.tool_input.command ?? input.tool_input.CommandLine), root, sessionRoots)) {
+     return withLifts(lifts, verdict(0));
+   }
+   if (toolName === "Bash" && isNarrowRepositoryRecoveryCommand((input.tool_input.command ?? input.tool_input.CommandLine), root)) {
+@@ -4834,7 +4907,7 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
+         return withLifts(lifts, blocked(
+           code,
+           null,
+-          retryActionsForDeniedCommand((input.tool_input.command ?? input.tool_input.CommandLine), root),
++          retryActionsForDeniedCommand((input.tool_input.command ?? input.tool_input.CommandLine), root, sessionRoots),
+           route.overrideGuidance,
+           rejectedGrammarElement(code, (input.tool_input.command ?? input.tool_input.CommandLine), parsed, root),
+           commitMessageFileRemediation((input.tool_input.command ?? input.tool_input.CommandLine)),
+diff --git a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+index 6bea12f4..fda86613 100644
+--- a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+@@ -6224,6 +6224,121 @@ test("NVA-B-READCONTAIN-1 correction round 2, F5: isRealpathedWithinBoundary fai
+   );
+ });
+ 
++/**
++ * NVA-B-READCONTAIN-2 (backlog: 2026-09-01-read-containment-was-removed-a-day-after-it-was-
++ * added-with-no-recorded-decision.md). Extends claudeMemorySessionFixture() (above) with an
++ * actual transcript FILE on disk -- that fixture only creates memoryDir; this feature's own
++ * transcript-file root requires the transcript itself to exist as a real, statable FILE before
++ * ever admitting it, exactly like claudeSessionMemoryDirectory's own isDirectory() check on the
++ * write side. Both returned paths are realpathSync()'d once here so a symlinked tmpdir ancestor
++ * (e.g. macOS /tmp -> /private/tmp) cannot make an honest in-scope read spuriously fail
++ * isRealpathedWithinBoundary's own first (lexical) gate, which compares an already-realpathed
++ * boundary against a raw candidate -- a pre-existing limitation shared with the write lane's
++ * isPathWithinRealpathedRoot, not introduced here.
++ */
++function transcriptReadFixture() {
++  const { transcriptPath, memoryDir } = claudeMemorySessionFixture();
++  writeFileSync(transcriptPath, '{"type":"user","message":"fixture"}\n');
++  return { transcriptPath: realpathSync(transcriptPath), memoryDir: realpathSync(memoryDir) };
++}
++
++function bashWithTranscript(command, transcriptPath) {
++  return { tool_name: "Bash", tool_input: { command }, transcript_path: transcriptPath };
++}
++
++test("NVA-B-READCONTAIN-2: a Bash read of exactly the session's own transcript file is admitted", () => {
++  const projectDir = hgoGitFixture("signature");
++  const { transcriptPath } = transcriptReadFixture();
++  try {
++    assert.equal(isReadOnlyDiagnosticCommand(`cat ${transcriptPath}`, projectDir), false,
++      "without the session-derived extra root explicitly threaded, this stays refused -- the exception is opt-in per call, not a global widening");
++    const result = evaluateLifecycleReadyGuard(
++      bashWithTranscript(`cat ${transcriptPath}`, transcriptPath), { projectDir, ...hgoReadyDeps() },
++    );
++    assert.deepEqual(result, { exitCode: 0, stderr: "" },
++      "a Bash read of the session's own transcript file must be admitted");
++  } finally {
++    rmSync(projectDir, { recursive: true, force: true });
++    rmSync(dirname(transcriptPath), { recursive: true, force: true });
++  }
++});
++
++test("NVA-B-READCONTAIN-2: a Bash read of a file inside dirname(transcript_path)/memory/ is admitted", () => {
++  const projectDir = hgoGitFixture("signature");
++  const { transcriptPath, memoryDir } = transcriptReadFixture();
++  const memoryFile = join(memoryDir, "learned.md");
++  writeFileSync(memoryFile, "note\n");
++  try {
++    const result = evaluateLifecycleReadyGuard(
++      bashWithTranscript(`cat ${memoryFile}`, transcriptPath), { projectDir, ...hgoReadyDeps() },
++    );
++    assert.deepEqual(result, { exitCode: 0, stderr: "" },
++      "a Bash read of a file inside the session's own memory/ directory must be admitted");
++  } finally {
++    rmSync(projectDir, { recursive: true, force: true });
++    rmSync(dirname(transcriptPath), { recursive: true, force: true });
++  }
++});
++
++test("NVA-B-READCONTAIN-2: a Bash read of a SIBLING file (not the transcript, not inside memory/) stays refused", () => {
++  const projectDir = hgoGitFixture("signature");
++  const { transcriptPath } = transcriptReadFixture();
++  const siblingFile = join(dirname(transcriptPath), "other-session-file.jsonl");
++  writeFileSync(siblingFile, '{"type":"other"}\n');
++  try {
++    const result = evaluateLifecycleReadyGuard(
++      bashWithTranscript(`cat ${siblingFile}`, transcriptPath), { projectDir, ...hgoReadyDeps() },
++    );
++    assert.equal(result.exitCode, 2,
++      "a sibling of the transcript file, outside memory/, must stay refused -- proves the exception stayed narrow");
++    assert.match(result.stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u);
++  } finally {
++    rmSync(projectDir, { recursive: true, force: true });
++    rmSync(dirname(transcriptPath), { recursive: true, force: true });
++  }
++});
++
++// Symlink regression, mirroring dotdotThroughSymlinkFixture() below: a symlink INSIDE the
++// session's own memory/ directory, pointing OUTSIDE it, composed with a `..` segment, must not
++// lexically escape the containment check -- proving the new memory-dir root (and, by the
++// identical shared extraRoots.some(extra => isRealpathedWithinBoundary(raw, extra)) loop, the
++// new transcript-file root too) is checked through the same realpath-safe discipline every
++// other root in this file already uses, never a new lexical-only shortcut.
++test("NVA-B-READCONTAIN-2: a `<symlink>/../<outside>/<file>` composed through the new memory-dir root is refused, not admitted", () => {
++  const projectDir = hgoGitFixture("signature");
++  const { transcriptPath, memoryDir } = transcriptReadFixture();
++  const outsideRoot = mkdtempSync(join(tmpdir(), "guard-lifecycle-readcontain2-outside-"));
++  const targetDir = join(outsideRoot, "target");
++  const siblingDir = join(outsideRoot, "sibling");
++  mkdirSync(targetDir);
++  mkdirSync(siblingDir);
++  const secretFile = join(siblingDir, "secret.txt");
++  writeFileSync(secretFile, "TOP-SECRET-OUTSIDE-MEMORY-DIR\n");
++  const linkPath = join(memoryDir, "linked-outside");
++  symlinkSync(targetDir, linkPath);
++  try {
++    const attackArg = `${linkPath}/../sibling/secret.txt`;
++    const result = evaluateLifecycleReadyGuard(
++      bashWithTranscript(`cat ${attackArg}`, transcriptPath), { projectDir, ...hgoReadyDeps() },
++    );
++    assert.equal(result.exitCode, 2,
++      "a dot-dot-through-symlink escape from inside the new memory-dir root must not lexically bypass containment");
++
++    // A plain, honest read inside the same memory dir stays admitted -- this fix must not
++    // widen containment to refuse ordinary reads through the new root.
++    const okFile = join(memoryDir, "ok.md");
++    writeFileSync(okFile, "hi\n");
++    const okResult = evaluateLifecycleReadyGuard(
++      bashWithTranscript(`cat ${okFile}`, transcriptPath), { projectDir, ...hgoReadyDeps() },
++    );
++    assert.deepEqual(okResult, { exitCode: 0, stderr: "" });
++  } finally {
++    rmSync(projectDir, { recursive: true, force: true });
++    rmSync(dirname(transcriptPath), { recursive: true, force: true });
++    rmSync(outsideRoot, { recursive: true, force: true });
++  }
++});
++
+ test("NVA-BL-76: the exact reproduction is refused under its own read-scope code, never as an unapproved operator", () => {
+   const { projectDir, outside, outsideFile } = readScopeFixture();
+   try {
+
+--- stderr ---
