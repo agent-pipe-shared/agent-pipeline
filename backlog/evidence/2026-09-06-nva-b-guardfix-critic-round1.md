@@ -99,3 +99,57 @@ range whose endpoints were not checked against the enumeration.
 
 F1 blocks. F2 and F3 are minor and do not by themselves withhold a pass; the
 Critic states this explicitly.
+
+## Round 2 — `0903b5d5`, `1c03ab9c` (NVA-B-BUDGETVIS-1, the F1 rework)
+
+T1 Critic round 2 (requested `claude-opus-5 at max`, identity observed as
+`claude-opus-5[1m]` from the dispatch's own runtime prompt; functional-
+equivalent lane). Verdict: **PASS** — two minor, no major, no blocker.
+Trajectory: consistent. Briefing violations: **none** — the evidence block
+carried bare paths this time, and the Critic states the prior round's
+dispatcher-side defect is corrected.
+
+**F1 closed.** The behaviour it identified no longer occurs: an unattributable
+payload leaves its own record naming its true reason, in a distinct sink, with
+no orchestrator marker. Proven three ways — a pre-fix red capture whose failing
+test line numbers match the committed test file exactly, four permanent
+regression tests, and a live probe over the guard's real durable state. Both
+commits are purely additive (`+84/-0` and `+35/-0`); no assertion was removed,
+which is the direct inverse of the pattern F1 was raised about. The two
+measured payload shapes are provably untouched and the disproved
+transcript-path discriminator was correctly not revived.
+
+The Critic also cleared QG-04 explicitly rather than by omission: the same
+dispatch authored both the tests and the guard change, and that is admissible
+here because QG-07 requires the fixer to write the failing repro first — a
+blanket QG-04 reading would make QG-07 unsatisfiable. The structural safeguard
+is that the tests were committed test-only and captured red before the guard
+changed, so they cannot have been shaped to fit the implementation.
+
+- **F-A** (minor): F1's diagnosis named two unreachable branches; the fix
+  revives `unresolved` and leaves `invalid-identity` unreachable, still
+  carrying the named invariant
+  `pipeline.dispatch-budget-invalid-identity-fails-closed` and a rationale
+  block describing behaviour that can no longer occur. A maintainer reads a
+  documented fail-closed posture the guard cannot deliver. Evidence:
+  `guard-dispatch-budget.mjs:517` against the complete return set at `:468`,
+  `:481`, `:483` and the sole assignment at `:491`. Spec-ref: QG-05.
+- **F-B** (minor): `recordUnresolved()` appends one line per call with no cap
+  or rotation, and this diff makes that sink reachable in production for the
+  first time. The sibling sink in the same guard is deliberately bounded to
+  one write per session and pinned by two tests (NVA-BUDGETROOT-1). Under the
+  very host variation the fix exists for, every tool call of every dispatch
+  would append a record to an unbounded, unread file. Evidence:
+  `guard-dispatch-budget.mjs:363-373` reached via `:510-515`, against
+  `:503-508`. Spec-ref: QG-05 plus the in-repo invariant.
+
+**Evidence-hygiene observation, not a finding.** The green capture holds a
+probe run rather than the suite run that would pair symmetrically with the red
+capture, so the commit message's suite counts have no dedicated artifact. The
+Critic did not rely on them; the fact they stand for is independently carried
+by the exact-bound gate evidence. Worth correcting in the next red/green pair:
+capture the same command on both sides.
+
+**Disposition of F-A and F-B:** both minor, neither withholds the pass, and the
+two-round limit for this package is now spent. They move to the backlog rather
+than to a third round.
