@@ -391,6 +391,7 @@
         "verify-phase:harness/scripts/verify.mjs:guard-push-scratch-advisory-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-push-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-push-v2-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-slicing-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-testpath-gmw-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-testpath-override-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-testpath-tests",
