@@ -1922,12 +1922,27 @@ const CAT_PIPELINE_DISPLAY_FLAGS = new Set([
 ]);
 
 /**
- * NVA-B-READCONTAIN-1 (fix round, F2). Shared by isApprovedCatPipelineReadPath below and
- * isApprovedSingleCommandReadArg (this file, further down): takes an ALREADY
- * lexically-resolved absolute candidate and confirms it survives the identical
- * ancestor-walk-then-realpath discipline isPathWithinRealpathedRoot() (this file, ~line
- * 1520) applies on the write lane, so a symlink planted inside `boundary` pointing outside
- * it is refused, not silently admitted by a lexical-only pathInside() check.
+ * NVA-B-READCONTAIN-1 (fix round, F2; corrected round 2, F4/F5). Shared by
+ * isApprovedCatPipelineReadPath below and isApprovedSingleCommandReadArg (this file, further
+ * down): takes a RAW, NOT lexically-collapsed candidate (see rawReadCandidatePath() just
+ * below -- built without path.resolve()/path.join(), which would silently cancel a `..`
+ * segment against a preceding path component before any filesystem check ever runs) and
+ * confirms it survives the identical ancestor-walk-then-realpath discipline
+ * isPathWithinRealpathedRoot() (this file, ~line 1520) applies on the write lane, so a
+ * symlink planted inside `boundary` pointing outside it is refused, not silently admitted by
+ * a lexical-only pathInside() check -- and so is the composed escape
+ * `<symlink>/../<outside-dir>/<file>`, where a purely lexical resolve() cancels the
+ * symlink-then-".." pair into a string that reads as trivially inside `boundary` while the
+ * OS actually dereferences the symlink FIRST and applies the following `..` relative to ITS
+ * real target (round 2, F4 -- reproduced live: the direct-symlink shape was refused, this
+ * composed shape was not, and the admitted command read bytes from outside the boundary).
+ *
+ * `boundary` itself is also realpathed here (round 2, F4) before either pathInside()
+ * comparison below, closing the asymmetry a prior round flagged but could not verify: this
+ * helper realpathed the candidate but compared it against a boundary that was, at most,
+ * lexically resolve()d by its callers -- never confirmed to be the boundary's own real,
+ * symlink-free path. A boundary that fails to realpath (does not exist, or a filesystem
+ * error) fails this check closed, exactly like every other catch branch here.
  *
  * Deliberately its OWN copy of that discipline, not a direct call into
  * isPathWithinRealpathedRoot() itself, for two reasons. First, this dispatch's forbidden
@@ -1937,8 +1952,8 @@ const CAT_PIPELINE_DISPLAY_FLAGS = new Set([
  * it is given (`resolve(root, filePath)`) -- correct for its single-boundary write-lane
  * caller, but calling it once per candidate boundary here (root, then each of extraRoots)
  * would silently reinterpret a RELATIVE read argument as relative to each extra boundary in
- * turn, admitting shapes the lexical check never did. Taking an already-resolved absolute
- * candidate and only re-deriving containment through realpath avoids that widening. This
+ * turn, admitting shapes the lexical check never did. Taking an already-built raw absolute
+ * candidate and only ever deriving containment through realpath avoids that widening. This
  * mirrors the same deliberate-separate-copy convention this function's own predecessor
  * comment already states for the bounded-pipeline family (below).
  *
@@ -1955,38 +1970,71 @@ const CAT_PIPELINE_DISPLAY_FLAGS = new Set([
  * read fell through to unconditional admission in ready state instead of landing on
  * GUARD-READ-SCOPE-OUTSIDE-ROOT). The shortcut costs nothing on the real-boundary path: a
  * resolved file path equals a directory boundary only when the boundary itself is the exact
- * thing being read, which needs no symlink walk to already be "inside itself".
+ * thing being read, which needs no symlink walk to already be "inside itself". Deliberately
+ * checked BEFORE boundary is realpathed below -- it is a caller-constructed identity on the
+ * caller's own strings, not a filesystem fact.
+ *
+ * `dependencies` (round 2, F5): exported so guard-lifecycle-ready.test.mjs can call this
+ * function directly with an injected `realpathSyncFn` that throws, proving the fail-closed
+ * catch branches below are real rather than merely present -- no production caller supplies
+ * it today; both real call sites always mean the real filesystem.
  */
-function isRealpathedWithinBoundary(resolved, boundary, dependencies = {}) {
+export function isRealpathedWithinBoundary(resolved, boundary, dependencies = {}) {
   if (resolved === boundary) return true;
-  if (!pathInside(boundary, resolved)) return false;
   const exists = dependencies.existsSyncFn ?? existsSync;
   const realpath = dependencies.realpathSyncFn ?? realpathSync;
+  let realBoundary;
+  try {
+    realBoundary = realpath(boundary);
+  } catch {
+    return false;
+  }
+  if (!pathInside(realBoundary, resolved)) return false;
   let ancestor = resolved;
   try {
     while (ancestor !== boundary && !exists(ancestor)) ancestor = dirname(ancestor);
-    return pathInside(boundary, realpath(ancestor));
+    return pathInside(realBoundary, realpath(ancestor));
   } catch {
     return false;
   }
 }
 
+// NVA-B-READCONTAIN-1 (correction round 2, F4). commandPath()'s existing null-for-a-flag
+// detection stays the "is this a path token at all" gate (both callers below still call
+// commandPath() first, unchanged, purely to decide that), but its RESOLVED return value must
+// never reach isRealpathedWithinBoundary(): path.resolve()/path.join() collapse a `..`
+// segment lexically, with zero filesystem awareness, before any symlink in the path is ever
+// examined. Building the candidate this way instead -- string concatenation, never resolve()
+// or join() -- keeps a literal `..` segment intact so dirname()/existsSync()/realpathSync()
+// (all OS-accurate and symlink-aware) walk the SAME path the shell will actually resolve,
+// dereferencing a symlink component before applying a `..` that follows it, exactly like the
+// kernel does and path.resolve() does not.
+function rawReadCandidatePath(value, root) {
+  if (typeof value !== "string" || value === "" || value.startsWith("-")) return null;
+  return isAbsolute(value) ? value : `${root}${sep}${value}`;
+}
+
 // A local twin of guard-command-grammar.mjs's approvedReadPath(): resolve `value` against
 // `root` and require it to stay inside `root`, through the realpath-resolving discipline
 // isRealpathedWithinBoundary() just above (NVA-B-READCONTAIN-1 fix round, F2 -- a symlink
-// inside `root` pointing outside it used to pass this check on lexical grounds alone). Not
-// imported -- approvedReadPath is not exported from that file (only parseGuardCommand and
-// isBoundedReadOnlyPipeline are), and this dispatch's briefed scope excludes editing it.
-// Uses this file's own already-local `pathInside` (below), the same containment logic
-// guard-command-grammar.mjs's copy applies.
+// inside `root` pointing outside it used to pass this check on lexical grounds alone; round
+// 2, F4 -- the candidate fed to that check is now the RAW, un-collapsed value from
+// rawReadCandidatePath() above, not `resolve(root, value)`, for the same reason
+// isApprovedSingleCommandReadArg below no longer feeds commandPath()'s resolved return value
+// in). Not imported -- approvedReadPath is not exported from that file (only
+// parseGuardCommand and isBoundedReadOnlyPipeline are), and this dispatch's briefed scope
+// excludes editing it. Uses this file's own already-local `pathInside` (below), the same
+// containment logic guard-command-grammar.mjs's copy applies.
 // A separate copy from isApprovedSingleCommandReadArg's near-identical containment check
 // (isReadOnlySimpleWords' single-command rule, above) on purpose -- this pipeline family
 // keeps its own copy rather than merging the two, a different pipeline family from the
 // single-command shape (pipeline.read-scope-single-command-root-check).
 function isApprovedCatPipelineReadPath(value, root) {
   if (typeof value !== "string" || value === "" || value.includes("\0")) return false;
+  const raw = rawReadCandidatePath(value, root);
+  if (raw === null) return false;
   try {
-    return isRealpathedWithinBoundary(resolve(root, value), resolve(root));
+    return isRealpathedWithinBoundary(raw, root);
   } catch {
     return false;
   }
@@ -2364,19 +2412,29 @@ function isReadOnlyDiagnosticCommandWithTrailingStderrRedirect(command, root) {
  * path argument must resolve inside `root` or one of `extraRoots`, through the SAME
  * ancestor-walk-then-realpath discipline isRealpathedWithinBoundary() applies for the cat
  * pipeline lane above (NVA-B-READCONTAIN-1 fix round, F2 -- a symlink inside `root` or an
- * extra root, pointing outside it, used to pass this check on lexical grounds alone). Also
- * the sole containment check isBoundedGitPipeline's subargs loop reuses, so this one fix
- * covers both the single-command and the bounded git-pipeline callers. Reused rather than a
- * second copy of the containment logic (see isOutsideRootBoundedDiagnosticRead's own
- * scopeLifted comment for why a second copy is exactly the drift this repository's
- * guardrails warn against).
+ * extra root, pointing outside it, used to pass this check on lexical grounds alone; round
+ * 2, F4 -- commandPath()'s RESOLVED return value is used only to detect a flag, never fed
+ * into the containment check itself; the containment candidate is rawReadCandidatePath()'s
+ * un-collapsed value instead, so `<symlink>/../<outside>/<file>` cannot cancel itself into a
+ * string that lexically reads as inside `root` before any symlink is examined). Also the
+ * sole containment check isBoundedGitPipeline's subargs loop reuses, so this one fix covers
+ * both the single-command and the bounded git-pipeline callers. Reused rather than a second
+ * copy of the containment logic (see isOutsideRootBoundedDiagnosticRead's own scopeLifted
+ * comment for why a second copy is exactly the drift this repository's guardrails warn
+ * against).
  */
 function isApprovedSingleCommandReadArg(arg, root, extraRoots) {
-  const resolved = commandPath(arg, root); // null for flags -> not a path token
-  if (resolved === null) return true;
-  if (isRealpathedWithinBoundary(resolved, root)) return true;
+  if (commandPath(arg, root) === null) return true; // null for flags -> not a path token
+  const raw = rawReadCandidatePath(arg, root);
+  if (isRealpathedWithinBoundary(raw, root)) return true;
+  // `extra` is never resolve()d here (round 2, F4): every extraRoots entry is already
+  // absolute (BOUNDED_PIPELINE_ADDITIONAL_ROOTS is realpathed at module load; a scopeLifted
+  // self-lift entry from isOutsideRootSingleCommandRead()/isOutsideRootBoundedDiagnosticRead()
+  // is `raw` itself, byte-for-byte). resolve() would lexically collapse a self-lifted `..`
+  // segment, breaking isRealpathedWithinBoundary's `resolved === boundary` identity shortcut
+  // for exactly the composed shape this round exists to close -- measured live this round.
   return extraRoots.some((extra) => {
-    try { return isRealpathedWithinBoundary(resolved, resolve(extra)); } catch { return false; }
+    try { return isRealpathedWithinBoundary(raw, extra); } catch { return false; }
   });
 }
 
@@ -2706,13 +2764,16 @@ function hasExternalOutputRedirect(command, root) {
  * Answered by evaluating the SAME predicate twice -- never by a second, competing parse of
  * the command, and never by re-deriving which argv token is a path (the rule against a rival
  * parser that rejectedGrammarElement() states one screen up applies here verbatim). The
- * second call passes every argv token, resolved against the invocation root, as its own
- * approved read root; `approvedReadPath` resolves a candidate exactly the same way, so
- * `pathInside(extra, target)` is true (rel === "") for precisely the path candidates and the
- * call returns true iff every OTHER bound already holds: two segments, one `|`, rg as the
- * producer, validateRg's flag allowlist on both sides, head's canonical 1..500 count, and
- * the single admitted `2>/dev/null` suppressor. `rg … | tee out.txt`, `… | head -n 9999`
- * and `… | head -n 5 > out.txt` therefore stay false and keep their existing codes.
+ * second call passes every argv token, lifted via rawReadCandidatePath() (round 2, F4 --
+ * NOT `resolve(root, token)`; see isRealpathedWithinBoundary's own doc comment for why a
+ * lexically-collapsed self-lift silently defeats the shortcut it exists to feed), as its own
+ * approved read root; `approvedReadPath` builds a candidate the identical un-collapsed way,
+ * so `isRealpathedWithinBoundary`'s `resolved === boundary` shortcut fires (byte-identical
+ * strings) for precisely the path candidates, and the call returns true iff every OTHER
+ * bound already holds: two segments, one `|`, rg as the producer, validateRg's flag
+ * allowlist on both sides, head's canonical 1..500 count, and the single admitted
+ * `2>/dev/null` suppressor. `rg … | tee out.txt`, `… | head -n 9999` and
+ * `… | head -n 5 > out.txt` therefore stay false and keep their existing codes.
  *
  * This never admits anything. Its only consumer picks WHICH refusal is printed, so the
  * relaxed second evaluation cannot widen what the guard allows: the first call, with the
@@ -2724,7 +2785,7 @@ export function isOutsideRootBoundedDiagnosticRead(parsed, root) {
   const scopeLifted = parsed.segments.flatMap((segment) => segment.argv
     .filter((token) => typeof token === "string" && token !== "" && !token.includes("\0"))
     .map((token) => {
-      try { return resolve(root, token); } catch { return null; }
+      try { return rawReadCandidatePath(token, root); } catch { return null; }
     })
     .filter((value) => value !== null));
   return isBoundedReadOnlyPipeline(parsed, root, [...BOUNDED_PIPELINE_ADDITIONAL_ROOTS, ...scopeLifted]);
@@ -2747,11 +2808,24 @@ export function isOutsideRootBoundedDiagnosticRead(parsed, root) {
  * function; a command not shaped like a read-only single command -- e.g. `grep
  * --files-with-matches`, or any write/mutating command -- returns false on the first call
  * regardless of extraRoots, since none of those branches ever consult extraRoots). The
- * second call, with the read's own literal path arguments additionally approved as extra
- * roots, answers "was the containment check the ONLY thing blocking this command" -- exactly
- * the question isOutsideRootBoundedDiagnosticRead() answers for the piped shape. This never
- * admits anything; its only consumer (evaluateLifecycleReadyGuard()) picks WHICH refusal
- * code is printed, so the relaxed second evaluation cannot widen what the guard allows.
+ * second call, with the read's own literal path arguments lifted via rawReadCandidatePath()
+ * (round 2, F4 -- NOT `resolve(root, token)`, for the identical reason
+ * isOutsideRootBoundedDiagnosticRead() above no longer uses it: a lexically-collapsed
+ * self-lift stops matching isApprovedSingleCommandReadArg's own raw candidate byte-for-byte,
+ * so isRealpathedWithinBoundary's `resolved === boundary` shortcut silently stops firing and
+ * this function falls back to false -- letting a composed `<symlink>/../<outside>/<file>`
+ * argument, in `ready` lifecycle state, fall through this whole branch to unconditional
+ * admission at evaluateAfterGrammarAdmission() instead of the READ_SCOPE_DENIAL_CODE refusal
+ * below; measured live this round before the fix), additionally approved as extra roots,
+ * answers "was the containment check the ONLY thing blocking this command" -- exactly the
+ * question isOutsideRootBoundedDiagnosticRead() answers for the piped shape. This never
+ * admits anything by ITSELF widening containment; its only consumer
+ * (evaluateLifecycleReadyGuard()) uses a `true` result to select the READ_SCOPE_DENIAL_CODE
+ * refusal over whatever else that branch would otherwise refuse under -- but for the
+ * un-piped, `ready`-lifecycle single-command shape this file admits by default, a `false`
+ * result here is exactly what a wrongly-widened self-lift turns into an actual admission, not
+ * merely a different denial code (the asymmetry with the piped sibling above, where every
+ * path through that branch still ends in a refusal one way or another).
  */
 export function isOutsideRootSingleCommandRead(parsed, root) {
   if (!parsed || parsed.parseStatus !== "accepted" || parsed.segments.length !== 1
@@ -2761,7 +2835,7 @@ export function isOutsideRootSingleCommandRead(parsed, root) {
   const scopeLifted = words.slice(1)
     .filter((token) => typeof token === "string" && token !== "" && !token.includes("\0"))
     .map((token) => {
-      try { return resolve(root, token); } catch { return null; }
+      try { return rawReadCandidatePath(token, root); } catch { return null; }
     })
     .filter((value) => value !== null);
   return isReadOnlySimpleWords(words, root, [...BOUNDED_PIPELINE_ADDITIONAL_ROOTS, ...scopeLifted]);

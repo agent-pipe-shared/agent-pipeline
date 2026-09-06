@@ -41,6 +41,7 @@ import {
   isNarrowRepositoryRecoveryCommand,
   isProjectWritePath,
   isReadOnlyDiagnosticCommand,
+  isRealpathedWithinBoundary,
   isRestartResumeHintInputWrite,
   isSanctionedGhReadOnlyDiagnostic,
   isSanctionedLifecycleCommand,
@@ -6122,6 +6123,105 @@ test("NVA-B-READCONTAIN-1 fix round, F2: a symlink planted inside the project ro
     rmSync(projectDir, { recursive: true, force: true });
     rmSync(outside, { recursive: true, force: true });
   }
+});
+
+// NVA-B-READCONTAIN-1 (correction round 2, F4). The F2 fix above closed the DIRECT symlink
+// shape but resolved its candidate via commandPath()'s `path.resolve(root, value)` -- a pure
+// STRING operation that collapses a `..` segment against the immediately preceding component
+// with zero filesystem awareness, before any symlink is ever examined. An argument shaped
+// `<symlink>/../<outside-dir>/<file>` therefore lexically collapses (the symlink component
+// and the following ".." cancel each other out) to a string that reads as trivially inside
+// the project root, while the OS actually resolving that same string at execution time
+// dereferences the symlink component FIRST, then applies the following ".." relative to the
+// symlink's REAL target -- landing outside the root. Reproduced live against the round-1
+// correction (commit bc00a861, `scratch/probe-f4-prefix.mjs` this dispatch, run against a
+// copy of that exact commit's file): both the single-command and cat-pipeline shapes below
+// were admitted (`true`) under that code; both are refused under the fix this test pins.
+function dotdotThroughSymlinkFixture() {
+  const projectDir = hgoGitFixture("signature");
+  const outsideRoot = mkdtempSync(join(tmpdir(), "guard-lifecycle-dotdot-outside-"));
+  const targetDir = join(outsideRoot, "target");
+  const siblingDir = join(outsideRoot, "sibling");
+  mkdirSync(targetDir);
+  mkdirSync(siblingDir);
+  const secretFile = join(siblingDir, "secret.txt");
+  writeFileSync(secretFile, "TOP-SECRET-OUTSIDE-ROOT\n");
+  const linkPath = join(projectDir, "linked-outside");
+  symlinkSync(targetDir, linkPath);
+  return { projectDir, outsideRoot, linkPath, secretFile };
+}
+
+test("NVA-B-READCONTAIN-1 correction round 2, F4: a `<symlink>/../<outside-sibling>/<file>` argument that lexically collapses to look inside the root is refused, not admitted", () => {
+  const { projectDir, outsideRoot, linkPath } = dotdotThroughSymlinkFixture();
+  try {
+    // Lexically (path.resolve) this collapses to `${projectDir}/sibling/secret.txt` -- a
+    // string that reads as inside `projectDir`. The OS actually resolves it by dereferencing
+    // `linked-outside` first, landing in `outsideRoot/sibling/secret.txt` instead.
+    const attackArg = `${linkPath}/../sibling/secret.txt`;
+    const singleCommand = `cat ${attackArg}`;
+    assert.equal(isReadOnlyDiagnosticCommand(singleCommand, projectDir), false,
+      "the single-command shape must not lexically escape the root check via a symlink+..");
+    const singleResult = readScopeRun(singleCommand, projectDir, { lifecycleStatus: "ready" });
+    assert.equal(singleResult.exitCode, 2, "the single-command dotdot-through-symlink read must be refused, not admitted");
+
+    const pipelineCommand = `cat ${attackArg} | head -n 5`;
+    assert.equal(isReadOnlyDiagnosticCommand(pipelineCommand, projectDir), false,
+      "the cat-pipeline shape must not lexically escape the root check via a symlink+..");
+    const pipelineResult = readScopeRun(pipelineCommand, projectDir, { lifecycleStatus: "ready" });
+    assert.equal(pipelineResult.exitCode, 2, "the cat-pipeline dotdot-through-symlink read must be refused, not admitted");
+
+    // A plain in-root read stays admitted -- this fix must not widen containment to refuse
+    // ordinary reads.
+    writeFileSync(join(projectDir, "ok.txt"), "hi\n");
+    assert.equal(isReadOnlyDiagnosticCommand(`cat ${join(projectDir, "ok.txt")}`, projectDir), true);
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+    rmSync(outsideRoot, { recursive: true, force: true });
+  }
+});
+
+// NVA-B-READCONTAIN-1 (correction round 2, F5). isRealpathedWithinBoundary()'s `dependencies`
+// parameter was, before this test, never supplied by any real call site, and its
+// `catch { return false; }` blocking paths had no test exercising them -- present but
+// unproven. Exported specifically so this test can be a real caller: injecting a
+// `realpathSyncFn` that throws proves the fail-closed direction is real, both for the
+// boundary realpath (round 2, F4's own addition) and for the ancestor-walk realpath (F2's
+// original addition).
+test("NVA-B-READCONTAIN-1 correction round 2, F5: isRealpathedWithinBoundary fails closed when realpathSyncFn throws", () => {
+  const boundary = "/fake/boundary";
+  const resolved = "/fake/boundary/file.txt";
+  // Boundary realpath throws unconditionally -- must not admit, regardless of the candidate.
+  const throwingRealpath = () => { throw new Error("simulated filesystem error"); };
+  assert.equal(
+    isRealpathedWithinBoundary(resolved, boundary, { realpathSyncFn: throwingRealpath, existsSyncFn: () => true }),
+    false,
+  );
+  // Boundary realpath succeeds (identity), the ancestor-walk realpath call throws -- must not
+  // admit. existsSyncFn reports the candidate itself as existing, so the ancestor loop never
+  // iterates and realpath() is called on `resolved` for the final check -- the exact call this
+  // branch exercises.
+  const identityBoundaryThenThrowOnAncestor = (value) => {
+    if (value === boundary) return boundary;
+    throw new Error("simulated filesystem error on ancestor walk");
+  };
+  assert.equal(
+    isRealpathedWithinBoundary(resolved, boundary, {
+      realpathSyncFn: identityBoundaryThenThrowOnAncestor,
+      existsSyncFn: () => true,
+    }),
+    false,
+  );
+  // Sanity: with dependencies that simulate a clean, symlink-free filesystem throughout (no
+  // throw anywhere), the identical in-boundary candidate resolves true -- the two injected
+  // failures above are what flip the result, not a change to the function's normal-path
+  // behaviour.
+  assert.equal(
+    isRealpathedWithinBoundary(resolved, boundary, {
+      realpathSyncFn: (value) => value,
+      existsSyncFn: () => true,
+    }),
+    true,
+  );
 });
 
 test("NVA-BL-76: the exact reproduction is refused under its own read-scope code, never as an unapproved operator", () => {
