@@ -60,12 +60,17 @@ move as a QG-16 violation. Wall clock **485s**, down from 645.7s
   `guard-dispatch-budget.mjs` is registered and **never fires** — logic proven
   by probe, invocation absent
   (`2026-09-06-a-dispatchs-own-tool-budget-stop-condition-cannot-fire-….md`).
-- **B — verify:** onboarding suite evicted from the serial lane, −25%,
-  same single red before/after. Clean-eight eviction in flight
-  (`NVA-B-LANEEVICT-2`, ceiling ≈11.7% of the current gate). Top-5 lane
-  members (52%) are process-global — not evictable on this axis
-  (`2026-09-06-verify-lane-achievable-win.md`). Trend 419→571→646→482→485s in
-  the 2026-09-01 regression item, which stays open.
+- **B — verify:** two evictions landed, **645.7s → 454.9s (−29.5%)**, same
+  single red before and after each. `f16ab254` (onboarding suite, −25%) and
+  `fcaf8d5e` (`session-cleanup-binding`, `worktree-lifecycle`, −6%). Of the
+  clean eight, one is kept for a *tooling* reason — `capture-evidence.mjs`
+  refuses a fixture literal as a host path, filed
+  `2026-09-06-the-evidence-capture-tool-refuses-a-fixture-literal-…` — and
+  five are unassessed, not unsafe. Top-5 lane members (52%) are
+  process-global, not evictable on this axis
+  (`2026-09-06-verify-lane-achievable-win.md`). Trend 419→571→646→482→455s
+  in the 2026-09-01 regression item, which stays open. T1 on both evictions
+  in flight.
 - **C — finished, needs a PO step:** plugin update + `/reload-plugins` (#5,
   installed guard copies stale); one shared TP-4 ceremony for all pending
   `hooks.json` edits (#2); ADR-0079 scope sentence; release mechanics
