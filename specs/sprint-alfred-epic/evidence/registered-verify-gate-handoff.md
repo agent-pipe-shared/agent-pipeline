@@ -1,7 +1,8 @@
 # Alfred registered Verify and gate handoff
 
-Status on 2026-09-06: registered Full Verify completed with a failing security
-gate. Independent T1 Critic review remains pending. This document preserves
+Status on 2026-09-06: Full Verify passed after the approved exact scanner
+exception. Independent T1 Critic review remains pending; the installed transport
+repair has a confirmed installed-layout path failure. This document preserves
 the result and routes the remaining work; it grants no repair authority,
 exception approval, acceptance or feature close.
 
@@ -25,7 +26,7 @@ the human revocation audit and returned an absent window; no maintenance lift
 remains active. That earlier checkpoint's pending-Verify/normal-continuation
 wording predates the results and blockers recorded here.
 
-## Gate 1: exact scanner exception approved and applied, Full Verify retry pending
+## Gate 1: exact scanner exception applied, candidate-bound Full Verify passed
 
 The scanner reports `generic-api-key` at line **1**, column **1030**, in
 `governance/events/human/14-evt-gmw-revoke-3de0bdca05a90ca795ac7696f4717abe-0.json`.
@@ -42,9 +43,9 @@ formula is `${producer}-${kind}-${i32}-${generation}`.
 event uses generation `0`. Thus `gmw-revoke-` + 32 public digest characters +
 `-0` accounts for all 45 characters. This is a deterministic public audit ID,
 not a private key. The historical scanner finding remains confirmed. The
-authorized exact exception is now applied; a Full Verify retry on the new
-candidate is pending, so the historical failed security result is not cleared
-by this update.
+authorized exact exception is now applied. The successful retry below supersedes
+the old failure for its own exact candidate; the historical failed run remains
+unchanged.
 
 The PO explicitly approved a single exception in `.gitleaksignore` on
 2026-09-06, bound to
@@ -69,6 +70,16 @@ exception only; it grants no path-wide or rule-wide exemption and changes no
 scanner rule, threshold or governance event. Independent T1 Critic review is
 still missing; the exception is unreviewed.
 
+The retry's machine evidence, `evidence/alfred-exact-exception-verify.json`,
+records exit **0**, **508 steps**, no failing steps, and exact clean start/finish
+bindings to commit `ca886b926e6d902a8501e14996ba6213d9371aab`, tree
+`d0b9c4ad67c5b8aba0720694dc09be1cae59a572`. Its file SHA-256 is
+`948aa94f1a7dc3b01935f338405764b7b16d96f928ecb26db8ca49c162cf2e9c`.
+`evidence/alfred-exact-exception-security.json` independently records exit 0
+against that same clean candidate; its file SHA-256 is
+`ed209f4890321f04a108ed98b98daebb01650b59c311351db48c98d3c6fd66d6`.
+These results do not cover subsequent handoff edits or substitute for review.
+
 ## Gate 2: source-supported Critic transport gap
 
 `evidence/dispatch-record-ALF-CRITIC-TRANSPORT-READINESS.json` is bounded source
@@ -80,11 +91,40 @@ The bridge emits the selection, requested route, references, profile and
 scratch binding, waits for a matching response, and returns that response's
 execution object. This seam does not itself launch the Critic.
 
-No inspected production consumer was found that consumes that selected launch
-request and launches the actual Critic. This is a source-supported transport
+At that earlier discovery checkpoint, no production consumer was found that
+consumes that selected launch request and launches the actual Critic. This is a source-supported transport
 gap, not a claimed live `host-mode-unavailable` result. No selected Critic
 started and no live selected transport receipt was obtained. Source tests and
 caller-supplied receipt-shaped values do not establish actual execution.
+
+### Installed repair inspection, 2026-09-06
+
+The current installed `0.6.1` distribution now includes
+`scripts/codex-critic-selected-host.mjs`, `scripts/codex-critic-app-server.mjs`
+and `scripts/codex-critic-app-server-child.mjs`. The first exports
+`runSelectedCriticHost`, composing an in-process launch/finalize bridge with
+the selected sandbox transport. The adapter builds the sandbox invocation and
+spawns the child; the child starts a fresh App-Server Critic turn. This changes
+the earlier source finding: a consumer implementation is now present. It does
+not establish a successful live review or validate the whole repair.
+
+The installed adapter bytes have SHA-256
+`5e60295bfd6ed7d92e95759fdaf15b479599b54b780e309a536447647b081ed0`.
+In those bytes, `PIPELINE_ROOT = resolve(HERE, "..", "..", "..")` assumes a
+source-checkout layout. From an installed plugin's `scripts/` directory this
+resolves two levels above the plugin root. Read-only existence checks found
+all three computed targets absent: `roles/critic.md`,
+`templates/prompts/critic-review.md`, and
+`plugins/pipeline-core/scripts/critic-verdict.schema.json`.
+`physicalRulesetFile()` calls `lstatSync` on those targets before the spawn;
+therefore this installed invocation cannot reach the child as written.
+
+The other Elephant owns the Pipeline repair, per the PO's explicit boundary.
+Required follow-up: resolve canonical references for both source and installed
+layouts, add installed-layout regression coverage, and demonstrate an actual
+selected Critic run with matching execution and duty receipts. No local repair,
+cache mutation, alternate runner bypass or review-success claim is authorized
+by this handoff. Inspection did not launch a Critic.
 
 The installed `pipeline-core:critic-review` skill requires a bounded
 `codex-app-server-health.mjs --critic-ready` model-start check before selection;
@@ -117,10 +157,9 @@ A separately authorized adapter package must satisfy all of these criteria:
 
 ## Continuation and limits
 
-The exact exception has PO approval and has been applied after rechecking its
-bindings. The Elephant must retry Full Verify on the new committed, clean
-candidate; no green result for that candidate is claimed here. Critic work
-waits for usable selected adapter
+The exact exception has PO approval, is applied, and its frozen candidate has
+green Full Verify as recorded above. Later changes need their own applicable
+candidate-bound verification. Critic work waits for usable selected adapter
 availability, green deterministic gates, and fresh candidate-bound readiness;
 it then needs the actual independent T1 review. No new signature ceremony is
 requested automatically by this handoff.
