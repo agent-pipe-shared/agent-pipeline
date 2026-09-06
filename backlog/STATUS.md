@@ -185,6 +185,7 @@
 | pipeline.docs-state-human-summary-diverges-from-machine-next-action | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.docs-state-md-next-action-text-is-a-static-snapshot-with-no-live-sync | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.docs-state-md-sync-ignores-calibration-configured-handover-path | closed | defect | pipeline | 2026-08-10 | — |
+| pipeline.documentation-has-no-reader-facing-review-and-no-machine-binding-for-one | open | requirement | pipeline | 2026-09-06 | — |
 | pipeline.documentation-information-architecture | deferred | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; deferred per PO triage 2026-08-23. |
 | pipeline.documenting-the-maxturns-cliff-did-not-stop-dispatches-falling-off-it | open | defect | pipeline | 2026-09-02 | — |
 | pipeline.dual-channel-publication | deferred | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; deferred per PO triage 2026-08-23. |
@@ -649,7 +650,7 @@
 
 ## Counts
 
-- open: 106
+- open: 107
 - in_progress: 0
 - closed: 521
 - rejected: 3
