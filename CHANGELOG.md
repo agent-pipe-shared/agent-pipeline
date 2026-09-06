@@ -67,12 +67,17 @@ once.
 
 ### Changed
 
-- **Verify gate wall clock 645.7s → 482.5s (−25%)** from one line:
-  `project-onboarding-v3-tests` evicted from the serial lane after being shown
-  a false positive of the lane sweep (own `mkdtemp` root per case, zero
-  `process.cwd()`, two concurrent full instances 164/164 green). Same single
-  non-zero suite before and after. The lane is still 100% of wall clock; its
-  remaining top five are not false positives on the same test.
+- **Verify gate wall clock 645.7s → 454.9s (−29.5%)** from three lines in
+  `SERIAL_LANE_SUITES`. First `project-onboarding-v3-tests` (−25%), shown a
+  false positive of the lane sweep — own `mkdtemp` root per case, zero
+  `process.cwd()`, two concurrent full instances 164/164 green. Then
+  `session-cleanup-binding-tests` and `worktree-lifecycle-tests` (−6%) after
+  per-signal assessment with citations and a passed self-race for the larger.
+  Same single non-zero suite before and after each. Of the remaining clean
+  candidates, one is kept because the evidence-capture tool refuses a
+  fixture literal as a host path (filed), and five are unassessed. The lane is
+  still 100% of wall clock; its top five are process-global and not evictable
+  on this axis.
 - **`guard-dispatch.test.mjs` no longer carries a silent-pass hazard**: its
   module-scope import of the hook — which would have reported the whole file
   as one passing test with nothing run, had the entrypoint gate regressed — is
