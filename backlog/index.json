@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "c917450eed60fee98f149528939bde3a3361b8cbc0db979538a3f52640ad7414"
+    "transitionHead": "3ed1b3ae97d941f5516347b2399cbd75f7127a0d5b7daa599b911528ccff8a4a"
   },
   "counts": {
-    "open": 100,
+    "open": 101,
     "in_progress": 0,
     "closed": 521,
     "rejected": 3,
@@ -4714,6 +4714,16 @@
       "closureRepository": "self",
       "closureCommit": "39454abc446f4b8d0e578598f4536d272305c987",
       "closureEvidence": "harness/scripts/generate-vendored-canon.test.mjs"
+    },
+    {
+      "id": "pipeline.orchestrator-added-file-undisclosed-in-dispatch-commit",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-06",
+      "source": "T1 Critic round-2 finding F-D on NVA-B-PARALLELSLICING-DESIGN-1, 2026-09-06: commit 9e40548b carries governance/observation-doc-governance.json (+1) alongside the draft; the stripped record lists only the draft and its own evidence file.",
+      "deferred": false,
+      "tracking": "Nova B -- a commit carrying a Dispatch: trailer can legitimately contain files the dispatch did not write (an EL-01-permitted orchestrator append, e.g. a governance registry line added at commit time). The dispatch record's changedFiles then under-reports the commit's file set, and there is no field in which the orchestrator's own addition can be disclosed. A Critic comparing git show --stat against the record sees an unexplained discrepancy and must reason its way to the benign reading."
     },
     {
       "id": "pipeline.orchestrator-authored-production-commits-have-no-deterministic-control",

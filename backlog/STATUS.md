@@ -383,6 +383,7 @@
 | pipeline.onboarding-ready-path-unconditional-restart-barrier-read | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.onboarding-restart-flow-is-codex-only-not-runner-aware | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.operating-model-not-shipped-with-the-plugin | closed | defect | pipeline | 2026-08-29 | — |
+| pipeline.orchestrator-added-file-undisclosed-in-dispatch-commit | open | defect | pipeline | 2026-09-06 | Nova B -- a commit carrying a Dispatch: trailer can legitimately contain files the dispatch did not write (an EL-01-permitted orchestrator append, e.g. a governance registry line added at commit time). The dispatch record's changedFiles then under-reports the commit's file set, and there is no field in which the orchestrator's own addition can be disclosed. A Critic comparing git show --stat against the record sees an unexplained discrepancy and must reason its way to the benign reading. |
 | pipeline.orchestrator-authored-production-commits-have-no-deterministic-control | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.over-broad-ignore-rule-swallows-closure-evidence | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.p-ac-11-four-dimensions-declared-but-inert | closed | defect | pipeline | 2026-08-16 | — |
@@ -643,7 +644,7 @@
 
 ## Counts
 
-- open: 100
+- open: 101
 - in_progress: 0
 - closed: 521
 - rejected: 3
