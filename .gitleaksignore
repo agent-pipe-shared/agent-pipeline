@@ -192,3 +192,6 @@ content-v1:7d42e3d3962b10f58824ebf7b423400bc3ad7d5a8a638348f3e6857b21960fa9:gove
 # reproducing the event-5 entry above byte-identically before these two were written.
 content-v1:f5589e082bf9c3692b965dfb5bfa8b2d4fa917187ccb202895b31fc74cafd7f2:governance/events/human/9-evt-hgo-deny-258a9160177f0211af28dee9702e5480-0.json:generic-api-key:1:987
 content-v1:081327d87b1ab19f416c119d3504a9c913f2247cc95b810870c60f24d012f680:governance/events/human/11-evt-hgo-deny-963df309b2c7016255858da133289a8f-0.json:generic-api-key:1:987
+# Public deterministic GMW revoke ID; PO-approved 2026-09-06.
+# Exact content/path/rule/position-bound exception.
+content-v1:88cc8879a89d4c3eec339244937908aee063293e59485562fd4a688130cc5944:governance/events/human/14-evt-gmw-revoke-3de0bdca05a90ca795ac7696f4717abe-0.json:generic-api-key:1:1030
