@@ -13,18 +13,21 @@
  */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, symlinkSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-// Imported directly, at the top level, in-process -- this is itself half of the GD16 proof
-// below: if the entrypoint gate ever regressed to executing the hook body on import (reading
-// stdin, calling process.exit), THIS import would silently terminate the whole test process
-// before a single `check(...)` call ran. guard-dispatch-budget.test.mjs already imports its
-// sibling hook the same way, for the same reason.
-import { extractWorkflowDispatches } from "./guard-dispatch.mjs";
-
+// NOTE, deliberately absent: no module-scope `import { extractWorkflowDispatches } from
+// "./guard-dispatch.mjs"` here. That shape was tried and removed (NVA-B-GD16HARDEN-1): if the
+// entrypoint gate ever regressed to executing the hook body on import (reading stdin, calling
+// process.exit), such an import would silently terminate the whole test process during module
+// evaluation, before a single `check(...)` call ran -- and under `node --test`, a file with no
+// `test()` calls that exits 0 is reported as ONE PASSING TEST, with none of GD1-GD19's own
+// checks having run. That is the exact silent-disarm shape this hook package exists to catch,
+// reproduced inside the guard's own suite. GD16 below instead spawns a CHILD process to import
+// the module and call the function, so a regression of that shape makes GD16 fail loudly
+// (missing success marker) rather than silently vanish the whole file's coverage.
 const GUARD = fileURLToPath(new URL("./guard-dispatch.mjs", import.meta.url));
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
@@ -182,14 +185,57 @@ check("GD15 allow  an Antigravity dispatch of an unrelated subagent type", {
 // added; GD19 proves it still fires reached through a symlink -- the exact 2026-08-06 failure
 // shape entrypoint.mjs's header documents (a naive entrypoint check left six hooks dead when
 // reached through a symlinked marketplace root).
+//
+// GD16 -- NVA-B-GD16HARDEN-1: proves the same thing the original GD16 proved (the export exists,
+// is callable, and returns the correct recovery), but via a CHILD process rather than a
+// module-scope import in THIS file. A module-scope `import { extractWorkflowDispatches } from
+// "./guard-dispatch.mjs"` at the top of this test file would be safe today only because the
+// entrypoint gate happens to be in place; if a future edit ever removed that gate (top-level
+// stdin read plus an unconditional process.exit, no isDirectInvocation check), that import would
+// silently terminate this whole test file during module evaluation, and `node --test` would
+// still report it as one passing test with none of GD1-GD19 having run. Spawning a child process
+// removes that risk: a regression of that shape makes the CHILD exit with no success marker in
+// its stdout, which the assertions below treat as an explicit failure, not a silent pass.
 {
-  const id = "GD16 extractWorkflowDispatches is importable and callable directly, with no hook side effects";
+  const id = "GD16 extractWorkflowDispatches is importable and callable directly, via a subprocess, with no in-process import of the hook module";
   const expected = [{ subagentType: "pipeline-core:critic", prompt: "hello world" }];
-  const result = extractWorkflowDispatches("agentType: 'pipeline-core:critic', prompt: `hello world`");
-  if (typeof extractWorkflowDispatches === "function" && JSON.stringify(result) === JSON.stringify(expected)) {
-    pass += 1; console.log(`PASS  ${id}`);
-  } else {
-    failures.push(`${id}: got ${JSON.stringify(result)}`); console.log(`FAIL  ${id} -- got ${JSON.stringify(result)}`);
+  const successMarker = "GD16-IMPORT-OK";
+  const runnerDir = mkdtempSync(join(tmpdir(), "guard-dispatch-import-check-"));
+  try {
+    const runnerPath = join(runnerDir, "import-check.mjs");
+    // The runner does the importing and calling; THIS file never imports guard-dispatch.mjs at
+    // its own module scope. Any stdin the runner's import might touch is fed explicitly via
+    // spawnSync's `input` option below -- never a shell redirect.
+    writeFileSync(runnerPath, [
+      "const mod = await import(process.argv[2]);",
+      "if (typeof mod.extractWorkflowDispatches !== 'function') {",
+      "  console.log('GD16-IMPORT-FAIL: extractWorkflowDispatches is not a function');",
+      "  process.exit(1);",
+      "}",
+      "const result = mod.extractWorkflowDispatches(\"agentType: 'pipeline-core:critic', prompt: `hello world`\");",
+      `console.log('${successMarker}');`,
+      "console.log('GD16-RESULT: ' + JSON.stringify(result));",
+    ].join("\n"));
+    const res = spawnSync(process.execPath, [runnerPath, GUARD], { input: "", encoding: "utf8", timeout: 10000 });
+    const stdout = res.stdout ?? "";
+    const stderr = res.stderr ?? "";
+    const problems = [];
+    if (res.status !== 0) problems.push(`child exited ${res.status} (expected 0) -- ${stderr.trim().slice(0, 200)}`);
+    // Fails loudly on ABSENCE of success, not merely on an error: a child that exits 0 having
+    // printed nothing (exactly what the pre-adc165bb regression shape produces) must fail here,
+    // because the success marker is what is actually asserted, not just the exit code.
+    if (!stdout.includes(successMarker)) problems.push(`child stdout missing success marker "${successMarker}" -- got ${JSON.stringify(stdout)}`);
+    // Exact-line match, not a substring: `includes` would still pass if a regression made the
+    // recovery return extra, unexpected entries alongside the correct one (e.g. `[expected,
+    // extra]`), which is exactly the kind of change the ORIGINAL GD16's strict
+    // `JSON.stringify(result) === JSON.stringify(expected)` equality caught. Matching a whole
+    // stdout line keeps that same strength under the new subprocess shape.
+    const expectedLine = `GD16-RESULT: ${JSON.stringify(expected)}`;
+    if (!stdout.split("\n").includes(expectedLine)) problems.push(`child stdout missing the exact line "${expectedLine}" -- got ${JSON.stringify(stdout)}`);
+    if (problems.length === 0) { pass += 1; console.log(`PASS  ${id}`); }
+    else { failures.push(`${id}: ${problems.join("; ")}`); console.log(`FAIL  ${id} -- ${problems.join("; ")}`); }
+  } finally {
+    rmSync(runnerDir, { recursive: true, force: true });
   }
 }
 
