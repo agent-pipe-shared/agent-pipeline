@@ -6224,6 +6224,121 @@ test("NVA-B-READCONTAIN-1 correction round 2, F5: isRealpathedWithinBoundary fai
   );
 });
 
+/**
+ * NVA-B-READCONTAIN-2 (backlog: 2026-09-01-read-containment-was-removed-a-day-after-it-was-
+ * added-with-no-recorded-decision.md). Extends claudeMemorySessionFixture() (above) with an
+ * actual transcript FILE on disk -- that fixture only creates memoryDir; this feature's own
+ * transcript-file root requires the transcript itself to exist as a real, statable FILE before
+ * ever admitting it, exactly like claudeSessionMemoryDirectory's own isDirectory() check on the
+ * write side. Both returned paths are realpathSync()'d once here so a symlinked tmpdir ancestor
+ * (e.g. macOS /tmp -> /private/tmp) cannot make an honest in-scope read spuriously fail
+ * isRealpathedWithinBoundary's own first (lexical) gate, which compares an already-realpathed
+ * boundary against a raw candidate -- a pre-existing limitation shared with the write lane's
+ * isPathWithinRealpathedRoot, not introduced here.
+ */
+function transcriptReadFixture() {
+  const { transcriptPath, memoryDir } = claudeMemorySessionFixture();
+  writeFileSync(transcriptPath, '{"type":"user","message":"fixture"}\n');
+  return { transcriptPath: realpathSync(transcriptPath), memoryDir: realpathSync(memoryDir) };
+}
+
+function bashWithTranscript(command, transcriptPath) {
+  return { tool_name: "Bash", tool_input: { command }, transcript_path: transcriptPath };
+}
+
+test("NVA-B-READCONTAIN-2: a Bash read of exactly the session's own transcript file is admitted", () => {
+  const projectDir = hgoGitFixture("signature");
+  const { transcriptPath } = transcriptReadFixture();
+  try {
+    assert.equal(isReadOnlyDiagnosticCommand(`cat ${transcriptPath}`, projectDir), false,
+      "without the session-derived extra root explicitly threaded, this stays refused -- the exception is opt-in per call, not a global widening");
+    const result = evaluateLifecycleReadyGuard(
+      bashWithTranscript(`cat ${transcriptPath}`, transcriptPath), { projectDir, ...hgoReadyDeps() },
+    );
+    assert.deepEqual(result, { exitCode: 0, stderr: "" },
+      "a Bash read of the session's own transcript file must be admitted");
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+    rmSync(dirname(transcriptPath), { recursive: true, force: true });
+  }
+});
+
+test("NVA-B-READCONTAIN-2: a Bash read of a file inside dirname(transcript_path)/memory/ is admitted", () => {
+  const projectDir = hgoGitFixture("signature");
+  const { transcriptPath, memoryDir } = transcriptReadFixture();
+  const memoryFile = join(memoryDir, "learned.md");
+  writeFileSync(memoryFile, "note\n");
+  try {
+    const result = evaluateLifecycleReadyGuard(
+      bashWithTranscript(`cat ${memoryFile}`, transcriptPath), { projectDir, ...hgoReadyDeps() },
+    );
+    assert.deepEqual(result, { exitCode: 0, stderr: "" },
+      "a Bash read of a file inside the session's own memory/ directory must be admitted");
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+    rmSync(dirname(transcriptPath), { recursive: true, force: true });
+  }
+});
+
+test("NVA-B-READCONTAIN-2: a Bash read of a SIBLING file (not the transcript, not inside memory/) stays refused", () => {
+  const projectDir = hgoGitFixture("signature");
+  const { transcriptPath } = transcriptReadFixture();
+  const siblingFile = join(dirname(transcriptPath), "other-session-file.jsonl");
+  writeFileSync(siblingFile, '{"type":"other"}\n');
+  try {
+    const result = evaluateLifecycleReadyGuard(
+      bashWithTranscript(`cat ${siblingFile}`, transcriptPath), { projectDir, ...hgoReadyDeps() },
+    );
+    assert.equal(result.exitCode, 2,
+      "a sibling of the transcript file, outside memory/, must stay refused -- proves the exception stayed narrow");
+    assert.match(result.stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u);
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+    rmSync(dirname(transcriptPath), { recursive: true, force: true });
+  }
+});
+
+// Symlink regression, mirroring dotdotThroughSymlinkFixture() below: a symlink INSIDE the
+// session's own memory/ directory, pointing OUTSIDE it, composed with a `..` segment, must not
+// lexically escape the containment check -- proving the new memory-dir root (and, by the
+// identical shared extraRoots.some(extra => isRealpathedWithinBoundary(raw, extra)) loop, the
+// new transcript-file root too) is checked through the same realpath-safe discipline every
+// other root in this file already uses, never a new lexical-only shortcut.
+test("NVA-B-READCONTAIN-2: a `<symlink>/../<outside>/<file>` composed through the new memory-dir root is refused, not admitted", () => {
+  const projectDir = hgoGitFixture("signature");
+  const { transcriptPath, memoryDir } = transcriptReadFixture();
+  const outsideRoot = mkdtempSync(join(tmpdir(), "guard-lifecycle-readcontain2-outside-"));
+  const targetDir = join(outsideRoot, "target");
+  const siblingDir = join(outsideRoot, "sibling");
+  mkdirSync(targetDir);
+  mkdirSync(siblingDir);
+  const secretFile = join(siblingDir, "secret.txt");
+  writeFileSync(secretFile, "TOP-SECRET-OUTSIDE-MEMORY-DIR\n");
+  const linkPath = join(memoryDir, "linked-outside");
+  symlinkSync(targetDir, linkPath);
+  try {
+    const attackArg = `${linkPath}/../sibling/secret.txt`;
+    const result = evaluateLifecycleReadyGuard(
+      bashWithTranscript(`cat ${attackArg}`, transcriptPath), { projectDir, ...hgoReadyDeps() },
+    );
+    assert.equal(result.exitCode, 2,
+      "a dot-dot-through-symlink escape from inside the new memory-dir root must not lexically bypass containment");
+
+    // A plain, honest read inside the same memory dir stays admitted -- this fix must not
+    // widen containment to refuse ordinary reads through the new root.
+    const okFile = join(memoryDir, "ok.md");
+    writeFileSync(okFile, "hi\n");
+    const okResult = evaluateLifecycleReadyGuard(
+      bashWithTranscript(`cat ${okFile}`, transcriptPath), { projectDir, ...hgoReadyDeps() },
+    );
+    assert.deepEqual(okResult, { exitCode: 0, stderr: "" });
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+    rmSync(dirname(transcriptPath), { recursive: true, force: true });
+    rmSync(outsideRoot, { recursive: true, force: true });
+  }
+});
+
 test("NVA-BL-76: the exact reproduction is refused under its own read-scope code, never as an unapproved operator", () => {
   const { projectDir, outside, outsideFile } = readScopeFixture();
   try {

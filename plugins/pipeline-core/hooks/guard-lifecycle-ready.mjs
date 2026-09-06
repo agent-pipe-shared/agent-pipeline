@@ -1592,6 +1592,59 @@ export function isClaudeSessionMemoryWritePath(filePath, input, dependencies = {
 }
 
 /**
+ * NVA-B-READCONTAIN-2 (backlog: 2026-09-01-read-containment-was-removed-a-day-after-it-was-
+ * added-with-no-recorded-decision.md). The READ-side twin of `claudeSessionMemoryDirectory()`
+ * just above: this session's own transcript file, exactly as the CLI's PreToolUse hook payload
+ * supplies it in `input.transcript_path`, never reconstructed, guessed, or pattern-matched from
+ * a sampled naming scheme. Admitted downstream as an EXACT single-file match only -- never a
+ * directory-prefix admission -- so a genuine agent need (reading its own session transcript) is
+ * met without reopening the boundary NVA-B-READCONTAIN-1 restored.
+ *
+ * Fails closed exactly like claudeSessionMemoryDirectory(): an absent, empty, relative, or
+ * null-byte-carrying transcript_path, or one that does not realpath to an existing plain FILE,
+ * returns null rather than guessing. realpathSync() resolves every symlinked ancestor (and the
+ * transcript_path itself, if it is a symlink) in one step, so a symlinked session directory
+ * cannot misdirect the boundary this function hands back.
+ */
+function claudeSessionTranscriptFilePath(input, dependencies = {}) {
+  const transcriptPath = input?.transcript_path;
+  if (typeof transcriptPath !== "string" || transcriptPath.trim() === ""
+    || transcriptPath.includes("\0") || !isAbsolute(transcriptPath)) return null;
+  const realpath = dependencies.realpathSyncFn ?? realpathSync;
+  const statFn = dependencies.statSyncFn ?? statSync;
+  try {
+    const real = realpath(transcriptPath);
+    return statFn(real).isFile() ? real : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * NVA-B-READCONTAIN-2. Exactly two session-derived read roots, no more: the transcript file
+ * itself (claudeSessionTranscriptFilePath() above) and this session's own memory directory
+ * (claudeSessionMemoryDirectory(), reused directly rather than re-derived a second way). Each
+ * entry is admitted or omitted independently -- a session with a materialized transcript but no
+ * memory/ directory yet still gets the transcript exception, and vice versa. Deliberately NOT a
+ * module-level constant (unlike BOUNDED_PIPELINE_ADDITIONAL_ROOTS): both roots vary per
+ * invocation with `input`, so this must be recomputed per call, never cached across commands.
+ *
+ * Deliberately excludes the `/tmp` task-output directory a dispatched subagent's own output
+ * lands in: that location is not carried in any PreToolUse hook field, and admitting it would
+ * mean pattern-matching Claude Code's own tmp-layout naming scheme (uid, encoded-cwd, session
+ * id, `tasks/`) -- the exact "guessed rather than resolved" shape this function, and MEMPATH-1
+ * before it, both refuse to do. That need stays out of scope for this function.
+ */
+function sessionReadScopeRoots(input, dependencies = {}) {
+  const roots = [];
+  const transcriptFile = claudeSessionTranscriptFilePath(input, dependencies);
+  if (transcriptFile !== null) roots.push(transcriptFile);
+  const memoryDir = claudeSessionMemoryDirectory(input, dependencies);
+  if (memoryDir !== null) roots.push(memoryDir);
+  return roots;
+}
+
+/**
  * MACHPATH-1 (PO decision, 2026-08-08 -- specs/sprint-nova-epic/plans/nova-setup-bootstrap.md
  * SS6a, "Where the machine plane lives"). The second, and so far last, write surface this
  * guard admits outside the project root: exactly one file, `<homedir>/.agent-pipeline/
@@ -2368,14 +2421,14 @@ function isChainEligibleSegment(segment, root) {
  * (guard-command-grammar.mjs, out of this dispatch's scope) -- GUARD-PARSE-UNSUPPORTED, with
  * rejectedAndChainSegment() (below) naming which exact segment failed and why.
  */
-function isBoundedReadOnlyAndChain(command, root) {
+function isBoundedReadOnlyAndChain(command, root, extraRoots = []) {
   const parts = splitTopLevelAndChain(command);
   if (!parts) return false;
-  return parts.every((part) => isChainSegmentAdmitted(part, root));
+  return parts.every((part) => isChainSegmentAdmitted(part, root, extraRoots));
 }
 
-function isChainSegmentAdmitted(part, root) {
-  if (isReadOnlyDiagnosticCommand(part, root)) return true;
+function isChainSegmentAdmitted(part, root, extraRoots = []) {
+  if (isReadOnlyDiagnosticCommand(part, root, extraRoots)) return true;
   const parsedPart = parseGuardCommand(part, root);
   return parsedPart.parseStatus === "accepted"
     && parsedPart.segments.length === 1
@@ -2430,9 +2483,10 @@ function simpleWordsAllowingTrailingStderrDevNullRedirect(command, root) {
   return [parsed.segments[0].executable, ...parsed.segments[0].argv];
 }
 
-function isReadOnlyDiagnosticCommandWithTrailingStderrRedirect(command, root) {
+function isReadOnlyDiagnosticCommandWithTrailingStderrRedirect(command, root, extraRoots = []) {
   const words = simpleWordsAllowingTrailingStderrDevNullRedirect(command, root);
-  return words !== null && isReadOnlySimpleWords(words, root);
+  return words !== null
+    && isReadOnlySimpleWords(words, root, [...BOUNDED_PIPELINE_ADDITIONAL_ROOTS, ...extraRoots]);
 }
 
 /**
@@ -2567,15 +2621,28 @@ function isReadOnlyGitSubcommand(subcommand, subargs) {
     && ["--get", "--get-all", "--get-regexp"].includes(subargs[0]);
 }
 
-export function isReadOnlyDiagnosticCommand(command, root) {
+/**
+ * `extraRoots` (NVA-B-READCONTAIN-2): zero or more additional, per-invocation resolved roots a
+ * read target may also fall under, ADDITIVE to BOUNDED_PIPELINE_ADDITIONAL_ROOTS -- never a
+ * replacement for it. Defaults to `[]` so every pre-existing call site naming only
+ * `(command, root)` is unaffected. Threaded only into the containment-checked lanes that
+ * already honor BOUNDED_PIPELINE_ADDITIONAL_ROOTS today (the single-command, git-pipeline, and
+ * `&&`-chain/trailing-stderr-redirect families); the rg-to-rg/rg-to-head bounded pipeline
+ * (guard-command-grammar.mjs's isBoundedReadOnlyPipeline) and the cat-pipeline family
+ * (isBoundedCatPipeline) are deliberately NOT widened here -- see this dispatch's own report
+ * for why (the former's containment is lexical-only, not realpath-safe; the latter would need a
+ * three-function signature change not required by this task's DoD).
+ */
+export function isReadOnlyDiagnosticCommand(command, root, extraRoots = []) {
   const parsed = parseGuardCommand(command, root, { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM });
+  const pipelineRoots = [...BOUNDED_PIPELINE_ADDITIONAL_ROOTS, ...extraRoots];
   if (isBoundedReadOnlyPipeline(parsed, root, BOUNDED_PIPELINE_ADDITIONAL_ROOTS)) return true;
   if (isBoundedGrepPipeline(parsed, root)) return true;
   if (isBoundedCatPipeline(parsed, root)) return true;
-  if (isBoundedGitPipeline(parsed, root, BOUNDED_PIPELINE_ADDITIONAL_ROOTS)) return true;
-  if (isBoundedReadOnlyAndChain(command, root)) return true;
-  if (isReadOnlyDiagnosticCommandWithTrailingStderrRedirect(command, root)) return true;
-  return isReadOnlySimpleWords(simpleWords(command, root), root);
+  if (isBoundedGitPipeline(parsed, root, pipelineRoots)) return true;
+  if (isBoundedReadOnlyAndChain(command, root, extraRoots)) return true;
+  if (isReadOnlyDiagnosticCommandWithTrailingStderrRedirect(command, root, extraRoots)) return true;
+  return isReadOnlySimpleWords(simpleWords(command, root), root, pipelineRoots);
 }
 
 /**
@@ -2624,7 +2691,7 @@ function commitMessageFileRemediation(command) {
  * add an entry past the per-part policy below: the returned list is the whole
  * envelope, and every element of it has passed that policy.
  */
-export function retryActionsForDeniedCommand(command, root) {
+export function retryActionsForDeniedCommand(command, root, extraRoots = []) {
   if (typeof command !== "string" || command.trim() === ""
     || /[\0`]/u.test(command) || /\$\s*\(/u.test(command)) return [];
   const parts = [];
@@ -2667,7 +2734,7 @@ export function retryActionsForDeniedCommand(command, root) {
     const parsed = parseGuardCommand(part, root, { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM });
     if (parsed.parseStatus !== "accepted" || parsed.segments.length !== 1
       || parsed.operators.length !== 0 || parsed.redirects.length !== 0
-      || !isReadOnlyDiagnosticCommand(part, root)) return [];
+      || !isReadOnlyDiagnosticCommand(part, root, extraRoots)) return [];
     actions.push({
       executable: parsed.segments[0].executable,
       argv: [...parsed.segments[0].argv],
@@ -4796,6 +4863,11 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
       }
     }
   }
+  // NVA-B-READCONTAIN-2: computed once, Bash-only (avoids the extra realpath/stat work for
+  // every Edit/Write/NotebookEdit call), and reused at every isReadOnlyDiagnosticCommand /
+  // retryActionsForDeniedCommand call site below that has `input` in scope. Never a module-
+  // level constant, unlike BOUNDED_PIPELINE_ADDITIONAL_ROOTS: both roots vary per invocation.
+  const sessionRoots = toolName === "Bash" ? sessionReadScopeRoots(input, dependencies) : [];
   if (toolName === "Bash"
     && isForbiddenCrossRepositoryMutation((input.tool_input.command ?? input.tool_input.CommandLine), root, dependencies)) {
     const route = humanOverrideRoute(
@@ -4804,7 +4876,8 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
     if (!route.admitted) return crossRepositoryMutationBlocked(route.overrideGuidance);
     lifts.push(route.admitted);
   }
-  if (toolName === "Bash" && isReadOnlyDiagnosticCommand((input.tool_input.command ?? input.tool_input.CommandLine), root)) {
+  if (toolName === "Bash"
+    && isReadOnlyDiagnosticCommand((input.tool_input.command ?? input.tool_input.CommandLine), root, sessionRoots)) {
     return withLifts(lifts, verdict(0));
   }
   if (toolName === "Bash" && isNarrowRepositoryRecoveryCommand((input.tool_input.command ?? input.tool_input.CommandLine), root)) {
@@ -4834,7 +4907,7 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
         return withLifts(lifts, blocked(
           code,
           null,
-          retryActionsForDeniedCommand((input.tool_input.command ?? input.tool_input.CommandLine), root),
+          retryActionsForDeniedCommand((input.tool_input.command ?? input.tool_input.CommandLine), root, sessionRoots),
           route.overrideGuidance,
           rejectedGrammarElement(code, (input.tool_input.command ?? input.tool_input.CommandLine), parsed, root),
           commitMessageFileRemediation((input.tool_input.command ?? input.tool_input.CommandLine)),
