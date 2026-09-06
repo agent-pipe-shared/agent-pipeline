@@ -325,30 +325,26 @@ edit). **Remaining: `verify-suite-registration-check`/
 `NVA-B-EVSLOTFIX-1`, see above). Next full verify attempt should be green
 except for that one, PO-signature-gated pair.
 
-### 2026-09-06: two backlog items landed, Critic found real issues in both
+### 2026-09-06: two backlog items — CLOSED, both hit and fixed real Critic findings
 
-**`NVA-B-HGOCOPYSAFE-1` — CLOSED** (`da6b381c` — import-source swap to the
-existing `copy-safe-command.mjs` re-export, no new capability needed, my
-briefing's premise was wrong). Round 1 FAIL (F1: two claimed test results
-had no durable evidence artifact, narrative only) → fixed directly
-(evidence capture, no code change) → round 2 PASS, zero findings, F1
-independently re-verified against live files. Registry:
+**`NVA-B-HGOCOPYSAFE-1`** (`da6b381c`): import-source swap to the existing
+`copy-safe-command.mjs` re-export. Round 1 FAIL (missing evidence
+artifacts, not a code defect) → fixed → round 2 PASS. Registry:
 `backlog/evidence/2026-09-06-nva-b-hgocopysafe-1-findings.md`.
 
-**`NVA-B-GG22FIX-1`** (`fe2d7afe` — pathspec-scoping fix, closed the
-2026-09-03 deadlock item): T1 Critic round 1 (partial) found a REAL
-admission-widening bug — `git commit -i`/`--include` stages the pathspec
-IN ADDITION to whatever's already staged, defeating the fix's "pathspec is
-exclusive" assumption. Plus `../` traversal (F3), non-durable evidence
-citation (F5). Registry:
-`backlog/evidence/2026-09-06-nva-b-gg22fix-1-findings.md`. **Correction
-`NVA-B-GG22FIX-2` landed** (`c6ef3425`/`316e16af`/`23672a96`): allowlist
-(not denylist) of message/authorship/signing-only flags proven exclusive
-from `git-commit(1)` itself; anything else (incl. `-i`, `-a`, `-p`,
-`--amend`) falls through to the full index check. Lexical `../`
-normalization for F3. Independently re-verified (232/232, allowlist logic
-traced by hand). Closing T1 Critic round 2 dispatched (last round for this
-package's own two-round cap).
+**`NVA-B-GG22FIX-1/2`** (`fe2d7afe` then `c6ef3425`/`316e16af`/`23672a96`):
+round 1 found a REAL admission-widening bug (`git commit -i`/`--include`
+defeats the "pathspec is exclusive" assumption) plus `../`-traversal and a
+non-durable evidence citation. Correction: an allowlist (not denylist) of
+message/authorship/signing-only flags proven exclusive from
+`git-commit(1)`; anything else falls through to the full index check.
+Closing round 2 (FAIL, `guardrails/git.md` GIT-09's own text was stale
+relative to the new behavior — the code correction itself was confirmed
+sound). Two-round cap exhausted — GIT-09 fixed directly (`1e3054a6`),
+self-verified (232/232, doc-contract clean), no third round. Two minor
+follow-ups filed (trailing-slash over-block; evidence-durability
+recurrence, folded into the existing test-gap item). Registry:
+`backlog/evidence/2026-09-06-nva-b-gg22fix-1-findings.md`.
 
 ## PO decisions and todos — collected during the autonomous run, not waited on
 
