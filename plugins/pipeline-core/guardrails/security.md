@@ -224,4 +224,4 @@ new term for this case).
   record, current scope-gap inventory (rg-pipe/cat-pipe/grep-pipe lanes,
   the leading-`~` fix, the transcript-file exact-match hardening still
   owed) and consequences:
-  [`docs/adr/draft-read-scope-containment-boundary.md`](../docs/adr/draft-read-scope-containment-boundary.md).
+  `docs/adr/draft-read-scope-containment-boundary.md`.
