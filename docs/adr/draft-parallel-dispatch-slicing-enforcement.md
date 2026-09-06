@@ -321,8 +321,17 @@ run looks at completed turns, and the fan-out reset only needs a past turn to
 have been recognized. An implementation that requires the in-flight call to
 be visible has changed the design and must say so.
 
-Measurement scripts: `scratch/measure-fanout-window.mjs`,
-`scratch/inspect-msgid-grouping.mjs`.
+**Measurement scripts, and the honest limit of this evidence.**
+`backlog/evidence/2026-09-06-fanout-window-measurement.mjs` and
+`backlog/evidence/2026-09-06-fanout-msgid-grouping.mjs` are tracked, so the
+**method** is durable and re-runnable. The **input** is not: it is a
+machine-local Claude Code transcript that this repository does not and should
+not contain. The numbers above are therefore a recorded measurement, not a
+result a reader can reproduce from the repository alone — a reader can re-run
+the same analysis against their own transcript and check whether the same
+separation holds. (Corrected 2026-09-06: these were first cited at their
+`scratch/` paths, which are gitignored, so the citation pointed at nothing a
+reader could open.)
 
 **Rate limiting is part of the trigger, not a refinement.** A nudge on every
 dispatch becomes ambient noise the model learns to skip — the identical decay
