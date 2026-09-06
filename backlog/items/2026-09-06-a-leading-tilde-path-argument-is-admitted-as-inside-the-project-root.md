@@ -119,7 +119,24 @@ The fourth acceptance criterion — cross-referencing this item from the ADR
 `backlog/items/2026-09-01-read-containment-was-removed-a-day-after-it-was-added-with-no-recorded-decision.md`
 (EL-04) owes — is **not done by this dispatch**: that file was an explicit
 no-go path in NVA-B-TILDEFIX-1's briefing (tracked separately, out of that
-dispatch's scope), so this item stays `open` rather than closed. Whoever
-authors that ADR still needs to cross-reference this item and its evidence
-as a now-closed gap.
+dispatch's scope), so this item stays `open` rather than closed.
+
+**T1 Critic review (opus, max): PASS**, 4 minor findings, no correction round
+needed. F1 (two lane tests pin `exitCode` only, not the specific denial
+code) and F3 (`commandPath()`, a sibling helper, still carries the untreated
+`resolve(root, value)` construction at named call sites, unproven
+exploitability) are tracked as their own item:
+`2026-09-06-commandpath-and-two-lane-tests-still-carry-the-untreated-tilde-construction.md`.
+F2 (the `rg`-pipe lane denies via `GUARD-OPERATOR-UNAPPROVED`, a less
+accurate code) is class-level covered by the existing
+`2026-09-06-suppressed-and-chained-outside-root-reads-land-on-the-wrong-denial-code.md`.
+**Owner and date for this AC-4 follow-up (closing the QG-06 gap the Critic
+named):** the Elephant of the session that authors the read-containment ADR
+(owed by `backlog/items/2026-09-01-read-containment-was-removed-a-day-after-it-was-added-with-no-recorded-decision.md`,
+EL-04), due immediately after `NVA-B-READCONTAIN-2` lands — that ADR must
+cross-reference this item and its evidence, plus name the
+`GUARD-PARSE-UNSUPPORTED`-vs-live-enforcement caveat filed separately as
+`2026-09-06-the-installed-plugin-copy-enforcing-this-session-predates-todays-guard-fixes.md`
+(the Critic's live reachability probe found this fix, though correct in
+source, was NOT yet enforced by this session's own installed plugin copy).
 
