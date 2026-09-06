@@ -7,12 +7,15 @@ must be fixed, not how or why — the fix-verification input contract
 (`templates/prompts/critic-review.md`, "Input contract for
 fix-verification/rework dispatches").
 
-**Status after round 1's correction (`bc00a861`) and round 2's bounded
-re-Critic:** F1 resolved. F2 only partially resolved — see F4 below, which
-supersedes F2's remaining scope. F3 still open (disclosed, not attempted).
-Per `harness/review-protocol.md`'s two-round cap, round 2 was the last
-allowed Critic round for this package; F4/F5 below are fixed and then
-self-verified directly by the Elephant, not by a third Critic round.
+**Final status:** F1 resolved (round 1 correction, `bc00a861`). F2 resolved
+for the direct-symlink shape (`bc00a861`); its remaining `..`-through-symlink
+scope, reclassified as F4, resolved by the second correction (`177bf884`).
+F5 resolved (`177bf884`). F3 stays open — disclosed, not attempted, tracked
+separately, non-blocking for this package. Per `harness/review-protocol.md`'s
+two-round cap, round 2 was the last allowed Critic round; F4/F5 were fixed
+and then independently self-verified by the Elephant directly (full
+regression 229/229, the three other DoD checks, authorship PASS on all
+three commits) — no third Critic round.
 
 - **F1**: the restored comment above `isOutsideRootBoundedDiagnosticRead`
   cites ADR-0059 Decision 6 as authority for classifying an outside-root read
