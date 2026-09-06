@@ -323,6 +323,30 @@ disposed as an accepted, reviewed process violation (code confirmed
 correct, no further action). Registry:
 `backlog/evidence/2026-09-06-nva-b-codexguardimport-1-findings.md`.
 
+### 2026-09-06: three more items — CLOSED, all Critic PASS
+
+**`NVA-B-STRIPFIX-1`** (`c229cce0`): fixed `backlog-item-strip-for-dispatch.mjs`
+to also strip `## Resolution`/verdict-shaped `## Progress note`/headingless
+bold verdict markers (T5, no Critic required — text-processing utility, no
+access-control role). 18/18 tests. One further recurrence (new heading
+names still uncaught) flagged, not actioned.
+
+**`NVA-B-GG22TRAILSLASH-1`** (`9c274f7b`): fixed the trailing-slash
+directory-pathspec false-block in GG-22. T1 Critic PASS, one minor finding
+(no tracked regression test — TP-1 blocked, already deferred; given a
+`due:` date per QG-06 so the deferral doesn't age silently).
+
+**`NVA-B-GLRMINORS-1` Gap A** (`571e67a8`): hardened the transcript-file
+exact-match invariant structurally (was OS-`ENOTDIR`-incidental only). T1
+Critic PASS, two minor findings — stale "still owed" canon text in
+`guardrails/security.md`/the read-scope ADR (fixed), and the exported
+`isRealpathedWithinBoundary` primitive itself staying unguarded for a
+future FILE-boundary caller (filed as its own item). **Gap B (denial-code
+accuracy) was not reached** — truncated at the dispatch's 80-turn limit
+after Gap A; its own reproduction found the tracking item's claimed
+`GUARD-OPERATOR-UNAPPROVED` code is stale (actual:
+`GUARD-PARSE-UNSUPPORTED`), corrected in the item for a future pick.
+
 ## PO decisions and todos — collected during the autonomous run, not waited on
 
 Per the PO's 2026-09-02 instruction. None blocks further Nova-B work.
