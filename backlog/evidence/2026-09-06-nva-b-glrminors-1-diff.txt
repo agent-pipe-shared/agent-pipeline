@@ -1,0 +1,137 @@
+command: git show 571e67a8
+label: 571e67a8 full diff for T1 Critic review (Gap A only)
+exitCode: 0
+--- stdout ---
+commit 571e67a820cdf6912b02e069c3c2d68c73a0f443
+Author: The Agent-Pipeline Contributors <301875187+agent-pipe-shared@users.noreply.github.com>
+Date:   Sun Sep 6 08:24:26 2026 +0200
+
+    fix(guard-lifecycle-ready): hold the transcript-file exact-match invariant structurally
+    
+    Gap A (backlog: 2026-09-06-the-exact-transcript-file-exception-admits-a-
+    nonexistent-child-path.md). isApprovedSingleCommandReadArg()'s extraRoots
+    loop now refuses a candidate shaped `<file-typed-boundary>/<nonexistent-
+    child>` before isRealpathedWithinBoundary's ancestor walk ever runs, instead
+    of relying on the real OS's own ENOTDIR to save it at read time. The
+    identity check stays first, before any statSync call, so the self-lift
+    symmetry isOutsideRootSingleCommandRead()/isOutsideRootBoundedDiagnosticRead()
+    rely on (a not-yet-existing candidate lifted into extraRoots as itself)
+    keeps working -- an earlier ordering of this fix broke that symmetry and
+    regressed the pre-existing NVA-B-TILDEFIX-1 test along with the new one,
+    caught by the reproduce-first suite run before this commit.
+    
+    New regression test pins the `<transcriptFile>/<child>` shape (previously
+    uncovered) at both the isReadOnlyDiagnosticCommand classifier level and
+    end-to-end through evaluateLifecycleReadyGuard.
+    
+    Full suite: 239/239 pass, 0 fail. check-consumer-safe-paths: green.
+    
+    AI-Assisted: true
+    Dispatch: NVA-B-GLRMINORS-1 (goldfish)
+
+diff --git a/plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs b/plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs
+index d07047b5..8a3f1b4d 100644
+--- a/plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs
++++ b/plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs
+@@ -1598,7 +1598,11 @@ export function isClaudeSessionMemoryWritePath(filePath, input, dependencies = {
+  * supplies it in `input.transcript_path`, never reconstructed, guessed, or pattern-matched from
+  * a sampled naming scheme. Admitted downstream as an EXACT single-file match only -- never a
+  * directory-prefix admission -- so a genuine agent need (reading its own session transcript) is
+- * met without reopening the boundary NVA-B-READCONTAIN-1 restored.
++ * met without reopening the boundary NVA-B-READCONTAIN-1 restored. That exact-match invariant
++ * is enforced structurally at the sole downstream consumer, isApprovedSingleCommandReadArg()'s
++ * extraRoots loop (NVA-B-GLRMINORS-1, Gap A) -- not merely by the ancestor-walk's own logic,
++ * which alone would incidentally admit any `<this file>/<nonexistent-child>` candidate string
++ * (saved only by the real OS's ENOTDIR at actual read time before that fix).
+  *
+  * Fails closed exactly like claudeSessionMemoryDirectory(): an absent, empty, relative, or
+  * null-byte-carrying transcript_path, or one that does not realpath to an existing plain FILE,
+@@ -2518,7 +2522,38 @@ function isApprovedSingleCommandReadArg(arg, root, extraRoots) {
+   // segment, breaking isRealpathedWithinBoundary's `resolved === boundary` identity shortcut
+   // for exactly the composed shape this round exists to close -- measured live this round.
+   return extraRoots.some((extra) => {
+-    try { return isRealpathedWithinBoundary(raw, extra); } catch { return false; }
++    try {
++      // NVA-B-GLRMINORS-1 (Gap A; backlog: 2026-09-06-the-exact-transcript-file-exception-
++      // admits-a-nonexistent-child-path.md). The identity check is deliberately FIRST, before
++      // any filesystem access: the self-lift symmetry isOutsideRootSingleCommandRead()/
++      // isOutsideRootBoundedDiagnosticRead() rely on (see the comment above) lifts a read's
++      // own, possibly NOT-YET-EXISTING candidate into extraRoots as `raw` itself, byte-for-
++      // byte -- `statSync(extra)` would throw ENOENT for that entirely legitimate case before
++      // ever reaching isRealpathedWithinBoundary's own identical `resolved === boundary`
++      // shortcut, silently defeating that symmetry (measured live this dispatch: reordering
++      // this the other way around made a phantom-child single-command read fall through to
++      // unconditional admission instead of the READ_SCOPE_DENIAL_CODE refusal, exactly the
++      // NVA-B-READCONTAIN-1 F4 failure mode this file's own comments warn about elsewhere).
++      //
++      // Once past that shortcut, an extraRoots entry may itself be a FILE (the transcript-file
++      // exception, NVA-B-READCONTAIN-2's claudeSessionTranscriptFilePath()), not only a
++      // directory (BOUNDED_PIPELINE_ADDITIONAL_ROOTS, the memory-dir root, or a genuinely
++      // different self-lifted candidate). isRealpathedWithinBoundary's ancestor walk is built
++      // for the "not-yet-existing path under a real DIRECTORY" case; applied unmodified to a
++      // FILE boundary, a candidate shaped `<file>/<nonexistent-child>` climbs the walk straight
++      // back up to the file itself (its own dirname-of-the-nonexistent-child) and is reported
++      // "inside" it -- true for ANY string of that shape. Not exploitable in practice only
++      // because the real shell command then hits the OS's own ENOTDIR, never because this
++      // guard's own logic holds the "exact single file, never a directory-prefix" invariant
++      // its neighboring doc comment (claudeSessionTranscriptFilePath, this file) claims.
++      // Refused here, before the ancestor walk ever runs, whenever `extra` itself is a FILE
++      // and `raw` is not already byte-identical to it (the case just handled above) -- the
++      // only admission isRealpathedWithinBoundary's own shortcut grants a FILE-typed boundary
++      // in the first place.
++      if (raw === extra) return true;
++      if (statSync(extra).isFile()) return false;
++      return isRealpathedWithinBoundary(raw, extra);
++    } catch { return false; }
+   });
+ }
+ 
+diff --git a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+index fda86613..f86551c1 100644
+--- a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+@@ -6339,6 +6339,42 @@ test("NVA-B-READCONTAIN-2: a `<symlink>/../<outside>/<file>` composed through th
+   }
+ });
+ 
++// NVA-B-GLRMINORS-1 (Gap A; backlog: 2026-09-06-the-exact-transcript-file-exception-admits-a-
++// nonexistent-child-path.md). Before the fix, isRealpathedWithinBoundary's ancestor walk --
++// built for the "not-yet-existing path under a real DIRECTORY" case -- climbed a candidate
++// shaped `<transcriptFile>/<nonexistent-child>` straight back up to the transcript file itself
++// (a FILE-typed boundary) and reported it "inside", contradicting the "EXACT single-file match
++// only" invariant claudeSessionTranscriptFilePath()'s own doc comment claims. Not exploitable
++// via the real shell (a real file has no children, so the actual `cat` hits ENOTDIR), but this
++// pins the guard's OWN admission decision, never the OS's incidental behaviour, as the thing
++// that refuses it -- this exact shape had zero test coverage before this item.
++test("NVA-B-GLRMINORS-1 Gap A: isReadOnlyDiagnosticCommand refuses a candidate shaped <transcriptFile>/<nonexistent-child>, even with the transcript file threaded as an extra root", () => {
++  const projectDir = hgoGitFixture("signature");
++  const { transcriptPath } = transcriptReadFixture();
++  const phantomChild = join(transcriptPath, "nonexistent-child");
++  try {
++    // Direct classifier-level check: the transcript file itself is admitted as an extra root,
++    // but a nonexistent child path under it must not be.
++    assert.equal(isReadOnlyDiagnosticCommand(`cat ${transcriptPath}`, projectDir, [transcriptPath]), true,
++      "sanity: the transcript file itself stays admitted once threaded as an extra root");
++    assert.equal(isReadOnlyDiagnosticCommand(`cat ${phantomChild}`, projectDir, [transcriptPath]), false,
++      "a <transcriptFile>/<child> candidate must be refused, not admitted, as inside the transcript-file boundary");
++
++    // End-to-end: the same shape through the full guard, with the transcript file threaded via
++    // the real sessionReadScopeRoots() path (input.transcript_path), must be refused under the
++    // true-reason read-scope code, not silently admitted.
++    const result = evaluateLifecycleReadyGuard(
++      bashWithTranscript(`cat ${phantomChild}`, transcriptPath), { projectDir, ...hgoReadyDeps() },
++    );
++    assert.equal(result.exitCode, 2,
++      "a candidate shaped <transcriptFile>/<child> must be refused end-to-end, even though the transcript file itself is admitted");
++    assert.match(result.stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u);
++  } finally {
++    rmSync(projectDir, { recursive: true, force: true });
++    rmSync(dirname(transcriptPath), { recursive: true, force: true });
++  }
++});
++
+ test("NVA-BL-76: the exact reproduction is refused under its own read-scope code, never as an unapproved operator", () => {
+   const { projectDir, outside, outsideFile } = readScopeFixture();
+   try {
+
+--- stderr ---
