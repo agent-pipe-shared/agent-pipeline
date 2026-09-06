@@ -88,3 +88,76 @@ lands.
 - If not exploitable: this item documents why (the specific host-tool
   behavior that closes the gap) so a future host-tool change that removes
   that protection is a known regression risk, not a silent one.
+
+## Measured 2026-09-06
+
+**Step 1 — the cheap trace (root's own realpath status).** Both callers
+realpath `root` before it ever reaches `isPathWithinRealpathedRoot()`,
+confirming the doc comment's claim (`guard-lifecycle-ready.mjs` lines
+1516-1520):
+
+- `isProjectWritePath()` (lines 1537-1539) is called from
+  `evaluateLifecycleReadyGuardCore()` at line 4940. That function derives
+  `root` at lines 4809-4815:
+  `root = (dependencies.realpathSyncFn ?? realpathSync)(resolve(requestedRoot))`
+  — already realpathed before use.
+- `isClaudeSessionMemoryWritePath()` (lines 1586-1592) obtains its boundary
+  from `claudeSessionMemoryDirectory()` (lines 1564-1577), which itself calls
+  `realpath(candidate)` at line 1572 and returns that realpathed value as
+  `memoryDir`, passed into `isPathWithinRealpathedRoot(filePath, memoryDir, ...)`
+  at line 1591 — also already realpathed.
+
+So the root boundary itself is not the exposed surface in either caller; any
+divergence would have to come from how the untrusted `filePath` argument is
+resolved — the `resolve(root, filePath)` lexical collapse at line 1526,
+structurally identical to the read lane's bug.
+
+**Step 2 — the decisive observation.** Built entirely under `scratch/`:
+
+- `scratch/writecontain-fixture-NVA-B-WRITECONTAIN-1/root/` — fixture
+  "project root".
+- `scratch/writecontain-fixture-NVA-B-WRITECONTAIN-1/outside/` — sibling
+  "outside" directory (left empty).
+- `scratch/writecontain-fixture-NVA-B-WRITECONTAIN-1/root/link` — a real
+  symlink pointing at the absolute path of that sibling `outside/` directory.
+
+One real `Write` tool call, target `file_path`:
+`scratch/writecontain-fixture-NVA-B-WRITECONTAIN-1/root/link/../outside/marker-write-test.txt`,
+content a harmless marker string identifying the fixture and the two
+candidate outcomes.
+
+Outcome of the tool call itself: **admitted outright, no guard refusal of any
+kind** — the write proceeded and the tool reported success.
+
+Where the bytes actually landed (verified with `ls -la` on the fixture root,
+the sibling `outside/` directory, and the nested path, plus reading the
+marker file's content — captured in
+`evidence/NVA-B-WRITECONTAIN-1-observation.txt`):
+`scratch/writecontain-fixture-NVA-B-WRITECONTAIN-1/root/outside/marker-write-test.txt`
+— a **brand-new real directory** named `outside`, created directly under the
+fixture root, distinct from both the symlink and the real sibling `outside/`
+directory it points at. The real sibling `outside/` directory (the symlink's
+actual target) stayed empty throughout; the marker content never reached it.
+
+**This supports (a), not (b).** The host tool's own Write path resolution
+collapsed `link/..` as a pure lexical operation — the same thing
+`path.resolve()`/`path.join()` would do — and materialized a boring new
+directory that happens to share a name with the symlink's target, without
+ever dereferencing the symlink. The guard's own lexical prediction
+(`resolve(root, filePath)`) and the host tool's actual write location agree
+in this fixture: no divergence, no bypass observed.
+
+Scope caveat: only the `Write` tool was exercised (per the "fix nothing,
+measure one thing" mandate of this dispatch, one real tool call). `Edit` and
+`NotebookEdit` were not separately tested and are not covered by this
+observation; if they route through a materially different path-resolution
+step than `Write` does, that would need its own measurement.
+
+**Recommendation:** close this item as "shape present, not exploitable
+here" for the `Write` tool, with the scope caveat above recorded rather than
+silently generalized to `Edit`/`NotebookEdit`. The specific host-tool
+behavior that closes the gap: Claude Code's `Write` tool resolves its
+`file_path` argument lexically (matching `path.resolve()`/`path.join()`
+semantics) before opening the file, without dereferencing intermediate
+symlinks — a future host-tool change to kernel-order resolution would
+reopen exactly this gap and is the regression risk to watch for.
