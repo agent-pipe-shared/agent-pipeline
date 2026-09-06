@@ -5,7 +5,9 @@ type: defect
 owner: pipeline
 status: closed
 closed_at: 2026-09-06
+closure_repository: self
 closure_commit: e183632fb154711cac2cb5fbde5a8ae0973863dc
+closure_evidence: "backlog/items/2026-09-01-read-containment-was-removed-a-day-after-it-was-added-with-no-recorded-decision.md"
 created: 2026-09-01
 sprint: nova-b
 tracking: "Nova B — the project-root containment check on read-only shell commands was added on 2026-08-29 to close a hole and removed wholesale on 2026-08-30. The removal is deliberate and undocumented outside its own commit message, and it silently invalidates a closed item's recorded remedy."
