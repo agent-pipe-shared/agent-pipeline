@@ -25,7 +25,7 @@ the human revocation audit and returned an absent window; no maintenance lift
 remains active. That earlier checkpoint's pending-Verify/normal-continuation
 wording predates the results and blockers recorded here.
 
-## Gate 1: confirmed scanner finding, exact exception undecided
+## Gate 1: exact scanner exception approved and applied, Full Verify retry pending
 
 The scanner reports `generic-api-key` at line **1**, column **1030**, in
 `governance/events/human/14-evt-gmw-revoke-3de0bdca05a90ca795ac7696f4717abe-0.json`.
@@ -41,26 +41,33 @@ formula is `${producer}-${kind}-${i32}-${generation}`.
 `revokeDecisionId` selects kind `revoke`; producer defaults to `gmw` and this
 event uses generation `0`. Thus `gmw-revoke-` + 32 public digest characters +
 `-0` accounts for all 45 characters. This is a deterministic public audit ID,
-not a private key. The scanner finding is still confirmed and the security
-gate remains failed until an authorized disposition is implemented and checked.
+not a private key. The historical scanner finding remains confirmed. The
+authorized exact exception is now applied; a Full Verify retry on the new
+candidate is pending, so the historical failed security result is not cleared
+by this update.
 
-The pending PO decision is a single exception in `.gitleaksignore`, bound to
+The PO explicitly approved a single exception in `.gitleaksignore` on
+2026-09-06, bound to
 the recognized content fingerprint, exact event path, rule, line and column.
 `evidence/alfred-gmw-close-exception-proposal.log` exits 0 as a diagnostic and
-reports `proposal-not-applied` / `pending-human-decision`. Its exact proposed
-authority line is:
+reports the historical `proposal-not-applied` / `pending-human-decision`
+status. That proposal predates the PO approval and application; its exact
+authority line, now appended to `.gitleaksignore`, is:
 
 ```text
 content-v1:88cc8879a89d4c3eec339244937908aee063293e59485562fd4a688130cc5944:governance/events/human/14-evt-gmw-revoke-3de0bdca05a90ca795ac7696f4717abe-0.json:generic-api-key:1:1030
 ```
 
 The proposal binds event SHA-256
-`5feee6b0930cc93ba9ea652aaec1c64e9434e6b8a3562c88ee3ff99f375231d4` and current
+`5feee6b0930cc93ba9ea652aaec1c64e9434e6b8a3562c88ee3ff99f375231d4` and original
 `.gitleaksignore` SHA-256
 `3d45889c584908a4bf769561b25518715a710e532f0162969f89ac101e68810c`.
-No permission has been received and no exception has been applied. This
-proposal grants no path-wide or rule-wide exemption and changes no scanner
-rule, threshold or governance event.
+Both bindings were rechecked before application. The prior ignore bytes were
+preserved and exactly this authority line plus its short rationale comment
+were appended. The PO approval covers this content/path/rule/position-bound
+exception only; it grants no path-wide or rule-wide exemption and changes no
+scanner rule, threshold or governance event. Independent T1 Critic review is
+still missing; the exception is unreviewed.
 
 ## Gate 2: source-supported Critic transport gap
 
@@ -110,9 +117,10 @@ A separately authorized adapter package must satisfy all of these criteria:
 
 ## Continuation and limits
 
-The Elephant can present the exact exception proposal for the PO decision.
-Any authorized application must first recheck its content bindings and then
-verify the resulting candidate. Critic work waits for usable selected adapter
+The exact exception has PO approval and has been applied after rechecking its
+bindings. The Elephant must retry Full Verify on the new committed, clean
+candidate; no green result for that candidate is claimed here. Critic work
+waits for usable selected adapter
 availability, green deterministic gates, and fresh candidate-bound readiness;
 it then needs the actual independent T1 review. No new signature ceremony is
 requested automatically by this handoff.
