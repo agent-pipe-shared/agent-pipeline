@@ -50,3 +50,24 @@ route).
   the sanctioned route).
 - `node --test plugins/pipeline-core/hooks/guard-git.test.mjs` passes with
   the new cases included.
+- Coverage additionally includes the `-i`/`--include` admission-widening
+  case and the `../`-traversal case `NVA-B-GG22FIX-2` (commit `c6ef3425`)
+  fixed, plus the trailing-slash directory-pathspec case tracked at
+  `2026-09-06-gg22-pathspec-normalization-false-blocks-a-trailing-slash-directory-pathspec.md`
+  — not only the original round-1 pathspec-scoping cases this item was
+  first filed for.
+
+## Also noted (2026-09-06, T1 Critic closing round for NVA-B-GG22FIX-2, F3)
+
+The RED/GREEN reproduction evidence for BOTH correction rounds
+(`backlog/evidence/2026-09-06-nva-b-gg22fix-{1,2}-{red,green}.txt`) cites a
+harness script (`scratch/gg22fix-*-repro.mjs`) that is itself gitignored —
+the tracked artifacts show identical `PASS` lines for RED and GREEN modes,
+differing only in a `[mode=...]`/`guard=...` trailer, so a reader without
+the harness cannot tell "bug reproduced" from "bug absent" from the tracked
+artifact alone. This is the same durability class as this package's
+already-fixed F5 (round 1's citation of gitignored paths), recurring in
+round 2's own new evidence. Once this item's permanent test lands in
+`guard-git.test.mjs` via the attended-operator route, the committed test
+IS the durable, self-interpretable proof and this note is moot; tracked
+here only so it is not lost before then.
