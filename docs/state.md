@@ -115,7 +115,7 @@ Commits survive compaction; intent does not — this block is the intent.
 - **A — slicing:** `guard-slicing.mjs`, 42 tests, runner-neutral (Claude by
   `message.id`, Antigravity by `Subagents[]`, Codex silent by proof — its
   adapter admits no dispatch tool). **Built, gated (`eecb4273`), not wired.** Channel
-  proven three ways; design at `docs/adr/draft-parallel-dispatch-slicing-enforcement.md`,
+  proven three ways; design at `docs/adr/0080-parallel-dispatch-slicing-enforcement.md`,
   two T1 rounds, acceptance is queue #9. Wiring order is fixed: payload
   capture (#3) → TP-3 (#1) → `hooks.json` (#2), because the sibling
   `guard-dispatch-budget.mjs` is registered and **never fires** — logic proven

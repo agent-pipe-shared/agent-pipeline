@@ -28,7 +28,7 @@ once.
   `message.id`, `Workflow` by script), for Antigravity (`invoke_subagent`
   with two or more `Subagents`), and is deliberately silent on Codex, whose
   guard adapter admits no dispatch tool at all — pinned by test. Design:
-  `docs/adr/draft-parallel-dispatch-slicing-enforcement.md`, two T1 rounds.
+  `docs/adr/0080-parallel-dispatch-slicing-enforcement.md`, two T1 rounds.
   **Built. Gated** (registered in `verify.mjs` under a PO signature,
   `eecb4273`; the inventory obligation that registration created is met in
   `ec0b158c`). **Not wired** (`hooks.json` is kernel-protected; attended step

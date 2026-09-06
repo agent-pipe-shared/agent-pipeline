@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 /**
  * guard-slicing.mjs -- NVA-B-SLICINGBUILD-2: the slicing-nudge mechanism from
- * `docs/adr/draft-parallel-dispatch-slicing-enforcement.md` (increment 1).
+ * `docs/adr/0080-parallel-dispatch-slicing-enforcement.md` (increment 1).
  * A `PreToolUse` hook, orchestrator-only, that delivers a non-blocking
  * default-to-parallel nudge through `hookSpecificOutput.additionalContext`
  * (confirmed empirically, on this runner, to reach the model on a

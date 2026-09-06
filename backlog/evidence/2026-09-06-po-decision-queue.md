@@ -155,9 +155,11 @@ Analysis: `backlog/evidence/2026-09-06-codex-selected-critic-transport-gap.md`.
 
 ## 9. Accept the slicing design as ADR-0080
 
+**DONE 2026-09-06** — accepted by the PO in session ("accept", all five decisions); renamed and indexed in this commit.
+
 **Needs:** one word from the PO — "accept".
 
-`docs/adr/draft-parallel-dispatch-slicing-enforcement.md` has had two T1
+`docs/adr/0080-parallel-dispatch-slicing-enforcement.md` has had two T1
 Critic rounds (FAIL then PASS-bounded-by-step-1), its blocking precondition is
 cleared by the channel probe, its open parameter is resolved by measurement,
 and the mechanism it describes is built and tested. ADR-0069 D2 allocates a

@@ -1,12 +1,16 @@
-# ADR-{{NNNN}}: Machine-delivered default task-slicing into parallel dispatch
+# ADR-0080: Machine-delivered default task-slicing into parallel dispatch
 
 > Agent-Pipeline · Sprint Nova-B · as of 2026-09-06
 
-**Status:** proposed — a design proposal only. It authorizes nothing; it is
-submitted for Elephant review, an advisor consultation and an independent
-Critic review before any implementation dispatch. Numbered only at acceptance
-per [ADR-0069](0069-adr-numbers-are-allocated-at-acceptance.md) Decision 2;
-until then this file is `docs/adr/draft-parallel-dispatch-slicing-enforcement.md`.
+> **Accepted as ADR-0080 on 2026-09-06.** Numbered in the act of acceptance per
+> [ADR-0069](0069-adr-numbers-are-allocated-at-acceptance.md) Decision 2 — this file and its index
+> row in `docs/adr/README.md` are one commit.
+
+**Status:** accepted (2026-09-06, PO decision in session — all five decisions
+accepted; Decision 1's precondition, the delivery channel, was met by the
+2026-09-06 probe recorded in the addendum below). Numbered at acceptance per
+[ADR-0069](0069-adr-numbers-are-allocated-at-acceptance.md) Decision 2; until
+then this file was `docs/adr/draft-parallel-dispatch-slicing-enforcement.md`.
 
 **Basis:**
 `backlog/items/2026-08-29-the-pipeline-defaults-to-sequential-work-with-no-enforced-task-slicing.md`
