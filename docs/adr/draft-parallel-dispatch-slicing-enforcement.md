@@ -634,7 +634,7 @@ this order:
    `hookSpecificOutput.additionalContext` reach the model on this runner? If
    not, does `PostToolUse`? If neither, **stop and report**: the PO's chosen
    increment is not implementable as specified and needs a fresh decision.
-   Steps 2–6 must not start until this is answered by observation.
+   Steps 2–7 must not start until this is answered by observation.
    - **Owner:** the PO (the recommended form is a temporary `PreToolUse`
      entry in `~/.claude/settings.json`, outside the repository, needing no
      ceremony — see the addendum above). An agent cannot edit that file's
@@ -644,6 +644,49 @@ this order:
      model's context on the next tool call, with the call NOT denied.
    - **On failure:** this design's increment 1 is withdrawn, not adjusted;
      re-decide between a blocking delivery and a different channel.
+   - **Method note, added 2026-09-06:** the probe session must be a genuinely
+     fresh one, NOT `--continue` and not a session that has seen
+     `scratch/kanalprobe-hook.mjs`. A session already carrying the marker
+     string in its context is not a witness — it can name the marker without
+     the hook ever having delivered it. The probe's matcher is `Read|Bash`,
+     not `Read`: under the auto-mode instruction a session reads via
+     `cat`/`sed -n` and a `Read`-only matcher can never fire, which would
+     render as "marker nowhere" and trigger the withdrawal branch on a probe
+     artifact rather than on the channel.
+
+   **Static evidence gathered 2026-09-06 — strengthens the prediction, does
+   NOT satisfy this step.** A read-only trace of the runner binary
+   (`claude` 2.1.263, the version a fresh probe session would run) found the
+   chain unbroken end to end: the `PreToolUse` variant of
+   `hookSpecificOutput` accepts `additionalContext`; the normalizer preserves
+   it (8000-character cap); it is mapped into `additionalContexts` and
+   emitted as a `hook_additional_context` attachment; consumption drops it
+   only for delegated subagents; and — the load-bearing find — the
+   `hook_additional_context` renderer has **no event filter**, in explicit
+   contrast to the sibling `hook_success` renderer, which returns `[]` for
+   every event except `SessionStart`/`UserPromptSubmit`/`UserPromptExpansion`.
+   Two live cross-event confirmations of that renderer were observed in the
+   same session's own context: a `SessionStart hook additional context: …`
+   line, and a `Stop hook additional context: …` line. The second one matters
+   most, because it removes this document's weakest link — that `SessionStart`
+   might be a special case. It is not; a non-`SessionStart`, non-blocking
+   emitter demonstrably reaches the model here.
+
+   **This is still not the pass condition, and is recorded as evidence rather
+   than as clearance for a reason.** The pass condition names an observed
+   marker on a `PreToolUse` call; what is now established is every link of
+   that chain except the `PreToolUse` emission itself, which remains
+   statically read only. Accepting a strong prediction in place of the stated
+   observation is precisely the substitution T1 Critic finding F1 recorded
+   against an earlier revision of this document — the evidence there was
+   weaker, but the move would be the same one. The trace lowers the expected
+   cost of the probe (the exact expected string is now known:
+   `PreToolUse:Bash hook additional context: KANALPROBE-7X4K: …`); it does not
+   replace it.
+
+   It also does not touch the separate claim below: that a non-blocking
+   message *changes behaviour*. The `Stop` observation shows delivery, not
+   effect.
    - The 2026-09-06 documentation probe is supporting evidence for what to
      expect, never a substitute for this step.
 2. **Two decisions the briefing must carry, not the dispatch guess.** Added
