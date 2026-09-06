@@ -11,6 +11,7 @@ import { PassThrough } from "node:stream";
 import { invokeCodexCriticAppServer } from "./codex-critic-app-server.mjs";
 import { runSelectedCriticHost, selectedCriticInProcessBridge } from "./codex-critic-selected-host.mjs";
 import { buildSandboxRequest, sandboxSelectionDigest } from "./codex-sandbox-select.mjs";
+import { runSandboxedReadonlyHostBridge } from "./sandboxed-readonly-host-bridge.mjs";
 
 import {
   ASSURANCE,
@@ -1363,6 +1364,17 @@ function fakeCriticSpawn(result, terminal = { code: 0, signal: null }, onRequest
   };
 }
 
+// A spawn that never gets a child at all -- the `error` event the real
+// child_process module emits on ENOENT/EACCES, with no `close` following it.
+function fakeCriticSpawnFailure(errorCode = "ENOENT") {
+  return () => {
+    const child = new EventEmitter();
+    child.stdin = new PassThrough(); child.stdout = new PassThrough(); child.stderr = new PassThrough();
+    queueMicrotask(() => child.emit("error", Object.assign(new Error(errorCode), { code: errorCode })));
+    return child;
+  };
+}
+
 function criticAnswered(overrides = {}) {
   return {
     schema: "pipeline.codex-critic-app-server-child.v1", ok: true, code: "answered",
@@ -1580,6 +1592,133 @@ await checkAsync("runSelectedCriticHost reports selected-critic-transport-failed
   assert.equal(result.code, "selected-critic-transport-failed");
   assert.notEqual(result.sandboxBinding, null);
   assert.equal(result.sandboxBinding.selectionId, "css_bbbbbbbbbbbbbbbbbbbbbbbbbi");
+});
+
+// --- NVA-B-XPORTFIX-1: a spawn that never starts a child at all must reach
+// the generic bridge as an observed childStarted:false, not undefined. An
+// undefined observation is routed to postLaunchFailure() (a falsified
+// "started, then lost stdio" receipt) instead of noChild() (an honest
+// "never started" receipt), and it also inverts runSelectedCriticHost's two
+// failure codes (selected-critic-transport-failed where
+// selected-sandbox-required is true). ---
+
+await checkAsync("codex-critic-app-server reports childStarted:false, not true, when the child never spawns at all (pins the upstream fact the fix below depends on)", async () => {
+  const result = await invokeCodexCriticAppServer(criticPayload(), {
+    buildSandboxInvocationFn: () => ({ command: "/codex", argv: ["sandbox"], options: { shell: false } }),
+    spawnFn: fakeCriticSpawnFailure("ENOENT"),
+  });
+  assert.deepEqual(result, { status: "unavailable", childStarted: false });
+});
+
+await checkAsync("selectedCriticInProcessBridge.launch reports a genuinely unstarted child as childStarted:false, not undefined -- this is the exact expression the generic bridge uses to tell noChild() apart from postLaunchFailure()", async () => {
+  const input = {
+    repoFingerprint: "b".repeat(64),
+    dispatch: { queueRevision: 1, candidateCommit: "c".repeat(40), candidateTree: "d".repeat(40), referenceSetSha256: "e".repeat(64) },
+    referencePaths: ["roles/critic.md"],
+    reviewBase: "9".repeat(40),
+    sandboxRuntime: { repoRoot: DEFAULT_PIPELINE_ROOT },
+  };
+  // A fully valid selection is required here (unlike the "refuses drifted
+  // ..." test above): every case there is rejected before launch() reaches
+  // sandboxSelectionDigest(), so a minimal selection object never has to
+  // survive validateSandboxSelection(). This case is not drifted, so it does.
+  const selection = criticSelectionFixture(input);
+  const built = selectedCriticInProcessBridge(input, {
+    invokeAppServer: async () => ({ status: "unavailable", childStarted: false }),
+  });
+  const launched = await built.bridge.launch({
+    selectionId: selection.selectionId, duty: "critic", selection,
+    requested: { runner: "codex", model: "gpt-5.6-sol" },
+    references: [...input.referencePaths],
+    profile: selection.profile,
+    scratch: { path: "/tmp/x", sha256: selection.profile.scratchRootSha256, sandboxStateJson: "{}", sandboxStateSha256: "4".repeat(64), repoRoot: input.sandboxRuntime.repoRoot, codexPath: "/codex" },
+  });
+  assert.deepEqual(launched, { childStarted: false });
+});
+
+await checkAsync("the real runSandboxedReadonlyHostBridge resolves a genuinely unstarted child to noChild(), never postLaunchFailure(), driven with only its own dependencies (readSelection, readback, resolveScratch, resealScratch) and the real selected-Critic launch/finalize pair, faking only the process-spawn boundary", async () => {
+  const input = {
+    repoFingerprint: "b".repeat(64),
+    dispatch: { queueRevision: 1, candidateCommit: "c".repeat(40), candidateTree: "d".repeat(40), referenceSetSha256: "e".repeat(64) },
+    referencePaths: ["roles/critic.md"],
+    reviewBase: "9".repeat(40),
+    sandboxRuntime: { repoRoot: DEFAULT_PIPELINE_ROOT },
+  };
+  const selection = criticSelectionFixture(input);
+  const scratch = { path: "/tmp/critic-scratch", sha256: selection.profile.scratchRootSha256, sandboxStateJson: "{}", sandboxStateSha256: "8".repeat(64), repoRoot: input.sandboxRuntime.repoRoot, codexPath: "/codex" };
+  const requested = { runner: "codex", model: "gpt-5.6-sol" };
+  const built = selectedCriticInProcessBridge(input, {
+    invokeAppServer: (payload) => invokeCodexCriticAppServer(payload, {
+      buildSandboxInvocationFn: () => ({ command: "/codex", argv: ["sandbox"], options: { shell: false } }),
+      spawnFn: fakeCriticSpawnFailure("ENOENT"),
+    }),
+  });
+  let resealed = 0;
+  const execution = await runSandboxedReadonlyHostBridge({
+    selectionId: selection.selectionId, duty: "critic", requested, references: input.referencePaths,
+  }, {
+    readSelection: async (selectionId) => { assert.equal(selectionId, selection.selectionId); return selection; },
+    readback: async ({ profile }) => profile,
+    resolveScratch: async () => scratch,
+    resealScratch: async () => { resealed += 1; },
+    launch: built.bridge.launch,
+    finalize: built.bridge.finalize,
+  });
+  assert.equal(execution.terminal.childStarted, false);
+  assert.equal(execution.terminal.stdioStatus, "not-started");
+  assert.equal(execution.terminal.cleanupStatus, "not-started");
+  assert.deepEqual(execution.observed, { cliSha256: null, profileSha256: null, networkEnabled: null, scratchRootSha256: null });
+  assert.equal(execution.dutyReceipt.status, "unavailable");
+  // noChild() is returned directly on an observed childStarted:false launch
+  // result; sandboxed-readonly-host-bridge.mjs only reseals scratch on a
+  // launch throw or a finalize failure, neither of which happens here.
+  assert.equal(resealed, 0);
+});
+
+await checkAsync("runSelectedCriticHost returns selected-sandbox-required, not selected-critic-transport-failed, when the real bridge chain observes no child started", async () => {
+  const input = {
+    repoFingerprint: "b".repeat(64),
+    dispatch: { queueRevision: 1, candidateCommit: "c".repeat(40), candidateTree: "d".repeat(40), referenceSetSha256: "e".repeat(64) },
+    referencePaths: ["roles/critic.md"],
+    reviewBase: "9".repeat(40),
+    sandboxRuntime: { repoRoot: DEFAULT_PIPELINE_ROOT },
+  };
+  const selection = criticSelectionFixture(input);
+  const scratch = { path: "/tmp/critic-scratch", sha256: selection.profile.scratchRootSha256, sandboxStateJson: "{}", sandboxStateSha256: "8".repeat(64), repoRoot: input.sandboxRuntime.repoRoot, codexPath: "/codex" };
+  const transport = {
+    invokeCodexCriticAppServer: (payload) => invokeCodexCriticAppServer(payload, {
+      buildSandboxInvocationFn: () => ({ command: "/codex", argv: ["sandbox"], options: { shell: false } }),
+      spawnFn: fakeCriticSpawnFailure("ENOENT"),
+    }),
+    dependencies: {
+      // This stand-in performs exactly the translation the real
+      // executeSandboxedReadonlyDuty applies at its own no-child branch
+      // (sandboxed-readonly-host-bridge.mjs, around :208-210) around a call
+      // to the REAL runSandboxedReadonlyHostBridge. The store/journal/
+      // selectCodexSandbox layer above that stays undriven here -- see the
+      // report's "what remains unproven".
+      async executeSandboxedReadonlyDuty(request, dependencies) {
+        const execution = await runSandboxedReadonlyHostBridge({
+          selectionId: selection.selectionId, duty: "critic", requested: request.requested, references: request.references,
+        }, {
+          readSelection: async () => selection,
+          readback: async ({ profile }) => profile,
+          resolveScratch: async () => scratch,
+          resealScratch: async () => {},
+          launch: dependencies.bridge.launch,
+          finalize: dependencies.bridge.finalize,
+        });
+        if (!execution.terminal.childStarted) {
+          return { status: "unavailable", failureClass: "host-mode-unavailable", childStarted: false, selectionId: selection.selectionId, assurance: structuredClone(execution.assurance) };
+        }
+        throw new Error("test stand-in only covers the no-child branch");
+      },
+    },
+  };
+  const result = await runSelectedCriticHost(input, transport);
+  assert.equal(result.ok, false);
+  assert.equal(result.code, "selected-sandbox-required");
+  assert.equal(result.selectionId, selection.selectionId);
 });
 
 process.stdout.write(`1..${passed}\n# pass ${passed}\n`);

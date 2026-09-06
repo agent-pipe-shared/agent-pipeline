@@ -96,10 +96,11 @@ function matchesSelectedHostExecution(value, selected) {
  * caller silently turns into "host-mode-unavailable" -- exactly the failure
  * mode this file exists to close. (The advisory precedent this mirrors,
  * advisory-host-bridge.mjs's selectedAdvisoryHostBridge, carries `take` on
- * the same object it returns for wiring; that object is never passed
- * directly as hostBridge by its own caller, so the defect is latent there
- * rather than live -- not fixed here since that file is read-only for this
- * task.)
+ * the same object it returns for wiring. Whether that is live or merely
+ * latent there is an OPEN QUESTION this file does not answer: no test or
+ * probe here checks whether that object's own caller ever passes it
+ * directly as hostBridge. Treat it as unconfirmed either way -- not fixed
+ * here since that file is out of scope for this task.)
  */
 export function selectedCriticInProcessBridge(input, { invokeAppServer = invokeCodexCriticAppServer } = {}) {
   const completed = new Map();
@@ -134,7 +135,16 @@ export function selectedCriticInProcessBridge(input, { invokeAppServer = invokeC
     if (result?.status !== "reviewed" || !result.verdict || typeof result.verdict !== "object" || Array.isArray(result.verdict)
       || !result.sandboxExecution || result.identity?.provider !== "openai" || result.identity?.modelId !== "gpt-5.6-sol"
       || result.identity?.effort !== "xhigh" || !matchesSelectedHostExecution(result.sandboxExecution, sandboxTransport)) {
-      return { childStarted: result?.childStarted === true ? true : undefined };
+      // Pass the consumer's own observation through unchanged: it reports a
+      // top-level childStarted only on its "unavailable" path (a spawn that
+      // never started a child at all is `false`; one that started but
+      // produced an invalid verdict is `true`). A "reviewed" result that
+      // fails the binding checks above carries no top-level observation --
+      // its child did start (invokeCodexCriticAppServer's own terminal
+      // record says so), but nothing here re-derives that; it stays
+      // undefined, which the generic bridge already treats as a distinct,
+      // conservative "unclear" case (postLaunchFailure()), not as "false".
+      return { childStarted: typeof result?.childStarted === "boolean" ? result.childStarted : undefined };
     }
     completed.set(request.selectionId, { result, sandboxTransport });
     return { childStarted: result.sandboxExecution.terminal?.childStarted === true, selectionId: request.selectionId };
