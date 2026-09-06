@@ -620,7 +620,7 @@ const SERIAL_LANE_SUITES = Object.freeze(new Set([
   "pipeline-state-discard-feature-tests", "pipeline-state-inspect-tests", "pipeline-state-inspection-contract-tests",
   "pipeline-state-rebind-runner-tests", "pipeline-state-reopen-design-tests", "pipeline-state-revocation-tests",
   "pipeline-state-tests", "po-gate-authority-fixture-tests", "po-human-approval-tests", "product-capability-inventory-tests",
-  "project-authority-migration-cli-tests", "project-authority-tests", "project-onboarding-v3-tests",
+  "project-authority-migration-cli-tests", "project-authority-tests",
   "publication-executor-productive-flow-tests", "publication-state-authority-tests", "push-prepare-tests",
   "push-release-flow-docs-contract-tests", "reference-path-check", "repair-map-tests",
   "scoped-verify-registration-tests", "scripts-pipeline-state-tests", "session-cleanup-binding-tests",
