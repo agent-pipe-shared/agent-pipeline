@@ -122,6 +122,30 @@ recorded but unexercised.
 **If never done:** the supervisor stays retained on paper and unproven in
 practice.
 
+## 8. One real end-to-end Codex Critic review run
+
+**Needs:** explicit approval for a live provider execution, plus a working
+Codex the run can reach.
+
+Handed over from the Alfred checkout: the selected-Codex-Critic transport has
+a producer and no consumer, so the `selected-runner-transport` gate has no
+implementation. Criteria 1–4 of that handover (the host-side consumer, real
+launch under the selected profile, correctly bound receipts, safe refusal) are
+buildable here without the PO and are being built.
+
+Criterion 5 is not. "At least one real successful end-to-end review run" means
+executing a live provider, the same class as item 7. An agent must not
+authorize that for itself, and satisfying it with a fixture while reporting it
+as real would reproduce precisely the defect the handover is complaining
+about — "existing tests with substituted functions do not prove this
+connection" — one level higher up.
+
+**If never done:** the transport ships tested but never once exercised against
+a real Codex, which is a weaker claim than the handover asks for and must be
+reported as such rather than rounded up.
+
+Analysis: `backlog/evidence/2026-09-06-codex-selected-critic-transport-gap.md`.
+
 ---
 
 ## Not on this list, deliberately
