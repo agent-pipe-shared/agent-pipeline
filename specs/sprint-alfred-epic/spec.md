@@ -77,6 +77,13 @@ C2's consolidation fields on the registration schema (`invariantPinned`,
 landed through that `revisions[]` mechanism when C2 ships — not an unpinned
 mid-sprint shape change.
 
+The Enforcement conformance record is at revision 2: one record retains the
+canonical `${runner.name}:${layer}` identity while `probeSurfaces[]` is a
+non-empty, unique subsequence of the approved global surface order and
+`observations[]` contains one closed, correlated raw observation per surface
+in that same order. Singular `probeSurface` and `observation` fields are not
+valid record shapes.
+
 ## 4. Track A — Enforcement ground truth and control integrity
 
 ### 4.1 A1 — Enforcement conformance probe
