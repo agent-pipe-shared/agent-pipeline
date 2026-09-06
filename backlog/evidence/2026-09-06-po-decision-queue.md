@@ -278,6 +278,38 @@ their own size, which the continuity-deadlock item now proposes.
 **If never decided:** the procedure waits for #67, which is the current plan,
 and each deadlock class gets handled on its own as it appears.
 
+## 14. Should the bootstrap-receipt gate (GL-09) actually start gating subagents?
+
+**Needs:** a yes or no. No signature, no ceremony, but it is not an
+implementor's call.
+
+GL-09 in `guard-lifecycle-ready.mjs` is built to require a bootstrap preflight
+receipt before a dispatched agent's first `Edit`/`Write`/`NotebookEdit`. It has
+never gated anything, because it identifies a subagent by a transcript-path
+shape no payload carries — the same measured defect as the budget guard's.
+
+Correcting the discriminator does not merely fix bookkeeping there: **it turns
+the gate on.** Every dispatched agent in every session would then be denied its
+first write until a preflight receipt exists. That is very probably what GL-09
+was built for, and it is a real change in what the guard admits, so a dispatch
+briefed only to re-scope state correctly refused to make it silently
+(`NVA-B-GLIDENT-1`, stopped clean, nothing touched).
+
+Two smaller questions ride along and only matter if the answer is yes: a
+payload with a relative transcript path is denied today through an
+invalid-identity sentinel and would flip to admitted; and about a dozen test
+cases exercise identity states the corrected two-state check has no analogue
+for.
+
+The third call site in the same file (`denialClassesScopeKey()`) is
+admission-neutral and needs no decision — it proceeds as ordinary work whatever
+you answer here.
+
+**If never decided:** GL-09 stays dead, and a dispatched agent can write before
+its bootstrap is proven. Nothing breaks that is not already broken; the gate
+simply never becomes real. Full analysis in
+`backlog/items/2026-09-01-subagent-identity-may-never-resolve-so-per-agent-scoping-is-inert.md`.
+
 ---
 
 ## Not on this list, deliberately

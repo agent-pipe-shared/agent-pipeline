@@ -171,9 +171,51 @@ it at 2 and lands in `orchestrator-seen/` instead.
 
 `guard-lifecycle-ready.mjs` still imports `subagentIdentity` (line 85) and uses
 it at three sites (around lines 4314, 4366 and 4474), so the per-agent
-denial-trim scoping this item is about remains inert. The remedy is now a small
-correction rather than the design decision the stop condition assumed: key those
-three sites on the measured discriminator. The AC-4 regression test's own
-weakness stands as recorded — it manufactures the transcript shape it needs, so
-it will keep passing either way and has to be replaced by fixtures carrying the
-two real key sets.
+denial-trim scoping this item is about remains inert.
+
+## Correction 2026-09-06 — the remedy is NOT uniformly small, and one third of it is a PO decision
+
+A dispatch briefed to key all three sites on the measured discriminator
+(`NVA-B-GLIDENT-1`) stopped before touching anything and reported why. It was
+right to, and the sentence above about a "small correction" is only true for
+one of the three sites.
+
+**The three sites are not equivalent.** Sites 1 and 2
+(`recordBootstrapPreflightReceipt` and `evaluateBootstrapReceiptGate`, the
+GL-09 bootstrap-receipt gate) are dead today for the same reason: every real
+subagent classifies as the orchestrator, so GL-09 never gates it. Correcting
+the discriminator does not merely re-scope their state — **it activates the
+gate.** A real subagent would then be denied its first `Edit`/`Write`/
+`NotebookEdit` until a preflight receipt exists. That is a change in what the
+guard admits, for every dispatched agent in every session, and it is very
+probably the behaviour GL-09 was built for. It is still not something to infer
+from a re-scoping task and ship silently.
+
+Site 3 (`denialClassesScopeKey()`) is admission-neutral: it only decides which
+key a denial-trim state lands under, and correcting it changes nothing about
+what is admitted or refused. That one is the small correction.
+
+**A second flip, narrower.** A payload with a present-but-relative
+`transcript_path` is denied today through the 2026-08-29 invalid-identity
+sentinel. An `agent_id`-only discriminator has no analogue for that state, so
+that case would flip from denied to admitted. It needs its own answer.
+
+**The test blast radius is about a dozen cases, not one.** The suite's
+`subagentInput()` helper (around line 7438) never carries `agent_id` or
+`agent_type`, and it backs roughly ten cases besides AC-4 — including
+meta-file-missing, corrupt-meta and spawn-depth states that exercise
+`subagentIdentity()`'s multi-state model, for which a two-state
+`agent_id`-presence check has no equivalent at all. Any correction has to
+decide what those cases become.
+
+**Also measured:** `dispatchBudgetCallerIdentity()` is not exported from
+`guard-dispatch-budget.mjs`, so this file cannot simply reuse the sibling's
+corrected function; it needs a local equivalent or a deliberate export.
+
+**Split, therefore.** Site 3 plus its probe is ordinary work and can proceed on
+its own. Sites 1 and 2 are a GL-09 activation decision — filed for the PO, not
+for an implementor.
+
+The AC-4 regression test's own weakness stands as recorded: it manufactures the
+transcript shape it needs, so it will keep passing either way and has to be
+replaced by fixtures carrying the two real key sets.
