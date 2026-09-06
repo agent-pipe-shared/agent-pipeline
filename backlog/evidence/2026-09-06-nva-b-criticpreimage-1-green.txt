@@ -1,0 +1,20 @@
+command: node --test plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.test.mjs
+label: criticpreimage-green
+exitCode: 0
+--- stdout ---
+ok 1 - F1 protected inventory is closed and names the autonomous-Critic policy baseline
+ok 2 - F1 protected paths are regular in-repository files without aliasing
+ok 3 - F1 current Critic execution surfaces remain byte-identical to the protected baseline
+ok 4 - F1 inventory records full lowercase SHA-256 values
+1..4
+✔ plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.test.mjs (82.99681ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 99.705956
+
+--- stderr ---
