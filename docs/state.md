@@ -87,13 +87,14 @@ Commits survive compaction; intent does not — this block is the intent.
    the positioning inputs persisted verbatim to
    `specs/sprint-nova-epic/design/2026-09-06-positioning-*` (`c90f9131`) —
    the D block reads those, never `scratch/`.
-6. NEXT, after the Critic — stamp 0.6.2 by goldfish-mechanic dispatch, as `63fe8b64` was:
-   `VERSION` → `0.6.2`; the three manifests →
-   `0.6.2+claude|codex|antigravity.<YYYYMMDDHHMMSS>.<7-hex oid of the
-   pre-stamp HEAD>`. Then, with nothing concurrent: full verify at the stamp
-   (expect 516/516), confirm `security-latest.json` binds it, a Critic on
-   the enumerated candidate range, then the PO's push-approval signature
-   (`docs/push-release-flow.md`; the handover commit lands BEFORE signing).
+6. NEXT, after the Critic — LOCAL re-stamp at base 0.6.1 by goldfish-mechanic
+   dispatch, as `331f3f7f` was: the three manifests →
+   `0.6.1+claude|codex|antigravity.<YYYYMMDDHHMMSS>.<7-hex oid of the
+   pre-stamp HEAD>`, `VERSION` untouched (PO 2026-09-06: the 0.6.2 bump comes
+   with the release, not with this local test candidate). Then, with nothing
+   concurrent: full verify at the stamp (expect 516/516), confirm
+   `security-latest.json` binds it. No push and no range Critic now — the
+   candidate serves a local test; the plugin update (#5) follows the stamp.
 
 **Idea-level facts that must not be re-derived wrongly:**
 
