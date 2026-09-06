@@ -925,7 +925,7 @@ const evidence = {
 
 writeEvidence(evidence);
 
-console.log(`\nEvidence written: ${evidencePath}`);
+console.log(`\nEvidence written: ${evidencePath} (run record: ${runEvidencePath})`);
 console.log(`Overall: ${steps.map((s) => `${s.name}=${s.exitCode}`).join(", ")} -> exit ${overallExitCode}`);
 
 process.exit(overallExitCode);
