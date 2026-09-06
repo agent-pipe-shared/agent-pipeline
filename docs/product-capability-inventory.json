@@ -26,6 +26,7 @@
         "guard:plugins/pipeline-core/hooks/guard-git.mjs:guard-git",
         "guard:plugins/pipeline-core/hooks/guard-onboarding-consent-lock.mjs:guard-onboarding-consent-lock",
         "guard:plugins/pipeline-core/hooks/guard-push.mjs:guard-push",
+        "guard:plugins/pipeline-core/hooks/guard-slicing.mjs:guard-slicing",
         "guard:plugins/pipeline-core/hooks/guard-testpath.mjs:guard-testpath",
         "guard:plugins/pipeline-core/hooks/guard-worktree-isolation.mjs:guard-worktree-isolation",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|Edit|Glob|Grep|NotebookEdit|Read|Task|TodoWrite|WebFetch|WebSearch|Write:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch-budget.mjs\"",
