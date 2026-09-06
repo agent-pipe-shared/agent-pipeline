@@ -70,33 +70,42 @@ phase-1 document names an artifact for this); how long onboarding takes.
 
 ## Findings
 
-### R1 — The one audience the PO named is nearly invisible in the word "audit" itself (weighting)
+### R1 — The audience the PO named gets no audit-facing answer on the front door (weighting)
 
-Across all six phase-1 documents (roughly 110 KB combined), the word "audit"
-appears exactly once: as the heading "Governance and audit evidence" in
-`docs/README.md` line 46, pointing to two one-line links
-(`audit-bundles.md`, `evidence-viewer.md`, lines 48–53). It does not appear
-in `README.md`, `SETUP.md`, `PIPELINE_FLOW.md`, `docs/overview.md`, or
-`docs/usage.md` at all. "Compliance" appears once, in the same two-line
-description (`docs/README.md` line 50: "evidence, not a compliance claim").
-For the audience the PO named, the single most relevant question — "what
-would I actually hand an auditor" — has no answer anywhere in the primary
-entry points, and only a buried pointer in the documentation map.
+The string "audit" occurs in only two of the six phase-1 documents:
+`docs/README.md` (the heading "Governance and audit evidence", line 46, and
+the filename/link `audit-bundles.md`, line 48) and `SETUP.md` line 427,
+where it appears only as the adjective "auditable" ("The bootstrap is the
+auditable session entry") — a claim about the bootstrap step, not a pointer
+to any artifact a reader could act on. It does not appear at all in
+`README.md`, `PIPELINE_FLOW.md`, `docs/overview.md`, or `docs/usage.md`.
+Nowhere across the six documents does "audit" name a reason to adopt the
+product, or point a reader to a concrete artifact they could hand an
+auditor. For the audience the PO named, the single most relevant question —
+"what would I actually hand an auditor" — has no answer in the primary entry
+points: only a two-line, easy-to-miss pointer in the documentation map
+(`docs/README.md` lines 46–53), and one unexplained adjective in `SETUP.md`.
 **Proposal:** name the audit/evidence-artifact story in `README.md`'s "What
 you get" list (lines 73–105) and in `docs/overview.md`, not only as a link
-title three clicks deep.
+title three clicks deep, and say what makes the bootstrap "auditable" the
+first time `SETUP.md` uses that word.
 
 ### R2 — Release-status narrative occupies most of README before the value proposition lands (weighting)
 
-`README.md` lines 24–251 (roughly 70% of the 326-line file) is release
-status ("Current release: 0.6.2", Phoenix/Nova/Nova B, lines 24–45),
-approval-configuration nuance (lines 54–62), internal source/plugin
-architecture ("Three roots", lines 109–160), and process diagrams (lines
-161–194) before "## The problem" (64–71) and "## What you get" (73–105) have
-even fully landed relative to it, and long before "## Quick start" (line
-253). The durable value proposition — what the product is, why it exists,
-what you actually get — is real estate-poor next to what reads as the most
-recently-touched content: a versioned release announcement.
+`README.md` sandwiches its actual value proposition — "## The problem"
+(64–71) and "## What you get" (73–105), 42 lines together — between two
+blocks of procedural and architectural content that together run longer:
+release status and approval-configuration nuance before it (lines 24–62:
+"Current release: 0.6.2", Phoenix/Nova/Nova B, "Choose approval strength
+honestly"), and internal source/plugin architecture plus two process
+diagrams after it (lines 107–194: "Three roots", "How it works", "How a run
+flows end to end"). Those two surrounding blocks add up to roughly 115
+lines, more than the value-proposition sections they enclose, and none of
+it is anywhere near "## Quick start" (line 253) — a reader deciding "is
+this for me" meets architecture and release mechanics on both sides of the
+actual pitch. The durable value proposition — what the product is, why it
+exists, what you actually get — is real estate-poor next to what reads as
+the most recently-touched content: a versioned release announcement.
 **Proposal:** move the "Current release" callout (lines 24–45) down, past
 "What you get", or trim it to a one-line pointer to a release-notes page;
 let "The problem" / "What you get" occupy the top of the document.
@@ -218,7 +227,7 @@ and are quoted, not upgraded).
 |---|---|---|---|
 | Audit/evidence artifacts (`audit-bundles.md`, `evidence-viewer.md` — USP catalog marks both "CLI"/shipped; **neither is one of the inventory's 16 declared capabilities**) | Highest — this is what the audience would hand an auditor | Near zero: one link each, `docs/README.md` only, word "audit" nowhere else | **Under-presented** (most severe) |
 | Security-controls / NIST SSDF / OWASP ASVS mapping (USP catalog Pillar 4, marked "shipped"; also **not** one of the 16 declared capabilities, and no page for it appears in `docs/README.md`'s map at all) | High — direct compliance-framework mapping is exactly what an audit-obligated team looks for | Zero in the six phase-1 documents | **Under-presented** |
-| Git/command guardrails and deterministic verify gate (`claude-hook-safety`, `deterministic-verification` — both `status: "shipped"` in the inventory) | Very high — this is the central enforcement claim the whole audience-fit rests on | Low: a 3-line bullet (README 92–98) and one command in a table (README 268); the suite scale (USP catalog: "~515 suites") is never quantified anywhere in the front door | Under-presented relative to its role |
+| Git/command guardrails and deterministic verify gate (`claude-hook-safety`, `deterministic-verification` — both `status: "shipped"` in the inventory) | Very high — this is the central enforcement claim the whole audience-fit rests on | Low: a 3-line bullet (README 92–94) and one command in a table (README 268); the suite scale (USP catalog: "~515 suites") is never quantified anywhere in the front door | Under-presented relative to its role |
 | Four-role model (`human-accountability-roles`, `specialist-agent-roles` — shipped) | High — the organizing idea of the whole product | High — full "What you get" section plus two diagrams | Appropriately weighted |
 | Release/version status narrative (Phoenix/Nova/Nova B — not itself one of the 16 declared capabilities; a framing layer over the release) | Low for a first-time evaluator | Very high — the first ~45 lines of `README.md`, repeated at the end of `PIPELINE_FLOW.md`, `docs/overview.md`, `docs/usage.md` | **Over-presented**, especially by position |
 | Advisor / consult mechanism (folded into `v3-routed-duties`, shipped; itself optional and off by default) | Low-medium | High — ~30 dedicated lines with internal transport/routing names in `SETUP.md` | **Over-presented** relative to its optional, disabled-by-default status |
