@@ -33,64 +33,36 @@ the release is being run as a handover event, not a lifecycle close. No
 
 ## Durable rules carried forward — these have no other home
 
-Extracted from the 2026-08-31 section before its rotation. Each was searched for
-in `CLAUDE.md`, `docs/adr/`, `guardrails/` and `backlog/items/` and found in
-none of them.
+Searched for in `CLAUDE.md`, `docs/adr/`, `guardrails/`, `backlog/items/`;
+found in none. Condensed 2026-09-06 (was verbose since 2026-08-31/09-02) —
+each still needs a real permanent home, not further compression.
 
-1. **The corrected release sequence:** all commits → security scan → full verify
-   → Critic on the final candidate → signature ceremony → push the feature
-   branch → CI against the pushed ref → `main`, tag, release. The
-   version-manifest stamp belongs in the pre-verify batch, not after the Critic.
-   `docs/push-release-flow.md` documents which layer runs as whom, never this
-   ordering.
-2. **`git push --no-verify` deliberately remains available** as git's own escape
-   route (PO instruction), and **no retroactive `approve-push` record is created
-   for a push that had none at execution time** — that is exactly the shape
-   `approve-push` exists to prevent. This sat in unresolved tension with
-   `guardrails/git.md` GG-17, which states the opposite as a guard-enforced MUST
-   NOT with no carve-out. **That tension is resolved — 2026-09-01, PO decision,
-   [ADR-0079](adr/0079-hook-bypass-is-never-agent-overridable.md)** — and this
-   entry's former closing line ("unrecorded and needs a PO decision") was stale.
-   A PO's own deliberate `--no-verify` push in their own terminal remains a
-   conscious human exception outside Pipeline authority; through the Pipeline it
-   is never permitted and the guard must catch it.
-3. **A `resume-hint` receipt proves only that a card's bytes were read**, never
-   that they were understood or acted on — and a `--resume` restart preserves
-   the session id, so capture-then-consumption under one session id is
-   externally indistinguishable from the false re-grounding case the checker
-   exists to catch.
-4. **"GS-6" does not resolve.** The rule cited under that id — a
-   mutation-adjacent action inside a repository the agent may not write outside
-   of is a human-only step — has no text anywhere in `guardrails/`, `CLAUDE.md`
-   or `docs/adr/`. Either the id is stale or the rule was never given a home.
+1. Release sequence: commits → security scan → full verify → Critic →
+   signature ceremony → push feature branch → CI → `main`/tag/release
+   (version-manifest stamp in the pre-verify batch). Not in
+   `docs/push-release-flow.md`.
+2. `git push --no-verify` stays available as a PO-only manual escape outside
+   Pipeline authority, never agent-usable, no retroactive `approve-push`
+   record — resolved 2026-09-01, [ADR-0079](adr/0079-hook-bypass-is-never-agent-overridable.md),
+   but the rule itself isn't restated anywhere else.
+3. A `resume-hint` receipt proves only that a card's bytes were read, never
+   understood/acted on; a `--resume` restart's same session id makes
+   capture-then-consumption indistinguishable from false re-grounding.
+4. "GS-6" (a cited human-only mutation-adjacent rule) has no text anywhere —
+   stale id or a rule never given a home.
+5. `push-prepare`'s `authorize-critical` command has an `--expires-at`
+   window: re-run immediately before signing, never reuse a printout.
+   `docs/push-release-flow.md` names the flag but not this operational
+   warning.
+6. TP-5 owes nothing until re-established — no backlog item names a
+   surviving carve-out; what the maintenance window owes is four suite
+   registrations plus promoting `check-suite-registration.mjs` to a gate
+   step (TP-3, signature-gated).
+7. A Critic's input must be an authorship-only dispatch-record projection
+   (`taskId`/`agentType`/`dispatcher`/`commits` only) — not stated in
+   `CLAUDE.md`, `critic-review.md`, or `roles/critic.md`.
 
-Extracted 2026-09-02 from the section rotated that day, each re-checked against
-its candidate home before being carried rather than assumed homeless.
-
-5. **`push-prepare`'s printed `authorize-critical` command carries an
-   `--expires-at` window: re-run `push-prepare` immediately before signing, and
-   never reuse an earlier printout.** Verified 2026-09-02:
-   `docs/push-release-flow.md` names the flag three times and documents that the
-   value is normalized rather than rejected (line 201), but states this
-   operational warning nowhere.
-6. **TP-5 owes nothing until something re-establishes it.** A "TP-5
-   release-adapter carve-out" was carried in this file's predecessor and in
-   several session summaries and could not be substantiated on 2026-09-01: no
-   backlog item names it, the TP-5 window item is closed, and the TP-3/4/5/6/7
-   restoration item is closed with the rules confirmed `armed`. What the
-   maintenance window still owes is four suite registrations plus promoting
-   `check-suite-registration.mjs` itself to a gate step — all TP-3, i.e. editing
-   `harness/scripts/verify.mjs`, for which signature mode admits no in-session
-   override. All four suites were measured green standalone, so the gap is that
-   the gate does not re-run them, not that the behaviour is unverified; the
-   guards are armed regardless of whether their suites are registered.
-7. **A Critic's input must be an authorship-only projection of a dispatch
-   record**, never the record itself: `taskId`, `agentType`, `dispatcher`,
-   `commits` and nothing more. An implementor's record embeds its own
-   completion-report prose, which contaminated four consecutive Critic rounds
-   before the projection was applied. Verified 2026-09-02: neither `CLAUDE.md`
-   nor `templates/prompts/critic-review.md` nor `roles/critic.md` contains this
-   rule in any form.
+## Nova B session log — 2026-09-01 through today
 
 ### Still-live open questions carried forward
 
