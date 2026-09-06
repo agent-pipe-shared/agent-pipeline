@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "05ff710ebb8969f2b22d893c74740ff1545b7ede3449d4a717fee911cb269914"
+    "transitionHead": "25d5a8fa37b5d0470457eee4896f8c0c8183c9df88eefbe7c912f03ce128ac29"
   },
   "counts": {
-    "open": 99,
+    "open": 100,
     "in_progress": 0,
     "closed": 520,
     "rejected": 3,
@@ -3790,6 +3790,16 @@
       "closureRepository": "self",
       "closureCommit": "e07082b66bba6406b9a4ababb79c003655bbea0d",
       "closureEvidence": "backlog/evidence/2026-09-04-nova-b-batch-3-closure-verification.md"
+    },
+    {
+      "id": "pipeline.isrealpathedwithinboundary-file-boundary-uncaveated",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-06",
+      "source": "T1 Critic review (opus, max) of commit 571e67a820cdf6912b02e069c3c2d68c73a0f443, F2.",
+      "deferred": false,
+      "tracking": "Nova B -- T1 Critic review of NVA-B-GLRMINORS-1 (PASS, 2 minor findings), F2: the hardening for the transcript-file exact-match invariant (commit 571e67a8) lives only at its sole call site, isApprovedSingleCommandReadArg(). The exported isRealpathedWithinBoundary() primitive itself still admits any <file>/<nonexistent-child> candidate when handed a FILE-typed boundary, and its own doc comment still reasons only in directory-boundary terms -- a future caller reusing this primitive with a FILE boundary would silently reopen the exact shape NVA-B-GLRMINORS-1 just closed, with no warning at the primitive itself."
     },
     {
       "id": "pipeline.kickoff-apply-action-drops-runner",
