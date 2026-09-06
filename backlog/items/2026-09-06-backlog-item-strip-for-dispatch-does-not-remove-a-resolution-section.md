@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.strip-for-dispatch-misses-resolution-heading
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-06
+closure_repository: self
+closure_commit: c229cce0d578211cfe9769c3881826caa4d8288f
+closure_evidence: "backlog/items/2026-09-06-backlog-item-strip-for-dispatch-does-not-remove-a-resolution-section.md"
 created: 2026-09-06
 sprint: nova-b
 tracking: "Nova B — discovered while assembling the T1 Critic dispatch for NVA-B-TILDEFIX-1. The backlog item being cited as spec had accumulated a '## Resolution' section (implementor narrative: which commit fixed it, how, and why the fix is believed correct) after its originating dispatch landed. backlog-item-strip-for-dispatch.mjs's output still carried that section verbatim — it only strips known Triage/Closure verdict-shaped headings, and 'Resolution' is not one of the patterns it recognizes."
@@ -89,3 +93,26 @@ regardless of its markdown structure (e.g. a line matching
 every such note to always use a recognized heading, never inline bold.
 Widens the acceptance criteria further: the fix must be robust to a
 verdict/progress note NOT introduced by a heading.
+
+## Closed, 2026-09-06 (`NVA-B-STRIPFIX-1`, commit `c229cce0`)
+
+All three named shapes fixed: `## Resolution` added to the unconditional
+heading allowlist; `## Progress note (...)` gated on a shared verdict-token
+content check (so a delivery-only progress note still survives); a
+headingless bold verdict marker detected independently of any heading. 18/18
+tests pass (6 new), zero existing-assertion changes, `check-consumer-safe-paths`
+9/9. `criticSkip` set by the dispatch (T5: non-A/G/S, risk class low, no risk
+flag) — accepted after independent review of the diff and test suite; a
+text-processing utility with no access-control/security role.
+
+**Flagged, not actioned — a genuinely new recurrence, not this item's
+scope:** the dispatch's own survey of real backlog items found further
+verdict-shaped heading names this fix does NOT catch (`## Closed, ...`, `##
+T1 Critic review of ... — round N (closing) PASS`, `## Re-verified, ...
+stays open`) — none of them "Progress note" or "Resolution", so neither the
+unconditional allowlist nor the content-gated check applies. The pattern is
+now three widenings deep (Resolution → Progress-note → headingless-marker →
+this) and heading names keep multiplying ad hoc; a future pass should
+consider content-gating EVERY heading (not just an ever-growing allowlist)
+as the more durable fix. Left open for a future item rather than expanded
+here.
