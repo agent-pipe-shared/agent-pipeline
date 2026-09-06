@@ -187,3 +187,41 @@ This is exactly the third-importer gap the item's own 2026-08-29 progress
 note flagged as "surfaced ... not yet actioned," and it remains unactioned
 today. Left `status: open`. `done_when` predicate not amended per briefing
 prohibition.
+
+## Progress note (2026-09-06, NVA-B-HGOCOPYSAFE-1, goldfish-deep)
+
+Resolved the `human-guard-override.mjs` third-importer gap named above.
+**Correction to this dispatch's own briefing's stated premise:** the
+briefing asserted `copy-safe-command.mjs` has "no existing mode" to render
+an opaque, already-assembled command string, listing only `placeholder`,
+`forcedQuote`, `boundedCopySafeCommand`, `renderHumanCopySafeCommand` as its
+exports. That list missed `copy-safe-command.mjs`'s own
+`export { boundedOpaqueCopyCommand };` (line 35) — a byte-identical
+re-export of the exact function `project-onboarding-v3.mjs` defines, already
+established as this repository's real precedent for the raw-opaque-string
+disclosure shape at `antigravity-pretool-guard.mjs`
+(`NVA-CF-BL19-COPYSAFEADOPT`: "sourced from the shared renderer module
+rather than project-onboarding-v3.mjs directly"). No new capability was
+needed in `copy-safe-command.mjs`. Delivered (commit `da6b381c`):
+`human-guard-override.mjs`'s import switched from
+`./project-onboarding-v3.mjs` to `./copy-safe-command.mjs` for
+`boundedOpaqueCopyCommand`, with a comment mirroring the antigravity
+precedent; one new round-trip test added to `copy-safe-command.test.mjs`
+proving the re-exported function reconstructs an already-assembled opaque
+command string (space, `$`, non-ASCII) byte-identical through a real shell
+(not `eval`, since an arbitrary opaque string has no shadowable executable
+name to capture argv through the way the argv-assembled tests above do).
+`copy-safe-command.test.mjs`: 32/32 pass (was 31/31). Full existing
+`human-guard-override.test.mjs`: 99/99 pass, zero assertion changes.
+`check-consumer-safe-paths.test.mjs`: 9/9 pass.
+
+**This item stays `status: open`, NOT closed.** Two gaps remain against the
+"every emitter" acceptance criterion: (1) `codex-pretool-guard.mjs:19` still
+imports `boundedOpaqueCopyCommand` directly from `project-onboarding-v3.mjs`
+rather than through `copy-safe-command.mjs`'s re-export, even though that
+file already imports `boundedCopySafeCommand`/`forcedQuote`/`placeholder`
+from `copy-safe-command.mjs` on the very next line — an inconsistency this
+dispatch found but was out of its briefed scope to touch; (2) the
+repository-wide "every OTHER emitter" audit this item's acceptance criteria
+require remains unperformed. Both were out of this dispatch's briefed
+scope (`human-guard-override.mjs` only).
