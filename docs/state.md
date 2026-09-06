@@ -23,14 +23,83 @@
 | 2026-08-11 to 2026-08-19 | Checkpoints 1-60 (2026-08-11 through 2026-08-19 checkpoint 60): superseded session narrative; durable decisions already live in ADRs/backlog/guardrails per this repo's own standing convention, not uniquely in this prose. | [docs/state-archive/2026-08-19--checkpoints-1-through-60.md](state-archive/2026-08-19--checkpoints-1-through-60.md) |
 | 2026-08-26 | 2026-08-25 Antigravity chat-gate-ceremony standardization, verify-tuner stage 2 acceptance, sprint-agy-runner delta4 Critic fix and candidate status | [docs/state-archive/2026-08-26--agy-runner-2026-08-25-handover.md](state-archive/2026-08-26--agy-runner-2026-08-25-handover.md) |
 
-## Current handover — 2026-09-01/02: the autonomous Nova B block
+## Current handover — 2026-09-06: the 0.6.2 local candidate, assembling
 
-**Lifecycle phase:** feature `sprint-nova-epic` · phase `implementation`
+**Lifecycle phase:** feature `sprint-nova-epic` · phase `implementation`.
+Sprint Nova is **not** closed; no `close-block`/`close-feature` invoked.
 
-PO mandate for the day: work items needing no PO interaction until ~17:00, then
-freeze, verify, and hand back a push-ready HEAD. Sprint Nova is **not** closed —
-the release is being run as a handover event, not a lifecycle close. No
-`close-block` and no `close-feature` have been invoked, deliberately.
+**Read next, in this order:** `CHANGELOG.md` `[Unreleased]` (per-item status
+words: *built / gated / wired / exercised*), then
+`backlog/evidence/2026-09-06-po-decision-queue.md` (nine PO items, each with
+cost, effect and what-if-never), then
+`scratch/handover-to-nova-b-2026-09-06.md` (the positioning session's inputs
+and the A→B→C→D assembly order the PO confirmed).
+
+**PO order for this candidate (2026-09-06, chat):** A parallelisation, B
+verify optimisation, C finished-but-unsigned items — *first*. D, the
+doc/positioning block, *afterwards and not in this candidate* ("rest erst
+danach").
+
+### Gate state
+
+`evidence/verify-latest.json` binds `a478b10c`: **514/515 green, one red**,
+`suite-registration-check`, because `guard-slicing.test.mjs` is not in
+`verify.mjs`. Two lines behind a TP-3 signature (queue #1). The parking-entry
+route was deliberately not taken — a T1 finding the same day recorded that
+move as a QG-16 violation. Wall clock **485s**, down from 645.7s
+(`2026-09-06-lane-eviction-measured-result.md`).
+
+### In the candidate
+
+- **A — slicing:** `guard-slicing.mjs`, 42 tests, runner-neutral (Claude by
+  `message.id`, Antigravity by `Subagents[]`, Codex silent by proof — its
+  adapter admits no dispatch tool). **Built, not gated, not wired.** Channel
+  proven three ways; design at `docs/adr/draft-parallel-dispatch-slicing-enforcement.md`,
+  two T1 rounds, acceptance is queue #9. Wiring order is fixed: payload
+  capture (#3) → TP-3 (#1) → `hooks.json` (#2), because the sibling
+  `guard-dispatch-budget.mjs` is registered and **never fires** — logic proven
+  by probe, invocation absent
+  (`2026-09-06-a-dispatchs-own-tool-budget-stop-condition-cannot-fire-….md`).
+- **B — verify:** onboarding suite evicted from the serial lane, −25%,
+  same single red before/after. Clean-eight eviction in flight
+  (`NVA-B-LANEEVICT-2`, ceiling ≈11.7% of the current gate). Top-5 lane
+  members (52%) are process-global — not evictable on this axis
+  (`2026-09-06-verify-lane-achievable-win.md`). Trend 419→571→646→482→485s in
+  the 2026-09-01 regression item, which stays open.
+- **C — finished, needs a PO step:** plugin update + `/reload-plugins` (#5,
+  installed guard copies stale); one shared TP-4 ceremony for all pending
+  `hooks.json` edits (#2); ADR-0079 scope sentence; release mechanics
+  (CHANGELOG has the entry; version stamp, security scan, Critic, push
+  approval, CI green *before* `main` — 0.6.1 went to `main` under bypass with
+  CI red, do not repeat).
+- **Also landed:** `guard-dispatch.mjs` importable without self-disarm +
+  symlink regression; `guard-dispatch.test.mjs` silent-pass removed, proven;
+  denial-code accuracy fix; Critic preflight `--sweep-evidence` (gated, 10
+  checks); selected-Codex-Critic transport with a real consumer — **built,
+  not exercised** (runner classifier blocks the sandbox spawn, queue #7/#8;
+  one T1 FAIL, F1/F2/F4 fixed in `70287f72`, F3 filed). Alfred handover
+  answered: `2026-09-06-codex-critic-transport-handover-answer.md`.
+
+### Not in the candidate, deliberately
+
+The D block (doc-drift fixes, capability inventory, front door, metering),
+per PO order. 60 of 63 open Nova-B items untouched. The stale
+`docs/pending-verify-registrations.md` banner (all four suites *are*
+registered, `verify.mjs:670–689`) is D.1.
+
+### The day's dispatcher-side findings — inherit the rule, not the commit
+
+Four T1 rounds, four FAIL; the load-bearing finding was mine each time:
+(1) Critic briefings contaminated with conclusions presented as facts —
+*a bare fact must be confirmable by opening a named path*; (2) a false
+absence claim — *an absence claim names where it looked*; now mechanical via
+`--sweep-evidence`; (3) "satisfy the check" read correctly as "silence the
+check" — *never instruct a dispatch to satisfy a tripwire; name the one
+admissible way or make it a stop condition*; (4) a dispatch-disclosed quirk
+relayed as settled — *a disclosed quirk is a finding handed over early*.
+Registries: `backlog/evidence/2026-09-06-nva-b-*-findings.md`. Also: five of
+five budgeted dispatches overran their tool budget; the guard that would stop
+them at 65 of 80 turns never fires (queue #3).
 
 ## Durable rules carried forward — these have no other home
 
