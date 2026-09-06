@@ -1,0 +1,104 @@
+command: git show d398a662
+label: d398a662 full diff (Elephant-authored, submitted for T1 review)
+exitCode: 0
+--- stdout ---
+commit d398a66212278cc6052c1b1fa467d085ffa1c6e7
+Author: The Agent-Pipeline Contributors <301875187+agent-pipe-shared@users.noreply.github.com>
+Date:   Sun Sep 6 07:14:00 2026 +0200
+
+    fix(codex-pretool-guard): import boundedOpaqueCopyCommand via copy-safe-command.mjs
+    
+    codex-pretool-guard.mjs imported boundedOpaqueCopyCommand directly from
+    project-onboarding-v3.mjs instead of through the shared copy-safe-command.mjs
+    re-export -- the same gap NVA-B-HGOCOPYSAFE-1 fixed for
+    human-guard-override.mjs. copy-safe-command.mjs already re-exports the exact
+    same function unchanged, so this is a pure import-source swap with zero
+    behavior change: full codex-pretool-guard.test.mjs (38/38) stays green.
+    
+    This was the disclosed remaining gap in
+    backlog/items/2026-08-28-po-facing-commands-are-not-uniformly-rendered-break-safe.md;
+    the repo-wide "every emitter" audit for that item is still unperformed.
+    
+    AI-Assisted: true
+
+diff --git a/backlog/evidence/2026-09-06-nva-b-codexguardimport-1-green.txt b/backlog/evidence/2026-09-06-nva-b-codexguardimport-1-green.txt
+new file mode 100644
+index 00000000..373aac7b
+--- /dev/null
++++ b/backlog/evidence/2026-09-06-nva-b-codexguardimport-1-green.txt
+@@ -0,0 +1,54 @@
++command: node --test plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs
++label: codex-pretool-guard.test.mjs after import-source swap
++exitCode: 0
++--- stdout ---
++ok 1 - Codex manifest matches the repository version and has a native hook descriptor
++ok 2 - Codex build-metadata stamp admits timestamp-and-OID and rejects malformed forms
++ok 3 - descriptor uses quoted PLUGIN_ROOT with Windows parity for both routing families
++ok 4 - Human override Git observation keeps a bounded cold-repository budget
++ok 5 - Bash, apply_patch, Edit and Write each reach their intended guard family
++ok 6 - multiple Bash guard denials are aggregated into one Codex decision
++ok 7 - F1: codex adapter recognizes every push shape guard-push.mjs itself recognizes, via shared normalization
++ok 8 - F1: the shared-normalization fix does not widen push detection to non-push commands
++ok 9 - F1 round 2: codex adapter recognizes the directPush and shellWrapperPush shapes guard-push.mjs itself recognizes
++ok 10 - F1 round 3: codex adapter recognizes the escaped-value and unrecognized-global-option push shapes lib/git-cmd.mjs now classifies
++ok 11 - bounded rg-to-rg search filtering remains read-only without an override loop
++ok 12 - attended Human override admits only the exact next tool call and is then consumed
++ok 13 - ADR-0059 Decision 4: the continuation names the configured mode's own final step, in both modes
++ok 14 - Pipeline Author Repair selects one exact source root and consumes one patch
++ok 15 - local plugin-cache installation returns one external boundary without an audit retry loop
++ok 16 - a safe Bash cross-repository-boundary denial carries the literal command and a copyCommand
++ok 17 - a secret-bearing Bash cross-repository-boundary denial never carries the secret verbatim
++ok 18 - override persistence failure remains a sanitized fail-closed denial
++ok 19 - Codex routes a documented Git override prefix to the Push-Gate's actual command
++ok 20 - ordinary ungoverned shell commands do not start heavyweight guards
++ok 21 - runtime-only V3 targets activate lifecycle enforcement in the outer adapter
++ok 22 - Codex outer adapter admits only the exact pre-ready V4 recovery diagnostics
++ok 23 - Codex native cwd wins over a stale inherited CLAUDE_PROJECT_DIR
++ok 24 - governed bootstrap can read only its loaded pipeline-start skill and current directory
++ok 25 - outer Codex routing admits the exact bounded diagnostic pipeline while non-ready
++ok 26 - lifecycle readiness is additive and aggregates with existing write guards
++ok 27 - Codex adapter blocks consumer-to-source drift for Edit, apply_patch and plugin mutation
++ok 28 - existing write-guard warnings remain warnings in an ungoverned repository
++ok 29 - malformed, unsupported and incomplete tool inputs fail closed
++ok 30 - GF-060: a secret-bearing denial reaching the host-boundary route never carries the secret verbatim
++ok 31 - GF-060: a confirmed non-secret Bash denial reaching the host-boundary route keeps the literal command actionable
++ok 32 - GF-060: a non-Bash denial reaching the host-boundary route never carries a misleading empty-string command
++ok 33 - GF-064: a secret-bearing Bash denial reaching the host-boundary route never carries the secret verbatim
++ok 34 - GF-094: a non-secret Bash host-boundary denial carries a bounded, pre-quoted copyCommand alongside the raw command
++ok 35 - GF-094: a secret-bearing Bash host-boundary denial never leaks the secret through copyCommand either
++ok 36 - GF-094: a non-Bash host-boundary denial never carries a copyCommand field either
++ok 37 - NVA-CROSSREPOGUIDANCE-1: a cross-repository denial prints the TARGET repo in every ceremony line, and the printed plan command actually resolves there
++ok 38 - NVA-CROSSREPOGUIDANCE-1: an ordinary in-root denial still prints the session's own root, unchanged
++1..38
++✔ plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs (56674.396307ms)
++ℹ tests 1
++ℹ suites 0
++ℹ pass 1
++ℹ fail 0
++ℹ cancelled 0
++ℹ skipped 0
++ℹ todo 0
++ℹ duration_ms 56691.521883
++
++--- stderr ---
+diff --git a/plugins/pipeline-core/hooks/codex-pretool-guard.mjs b/plugins/pipeline-core/hooks/codex-pretool-guard.mjs
+index 66a799f5..788abf7e 100644
+--- a/plugins/pipeline-core/hooks/codex-pretool-guard.mjs
++++ b/plugins/pipeline-core/hooks/codex-pretool-guard.mjs
+@@ -16,8 +16,12 @@ import {
+ } from "../lib/human-guard-override.mjs";
+ import { USER_SOURCE_PATH, readHumanApprovalMode } from "../lib/critical-human-proof-policy.mjs";
+ import { loadRuntimeProjectionV3OwnedKeys } from "../lib/runtime-projection-v3.mjs";
+-import { boundedOpaqueCopyCommand } from "../lib/project-onboarding-v3.mjs";
+-import { boundedCopySafeCommand, forcedQuote, placeholder } from "../lib/copy-safe-command.mjs";
++import {
++  boundedCopySafeCommand,
++  boundedOpaqueCopyCommand,
++  forcedQuote,
++  placeholder,
++} from "../lib/copy-safe-command.mjs";
+ import {
+   nativeHookSessionId,
+   rememberedNativeHookFailure,
+
+--- stderr ---
