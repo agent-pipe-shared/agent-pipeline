@@ -1721,4 +1721,66 @@ await checkAsync("runSelectedCriticHost returns selected-sandbox-required, not s
   assert.equal(result.selectionId, selection.selectionId);
 });
 
+// --- NVA-B-XPORTFIX-2: a child that completed (the app server's own terminal
+// record says childStarted:true, exitCode:0, stdioStatus:"complete",
+// cleanupStatus:"complete") but then fails the selected-host binding checks
+// (identity/selection/dispatch, not the terminal shape) must not have that
+// real observation discarded. selectedCriticInProcessBridge.launch() used to
+// collapse this case to {childStarted: undefined}, which the generic,
+// untouched runSandboxedReadonlyHostBridge routes to postLaunchFailure() --
+// synthesizing exitCode:null/stdioStatus:"lost"/cleanupStatus:"pending" for a
+// run that plainly finished. The duty receipt still has to report the
+// failure (dutyReceipt.status:"error"); only the terminal must stop being
+// falsified. ---
+
+await checkAsync("selectedCriticInProcessBridge carries the app server's own observed terminal through to the persisted execution receipt when the child completed but a selected-host binding check failed, instead of postLaunchFailure()'s synthesized lost-stdio shape for a run that finished -- driven through the real, unedited runSandboxedReadonlyHostBridge so postLaunchFailure() would fire here if this branch regressed", async () => {
+  const input = {
+    repoFingerprint: "b".repeat(64),
+    dispatch: { queueRevision: 1, candidateCommit: "c".repeat(40), candidateTree: "d".repeat(40), referenceSetSha256: "e".repeat(64) },
+    referencePaths: ["roles/critic.md"],
+    reviewBase: "9".repeat(40),
+    sandboxRuntime: { repoRoot: DEFAULT_PIPELINE_ROOT },
+  };
+  const selection = criticSelectionFixture(input);
+  const scratch = { path: "/tmp/critic-scratch", sha256: selection.profile.scratchRootSha256, sandboxStateJson: "{}", sandboxStateSha256: "8".repeat(64), repoRoot: input.sandboxRuntime.repoRoot, codexPath: "/codex" };
+  const requested = { runner: "codex", model: "gpt-5.6-sol" };
+  const built = selectedCriticInProcessBridge(input, {
+    // The app server observed a genuine completion but reports the wrong
+    // model effort -- a binding fact this bridge must still refuse to
+    // accept as a reviewed verdict, even though the child plainly ran.
+    invokeAppServer: async ({ sandboxTransport }) => ({
+      status: "reviewed",
+      verdict: { pass: true, findings: [], summary: "ok" },
+      identity: { provider: "openai", modelId: "gpt-5.6-sol", effort: "high" },
+      sandboxExecution: {
+        schema: "pipeline.codex-sandbox-host-execution.v1",
+        selectionId: sandboxTransport.selectionId,
+        selectionSha256: sandboxTransport.selectionSha256,
+        repoFingerprint: sandboxTransport.repoFingerprint,
+        duty: sandboxTransport.duty,
+        dispatch: sandboxTransport.dispatch,
+        observed: { cliSha256: sandboxTransport.toolchain.cliSha256, profileSha256: sandboxTransport.profile.sha256, networkEnabled: true, scratchRootSha256: sandboxTransport.profile.scratchRootSha256 },
+        terminal: { childStarted: true, exitCode: 0, stdioStatus: "complete", cleanupStatus: "complete" },
+      },
+    }),
+  });
+  let resealed = 0;
+  const execution = await runSandboxedReadonlyHostBridge({
+    selectionId: selection.selectionId, duty: "critic", requested, references: input.referencePaths,
+  }, {
+    readSelection: async () => selection,
+    readback: async ({ profile }) => profile,
+    resolveScratch: async () => scratch,
+    resealScratch: async () => { resealed += 1; },
+    launch: built.bridge.launch,
+    finalize: built.bridge.finalize,
+  });
+  assert.equal(execution.terminal.childStarted, true);
+  assert.equal(execution.terminal.exitCode, 0);
+  assert.equal(execution.terminal.stdioStatus, "complete");
+  assert.equal(execution.terminal.cleanupStatus, "complete");
+  assert.equal(execution.dutyReceipt.status, "error");
+  assert.equal(resealed, 1);
+});
+
 process.stdout.write(`1..${passed}\n# pass ${passed}\n`);

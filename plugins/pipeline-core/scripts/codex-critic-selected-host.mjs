@@ -17,7 +17,12 @@
  *
  * Every receipt field below is either copied from the caller's own bound
  * input or copied from an observed fact the consumer reported; nothing here
- * synthesises a terminal observation, an exit code, or a cleanup status.
+ * synthesises a terminal observation, an exit code, or a cleanup status --
+ * including on the completed-but-bound-failure branch inside launch()
+ * below, where the child ran to completion but some other binding fact
+ * (identity, selection, dispatch) failed to match: the observed terminal is
+ * carried through to the execution receipt exactly as reported, and only
+ * the duty receipt records the failure.
  */
 import { createHash } from "node:crypto";
 
@@ -135,15 +140,26 @@ export function selectedCriticInProcessBridge(input, { invokeAppServer = invokeC
     if (result?.status !== "reviewed" || !result.verdict || typeof result.verdict !== "object" || Array.isArray(result.verdict)
       || !result.sandboxExecution || result.identity?.provider !== "openai" || result.identity?.modelId !== "gpt-5.6-sol"
       || result.identity?.effort !== "xhigh" || !matchesSelectedHostExecution(result.sandboxExecution, sandboxTransport)) {
-      // Pass the consumer's own observation through unchanged: it reports a
-      // top-level childStarted only on its "unavailable" path (a spawn that
-      // never started a child at all is `false`; one that started but
-      // produced an invalid verdict is `true`). A "reviewed" result that
-      // fails the binding checks above carries no top-level observation --
-      // its child did start (invokeCodexCriticAppServer's own terminal
-      // record says so), but nothing here re-derives that; it stays
-      // undefined, which the generic bridge already treats as a distinct,
-      // conservative "unclear" case (postLaunchFailure()), not as "false".
+      // Two different failure shapes reach this branch, and only one of them
+      // carries a real observation. When the consumer never reports a
+      // terminal at all (result.sandboxExecution is absent -- its own
+      // "unavailable" path, no full run to describe), there is nothing here
+      // to carry through: fall back to the consumer's own top-level
+      // childStarted (false for a spawn that never started; undefined
+      // otherwise), which the generic bridge's postLaunchFailure() treats as
+      // its conservative "unclear" case. But when result.sandboxExecution IS
+      // present with terminal.childStarted true, the child DID start and
+      // finish -- the consumer's own terminal record says so -- and only
+      // some other binding fact (identity, selection, dispatch) failed to
+      // match. Store that observation and let finalize() below carry it
+      // through untouched, with the duty receipt (not the terminal) carrying
+      // the failure -- rather than let it fall into postLaunchFailure()'s
+      // synthesized "lost stdio" shape for a run that plainly completed.
+      const observedTerminal = result?.sandboxExecution?.terminal;
+      if (observedTerminal?.childStarted === true) {
+        completed.set(request.selectionId, { result, sandboxTransport, bindingFailed: true });
+        return { childStarted: true, selectionId: request.selectionId };
+      }
       return { childStarted: typeof result?.childStarted === "boolean" ? result.childStarted : undefined };
     }
     completed.set(request.selectionId, { result, sandboxTransport });
@@ -152,14 +168,13 @@ export function selectedCriticInProcessBridge(input, { invokeAppServer = invokeC
   const finalize = async ({ selection, launched, requested }) => {
     const completedResult = completed.get(selection?.selectionId);
     if (!completedResult || launched?.selectionId !== selection.selectionId) fail("selected Critic launch result is unavailable");
-    const { result, sandboxTransport } = completedResult;
+    const { result, sandboxTransport, bindingFailed } = completedResult;
     if (sandboxTransport.selectionSha256 !== sandboxSelectionDigest(selection)
       || sandboxTransport.repoFingerprint !== selection.repoFingerprint
       || !equal(sandboxTransport.dispatch, selection.dispatch)
       || !equal(sandboxTransport.requested, requested)) fail("selected Critic binding drifted");
-    const receipt = receiptFor({ selection, requested, identity: result.identity, verdict: result.verdict });
     const hostExecution = result.sandboxExecution;
-    const execution = {
+    const header = {
       schema: "pipeline.codex-sandbox-execution-receipt.v1",
       selectionId: selection.selectionId,
       selectionSha256: sandboxSelectionDigest(selection),
@@ -170,8 +185,28 @@ export function selectedCriticInProcessBridge(input, { invokeAppServer = invokeC
       observed: structuredClone(hostExecution.observed),
       terminal: structuredClone(hostExecution.terminal),
       assurance: structuredClone(selection.assurance),
-      dutyReceipt: { schema: "pipeline.critic-receipt.v1", sha256: sha256(canonicalJson(receipt)), status: "reviewed" },
       createdAt: new Date().toISOString(),
+    };
+    if (bindingFailed) {
+      // The consumer's own terminal record above is carried through
+      // unchanged -- it already reflects the real completion. Only the duty
+      // receipt reports the failure: no verdict is certified as reviewed
+      // when the binding checks that would authorize doing so did not pass.
+      const execution = {
+        ...header,
+        dutyReceipt: {
+          schema: "pipeline.critic-receipt.v1",
+          sha256: sha256(canonicalJson({ schema: "pipeline.codex-sandbox-transport-failure.v1", selectionId: selection.selectionId, phase: "finalize" })),
+          status: "error",
+        },
+      };
+      completed.set(selection.selectionId, { result, execution });
+      return execution;
+    }
+    const receipt = receiptFor({ selection, requested, identity: result.identity, verdict: result.verdict });
+    const execution = {
+      ...header,
+      dutyReceipt: { schema: "pipeline.critic-receipt.v1", sha256: sha256(canonicalJson(receipt)), status: "reviewed" },
     };
     completed.set(selection.selectionId, { result, receipt, execution });
     return execution;
