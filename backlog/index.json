@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "3ed1b3ae97d941f5516347b2399cbd75f7127a0d5b7daa599b911528ccff8a4a"
+    "transitionHead": "8bc61f30e2976034d11c6bfd91ac4619f04d618ed66e20e591fb7838b5791cfe"
   },
   "counts": {
-    "open": 101,
+    "open": 103,
     "in_progress": 0,
     "closed": 521,
     "rejected": 3,
@@ -1144,6 +1144,16 @@
       "closureRepository": "self",
       "closureCommit": "e7d729042a1dfdf6439c74959b143eade6d7870c",
       "closureEvidence": "backlog/items/2026-08-08-a-briefings-model-field-can-contradict-the-agent-it-dispatches.md"
+    },
+    {
+      "id": "pipeline.budget-guard-test-suite-silent-pass",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-06",
+      "source": "T1 Critic finding F3 on commits adc165bb/e4aeb8fe, 2026-09-06. The hazard's effect is not argued but measured: evidence/NVA-B-GD16HARDEN-1-red-demonstration.txt Part B is an executed probe showing node --test reporting a module whose import consumes control via process.exit(0) as one passing test.",
+      "deferred": false,
+      "tracking": "Nova B -- guard-dispatch-budget.test.mjs imports its module at the test file's own module scope. If that guard's entrypoint gate ever regresses to an unconditional top-level body, the import calls process.exit at module-evaluation time and node --test reports the whole file as ONE PASSING TEST with no assertion having run. The sibling suite guard-dispatch.test.mjs had the identical shape and it was removed in e4aeb8fe; this one was on that package's no-go list and was carried forward in a commit message body, which is not a tracked mitigation."
     },
     {
       "id": "pipeline.canonical-verify-evidence-path",
@@ -7202,6 +7212,16 @@
       "closureRepository": "self",
       "closureCommit": "4a3534ce970962eda367f6eeb523e69ceb84da94",
       "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
+    },
+    {
+      "id": "pipeline.tool-budget-stop-condition-cannot-fire",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-06",
+      "source": "Direct measurement, 2026-09-06: NVA-B-VERIFYLANE-2 used ~59-61 tool calls against a briefed 45+5 and reported the overrun only after an advisor consult flagged it retroactively; NVA-B-DENIALCODE-1 reached the harness turn limit at 80 against a briefed 40+5, losing its report entirely.",
+      "deferred": false,
+      "tracking": "Nova B -- every Goldfish briefing carries 'tool budget reached or clearly about to be exceeded' as a stop condition, but an agent has no counter to read: it must estimate its own tool-call count from memory of its own turn. Measured twice on 2026-09-06 in one session: both dispatches overran and neither stop condition fired. This is a sibling of the closed maxTurns-cliff item, not a duplicate -- that one was about the hard limit being unannounced, this one is about the soft limit being unobservable to the agent expected to honour it."
     },
     {
       "id": "pipeline.tp-ceremony-denials-inline-a-150-line-multi-shell-block-by-default",

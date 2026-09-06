@@ -99,6 +99,7 @@
 | pipeline.briefed-tool-budget-sits-below-an-unannounced-harness-maxturns-cliff | closed | defect | pipeline | 2026-08-23 | — |
 | pipeline.briefing-bundling-two-findings-asks-for-two-dispatches | closed | defect | pipeline | 2026-09-01 | Nova B — dispatcher-side scoping defect: bundling two independent review findings into one briefing produced a package that could not fit any single tool budget, and the overrun was read as an agent problem rather than a briefing problem. |
 | pipeline.briefing-model-field-contradicts-agent-definition | closed | defect | pipeline | 2026-08-08 | — |
+| pipeline.budget-guard-test-suite-silent-pass | open | defect | pipeline | 2026-09-06 | Nova B -- guard-dispatch-budget.test.mjs imports its module at the test file's own module scope. If that guard's entrypoint gate ever regresses to an unconditional top-level body, the import calls process.exit at module-evaluation time and node --test reports the whole file as ONE PASSING TEST with no assertion having run. The sibling suite guard-dispatch.test.mjs had the identical shape and it was removed in e4aeb8fe; this one was on that package's no-go list and was carried forward in a commit message body, which is not a tracked mitigation. |
 | pipeline.canonical-verify-evidence-path | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.canonical-worktree-lifecycle | closed | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.capability-first-advisor-critic-dispatch | closed | workflow-improvement | pipeline | 2026-08-18 | — |
@@ -582,6 +583,7 @@
 | pipeline.three-onboarding-suites-pass-locally-and-fail-in-ci | closed | defect | pipeline | 2026-09-01 | — |
 | pipeline.three-runners-showed-wide-pipeline-administration-overhead-variance | open | idea | pipeline | 2026-08-29 | — |
 | pipeline.three-smaller-greenfield-defects | closed | defect | pipeline | 2026-08-08 | — |
+| pipeline.tool-budget-stop-condition-cannot-fire | open | defect | pipeline | 2026-09-06 | Nova B -- every Goldfish briefing carries 'tool budget reached or clearly about to be exceeded' as a stop condition, but an agent has no counter to read: it must estimate its own tool-call count from memory of its own turn. Measured twice on 2026-09-06 in one session: both dispatches overran and neither stop condition fired. This is a sibling of the closed maxTurns-cliff item, not a duplicate -- that one was about the hard limit being unannounced, this one is about the soft limit being unobservable to the agent expected to honour it. |
 | pipeline.tp-ceremony-denials-inline-a-150-line-multi-shell-block-by-default | closed | workflow-improvement | pipeline | 2026-08-30 | NOW / Nova A -- PO decision 2026-08-30, item #12 of a 12-point instruction list: implement the Elephant's own guard-verbosity-slimming proposal. |
 | pipeline.tp-guard-rules-lifted-on-the-merging-machine-must-be-restored | closed | defect | pipeline | 2026-08-27 | — |
 | pipeline.transactional-readbacks-not-status-cascades | closed | workflow-improvement | pipeline | 2026-08-18 | — |
@@ -644,7 +646,7 @@
 
 ## Counts
 
-- open: 101
+- open: 103
 - in_progress: 0
 - closed: 521
 - rejected: 3
