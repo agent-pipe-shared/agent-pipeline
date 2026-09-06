@@ -90,6 +90,31 @@ can do.
 - `plugins/pipeline-core/scripts/repair-map.mjs` — today it correctly reports
   that no lift exists; with a sanctioned repair path it would name one.
 
+## The principle is already designed, for a different trigger
+
+Issue #97 ("Support PO-approved design amendments during implementation
+without full rebaseline", `sprint:nightwing`, P1/L) contains the same
+principle as its scope item 7, in almost these words: unapproved authority
+drift during implementation "must not trigger a generic Design rollback or
+lifecycle deadlock", must return a typed result such as
+`design-amendment-required`, and "the guard must permit those exact recovery
+actions while continuing to block implementation that depends on unapproved
+design changes".
+
+That is exactly the shape asked for above, and it was designed for a
+different trigger: a design change discovered mid-implementation, not an
+evidence-path collision at close time. So the principle is settled and the
+mechanism is not — issue #97 builds it for authority drift only, sits in the
+Nightwing planning window, and carries an activation gate on #67 (the
+integrated Nova/Cyborg/Phoenix baseline). Nothing in it covers this item's
+trigger, and waiting for it means waiting for a large lifecycle redesign to
+land first.
+
+The useful reading: do not pull issue #97 forward, and do not duplicate it.
+Take its typed-result-plus-sanctioned-recovery pattern as the settled
+precedent for how a fail-closed gate should behave, and apply it to this
+trigger at the size this trigger deserves.
+
 ## Proposal
 
 Take prevention first, because it is small, mechanical, and removes the whole
