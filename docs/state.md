@@ -61,14 +61,14 @@ the intent.
 
 **Exact sequence, in order, nothing skipped:**
 
-1. **`NVA-B-XPORTFIX-2` may still be running** (goldfish-deep, carries the
-   observed terminal through on the transport's completed-but-bound-failure
-   branch; two-round Critic cap is spent → Elephant self-verifies). If a
-   notification says it landed: verify its commit with
-   `dispatch-authorship-verify.mjs --commit <sha>` and read its red/green
-   captures under `evidence/NVA-B-XPORTFIX-2-*`. If it was cut at the turn
-   limit: check `git status`, complete its record honestly as
-   `completedBy: orchestrator`, commit its files path-scoped.
+1. **`NVA-B-XPORTFIX-2` IS DONE — `eb9c477f` (fix + test 110), `3f30b2c7`
+   (evidence). Use it; do NOT re-dispatch.** Self-verified after the spent
+   cap: both commits bind (authorship PASS ×2), two source files only, RED
+   is a real exit 1 at case 110, GREEN 110/110, cases 108/109 shown red
+   against pre-`70287f72`. Closes round-2 F-A/F-B. Open: the sibling
+   `advisory-host-bridge.mjs` has the same collapse (out of scope); both
+   transport dispatches force-added captures under `evidence/` against
+   `.gitignore`/ADR-0063 — decide once, don't revert twice.
 2. **SEQUENCE AMENDED after a resume-hint card was captured** (its own
    note: *"a live Resume-Hint card fails resume-consumption-check until a
    later session runs `resume-hint.mjs consume`"*). So the gate cannot be
