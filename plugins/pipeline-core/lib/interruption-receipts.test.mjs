@@ -200,6 +200,38 @@ test("accessors, symbols, sparse arrays and custom prototypes reject without get
   assert.equal(invoked, 0);
   const value = input(); Object.setPrototypeOf(value, null); Object.setPrototypeOf(value.scope, null); receipt(value);
 });
+for (const kind of ["null", "string", "message getter", "private message", "descriptor trap"]) test(`classifier closes hostile ${kind} exceptions without reading getters`, () => {
+  let invoked = 0;
+  const privateText = "synthetic-private-path/token";
+  const thrown = kind === "null" ? null : kind === "string" ? privateText
+    : kind === "message getter" ? Object.defineProperty({}, "message", { get() { invoked++; return privateText; } })
+    : kind === "private message" ? new Error(privateText)
+    : new Proxy({}, { getOwnPropertyDescriptor() { throw privateText; } });
+  const hostile = new Proxy({}, { getPrototypeOf() { throw thrown; } });
+  assert.throws(() => classify(hostile, registry), { name: "TypeError", message: "C1-SHAPE" });
+  assert.throws(() => classify(input(), hostile), { name: "TypeError", message: "C1-REGISTRY" });
+  assert.equal(invoked, 0);
+});
+test("classifier rejects input getters and retains closed validation categories", () => {
+  let invoked = 0;
+  const value = input();
+  Object.defineProperty(value.actor, "runner", { enumerable: true, get() { invoked++; return "synthetic-private"; } });
+  assert.throws(() => classify(value, registry), { name: "TypeError", message: "C1-SHAPE" });
+  assert.equal(invoked, 0);
+  const cases = [
+    ["C1-SHAPE", (v) => { v.observations[0].sourceKind = "synthetic-private"; }],
+    ["C1-BINDING", (v) => { v.binding.artifacts[0].sha256 = B; }],
+    ["C1-TIME", (v) => { v.firstObservedAt = time(11); }],
+    ["C1-LINEAGE", (v) => { v.joins.reviews = reviews().slice(1); }],
+    ["C1-CONFLICT", (v) => { resolve(v); v.resolution.class = "deliberate-stop"; }],
+  ];
+  for (const [message, mutate] of cases) {
+    const invalid = input(); mutate(invalid);
+    assert.throws(() => classify(invalid, registry), { name: "TypeError", message });
+  }
+  const rules = clone(registry); rules.rules[0].provenance.section = "synthetic-private";
+  assert.throws(() => classify(input(), rules), { name: "TypeError", message: "C1-REGISTRY" });
+});
 test("collection bounds, primitive types and sorted unique observations are enforced", () => {
   for (const mutate of [(v) => { v.joins.usages = Array(4097).fill({}); }, (v) => { v.observations[0].facts = ["expected-boundary", "expected-boundary"]; }, (v) => { v.typedCode = 42; }, (v) => { v.actor.runner = Infinity; }, (v) => { delete v.actor.runner; }, (v) => { v.observations = []; }]) {
     const value = input(); mutate(value); rejected(value);

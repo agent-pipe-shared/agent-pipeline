@@ -220,8 +220,12 @@ function classify(input, registry) {
 }
 /** Invalid classification inputs throw only a closed C1 diagnostic. */
 export function classifyInterruption(input, registry) {
-  registryCheck(registry);
-  return classify(normalize(input), registry);
+  try {
+    registryCheck(registry);
+    return classify(normalize(input), registry);
+  } catch (error) {
+    fail(diagnostic(error));
+  }
 }
 const fold = (statuses) => STATUSES[Math.max(...statuses.map((status) => STATUSES.indexOf(status)))];
 const metric = (value, status, unit) => ({ value: ["measured", "estimated"].includes(status) ? value : null, status, unit });
