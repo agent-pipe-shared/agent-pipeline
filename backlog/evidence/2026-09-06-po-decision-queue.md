@@ -51,9 +51,25 @@ no data to be decided on.
 
 ## 3. Payload capture: why does `guard-dispatch-budget.mjs` never fire?
 
-**IN PROGRESS 2026-09-06** — hook installed, Claude Code restarted, one
-read-only subagent ran in the new session; awaiting the PO's `remove` and
-`show` of the capture log.
+**DONE 2026-09-06 — answered, and the answer is actionable.** The capture ran
+against two live dispatches. Every payload, from a dispatched subagent as much
+as from the orchestrator, carries the PARENT session's `transcript_path` and
+`session_id`; no payload ever carries a `subagents/agent-<id>.jsonl` path. The
+guard's discriminator therefore never matches, which is exactly why its
+counter never moved. The real discriminator is the key set: a subagent payload
+carries `agent_id` and `agent_type`, an orchestrator payload does not, and
+`agent_type` additionally names the agent definition, so a budget could be
+tiered per tier. The capture hook itself was dead for hours for an unrelated
+reason worth remembering: its inline `node -e` program carried the log path in
+double quotes inside a double-quoted program, the shell stripped the inner
+pair, node died on a SyntaxError, and a `PreToolUse` hook exiting
+non-zero-but-not-2 reports only to the user — invisible from inside the
+session. The sink is a file now. Full record:
+`scratch/payloadcapture-finding.md`, to be filed as evidence.
+
+**No longer blocked on the PO.** The guard fix (swap the discriminator to the
+presence of `agent_id`, with tests pinning both payload shapes) is ordinary
+work and is filed as its own backlog item.
 
 **Needs:** a temporary hook in the user-level `~/.claude/settings.json` plus a
 Claude Code restart — the same cheap route the channel probe used, no
@@ -93,10 +109,12 @@ the conflict simply stays unresolved and will be rediscovered.
 
 ## 5. Stale installed plugin copy
 
-**READY 2026-09-06** — the local candidate is stamped (`6565190d`,
-`0.6.1+claude.20260906172530.87af6b6`) and green (516/516 at `c784a462`);
-the marketplace/plugin update can run now, followed by `/reload-plugins`
-and a readback of the loaded version.
+**DONE 2026-09-06** — the PO ran the marketplace copy, `claude plugin update`
+and `/reload-plugins`; the preflight reads back
+`0.6.1+claude.20260906172530.87af6b6` as the loaded version, so this
+checkout's own sessions now enforce the current guards. No restart was needed:
+`hooks.json` changed only inside its `$comment` between the installed build
+and this one.
 
 **Needs:** a marketplace/plugin update plus `/reload-plugins`.
 
@@ -176,6 +194,61 @@ says the word.
 
 **If never done:** the design stays a draft referenced by slug. Nothing
 breaks; ADR-0069's counter simply never learns of it.
+
+## 10. Where the reader's review is anchored so it cannot be skipped
+
+**Needs:** a decision on placement, not on whether it happens — the PO already
+required the review itself.
+
+A reader's Critic (Lektor) reads the user-facing documents as a user and
+judges comprehensibility, order, granularity and weighting, with a hunt for
+the recency inversion agent-written documentation reliably produces. The first
+round ran on 2026-09-06 and produced findings no structural check produces
+(`backlog/evidence/2026-09-06-doc-reader-review-round1.md`): the word "audit"
+appears in two of six front-door documents while the decided audience is
+teams carrying audit obligations.
+
+The placement problem is the PO's own: a review at the release preflight
+produces findings, which produce documentation changes, which produce a new
+candidate the preflight would have to review again. The proposal on the table
+is to split the expensive judgment from the cheap binding — run the review
+inside the documentation block, record it against the documentation state it
+read, and let the preflight check only that binding, exactly the way
+`check-doc-reconciliation.mjs` binds an obligation to a commit range. Full
+reasoning in `backlog/items/2026-09-06-documentation-has-no-reader-facing-review-and-no-machine-binding-for-one.md`.
+
+**If never done:** the review stays a practice one Elephant remembers, which
+is the failure mode the reconciliation check's own header warns about.
+
+## 11. TP-3 signature: run the done-predicate checker as a gate check
+
+**Needs:** one PO signature on `harness/scripts/verify.mjs`, whenever the PO
+is at the desk — the same ceremony as item 1.
+
+`check-backlog-done-predicate.mjs` finds items whose declared completion
+predicate contradicts their status. It is registered in the gate **only as a
+test suite**, so the checker itself never runs against the live tree. Its
+sibling `check-backlog-sprint-assignment.mjs` IS registered as an executable
+check, so the asymmetry is visible in one file. Running it today reports three
+items in `status: open` whose predicate is already satisfied — work that is
+finished and still counted as open.
+
+**If never done:** the backlog's own contradiction detector stays advisory and
+the open counts drift quietly.
+
+## 12. Does the reconciliation precedent get its coverage back?
+
+**Needs:** a priority call, not a signature.
+
+`check-doc-reconciliation.mjs` enforces only against ADRs carrying a
+`**Governs:**` line: 12 of 80 today. The rest are counted and never enforced,
+deliberately, so the check was usable on day one. Adding the missing lines is
+mechanical and cheap; the question is only whether it is worth doing before
+the reader-review record is built on the same mechanism.
+
+**If never done:** the push-time documentation gate keeps covering roughly a
+sixth of the decisions it was built to cover, and any new mechanism modelled
+on it inherits the same quiet gap.
 
 ---
 
