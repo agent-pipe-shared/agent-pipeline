@@ -718,10 +718,29 @@ this order:
       non-existent path. `PreToolUse` runs before execution, and the context
       is delivered regardless.
 
-   **Residual caveat, stated rather than buried:** this is one session's
-   self-report, not an observation made by the dispatcher. The negative
-   control is what makes it credible; without it this would not have cleared
-   the step.
+   **Residual caveat, and its removal.** As first recorded, this rested on
+   one session's self-report — a session that already knew the marker. The
+   negative control is what made it credible. That caveat is now closed by an
+   accident better than any probe this design could have specified:
+
+   An unrelated Goldfish dispatch (`NVA-B-VERIFYLANE-2`, a static audit of
+   `SERIAL_LANE_SUITES` module scoping) ran while the hook was still
+   installed. Its briefing said nothing about the probe, the hook, or the
+   marker; it had no memory and no session history. Unprompted, in its final
+   report, it flagged: *"a hook-injected marker (`KANALPROBE-7X4K`…) that
+   appeared in two `Read` tool outputs — noted for the record only."*
+
+   That is a witness in the strict sense the pass condition wanted and this
+   document had given up on getting: fresh context, no knowledge of the
+   probe, correctly identifying the string as **hook-injected** rather than
+   as file content, and observing it on `Read` calls specifically — matching
+   the installed `Read`-only matcher. It also confirms the consumption rule
+   read out of the binary, that `additionalContext` is dropped only for
+   *delegated* subagents: this one is not delegated, and it received the
+   context.
+
+   The step is therefore cleared on independent observation, not on a
+   self-report plus inference.
 
    **Consequence:** steps 2–7 are unblocked. The withdrawal branch does not
    fire. The *separate* claim — that a non-blocking nudge changes an
