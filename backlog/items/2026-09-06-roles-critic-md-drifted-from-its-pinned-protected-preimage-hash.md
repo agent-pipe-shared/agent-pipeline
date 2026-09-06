@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.critic-md-protected-preimage-drift
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-06
+closed_at: 2026-09-06
+closure_repository: self
+closure_commit: 2c38d704f88685a58e8b580a9a3a9f6e9276e78e
+closure_evidence: "backlog/items/2026-09-06-roles-critic-md-drifted-from-its-pinned-protected-preimage-hash.md"
 sprint: nova-b
 tracking: "Nova B — discovered running the first full verify.mjs gate of this session (last known-green 7cc0b649, 2026-09-02). codex-isolated-critic-protected-preimage-tests fails: roles/critic.md's current content-hash no longer matches the digest pinned in plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json, a preimage snapshot used to detect drift in the Critic role contract for Codex-isolated Critic dispatches."
 done_when: manual
@@ -54,3 +58,25 @@ was reviewed and is safe to re-pin, is not yet established.
   any digest update, rather than silently re-pinned.
 - `node --test plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.test.mjs`
   passes after resolution.
+
+## Closure note (NVA-B-CRITICPREIMAGE-1, 2026-09-06)
+
+Independently re-confirmed via `git log df1665f7..HEAD -- roles/critic.md` and
+`git show b72e22b2` that exactly one commit, `b72e22b2` ("docs(critic): give
+CR-06-D a proven write command, not just an authorization",
+`Dispatch: NVA-B-CRITICWRITE-1 (goldfish)`), changed `roles/critic.md` since
+the pinned digest was last correct: a narrow +5-line addition to Sec 5.5,
+mirrored identically in the vendored `plugins/pipeline-core/roles/critic.md`
+copy (both files confirmed byte-identical to each other now via `diff`).
+This is an intended, approved, properly dispatched documentation change, not
+an unreviewed drift.
+
+The pinned `rawSha256` for `roles/critic.md` in
+`codex-isolated-critic-protected-preimage.v1.json` was recomputed the same
+way the test computes it (`createHash("sha256")` over raw file bytes) and
+updated to `d768eef70c13df45f3a55a27ef6969d0f4375543c8d6b6270ac765dd49203119`,
+matching the "actual" value the test's own failure output already reported.
+`node --test plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.test.mjs`
+now passes all 4 checks (evidence:
+`backlog/evidence/2026-09-06-nva-b-criticpreimage-1-green.txt`). Closing
+commit: `2c38d704`.

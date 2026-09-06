@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "f3a979ee5d6694976551f21556ffa1ac52e85908656d858c1660e98039c379c9"
+    "transitionHead": "077a8d19fd6661434a2bb55f4556042a14af454c3149e2ab8583f8d4a3867acc"
   },
   "counts": {
-    "open": 102,
+    "open": 100,
     "in_progress": 0,
-    "closed": 515,
+    "closed": 517,
     "rejected": 3,
     "deferred": 11
   },
@@ -1784,13 +1784,17 @@
     },
     {
       "id": "pipeline.critic-md-protected-preimage-drift",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-06",
       "source": "Elephant, 2026-09-06, running `node --test plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.test.mjs` while diagnosing the first full verify.mjs gate of this session.",
       "deferred": false,
-      "tracking": "Nova B — discovered running the first full verify.mjs gate of this session (last known-green 7cc0b649, 2026-09-02). codex-isolated-critic-protected-preimage-tests fails: roles/critic.md's current content-hash no longer matches the digest pinned in plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json, a preimage snapshot used to detect drift in the Critic role contract for Codex-isolated Critic dispatches."
+      "tracking": "Nova B — discovered running the first full verify.mjs gate of this session (last known-green 7cc0b649, 2026-09-02). codex-isolated-critic-protected-preimage-tests fails: roles/critic.md's current content-hash no longer matches the digest pinned in plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json, a preimage snapshot used to detect drift in the Critic role contract for Codex-isolated Critic dispatches.",
+      "closedAt": "2026-09-06",
+      "closureRepository": "self",
+      "closureCommit": "2c38d704f88685a58e8b580a9a3a9f6e9276e78e",
+      "closureEvidence": "backlog/items/2026-09-06-roles-critic-md-drifted-from-its-pinned-protected-preimage-hash.md"
     },
     {
       "id": "pipeline.critic-review-has-no-defined-path-for-a-root-commit",
@@ -2378,13 +2382,17 @@
     },
     {
       "id": "pipeline.evslotfix-1-broke-verify-fixture-module-lists",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-06",
       "source": "Elephant, 2026-09-06, running `node harness/scripts/verify.mjs` for the first full-gate pass this session and diagnosing the two resulting failures directly.",
       "deferred": false,
-      "tracking": "Nova B — discovered running the first full verify.mjs gate of this session (last known-green was 7cc0b649, 2026-09-02; many commits landed since across the whole day). Blocks A-C of NVA-B-EVSLOTFIX-1 (commits 61dc7fc5/d30273d3) added a new import to harness/scripts/verify.mjs (harness/scripts/verify-evidence-writer.mjs). Two test fixtures that copy verify.mjs and a hardcoded list of its dependencies into an isolated sandbox to test its behavior were never updated to also copy the new file, so the copied verify.mjs now fails to even load in those sandboxes."
+      "tracking": "Nova B — discovered running the first full verify.mjs gate of this session (last known-green was 7cc0b649, 2026-09-02; many commits landed since across the whole day). Blocks A-C of NVA-B-EVSLOTFIX-1 (commits 61dc7fc5/d30273d3) added a new import to harness/scripts/verify.mjs (harness/scripts/verify-evidence-writer.mjs). Two test fixtures that copy verify.mjs and a hardcoded list of its dependencies into an isolated sandbox to test its behavior were never updated to also copy the new file, so the copied verify.mjs now fails to even load in those sandboxes.",
+      "closedAt": "2026-09-06",
+      "closureRepository": "self",
+      "closureCommit": "00a58a0ebc3aa9fe41a4c0e3b478f691e9db56f2",
+      "closureEvidence": "backlog/items/2026-09-06-nva-b-evslotfix-1-broke-two-verify-fixtures-that-hardcode-verify-mjs-dependencies.md"
     },
     {
       "id": "pipeline.execution-model-switchback",
