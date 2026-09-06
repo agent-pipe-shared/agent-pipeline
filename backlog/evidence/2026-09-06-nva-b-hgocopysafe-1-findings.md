@@ -25,3 +25,14 @@ same format the Critic already validated for the other two —
 
 Bounded re-Critic round (round 2, the last allowed under the two-round
 cap) requested against F1 only.
+
+**Round 2 result: PASS.** Both new evidence artifacts independently
+corroborated by the Critic against the live files (test-name line counts,
+exact ordering match), not merely accepted on format. Zero findings. F1
+closed. Package closed — no further round.
+
+**Process note (minor, non-blocking):** the Critic disclosed this
+findings-registry file itself carried reasoning/expected-conclusion
+content beyond the bare finding ID (this paragraph's predecessor text) —
+a repeat instance of the same contamination class already queued as
+session feedback. Did not affect the verdict (independently re-derived).
