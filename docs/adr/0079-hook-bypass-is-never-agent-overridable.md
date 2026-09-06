@@ -91,7 +91,16 @@ This boundary is the necessary complement to the decision above, not a weakening
 closes the route for the agent completely; it does not and cannot reach outside the tool-call
 surface it governs.
 
-## Open scope question (not decided here)
+## Scope question (decided 2026-09-06)
+
+**Confirmed by the PO on 2026-09-06, in session, in these words: "Das
+Hook-Bypass-Verbot gilt für commit und push."** The whole hook-bypass family
+— `GG-17`, `GG-18`, `GG-19`, `GG-20` — is non-overridable for the agent on
+`git commit` and `git push` alike. The reasoning below is kept as it was
+written; its recommended reading is now the decided one. Nothing changes for
+an agent's ordinary commit flow (`git commit -F <message-file> -- <paths>`):
+only the override route for a hook skip is closed, and the PO's own terminal
+stays outside the Pipeline's authority as stated above.
 
 The PO's words in session named **pushing** with `--no-verify`. The guard rules in scope are wider:
 `GG-17` matches `--no-verify` on any `git` subcommand (commit or push alike); `GG-18` (`git commit
@@ -150,4 +159,4 @@ an open question above, for the PO to confirm or correct.
   — corrects the `guardrails/git.md` GIT-07 sentence and moves `GG-17`…`GG-20` out of the
   overridable union, following the `GIT-03` precedent (evaluated non-overridably, with a stated
   recoverability rationale). Scheduled for the maintenance window, not immediate implementation.
-- The PO should confirm or correct the open scope question above (commit-and-push vs. push-only).
+- Scope confirmed by the PO 2026-09-06: commit and push (see "Scope question (decided 2026-09-06)" above).
