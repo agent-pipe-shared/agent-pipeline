@@ -263,6 +263,13 @@ publication remains contingent on evidence bound to the final candidate.
   a typed non-success. Smoother onboarding and delivery sequencing do not waive
   approvals, signatures, deterministic checks, or the release boundary.
 
+> **Note.** Seven tags carry no entry in this file: `v0.5.4`, `v0.5.3`,
+> `v0.5.2`, `v0.4.7`, `v0.4.2`, `v0.4.1`, `v0.4.0`. Where recorded, their
+> scope lives in `docs/release-0.5.3-readiness.md`,
+> `docs/release-0.5.2-readiness.md`, `docs/release-0.4.2-readiness.md`, and
+> `docs/release-0.4-readiness.md`. `v0.5.4`, `v0.4.7`, and `v0.4.1` have only
+> their tag.
+
 ## [0.5.1] — 2026-08-02
 
 ### Fixed
