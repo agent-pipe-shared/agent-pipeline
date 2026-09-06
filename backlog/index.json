@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "6fc9b1e77e45bfb6a65fa4addd35f57b54e7d6abf8a15587421477c7865867bc"
+    "transitionHead": "10685a667d551d5c92cbe07b2a4b06f7685327627d3d1426ee50749dbbf4c055"
   },
   "counts": {
-    "open": 100,
+    "open": 101,
     "in_progress": 0,
     "closed": 518,
     "rejected": 3,
@@ -2645,6 +2645,16 @@
       "closureRepository": "self",
       "closureCommit": "794fa61970ebaac3eb5969a4b38b67134dd98c65",
       "closureEvidence": "backlog/items/2026-08-29-gg-22s-own-remediation-order-creates-unclearable-ledger-debt.md"
+    },
+    {
+      "id": "pipeline.gg22-normalization-false-blocks-trailing-slash-pathspec",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-06",
+      "source": "T1 Critic review (opus, max), closing round 2 for NVA-B-GG22FIX-2, finding F2.",
+      "deferred": false,
+      "tracking": "Nova B -- T1 Critic closing round for NVA-B-GG22FIX-2 (F2, minor): normalizePathspecLexically() drops empty path segments, so a trailing-slash directory pathspec token (backlog/items/) normalizes to backlog/items, which then fails the backlog/items/ prefix check and is classed disallowed -- a legitimate git commit -F <msg> -- backlog/items/ is now blocked while GG-22 debt is outstanding. Fail-closed direction (a false block, not a false admission), so this is NOT a security regression, but it does regress the deadlock fix's own intent for the directory form of a pathspec."
     },
     {
       "id": "pipeline.gg22-pathspec-fix-lacks-permanent-test",
