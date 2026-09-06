@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "c73208a0239c4bbd909e499024db1fc504dd844c12be198bf8f65b855ce81211"
+    "transitionHead": "9d51e8d616cd4b540d19398d5e083166b3d84c793f5d0c4cd450f4e2b6d8bf43"
   },
   "counts": {
-    "open": 95,
+    "open": 98,
     "in_progress": 0,
     "closed": 513,
     "rejected": 3,
@@ -5731,6 +5731,16 @@
       "tracking": "Nova B — the project-root containment check on read-only shell commands was added on 2026-08-29 to close a hole and removed wholesale on 2026-08-30. The removal is deliberate and undocumented outside its own commit message, and it silently invalidates a closed item's recorded remedy."
     },
     {
+      "id": "pipeline.read-scope-denial-code-accuracy-f3",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-06",
+      "source": "T1 Critic review (opus, max) of commit cbc30756252ff1573b53ab2ada34ae2f02569f8d, F3, recorded in backlog/evidence/2026-09-06-nva-b-readcontain-1-findings.md.",
+      "deferred": false,
+      "tracking": "Nova B — NVA-B-READCONTAIN-1's T1 Critic (round 1) finding F3, carried in backlog/evidence/2026-09-06-nva-b-readcontain-1-findings.md but never given its own backlog/items/ entry. Filed now to close that tracking gap; the underlying behavior is unchanged and non-blocking (the command is still refused end-to-end, only the printed reason code is wrong)."
+    },
+    {
       "id": "pipeline.read-scope-guard-admits-single-command-but-blocks-the-piped-form",
       "status": "closed",
       "type": "defect",
@@ -5742,6 +5752,16 @@
       "closureRepository": "self",
       "closureCommit": "9639d91ee78f42ca0fbe6c3a424321a9d3c492d8",
       "closureEvidence": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs"
+    },
+    {
+      "id": "pipeline.read-scope-tilde-expansion-mismatch",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-06",
+      "source": "Elephant, 2026-09-06, triaging NVA-B-READCONTAIN-1's closure (not a Critic finding; NVA-B-READCONTAIN-1 itself is closed and unaffected by this item).",
+      "deferred": false,
+      "tracking": "Nova B — while triaging NVA-B-READCONTAIN-1's closure, the Elephant independently checked whether the restored read-scope containment accounts for shell tilde expansion. It does not: the guard's parser never expands a leading `~` in a path-taking argument, so it evaluates the LITERAL string `~/.ssh/id_rsa` as a (nonexistent) path under the project root, while the actual shell expands `~` to the real home directory before the command ever runs. Confirmed live via evaluateLifecycleReadyGuard() directly (never via an executed Bash cat of a real credential path)."
     },
     {
       "id": "pipeline.readiness-guard-blocks-its-own-recovery",
@@ -6118,6 +6138,16 @@
       "closureRepository": "self",
       "closureCommit": "67db3432fe06ccee3a89e5362317c8997a3ed3a0",
       "closureEvidence": "backlog/items/2026-08-18-resume-hint-test-unregistered-in-verify-gate.md"
+    },
+    {
+      "id": "pipeline.rg-pipe-lexical-containment-gap",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-06",
+      "source": "Elephant, 2026-09-06, code trace of guard-command-grammar.mjs's approvedReadPath()/validateRg()/isBoundedReadOnlyPipeline() against guard-lifecycle-ready.mjs's now-realpath-aware isApprovedSingleCommandReadArg()/isApprovedCatPipelineReadPath(), prompted by an advisor review of NVA-B-READCONTAIN-1's closure.",
+      "deferred": false,
+      "tracking": "Nova B — NVA-B-READCONTAIN-1 restored realpath-aware containment for the single-command read lane, the cat-pipeline lane, and the git-pipeline lane in guard-lifecycle-ready.mjs. It deliberately did not touch guard-command-grammar.mjs's approvedReadPath(), which backs the rg-to-rg/rg-to-head bounded pipeline (isBoundedReadOnlyPipeline) — that function stays purely lexical (resolve()+pathInside(), no existsSync/realpathSync at all), a strictly weaker check than even NVA-B-READCONTAIN-1's own round-1 (direct-symlink-only) fix. Traced and confirmed by the Elephant, 2026-09-06, while filing related gaps found during the same package's closure."
     },
     {
       "id": "pipeline.ruleset-freshness-wsl-subsystem-absent",
