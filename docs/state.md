@@ -318,32 +318,44 @@ after Gap A; its own reproduction found the tracking item's claimed
 **B1 (`#21`) descoped by PO decision** — `docs/adr/draft-b1-worker-pool-superseded-by-workflow-tool.md`
 (`90405d8b`). The runner's Workflow tool supersedes the Pipeline's own
 parallel worker pool, so NVA-B21-1/6/9 are *withdrawn*, not merely unmet.
-Left open rather than assumed: whether the already-landed B1-I supervisor
-surface (~15 files) is retired or just left in place, and that the Workflow
-tool has NOT been certified against `#7` — "we need no pool" is not "the
-tool passed our bar".
+**Amended same day (`4876185d`, PO challenge, correct):** that holds only for
+Claude Code — Codex/AGY have no Workflow tool, so the B1-I supervisor is
+RETAINED for runner neutrality. It has never run a real provider
+(`codex-exec` needs `allowProviderExecution: true`, never passed); a one-site
+live probe is offered, not approved. Workflow tool still uncertified vs `#7`.
 
-**Parallel-dispatch slicing enforcement — design drafted, NOT authorized**
-(`9e40548b`, opus/max). Answers the four open questions of
+**Parallel-dispatch slicing enforcement — designed, NOT authorized to build**
+(`9e40548b` + corrections `f17a63d1`, opus/max). Answers the four open
+questions of
 `2026-08-29-the-pipeline-defaults-to-sequential-work-with-no-enforced-task-slicing.md`
 with a conjunctive Parallel-Safety Predicate and a staged notion of
-"enforced". **Two findings gate the PO's preferred lighter increment:**
-(a) every in-repo instance of decision-point delivery changing behaviour
-comes from *blocking* delivery — a non-blocking nudge has zero recorded
-evidence here, so delivery-only is an untested hypothesis by this repo's own
-standard; (b) `additionalContext` appears only under `SessionStart`, so a
-PreToolUse nudge may not reach the model at all here. A bounded channel
-probe is the next step, BEFORE advisor, Critic or build.
+"enforced". T1 Critic round 1: **FAIL** on F1 (major) — and F1 was the
+Elephant's, not the design's: it struck the design's own BLOCKING empirical
+channel probe and wrote "the build may proceed" on documentation-only
+evidence, deferring the real check to an unowned, undated "whoever builds
+step 2". All seven findings corrected in `f17a63d1`; step 1 is blocking again
+with owner/pass-condition/failure-branch. Neutral registry:
+`backlog/evidence/2026-09-06-nva-b-parallelslicing-design-1-findings.md`.
+Closing round (two-round cap) dispatched.
 
-**Verify runtime measured** (analysis only). Wall clock 674.6s; the
-60-member serial lane sums to 673.8s — the lane *is* the runtime, and 1091s
-of pool work runs in its shadow. Raising concurrency or deleting fast suites
-cannot help, by construction. `project-onboarding-v3-tests` alone is 174.1s
-(26%); the lane's top five are 59%. The lane was filled by a sweep flagging
-"plausibly unsafe", never "proven unsafe" — the lever is per-member eviction
-proofs, not deletion. Tracked at
+**The build gate is one cheap PO action.** The channel probe needs no
+`hooks.json` ceremony: a temporary `PreToolUse` entry in the user-level
+`~/.claude/settings.json` is outside the repository. Installer/remover ready
+at `scratch/kanalprobe-hook.mjs` (`install` | `remove` | `show`, backs up
+first). Pass = marker `KANALPROBE-7X4K` visible **to the model**, not just in
+the operator's pane; on failure the lighter increment is withdrawn, not
+adjusted. Unresolved either way: the channel existing and a *non-blocking*
+nudge changing behaviour are two different claims.
+
+**Verify runtime measured** (analysis only). Wall clock 674.6s; the 60-member
+serial lane sums to 673.8s — the lane *is* the runtime, so raising
+concurrency or deleting fast suites cannot help. The lane was filled by a
+sweep flagging "plausibly unsafe", never proven — the lever is per-member
+eviction proofs. Four modules decide ~300s (44%): `human-guard-override`,
+`session-cleanup`, `pipeline-state`, `worktree-lifecycle` — do they scope
+state by `--repo`/`rootDir`? Tracked at
 `2026-09-01-verify-runtime-is-concentrated-in-ten-suites-not-spread-across-many.md`
-(open; its 571s is now 674.6s, +18% in five days).
+(open).
 
 ## PO decisions and todos — collected during the autonomous run, not waited on
 
@@ -374,9 +386,8 @@ Per the PO's 2026-09-02 instruction. None blocks further Nova-B work.
    are confirmed stale (see the READCONTAIN-1/2 section above for detail) —
    neither today's read-scope fixes nor the GG-22 pathspec fixes are yet
    actually enforced for this checkout's own sessions.
-8. **Two open questions from the 2026-09-06 design work**, recorded not
-   assumed: the fate of the existing B1-I supervisor surface, and whether
-   the slicing nudge stays non-blocking if the channel probe fails.
+8. **Open from the 2026-09-06 design work:** whether the slicing nudge stays
+   non-blocking if the channel probe fails.
 
 ## Operational head
 
