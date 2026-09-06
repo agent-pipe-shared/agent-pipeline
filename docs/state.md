@@ -324,18 +324,16 @@ RETAINED for runner neutrality. It has never run a real provider
 (`codex-exec` needs `allowProviderExecution: true`, never passed); a one-site
 live probe is offered, not approved. Workflow tool still uncertified vs `#7`.
 
-**Parallel-dispatch slicing enforcement — designed, NOT authorized to build**
-(`9e40548b` + corrections `f17a63d1`, opus/max). Answers the four open
+**Parallel-dispatch slicing enforcement — designed, cleared to build**
+(`9e40548b`, corrections `f17a63d1`, opus/max). Answers the four open
 questions of
 `2026-08-29-the-pipeline-defaults-to-sequential-work-with-no-enforced-task-slicing.md`
 with a conjunctive Parallel-Safety Predicate and a staged notion of
-"enforced". T1 Critic round 1: **FAIL** on F1 (major) — and F1 was the
-Elephant's, not the design's: it struck the design's own BLOCKING empirical
-channel probe and wrote "the build may proceed" on documentation-only
-evidence. All seven corrected in `f17a63d1`. Closing round: **PASS**, bounded
-by that same step 1 — four more findings, F-A major (PSP-3 cited from two
-wrong incidents). F-A/F-B/F-C corrected, F-D filed as its own item. Cap
-exhausted; the Elephant self-verifies.
+"enforced". Two T1 Critic rounds: round 1 **FAIL** on F1, the Elephant's own
+error — it struck the design's blocking probe and wrote "the build may
+proceed" on documentation-only evidence. Closing round **PASS** with four
+more, F-A major (PSP-3 cited from two wrong incidents). All corrected except
+F-D, filed as its own item. Cap exhausted; the Elephant self-verifies.
 Registries: `backlog/evidence/2026-09-06-nva-b-parallelslicing-design-1*`.
 
 **Channel probe PASSED 2026-09-06 — the build is unblocked.** A `PreToolUse`
@@ -349,10 +347,12 @@ behaviour. Increment 1 is built as a hypothesis the ledger measures.
 **Verify runtime measured** (analysis only). Wall clock 674.6s; the 60-member
 serial lane sums to 673.8s — the lane *is* the runtime, so raising
 concurrency or deleting fast suites cannot help. The lane was filled by a
-sweep flagging "plausibly unsafe", never proven — the lever is per-member
-eviction proofs. Four modules decide ~300s (44%): `human-guard-override`,
-`session-cleanup`, `pipeline-state`, `worktree-lifecycle` — do they scope
-state by `--repo`/`rootDir`? Tracked at
+sweep flagging "plausibly unsafe", never proven. **The four-module lever is
+refuted** (audit `1b5b2793`): `pipeline-state` and `human-guard-override` are
+process-global — `projectDir()` is `CLAUDE_PROJECT_DIR` or `cwd()`, and that
+CLI has no `--repo` flag at all — so the two heavy suites the win was
+expected from are ineligible. 12 members are eligible on that criterion
+alone; two further modules still gate them. Tracked at
 `2026-09-01-verify-runtime-is-concentrated-in-ten-suites-not-spread-across-many.md`
 (open).
 
