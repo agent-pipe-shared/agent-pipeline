@@ -47,6 +47,31 @@ four-segment cache shape and an anchor computed by `path.resolve` before it
 was written; re-dispatched as `NVA-B-XPORTROOT-3`; round 2 follows on that
 correction commit.
 
+## Round 2 — `573180b8` (NVA-B-XPORTROOT-3, the correction commit)
+
+T1 Critic round 2 (requested `claude-opus-5 at max`, identity observed as
+Opus 5 from the dispatch's own runtime prompt; functional-equivalent lane).
+Verdict: **PASS** — one minor, no major, no blocker; **F1 closed** (the
+anchor `<tmp>/cache/agent-pipeline` confirmed from the red capture's own
+stack trace, all three references absent under it, the comment claims
+exactly what the assertions prove). Trajectory: consistent.
+
+- **F-A** (minor): `evidence/verify-latest.json` binds `2dca9b8d`, not the
+  reviewed commit; no verify run at `573180b8` is evidenced (QG-01/QG-08).
+  **Disposition — accepted; closed by the next step of the sequence:** the
+  full verify gate runs at the stamped candidate HEAD, which contains
+  `573180b8`, with nothing concurrent; `verify-latest.json` then binds that
+  HEAD exactly. Recorded in `docs/state.md` Gate state when it lands.
+
+Dispatcher-side disclosures the Critic surfaced, both real: the dispatch
+called `b5a181ce` the correction commit's "parent" (it is an ancestor four
+commits back — the enumerated SHA was exact, so the diff was unaffected);
+and the dispatch's ruleset SHA was set to the candidate SHA instead of the
+HEAD the dispatch was built at (`39949e83`), which also disagrees with the
+dispatch record's `rulesetSha` (`9a9c5bc1`). Rule: the ruleset SHA of a
+Critic dispatch is the HEAD at dispatch time, never the review object; a
+commit relation is named only after `git log` shows it.
+
 **Dispatcher-side rule, inherited from this (the third of the day's kind):**
 a path or formula prescribed in a briefing is computed first — one `node`
 probe with the real `resolve` call — never written from a mental count of
