@@ -1598,7 +1598,11 @@ export function isClaudeSessionMemoryWritePath(filePath, input, dependencies = {
  * supplies it in `input.transcript_path`, never reconstructed, guessed, or pattern-matched from
  * a sampled naming scheme. Admitted downstream as an EXACT single-file match only -- never a
  * directory-prefix admission -- so a genuine agent need (reading its own session transcript) is
- * met without reopening the boundary NVA-B-READCONTAIN-1 restored.
+ * met without reopening the boundary NVA-B-READCONTAIN-1 restored. That exact-match invariant
+ * is enforced structurally at the sole downstream consumer, isApprovedSingleCommandReadArg()'s
+ * extraRoots loop (NVA-B-GLRMINORS-1, Gap A) -- not merely by the ancestor-walk's own logic,
+ * which alone would incidentally admit any `<this file>/<nonexistent-child>` candidate string
+ * (saved only by the real OS's ENOTDIR at actual read time before that fix).
  *
  * Fails closed exactly like claudeSessionMemoryDirectory(): an absent, empty, relative, or
  * null-byte-carrying transcript_path, or one that does not realpath to an existing plain FILE,
@@ -2518,7 +2522,38 @@ function isApprovedSingleCommandReadArg(arg, root, extraRoots) {
   // segment, breaking isRealpathedWithinBoundary's `resolved === boundary` identity shortcut
   // for exactly the composed shape this round exists to close -- measured live this round.
   return extraRoots.some((extra) => {
-    try { return isRealpathedWithinBoundary(raw, extra); } catch { return false; }
+    try {
+      // NVA-B-GLRMINORS-1 (Gap A; backlog: 2026-09-06-the-exact-transcript-file-exception-
+      // admits-a-nonexistent-child-path.md). The identity check is deliberately FIRST, before
+      // any filesystem access: the self-lift symmetry isOutsideRootSingleCommandRead()/
+      // isOutsideRootBoundedDiagnosticRead() rely on (see the comment above) lifts a read's
+      // own, possibly NOT-YET-EXISTING candidate into extraRoots as `raw` itself, byte-for-
+      // byte -- `statSync(extra)` would throw ENOENT for that entirely legitimate case before
+      // ever reaching isRealpathedWithinBoundary's own identical `resolved === boundary`
+      // shortcut, silently defeating that symmetry (measured live this dispatch: reordering
+      // this the other way around made a phantom-child single-command read fall through to
+      // unconditional admission instead of the READ_SCOPE_DENIAL_CODE refusal, exactly the
+      // NVA-B-READCONTAIN-1 F4 failure mode this file's own comments warn about elsewhere).
+      //
+      // Once past that shortcut, an extraRoots entry may itself be a FILE (the transcript-file
+      // exception, NVA-B-READCONTAIN-2's claudeSessionTranscriptFilePath()), not only a
+      // directory (BOUNDED_PIPELINE_ADDITIONAL_ROOTS, the memory-dir root, or a genuinely
+      // different self-lifted candidate). isRealpathedWithinBoundary's ancestor walk is built
+      // for the "not-yet-existing path under a real DIRECTORY" case; applied unmodified to a
+      // FILE boundary, a candidate shaped `<file>/<nonexistent-child>` climbs the walk straight
+      // back up to the file itself (its own dirname-of-the-nonexistent-child) and is reported
+      // "inside" it -- true for ANY string of that shape. Not exploitable in practice only
+      // because the real shell command then hits the OS's own ENOTDIR, never because this
+      // guard's own logic holds the "exact single file, never a directory-prefix" invariant
+      // its neighboring doc comment (claudeSessionTranscriptFilePath, this file) claims.
+      // Refused here, before the ancestor walk ever runs, whenever `extra` itself is a FILE
+      // and `raw` is not already byte-identical to it (the case just handled above) -- the
+      // only admission isRealpathedWithinBoundary's own shortcut grants a FILE-typed boundary
+      // in the first place.
+      if (raw === extra) return true;
+      if (statSync(extra).isFile()) return false;
+      return isRealpathedWithinBoundary(raw, extra);
+    } catch { return false; }
   });
 }
 

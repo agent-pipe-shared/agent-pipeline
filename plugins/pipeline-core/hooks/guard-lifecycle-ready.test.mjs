@@ -6339,6 +6339,42 @@ test("NVA-B-READCONTAIN-2: a `<symlink>/../<outside>/<file>` composed through th
   }
 });
 
+// NVA-B-GLRMINORS-1 (Gap A; backlog: 2026-09-06-the-exact-transcript-file-exception-admits-a-
+// nonexistent-child-path.md). Before the fix, isRealpathedWithinBoundary's ancestor walk --
+// built for the "not-yet-existing path under a real DIRECTORY" case -- climbed a candidate
+// shaped `<transcriptFile>/<nonexistent-child>` straight back up to the transcript file itself
+// (a FILE-typed boundary) and reported it "inside", contradicting the "EXACT single-file match
+// only" invariant claudeSessionTranscriptFilePath()'s own doc comment claims. Not exploitable
+// via the real shell (a real file has no children, so the actual `cat` hits ENOTDIR), but this
+// pins the guard's OWN admission decision, never the OS's incidental behaviour, as the thing
+// that refuses it -- this exact shape had zero test coverage before this item.
+test("NVA-B-GLRMINORS-1 Gap A: isReadOnlyDiagnosticCommand refuses a candidate shaped <transcriptFile>/<nonexistent-child>, even with the transcript file threaded as an extra root", () => {
+  const projectDir = hgoGitFixture("signature");
+  const { transcriptPath } = transcriptReadFixture();
+  const phantomChild = join(transcriptPath, "nonexistent-child");
+  try {
+    // Direct classifier-level check: the transcript file itself is admitted as an extra root,
+    // but a nonexistent child path under it must not be.
+    assert.equal(isReadOnlyDiagnosticCommand(`cat ${transcriptPath}`, projectDir, [transcriptPath]), true,
+      "sanity: the transcript file itself stays admitted once threaded as an extra root");
+    assert.equal(isReadOnlyDiagnosticCommand(`cat ${phantomChild}`, projectDir, [transcriptPath]), false,
+      "a <transcriptFile>/<child> candidate must be refused, not admitted, as inside the transcript-file boundary");
+
+    // End-to-end: the same shape through the full guard, with the transcript file threaded via
+    // the real sessionReadScopeRoots() path (input.transcript_path), must be refused under the
+    // true-reason read-scope code, not silently admitted.
+    const result = evaluateLifecycleReadyGuard(
+      bashWithTranscript(`cat ${phantomChild}`, transcriptPath), { projectDir, ...hgoReadyDeps() },
+    );
+    assert.equal(result.exitCode, 2,
+      "a candidate shaped <transcriptFile>/<child> must be refused end-to-end, even though the transcript file itself is admitted");
+    assert.match(result.stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u);
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+    rmSync(dirname(transcriptPath), { recursive: true, force: true });
+  }
+});
+
 test("NVA-BL-76: the exact reproduction is refused under its own read-scope code, never as an unapproved operator", () => {
   const { projectDir, outside, outsideFile } = readScopeFixture();
   try {
