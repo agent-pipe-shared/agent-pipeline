@@ -69,7 +69,31 @@ likely downstream suites (`generate-agent-obligations`, `codex-pretool-guard`)
 and found both green. The remaining suites are covered by the candidate gate
 run under F3.
 
-**F5, F6 — open, dispatched as a follow-up package.** Both are production-code
-changes an Elephant does not write (EL-01): a test for the Windows dialect
-branch, and a one-line comment correction naming the `operators.length` guard
-rather than the `segments.length` one.
+**F5 — closed by determination, no test manufactured.** The follow-up dispatch
+traced the reachability question rather than guessing it. `windows === true`
+and `isAdmittedRedirect === true` are individually reachable (e.g.
+`certutil.exe -hashfile … SHA256 2>nul`), but the function's overall return
+value cannot become `true` under the `windows-direct` dialect for any
+currently-recognized executable on this host. Writing a test would have
+required manufacturing an unreachable state, which the briefing named as the
+wrong outcome. **Disclosed rather than buried:** on a native win32 Node
+process — not WSL or git-bash — `path.basename` would split a
+drive-letter-prefixed executable and the branch would become reachable in
+effect. The determination is therefore scoped to the POSIX-basename host this
+repository's tests and CI actually run on, and the win32 case is an open
+design question, not a closed one.
+
+**F6 — CLOSED AS A CRITIC FALSE POSITIVE.** The finding claimed
+`isOutsideRootSingleCommandRead()` returns false on `parsed.operators.length
+!== 0` *before* `segments.length` is consulted, making the new comment's
+stated reason inoperative. That is backwards. Verified directly in the source
+(`guard-lifecycle-ready.mjs:2979-2980`): the guard is one left-to-right
+short-circuiting `||` chain in which `parsed.segments.length !== 1` is the
+third operand and `parsed.operators.length !== 0` the fourth. For a
+`|`-joined pipeline the third operand is already true and short-circuits, so
+the comment names the operative reason correctly.
+
+The dispatch stopped rather than "correcting" a correct comment, which is the
+behaviour its stop condition asked for and the right one: a Critic finding is
+evidence to check, not an instruction to comply with. No code change was made
+for either finding, and none was warranted.
