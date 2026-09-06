@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.gg-22-reads-the-shared-index-so-a-concurrent-dispatch-blocks-an-unrelated-ledger-commit
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-03
+closed_at: 2026-09-06
+closure_repository: self
+closure_commit: fe2d7afe4eed421df1dffdaa94a485c631447d06
+closure_evidence: backlog/items/2026-09-03-gg-22-reads-the-shared-index-so-a-concurrent-dispatch-blocks-an-unrelated-ledger-commit.md
 sprint: nova-b
 done_when: "contains plugins/pipeline-core/hooks/guard-git.mjs pipeline.gg-22-scopes-debt-check-to-the-commit-pathspec"
 tracking: "Nova B — GG-22's disallowed-path check reads `git diff --cached`, the shared index, rather than the paths the blocked commit actually names. Under parallel dispatch that makes an unrelated agent's staged work block a correct ledger commit, with a denial text that names neither the real cause nor a route forward."
@@ -119,3 +123,22 @@ commit causes. It belongs with
 `backlog/items/2026-09-01-concurrent-dispatches-in-one-shared-checkout-collide-in-ways-no-guard-catches.md`,
 which is the general item; this one is a specific, reproducible instance with a
 named fix, and should be resolvable without waiting for the general question.
+
+## Closure note (2026-09-06, NVA-B-GG22FIX-1)
+
+Fixed in `fe2d7afe4eed421df1dffdaa94a485c631447d06`: GG-22 now reuses the
+`tokenizeArgv` tokenizer already imported for GIT-03/GIT-01 to look for an
+explicit `--` pathspec on the commit under evaluation; when present, only
+those named paths are checked, never the shared index. A bare commit (no
+pathspec) is unchanged (`git diff --cached` remains the question). Reproduced
+the deadlock shape RED-then-GREEN via a throwaway harness
+(`scratch/gg22-pathspec-repro.mjs`; `evidence/NVA-B-GG22FIX-1-gg22-pathspec-{red,green}.txt`)
+rather than as a persisted case in `guard-git.test.mjs`: that file is a
+protected test path (TP-1) with no in-session override, and the sanctioned
+operator route (`harness/scripts/apply-pending-protected-edits.mjs`, already
+used for this exact file's GG22-7/GG22-8 fixtures) was out of this dispatch's
+briefed scope. The existing GG22-3 case (bare commit, disallowed path staged,
+debt) already covers the no-pathspec regression and stayed green
+(232/232 full suite). Persisting the new pathspec cases into the committed
+suite via an `apply-pending-protected-edits.mjs` step remains open for a
+follow-up operator action.
