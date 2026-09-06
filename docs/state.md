@@ -319,15 +319,21 @@ still bypasses it — live-reproduced, `cat` of that shape read content from
 outside the fixture root. F1 confirmed resolved; F5 minor (unused DI
 param, untested catch) also found. Registry updated (F4/F5):
 `backlog/evidence/2026-09-06-nva-b-readcontain-1-findings.md`. Two-round
-cap now exhausted — **correction 2 (F4/F5) is dispatched, to be
-self-verified by the Elephant directly, no third round.** A same-shaped
+cap now exhausted — **correction 2 landed, `177bf884`: F4/F5 fixed
+(candidate now built raw via `rawReadCandidatePath()`, never
+`resolve()`/`join()`-collapsed, so `existsSync`/`realpathSync` walk the
+same path the shell actually resolves; boundary itself now realpathed
+too; `isRealpathedWithinBoundary` exported for a direct fail-closed test).
+Self-verified by the Elephant directly, no third round: 229/229 full
+regression, all three other DoD checks, authorship PASS on all three
+commits (`cbc30756`, `bc00a861`, `177bf884`).** A same-shaped
 `resolve()`-before-realpath gap MAY also affect the WRITE lane's
 `isPathWithinRealpathedRoot` (unverified — depends on host-tool internals
 this repo can't inspect); filed separately:
 `2026-09-06-the-write-lane-symlink-containment-check-may-share-the-read-lanes-dotdot-bypass.md`.
 
-`NVA-B-READCONTAIN-2` (not yet dispatched, after the correction round
-lands) adds two new session-derived exception roots
+`NVA-B-READCONTAIN-2` (not yet dispatched) adds two new session-derived
+exception roots
 (transcript-adjacent tree, task-output tree — both resolved from the
 PreToolUse hook's `transcript_path` field the way
 `claudeSessionMemoryDirectory`/MEMPATH-1 already does for the write side,
