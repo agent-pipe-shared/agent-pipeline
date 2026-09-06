@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "9ff31f2bf5167fb1aacc7344f2422956053b88d8f9717180d416252ca81bca9b"
+    "transitionHead": "6fc9b1e77e45bfb6a65fa4addd35f57b54e7d6abf8a15587421477c7865867bc"
   },
   "counts": {
-    "open": 99,
+    "open": 100,
     "in_progress": 0,
     "closed": 518,
     "rejected": 3,
@@ -2645,6 +2645,16 @@
       "closureRepository": "self",
       "closureCommit": "794fa61970ebaac3eb5969a4b38b67134dd98c65",
       "closureEvidence": "backlog/items/2026-08-29-gg-22s-own-remediation-order-creates-unclearable-ledger-debt.md"
+    },
+    {
+      "id": "pipeline.gg22-pathspec-fix-lacks-permanent-test",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-06",
+      "source": "NVA-B-GG22FIX-1's own dispatch report, 2026-09-06: 'Persisting GG22-9/10/11 into guard-git.test.mjs needs a new step in apply-pending-protected-edits.mjs (mirroring stepGuardGit22) -- an attended-operator action outside this dispatch's scope.'",
+      "deferred": false,
+      "tracking": "Nova B — NVA-B-GG22FIX-1 (commit fe2d7afe) fixed the GG-22 shared-index deadlock, but plugins/pipeline-core/hooks/guard-git.test.mjs is TP-1 protected with no in-session override route, so the dispatch could not add a permanent regression test there. The fix was proven RED-then-GREEN via an ephemeral scratch/ reproduction script instead, which is not committed and does not guard against a future regression of this exact scoping logic."
     },
     {
       "id": "pipeline.git-09-still-calls-the-append-only-source-ledger-a-projection-file",
