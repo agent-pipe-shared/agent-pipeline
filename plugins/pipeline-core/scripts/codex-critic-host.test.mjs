@@ -2,11 +2,12 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { EventEmitter } from "node:events";
-import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { PassThrough } from "node:stream";
+import { pathToFileURL } from "node:url";
 
 import { invokeCodexCriticAppServer } from "./codex-critic-app-server.mjs";
 import { runSelectedCriticHost, selectedCriticInProcessBridge } from "./codex-critic-selected-host.mjs";
@@ -1781,6 +1782,43 @@ await checkAsync("selectedCriticInProcessBridge carries the app server's own obs
   assert.equal(execution.terminal.cleanupStatus, "complete");
   assert.equal(execution.dutyReceipt.status, "error");
   assert.equal(resealed, 1);
+});
+
+// --- NVA-B-XPORTROOT-1: the adapter resolves its ruleset from the executing
+// plugin root, not three levels up, so an installed marketplace copy (which
+// has no repo-root roles/templates to coincidentally land on) still finds
+// its own vendored roles/critic.md, templates/prompts/critic-review.md and
+// scripts/critic-verdict.schema.json. ---
+
+await checkAsync("codex-critic-app-server resolves its ruleset against the executing plugin root, not the repository root, under an installed marketplace layout", async () => {
+  const fixtureRoot = mkdtempSync(join(tmpdir(), "codex-critic-app-server-installed-"));
+  try {
+    const installedPluginRoot = join(fixtureRoot, "marketplace", "plugins", "pipeline-core");
+    mkdirSync(dirname(installedPluginRoot), { recursive: true });
+    cpSync(join(DEFAULT_PIPELINE_ROOT, "plugins", "pipeline-core"), installedPluginRoot, { recursive: true });
+    // Sanity: this is genuinely an installed layout, not a repo checkout that
+    // happens to also carry these paths at its root -- the old three-levels-up
+    // anchor lands exactly on <tmp>/marketplace, which must not resolve them.
+    for (const missing of [
+      join(fixtureRoot, "marketplace", "roles"),
+      join(fixtureRoot, "marketplace", "templates"),
+      join(fixtureRoot, "roles"),
+      join(fixtureRoot, "templates"),
+      join(fixtureRoot, "plugins", "pipeline-core", "scripts", "critic-verdict.schema.json"),
+    ]) {
+      assert.equal(existsSync(missing), false, `installed-layout fixture must not contain ${missing}`);
+    }
+    const installedModuleUrl = pathToFileURL(join(installedPluginRoot, "scripts", "codex-critic-app-server.mjs")).href;
+    const installedModule = await import(installedModuleUrl);
+    const result = await installedModule.invokeCodexCriticAppServer(criticPayload(), {
+      buildSandboxInvocationFn: () => ({ command: "/codex", argv: ["sandbox"], options: { shell: false } }),
+      spawnFn: fakeCriticSpawn(criticAnswered()),
+    });
+    assert.equal(result.status, "reviewed");
+    assert.deepEqual(result.verdict, validCriticVerdict());
+  } finally {
+    rmSync(fixtureRoot, { recursive: true, force: true });
+  }
 });
 
 process.stdout.write(`1..${passed}\n# pass ${passed}\n`);

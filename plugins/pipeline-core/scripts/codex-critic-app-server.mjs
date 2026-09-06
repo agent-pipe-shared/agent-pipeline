@@ -10,14 +10,18 @@ import { buildSandboxInvocation } from "./codex-sandbox-preflight.mjs";
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const PIPELINE_ROOT = resolve(HERE, "..", "..", "..");
+// The directory containing scripts/, roles/, templates/ -- the executing
+// plugin root, never the candidate repository (this is a source-checkout
+// vendored copy or an installed marketplace copy; the two are the same
+// shape either way).
+const PLUGIN_ROOT = resolve(HERE, "..");
 const CHILD = realpathSync(fileURLToPath(new URL("./codex-critic-app-server-child.mjs", import.meta.url)));
 const MODEL = "gpt-5.6-sol";
 const PROVIDER = "openai";
 const EFFORT = "xhigh";
 const ROLE_CONTRACT_PATH = "roles/critic.md";
 const PROMPT_CONTRACT_PATH = "templates/prompts/critic-review.md";
-const VERDICT_SCHEMA_PATH = "plugins/pipeline-core/scripts/critic-verdict.schema.json";
+const VERDICT_SCHEMA_PATH = "scripts/critic-verdict.schema.json";
 const COMMIT_SHA = /^[0-9a-f]{40}$/;
 const TREE_SHA = /^[0-9a-f]{40,64}$/;
 
@@ -25,7 +29,7 @@ function fail(message) { throw new Error(message); }
 
 /** Resolved against the executing plugin root, never the candidate repository. */
 function physicalRulesetFile(relativePath) {
-  const absolute = resolve(PIPELINE_ROOT, relativePath);
+  const absolute = resolve(PLUGIN_ROOT, relativePath);
   const lexical = lstatSync(absolute);
   if (lexical.isSymbolicLink() || !lexical.isFile()) fail(`Critic ruleset reference is not a regular file: ${relativePath}`);
   return absolute;
