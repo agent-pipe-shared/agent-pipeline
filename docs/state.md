@@ -325,19 +325,24 @@ edit). **Remaining: `verify-suite-registration-check`/
 `NVA-B-EVSLOTFIX-1`, see above). Next full verify attempt should be green
 except for that one, PO-signature-gated pair.
 
-### 2026-09-06: two backlog items dispatched while waiting on the PO
+### 2026-09-06: two backlog items landed while waiting on the PO, Critic pending
 
-Not blocked by Block D/E. `NVA-B-GG22FIX-1` (`guard-git.mjs`, dispatched):
-scopes GG-22's disallowed-path check to the refused commit's own pathspec
-instead of the whole shared index (fixes a measured, reproducible deadlock
-between concurrent dispatches —
-`2026-09-03-gg-22-reads-the-shared-index-so-a-concurrent-dispatch-blocks-an-unrelated-ledger-commit.md`).
-`NVA-B-HGOCOPYSAFE-1` (`human-guard-override.mjs`, dispatched): resolves
-its last direct `boundedOpaqueCopyCommand` import — briefed as a genuine
-design-fork (extend `copy-safe-command.mjs` with an opaque-string mode, or
-determine and report that this needs its own PO decision like the sibling
-`codex-pretool-guard.mjs` conversion did) —
-`2026-08-28-po-facing-commands-are-not-uniformly-rendered-break-safe.md`.
+Neither blocked by Block D/E. **`NVA-B-GG22FIX-1` landed** (`fe2d7afe`/
+`8c9b4906`/ledger): scopes GG-22's disallowed-path check to the refused
+commit's own `--` pathspec instead of the whole shared index, fixing a
+measured deadlock between concurrent dispatches — closed
+`2026-09-03-gg-22-reads-the-shared-index-so-a-concurrent-dispatch-blocks-an-unrelated-ledger-commit.md`.
+No permanent regression test landed (`guard-git.test.mjs` is TP-1 protected,
+no in-session route) — tracked:
+`2026-09-06-gg22-pathspec-fix-has-no-permanent-regression-test.md` (needs
+an attended operator running `apply-pending-protected-edits.mjs`).
+**`NVA-B-HGOCOPYSAFE-1` landed** (`da6b381c`/`457908a0`): the goldfish
+found my briefing's premise wrong — `copy-safe-command.mjs` already
+re-exports `boundedOpaqueCopyCommand` unchanged — so the fix was a one-line
+import-source swap, not new capability. `codex-pretool-guard.mjs` still
+imports it directly too (disclosed, unfixed, item stays open). Both
+independently re-verified (232/232, 32/32, 99/99); two T1 Critic rounds
+dispatched.
 
 ## PO decisions and todos — collected during the autonomous run, not waited on
 
