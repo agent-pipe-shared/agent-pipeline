@@ -66,36 +66,33 @@ Commits survive compaction; intent does not — this block is the intent.
 2. DONE — gate at `2dca9b8d` 515/516; the one red fixed in `ec0b158c`;
    queue #1 done (`eecb4273`).
 3. DONE — Gate state, CHANGELOG and the queue updated (`befe4470`).
-4. IN PROGRESS — payload capture (queue #3): the PO restarted with the
-   `Bash|Read` capture hook installed; the read-only dispatch
-   `NVA-B-PENDINGDOC-CHECK-1` ran in the new session and generated subagent
-   tool calls. The PO now runs `node scratch/payloadcapture-hook.mjs remove`,
-   then `show`, and pastes the subagent lines. **The question:** do they
-   carry `…/subagents/agent-<id>.jsonl` or the PARENT `<session>.jsonl` as
-   `transcript_path`? The latter is the leading hypothesis for why
-   `guard-dispatch-budget.mjs` never fires (logic proven by probe;
-   invocation absent). Answer it BEFORE seeding the one shared TP-4
-   `hooks.json` ceremony (queue #2), or a second inert guard ships.
-5. DONE — the Codex session's installed-root defect (`PIPELINE_ROOT` three
-   levels above the adapter file) is fixed in `b5a181ce` (`NVA-B-XPORTROOT-1`,
-   goldfish-deep; RED/GREEN captured, 111/111; the briefing carried one false
-   fixture-assertion cell, disclosed by the dispatch and left out). T1 round 1
-   (Opus, max): PASS, one minor — F1, the fixture layout let the old anchor
-   still find the schema (`2026-09-06-nva-b-xportroot-1-critic-round1.md`,
-   R4 amended); fixed in `573180b8` (`NVA-B-XPORTROOT-3`; the `-2` run
-   stopped on a briefing defect, nothing committed); round 2 PASS.
-   Also landed: ADR-0080 accepted (`07d6041f`);
-   the positioning inputs persisted verbatim to
+4. DONE — payload capture (queue #3) ANSWERED. No payload carries a
+   `…/subagents/agent-<id>.jsonl` path; subagent and orchestrator alike carry
+   the PARENT transcript. The discriminator is the `agent_id` key, which only
+   a subagent payload has. Record:
+   `backlog/evidence/2026-09-06-dispatch-budget-guard-discriminator-measured.md`.
+   The TP-4 `hooks.json` ceremony (queue #2) is no longer blocked by this.
+5. DONE — Codex installed-root defect fixed (`b5a181ce`, corrected in
+   `573180b8`), two T1 Critic rounds PASS
+   (`2026-09-06-nva-b-xportroot-1-critic-round1.md`); ADR-0080 accepted
+   (`07d6041f`); positioning inputs persisted to
    `specs/sprint-nova-epic/design/2026-09-06-positioning-*` (`c90f9131`) —
    the D block reads those, never `scratch/`.
-6. DONE — Critic round 2 PASS (`87af6b67`); local re-stamp `6565190d`
-   (base 0.6.1 by PO decision, the 0.6.2 bump comes with the release); gate
-   **516/516 at `c784a462`** (Gate state above). No push, no range Critic:
-   the candidate serves a local test.
-7. NEXT — PO: plugin update + `/reload-plugins` (queue #5), then the local
-   install test; capture log (#3) still awaited. Then the D block from
-   `specs/sprint-nova-epic/design/2026-09-06-positioning-*` (D.1–D.6),
-   which later joins 0.6.2 with a re-stamp.
+6. DONE — local re-stamp `6565190d` (base 0.6.1; the 0.6.2 bump comes with
+   the release); gate **516/516 at `c784a462`**. PO then installed it;
+   preflight reads back `0.6.1+claude.20260906172530.87af6b6` as loaded.
+7. DONE — D.1. `94277a0b`/`a82a1415` put the local candidate on the front
+   doors; **PO rule: user docs always describe the NEXT release, never a
+   local candidate or its branch** — corrected in `9a3c188f`. Reader's Critic
+   (Lektor) round 1 in `2026-09-06-doc-reader-review-round1.md`: ten
+   findings, "audit" appears in 2 of 6 front doors against an audit-obligated
+   audience. PO queue gained items 10–12.
+8. IN FLIGHT (PO afk, autonomous Nova-B work), all four disjoint, Critic
+   rounds pending: `NVA-B-CASPREFLIGHT-3` (async spawn for the handshake
+   race; apply only on 10/10), `NVA-B-T1WIRE-1` (CLI + consumer for the
+   unreachable T1 PO override), `NVA-B-WIREAUDIT-1` (measure every
+   built-but-unwired module), `NVA-B-BUDGETGUARD-2` (suite hardening +
+   `agent_id` discriminator).
 
 **Idea-level facts that must not be re-derived wrongly:**
 
