@@ -32,14 +32,31 @@ vouches for the file set and measured suite results only — never for
 authorship. Writing a plausible-sounding dispatch report would have converted
 an honest evidence gap into a fabricated one.
 
-**F2 — closed.** RED captured at
-`evidence/NVA-B-DENIALCODE-1-red-prefix.txt`: the two new tests run against
-the pre-fix module in a detached worktree at `1b639a8a^`, exit 1. The
-captured failure shows the `&&`-chained outside-root read producing
-`GUARD-PARSE-UNSUPPORTED` where the test expects
-`GUARD-READ-SCOPE-OUTSIDE-ROOT`. This also independently confirms the
-corrected code in the backlog item and rules out the stale
-`GUARD-OPERATOR-UNAPPROVED` reading.
+**F2 — closed, and the finding rested on a false premise supplied by the
+orchestrator.** This must be recorded plainly, because the error was mine and
+it propagated into a Critic round.
+
+The dispatch DID capture RED, in situ, before its fix:
+`backlog/evidence/2026-09-06-nva-b-denialcode-1-red.txt` (exit 1), written
+11:32, showing **both** new tests failing against the pre-fix module. It also
+captured the matching GREEN. The orchestrator did not find these files —
+they were written under `backlog/evidence/` rather than the `evidence/`
+directory the briefing named — and then stated "No RED (pre-fix) evidence
+artifact exists for this task id" to the Critic as a bare fact. It was not a
+fact. F2 was raised on it, correctly given what the Critic was told.
+
+Two consequences worth keeping:
+- A "bare fact" asserted from an absence is only as good as the search behind
+  it. An absence claim handed to a Critic should name where it looked.
+- The orchestrator then re-derived RED independently
+  (`evidence/NVA-B-DENIALCODE-1-red-prefix.txt`, a detached worktree at
+  `1b639a8a^`, exit 1). The two artifacts agree, which is the one useful
+  by-product: the reproduction is now confirmed twice, from two directions.
+  The dispatch's own capture is the stronger of the two — in situ, both
+  tests, no reconstruction.
+
+Both artifacts confirm the corrected code in the backlog item and rule out
+the stale `GUARD-OPERATOR-UNAPPROVED` reading.
 
 **F3 — open, deliberately deferred to the candidate gate.** A verify run
 bound to this commit is not being spent now: further commits are landing in
