@@ -1563,4 +1563,157 @@ function awaitingApprovalFixture() {
   assert.deepEqual(antigravityEnv2, { ok: true, runner: "antigravity" }, "AI_AGENT=antigravity still resolves antigravity");
 }
 
+// NVA-B-CLOSECOLLIDE-1: a feature close refuses to claim an evidence path an
+// already-closed feature holds. The incident: two closed features recorded the
+// SAME close-evidence path with different content digests; closing the second
+// overwrote the file on disk, so the first entry's recorded sha256 no longer
+// matched the bytes there, and continuity validation classified the state as
+// damaged with no harmless way back. This suite pins the refusal at the one
+// place that can see both the new close and every already-closed feature at
+// once -- before any bytes are written, not after the collision has landed.
+function closeCollideFixture({
+  featureId = "closecollide-feature",
+  closeEvidencePath = "evidence/close.json",
+  closeEvidenceText = "close evidence text\n",
+  priorClosedFeatures = [],
+} = {}) {
+  const dir = mkdtempSync(join(tmpdir(), "closecollide-"));
+  mkdirSync(join(dir, "project"), { recursive: true });
+  mkdirSync(join(dir, "specs"), { recursive: true });
+  mkdirSync(join(dir, "evidence"), { recursive: true });
+  const resultText = "```pipeline-result\n{\n  \"finalIntegrations\": []\n}\n```\n";
+  writeFileSync(join(dir, "specs", "result.md"), resultText);
+  writeFileSync(join(dir, closeEvidencePath), closeEvidenceText);
+  const resultSha256 = createHash("sha256").update(resultText).digest("hex");
+  const closeEvidenceSha256 = createHash("sha256").update(closeEvidenceText).digest("hex");
+  const continuity = {
+    schema: "pipeline.continuity.v0",
+    featureId,
+    revision: 0,
+    runtime: { humanFacingLanguage: "en", activeDuty: "Coordinator" },
+    authority: {
+      prd: { path: "specs/prd.md", sha256: "a".repeat(64) },
+      spec: { path: "specs/spec.md", sha256: "b".repeat(64) },
+      result: { path: "specs/result.md", sha256: resultSha256 },
+    },
+    queueHead: {
+      packageId: "P1", actionId: "continuity-writer", nextAction: "close",
+      productRetryCount: 0, environmentRerouteCount: 0, dispatch: null,
+    },
+    blocker: null,
+    acknowledgedFinal: null,
+    resume: { mode: "immediate", sourceRevision: 0, reasonCode: "active-turn" },
+    recovery: null,
+    decisionTxn: null,
+    capacity: { concurrencyLimit: 3, reservedCriticSlots: 1, reservedRecoverySlots: 1, fallbackPolicy: "defer" },
+  };
+  const state = {
+    schema: "pipeline.state.v0",
+    activeFeature: { id: featureId, planPath: "specs/prd.md", phase: "implementation" },
+    planApproved: true,
+    continuity,
+    updatedAt: "2026-01-01T00:00:00.000Z",
+  };
+  if (priorClosedFeatures.length > 0) state.closedFeatures = priorClosedFeatures;
+  writeFileSync(statePath(dir), JSON.stringify(state, null, 2));
+  const closeRequest = {
+    schema: "pipeline.continuity-close.v0",
+    featureId,
+    expectedRevision: 0,
+    result: { path: "specs/result.md", sha256: resultSha256 },
+    closeEvidence: { path: closeEvidencePath, sha256: closeEvidenceSha256 },
+  };
+  writeFileSync(join(dir, "close-request.json"), JSON.stringify(closeRequest, null, 2));
+  return { dir, closeRequestFile: "close-request.json" };
+}
+
+function closeCollideDeps(dir) {
+  return { dir, now: () => "2026-02-02T00:00:00.000Z", gitHead: () => ({ ok: true, commit: "c".repeat(40) }) };
+}
+
+function closeCollidePriorEntry(overrides = {}) {
+  return {
+    id: "earlier-feature",
+    planPath: "specs/earlier-prd.md",
+    phaseAtClose: "implementation",
+    closedAt: "2026-01-01T00:00:00.000Z",
+    closedBy: "po-test",
+    forCommit: "a".repeat(40),
+    continuityClose: {
+      schema: "pipeline.continuity-close.v0",
+      featureId: "earlier-feature",
+      expectedRevision: 0,
+      result: { path: "specs/earlier-result.md", sha256: "c".repeat(64) },
+      closeEvidence: { path: "evidence/close.json", sha256: "d".repeat(64) },
+    },
+    ...overrides,
+  };
+}
+
+// 1. A close-evidence path already claimed by an earlier closed feature is
+// refused: zero mutation, and the error names both the colliding path and the
+// id of the feature that already holds it. Also pins that the exit code
+// matches an existing, unrelated close-feature refusal (no activeFeature at
+// all) -- the new check does not invent its own code.
+{
+  const fx = closeCollideFixture({ closeEvidencePath: "evidence/close.json", priorClosedFeatures: [closeCollidePriorEntry()] });
+  const before = readFileSync(statePath(fx.dir), "utf8");
+  const refusal = capturedStderr(() => run(
+    ["close-feature", "--by", "po-test", "--continuity-close-request", fx.closeRequestFile],
+    closeCollideDeps(fx.dir),
+  ));
+  assert.equal(refusal.result, 2, "a colliding close-evidence path must be refused (exit 2)");
+  assert.equal(readFileSync(statePath(fx.dir), "utf8"), before,
+    "a refused collision must leave the state file byte-identical (zero mutation)");
+  assert.ok(refusal.lines.some((line) => line.includes("evidence/close.json")),
+    `refusal must name the colliding path: ${refusal.lines.join(" ")}`);
+  assert.ok(refusal.lines.some((line) => line.includes("earlier-feature")),
+    `refusal must name the feature that already holds the path: ${refusal.lines.join(" ")}`);
+
+  const noActiveFeatureDir = mkdtempSync(join(tmpdir(), "closecollide-noactive-"));
+  mkdirSync(join(noActiveFeatureDir, "project"), { recursive: true });
+  const noActiveFeature = run(["close-feature", "--by", "po-test"], { dir: noActiveFeatureDir, now: () => "2026-02-02T00:00:00.000Z" });
+  assert.equal(noActiveFeature, 2, "sanity: the pre-existing no-activeFeature close-feature refusal is exit 2");
+  assert.equal(refusal.result, noActiveFeature,
+    "the new collision refusal must use the same exit code as an existing close-feature refusal");
+}
+
+// 2. A close with a distinct evidence path still succeeds, even with the same
+// colliding-by-id prior entry present -- only the path decides the collision.
+{
+  const fx = closeCollideFixture({ closeEvidencePath: "evidence/close-distinct.json", priorClosedFeatures: [closeCollidePriorEntry()] });
+  const accepted = run(
+    ["close-feature", "--by", "po-test", "--continuity-close-request", fx.closeRequestFile],
+    closeCollideDeps(fx.dir),
+  );
+  assert.equal(accepted, 0, "a distinct close-evidence path must still succeed");
+  const finalState = JSON.parse(readFileSync(statePath(fx.dir), "utf8"));
+  assert.equal(finalState.closedFeatures.length, 2, "the new entry must join the prior one");
+  assert.equal(finalState.closedFeatures.at(-1).continuityClose.closeEvidence.path, "evidence/close-distinct.json");
+  assert.equal(finalState.activeFeature, undefined, "close-feature must still remove activeFeature on success");
+}
+
+// 3. A prior closed entry with no recorded close-evidence path at all (an
+// ordinary close with no continuity) collides with nothing -- an absent path
+// is not a claim.
+{
+  const priorNoEvidence = {
+    id: "no-evidence-feature",
+    planPath: "specs/no-evidence-prd.md",
+    phaseAtClose: "implementation",
+    closedAt: "2026-01-01T00:00:00.000Z",
+    closedBy: "po-test",
+    forCommit: "b".repeat(40),
+  };
+  const fx = closeCollideFixture({ closeEvidencePath: "evidence/close.json", priorClosedFeatures: [priorNoEvidence] });
+  const accepted = run(
+    ["close-feature", "--by", "po-test", "--continuity-close-request", fx.closeRequestFile],
+    closeCollideDeps(fx.dir),
+  );
+  assert.equal(accepted, 0, "an earlier entry with no recorded close-evidence path must never collide");
+  const finalState = JSON.parse(readFileSync(statePath(fx.dir), "utf8"));
+  assert.equal(finalState.closedFeatures.length, 2, "the new entry must join the prior evidence-less one");
+  assert.equal(finalState.closedFeatures.at(-1).continuityClose.closeEvidence.path, "evidence/close.json");
+}
+
 console.log("pipeline-state.test.mjs (CB-1a): all checks passed");

@@ -187,6 +187,13 @@
  *                                                 --continuity-close-request <repo-relative-json>
  *                                                 bound to the exact close-head revision and
  *                                                 byte-verified Result/close-evidence files.
+ *                                                 Also refused: the request's close-evidence
+ *                                                 path is identical to the close-evidence path
+ *                                                 already recorded on an earlier entry in
+ *                                                 closedFeatures (English error naming both the
+ *                                                 path and the holding feature id, exit 2,
+ *                                                 nothing written) -- an earlier entry with no
+ *                                                 recorded close-evidence path never collides.
  *   discard-feature --by <name>                   Discards the current activeFeature before
  *                 --reason <text>                 any Result exists: appends {id, planPath,
  *                                                 phaseAtDiscard, discardedAt, discardedBy,
@@ -308,9 +315,10 @@
  * EXIT CODES: 0 = written / success. 2 = refused (bad usage, malformed pre-existing
  * file, `git rev-parse HEAD` failed for `approve-push`, no `activeFeature` for
  * `close-feature`, a blank `activeFeature.id`/`planPath`, a non-array pre-existing
- * `closedFeatures`, a non-array pre-existing `deployApprovals`, or -- `consume-deploy`/
- * `clear-deploy` only -- no matching {env, artifact} record to act on) -- nothing
- * written. Note: a `git rev-parse HEAD` failure during close-feature does NOT produce
+ * `closedFeatures`, a non-array pre-existing `deployApprovals`, a continuity close whose
+ * close-evidence path is already claimed by an earlier `closedFeatures` entry, or --
+ * `consume-deploy`/`clear-deploy` only -- no matching {env, artifact} record to act on) --
+ * nothing written. Note: a `git rev-parse HEAD` failure during close-feature does NOT produce
  * exit 2 -- see the DEVIATION note in RULES above.
  *
  * VERIFY: node harness/scripts/pipeline-state.test.mjs (this file's own behavior
@@ -9295,6 +9303,18 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       }
       const closedAt = now();
       const priorClosed = Array.isArray(base.closedFeatures) ? base.closedFeatures : [];
+      if (continuityClose !== undefined) {
+        const claimedPath = continuityClose.closeEvidence.path;
+        const holder = priorClosed.find(
+          (entry) => entry?.continuityClose?.closeEvidence?.path === claimedPath,
+        );
+        if (holder !== undefined) {
+          console.error(
+            `Error: close-evidence path "${claimedPath}" is already claimed by closed feature "${holder.id}" -- give this feature's close evidence its own path.`,
+          );
+          return 2;
+        }
+      }
       const closedEntry = {
         id: activeFeature.id,
         planPath: activeFeature.planPath,
