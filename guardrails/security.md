@@ -221,7 +221,7 @@ new term for this case).
   sampling, or reconstructing a scheme owned by something outside this
   repository's own code (e.g. a host tmp-directory layout) is a SEC-11
   violation to flag at design review or Critic review. Full decision
-  record, current scope-gap inventory (rg-pipe/cat-pipe/grep-pipe lanes,
-  the leading-`~` fix, the transcript-file exact-match hardening still
-  owed) and consequences:
+  record, current scope-gap inventory (rg-pipe/cat-pipe/grep-pipe lanes;
+  the transcript-file exact-match invariant is now enforced structurally,
+  `NVA-B-GLRMINORS-1`) and consequences:
   `docs/adr/draft-read-scope-containment-boundary.md`.

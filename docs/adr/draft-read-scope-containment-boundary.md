@@ -113,14 +113,19 @@ honest boundary rather than assuming the lane is now uniformly hardened:
   true-reason `GUARD-READ-SCOPE-OUTSIDE-ROOT`) — still refused, not a
   containment bypass. Tracked:
   `2026-09-06-suppressed-and-chained-outside-root-reads-land-on-the-wrong-denial-code.md`.
-- **The new transcript-file exception's own doc comment overstates its
-  enforcement**: it claims an "EXACT single-file match... never a
-  directory-prefix admission," but a candidate shaped
-  `<transcriptFile>/<nonexistent-child>` is admitted by the containment
-  check's ancestor-walk logic, saved only by a real OS `ENOTDIR` at actual
-  read time — not exploitable today, but not structurally enforced either.
-  Tracked:
-  `2026-09-06-the-exact-transcript-file-exception-admits-a-nonexistent-child-path.md`.
+- **Closed, 2026-09-06 (`NVA-B-GLRMINORS-1`, commit `571e67a8`):** the
+  transcript-file exception's "EXACT single-file match... never a
+  directory-prefix admission" invariant is now enforced structurally at
+  `isApprovedSingleCommandReadArg()` (identity check first, then refuse
+  outright for any non-identical candidate under a FILE-typed boundary)
+  rather than relying on the OS's own `ENOTDIR` at read time. T1 Critic
+  PASS with two minor follow-ups: the exported `isRealpathedWithinBoundary`
+  primitive itself keeps its unguarded FILE-boundary behavior, un-caveated,
+  for any future caller that reuses it that way (tracked:
+  `2026-09-06-isrealpathedwithinboundary-keeps-unsafe-file-boundary-behavior-uncaveated.md`);
+  this document and `guardrails/security.md` SEC-11 needed the "still owed"
+  language corrected (this edit).
+  Full history: `2026-09-06-the-exact-transcript-file-exception-admits-a-nonexistent-child-path.md`.
 - **The WRITE lane's `isPathWithinRealpathedRoot` may share the READ lane's
   `..`-through-symlink bypass shape** `NVA-B-READCONTAIN-1` found and
   fixed — unverified, depends on host-tool internals (Claude Code's own
