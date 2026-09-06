@@ -464,7 +464,7 @@
 | pipeline.push-release-flow-unusable-for-third-party-adopters | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.quote-style-fragility-in-shell-command-admission | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.raw-apply_patch-is-unconditionally-admitted-by-the-outer-lifecycle-gate | closed | defect | pipeline | 2026-08-09 | — |
-| pipeline.read-containment-removed-with-no-recorded-decision | open | defect | pipeline | 2026-09-01 | Nova B — the project-root containment check on read-only shell commands was added on 2026-08-29 to close a hole and removed wholesale on 2026-08-30. The removal is deliberate and undocumented outside its own commit message, and it silently invalidates a closed item's recorded remedy. |
+| pipeline.read-containment-removed-with-no-recorded-decision | closed | defect | pipeline | 2026-09-01 | Nova B — the project-root containment check on read-only shell commands was added on 2026-08-29 to close a hole and removed wholesale on 2026-08-30. The removal is deliberate and undocumented outside its own commit message, and it silently invalidates a closed item's recorded remedy. |
 | pipeline.read-scope-denial-code-accuracy-f3 | open | defect | pipeline | 2026-09-06 | Nova B — NVA-B-READCONTAIN-1's T1 Critic (round 1) finding F3, carried in backlog/evidence/2026-09-06-nva-b-readcontain-1-findings.md but never given its own backlog/items/ entry. Filed now to close that tracking gap; the underlying behavior is unchanged and non-blocking (the command is still refused end-to-end, only the printed reason code is wrong). |
 | pipeline.read-scope-guard-admits-single-command-but-blocks-the-piped-form | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.read-scope-tilde-expansion-mismatch | open | defect | pipeline | 2026-09-06 | Nova B — while triaging NVA-B-READCONTAIN-1's closure, the Elephant independently checked whether the restored read-scope containment accounts for shell tilde expansion. It does not: the guard's parser never expands a leading `~` in a path-taking argument, so it evaluates the LITERAL string `~/.ssh/id_rsa` as a (nonexistent) path under the project root, while the actual shell expands `~` to the real home directory before the command ever runs. Confirmed live via evaluateLifecycleReadyGuard() directly (never via an executed Bash cat of a real credential path). |
@@ -637,8 +637,8 @@
 
 ## Counts
 
-- open: 102
+- open: 101
 - in_progress: 0
-- closed: 513
+- closed: 514
 - rejected: 3
 - deferred: 11
