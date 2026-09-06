@@ -146,6 +146,23 @@ reported as such rather than rounded up.
 
 Analysis: `backlog/evidence/2026-09-06-codex-selected-critic-transport-gap.md`.
 
+## 9. Accept the slicing design as ADR-0080
+
+**Needs:** one word from the PO — "accept".
+
+`docs/adr/draft-parallel-dispatch-slicing-enforcement.md` has had two T1
+Critic rounds (FAIL then PASS-bounded-by-step-1), its blocking precondition is
+cleared by the channel probe, its open parameter is resolved by measurement,
+and the mechanism it describes is built and tested. ADR-0069 D2 allocates a
+number *"in the act of being accepted into the trunk — the same moment its
+`Status:` becomes `accepted`"*. That is a PO act, not an agent's. On
+acceptance the file is renamed to `0080-…`, its status set, and every
+slug reference rewritten in the same commit — the agent does that; the PO
+says the word.
+
+**If never done:** the design stays a draft referenced by slug. Nothing
+breaks; ADR-0069's counter simply never learns of it.
+
 ---
 
 ## Not on this list, deliberately
