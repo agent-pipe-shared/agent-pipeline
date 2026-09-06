@@ -1,0 +1,31 @@
+command: git show --stat bf274c394fa037c667da9dbdffcc81ae843c748f
+label: bf274c39 diff (round 1 remediation: evidence only, no code change)
+exitCode: 0
+--- stdout ---
+commit bf274c394fa037c667da9dbdffcc81ae843c748f
+Author: The Agent-Pipeline Contributors <301875187+agent-pipe-shared@users.noreply.github.com>
+Date:   Sun Sep 6 07:36:49 2026 +0200
+
+    docs(backlog): record T1 Critic round 1 for the codexguardimport-1 commit and remediate its evidence gaps
+    
+    Round 1 FAIL rested on two evidence gaps (F2: no completed verify result
+    bound to the commit; F3: consumer-safe-paths check not evidenced), not a
+    code defect -- the code itself was confirmed correct. Both remediated:
+    a completed full verify.mjs run bound to a descendant commit (exactly the
+    one known PO-blocked failure, otherwise green) and the consumer-safe-paths
+    check, both captured durably.
+    
+    Also confirms a recurrence of the strip-for-dispatch gap (Progress-note
+    heading not stripped, same shape as the already-tracked Resolution-heading
+    gap) -- noted in that item rather than filed separately.
+    
+    AI-Assisted: true
+
+ ...2026-09-06-nva-b-codexguardimport-1-findings.md |   44 +
+ ...6-09-06-nva-b-codexguardimport-1-safe-paths.txt |   24 +
+ ...-06-nva-b-codexguardimport-1-verify-latest.json | 3113 ++++++++++++++++++++
+ ...mmands-are-not-uniformly-rendered-break-safe.md |   11 +
+ ...ispatch-does-not-remove-a-resolution-section.md |   14 +
+ 5 files changed, 3206 insertions(+)
+
+--- stderr ---
