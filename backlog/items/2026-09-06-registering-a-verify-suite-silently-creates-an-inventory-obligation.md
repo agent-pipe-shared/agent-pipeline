@@ -33,6 +33,16 @@ edits cannot even share a ceremony).
 - `ec0b158c` (2026-09-06 evening): `guard-slicing-tests` registered under PO
   signature (`eecb4273`); the first full run bound to `2dca9b8d` came back
   515/516 with the inventory suite as the one red; fixed by one line.
+- `8d76e28d` (2026-09-06 night, a third trigger and a third obligation): the
+  release-line corrections edited `docs/operating-model.md`, which is vendored
+  into the plugin as `plugins/pipeline-core/docs/operating-model.md`. The
+  vendored copy was not regenerated, and the next full gate went red on TWO
+  suites — `generate-vendored-canon-tests` directly, and `doc-contract-tests`
+  through its own check that every shipped vendored link exclusion is
+  justified by a byte-identical origin. One stale generated file, two red
+  suites, neither of them the one whose file was edited. The remedy is a single
+  command (`node harness/scripts/generate-vendored-canon.mjs`) that nothing at
+  the editing step names.
 - `c784a462` (2026-09-06 evening, same class, a second inventory): the
   ADR-0080 acceptance renamed `docs/adr/draft-…` to `docs/adr/0080-…`
   (`07d6041f`); `governance/observation-doc-governance.json` still listed
