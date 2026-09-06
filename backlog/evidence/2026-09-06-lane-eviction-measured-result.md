@@ -58,6 +58,31 @@ Recorded because the methodological lesson is more durable than the number:
 the audit answered the question it was asked precisely and well, and the
 question was the smaller one.
 
+## Second eviction — `fcaf8d5e`, measured, with the definition stated
+
+Added after a T1 review found this artifact carried no row for it.
+
+| | Before (`a478b10c`) | After (`fcaf8d5e`) |
+|---|---|---|
+| Wall clock, **suite span** (first suite `startedAt` → last suite `completedAt`, from the progress stream) | 485.0s | **454.9s** (−30.1s) |
+| Wall clock, **run envelope** (`verify-latest.json` `startedAt` → `finishedAt`) | 482.5s* | **462.3s** (−20.2s) |
+| Serial lane | 484.3s (59 members) | 454.1s (57 members) |
+| Non-zero suites | 1 | 1 |
+
+\* the envelope baseline is the `d483eea6` run's; the `a478b10c` envelope was
+not separately recorded.
+
+Two definitions, both correct, ~7–8s apart — the runner's pre- and
+post-suite overhead. Every earlier number in this file and in the trend rows
+is the **suite span**; the Critic that raised the gap measured the
+**envelope**. Neither artifact had said which, and that was the defect, not
+either number.
+
+Predicted ≈35s; measured 30.1s (suite span). Short by about the amount the
+pool absorbed. Cumulative across both evictions, suite span:
+645.7s → 454.9s, **−190.8s, −29.5%**, same single non-zero suite before and
+after each — the TP-3 registration blocker, since cleared by PO signature.
+
 ## Still open on the same suite
 
 Intra-file concurrency. Node runs `test()` cases within one file sequentially
