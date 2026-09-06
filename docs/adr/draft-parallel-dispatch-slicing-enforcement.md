@@ -287,16 +287,42 @@ dispatch — which the role definitions deliberately make impossible
   trigger and PSP-0 name the same threshold. The implementation must not
   re-introduce a second threshold: PSP-0's N is the single source.
 
-**Open parameter the implementation must fix, not guess (F4, second half):**
-fan-out recognition ("≥2 `Task`/`Agent` dispatch calls in the same turn")
-has no turn-boundary field available to a `PreToolUse` hook, so the only
-available detection is a timestamp window — and this design deliberately does
-not fix its width. That is decomposition debt, not a build detail: an
-implementation dispatch must be briefed with the window decided, or it will
-guess, and a wrong window produces exactly the false positive Decision 3 says
-the mechanism must not create (nudging an Elephant that is already
-parallelizing). Until it is decided, the unit test mandated for fan-out
-recognition in Next steps cannot be written against a fixed contract.
+**Open parameter — RESOLVED 2026-09-06, and not by fixing the number.**
+This section previously said fan-out recognition ("≥2 `Task`/`Agent`
+dispatch calls in the same turn") has no turn-boundary field available to a
+`PreToolUse` hook, so the only available detection is a timestamp window
+whose width an implementation dispatch must be briefed with. **Both halves of
+that were wrong.** Measured, not argued:
+
+- **A timestamp window does not work at all.** Over 226 dispatch calls in
+  this repository's own transcript, same-turn gaps run 6.2–36.8s (streaming
+  spreads one message's tool calls over real time) while cross-turn gaps
+  start at 13.6s. The populations **overlap**, so no threshold separates
+  them. Had the implementation been briefed to pick a width, it would have
+  been asked to tune a discriminator that cannot discriminate.
+- **A turn boundary is available, and it is exact.** A `PreToolUse` payload
+  carries `transcript_path` — `guard-dispatch-budget.mjs` already consumes
+  it (`:192`, `:428`). Transcript rows carry `message.id`, which groups tool
+  calls by assistant message, i.e. by turn. Over the same 197 dispatch-
+  bearing messages: 179 carry exactly one dispatch call, 18 carry two to
+  four. Fan-out is an **identity match on `message.id`**, not a threshold —
+  so it has no false-positive rate to tune, and Decision 3's false-positive
+  concern does not arise for this trigger at all.
+
+**Consequence for the build:** implement fan-out recognition by grouping the
+transcript's dispatch calls on `message.id`. Do not implement a timestamp
+window; do not add a tunable width.
+
+**One caveat the implementation must respect rather than assume away:**
+whether the *current* tool call is already written to the transcript when
+`PreToolUse` fires is NOT established here. It does not need to be. Both
+triggers are retrospective by construction — the consecutive-single-dispatch
+run looks at completed turns, and the fan-out reset only needs a past turn to
+have been recognized. An implementation that requires the in-flight call to
+be visible has changed the design and must say so.
+
+Measurement scripts: `scratch/measure-fanout-window.mjs`,
+`scratch/inspect-msgid-grouping.mjs`.
 
 **Rate limiting is part of the trigger, not a refinement.** A nudge on every
 dispatch becomes ambient noise the model learns to skip — the identical decay
@@ -758,11 +784,12 @@ this order:
    2026-09-06 after T1 Critic finding F-C: both were stated in the body as
    must-fix-before-build but were missing from this ordered list, which is
    what a briefing gets assembled from.
-   - **Fix the fan-out detection window** (see the "open parameter" section
-     above). Until it is a number, step 4's fan-out unit test has no fixed
-     contract to test against, and an implementer will guess it — producing
-     exactly the false-positive class Decision 3 forbids. **Owner:** the
-     implementation briefing's author, before dispatch.
+   - ~~**Fix the fan-out detection window**~~ — **RESOLVED 2026-09-06, no
+     window needed.** Measurement showed a timestamp window cannot separate
+     fan-out from sequential work (the populations overlap), and that
+     `transcript_path` + `message.id` gives an exact turn boundary instead.
+     See the "open parameter" section above; the build implements the
+     identity match, not a threshold.
    - **Confirm ADR-0063's directory contract admits
      `.git/agent-pipeline/dispatch-slicing/`** rather than assuming this
      document settled it. **Owner:** the implementation dispatch, as its
