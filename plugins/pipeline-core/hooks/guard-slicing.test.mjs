@@ -270,6 +270,59 @@ test("GS8b: the ledger's workflowRecoveredCount reflects extractWorkflowDispatch
   assert.equal(record.event, LEDGER_EVENT_FANOUT, "a Workflow call is itself recorded as fanout, not plain dispatch");
 });
 
+// --- The ledger's `fanout` field must see a Task/Agent fan-out under EITHER
+// write timing (NVA-B-SLICINGFANOUT-1). The buggy expression
+// (`inFlightSiblingCount >= 2`) can only ever be true when the CURRENT call's
+// own content is already matched into the last transcript group -- which
+// structurally never happens under the not-yet-written timing, and even
+// under the already-written timing only for the LAST sibling of the pair
+// (never the first, whose own group cannot yet contain a sibling that has not
+// been decided). The fix instead classifies the LAST *completed* group
+// (`excluded.groups`, after in-flight exclusion) -- this recognizes the
+// fan-out on the first ordinary dispatch call that follows it, consistently
+// under both timings. -------------------------------------------------------
+
+test("GS19: an already-completed Task/Agent fan-out is recognized on the NEXT call when that call's own row is already written (favorable timing)", () => {
+  // History: one single (m1), then a completed 2-way fan-out (mF), then the
+  // CURRENT call's own row already recorded as its own message (m4) --
+  // simulating the "own row written before its own hook fires" timing.
+  const current = { subagent_type: "x", prompt: "after-the-fanout" };
+  const rows = [
+    dispatchRow("m1", "Task"),
+    fanoutRow("mF", [["Task", { a: 1 }], ["Agent", { b: 2 }]]),
+    dispatchRow("m4", "Task", current),
+  ];
+  const store = makeStore({ [ORCH_TRANSCRIPT]: transcriptText(rows) });
+  const result = evaluateSlicingGuard(
+    { transcript_path: ORCH_TRANSCRIPT, session_id: "s19", tool_name: "Task", tool_input: current },
+    baseOptions(store),
+  );
+  const raw = store.files.get(ledgerPath(COMMON_DIR, "s19"));
+  const record = JSON.parse(raw.trim().split("\n").pop());
+  assert.equal(record.fanout, true, "a completed Task/Agent fan-out immediately behind this call must be recognized");
+  assert.equal(record.event, LEDGER_EVENT_FANOUT);
+});
+
+test("GS20: an already-completed Task/Agent fan-out is recognized on the NEXT call when that call's own row is NOT yet written (the other write timing)", () => {
+  // History: one single (m1), then a completed 2-way fan-out (mF). The
+  // CURRENT call's own row is absent -- simulating the "not yet written"
+  // timing GS6b names. Nothing in history matches the current call's content.
+  const current = { subagent_type: "x", prompt: "after-the-fanout-unwritten" };
+  const rows = [
+    dispatchRow("m1", "Task"),
+    fanoutRow("mF", [["Task", { a: 1 }], ["Agent", { b: 2 }]]),
+  ];
+  const store = makeStore({ [ORCH_TRANSCRIPT]: transcriptText(rows) });
+  const result = evaluateSlicingGuard(
+    { transcript_path: ORCH_TRANSCRIPT, session_id: "s20", tool_name: "Task", tool_input: current },
+    baseOptions(store),
+  );
+  const raw = store.files.get(ledgerPath(COMMON_DIR, "s20"));
+  const record = JSON.parse(raw.trim().split("\n").pop());
+  assert.equal(record.fanout, true, "a completed Task/Agent fan-out immediately behind this call must be recognized under this timing too");
+  assert.equal(record.event, LEDGER_EVENT_FANOUT);
+});
+
 // --- Trigger B: TodoWrite >= threshold pending, rate-limited per batch ----
 
 test("GS9: fewer than SLICING_THRESHOLD pending items does not fire", () => {

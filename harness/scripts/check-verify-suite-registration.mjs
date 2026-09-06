@@ -162,7 +162,7 @@ export const REQUIRED_EXCLUSION_FIELDS = Object.freeze(["reason", "owner", "expi
  * because they share the others' justification.
  *
  * ADDED 2026-09-06 (NVA-B-SLICINGBUILD-2): `plugins/pipeline-core/hooks/guard-slicing.test.mjs`
- * joined the green group below by the identical route -- 30/30 passing, parked solely because
+ * joined the green group below by the identical route -- 33/33 passing, parked solely because
  * registering it edits verify.mjs while the window is closed. The paragraph above this one
  * predates that addition and is not restated here; see the entry itself, and the test below
  * that pins the current membership, for the up-to-date set.
@@ -227,7 +227,7 @@ export const EXCLUSIONS = Object.freeze({
     expires: "2026-09-07",
   }),
   "plugins/pipeline-core/hooks/guard-slicing.test.mjs": Object.freeze({
-    reason: "GREEN, not red: 30/30 passing (NVA-B-SLICINGBUILD-2, 2026-09-06), covering guard-slicing.mjs's orchestrator/subagent targeting; trigger A's three-consecutive-single-dispatch backstop with in-flight-turn exclusion by canonical-hash identity (both write-timing possibilities); message.id and Workflow fan-out resets (the Workflow reset independent of extractWorkflowDispatches()'s recovered count, by design); trigger B's TodoWrite pending>=3 threshold with per-batch-hash rate limiting; the exact PreToolUse additionalContext stdout shape; the ledger record shape; and fail-open on each malformed-input class. Parked solely because registering it edits verify.mjs, a protected test path (TP-3) whose maintenance window is closed and whose reopening needs a human signature. Register on the next window; this entry is a scheduling record, not a defect record.",
+    reason: "GREEN, not red: 33/33 passing (NVA-B-SLICINGBUILD-2, 2026-09-06), covering guard-slicing.mjs's orchestrator/subagent targeting; trigger A's three-consecutive-single-dispatch backstop with in-flight-turn exclusion by canonical-hash identity (both write-timing possibilities); message.id and Workflow fan-out resets (the Workflow reset independent of extractWorkflowDispatches()'s recovered count, by design); trigger B's TodoWrite pending>=3 threshold with per-batch-hash rate limiting; the exact PreToolUse additionalContext stdout shape; the ledger record shape; and fail-open on each malformed-input class. Parked solely because registering it edits verify.mjs, a protected test path (TP-3) whose maintenance window is closed and whose reopening needs a human signature. Register on the next window; this entry is a scheduling record, not a defect record.",
     owner: "PO",
     expires: "2026-09-07",
   }),

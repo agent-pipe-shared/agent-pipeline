@@ -9,6 +9,15 @@
  * `PreToolUse` exit-0 response -- see the ADR's addendum) and records one
  * line per evaluated call to a machine-readable ledger.
  *
+ * CORRECTED NVA-B-SLICINGFANOUT-1 (2026-09-06): the ledger's `fanout` field
+ * was permanently `false` for every `Task`/`Agent` call under the
+ * not-yet-written transcript timing, and even under the already-written
+ * timing could only ever be `true` for the LAST-processed sibling of a
+ * fan-out pair, never the first -- see the "LEDGER `fanout` FIELD" note
+ * below `evaluateTriggerA` for the fix and its two disclosed residuals. The
+ * run reset itself (`classifyGroup`/`computeTrailingSingleRun`) was already
+ * correct and is untouched by this fix.
+ *
  * NOT WIRED into `hooks.json` by this dispatch -- that file is TP-4 and on
  * `NEVER_LIFTABLE_KERNEL_PATHS`; wiring it is an attended PO operator-tool
  * run outside any session, the same route `guard-dispatch-budget.mjs`'s own
@@ -95,7 +104,41 @@
  * reimplemented locally because it is not exported there), that group is
  * dropped from the run computation entirely. This holds under either
  * transcript write-timing per the ADR's own caveat -- no timing probe is
- * needed, and none is implemented.
+ * needed, and none is implemented. NOTE: this exclusion feeds the RUN LENGTH
+ * only (`computeTrailingSingleRun`), never the ledger's `fanout` field --
+ * see the next section.
+ *
+ * LEDGER `fanout` FIELD (CORRECTED NVA-B-SLICINGFANOUT-1). `fanout` is
+ * `true` for a `Workflow` call by tool name alone (unconditional, per the
+ * ADR), and otherwise derived from `classifyGroup` on the LAST group of
+ * `excludeInFlightGroup`'s returned `groups` -- i.e. the last COMPLETED
+ * group, after the in-flight group (if matched) has been dropped -- NOT from
+ * `inFlightSiblingCount`. The prior expression (`inFlightSiblingCount >= 2`)
+ * was permanently `false` for every `Task`/`Agent` call under the
+ * not-yet-written timing (a sibling that has not yet been transcribed cannot
+ * be matched by identity), and even under the already-written timing was
+ * only ever `true` for the LAST-processed sibling of a fan-out pair -- the
+ * first sibling's own group cannot yet contain a block that has not been
+ * decided. The ADR (the "Open parameter" resolution) already establishes
+ * that fan-out recognition is retrospective by design and must not require
+ * the in-flight call to be visible; classifying the last COMPLETED group
+ * honors that under both timings uniformly, at the cost of two disclosed
+ * trade-offs rather than silently accepting the old zero-signal:
+ * - The fan-out is recognized on the FIRST ORDINARY dispatch call that
+ *   follows a completed `Task`/`Agent` fan-out, not on the fan-out's own
+ *   constituent calls (which, per the paragraph above, cannot see each other
+ *   reliably under both timings). That following call's own `tool`/
+ *   `agentType` land on the ledger record, not the fan-out's. `Workflow`
+ *   does not share this asymmetry -- it self-records immediately, by name.
+ * - Under the not-yet-written timing, a fan-out of 3 or more siblings can be
+ *   recognized TWICE: once on its own last sibling (which, by then, sees the
+ *   OTHER N-1 >= 2 siblings already committed) and again on the very next
+ *   ordinary call (which still sees that same completed group as the last
+ *   one). This is a bounded over-count, not an unbounded one, and fixing it
+ *   needs a group-identity field on the ledger record to tell "the same
+ *   fan-out, seen twice" apart from "two separate fan-outs" -- out of scope
+ *   here: `pipeline.dispatch-slicing-ledger.v1`'s shape is the ADR's, not
+ *   this file's, to extend.
  *
  * LEDGER. One JSON line per evaluated orchestrator call, appended to
  * `.git/agent-pipeline/dispatch-slicing/<session-id>.jsonl` (git-common-dir
@@ -242,9 +285,18 @@ export function classifyGroup(group) {
  * call is a real (if unusual) historical turn, not the in-flight one, and
  * must not be dropped. Returns the possibly-shortened group list plus
  * `inFlightSiblingCount` (the in-flight group's own block count, 0 when no
- * match was found) -- the latter feeds the ledger's `fanout` field only, it
- * never affects the run computation, since the in-flight group is excluded
- * from that either way.
+ * match was found).
+ *
+ * CORRECTED NVA-B-SLICINGFANOUT-1: `inFlightSiblingCount` does NOT feed the
+ * ledger's `fanout` field (it did before this fix, and that was the defect --
+ * see `evaluateTriggerA`'s header note on where `fanout` is derived now).
+ * `inFlightSiblingCount` can only ever be >= 2 when the CURRENT call's own
+ * content is ALREADY matched into the last transcript group, which requires
+ * BOTH the already-written timing AND this call being the LAST-processed
+ * sibling of the pair -- a structural ceiling, not a bug in this function.
+ * It is retained on the return value for its own direct callers/tests
+ * (`excludeInFlightGroup`'s suite) and as a diagnostic, not because anything
+ * in this module still consumes it for the fan-out verdict.
  */
 export function excludeInFlightGroup(groups, currentToolName, currentToolInput) {
   if (!Array.isArray(groups) || groups.length === 0) {
@@ -428,15 +480,19 @@ function evaluateTriggerB({ toolInput, sessionId, commonDir, nowFn, options }) {
 function evaluateTriggerA({ input, toolName, toolInput, sessionId, commonDir, nowFn, options }) {
   const transcriptPath = input?.transcript_path;
   let runLength = 0;
-  let inFlightSiblingCount = 0;
+  // Whether the LAST *completed* group (after in-flight exclusion) is itself
+  // a recognized fan-out/Workflow reset -- see the "LEDGER `fanout` FIELD"
+  // header note (NVA-B-SLICINGFANOUT-1) for why this replaces
+  // `inFlightSiblingCount >= 2` rather than supplementing it.
+  let lastCompletedGroupIsReset = false;
 
   if (typeof transcriptPath === "string" && transcriptPath !== "") {
     const rows = (options.readTranscriptRowsFn ?? readTranscriptRows)(transcriptPath, options);
     if (rows !== null) {
       const groups = groupDispatchMessages(rows);
       const excluded = excludeInFlightGroup(groups, toolName, toolInput);
-      inFlightSiblingCount = excluded.inFlightSiblingCount;
       runLength = computeTrailingSingleRun(excluded.groups);
+      lastCompletedGroupIsReset = classifyGroup(excluded.groups[excluded.groups.length - 1]) === "reset";
     }
     // rows === null (unreadable/malformed transcript) -> fail open: runLength stays 0, no nudge
   }
@@ -463,9 +519,19 @@ function evaluateTriggerA({ input, toolName, toolInput, sessionId, commonDir, no
   // hook starts observing a session whose history already exceeds the threshold
   // -- e.g. wired mid-session -- runLength can start above SLICING_THRESHOLD and
   // this run's one nudge is silently skipped rather than firing late; that is the
-  // safe direction, a missed nudge, not a repeated one.)
+  // safe direction, a missed nudge, not a repeated one. A second, narrower
+  // edge case (NVA-B-SLICINGFANOUT-1, item c): under the not-yet-written
+  // timing, if the in-flight call's own content is byte-identical to the
+  // IMMEDIATELY PRECEDING historical single, `excludeInFlightGroup` wrongly
+  // matches and drops that real historical group -- since it only ever
+  // inspects the LAST group -- undercounting this call's runLength by one
+  // and overcounting a later call's by one once the real row lands. Net
+  // effect: the run's one nudge is silently skipped (e.g. 2, then a jump to
+  // 4), never firing at exactly 3. Unaffected under the already-written
+  // timing, where the in-flight call's own row is the one that legitimately
+  // matches and the real preceding single survives untouched.)
   const advisoryEmitted = runLength === SLICING_THRESHOLD;
-  const fanout = toolName === WORKFLOW_TOOL_NAME || inFlightSiblingCount >= 2;
+  const fanout = toolName === WORKFLOW_TOOL_NAME || lastCompletedGroupIsReset;
 
   const record = buildLedgerRecord({
     nowFn, sessionId, event: fanout ? LEDGER_EVENT_FANOUT : LEDGER_EVENT_DISPATCH, tool: toolName,
