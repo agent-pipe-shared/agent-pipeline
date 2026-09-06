@@ -82,8 +82,11 @@ Commits survive compaction; intent does not — this block is the intent.
 5. DONE — the Codex session's installed-root defect (`PIPELINE_ROOT` three
    levels above the adapter file) is fixed in `b5a181ce` (`NVA-B-XPORTROOT-1`,
    goldfish-deep; RED/GREEN captured, 111/111; the briefing carried one false
-   fixture-assertion cell, disclosed by the dispatch and left out). T1 Critic
-   (Opus, max) on it in flight. Also landed: ADR-0080 accepted (`07d6041f`);
+   fixture-assertion cell, disclosed by the dispatch and left out). T1 round 1
+   (Opus, max): PASS, one minor — F1, the fixture layout let the old anchor
+   still find the schema (`2026-09-06-nva-b-xportroot-1-critic-round1.md`,
+   R4 amended); fix `NVA-B-XPORTROOT-2` in flight, round 2 follows on it.
+   Also landed: ADR-0080 accepted (`07d6041f`);
    the positioning inputs persisted verbatim to
    `specs/sprint-nova-epic/design/2026-09-06-positioning-*` (`c90f9131`) —
    the D block reads those, never `scratch/`.
