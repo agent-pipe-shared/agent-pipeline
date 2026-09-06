@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "f7ce7fbeeec7df5b92a0c96265b6c546cbfe81f6981c9d45a0901f837627e873"
+    "transitionHead": "9d695f530fb90ea53d94687961c458c4159989fde2bcff94eb2de60562c61970"
   },
   "counts": {
-    "open": 113,
+    "open": 114,
     "in_progress": 0,
     "closed": 521,
     "rejected": 3,
@@ -7031,6 +7031,15 @@
       "source": "Re-Critic vtpgate2-368458af finding F5, re-measured and found wider than reported",
       "deferred": false,
       "tracking": "Scheduled for Nova B (PO decision 2026-08-28)"
+    },
+    {
+      "id": "pipeline.the-budget-guard-carries-a-dead-branch-and-an-unbounded-sink",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-07",
+      "source": "T1 Critic round 2 on NVA-B-BUDGETVIS-1 (PASS, two minor findings F-A and F-B), recorded in backlog/evidence/2026-09-06-nva-b-guardfix-critic-round1.md; plus one inconsistency the reworking dispatch disclosed about its own change",
+      "deferred": false
     },
     {
       "id": "pipeline.the-denial-trim-state-is-keyed-per-session-not-per-agent-as-its-comment-claims",
