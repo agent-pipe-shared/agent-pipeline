@@ -3,14 +3,12 @@
 Start with the top-level [README](../README.md) for the product model and
 [SETUP](../SETUP.md) for installation or adoption.
 
-`0.6.1` (tagged 2026-09-02, `v0.6.1`) is the current tagged release. `0.6.2`
-is the next candidate, assembling locally on the working branch and not yet
-released. Phoenix is the integrated delivery-governance foundation; Nova is
-the active execution and adoption stream. The released scope includes a
-tested public Greenfield Driver for Claude, Codex, and Antigravity, but does
-not claim that every Nova B item or every host-specific assurance is
-complete. Read [What's new in 0.6.0](whats-new-0.6.0.md) first for the
-scope and non-claims.
+`0.6.2` is the current release. Phoenix is the integrated
+delivery-governance foundation; Nova is the active execution and adoption
+stream. The released scope includes a tested public Greenfield Driver for
+Claude, Codex, and Antigravity, but does not claim that every Nova B item or
+every host-specific assurance is complete. See [What's new in
+0.6.0](whats-new-0.6.0.md) for what changed in that earlier release.
 
 ## User journey
 
@@ -29,8 +27,8 @@ scope and non-claims.
 
 - [`overview.md`](overview.md) — the integrated Phoenix foundation and the
   active Nova product stream.
-- [`whats-new-0.6.0.md`](whats-new-0.6.0.md) — candidate-level product scope,
-  release boundary, and non-claims.
+- [`whats-new-0.6.0.md`](whats-new-0.6.0.md) — what was new in the `0.6.0`
+  release: product scope, release boundary, and non-claims at that time.
 - [`operating-model.md`](operating-model.md) — normative roles, lifecycle,
   review, evidence, and human authority.
 - [`codex-onboarding-threat-model.md`](codex-onboarding-threat-model.md) —

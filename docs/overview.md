@@ -6,19 +6,17 @@ history the source of truth. Its core loop is simple: record the work,
 dispatch it with a fresh context, collect deterministic evidence, review the
 result independently, and preserve the decision for the next session.
 
-## The release line: 0.6.1 tagged, 0.6.2 assembling
+## The release line: 0.6.2
 
-`0.6.1` (tagged 2026-09-02, `v0.6.1`) is the current tagged release. `0.6.2`
-is the next candidate, assembling locally on the working branch and not yet
-released. `0.6.1` combines a completed, integrated Phoenix foundation with
-the Nova increment released in that tag.
+`0.6.2` is the current release. It combines a completed, integrated Phoenix
+foundation with the Nova increment released in that version.
 
 | Product strand | What it contributes in this release | Status |
 | --- | --- | --- |
 | Phoenix | Durable delivery governance: explicit human decisions, candidate-bound evidence, deterministic gates before review, safe external-action boundaries, and recoverable public records. | Integrated foundation |
-| Nova | Runner-aware execution and guided adoption: public Driver actions, resumable onboarding context, a real verify setup, and scoped parallel delivery. | Active; the listed subset is released in `0.6.1` |
+| Nova | Runner-aware execution and guided adoption: public Driver actions, resumable onboarding context, a real verify setup, and scoped parallel delivery. | Active; the listed subset is released in `0.6.2` |
 
-The candidate's Greenfield route is covered for Claude, Codex, and Antigravity:
+The release's Greenfield route is covered for Claude, Codex, and Antigravity:
 from an empty directory through public onboarding actions, plan approval and a
 real verify command to the first implementation step. A runner follows the
 returned Driver action and fills only its named human placeholders. That makes
@@ -39,7 +37,7 @@ platform-specific evidence. Those items do not reduce the controls that are
 already integrated through Phoenix, and this overview does not present them as
 completed.
 
-For the product entry point, use the top-level [README](../README.md). For a
-candidate-level summary and non-claims, see [What's new in
+For the product entry point, use the top-level [README](../README.md). For
+what changed in the earlier `0.6.0` release, see [What's new in
 0.6.0](whats-new-0.6.0.md). [Usage](usage.md) gives the normal user journey;
 [Operating Model](operating-model.md) is the normative process contract.

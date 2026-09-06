@@ -211,9 +211,8 @@ not turn a repository rule into host-wide enforcement, a governance path into IA
 a requested route into observed model identity, or a machine gate into proof of
 every semantic property.
 
-`0.6.1` (tagged 2026-09-02, `v0.6.1`) is the current tagged source and plugin
-release. `0.6.2` is the next candidate, assembling locally on the working
-branch and not yet released; the scope described here is bounded accordingly:
+`0.6.2` is the current source and plugin release; the scope described here
+is bounded accordingly:
 
 - The completed Phoenix product strand is integrated as the delivery-governance
   foundation: candidate-bound evidence and approvals, deterministic checks
@@ -228,7 +227,7 @@ branch and not yet released; the scope described here is bounded accordingly:
 - The three-runner Greenfield contract is covered for Claude, Codex, and
   Antigravity, but that coverage is not a claim of identical native
   enforcement per host.
-- This candidate does not claim publication, a Git tag, marketplace
+- This release does not claim publication, a Git tag, marketplace
   availability, or production support.
 
 For normative detail, see the [Operating Model](docs/operating-model.md). For
@@ -464,9 +463,7 @@ Durchsetzung, aus einem Governance-Pfad kein IAM, aus einer angefragten Route
 keine beobachtete Modellidentität und aus einem Maschinen-Gate keinen Beweis
 jeder semantischen Eigenschaft.
 
-`0.6.1` (getaggt am 2026-09-02, `v0.6.1`) ist das aktuelle getaggte Release
-für Source und Plugin. `0.6.2` ist der nächste Kandidat, der lokal auf dem
-Arbeitsbranch entsteht und noch nicht veröffentlicht ist; der hier
+`0.6.2` ist das aktuelle Release für Source und Plugin; der hier
 beschriebene Umfang ist entsprechend begrenzt:
 
 - Der abgeschlossene Phoenix-Produktstrang ist als Delivery-Governance-
@@ -482,7 +479,7 @@ beschriebene Umfang ist entsprechend begrenzt:
 - Der Drei-Runner-Greenfield-Vertrag ist für Claude, Codex und Antigravity
   abgedeckt, aber diese Abdeckung ist kein Anspruch auf identische native
   Durchsetzung je Host.
-- Dieser Kandidat behauptet weder Veröffentlichung, einen Git-Tag,
+- Dieses Release behauptet weder Veröffentlichung, einen Git-Tag,
   Marketplace-Verfügbarkeit noch Produktivsupport.
 
 Normative Details stehen im [Operating Model](docs/operating-model.md). Für

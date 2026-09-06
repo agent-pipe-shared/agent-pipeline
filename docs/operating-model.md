@@ -13,15 +13,13 @@ product entry point, [PIPELINE_FLOW](../PIPELINE_FLOW.md) is the maintained
 user journey, and [SETUP](../SETUP.md) is the task guide. When they disagree,
 this document and the applicable ADRs take precedence.
 
-> **Release boundary (2026-09-02).** `0.6.1` is the current tagged release
-> (`v0.6.1`, commit `6262d408`). `0.6.2` is the next candidate, assembling
-> locally on the working branch and not yet released. **Phoenix is the completed,
-> integrated product foundation** for this candidate: candidate-bound
+> **Current release: `0.6.2`.** **Phoenix is the completed,
+> integrated product foundation** for this release: candidate-bound
 > evidence and approvals, deterministic gates before review, recoverable
 > delivery records, and typed safe boundaries for external actions. Its
 > fail-closed rule is unchanged: absent, stale, malformed, or
 > candidate-mismatched evidence cannot become success. **Nova remains an
-> active product stream.** This candidate includes its guided public Driver
+> active product stream.** This release includes its guided public Driver
 > route from an empty directory through onboarding, plan approval, verify
 > setup, and the first implementation step for Claude, Codex, and
 > Antigravity. A Driver action is a structured contract: runners follow it
@@ -456,16 +454,14 @@ ist der Produkteinstieg, der [PIPELINE_FLOW](../PIPELINE_FLOW.md) die gepflegte
 Nutzerreise und [SETUP](../SETUP.md) der Aufgabenleitfaden. Bei Widerspruch
 gehen dieses Dokument und die passenden ADRs vor.
 
-> **Release-Grenze (2026-09-02).** `0.6.1` ist das aktuelle getaggte Release
-> (`v0.6.1`, Commit `6262d408`). `0.6.2` ist der nächste Kandidat, der lokal
-> auf dem Arbeitsbranch entsteht und noch nicht veröffentlicht ist. **Phoenix ist die
-> abgeschlossene, integrierte Produktgrundlage** dieses Kandidaten:
+> **Aktuelles Release: `0.6.2`.** **Phoenix ist die
+> abgeschlossene, integrierte Produktgrundlage** dieses Releases:
 > kandidatengebundene Evidenz und Freigaben, deterministische Gates vor dem
 > Review, wiederherstellbare Delivery-Aufzeichnungen und typisierte sichere
 > Grenzen für externe Aktionen. Seine Fail-closed-Regel bleibt unverändert:
 > Fehlende, veraltete, fehlerhafte oder nicht zum Kandidaten passende Evidenz
-> kann kein Erfolg werden. **Nova bleibt ein aktiver Produktstrang.** Dieser
-> Kandidat enthält seinen geführten öffentlichen Driver-Weg vom leeren
+> kann kein Erfolg werden. **Nova bleibt ein aktiver Produktstrang.** Dieses
+> Release enthält seinen geführten öffentlichen Driver-Weg vom leeren
 > Verzeichnis über Onboarding, Planfreigabe und Verify-Setup bis zum ersten
 > Implementierungsschritt für Claude, Codex und Antigravity. Eine
 > Driver-Aktion ist ein strukturierter Vertrag: Runner folgen ihr und

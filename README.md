@@ -21,16 +21,14 @@ feature branches and dogfooding rounds. Feedback welcome.*
 > required next document is `SETUP.md`; deeper and conceptual documentation
 > is optional reference.
 
-> **Current release: `0.6.1`, tagged 2026-09-02 (`v0.6.1`).** `0.6.2` is the
-> next candidate, assembling locally on the working branch and not yet
-> released. A tagged release is still not an installation recommendation or
-> production release. **Phoenix is the completed,
+> **Current release: `0.6.2`.** A tagged release is still not an
+> installation recommendation or production release. **Phoenix is the completed,
 > integrated product foundation:** durable delivery governance, explicit
 > candidate-bound evidence and approvals, independent review, and safe
 > boundaries for external actions. Missing, stale, malformed, or mismatched
 > proof remains a typed non-success.
 >
-> **Nova remains active.** This candidate carries its usable, runner-aware
+> **Nova remains active.** This release carries its usable, runner-aware
 > increment: a public Driver takes an empty directory through guided onboarding,
 > an existing or new first trust anchor, resumable intake, plan approval, real
 > verify setup, and the first implementation step. Claude, Codex, and
@@ -351,9 +349,7 @@ willkommen.*
 > als Nächstes nur `SETUP.md` erforderlich; weiterführende und
 > konzeptionelle Dokumentation ist optionales Nachschlagewerk.
 
-> **Aktuelles Release: `0.6.1`, getaggt am 2026-09-02 (`v0.6.1`).** `0.6.2` ist
-> der nächste Kandidat, der lokal auf dem Arbeitsbranch entsteht und noch
-> nicht veröffentlicht ist. Ein getaggtes Release ist weiterhin keine
+> **Aktuelles Release: `0.6.2`.** Ein getaggtes Release ist weiterhin keine
 > Installationsempfehlung und kein Produktiv-Release.
 > **Phoenix ist die abgeschlossene, integrierte Produktgrundlage:** dauerhafte
 > Delivery-Governance, explizite kandidatengebundene Evidenz und Freigaben,
@@ -361,7 +357,7 @@ willkommen.*
 > veraltete, fehlerhafte oder nicht passende Nachweise bleiben typisierte
 > Nicht-Erfolge.
 >
-> **Nova bleibt aktiv.** Dieser Kandidat enthält dessen nutzbaren,
+> **Nova bleibt aktiv.** Dieses Release enthält dessen nutzbaren,
 > runner-bewussten Schritt: Ein öffentlicher Driver führt ein leeres Verzeichnis
 > über geführtes Onboarding, einen vorhandenen oder neuen ersten Trust Anchor,
 > wiederaufnehmbaren Intake, Planfreigabe, ein echtes Verify-Setup und den Start
