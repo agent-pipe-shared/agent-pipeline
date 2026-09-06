@@ -145,15 +145,13 @@ bypass-free route — dispatch `verify` on a feature branch first, then push
 that same SHA to `main` — is the intended fix before the next release).
 `protect-release-tags` (id 22072995) has no bypass actor at all.
 
-Two incidents worth their own durable record, both filed as their own
-backlog items rather than restated here: a torn audit-ledger append had
-disabled every human-guard-override route for 13 days
-(`pipeline.a-torn-audit-append-has-disabled-every-human-guard-override-since-august-20`),
-and CI ran red on the released commit for three suites, two fixed since
-(`216ff054`, `ae8da7b8`), one deliberately not
-(`backlog/items/2026-09-02-worker-cancellation-is-denied-when-the-record-digest-ages-between-read-and-cancel.md`,
-LWSC04 — needs its own briefed dispatch with independent review). Full
-verify green at `7cc0b649`, 506 suites.
+Two incidents, both filed as their own backlog items, not restated here: a
+torn audit-ledger append disabled every human-guard-override route for 13
+days (`pipeline.a-torn-audit-append-has-disabled-every-human-guard-override-since-august-20`);
+CI ran red on the released commit for three suites, two fixed (`216ff054`,
+`ae8da7b8`), one deliberately not (LWSC04,
+`backlog/items/2026-09-02-worker-cancellation-is-denied-when-the-record-digest-ages-between-read-and-cancel.md`).
+Full verify green at `7cc0b649`, 506 suites.
 
 ### At the freeze — what the PO decides
 
@@ -308,30 +306,25 @@ outside it bypasses the boundary, unlike the same file's write lane
 edge shapes (trailing `2>/dev/null` on a single read, the same via `&&`)
 lost test coverage and land on a technically-wrong denial code. Findings
 registry: `backlog/evidence/2026-09-06-nva-b-readcontain-1-findings.md`.
-Two minors also noted (no ADR/threat-model pointer yet — the Elephant
-authors this after both READCONTAIN dispatches land; evidence logs not
-bound to a commit SHA). Per the two-round cap, this is round 1 of 2.
+Two minors also noted (ADR pending; evidence logs not commit-bound).
 
-**Correction landed, `bc00a861`.** F1 fixed (comment corrected after
-reading Decision 6 directly). F2 fixed (new `isRealpathedWithinBoundary`
-helper wired into `isApprovedSingleCommandReadArg`/`isApprovedCatPipelineReadPath`;
-a self-referential-boundary regression in the fix's own first draft was
-caught and corrected before commit; new symlink regression test, 226→227
-tests, independently re-verified 227/227 green). F3 NOT fixed — tool
-budget exhausted; diagnosed and disclosed for a future round
-(`isOutsideRootSingleCommandRead` excludes any redirect/operator, so a
-`2>/dev/null`-suppressed or `&&`-chained outside-root single read never
-reaches the read-scope classifier). Process fix: the rework wrote a
-separate `-rework`-suffixed dispatch record, which `dispatch-authorship-verify`
-could not resolve (`record-names-different-commit`) — merged `bc00a861`
-into the standard-named record; both commits now PASS authorship. The
-three DoD checks the rework couldn't run were completed independently by
-the Elephant: predicate regression still 0, generator still green,
-consumer-safe-paths still green. Re-Critic round 2 dispatched (bounded
-delta: base `cbc30756`, head `bc00a861`, plus the two guardrail files
-round 1 never reached) — the last allowed round per the two-round cap; a
-further blocking finding is self-verified by the Elephant, not a third
-round.
+**Correction 1 landed, `bc00a861`:** F1 fixed; F2 fixed for the direct-symlink
+shape (new `isRealpathedWithinBoundary`, 226→227 tests green); F3 disclosed,
+not fixed. (Process fix: a separate `-rework`-record broke
+`dispatch-authorship-verify`; merged into the standard-named record.)
+**Re-Critic round 2 (bounded delta, opus/max) then found F2 only PARTIAL**:
+`isRealpathedWithinBoundary` realpaths a candidate `commandPath()` already
+lexically collapsed via `resolve()`, so `<symlink>/../<outside>/<file>`
+still bypasses it — live-reproduced, `cat` of that shape read content from
+outside the fixture root. F1 confirmed resolved; F5 minor (unused DI
+param, untested catch) also found. Registry updated (F4/F5):
+`backlog/evidence/2026-09-06-nva-b-readcontain-1-findings.md`. Two-round
+cap now exhausted — **correction 2 (F4/F5) is dispatched, to be
+self-verified by the Elephant directly, no third round.** A same-shaped
+`resolve()`-before-realpath gap MAY also affect the WRITE lane's
+`isPathWithinRealpathedRoot` (unverified — depends on host-tool internals
+this repo can't inspect); filed separately:
+`2026-09-06-the-write-lane-symlink-containment-check-may-share-the-read-lanes-dotdot-bypass.md`.
 
 `NVA-B-READCONTAIN-2` (not yet dispatched, after the correction round
 lands) adds two new session-derived exception roots
