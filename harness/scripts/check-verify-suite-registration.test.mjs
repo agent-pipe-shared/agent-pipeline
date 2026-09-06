@@ -220,7 +220,6 @@ check("EXCLUSIONS is exactly the green suites parked on a closed maintenance win
     "harness/scripts/check-doc-reconciliation.test.mjs",
     "harness/scripts/print-verify-failures.test.mjs",
     "plugins/pipeline-core/hooks/guard-push-release-tag-ancestry.test.mjs",
-    "plugins/pipeline-core/hooks/guard-slicing.test.mjs",
     "plugins/pipeline-core/scripts/check-critic-skip-coverage.test.mjs",
     "plugins/pipeline-core/scripts/measure-tofu-push-e2e.test.mjs",
   ];
