@@ -53,10 +53,14 @@
 import { readFileSync } from "node:fs";
 
 import { dispatchFindings } from "../lib/dispatch-policy.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 // Recover `{ agentType: '...', prompt: `...` }`-shaped dispatches embedded in a Workflow
 // script body. Regex-based, not a JS parser: it only claims the statically-obvious case.
-function extractWorkflowDispatches(script) {
+// Exported so another module (a Workflow-dispatch preflight, a test) can recover the same
+// embedded dispatches without importing this file for its side effects -- see the
+// `isDirectInvocation` gate below, which is what makes that safe.
+export function extractWorkflowDispatches(script) {
   const found = [];
   const agentTypeRe = /agentType\s*:\s*(['"])((?:(?!\1)[\s\S])*?)\1/g;
   let m;
@@ -97,55 +101,62 @@ function extractAntigravityDispatches(subagents) {
   return found;
 }
 
-let input;
-try {
-  input = JSON.parse(readFileSync(0, "utf8"));
-} catch {
-  process.exit(0); // unreadable input -> no opinion; a broken hook must not stop work
+// Gate the entire hook body on being the process entrypoint (matching
+// guard-dispatch-budget.mjs's shape). Importing this module for `extractWorkflowDispatches`
+// must never itself read stdin, parse it, or call `process.exit` -- see `../lib/entrypoint.mjs`'s
+// header for the 2026-08-06 incident (a naive entrypoint check left six hooks dead through a
+// symlinked marketplace root) this gate must not reproduce.
+if (isDirectInvocation(import.meta.url)) {
+  let input;
+  try {
+    input = JSON.parse(readFileSync(0, "utf8"));
+  } catch {
+    process.exit(0); // unreadable input -> no opinion; a broken hook must not stop work
+  }
+
+  const toolInput = input?.tool_input;
+  if (!toolInput || typeof toolInput !== "object") process.exit(0);
+
+  // The subagent tool is `Task` in Claude Code and `Agent` in some runners; both are accepted
+  // rather than guessing one, because a matcher that names the wrong tool is a silent no-op —
+  // the failure class this repository already paid for with NotebookEdit.
+  const subagentType = toolInput.subagent_type ?? toolInput.subagentType ?? "";
+  const prompt = toolInput.prompt ?? "";
+
+  let dispatches;
+  if (typeof subagentType === "string" && subagentType !== "" && typeof prompt === "string") {
+    dispatches = [{ subagentType, prompt }];
+  } else if (typeof toolInput.script === "string" && toolInput.script !== "") {
+    // Workflow-tool call: no discrete subagent_type/prompt field, but the script may carry
+    // one or more embedded agent()/parallel()/pipeline() dispatches worth checking the same way.
+    dispatches = extractWorkflowDispatches(toolInput.script);
+    if (dispatches.length === 0) process.exit(0);
+  } else if (Array.isArray(toolInput.Subagents)) {
+    // Antigravity runner's native invoke_subagent shape: capitalized, array-wrapped.
+    dispatches = extractAntigravityDispatches(toolInput.Subagents);
+    if (dispatches.length === 0) process.exit(0);
+  } else {
+    process.exit(0);
+  }
+
+  const blocked = dispatches
+    .map((d) => dispatchFindings(d))
+    .filter((r) => r.findings.length > 0);
+  if (blocked.length === 0) process.exit(0);
+
+  const { role, findings } = blocked[0];
+  const template = role === "critic" ? "templates/prompts/critic-review.md" : "templates/prompts/goldfish-task.md";
+  process.stderr.write([
+    `BLOCKED (guard-dispatch, plugin pipeline-core): this ${role} dispatch was not built from ${template}.`,
+    "",
+    ...findings.map((f, i) => `  ${i + 1}. ${f.code}\n     ${f.why}`),
+    "",
+    `Fill ${template} and dispatch that. The template is not a suggestion: it already forbids`,
+    "every pattern listed above, in those words. A review steered by the dispatcher's own",
+    "hypotheses is not an independent review, and an incomplete briefing is not dispatchable.",
+    "",
+    "This check is structural. It cannot see a steer written in fresh prose — read the template.",
+    "",
+  ].join("\n"));
+  process.exit(2);
 }
-
-const toolInput = input?.tool_input;
-if (!toolInput || typeof toolInput !== "object") process.exit(0);
-
-// The subagent tool is `Task` in Claude Code and `Agent` in some runners; both are accepted
-// rather than guessing one, because a matcher that names the wrong tool is a silent no-op —
-// the failure class this repository already paid for with NotebookEdit.
-const subagentType = toolInput.subagent_type ?? toolInput.subagentType ?? "";
-const prompt = toolInput.prompt ?? "";
-
-let dispatches;
-if (typeof subagentType === "string" && subagentType !== "" && typeof prompt === "string") {
-  dispatches = [{ subagentType, prompt }];
-} else if (typeof toolInput.script === "string" && toolInput.script !== "") {
-  // Workflow-tool call: no discrete subagent_type/prompt field, but the script may carry
-  // one or more embedded agent()/parallel()/pipeline() dispatches worth checking the same way.
-  dispatches = extractWorkflowDispatches(toolInput.script);
-  if (dispatches.length === 0) process.exit(0);
-} else if (Array.isArray(toolInput.Subagents)) {
-  // Antigravity runner's native invoke_subagent shape: capitalized, array-wrapped.
-  dispatches = extractAntigravityDispatches(toolInput.Subagents);
-  if (dispatches.length === 0) process.exit(0);
-} else {
-  process.exit(0);
-}
-
-const blocked = dispatches
-  .map((d) => dispatchFindings(d))
-  .filter((r) => r.findings.length > 0);
-if (blocked.length === 0) process.exit(0);
-
-const { role, findings } = blocked[0];
-const template = role === "critic" ? "templates/prompts/critic-review.md" : "templates/prompts/goldfish-task.md";
-process.stderr.write([
-  `BLOCKED (guard-dispatch, plugin pipeline-core): this ${role} dispatch was not built from ${template}.`,
-  "",
-  ...findings.map((f, i) => `  ${i + 1}. ${f.code}\n     ${f.why}`),
-  "",
-  `Fill ${template} and dispatch that. The template is not a suggestion: it already forbids`,
-  "every pattern listed above, in those words. A review steered by the dispatcher's own",
-  "hypotheses is not an independent review, and an incomplete briefing is not dispatchable.",
-  "",
-  "This check is structural. It cannot see a steer written in fresh prose — read the template.",
-  "",
-].join("\n"));
-process.exit(2);

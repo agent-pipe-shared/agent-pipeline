@@ -13,9 +13,17 @@
  */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, symlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+
+// Imported directly, at the top level, in-process -- this is itself half of the GD16 proof
+// below: if the entrypoint gate ever regressed to executing the hook body on import (reading
+// stdin, calling process.exit), THIS import would silently terminate the whole test process
+// before a single `check(...)` call ran. guard-dispatch-budget.test.mjs already imports its
+// sibling hook the same way, for the same reason.
+import { extractWorkflowDispatches } from "./guard-dispatch.mjs";
 
 const GUARD = fileURLToPath(new URL("./guard-dispatch.mjs", import.meta.url));
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
@@ -166,6 +174,57 @@ check("GD15 allow  an Antigravity dispatch of an unrelated subagent type", {
   tool_name: "invoke_subagent",
   tool_input: { Subagents: [{ TypeName: "general-purpose", Prompt: "find where X is defined" }] },
 }, ALLOW);
+
+// GD16-GD19 -- NVA-B-DISPATCHEXPORT-1: extractWorkflowDispatches is now exported and the hook
+// body only runs when this module is the process entrypoint (isDirectInvocation, matching
+// guard-dispatch-budget.mjs), so it can be imported without disarming it. GD16 proves the
+// import half; GD17/GD18 prove the hook still fires via its own real path after the gate was
+// added; GD19 proves it still fires reached through a symlink -- the exact 2026-08-06 failure
+// shape entrypoint.mjs's header documents (a naive entrypoint check left six hooks dead when
+// reached through a symlinked marketplace root).
+{
+  const id = "GD16 extractWorkflowDispatches is importable and callable directly, with no hook side effects";
+  const expected = [{ subagentType: "pipeline-core:critic", prompt: "hello world" }];
+  const result = extractWorkflowDispatches("agentType: 'pipeline-core:critic', prompt: `hello world`");
+  if (typeof extractWorkflowDispatches === "function" && JSON.stringify(result) === JSON.stringify(expected)) {
+    pass += 1; console.log(`PASS  ${id}`);
+  } else {
+    failures.push(`${id}: got ${JSON.stringify(result)}`); console.log(`FAIL  ${id} -- got ${JSON.stringify(result)}`);
+  }
+}
+
+check("GD17 block  via the real path, a refusable dispatch still refuses after the entrypoint gate", {
+  tool_name: "Task",
+  tool_input: { subagent_type: "pipeline-core:critic", prompt: `${CLEAN_CRITIC}\n\nWHAT THE CHANGE CLAIMS (verify each):\n 1. x` },
+}, BLOCK, { stderrIncludes: ["DISPATCH-CONTAMINATION-CLAIMS-LIST", "templates/prompts/critic-review.md"] });
+
+check("GD18 allow  via the real path, an admissible dispatch still admits after the entrypoint gate", {
+  tool_name: "Task",
+  tool_input: { subagent_type: "pipeline-core:critic", prompt: CLEAN_CRITIC },
+}, ALLOW);
+
+{
+  const id = "GD19 block  invoked through a symlink to the module, the hook still refuses (the 2026-08-06 failure shape)";
+  const linkDir = mkdtempSync(join(tmpdir(), "guard-dispatch-link-"));
+  try {
+    const linked = join(linkDir, "guard-dispatch.mjs");
+    symlinkSync(GUARD, linked);
+    const payload = {
+      tool_name: "Task",
+      tool_input: { subagent_type: "pipeline-core:critic", prompt: `${CLEAN_CRITIC}\n\nWHAT THE CHANGE CLAIMS (verify each):\n 1. x` },
+    };
+    const res = spawnSync(process.execPath, [linked], { input: JSON.stringify(payload), encoding: "utf8" });
+    const stderr = res.stderr ?? "";
+    const problems = [];
+    if (res.status !== BLOCK) problems.push(`exit ${res.status} (expected ${BLOCK}) through the symlink -- ${stderr.trim().slice(0, 200)}`);
+    if (!stderr.includes("DISPATCH-CONTAMINATION-CLAIMS-LIST")) problems.push("stderr missing DISPATCH-CONTAMINATION-CLAIMS-LIST through the symlink");
+    if (res.status === 0 && stderr === "") problems.push("silent no-op through the symlink -- exit 0 means ALLOW");
+    if (problems.length === 0) { pass += 1; console.log(`PASS  ${id}`); }
+    else { failures.push(`${id}: ${problems.join("; ")}`); console.log(`FAIL  ${id} -- ${problems.join("; ")}`); }
+  } finally {
+    rmSync(linkDir, { recursive: true, force: true });
+  }
+}
 
 console.log(`\n${pass}/${pass + failures.length} cases passed.`);
 if (failures.length > 0) {
