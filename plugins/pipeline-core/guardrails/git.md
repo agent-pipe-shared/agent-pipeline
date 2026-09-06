@@ -134,20 +134,33 @@ Rule IDs: `GIT-xx`.
   plain deny with no override token (`OVERRIDE GG-22`): the fix is always
   the same cheap, mechanical sequence, so there is no legitimate reason to
   bypass it.
-- **This inverts the usual `git commit -- <exact paths>` discipline.**
-  Everywhere else scoping a commit to exact paths is enough on its own; here
-  it is not, because `GG-22` inspects the WHOLE staged index (`git diff
-  --cached --name-only`), not the commit's pathspec — an unrelated staged
-  file fails the commit regardless of how narrowly the commit command itself
-  names paths, and regardless of whether a ledger file happens to be staged
-  alongside it. Concretely: several `backlog/items/*.md` status edits MAY be
+- **The usual `git commit -- <exact paths>` discipline DOES scope this
+  check — but only when the commit's own flag set proves that pathspec is
+  the commit's exclusive content.** `GG-22` evaluates exactly the paths
+  named after an explicit `--` pathspec when nothing else on that
+  invocation can add unnamed content to the commit (message/authorship/
+  signing/display flags only, read from `git-commit(1)` itself — see
+  `plugins/pipeline-core/hooks/guard-git.mjs`'s `PATHSPEC_EXCLUSIVE_SAFE_FLAGS`/
+  `PATHSPEC_EXCLUSIVE_SAFE_VALUE_FLAGS`). A commit carrying `-i`/`--include`,
+  `-a`/`--all`, `-p`/`--patch`, `--amend`, or any OTHER flag this allowlist
+  does not recognize is conservatively treated as NOT pathspec-exclusive
+  (git's own documented semantics make several of these add unnamed staged
+  content to the commit) and falls back, unchanged, to inspecting the WHOLE
+  staged index (`git diff --cached --name-only`) — an unrelated staged file
+  fails such a commit regardless of how narrowly its own pathspec names
+  paths. Concretely: several `backlog/items/*.md` status edits MAY be
   batched into one commit (or several separate commits) before reconciling —
   that is an established, legitimate pattern — but while the debt is
   outstanding, `backlog/items/**` edits, the source ledger, and its two
-  generated projections are the only paths that may be staged in any
-  commit; anything else staged alongside is blocked, in every commit made
-  while the debt exists, not only in the commit that eventually lands the
-  reconciliation.
+  generated projections are the only paths that may land in the effective
+  content of any commit (its exclusive pathspec, or its whole staged index
+  when no pathspec is provably exclusive); anything else is blocked, in
+  every commit made while the debt exists, not only in the commit that
+  eventually lands the reconciliation. (Restored to this pathspec-aware
+  form 2026-09-06 by `NVA-B-GG22FIX-1`/`-2`, after a several-day period
+  where a plain `git commit -F <msg> -- <paths>` was blocked by an
+  unrelated concurrent dispatch's staged files regardless of its own exact
+  pathspec — `backlog/items/2026-09-03-gg-22-reads-the-shared-index-so-a-concurrent-dispatch-blocks-an-unrelated-ledger-commit.md`.)
 - **Remediation order:** before closing an item, fill in its `closure_commit`
   (and the item's other closure fields) — `reconcile-backlog-ledger.mjs
   --activate` refuses to write anything while any closed item is missing a
