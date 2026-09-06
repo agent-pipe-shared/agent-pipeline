@@ -113,6 +113,43 @@ the counter: every identity branch that declines to count still records to
 being empty means the guard is not reaching its identity branches at all for
 subagent tool calls.
 
+## Bisection probe, 2026-09-06: the module is correct, the invocation is not
+
+`scratch/budgetguard-probe.mjs` hands `guard-dispatch-budget.mjs` a
+subagent-shaped `PreToolUse` payload directly — a fixture transcript at
+`…/subagents/agent-<id>.jsonl` with its `.meta.json`, a `Bash` tool call, and
+a synthetic agent id no live dispatch owns, so the counter it writes cannot
+disturb a running budget. Result:
+
+```
+counter written : true
+counter contents: { "agentId": "probe…", "agentType": "pipeline-core:goldfish-deep",
+                    "maxTurns": 80, "workingCap": 65, "count": 1 }
+```
+
+**The guard's own logic counts correctly.** Identity resolution, agent-type
+lookup, `maxTurns` resolution and the counter write all work. The defect is
+therefore entirely upstream: the runtime does not invoke this hook for a
+subagent's tool calls, or invokes it with a payload that routes elsewhere.
+
+**The cost of this is measurable and large.** The probe resolved
+`maxTurns: 80` — exactly the harness cliff that cut four dispatches short on
+2026-09-06 — and `workingCap: 65`. Had the guard been firing, every one of
+those four would have been stopped at 65 calls with a closing allowance still
+available, which is precisely the handover point it was built to protect. Two
+of the four lost their entire report. **This guard, working, would have
+prevented all four truncations.**
+
+**Leading hypothesis, stated as a hypothesis and not yet confirmed:** a real
+subagent's `PreToolUse` payload may carry the PARENT session's
+`transcript_path` rather than the subagent's own. `subagentIdentity()` would
+then classify every subagent call as `orchestrator`, and the orchestrator
+branch writes one marker file per session keyed on the transcript stem — which
+already exists — so nothing further is written and nothing is counted. That
+predicts exactly what is observed: two `orchestrator-seen/` markers, no
+counter, and no `unresolved.jsonl`. Confirming it needs a captured real
+payload, which needs a logging hook, not more source reading.
+
 **What remains unknown, and needs a live probe rather than more reading:**
 why the hook does not execute for a subagent's tool call when its matcher
 names the tools that subagent uses and other hooks on sibling matchers do
