@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.evslotfix-1-broke-verify-fixture-module-lists
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-06
+closed_at: 2026-09-06
+closure_repository: self
+closure_commit: 00a58a0e
+closure_evidence: "backlog/items/2026-09-06-nva-b-evslotfix-1-broke-two-verify-fixtures-that-hardcode-verify-mjs-dependencies.md"
 sprint: nova-b
 tracking: "Nova B — discovered running the first full verify.mjs gate of this session (last known-green was 7cc0b649, 2026-09-02; many commits landed since across the whole day). Blocks A-C of NVA-B-EVSLOTFIX-1 (commits 61dc7fc5/d30273d3) added a new import to harness/scripts/verify.mjs (harness/scripts/verify-evidence-writer.mjs). Two test fixtures that copy verify.mjs and a hardcoded list of its dependencies into an isolated sandbox to test its behavior were never updated to also copy the new file, so the copied verify.mjs now fails to even load in those sandboxes."
 done_when: manual
@@ -33,3 +37,7 @@ None of those three dispatches touched `harness/scripts/verify.mjs` or either fi
 - `windows-assurance-verify-registration.test.mjs`'s `FIXTURE_MODULES` gets the same fix.
 - Both suites pass: `node --test plugins/pipeline-core/lib/scoped-verify-registration.test.mjs` and `node --test plugins/pipeline-core/lib/windows-assurance-verify-registration.test.mjs`.
 - A regression test or comment ties the fixture's module list to `verify.mjs`'s actual import statements, so the next new `verify.mjs` dependency doesn't silently break these fixtures again the same way (a mechanical cross-check, if cheap; otherwise a durable comment naming the risk is acceptable).
+
+## Closure
+
+Cross-referenced `verify.mjs`'s full current local import list (`harness/scripts/`: `check-verify-suite-registration.mjs`, `manual-check-logic.mjs`, `verify-evidence-writer.mjs`; `plugins/pipeline-core/lib/`: `nova-candidate-freeze.mjs`, `project-authority.mjs`, `scoped-verify-registration.mjs`, `windows-assurance-verify-registration.mjs`, `verify-resume.mjs`; `verify-journal.mjs` is deliberately stubbed, not copied, in both fixtures) against both fixtures exhaustively. `harness/scripts/verify-evidence-writer.mjs` was the only file missing from either copy-list — added to `scoped-verify-registration.test.mjs`'s `scopedRegistrationFailureFixture()` and to `windows-assurance-verify-registration.test.mjs`'s `FIXTURE_MODULES`, each with a comment naming the risk (NVA-B-EVSLOTFIXTURE-1). `node --test plugins/pipeline-core/lib/scoped-verify-registration.test.mjs`: 35/35 pass. `node --test plugins/pipeline-core/lib/windows-assurance-verify-registration.test.mjs`: 24/24 pass. Fixed in commit `00a58a0e`.
