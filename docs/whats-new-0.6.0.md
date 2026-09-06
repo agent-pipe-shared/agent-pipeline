@@ -1,10 +1,14 @@
 # What's new in 0.6.0 (release candidate)
 
-`0.6.0` is the current source and plugin release candidate. It is not yet a
-published release, marketplace publication, or production-installation
-recommendation. A release claim needs the final candidate's own verification,
-independent review, approval, and remote readback; evidence for an earlier tree
-does not carry forward automatically.
+> **Note.** `0.6.0` was never tagged or published. `0.6.1` (2026-09-02,
+> `v0.6.1`) is the release that carries this scope; the CHANGELOG entry for
+> `0.6.1` is the authoritative record.
+
+`0.6.0` was the source and plugin release candidate that preceded `0.6.1`. It
+was never a published release, marketplace publication, or
+production-installation recommendation. A release claim needed the final
+candidate's own verification, independent review, approval, and remote
+readback; evidence for an earlier tree did not carry forward automatically.
 
 ## The product baseline: Phoenix is integrated
 

@@ -3,12 +3,14 @@
 Start with the top-level [README](../README.md) for the product model and
 [SETUP](../SETUP.md) for installation or adoption.
 
-`0.6.0` is a local release candidate, not a published release. Phoenix is the
-integrated delivery-governance foundation; Nova is the active execution and
-adoption stream. The candidate includes a tested public Greenfield Driver for
-Claude, Codex, and Antigravity, but does not claim that every Nova B item or
-every host-specific assurance is complete. Read [What's new in
-0.6.0](whats-new-0.6.0.md) first for the precise scope and non-claims.
+`0.6.1` (tagged 2026-09-02, `v0.6.1`) is the current tagged release. `0.6.2`
+is the next candidate, assembling locally on the working branch and not yet
+released. Phoenix is the integrated delivery-governance foundation; Nova is
+the active execution and adoption stream. The released scope includes a
+tested public Greenfield Driver for Claude, Codex, and Antigravity, but does
+not claim that every Nova B item or every host-specific assurance is
+complete. Read [What's new in 0.6.0](whats-new-0.6.0.md) first for the
+scope and non-claims.
 
 ## User journey
 

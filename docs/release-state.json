@@ -1,11 +1,11 @@
 {
   "schema": "pipeline.public-release-state.v1",
-  "version": "0.5.4",
-  "tag": "v0.5.4",
-  "commit": "dd1eb9eedeb7ac48860c8ec9745750c9a8367b32",
-  "tree": "b6857469bbc84de94c0f917ed64dc59b0eccc8de",
+  "version": "0.6.1",
+  "tag": "v0.6.1",
+  "commit": "6262d408aa616651232b46ab8ecbfd88ce4055b0",
+  "tree": "69b12f1d8714de57e22acb730a09f4bbac067360",
   "publicationStatus": "published",
   "releaseUrlClass": "public-release",
-  "observedAt": "2026-08-10T11:49:10.000Z",
-  "recordSha256": "f6d98820fe6ccd7b2ac3d8da236730840e888fa2cb1439b5aed9a8da23fbeba8"
+  "observedAt": "2026-09-06T18:23:57.030Z",
+  "recordSha256": "c79d6a228fe408b32de46cb4728a6057b1fadd1094404004751d6478e2a2bf9c"
 }

@@ -21,9 +21,10 @@ feature branches and dogfooding rounds. Feedback welcome.*
 > required next document is `SETUP.md`; deeper and conceptual documentation
 > is optional reference.
 
-> **Current candidate: `0.6.0` — not released.** The local source and plugin
-> manifests are versioned as `0.6.0`, but this is a release candidate, not an
-> installation recommendation or production release. **Phoenix is the completed,
+> **Current release: `0.6.1`, tagged 2026-09-02 (`v0.6.1`).** `0.6.2` is the
+> next candidate, assembling locally on the working branch and not yet
+> released. A tagged release is still not an installation recommendation or
+> production release. **Phoenix is the completed,
 > integrated product foundation:** durable delivery governance, explicit
 > candidate-bound evidence and approvals, independent review, and safe
 > boundaries for external actions. Missing, stale, malformed, or mismatched
@@ -350,9 +351,10 @@ willkommen.*
 > als Nächstes nur `SETUP.md` erforderlich; weiterführende und
 > konzeptionelle Dokumentation ist optionales Nachschlagewerk.
 
-> **Aktueller Kandidat: `0.6.0` — noch nicht veröffentlicht.** Der lokale
-> Source und die Plugin-Manifeste tragen bereits `0.6.0`, aber das ist ein
-> Release-Kandidat und weder Installationsempfehlung noch Produktiv-Release.
+> **Aktuelles Release: `0.6.1`, getaggt am 2026-09-02 (`v0.6.1`).** `0.6.2` ist
+> der nächste Kandidat, der lokal auf dem Arbeitsbranch entsteht und noch
+> nicht veröffentlicht ist. Ein getaggtes Release ist weiterhin keine
+> Installationsempfehlung und kein Produktiv-Release.
 > **Phoenix ist die abgeschlossene, integrierte Produktgrundlage:** dauerhafte
 > Delivery-Governance, explizite kandidatengebundene Evidenz und Freigaben,
 > unabhängige Prüfung sowie sichere Grenzen für externe Aktionen. Fehlende,

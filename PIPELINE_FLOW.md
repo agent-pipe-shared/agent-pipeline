@@ -211,8 +211,9 @@ not turn a repository rule into host-wide enforcement, a governance path into IA
 a requested route into observed model identity, or a machine gate into proof of
 every semantic property.
 
-`0.6.0` is the current source and plugin release candidate, not yet a
-published release, and its scope is bounded accordingly:
+`0.6.1` (tagged 2026-09-02, `v0.6.1`) is the current tagged source and plugin
+release. `0.6.2` is the next candidate, assembling locally on the working
+branch and not yet released; the scope described here is bounded accordingly:
 
 - The completed Phoenix product strand is integrated as the delivery-governance
   foundation: candidate-bound evidence and approvals, deterministic checks
@@ -463,8 +464,10 @@ Durchsetzung, aus einem Governance-Pfad kein IAM, aus einer angefragten Route
 keine beobachtete Modellidentität und aus einem Maschinen-Gate keinen Beweis
 jeder semantischen Eigenschaft.
 
-`0.6.0` ist der aktuelle Release-Kandidat für Source und Plugin, noch kein
-veröffentlichtes Release, und sein Umfang ist entsprechend begrenzt:
+`0.6.1` (getaggt am 2026-09-02, `v0.6.1`) ist das aktuelle getaggte Release
+für Source und Plugin. `0.6.2` ist der nächste Kandidat, der lokal auf dem
+Arbeitsbranch entsteht und noch nicht veröffentlicht ist; der hier
+beschriebene Umfang ist entsprechend begrenzt:
 
 - Der abgeschlossene Phoenix-Produktstrang ist als Delivery-Governance-
   Fundament integriert: kandidatengebundene Evidenz und Freigaben,

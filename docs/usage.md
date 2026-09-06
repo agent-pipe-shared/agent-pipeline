@@ -77,11 +77,13 @@ delivery work, not extra approval turns.
 
 ## Know the boundary
 
-`0.6.0` is still a release candidate. The three-runner Greenfield Driver
-contract is covered for Claude, Codex, and Antigravity, but coverage is not a
-claim of identical native enforcement across hosts. Final publication needs the
-same candidate's Verify, security, independent review, approval, and remote
-readback. Nova B remains open for further runner and workflow refinements.
+`0.6.1` (tagged 2026-09-02, `v0.6.1`) is the current tagged release; `0.6.2`
+is the next candidate, assembling locally and not yet released. The
+three-runner Greenfield Driver contract is covered for Claude, Codex, and
+Antigravity, but coverage is not a claim of identical native enforcement
+across hosts. Publication of the next candidate needs its own Verify,
+security, independent review, approval, and remote readback. Nova B remains
+open for further runner and workflow refinements.
 
 Use [SETUP](../SETUP.md) for installation, [PIPELINE_FLOW](../PIPELINE_FLOW.md)
 for the maintained lifecycle, and the [Operating Model](operating-model.md) for

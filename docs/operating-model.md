@@ -13,8 +13,9 @@ product entry point, [PIPELINE_FLOW](../PIPELINE_FLOW.md) is the maintained
 user journey, and [SETUP](../SETUP.md) is the task guide. When they disagree,
 this document and the applicable ADRs take precedence.
 
-> **0.6.0 candidate boundary (2026-08-30).** `0.6.0` is the current local
-> release candidate, not a published release. **Phoenix is the completed,
+> **Release boundary (2026-09-02).** `0.6.1` is the current tagged release
+> (`v0.6.1`, commit `6262d408`). `0.6.2` is the next candidate, assembling
+> locally on the working branch and not yet released. **Phoenix is the completed,
 > integrated product foundation** for this candidate: candidate-bound
 > evidence and approvals, deterministic gates before review, recoverable
 > delivery records, and typed safe boundaries for external actions. Its
@@ -455,8 +456,9 @@ ist der Produkteinstieg, der [PIPELINE_FLOW](../PIPELINE_FLOW.md) die gepflegte
 Nutzerreise und [SETUP](../SETUP.md) der Aufgabenleitfaden. Bei Widerspruch
 gehen dieses Dokument und die passenden ADRs vor.
 
-> **Kandidatengrenze 0.6.0 (2026-08-30).** `0.6.0` ist der aktuelle lokale
-> Release-Kandidat, kein veröffentlichtes Release. **Phoenix ist die
+> **Release-Grenze (2026-09-02).** `0.6.1` ist das aktuelle getaggte Release
+> (`v0.6.1`, Commit `6262d408`). `0.6.2` ist der nächste Kandidat, der lokal
+> auf dem Arbeitsbranch entsteht und noch nicht veröffentlicht ist. **Phoenix ist die
 > abgeschlossene, integrierte Produktgrundlage** dieses Kandidaten:
 > kandidatengebundene Evidenz und Freigaben, deterministische Gates vor dem
 > Review, wiederherstellbare Delivery-Aufzeichnungen und typisierte sichere

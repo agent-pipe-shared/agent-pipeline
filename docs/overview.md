@@ -6,16 +6,17 @@ history the source of truth. Its core loop is simple: record the work,
 dispatch it with a fresh context, collect deterministic evidence, review the
 result independently, and preserve the decision for the next session.
 
-## The 0.6.0 product shape
+## The release line: 0.6.1 tagged, 0.6.2 assembling
 
-`0.6.0` is a local release candidate, not a published release. It combines a
-completed, integrated Phoenix foundation with the current candidate-ready Nova
-increment.
+`0.6.1` (tagged 2026-09-02, `v0.6.1`) is the current tagged release. `0.6.2`
+is the next candidate, assembling locally on the working branch and not yet
+released. `0.6.1` combines a completed, integrated Phoenix foundation with
+the Nova increment released in that tag.
 
-| Product strand | What it contributes in this candidate | Status |
+| Product strand | What it contributes in this release | Status |
 | --- | --- | --- |
 | Phoenix | Durable delivery governance: explicit human decisions, candidate-bound evidence, deterministic gates before review, safe external-action boundaries, and recoverable public records. | Integrated foundation |
-| Nova | Runner-aware execution and guided adoption: public Driver actions, resumable onboarding context, a real verify setup, and scoped parallel delivery. | Active; the listed 0.6.0 subset is candidate-ready |
+| Nova | Runner-aware execution and guided adoption: public Driver actions, resumable onboarding context, a real verify setup, and scoped parallel delivery. | Active; the listed subset is released in `0.6.1` |
 
 The candidate's Greenfield route is covered for Claude, Codex, and Antigravity:
 from an empty directory through public onboarding actions, plan approval and a
