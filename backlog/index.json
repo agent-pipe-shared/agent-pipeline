@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "1280afcd586cd46c6d79e4a358604131f8e76e4c379511b27e2c8b4ca9f165e7"
+    "transitionHead": "2acd9d24b41961b6bbb185640ce07ae15d194fb1f4dd720c3fca95c77fb95e7f"
   },
   "counts": {
-    "open": 109,
+    "open": 111,
     "in_progress": 0,
     "closed": 521,
     "rejected": 3,
@@ -1203,6 +1203,15 @@
       "closureRepository": "self",
       "closureCommit": "9ae28dad3f6c9c41833e7d629fa3d1d73872d2a2",
       "closureEvidence": "backlog/items/2026-08-18-capability-first-advisor-critic-dispatch.md"
+    },
+    {
+      "id": "pipeline.capability-is-built-tested-and-declared-ahead-of-anything-that-could-call-it",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-09-06",
+      "source": "NVA-B-WIREAUDIT-1, a measured reachability audit of every non-test module under plugins/pipeline-core/{lib,scripts,hooks}; report backlog/evidence/2026-09-06-built-but-unwired-audit.md, machine output evidence/NVA-B-WIREAUDIT-1-graph.json. Commissioned by the PO on the suspicion that built-but-unwired is a pattern of agentic development rather than a set of accidents.",
+      "deferred": false
     },
     {
       "id": "pipeline.capture-evidence-refuses-fixture-literal-as-host-path",
@@ -7162,6 +7171,15 @@
       "closureRepository": "self",
       "closureCommit": "afb2e3c0f11f7bb0f6af31bec94a376616d31cb4",
       "closureEvidence": "backlog/evidence/2026-09-03-nva-rebdead-round2-findings.md"
+    },
+    {
+      "id": "pipeline.the-sandbox-preflight-app-server-handshake-is-a-race",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-06",
+      "source": "three measurement dispatches on 2026-09-06 (NVA-B-CASPREFLIGHT-1/-2/-3) against the real Codex CLI 0.153.4; evidence under evidence/NVA-B-CASPREFLIGHT-*, forwarded from a Codex session that could not start an isolated Critic",
+      "deferred": false
     },
     {
       "id": "pipeline.the-two-suite-registration-checkers-disagree",

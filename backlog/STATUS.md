@@ -104,6 +104,7 @@
 | pipeline.canonical-verify-evidence-path | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.canonical-worktree-lifecycle | closed | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.capability-first-advisor-critic-dispatch | closed | workflow-improvement | pipeline | 2026-08-18 | — |
+| pipeline.capability-is-built-tested-and-declared-ahead-of-anything-that-could-call-it | open | workflow-improvement | pipeline | 2026-09-06 | — |
 | pipeline.capture-evidence-refuses-fixture-literal-as-host-path | open | defect | pipeline | 2026-09-06 | Nova B -- capture-evidence.mjs's windows-drive-letter leak heuristic (scripts/capture-evidence.mjs:120) matches a synthetic fixture literal such as C:\Users\Foo\repo inside a test's own description and body, and on any match refuses to write the capture (:197). The tool has no allowlist. Consequence measured 2026-09-06: guard-maintenance-window-tests clears every serial-lane safety signal and passes solo 62/62, but its self-race evidence cannot be captured because GMW45's description contains that literal -- so the suite stays in the lane on a tooling refusal, not a safety finding, at 16.3s of lane time. |
 | pipeline.chat-gate-non-ascii-name-windows | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — delivered 2026-08-28, same session it was reported |
 | pipeline.chat-mode-push-approval-has-no-enforced-human-turn-boundary | closed | defect | pipeline | 2026-08-25 | — |
@@ -580,6 +581,7 @@
 | pipeline.the-privacy-sign-off-is-bound-to-a-superseded-candidate | open | defect | pipeline | 2026-08-31 | — |
 | pipeline.the-push-authority-surface-cannot-be-bounded-by-static-enumeration | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.the-rebase-authority-is-resolved-and-advertised-but-not-executable | closed | defect | pipeline | 2026-09-02 | — |
+| pipeline.the-sandbox-preflight-app-server-handshake-is-a-race | open | defect | pipeline | 2026-09-06 | — |
 | pipeline.the-two-suite-registration-checkers-disagree | closed | defect | pipeline | 2026-08-27 | — |
 | pipeline.the-unparsed-command-lane-still-carries-the-false-denial-claim | open | defect | pipeline | 2026-09-03 | Nova B — the sibling of the opaque-interpreter-code lane. Same blind-scan fallback, same fail-closed refusal of a mere mention, and the guard still tells the reader that only a detected write is refused. |
 | pipeline.the-unregistered-suite-detector-is-not-itself-a-gate-step | closed | defect | pipeline | 2026-09-01 | — |
@@ -652,7 +654,7 @@
 
 ## Counts
 
-- open: 109
+- open: 111
 - in_progress: 0
 - closed: 521
 - rejected: 3
