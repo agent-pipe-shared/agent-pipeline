@@ -7,7 +7,7 @@ status: closed
 created: 2026-09-06
 closed_at: 2026-09-06
 closure_repository: self
-closure_commit: 00a58a0e
+closure_commit: 00a58a0ebc3aa9fe41a4c0e3b478f691e9db56f2
 closure_evidence: "backlog/items/2026-09-06-nva-b-evslotfix-1-broke-two-verify-fixtures-that-hardcode-verify-mjs-dependencies.md"
 sprint: nova-b
 tracking: "Nova B — discovered running the first full verify.mjs gate of this session (last known-green was 7cc0b649, 2026-09-02; many commits landed since across the whole day). Blocks A-C of NVA-B-EVSLOTFIX-1 (commits 61dc7fc5/d30273d3) added a new import to harness/scripts/verify.mjs (harness/scripts/verify-evidence-writer.mjs). Two test fixtures that copy verify.mjs and a hardcoded list of its dependencies into an isolated sandbox to test its behavior were never updated to also copy the new file, so the copied verify.mjs now fails to even load in those sandboxes."
