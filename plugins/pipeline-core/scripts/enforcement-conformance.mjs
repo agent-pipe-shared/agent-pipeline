@@ -2,15 +2,15 @@
 // SPDX-License-Identifier: SUL-1.0
 
 const TOP_LEVEL_KEYS = Object.freeze([
-  "schema", "recordId", "candidate", "runner", "layer", "probeSurface",
-  "measurement", "observation", "evaluator", "staleness", "sanitization",
+  "schema", "recordId", "candidate", "runner", "layer", "probeSurfaces",
+  "measurement", "observations", "evaluator", "staleness", "sanitization",
   "provenance", "measuredAt",
 ]);
 const NESTED_KEYS = Object.freeze({
   candidate: ["commit", "tree", "artifactSha256"],
   runner: ["name", "version", "pluginVersion"],
   measurement: ["status", "values"],
-  observation: ["hookObservation", "evidenceKind", "exitCode", "markerSha256"],
+  observation: ["probeSurface", "hookObservation", "evidenceKind", "exitCode", "markerSha256"],
   evaluator: ["outcome", "basis", "acceptanceSha256"],
   staleness: ["status", "runnerVersion", "pluginVersion", "invalidatedBy"],
   sanitization: ["policy", "redactions"],
@@ -71,7 +71,18 @@ export function validateRecord(record) {
   string(record.runner.pluginVersion, "runner.pluginVersion");
   if (record.recordId !== createRecordId(record.runner.name, record.layer)) throw new TypeError("recordId mismatch");
   enumValue(record.layer, ENFORCEMENT_LAYERS, "layer");
-  enumValue(record.probeSurface, PROBE_SURFACES, "probeSurface");
+  if (!Array.isArray(record.probeSurfaces) || record.probeSurfaces.length === 0) {
+    throw new TypeError("probeSurfaces must be a non-empty array");
+  }
+  let previousSurfaceIndex = -1;
+  for (const [index, probeSurface] of record.probeSurfaces.entries()) {
+    enumValue(probeSurface, PROBE_SURFACES, `probeSurfaces[${index}]`);
+    const surfaceIndex = PROBE_SURFACES.indexOf(probeSurface);
+    if (surfaceIndex <= previousSurfaceIndex) {
+      throw new TypeError("probeSurfaces must be unique and in canonical order");
+    }
+    previousSurfaceIndex = surfaceIndex;
+  }
 
   exactKeys(record.measurement, NESTED_KEYS.measurement, "measurement");
   enumValue(record.measurement.status, MEASUREMENT_STATUSES, "measurement.status");
@@ -86,33 +97,41 @@ export function validateRecord(record) {
     throw new TypeError("absent telemetry must not be represented as values");
   }
 
-  exactKeys(record.observation, NESTED_KEYS.observation, "observation");
-  enumValue(record.observation.hookObservation, HOOK_OBSERVATIONS, "observation.hookObservation");
-  enumValue(record.observation.evidenceKind, EVIDENCE_KINDS, "observation.evidenceKind");
-  if (!Number.isInteger(record.observation.exitCode) && record.observation.exitCode !== null) throw new TypeError("observation.exitCode must be an integer or null");
-  hash(record.observation.markerSha256, "observation.markerSha256", { nullable: true });
+  if (!Array.isArray(record.observations) || record.observations.length !== record.probeSurfaces.length) {
+    throw new TypeError("observations must exactly match probeSurfaces");
+  }
+  for (const [index, observation] of record.observations.entries()) {
+    exactKeys(observation, NESTED_KEYS.observation, `observations[${index}]`);
+    if (observation.probeSurface !== record.probeSurfaces[index]) {
+      throw new TypeError("observations must correlate to probeSurfaces in order");
+    }
+    enumValue(observation.hookObservation, HOOK_OBSERVATIONS, `observations[${index}].hookObservation`);
+    enumValue(observation.evidenceKind, EVIDENCE_KINDS, `observations[${index}].evidenceKind`);
+    if (!Number.isInteger(observation.exitCode) && observation.exitCode !== null) throw new TypeError(`observations[${index}].exitCode must be an integer or null`);
+    hash(observation.markerSha256, `observations[${index}].markerSha256`, { nullable: true });
+  }
 
   exactKeys(record.evaluator, NESTED_KEYS.evaluator, "evaluator");
   enumValue(record.evaluator.outcome, EVALUATOR_OUTCOMES, "evaluator.outcome");
   string(record.evaluator.basis, "evaluator.basis");
   hash(record.evaluator.acceptanceSha256, "evaluator.acceptanceSha256", { nullable: true });
-  if (record.evaluator.outcome === "pass" &&
-      !(record.observation.evidenceKind === "deterministic-execution" ||
-        (record.observation.evidenceKind === "human-acceptance" && record.evaluator.acceptanceSha256 !== null))) {
-    throw new TypeError("pass requires deterministic execution or bound human acceptance");
+  const evidenceKinds = record.observations.map((observation) => observation.evidenceKind);
+  const hasHumanAcceptance = evidenceKinds.includes("human-acceptance");
+  if (hasHumanAcceptance && record.evaluator.acceptanceSha256 === null) {
+    throw new TypeError("human acceptance requires bound acceptance");
   }
-  if (record.evaluator.outcome === "excepted" &&
-      !(record.observation.evidenceKind === "human-acceptance" && record.evaluator.acceptanceSha256 !== null)) {
-    throw new TypeError("excepted requires bound human acceptance");
-  }
-  if (record.observation.evidenceKind === "human-acceptance" &&
-      ["pass", "excepted"].includes(record.evaluator.outcome) && record.evaluator.acceptanceSha256 === null) {
-    throw new TypeError("human acceptance pass/excepted requires bound acceptance");
-  }
-  if (record.observation.evidenceKind !== "human-acceptance" && record.evaluator.acceptanceSha256 !== null) {
+  if (!hasHumanAcceptance && record.evaluator.acceptanceSha256 !== null) {
     throw new TypeError("acceptance hash requires human acceptance evidence");
   }
-  if (["model-attestation", "self-attestation"].includes(record.observation.evidenceKind) &&
+  if (record.evaluator.outcome === "pass" &&
+      evidenceKinds.some((evidenceKind) => !["deterministic-execution", "human-acceptance"].includes(evidenceKind))) {
+    throw new TypeError("pass requires deterministic execution or bound human acceptance for every observation");
+  }
+  if (record.evaluator.outcome === "excepted" &&
+      (!hasHumanAcceptance || evidenceKinds.some((evidenceKind) => ["model-attestation", "self-attestation", "unavailable"].includes(evidenceKind)))) {
+    throw new TypeError("excepted requires bound human acceptance without model, self, or unavailable evidence");
+  }
+  if (evidenceKinds.some((evidenceKind) => ["model-attestation", "self-attestation"].includes(evidenceKind)) &&
       ["pass", "excepted"].includes(record.evaluator.outcome)) {
     throw new TypeError("model and self-attestation cannot produce pass or excepted");
   }

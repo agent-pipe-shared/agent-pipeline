@@ -26,27 +26,33 @@ self-attestation is evidence about an observation only and can never emit
 Emit exactly one closed record per `{runner, layer}`. Unknown keys are
 refused. Required keys are:
 
-`schema`, `recordId`, `candidate`, `runner`, `layer`, `probeSurface`,
-`measurement`, `observation`, `evaluator`, `staleness`, `sanitization`,
+`schema`, `recordId`, `candidate`, `runner`, `layer`, `probeSurfaces`,
+`measurement`, `observations`, `evaluator`, `staleness`, `sanitization`,
 `provenance`, `measuredAt`.
 
 `schema` is `pipeline.enforcement-conformance.v1`; `recordId` is a stable
 canonical `{runner,layer}` identity; `candidate` binds the exact HEAD commit,
 tree, and artifact SHA-256; `runner` carries runner name/version; `layer` is
 one of `git-hook | tool-scope | runner-hook | posthoc-verify | prose`.
-`probeSurface` is a literal one of `runner-hook/orchestrator`,
-`runner-hook/subagent`, `payload-indirection`, or `git-hook`.
+`probeSurfaces` is a non-empty, unique subsequence in the approved global
+order of `runner-hook/orchestrator`, `runner-hook/subagent`,
+`payload-indirection`, and `git-hook`. `observations` has exactly one closed
+`{probeSurface, hookObservation, evidenceKind, exitCode, markerSha256}` item
+for each surface, in the identical correlated order. Singular `probeSurface`
+and `observation` shapes are refused.
 
 `measurement` keeps quantitative values beside `status`, whose only values
-are `measured | estimated | unavailable | unknown`. `observation` is raw
-probe data plus `hookObservation`, whose only values are `fires | fires-not |
-unknown`; it is never the evaluator verdict. `evaluator.outcome` is one of
-`pass | finding | unavailable | unsupported | unknown | excepted`, with the
-deterministic-pass rule: only deterministic execution or an explicit human
-acceptance record may produce `pass`; model/self-attestation is capped at
-`finding` (or an uncertainty outcome). `staleness` records the runner/plugin
-versions and invalidation reason; `sanitization` records the applied
-redaction policy and must contain no secrets, credentials, transcripts,
+are `measured | estimated | unavailable | unknown`. Each observation is raw
+probe data with `hookObservation` one of `fires | fires-not | unknown`; it is
+never the evaluator verdict. `evaluator.outcome` is one of `pass | finding |
+unavailable | unsupported | unknown | excepted`. A `pass` requires every
+observation to be deterministic execution or human acceptance; a human
+acceptance requires the record-level acceptance hash. `excepted` requires at
+least one human acceptance, that hash, and no model, self, or unavailable
+observation. Model/self-attestation forbids `pass` and `excepted`, and an
+acceptance hash is forbidden without human acceptance. `staleness` records the
+runner/plugin versions and invalidation reason; `sanitization` records the
+applied redaction policy and must contain no secrets, credentials, transcripts,
 private paths, or organization coordinates. `provenance` identifies command,
 fixture, and source inputs without private data. All records are candidate
 bound before qualification.
@@ -96,8 +102,8 @@ PO-authorized change.
 |---|---|
 | closed shape | exact-key acceptance; unknown-key, missing-key, enum, and non-canonical record rejection |
 | measurement | each quantitative value has a status; absent telemetry is never zero |
-| observation | simulated hooks-fire and hooks-do-not-fire transcripts classify correctly; raw observation remains distinct from outcome |
-| evaluator | deterministic pass only; model/self-attestation cannot pass; unavailable/unsupported/unknown remain visible |
+| observations | simulated hooks-fire and hooks-do-not-fire transcripts classify correctly; plural surfaces are uniquely ordered and exactly correlated with separate raw observations |
+| evaluator | deterministic or human-accepted pass only; model/self-attestation cannot pass or except; unavailable/unsupported/unknown remain visible |
 | surfaces | orchestrator, subagent, payload-indirection, and git-hook adapters each exercise positive, refusal, and residual-gap cases |
 | binding | commit/tree/artifact digest mismatch and changed runner/plugin version mark stale and prevent qualification |
 | privacy | secret, credential, transcript, private-path, and organization-coordinate sanitization fixtures |

@@ -1,6 +1,6 @@
 {
   "schema": "pipeline.alfred-contract-freeze.v1",
-  "freezeRevision": 1,
+  "freezeRevision": 2,
   "digestRule": {
     "algorithm": "SHA-256",
     "encoding": "lowercase hexadecimal",
@@ -23,8 +23,8 @@
       "schemaId": [
         "pipeline.enforcement-conformance.v1"
       ],
-      "revision": 1,
-      "digest": "7dd7b4cd542dfdd0778efa0d2a2c1cdb7acbfbbd3c6d3c5b9d38dad910adb5f7",
+      "revision": 2,
+      "digest": "c3dd914f491b6dfd3eadfee5d05ad5e7143036b80af3048eb8903c2b5bd432c4",
       "owner": "A1",
       "consumers": [
         "A2",
@@ -438,6 +438,17 @@
       "landedRevision": null,
       "landedDigest": null,
       "summary": "C2 must add both consolidation fields through a later revision bump and a new landed ledger entry; this predeclaration does not change revision 1."
+    },
+    {
+      "sequence": 3,
+      "status": "landed",
+      "kind": "contract-revision",
+      "freezeRevision": 2,
+      "contractFamily": "Enforcement conformance record",
+      "priorRevision": 1,
+      "landedRevision": 2,
+      "landedDigest": "c3dd914f491b6dfd3eadfee5d05ad5e7143036b80af3048eb8903c2b5bd432c4",
+      "summary": "Landed plural probe-surface and correlated-observation contract revision for A1."
     }
   ]
 }
