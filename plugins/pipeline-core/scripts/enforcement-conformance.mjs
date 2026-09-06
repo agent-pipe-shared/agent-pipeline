@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 
+import { createHash } from "node:crypto";
+
 const TOP_LEVEL_KEYS = Object.freeze([
   "schema", "recordId", "candidate", "runner", "layer", "probeSurfaces",
   "measurement", "observations", "evaluator", "staleness", "sanitization",
@@ -28,6 +30,9 @@ const HEX64 = /^[0-9a-f]{64}$/;
 const GIT_OID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
 const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 const RUNNER_NAME = /^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$/;
+const PROBE_REQUEST_SCHEMA = "pipeline.enforcement-probe-request.v1";
+const PROBE_RECEIPT_SCHEMA = "pipeline.enforcement-probe-receipt.v1";
+const ARTIFACT_PREIMAGE_HEADER = "pipeline.enforcement-conformance.v1/a1-2-artifact-preimage";
 
 function exactKeys(value, keys, label) {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new TypeError(`${label} must be an object`);
@@ -141,7 +146,7 @@ export function validateRecord(record) {
   string(record.staleness.runnerVersion, "staleness.runnerVersion");
   string(record.staleness.pluginVersion, "staleness.pluginVersion");
   if (record.staleness.invalidatedBy !== null) string(record.staleness.invalidatedBy, "staleness.invalidatedBy");
-  if (record.staleness.runnerVersion !== record.runner.version || record.staleness.pluginVersion !== record.runner.pluginVersion) throw new TypeError("staleness version drift");
+  if (record.staleness.status === "current" && (record.staleness.runnerVersion !== record.runner.version || record.staleness.pluginVersion !== record.runner.pluginVersion)) throw new TypeError("staleness version drift");
   if (record.staleness.status === "current" && record.staleness.invalidatedBy !== null) throw new TypeError("current record cannot be invalidated");
   if (record.staleness.status === "stale" && (record.staleness.invalidatedBy === null || record.staleness.invalidatedBy.length === 0)) throw new TypeError("stale record requires invalidation reason");
   if (record.staleness.status === "stale" && record.evaluator.outcome === "pass") throw new TypeError("stale record cannot pass");
@@ -163,6 +168,218 @@ export function classifyHookObservation({ fired, markerAvailable = false } = {})
   return "unknown";
 }
 
+function sha256(bytes) {
+  return createHash("sha256").update(bytes, "utf8").digest("hex");
+}
+
+function canonicalSurfaces(surfaces) {
+  if (!Array.isArray(surfaces) || surfaces.length === 0) throw new TypeError("probe surfaces must be a non-empty array");
+  const canonical = [...surfaces].sort((left, right) => PROBE_SURFACES.indexOf(left) - PROBE_SURFACES.indexOf(right));
+  if (canonical.some((surface, index) => !PROBE_SURFACES.includes(surface) || canonical.indexOf(surface) !== index)) {
+    throw new TypeError("probe surfaces must be approved and unique");
+  }
+  return canonical;
+}
+
+function requireAdapter(adapters, name) {
+  const adapter = adapters?.[name];
+  if (!adapter || typeof adapter !== "object") throw new TypeError(`missing ${name} adapter`);
+  return adapter;
+}
+
+function requireMethod(adapter, method, adapterName) {
+  if (typeof adapter[method] !== "function") throw new TypeError(`${adapterName}.${method} must be a function`);
+  return adapter[method].bind(adapter);
+}
+
+function validateRunner(runner) {
+  exactKeys(runner, NESTED_KEYS.runner, "runner metadata");
+  string(runner.name, "runner metadata name");
+  string(runner.version, "runner metadata version");
+  string(runner.pluginVersion, "runner metadata plugin version");
+  createRecordId(runner.name, "runner-hook");
+  return runner;
+}
+
+function validateCandidate(candidate) {
+  exactKeys(candidate, NESTED_KEYS.candidate, "candidate binding");
+  hash(candidate.commit, "candidate binding commit", { oid: true });
+  hash(candidate.tree, "candidate binding tree", { oid: true });
+  hash(candidate.artifactSha256, "candidate binding artifact", { oid: false });
+  return candidate;
+}
+
+function commandIdForSurface(surface) {
+  if (surface === "git-hook") return "guarded-push-refusal";
+  return surface === "payload-indirection" ? "compound-shell-payload" : "compound-shell-refusal";
+}
+
+function safeExitCode(result) {
+  return Number.isInteger(result?.exitCode) ? result.exitCode : null;
+}
+
+function observationFromReceipt(receipt, marker) {
+  const covered = marker?.status === "covered";
+  const markerSha256 = covered && typeof marker.markerSha256 === "string" ? marker.markerSha256 : null;
+  if (markerSha256 !== null) hash(markerSha256, "marker markerSha256");
+  const executionAvailable = ["allowed", "refused"].includes(receipt.executionStatus);
+  return {
+    probeSurface: receipt.probeSurface,
+    hookObservation: classifyHookObservation({ fired: markerSha256 !== null, markerAvailable: covered }),
+    evidenceKind: executionAvailable && covered ? receipt.executionEvidenceKind : "unavailable",
+    exitCode: receipt.exitCode,
+    markerSha256,
+  };
+}
+
+export function digestProbeReceipt(receipt) {
+  return sha256(JSON.stringify(receipt));
+}
+
+function markerBoundToReceipt(marker, receipt) {
+  if (!marker || marker.status !== "covered") return { status: marker?.status ?? "unavailable", markerSha256: null };
+  if (marker.receiptSha256 !== digestProbeReceipt(receipt)) return { status: "unknown", markerSha256: null };
+  return { status: "covered", markerSha256: marker.markerSha256 ?? null };
+}
+
+function evaluatorFor(observations, evidenceScope, executionStatuses, markerStatuses) {
+  if (evidenceScope !== "native") return { outcome: "unavailable", basis: "fixture-only simulation is not live enforcement", acceptanceSha256: null };
+  if (executionStatuses.includes("unsupported")) {
+    return { outcome: "unsupported", basis: "native adapter does not support this surface", acceptanceSha256: null };
+  }
+  if (markerStatuses.includes("unknown")) {
+    return { outcome: "unknown", basis: "marker adapter could not classify coverage", acceptanceSha256: null };
+  }
+  if (observations.some((observation) => observation.evidenceKind === "unavailable")) {
+    return { outcome: "unavailable", basis: "adapter or marker evidence unavailable", acceptanceSha256: null };
+  }
+  if (observations.some((observation) => observation.hookObservation === "fires-not")) {
+    return { outcome: "finding", basis: "native marker coverage confirms a hook did not fire", acceptanceSha256: null };
+  }
+  if (executionStatuses.includes("allowed")) {
+    return { outcome: "finding", basis: "canonical refused shape was allowed", acceptanceSha256: null };
+  }
+  return { outcome: "unavailable", basis: "injected adapter evidence is not a live native runner measurement", acceptanceSha256: null };
+}
+
+/**
+ * Hashes the exact A1-2 artifact preimage: UTF-8 of the fixed header, then every
+ * caller-supplied relative artifact path and its exact bytes, each byte-length-framed.
+ * The conformance record is deliberately not an input, so artifactSha256 cannot
+ * hash the record which contains it. Callers bind module/fixture bytes before
+ * constructing a record and never include generated evidence records here.
+ */
+export function digestArtifactPreimage(artifacts) {
+  if (!Array.isArray(artifacts) || artifacts.length === 0) throw new TypeError("artifact preimage needs at least one artifact");
+  const chunks = [ARTIFACT_PREIMAGE_HEADER];
+  for (const artifact of artifacts) {
+    if (!artifact || typeof artifact.path !== "string" || artifact.path.length === 0 || artifact.path.includes("\u0000") || artifact.path.startsWith("/") || artifact.path.startsWith("\\") || artifact.path.includes("\\") || /^[A-Za-z]:[\\/]/u.test(artifact.path) || artifact.path.split("/").includes("..")) {
+      throw new TypeError("artifact path must be a relative non-traversing path");
+    }
+    if (typeof artifact.bytes !== "string") throw new TypeError("artifact bytes must be a string");
+    chunks.push(`${Buffer.byteLength(artifact.path, "utf8")}:${artifact.path}`, `${Buffer.byteLength(artifact.bytes, "utf8")}:${artifact.bytes}`);
+  }
+  return sha256(chunks.join("\u0000"));
+}
+
+export function createProbeRequest({ candidate, runner, layer, probeSurface, fixtureId }) {
+  validateCandidate(candidate);
+  validateRunner(runner);
+  enumValue(layer, ENFORCEMENT_LAYERS, "probe layer");
+  enumValue(probeSurface, PROBE_SURFACES, "probe surface");
+  string(fixtureId, "fixture id");
+  return Object.freeze({
+    schema: PROBE_REQUEST_SCHEMA,
+    candidate: { ...candidate },
+    runner: { ...runner },
+    layer,
+    probeSurface,
+    fixtureId,
+    commandId: commandIdForSurface(probeSurface),
+  });
+}
+
+/**
+ * Executes only through injected adapters. Native runner bridges intentionally do
+ * not exist here: a caller without one must report adapter evidence unavailable.
+ */
+export async function runProbeMatrix({ layer = "runner-hook", surfaces = PROBE_SURFACES, adapters, fixtureIds = {}, evidenceScope = "fixture" } = {}) {
+  enumValue(layer, ENFORCEMENT_LAYERS, "probe layer");
+  if (!["fixture", "native"].includes(evidenceScope)) throw new TypeError("evidence scope must be fixture or native");
+  const runnerMetadata = requireMethod(requireAdapter(adapters, "runnerMetadata"), "read", "runnerMetadata");
+  const readBinding = requireMethod(requireAdapter(adapters, "gitBinding"), "read", "gitBinding");
+  const now = requireMethod(requireAdapter(adapters, "clock"), "now", "clock");
+  const execute = requireMethod(requireAdapter(adapters, "execution"), "execute", "execution");
+  const readMarker = requireMethod(requireAdapter(adapters, "observationMarkers"), "read", "observationMarkers");
+  const allocate = requireMethod(requireAdapter(adapters, "scratch"), "allocate", "scratch");
+  const runner = validateRunner(await runnerMetadata());
+  const candidate = validateCandidate(await readBinding());
+  const probeSurfaces = canonicalSurfaces(surfaces);
+  const observations = [];
+  const commandIds = [];
+  const executionStatuses = [];
+  const markerStatuses = [];
+  for (const probeSurface of probeSurfaces) {
+    const fixtureId = fixtureIds[probeSurface] ?? `a1-2-${probeSurface.replaceAll("/", "-")}`;
+    const request = createProbeRequest({ candidate, runner, layer, probeSurface, fixtureId });
+    const scratch = probeSurface === "payload-indirection" ? await allocate({ request, disposable: true }) : null;
+    let result;
+    try {
+      result = await execute({ request, scratch });
+    } catch {
+      result = { status: "error", exitCode: null };
+    }
+    const receipt = Object.freeze({
+      schema: PROBE_RECEIPT_SCHEMA,
+      candidate: { ...candidate },
+      runner: { ...runner },
+      layer,
+      probeSurface,
+      executionStatus: ["allowed", "refused", "error", "unavailable", "unsupported"].includes(result?.status) ? result.status : "error",
+      executionEvidenceKind: EVIDENCE_KINDS.includes(result?.evidenceKind) ? result.evidenceKind : "unavailable",
+      exitCode: safeExitCode(result),
+    });
+    let marker;
+    try {
+      marker = await readMarker({ request, receipt });
+    } catch {
+      marker = { status: "unavailable", markerSha256: null };
+    }
+    marker = markerBoundToReceipt(marker, receipt);
+    observations.push(observationFromReceipt(receipt, marker));
+    commandIds.push(request.commandId);
+    executionStatuses.push(receipt.executionStatus);
+    markerStatuses.push(typeof marker?.status === "string" ? marker.status : "unavailable");
+  }
+  const unavailable = observations.some((observation) => observation.evidenceKind === "unavailable");
+  const finalRunner = validateRunner(await runnerMetadata());
+  const finalCandidate = validateCandidate(await readBinding());
+  const candidateChanged = ["commit", "tree", "artifactSha256"].some((field) => candidate[field] !== finalCandidate[field]);
+  const runnerChanged = ["name", "version", "pluginVersion"].some((field) => runner[field] !== finalRunner[field]);
+  const invalidatedBy = candidateChanged ? "candidate-binding-changed-during-probe" : runnerChanged ? "runner-metadata-changed-during-probe" : null;
+  const measurement = unavailable
+    ? { status: "unavailable", values: [] }
+    : { status: "measured", values: [] };
+  const sourceSha256 = candidate.artifactSha256;
+  const record = {
+    schema: "pipeline.enforcement-conformance.v1",
+    recordId: createRecordId(runner.name, layer),
+    candidate,
+    runner,
+    layer,
+    probeSurfaces,
+    measurement,
+    observations,
+    evaluator: evaluatorFor(observations, evidenceScope, executionStatuses, markerStatuses),
+    staleness: { status: invalidatedBy === null ? "current" : "stale", runnerVersion: finalRunner.version, pluginVersion: finalRunner.pluginVersion, invalidatedBy },
+    sanitization: { policy: "redact-sensitive-shapes-v1", redactions: ["raw-stdout-omitted", "private-paths-omitted"] },
+    provenance: { commandSha256: sha256(commandIds.join("\u0000")), fixtureIds: probeSurfaces.map((surface) => fixtureIds[surface] ?? `a1-2-${surface.replaceAll("/", "-")}`), sourceSha256 },
+    measuredAt: now(),
+  };
+  validateRecord(record);
+  return sanitizeRecord(record);
+}
+
 export function checkCandidateBinding(record, expected) {
   // This function validates and qualifies a complete record; malformed input throws, while
   // a well-formed but non-qualifying record returns a typed false reason.
@@ -177,8 +394,8 @@ export function checkCandidateBinding(record, expected) {
   const mismatch = fields.find((field) => record.candidate[field] !== expected[field]);
   if (mismatch) return { qualifies: false, reason: `candidate.${mismatch}-mismatch` };
   if (record.runner.version !== expected.runnerVersion || record.runner.pluginVersion !== expected.pluginVersion) return { qualifies: false, reason: "runner-or-plugin-version-mismatch" };
-  if (record.staleness.runnerVersion !== expected.runnerVersion || record.staleness.pluginVersion !== expected.pluginVersion) return { qualifies: false, reason: "staleness-version-mismatch" };
   if (record.staleness.status !== "current") return { qualifies: false, reason: "stale-record" };
+  if (record.staleness.runnerVersion !== expected.runnerVersion || record.staleness.pluginVersion !== expected.pluginVersion) return { qualifies: false, reason: "staleness-version-mismatch" };
   return { qualifies: true, reason: null };
 }
 
