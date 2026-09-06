@@ -294,7 +294,15 @@ marketplace/plugin update + `/reload-plugins`
 (`references/freshness.md`'s documented remedy). Filed:
 `2026-09-06-the-installed-plugin-copy-enforcing-this-session-predates-todays-guard-fixes.md`.
 
-### 2026-09-06: first full verify.mjs gate this session — 6 of 8 failures closed
+### 2026-09-06: full verify.mjs gate — 6 of 8 failures closed, 1 remains (PO-blocked)
+
+**Second full gate confirms: exactly one root cause left, all 513 suites
+otherwise green.** `verify-suite-registration-tests`/
+`verify-suite-registration-check`/`suite-registration-check` are the ONLY
+failures — Block D/E of `NVA-B-EVSLOTFIX-1` (two test files exist on disk,
+not yet registered in `harness/scripts/verify.mjs`'s `TEST_SUITES`, which
+needs the TP-3 signature ceremony). **This is the single remaining blocker
+for a fully green local candidate.**
 
 Last known-green was `7cc0b649` (2026-09-02, 506 suites); only individual
 suites had been run since. First full gate this session (candidate
