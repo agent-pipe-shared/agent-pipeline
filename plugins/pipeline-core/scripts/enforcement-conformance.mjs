@@ -146,7 +146,7 @@ export function validateRecord(record) {
   string(record.staleness.runnerVersion, "staleness.runnerVersion");
   string(record.staleness.pluginVersion, "staleness.pluginVersion");
   if (record.staleness.invalidatedBy !== null) string(record.staleness.invalidatedBy, "staleness.invalidatedBy");
-  if (record.staleness.status === "current" && (record.staleness.runnerVersion !== record.runner.version || record.staleness.pluginVersion !== record.runner.pluginVersion)) throw new TypeError("staleness version drift");
+  if (record.staleness.runnerVersion !== record.runner.version || record.staleness.pluginVersion !== record.runner.pluginVersion) throw new TypeError("staleness version drift");
   if (record.staleness.status === "current" && record.staleness.invalidatedBy !== null) throw new TypeError("current record cannot be invalidated");
   if (record.staleness.status === "stale" && (record.staleness.invalidatedBy === null || record.staleness.invalidatedBy.length === 0)) throw new TypeError("stale record requires invalidation reason");
   if (record.staleness.status === "stale" && record.evaluator.outcome === "pass") throw new TypeError("stale record cannot pass");
@@ -312,8 +312,8 @@ export async function runProbeMatrix({ layer = "runner-hook", surfaces = PROBE_S
   const execute = requireMethod(requireAdapter(adapters, "execution"), "execute", "execution");
   const readMarker = requireMethod(requireAdapter(adapters, "observationMarkers"), "read", "observationMarkers");
   const allocate = requireMethod(requireAdapter(adapters, "scratch"), "allocate", "scratch");
-  const runner = validateRunner(await runnerMetadata());
-  const candidate = validateCandidate(await readBinding());
+  const runner = Object.freeze({ ...validateRunner(await runnerMetadata()) });
+  const candidate = Object.freeze({ ...validateCandidate(await readBinding()) });
   const probeSurfaces = canonicalSurfaces(surfaces);
   const observations = [];
   const commandIds = [];
@@ -352,8 +352,8 @@ export async function runProbeMatrix({ layer = "runner-hook", surfaces = PROBE_S
     markerStatuses.push(typeof marker?.status === "string" ? marker.status : "unavailable");
   }
   const unavailable = observations.some((observation) => observation.evidenceKind === "unavailable");
-  const finalRunner = validateRunner(await runnerMetadata());
-  const finalCandidate = validateCandidate(await readBinding());
+  const finalRunner = Object.freeze({ ...validateRunner(await runnerMetadata()) });
+  const finalCandidate = Object.freeze({ ...validateCandidate(await readBinding()) });
   const candidateChanged = ["commit", "tree", "artifactSha256"].some((field) => candidate[field] !== finalCandidate[field]);
   const runnerChanged = ["name", "version", "pluginVersion"].some((field) => runner[field] !== finalRunner[field]);
   const invalidatedBy = candidateChanged ? "candidate-binding-changed-during-probe" : runnerChanged ? "runner-metadata-changed-during-probe" : null;
@@ -371,7 +371,7 @@ export async function runProbeMatrix({ layer = "runner-hook", surfaces = PROBE_S
     measurement,
     observations,
     evaluator: evaluatorFor(observations, evidenceScope, executionStatuses, markerStatuses),
-    staleness: { status: invalidatedBy === null ? "current" : "stale", runnerVersion: finalRunner.version, pluginVersion: finalRunner.pluginVersion, invalidatedBy },
+    staleness: { status: invalidatedBy === null ? "current" : "stale", runnerVersion: runner.version, pluginVersion: runner.pluginVersion, invalidatedBy },
     sanitization: { policy: "redact-sensitive-shapes-v1", redactions: ["raw-stdout-omitted", "private-paths-omitted"] },
     provenance: { commandSha256: sha256(commandIds.join("\u0000")), fixtureIds: probeSurfaces.map((surface) => fixtureIds[surface] ?? `a1-2-${surface.replaceAll("/", "-")}`), sourceSha256 },
     measuredAt: now(),

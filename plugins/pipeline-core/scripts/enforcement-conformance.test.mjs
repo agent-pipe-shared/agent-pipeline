@@ -191,6 +191,10 @@ test("rejects candidate commit, tree, and artifact mismatches and version stalen
 test("requires coherent staleness versions and invalidation state", () => {
   assert.throws(() => validateRecord(validRecord({ staleness: { runnerVersion: "2.0.0" } })));
   assert.throws(() => validateRecord(validRecord({ staleness: { pluginVersion: "2.0.0" } })));
+  assert.throws(() => validateRecord(validRecord({
+    staleness: { status: "stale", runnerVersion: "2.0.0", invalidatedBy: "runner-metadata-changed-during-probe" },
+    evaluator: { outcome: "finding" },
+  })), /staleness version drift/);
   assert.throws(() => validateRecord(validRecord({ staleness: { invalidatedBy: "manual" } })));
   assert.throws(() => validateRecord(validRecord({ staleness: { status: "stale", invalidatedBy: null }, evaluator: { outcome: "finding" } })));
 });
@@ -291,7 +295,7 @@ test("execution errors cannot be promoted by exit codes or prose alone", async (
   assert.equal(record.evaluator.outcome, "unavailable");
 });
 
-test("marker evidence must bind the exact receipt and a changing candidate becomes stale", async () => {
+test("marker evidence must bind the exact receipt and preserves immutable initial bindings across metadata drift", async () => {
   const mismatchedMarker = matrixAdapters({ marker: () => ({ status: "covered", markerSha256: sha, receiptSha256: "c".repeat(64) }) });
   const mismatch = await runProbeMatrix({ adapters: mismatchedMarker.adapters, evidenceScope: "native" });
   assert.equal(mismatch.observations[0].hookObservation, "unknown");
@@ -309,6 +313,8 @@ test("marker evidence must bind the exact receipt and a changing candidate becom
   assert.equal(stale.staleness.invalidatedBy, "candidate-binding-changed-during-probe");
   assert.equal(stale.candidate.commit, oid);
   assert.equal(stale.candidate.artifactSha256, sha);
+  assert.equal(stale.staleness.runnerVersion, "1.0.0");
+  assert.equal(stale.staleness.pluginVersion, "0.6.1");
   assert.equal(stale.provenance.sourceSha256, sha);
   assert.equal(checkCandidateBinding(stale, { ...stale.candidate, runnerVersion: "1.0.0", pluginVersion: "0.6.1" }).qualifies, false);
 
@@ -321,8 +327,46 @@ test("marker evidence must bind the exact receipt and a changing candidate becom
   } });
   const runnerStale = await runProbeMatrix({ adapters: changingRunner.adapters });
   assert.equal(runnerStale.runner.version, "1.0.0");
-  assert.equal(runnerStale.staleness.runnerVersion, "2.0.0");
+  assert.equal(runnerStale.staleness.runnerVersion, "1.0.0");
+  assert.equal(runnerStale.staleness.pluginVersion, "0.6.1");
   assert.equal(runnerStale.staleness.status, "stale");
+  assert.equal(runnerStale.staleness.invalidatedBy, "runner-metadata-changed-during-probe");
+  assert.equal(checkCandidateBinding(runnerStale, { ...runnerStale.candidate, runnerVersion: "1.0.0", pluginVersion: "0.6.1" }).qualifies, false);
+
+  const sharedCandidate = { commit: oid, tree: oid, artifactSha256: sha };
+  let sharedCandidateReads = 0;
+  const aliasingCandidate = matrixAdapters({ candidate: () => {
+    sharedCandidateReads += 1;
+    if (sharedCandidateReads === 2) Object.assign(sharedCandidate, { commit: "d".repeat(40), tree: "d".repeat(40), artifactSha256: "d".repeat(64) });
+    return sharedCandidate;
+  } });
+  const aliasedCandidateRecord = await runProbeMatrix({ adapters: aliasingCandidate.adapters });
+  assert.equal(aliasedCandidateRecord.candidate.commit, oid);
+  assert.equal(aliasedCandidateRecord.candidate.tree, oid);
+  assert.equal(aliasedCandidateRecord.candidate.artifactSha256, sha);
+  assert.equal(aliasedCandidateRecord.staleness.status, "stale");
+  assert.equal(aliasedCandidateRecord.staleness.invalidatedBy, "candidate-binding-changed-during-probe");
+  assert.equal(checkCandidateBinding(aliasedCandidateRecord, { ...aliasedCandidateRecord.candidate, runnerVersion: "1.0.0", pluginVersion: "0.6.1" }).qualifies, false);
+
+  const sharedRunner = { name: "codex", version: "1.0.0", pluginVersion: "0.6.1" };
+  let sharedRunnerReads = 0;
+  const aliasingRunner = matrixAdapters({ runner: () => {
+    sharedRunnerReads += 1;
+    if (sharedRunnerReads === 2) Object.assign(sharedRunner, { version: "2.0.0", pluginVersion: "0.7.0" });
+    return sharedRunner;
+  } });
+  const aliasedRunnerRecord = await runProbeMatrix({ adapters: aliasingRunner.adapters });
+  assert.deepEqual(aliasedRunnerRecord.runner, { name: "codex", version: "1.0.0", pluginVersion: "0.6.1" });
+  assert.deepEqual(aliasedRunnerRecord.staleness, {
+    status: "stale",
+    runnerVersion: "1.0.0",
+    pluginVersion: "0.6.1",
+    invalidatedBy: "runner-metadata-changed-during-probe",
+  });
+  assert.equal(checkCandidateBinding(aliasedRunnerRecord, { ...aliasedRunnerRecord.candidate, runnerVersion: "1.0.0", pluginVersion: "0.6.1" }).qualifies, false);
+
+  const current = await runProbeMatrix({ adapters: matrixAdapters().adapters });
+  assert.deepEqual(current.staleness, { status: "current", runnerVersion: "1.0.0", pluginVersion: "0.6.1", invalidatedBy: null });
 });
 
 test("probe requests bind candidate and runner while artifact digests exclude generated records", () => {
