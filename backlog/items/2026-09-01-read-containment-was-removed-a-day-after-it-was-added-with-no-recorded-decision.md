@@ -3,7 +3,9 @@ schema: pipeline.backlog-item.v1
 id: pipeline.read-containment-removed-with-no-recorded-decision
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-06
+closure_commit: e183632fb154711cac2cb5fbde5a8ae0973863dc
 created: 2026-09-01
 sprint: nova-b
 tracking: "Nova B — the project-root containment check on read-only shell commands was added on 2026-08-29 to close a hole and removed wholesale on 2026-08-30. The removal is deliberate and undocumented outside its own commit message, and it silently invalidates a closed item's recorded remedy."
@@ -143,3 +145,32 @@ it.
 - If containment is restored, the external read roots that motivated its removal
   are admitted explicitly and covered by tests, so the next legitimate need does
   not get met by removing the boundary again.
+
+## Closed, 2026-09-06
+
+All three acceptance criteria satisfied:
+
+1. **Decision recorded**: `docs/adr/draft-read-scope-containment-boundary.md`
+   (numbered only at PO acceptance of its text, per ADR-0069; the underlying
+   technical decision was already made by the PO in this item's own Triage
+   section above) plus a pointer from `guardrails/security.md` SEC-11 (the
+   nearest existing threat-model-scope document — no dedicated Bash-guard
+   threat-model file existed to point from, so this ADR and SEC-11 are that
+   pointer, stated explicitly rather than left implicit).
+2. **`2026-08-29-read-scope-guard-admits-single-command-but-blocks-the-piped-form.md`
+   regains a satisfied predicate**: confirmed via
+   `check-backlog-done-predicate.mjs`, 2026-09-06 — 0 REGRESSION, only the
+   two pre-existing, unrelated STALE-OPEN findings. That item's own
+   "Resolved, 2026-09-06" section records this.
+3. **External read roots admitted explicitly, covered by tests**:
+   `NVA-B-READCONTAIN-2` (commits `e183632f`/`3cbb7d2a`) admits exactly the
+   session transcript file and the session memory directory, both resolved
+   from `input.transcript_path` (never pattern-matched), each with
+   dedicated regression tests including a negative case and a symlink
+   composition. T1 Critic PASS.
+
+Not everything is closed by this — the ADR's own "current scope-gap
+inventory" section lists what remains open (rg-pipe/cat-pipe lexical gaps,
+denial-code accuracy, the transcript-file exact-match hardening) as
+separately tracked, separately scheduled items. This item closes because
+its OWN three criteria are met, not because every read-scope gap is gone.

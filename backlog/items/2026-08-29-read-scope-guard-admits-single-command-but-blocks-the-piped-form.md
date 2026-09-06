@@ -130,3 +130,18 @@ directions without choosing: restore containment with enumerated external read
 roots, or accept the open read lane and record the reasoning in an ADR. Whichever
 is chosen, this item's status and predicate are settled as part of that decision
 — not before, and not by editing this line to make a checker quiet.
+
+## Resolved, 2026-09-06 — restored, not accepted
+
+PO decision: restore. `NVA-B-READCONTAIN-1` (commits `cbc30756`/`bc00a861`/
+`177bf884`, two T1 Critic rounds) restored `isOutsideRootSingleCommandRead`
+and the `pipeline.read-scope-single-command-root-check` marker this item's
+predicate names; `NVA-B-READCONTAIN-2` (commits `e183632f`/`3cbb7d2a`, T1
+Critic PASS) added the two enumerated external read roots (session
+transcript file, session memory directory) the removal's motivating need
+required, instead of reopening the lane. `check-backlog-done-predicate.mjs`
+confirmed 2026-09-06: predicate satisfied, 0 REGRESSION. Full decision
+record: `docs/adr/draft-read-scope-containment-boundary.md`. This item
+stays `closed` (status never changed); the REGRESSION line above is now
+historical — kept rather than deleted, since it was the correct, honest
+signal for the seven days the removal went unrecorded.
