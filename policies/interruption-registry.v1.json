@@ -1,0 +1,16 @@
+{
+  "schema": "pipeline.interruption-registry.v1",
+  "contractPin": { "family": "Interruption receipt + registry", "revision": 1, "digest": "e60c80dd242b9d4dde5fd3b035b4ad56671c10117568f82b31d77d430fe12ff5" },
+  "derivationRevision": "c1-classification-r1",
+  "rules": [
+    { "id": "authority-wait", "sourceKind": "authority-wait", "allFacts": ["declared-authority-wait"], "classification": "external-wait", "category": "authority-wait", "provenance": { "sourceId": "issue-103", "section": "classification-3" } },
+    { "id": "deliberate-stop", "sourceKind": "terminal-decision", "allFacts": ["deliberately-stopped"], "classification": "terminal-blocker", "category": "terminal-stop", "provenance": { "sourceId": "issue-103", "section": "classification-4" } },
+    { "id": "dispatch-truncation", "sourceKind": "dispatch-observer", "allFacts": ["dispatch-ended", "next-step-prevented", "report-missing"], "classification": "unplanned-interrupt", "category": "dispatch-truncation", "provenance": { "sourceId": "alfred-issue-intake-103", "section": "dispatch-truncation-2026-08-08" } },
+    { "id": "expected-gate", "sourceKind": "lifecycle-boundary", "allFacts": ["expected-boundary"], "classification": "planned-gate", "category": "lifecycle-gate", "provenance": { "sourceId": "issue-103", "section": "classification-1" } },
+    { "id": "non-recoverable", "sourceKind": "terminal-decision", "allFacts": ["non-recoverable"], "classification": "terminal-blocker", "category": "terminal-stop", "provenance": { "sourceId": "issue-103", "section": "classification-4" } },
+    { "id": "prevented-step", "sourceKind": "workflow-observer", "allFacts": ["next-step-prevented"], "classification": "unplanned-interrupt", "category": "workflow-interruption", "provenance": { "sourceId": "issue-103", "section": "classification-2" } },
+    { "id": "read-only-refusal", "sourceKind": "guard-observation", "allFacts": ["next-step-prevented", "read-only-command"], "classification": "unplanned-interrupt", "category": "read-only-refusal", "provenance": { "sourceId": "alfred-issue-intake-103", "section": "read-only-refusal-2026-08-27" } },
+    { "id": "readiness-partial", "sourceKind": "readiness-observer", "allFacts": ["next-step-prevented", "readiness-partial", "writer-observer-disagreement"], "classification": "unplanned-interrupt", "category": "readiness-partial-deadlock", "provenance": { "sourceId": "alfred-issue-intake-103", "section": "readiness-partial-2026-08-27" } },
+    { "id": "tp-wait", "sourceKind": "authority-wait", "allFacts": ["declared-authority-wait", "tp-ceremony"], "classification": "external-wait", "category": "tp-ceremony-wait", "provenance": { "sourceId": "alfred-issue-intake-103", "section": "tp-ceremony-2026-08-18" } }
+  ]
+}
