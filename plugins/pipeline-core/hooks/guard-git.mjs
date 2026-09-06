@@ -1261,16 +1261,64 @@ if (inspection.message !== null) {
       }
 
       if (debtPaths.length > 0) {
-        const stagedRun = run(["diff", "--cached", "--name-only"]);
-        if (stagedRun.error) throw stagedRun.error;
-        const stagedPaths = stagedRun.status === 0
-          ? String(stagedRun.stdout ?? "").split("\n").map((line) => line.trim()).filter(Boolean)
-          : [];
+        // Scope the check to the paths THIS COMMIT actually names, not the shared index
+        // (marker: pipeline.gg-22-scopes-debt-check-to-the-commit-pathspec;
+        // backlog/items/2026-09-03-gg-22-reads-the-shared-index-so-a-concurrent-dispatch-blocks-an-unrelated-ledger-commit.md).
+        // Under concurrent dispatch the index holds every agent's staged work, not just
+        // this commit's own content -- reading `git diff --cached` unconditionally made an
+        // unrelated agent's staged files block a correct, narrowly-pathspec'd ledger commit,
+        // and each side's remediation was the other side's forbidden action (a genuine
+        // deadlock, not a delay).
+        //
+        // `tokenizeArgv` is the SAME tokenizer already imported and used by
+        // commitMessageFindings (above, GIT-03/GIT-01) to confirm this command is a git
+        // commit -- reused here, not re-derived. This block does not re-answer "is this a
+        // commit" (already known: we are inside `inspection.message !== null`); it only
+        // asks a NEW question that block never needed: did the commit name an explicit
+        // pathspec? Per this repository's own commit discipline (agent-obligations.md
+        // §6: `git commit -F <msgfile> -- <paths>`), a pathspec always follows a literal
+        // `--` token. A `-m`/`--message`/`-F`/`--file` flag consumes the token immediately
+        // after it as its VALUE, so a `--` occurring there is message content, not a
+        // separator, and is skipped when locating the real one.
+        const commitTokens = tokenizeArgv(cmd);
+        const PATHSPEC_VALUE_CONSUMING_FLAGS = new Set(["-m", "--message", "-F", "--file"]);
+        let separatorIndex = -1;
+        for (let idx = 0; idx < commitTokens.length; idx += 1) {
+          if (commitTokens[idx] !== "--") continue;
+          if (idx > 0 && PATHSPEC_VALUE_CONSUMING_FLAGS.has(commitTokens[idx - 1])) continue;
+          separatorIndex = idx;
+          break;
+        }
+        // Strip a leading "./" only (never resolve "../") so `-- ./backlog/STATUS.md`
+        // compares equal to the repo-relative form the ledger/backlog-items checks below
+        // expect -- without it, a harmless "./" prefix would false-block a legitimate
+        // pathspec'd commit the old, staged-index-only code never had to worry about.
+        const explicitPathspec = separatorIndex === -1
+          ? null
+          : commitTokens.slice(separatorIndex + 1)
+              .map((token) => token.trim())
+              .filter(Boolean)
+              .map((token) => (token.startsWith("./") ? token.slice(2) : token));
+
+        // A bare `git commit` (no pathspec, or a trailing `--` naming none) commits
+        // whatever is staged -- the staged index genuinely IS this commit's content, so
+        // `git diff --cached` remains the right question for that case, unchanged from
+        // before this fix.
+        let commitPaths;
+        if (explicitPathspec !== null && explicitPathspec.length > 0) {
+          commitPaths = explicitPathspec;
+        } else {
+          const stagedRun = run(["diff", "--cached", "--name-only"]);
+          if (stagedRun.error) throw stagedRun.error;
+          commitPaths = stagedRun.status === 0
+            ? String(stagedRun.stdout ?? "").split("\n").map((line) => line.trim()).filter(Boolean)
+            : [];
+        }
         const LEDGER_PATHS = new Set(["backlog/transitions.ndjson", "backlog/STATUS.md", "backlog/index.json"]);
         // Allowed set = every backlog/items/*.md path (any item, not just debtPaths -- batched
         // multi-item closures across several commits before one shared reconciliation commit
         // are an established, legitimate pattern) UNION the ledger files themselves.
-        const disallowed = stagedPaths.filter((path) => !path.startsWith("backlog/items/") && !LEDGER_PATHS.has(path));
+        const disallowed = commitPaths.filter((path) => !path.startsWith("backlog/items/") && !LEDGER_PATHS.has(path));
         if (disallowed.length > 0) {
           // Remediation order (marker: pipeline.gg-22-remediation-order-is-reconcile-last;
           // backlog/items/2026-08-29-gg-22s-own-remediation-order-creates-unclearable-ledger-debt.md):
