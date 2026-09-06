@@ -1413,6 +1413,8 @@ await checkAsync("codex-critic-app-server consumer never collapses a completed-b
     criticAnswered({ answer: "not json" }),
     criticAnswered({ answer: JSON.stringify(["not", "an", "object"]) }),
     criticAnswered({ answer: JSON.stringify({ ...validCriticVerdict(), pass: "yes" }) }),
+    (() => { const r = criticAnswered(); delete r.observed.exitCode; return r; })(),
+    (() => { const r = criticAnswered(); delete r.observed; return r; })(),
   ];
   for (const result of cases) {
     const actual = await invokeCodexCriticAppServer(criticPayload(), {
@@ -1513,6 +1515,32 @@ await checkAsync("runSelectedCriticHost composes the real in-process bridge and 
   assert.equal(result.receipt.status, "reviewed");
   assert.equal(result.execution.dutyReceipt.schema, "pipeline.critic-receipt.v1");
   assert.equal(result.sandboxBinding.selectionId, selection.selectionId);
+});
+
+await checkAsync("selectedCriticInProcessBridge.finalize refuses when the selection or requested route drifted after a successful launch", async () => {
+  const input = {
+    sandboxRuntime: { repoRoot: DEFAULT_PIPELINE_ROOT }, referencePaths: ["roles/critic.md"],
+    dispatch: { candidateCommit: "c".repeat(40), candidateTree: "d".repeat(40), referenceSetSha256: "e".repeat(64) },
+    reviewBase: "9".repeat(40),
+  };
+  const selection = criticSelectionFixture(input);
+  const built = selectedCriticInProcessBridge(input, {
+    invokeAppServer: (payload) => invokeCodexCriticAppServer(payload, {
+      buildSandboxInvocationFn: () => ({ command: "/codex", argv: ["sandbox"], options: { shell: false } }),
+      spawnFn: fakeCriticSpawn(criticAnswered()),
+    }),
+  });
+  const scratch = { path: "/tmp/critic-scratch", sha256: selection.profile.scratchRootSha256, sandboxStateJson: "{}", sandboxStateSha256: "8".repeat(64), repoRoot: input.sandboxRuntime.repoRoot, codexPath: "/codex" };
+  const requested = { runner: "codex", model: "gpt-5.6-sol" };
+  const launched = await built.bridge.launch({
+    selectionId: selection.selectionId, duty: "critic", selection, requested, references: input.referencePaths, profile: selection.profile, scratch,
+  });
+  assert.equal(launched.childStarted, true);
+  const driftedSelection = { ...selection, dispatch: { ...selection.dispatch, queueRevision: selection.dispatch.queueRevision + 1 } };
+  await assert.rejects(built.bridge.finalize({ selection: driftedSelection, launched, requested }), /drifted/);
+  await assert.rejects(built.bridge.finalize({ selection, launched, requested: { runner: "codex", model: "gpt-5.6-terra" } }), /drifted/);
+  const execution = await built.bridge.finalize({ selection, launched, requested });
+  assert.equal(execution.dutyReceipt.status, "reviewed");
 });
 
 await checkAsync("runSelectedCriticHost reports selected-sandbox-required when no selection/child is available", async () => {
