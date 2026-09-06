@@ -214,11 +214,8 @@ its own PO Ed25519 signature ceremony (ADR-0059) because a single Edit call
 covers only one contiguous region.
 
 - **Blocks A, B, C all landed** (`61dc7fc5`, `d30273d3`) — imports,
-  `evidencePath`/`writeEvidence`/`runId`, and wiring `runId` into the
-  `runVerifyJournal` call site. Each ceremony's request/plan hashes are in
-  its own commit message. Block C's first request expired unsigned after 8
-  windows on 2026-09-04; the re-seeded request landed the moment the PO
-  could sign immediately, per the seeding rule (CLAUDE.md).
+  `evidencePath`/`writeEvidence`/`runId`, and wiring `runId` into
+  `runVerifyJournal`. Request/plan hashes are in each commit message.
 - **Block D is drafted, not yet seeded.** Extends the final log line:
   ```js
   // old:
@@ -247,12 +244,10 @@ covers only one contiguous region.
     { name: "dispatch-record-strip-for-critic-tests", file: join(libDir, "dispatch-record-strip-for-critic.test.mjs") },
   ];
   ```
-  `NVA-B-CRITICINPUT-1/2` (commits `a5e264a8`, `fa8362a2`, `00036dcf`,
-  `d2fb4495`, `4e204dae`) is one correction commit into its one allowed
-  rework round (`harness/review-protocol.md`) — F1/F3/F4 fixed and
-  re-verified; F2 needs this registration landed before the remaining
-  fresh re-Critic round runs. Neutral findings registry for that round:
-  `backlog/evidence/2026-09-04-nva-b-criticinput-findings.md`.
+  `NVA-B-CRITICINPUT-1/2` (`a5e264a8`..`4e204dae`) is one correction commit
+  into its one allowed rework round — F1/F3/F4 fixed and re-verified; F2
+  needs this registration landed before the last, fresh re-Critic round runs.
+  Registry: `backlog/evidence/2026-09-04-nva-b-criticinput-findings.md`.
 
 Tree is clean at `4e204dae` (or later — check `git rev-parse HEAD`) with no
 outstanding ceremony. After C/D/E land:
@@ -332,17 +327,25 @@ commits (`cbc30756`, `bc00a861`, `177bf884`).** A same-shaped
 this repo can't inspect); filed separately:
 `2026-09-06-the-write-lane-symlink-containment-check-may-share-the-read-lanes-dotdot-bypass.md`.
 
-`NVA-B-READCONTAIN-2` (not yet dispatched) adds two new session-derived
-exception roots
-(transcript-adjacent tree, task-output tree — both resolved from the
-PreToolUse hook's `transcript_path` field the way
-`claudeSessionMemoryDirectory`/MEMPATH-1 already does for the write side,
-never pattern-matched) on top of the now-restored floor; it also needs its
-own T1 Critic round. After both land, author the ADR the backlog item's
-acceptance criteria require (recording both the restored boundary and the
-grep/cat/git-pipe scope gap above) and close both
-`2026-09-01-read-containment-was-removed-a-day-after-it-was-added-with-no-recorded-decision.md`
-and the 2026-08-29 item.
+Triaging -1's closure found three more gaps, each its own item, 2026-09-06: a
+leading-`~` argument is live-CONFIRMED admitted (literal-string mismatch, no
+tilde-expansion anywhere) in every read lane incl. the `rg`-pipe family
+(`2026-09-06-a-leading-tilde-path-argument-is-admitted-as-inside-the-project-root.md`,
+`NVA-B-TILDEFIX-1`, **dispatched, in flight**, before -2 since -2 builds on
+this floor); `rg`-to-`rg`/`rg`-to-`head`'s `approvedReadPath` stays fully
+lexical, weaker even than -1's round-1 fix
+(`...the-rg-pipe-family-stays-lexical-and-symlink-unaware-after-readcontain-1.md`,
+after -2); F3's denial-code gap has its own item too
+(`...suppressed-and-chained-outside-root-reads-land-on-the-wrong-denial-code.md`).
+
+`NVA-B-READCONTAIN-2` (waits on TILDEFIX-1) adds exactly two exception roots
+from the PreToolUse hook's own `transcript_path`: the transcript file itself,
+and `dirname(transcript_path)/memory/` via `claudeSessionMemoryDirectory`/
+MEMPATH-1 — NOT the `/tmp` task-output dir (would guess Claude Code's
+tmp-layout rather than reuse a resolved value; that need routes via Read/
+signature ceremony, an accepted ADR scope limit, not solved here). Own fresh
+T1 Critic round. Then: author the ADR (boundary, all three gaps, this limit)
+and close both the 2026-09-01 and 2026-08-29 items.
 
 ## PO decisions and todos — collected during the autonomous run, not waited on
 
