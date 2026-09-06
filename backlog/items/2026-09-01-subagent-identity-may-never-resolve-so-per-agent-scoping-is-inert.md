@@ -140,3 +140,40 @@ that runs, rather than the guard in the tree, is what made this evidence hold.
 **No fix.** The stop condition applied: the remedy needs harness instrumentation
 or an attended operator, which is a design decision rather than a small
 correction. Nothing was changed.
+
+## Confirmed 2026-09-06 — the question is settled, and the remedy is smaller than assumed
+
+Live payload capture, run against two dispatched goldfish agents through a
+temporary user-level `PreToolUse` hook, closes both readings this item left
+open. Record:
+`backlog/evidence/2026-09-06-dispatch-budget-guard-discriminator-measured.md`.
+
+`subagentIdentity()` resolves `kind: "orchestrator"` for a real dispatched
+subagent — not through a fixture gap, and not through an unresolved or invalid
+identity. It resolves that way because the fact it consumes does not exist:
+**no `PreToolUse` payload carries a `subagents/agent-<id>.jsonl` transcript
+path.** A subagent's payload carries the PARENT session's `transcript_path` and
+`session_id`, exactly like the orchestrator's. The by-elimination conclusion
+recorded above was correct, and the mechanism behind it is now measured rather
+than inferred.
+
+What actually discriminates the two callers is the payload's key set: a
+subagent's payload carries `agent_id` and `agent_type`, an orchestrator's does
+not.
+
+**Fixed for the budget guard, still open here.** `NVA-B-BUDGETGUARD-2`
+(`b1ecbef2`, `6372b984`) added `dispatchBudgetCallerIdentity()`, which keys on
+`agent_id`, and deliberately left the exported `subagentIdentity()` untouched
+because this file's consumer was outside that dispatch's scope. Proof that the
+budget guard now counts: `evidence/NVA-B-BUDGETGUARD-2-probe.txt` — the
+subagent payload moves the counter from 1 to 2, the orchestrator payload leaves
+it at 2 and lands in `orchestrator-seen/` instead.
+
+`guard-lifecycle-ready.mjs` still imports `subagentIdentity` (line 85) and uses
+it at three sites (around lines 4314, 4366 and 4474), so the per-agent
+denial-trim scoping this item is about remains inert. The remedy is now a small
+correction rather than the design decision the stop condition assumed: key those
+three sites on the measured discriminator. The AC-4 regression test's own
+weakness stands as recorded — it manufactures the transcript shape it needs, so
+it will keep passing either way and has to be replaced by fixtures carrying the
+two real key sets.
