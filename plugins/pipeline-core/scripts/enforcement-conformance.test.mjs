@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: SUL-1.0
 import test from "node:test";
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { ARTIFACT_PATHS, runEvidenceCli } from "./enforcement-conformance-cli.mjs";
 
 import {
   ENFORCEMENT_LAYERS,
@@ -432,4 +437,175 @@ test("sanitizes known credential, coordinate, path, transcript, and control shap
   assert.deepEqual(sanitizeValue(safe), safe);
   const redactedRecord = sanitizeRecord(validRecord({ sanitization: { redactions: ["credential", "path"] } }));
   assert.equal(validateRecord(redactedRecord), true);
+});
+
+const sourceRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
+const cliPath = join(sourceRoot, "plugins/pipeline-core/scripts/enforcement-conformance-cli.mjs");
+function cliFixture(t) {
+  const scratch = join(sourceRoot, "scratch");
+  mkdirSync(scratch, { recursive: true });
+  const root = mkdtempSync(join(scratch, "a1-evidence-cli-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  for (const path of ARTIFACT_PATHS) {
+    mkdirSync(dirname(join(root, path)), { recursive: true });
+    writeFileSync(join(root, path), readFileSync(join(sourceRoot, path)));
+  }
+  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")));
+  const git = (...args) => {
+    const result = spawnSync("git", ["-C", root, ...args], { encoding: "utf8", env, timeout: 10000 });
+    assert.equal(result.status, 0, "fixture Git command must complete");
+    return result.stdout.trim();
+  };
+  git("init", "--quiet");
+  mkdirSync(join(root, "empty-hooks"));
+  git("config", "core.hooksPath", join(root, "empty-hooks"));
+  git("config", "user.name", "Evidence Fixture");
+  git("config", "user.email", "fixture@example.invalid");
+  git("config", "commit.gpgsign", "false");
+  git("add", "--", ...ARTIFACT_PATHS);
+  git("commit", "--quiet", "-m", "fixture source");
+  const base = ["--root", root, "--runner", "codex", "--runner-version", "1.2.3"];
+  const run = (operation = "emit", extra = [], chosenBase = base) => {
+    const result = spawnSync(process.execPath, [cliPath, operation, ...chosenBase, ...extra], {
+      cwd: sourceRoot, encoding: "utf8", timeout: 15000,
+    });
+    assert.equal(result.stderr, "", "CLI errors must stay in sanitized JSON");
+    assert.ok(result.stdout.length < 16384, "bounded CLI output");
+    assert.equal(result.stdout.includes(root), false, "source root must be omitted");
+    return { status: result.status, output: JSON.parse(result.stdout) };
+  };
+  const recordPath = join(root, "record.json");
+  const save = (record) => writeFileSync(recordPath, JSON.stringify(record));
+  return { root, git, run, base, save, recordPath };
+}
+
+test("offline CLI emits actual candidate unavailable evidence and reads raw or captured records", (t) => {
+  const f = cliFixture(t);
+  const emitted = f.run();
+  assert.equal(emitted.status, 0);
+  const record = emitted.output;
+  assert.equal(validateRecord(record), true);
+  assert.equal(record.candidate.commit, f.git("rev-parse", "HEAD"));
+  assert.equal(record.candidate.tree, f.git("rev-parse", "HEAD^{tree}"));
+  assert.equal(record.candidate.artifactSha256, digestArtifactPreimage(ARTIFACT_PATHS.map((path) => ({ path, bytes: readFileSync(join(f.root, path), "utf8") }))));
+  assert.equal(record.runner.pluginVersion, JSON.parse(readFileSync(join(f.root, ARTIFACT_PATHS[2]), "utf8")).version);
+  assert.deepEqual(record.measurement, { status: "unavailable", values: [] });
+  assert.equal(record.evaluator.outcome, "unavailable");
+  assert.equal(record.observations.every((item) => item.evidenceKind === "unavailable" && item.hookObservation === "unknown" && item.exitCode === null), true);
+  f.save(record);
+  for (const root of [f.root, relative(sourceRoot, f.root)]) {
+    const result = f.run("check", ["--record", f.recordPath], ["--root", root, ...f.base.slice(2)]);
+    assert.equal(result.status, 0);
+    assert.deepEqual(result.output.binding, { matches: true, reason: null });
+    assert.deepEqual(result.output.qualification, { qualifies: false, reason: "evaluator-outcome-not-pass" });
+    assert.equal(result.output.nativeMeasurementVerified, false);
+  }
+  writeFileSync(f.recordPath, `command: node evidence-command\nlabel: fixture\nexitCode: 0\n--- stdout ---\n${JSON.stringify(record)}\n\n--- stderr ---\n`);
+  assert.equal(f.run("check", ["--record", f.recordPath]).status, 0);
+  const relativeEmit = f.run("emit", [], ["--root", relative(sourceRoot, f.root), ...f.base.slice(2)]);
+  assert.equal(relativeEmit.status, 0);
+  assert.deepEqual(relativeEmit.output.candidate, record.candidate);
+});
+
+test("offline readback rejects every candidate field, stale records and runner/plugin drift before qualification", (t) => {
+  const f = cliFixture(t);
+  const record = f.run().output;
+  for (const key of ["commit", "tree", "artifactSha256"]) {
+    const changed = structuredClone(record);
+    changed.candidate[key] = "c".repeat(key === "artifactSha256" ? 64 : 40);
+    f.save(changed);
+    const result = f.run("check", ["--record", f.recordPath]);
+    assert.equal(result.status, 5);
+    assert.equal(result.output.binding.reason, `candidate.${key}-mismatch`);
+    assert.equal(result.output.qualification.qualifies, false);
+  }
+  for (const key of ["version", "pluginVersion"]) {
+    const changed = structuredClone(record);
+    changed.runner[key] = "9.9.9";
+    changed.staleness[key === "version" ? "runnerVersion" : key] = "9.9.9";
+    f.save(changed);
+    assert.equal(f.run("check", ["--record", f.recordPath]).status, 5);
+  }
+  f.save({ ...record, staleness: { ...record.staleness, status: "stale", invalidatedBy: "version-change" } });
+  assert.equal(f.run("check", ["--record", f.recordPath]).output.binding.reason, "stale-record");
+  f.save(record);
+  f.git("commit", "--quiet", "--allow-empty", "-m", "new candidate");
+  assert.equal(f.run("check", ["--record", f.recordPath]).output.binding.reason, "candidate.commit-mismatch");
+});
+
+test("offline CLI rejects dirty/staged source and different executing code but tolerates unrelated dirt", (t) => {
+  const f = cliFixture(t);
+  writeFileSync(join(f.root, "unrelated.txt"), "unrelated working file");
+  assert.equal(f.run().status, 0);
+  const corePath = join(f.root, ARTIFACT_PATHS[0]);
+  const original = readFileSync(corePath);
+  writeFileSync(corePath, Buffer.concat([original, Buffer.from("\n// fixture change\n")]));
+  assert.equal(f.run().output.error, "dirty-implementation-source");
+  f.git("add", "--", ARTIFACT_PATHS[0]);
+  writeFileSync(corePath, original);
+  assert.equal(f.run().output.error, "dirty-implementation-source");
+  writeFileSync(corePath, Buffer.concat([original, Buffer.from("\n// fixture change\n")]));
+  f.git("commit", "--quiet", "-m", "different implementation");
+  assert.equal(f.run().output.error, "executing-source-mismatch");
+});
+
+test("offline CLI fails closed for missing metadata, malformed records, missing version and privacy errors", (t) => {
+  const f = cliFixture(t);
+  for (const raw of ["{", "{}", JSON.stringify({ ...f.run().output, unexpected: true })]) {
+    writeFileSync(f.recordPath, raw);
+    assert.equal(f.run("check", ["--record", f.recordPath]).status, 4);
+  }
+  assert.equal(f.run("emit", [], f.base.slice(0, 4)).status, 2);
+  const hostile = ["/" + "home/example/private", "C:" + "\\Users\\example\\private", "https:" + "//example.invalid/private", "token=" + "sentinel", "session-id=" + "sentinel"];
+  for (const value of hostile) {
+    const result = f.run("emit", [], [...f.base.slice(0, 5), value]);
+    assert.equal(result.status, 2);
+    assert.equal(JSON.stringify(result.output).includes(value), false);
+    const record = f.run().output;
+    record.evaluator.basis = value;
+    f.save(record);
+    const readback = f.run("check", ["--record", f.recordPath]);
+    assert.equal(JSON.stringify(readback.output).includes(value), false);
+  }
+  const absent = join(f.root, "absent");
+  assert.equal(f.run("emit", [], ["--root", absent, ...f.base.slice(2)]).status, 3);
+  f.git("config", "core.fsmonitor", "sentinel-do-not-execute");
+  assert.equal(f.run().status, 0);
+  rmSync(join(f.root, ".git"), { recursive: true, force: true });
+  assert.equal(f.run().status, 3);
+});
+
+test("offline API detects a source mutation during the asynchronous matrix operation", async (t) => {
+  const f = cliFixture(t);
+  const pending = runEvidenceCli(["emit", ...f.base]);
+  queueMicrotask(() => writeFileSync(join(f.root, ARTIFACT_PATHS[2]), '{"version":"9.9.9"}\n'));
+  const result = await pending;
+  assert.equal(result.exitCode, 3);
+  assert.equal(result.output.error, "dirty-implementation-source");
+});
+
+test("offline readback cannot qualify hand-authored native pass claims", (t) => {
+  const f = cliFixture(t);
+  const record = f.run().output;
+  record.evaluator = { outcome: "pass", basis: "claimed deterministic refusal", acceptanceSha256: null };
+  record.measurement = { status: "measured", values: [] };
+  record.observations = record.observations.map((item) => ({ ...item, hookObservation: "fires", evidenceKind: "deterministic-execution", exitCode: 2, markerSha256: sha }));
+  f.save(record);
+  const result = f.run("check", ["--record", f.recordPath]);
+  assert.equal(result.status, 0);
+  assert.equal(result.output.binding.matches, true);
+  assert.deepEqual(result.output.qualification, { qualifies: false, reason: "native-measurement-not-verified" });
+});
+
+test("offline CLI reads changed committed plugin versions and sanitizes missing startup source", (t) => {
+  const f = cliFixture(t);
+  writeFileSync(join(f.root, ARTIFACT_PATHS[2]), '{"version":"7.8.9"}\n');
+  f.git("add", "--", ARTIFACT_PATHS[2]);
+  f.git("commit", "--quiet", "-m", "fixture plugin version");
+  assert.equal(f.run().output.runner.pluginVersion, "7.8.9");
+  rmSync(join(f.root, ARTIFACT_PATHS[0]));
+  const result = spawnSync(process.execPath, [join(f.root, ARTIFACT_PATHS[1]), "emit", ...f.base], { encoding: "utf8", timeout: 15000 });
+  assert.equal(result.status, 3);
+  assert.equal(result.stderr, "");
+  assert.deepEqual(JSON.parse(result.stdout), { schema: "pipeline.enforcement-conformance-cli-error.v1", error: "executing-source-unavailable" });
 });
