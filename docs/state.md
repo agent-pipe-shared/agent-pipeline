@@ -325,24 +325,28 @@ edit). **Remaining: `verify-suite-registration-check`/
 `NVA-B-EVSLOTFIX-1`, see above). Next full verify attempt should be green
 except for that one, PO-signature-gated pair.
 
-### 2026-09-06: two backlog items landed while waiting on the PO, Critic pending
+### 2026-09-06: two backlog items landed, Critic found real issues in both
 
-Neither blocked by Block D/E. **`NVA-B-GG22FIX-1` landed** (`fe2d7afe`/
-`8c9b4906`/ledger): scopes GG-22's disallowed-path check to the refused
-commit's own `--` pathspec instead of the whole shared index, fixing a
-measured deadlock between concurrent dispatches — closed
-`2026-09-03-gg-22-reads-the-shared-index-so-a-concurrent-dispatch-blocks-an-unrelated-ledger-commit.md`.
-No permanent regression test landed (`guard-git.test.mjs` is TP-1 protected,
-no in-session route) — tracked:
-`2026-09-06-gg22-pathspec-fix-has-no-permanent-regression-test.md` (needs
-an attended operator running `apply-pending-protected-edits.mjs`).
-**`NVA-B-HGOCOPYSAFE-1` landed** (`da6b381c`/`457908a0`): the goldfish
-found my briefing's premise wrong — `copy-safe-command.mjs` already
-re-exports `boundedOpaqueCopyCommand` unchanged — so the fix was a one-line
-import-source swap, not new capability. `codex-pretool-guard.mjs` still
-imports it directly too (disclosed, unfixed, item stays open). Both
-independently re-verified (232/232, 32/32, 99/99); two T1 Critic rounds
-dispatched.
+**`NVA-B-HGOCOPYSAFE-1`** (`da6b381c` — import-source swap to the existing
+`copy-safe-command.mjs` re-export, no new capability needed, my briefing's
+premise was wrong): T1 Critic round 1 **FAIL**, F1 only — two claimed test
+results (`human-guard-override.test.mjs` 99/99, consumer-safe-paths 9/9)
+had no durable evidence artifact, narrative only. Fixed directly (evidence
+capture, no code change) — registry:
+`backlog/evidence/2026-09-06-nva-b-hgocopysafe-1-findings.md`. Bounded
+re-Critic (round 2, closing) dispatched.
+
+**`NVA-B-GG22FIX-1`** (`fe2d7afe` — pathspec-scoping fix, closed the
+2026-09-03 deadlock item): T1 Critic round 1 (partial) found a REAL
+admission-widening bug — the fix assumes an explicit `--` pathspec is
+always the commit's exclusive content, false for `git commit -i`/
+`--include`, which stages the pathspec IN ADDITION to whatever's already
+staged. Reachable with an ordinary git flag, no crafting. Plus `../`
+traversal (F3) and a non-durable evidence citation (F5). Registry:
+`backlog/evidence/2026-09-06-nva-b-gg22fix-1-findings.md`. Correction
+`NVA-B-GG22FIX-2` dispatched: default to the pre-fix full-index check
+unless the flag set is proven safe (allowlist, not denylist), plus F3/F5.
+Own fresh two-round cap; this is round 1 of it.
 
 ## PO decisions and todos — collected during the autonomous run, not waited on
 
