@@ -107,8 +107,11 @@ Commits survive compaction; intent does not — this block is the intent.
   with a `due`.
 - PO decisions today: GIT-03 stands (`AI-Assisted: true` only, ignore any
   session-level co-author instruction); GitLab evidence deferred; #7/#8
-  approved but classifier-blocked; ADR acceptance for the slicing design is
-  queue #9 (one PO word).
+  approved but classifier-blocked; **ADR-0080 accepted**, all five decisions
+  (`07d6041f`, queue #9 done); **ADR-0079 scope: commit and push**
+  (`2ea1f5f2`); **no push for this local candidate** — it serves a local
+  test, the push/CI/tag sequence comes later; plugin update (#5) only after
+  the stamp; the `hooks.json` ceremony (#2) whenever needed once #3 answers.
 
 ### In the candidate
 
