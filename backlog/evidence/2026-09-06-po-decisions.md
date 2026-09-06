@@ -27,8 +27,22 @@ durable trace of that run, and the deferral does not change that.
 One live execution of `local-worker-supervisor.mjs` with
 `allowProviderExecution: true` at one call site, against a real Codex worker.
 
-`codex-cli 0.153.4` is reachable at `~/.local/bin/codex`, so the probe is
-runnable.
+`codex-cli 0.153.4` is reachable at `~/.local/bin/codex`.
+
+**Attempted 2026-09-06 and BLOCKED — the approval was not enough.** The
+runner's auto-mode permission classifier denied the `codex … exec … --sandbox
+danger-full-access` spawn pre-execution, while permitting `codex --version`
+and `codex exec --help`. The dispatch stopped instead of reshaping the call.
+
+The approval stands; what it cannot grant is the runner-level permission. To
+actually run it the PO must either add a Bash permission rule for that exact
+invocation, or run the probe from a session outside this classifier's scope.
+Nothing in this repository needs to change.
+
+Established anyway, and new: `planLocalWorkerSupervisor` returns
+`LWS-PLAN-READY` for a real `codex-exec` request. That path had never been
+built before. Detail:
+`backlog/evidence/2026-09-06-lws-live-probe-blocked.md`.
 
 ## #8 — Real end-to-end Codex Critic review run: APPROVED
 
