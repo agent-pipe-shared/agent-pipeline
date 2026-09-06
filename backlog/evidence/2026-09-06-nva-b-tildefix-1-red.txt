@@ -1,0 +1,334 @@
+command: node --test plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+label: NVA-B-TILDEFIX-1-red
+exitCode: 1
+--- stdout ---
+✔ ordinary non-governed repositories remain untouched and never inspect lifecycle (12.397602ms)
+✔ ungoverned write tools require one session consent record, while Bash and missing sessions fail open (6.568218ms)
+✔ source, calibration, lock, and runtime-only markers activate exact session readiness (51.943959ms)
+✔ governanceMarkers() fails open to the fixed base markers, with an explicit warning, when the runtime-projection loader throws (0.741988ms)
+✔ governanceMarkers() returns the real runtime-projection-derived markers, with no warning, when the loader succeeds (0.851286ms)
+✔ evaluateLifecycleReadyGuard threads its own dependencies into governanceMarkers() and stays fail-open, not fail-closed, on a throwing loader (7.104285ms)
+✔ evaluateLifecycleReadyGuard stays admit-open on a throwing loader when no governance marker at all is present (0.84823ms)
+✔ exact session readiness allows the governed project write and threads the caller-supplied runner explicitly (10.026452ms)
+✔ direct State edits remain blocked even when session readiness is exact (18.061805ms)
+✔ writes to the currently bound PRD, Spec, or design input are blocked even when session readiness is exact, and name the rebind route (18.588563ms)
+✔ Write and NotebookEdit are refused for a bound authority document exactly like Edit (15.342044ms)
+✔ a reopened design (planInvalidation recorded) releases the authority-document write refusal (17.21108ms)
+✔ a file beside the bound documents is not blocked by the authority-document refusal (6.613934ms)
+✔ an absent, malformed, or authority-less Pipeline State is not treated as a bound authority document (17.458078ms)
+✔ governed consumer edits cannot escape their physical project root (89.16434ms)
+✔ a host-temp-style scratchpad path is refused exactly like any other cross-repo target, and ADR-0059 documents that consequence (43.91563ms)
+✔ consumer sessions cannot mutate Pipeline sources, cachebusters or plugin installations (270.461803ms)
+✔ agents prepare and verify only public PO artifacts while human signing stays external (7.647677ms)
+✔ newly-recognized human-signing commands (approve-critical, authorize-critical, sign-intent) stay external (1.642468ms)
+✔ po-approval-gate --help and --version are read-only, never a forbidden cross-repository mutation (3.866099ms)
+✔ cachebuster is source-root scoped while plugin installation remains operator-only (0.912442ms)
+✔ confirmed host-init admission or exact existing protected Git mount handles only repository cross-view failures (62.400101ms)
+✔ host-init admission never masks App Server, runtime, continuity, or malformed readiness failures (72.050125ms)
+✔ exact session readiness allows an arbitrary Bash command while non-ready Bash writes are denied (3.287169ms)
+✔ non-ready governed roots retain a narrow simple-command read-only diagnostic lane (90.76772ms)
+✔ non-ready write denials surface only the typed lifecycle status and recovery route (182.789669ms)
+✔ NVA-W4-READYGUARDTEST: the recovery inspection named by a non-ready denial is admitted at every controlling status (37.541332ms)
+✔ PORG-INVALID-OBSERVATION is named as an invalid observation, distinct from both a typed not-ready status and the generic unresolved-cause denial (13.522618ms)
+✔ closed command grammar preserves native Windows paths and direct node.exe identity (0.794047ms)
+✔ Claude/Bash-path command parsing ignores a win32 host: $PWD expands and POSIX grammar governs (21.399612ms)
+✔ NVA-R15-ROOTADMIT: a --root value that does not resolve at all stays refused, and carries no root-identity-mismatch hint (3.353606ms)
+✔ NVA-R15-ROOTADMIT: a --root value that resolves to a DIFFERENT real directory stays refused, and the denial names it a root-identity mismatch, not an unadmitted shape (2.656593ms)
+✔ NVA-R15-ROOTADMIT: a symlinked parent resolving to the exact same project root is admitted regardless of which spelling was typed (0.676835ms)
+✔ NVA-R15-ROOTADMIT: differing separator and differing drive-letter case admit the same logical Windows root (0.488377ms)
+✔ only bounded rg search pipelines and platform null redirect are read-only (3.777827ms)
+✔ bounded rg pipeline admits self-inspection reads of the plugin's own installed root (1.966924ms)
+✔ bounded rg-to-head pipeline accepts both head -n N and combined head -N (0.495351ms)
+✔ NVA-CATPIPE-1: cat-sourced bounded pipeline -- single-path grep and head sinks are admitted, the exact live GUARD-OPERATOR-UNAPPROVED refusal (1.615036ms)
+✔ NVA-CATPIPE-1: a multi-path cat source piped into grep -E is admitted -- the exact live multi-file refusal shape (1.578657ms)
+✔ NVA-CATPIPE-1: a cat pipeline naming a gate-strength file is classified as a read, never GUARD-GATE-STRENGTH-SHELL (4.646761ms)
+✔ NVA-CATPIPE-1: exactness -- outside-root path, a third segment, a non-grep/head sink, an out-of-range head count, and a non-null-device redirect all stay refused (1.437178ms)
+✔ NVA-CATPIPE-1: a recognised display-only cat flag is admitted, an unrecognised flag fails closed (1.001531ms)
+✔ NVA-CF-GITPIPEALLOWLIST: git-sourced bounded pipeline into head is admitted, both head forms (1.684698ms)
+✔ NVA-CF-GITPIPEALLOWLIST: exactness -- out-of-range head count, a non-read-only git subcommand, and an outside-root path argument all stay refused (0.86954ms)
+✔ NVA-CF-GITPIPEALLOWLIST: the admitted grammar shapes include the git-to-head pipeline, and its example is genuinely admitted (0.402885ms)
+✔ the &&-chain union (read-only classifier plus the small always-safe-write allowlist) and trailing 2>/dev/null admit exactly the backlog's triggering shapes, widened per NVA-I-GRAMMAR, and nothing more (3.561981ms)
+✔ the narrowed mkdir chain predicate (F1) still admits scratch/ and refuses an arbitrary in-repo path on a genuinely governed, not-yet-ready root (42.464728ms)
+✔ redirect-looking quoted data stays argv while hostile composition is typed and denied (96.627881ms)
+✔ grammar denials return closed typed retries only for independent read diagnostics (23.11095ms)
+✔ GRAMMARHINT-1 AC-1: the rejected element is named from what the parser already determined (79.096131ms)
+✔ GRAMMARHINT-1 AC-2 / AC-047-140: a git commit -m value with an embedded newline yields no typed action (37.674965ms)
+✔ GUARDFIX-2: the newline-in--m refusal carries no mutating action, and states the -F shape as text (40.459674ms)
+✔ GRAMMARHINT-1 AC-4: GUARD-OPERATOR-UNAPPROVED and GUARD-PARSE-UNSUPPORTED stay distinct, own codes never conflated (301.618618ms)
+✔ non-ready Bash permits only exact plugin-local lifecycle remediation argv (249.464096ms)
+✔ greenfield verify transition admits only the exact non-placeholder set-phase argv (8.535793ms)
+✔ GF-097: bare `gh --version` and `gh auth status` are admitted while lifecycle is not-ready, and no other `gh` shape is (7.656825ms)
+✔ OBLIGROUTE-1: the non-ready lane admits the repair map by exact argv, and nothing beside it (166.605914ms)
+✔ NVA-K-DRIVERREACH: the guided driver is admitted at every non-ready readiness status, in its exact argv shape and no wider one (130.407852ms)
+✔ non-ready Bash admits the repair script's own --human-facing argv, positionally and closed (186.58555ms)
+✔ signature mode's authorize-by-signature is admitted in exactly its printed shape and refused when mutated (22.777556ms)
+✔ plan-runtime family accepts the runner-plus-intent argv lifecycleArgv actually emits for non-default intents (4.058445ms)
+✔ GUARDALLOW-1: plan-partial-authority is admitted with the same shape as its plan* siblings (1.371884ms)
+✔ GUARDDERIVE-1: the guard's admitted plan* set is the CLI table's derivation, and admits exactly that set (3.726013ms)
+✔ GUARDDERIVE-1: the derivation keys on the declared properties, never on the plan name prefix (0.369832ms)
+✔ GUARDDERIVE-1: every registered onboarding subcommand declares both properties explicitly (0.41099ms)
+✔ NVA-LCGUARD-1: apply-partial-authority admits exactly the applyAction shape and no wider one (1.532168ms)
+✔ NVA-LCGUARD-1: adopt-remote admits exactly the plan and apply shapes and no third subcommand (1.65441ms)
+✔ NVA-W5-GUARDADMIT-1: intake-consent-apply admits exactly the full-bundle shape and no wider one (1.938359ms)
+✔ NVA-V10B-INTAKEONEROUND: intake-consent-apply admits the same optional --text/--text-file material intake-capture-apply accepts, order-insensitively with the other four optional flags, and refuses a duplicated or malformed value (1.08004ms)
+✔ NVA-VERIFYGREEN-1: intake-consent-apply admits consent alone (--granted/--activate, no optional value flags) and refuses a duplicated flag (1.113383ms)
+✔ NVA-VERIFYGREEN-1: runner-profile-migration apply admits --activate before --root, and stays exact everywhere else (0.930496ms)
+✔ NVA-W5-GUARDADMIT-1: intake-capture-apply admits exactly the --text/--activate shape and no wider one (0.938081ms)
+✔ NVA-W5-GUARDADMIT-1: intake-design-questions-apply admits exactly the --answers-json/--activate shape and no wider one (0.855794ms)
+✔ NVA-W5-GUARDADMIT-1: intake-generate-apply admits exactly the --plan-sha256/--activate shape and no wider one (0.809908ms)
+✔ NVA-W5-COORD-STEP5-2: bootstrap-bind-apply admits exactly the --plan-sha256/--activate shape and no wider one, under exact session readiness (1.066785ms)
+✔ NVA-W5-COORD-STEP5-2: bootstrap-bind-plan admits the bare lifecycle argv via GUARDDERIVE-1's derived admission (0.545085ms)
+✔ NVA-CODEXARGV-1 (AC-3): automatedMutatingApplyArgv's own emitted argv is admitted by the guard's real admission function, for every declared mutating subcommand (1.210087ms)
+✔ NVA-CODEXARGV-1 (AC-4): the same emitted mutating-apply argv, with --activate removed, stays refused for every declared subcommand (1.024384ms)
+✔ NVA-V4-PUSHDRIVER: push-init.mjs is admitted in exactly its own argv shape and nothing wider (64.879956ms)
+✔ NVA-V4-PUSHDRIVER: buildPushInitArgv's own emitted argv is admitted by the guard's real admission function (0.893315ms)
+✔ NVA-V4-PUSHDRIVER: the presented authorize-critical signature command is refused for a Bash tool call, real argv from po-human-approval.mjs (9.623026ms)
+✔ NVA-LCGUARD-3: plan-repair and apply-repair admit exactly the operator-authority shape (3.676669ms)
+✔ GUARDFIX-1: the apply family admits exactly the runner-plus-intent argv the planner returns and no wider shape (64.211127ms)
+✔ GUARDFIX-1: a null-device stderr suppressor is never itself a cross-repository mutation while every real redirect keeps its own code (289.738385ms)
+✔ partial PO authority rebind admits only the exact read-only planner (5.914747ms)
+✔ non-ready cleanup recovery and privatization admit only exact closed argv (51.877606ms)
+✔ non-ready session-cleanup admits the documented optional --runner tail on every subcommand this allowlist covers (70.965632ms)
+✔ partial lifecycle admits only exact rebase abort plus ordinary readback (55.627288ms)
+✔ restart-required admits only the consumed bounded resume-hint input and capture (29.941666ms)
+✔ RESTART_LIFECYCLE_SCRATCH_WRITE: restart-required admits any resolved scratch/ write and matching mkdir, nothing wider (55.365495ms)
+✔ NVA-LCREADONLY-1: partial lifecycle admits exactly mkdir scratch and the fixed incident-report write, nothing wider (71.52456ms)
+✔ NVA-LCREADONLY-2: partial denial names the diagnosis lane; other statuses stay unchanged (19.685066ms)
+✔ NVA-GF-SCRATCH: intake statuses admit any resolved scratch/ write and matching mkdir, nothing wider (201.197215ms)
+✔ NVA-BL-INTAKEBIND-1: bootstrap-binding-required admits exactly the staging PRD/spec authoring writes, nothing wider (91.899485ms)
+✔ NVA-MICRO-1: a near-miss resume-hint-input write names the correct path and does not escalate (37.709341ms)
+✔ isRestartResumeHintInputWrite recognizes an apply_patch write to the resume-hint input file (0.915859ms)
+✔ restart-process launcher is always rejected as an external user-copy-only action (1.595038ms)
+✔ every controlling non-ready status denies before the governed implementation write (215.738392ms)
+✔ guard exceptions and malformed ready receipts fail closed with sanitized output (20.226455ms)
+✔ every in-root Edit or Write requires readiness while outside targets stop before readiness (179.514802ms)
+✔ H3 recovery commands admit only exact plugin-local argv and reject lookalikes (1.352698ms)
+✔ main() reads --runner from its own argv and reaches the gate with codex even when CLAUDECODE=1 is present in its environment (regression pin for ready-gate-env-var-runner-authority) (7.503543ms)
+✔ main() fails closed on an absent or invalid --runner without ever inspecting lifecycle readiness (0.661736ms)
+✔ NOVA-LCR-HGO-1: a chat-armed capability admits the exact denied grammar command, for all three codes (1705.823666ms)
+✔ NOVA-LCR-HGO-1: a signature-armed capability admits the denied grammar command, regardless of the committed mode (646.316673ms)
+✔ NOVA-LCR-HGO-1: with nothing armed, the grammar denial names the mode-appropriate next command (ADR-0059 Decision 4) (317.540145ms)
+✔ NVA-GF-COPYSAFE: lifecycle denials default to a bounded, platform-determined command block without an unsafe primary command or rendering prerequisite (314.539188ms)
+✔ NVA-B-DENIALBOILER-1: chat-mode denial renders each of its three ceremony commands exactly once (160.022186ms)
+✔ NOVA-LCR-HGO-1: an unusable override store leaves the plain grammar refusal exactly as it was (23.094103ms)
+✔ NOVA-XREPO-HGO-1: with nothing armed a cross-repo denial still refuses, and names the mode-appropriate next command (322.141749ms)
+✔ NOVA-XREPO-HGO-2: a signature-armed capability admits the exact cross-repo command, and only once (452.795247ms)
+✔ NOVA-XREPO-HGO-3: a chat-armed capability admits the exact cross-repo command in a chat-mode repository (344.57367ms)
+✔ NOVA-XREPO-HGO-4: a capability armed for a different command does not admit this one (432.4636ms)
+✔ NOVA-XREPO-HGO-5: GUARD-LIFECYCLE-NOT-READY is never liftable, armed capability or not (452.058875ms)
+✔ NOVA-XREPO-HGO-6: an out-of-root target is refused but routable on narrowed terms, while a still-unroutable one reports why instead of falling silent (880.543573ms)
+✔ NOVA-XREPO-HGO-7: the guard union's absolute prohibitions gain no admission path here (182.139333ms)
+✔ NVA-BL-75: the guard-classification corpus measures override reachability, not only the verdict (1918.530044ms)
+✔ NVA-BL-75: the reachability labels are proven against a real capability, not read off the message (559.119413ms)
+✔ NOVA-LCR-HGO-2: a consumed grammar capability admits the composed command only once the readiness tail also admits it (337.193301ms)
+✔ NOVA-LCR-HGO-2: an armed matching capability does not bypass GUARD-LIFECYCLE-NOT-READY (454.739401ms)
+✔ NOVA-HGOSIG-ROUTE-1: a grammar denial whose route planning throws prints a typed reason, not silence (24.463425ms)
+✔ NOVA-HGOSIG-ROUTE-1: a grammar denial whose route planning returns a non-planned status reports that status (418.00929ms)
+✔ NOVA-HGOSIG-ROUTE-1: the printed reason is bounded to typed tokens, whatever planning returns or throws (35.535581ms)
+✔ NOVA-LCR-HGO-2: an armed matching capability for a command naming LAUNCH_SCRIPT still requires externalRestartOnly() (348.418252ms)
+✔ MEMPATH-1: a governed session admits its own derived Claude memory directory, and only that directory (1.764449ms)
+✔ MEMPATH-1: the derived memory admission still requires session readiness, not a substitute for it (1.029344ms)
+✔ MEMPATH-1: a symlink planted inside the derived memory directory cannot redirect a write outside it (31.449585ms)
+✔ MEMPATH-1: an absent, empty, relative, or not-yet-materialized transcript_path fails closed rather than guessing (1.093045ms)
+✔ MEMPATH-1: a not-yet-materialized memory directory is refused end to end by the guard, not just by the helper (26.860685ms)
+✔ MEMPATH-1: every other standard-Claude-path shape stays refused -- settings, agents, plugins, marketplace, another repository, and a merely-similarly-named directory (206.655276ms)
+✔ MACHPATH-1: a governed session admits the exact machine-plane file, for every write-capable tool (35.695393ms)
+✔ MACHPATH-1: nothing else under the derived home directory is admitted -- the directory itself, a sibling, a nested file, a similarly-named neighbour, and a bare-home file (609.805473ms)
+✔ MACHPATH-1: a lexical escape through the derived file path is refused (35.5278ms)
+✔ MACHPATH-1: a symlinked .agent-pipeline ancestor cannot redirect the write outside the derived home directory (200.43684ms)
+✔ MACHPATH-1: a symlinked .agent-pipeline that redirects INSIDE the same home directory is a pinned, accepted limit -- the write is admitted, not refused (11.86127ms)
+✔ MACHPATH-1: machine.json planted as a symlink to another existing file inside the same home directory is refused -- closed, not pinned (206.133653ms)
+✔ MACHPATH-1: machine.json planted as a symlink to a path outside the home directory is refused -- closed, not pinned (208.833934ms)
+✔ MACHPATH-1: an absent, empty, relative, or unresolvable home directory fails closed rather than guessing (1.001902ms)
+✔ MACHPATH-1: the machine-plane admission still requires session readiness, not a substitute for it (8.926518ms)
+✔ MACHPATH-1: the shell lane stays unchanged -- a Bash write to the same machine-plane path is still refused as a cross-repository mutation, with the same code as before this change (30.354102ms)
+✔ MACHPATH-1/AC-10: the path the guard admits is exactly the path the machine-plane writer writes to -- proven via the library's own writer and resolver, not the guard's re-export (11.260323ms)
+✔ GSSHELL-STAGE-1: staging and committing a gate-strength file is admitted, while every verb that can rewrite it stays refused (11.183418ms)
+✔ NVA-LCGUARD-4 gap 1: a backup-style filename sharing a protected name as a substring is admitted, while the real protected file stays refused (9.827394ms)
+✔ NVA-STARNEEDLE-1: a command whose text merely quotes an asterisk is never refused by this lane (60.956725ms)
+✔ NVA-STARNEEDLE-1: a shell command naming a real file under the GS-15 staging directory stays refused (4.788499ms)
+✔ NVA-STARNEEDLE-1 AC-3: every configured gate-strength path still refuses a shell command naming a real instance of it (6.529002ms)
+✔ NVA-STARNEEDLE-1 AC-4: the needle-derivation rule and its defensive filter, pinned directly (0.285021ms)
+✔ NVA-B-READCONTAIN-1: the restored read-scope refusal covers every containment-checked shape across ready and non-ready lifecycle states, and leaves the never-contained shapes admitted (4053.270716ms)
+✔ NVA-B-READCONTAIN-1 fix round, F2: a symlink planted inside the project root pointing outside it is refused by the single-command read shape and by the cat-pipeline bounded shape (234.540597ms)
+✔ NVA-B-READCONTAIN-1 correction round 2, F4: a `<symlink>/../<outside-sibling>/<file>` argument that lexically collapses to look inside the root is refused, not admitted (231.178606ms)
+✔ NVA-B-READCONTAIN-1 correction round 2, F5: isRealpathedWithinBoundary fails closed when realpathSyncFn throws (0.531659ms)
+✔ NVA-BL-76: the exact reproduction is refused under its own read-scope code, never as an unapproved operator (164.962766ms)
+✔ NVA-BL-76: the new remedy is true -- each line is executed, not merely matched (688.736062ms)
+✔ NVA-BL-76 audit: rg-to-rg carries the identical outside-root asymmetry, in either segment (560.94505ms)
+✔ NVA-BL-76: nothing but the bounded diagnostic shape is reclassified (892.905243ms)
+✔ NVA-BL-76: the read-scope refusal is override-REACHABLE, and is not the cross-repository-mutation class (774.605168ms)
+✔ NVA-BL-76: a real signed capability reaches the read-scope denial end to end (331.309848ms)
+✔ pipeline.read-scope-single-command-root-check: a single un-piped read outside the project root is refused under the same code as the piped shape (421.953798ms)
+✔ pipeline.read-scope-single-command-root-check: an in-root single un-piped read is unaffected, and so is the piped shape (208.413812ms)
+✔ pipeline.read-scope-single-command-root-check: BOUNDED_PIPELINE_ADDITIONAL_ROOTS is honoured identically by the single-command check (185.088068ms)
+✔ pipeline.read-scope-single-command-root-check: a shape that is not solely a root-scope issue is not reclassified as one (183.522577ms)
+✖ NVA-B-TILDEFIX-1: a leading-`~` argument is refused, not admitted, in the single-command read lane (both `~/...` and `~user/...` forms) (46.630536ms)
+✖ NVA-B-TILDEFIX-1: a leading-`~` argument is refused, not admitted, in the cat-pipeline bounded read lane (both `~/...` and `~user/...` forms) (46.583598ms)
+✖ NVA-B-TILDEFIX-1: a leading-`~` argument is refused, not admitted, in the git-pipeline bounded read lane (both `~/...` and `~user/...` forms) (45.864575ms)
+✖ NVA-B-TILDEFIX-1: a leading-`~` argument is refused, not admitted, in the rg-to-rg/rg-to-head bounded pipeline lane (both `~/...` and `~user/...` forms) -- the exact live admission this item reported (45.18511ms)
+✔ NVA-B-TILDEFIX-1: an ordinary in-root read is unaffected -- the fix narrows only a leading `~`, nothing else (83.391528ms)
+✔ NVA-B-READCONTAIN-1: writes, scripts, and unsupported composition remain refused for their own pre-existing reasons, independent of read-scope containment (302.131522ms)
+✔ TPSHELL-1: a shell write to a protected test path is refused, while reading and running it stay admitted (301.444618ms)
+✔ TPSHELL-REBASE-EXEC: a git rebase --exec payload naming a protected test path is refused, while ordinary rebase steps are not claimed (62.82051ms)
+✔ TPSHELL-REBASE-ABBREV: an abbreviated or unenumerated rebase option carrying a write payload is refused (63.166336ms)
+✔ TPSHELL-OPAQUEMENTION: a mere mention is admitted, running a protected suite via rebase --exec is admitted, an unresolved indirection stays refused (49.530942ms)
+✔ TPSHELL-2: with no protectedTestPaths configured the shell lane claims nothing (5.777479ms)
+✔ TPSHELL-3: a PowerShell write cmdlet naming a protected test path is refused, Get-Content is not (76.207943ms)
+✔ TPSHELL-4: the shell-lane refusal is liftable by a real chat- and signature-armed capability, once (1133.22489ms)
+✔ TPSHELL-5: the shell lane and the write lane resolve the same rules from the same committed config (1.889648ms)
+✔ TPSHELL-6: literal basenames are derived from the configured patterns, alternation included (1.838501ms)
+✔ TPSHELL-7: a classifier fault fails closed (GL-09), never silently admits the command (2.003955ms)
+✔ DEVPLANSHELL-1: a shell write to a dev-plan-gated path is refused, while reading stays admitted (172.639823ms)
+✔ DEVPLANSHELL-2: a target under an exempt prefix is not blocked by this lane (9.794957ms)
+✔ DEVPLANSHELL-3: a PowerShell write cmdlet naming a dev-plan-gated path is refused, Get-Content is not (85.404954ms)
+✔ DEVPLANSHELL-4: a classifier fault fails closed (GL-09), never silently admits the command (1.925595ms)
+✔ NVA-B-GITARGV case 5: git rebase --show-current-patch is not blocked as a dev-plan write (4.471009ms)
+✔ isSanctionedStartPreflightInvocation: matches only the exact zero-argument preflight invocation, never a looser shape (0.431389ms)
+✔ NVA-BOOTRECEIPT-1: a subagent's sanctioned preflight Bash call writes a receipt, and a subsequent Edit then passes (3.775078ms)
+✔ NVA-BOOTRECEIPT-1: near-miss Bash commands do not write a receipt (2.490688ms)
+✔ NVA-BOOTRECEIPT-1: a subagent's first Edit/Write/NotebookEdit with no receipt is denied, naming the exact preflight command (2.535314ms)
+✔ NVA-BOOTRECEIPT-1 / pipeline.identity-attestation-fail-closed-fallback: a transcript_path that is present but relative is denied, never fail-open (1.201221ms)
+✔ NVA-BOOTRECEIPT-1: a subagent's Edit WITH a receipt is allowed (1.416499ms)
+✔ NVA-BOOTRECEIPT-1: the orchestrating session is never gated, whatever the receipt state (0.944604ms)
+✔ NVA-BOOTRECEIPT-1: Read, Grep and Glob are never gated for a subagent with no receipt (1.013143ms)
+✔ NVA-BOOTRECEIPT-1: an unresolved subagent identity (missing meta.json) allows the call and appends an observation line (1.409156ms)
+✔ NVA-BOOTRECEIPT-1: an unreadable/corrupt receipt file allows the call and appends an observation line (1.608894ms)
+✔ NVA-BOOTRECEIPT-1: a thrown filesystem error while checking the receipt allows the call and appends an observation line (2.054992ms)
+✔ NVA-BOOTRECEIPT-1: every gate decision is observed, and the guard writes nothing outside bootstrap-receipt/ (2.113172ms)
+✔ NVA-INTAKEARGV-1: the agent-facing command hint names every flag its own shape requires (0.602123ms)
+✔ NVA-INTAKEARGV-1: the one-of text routes admit exactly one alternative, and every mandatory flag is load-bearing (2.103985ms)
+✔ NVA-INTAKESPECS-1: the bootstrap-binding authoring admission covers specs/<featureId>/, and a PRD in a foreign feature's directory is refused (72.692829ms)
+✔ NVA-I-GRAMMAR DoD 1: quoted operator-looking characters are read as data, never as shell syntax, for all three backlog reproductions (49.045805ms)
+✔ NVA-I-GRAMMAR DoD 2: head -N is admitted wherever head -n N is, for grep-to-head and cat-to-head, with the same 1..500 bound (0.8589ms)
+✔ NVA-I-GRAMMAR DoD 5: every admitted-grammar-shape example is printed in the refusal AND independently admitted when submitted (21.348303ms)
+✔ NVA-I-GRAMMAR DoD 6: negative regression -- no mutating, protected-path, or cross-repo-mutating segment is admitted by composition with an admitted one (1001.572346ms)
+✔ NVA-B-DENIALTRIM AC-1/AC-2/AC-3: a second same-class denial in one session renders shorter, the first stays full, and both stay actionable (78.359593ms)
+✔ NVA-B-DENIALTRIM AC-4: with no resolvable session identity, the guard renders full text every time and never throws (78.996657ms)
+✔ NVA-B-DENIALTRIM AC-6: per-session denial-class state is written under the git common dir's agent-pipeline/ tree, never scratch/ or the working tree (39.343049ms)
+✔ NVA-B-TRIMKEY AC-4: a subagent's own first denial of a class renders full text even though its orchestrating session already saw that class (78.917566ms)
+✔ rebwire fixture: a real conflicted rebase, and the guard reads its real .git/rebase-merge (398.642424ms)
+✔ rebwire positive-1: the exact continuations are admitted mid-rebase, with the gate armed (661.959391ms)
+✔ rebwire positive-2: an Edit/Write resolving a conflicted path is admitted, relative and absolute (1079.929396ms)
+✔ rebwire positive-3: git checkout --ours on a real conflict path is admitted, relative and absolute (511.862776ms)
+✔ rebwire positive-4: git rebase --show-current-patch is admitted during an active rebase (443.22189ms)
+✔ rebwire positive-5: git rebase --abort keeps its own recovery lane, independent of this authority (547.983866ms)
+✔ rebwire negative-1: a file outside the conflict set stays blocked while a rebase is active (597.671599ms)
+✔ rebwire negative-2 / negative-3: --edit-todo, --exec and --skip are refused under active authority (686.105486ms)
+✔ rebwire negative-4: only -c core.editor=true is admitted, never an arbitrary -c (621.633284ms)
+✔ rebwire negative-5: no push authority is granted, implied or represented anywhere (521.02654ms)
+✔ rebwire negative-6: a conflict command whose pathspec lies outside the surface is refused (794.050251ms)
+✔ rebwire negative-7: a rebase whose orig-head is not validly approved gets no authority at all (511.219263ms)
+✔ rebwire req5-1: a mid-rebase denial carries a non-empty read-only envelope naming the surface (616.764222ms)
+✔ rebwire req5-2: an uninformed session reaches a finished rebase by following only the denials (806.594264ms)
+✔ rebwire regression: with no rebase in progress the guard's output is unchanged (20.044018ms)
+✔ rebdead positive-1: Edit/Write on the exact conflict path (the lifecycle state file itself) is admitted, relative and absolute (341.516839ms)
+✔ rebdead positive-1 (apply_patch): a raw apply_patch call naming the conflict path is admitted, through the guard's real evaluation entry point, because the outer tool-name gate does not recognize apply_patch at all (179.149857ms)
+✔ rebdead positive-2: checkout --ours/--theirs and restore are admitted on the conflict path (419.052935ms)
+✔ rebdead positive-3: git add on the conflict path is admitted (238.57969ms)
+✔ rebdead positive-4: git rebase --continue is admitted, and once the conflict path is actually resolved and staged the rebase genuinely finishes (540.323669ms)
+✔ rebdead positive-5: all three read-only diagnostics are reachable despite the invalid conflict JSON (332.606576ms)
+✔ rebdead positive-6: continuity-damaged (the parseable-but-inconsistent lane) also receives the rebase relief (289.299541ms)
+✔ rebdead negative-1: a path outside conflictPaths stays refused, including the OTHER lifecycle state file (294.861065ms)
+✔ rebdead positive-1 (LEGACY_STATE conflict): Edit/Write on the exact conflict path is admitted, relative and absolute -- the same relief on the OTHER lifecycle state file (381.42797ms)
+✔ rebdead negative-1 (LEGACY_STATE conflict): NEUTRAL_STATE stays refused in the same fixture -- the exact mirror of rebdead negative-1 (245.49012ms)
+✔ rebdead negative-2: --skip, --edit-todo, --exec, an arbitrary -c, push and force-push all stay refused (481.572779ms)
+✔ rebdead negative-3: the admission disappears entirely once the rebase is aborted (309.29197ms)
+✔ rebdead negative-4: no human signature is demanded anywhere in the admitted path (432.357811ms)
+✔ rebdead negative-5: a restart-required session with a validly-resolved active rebase does not receive the rebase relief, only its own narrower sibling exemption where it applies (304.274221ms)
+ℹ tests 234
+ℹ suites 0
+ℹ pass 230
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 43357.146533
+
+✖ failing tests:
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:6492:1
+✖ NVA-B-TILDEFIX-1: a leading-`~` argument is refused, not admitted, in the single-command read lane (both `~/...` and `~user/...` forms) (46.630536ms)
+  AssertionError [ERR_ASSERTION]: cat ~/nva-tildefix-marker.txt
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:6497:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)
+      at Test.postRun (node:internal/test_runner/test:1522:19)
+      at Test.run (node:internal/test_runner/test:1447:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:6508:1
+✖ NVA-B-TILDEFIX-1: a leading-`~` argument is refused, not admitted, in the cat-pipeline bounded read lane (both `~/...` and `~user/...` forms) (46.583598ms)
+  AssertionError [ERR_ASSERTION]: cat ~/nva-tildefix-marker.txt | head -n 5
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:6513:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)
+      at Test.postRun (node:internal/test_runner/test:1522:19)
+      at Test.run (node:internal/test_runner/test:1447:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:6523:1
+✖ NVA-B-TILDEFIX-1: a leading-`~` argument is refused, not admitted, in the git-pipeline bounded read lane (both `~/...` and `~user/...` forms) (45.864575ms)
+  AssertionError [ERR_ASSERTION]: git log ~/nva-tildefix-marker.txt | head -n 5
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:6528:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)
+      at Test.postRun (node:internal/test_runner/test:1522:19)
+      at Test.run (node:internal/test_runner/test:1447:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:6538:1
+✖ NVA-B-TILDEFIX-1: a leading-`~` argument is refused, not admitted, in the rg-to-rg/rg-to-head bounded pipeline lane (both `~/...` and `~user/...` forms) -- the exact live admission this item reported (45.18511ms)
+  AssertionError [ERR_ASSERTION]: rg x ~/nva-tildefix-marker.txt | head -n 5
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:6543:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)
+      at Test.postRun (node:internal/test_runner/test:1522:19)
+      at Test.run (node:internal/test_runner/test:1447:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

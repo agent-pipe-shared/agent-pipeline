@@ -2009,8 +2009,38 @@ export function isRealpathedWithinBoundary(resolved, boundary, dependencies = {}
 // (all OS-accurate and symlink-aware) walk the SAME path the shell will actually resolve,
 // dereferencing a symlink component before applying a `..` that follows it, exactly like the
 // kernel does and path.resolve() does not.
+// NVA-B-TILDEFIX-1 (backlog: 2026-09-06-a-leading-tilde-path-argument-is-admitted-as-inside-
+// the-project-root.md): a leading `~` is expanded by the REAL shell to an absolute
+// home-directory path BEFORE this command's argv is ever assembled -- entirely outside
+// anything this parser sees or can walk. Concatenating it under `root` (the branch below,
+// unmodified for every other value) is exactly the bug: isRealpathedWithinBoundary's
+// ancestor-walk then finds no directory literally named `~`, climbs all the way to `root`,
+// and calls the (nonexistent, literal) path "inside" it. Prefixing with `sep` instead makes
+// the candidate syntactically absolute and lexically outside `root` by plain string
+// concatenation, with no existsSync/realpathSync call needed to fail containment -- this is a
+// narrow reject, never real tilde expansion. Returning the bare, un-prefixed `value` would NOT
+// be safe here even though it looks lexically foreign to `root`: pathInside()'s
+// path.relative() call re-resolves a RELATIVE `target` against the guard process's own cwd
+// before comparing, and in real (non-test) usage `root` usually IS that cwd, which would
+// silently re-admit the tilde value as "inside" (measured live, this dispatch). Prefixing with
+// `sep` yields an already-absolute string, so no such cwd-dependent re-resolution ever
+// happens. Deterministic in `value` alone, so when isOutsideRootSingleCommandRead()'s /
+// isOutsideRootBoundedDiagnosticRead()'s scope-lift widening later re-adds this exact same
+// candidate as its own extraRoots entry, the two calls still byte-match and
+// isRealpathedWithinBoundary()'s `resolved === boundary` shortcut still fires -- preserving
+// the self-lift symmetry those callers rely on to route this to READ_SCOPE_DENIAL_CODE
+// instead of silently falling through to unconditional admission for the un-piped
+// single-command shape (see isRealpathedWithinBoundary's own doc comment above, and F4's
+// identical concern about a broken self-lift shortcut). guard-command-grammar.mjs's
+// approvedReadPath() carries an independent twin of the underlying `startsWith("~")` check --
+// never imported (guard-lifecycle-ready.mjs imports FROM guard-command-grammar.mjs, never the
+// reverse) and deliberately NOT this same sentinel-candidate construction: that lane's only
+// caller (isBoundedReadOnlyPipeline, always inside a `|`-joined two-segment pipeline) already
+// denies with an existing code once containment fails, with or without the self-lift
+// symmetry, so a plain unconditional `return false` is correct and sufficient there.
 function rawReadCandidatePath(value, root) {
   if (typeof value !== "string" || value === "" || value.startsWith("-")) return null;
+  if (value.startsWith("~")) return `${sep}${value}`;
   return isAbsolute(value) ? value : `${root}${sep}${value}`;
 }
 

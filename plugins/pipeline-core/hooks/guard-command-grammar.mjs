@@ -218,6 +218,21 @@ function pathInside(root, target) {
  */
 function approvedReadPath(value, root, additionalRoots = []) {
   if (typeof value !== "string" || value === "" || value.includes("\0")) return false;
+  // NVA-B-TILDEFIX-1 (backlog: 2026-09-06-a-leading-tilde-path-argument-is-admitted-as-inside-
+  // the-project-root.md): a leading `~` is expanded by the real shell to an absolute
+  // home-directory path BEFORE this argument ever reaches `resolve(root, value)` below --
+  // resolving it against `root` there collapses it to a literal, never-realpathed
+  // `<root>/~/...` string that pathInside() admits on lexical grounds alone, no ancestor-walk
+  // even needed. Refused unconditionally, regardless of `additionalRoots` -- this function's
+  // only caller (isBoundedReadOnlyPipeline, always inside a `|`-joined two-segment pipeline)
+  // already denies with an existing code (GUARD-OPERATOR-UNAPPROVED or
+  // GUARD-READ-SCOPE-OUTSIDE-ROOT) once containment fails here, so no self-referential-match
+  // trick is needed to route this to a specific code the way guard-lifecycle-ready.mjs's
+  // independent twin of this same one-line check must (see that file's
+  // rawReadCandidatePath() -- not imported here; the import direction is fixed the other way,
+  // this file exports to that one, never the reverse). Never existsSync/realpathSync -- a
+  // narrow reject, not real tilde expansion.
+  if (value.startsWith("~")) return false;
   if (value === ".") return true;
   try {
     const target = resolve(root, value);

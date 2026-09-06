@@ -1,0 +1,24 @@
+command: node --test harness/scripts/check-consumer-safe-paths.test.mjs
+label: NVA-B-TILDEFIX-1-consumer-safe-paths
+exitCode: 0
+--- stdout ---
+check-consumer-safe-paths: fixture and repository checks passed
+✔ a fixture naming a source-only path fails (2.240023ms)
+✔ a clean fixture passes (1.371745ms)
+✔ an allowlisted occurrence passes (0.601252ms)
+✔ a stale allowlist entry (never matches) is itself reported (0.561636ms)
+✔ multiple prefix hits on one line each produce a finding (0.330828ms)
+✔ SOURCE_ONLY_PREFIXES carries the backlog item's minimum set (0.498346ms)
+✔ every ALLOWLIST entry is either a (file, match) pair or a filePattern, each with a non-empty stated reason (0.840005ms)
+✔ current repository passes with the real ALLOWLIST (AC-11) (520.994552ms)
+✔ real allowlisted (file, match) entries still exist and still contain the allowlisted substring (14.505502ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 674.082599
+
+--- stderr ---

@@ -6471,6 +6471,107 @@ test("pipeline.read-scope-single-command-root-check: a shape that is not solely 
   }
 });
 
+// ---------------------------------------------------------------------------------
+// NVA-B-TILDEFIX-1 (backlog: 2026-09-06-a-leading-tilde-path-argument-is-admitted-as-inside-
+// the-project-root.md). A leading `~` in a path-taking argument is expanded by the real shell
+// to an absolute home-directory path BEFORE the command's argv is ever assembled -- entirely
+// outside anything this guard's parser sees. Before this fix, none of the four read-scope
+// containment lanes accounted for that: each treated the literal, nonexistent `~...` string as
+// a path segment name and concluded it was safely inside the project root (single-command and
+// cat-pipeline via isRealpathedWithinBoundary's ancestor-walk climbing all the way to `root`;
+// the rg-to-rg/rg-to-head bounded pipeline via approvedReadPath's plain lexical pathInside(), no
+// ancestor-walk even needed). Confirmed live (guard verdicts only, never an executed read of a
+// real credential path): `cat ~/.ssh/id_rsa`, `rg x ~/.ssh | head -n 5`, and `cat ~root/x` were
+// all admitted. The marker paths below are synthetic -- this guard never performs real tilde
+// expansion or touches the real filesystem for the literal `~` segment either before or after
+// this fix, so no real home directory or credential path is ever read by these tests.
+// ---------------------------------------------------------------------------------
+
+const TILDE_MARKER_FORMS = ["~/nva-tildefix-marker.txt", "~nva-tildefix-user/nva-tildefix-marker.txt"];
+
+test("NVA-B-TILDEFIX-1: a leading-`~` argument is refused, not admitted, in the single-command read lane (both `~/...` and `~user/...` forms)", () => {
+  const { projectDir, outside } = readScopeFixture();
+  try {
+    for (const marker of TILDE_MARKER_FORMS) {
+      const command = `cat ${marker}`;
+      assert.equal(isReadOnlyDiagnosticCommand(command, projectDir), false, command);
+      const refused = readScopeRun(command, projectDir);
+      assert.equal(refused.exitCode, 2, command);
+      assert.match(refused.stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u, command);
+    }
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("NVA-B-TILDEFIX-1: a leading-`~` argument is refused, not admitted, in the cat-pipeline bounded read lane (both `~/...` and `~user/...` forms)", () => {
+  const { projectDir, outside } = readScopeFixture();
+  try {
+    for (const marker of TILDE_MARKER_FORMS) {
+      const command = `cat ${marker} | head -n 5`;
+      assert.equal(isReadOnlyDiagnosticCommand(command, projectDir), false, command);
+      const refused = readScopeRun(command, projectDir);
+      assert.equal(refused.exitCode, 2, command);
+    }
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("NVA-B-TILDEFIX-1: a leading-`~` argument is refused, not admitted, in the git-pipeline bounded read lane (both `~/...` and `~user/...` forms)", () => {
+  const { projectDir, outside } = readScopeFixture();
+  try {
+    for (const marker of TILDE_MARKER_FORMS) {
+      const command = `git log ${marker} | head -n 5`;
+      assert.equal(isReadOnlyDiagnosticCommand(command, projectDir), false, command);
+      const refused = readScopeRun(command, projectDir);
+      assert.equal(refused.exitCode, 2, command);
+    }
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("NVA-B-TILDEFIX-1: a leading-`~` argument is refused, not admitted, in the rg-to-rg/rg-to-head bounded pipeline lane (both `~/...` and `~user/...` forms) -- the exact live admission this item reported", () => {
+  const { projectDir, outside } = readScopeFixture();
+  try {
+    for (const marker of TILDE_MARKER_FORMS) {
+      const command = `rg x ${marker} | head -n 5`;
+      assert.equal(isReadOnlyDiagnosticCommand(command, projectDir), false, command);
+      const refused = readScopeRun(command, projectDir);
+      assert.equal(refused.exitCode, 2, command);
+      // NVA-B-TILDEFIX-1: this lane's own approvedReadPath() rejects a leading `~`
+      // unconditionally rather than through the self-referential-match trick
+      // rawReadCandidatePath() uses in guard-lifecycle-ready.mjs (see that function's own doc
+      // comment) -- refused, but under GUARD-OPERATOR-UNAPPROVED rather than the more
+      // semantically precise GUARD-READ-SCOPE-OUTSIDE-ROOT. This is the SAME pre-existing,
+      // separately-tracked denial-code-accuracy gap the bounded-pipeline family already has for
+      // a suppressed/chained outside-root read (backlog: 2026-09-06-suppressed-and-chained-
+      // outside-root-reads-land-on-the-wrong-denial-code.md) -- out of this fix's scope;
+      // fail-closed refusal is what this item requires, not code precision in this one lane.
+      assert.match(refused.stderr, /GUARD-OPERATOR-UNAPPROVED/u, command);
+    }
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("NVA-B-TILDEFIX-1: an ordinary in-root read is unaffected -- the fix narrows only a leading `~`, nothing else", () => {
+  const { projectDir, outside } = readScopeFixture();
+  try {
+    for (const command of ["cat verify-latest.json", "rg -n 'Overall' verify-latest.json | head -n 5", "git log | head -n 3"]) {
+      assert.equal(readScopeRun(command, projectDir).exitCode, 0, command);
+    }
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
 test("NVA-B-READCONTAIN-1: writes, scripts, and unsupported composition remain refused for their own pre-existing reasons, independent of read-scope containment", () => {
   const { projectDir, outside, outsideFile } = readScopeFixture();
   const dependencies = {
