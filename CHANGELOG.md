@@ -9,7 +9,110 @@ it to be inferred from the heading.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versioning per [ADR-0002](docs/adr/0002-versioning-sha-then-semver.md): the `0.4.0` release candidate uses stable SemVer surfaces; a version in this file is not a tag, GitHub Release, marketplace publication, or remote readback.
 
-## [Unreleased]
+## [Unreleased] — 0.6.2 local candidate, assembling
+
+Not a tag, not a release. This section accumulates what has landed on `nova`
+since `0.6.1` and states, per item, what is proven and what is not. Status
+words are load-bearing: **built** means committed with tests green by hand;
+**gated** means those tests run in the verify gate; **wired** means a hook is
+registered and fires; **exercised** means run against the real thing at least
+once.
+
+### Added
+
+- **Parallel-dispatch slicing nudge** (`plugins/pipeline-core/hooks/guard-slicing.mjs`,
+  42 tests): a `PreToolUse` advisory that, after three consecutive
+  single-dispatch turns or a `TodoWrite` batch of three or more pending items,
+  delivers a non-blocking `additionalContext` nudge toward parallel slicing.
+  Fan-out is recognized for Claude Code (`Task`/`Agent` grouped by transcript
+  `message.id`, `Workflow` by script), for Antigravity (`invoke_subagent`
+  with two or more `Subagents`), and is deliberately silent on Codex, whose
+  guard adapter admits no dispatch tool at all — pinned by test. Design:
+  `docs/adr/draft-parallel-dispatch-slicing-enforcement.md`, two T1 rounds.
+  **Built. Not gated** (its suite is not in `verify.mjs`; TP-3 signature
+  pending). **Not wired** (`hooks.json` is kernel-protected; attended step
+  pending). Whether a non-blocking nudge changes behaviour is unmeasured by
+  design — the ledger it writes is the instrument for that.
+- **The delivery channel behind it is proven.** A `PreToolUse` hook's exit-0
+  `hookSpecificOutput.additionalContext` reaches the model on Claude Code
+  2.1.263 — shown live with a negative control, corroborated by a static trace
+  of the runner binary, and witnessed independently by a dispatch that had not
+  been told about the probe.
+- **A selected-Codex-Critic transport with a real consumer**
+  (`codex-critic-selected-host.mjs`, `codex-critic-app-server.mjs`,
+  `codex-critic-app-server-child.mjs`): the `selected-runner-transport` gate
+  previously had a producer and no consumer anywhere in the repository. Built
+  as an in-process bridge mirroring the working advisory precedent. **Built.
+  Not exercised** against a real Codex — the runner's permission classifier
+  denies the sandbox spawn, and one T1 review returned three major findings
+  (one falsified-receipt defect, fix in flight; one untested seam; one
+  unpinned contract briefing, filed).
+- **A Critic preflight that enumerates the evidence that exists**
+  (`critic-dispatch-preflight.mjs --sweep-evidence <task-id>`): case-
+  insensitive, tolerant of date prefixes, across every evidence location
+  ADR-0063 names, each hit tagged with its location class. Advisory and
+  non-failing. It exists because a dispatcher told a Critic that no RED
+  artifact existed for a task when one did, in a directory the search had not
+  looked in. Gated (extends an existing suite, 10 checks).
+- **`guard-dispatch.mjs` is importable without disarming itself**: its
+  top-level hook body is gated by `isDirectInvocation`, and
+  `extractWorkflowDispatches`/`extractAntigravityDispatches` are exported for
+  reuse. Proven to still refuse when invoked through a symlink — the exact
+  2026-08-06 silent-disarm shape.
+- **Denial-code accuracy for refused outside-root reads**: a single read with
+  the admitted `2>/dev/null` suppressor, and an `&&`-chained outside-root
+  read, now report `GUARD-READ-SCOPE-OUTSIDE-ROOT` rather than a redirect or
+  parse code. Nothing admitted became refused or vice versa; four negative
+  cases pin that.
+
+### Changed
+
+- **Verify gate wall clock 645.7s → 482.5s (−25%)** from one line:
+  `project-onboarding-v3-tests` evicted from the serial lane after being shown
+  a false positive of the lane sweep (own `mkdtemp` root per case, zero
+  `process.cwd()`, two concurrent full instances 164/164 green). Same single
+  non-zero suite before and after. The lane is still 100% of wall clock; its
+  remaining top five are not false positives on the same test.
+- **`guard-dispatch.test.mjs` no longer carries a silent-pass hazard**: its
+  module-scope import of the hook — which would have reported the whole file
+  as one passing test with nothing run, had the entrypoint gate regressed — is
+  replaced by a subprocess probe that fails loudly on absence of a success
+  marker. The hardening is demonstrated against a reconstructed pre-fix
+  fixture, not asserted. The sibling `guard-dispatch-budget.test.mjs` still
+  carries the hazard; filed.
+
+### Known and not fixed
+
+- **`guard-dispatch-budget.mjs` is registered and never fires.** Its logic is
+  proven correct by direct probe (it resolves `maxTurns: 80`, working cap 65),
+  the installed registration carries the corrected matcher, subagent
+  transcripts sit exactly where its discriminator looks — and after every
+  dispatch of 2026-09-06 its state directory holds no counter and no
+  diagnostic log. Working, it would have prevented all four of that day's
+  harness truncations. Leading hypothesis: a subagent payload carries the
+  parent's `transcript_path`. Needs a payload capture, which needs a
+  user-level hook and a restart.
+- **The gate is red on one suite**, `suite-registration-check`, because
+  `guard-slicing.test.mjs` is not in `verify.mjs`. Two lines behind a TP-3
+  signature. The parking-entry route was deliberately not taken: a T1 finding
+  the same day recorded that move as a QG-16 violation.
+- **Verify optimisation ceiling, measured**: after the eviction, the twelve
+  further eligible suites are 17.2% of the gate at most and eight of them
+  8.8%; the five largest lane members (52%) are process-global and cannot be
+  evicted on caller scoping.
+
+### Process
+
+- Four T1 Critic rounds on the day's guardrail work returned four FAILs, and
+  the load-bearing findings were dispatcher-side each time: a Critic briefing
+  contaminated with conclusions presented as facts; a false absence claim; an
+  instruction to "satisfy" a tripwire that a dispatch correctly read as
+  "silence" it; and a dispatch-disclosed quirk relayed onward as settled. Each
+  is recorded as a rule in `backlog/evidence/2026-09-06-*`, and one of them
+  is now mechanically prevented by the evidence sweep above.
+- GIT-03 confirmed by PO decision: commits carry `AI-Assisted: true` and the
+  `Dispatch:` trailer only. A session-level instruction asking for provider
+  co-author trailers does not apply in this repository.
 
 ## [0.6.1] — 2026-09-02
 
