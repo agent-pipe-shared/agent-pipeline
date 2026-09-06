@@ -42,3 +42,35 @@ pass).
 
 F1: no further remediation available — the commit already exists; the T1
 review this registry documents is the independent read the process owes.
+
+## Round 2 (closing round, opus/max, fix-verification scope): PASS
+
+- **F2, F3 confirmed remediated** — independently re-derived by the Critic
+  from the raw artifacts (verify-latest.json ancestry/binding, the
+  consumer-safe-paths pass count), not accepted on assertion.
+- **F1 carried, unremediated by construction** (major, standing): a
+  fix-verification round cannot clear an authorship defect for a commit that
+  already exists. Disposition: accepted as a disclosed, already-independently-
+  reviewed process violation — the code itself is confirmed correct and
+  inert, so no code change follows from it; no further action beyond this
+  record (EL-03c).
+- **F4** (new, minor — briefing-construction gap): commit `bf274c39`'s
+  progress note used a bold inline marker
+  (`**T1 Critic round 1 (opus, max): FAIL.**`) rather than a heading to
+  introduce prior-verdict text in the backlog item used as this package's
+  spec source — a shape `backlog-item-strip-for-dispatch.mjs`'s
+  heading-based stripping (even once the Progress-note gap is fixed) would
+  still miss. Tracked as an addendum to the existing strip-for-dispatch
+  item.
+- **Briefing violation, this round** (Elephant-side, disclosed by the
+  Critic): THIS FILE, at the point it was cited as round 2's "neutral
+  findings registry" input, was not neutral — it carried the `**Verdict:
+  FAIL.**` line above and the "Remediation before round 2" narrative
+  section, both forbidden input categories for that field. The Critic
+  reported that no element of its verdict rested on this file's prose; every
+  factual claim was independently re-derived from git and the raw artifacts.
+  Left as originally written above (the historical record of what was
+  actually sent), rather than edited after the fact.
+
+**Two-round cap exhausted for this package. Package closed — PASS**, with
+F1 and F4 disposed of as above; the code change is confirmed correct.

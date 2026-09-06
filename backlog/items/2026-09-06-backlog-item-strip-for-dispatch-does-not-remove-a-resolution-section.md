@@ -74,3 +74,18 @@ its review rested on the contaminated text. Widens this item's acceptance
 criteria: the heading survey must also include `## Progress note (...)`,
 which is now confirmed as a second real, recurring instance of the same
 pattern, not a one-off.
+
+## Recurred again, 2026-09-06 (NVA-B-CODEXGUARDIMPORT-1 T1 Critic round 2, F4) — a non-heading shape
+
+A third instance, and a harder one: commit `bf274c39` added a prior Critic
+verdict into the same backlog item using a **bold inline marker**
+(`**T1 Critic round 1 (opus, max): FAIL.**`) rather than any `##` heading at
+all. A heading-based strip fix — even a complete one covering every heading
+name this item's acceptance criteria already name — would NOT catch this
+shape, because there is no heading to match. This means the fix cannot be
+purely a heading-name allowlist; it needs a rule for verdict-shaped prose
+regardless of its markdown structure (e.g. a line matching
+`**T1 Critic ... (PASS|FAIL)` or similar), or a convention change requiring
+every such note to always use a recognized heading, never inline bold.
+Widens the acceptance criteria further: the fix must be robust to a
+verdict/progress note NOT introduced by a heading.
