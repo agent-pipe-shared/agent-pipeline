@@ -60,7 +60,7 @@ assumed — every claim below was read from the file named):
 | `guard-dispatch-budget.mjs` matcher already includes `TodoWrite` and `Task`, live | `hooks/hooks.json:18` | A tool payload carrying plan shape is **already** routed to a hook. No new wiring is needed to *observe* it. |
 | A PreToolUse payload carries `transcript_path`; parent dirname `subagents` distinguishes a dispatched subagent from the orchestrator | `guard-dispatch-budget.mjs` header (empirically confirmed 2026-08-27) | The mechanism can target the Elephant only, and must. |
 | `hooks.json` is TP-4 protected **and** on `NEVER_LIFTABLE_KERNEL_PATHS`; no signed window lifts it. The route is an attended operator tool run by the PO outside the session (precedent: `harness/scripts/wire-dispatch-budget-hook.mjs`) | `guard-dispatch-budget.mjs` header; `templates/prompts/agent-obligations.md` §2 | Any *new* hook file costs a PO ceremony. Folding into an existing hook body costs none. |
-| `additionalContext` is used in this repo **only** under `hookEventName: "SessionStart"` (`staleness-check.mjs`, `codex-session-start-hint.mjs`). The only PreToolUse structured-output precedent is `permissionDecision: "deny"` (`codex-pretool-guard.mjs`) | direct grep, 2026-09-06 | **There is no confirmed non-blocking, model-reaching PreToolUse channel in this repository.** This is the single largest risk to the PO's preferred increment; see Decision 1. |
+| `additionalContext` has five emitters in this repo: four under `hookEventName: "SessionStart"` (`staleness-check.mjs`, `codex-session-start-hint.mjs`, `setup-check.mjs:248`, `post-compact-reground.mjs:274`) and one under `"Stop"` (`stop-suggest.mjs:306,386`). There is no `PreToolUse` emitter; the only PreToolUse structured-output precedent is `permissionDecision: "deny"` (`codex-pretool-guard.mjs`) | direct grep, corrected 2026-09-06 after T1 Critic finding F2 — an earlier revision of this row claimed "only under SessionStart", which was false and missed three emitters | **There is no `PreToolUse` non-blocking, model-reaching precedent in this repository.** This remains the single largest risk to the PO's preferred increment; see Decision 1. Note the correction cuts against this document elsewhere: `stop-suggest.mjs` IS a live non-blocking `additionalContext` emitter, so the tension section's "every piece of evidence comes from blocking delivery" is weakened — availability is still not effect, so it is weakened rather than refuted. |
 | `TodoWrite` has zero mentions in `roles/elephant.md` and `docs/operating-model.md` | direct grep, 2026-09-06 | Plan-shape visibility is ambient tool behaviour, not a contracted practice. The prospective trigger is opportunistic, not guaranteed. |
 
 **The PO's scope input (2026-09-06).** For a first iteration, a *mechanically
@@ -131,11 +131,19 @@ the briefings themselves, without running anything.
   *affirmatively*; today field 4 lists prohibitions and no-go paths, not an
   allowlist. See *Consequences* for that cost.
 - **PSP-2 — No dependency edge.** No package's field 2 (Context files) names a
-  path that another package declares in its write scope. This is the check that
-  replaces "use judgment": a dependency is exactly *A reads what B writes*, and
-  both sides are already written down in the canonical 6-field briefing. A
-  detected edge means the pair must be sequenced (`pipeline()`), not
-  parallelized.
+  path that another package declares in its write scope. A detected edge means
+  the pair must be sequenced (`pipeline()`), not parallelized.
+  **Corrected 2026-09-06 after T1 Critic finding F3:** an earlier revision
+  called this "the check that replaces 'use judgment'" on the ground that
+  "both sides are already written down in the canonical 6-field briefing".
+  Only one side is. Field 2 (Context files) supplies the *read* set; field 4
+  is **Forbidden** — prohibitions, not an affirmative write scope
+  (`templates/prompts/goldfish-task.md`). Until the template gains a declared
+  write scope (Next steps step 6, explicitly out of scope for increment 1),
+  PSP-2 is a check the Elephant performs with the write set it must supply
+  itself — better than unaided judgment because it names what to compare, but
+  not mechanically decidable from today's briefings. Consequences below states
+  the same limit; this sentence previously contradicted it.
 - **PSP-3 — Commit-surface isolation.** At least one of: every slice runs
   `isolation: "worktree"`; **or** at most one slice commits and the rest hand
   back diffs; **or** the round is sequenced so exactly one commit is in flight
@@ -246,9 +254,26 @@ dispatch — which the role definitions deliberately make impossible
 - **Primary (prospective):** a `TodoWrite` payload whose `pending` set has ≥ 3
   items. Fires once per distinct pending set (hashed), never again for the same
   set.
-- **Backstop (retrospective):** the 2nd consecutive single-dispatch call in a
-  session with no intervening fan-out. Fires once per run; any recognized
+- **Backstop (retrospective):** the **3rd** consecutive single-dispatch call in
+  a session with no intervening fan-out. Fires once per run; any recognized
   fan-out resets the run.
+  **Corrected 2026-09-06 after T1 Critic finding F4:** this said "2nd", which
+  contradicted PSP-0 ("N = 2 is permitted but never nudged for") — the
+  backstop would have nudged on an observed two-item run that the predicate
+  itself declares out of scope. Raised to the 3rd so the retrospective
+  trigger and PSP-0 name the same threshold. The implementation must not
+  re-introduce a second threshold: PSP-0's N is the single source.
+
+**Open parameter the implementation must fix, not guess (F4, second half):**
+fan-out recognition ("≥2 `Task`/`Agent` dispatch calls in the same turn")
+has no turn-boundary field available to a `PreToolUse` hook, so the only
+available detection is a timestamp window — and this design deliberately does
+not fix its width. That is decomposition debt, not a build detail: an
+implementation dispatch must be briefed with the window decided, or it will
+guess, and a wrong window produces exactly the false positive Decision 3 says
+the mechanism must not create (nudging an Elephant that is already
+parallelizing). Until it is decided, the unit test mandated for fan-out
+recognition in Next steps cannot be written against a fixed contract.
 
 **Rate limiting is part of the trigger, not a refinement.** A nudge on every
 dispatch becomes ambient noise the model learns to skip — the identical decay
@@ -305,11 +330,19 @@ refuses legitimately-sequential work, which is precisely the failure mode the
 item names as "at least as bad as the current gap." (ii) Under **EL-16**
 (delegate-first: every execution-phase implementation is a briefed Goldfish
 dispatch), a block on dispatch is a block on all execution work — the blast
-radius of a false positive is the whole session. (iii) The 2026-08-07 item is
-four incidents of what happens when parallel dispatch is chosen without PSP-3
-holding; a mechanism that *pushes* toward parallel while the human safety
-check is the only thing evaluating PSP-3 is buying the sequential complaint
-with a race-condition regression.
+radius of a false positive is the whole session. (iii) The 2026-08-07 item
+records five incidents of what happens when parallel dispatch is chosen
+without the predicate holding — three in the 2026-08-07 wave plus recurrences
+on 2026-08-09 and 2026-08-12; of those, incident 2 and the orphaned chain are
+PSP-3 (commit-surface) failures, while incidents 1 and 3 are shared-filename
+and shared-record collisions, i.e. PSP-1. A mechanism that *pushes* toward
+parallel while a human is the only thing evaluating the predicate is buying
+the sequential complaint with a race-condition regression.
+**Corrected 2026-09-06 after T1 Critic finding F5:** this read "four
+incidents … without PSP-3 holding" — the count matched no reading of the
+item, and attributing all of them to PSP-3 over-claimed, since two are PSP-1
+failures on this document's own taxonomy. The argument does not turn on the
+number; the citation was simply wrong and is now corrected.
 
 **Consistency with EL-16 and EL-18, stated explicitly as the DoD requires:**
 
@@ -370,6 +403,17 @@ recorded evidence in this repository that a non-blocking decision-point
 message changes an Elephant's default.** The PO's preferred increment is a
 plausible and cheap hypothesis, and it is an *untested* one by this repo's own
 standards of evidence.
+
+**Narrowed 2026-09-06 after T1 Critic finding F2.** The sentence above
+originally rested on a survey that missed three `additionalContext` emitters,
+one of which — `stop-suggest.mjs:306,386`, under `hookEventName: "Stop"` — is
+a live, *non-blocking* emitter. So this repository does carry a non-blocking
+`additionalContext` mechanism in production; what it does not carry is any
+recorded evidence about whether that mechanism *changes behaviour*. The claim
+survives in its load-bearing form — effectiveness is unevidenced — but not in
+the stronger form that non-blocking delivery is unprecedented here. Anyone
+building increment 1 should read `stop-suggest.mjs` first: it is the closest
+existing thing to what this design proposes.
 
 **Recommendation: follow the PO's lighter option — and amend the item's
 acceptance criteria in the same act, not silently.**
@@ -519,29 +563,59 @@ today's failure mode in new clothing.
 **Honest limit of this answer:** it is documentation-based, not measured on
 this runner. Given that this same session found an installed guard copy
 running stale and a documented denial code that no longer matched reality,
-"documented" is not "verified here". The empirical confirmation falls out of
-the first build run for free — when the hook first fires, either the nudge is
-in context or it is not — so a separate empirical probe was judged not worth
-its own dispatch. Whoever builds step 2 should treat the first live firing as
-the real check and report what they observed.
+"documented" is not "verified here".
+
+**Corrected 2026-09-06, after T1 Critic review (finding F1, major).** An
+earlier revision of this addendum struck Next steps step 1 through and wrote
+"the build may proceed", deferring the real check to whoever built step 2.
+That was wrong on this document's own terms: Decision 1 makes empirical
+confirmation a precondition *before* the channel is built on, and a deferral
+with no named owner and no date is exactly what QG-06 classes as a finding
+rather than a mitigation. Step 1 is re-instated as blocking below. This
+addendum therefore narrows a *documented* claim only: the channel is
+specified to exist and the stdout trap is real; whether it behaves that way
+on this runner is still unmeasured.
+
+**Why the probe is cheap after all** — the reason the deferral looked
+attractive was an assumed cost that does not hold. Wiring a hook through the
+repository's own `hooks.json` needs a PO-attended kernel-path ceremony, so a
+throwaway probe hook appeared to cost one ceremony plus a second for the real
+build. But a hook registered in the *user-level* settings file
+(`~/.claude/settings.json`, which currently declares no `hooks` block at all)
+sits entirely outside the repository and needs no ceremony. A one-off
+`PreToolUse` entry there, emitting a distinctive marker string via
+`hookSpecificOutput.additionalContext`, answers the question directly: either
+the marker appears in the model's context on the next tool call or it does
+not. It is reversible by deleting the entry, and it touches no repository
+file. That is the recommended way to satisfy step 1.
 
 This does NOT resolve the row above it in the risk table: that a *non-blocking*
 message changes an Elephant's behaviour at all remains unevidenced in this
 repository. The channel being available and the nudge being effective are two
-different claims, and only the first is now settled.
+different claims, and even after the probe only the first would be settled.
 
 ## Next steps
 
 **What a follow-up implementation dispatch would need to build** — strictly in
 this order:
 
-1. ~~**Confirm the delivery channel empirically** (Decision 1): does a PreToolUse
-   hook's exit-0 `hookSpecificOutput.additionalContext` reach the model on this
-   runner? If not, does PostToolUse? If neither, **stop and report** — the
-   PO's chosen increment is not implementable as specified and needs a fresh
-   decision. This is a bounded probe dispatch, not part of the build.~~
-   **Done 2026-09-06 — see the addendum above. The channel exists; the build
-   may proceed, using the structured JSON field and never stdout.**
+1. **Confirm the delivery channel empirically — BLOCKING, not yet done.**
+   Does a `PreToolUse` hook's exit-0
+   `hookSpecificOutput.additionalContext` reach the model on this runner? If
+   not, does `PostToolUse`? If neither, **stop and report**: the PO's chosen
+   increment is not implementable as specified and needs a fresh decision.
+   Steps 2–6 must not start until this is answered by observation.
+   - **Owner:** the PO (the recommended form is a temporary `PreToolUse`
+     entry in `~/.claude/settings.json`, outside the repository, needing no
+     ceremony — see the addendum above). An agent cannot edit that file's
+     hook configuration on the PO's behalf.
+   - **Pass condition:** a distinctive marker string emitted through
+     `hookSpecificOutput.additionalContext` is observably present in the
+     model's context on the next tool call, with the call NOT denied.
+   - **On failure:** this design's increment 1 is withdrawn, not adjusted;
+     re-decide between a blocking delivery and a different channel.
+   - The 2026-09-06 documentation probe is supporting evidence for what to
+     expect, never a substitute for this step.
 2. Implement `guard-slicing.mjs`: orchestrator-only (the `subagents`
    parent-dirname discriminator), the two triggers of Decision 4, the
    rate-limiting, and the ledger append. Fail-open on anything unparseable,
@@ -561,8 +635,18 @@ this order:
    template field, and increment 2's `Slicing:` disclosure line. Both are named
    here so they are visible decisions rather than surprises.
 
-**What a Critic review of *this design document* should specifically
-interrogate** — i.e. what would make it wrong:
+**Open questions and known weaknesses of this design** — the places it is
+most likely to be wrong, recorded for any reader:
+
+> *Retitled 2026-09-06 after T1 Critic finding F6.* This section previously
+> told a Critic what to interrogate. That is the author framing the reviewer's
+> search surface, which `roles/critic.md` reserves for the Critic — the same
+> failure CLAUDE.md records for freehand Critic dispatches ("a review that
+> only looks where you told it to look is not a second pair of eyes"), reached
+> through the artifact instead of the briefing. Empirically it also failed to
+> cover the surface: the review that found it raised three findings this list
+> does not mention. The content below is legitimate ADR material as
+> self-assessment; it is not an instruction to a reviewer.
 
 - **The channel claim (highest value).** Is exit-0 PreToolUse
   `additionalContext` real on this runner, or did this design build an
