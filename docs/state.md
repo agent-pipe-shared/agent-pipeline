@@ -24,7 +24,7 @@
 | 2026-08-11 to 2026-08-19 | Checkpoints 1-60 (2026-08-11 through 2026-08-19 checkpoint 60): superseded session narrative; durable decisions already live in ADRs/backlog/guardrails per this repo's own standing convention, not uniquely in this prose. | [docs/state-archive/2026-08-19--checkpoints-1-through-60.md](state-archive/2026-08-19--checkpoints-1-through-60.md) |
 | 2026-08-26 | 2026-08-25 Antigravity chat-gate-ceremony standardization, verify-tuner stage 2 acceptance, sprint-agy-runner delta4 Critic fix and candidate status | [docs/state-archive/2026-08-26--agy-runner-2026-08-25-handover.md](state-archive/2026-08-26--agy-runner-2026-08-25-handover.md) |
 
-## Current handover — sprint-alfred-epic: A1 offline evidence and C1 core (2026-09-06)
+## Current handover — sprint-alfred-epic: A1/C1 registered, maintenance closed (2026-09-06)
 
 The PO approved plural `probeSurfaces[]` with correlated `observations[]`
 and deferred the combined suite/capability registration until A1-2 stabilizes
@@ -48,8 +48,10 @@ The [C1 plan](../specs/sprint-alfred-epic/plans/c1-core.md) landed at
 `a87677726d7d451862585b8e4870ddebb1325c4d`. The
 [C1 verification checkpoint](../specs/sprint-alfred-epic/evidence/c1-core-verification.md)
 records 39 passing tests, closed validation, deterministic classification,
-lineage joins and status-tagged metrics. Aggregation, emission, source
-authenticity checks, local reports and actual baseline collection have not started.
+lineage joins and status-tagged metrics. The
+[C1 aggregation plan](../specs/sprint-alfred-epic/plans/c1-aggregation.md)
+is prepared; aggregation implementation, emission, source authenticity checks,
+local reports and actual baseline collection remain open.
 
 Full Verify is historical exact-source-candidate evidence for
 `a87677726d7d451862585b8e4870ddebb1325c4d`, tree
@@ -59,13 +61,19 @@ Full Verify is historical exact-source-candidate evidence for
 `verify-suite-registration-check` failing; all other 505 steps, including
 security, exit 0. This does not verify the later documentation HEAD.
 
-Next is the PO-performed TP-3 maintenance act described in
-[coupled registration preparation](../specs/sprint-alfred-epic/evidence/a1-registration-preparation.md):
-register both A1 and C1 suites and their exact capability surfaces together.
-A1's prior option-1 approval stands; C1 adds required registration scope,
-without claiming approval or execution of a specific combined payload.
-Registration is the one observed integrated Verify blocker. Fresh Full Verify
-after registration, independent T1 Critic review and PO acceptance remain open.
+The signed TP-3 maintenance act is committed at
+`0a86cbdcb315ffff55e8788b420af16788b7a8b8`: both A1/C1 suites and their exact
+capability surfaces are registered together. The
+[registration evidence](../specs/sprint-alfred-epic/evidence/a1-registration-preparation.md)
+records 506 registered, zero unregistered and four declared exclusions;
+focused A1 and C1 checks pass 25 and 39 tests respectively. The sanctioned
+GMW close completed, appended the human revocation audit, and returned an
+absent window. No maintenance lift remains active.
+
+Next are fresh Full Verify on the resulting clean candidate and independent
+T1 Critic review; both remain pending. Normal continuation needs no new
+approval or signature. Native A1 evidence, C1 emission and the measured
+14-day baseline remain open, as does PO acceptance.
 Alfred remains implementing; this is no feature close or full A1/C1/Wave-0
 completion. No new schema/profile decision is requested. The PO selected
 Astra for the Elephant; no comparative performance or token-cost result is established.
