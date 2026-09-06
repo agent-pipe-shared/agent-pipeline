@@ -6,7 +6,7 @@ owner: pipeline
 status: open
 created: 2026-09-06
 sprint: nova-b
-review_by: "next PO-attended maintenance window (no fixed calendar date — the remedy requires an attended operator running apply-pending-protected-edits.mjs; QG-06, per T1 Critic review of NVA-B-GG22TRAILSLASH-1, 2026-09-06: a deferred gap needs a due-date signal, not indefinite silence)"
+due: "2026-10-06"
 tracking: "Nova B — NVA-B-GG22FIX-1 (commit fe2d7afe) fixed the GG-22 shared-index deadlock, but plugins/pipeline-core/hooks/guard-git.test.mjs is TP-1 protected with no in-session override route, so the dispatch could not add a permanent regression test there. The fix was proven RED-then-GREEN via an ephemeral scratch/ reproduction script instead, which is not committed and does not guard against a future regression of this exact scoping logic."
 done_when: manual
 source: "NVA-B-GG22FIX-1's own dispatch report, 2026-09-06: 'Persisting GG22-9/10/11 into guard-git.test.mjs needs a new step in apply-pending-protected-edits.mjs (mirroring stepGuardGit22) -- an attended-operator action outside this dispatch's scope.'"
@@ -72,3 +72,13 @@ round 2's own new evidence. Once this item's permanent test lands in
 `guard-git.test.mjs` via the attended-operator route, the committed test
 IS the durable, self-interpretable proof and this note is moot; tracked
 here only so it is not lost before then.
+
+## Due-date note (2026-09-06, per T1 Critic review of NVA-B-GG22TRAILSLASH-1)
+
+`due: 2026-10-06` above is a review checkpoint, not a hard technical
+deadline — actual completion needs an attended operator running
+`apply-pending-protected-edits.mjs`, an event this session cannot schedule.
+Set per QG-06 (a deferred gap needs a due-date signal, not indefinite
+silence) so this item surfaces for a fresh look rather than aging silently;
+re-set it forward if the attended-operator window has not yet occurred by
+then, rather than treating a missed date as a failure.
