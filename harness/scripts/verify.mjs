@@ -195,6 +195,8 @@ const WINDOWS_ASSURANCE_VERIFY_REGISTRATION = Object.freeze({
 
 const TEST_SUITES = [
   { name: "setup-tests", file: join(repoRoot, "setup.test.mjs") },
+  { name: "enforcement-conformance-tests", file: join(pluginScriptsDir, "enforcement-conformance.test.mjs") },
+  { name: "interruption-receipts-tests", file: join(libDir, "interruption-receipts.test.mjs") },
   { name: "routing-projection-tests", file: join(pluginScriptsDir, "check-routing-projections.test.mjs") },
   { name: "routing-projection-check", file: join(pluginScriptsDir, "check-routing-projections.mjs") },
   { name: "route-receipt-tests", file: join(libDir, "route-receipt.test.mjs") },

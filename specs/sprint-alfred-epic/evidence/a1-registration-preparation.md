@@ -1,6 +1,44 @@
 # A1/C1 Verify registration preparation
 
-Status: preparation only. This file proposes a later PO TP-3 maintenance act;
+Status on 2026-09-06: the coupled A1/C1 suite and capability registrations
+are applied; full Verify and independent T1 review remain pending.
+
+## Signed maintenance registration
+
+The route used is the externally signed Guard Maintenance Window of
+[ADR-0058](../../../docs/adr/0058-guard-maintenance-window.md), Decision 1–5.
+The installed `guard-maintenance-window.mjs status` verifier reported
+`active`, `scopeRuleIds: ["TP-3"]`, `humanApproval.mode: "signature-verified"`,
+and `authorshipMode: "goldfish-dispatch"` before the edit, with expiry
+`1788688731163`. This is the signed GMW route, not the batch helper whose
+historical payload limitation is documented below.
+
+On source base `4dc7007e1a2a36b53adc6d9e297664ea6904887d`, dispatch
+`ALF-REGISTER-A1-C1` added exactly the two proposed entries below to
+`TEST_SUITES` and their two exact surfaces to the existing
+`deterministic-verification` capability. The sanctioned install writer's
+request/grant events and human ledger head are included unchanged in the
+same maintenance commit. No exclusion, suite implementation, or policy changed.
+
+Captured focused checks after registration (all exit 0):
+
+| Command | Actual result | Machine capture |
+|---|---|---|
+| `node --check harness/scripts/verify.mjs` | Syntax valid | `evidence/alfred-registration-syntax.log` |
+| `node harness/scripts/check-verify-suite-registration.mjs` | 506 registered, 4 declared exclusions, 0 unregistered | `evidence/alfred-registration-suite-registration.log` |
+| `node harness/scripts/check-product-capability-inventory.mjs --check-reachability` | Entry-point reachability passes | `evidence/alfred-registration-capability-reachability.log` |
+| `node --test plugins/pipeline-core/scripts/enforcement-conformance.test.mjs` | 25 passed, 0 failed | `evidence/alfred-registration-a1.log` |
+| `node --test plugins/pipeline-core/lib/interruption-receipts.test.mjs` | 39 passed, 0 failed | `evidence/alfred-registration-c1.log` |
+
+Dispatch bookkeeping and final document/diff check evidence are recorded in
+`evidence/dispatch-record-ALF-REGISTER-A1-C1.json`. These focused results do
+not establish full Verify, a Critic verdict, native enforcement evidence, or
+a C1 dogfood baseline. The Elephant owns GMW closure and subsequent full
+Verify and T1 review against the resulting candidate.
+
+## Historical preparation (preserved)
+
+Status at preparation: preparation only. This file proposed a later PO TP-3 maintenance act;
 it does not edit `harness/scripts/verify.mjs`, the capability inventory, or
 any exclusion table.
 
