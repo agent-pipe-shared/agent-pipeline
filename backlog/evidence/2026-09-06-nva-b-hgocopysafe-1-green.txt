@@ -1,0 +1,46 @@
+command: node --test plugins/pipeline-core/lib/copy-safe-command.test.mjs
+label: hgocopysafe-green
+exitCode: 0
+--- stdout ---
+✔ boundedOpaqueCopyCommand is re-exported unchanged -- the same function object project-onboarding-v3.mjs already exported, not a reimplementation (2.841794ms)
+✔ NVA-B-HGOCOPYSAFE-1: boundedOpaqueCopyCommand round-trips an already-assembled opaque command string containing a space, $, and non-ASCII characters through a real shell reconstruction, unexpanded (9.444678ms)
+✔ boundedCopySafeCommand assembles the exact executable+argv into one command line and a bounded copyCommand (5.025129ms)
+✔ boundedCopySafeCommand refuses a missing/empty executable or argv instead of silently rendering a broken command (0.93223ms)
+✔ the copyCommand rendering is bounded on every shell, and the posix rendering round-trips through a real bash eval to the exact intended argv -- including a value with a space and a value with non-ASCII characters (11.440617ms)
+✔ placeholder() requires a non-empty string (0.531809ms)
+✔ boundedCopySafeCommand renders a placeholder() argv entry verbatim -- not shellWord()-quoted -- while real values around it are still safely quoted (1.825876ms)
+✔ boundedCopySafeCommand refuses an argv entry that is neither a string nor a placeholder() value (0.503175ms)
+✔ a command containing a placeholder still produces a bounded copyCommand rendering (the placeholder becomes part of the one opaque command string boundedOpaqueCopyCommand chunks) (4.794411ms)
+✔ boundedCopySafeCommand with no placeholder() entries is byte-identical to before this mode existed (delegates to renderProjectOnboardingAction unchanged) (4.785314ms)
+✔ a short argv (inline command fits the column bound) renders WITHOUT the wrapped posix/powershell/cmd forms (0.702373ms)
+✔ a short argv's bare inline command line still round-trips through a real bash eval to the exact intended argv (6.416191ms)
+✔ a genuinely-too-long argv still gets exact wrapped POSIX/PowerShell renderings and refuses an inexact cmd.exe rendering (5.036729ms)
+✔ boundedCopySafeCommand renders a placeholder()-wrapped JSON.stringify()'d path as a quoted literal, not verbatim -- a genuine template slot in the SAME command still renders verbatim (0.580231ms)
+✔ NVA-CF-COPYSAFE: a JSON.stringify()'d path containing $, a backtick, or $( survives a real bash -c round-trip through placeholder() unexpanded/unsubstituted (6.925066ms)
+✔ forcedQuote() requires a non-empty string (0.672116ms)
+✔ forcedQuote() forces double-quoting for its own argv entry while ordinary entries render exactly as shellWord() would (0.868749ms)
+✔ forcedQuote() differs from shellWord()'s own choice for the same ordinary value -- proving the mode actually forces the quote character (0.414387ms)
+✔ boundedCopySafeCommand with no placeholder() and no forcedQuote() entries stays byte-identical to before either mode existed (1.396901ms)
+✔ forcedQuote() and placeholder() may be combined in the same command, each rendering through its own rule (0.477947ms)
+✔ forcedQuote() escapes $, a backtick and a double quote inside its forced quoting -- it never reintroduces the verbatim-JSON.stringify() shell-injection class placeholder()'s own fix closed (8.33917ms)
+✔ boundedCopySafeCommand refuses an argv entry that is neither a string, a placeholder(), nor a forcedQuote() value (0.393988ms)
+✔ renderHumanCopySafeCommand emits bounded POSIX and PowerShell blocks by default, plus cmd.exe when the argv is representable (1.765341ms)
+✔ renderHumanCopySafeCommand preserves exact argv through every real shell available on this host (166.02984ms)
+✔ renderHumanCopySafeCommand keeps explicit placeholders visible while bounding every physical line (8.300686ms)
+✔ test-path default hand-off round-trips the bounded POSIX/PowerShell plan command with spaces and Unicode (846.158624ms)
+✔ test-path default chat hand-off includes cmd.exe when the exact argv is representable (419.214896ms)
+✔ NVA-B-COPYSAFE: a script filename embedded in the copy-safe plan command stays one contiguous, greppable string across a range of checkout path lengths spanning the measured wrap-point-sensitive bands (804.777285ms)
+✔ NVA-B-COPYSAFE: the delimiter-aligned wrap point still round-trips the exact argv through a real bash eval at a previously-splitting checkout length (8.896513ms)
+✔ NVA-B-COPYSAFE: a single path segment wider than one whole line falls back to a mid-token split, defined and tested rather than incidental -- the bound still holds and reconstruction stays byte-exact (6.523303ms)
+✔ NVA-B-COPYSAFE-FIX (AC-1): a Windows backslash-delimited script path stays contiguous across a range of root lengths -- pins the backslash arm of the delimiter predicate (74.15454ms)
+✔ NVA-B-COPYSAFE-FIX (AC-2/AC-3): the script filename stays contiguous in EACH renderer separately -- posix, powershell and cmd -- across a range of checkout lengths spanning the measured wrap-point-sensitive bands (920.421093ms)
+ℹ tests 32
+ℹ suites 0
+ℹ pass 32
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3678.120777
+
+--- stderr ---
