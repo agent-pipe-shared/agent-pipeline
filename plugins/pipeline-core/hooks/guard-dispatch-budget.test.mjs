@@ -445,6 +445,90 @@ test("evaluateDispatchBudgetGuard (NVA-B-BUDGETGUARD-2): the measured orchestrat
   assert.deepEqual(counterFiles, []);
 });
 
+// NVA-B-BUDGETVIS-1 (F1, backlog/evidence/2026-09-06-nva-b-guardfix-critic-round1.md): a payload
+// that carries neither a usable `agent_id` NOR the measured orchestrator shape's own clean absence
+// of both `agent_id` and `agent_type` -- i.e. partial/malformed dispatch-identity evidence -- must
+// leave a record naming its true reason, distinguishable from both a counted subagent and the
+// once-per-session orchestrator marker. Built on the measured fixtures (never the 3-key legacy
+// `orchestratorInputObj()`/minimal payloads above, which stay exactly as pinned -- their own
+// absence of `session_id`/`cwd`/etc. is not what this dispatch is testing). EXPECTED TO FAIL against
+// the guard as it stands after `6372b984`: `dispatchBudgetCallerIdentity()` there returns only
+// `subagent`/`orchestrator`, so every case below currently lands in the orchestrator branch.
+const UNRESOLVED_PATH = `${COMMON_DIR}/agent-pipeline/dispatch-budget/unresolved.jsonl`;
+
+test("evaluateDispatchBudgetGuard (NVA-B-BUDGETVIS-1): a payload carrying agent_type without agent_id is recorded as unattributable, not silently absorbed into the orchestrator marker", () => {
+  const { results } = run({
+    rootDir: FAKE_ROOT,
+    steps: [
+      { op: "guard", input: measuredOrchestratorPayload({ agent_type: "pipeline-core:goldfish-deep" }) },
+      { op: "getFile", path: UNRESOLVED_PATH },
+      { op: "getFile", path: `${COMMON_DIR}/agent-pipeline/dispatch-budget/orchestrator-seen/parent.json` },
+      { op: "listFiles" },
+    ],
+  });
+  assert.equal(results[0].exitCode, 0, "an unattributable call is still allowed, exactly as today");
+  assert.ok(results[1] !== null, "an unattributable call must leave a record in unresolved.jsonl");
+  const record = JSON.parse(results[1].trim().split("\n")[0]);
+  assert.equal(record.kind, "unresolved");
+  assert.equal(record.branch, "unresolved-identity");
+  assert.equal(record.reason, "agent-type-without-agent-id");
+  assert.equal(record.agentTypeRaw, "pipeline-core:goldfish-deep");
+  assert.equal(results[2], null, "no orchestrator marker is written for this call -- it is not classified as the orchestrator");
+  const counterFiles = results[3].filter((p) => p.includes("/dispatch-budget/") && !p.includes("orchestrator-seen") && !p.endsWith("unresolved.jsonl"));
+  assert.deepEqual(counterFiles, [], "an unattributable call is never counted as a per-agent dispatch");
+});
+
+test("evaluateDispatchBudgetGuard (NVA-B-BUDGETVIS-1): a payload carrying a blank agent_id is recorded as unattributable, not the orchestrator", () => {
+  const { results } = run({
+    rootDir: FAKE_ROOT,
+    steps: [
+      { op: "guard", input: measuredOrchestratorPayload({ agent_id: "   " }) },
+      { op: "getFile", path: UNRESOLVED_PATH },
+    ],
+  });
+  assert.equal(results[0].exitCode, 0);
+  assert.ok(results[1] !== null, "an unattributable call must leave a record in unresolved.jsonl");
+  const record = JSON.parse(results[1].trim().split("\n")[0]);
+  assert.equal(record.reason, "agent-id-present-but-blank");
+  assert.equal(record.agentIdRaw, "   ");
+});
+
+test("evaluateDispatchBudgetGuard (NVA-B-BUDGETVIS-1): a payload carrying a non-string agent_id is recorded as unattributable with its raw value preserved", () => {
+  const { results } = run({
+    rootDir: FAKE_ROOT,
+    steps: [
+      { op: "guard", input: measuredOrchestratorPayload({ agent_id: 12345 }) },
+      { op: "getFile", path: UNRESOLVED_PATH },
+    ],
+  });
+  assert.equal(results[0].exitCode, 0);
+  assert.ok(results[1] !== null, "an unattributable call must leave a record in unresolved.jsonl");
+  const record = JSON.parse(results[1].trim().split("\n")[0]);
+  assert.equal(record.reason, "agent-id-present-but-not-a-string");
+  assert.equal(record.agentIdRaw, 12345);
+});
+
+test("evaluateDispatchBudgetGuard (NVA-B-BUDGETVIS-1): the three identity shapes land in three disjoint sinks -- counted, marker-only, and unresolved-only", () => {
+  const { results } = run({
+    rootDir: FAKE_ROOT,
+    files: seedSubagentFiles(20),
+    steps: [
+      { op: "guard", input: measuredSubagentPayload() },
+      { op: "guard", input: measuredOrchestratorPayload({ transcript_path: "/fake/session/other.jsonl" }) },
+      { op: "guard", input: measuredOrchestratorPayload({ transcript_path: "/fake/session/third.jsonl", agent_type: "pipeline-core:goldfish-deep" }) },
+      { op: "listFiles" },
+    ],
+  });
+  for (const r of results.slice(0, 3)) assert.equal(r.exitCode, 0);
+  const allFiles = results[3];
+  const counterFiles = allFiles.filter((p) => p.includes("/dispatch-budget/") && !p.includes("orchestrator-seen") && !p.endsWith("unresolved.jsonl"));
+  const markerFiles = allFiles.filter((p) => p.includes("/orchestrator-seen/"));
+  const unresolvedFiles = allFiles.filter((p) => p.endsWith("unresolved.jsonl"));
+  assert.equal(counterFiles.length, 1, "exactly one per-agent counter file, for the genuine subagent call");
+  assert.equal(markerFiles.length, 1, "exactly one orchestrator marker, for the genuine orchestrator call");
+  assert.equal(unresolvedFiles.length, 1, "exactly one unresolved.jsonl, holding the unattributable call's record");
+});
+
 test("evaluateDispatchBudgetGuard: workingCap always equals each agent's own maxTurns minus the documented reserve", () => {
   for (const agentName of ["goldfish-deep", "goldfish-implementor", "goldfish-mechanic"]) {
     const { results } = run({
