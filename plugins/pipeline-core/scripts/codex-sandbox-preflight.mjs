@@ -265,6 +265,11 @@ function canaryProjection(canaries) {
 
 export function evaluatePreflight(observation) {
   exactKeys(observation, ["kind", "cli", "observedHelper", "platform", "profile", "compiledState", "readback", "control", "sandbox", "probes", "canaries", "events", "durationMs", "streamBytes", "terminalCode"], "preflight observation");
+  // NVA-B-CASPREFLIGHT-2: close the per-side semantic-observation shape too, so an unknown key on
+  // either side is rejected the same way an unknown top-level observation key already is.
+  const semanticKeys = ["stdinSha256", "eofObserved", "stdoutSha256", "stderrSha256", "childExit", "appServerInitialized", "appServerBoundedStop", "appServerErrorClass"];
+  exactKeys(observation.control, semanticKeys, "control semantic observation");
+  exactKeys(observation.sandbox, semanticKeys, "sandbox semantic observation");
   const kind = validateProfileIntent(observation.profile.value, observation.kind);
   validateDigest(observation.profile.rawSha256, "profile digest");
   validateDigest(observation.compiledState.rawSha256, "compiled state digest");
@@ -280,6 +285,17 @@ export function evaluatePreflight(observation) {
   const childEquivalent = semanticEqual(observation.control, observation.sandbox);
   const appServerInitEquivalent = observation.control.appServerInitialized === true && observation.sandbox.appServerInitialized === true
     && observation.control.appServerBoundedStop === true && observation.sandbox.appServerBoundedStop === true;
+  // NVA-B-CASPREFLIGHT-2: appServerInitEquivalent above collapses four booleans (two per side) into
+  // one, so a reader of the persisted receipt could not previously tell which side failed, which of
+  // the two conditions failed, or with which errorClass. This carries the probe's own diagnosis
+  // through into the receipt unchanged; it never relaxes the conjunction above, which keeps its
+  // exact current meaning.
+  const appServerSide = (side) => ({
+    appServerInitialized: side.appServerInitialized === true,
+    appServerBoundedStop: side.appServerBoundedStop === true,
+    appServerErrorClass: side.appServerErrorClass,
+  });
+  const appServer = { control: appServerSide(observation.control), sandbox: appServerSide(observation.sandbox) };
   const canaries = canaryProjection(observation.canaries);
   const events = Array.isArray(observation.events) && observation.events.length > 0 ? observation.events : [];
   const lifecycleComplete = JSON.stringify(events.map(({ type }) => type)) === JSON.stringify(["control-started", "control-complete", "sandbox-started", "sandbox-complete"])
@@ -327,6 +343,7 @@ export function evaluatePreflight(observation) {
     profile: { id: observation.profile.value.id, rawSha256: observation.profile.rawSha256, compiledStateSha256: observation.compiledState.rawSha256 },
     networkEnabled: observation.profile.value.networkEnabled,
     vectors,
+    appServer,
     canaries,
     eventChainSha256: sha256(Buffer.from(canonicalJson(events))),
     durationMs: observation.durationMs,
@@ -559,7 +576,7 @@ function payloadRequest(fixture, network, codexPath) {
   return Buffer.from(JSON.stringify({ ...fixture.paths, codexPath, codexHomePath: fixture.codexHomePath, networkHost: network.host, networkPort: network.port }), "utf8").toString("base64url");
 }
 function semanticProjection(result) {
-  if (!result) return { stdinSha256: sha256(Buffer.alloc(0)), eofObserved: false, stdoutSha256: sha256(Buffer.alloc(0)), stderrSha256: sha256(Buffer.alloc(0)), childExit: -1, appServerInitialized: false, appServerBoundedStop: false };
+  if (!result) return { stdinSha256: sha256(Buffer.alloc(0)), eofObserved: false, stdoutSha256: sha256(Buffer.alloc(0)), stderrSha256: sha256(Buffer.alloc(0)), childExit: -1, appServerInitialized: false, appServerBoundedStop: false, appServerErrorClass: "no-result" };
   return {
     stdinSha256: sha256(Buffer.from(result.stdin || "", "base64")),
     eofObserved: result.eof === true,
@@ -568,6 +585,10 @@ function semanticProjection(result) {
     childExit: Number.isSafeInteger(result.child?.status) ? result.child.status : -1,
     appServerInitialized: result.appServer?.initialized === true,
     appServerBoundedStop: result.appServer?.boundedStopObserved === true,
+    // NVA-B-CASPREFLIGHT-2: carry the probe's own errorClass through unchanged (never derived or
+    // guessed) so evaluatePreflight() can persist it per side; see the "no-result" sentinel above
+    // for the case where the payload never produced a result at all.
+    appServerErrorClass: typeof result.appServer?.errorClass === "string" ? result.appServer.errorClass : null,
   };
 }
 function probeProjection(result) {

@@ -80,7 +80,7 @@ function observation(kind = "strong") {
     useLegacyLandlock: false,
   };
   const digest = "a".repeat(64);
-  const semantic = { stdinSha256: digest, eofObserved: true, stdoutSha256: "b".repeat(64), stderrSha256: "c".repeat(64), childExit: 7, appServerInitialized: true, appServerBoundedStop: true };
+  const semantic = { stdinSha256: digest, eofObserved: true, stdoutSha256: "b".repeat(64), stderrSha256: "c".repeat(64), childExit: 7, appServerInitialized: true, appServerBoundedStop: true, appServerErrorClass: null };
   return {
     kind,
     cli: { version: "0.144.6", artifactSha256: "d".repeat(64) },
@@ -190,6 +190,55 @@ test("missing no-model app-server initialization fails closed [child-stdio-error
   const value = observation("intermediate");
   value.sandbox.appServerInitialized = false;
   assert.deepEqual({ eligibility: evaluatePreflight(value).eligibility, terminalCode: evaluatePreflight(value).terminalCode }, { eligibility: "none", terminalCode: "child-stdio-error" });
+});
+
+// NVA-B-CASPREFLIGHT-2: appServerInitEquivalent collapsed all four app-server booleans (two per
+// side) into one, so a reader of the persisted receipt could not tell which side or condition
+// failed, or with which errorClass. child-stdio-error remains the correct terminal code below --
+// it already covers "the child-process pipeline behaved unexpectedly", of which an app-server
+// handshake failure is one instance -- the new `appServer` diagnosis field, not a new terminal
+// code, is what makes the failure legible per side and per condition.
+test("per-side app-server diagnosis names which of the four conditions failed and with which errorClass [child-stdio-error]", () => {
+  const cases = [
+    { side: "control", key: "appServerInitialized", errorClass: "initialization-error" },
+    { side: "sandbox", key: "appServerInitialized", errorClass: "initialization-error" },
+    { side: "control", key: "appServerBoundedStop", errorClass: "timeout" },
+    { side: "sandbox", key: "appServerBoundedStop", errorClass: "timeout" },
+  ];
+  for (const { side, key, errorClass } of cases) {
+    const value = observation("intermediate");
+    value[side][key] = false;
+    value[side].appServerErrorClass = errorClass;
+    const receipt = evaluatePreflight(value);
+    assert.equal(receipt.terminalCode, "child-stdio-error");
+    assert.equal(receipt.eligibility, "none");
+    assert.equal(receipt.vectors.appServerInitEquivalent, false);
+    assert.equal(receipt.appServer[side][key], false);
+    assert.equal(receipt.appServer[side].appServerErrorClass, errorClass);
+    const otherSide = side === "control" ? "sandbox" : "control";
+    assert.equal(receipt.appServer[otherSide].appServerInitialized, true);
+    assert.equal(receipt.appServer[otherSide].appServerBoundedStop, true);
+    assert.equal(receipt.appServer[otherSide].appServerErrorClass, null);
+  }
+});
+
+test("all four app-server conditions true keeps appServerInitEquivalent true and carries a null errorClass on both sides [ok]", () => {
+  const receipt = evaluatePreflight(observation("intermediate"));
+  assert.equal(receipt.vectors.appServerInitEquivalent, true);
+  assert.deepEqual(receipt.appServer, {
+    control: { appServerInitialized: true, appServerBoundedStop: true, appServerErrorClass: null },
+    sandbox: { appServerInitialized: true, appServerBoundedStop: true, appServerErrorClass: null },
+  });
+  assert.equal(validatePreflightReceipt(receipt), receipt);
+});
+
+test("an unknown key in either side's semantic observation is rejected, not silently accepted [profile-error]", () => {
+  const control = observation("intermediate");
+  control.control.unexpectedField = "not in the closed contract";
+  assert.throws(() => evaluatePreflight(control), { code: "profile-error" });
+  const sandbox = observation("intermediate");
+  sandbox.sandbox.unexpectedField = "not in the closed contract";
+  assert.throws(() => evaluatePreflight(sandbox), { code: "profile-error" });
 });
 
 test("permission and network probe failures are typed, never diagnostic success [permission-mismatch, network-mismatch]", () => {
@@ -394,6 +443,7 @@ test("the fixture-driven payload actually runs and drives an eligible intermedia
     childExit: run.payloadResult.child.status,
     appServerInitialized: true,
     appServerBoundedStop: true,
+    appServerErrorClass: null,
   };
   const measuredProbes = {
     allowedRead: run.payloadResult.probes.allowedRead === "success",

@@ -4,7 +4,7 @@
   "title": "Sanitized Codex sandbox preflight receipt",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema", "cli", "sandboxTransport", "observedHelper", "platform", "profile", "networkEnabled", "vectors", "canaries", "eventChainSha256", "durationMs", "eligibility", "terminalCode"],
+  "required": ["schema", "cli", "sandboxTransport", "observedHelper", "platform", "profile", "networkEnabled", "vectors", "appServer", "canaries", "eventChainSha256", "durationMs", "eligibility", "terminalCode"],
   "properties": {
     "schema": { "type": "string", "enum": ["pipeline.codex-sandbox-preflight.v1"] },
     "cli": {
@@ -70,6 +70,33 @@
         "childExitEquivalent": { "type": "boolean" },
         "appServerInitEquivalent": { "type": "boolean" },
         "lifecycleComplete": { "type": "boolean" }
+      }
+    },
+    "appServer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["control", "sandbox"],
+      "properties": {
+        "control": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["appServerInitialized", "appServerBoundedStop", "appServerErrorClass"],
+          "properties": {
+            "appServerInitialized": { "type": "boolean" },
+            "appServerBoundedStop": { "type": "boolean" },
+            "appServerErrorClass": { "type": ["string", "null"] }
+          }
+        },
+        "sandbox": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["appServerInitialized", "appServerBoundedStop", "appServerErrorClass"],
+          "properties": {
+            "appServerInitialized": { "type": "boolean" },
+            "appServerBoundedStop": { "type": "boolean" },
+            "appServerErrorClass": { "type": ["string", "null"] }
+          }
+        }
       }
     },
     "canaries": {
