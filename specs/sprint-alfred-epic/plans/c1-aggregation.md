@@ -216,8 +216,9 @@ and state unresolved, resolved or terminal. A resolved receipt classified as
 terminal-blocker is unassessed for this measure, never a success. Skipped,
 unavailable, unknown state/class and unordered histories are unassessed.
 `assessedCount` is the denominator, `resolvedCount` counts its resolved members,
-and `unassessedCount` counts all remaining group members; their sum is the
-group's episodeCount. The ratio is a descriptive observed-resolution share,
+and `unassessedCount` counts all remaining group members:
+`assessedCount + unassessedCount = episodeCount`; `resolvedCount` is a subset
+of `assessedCount`, not an additional term. The ratio is a descriptive observed-resolution share,
 not a causal effectiveness claim or a green gate. Its status is the fold of
 receipt-population coverage and relevant selected-receipt collection statuses;
 unknown/unavailable yields null ratio while tagged cohort counts stay visible.
@@ -312,7 +313,8 @@ just schema markers. Focused green tests do not replace Stage 1 integration.
 This architectural API refinement triggers
 [review-protocol §2.1 T1](../../../harness/review-protocol.md#21-trigger-decision-table).
 Independent Critic review is mandatory; no criticSkip determination applies.
-Prior review of the first core does not clear this plan or aggregation code.
+The first-core Critic review remains pending; its eventual completion does not
+automatically clear this new plan or aggregation code.
 The Elephant owns the required review route and candidate scope; this plan does
 not waive or silently batch A/G/S review. Full green Verify remains required
 for delivery and is currently blocked by outstanding TP-3 suite registrations;
