@@ -325,6 +325,20 @@ edit). **Remaining: `verify-suite-registration-check`/
 `NVA-B-EVSLOTFIX-1`, see above). Next full verify attempt should be green
 except for that one, PO-signature-gated pair.
 
+### 2026-09-06: two backlog items dispatched while waiting on the PO
+
+Not blocked by Block D/E. `NVA-B-GG22FIX-1` (`guard-git.mjs`, dispatched):
+scopes GG-22's disallowed-path check to the refused commit's own pathspec
+instead of the whole shared index (fixes a measured, reproducible deadlock
+between concurrent dispatches —
+`2026-09-03-gg-22-reads-the-shared-index-so-a-concurrent-dispatch-blocks-an-unrelated-ledger-commit.md`).
+`NVA-B-HGOCOPYSAFE-1` (`human-guard-override.mjs`, dispatched): resolves
+its last direct `boundedOpaqueCopyCommand` import — briefed as a genuine
+design-fork (extend `copy-safe-command.mjs` with an opaque-string mode, or
+determine and report that this needs its own PO decision like the sibling
+`codex-pretool-guard.mjs` conversion did) —
+`2026-08-28-po-facing-commands-are-not-uniformly-rendered-break-safe.md`.
+
 ## PO decisions and todos — collected during the autonomous run, not waited on
 
 Per the PO's 2026-09-02 instruction. None blocks further Nova-B work.
