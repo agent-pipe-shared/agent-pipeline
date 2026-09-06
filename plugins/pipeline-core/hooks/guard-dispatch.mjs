@@ -89,7 +89,13 @@ export function extractWorkflowDispatches(script) {
 // native `invoke_subagent` payload: `toolInput.Subagents` is an array, one entry per dispatched
 // subagent. An entry with no string `TypeName` carries nothing to check against a role template
 // and is skipped, not guessed at -- same fail-open posture as the rest of this file.
-function extractAntigravityDispatches(subagents) {
+//
+// Exported (NVA-B-SLICINGRUNNER-1) so a second consumer -- guard-slicing.mjs's Antigravity
+// fan-out recognizer -- can recover the same entries without a second, locally written copy of
+// this parsing logic. Same one-word enabling change, same shape, as `extractWorkflowDispatches`
+// above (adc165bb): the top-level hook body stays gated behind `isDirectInvocation` below, so
+// importing this module for the export alone still does not execute it.
+export function extractAntigravityDispatches(subagents) {
   const found = [];
   for (const entry of subagents) {
     if (!entry || typeof entry !== "object") continue;

@@ -272,6 +272,47 @@ check("GD18 allow  via the real path, an admissible dispatch still admits after 
   }
 }
 
+// GD20 -- NVA-B-SLICINGRUNNER-1: extractAntigravityDispatches is now exported the same way
+// extractWorkflowDispatches was (adc165bb/GD16 above) -- same subprocess-only proof, for the same
+// reason documented at the top of this file: a module-scope import here would be safe only as
+// long as the entrypoint gate stays in place, and a regression of that gate must fail this case
+// loudly (missing success marker) rather than silently vanish this whole file's coverage.
+{
+  const id = "GD20 extractAntigravityDispatches is importable and callable directly, via a subprocess, with no in-process import of the hook module";
+  const expected = [{ subagentType: "pipeline-core:critic", prompt: "hello world" }];
+  const successMarker = "GD20-IMPORT-OK";
+  const runnerDir = mkdtempSync(join(tmpdir(), "guard-dispatch-antigravity-import-check-"));
+  try {
+    const runnerPath = join(runnerDir, "import-check.mjs");
+    // The runner does the importing and calling; THIS file never imports guard-dispatch.mjs at
+    // its own module scope. Any stdin the runner's import might touch is fed explicitly via
+    // spawnSync's `input` option below -- never a shell redirect.
+    writeFileSync(runnerPath, [
+      "const mod = await import(process.argv[2]);",
+      "if (typeof mod.extractAntigravityDispatches !== 'function') {",
+      "  console.log('GD20-IMPORT-FAIL: extractAntigravityDispatches is not a function');",
+      "  process.exit(1);",
+      "}",
+      "const result = mod.extractAntigravityDispatches([{ TypeName: 'pipeline-core:critic', Prompt: 'hello world' }]);",
+      `console.log('${successMarker}');`,
+      "console.log('GD20-RESULT: ' + JSON.stringify(result));",
+    ].join("\n"));
+    const res = spawnSync(process.execPath, [runnerPath, GUARD], { input: "", encoding: "utf8", timeout: 10000 });
+    const stdout = res.stdout ?? "";
+    const stderr = res.stderr ?? "";
+    const problems = [];
+    if (res.status !== 0) problems.push(`child exited ${res.status} (expected 0) -- ${stderr.trim().slice(0, 200)}`);
+    // Fails loudly on ABSENCE of success, not merely on an error -- same rationale as GD16.
+    if (!stdout.includes(successMarker)) problems.push(`child stdout missing success marker "${successMarker}" -- got ${JSON.stringify(stdout)}`);
+    const expectedLine = `GD20-RESULT: ${JSON.stringify(expected)}`;
+    if (!stdout.split("\n").includes(expectedLine)) problems.push(`child stdout missing the exact line "${expectedLine}" -- got ${JSON.stringify(stdout)}`);
+    if (problems.length === 0) { pass += 1; console.log(`PASS  ${id}`); }
+    else { failures.push(`${id}: ${problems.join("; ")}`); console.log(`FAIL  ${id} -- ${problems.join("; ")}`); }
+  } finally {
+    rmSync(runnerDir, { recursive: true, force: true });
+  }
+}
+
 console.log(`\n${pass}/${pass + failures.length} cases passed.`);
 if (failures.length > 0) {
   console.log("Failures:");
