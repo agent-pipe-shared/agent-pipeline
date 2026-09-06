@@ -59,16 +59,12 @@ Commits survive compaction; intent does not — this block is the intent.
 
 **Sequence, with what is done:**
 
-1. DONE — `NVA-B-XPORTFIX-2` landed (`eb9c477f` fix + test 110, `3f30b2c7`
-   evidence), self-verified after the spent Critic cap; closes round-2
-   F-A/F-B. Open: the sibling `advisory-host-bridge.mjs` has the same
-   collapse (out of scope); both transport dispatches force-added captures
-   under `evidence/` against `.gitignore`/ADR-0063 — decide once, don't
-   revert twice.
-2. DONE — the resumed session consumed the resume-hint card, then ran the
-   gate at `2dca9b8d`: 515/516, one new red, fixed in `ec0b158c` (Gate
-   state above). PO queue #1 is done (`eecb4273`).
-3. DONE — this commit updates Gate state, CHANGELOG and the queue.
+1. DONE — `NVA-B-XPORTFIX-2` (`eb9c477f`, `3f30b2c7`), self-verified after
+   the spent cap. Open: sibling `advisory-host-bridge.mjs` same collapse;
+   captures force-added under `evidence/` against ADR-0063 — decide once.
+2. DONE — gate at `2dca9b8d` 515/516; the one red fixed in `ec0b158c`;
+   queue #1 done (`eecb4273`).
+3. DONE — Gate state, CHANGELOG and the queue updated (`befe4470`).
 4. IN PROGRESS — payload capture (queue #3): the PO restarted with the
    `Bash|Read` capture hook installed; the read-only dispatch
    `NVA-B-PENDINGDOC-CHECK-1` ran in the new session and generated subagent
