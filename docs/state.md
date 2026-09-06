@@ -69,8 +69,14 @@ the intent.
    captures under `evidence/NVA-B-XPORTFIX-2-*`. If it was cut at the turn
    limit: check `git status`, complete its record honestly as
    `completedBy: orchestrator`, commit its files path-scoped.
-2. **Then the final gate**: `node harness/scripts/verify.mjs` at the
-   candidate HEAD. Expected **515/515 for the first time today** — the TP-3
+2. **SEQUENCE AMENDED after a resume-hint card was captured** (its own
+   note: *"a live Resume-Hint card fails resume-consumption-check until a
+   later session runs `resume-hint.mjs consume`"*). So the gate cannot be
+   green in the session that captured the card. **The final gate moves to
+   the next session**: bootstrap consumes the card (mandatory step), THEN
+   run `node harness/scripts/verify.mjs` at the candidate HEAD. The PO may
+   therefore restart as soon as step 1 has landed — the restart serves the
+   payload capture AND unblocks the gate. Expected **515/515 for the first time today** — the TP-3
    registration landed under PO signature (`eecb4273`), both registration
    checkers are green, the dead parking entry is removed (`8bd5eb21`).
    Suite-span wall clock should be ≈455s (three lane evictions,
