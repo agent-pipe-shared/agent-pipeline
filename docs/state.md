@@ -24,7 +24,7 @@
 | 2026-08-11 to 2026-08-19 | Checkpoints 1-60 (2026-08-11 through 2026-08-19 checkpoint 60): superseded session narrative; durable decisions already live in ADRs/backlog/guardrails per this repo's own standing convention, not uniquely in this prose. | [docs/state-archive/2026-08-19--checkpoints-1-through-60.md](state-archive/2026-08-19--checkpoints-1-through-60.md) |
 | 2026-08-26 | 2026-08-25 Antigravity chat-gate-ceremony standardization, verify-tuner stage 2 acceptance, sprint-agy-runner delta4 Critic fix and candidate status | [docs/state-archive/2026-08-26--agy-runner-2026-08-25-handover.md](state-archive/2026-08-26--agy-runner-2026-08-25-handover.md) |
 
-## Current handover — sprint-alfred-epic: A1 schema recovery (2026-09-06)
+## Current handover — sprint-alfred-epic: A1 offline evidence and C1 core (2026-09-06)
 
 The PO approved plural `probeSurfaces[]` with correlated `observations[]`
 and deferred the combined suite/capability registration until A1-2 stabilizes
@@ -34,17 +34,41 @@ re-submitted the same accepted scope, recorded that approval, and returned
 Alfred to `implementation`, continuity revision 5. The current spec digest
 is `301d04ee27007f8fb2e1b49b0242e1adfc82c7630bb96a393e532c3f3cb95953`.
 
-Commit `33df8a4bf26f736a31f13303236e24bfac04d8e5` landed with 13 A1 tests and
-9 consumer-safe tests passing. Next: implement A1-2's four-surface probe
-matrix, then prepare the single TP-3 registration act. The A1-2 adapter/matrix
-kernel is now covered by the recorded 18/18 probe-matrix and 18/18 binding-
-regression TAP artifacts; this is injected-fixture evidence only, not a live
-enforcement pass. Native runner bridges/live measurements and executable A1-3
-evidence packaging remain open. Full Verify and Critic remain outstanding;
-standalone tests do not resolve registration debt. The accepted suite-plus-
-capability coupling stands for registration after A1-2 stabilization; no new
-PO design choice is requested. The PO selected Astra for the Elephant; no
-comparative performance or token-cost result is established.
+A1's offline CLI landed at `a141b856ecfe8be9afedff6122738c3eeea244ae`;
+[its evidence checkpoint](../specs/sprint-alfred-epic/evidence/a1-matrix-verification.md)
+landed at `df8e64ab7b6880d4e5a179e5ef953ff433fbe167`. Emission and matching
+readback report unavailable execution; stale-candidate rejection is recorded.
+Native runner bridges/live measurements remain pending; offline unavailable
+is not enforcement evidence. The later A1 regression has 25 passing tests in
+`evidence/a1-after-c1-regression.log`.
+
+The [C1 plan](../specs/sprint-alfred-epic/plans/c1-core.md) landed at
+`2d791bcec9e89708e4970699a91898375d42d123`, pure receipt core at
+`a6ab08abe56d1c834e541131876e71a1781727fb`, and classifier boundary fix at
+`a87677726d7d451862585b8e4870ddebb1325c4d`. The
+[C1 verification checkpoint](../specs/sprint-alfred-epic/evidence/c1-core-verification.md)
+records 39 passing tests, closed validation, deterministic classification,
+lineage joins and status-tagged metrics. Aggregation, emission, source
+authenticity checks, local reports and actual baseline collection have not started.
+
+Full Verify is historical exact-source-candidate evidence for
+`a87677726d7d451862585b8e4870ddebb1325c4d`, tree
+`ab73c82fe6678a545e8e8a44f2d16d622af057cc`, clean at start and finish:
+`evidence/alfred-wave0-full-verify.log` and
+`evidence/alfred-wave0-verify-summary.log` record exit 2, 506 steps, only
+`verify-suite-registration-check` failing; all other 505 steps, including
+security, exit 0. This does not verify the later documentation HEAD.
+
+Next is the PO-performed TP-3 maintenance act described in
+[coupled registration preparation](../specs/sprint-alfred-epic/evidence/a1-registration-preparation.md):
+register both A1 and C1 suites and their exact capability surfaces together.
+A1's prior option-1 approval stands; C1 adds required registration scope,
+without claiming approval or execution of a specific combined payload.
+Registration is the one observed integrated Verify blocker. Fresh Full Verify
+after registration, independent T1 Critic review and PO acceptance remain open.
+Alfred remains implementing; this is no feature close or full A1/C1/Wave-0
+completion. No new schema/profile decision is requested. The PO selected
+Astra for the Elephant; no comparative performance or token-cost result is established.
 
 ### Original Alfred implementation entry (2026-08-28)
 
