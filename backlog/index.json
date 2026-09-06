@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "5404aa2fd94716e2caa6bbe3c542744393ad71a9168a2d19bbc05dc9a4111372"
+    "transitionHead": "f7ce7fbeeec7df5b92a0c96265b6c546cbfe81f6981c9d45a0901f837627e873"
   },
   "counts": {
-    "open": 112,
+    "open": 113,
     "in_progress": 0,
     "closed": 521,
     "rejected": 3,
@@ -69,6 +69,15 @@
       "closureRepository": "self",
       "closureCommit": "b72e22b2cccfb49a9d4b74131b7b3f55518befca",
       "closureEvidence": "backlog/evidence/2026-09-04-nva-b-criticwrite-1-closure-verification.md"
+    },
+    {
+      "id": "pipeline.a-damaged-continuity-locks-the-session-out-of-the-repair-it-needs",
+      "status": "open",
+      "type": "requirement",
+      "owner": "pipeline",
+      "created": "2026-09-06",
+      "source": "PO ruling 2026-09-06: sessions still block themselves too often and the repair is still too complicated — an agent has to be able to get out of it alone. Reported from a consumer project driven through a different runner, where two closed features shared one evidence path; the PO explicitly framed it as generic, not as that project's problem.",
+      "deferred": false
     },
     {
       "id": "pipeline.a-deferred-item-is-terminal-so-a-live-defect-can-be-parked-invisibly",
