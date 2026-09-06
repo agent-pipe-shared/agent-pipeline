@@ -80,13 +80,51 @@ That reframes the defect entirely, and makes it worse rather than better:
   least two other guards are stale, so "wired in the repo" is not evidence of
   "enforcing in this session".
 
-**Next step is diagnosis, not design:** determine whether the hook fires in
-subagents at all here, and if it does, what `subagentIdentity()` returns for a
-dispatch launched through the `Agent` tool. Note that hook 9's matcher
-(`Bash|Edit|Glob|Grep|NotebookEdit|Read|Task|TodoWrite|WebFetch|WebSearch|Write`)
-names `Task` but not `Agent` or `Workflow`, while the sibling hook on the next
-line does name `Workflow` — whether that asymmetry matters for subagent
-counting is exactly the thing to measure rather than assume.
+## Diagnosis performed 2026-09-06 — four candidate causes eliminated, one remains
+
+Each line below was checked directly rather than reasoned about.
+
+1. **Registration is correct, including in the INSTALLED copy.**
+   `~/agent-pipeline-local-marketplace/plugins/pipeline-core/hooks/hooks.json`
+   carries the corrected enumerated matcher
+   `Bash|Edit|Glob|Grep|NotebookEdit|Read|Task|TodoWrite|WebFetch|WebSearch|Write`,
+   not the earlier match-all that "matched nothing". Staleness of the
+   installed plugin copy is therefore NOT the cause here.
+2. **The subagent discriminator would succeed.** `subagentIdentity()`
+   requires the transcript to sit in a directory named `subagents` with
+   filename `agent-<id>.jsonl`. Today's dispatch transcripts are exactly
+   that: `…/<session-uuid>/subagents/agent-<id>.jsonl`, with sibling
+   `.meta.json` files. The shape it looks for is present.
+3. **Hooks do reach subagents in this session.** Multiple dispatches today
+   were refused mid-run by `guard-lifecycle-ready` (closed-grammar denials)
+   and by the cross-repo write guard. This is the control that separates
+   "hooks do not fire in subagents" from "this hook does not fire".
+4. **The write location was verified, not assumed.** `counterPath()` is
+   `<git-common-dir>/agent-pipeline/dispatch-budget/<agentId>.json` — the
+   exact directory inspected. (Checked deliberately: two absence claims made
+   earlier in the same session turned out false because the search looked in
+   the wrong place.)
+
+**Result: after four dispatches, that directory holds only two
+`orchestrator-seen/` markers — no counter file, and no `unresolved.jsonl`
+either.** The absence of the diagnostic log matters as much as the absence of
+the counter: every identity branch that declines to count still records to
+`unresolved.jsonl` by design, precisely so the gap can never be silent. Both
+being empty means the guard is not reaching its identity branches at all for
+subagent tool calls.
+
+**What remains unknown, and needs a live probe rather than more reading:**
+why the hook does not execute for a subagent's tool call when its matcher
+names the tools that subagent uses and other hooks on sibling matchers do
+fire. One asymmetry worth measuring rather than assuming: hook 9's matcher
+names `Task` but neither `Agent` nor `Workflow`, while the sibling
+registration on the next line does name `Workflow` — dispatches in this
+session are launched through the `Agent` tool.
+
+**Consequence for planned work:** a second mechanical dispatch check
+(`guard-slicing.mjs`) is being built alongside this one. Building it without
+resolving this first risks a second guard that is registered, tested, and
+silently inert — the failure this guard's own comment warns about twice.
 
 ## Not yet decided (superseded in part by the correction above)
 
