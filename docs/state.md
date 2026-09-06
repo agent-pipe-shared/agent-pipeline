@@ -327,14 +327,13 @@ except for that one, PO-signature-gated pair.
 
 ### 2026-09-06: two backlog items landed, Critic found real issues in both
 
-**`NVA-B-HGOCOPYSAFE-1`** (`da6b381c` — import-source swap to the existing
-`copy-safe-command.mjs` re-export, no new capability needed, my briefing's
-premise was wrong): T1 Critic round 1 **FAIL**, F1 only — two claimed test
-results (`human-guard-override.test.mjs` 99/99, consumer-safe-paths 9/9)
-had no durable evidence artifact, narrative only. Fixed directly (evidence
-capture, no code change) — registry:
-`backlog/evidence/2026-09-06-nva-b-hgocopysafe-1-findings.md`. Bounded
-re-Critic (round 2, closing) dispatched.
+**`NVA-B-HGOCOPYSAFE-1` — CLOSED** (`da6b381c` — import-source swap to the
+existing `copy-safe-command.mjs` re-export, no new capability needed, my
+briefing's premise was wrong). Round 1 FAIL (F1: two claimed test results
+had no durable evidence artifact, narrative only) → fixed directly
+(evidence capture, no code change) → round 2 PASS, zero findings, F1
+independently re-verified against live files. Registry:
+`backlog/evidence/2026-09-06-nva-b-hgocopysafe-1-findings.md`.
 
 **`NVA-B-GG22FIX-1`** (`fe2d7afe` — pathspec-scoping fix, closed the
 2026-09-03 deadlock item): T1 Critic round 1 (partial) found a REAL
