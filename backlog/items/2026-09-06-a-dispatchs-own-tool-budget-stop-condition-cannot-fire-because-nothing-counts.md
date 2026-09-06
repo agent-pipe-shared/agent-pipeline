@@ -46,7 +46,49 @@ The second row is the expensive one. The budget exists to make a dispatch stop
 report and a harness-cut one does not. A stop condition that cannot fire
 converts every mis-sized budget into data loss instead of a clean stop.
 
-## Not yet decided
+## CORRECTION 2026-09-06, same day: the premise above is wrong in an important way
+
+This item was filed claiming nothing counts an agent's tool calls. **Something
+does.** `plugins/pipeline-core/hooks/guard-dispatch-budget.mjs` exists, is
+registered in `hooks/hooks.json` (hook 9), and was built for exactly this
+problem — its own registration comment states the motivation verbatim: *"three
+dispatches ran 62, 53 and 50 tool calls against a stated ~40-45 allowance, and
+one reported '34 logged' while the runtime recorded 62."* It is designed to
+count externally rather than trust the self-report, and to permit only closing
+acts once the cap is reached, so a dispatch stops before the harness cliff at
+the one point where a handover is still possible.
+
+**It is not counting.** After four budgeted dispatches on 2026-09-06,
+`<git-common-dir>/agent-pipeline/dispatch-budget/` contains only two
+`orchestrator-seen/` marker files and **no per-dispatch counter of any kind**.
+Every dispatch of the day was therefore either identified as the orchestrator,
+left unresolved, or never reached by the hook.
+
+That reframes the defect entirely, and makes it worse rather than better:
+
+- The real question is not "should we build a counter" but **"why is the
+  counter that exists silently not firing"** — the exact failure class this
+  guard's own comment warns about twice, in its own words: *"a matcher the
+  runtime does not recognise is a SILENT no-op that looks exactly like
+  success."* That comment records this hook having already been registered
+  once with a matcher that matched nothing while a live dispatch made 34 tool
+  calls.
+- A guard that was corrected once for silently matching nothing, and now
+  again writes no counters, is a guard whose enforcement has never been
+  confirmed live in this checkout.
+- `docs/state.md` separately records that installed marketplace copies of at
+  least two other guards are stale, so "wired in the repo" is not evidence of
+  "enforcing in this session".
+
+**Next step is diagnosis, not design:** determine whether the hook fires in
+subagents at all here, and if it does, what `subagentIdentity()` returns for a
+dispatch launched through the `Agent` tool. Note that hook 9's matcher
+(`Bash|Edit|Glob|Grep|NotebookEdit|Read|Task|TodoWrite|WebFetch|WebSearch|Write`)
+names `Task` but not `Agent` or `Workflow`, while the sibling hook on the next
+line does name `Workflow` — whether that asymmetry matters for subagent
+counting is exactly the thing to measure rather than assume.
+
+## Not yet decided (superseded in part by the correction above)
 
 Candidate directions, none chosen:
 
