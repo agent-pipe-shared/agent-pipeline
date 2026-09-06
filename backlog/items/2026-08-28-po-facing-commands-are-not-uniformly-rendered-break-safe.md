@@ -225,3 +225,21 @@ dispatch found but was out of its briefed scope to touch; (2) the
 repository-wide "every OTHER emitter" audit this item's acceptance criteria
 require remains unperformed. Both were out of this dispatch's briefed
 scope (`human-guard-override.mjs` only).
+
+## Progress note (2026-09-06, NVA-B-CODEXGUARDIMPORT-1)
+
+Resolved gap (1) above: `codex-pretool-guard.mjs`'s import switched from
+`../lib/project-onboarding-v3.mjs` to `../lib/copy-safe-command.mjs` for
+`boundedOpaqueCopyCommand` (commit `d398a662`), the identical re-export
+already used by `human-guard-override.mjs` and `antigravity-pretool-guard.mjs`
+— byte-identical function, zero behavior change. Full existing
+`codex-pretool-guard.test.mjs`: 38/38 pass, zero assertion changes
+(`backlog/evidence/2026-09-06-nva-b-codexguardimport-1-green.txt`).
+
+**Disclosed authorship note:** this commit was authored directly by the
+Elephant session rather than dispatched, submitted for the mandatory T1
+Critic review any guardrail-hook diff requires
+(`backlog/evidence/2026-09-06-nva-b-codexguardimport-1-authorship-disclosure.md`).
+
+Gap (2), the repository-wide "every OTHER emitter" audit, remains
+unperformed — this item stays `status: open`.
