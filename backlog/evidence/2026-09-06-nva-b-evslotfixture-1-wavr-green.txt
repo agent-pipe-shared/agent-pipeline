@@ -1,0 +1,41 @@
+command: node --test plugins/pipeline-core/lib/windows-assurance-verify-registration.test.mjs
+label: evslotfixture-wavr-green
+exitCode: 0
+--- stdout ---
+PASS WAVR01 accepts only the PO-approved three-suite Windows-assurance registration
+PASS WAVR02 missing top-level schema fails closed
+PASS WAVR02 missing top-level taskId fails closed
+PASS WAVR02 missing top-level authority fails closed
+PASS WAVR02 missing top-level suites fails closed
+PASS WAVR03 extra top-level keys fail closed
+PASS WAVR04 wrong schema fails closed
+PASS WAVR05 wrong task binding fails closed
+PASS WAVR06 noncanonical authority path fails closed
+PASS WAVR07 noncanonical authority digest fails closed
+PASS WAVR08 absolute authority paths fail closed
+PASS WAVR09 traversal authority paths fail closed
+PASS WAVR10 extra authority keys fail closed
+PASS WAVR11 absolute suite paths fail closed
+PASS WAVR12 traversal suite paths fail closed
+PASS WAVR13 arbitrary existing test targets fail closed
+PASS WAVR14 omitting authorized suite trusted-tool-resolution-tests fails closed
+PASS WAVR14 omitting authorized suite advisory-receipt-assurance-tests fails closed
+PASS WAVR14 omitting authorized suite toolchain-preflight-tests fails closed
+PASS WAVR15 adding a fourth suite fails closed
+PASS WAVR16 reordering the canonical allowlist fails closed
+PASS WAVR17 suite command input fails closed
+PASS WAVR18 detects a tampered authority matrix from the validator fixture root
+PASS WAVR19 Verify fails before ordinary suites with a named Windows-assurance registration step
+
+24 passed, 0 failed
+✔ plugins/pipeline-core/lib/windows-assurance-verify-registration.test.mjs (333.399532ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 349.70336
+
+--- stderr ---

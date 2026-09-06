@@ -214,6 +214,13 @@ function scopedRegistrationFailureFixture() {
       join(repoRoot, "harness", "scripts", "manual-check-logic.mjs"),
       join(fixtureRoot, "harness", "scripts", "manual-check-logic.mjs"),
     );
+    // verify.mjs also imports writeEvidenceAtomic from this sibling (harness/scripts/);
+    // the fixture root must carry it too or the copied verify.mjs fails to even load
+    // (NVA-B-EVSLOTFIXTURE-1, restoring what NVA-B-EVSLOTFIX-1's own new import broke here).
+    copyFileSync(
+      join(repoRoot, "harness", "scripts", "verify-evidence-writer.mjs"),
+      join(fixtureRoot, "harness", "scripts", "verify-evidence-writer.mjs"),
+    );
     copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "scoped-verify-registration.mjs"), registration);
     copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "windows-assurance-verify-registration.mjs"), windowsRegistration);
     copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "verify-resume.mjs"), join(fixtureRoot, "plugins", "pipeline-core", "lib", "verify-resume.mjs"));

@@ -1,0 +1,52 @@
+command: node --test plugins/pipeline-core/lib/scoped-verify-registration.test.mjs
+label: evslotfixture-svr-green
+exitCode: 0
+--- stdout ---
+PASS SVR01 accepts only the canonical three-suite SNT-7 registration bound to its PRD authority
+PASS SVR02 missing top-level schema fails closed
+PASS SVR02 missing top-level taskId fails closed
+PASS SVR02 missing top-level authority fails closed
+PASS SVR02 missing top-level suites fails closed
+PASS SVR03 extra top-level keys fail closed
+PASS SVR04 wrong schema fails closed
+PASS SVR05 missing authority prd fails closed
+PASS SVR06 extra authority keys fail closed
+PASS SVR07 missing PRD authority path fails closed
+PASS SVR07 missing PRD authority sha256 fails closed
+PASS SVR08 extra PRD authority keys fail closed
+PASS SVR09 wrong task binding fails closed
+PASS SVR10 wrong PRD path binding fails closed
+PASS SVR11 malformed PRD digest fails closed
+PASS SVR12 absolute PRD paths fail closed
+PASS SVR13 traversal PRD paths fail closed
+PASS SVR14 absolute suite paths fail closed
+PASS SVR15 traversal suite paths fail closed
+PASS SVR16 non-test suite targets fail closed
+PASS SVR17 missing .test.mjs targets relative to the repository root fail closed
+PASS SVR18 an arbitrary existing test path cannot replace an authorized SNT-7 suite
+PASS SVR19 omitting authorized suite scoped-verify-registration-tests fails closed
+PASS SVR19 omitting authorized suite workflow-preflight-tests fails closed
+PASS SVR19 omitting authorized suite interaction-continuity-tests fails closed
+PASS SVR20 adding a fourth otherwise-valid suite fails closed
+PASS SVR21 reordering the canonical allowlist fails closed
+PASS SVR22 missing suite name fails closed
+PASS SVR23 missing suite file target fails closed
+PASS SVR24 extra suite keys fail closed
+PASS SVR25 an empty suite list fails closed
+PASS SVR26 a duplicate suite name fails closed
+PASS SVR27 a duplicate suite file fails closed
+PASS SVR28 Verify writes only the failed scoped-registration evidence when its registered target is absent
+PASS SVR29 detects a tampered canonical PRD from the validator fixture root
+
+35 passed, 0 failed
+✔ plugins/pipeline-core/lib/scoped-verify-registration.test.mjs (332.262962ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 348.547573
+
+--- stderr ---
