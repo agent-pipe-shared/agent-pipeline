@@ -438,12 +438,47 @@ function recordOrchestratorObservation(commonDir, record, dependencies) {
  * `agent_type`) that an orchestrator payload does not. The orchestrator exemption stays
  * INSIDE this guard (the branch below), never folded into the matcher -- that separation is
  * what keeps the hook safe to widen.
+ *
+ * pipeline.dispatch-budget-partial-identity-is-visible (2026-09-07, NVA-B-BUDGETVIS-1, F1
+ * backlog/evidence/2026-09-06-nva-b-guardfix-critic-round1.md): the discriminator above is a
+ * two-way read (has a usable `agent_id` string, or does not) with no positive orchestrator-only
+ * fact to check against -- per the same measurement, the orchestrator payload's ENTIRE
+ * distinguishing fact is the clean absence of both `agent_id` and `agent_type`. A payload that
+ * carries neither a usable `agent_id` nor that clean absence -- `agent_type` present with no
+ * `agent_id` key at all, or an `agent_id` key present but blank or not a string -- is therefore
+ * neither measured shape: it is partial or malformed dispatch-identity evidence, exactly the
+ * class a host or runner variation could plausibly produce. Before this fix such a payload fell
+ * straight into the orchestrator branch below, silently exempt and merged into that branch's
+ * once-per-session marker with no way to tell it apart from a genuine orchestrator call
+ * afterward. It now returns `kind: "unresolved"` instead, which routes through
+ * `evaluateDispatchBudgetGuard`'s EXISTING `identity.kind === "unresolved"` branch into
+ * `recordUnresolved()` (`unresolved.jsonl`) -- no new sink, no change to the allow verdict (still
+ * exit 0), and no restoration of the transcript-path-keyed reasons that branch used to carry
+ * before `6372b984` (those tested a discriminator the 2026-09-06 measurement disproved; this is a
+ * new reason keyed on the payload's actual key set, not a revival of the old one). The two
+ * measured shapes are untouched: a payload with a usable `agent_id` is still `subagent`; a payload
+ * with neither an `agent_id` key nor an `agent_type` key is still `orchestrator`, exactly as
+ * before, including every legacy fixture already pinned in the test suite that never carries
+ * either key.
  */
 function dispatchBudgetCallerIdentity(input) {
   const agentId = input?.agent_id;
   if (typeof agentId === "string" && agentId.trim() !== "") {
     const agentType = typeof input?.agent_type === "string" ? input.agent_type : undefined;
     return { kind: "subagent", agentId, agentType };
+  }
+  const isObjectInput = typeof input === "object" && input !== null;
+  const hasAgentIdKey = isObjectInput && Object.prototype.hasOwnProperty.call(input, "agent_id");
+  const hasAgentTypeKey = isObjectInput && Object.prototype.hasOwnProperty.call(input, "agent_type");
+  if (hasAgentIdKey || hasAgentTypeKey) {
+    const agentIdRaw = hasAgentIdKey ? input.agent_id : undefined;
+    const agentTypeRaw = hasAgentTypeKey ? input.agent_type : undefined;
+    const reason = !hasAgentIdKey
+      ? "agent-type-without-agent-id"
+      : (typeof agentIdRaw === "string" && agentIdRaw.trim() === "")
+        ? "agent-id-present-but-blank"
+        : "agent-id-present-but-not-a-string";
+    return { kind: "unresolved", reason, agentIdRaw, agentTypeRaw };
   }
   return { kind: "orchestrator" };
 }
