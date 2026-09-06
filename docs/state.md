@@ -70,9 +70,20 @@ focused A1 and C1 checks pass 25 and 39 tests respectively. The sanctioned
 GMW close completed, appended the human revocation audit, and returned an
 absent window. No maintenance lift remains active.
 
-Next are fresh Full Verify on the resulting clean candidate and independent
-T1 Critic review; both remain pending. Normal continuation needs no new
-approval or signature. Native A1 evidence, C1 emission and the measured
+The [registered Verify gate handoff](../specs/sprint-alfred-epic/evidence/registered-verify-gate-handoff.md)
+records completed Full Verify on clean candidate
+`e23ff27e9fd318cbf4fd38c70ef8f61e5eec3340`, tree
+`85002d1a60669d137bbf6178c3237633ef7753f4`: exit 2, 508 steps, 507 green,
+only `security-scan` failing. Its confirmed finding is a deterministic public
+GMW revoke ID; the exact content/path/rule/position-bound scanner exception
+awaits a PO decision and has not been applied. Independent T1 review also
+remains pending: source discovery found the selected Critic launch protocol,
+but no inspected production consumer launching the actual Critic and no live
+transport receipt. Model admission alone cannot clear that gate. The handoff
+names the proposed adapter owner and acceptance criteria without authorizing
+Nova, plugin or guard changes. No new signature ceremony is requested
+automatically. These Verify results do not cover this later documentation
+commit. Native A1 evidence, C1 emission and the measured
 14-day baseline remain open, as does PO acceptance.
 Alfred remains implementing; this is no feature close or full A1/C1/Wave-0
 completion. No new schema/profile decision is requested. The PO selected
