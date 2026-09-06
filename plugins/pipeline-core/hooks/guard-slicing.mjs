@@ -11,9 +11,9 @@
  *
  * NOT WIRED into `hooks.json` by this dispatch -- that file is TP-4 and on
  * `NEVER_LIFTABLE_KERNEL_PATHS`; wiring it is an attended PO operator-tool
- * run outside any session (precedent: `harness/scripts/wire-dispatch-budget-hook.mjs`).
- * Built and unit-tested only, exactly like `guard-dispatch-budget.mjs` before
- * its own wiring dispatch.
+ * run outside any session, the same route `guard-dispatch-budget.mjs`'s own
+ * header names. Built and unit-tested only, exactly like
+ * `guard-dispatch-budget.mjs` before its own wiring dispatch.
  *
  * NEVER BLOCKING. Every path returns exit 0. This mechanism is a delivered
  * default, not a gate -- Decision 5 of the ADR explicitly rejects a hard
@@ -27,8 +27,9 @@
  * unexpected exception to a silent allow -- a slicing nudge is never worth
  * denying, or even visibly failing, a tool call over.
  *
- * TWO TRIGGERS (ADR Decision 4), rate-limited, sharing ONE threshold constant
- * (`SLICING_THRESHOLD`, currently 3 -- PSP-0's N; corrected 2026-09-06 from
+ * TWO TRIGGERS (ADR Decision 4), each fired at most once per run/batch,
+ * sharing ONE threshold constant (`SLICING_THRESHOLD`, currently 3 -- PSP-0's
+ * N; corrected 2026-09-06 from
  * an earlier "2nd" that contradicted PSP-0's "N=2 is permitted but never
  * nudged for"). No second threshold and no timestamp window are introduced
  * anywhere in this file -- the ADR's "Open parameter" section measured a
@@ -48,7 +49,14 @@
  *   the in-flight call (which may itself still grow into a fan-out later in
  *   the same turn), so the 3rd single can only be counted once it is a
  *   COMPLETED, already-recorded turn -- which is necessarily one call later
- *   than the call that produced it.
+ *   than the call that produced it. Fires on EXACT equality with
+ *   `SLICING_THRESHOLD`, never `>=` -- ADR Decision 4: "Fires once per run;
+ *   any recognized fan-out resets the run" and "A nudge on every dispatch
+ *   becomes ambient noise." Since the run length is recomputed fresh from
+ *   history on every call and grows by exactly one between consecutive
+ *   non-resetting calls, exact equality crosses the threshold exactly once
+ *   per run with no separate rate-limit state needed (see the comment at the
+ *   comparison itself for the one accepted cold-start edge case).
  * - Trigger B (prospective): a `TodoWrite` call whose `tool_input.todos`
  *   array (Claude Code's documented shape -- `{content, status, activeForm}`
  *   per item; no repository precedent for this shape was found to check
@@ -444,7 +452,19 @@ function evaluateTriggerA({ input, toolName, toolInput, sessionId, commonDir, no
     }
   }
 
-  const advisoryEmitted = runLength >= SLICING_THRESHOLD;
+  // Exact equality, not >=: ADR Decision 4 -- "Fires once per run; any recognized
+  // fan-out resets the run" and "Rate limiting is part of the trigger, not a
+  // refinement. A nudge on every dispatch becomes ambient noise." Since runLength
+  // is recomputed fresh from history on every call and grows by exactly one
+  // between consecutive non-resetting calls (this hook fires on every dispatch
+  // call once wired), it crosses SLICING_THRESHOLD exactly once per run -- so
+  // "fires once per run" needs no separate rate-limit state, unlike trigger B's
+  // ledger-backed dedup. (A cold-start edge case is accepted, not hidden: if the
+  // hook starts observing a session whose history already exceeds the threshold
+  // -- e.g. wired mid-session -- runLength can start above SLICING_THRESHOLD and
+  // this run's one nudge is silently skipped rather than firing late; that is the
+  // safe direction, a missed nudge, not a repeated one.)
+  const advisoryEmitted = runLength === SLICING_THRESHOLD;
   const fanout = toolName === WORKFLOW_TOOL_NAME || inFlightSiblingCount >= 2;
 
   const record = buildLedgerRecord({

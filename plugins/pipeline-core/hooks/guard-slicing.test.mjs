@@ -158,6 +158,22 @@ test("GS5b: SLICING_THRESHOLD is the single source of the count used by trigger 
   assert.equal(SLICING_THRESHOLD, 3);
 });
 
+test("GS5c: trigger A fires ONCE per run -- a continuing run past the threshold does not nudge again", () => {
+  // Four completed singles precede the current call (one more than GS5's three).
+  // ADR Decision 4: "Fires once per run; any recognized fan-out resets the run" --
+  // a nudge on every dispatch of a continuing run would be exactly the "ambient
+  // noise" the ADR rejects. This case fails if the comparison regresses from
+  // exact equality back to `runLength >= SLICING_THRESHOLD`.
+  const rows = [dispatchRow("m1", "Task"), dispatchRow("m2", "Task"), dispatchRow("m3", "Task"), dispatchRow("m4", "Task")];
+  const store = makeStore({ [ORCH_TRANSCRIPT]: transcriptText(rows) });
+  const current = { subagent_type: "pipeline-core:goldfish-mechanic", prompt: "fifth one, run already spent its nudge" };
+  const result = evaluateSlicingGuard(
+    { transcript_path: ORCH_TRANSCRIPT, session_id: "s1b", tool_name: "Task", tool_input: current },
+    baseOptions(store),
+  );
+  assert.equal(result.stdout, "", "the run's one nudge already fired at exactly 3 -- the 4th completed single must not fire again");
+});
+
 // --- In-flight-turn exclusion (the correctness crux) ---------------------
 
 test("GS6a: in-flight turn already written to the transcript is excluded by identity, not counted as a 4th single", () => {
