@@ -35,5 +35,22 @@ shape `<tmp>/cache/<marketplace>/<plugin>/` that
 `docs/claude-local-plugin-development.md` documents for a git-sourced
 install — so the old anchor resolves none of the three references and the
 absence assertions, the schema one included, are all true; the fixture
-comment then states exactly that. Dispatched as `NVA-B-XPORTROOT-2`; round 2
-follows on the correction commit.
+comment then states exactly that. Dispatched as `NVA-B-XPORTROOT-2`, which
+**stopped on a briefing defect** (record
+`evidence/dispatch-record-NVA-B-XPORTROOT-2.json`, outcome
+`stopped-briefing-defect`; its probe `evidence/NVA-B-XPORTROOT-2-anchor-probe.json`):
+the first R4 amendment prescribed a three-segment layout and named an anchor
+one level deeper than `resolve(HERE, "..", "..", "..")` actually yields —
+the same shape of error (a claim the assertions would not prove) that F1
+reported, made a second time by the dispatcher. R4 is re-amended with the
+four-segment cache shape and an anchor computed by `path.resolve` before it
+was written; re-dispatched as `NVA-B-XPORTROOT-3`; round 2 follows on that
+correction commit.
+
+**Dispatcher-side rule, inherited from this (the third of the day's kind):**
+a path or formula prescribed in a briefing is computed first — one `node`
+probe with the real `resolve` call — never written from a mental count of
+segments. Two consecutive briefings on the same fixture carried an
+uncomputed path claim, and both were caught downstream (once by the Critic,
+once by the dispatch's own probe) at the cost of a Critic round and a
+stopped dispatch.

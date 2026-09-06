@@ -26,19 +26,26 @@ its procedure so a reviewer can read requirements only.
   imports the copied adapter, and invokes it with the same stubs as the
   existing green case. The check is red against the pre-fix module and green
   after; both runs are captured by `capture-evidence.mjs`.
-  *Amended 2026-09-06 after Critic round 1, F1:* the layout has NO
-  `plugins/pipeline-core` segment above the plugin root — the whole plugin
-  tree is copied to `<tmp>/cache/agent-pipeline/pipeline-core` (the runner
-  cache shape `docs/claude-local-plugin-development.md` documents for a
-  git-sourced install), so that the pre-fix anchor, three levels above the
-  adapter file, is `<tmp>/cache/agent-pipeline`. The check asserts that none
-  of `roles/critic.md`, `templates/prompts/critic-review.md`, and
+  *Amended 2026-09-06 after Critic round 1, F1, and re-amended the same day
+  after dispatch NVA-B-XPORTROOT-2 stopped on an arithmetic error in the
+  first amendment:* the layout has NO `plugins/pipeline-core` segment above
+  the plugin root — the whole plugin tree is copied to
+  `<tmp>/cache/agent-pipeline/pipeline-core/0.6.1-local` (the four-segment
+  runner cache shape `<cache>/<marketplace>/<plugin>/<version>/` that
+  `docs/claude-local-plugin-development.md` documents for a git-sourced
+  install), so that the pre-fix anchor — three levels above the adapter
+  file `<plugin-root>/scripts/codex-critic-app-server.mjs`, computed with
+  `resolve(HERE, "..", "..", "..")` — is `<tmp>/cache/agent-pipeline`. The
+  check asserts that none of `roles`, `templates`, and
   `plugins/pipeline-core/scripts/critic-verdict.schema.json` exists under
   that anchor or under `<tmp>`, and its comment claims exactly what those
-  assertions prove. (The first version prescribed
-  `<tmp>/marketplace/plugins/pipeline-core`, under which the schema
-  sub-clause was unsatisfiable by construction — a dispatcher-side spec
-  error.)
+  assertions prove. (Two dispatcher-side spec errors preceded this text: the
+  first version prescribed `<tmp>/marketplace/plugins/pipeline-core`, under
+  which the schema sub-clause was unsatisfiable by construction; the second
+  prescribed a three-segment `<tmp>/cache/agent-pipeline/pipeline-core`
+  whose pre-fix anchor is `<tmp>/cache`, not the `<tmp>/cache/agent-pipeline`
+  it named. The anchor above was computed by `path.resolve` before being
+  written down.)
 - **R5 — Existing cases unchanged.** Every existing check in
   `codex-critic-host.test.mjs` and `codex-critic-isolation.test.mjs` keeps
   passing; no existing check is edited, weakened or removed.
