@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.read-scope-tilde-expansion-mismatch
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-06
+closure_repository: self
+closure_commit: 1062b50a399958dfb91f079d53768d746f6fad15
+closure_evidence: "backlog/items/2026-09-06-a-leading-tilde-path-argument-is-admitted-as-inside-the-project-root.md"
 created: 2026-09-06
 sprint: nova-b
 tracking: "Nova B — while triaging NVA-B-READCONTAIN-1's closure, the Elephant independently checked whether the restored read-scope containment accounts for shell tilde expansion. It does not: the guard's parser never expands a leading `~` in a path-taking argument, so it evaluates the LITERAL string `~/.ssh/id_rsa` as a (nonexistent) path under the project root, while the actual shell expands `~` to the real home directory before the command ever runs. Confirmed live via evaluateLifecycleReadyGuard() directly (never via an executed Bash cat of a real credential path)."
@@ -139,4 +143,12 @@ cross-reference this item and its evidence, plus name the
 `2026-09-06-the-installed-plugin-copy-enforcing-this-session-predates-todays-guard-fixes.md`
 (the Critic's live reachability probe found this fix, though correct in
 source, was NOT yet enforced by this session's own installed plugin copy).
+
+## Closed, 2026-09-06
+
+AC-4 satisfied: `docs/adr/draft-read-scope-containment-boundary.md` (the
+ADR `NVA-B-READCONTAIN-1`/`-2` owed, authored by the same Elephant session
+that committed to this item's own AC-4 follow-up note above) cross-
+references this item by name and evidence path in its "current scope-gap
+inventory" section.
 

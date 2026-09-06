@@ -96,7 +96,9 @@ honest boundary rather than assuming the lane is now uniformly hardened:
   only the single-command shape is admitted. Disclosed in
   `NVA-B-READCONTAIN-2`'s own commit message as a deliberate scope
   boundary (would need a three-function signature change not required by
-  that task's DoD), not yet filed as its own item.
+  that task's DoD). Folded into the rg-pipe item below (same shape: a
+  pipeline lane not receiving a root set or discipline the single-command
+  lane already has).
 - **grep-pipe carries no location containment at all**, in either the
   pre-removal, removed, or restored state — `NVA-BL-76` never scoped it in.
 - **A leading-`~` argument was admitted as inside the project root** (a
@@ -129,6 +131,17 @@ honest boundary rather than assuming the lane is now uniformly hardened:
   own Critic dispatches (unrelated to the guard itself, but discovered in
   the same work). Tracked:
   `2026-09-06-backlog-item-strip-for-dispatch-does-not-remove-a-resolution-section.md`.
+- **This restoration is correct in source but was NOT live-enforced for
+  this session while the work was landing.** This session's own enforcing
+  guard resolved to a separately-installed marketplace copy of
+  `guard-lifecycle-ready.mjs`, six commits and roughly two days stale,
+  predating this whole restoration entirely — confirmed by a T1 Critic's
+  live reachability probe (a synthetic marker path, never a real
+  credential) during `NVA-B-TILDEFIX-1`'s review. This is a deployment/
+  install-sync gap, not a defect in the restoration itself, but it means
+  any claim that the restored containment is "live" needs this caveat
+  until an operator resyncs the installed copy. Tracked:
+  `2026-09-06-the-installed-plugin-copy-enforcing-this-session-predates-todays-guard-fixes.md`.
 
 ## What this decision does NOT do
 
@@ -146,11 +159,15 @@ honest boundary rather than assuming the lane is now uniformly hardened:
 
 ## Consequences
 
-**Positive:** the 2026-08-29 item's remedy is real again — the
+**Positive:** the 2026-08-29 item's remedy is real again IN SOURCE — the
 `GUARD-READ-SCOPE-OUTSIDE-ROOT` refusal, the reachability-lift
 classification, and the bounded-additional-roots mechanism all match what
 that item's closure originally claimed, so
-`check-backlog-done-predicate.mjs` no longer reports it as a REGRESSION. The
+`check-backlog-done-predicate.mjs` no longer reports it as a REGRESSION.
+Whether it is enforced for a GIVEN session depends on that session's
+installed plugin copy being current — see the scope-gap inventory's final
+entry above; this decision does not, by itself, make the restoration live
+everywhere it is claimed to hold. The
 legitimate transcript/memory read need is met without reopening the whole
 lane, closing the exact failure mode `c8c7f449` introduced. The decision
 and its current honest boundary are now recorded where EL-04 requires: this

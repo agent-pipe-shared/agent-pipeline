@@ -91,6 +91,19 @@ realpath-awareness for the whole `rg`-pipe family) is the larger of the two
 and should land after, informed by whatever shared-home decision the tilde
 fix makes for its own cross-file rejection.
 
+## Also folded into this item's scope, 2026-09-06 (found during NVA-B-READCONTAIN-2)
+
+The cat-pipeline family (`isBoundedCatPipeline`) does not receive the two
+session-derived exception roots `NVA-B-READCONTAIN-2` added (the session
+transcript file, the session memory directory) — reading either through a
+`cat <path> | grep ...` shape is refused; only the single-command shape is
+admitted. `NVA-B-READCONTAIN-2`'s own commit message names this a
+deliberate scope boundary ("would need a three-function signature change
+not required by that task's DoD"), disclosed rather than fixed. Both this
+gap and the `rg`-pipe realpath gap above are the same shape — a pipeline
+lane not receiving a containment discipline or root set the single-command
+lane already has — so they belong in one item rather than two.
+
 ## Acceptance criteria
 
 - The `rg`-to-`rg`/`rg`-to-`head` bounded pipeline resolves a symlinked
@@ -101,6 +114,11 @@ fix makes for its own cross-file rejection.
   `guard-lifecycle-ready.test.mjs`'s `dotdotThroughSymlinkFixture()`) proves
   it.
 - The stale doc comment above `approvedReadPath` is corrected.
+- The cat-pipeline family (`isBoundedCatPipeline`) is threaded through to
+  accept the same session-derived extra roots the single-command/
+  git-pipeline/`&&`-chain lanes already receive, with a regression test
+  proving a transcript-file or memory-dir read through a `cat ... | ...`
+  shape is admitted the same way the single-command shape already is.
 - Full existing regression suites for both touched files stay green.
 - This item's resolution (or continued deferral) is recorded in the ADR
   NVA-B-READCONTAIN-1/-2 owe.
