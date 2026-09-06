@@ -294,6 +294,33 @@ marketplace/plugin update + `/reload-plugins`
 (`references/freshness.md`'s documented remedy). Filed:
 `2026-09-06-the-installed-plugin-copy-enforcing-this-session-predates-todays-guard-fixes.md`.
 
+### 2026-09-06: first full verify.mjs gate this session — NOT green
+
+Last known-green was `7cc0b649` (2026-09-02, 506 suites); only individual
+suites had been run since, across a full day of dispatches. First full gate
+this session (candidate `2ed047a1` or later) found 8 failing suites, all
+pre-existing and unrelated to any of today's read-scope work (confirmed:
+none of the three read-containment dispatches touched any file involved).
+Three fixed directly (mechanical manifest/doc-contract drift caused by this
+session's own SEC-11/ADR addition — a vendored-copy link path, an
+unclassified new doc, seven pre-existing `verify.mjs` suites missing from
+`docs/product-capability-inventory.json`): `doc-contract-check`,
+`observation-governance-tests`, `product-capability-inventory-tests`.
+**Two already known and PO-blocked** (Block D/E of `NVA-B-EVSLOTFIX-1`,
+see above — `verify-suite-registration-check`/`suite-registration-check`).
+**Two newly diagnosed, not yet fixed**, both traced to root cause but
+needing their own dispatch/review rather than a hasty hand-fix:
+`scoped-verify-registration-tests`/`windows-assurance-verify-registration-tests`
+(`NVA-B-EVSLOTFIX-1`'s new `verify-evidence-writer.mjs` import broke two
+fixtures that hardcode `verify.mjs`'s dependency list —
+`2026-09-06-nva-b-evslotfix-1-broke-two-verify-fixtures-that-hardcode-verify-mjs-dependencies.md`)
+and `codex-isolated-critic-protected-preimage-tests` (`roles/critic.md`'s
+content no longer matches its pinned integrity digest — needs review of
+WHEN/WHY it changed before re-pinning, not a blind hash update —
+`2026-09-06-roles-critic-md-drifted-from-its-pinned-protected-preimage-hash.md`).
+**A full local candidate is not yet achievable** — these two need their
+own dispatches before the next full verify attempt.
+
 ## PO decisions and todos — collected during the autonomous run, not waited on
 
 Per the PO's 2026-09-02 instruction. None blocks further Nova-B work.
