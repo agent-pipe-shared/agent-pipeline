@@ -97,3 +97,29 @@ the import-direction constraint explicitly in its briefing.
 - This item and its evidence are cross-referenced from the ADR that
   NVA-B-READCONTAIN-1/-2 owe (`backlog/items/2026-09-01-read-containment-was-removed-a-day-after-it-was-added-with-no-recorded-decision.md`,
   EL-04) as a known-closed (or known-open, if deferred past that ADR) gap.
+
+## Resolution
+
+Fixed by NVA-B-TILDEFIX-1 (dispatch, `claude-sonnet-5`, xhigh), commit
+`afc6af70a5e3c474e23409e2388ce2e354e3416c`. `rawReadCandidatePath()`
+(`guard-lifecycle-ready.mjs`) now returns a deterministic, syntactically
+absolute sentinel (`sep` + the literal value) for a leading `~`, covering the
+single-command, cat-pipeline, and git-pipeline lanes in one place (the latter
+two reuse it); `approvedReadPath()` (`guard-command-grammar.mjs`) carries an
+independent one-line twin, covering the `rg`-to-`rg`/`rg`-to-`head` bounded
+pipeline lane. Reproduce-first RED
+(`backlog/evidence/2026-09-06-nva-b-tildefix-1-red.txt`, 4 new tests failing
+against pre-fix code) then GREEN after the fix
+(`backlog/evidence/2026-09-06-nva-b-tildefix-1-green.txt`, 234/234, 229 prior
++ 5 new, 0 regressions) — both `~/...` and `~user/...` forms, all four lanes,
+synthetic marker paths only, no real credential path ever constructed or
+read. The first three acceptance criteria above are satisfied.
+
+The fourth acceptance criterion — cross-referencing this item from the ADR
+`backlog/items/2026-09-01-read-containment-was-removed-a-day-after-it-was-added-with-no-recorded-decision.md`
+(EL-04) owes — is **not done by this dispatch**: that file was an explicit
+no-go path in NVA-B-TILDEFIX-1's briefing (tracked separately, out of that
+dispatch's scope), so this item stays `open` rather than closed. Whoever
+authors that ADR still needs to cross-reference this item and its evidence
+as a now-closed gap.
+
