@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "10685a667d551d5c92cbe07b2a4b06f7685327627d3d1426ee50749dbbf4c055"
+    "transitionHead": "2b5a5a46699a71098a5dcad2bd4f282e76857e3d0f6cc962568ce7adb015ffc6"
   },
   "counts": {
-    "open": 101,
+    "open": 100,
     "in_progress": 0,
-    "closed": 518,
+    "closed": 519,
     "rejected": 3,
     "deferred": 11
   },
@@ -6817,13 +6817,17 @@
     },
     {
       "id": "pipeline.strip-for-dispatch-misses-resolution-heading",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-06",
       "source": "Elephant, 2026-09-06, while building the NVA-B-TILDEFIX-1 Critic dispatch: ran the strip script, then noticed the output still contained '## Resolution' with the fix's own justification prose, and manually removed it from the scratch copy used as SPEC_PATH before dispatching.",
       "deferred": false,
-      "tracking": "Nova B — discovered while assembling the T1 Critic dispatch for NVA-B-TILDEFIX-1. The backlog item being cited as spec had accumulated a '## Resolution' section (implementor narrative: which commit fixed it, how, and why the fix is believed correct) after its originating dispatch landed. backlog-item-strip-for-dispatch.mjs's output still carried that section verbatim — it only strips known Triage/Closure verdict-shaped headings, and 'Resolution' is not one of the patterns it recognizes."
+      "tracking": "Nova B — discovered while assembling the T1 Critic dispatch for NVA-B-TILDEFIX-1. The backlog item being cited as spec had accumulated a '## Resolution' section (implementor narrative: which commit fixed it, how, and why the fix is believed correct) after its originating dispatch landed. backlog-item-strip-for-dispatch.mjs's output still carried that section verbatim — it only strips known Triage/Closure verdict-shaped headings, and 'Resolution' is not one of the patterns it recognizes.",
+      "closedAt": "2026-09-06",
+      "closureRepository": "self",
+      "closureCommit": "c229cce0d578211cfe9769c3881826caa4d8288f",
+      "closureEvidence": "backlog/items/2026-09-06-backlog-item-strip-for-dispatch-does-not-remove-a-resolution-section.md"
     },
     {
       "id": "pipeline.subagent-identity-may-never-resolve-so-per-agent-scoping-is-inert",
