@@ -36,9 +36,15 @@ is `301d04ee27007f8fb2e1b49b0242e1adfc82c7630bb96a393e532c3f3cb95953`.
 
 Commit `33df8a4bf26f736a31f13303236e24bfac04d8e5` landed with 13 A1 tests and
 9 consumer-safe tests passing. Next: implement A1-2's four-surface probe
-matrix, then prepare the single TP-3 registration act. Full Verify and Critic
-remain outstanding; standalone tests do not resolve registration debt. The PO selected Astra for
-the Elephant; no comparative performance or token-cost result is established.
+matrix, then prepare the single TP-3 registration act. The A1-2 adapter/matrix
+kernel is now covered by the recorded 18/18 probe-matrix and 18/18 binding-
+regression TAP artifacts; this is injected-fixture evidence only, not a live
+enforcement pass. Native runner bridges/live measurements and executable A1-3
+evidence packaging remain open. Full Verify and Critic remain outstanding;
+standalone tests do not resolve registration debt. The accepted suite-plus-
+capability coupling stands for registration after A1-2 stabilization; no new
+PO design choice is requested. The PO selected Astra for the Elephant; no
+comparative performance or token-cost result is established.
 
 ### Original Alfred implementation entry (2026-08-28)
 

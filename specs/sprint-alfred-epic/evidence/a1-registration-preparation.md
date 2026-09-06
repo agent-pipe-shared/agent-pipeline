@@ -4,6 +4,19 @@ Status: preparation only. This file proposes a later PO TP-3 maintenance act;
 it does not edit `harness/scripts/verify.mjs`, the capability inventory, or
 any exclusion table.
 
+The accepted suite-plus-capability coupling remains the intended registration
+after A1-2 stabilization; no new PO design choice is requested here. The act
+is still open: this preparation is not registration evidence, and full Verify
+and Critic remain pending.
+
+Readback on 2026-09-06, after schema revision 2: the authoritative command
+`node harness/scripts/check-verify-suite-registration.mjs` exits 2 with
+exactly one unregistered suite (A1), four honoured exclusions, zero malformed
+exclusions, and zero expired exclusions. The capability reachability command
+`node harness/scripts/check-product-capability-inventory.mjs --check-reachability`
+exits 0. Historical exclusion counts below describe the earlier preparation;
+the current command output governs the maintenance act.
+
 ## Proposed registration
 
 Exact `TEST_SUITES` entry:
