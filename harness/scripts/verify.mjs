@@ -315,6 +315,7 @@ const TEST_SUITES = [
   // override's checks live in a separate file; the safety half is what is gated here.
   { name: "guard-testpath-override-tests", file: join(hooksDir, "guard-testpath-override.test.mjs") },
   { name: "guard-dispatch-tests", file: join(hooksDir, "guard-dispatch.test.mjs") },
+  { name: "guard-slicing-tests", file: join(hooksDir, "guard-slicing.test.mjs") },
   { name: "advisor-consult-v3-tests", file: join(repoRoot, "plugins", "pipeline-core", "skills", "advisor-consult", "advisor-consult-v3.test.mjs") },
   { name: "sandboxed-readonly-duty-tests", file: join(libDir, "sandboxed-readonly-duty.test.mjs") },
   { name: "sandboxed-readonly-host-bridge-tests", file: join(pluginScriptsDir, "sandboxed-readonly-host-bridge.test.mjs") },
