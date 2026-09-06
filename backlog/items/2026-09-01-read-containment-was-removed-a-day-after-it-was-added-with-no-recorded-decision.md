@@ -109,14 +109,24 @@ this item's own acceptance criterion 3 is not left resting only on
   This alone does NOT satisfy acceptance criterion 3 below; that is expected
   and is `NVA-B-READCONTAIN-2`'s job, not a regression of this dispatch.
   Findings registry: `backlog/evidence/2026-09-06-nva-b-readcontain-1-findings.md`.
-- **`NVA-B-READCONTAIN-2` (not yet dispatched, committed next step).** Adds
-  the two new session-derived exception roots this item's acceptance
-  criterion 3 requires — this session's own transcript-adjacent tree and
-  task-output tree, both resolved from the PreToolUse hook's own
+- **`NVA-B-READCONTAIN-2` (dispatching now).** Adds exactly two session-derived
+  exception roots, both resolved from the PreToolUse hook's own
   `transcript_path` field the way `claudeSessionMemoryDirectory` already does
-  for the write side (MEMPATH-1) — so the legitimate need stays met without a
-  blanket-open lane. Dispatched immediately after `NVA-B-READCONTAIN-1`'s
-  correction round lands and passes its re-Critic.
+  for the write side (MEMPATH-1, never pattern-matched): the transcript file
+  itself, and `dirname(transcript_path)/memory/` (reusing
+  `claudeSessionMemoryDirectory` directly). **Narrowed from the original scope
+  above (2026-09-06, Elephant judgement call, EL-03) to exclude the `/tmp`
+  task-output directory**: that directory's naming (`/tmp/claude-<uid>/
+  <encoded-cwd>/<session>/tasks/`) is not carried in any PreToolUse hook field
+  the way `transcript_path` is — admitting it would mean reconstructing
+  Claude Code's own tmp-layout scheme, exactly the "resolved rather than
+  pattern-matched" discipline this item's own re-narrow direction requires
+  MEMPATH-1-style roots to avoid. The task-output read need is left to the
+  Read tool or the signature-override ceremony instead; this is recorded as
+  an accepted scope limit in the ADR this item's acceptance criterion 1
+  requires, not silently dropped. `NVA-B-READCONTAIN-1`'s correction round
+  landed and was self-verified (two-round Critic cap exhausted with F4/F5
+  fixed) rather than re-Critic'd a third time — see its own entry above.
 
 An arbitrary external read outside every approved root stays refused,
 override-reachable by human signature, exactly as before `c8c7f449` removed
