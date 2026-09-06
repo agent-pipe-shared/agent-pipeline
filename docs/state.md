@@ -345,9 +345,10 @@ recurrence, folded into the existing test-gap item). Registry:
 
 **`NVA-B-CODEXGUARDIMPORT-1`** (`d398a662`): same fix as HGOCOPYSAFE-1, on
 `codex-pretool-guard.mjs` — self-disclosed EL-01 slip (Elephant-authored, no
-fast-path exception for a guardrail-hook file). Round 1 FAIL on two evidence
-gaps only, code confirmed correct; both remediated; round 2 (last allowed)
-in progress. Registry:
+fast-path exception for a guardrail-hook file). Round 1 FAIL, two evidence
+gaps only, remediated; round 2 (closing) **PASS**, cap exhausted. F1
+disposed as an accepted, reviewed process violation (code confirmed
+correct, no further action). Registry:
 `backlog/evidence/2026-09-06-nva-b-codexguardimport-1-findings.md`.
 
 ## PO decisions and todos — collected during the autonomous run, not waited on
