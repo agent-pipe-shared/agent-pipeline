@@ -22,13 +22,23 @@ its procedure so a reviewer can read requirements only.
   reference is `lstat`ed before the child starts, a symbolic link or a
   non-regular file is refused.
 - **R4 — Regression check with a real installed layout.** One new check in
-  the registered suite builds the installed layout under a temporary root
-  (the whole plugin tree copied to `<tmp>/marketplace/plugins/pipeline-core`,
-  with no `roles/`, `templates/`, or `plugins/pipeline-core/scripts/critic-verdict.schema.json`
-  at `<tmp>/marketplace` or `<tmp>`), imports the copied adapter, and invokes
-  it with the same stubs as the existing green case. The check is red against
-  the pre-fix module and green after; both runs are captured by
-  `capture-evidence.mjs`.
+  the registered suite builds an installed layout under a temporary root,
+  imports the copied adapter, and invokes it with the same stubs as the
+  existing green case. The check is red against the pre-fix module and green
+  after; both runs are captured by `capture-evidence.mjs`.
+  *Amended 2026-09-06 after Critic round 1, F1:* the layout has NO
+  `plugins/pipeline-core` segment above the plugin root — the whole plugin
+  tree is copied to `<tmp>/cache/agent-pipeline/pipeline-core` (the runner
+  cache shape `docs/claude-local-plugin-development.md` documents for a
+  git-sourced install), so that the pre-fix anchor, three levels above the
+  adapter file, is `<tmp>/cache/agent-pipeline`. The check asserts that none
+  of `roles/critic.md`, `templates/prompts/critic-review.md`, and
+  `plugins/pipeline-core/scripts/critic-verdict.schema.json` exists under
+  that anchor or under `<tmp>`, and its comment claims exactly what those
+  assertions prove. (The first version prescribed
+  `<tmp>/marketplace/plugins/pipeline-core`, under which the schema
+  sub-clause was unsatisfiable by construction — a dispatcher-side spec
+  error.)
 - **R5 — Existing cases unchanged.** Every existing check in
   `codex-critic-host.test.mjs` and `codex-critic-isolation.test.mjs` keeps
   passing; no existing check is edited, weakened or removed.
