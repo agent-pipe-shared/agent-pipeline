@@ -60,39 +60,35 @@ Commits survive compaction; intent does not — this block is the intent.
 
 **Sequence, with what is done:**
 
-1. DONE — `NVA-B-XPORTFIX-2` (`eb9c477f`, `3f30b2c7`), self-verified after
-   the spent cap. Open: sibling `advisory-host-bridge.mjs` same collapse;
-   captures force-added under `evidence/` against ADR-0063 — decide once.
-2. DONE — gate at `2dca9b8d` 515/516; the one red fixed in `ec0b158c`;
-   queue #1 done (`eecb4273`).
-3. DONE — Gate state, CHANGELOG and the queue updated (`befe4470`).
-4. DONE — payload capture (queue #3) ANSWERED. No payload carries a
-   `…/subagents/agent-<id>.jsonl` path; subagent and orchestrator alike carry
-   the PARENT transcript. The discriminator is the `agent_id` key, which only
-   a subagent payload has. Record:
-   `backlog/evidence/2026-09-06-dispatch-budget-guard-discriminator-measured.md`.
-   The TP-4 `hooks.json` ceremony (queue #2) is no longer blocked by this.
-5. DONE — Codex installed-root defect fixed (`b5a181ce`, corrected in
-   `573180b8`), two T1 Critic rounds PASS
-   (`2026-09-06-nva-b-xportroot-1-critic-round1.md`); ADR-0080 accepted
-   (`07d6041f`); positioning inputs persisted to
+1–7. DONE. Local candidate stamped `6565190d` (base 0.6.1; the 0.6.2 bump
+   comes with the release), gate **516/516 at `c784a462`**, installed by the
+   PO and read back as loaded. Codex installed-root defect fixed
+   (`b5a181ce`/`573180b8`, two T1 rounds PASS); ADR-0080 accepted
+   (`07d6041f`); positioning inputs at
    `specs/sprint-nova-epic/design/2026-09-06-positioning-*` (`c90f9131`) —
-   the D block reads those, never `scratch/`.
-6. DONE — local re-stamp `6565190d` (base 0.6.1; the 0.6.2 bump comes with
-   the release); gate **516/516 at `c784a462`**. PO then installed it;
-   preflight reads back `0.6.1+claude.20260906172530.87af6b6` as loaded.
-7. DONE — D.1. `94277a0b`/`a82a1415` put the local candidate on the front
-   doors; **PO rule: user docs always describe the NEXT release, never a
-   local candidate or its branch** — corrected in `9a3c188f`. Reader's Critic
-   (Lektor) round 1 in `2026-09-06-doc-reader-review-round1.md`: ten
-   findings, "audit" appears in 2 of 6 front doors against an audit-obligated
-   audience. PO queue gained items 10–12.
-8. IN FLIGHT (PO afk, autonomous Nova-B work), all four disjoint, Critic
-   rounds pending: `NVA-B-CASPREFLIGHT-3` (async spawn for the handshake
-   race; apply only on 10/10), `NVA-B-T1WIRE-1` (CLI + consumer for the
-   unreachable T1 PO override), `NVA-B-WIREAUDIT-1` (measure every
-   built-but-unwired module), `NVA-B-BUDGETGUARD-2` (suite hardening +
-   `agent_id` discriminator).
+   the D block reads those, never `scratch/`. D.1 landed and was corrected:
+   **PO rule — user docs always describe the NEXT release, never a local
+   candidate or its branch** (`9a3c188f`). Reader's Critic round 1:
+   `2026-09-06-doc-reader-review-round1.md`. Payload capture ANSWERED — no
+   payload carries a subagent transcript path, the discriminator is the
+   `agent_id` key, so the TP-4 ceremony (queue #2) is unblocked. Still open
+   from step 1: `advisory-host-bridge.mjs` may share the same collapse, and
+   the force-added `evidence/` captures need one ADR-0063 decision.
+8. DONE (autonomous block, PO afk). `CASPREFLIGHT-3`: async spawn measured
+   4/10 against a 10/10 rule, nothing applied; the blocked-event-loop theory
+   is dead (the two never overlap). `T1WIRE-1`: CLI landed (`b3b7cb7e`), the
+   consumer deliberately NOT wired — the selection layer collapses every
+   preflight code into `preflight-failed`, so the fallback's allowed codes
+   never arrive, and the briefed composition point is bypassed by
+   `runSelectedCriticHost`. `WIREAUDIT-1`: 415 modules, 202 reachable; the
+   pattern is cluster-shaped (`afk-*`, `advisory-*`, `control-*`), the count
+   is an upper bound (no spawn detection). `WRITECONTAIN-1`: the read lane's
+   symlink bypass does NOT reach the write lane — measured, case (a).
+   Six new backlog items filed and reconciled; PO queue at items 1–13.
+9. IN FLIGHT: `NVA-B-BUDGETGUARD-2` (suite hardening + `agent_id`
+   discriminator), `NVA-B-CLOSECOLLIDE-1` (a close refuses an evidence path
+   another closed feature holds — PO-approved prevention). **Critic rounds
+   pending on every commit of block 8 and 9; none has had one.**
 
 **Idea-level facts that must not be re-derived wrongly:**
 
