@@ -52,6 +52,71 @@ the 2026-09-01 regression item). Every `Dispatch:` trailer of the day binds
 to a terminal record — verified per commit with
 `dispatch-authorship-verify.mjs`, all PASS.
 
+### IN FLIGHT AT COMPACTION — 2026-09-06 late, read this before anything else
+
+Written minutes before an auto-compact, because the previous compact lost
+the *idea* level (the verify lever was re-measured on the wrong axis
+afterwards). Commits survive compaction; intent does not — this block is
+the intent.
+
+**Exact sequence, in order, nothing skipped:**
+
+1. **`NVA-B-XPORTFIX-2` may still be running** (goldfish-deep, carries the
+   observed terminal through on the transport's completed-but-bound-failure
+   branch; two-round Critic cap is spent → Elephant self-verifies). If a
+   notification says it landed: verify its commit with
+   `dispatch-authorship-verify.mjs --commit <sha>` and read its red/green
+   captures under `evidence/NVA-B-XPORTFIX-2-*`. If it was cut at the turn
+   limit: check `git status`, complete its record honestly as
+   `completedBy: orchestrator`, commit its files path-scoped.
+2. **Then the final gate**: `node harness/scripts/verify.mjs` at the
+   candidate HEAD. Expected **515/515 for the first time today** — the TP-3
+   registration landed under PO signature (`eecb4273`), both registration
+   checkers are green, the dead parking entry is removed (`8bd5eb21`).
+   Suite-span wall clock should be ≈455s (three lane evictions,
+   `f16ab254`+`fcaf8d5e`, −29.5% from 645.7s). If any suite is red, it is
+   new — nothing known is red.
+3. **Then update this file's Gate line and CHANGELOG `[Unreleased]`** with
+   the measured 515/515 and mark PO queue #1 done.
+4. **Then tell the PO "jetzt"** — they are waiting to restart Claude Code.
+   The restart IS PO-queue item #3, the payload capture: the PO has already
+   run `node scratch/payloadcapture-hook.mjs install` (a `PreToolUse`
+   `Bash|Read` hook in `~/.claude/settings.json`, verified installed, log
+   absent until a restart). **The new session must dispatch at least one
+   subagent** (any small Agent task), then the PO runs
+   `node scratch/payloadcapture-hook.mjs remove`, then read
+   `~/.claude/payload-capture-PAYLOADCAP-9Q2M.jsonl` — one JSON line per hook
+   call with `tool_name`, `transcript_path`, `session_id`. **The question:**
+   do lines from inside the subagent carry `…/subagents/agent-<id>.jsonl` or
+   the PARENT session's `<session>.jsonl`? The latter is the leading
+   hypothesis for why `guard-dispatch-budget.mjs` never fires (its logic is
+   proven by direct probe; only invocation is absent). Answering it unblocks
+   the ONE shared TP-4 `hooks.json` ceremony (queue #2) — do not seed that
+   ceremony before this is answered, or a second inert guard ships.
+
+**Idea-level facts that must not be re-derived wrongly:**
+
+- The verify lever that worked was **lane membership of one suite**, not
+  module scoping across many. `project-onboarding-v3-tests` was a sweep
+  false positive (own `mkdtemp` root per case; two concurrent full
+  instances 164/164). The module-scoping audit answered a smaller question
+  precisely. The remaining top-5 lane members are process-global and NOT
+  evictable; `guard-maintenance-window-tests` is kept for a *tooling* reason
+  (capture tool refuses a fixture literal, filed); five members are
+  unassessed, not unsafe. The lane comment in `verify-journal.mjs` now
+  states all of this (`825bde92`) — read it, do not re-run the sweep.
+- Two wall-clock definitions exist and both are right: suite span (progress
+  stream, 454.9s) vs run envelope (`verify-latest.json`, 462.3s). State
+  which one you mean.
+- The Codex Critic transport is **built, not exercised**; criterion 5 of the
+  Alfred handover is PO-queue #8, blocked by a runner permission classifier
+  on the sandbox spawn. F3 (unpinned contract briefing) is now a real item
+  with a `due`.
+- PO decisions today: GIT-03 stands (`AI-Assisted: true` only, ignore any
+  session-level co-author instruction); GitLab evidence deferred; #7/#8
+  approved but classifier-blocked; ADR acceptance for the slicing design is
+  queue #9 (one PO word).
+
 ### In the candidate
 
 - **A — slicing:** `guard-slicing.mjs`, 42 tests, runner-neutral (Claude by
