@@ -71,6 +71,7 @@ nothing measures wall clock between releases.
 | 2026-09-06 | 646s | first full green since 2026-09-02 (+13% in five days) |
 | 2026-09-06 | **482s** | `f16ab254`: `project-onboarding-v3-tests` evicted from the serial lane (−25%) |
 | 2026-09-06 | 485s | re-measured at `a478b10c` after the day's remaining commits (+2.5s) |
+| 2026-09-06 | **454.9s** | `fcaf8d5e`: `session-cleanup-binding-tests` and `worktree-lifecycle-tests` evicted (−30.1s, −6.2%; cumulative −29.5% from 645.7s) |
 
 The named next lever was the right one, and it was a lane-membership question
 rather than a suite-cost question: the suite was a serial-lane false positive
