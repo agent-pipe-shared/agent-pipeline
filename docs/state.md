@@ -288,63 +288,56 @@ route; grep-pipe carries no location containment at all, in either state).
 Not a regression from this dispatch — worth naming in the ADR below as a
 known, pre-existing scope boundary rather than letting it stay implicit.
 
-**T1 Critic round 1 (opus, max, functional-equivalent-read-only): FAIL
-(partial — 24-tool base budget exhausted before `guardrails/security.md`/
-`guardrails/global.md`; findings stand regardless).** Three findings, all
-disclosed and fixed via a correction dispatch (in progress): F1, a stale
-`ADR-0059 Decision 6` citation misattributing a mutation-only decision as
-authority for a read classification; F2 (the serious one) — the restored
-containment checks resolve targets lexically (`commandPath`/`pathInside`,
-no `realpathSync`), so a symlink planted inside the project root pointing
-outside it bypasses the boundary, unlike the same file's write lane
-(`isPathWithinRealpathedRoot`), which already closes exactly this; F3, two
-edge shapes (trailing `2>/dev/null` on a single read, the same via `&&`)
-lost test coverage and land on a technically-wrong denial code. Findings
-registry: `backlog/evidence/2026-09-06-nva-b-readcontain-1-findings.md`.
-Two minors also noted (ADR pending; evidence logs not commit-bound).
-
-**Correction 1 landed, `bc00a861`:** F1 fixed; F2 fixed for the direct-symlink
-shape (new `isRealpathedWithinBoundary`, 226→227 tests green); F3 disclosed,
-not fixed. (Process fix: a separate `-rework`-record broke
-`dispatch-authorship-verify`; merged into the standard-named record.)
-**Re-Critic round 2 (bounded delta, opus/max) then found F2 only PARTIAL**:
-`isRealpathedWithinBoundary` realpaths a candidate `commandPath()` already
-lexically collapsed via `resolve()`, so `<symlink>/../<outside>/<file>`
-still bypasses it — live-reproduced, `cat` of that shape read content from
-outside the fixture root. F1 confirmed resolved; F5 minor (unused DI
-param, untested catch) also found. Registry updated (F4/F5):
-`backlog/evidence/2026-09-06-nva-b-readcontain-1-findings.md`. Two-round
-cap now exhausted — **correction 2 landed, `177bf884`: F4/F5 fixed
-(candidate now built raw via `rawReadCandidatePath()`, never
-`resolve()`/`join()`-collapsed, so `existsSync`/`realpathSync` walk the
-same path the shell actually resolves; boundary itself now realpathed
-too; `isRealpathedWithinBoundary` exported for a direct fail-closed test).
-Self-verified by the Elephant directly, no third round: 229/229 full
-regression, all three other DoD checks, authorship PASS on all three
-commits (`cbc30756`, `bc00a861`, `177bf884`).** A same-shaped
-`resolve()`-before-realpath gap MAY also affect the WRITE lane's
-`isPathWithinRealpathedRoot` (unverified — depends on host-tool internals
-this repo can't inspect); filed separately:
-`2026-09-06-the-write-lane-symlink-containment-check-may-share-the-read-lanes-dotdot-bypass.md`.
+**Two T1 Critic rounds (opus, max), two-round cap then exhausted, closed
+self-verified by the Elephant, no third round:** round 1 FAIL (F1 stale ADR
+citation, F2 symlink bypass since `commandPath`/`pathInside` never realpath,
+F3 two edge-shape denial-codes) → correction 1 `bc00a861` (F1 fixed, F2
+direct-symlink case fixed) → round 2 found F2 only partial (a `..`-through-
+symlink shape still bypassed, live-reproduced) plus F5 minor → correction 2
+`177bf884` fixed both (raw, never lexically-collapsed candidate now feeds
+`existsSync`/`realpathSync`), self-verified: 229/229, authorship PASS on
+`cbc30756`/`bc00a861`/`177bf884`. Full detail:
+`backlog/evidence/2026-09-06-nva-b-readcontain-1-findings.md`. A same-shaped
+gap MAY also affect the WRITE lane's `isPathWithinRealpathedRoot`
+(unverified): `2026-09-06-the-write-lane-symlink-containment-check-may-share-the-read-lanes-dotdot-bypass.md`.
 
 Triaging -1's closure found three more gaps, each its own item, 2026-09-06: a
-leading-`~` argument is live-CONFIRMED admitted (literal-string mismatch, no
+leading-`~` argument was live-CONFIRMED admitted (literal-string mismatch, no
 tilde-expansion anywhere) in every read lane incl. the `rg`-pipe family
-(`2026-09-06-a-leading-tilde-path-argument-is-admitted-as-inside-the-project-root.md`,
-`NVA-B-TILDEFIX-1`, **dispatched, in flight**, before -2 since -2 builds on
-this floor); `rg`-to-`rg`/`rg`-to-`head`'s `approvedReadPath` stays fully
-lexical, weaker even than -1's round-1 fix
+(`2026-09-06-a-leading-tilde-path-argument-is-admitted-as-inside-the-project-root.md`);
+`rg`-to-`rg`/`rg`-to-`head`'s `approvedReadPath` stays fully lexical, weaker
+even than -1's round-1 fix
 (`...the-rg-pipe-family-stays-lexical-and-symlink-unaware-after-readcontain-1.md`,
-after -2); F3's denial-code gap has its own item too
+scheduled after -2); F3's denial-code gap has its own item too
 (`...suppressed-and-chained-outside-root-reads-land-on-the-wrong-denial-code.md`).
 
-`NVA-B-READCONTAIN-2` (waits on TILDEFIX-1) adds exactly two exception roots
+**`NVA-B-TILDEFIX-1` landed** (`afc6af70`/`c88c4f1f`/`aa389a17`, one 80-turn
+resume for its ledger step) fixing the tilde gap in all four lanes; T1 Critic
+(opus, max) **PASS**, 4 minors, no correction round —
+`backlog/evidence/2026-09-06-nva-b-tildefix-1-findings.md`. Minors spawned
+two more items (`commandpath-and-two-lane-tests-still-carry-the-untreated-tilde-construction`,
+class-level-covered `F2`) plus fixed F4 (QG-06 owner/date) in place.
+
+**Urgent, needs PO/operator action — found by that Critic's live reachability
+probe, not by this diff:** this session's own enforcing guard is the
+INSTALLED marketplace copy
+(`/home/skar667/agent-pipeline-local-marketplace/plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs`,
+confirmed a plain file, not a symlink), which predates `NVA-B-READCONTAIN-1`
+entirely — six commits of today's read-scope fixes are NOT yet live-enforced
+for this checkout's own sessions. Fix: PO runs the marketplace/plugin update
++ `/reload-plugins` (`references/freshness.md`'s own documented remedy — the
+agent side never copies source). Filed:
+`2026-09-06-the-installed-plugin-copy-enforcing-this-session-predates-todays-guard-fixes.md`
+(also asks why `pipeline-start-preflight.mjs`'s freshness check reported
+`ready` despite this).
+
+`NVA-B-READCONTAIN-2` (next to dispatch) adds exactly two exception roots
 from the PreToolUse hook's own `transcript_path`: the transcript file itself,
 and `dirname(transcript_path)/memory/` via `claudeSessionMemoryDirectory`/
 MEMPATH-1 — NOT the `/tmp` task-output dir (would guess Claude Code's
 tmp-layout rather than reuse a resolved value; that need routes via Read/
 signature ceremony, an accepted ADR scope limit, not solved here). Own fresh
-T1 Critic round. Then: author the ADR (boundary, all three gaps, this limit)
+T1 Critic round. Then: author the ADR (boundary, all gaps above, this limit)
 and close both the 2026-09-01 and 2026-08-29 items.
 
 ## PO decisions and todos — collected during the autonomous run, not waited on
@@ -371,6 +364,9 @@ Per the PO's 2026-09-02 instruction. None blocks further Nova-B work.
 6. **Nova B is 68 open items, not the 19 the STATUS.md tracking column shows.**
    The authoritative field is `sprint: nova-b` in frontmatter. Recorded because
    "work the Nova B backlog" and "work 68 items" are different asks.
+7. **Action needed now: run the marketplace/plugin update + `/reload-plugins`.**
+   This session's live guard is stale by six commits (see the READCONTAIN-1/2
+   section above) — today's read-scope fixes are not yet actually enforced.
 
 ## Operational head
 
