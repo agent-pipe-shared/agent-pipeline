@@ -60,3 +60,16 @@ lose.
   proving the actual current (or hardened) behavior — this shape had zero
   test coverage before this item.
 - Full existing regression suite stays green.
+
+## Progress note (2026-09-06, NVA-B-GLRMINORS-1, goldfish-deep)
+
+Fixed via option (a) (commit `571e67a8`): `isApprovedSingleCommandReadArg()`'s
+`extraRoots` loop now checks identity first (`raw === extra`, preserving the
+self-lift symmetry other read-scope checks rely on), then refuses outright
+when `extra` is a FILE and `raw` is not identical to it — before
+`isRealpathedWithinBoundary`'s ancestor walk ever runs. New regression test
+pins the `<transcriptFile>/<child>` shape (previously zero coverage). Full
+suite 239/239, `check-consumer-safe-paths` green, both independently
+re-verified. **T1 Critic review still owed before this item can close** —
+guardrail-hook file, mandatory regardless of dispatch-level `criticSkip`
+(none was set).

@@ -47,3 +47,16 @@ home per this repository's normal tracking convention.
 - Regression tests cover both shapes.
 - Every other command shape's existing denial code is unchanged (this is a
   refinement of an already-refusing path, never a change to what is admitted).
+
+## Not reached, 2026-09-06 (NVA-B-GLRMINORS-1, goldfish-deep) — correction to this item's own claimed code
+
+This item was bundled with Gap A (the transcript-file item) for review
+efficiency; the dispatch ran out of tool budget after Gap A and did not
+reach this gap — no code change landed for it. Its own reproduction found
+this item's stated denial code for the `&&`-chained shape is factually
+stale: the current actual code is `GUARD-PARSE-UNSUPPORTED`, not
+`GUARD-OPERATOR-UNAPPROVED` as this item's "The gap" section states (the
+single-command `2>/dev/null` shape's claimed `GUARD-REDIRECT-UNAPPROVED`
+was confirmed still accurate). A future dispatch should re-verify both
+codes fresh rather than trusting this item's text, and should size its own
+budget independently of any other bundled gap.
