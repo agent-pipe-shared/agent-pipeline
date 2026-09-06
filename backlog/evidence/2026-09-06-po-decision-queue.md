@@ -250,6 +250,34 @@ the reader-review record is built on the same mechanism.
 sixth of the decisions it was built to cover, and any new mechanism modelled
 on it inherits the same quiet gap.
 
+## 13. The change-request procedure is Nightwing, not Alfred — decide whether that stands
+
+**Needs:** a scheduling call, and only that. No signature, no ceremony.
+
+The PO asked on 2026-09-06 whether the change-request procedure should be
+pulled forward, and wondered whether it might already be coming with Alfred.
+Measured: it is issue #97, "Support PO-approved design amendments during
+implementation without full rebaseline", labelled `sprint:nightwing`, P1/L,
+with an activation gate on issue #67 (the integrated Nova/Cyborg/Phoenix
+baseline). Alfred does not carry it.
+
+It is not a process rule that can be adopted quickly. It defines a
+rebase-stable Authority Revision over a closed authority boundary and
+deliberately dissolves the mutable digest chain that currently binds the PRD
+to the Spec — a foundation change, not a procedure laid alongside the
+existing one.
+
+What is separable, and worth knowing: issue #97's scope item 7 already states
+the principle a blocked session needs, in almost these words — unapproved
+authority drift must return a typed result with sanctioned recovery actions
+rather than a generic lifecycle deadlock, and the guard must admit exactly
+those actions. That principle is therefore settled and no longer needs
+deciding. What is open is only whether it gets applied to other triggers at
+their own size, which the continuity-deadlock item now proposes.
+
+**If never decided:** the procedure waits for #67, which is the current plan,
+and each deadlock class gets handled on its own as it appears.
+
 ---
 
 ## Not on this list, deliberately
