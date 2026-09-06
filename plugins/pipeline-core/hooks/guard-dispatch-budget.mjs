@@ -422,12 +422,38 @@ function recordOrchestratorObservation(commonDir, record, dependencies) {
  * @param {() => string} [options.nowFn] clock override (tests only)
  * @param {object} [options] also doubles as the dependency-injection bag for every helper above (tests only)
  */
+/**
+ * pipeline.dispatch-budget-discriminator-is-agent-id (2026-09-06, NVA-B-BUDGETGUARD-2):
+ * THIS guard's own identity step -- deliberately NOT `subagentIdentity()` above, which stays
+ * exported and UNCHANGED because guard-lifecycle-ready.mjs's GL-09 bootstrap-receipt gate
+ * also imports and relies on it; that caller is out of this dispatch's scope and was not
+ * touched or re-verified here. CORRECTION to this file's own "Identity chain" header block
+ * above: measured 2026-09-06 against two live goldfish dispatches
+ * (backlog/evidence/2026-09-06-dispatch-budget-guard-discriminator-measured.md), no real
+ * PreToolUse payload -- subagent or orchestrator alike -- ever carries a
+ * `.../subagents/agent-<id>.jsonl` transcript_path; every payload carries the PARENT
+ * session's own transcript_path and session_id. `subagentIdentity()`'s discriminator was
+ * therefore never true in practice, and this guard's counter never moved. The real
+ * discriminator is the payload's key set: a subagent payload carries `agent_id` (and
+ * `agent_type`) that an orchestrator payload does not. The orchestrator exemption stays
+ * INSIDE this guard (the branch below), never folded into the matcher -- that separation is
+ * what keeps the hook safe to widen.
+ */
+function dispatchBudgetCallerIdentity(input) {
+  const agentId = input?.agent_id;
+  if (typeof agentId === "string" && agentId.trim() !== "") {
+    const agentType = typeof input?.agent_type === "string" ? input.agent_type : undefined;
+    return { kind: "subagent", agentId, agentType };
+  }
+  return { kind: "orchestrator" };
+}
+
 export function evaluateDispatchBudgetGuard(input, options = {}) {
   const rootDir = options.rootDir ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd();
   const nowFn = options.nowFn ?? (() => new Date().toISOString());
   const rawTranscriptPath = input?.transcript_path;
 
-  const identity = subagentIdentity(input, options);
+  const identity = dispatchBudgetCallerIdentity(input);
   const commonDir = (options.resolveGitCommonDirFn ?? resolveGitCommonDir)(rootDir, options);
 
   if (commonDir === null) {

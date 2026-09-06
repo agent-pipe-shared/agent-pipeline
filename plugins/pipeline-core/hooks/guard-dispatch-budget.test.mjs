@@ -146,8 +146,11 @@ function seedSubagentFiles(maxTurns = 20) {
   };
 }
 
-function readInputObj(tool_input) {
-  return { transcript_path: SUBAGENT_TRANSCRIPT, tool_name: "Read", tool_input };
+// NVA-B-BUDGETGUARD-2: a subagent call now needs agent_id (and agent_type, for maxTurns
+// resolution) directly on the payload -- transcript_path is no longer read by this guard's
+// own identity step at all, though it is kept here for realism/logging.
+function readInputObj(tool_input, agentType = "pipeline-core:goldfish-deep") {
+  return { transcript_path: SUBAGENT_TRANSCRIPT, tool_name: "Read", tool_input, agent_id: "abc123", agent_type: agentType };
 }
 
 function orchestratorInputObj(tool_input = { file_path: "/x" }) {
@@ -197,7 +200,7 @@ test("subagentIdentity: a null transcript_path is unresolved (treated as absent)
   assert.equal(results[0].reason, "transcript-path-missing-or-relative");
 });
 
-test("evaluateDispatchBudgetGuard: an invalid-identity (present-but-relative transcript_path) call still fails open here, unaffected -- this guard's own documented fail-open-but-visible posture is unchanged by the new kind", () => {
+test("evaluateDispatchBudgetGuard (NVA-B-BUDGETGUARD-2): a payload without agent_id is the orchestrator to this guard regardless of its transcript_path shape -- exit 0", () => {
   const { results } = run({
     rootDir: FAKE_ROOT,
     steps: [{ op: "guard", input: { transcript_path: "relative/session/subagents/agent-x.jsonl", tool_name: "Read", tool_input: { file_path: "/x" } } }],
@@ -205,23 +208,19 @@ test("evaluateDispatchBudgetGuard: an invalid-identity (present-but-relative tra
   assert.equal(results[0].exitCode, 0);
 });
 
-test("evaluateDispatchBudgetGuard: an invalid-identity call is recorded under its own distinct branch and TRUE reason, never the misleading max-turns-unresolvable shape", () => {
+test("evaluateDispatchBudgetGuard (NVA-B-BUDGETGUARD-2): a payload without agent_id writes no counter and no unresolved.jsonl -- it is the orchestrator to this guard, full stop, whatever its transcript_path looks like", () => {
   const { results } = run({
     rootDir: FAKE_ROOT,
     steps: [
       { op: "guard", input: { transcript_path: "relative/session/subagents/agent-x.jsonl", tool_name: "Read", tool_input: { file_path: "/x" } } },
       { op: "getFile", path: `${COMMON_DIR}/agent-pipeline/dispatch-budget/unresolved.jsonl` },
+      { op: "listFiles" },
     ],
   });
   assert.equal(results[0].exitCode, 0);
-  const unresolvedRaw = results[1];
-  assert.ok(unresolvedRaw, "an invalid-identity call must still be recorded for visibility");
-  const record = JSON.parse(unresolvedRaw.trim());
-  assert.equal(record.kind, "invalid-identity");
-  assert.equal(record.branch, "invalid-identity");
-  assert.equal(record.reason, "transcript-path-present-but-not-absolute");
-  assert.notEqual(record.reason, "max-turns-unresolvable");
-  assert.notEqual(record.branch, "max-turns-unresolved");
+  assert.equal(results[1], null, "no agent_id means this guard's own identity step never inspects transcript_path at all, so no unresolved.jsonl entry is ever written for this call");
+  const counterFiles = results[2].filter((p) => p.includes("/dispatch-budget/") && !p.includes("orchestrator-seen") && !p.endsWith("unresolved.jsonl"));
+  assert.deepEqual(counterFiles, [], "no per-agent counter file is written for a payload with no agent_id");
 });
 
 test("subagentIdentity: missing sibling meta.json is unresolved", () => {
@@ -278,10 +277,11 @@ test("evaluateDispatchBudgetGuard: refuses a non-closing working call once the c
 test("evaluateDispatchBudgetGuard: each permitted closing act still passes after the cap", () => {
   const steps = [];
   for (let i = 1; i <= 5; i += 1) steps.push({ op: "guard", input: readInputObj({ file_path: "/x" }) }); // workingCap = 5
-  steps.push({ op: "guard", input: { transcript_path: SUBAGENT_TRANSCRIPT, tool_name: "Write", tool_input: { file_path: `${FAKE_ROOT}/evidence/dispatch-record-NVA-BUDGETGUARD-1.json`, content: "{}" } } });
-  steps.push({ op: "guard", input: { transcript_path: SUBAGENT_TRANSCRIPT, tool_name: "Bash", tool_input: { command: "git add -- evidence/x.json" } } });
-  steps.push({ op: "guard", input: { transcript_path: SUBAGENT_TRANSCRIPT, tool_name: "Bash", tool_input: { command: "git commit -F m.txt -- evidence/x.json" } } });
-  steps.push({ op: "guard", input: { transcript_path: SUBAGENT_TRANSCRIPT, tool_name: "Edit", tool_input: { file_path: `${FAKE_ROOT}/lib/x.mjs`, old_string: "a", new_string: "b" } } });
+  const AGENT_ID_FIELDS = { agent_id: "abc123", agent_type: "pipeline-core:goldfish-deep" };
+  steps.push({ op: "guard", input: { transcript_path: SUBAGENT_TRANSCRIPT, tool_name: "Write", tool_input: { file_path: `${FAKE_ROOT}/evidence/dispatch-record-NVA-BUDGETGUARD-1.json`, content: "{}" }, ...AGENT_ID_FIELDS } });
+  steps.push({ op: "guard", input: { transcript_path: SUBAGENT_TRANSCRIPT, tool_name: "Bash", tool_input: { command: "git add -- evidence/x.json" }, ...AGENT_ID_FIELDS } });
+  steps.push({ op: "guard", input: { transcript_path: SUBAGENT_TRANSCRIPT, tool_name: "Bash", tool_input: { command: "git commit -F m.txt -- evidence/x.json" }, ...AGENT_ID_FIELDS } });
+  steps.push({ op: "guard", input: { transcript_path: SUBAGENT_TRANSCRIPT, tool_name: "Edit", tool_input: { file_path: `${FAKE_ROOT}/lib/x.mjs`, old_string: "a", new_string: "b" }, ...AGENT_ID_FIELDS } });
   const { results } = run({ rootDir: FAKE_ROOT, files: seedSubagentFiles(20), steps });
   assert.equal(results[5].exitCode, 0, "dispatch-record write");
   assert.equal(results[6].exitCode, 0, "git add");
@@ -366,27 +366,83 @@ test("evaluateDispatchBudgetGuard: a write failure in the new orchestrator obser
   assert.equal(results[1].exitCode, 0);
 });
 
-test("evaluateDispatchBudgetGuard: an unresolvable identity allows the call AND records it for visibility", () => {
+test("evaluateDispatchBudgetGuard (NVA-B-BUDGETGUARD-2): a subagents/-shaped transcript_path with no agent_id is still the orchestrator to this guard -- transcript_path shape is no longer read at all for this guard's own identity step", () => {
   const { results } = run({
-    rootDir: FAKE_ROOT, // no meta.json seeded -> meta-file-missing
-    steps: [{ op: "guard", input: readInputObj({ file_path: "/x" }) }, { op: "getFile", path: `${COMMON_DIR}/agent-pipeline/dispatch-budget/unresolved.jsonl` }],
+    rootDir: FAKE_ROOT, // subagents/-shaped transcript_path, deliberately no agent_id, no meta.json seeded
+    steps: [
+      { op: "guard", input: { transcript_path: SUBAGENT_TRANSCRIPT, tool_name: "Read", tool_input: { file_path: "/x" } } },
+      { op: "getFile", path: `${COMMON_DIR}/agent-pipeline/dispatch-budget/unresolved.jsonl` },
+    ],
   });
   assert.equal(results[0].exitCode, 0);
-  const unresolvedRaw = results[1];
-  assert.ok(unresolvedRaw, "an unresolved-identity call must be recorded");
-  const record = JSON.parse(unresolvedRaw.trim());
-  assert.equal(record.reason, "meta-file-missing");
+  assert.equal(results[1], null, "no unresolved.jsonl entry is written -- a payload with no agent_id is simply the orchestrator now, regardless of transcript_path shape");
 });
 
-test("evaluateDispatchBudgetGuard: an unresolvable maxTurns (unknown agent definition) also allows and records", () => {
+test("evaluateDispatchBudgetGuard (NVA-B-BUDGETGUARD-2): an unresolvable maxTurns (unknown agent_type carried directly on the payload) still allows and records", () => {
   const { results } = run({
     rootDir: FAKE_ROOT,
-    files: { [META_PATH]: JSON.stringify({ agentType: "pipeline-core:not-a-real-agent", spawnDepth: 1 }) },
-    steps: [{ op: "guard", input: readInputObj({ file_path: "/x" }) }, { op: "getFile", path: `${COMMON_DIR}/agent-pipeline/dispatch-budget/unresolved.jsonl` }],
+    steps: [
+      { op: "guard", input: { agent_id: "abc123", agent_type: "pipeline-core:not-a-real-agent", tool_name: "Read", tool_input: { file_path: "/x" } } },
+      { op: "getFile", path: `${COMMON_DIR}/agent-pipeline/dispatch-budget/unresolved.jsonl` },
+    ],
   });
   assert.equal(results[0].exitCode, 0);
   const record = JSON.parse(results[1].trim());
   assert.equal(record.reason, "max-turns-unresolvable");
+  assert.equal(record.agentId, "abc123");
+  assert.equal(record.agentType, "pipeline-core:not-a-real-agent");
+});
+
+// NVA-B-BUDGETGUARD-2 -- both live-measured PreToolUse payload key sets
+// (backlog/evidence/2026-09-06-dispatch-budget-guard-discriminator-measured.md), pinned as
+// fixtures so a future regression back to guessing a transcript_path shape fails a test here
+// instead of silently reintroducing a discriminator no real payload satisfies.
+const ORCHESTRATOR_PAYLOAD_KEYS = ["cwd", "effort", "hook_event_name", "permission_mode", "prompt_id", "scratchpad_dir", "session_id", "tool_input", "tool_name", "tool_use_id", "transcript_path"];
+const SUBAGENT_PAYLOAD_KEYS = [...ORCHESTRATOR_PAYLOAD_KEYS, "agent_id", "agent_type"];
+
+function measuredOrchestratorPayload(overrides = {}) {
+  return {
+    cwd: "/fake/cwd", effort: "xhigh", hook_event_name: "PreToolUse", permission_mode: "default",
+    prompt_id: "p1", scratchpad_dir: "/fake/scratch", session_id: "sess-1",
+    tool_input: { file_path: "/x" }, tool_name: "Read", tool_use_id: "tu-1",
+    transcript_path: "/fake/session/parent.jsonl",
+    ...overrides,
+  };
+}
+
+function measuredSubagentPayload(overrides = {}) {
+  return { ...measuredOrchestratorPayload(), agent_id: "abc123", agent_type: "pipeline-core:goldfish-deep", ...overrides };
+}
+
+test("evaluateDispatchBudgetGuard (NVA-B-BUDGETGUARD-2): the two measured live PreToolUse payload key sets are pinned as fixtures", () => {
+  assert.deepEqual(Object.keys(measuredOrchestratorPayload()).sort(), [...ORCHESTRATOR_PAYLOAD_KEYS].sort());
+  assert.deepEqual(Object.keys(measuredSubagentPayload()).sort(), [...SUBAGENT_PAYLOAD_KEYS].sort());
+});
+
+test("evaluateDispatchBudgetGuard (NVA-B-BUDGETGUARD-2): the measured subagent-shaped fixture is counted -- a counter file is written carrying its agentId and agentType", () => {
+  const { results } = run({
+    rootDir: FAKE_ROOT,
+    files: seedSubagentFiles(20),
+    steps: [
+      { op: "guard", input: measuredSubagentPayload() },
+      { op: "getFile", path: `${COMMON_DIR}/agent-pipeline/dispatch-budget/abc123.json` },
+    ],
+  });
+  assert.equal(results[0].exitCode, 0);
+  const counter = JSON.parse(results[1]);
+  assert.equal(counter.agentId, "abc123");
+  assert.equal(counter.agentType, "pipeline-core:goldfish-deep");
+  assert.equal(counter.count, 1);
+});
+
+test("evaluateDispatchBudgetGuard (NVA-B-BUDGETGUARD-2): the measured orchestrator-shaped fixture is never counted -- no per-agent counter file is ever written for it", () => {
+  const { results } = run({
+    rootDir: FAKE_ROOT,
+    steps: [{ op: "guard", input: measuredOrchestratorPayload() }, { op: "listFiles" }],
+  });
+  assert.equal(results[0].exitCode, 0);
+  const counterFiles = results[1].filter((p) => p.includes("/dispatch-budget/") && !p.includes("orchestrator-seen"));
+  assert.deepEqual(counterFiles, []);
 });
 
 test("evaluateDispatchBudgetGuard: workingCap always equals each agent's own maxTurns minus the documented reserve", () => {
@@ -419,7 +475,7 @@ test("evaluateDispatchBudgetGuard: workingCap always equals each agent's own max
         [agentDefPath(agentName)]: `---\nname: ${agentName}\nmodel: sonnet\nmaxTurns: ${maxTurns}\ntools: Read\n---\nbody\n`,
       },
       steps: [
-        { op: "guard", input: readInputObj({ file_path: "/x" }) },
+        { op: "guard", input: readInputObj({ file_path: "/x" }, `pipeline-core:${agentName}`) },
         { op: "getFile", path: `${COMMON_DIR}/agent-pipeline/dispatch-budget/abc123.json` },
       ],
     });
