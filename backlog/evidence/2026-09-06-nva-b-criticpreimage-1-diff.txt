@@ -1,0 +1,71 @@
+command: git show 2c38d704f88685a58e8b580a9a3a9f6e9276e78e
+label: criticpreimage-diff
+exitCode: 0
+--- stdout ---
+commit 2c38d704f88685a58e8b580a9a3a9f6e9276e78e
+Author: The Agent-Pipeline Contributors <301875187+agent-pipe-shared@users.noreply.github.com>
+Date:   Sun Sep 6 05:08:28 2026 +0200
+
+    fix(critic-preimage): re-pin roles/critic.md digest after b72e22b2
+    
+    Independently confirmed via git log/git show that exactly one commit,
+    b72e22b2 (docs(critic): give CR-06-D a proven write command, not just
+    an authorization, Dispatch: NVA-B-CRITICWRITE-1), changed roles/critic.md
+    since the digest was last correctly pinned: a narrow +5-line addition to
+    Sec 5.5, mirrored identically in the vendored
+    plugins/pipeline-core/roles/critic.md copy. Both files are still
+    byte-identical to each other.
+    
+    Recomputes the pinned rawSha256 for roles/critic.md in
+    codex-isolated-critic-protected-preimage.v1.json using the same
+    raw-bytes SHA-256 the test itself computes (createHash("sha256") over
+    readFileSync bytes), matching the "actual" value the test's failure
+    already reported (d768eef7...).
+    
+    node --test plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.test.mjs
+    now passes all 4 checks; evidence captured.
+    
+    AI-Assisted: true
+    Dispatch: NVA-B-CRITICPREIMAGE-1 (goldfish)
+
+diff --git a/backlog/evidence/2026-09-06-nva-b-criticpreimage-1-green.txt b/backlog/evidence/2026-09-06-nva-b-criticpreimage-1-green.txt
+new file mode 100644
+index 00000000..c19af2c3
+--- /dev/null
++++ b/backlog/evidence/2026-09-06-nva-b-criticpreimage-1-green.txt
+@@ -0,0 +1,20 @@
++command: node --test plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.test.mjs
++label: criticpreimage-green
++exitCode: 0
++--- stdout ---
++ok 1 - F1 protected inventory is closed and names the autonomous-Critic policy baseline
++ok 2 - F1 protected paths are regular in-repository files without aliasing
++ok 3 - F1 current Critic execution surfaces remain byte-identical to the protected baseline
++ok 4 - F1 inventory records full lowercase SHA-256 values
++1..4
++✔ plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.test.mjs (82.99681ms)
++ℹ tests 1
++ℹ suites 0
++ℹ pass 1
++ℹ fail 0
++ℹ cancelled 0
++ℹ skipped 0
++ℹ todo 0
++ℹ duration_ms 99.705956
++
++--- stderr ---
+diff --git a/plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json b/plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json
+index 6aa5190c..a219b7ad 100644
+--- a/plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json
++++ b/plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json
+@@ -36,7 +36,7 @@
+     },
+     {
+       "path": "roles/critic.md",
+-      "rawSha256": "1eed846eb81efb7f967b9182bd284df80adfcbc70b2bfdc64df75104fbb9f6ae"
++      "rawSha256": "d768eef70c13df45f3a55a27ef6969d0f4375543c8d6b6270ac765dd49203119"
+     }
+   ]
+ }
+
+--- stderr ---
