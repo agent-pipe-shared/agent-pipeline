@@ -332,11 +332,11 @@ with a conjunctive Parallel-Safety Predicate and a staged notion of
 "enforced". T1 Critic round 1: **FAIL** on F1 (major) — and F1 was the
 Elephant's, not the design's: it struck the design's own BLOCKING empirical
 channel probe and wrote "the build may proceed" on documentation-only
-evidence, deferring the real check to an unowned, undated "whoever builds
-step 2". All seven findings corrected in `f17a63d1`; step 1 is blocking again
-with owner/pass-condition/failure-branch. Neutral registry:
-`backlog/evidence/2026-09-06-nva-b-parallelslicing-design-1-findings.md`.
-Closing round (two-round cap) dispatched.
+evidence. All seven corrected in `f17a63d1`. Closing round: **PASS**, bounded
+by that same step 1 — four more findings, F-A major (PSP-3 cited from two
+wrong incidents). F-A/F-B/F-C corrected, F-D filed as its own item. Cap
+exhausted; the Elephant self-verifies.
+Registries: `backlog/evidence/2026-09-06-nva-b-parallelslicing-design-1*`.
 
 **The build gate is one cheap PO action.** The channel probe needs no
 `hooks.json` ceremony: a temporary `PreToolUse` entry in the user-level

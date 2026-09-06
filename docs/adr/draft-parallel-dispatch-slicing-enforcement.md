@@ -45,9 +45,13 @@ redundant:
 - `2026-08-07-parallel-goldfish-dispatches-race-on-shared-checkout.md` is the
   risk register, not a design. Its incidents — three in one 2026-08-07 wave,
   recurring twice more (2026-08-09, 2026-08-12) — are the concrete cost of
-  getting slicing wrong: a sibling's finished commit destroyed
-  by another dispatch's `git reset --soft`; a shared-filename clobber; an
-  orphaned commit chain from a mis-fired worktree self-heal. Its remedies
+  getting slicing wrong: a matrix-row edit swept into a sibling's commit; a
+  sibling's finished commit destroyed by another dispatch's `git reset
+  --soft`; a shared-filename clobber; a staging-area sweep followed by an
+  unverified reset; an unscoped `--amend` landing on a sibling's commit.
+  (**Corrected 2026-09-06 after T1 Critic finding F-A:** this list previously
+  dropped incident 1 and substituted an orphaned commit chain that the item
+  does not contain.) Its remedies
   (per-task `dispatch-record-<taskId>.json`, the unverified-self-correction
   stop condition) reduce blast radius; they do not decide when to parallelize.
 
@@ -92,8 +96,14 @@ before it is built on**:
 
 1. **PreToolUse `hookSpecificOutput.additionalContext` on exit 0.** The
    structurally correct answer: non-blocking, model-reaching, attached to the
-   exact tool call. **No precedent in this repository** — `additionalContext`
-   here is SessionStart-only. Confirm against the live runner first.
+   exact tool call. **No `PreToolUse` precedent in this repository** — of the
+   five `additionalContext` emitters here, four are `SessionStart` and one is
+   `Stop` (`stop-suggest.mjs:306,386`, non-blocking); none is `PreToolUse`.
+   (**Corrected 2026-09-06 after T1 Critic finding F-B:** this said
+   "SessionStart-only", the same claim the risk table above had already been
+   corrected for in round 1 — the correction had not reached the normative
+   Decision section a reader arrives at first.) Confirm against the live
+   runner first.
 2. **PostToolUse `additionalContext` on the same tool call.** Arrives one beat
    later — after the first dispatch of the batch, before the second. Acceptable
    for the retrospective trigger, weaker for the prospective one.
@@ -139,7 +149,7 @@ the briefings themselves, without running anything.
   Only one side is. Field 2 (Context files) supplies the *read* set; field 4
   is **Forbidden** — prohibitions, not an affirmative write scope
   (`templates/prompts/goldfish-task.md`). Until the template gains a declared
-  write scope (Next steps step 6, explicitly out of scope for increment 1),
+  write scope (Next steps step 7, explicitly out of scope for increment 1),
   PSP-2 is a check the Elephant performs with the write set it must supply
   itself — better than unaided judgment because it names what to compare, but
   not mechanically decidable from today's briefings. Consequences below states
@@ -148,9 +158,22 @@ the briefings themselves, without running anything.
   `isolation: "worktree"`; **or** at most one slice commits and the rest hand
   back diffs; **or** the round is sequenced so exactly one commit is in flight
   at a time. The git index is a shared mutable resource that PSP-1 does not
-  cover — incident 2 of the 2026-08-07 item (a sibling's real commit discarded
-  by another dispatch's reset) and `workflow-dispatch.md`'s orphaned-chain
-  incident are both PSP-3 failures with clean PSP-1 file scopes.
+  cover, and the 2026-08-07 item carries two occurrences that show it with
+  **clean PSP-1 file scopes**: 2026-08-09 (`PHX-WP-DOC-1`/`-2`, "both writing
+  prose to disjoint *primary* doc files but sharing the one physical
+  checkout" — "the *shared* surface was the working tree's staging area
+  itself, not a named shared file", item `:128-136`), and 2026-08-12
+  (`AR05G`/`FAILCLOSED`, disjoint primary files; an unscoped
+  `git commit --amend` landed on the *other* dispatch's commit, item
+  `:158-176`). **Corrected 2026-09-06 after T1 Critic finding F-A:** this
+  previously cited incident 2 of the 2026-08-07 wave and an orphaned commit
+  chain. Both citations were wrong, and in the direction that flattered the
+  claim. Incident 2's own trigger was `#12`/`#14` material in the shared tree
+  and index (item `:46-50`) — the acceptance/tracking matrix, a file this
+  document's own PSP-1 denylist names — so it is a PSP-1 breach cascading into
+  commit-surface loss, not a clean-PSP-1 case. The orphaned commit chain
+  appears nowhere in that item at all. PSP-3 is still grounded; it was cited
+  from the wrong two incidents.
 
 **Deliberately not a condition: "each slice is independently verifiable by
 running its verify command."** That is the right idea and the wrong mechanism —
@@ -333,9 +356,11 @@ dispatch), a block on dispatch is a block on all execution work — the blast
 radius of a false positive is the whole session. (iii) The 2026-08-07 item
 records five incidents of what happens when parallel dispatch is chosen
 without the predicate holding — three in the 2026-08-07 wave plus recurrences
-on 2026-08-09 and 2026-08-12; of those, incident 2 and the orphaned chain are
-PSP-3 (commit-surface) failures, while incidents 1 and 3 are shared-filename
-and shared-record collisions, i.e. PSP-1. A mechanism that *pushes* toward
+on 2026-08-09 and 2026-08-12. All five attributed, none left over: incidents
+1 and 3 are PSP-1 (a shared matrix row; a shared `dispatch-record.json`
+filename); incident 2 is a PSP-1 breach that cascaded into commit-surface
+loss; 2026-08-09 and 2026-08-12 are the two clean PSP-3 failures. A mechanism
+that *pushes* toward
 parallel while a human is the only thing evaluating the predicate is buying
 the sequential complaint with a race-condition regression.
 **Corrected 2026-09-06 after T1 Critic finding F5:** this read "four
@@ -343,6 +368,11 @@ incidents … without PSP-3 holding" — the count matched no reading of the
 item, and attributing all of them to PSP-3 over-claimed, since two are PSP-1
 failures on this document's own taxonomy. The argument does not turn on the
 number; the citation was simply wrong and is now corrected.
+**Corrected again 2026-09-06 after T1 Critic finding F-A:** the F5 fix got
+the count right and the attribution still wrong — it credited incident 2 and
+an "orphaned chain" to PSP-3 and left the 2026-08-09/08-12 recurrences
+unattributed entirely. Two rounds on one citation; the lesson is that fixing
+a number is not the same as re-reading the source.
 
 **Consistency with EL-16 and EL-18, stated explicitly as the DoD requires:**
 
@@ -616,22 +646,36 @@ this order:
      re-decide between a blocking delivery and a different channel.
    - The 2026-09-06 documentation probe is supporting evidence for what to
      expect, never a substitute for this step.
-2. Implement `guard-slicing.mjs`: orchestrator-only (the `subagents`
+2. **Two decisions the briefing must carry, not the dispatch guess.** Added
+   2026-09-06 after T1 Critic finding F-C: both were stated in the body as
+   must-fix-before-build but were missing from this ordered list, which is
+   what a briefing gets assembled from.
+   - **Fix the fan-out detection window** (see the "open parameter" section
+     above). Until it is a number, step 4's fan-out unit test has no fixed
+     contract to test against, and an implementer will guess it — producing
+     exactly the false-positive class Decision 3 forbids. **Owner:** the
+     implementation briefing's author, before dispatch.
+   - **Confirm ADR-0063's directory contract admits
+     `.git/agent-pipeline/dispatch-slicing/`** rather than assuming this
+     document settled it. **Owner:** the implementation dispatch, as its
+     first step; on refusal it stops and reports rather than choosing another
+     location.
+3. Implement `guard-slicing.mjs`: orchestrator-only (the `subagents`
    parent-dirname discriminator), the two triggers of Decision 4, the
    rate-limiting, and the ledger append. Fail-open on anything unparseable,
    matching every sibling guard's posture.
-3. Unit tests covering, at minimum: orchestrator vs. subagent targeting; the
+4. Unit tests covering, at minimum: orchestrator vs. subagent targeting; the
    `TodoWrite` ≥3-pending trigger and its per-batch-hash rate limit; the
    consecutive-single-dispatch run trigger and its reset on fan-out; fan-out
    recognition via **both** a Workflow script with ≥2 `agent()` calls and ≥2
    `Task` calls; the ledger record shape; and fail-open on malformed input.
-4. The `hooks.json` wiring — an attended PO operator-tool run outside the
+5. The `hooks.json` wiring — an attended PO operator-tool run outside the
    session (`hooks.json` is kernel-protected; there is no in-session route).
    Brief this as a known PO handoff, never as something the dispatch can do.
-5. Amend the backlog item's acceptance criterion 2 as drafted above, in the
+6. Amend the backlog item's acceptance criterion 2 as drafted above, in the
    same work package that lands the mechanism, so record and built thing do not
    diverge.
-6. **Not in scope, and must be briefed as such:** the affirmative write-scope
+7. **Not in scope, and must be briefed as such:** the affirmative write-scope
    template field, and increment 2's `Slicing:` disclosure line. Both are named
    here so they are visible decisions rather than surprises.
 
