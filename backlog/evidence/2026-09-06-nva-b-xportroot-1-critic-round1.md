@@ -61,7 +61,9 @@ exactly what the assertions prove). Trajectory: consistent.
   **Disposition — accepted; closed by the next step of the sequence:** the
   full verify gate runs at the stamped candidate HEAD, which contains
   `573180b8`, with nothing concurrent; `verify-latest.json` then binds that
-  HEAD exactly. Recorded in `docs/state.md` Gate state when it lands.
+  HEAD exactly. **F-A closed 2026-09-06:** the full gate is 516/516, bound
+  exactly at `c784a462` (which contains `573180b8`), recorded in
+  `docs/state.md` Gate state by `ac546a57`.
 
 Dispatcher-side disclosures the Critic surfaced, both real: the dispatch
 called `b5a181ce` the correction commit's "parent" (it is an ancestor four

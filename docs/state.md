@@ -82,7 +82,8 @@ Commits survive compaction; intent does not — this block is the intent.
    fixture-assertion cell, disclosed by the dispatch and left out). T1 round 1
    (Opus, max): PASS, one minor — F1, the fixture layout let the old anchor
    still find the schema (`2026-09-06-nva-b-xportroot-1-critic-round1.md`,
-   R4 amended); fix `NVA-B-XPORTROOT-2` in flight, round 2 follows on it.
+   R4 amended); fixed in `573180b8` (`NVA-B-XPORTROOT-3`; the `-2` run
+   stopped on a briefing defect, nothing committed); round 2 PASS.
    Also landed: ADR-0080 accepted (`07d6041f`);
    the positioning inputs persisted verbatim to
    `specs/sprint-nova-epic/design/2026-09-06-positioning-*` (`c90f9131`) —

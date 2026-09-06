@@ -33,6 +33,14 @@ edits cannot even share a ceremony).
 - `ec0b158c` (2026-09-06 evening): `guard-slicing-tests` registered under PO
   signature (`eecb4273`); the first full run bound to `2dca9b8d` came back
   515/516 with the inventory suite as the one red; fixed by one line.
+- `c784a462` (2026-09-06 evening, same class, a second inventory): the
+  ADR-0080 acceptance renamed `docs/adr/draft-…` to `docs/adr/0080-…`
+  (`07d6041f`); `governance/observation-doc-governance.json` still listed
+  the draft path and the accepted path was unclassified, so the first full
+  gate at the stamped candidate went red on `observation-governance-tests`
+  and `doc-contract-tests`. A rename creates the same hidden obligation as
+  a registration; `check-adr-consistency.mjs` (run green by the acceptance
+  dispatch) does not look at that inventory.
 
 ## Affected artifact
 
