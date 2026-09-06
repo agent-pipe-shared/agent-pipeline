@@ -1,7 +1,9 @@
 # A1/C1 Verify registration preparation
 
 Status on 2026-09-06: the coupled A1/C1 suite and capability registrations
-are applied; full Verify and independent T1 review remain pending.
+are committed at `0a86cbdcb315ffff55e8788b420af16788b7a8b8`; the signed
+maintenance window is closed. Fresh full Verify and independent T1 review
+remain pending.
 
 ## Signed maintenance registration
 
@@ -33,8 +35,21 @@ Captured focused checks after registration (all exit 0):
 Dispatch bookkeeping and final document/diff check evidence are recorded in
 `evidence/dispatch-record-ALF-REGISTER-A1-C1.json`. These focused results do
 not establish full Verify, a Critic verdict, native enforcement evidence, or
-a C1 dogfood baseline. The Elephant owns GMW closure and subsequent full
-Verify and T1 review against the resulting candidate.
+a C1 dogfood baseline. The Elephant owns subsequent full Verify and T1
+review against the resulting clean candidate.
+
+## Maintenance closure checkpoint
+
+The sanctioned installed GMW writer subsequently returned `closed`, appended
+the human revocation event with reason `GUARD.MAINTENANCE.CLOSED`, and left
+the window status `absent`. The unchanged close audit is
+`governance/events/human/14-evt-gmw-revoke-3de0bdca05a90ca795ac7696f4717abe-0.json`,
+with its updated human ledger head in `governance/events/heads.json`.
+Normal continuation requires no new approval or signature. Fresh full Verify,
+independent T1 review, native A1 measurements, C1 emission and the measured
+14-day baseline remain open; the [C1 aggregation plan](../plans/c1-aggregation.md)
+is prepared, not implemented. No new Verify result, Critic verdict, baseline
+start or acceptance is claimed by this closure.
 
 ## Historical preparation (preserved)
 
