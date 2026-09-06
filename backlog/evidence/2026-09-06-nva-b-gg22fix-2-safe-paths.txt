@@ -1,0 +1,24 @@
+command: node --test harness/scripts/check-consumer-safe-paths.test.mjs
+label: gg22fix-2-safe-paths
+exitCode: 0
+--- stdout ---
+check-consumer-safe-paths: fixture and repository checks passed
+✔ a fixture naming a source-only path fails (2.436708ms)
+✔ a clean fixture passes (1.312192ms)
+✔ an allowlisted occurrence passes (0.591002ms)
+✔ a stale allowlist entry (never matches) is itself reported (0.567739ms)
+✔ multiple prefix hits on one line each produce a finding (0.369612ms)
+✔ SOURCE_ONLY_PREFIXES carries the backlog item's minimum set (0.481704ms)
+✔ every ALLOWLIST entry is either a (file, match) pair or a filePattern, each with a non-empty stated reason (0.965123ms)
+✔ current repository passes with the real ALLOWLIST (AC-11) (166.91116ms)
+✔ real allowlisted (file, match) entries still exist and still contain the allowlisted substring (15.307759ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 321.056717
+
+--- stderr ---

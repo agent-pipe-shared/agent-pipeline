@@ -1,0 +1,249 @@
+command: node --test plugins/pipeline-core/hooks/guard-git.test.mjs
+label: gg22fix-2-guard-git-regression
+exitCode: 0
+--- stdout ---
+PASS  R01 block  --force
+PASS  R01 block  -f
+PASS  R01 block  --force-with-lease
+PASS  R01 allow  plain push
+PASS  R01 allow  push -u feature
+PASS  R02 block  +refspec
+PASS  R02 allow  same refspec without +
+PASS  R03 block  --delete main
+PASS  R03 block  -d master
+PASS  R03 block  :main refspec
+PASS  R03 block  dev:main overwrite
+PASS  R03 allow  --delete feature branch
+PASS  R03 allow  dev:staging refspec
+PASS  R04 block  --delete archive tag
+PASS  R04 block  bare :archive refspec
+PASS  R04 allow  pushing an archive tag
+PASS  R05 block  tag -d archive/
+PASS  R05 allow  tag -d other tag
+PASS  R06 block  branch -D main
+PASS  R06 block  branch --delete master
+PASS  R06 allow  branch -d feature
+PASS  R06 block  branch -delete main (inert word form, GG-06)
+PASS  R06 allow  branch -delete feature
+PASS  R07 block  reset --hard
+PASS  R07 block  reset -q --hard (hardened)
+PASS  R07 allow  reset --soft
+PASS  R07 allow  unstage file
+PASS  R08 block  clean -fd
+PASS  R08 block  clean --force (long flag)
+PASS  R08 allow  clean dry-run
+PASS  R09 block  checkout -- .
+PASS  R09 block  restore -- *
+PASS  R09 allow  checkout -- single file
+PASS  R10 block  bare checkout .
+PASS  R10 block  bare restore .
+PASS  R10 allow  checkout branch
+PASS  R10 allow  restore single file
+PASS  R10 allow  checkout ./subpath (anchor)
+PASS  R21 block  checkout --force branch
+PASS  R21 block  switch -f branch
+PASS  R21 allow  ordinary fetch
+PASS  R11 block  add .env
+PASS  R11 block  add .env.production
+PASS  R11 block  add secrets.yaml
+PASS  R11 allow  add fakesecrets.yaml (unrelated file matched only by substring before the GG-11 fix)
+PASS  R11 allow  add .storage (project-specific entry removed from the generic denylist)
+PASS  R11 allow  add app-state.db (project-specific entry removed from the generic denylist)
+PASS  R11 block  add id_rsa
+PASS  R11 block  add id_ed25519
+PASS  R11 block  add .pem
+PASS  R11 block  add .key
+PASS  R11 allow  add normal files
+PASS  R11 block  add .env.example (documented errs-safe overblock)
+PASS  R12 block  rm -rf .git
+PASS  R12 block  rm .git -rf (flag after path)
+PASS  R12 block  rm -rf /config
+PASS  R12 allow  rm -rf build/config (path-start anchor)
+PASS  R12 allow  rm -rf node_modules
+PASS  R12 allow  rm -rf .github (word boundary)
+PASS  R12 block  rm --recursive .git (long form)
+PASS  R12 block  rm --recursive --force app/.git (long forms combined)
+PASS  R12 block  rm /config --recursive (target-first, long form)
+PASS  R12 allow  rm --recursive node_modules (long form, harmless target)
+PASS  R13 block  Remove-Item -Recurse .git
+PASS  R13 block  Remove-Item target-first -r
+PASS  R13 block  Remove-Item secrets.yaml -Recurse
+PASS  R13 allow  Remove-Item -Recurse other dir
+PASS  R13 block  Remove-Item .storage -recu -Force (abbreviation)
+PASS  R13 allow  Remove-Item -recu temp (abbreviation, harmless target)
+PASS  R13 block  Remove-Item -rec abbreviation now covered (AP-P1-G1 rework R1)
+PASS  GAP allow  non-recursive secret deletion (parity gap)
+PASS  QS  allow  commit message mentions git push --force
+PASS  QS  allow  single-quoted mention of reset --hard
+PASS  QS  block  force flag OUTSIDE quotes still fires
+PASS  SEG allow  flag in later segment does not bleed back
+PASS  SEG allow  chained with && (no cross-segment match)
+PASS  SEG block  deny still fires inside a later segment
+PASS  CFG block  extraDenyPattern fires with origin line
+PASS  CFG allow  harmless command with valid config
+PASS  CFG warn   broken JSON surfaces as exit 1 WARN
+PASS  CFG block  union still active despite broken config
+PASS  CFG allow  missing config is silent (no warning)
+PASS  CFG block  union active without any config
+PASS  OV-AC1 warn   valid inline override for the matching rule (GG-07 reset --hard) allows (exit 1)
+PASS  OV-AC1 warn   valid env-fallback override for the matching rule (fresh token) allows (exit 1)
+PASS  OV-AC2 block  reusing an already-consumed rule|token pair
+PASS  OV-AC3 block  malformed override (empty reason) — matching rule still blocks
+PASS  OV-AC3 warn   malformed override (unknown rule id), no rule matches -> exit-1 warning only
+PASS  OV-AC4 block  override armed for GG-07 does not cover an additional matching rule (GG-01)
+PASS  OV-AC4 warn   same rule|token still fresh afterward (AC-4 attempt consumed nothing), allows (exit 1)
+PASS  OV-AC5 block  ledger not appendable (.claude missing) -> override not applied, fail-closed
+PASS  OV-AC6 block  no arming present -> unchanged block behavior
+PASS  OV-AC6 allow  no arming present -> unchanged allow behavior
+PASS  OV-AC7 block  union rule prints its stable id
+PASS  OV-AC7 block  project guard-config rule prints its PX id
+PASS  OV-bonus warn   PowerShell arming form parses and applies, allows (exit 1)
+PASS  OV-bonus warn   inline prefix wins over a conflicting env arming (env ignored, noted), allows (exit 1)
+PASS  GO-GG01 block  -C interposed force-push
+PASS  GO-GG02 block  -C interposed +refspec
+PASS  GO-GG03 block  -C interposed remote main delete
+PASS  GO-GG04 block  -C interposed remote archive tag delete
+PASS  GO-GG05 block  -C interposed local archive tag delete
+PASS  GO-GG06 block  -C interposed local main branch delete
+PASS  GO-GG07 block  -C interposed reset --hard
+PASS  GO-GG08 block  -C interposed clean -fd
+PASS  GO-GG09 block  -C interposed blanket discard --
+PASS  GO-GG10 block  -C interposed bare checkout .
+PASS  GO-GG11 block  -C interposed secret staging
+PASS  GO-push -c   -c interposed force-push
+PASS  GO-push --git-dir  --git-dir= interposed force-push
+PASS  GO-reset -c   -c interposed reset --hard
+PASS  GO-reset --git-dir  --git-dir <arg> (space form) interposed reset --hard
+PASS  GO-add -c   -c interposed secret staging
+PASS  GO-add --git-dir  --git-dir= interposed secret staging
+PASS  GO-multi block  -C + -c combined before push --force
+PASS  GO-quote block  -c with quoted value before push --force (quote-stripping interaction)
+PASS  GO-allow  -C interposed harmless status
+PASS  GO-allow  -c interposed harmless commit
+PASS  GO-CFG block  extraDenyPattern normalizes -C before matching (AR-2)
+PASS  GO-CFG allow  -C interposed harmless command with the same config loaded
+PASS  GO-OV block  override armed for GG-07 rejects a cross-target -C command
+PASS  GO-OV warn   override accepts an explicit same-root relative -C target
+PASS  GO-OV ledger target binding stores only an opaque physical-target digest
+PASS  GO-OV block  override rejects a relative cross-target -C target
+PASS  GO-OV block  override rejects an absolute cross-target -C target
+PASS  GO-OV block  override rejects a cross-target --git-dir= selector
+PASS  GO-OV ledger --git-dir= rejection records no coordinator token
+PASS  GO-OV warn   --git-dir= rejection leaves token unconsumed
+PASS  GO-OV block  override rejects a cross-target --git-dir space selector
+PASS  GO-OV ledger --git-dir space rejection records no coordinator token
+PASS  GO-OV warn   --git-dir space rejection leaves token unconsumed
+PASS  GO-OV block  override rejects a cross-target --work-tree= selector
+PASS  GO-OV ledger --work-tree= rejection records no coordinator token
+PASS  GO-OV warn   --work-tree= rejection leaves token unconsumed
+PASS  GO-OV block  override rejects a cross-target --work-tree space selector
+PASS  GO-OV ledger --work-tree space rejection records no coordinator token
+PASS  GO-OV warn   --work-tree space rejection leaves token unconsumed
+PASS  GO-OV block  override rejects a cross-target GIT_DIR environment selector
+PASS  GO-OV ledger GIT_DIR environment rejection records no coordinator token
+PASS  GO-OV warn   GIT_DIR environment rejection leaves token unconsumed
+PASS  GO-OV block  override rejects a cross-target GIT_WORK_TREE environment selector
+PASS  GO-OV ledger GIT_WORK_TREE environment rejection records no coordinator token
+PASS  GO-OV warn   GIT_WORK_TREE environment rejection leaves token unconsumed
+PASS  GO-OV block  override rejects a cross-target PowerShell GIT_DIR environment selector
+PASS  GO-OV ledger PowerShell GIT_DIR environment rejection records no coordinator token
+PASS  GO-OV warn   PowerShell GIT_DIR environment rejection leaves token unconsumed
+PASS  GO-OV block  override rejects a cross-target PowerShell GIT_WORK_TREE environment selector
+PASS  GO-OV ledger PowerShell GIT_WORK_TREE environment rejection records no coordinator token
+PASS  GO-OV warn   PowerShell GIT_WORK_TREE environment rejection leaves token unconsumed
+PASS  R14 block  ssh with quoted rm -rf /config
+PASS  R14 block  bash -c with quoted git reset --hard
+PASS  R14 block  pwsh -Command with quoted git push --force
+PASS  R14 allow  commit message mentions bash -c (prose, no wrapper)
+PASS  R14 allow  echo mentions rm -rf /config (no wrapper)
+PASS  R14 allow  ssh with quoted harmless command
+PASS  R15 block  git add quoted secrets.yaml
+PASS  R15 block  git add single-quoted .env
+PASS  R15 allow  commit message mentions git add secrets.yaml (prose, no inner quotes)
+PASS  R16 block  rm -rf quoted .git
+PASS  R16 block  Remove-Item -Recurse quoted .storage
+PASS  R16 allow  rm -rf quoted harmless target
+PASS  RAW-OV warn   valid inline override for a raw-string rule (GG-15 quoted git add) allows (exit 1)
+PASS  RAW-OV allow  arming reason mentioning `rm -rf /config` does not trip GG-14/16 on a harmless command
+PASS  R17 block  commit --no-verify
+PASS  R17 block  push --no-verify
+PASS  R17 block  merge --no-verify
+PASS  R17 allow  merge --no-verify-signatures (real flag, NOT a hook-skip)
+PASS  R17 allow  commit message quotes --no-verify (prose, no actual flag)
+PASS  R18 block  commit -n
+PASS  R18 block  commit -nm (bundled)
+PASS  R18 block  commit -an (bundled, n at end)
+PASS  R18 allow  push -n origin main (=--dry-run, not a hook-skip)
+PASS  R18 allow  push --dry-run
+PASS  R18 allow  merge -n (=--no-stat, not a hook-skip)
+PASS  R18 allow  commit --no-edit (long flag, double-dash excluded)
+PASS  R18 allow  commit -m normal message
+PASS  R19 block  -c core.hooksPath=/dev/null commit
+PASS  R19 block  -c core.hooksPath commit (no value, boolean true)
+PASS  R19 block  --config-env=core.hooksPath=X commit
+PASS  R19 allow  commit message quotes core.hooksPath (prose, no actual -c)
+PASS  R19 allow  -c with quoted value (documented quote-stripping trade-off, NOT a regression)
+PASS  R19 block  --config-env core.hooksPath=X commit (space form, critic L1)
+PASS  R19 allow  grep -c core.hooksPath (non-git command, git-anchored, critic L1)
+PASS  R20 block  config core.hooksPath /tmp/x
+PASS  R20 block  config set core.hooksPath /tmp/x (git >= 2.46 form)
+PASS  R20 allow  commit message quotes git config core.hooksPath (prose, no actual git config)
+PASS  GIT03-1 block  provider co-author and session URL via -F
+PASS  GIT03-2 allow  a clean message via -F
+PASS  GIT03-3 block  an inline session trailer
+PASS  GIT03-4 allow  a human co-author
+PASS  GIT03-5 block  an armed override does not open the correlation rule
+PASS  GIT03-6 allow  a missing marker is not enforced by default
+PASS  GIT03-7 block  a -F file outside the project root, even with clean content
+PASS  GIT01-1 block  inadmissible type
+PASS  GIT01-2 allow  admitted type
+PASS  GIT01-3 allow  editor commit (no -m/-F) is never false-blocked by GIT-01
+PASS  GIT01-4 allow  a non-commit git command is untouched by GIT-01
+PASS  SIG-1 allow   GG-03 push with a verifying push approval and no arming at all
+PASS  SIG-1 ledger  the admission records the authorization it relied on (key, forCommit, destination) and no token
+PASS  SIG-2 block   a valid signature from a key the committed anchor does not name
+PASS  SIG-3 block   a push whose destination differs from the approved one
+PASS  SIG-4 block   a push at a commit that is not the approval's forCommit
+PASS  SIG-5 block   --force carrying a VALID approval still blocks on GG-01 (single-match invariant)
+PASS  SIG-5 ledger  the refused force-push wrote no authorization record
+PASS  SIG-6 block   a GG-03 push with no approval and no arming blocks with today's message
+PASS  SIG-7 block   `push origin --delete main` under a valid approval is never attested
+PASS  SIG-7 ledger  the refused deletion wrote no authorization record
+PASS  SIG-8 block   a verified approval is NOT applied when the audit ledger cannot be written
+PASS  SIG-9 block   a cross-target -C push under a valid approval is refused before any attestation
+PASS  SIG-10 warn   an armed GG-03 override still takes the unchanged token route
+PASS  SIG-11 block  a project with no committed trust anchor cannot attest anything
+PASS  SIG-12 block  a threat model edited after the approval revokes it
+PASS  SIG-13 block  a record whose stated binding contradicts the signed subject
+PASS  RTY-1 warn    first admission of an armed token allows and ledgers it
+PASS  RTY-1 ledger  the entry binds command + candidate and carries a 3600s default lifetime
+PASS  RTY-2 warn    the SAME token, byte-identical command, same HEAD, inside the TTL is admitted again
+PASS  RTY-2 ledger  the re-presentation is appended as a retry and does NOT extend the lifetime
+PASS  RTY-3 block   the same token against a DIFFERENT command is consumed exactly as before
+PASS  RTY-4 block   a cross-target -C re-presentation of an admitted arming is refused (target binding)
+PASS  RTY-5 block   the identical command after HEAD moved is a different act and stays consumed
+PASS  RTY-6 warn    first admission under a configured lifetime allows
+PASS  RTY-6 ledger  overrideArmingTtlSeconds from the guard-config is what bounds the arming
+PASS  RTY-7 block   the identical command after the arming expired stays consumed
+PASS  RTY-8 block   an OLD-shape ledger entry (no commandSha256) stays fully consumed
+PASS  GG22-1 allow  bootstrap: backlog/transitions.ndjson never existed in history
+PASS  GG22-2 allow  clean: status flip reconciled by a later ledger touch, nothing outstanding
+PASS  GG22-3 block  debt: status flip after the last ledger touch, disallowed path staged
+PASS  GG22-4 allow  reconciliation commit: staged commit touches only backlog/items+ledger paths
+PASS  GG22-5 allow  non-status edit: item touched since reconcile but its status: line did not change
+PASS  GG22-6 allow  fail-open: a spawnSync git failure never blocks (same debt state as GG22-3)
+PASS  GG22-7 allow  fixed order: item edits committed first, reconciler run once, ledger commit last -- no debt
+PASS  GG22-8 block  remediation text states the corrected reconcile-last order, not reconcile-first
+
+232/232 cases passed.
+✔ plugins/pipeline-core/hooks/guard-git.test.mjs (21755.294773ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 21771.102069
+
+--- stderr ---

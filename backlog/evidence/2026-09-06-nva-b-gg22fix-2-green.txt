@@ -1,0 +1,13 @@
+command: node scratch/gg22fix-2-repro.mjs green
+label: gg22fix-2-green
+exitCode: 0
+--- stdout ---
+PASS  GG22-12 -i/--include: a pathspec'd -i commit with an unrelated disallowed path already staged
+PASS  GG22-13 ../ traversal: a pathspec token escaping backlog/items/ via .. is still refused
+PASS  GG22-14 allow  plain -F, ledger-only pathspec, unrelated staged elsewhere -- still admitted
+PASS  GG22-15 allow  -s (signoff, message-metadata only) combined with the pathspec fast path
+PASS  GG22-16 -a/--all: same admission-widening pattern as -i, also falls through post-fix
+
+[mode=green] 5/5 cases passed. guard=<repo-root>/plugins/pipeline-core/hooks/guard-git.mjs
+
+--- stderr ---

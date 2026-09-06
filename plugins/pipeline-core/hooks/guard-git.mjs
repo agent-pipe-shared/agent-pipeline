@@ -1201,6 +1201,33 @@ if (inspection.message !== null) {
   }
 }
 
+/**
+ * normalizePathspecLexically(token) -- pure STRING segment collapse for a `--` pathspec
+ * literal (GG-22's own fast-path exclusivity question, NVA-B-GG22FIX-2 F3, backlog/evidence/
+ * 2026-09-06-nva-b-gg22fix-1-findings.md). No filesystem access -- `existsSync`/`realpathSync`
+ * resolve a REAL path on THIS machine, which a pathspec literal being compared against a
+ * `backlog/items/`/LEDGER_PATHS string prefix is not. This applies the same `.`/`..` segment
+ * arithmetic git itself uses when resolving a pathspec, on the string alone: a `.` segment is
+ * dropped; a `..` segment pops the previous segment, or (for a relative token with nothing left
+ * to pop) is kept literally -- an escape past the pathspec's own root, which then correctly
+ * fails every `backlog/`-prefixed check below instead of silently stopping at the root the way
+ * a filesystem `path.resolve` would.
+ */
+function normalizePathspecLexically(token) {
+  const isAbsolute = token.startsWith("/");
+  const out = [];
+  for (const segment of token.split("/")) {
+    if (segment === "" || segment === ".") continue;
+    if (segment === "..") {
+      if (out.length > 0 && out[out.length - 1] !== "..") out.pop();
+      else if (!isAbsolute) out.push("..");
+      continue;
+    }
+    out.push(segment);
+  }
+  return (isAbsolute ? "/" : "") + out.join("/");
+}
+
 // ---- GG-22: a commit must not leave an earlier backlog status-flip unreconciled since ----
 // the last backlog/transitions.ndjson touch -------------------------------------------------
 //
@@ -1289,23 +1316,73 @@ if (inspection.message !== null) {
           separatorIndex = idx;
           break;
         }
-        // Strip a leading "./" only (never resolve "../") so `-- ./backlog/STATUS.md`
-        // compares equal to the repo-relative form the ledger/backlog-items checks below
-        // expect -- without it, a harmless "./" prefix would false-block a legitimate
-        // pathspec'd commit the old, staged-index-only code never had to worry about.
+
+        // NVA-B-GG22FIX-2 (backlog/evidence/2026-09-06-nva-b-gg22fix-1-findings.md F1): an
+        // explicit `--` pathspec is this commit's WHOLE content -- and therefore usable in
+        // place of `git diff --cached` below -- ONLY for the flag set actually present on THIS
+        // invocation, never universally. Read in full from git-commit(1) (Git 2.53.0) for this
+        // correction:
+        //   -i/--include is documented to stage the pathspec paths IN ADDITION to whatever is
+        //     already staged, then commit the WHOLE staged set -- a pathspec'd `-i` commit with
+        //     an unrelated disallowed path already staged was admitted by the fe2d7afe fast
+        //     path where the pre-fe2d7afe full-index check would have refused it (confirmed
+        //     reachable, no crafting beyond an ordinary documented git flag).
+        //   -a/--all documents its own auto-staging effect but never states how it combines
+        //     with an explicit pathspec, unlike -i/-o (which both do) -- unconfirmed, so unsafe.
+        //   -p/--patch/--interactive select hunks interactively -- content is not knowable from
+        //     argv at all.
+        //   --amend's tree is "prepared as usual (including the effect of -i/-o and pathspec)"
+        //     but rebased onto a DIFFERENT parent (HEAD^) -- the disallowed-path question this
+        //     block asks no longer reduces to plain pathspec exclusivity, so unsafe.
+        // Everything in the two allow-lists below is read from the same source and is message,
+        // authorship, signing or display metadata that never changes WHICH paths land in the
+        // tree -- safe to combine with the fast path. Per this dispatch's own stop-condition
+        // instruction, ANY token that is neither one of these NOR already-known message content
+        // (PATHSPEC_VALUE_CONSUMING_FLAGS above) falls through to the full `git diff --cached`
+        // check below, unchanged -- conservative by construction, never assumed safe.
+        const PATHSPEC_EXCLUSIVE_SAFE_FLAGS = new Set([
+          "-o", "--only",
+          "-s", "--signoff", "--no-signoff",
+          "-e", "--edit", "--no-edit",
+          "-n", "--verify", "--no-verify",
+          "--allow-empty", "--allow-empty-message",
+          "--reset-author",
+          "-v", "--verbose",
+          "-q", "--quiet",
+          "-S", "--gpg-sign", "--no-gpg-sign",
+        ]);
+        const PATHSPEC_EXCLUSIVE_SAFE_VALUE_FLAGS = new Set(["--author", "--date"]);
+        const PATHSPEC_EXCLUSIVE_SAFE_VALUE_PREFIXES = ["--author=", "--date=", "--gpg-sign="];
+        let pathspecIsExclusive = separatorIndex !== -1;
+        for (let idx = 0; pathspecIsExclusive && idx < separatorIndex; idx += 1) {
+          const token = commitTokens[idx];
+          const prevToken = idx > 0 ? commitTokens[idx - 1] : undefined;
+          if (prevToken !== undefined && (PATHSPEC_VALUE_CONSUMING_FLAGS.has(prevToken) || PATHSPEC_EXCLUSIVE_SAFE_VALUE_FLAGS.has(prevToken))) continue;
+          if (token === "git" || token === "commit") continue;
+          if (PATHSPEC_VALUE_CONSUMING_FLAGS.has(token) || PATHSPEC_EXCLUSIVE_SAFE_FLAGS.has(token) || PATHSPEC_EXCLUSIVE_SAFE_VALUE_FLAGS.has(token)) continue;
+          if (token.startsWith("--message=") || token.startsWith("--file=")) continue;
+          if (PATHSPEC_EXCLUSIVE_SAFE_VALUE_PREFIXES.some((prefix) => token.startsWith(prefix))) continue;
+          pathspecIsExclusive = false;
+        }
+
+        // Lexical `.`/`..` segment collapse (normalizePathspecLexically, above) -- NVA-B-
+        // GG22FIX-2 F3: `backlog/items/../../src/x.js` used to satisfy the `backlog/items/`
+        // prefix test unnormalized while git itself resolves it outside `backlog/` entirely.
+        // Replaces the old "strip a leading ./ only, never resolve .." approach: that was
+        // exactly the gap F3 found.
         const explicitPathspec = separatorIndex === -1
           ? null
           : commitTokens.slice(separatorIndex + 1)
               .map((token) => token.trim())
               .filter(Boolean)
-              .map((token) => (token.startsWith("./") ? token.slice(2) : token));
+              .map((token) => normalizePathspecLexically(token));
 
-        // A bare `git commit` (no pathspec, or a trailing `--` naming none) commits
-        // whatever is staged -- the staged index genuinely IS this commit's content, so
-        // `git diff --cached` remains the right question for that case, unchanged from
-        // before this fix.
+        // A bare `git commit` (no pathspec, a trailing `--` naming none, or a pathspec paired
+        // with a flag this block cannot prove exclusive) commits whatever is staged -- the
+        // staged index genuinely IS this commit's content, so `git diff --cached` remains the
+        // right question, unchanged from before this fix.
         let commitPaths;
-        if (explicitPathspec !== null && explicitPathspec.length > 0) {
+        if (pathspecIsExclusive && explicitPathspec !== null && explicitPathspec.length > 0) {
           commitPaths = explicitPathspec;
         } else {
           const stagedRun = run(["diff", "--cached", "--name-only"]);
