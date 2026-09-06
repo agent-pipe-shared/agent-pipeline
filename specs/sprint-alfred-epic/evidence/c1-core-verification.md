@@ -41,24 +41,37 @@ It is historical exact-source-candidate evidence, not proof of a later HEAD
 containing this documentation. A1/C1 standalone passes do not mean those
 unregistered suites ran inside Full Verify.
 
+## Registration and maintenance closure
+
+The historical integrated blocker was two missing suite registrations:
+`evidence/alfred-registration-current.log` records exit 2, two unregistered,
+four honoured exclusions and zero malformed/expired exclusions. Historical
+capability reachability exits 0 in `evidence/alfred-capability-readback.log`.
+
+Registration is now committed at `0a86cbdcb315ffff55e8788b420af16788b7a8b8`
+through the signed TP-3 GMW route. The coupled
+[A1/C1 suite and capability payload](a1-registration-preparation.md) adds
+exactly two suites and their two surfaces. The registration capture
+`evidence/alfred-registration-suite-registration.log` exits 0: 506 registered,
+zero unregistered and four declared exclusions. Capability reachability
+passes in `evidence/alfred-registration-capability-reachability.log`;
+focused A1/C1 checks pass 25/39 tests in `evidence/alfred-registration-a1.log`
+and `evidence/alfred-registration-c1.log`. All four captures exit 0.
+
+The sanctioned GMW close completed and appended the human revocation event
+with reason `GUARD.MAINTENANCE.CLOSED`; the resulting window status is absent.
+The close audit and updated human ledger head are preserved unchanged with
+this documentation closure. No new approval or signature is required for
+normal continuation.
+
 ## Required continuation
 
-The one observed integrated blocker is two missing suite registrations:
-`evidence/alfred-registration-current.log` records exit 2, two unregistered,
-four honoured exclusions and zero malformed/expired exclusions. Capability
-reachability exits 0 in `evidence/alfred-capability-readback.log`.
-The next non-agent step is PO review and execution of the exact coupled
-[A1/C1 suite and capability payload](a1-registration-preparation.md) through
-the sanctioned protected-edit mechanism. The existing batch helper contains
-no A1/C1 payload; this note supplies no executable signing/apply route.
-A1 option-1 approval stands; the additional C1 scope is proposed, with no
-claim that the combined payload has already been approved or applied.
-
-After registration, rerun Full Verify on the exact unchanged new candidate.
+Run fresh Full Verify on the exact unchanged resulting clean candidate.
 Independent T1 Critic review and PO acceptance remain pending. A1 native
 measurements remain pending; [offline evidence](a1-matrix-verification.md)
-reports unavailable execution, not measured enforcement. C1 aggregation,
-emission, source-authenticity validation, local reports and baseline collection
-have not started. No baseline start is inferred from fixtures or these commits;
+reports unavailable execution, not measured enforcement. The
+[C1 aggregation plan](../plans/c1-aggregation.md) is prepared, not implemented.
+C1 emission, source-authenticity validation, local reports and baseline
+collection remain open. No baseline start is inferred from fixtures or these commits;
 the measured 14-day requirement remains. Alfred is still implementing, with
 no new schema/profile decision, feature close or acceptance in this handoff.
