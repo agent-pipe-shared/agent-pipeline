@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "7e37f48194791631791ea59a520993059e702bd0e0be34764050f6e2a5fd1a3b"
+    "transitionHead": "f3a979ee5d6694976551f21556ffa1ac52e85908656d858c1660e98039c379c9"
   },
   "counts": {
-    "open": 100,
+    "open": 102,
     "in_progress": 0,
     "closed": 515,
     "rejected": 3,
@@ -1783,6 +1783,16 @@
       "closureEvidence": "plugins/pipeline-core/hooks/guard-dispatch.test.mjs"
     },
     {
+      "id": "pipeline.critic-md-protected-preimage-drift",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-06",
+      "source": "Elephant, 2026-09-06, running `node --test plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.test.mjs` while diagnosing the first full verify.mjs gate of this session.",
+      "deferred": false,
+      "tracking": "Nova B — discovered running the first full verify.mjs gate of this session (last known-green 7cc0b649, 2026-09-02). codex-isolated-critic-protected-preimage-tests fails: roles/critic.md's current content-hash no longer matches the digest pinned in plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json, a preimage snapshot used to detect drift in the Critic role contract for Codex-isolated Critic dispatches."
+    },
+    {
       "id": "pipeline.critic-review-has-no-defined-path-for-a-root-commit",
       "status": "closed",
       "type": "defect",
@@ -2365,6 +2375,16 @@
       "closureRepository": "self",
       "closureCommit": "00350b2d4f46f86804f188cb84ceff6c947bfa3d",
       "closureEvidence": "backlog/items/2026-08-17-evidence-gitignore-left-dozens-of-durable-artifacts-untracked.md"
+    },
+    {
+      "id": "pipeline.evslotfix-1-broke-verify-fixture-module-lists",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-06",
+      "source": "Elephant, 2026-09-06, running `node harness/scripts/verify.mjs` for the first full-gate pass this session and diagnosing the two resulting failures directly.",
+      "deferred": false,
+      "tracking": "Nova B — discovered running the first full verify.mjs gate of this session (last known-green was 7cc0b649, 2026-09-02; many commits landed since across the whole day). Blocks A-C of NVA-B-EVSLOTFIX-1 (commits 61dc7fc5/d30273d3) added a new import to harness/scripts/verify.mjs (harness/scripts/verify-evidence-writer.mjs). Two test fixtures that copy verify.mjs and a hardcoded list of its dependencies into an isolated sandbox to test its behavior were never updated to also copy the new file, so the copied verify.mjs now fails to even load in those sandboxes."
     },
     {
       "id": "pipeline.execution-model-switchback",
