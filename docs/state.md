@@ -338,14 +338,13 @@ wrong incidents). F-A/F-B/F-C corrected, F-D filed as its own item. Cap
 exhausted; the Elephant self-verifies.
 Registries: `backlog/evidence/2026-09-06-nva-b-parallelslicing-design-1*`.
 
-**The build gate is one cheap PO action.** The channel probe needs no
-`hooks.json` ceremony: a temporary `PreToolUse` entry in the user-level
-`~/.claude/settings.json` is outside the repository. Installer/remover ready
-at `scratch/kanalprobe-hook.mjs` (`install` | `remove` | `show`, backs up
-first). Pass = marker `KANALPROBE-7X4K` visible **to the model**, not just in
-the operator's pane; on failure the lighter increment is withdrawn, not
-adjusted. Unresolved either way: the channel existing and a *non-blocking*
-nudge changing behaviour are two different claims.
+**Channel probe PASSED 2026-09-06 — the build is unblocked.** A `PreToolUse`
+exit-0 `additionalContext` does reach the model here. The probe session knew
+the marker, so what carries the result is an accidental negative control:
+~15 `Bash` calls silent under a `Read`-only matcher, the first real `Read`
+fired. Detail and the residual caveat in the ADR's step-1 result block.
+Untouched and still unevidenced: that a *non-blocking* nudge changes
+behaviour. Increment 1 is built as a hypothesis the ledger measures.
 
 **Verify runtime measured** (analysis only). Wall clock 674.6s; the 60-member
 serial lane sums to 673.8s — the lane *is* the runtime, so raising
