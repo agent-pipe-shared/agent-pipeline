@@ -10,7 +10,11 @@ import {
   PROBE_SURFACES,
   checkCandidateBinding,
   classifyHookObservation,
+  createProbeRequest,
   createRecordId,
+  digestArtifactPreimage,
+  digestProbeReceipt,
+  runProbeMatrix,
   sanitizeRecord,
   sanitizeValue,
   validateRecord,
@@ -48,6 +52,26 @@ function validRecord(overrides = {}) {
     measuredAt: "2026-09-04T12:00:00.000Z",
   };
   return deepMerge(record, overrides);
+}
+
+function matrixAdapters({
+  runner = { name: "codex", version: "1.0.0", pluginVersion: "0.6.1" },
+  candidate = { commit: oid, tree: oid, artifactSha256: sha },
+  execution = () => ({ status: "refused", exitCode: 2, evidenceKind: "deterministic-execution" }),
+  marker = ({ receipt }) => ({ status: "covered", markerSha256: sha, receiptSha256: digestProbeReceipt(receipt) }),
+} = {}) {
+  const calls = { execution: [], markers: [], scratch: [] };
+  return {
+    calls,
+    adapters: {
+      runnerMetadata: { read: async () => typeof runner === "function" ? runner() : runner },
+      gitBinding: { read: async () => typeof candidate === "function" ? candidate() : candidate },
+      clock: { now: () => "2026-09-04T12:00:00.000Z" },
+      execution: { execute: async (input) => { calls.execution.push(input); return execution(input); } },
+      observationMarkers: { read: async (input) => { calls.markers.push(input); return marker(input); } },
+      scratch: { allocate: async (input) => { calls.scratch.push(input); return { path: "scratch/a1-2-payload" }; } },
+    },
+  };
 }
 
 function deepMerge(base, changes) {
@@ -151,16 +175,17 @@ test("requires canonical one-to-one plural surface correlation", () => {
 });
 
 test("rejects candidate commit, tree, and artifact mismatches and version staleness", () => {
-  const expected = { commit: oid, tree: oid, artifactSha256: sha, runnerVersion: "1.0.0", pluginVersion: "0.6.1" };
-  assert.deepEqual(checkCandidateBinding(validRecord(), expected), { qualifies: true, reason: null });
+  const expected = { commit: oid, tree: oid, artifactSha256: sha, runnerVersion: "1.0.0", pluginVersion: "0.6.1", evidenceScope: "native" };
+  const liveRecord = (changes = {}) => validRecord({ provenance: { fixtureIds: [] }, ...changes });
+  assert.deepEqual(checkCandidateBinding(liveRecord(), expected), { qualifies: true, reason: null });
   for (const field of ["commit", "tree", "artifactSha256"]) {
     const candidate = { ...expected, [field]: field === "artifactSha256" ? "c".repeat(64) : "c".repeat(40) };
-    assert.equal(checkCandidateBinding(validRecord(), candidate).qualifies, false);
+    assert.equal(checkCandidateBinding(liveRecord(), candidate).qualifies, false);
   }
-  assert.equal(checkCandidateBinding(validRecord({ evaluator: { outcome: "finding" } }), expected).reason, "evaluator-outcome-not-pass");
-  assert.equal(checkCandidateBinding(validRecord({ runner: { version: "2.0.0" }, staleness: { runnerVersion: "2.0.0" } }), expected).reason, "runner-or-plugin-version-mismatch");
-  assert.equal(checkCandidateBinding(validRecord({ staleness: { runnerVersion: "2.0.0" } }), expected).reason, "staleness-version-mismatch");
-  assert.equal(checkCandidateBinding(validRecord({ staleness: { status: "stale", invalidatedBy: "plugin-version" }, evaluator: { outcome: "finding" } }), expected).reason, "evaluator-outcome-not-pass");
+  assert.equal(checkCandidateBinding(liveRecord({ evaluator: { outcome: "finding" } }), expected).reason, "evaluator-outcome-not-pass");
+  assert.equal(checkCandidateBinding(liveRecord({ runner: { version: "2.0.0" }, staleness: { runnerVersion: "2.0.0" } }), expected).reason, "runner-or-plugin-version-mismatch");
+  assert.equal(checkCandidateBinding(liveRecord({ staleness: { runnerVersion: "2.0.0" } }), expected).reason, "staleness-version-mismatch");
+  assert.equal(checkCandidateBinding(liveRecord({ staleness: { status: "stale", invalidatedBy: "plugin-version" }, evaluator: { outcome: "finding" } }), expected).reason, "evaluator-outcome-not-pass");
 });
 
 test("requires coherent staleness versions and invalidation state", () => {
@@ -194,6 +219,130 @@ test("refuses invalid values from every normative enum family", () => {
   for (const surface of ["invalid"]) assert.throws(() => validateRecord(validRecord({ probeSurfaces: [surface] })));
   for (const observation of ["invalid"]) assert.throws(() => validateRecord(validRecord({ observations: observationsFor(["runner-hook/orchestrator", "runner-hook/subagent"], { 0: { hookObservation: observation } }) })));
   for (const outcome of ["invalid"]) assert.throws(() => validateRecord(validRecord({ evaluator: { outcome } })));
+});
+
+test("runs the injected four-surface matrix with correlated requests, receipts, and payload scratch", async () => {
+  const hostile = ["/", "private", "/", "stdout"].join("");
+  const { adapters, calls } = matrixAdapters({
+    execution: ({ request, scratch }) => ({
+      status: request.probeSurface === "payload-indirection" ? "allowed" : "refused",
+      exitCode: request.probeSurface === "payload-indirection" ? 0 : 2,
+      stdout: `${hostile} token=do-not-emit`,
+      scratch,
+    }),
+  });
+  const record = await runProbeMatrix({ adapters, surfaces: [...PROBE_SURFACES].reverse(), fixtureIds: { "payload-indirection": hostile } });
+  assert.deepEqual(record.probeSurfaces, PROBE_SURFACES);
+  assert.equal(record.observations.every((observation) => observation.hookObservation === "fires"), true);
+  assert.equal(record.evaluator.outcome, "unavailable");
+  assert.equal(record.provenance.fixtureIds.length, PROBE_SURFACES.length);
+  assert.equal(JSON.stringify(record).includes(hostile), false);
+  assert.equal(record.provenance.fixtureIds.includes("[REDACTED-PATH]"), true);
+  assert.equal(calls.execution.length, PROBE_SURFACES.length);
+  assert.equal(calls.markers.length, PROBE_SURFACES.length);
+  assert.equal(calls.scratch.length, 1);
+  assert.equal(calls.scratch[0].request.probeSurface, "payload-indirection");
+  assert.equal(calls.execution.find((call) => call.request.probeSurface === "git-hook").request.commandId, "guarded-push-refusal");
+  for (const [index, call] of calls.markers.entries()) {
+    assert.equal(call.request.probeSurface, PROBE_SURFACES[index]);
+    assert.equal(call.receipt.probeSurface, PROBE_SURFACES[index]);
+    assert.deepEqual(call.receipt.candidate, record.candidate);
+    assert.deepEqual(call.receipt.runner, record.runner);
+    assert.equal(call.receipt.layer, record.layer);
+  }
+  assert.equal(checkCandidateBinding(record, { ...record.candidate, runnerVersion: "1.0.0", pluginVersion: "0.6.1" }).reason, "evaluator-outcome-not-pass");
+});
+
+test("marker coverage distinguishes fires, fires-not, unknown, unavailable, and unsupported without claiming live enforcement", async () => {
+  const positive = matrixAdapters();
+  const live = await runProbeMatrix({ adapters: positive.adapters, evidenceScope: "native" });
+  assert.equal(live.observations.every((observation) => observation.hookObservation === "fires"), true);
+  assert.equal(live.evaluator.outcome, "unavailable");
+  assert.equal(checkCandidateBinding(live, { ...live.candidate, runnerVersion: "1.0.0", pluginVersion: "0.6.1" }).reason, "evaluator-outcome-not-pass");
+
+  const missingMarker = matrixAdapters({ marker: ({ receipt }) => ({ status: "covered", markerSha256: null, receiptSha256: digestProbeReceipt(receipt) }) });
+  const missing = await runProbeMatrix({ adapters: missingMarker.adapters, evidenceScope: "native" });
+  assert.equal(missing.observations[0].hookObservation, "fires-not");
+  assert.equal(missing.evaluator.outcome, "finding");
+
+  const allowed = matrixAdapters({ execution: () => ({ status: "allowed", exitCode: 0, evidenceKind: "deterministic-execution" }) });
+  assert.equal((await runProbeMatrix({ adapters: allowed.adapters, evidenceScope: "native" })).evaluator.outcome, "finding");
+
+  const unknownMarker = matrixAdapters({ marker: () => ({ status: "unknown", markerSha256: null }) });
+  assert.equal((await runProbeMatrix({ adapters: unknownMarker.adapters, evidenceScope: "native" })).evaluator.outcome, "unknown");
+
+  const unavailableAdapter = matrixAdapters({ execution: () => ({ status: "unavailable", exitCode: null }), marker: () => ({ status: "unavailable", markerSha256: null }) });
+  assert.equal((await runProbeMatrix({ adapters: unavailableAdapter.adapters, evidenceScope: "native" })).evaluator.outcome, "unavailable");
+
+  const unsupportedAdapter = matrixAdapters({ execution: () => ({ status: "unsupported", exitCode: null }), marker: () => ({ status: "unavailable", markerSha256: null }) });
+  assert.equal((await runProbeMatrix({ adapters: unsupportedAdapter.adapters, evidenceScope: "native" })).evaluator.outcome, "unsupported");
+
+  const selfAttestation = matrixAdapters({ execution: () => ({ status: "refused", exitCode: 2, evidenceKind: "self-attestation" }) });
+  const selfRecord = await runProbeMatrix({ adapters: selfAttestation.adapters, evidenceScope: "native" });
+  assert.equal(selfRecord.observations[0].evidenceKind, "self-attestation");
+  assert.equal(selfRecord.evaluator.outcome, "unavailable");
+});
+
+test("execution errors cannot be promoted by exit codes or prose alone", async () => {
+  const { adapters } = matrixAdapters({ execution: () => { throw new Error("fixture error"); }, marker: () => ({ status: "unavailable", markerSha256: null }) });
+  const record = await runProbeMatrix({ adapters, evidenceScope: "native" });
+  assert.equal(record.observations.every((observation) => observation.exitCode === null), true);
+  assert.equal(record.observations.every((observation) => observation.hookObservation === "unknown"), true);
+  assert.equal(record.evaluator.outcome, "unavailable");
+});
+
+test("marker evidence must bind the exact receipt and a changing candidate becomes stale", async () => {
+  const mismatchedMarker = matrixAdapters({ marker: () => ({ status: "covered", markerSha256: sha, receiptSha256: "c".repeat(64) }) });
+  const mismatch = await runProbeMatrix({ adapters: mismatchedMarker.adapters, evidenceScope: "native" });
+  assert.equal(mismatch.observations[0].hookObservation, "unknown");
+  assert.equal(mismatch.evaluator.outcome, "unknown");
+
+  let candidateReads = 0;
+  const changingCandidate = matrixAdapters({ candidate: () => {
+    candidateReads += 1;
+    return candidateReads === 1
+      ? { commit: oid, tree: oid, artifactSha256: sha }
+      : { commit: "c".repeat(40), tree: "c".repeat(40), artifactSha256: "c".repeat(64) };
+  } });
+  const stale = await runProbeMatrix({ adapters: changingCandidate.adapters });
+  assert.equal(stale.staleness.status, "stale");
+  assert.equal(stale.staleness.invalidatedBy, "candidate-binding-changed-during-probe");
+  assert.equal(stale.candidate.commit, oid);
+  assert.equal(stale.candidate.artifactSha256, sha);
+  assert.equal(stale.provenance.sourceSha256, sha);
+  assert.equal(checkCandidateBinding(stale, { ...stale.candidate, runnerVersion: "1.0.0", pluginVersion: "0.6.1" }).qualifies, false);
+
+  let runnerReads = 0;
+  const changingRunner = matrixAdapters({ runner: () => {
+    runnerReads += 1;
+    return runnerReads === 1
+      ? { name: "codex", version: "1.0.0", pluginVersion: "0.6.1" }
+      : { name: "codex", version: "2.0.0", pluginVersion: "0.6.1" };
+  } });
+  const runnerStale = await runProbeMatrix({ adapters: changingRunner.adapters });
+  assert.equal(runnerStale.runner.version, "1.0.0");
+  assert.equal(runnerStale.staleness.runnerVersion, "2.0.0");
+  assert.equal(runnerStale.staleness.status, "stale");
+});
+
+test("probe requests bind candidate and runner while artifact digests exclude generated records", () => {
+  const candidate = { commit: oid, tree: oid, artifactSha256: sha };
+  const runner = { name: "codex", version: "1.0.0", pluginVersion: "0.6.1" };
+  const request = createProbeRequest({ candidate, runner, layer: "runner-hook", probeSurface: "runner-hook/subagent", fixtureId: "subagent-fixture" });
+  assert.equal(Object.isFrozen(request), true);
+  assert.deepEqual(request.candidate, candidate);
+  assert.deepEqual(request.runner, runner);
+  const first = digestArtifactPreimage([{ path: "plugins/pipeline-core/scripts/enforcement-conformance.mjs", bytes: "module-bytes" }]);
+  const second = digestArtifactPreimage([{ path: "plugins/pipeline-core/scripts/enforcement-conformance.mjs", bytes: "changed-module-bytes" }]);
+  const nulDelimitedA = digestArtifactPreimage([{ path: "a", bytes: "b\u0000c" }]);
+  const nulDelimitedB = digestArtifactPreimage([{ path: "a", bytes: "b" }]);
+  assert.notEqual(first, second);
+  assert.notEqual(nulDelimitedA, nulDelimitedB);
+  assert.throws(() => digestArtifactPreimage([{ path: "../record.json", bytes: "generated-record-must-not-be-hashed" }]));
+  assert.throws(() => digestArtifactPreimage([{ path: "C:/private/record.json", bytes: "generated-record-must-not-be-hashed" }]));
+  assert.throws(() => digestArtifactPreimage([{ path: "a\u0000b", bytes: "generated-record-must-not-be-hashed" }]));
+  assert.throws(() => digestArtifactPreimage([{ path: "..\\record.json", bytes: "generated-record-must-not-be-hashed" }]));
+  assert.throws(() => digestArtifactPreimage([{ path: "\\\\host\\share\\record.json", bytes: "generated-record-must-not-be-hashed" }]));
 });
 
 test("sanitizes known credential, coordinate, path, transcript, and control shapes", () => {
