@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "8bc61f30e2976034d11c6bfd91ac4619f04d618ed66e20e591fb7838b5791cfe"
+    "transitionHead": "50f3eb63c7872514c488ca76b3204dfc0de17cd740eb1cd7dc00ac73218e6004"
   },
   "counts": {
-    "open": 103,
+    "open": 104,
     "in_progress": 0,
     "closed": 521,
     "rejected": 3,
@@ -1194,6 +1194,16 @@
       "closureRepository": "self",
       "closureCommit": "9ae28dad3f6c9c41833e7d629fa3d1d73872d2a2",
       "closureEvidence": "backlog/items/2026-08-18-capability-first-advisor-critic-dispatch.md"
+    },
+    {
+      "id": "pipeline.capture-evidence-refuses-fixture-literal-as-host-path",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-06",
+      "source": "NVA-B-LANEEVICT-2 dispatch, 2026-09-06: both concurrent capture-evidence.mjs invocations of guard-maintenance-window.test.mjs refused before writing; a direct node --test run of the same suite is green. Trigger confirmed by the orchestrator at plugins/pipeline-core/lib/guard-maintenance-window.test.mjs:1668,1679,1682.",
+      "deferred": false,
+      "tracking": "Nova B -- capture-evidence.mjs's windows-drive-letter leak heuristic (scripts/capture-evidence.mjs:120) matches a synthetic fixture literal such as C:\\Users\\Foo\\repo inside a test's own description and body, and on any match refuses to write the capture (:197). The tool has no allowlist. Consequence measured 2026-09-06: guard-maintenance-window-tests clears every serial-lane safety signal and passes solo 62/62, but its self-race evidence cannot be captured because GMW45's description contains that literal -- so the suite stays in the lane on a tooling refusal, not a safety finding, at 16.3s of lane time."
     },
     {
       "id": "pipeline.chat-gate-non-ascii-name-windows",
