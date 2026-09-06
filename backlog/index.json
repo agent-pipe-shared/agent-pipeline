@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "9d51e8d616cd4b540d19398d5e083166b3d84c793f5d0c4cd450f4e2b6d8bf43"
+    "transitionHead": "026cb11ae713144756146fa2e60c95071bb9bc8c19896a0f32f82172610a1f1d"
   },
   "counts": {
-    "open": 98,
+    "open": 99,
     "in_progress": 0,
     "closed": 513,
     "rejected": 3,
@@ -6734,6 +6734,16 @@
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
       "deferred": true,
       "tracking": "Sentinel recovery baseline; deferred per PO triage 2026-08-23."
+    },
+    {
+      "id": "pipeline.strip-for-dispatch-misses-resolution-heading",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-06",
+      "source": "Elephant, 2026-09-06, while building the NVA-B-TILDEFIX-1 Critic dispatch: ran the strip script, then noticed the output still contained '## Resolution' with the fix's own justification prose, and manually removed it from the scratch copy used as SPEC_PATH before dispatching.",
+      "deferred": false,
+      "tracking": "Nova B — discovered while assembling the T1 Critic dispatch for NVA-B-TILDEFIX-1. The backlog item being cited as spec had accumulated a '## Resolution' section (implementor narrative: which commit fixed it, how, and why the fix is believed correct) after its originating dispatch landed. backlog-item-strip-for-dispatch.mjs's output still carried that section verbatim — it only strips known Triage/Closure verdict-shaped headings, and 'Resolution' is not one of the patterns it recognizes."
     },
     {
       "id": "pipeline.subagent-identity-may-never-resolve-so-per-agent-scoping-is-inert",

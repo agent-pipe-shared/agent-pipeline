@@ -543,6 +543,7 @@
 | pipeline.stale-worktree-directories-accumulate-with-no-sweep | closed | defect | pipeline | 2026-08-27 | — |
 | pipeline.staleness-check-unsettled-top-level-await-warning | closed | defect | pipeline | 2026-08-19 | — |
 | pipeline.stateful-design-contract-template | deferred | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; deferred per PO triage 2026-08-23. |
+| pipeline.strip-for-dispatch-misses-resolution-heading | open | defect | pipeline | 2026-09-06 | Nova B — discovered while assembling the T1 Critic dispatch for NVA-B-TILDEFIX-1. The backlog item being cited as spec had accumulated a '## Resolution' section (implementor narrative: which commit fixed it, how, and why the fix is believed correct) after its originating dispatch landed. backlog-item-strip-for-dispatch.mjs's output still carried that section verbatim — it only strips known Triage/Closure verdict-shaped headings, and 'Resolution' is not one of the patterns it recognizes. |
 | pipeline.subagent-identity-may-never-resolve-so-per-agent-scoping-is-inert | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.sweep-remaining-guards-for-fail-open-identity-and-pipe-unpiped-scope-asymmetry | closed | workflow-improvement | pipeline | 2026-08-29 | — |
 | pipeline.t1-governance-path-preflight | closed | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
@@ -633,7 +634,7 @@
 
 ## Counts
 
-- open: 98
+- open: 99
 - in_progress: 0
 - closed: 513
 - rejected: 3
