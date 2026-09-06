@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "026cb11ae713144756146fa2e60c95071bb9bc8c19896a0f32f82172610a1f1d"
+    "transitionHead": "e11b524581b13e872aa0c97bc667fb76fd3a0d2e74685facaa5b15fef8ab7911"
   },
   "counts": {
-    "open": 99,
+    "open": 101,
     "in_progress": 0,
     "closed": 513,
     "rejected": 3,
@@ -1561,6 +1561,16 @@
       "created": "2026-08-17",
       "source": "R-AC-06 investigation (PHX-WP-RAC06, 2026-08-17), specs/sprint-phoenix-epic/evidence/acceptance-evidence-map.mjs POINTERS['R-AC-06']",
       "deferred": false
+    },
+    {
+      "id": "pipeline.commandpath-sibling-tilde-gap-and-test-pins",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-06",
+      "source": "T1 Critic review of NVA-B-TILDEFIX-1 (opus, max), findings F1 and F3, `scratch/dispatch/tildefix-critic-7f3a9c21/critic-notes.md` (scratch, not durable -- this item is the durable record).",
+      "deferred": false,
+      "tracking": "Nova B — T1 Critic review of NVA-B-TILDEFIX-1 (PASS, 4 minor findings). F3: commandPath() in guard-lifecycle-ready.mjs still builds resolve(root, value) with no tilde reject, so a leading-~ argument still resolves as inside root wherever a caller trusts that result directly (named call sites: lines 2783, 2956, 2979, 2987) -- not proven exploitable, disclosed as such. F1: the cat-pipeline and git-pipeline lane tests added by NVA-B-TILDEFIX-1 assert only exitCode 2, not the specific denial code, unlike their single-command/rg siblings, so a future refactor could silently change which code those two lanes report with the suite still green."
     },
     {
       "id": "pipeline.commit-trailer-block-wrapped-continuation-line-parses-as-empty",
@@ -3648,6 +3658,16 @@
       "closureRepository": "self",
       "closureCommit": "d76db9a26692ebcfe81dd1791bebfef0709dcae0",
       "closureEvidence": "docs/claude-local-plugin-development.md"
+    },
+    {
+      "id": "pipeline.installed-plugin-copy-stale-vs-repo-source",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-06",
+      "source": "T1 Critic review of NVA-B-TILDEFIX-1 (opus, max), 'Live reachability probe' disclosure section, 2026-09-06; confirmed independently by the Elephant via `stat`/`diff` against the installed marketplace copy.",
+      "deferred": false,
+      "tracking": "Nova B — a T1 Critic reviewing NVA-B-TILDEFIX-1 ran a live reachability probe (a synthetic marker path, never a real credential) and found the shell-expanded tilde was ADMITTED AND EXECUTED by the guard actually enforcing that dispatch's own session — even though the source fix is confirmed present and Critic-approved in the reviewed working tree. Traced by the Elephant: the enforcing hook is loaded from the installed marketplace copy (/home/skar667/agent-pipeline-local-marketplace/plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs), a plain regular file (not a symlink) last modified 2026-09-04 07:42, which diverges from the repo's own copy by roughly six commits and predates NVA-B-READCONTAIN-1 entirely, not only NVA-B-TILDEFIX-1."
     },
     {
       "id": "pipeline.installed-plugin-gmw-hgo-v3-anchor-gap-blocks-all-protected-edits",

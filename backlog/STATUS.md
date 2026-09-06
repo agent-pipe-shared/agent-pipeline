@@ -132,6 +132,7 @@
 | pipeline.codex-worker-supervisor-hardcodes-a-sandbox-mode-that-blocks-git-spawn | open | defect | pipeline | 2026-08-30 | Nova B -- Nova A's danger-full-access quick fix is landed and re-verified; the remaining scope is the PO-recalled custom, safer sandbox profile with bootstrap-time selection. |
 | pipeline.command-grammar-guesses-shell-dialect-from-host-os-not-the-actual-tool-shell | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.command-offer-schema-has-no-displayed-generated-asserted-states | rejected | requirement | pipeline | 2026-08-17 | — |
+| pipeline.commandpath-sibling-tilde-gap-and-test-pins | open | defect | pipeline | 2026-09-06 | Nova B — T1 Critic review of NVA-B-TILDEFIX-1 (PASS, 4 minor findings). F3: commandPath() in guard-lifecycle-ready.mjs still builds resolve(root, value) with no tilde reject, so a leading-~ argument still resolves as inside root wherever a caller trusts that result directly (named call sites: lines 2783, 2956, 2979, 2987) -- not proven exploitable, disclosed as such. F1: the cat-pipeline and git-pipeline lane tests added by NVA-B-TILDEFIX-1 assert only exitCode 2, not the specific denial code, unlike their single-command/rg siblings, so a future refactor could silently change which code those two lanes report with the suite still green. |
 | pipeline.commit-trailer-block-wrapped-continuation-line-parses-as-empty | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.commit-trailer-cannot-distinguish-authorship-from-commit-act | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.compact-nudge-cadence-too-aggressive-and-not-configurable | open | idea | pipeline | 2026-08-26 | — |
@@ -299,6 +300,7 @@
 | pipeline.inherited-still-open-claims-need-a-re-check-before-dispatch-no-durable-home | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.inode-identity-decides-deletion-in-a-second-rollback-path | closed | defect | pipeline | 2026-09-01 | — |
 | pipeline.installed-marketplace-guard-copy-drifts-silently-from-repo-source | closed | defect | pipeline | 2026-08-29 | PO decision 2026-08-29: candidate 3 (accept as inherent), documented permanently. |
+| pipeline.installed-plugin-copy-stale-vs-repo-source | open | defect | pipeline | 2026-09-06 | Nova B — a T1 Critic reviewing NVA-B-TILDEFIX-1 ran a live reachability probe (a synthetic marker path, never a real credential) and found the shell-expanded tilde was ADMITTED AND EXECUTED by the guard actually enforcing that dispatch's own session — even though the source fix is confirmed present and Critic-approved in the reviewed working tree. Traced by the Elephant: the enforcing hook is loaded from the installed marketplace copy (/home/skar667/agent-pipeline-local-marketplace/plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs), a plain regular file (not a symlink) last modified 2026-09-04 07:42, which diverges from the repo's own copy by roughly six commits and predates NVA-B-READCONTAIN-1 entirely, not only NVA-B-TILDEFIX-1. |
 | pipeline.installed-plugin-gmw-hgo-v3-anchor-gap-blocks-all-protected-edits | closed | defect | pipeline | 2026-08-16 | — |
 | pipeline.installing-consumer-is-never-asked-any-setup-decision | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.intake-generate-coordinator-path-undocumented-in-skill-references | closed | defect | pipeline | 2026-08-24 | — |
@@ -634,7 +636,7 @@
 
 ## Counts
 
-- open: 99
+- open: 101
 - in_progress: 0
 - closed: 513
 - rejected: 3
