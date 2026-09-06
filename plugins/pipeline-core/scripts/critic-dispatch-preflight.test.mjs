@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
 
-import { CriticDispatchPreflightError, preflightCriticDispatch } from "./critic-dispatch-preflight.mjs";
+import { CriticDispatchPreflightError, EVIDENCE_SWEEP_SCHEMA, enumerateEvidenceArtifacts, preflightCriticDispatch } from "./critic-dispatch-preflight.mjs";
 
 function git(root, args) { return execFileSync("git", ["-C", root, ...args], { encoding: "utf8" }).trim(); }
 function commit(root, message) {
@@ -143,4 +143,75 @@ test("a base ref that fails commit-peeling and is not the empty tree is still re
     () => preflightCriticDispatch(input(fx, { base: bogus })),
     (error) => error instanceof CriticDispatchPreflightError && error.code === "CDP-GIT",
   );
+});
+
+/**
+ * Fixture reproducing the shape of the 2026-09-06 incident: the searched-for
+ * task id is `NVA-B-DENIALCODE-1`; the real artifact that was missed is named
+ * `2026-09-06-nva-b-denialcode-1-red.txt` -- lower-cased and carrying a date
+ * prefix and a role suffix. A second sibling and an unrelated file are added
+ * so the sweep is proven to be selective, not merely permissive.
+ */
+function evidenceSweepFixture() {
+  const root = mkdtempSync(join(tmpdir(), "critic-dispatch-preflight-sweep-"));
+  mkdirSync(join(root, "evidence"), { recursive: true });
+  mkdirSync(join(root, "backlog", "evidence"), { recursive: true });
+  mkdirSync(join(root, "specs", "some-feature", "evidence"), { recursive: true });
+  writeFileSync(join(root, "evidence", "2026-09-06-nva-b-denialcode-1-red.txt"), "red\n");
+  writeFileSync(join(root, "backlog", "evidence", "2026-09-06-nva-b-denialcode-1-green.txt"), "green\n");
+  writeFileSync(join(root, "specs", "some-feature", "evidence", "unrelated.txt"), "unrelated\n");
+  writeFileSync(join(root, "evidence", "NVA-B-OTHERTASK-1.json"), "{}\n");
+  git(root, ["init", "-q"]);
+  return { root };
+}
+
+test("evidence sweep finds the misplaced regression artifact by case-insensitive substring match, across a date prefix and a role suffix", () => {
+  const fx = evidenceSweepFixture();
+  try {
+    const result = enumerateEvidenceArtifacts({ root: fx.root, taskId: "NVA-B-DENIALCODE-1" });
+    assert.equal(result.schema, EVIDENCE_SWEEP_SCHEMA);
+    const paths = result.matches.map(({ path }) => path).sort();
+    assert.deepEqual(paths, [
+      "backlog/evidence/2026-09-06-nva-b-denialcode-1-green.txt",
+      "evidence/2026-09-06-nva-b-denialcode-1-red.txt",
+    ]);
+    assert.equal(result.matches.length, 2, "the unrelated task id and unrelated file must not match");
+  } finally {
+    rmSync(fx.root, { recursive: true, force: true });
+  }
+});
+
+test("evidence sweep names each result's location class, distinguishing the ignored root directory from a tracked one", () => {
+  const fx = evidenceSweepFixture();
+  try {
+    const result = enumerateEvidenceArtifacts({ root: fx.root, taskId: "NVA-B-DENIALCODE-1" });
+    const byPath = new Map(result.matches.map((match) => [match.path, match.locationClass]));
+    assert.match(byPath.get("evidence/2026-09-06-nva-b-denialcode-1-red.txt"), /ignored/);
+    assert.match(byPath.get("backlog/evidence/2026-09-06-nva-b-denialcode-1-green.txt"), /tracked/);
+  } finally {
+    rmSync(fx.root, { recursive: true, force: true });
+  }
+});
+
+test("evidence sweep is advisory and non-failing: a task id with no artifacts yields an empty result, never an error", () => {
+  const fx = evidenceSweepFixture();
+  try {
+    const result = enumerateEvidenceArtifacts({ root: fx.root, taskId: "NVA-B-NOTHING-HERE-AT-ALL" });
+    assert.equal(result.schema, EVIDENCE_SWEEP_SCHEMA);
+    assert.deepEqual(result.matches, []);
+  } finally {
+    rmSync(fx.root, { recursive: true, force: true });
+  }
+});
+
+test("evidence sweep never touches preflightCriticDispatch()'s own binding checks or failure modes", () => {
+  const fx = fixture();
+  // The full-strictness preflight still fails exactly as before when evidence
+  // does not bind the exact candidate -- the sweep is a separate function and
+  // does not relax or replace `matchingCandidateEvidence()`.
+  writeFileSync(join(fx.root, "evidence", "verify.json"), `${JSON.stringify({ candidate: { commit: fx.base, tree: fx.tree } })}\n`);
+  assert.throws(() => preflightCriticDispatch(input(fx)), (error) => error instanceof CriticDispatchPreflightError && error.code === "CDP-EVIDENCE-BINDING");
+  // But the sweep over the same directory still reports what is there.
+  const swept = enumerateEvidenceArtifacts({ root: fx.root, taskId: "verify" });
+  assert.ok(swept.matches.some(({ path }) => path === "evidence/verify.json"));
 });

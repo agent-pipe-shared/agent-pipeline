@@ -11,7 +11,7 @@
  * runner, so a packet-ready result is deliberately not a spawn authorization.
  */
 import { createHash } from "node:crypto";
-import { lstatSync, readFileSync, realpathSync } from "node:fs";
+import { lstatSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 
@@ -23,6 +23,18 @@ import {
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 export const CRITIC_DISPATCH_PREFLIGHT_SCHEMA = "pipeline.critic-dispatch-preflight.v1";
+export const EVIDENCE_SWEEP_SCHEMA = "pipeline.critic-dispatch-preflight-evidence-sweep.v1";
+
+/**
+ * The directory kinds ADR-0063 names as candidate homes for evidence: the
+ * ignored, machine-regenerated repo-root directory, and the tracked, durable
+ * citation-target directories (`backlog/evidence/` is fixed; `specs/*\/evidence/`
+ * is one instance per feature package and is discovered at sweep time).
+ */
+const FIXED_EVIDENCE_LOCATIONS = [
+  { dir: "evidence", locationClass: "machine-regenerated (ignored, repo-root evidence/)" },
+  { dir: "backlog/evidence", locationClass: "durable citation target (tracked, backlog/evidence/)" },
+];
 const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
 const PATH_MAX = 240;
 const EVIDENCE_MAX_BYTES = 1024 * 1024;
@@ -234,12 +246,60 @@ export function preflightCriticDispatch({ root, base, candidate, specPath, guard
   };
 }
 
+/**
+ * Advisory, non-failing enumeration of evidence-shaped artifacts for a given
+ * task id, across every location ADR-0063 names as an evidence home. This is
+ * NOT part of `preflightCriticDispatch()` and never affects its pass/fail
+ * outcome: `matchingCandidateEvidence()` still refuses anything that does not
+ * bind the exact candidate, unchanged. This function only answers "what
+ * exists", so a dispatcher can cite it instead of asserting an absence.
+ *
+ * Matching is case-insensitive substring matching of the task id against each
+ * candidate file's basename. Substring matching -- rather than an exact or
+ * anchored match -- is deliberate: the regression case that motivated this
+ * (2026-09-06, NVA-B-DENIALCODE-1) is a file named
+ * `2026-09-06-nva-b-denialcode-1-red.txt`, which carries a date prefix before
+ * the task id and a role suffix after it. Lower-casing both sides absorbs the
+ * case difference; substring containment absorbs the surrounding text. A
+ * task id is never treated as a regular expression.
+ */
+export function enumerateEvidenceArtifacts({ root, taskId }) {
+  if (typeof root !== "string" || root.length === 0) fail("CDP-SWEEP-INPUT", "root is required.");
+  if (typeof taskId !== "string" || taskId.length === 0) fail("CDP-SWEEP-INPUT", "taskId is required.");
+  const realRoot = realpathSync(root);
+  const needle = taskId.toLowerCase();
+
+  const locations = [...FIXED_EVIDENCE_LOCATIONS];
+  const specsDir = resolve(realRoot, "specs");
+  let specEntries = [];
+  try { specEntries = readdirSync(specsDir, { withFileTypes: true }); } catch { specEntries = []; }
+  for (const entry of specEntries) {
+    if (!entry.isDirectory()) continue;
+    const dir = `specs/${entry.name}/evidence`;
+    locations.push({ dir, locationClass: `durable citation target (tracked, ${dir}/)` });
+  }
+
+  const matches = [];
+  for (const { dir, locationClass } of locations) {
+    let entries = [];
+    try { entries = readdirSync(resolve(realRoot, dir), { withFileTypes: true }); } catch { entries = []; }
+    for (const entry of entries) {
+      if (!entry.isFile()) continue;
+      if (!entry.name.toLowerCase().includes(needle)) continue;
+      matches.push({ path: `${dir}/${entry.name}`, locationClass });
+    }
+  }
+  matches.sort((left, right) => compare(left.path, right.path));
+
+  return { schema: EVIDENCE_SWEEP_SCHEMA, taskId, matches };
+}
+
 function parseArgs(argv) {
-  const values = { guardrailPaths: [], evidencePaths: [], priorCriticEvidencePath: null };
+  const values = { guardrailPaths: [], evidencePaths: [], priorCriticEvidencePath: null, sweepEvidenceTaskId: null };
   for (let index = 0; index < argv.length; index += 1) {
     const flag = argv[index];
     const value = argv[index + 1];
-    if (["--root", "--base", "--candidate", "--spec", "--guardrail", "--evidence", "--prior-critic"].includes(flag) && value === undefined) fail("CDP-ARGUMENT", `${flag} requires a value.`);
+    if (["--root", "--base", "--candidate", "--spec", "--guardrail", "--evidence", "--prior-critic", "--sweep-evidence"].includes(flag) && value === undefined) fail("CDP-ARGUMENT", `${flag} requires a value.`);
     if (flag === "--root") values.root = value;
     else if (flag === "--base") values.base = value;
     else if (flag === "--candidate") values.candidate = value;
@@ -247,6 +307,7 @@ function parseArgs(argv) {
     else if (flag === "--guardrail") values.guardrailPaths.push(value);
     else if (flag === "--evidence") values.evidencePaths.push(value);
     else if (flag === "--prior-critic") values.priorCriticEvidencePath = value;
+    else if (flag === "--sweep-evidence") values.sweepEvidenceTaskId = value;
     else fail("CDP-ARGUMENT", `Unknown argument: ${flag}`);
     index += 1;
   }
@@ -254,12 +315,24 @@ function parseArgs(argv) {
 }
 
 if (isDirectInvocation(import.meta.url)) {
-  try {
-    const result = preflightCriticDispatch(parseArgs(process.argv.slice(2)));
-    process.stdout.write(`${JSON.stringify(result)}\n`);
-  } catch (error) {
-    const code = error instanceof CriticDispatchPreflightError ? error.code : "CDP-UNEXPECTED";
-    process.stderr.write(`${JSON.stringify({ schema: CRITIC_DISPATCH_PREFLIGHT_SCHEMA, status: "rejected", code })}\n`);
-    process.exitCode = 1;
+  const args = parseArgs(process.argv.slice(2));
+  if (args.sweepEvidenceTaskId !== null) {
+    try {
+      const result = enumerateEvidenceArtifacts({ root: args.root, taskId: args.sweepEvidenceTaskId });
+      process.stdout.write(`${JSON.stringify(result)}\n`);
+    } catch (error) {
+      const code = error instanceof CriticDispatchPreflightError ? error.code : "CDP-UNEXPECTED";
+      process.stderr.write(`${JSON.stringify({ schema: EVIDENCE_SWEEP_SCHEMA, status: "rejected", code })}\n`);
+      process.exitCode = 1;
+    }
+  } else {
+    try {
+      const result = preflightCriticDispatch(args);
+      process.stdout.write(`${JSON.stringify(result)}\n`);
+    } catch (error) {
+      const code = error instanceof CriticDispatchPreflightError ? error.code : "CDP-UNEXPECTED";
+      process.stderr.write(`${JSON.stringify({ schema: CRITIC_DISPATCH_PREFLIGHT_SCHEMA, status: "rejected", code })}\n`);
+      process.exitCode = 1;
+    }
   }
 }
