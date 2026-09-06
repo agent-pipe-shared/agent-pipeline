@@ -78,12 +78,17 @@ only `security-scan` failing. Its confirmed finding is a deterministic public
 GMW revoke ID; the exact content/path/rule/position-bound scanner exception
 was explicitly PO-approved on 2026-09-06 and applied after rechecking its
 original ignore-file and immutable event bindings. The proposal log's pending
-decision status is historical. Full Verify retry on the new committed, clean
-candidate remains pending; the prior failed result is not cleared by this
-update. The exception is unreviewed; independent T1 review also remains
-pending: source discovery found the selected Critic launch protocol,
-but no inspected production consumer launching the actual Critic and no live
-transport receipt. Model admission alone cannot clear that gate. The handoff
+decision status is historical. Full Verify subsequently passed on clean commit
+`ca886b926e6d902a8501e14996ba6213d9371aab`, tree
+`d0b9c4ad67c5b8aba0720694dc09be1cae59a572`: exit 0, 508/508, exact clean
+start/finish bindings in `evidence/alfred-exact-exception-verify.json`.
+The exception is unreviewed; independent T1 review remains pending.
+Installed `0.6.1` now contains the selected Critic consumer, but its adapter
+resolves three required ruleset files against a source-only layout; all three
+installed targets are absent. The handoff records the inspected byte digest
+and failure before child launch. The other Elephant owns that Pipeline repair;
+this session does not change the plugin or Nova. No live selected transport
+receipt exists here. Model admission alone cannot clear that gate. The handoff
 names the proposed adapter owner and acceptance criteria without authorizing
 Nova, plugin or guard changes. No new signature ceremony is requested
 automatically. These Verify results do not cover this later documentation
