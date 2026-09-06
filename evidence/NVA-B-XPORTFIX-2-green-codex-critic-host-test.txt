@@ -1,0 +1,127 @@
+command: node --test plugins/pipeline-core/scripts/codex-critic-host.test.mjs
+label: NVA-B-XPORTFIX-2-green
+exitCode: 0
+--- stdout ---
+ok 1 - duplicate JSON keys fail before JSON.parse
+ok 2 - nested duplicate JSON keys fail
+ok 3 - valid nested JSON passes duplicate scan
+ok 4 - absolute path is rejected
+ok 5 - parent traversal is rejected
+ok 6 - backslash is rejected
+ok 7 - AGENTS exclusion is rejected
+ok 8 - state exclusion is rejected
+ok 9 - normalized public path passes
+ok 10 - unknown CLI command fails closed
+ok 11 - missing CLI argument fails closed
+ok 12 - selected Critic transport requires one closed input packet
+ok 13 - observer must be named and absolute
+ok 14 - request rejects unknown fields
+ok 15 - request rejects short commits
+ok 16 - request rejects duplicate references
+ok 17 - request rejects the coordinator-reserved diff reference
+ok 18 - T1 request accepts standing authorization without a legacy waiver
+ok 19 - exact historical dispatch authorization stays readable but cannot select current T1 assurance
+ok 20 - forged or structurally deviant legacy dispatch authorization fails closed
+ok 21 - request rejects a fifth Critic round before any checkout
+ok 22 - request rejects a missing review economy before any checkout
+ok 23 - unprovable delta impact is downgraded to full rather than silently narrowed
+ok 24 - every controlling non-ready dispatch status and gate failure precedes Critic checkout, temporary state, and child execution
+ok 25 - prepare requires canonical private and shared observers
+ok 26 - private and shared observer roots must be distinct
+ok 27 - candidate and ruleset roots must be separate
+ok 28 - control outputs cannot cross a symlinked parent
+ok 29 - dispatch state cannot be placed inside the review checkout
+ok 30 - dirty ruleset checkout is refused
+ok 31 - hidden index visibility flags are refused
+ok 32 - hidden candidate index visibility flags are refused
+ok 33 - prepare emits fixed native Sol/xhigh route
+ok 34 - the exact runner value prepareNativeCritic sends the gate is accepted by the real onboarding readiness gate, not merely present in a captured argument
+ok 35 - prepared packet is private and no observer path leaks
+ok 36 - disposable checkout has no remote and exact candidate
+ok 37 - prepared packet binds verify evidence and observer state
+ok 38 - prepared packet binds the exact enumerated commit-set as its diff reference
+ok 39 - delta prepare binds only the actual changed path and its invariant
+ok 40 - delta preparation rejects forged legacy receipt metadata or an underreported correction range
+ok 41 - later full admission cannot bypass exact correction-range reconciliation
+ok 42 - configured fsmonitor cannot run before the protected baseline
+ok 43 - verify-time observer mutation is detected before baselining
+ok 44 - valid host return passes pure validation
+ok 45 - T1 rejects the normal-lane assurance claim
+ok 46 - unknown assurance claims fail closed at the return schema
+ok 47 - non-T1 preparation retains the normal assurance
+ok 48 - wrong model fails closed
+ok 49 - delegating host fails closed
+ok 50 - wrong task name fails closed
+ok 51 - late first evidence fails closed
+ok 52 - lease timeout fails closed
+ok 53 - second recovery fails closed
+ok 54 - prepared replay fails closed
+ok 55 - candidate replay fails closed
+ok 56 - private path leak fails closed
+ok 57 - briefing violation with pass fails closed
+ok 58 - inconsistent trajectory with pass fails closed
+ok 59 - major finding with pass fails closed
+ok 60 - empty context disclosure fails closed
+ok 61 - duplicate context disclosure fails closed
+ok 62 - contradictory none disclosure fails closed
+ok 63 - repeated liveness evidence does not count as progress
+ok 64 - generic liveness text is rejected
+ok 65 - actual vector advance resets stagnation independently of wall time
+ok 66 - unchanged vector above the stagnation interval fails closed
+ok 67 - regressing progress vector fails closed
+ok 68 - completed progress binds the exact result byte count
+ok 69 - unbound analysis-progress cannot claim a vector advance
+ok 70 - recovery status without an advance cannot reset the stagnation lease
+ok 71 - path-line-bound analysis vector advance extends the stagnation lease
+ok 72 - finalize transaction paths must be pairwise distinct
+ok 73 - leaf-symlinked host return is rejected
+ok 74 - observer mutation blocks finalize
+ok 75 - ignored observer content mutation blocks finalize
+ok 76 - Git administrative mutation blocks finalize
+ok 77 - new loose Git object blocks finalize
+ok 78 - persistent Git index lock blocks finalize
+ok 79 - raw Git index-only mutation blocks finalize
+ok 80 - Git index mode-only mutation changes the administrative fingerprint
+ok 81 - empty untracked worktree directory mutation changes the fingerprint
+ok 82 - reserved AGENTS.md directories fail closed without opening their contents
+ok 83 - symlinked Git index is rejected instead of dereferenced
+ok 84 - mutation probes restore every protected repository exactly
+ok 85 - reference mutation blocks finalize
+ok 86 - enumerated diff mutation blocks finalize
+ok 87 - path-only finding citation is rejected
+ok 88 - synthetic trailing-newline finding citation is rejected
+ok 89 - out-of-range finding citation is rejected
+ok 90 - current finalization strips legacy authorization while historical receipts remain schema-valid
+ok 91 - consumed dispatch cannot be finalized twice
+ok 92 - pre-existing receipt refuses without consuming the dispatch
+ok 93 - failing review emits a sanitized disposition receipt
+ok 94 - interrupted receipt publication recovers from the finalizing marker
+ok 95 - a failed review receipt also consumes the dispatch
+ok 96 - affected Codex Critic launches consume the generic selected read-only transport
+ok 97 - codex-critic-app-server consumer accepts a complete, valid child turn bound to the selected profile
+ok 98 - codex-critic-app-server consumer refuses before spawning on invalid selection, references or dispatch identity
+ok 99 - codex-critic-app-server consumer never collapses a completed-but-invalid child into no-child evidence
+ok 100 - selectedCriticInProcessBridge exposes exactly {launch, finalize} to the sandbox runtime's hostBridge contract
+ok 101 - selectedCriticInProcessBridge.launch refuses drifted references, repository root or dispatch identity before invoking the consumer
+ok 102 - runSelectedCriticHost composes the real in-process bridge and the real consumer end to end, faking only the child process and the generic selected-duty executor
+ok 103 - selectedCriticInProcessBridge.finalize refuses when the selection or requested route drifted after a successful launch
+ok 104 - runSelectedCriticHost reports selected-sandbox-required when no selection/child is available
+ok 105 - runSelectedCriticHost reports selected-critic-transport-failed rather than collapsing a completed-but-invalid child into no-child evidence
+ok 106 - codex-critic-app-server reports childStarted:false, not true, when the child never spawns at all (pins the upstream fact the fix below depends on)
+ok 107 - selectedCriticInProcessBridge.launch reports a genuinely unstarted child as childStarted:false, not undefined -- this is the exact expression the generic bridge uses to tell noChild() apart from postLaunchFailure()
+ok 108 - the real runSandboxedReadonlyHostBridge resolves a genuinely unstarted child to noChild(), never postLaunchFailure(), driven with only its own dependencies (readSelection, readback, resolveScratch, resealScratch) and the real selected-Critic launch/finalize pair, faking only the process-spawn boundary
+ok 109 - runSelectedCriticHost returns selected-sandbox-required, not selected-critic-transport-failed, when the real bridge chain observes no child started
+ok 110 - selectedCriticInProcessBridge carries the app server's own observed terminal through to the persisted execution receipt when the child completed but a selected-host binding check failed, instead of postLaunchFailure()'s synthesized lost-stdio shape for a run that finished -- driven through the real, unedited runSandboxedReadonlyHostBridge so postLaunchFailure() would fire here if this branch regressed
+1..110
+# pass 110
+✔ plugins/pipeline-core/scripts/codex-critic-host.test.mjs (28897.621384ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 28913.859848
+
+--- stderr ---

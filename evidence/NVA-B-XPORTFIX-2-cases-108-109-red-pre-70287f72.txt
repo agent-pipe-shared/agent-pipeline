@@ -1,0 +1,52 @@
+label: NVA-B-XPORTFIX-2-cases-108-109-red-pre-70287f72
+purpose: DoD requirement -- confirm cases 108 and 109 (added by NVA-B-XPORTFIX-1,
+  "the real runSandboxedReadonlyHostBridge resolves a genuinely unstarted child
+  to noChild()..." and "runSelectedCriticHost returns selected-sandbox-required,
+  not selected-critic-transport-failed...") are genuinely red against the
+  source as it stood before commit 70287f72, not merely unreached or passing
+  vacuously.
+
+method: codex-critic-host.test.mjs's check()/checkAsync() helpers are plain
+  top-level calls, not real node:test subtests -- an assertion failure throws
+  uncaught and aborts the whole file. Running the full suite against the
+  pre-70287f72 source stops at case 107 (already-known red per
+  evidence/NVA-B-XPORTFIX-1-red-codex-critic-host-test.txt), so 108/109 never
+  execute in that mode. Built scratch/xportfix2-repro-108-109.mjs, an
+  isolation harness copying the two check bodies verbatim (not part of the
+  suite, not committed), to run 108 and 109 independently.
+
+procedure:
+  1. `git show 70287f72^:plugins/pipeline-core/scripts/codex-critic-selected-host.mjs`
+     written temporarily over the real file (Write tool).
+  2. `node scratch/xportfix2-repro-108-109.mjs` run against that pre-fix source.
+  3. `git checkout -- plugins/pipeline-core/scripts/codex-critic-selected-host.mjs`
+     to restore the post-XPORTFIX-1 (fixed) source.
+  4. `node scratch/xportfix2-repro-108-109.mjs` run again against the fixed
+     source, to confirm the harness itself is faithful (both pass there).
+
+result against pre-70287f72 source (RED, both cases):
+{"case":108,"result":"fail","message":"Expected values to be strictly equal:\n\ntrue !== false\n","actual":true,"expected":false}
+{"case":109,"result":"fail","message":"Expected values to be strictly equal:\n+ actual - expected\n\n+ null\n- 'css_aaaaaaaaaaaaaaaaaaaaaaaaae'\n","actual":null,"expected":"css_aaaaaaaaaaaaaaaaaaaaaaaaae"}
+
+result against the fixed (current) source (GREEN, both cases):
+{"case":108,"result":"pass"}
+{"case":109,"result":"pass"}
+
+finding: neither case passes vacuously against the pre-70287f72 source.
+Case 108 fails because launch() collapsed the genuinely-unstarted child's
+observation to childStarted:undefined (old code: `result?.childStarted === true
+? true : undefined`, which also maps an explicit `false` to `undefined`),
+routing the generic bridge to postLaunchFailure() (childStarted:true) instead
+of noChild() (childStarted:false) -- the assertion `execution.terminal.childStarted
+=== false` fails with actual `true`. Case 109 fails downstream of the same
+root cause: the test's executeSandboxedReadonlyDuty stand-in throws when it
+observes execution.terminal.childStarted (true, wrongly, per case 108's
+finding) instead of returning the no-child translation, and that thrown error
+is caught by runSelectedCriticHost's top-level try/catch, which returns
+unavailableResult("selected-sandbox-required") with no `selected` argument --
+so `result.code` happens to still read "selected-sandbox-required" (matching
+by coincidence of the catch-all default), but `result.selectionId` is null
+instead of the real selection id, so the assertion
+`result.selectionId === selection.selectionId` fails. Both are genuine,
+non-vacuous reds. No test-authoring fix was required for cases 108/109; this
+capture documents the verification rather than a defect in those two tests.
