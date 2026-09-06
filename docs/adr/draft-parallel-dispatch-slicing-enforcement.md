@@ -497,16 +497,51 @@ Beyond the trigger alternatives in Decision 4 and the hard block in Decision 5:
 
 ---
 
+## Addendum, 2026-09-06 (after this document was written): the channel question is answered
+
+Step 1 below was run as a bounded documentation probe the same day, before
+any build. **Result: the channel exists.** Per the current Claude Code hooks
+reference, a `PreToolUse` hook may return
+`hookSpecificOutput.additionalContext` together with
+`permissionDecision: "allow"`; the context reaches the model and the tool
+call is not blocked. `PostToolUse` supports the same field.
+
+The probe also surfaced a trap this document did not anticipate: **for tool
+events, stdout does NOT reach the model.** Exit 0 plus text on stdout is
+ignored for `PreToolUse`/`PostToolUse`; only the structured
+`hookSpecificOutput.additionalContext` field is delivered. (For
+`SessionStart`/`UserPromptSubmit` it is the reverse — stdout is treated as
+plain text and does reach the model, which is why this repository's existing
+`SessionStart` precedents look the way they do.) A build that writes the
+nudge to stdout would deliver it to the operator's pane only — precisely
+today's failure mode in new clothing.
+
+**Honest limit of this answer:** it is documentation-based, not measured on
+this runner. Given that this same session found an installed guard copy
+running stale and a documented denial code that no longer matched reality,
+"documented" is not "verified here". The empirical confirmation falls out of
+the first build run for free — when the hook first fires, either the nudge is
+in context or it is not — so a separate empirical probe was judged not worth
+its own dispatch. Whoever builds step 2 should treat the first live firing as
+the real check and report what they observed.
+
+This does NOT resolve the row above it in the risk table: that a *non-blocking*
+message changes an Elephant's behaviour at all remains unevidenced in this
+repository. The channel being available and the nudge being effective are two
+different claims, and only the first is now settled.
+
 ## Next steps
 
 **What a follow-up implementation dispatch would need to build** — strictly in
-this order, because step 1 can invalidate steps 2–4:
+this order:
 
-1. **Confirm the delivery channel empirically** (Decision 1): does a PreToolUse
+1. ~~**Confirm the delivery channel empirically** (Decision 1): does a PreToolUse
    hook's exit-0 `hookSpecificOutput.additionalContext` reach the model on this
    runner? If not, does PostToolUse? If neither, **stop and report** — the
    PO's chosen increment is not implementable as specified and needs a fresh
-   decision. This is a bounded probe dispatch, not part of the build.
+   decision. This is a bounded probe dispatch, not part of the build.~~
+   **Done 2026-09-06 — see the addendum above. The channel exists; the build
+   may proceed, using the structured JSON field and never stdout.**
 2. Implement `guard-slicing.mjs`: orchestrator-only (the `subagents`
    parent-dirname discriminator), the two triggers of Decision 4, the
    rate-limiting, and the ledger append. Fail-open on anything unparseable,

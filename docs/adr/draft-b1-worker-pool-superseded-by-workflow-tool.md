@@ -70,15 +70,61 @@ built thing do not diverge:
    `backlog/items/2026-08-29-the-pipeline-defaults-to-sequential-work-with-no-enforced-task-slicing.md`
    — this ADR does not solve that and must not be read as solving it.
 
+## Decision, amended 2026-09-06 (later the same day): the discard does NOT extend to Codex
+
+The Decision above was taken on the understanding that the Workflow tool
+covers the need. That is true **for Claude Code**. It is false for the other
+runners, and the PO caught this within the hour:
+
+> "es könnte für codex und agy aber wichtig sein es wirklich in den einsatz
+> zu bringen oder?"
+
+Three facts, all verified from source after that question:
+
+1. **The supervisor already carries a real Codex adapter, deliberately
+   switched off.** `plugins/pipeline-core/lib/local-worker-supervisor.mjs`
+   accepts two runner kinds, `"fixture"` and `"codex-exec"` (line 162), with
+   Codex-specific JSONL output validation (line 833) and a
+   `providerExecutionRequired` marker (lines 591, 621). Activation is gated
+   by one function parameter defaulting to false (line 1095):
+   `if (request.runner.kind === "codex-exec" && !allowProviderExecution)
+   return { ok: false, code: "LWS-PROVIDER-ACTIVATION-REQUIRED" }` (line
+   1102). This is a finished, gated capability, not a stub.
+2. **Codex has no working delegation path at all today.**
+   `backlog/items/2026-08-29-codex-worker-subagent-dispatch-capability-is-broken.md`
+   (open) records a real Codex run in which BOTH dispatched worker sessions
+   failed with `repository-control-path-invalid` /
+   `session-capability-unavailable`, making "the entire Goldfish-dispatch
+   model practically unusable in the Codex runner".
+3. **The Workflow tool is a Claude Code feature.** It does not exist for
+   Codex or Antigravity.
+
+Taken together: for Codex, the supervisor is not a redundant rebuild of the
+Workflow tool — it is the only mechanism in this repository that could
+execute delegated work at all, because it spawns its own child processes
+(`node:child_process`) instead of relying on the runner's own subagent
+mechanism, which is precisely what is broken there.
+
+**Amended decision:** the discard stands **for Claude Code only**. The
+supervisor surface is retained. Nova B still makes no advertised
+concurrent-pool capability claim, and NVA-B21-1/6/9 stay withdrawn as
+delivery obligations — but the code is kept as the runner-neutral execution
+path, and the open question is no longer "retire or keep" but "switch on for
+Codex, and at what scope".
+
+**The cheapest next step is a probe, not a build.** `allowProviderExecution`
+is one parameter at one call site. Passing `true` once, against a real
+Codex worker, answers whether this path works at all — the same shape as the
+`additionalContext` channel probe run the same day. That is materially
+smaller than NVA-B21-9's original bar (two concurrent provider-backed
+workers observed on one host), and it must not be reported as satisfying it.
+
 ## What this decision does NOT do
 
 - It does **not** remove the already-landed B1-I local supervisor code or its
-  green contract tests. Those stay as-is. The PO's wording was "we do not
-  need to rebuild it", which is a decision about further work, not an
-  instruction to rip out what exists. **Open question for the PO:** whether
-  the existing local-supervisor surface should now be retired, kept as an
-  unadvertised internal mechanism, or left untouched. Recorded here rather
-  than decided by an agent.
+  green contract tests — see the 2026-09-06 amendment above, which settles
+  this: the surface is retained as the runner-neutral execution path. The
+  question that replaced it is the probe scope for `codex-exec`.
 - It does **not** touch B2 (`#16`/`#18`) or B4 (`#51`). Those have their own
   separate remaining questions.
 - It does **not** claim the Workflow tool has been certified against this
