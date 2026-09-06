@@ -623,9 +623,9 @@ const SERIAL_LANE_SUITES = Object.freeze(new Set([
   "project-authority-migration-cli-tests", "project-authority-tests",
   "publication-executor-productive-flow-tests", "publication-state-authority-tests", "push-prepare-tests",
   "push-release-flow-docs-contract-tests", "reference-path-check", "repair-map-tests",
-  "scoped-verify-registration-tests", "scripts-pipeline-state-tests", "session-cleanup-binding-tests",
+  "scoped-verify-registration-tests", "scripts-pipeline-state-tests",
   "session-cleanup-owner-nonce-tests", "session-cleanup-power-tests", "session-cleanup-recovery-tests",
-  "session-power-cli-tests", "settings-allowlist-merge-tests", "worktree-lifecycle-tests",
+  "session-power-cli-tests", "settings-allowlist-merge-tests",
 ]));
 
 // AGY-VERIFYTUNER-2: the exclusive lane. Unlike SERIAL_LANE_SUITES (mutually exclusive of EACH
