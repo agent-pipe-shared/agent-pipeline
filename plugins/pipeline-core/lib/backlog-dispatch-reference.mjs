@@ -44,7 +44,51 @@ export const BACKLOG_STRIP_FENCE =
 // "earliest match strips to end-of-file" behavior dropped every later
 // section regardless of shape -- backlog/items/2026-08-25-backlog-strip-for-
 // dispatch-drops-every-section-after-triage.md).
-const VERDICT_HEADING = /^(triage|closure|po-decision implementation)\b/iu;
+// Headings whose NAME alone marks the entire section as verdict/decision/
+// closure/implementor-narrative prose (an unconditional match, regardless of
+// what the section actually says) -- these never legitimately carry spec
+// content under this repository's convention. "resolution" was added
+// 2026-09-06 (backlog/items/2026-09-06-backlog-item-strip-for-dispatch-does-
+// not-remove-a-resolution-section.md): a "## Resolution" heading is, BY
+// DEFINITION, the implementor's own account of which commit fixed the item
+// and why the fix is believed correct -- there is no legitimate spec-shaped
+// use of that heading name, so (like Triage/Closure/PO-decision) no content
+// check is needed.
+const VERDICT_HEADING = /^(triage|closure|po-decision implementation|resolution)\b/iu;
+
+// "## Progress note (...)" is different: this repository's real convention
+// (surveyed 2026-09-06 across multiple closed/in-progress items) uses this
+// exact heading shape for BOTH legitimate delivery narrative ("what changed,
+// which files, which tests") and prior verdict/self-assessment prose ("byte-
+// identical, zero behavior change", "38/38 pass") -- unlike "## Resolution",
+// an unconditional heading-name match would swallow genuinely spec-shaped
+// delivery notes too. So a "progress note" heading is only a CANDIDATE: it
+// is only treated as verdict-shaped, and its whole section stripped, when
+// its own content also contains a verdict-shaped token (VERDICT_TOKEN_RE
+// below).
+const PROGRESS_NOTE_HEADING = /^progress note\b/iu;
+
+// Vocabulary shared by the "## Progress note" content gate and the
+// headingless bold-marker detector below -- deliberately small and drawn
+// directly from the real verdict prose observed in this repository's own
+// backlog items (2026-09-06 survey): PASS/FAIL (Critic verdicts), approved/
+// rejected (PO decisions), resolved (implementor self-assessment, e.g.
+// "Resolved gap (1) above"), and the word "Critic" itself (a prior review's
+// own name for itself). Kept narrow on purpose: a wider net risks swallowing
+// genuine spec prose that happens to use one of these as an ordinary word.
+const VERDICT_TOKEN_RE = /\b(pass(?:ed|es)?|fail(?:ed|s)?|approved|rejected|resolved|critic)\b/iu;
+
+// A verdict-shaped bold inline marker with NO heading at all (2026-09-06,
+// same spec item, "Recurred again" section): e.g.
+// `**T1 Critic round 1 (opus, max): FAIL.**` followed by remediation prose.
+// Matches only when the bold span starts the line (after optional leading
+// whitespace) and its OWN text contains a verdict token -- a list item like
+// `- **Decision:** rejected` does not match (the token sits outside the bold
+// span, and the line does not start with `**`), so this never re-triggers on
+// the existing Triage-body bold labels.
+const BOLD_MARKER_LINE_RE = /^\*\*([^*\n]+)\*\*/u;
+const VERDICT_MARKER_LABEL = "verdict-marker (no heading)";
+
 const HEADING_LINE_RE = /^(#{1,6})[ \t]+(.*)$/u;
 const FENCE_LINE_RE = /^\s*(`{3,}|~{3,})/u;
 
@@ -70,11 +114,35 @@ function findHeadings(body) {
   return headings;
 }
 
-function verdictWord(lineText) {
-  const headingMatch = HEADING_LINE_RE.exec(lineText);
-  if (!headingMatch) return null;
-  const verdictMatch = VERDICT_HEADING.exec(headingMatch[2]);
-  return verdictMatch ? verdictMatch[1].toLowerCase() : null;
+/**
+ * Locate every headingless verdict-shaped bold marker line in `body`, using
+ * the same fenced-code-block skip as `findHeadings` so a marker-shaped
+ * example inside a fenced block is never mistaken for a real one.
+ */
+function findVerdictMarkers(body) {
+  const markers = [];
+  let insideFence = false;
+  let offset = 0;
+  for (const line of body.split("\n")) {
+    if (FENCE_LINE_RE.test(line)) {
+      insideFence = !insideFence;
+    } else if (!insideFence) {
+      const stripped = line.replace(/^[ \t]+/u, "");
+      const match = BOLD_MARKER_LINE_RE.exec(stripped);
+      if (match && VERDICT_TOKEN_RE.test(match[1])) markers.push({ start: offset });
+    }
+    offset += line.length + 1;
+  }
+  return markers;
+}
+
+/** End boundary (exclusive) of a heading's own section: the next heading at
+ * the same level or shallower, or end-of-body when there is none. */
+function headingSectionEnd(headings, index, level, bodyLength) {
+  for (let j = index + 1; j < headings.length; j += 1) {
+    if (headings[j].level <= level) return headings[j].start;
+  }
+  return bodyLength;
 }
 
 /** Merge overlapping/adjacent/nested [start, end) ranges into disjoint, ordered ranges. */
@@ -97,30 +165,57 @@ function mergeRanges(ranges) {
  * body unchanged (`wasStripped: false`) when no verdict-shaped heading is
  * present -- an item with no Triage yet carries no verdict prose to strip.
  *
+ * Three sources of a "verdict-shaped" range, combined (2026-09-06 fix,
+ * backlog/items/2026-09-06-backlog-item-strip-for-dispatch-does-not-remove-
+ * a-resolution-section.md): (1) an unconditional VERDICT_HEADING match
+ * (Triage/Closure/PO-decision/Resolution); (2) a PROGRESS_NOTE_HEADING match
+ * whose own section also contains a VERDICT_TOKEN_RE hit; (3) a headingless
+ * bold verdict marker line, stripped up to the next heading of any level (or
+ * end of body). `removedHeading` reports whichever of these starts earliest
+ * in the document, matching the existing "earliest verdict-shaped heading"
+ * contract.
+ *
  * @param {string} body
  * @returns {{ text: string, wasStripped: boolean, removedHeading: string|null }}
  */
 export function stripBacklogVerdictProse(body) {
   if (typeof body !== "string") throw new TypeError("body must be a string");
   const headings = findHeadings(body);
-  const ranges = [];
-  let removedHeading = null;
+  const entries = [];
+
   for (let i = 0; i < headings.length; i += 1) {
     const heading = headings[i];
-    const word = verdictWord(heading.lineText);
-    if (!word) continue;
-    if (removedHeading === null) removedHeading = word;
+    const headingMatch = HEADING_LINE_RE.exec(heading.lineText);
+    const title = headingMatch ? headingMatch[2] : "";
+    const verdictMatch = VERDICT_HEADING.exec(title);
+    if (verdictMatch) {
+      const end = headingSectionEnd(headings, i, heading.level, body.length);
+      entries.push({ start: heading.start, end, label: verdictMatch[1].toLowerCase() });
+      continue;
+    }
+    if (PROGRESS_NOTE_HEADING.test(title)) {
+      const end = headingSectionEnd(headings, i, heading.level, body.length);
+      if (VERDICT_TOKEN_RE.test(body.slice(heading.start, end))) {
+        entries.push({ start: heading.start, end, label: "progress note" });
+      }
+    }
+  }
+
+  for (const marker of findVerdictMarkers(body)) {
     let end = body.length;
-    for (let j = i + 1; j < headings.length; j += 1) {
-      if (headings[j].level <= heading.level) {
-        end = headings[j].start;
+    for (const heading of headings) {
+      if (heading.start > marker.start) {
+        end = heading.start;
         break;
       }
     }
-    ranges.push([heading.start, end]);
+    entries.push({ start: marker.start, end, label: VERDICT_MARKER_LABEL });
   }
-  if (ranges.length === 0) return { text: body, wasStripped: false, removedHeading: null };
-  const merged = mergeRanges(ranges);
+
+  if (entries.length === 0) return { text: body, wasStripped: false, removedHeading: null };
+  entries.sort((a, b) => a.start - b.start);
+  const removedHeading = entries[0].label;
+  const merged = mergeRanges(entries.map(({ start, end }) => [start, end]));
   let text = "";
   let cursor = 0;
   for (const [start, end] of merged) {

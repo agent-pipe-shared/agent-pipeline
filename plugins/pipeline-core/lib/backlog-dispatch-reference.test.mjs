@@ -129,3 +129,115 @@ test("stripBacklogItemForDispatch rejects text with no frontmatter", () => {
 test("stripBacklogItemForDispatch rejects an unterminated frontmatter block", () => {
   assert.throws(() => stripBacklogItemForDispatch("---\nschema: x\n"), /closing delimiter/);
 });
+
+// 2026-09-06 regression coverage: backlog/items/2026-09-06-backlog-item-
+// strip-for-dispatch-does-not-remove-a-resolution-section.md. Three shapes
+// this script was found to miss entirely (confirmed live against real,
+// already-committed backlog items before this fix): a "## Resolution"
+// heading, a "## Progress note (...)" heading whose content is verdict-
+// shaped, and a verdict-shaped bold inline marker introduced by no heading
+// at all.
+
+test("stripBacklogVerdictProse strips a '## Resolution' heading and its content", () => {
+  const body =
+    "\n## Acceptance criteria\n\n- A.\n\n## Resolution\n\n" +
+    "Fixed by NVA-B-TILDEFIX-1 (dispatch, claude-sonnet-5, xhigh), commit " +
+    "afc6af70a5e3c474e23409e2388ce2e354e3416c. Full existing regression " +
+    "suite for both touched files stays green.\n";
+  const result = stripBacklogVerdictProse(body);
+  assert.equal(result.wasStripped, true);
+  assert.equal(result.removedHeading, "resolution");
+  assert.ok(result.text.includes("## Acceptance criteria"));
+  assert.ok(result.text.includes("- A."));
+  assert.ok(!result.text.includes("NVA-B-TILDEFIX-1"));
+  assert.ok(!result.text.includes("afc6af70a5e3c474e23409e2388ce2e354e3416c"));
+  assert.ok(result.text.includes(BACKLOG_STRIP_FENCE));
+});
+
+test("stripBacklogVerdictProse strips a '## Progress note (...)' heading whose content is verdict-shaped, matching the real NVA-B-CODEXGUARDIMPORT-1 incident text", () => {
+  // Verbatim in substance from backlog/items/2026-08-28-po-facing-commands-
+  // are-not-uniformly-rendered-break-safe.md's "## Progress note (2026-09-06,
+  // NVA-B-CODEXGUARDIMPORT-1)" section -- the exact contamination the Critic
+  // itself flagged (2026-09-06). Note this text carries NO bold PASS/FAIL
+  // marker at all, only "Resolved", "pass" and "Critic" as ordinary prose --
+  // proving detection cannot rely on the bold-marker shape alone.
+  const body =
+    "\n## Acceptance criteria\n\n- A.\n\n" +
+    "## Progress note (2026-09-06, NVA-B-CODEXGUARDIMPORT-1)\n\n" +
+    "Resolved gap (1) above: codex-pretool-guard.mjs's import switched " +
+    "(commit d398a662), the identical re-export already used elsewhere -- " +
+    "byte-identical function, zero behavior change. Full existing " +
+    "codex-pretool-guard.test.mjs: 38/38 pass, zero assertion changes.\n\n" +
+    "Disclosed authorship note: this commit was authored directly by the " +
+    "Elephant session rather than dispatched, submitted for the mandatory " +
+    "Critic review any guardrail-hook diff requires.\n";
+  const result = stripBacklogVerdictProse(body);
+  assert.equal(result.wasStripped, true);
+  assert.equal(result.removedHeading, "progress note");
+  assert.ok(result.text.includes("## Acceptance criteria"));
+  assert.ok(!result.text.includes("d398a662"));
+  assert.ok(!result.text.includes("byte-identical function"));
+  assert.ok(result.text.includes(BACKLOG_STRIP_FENCE));
+});
+
+test("stripBacklogVerdictProse does NOT strip a '## Progress note' section that reports only what was delivered, with no verdict word", () => {
+  const body =
+    "\n## Acceptance criteria\n\n- A.\n\n" +
+    "## Progress note (2026-09-06, NVA-EXAMPLE-1)\n\n" +
+    "Delivered: renamed `handleRequest` to `processRequest` across three " +
+    "call sites; added a new helper module with two exported functions; " +
+    "updated the caller in the CLI wrapper to use the new name.\n";
+  const result = stripBacklogVerdictProse(body);
+  assert.equal(result.wasStripped, false);
+  assert.equal(result.removedHeading, null);
+  assert.equal(result.text, body);
+});
+
+test("stripBacklogVerdictProse strips a verdict-shaped bold inline marker introduced by no heading, up to the next heading", () => {
+  // Verbatim in substance from commit bf274c39's diff to
+  // backlog/items/2026-08-28-po-facing-commands-are-not-uniformly-rendered-
+  // break-safe.md -- a prior Critic verdict added with a bold inline marker
+  // and no heading at all, later manually corrected in that file.
+  const body =
+    "\n## Acceptance criteria\n\n- A.\n\n" +
+    "Gap (2), the repository-wide audit, remains unperformed -- this item " +
+    "stays `status: open`.\n\n" +
+    "**T1 Critic round 1 (opus, max): FAIL.** Code confirmed correct and " +
+    "inert (byte-identical re-export, no behavior change); the verdict " +
+    "rested on two evidence gaps, not a code defect.\n\n" +
+    "## A later section\n\nThis survives.\n";
+  const result = stripBacklogVerdictProse(body);
+  assert.equal(result.wasStripped, true);
+  assert.equal(result.removedHeading, "verdict-marker (no heading)");
+  assert.ok(result.text.includes("## Acceptance criteria"));
+  assert.ok(result.text.includes("Gap (2)"));
+  assert.ok(!result.text.includes("T1 Critic round 1"));
+  assert.ok(!result.text.includes("byte-identical re-export"));
+  assert.ok(result.text.includes("## A later section"));
+  assert.ok(result.text.includes("This survives."));
+  assert.ok(result.text.includes(BACKLOG_STRIP_FENCE));
+});
+
+test("stripBacklogVerdictProse does not treat a bold list-item label as a headingless verdict marker", () => {
+  // `- **Decision:** rejected` (already used inside the existing Triage
+  // fixtures above): the verdict token sits OUTSIDE the bold span, and the
+  // line does not start with `**` -- this must not independently trigger
+  // the new headingless-marker detector outside of a verdict heading.
+  const body =
+    "\n## Acceptance criteria\n\n- **Decision:** rejected\n\n" +
+    "## Design notes\n\nStill here.\n";
+  const result = stripBacklogVerdictProse(body);
+  assert.equal(result.wasStripped, false);
+  assert.equal(result.removedHeading, null);
+});
+
+test("stripBacklogVerdictProse does not strip plain (non-bold) prose that merely mentions a verdict word", () => {
+  const body =
+    "\n## Acceptance criteria\n\n" +
+    "- The Critic will review this change before it merges.\n" +
+    "- All tests must pass before closure.\n";
+  const result = stripBacklogVerdictProse(body);
+  assert.equal(result.wasStripped, false);
+  assert.equal(result.removedHeading, null);
+  assert.equal(result.text, body);
+});
