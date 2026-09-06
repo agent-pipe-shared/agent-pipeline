@@ -16,8 +16,12 @@ import {
 } from "../lib/human-guard-override.mjs";
 import { USER_SOURCE_PATH, readHumanApprovalMode } from "../lib/critical-human-proof-policy.mjs";
 import { loadRuntimeProjectionV3OwnedKeys } from "../lib/runtime-projection-v3.mjs";
-import { boundedOpaqueCopyCommand } from "../lib/project-onboarding-v3.mjs";
-import { boundedCopySafeCommand, forcedQuote, placeholder } from "../lib/copy-safe-command.mjs";
+import {
+  boundedCopySafeCommand,
+  boundedOpaqueCopyCommand,
+  forcedQuote,
+  placeholder,
+} from "../lib/copy-safe-command.mjs";
 import {
   nativeHookSessionId,
   rememberedNativeHookFailure,
