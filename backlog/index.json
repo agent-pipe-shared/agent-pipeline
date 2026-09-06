@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "e11b524581b13e872aa0c97bc667fb76fd3a0d2e74685facaa5b15fef8ab7911"
+    "transitionHead": "021b2b1e9a56e596abfd1a3e346fc485fd2260a7d5c09c59cb73b400fb3f401f"
   },
   "counts": {
-    "open": 101,
+    "open": 102,
     "in_progress": 0,
     "closed": 513,
     "rejected": 3,
@@ -7154,6 +7154,16 @@
       "closureRepository": "self",
       "closureCommit": "9ae28dad3f6c9c41833e7d629fa3d1d73872d2a2",
       "closureEvidence": "backlog/items/2026-08-18-transactional-readbacks-not-status-cascades.md"
+    },
+    {
+      "id": "pipeline.transcript-root-child-path-admission",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-06",
+      "source": "T1 Critic review of NVA-B-READCONTAIN-2 (opus, max), finding F1, backlog/evidence/2026-09-06-nva-b-readcontain-2-findings.md.",
+      "deferred": false,
+      "tracking": "Nova B — T1 Critic review of NVA-B-READCONTAIN-2 (PASS, 2 minor findings). F1: the transcript-file exception root's own doc comment claims 'admitted as an EXACT single-file match only -- never a directory-prefix admission', but isRealpathedWithinBoundary's ancestor-walk admits a candidate shaped <transcriptFile>/<child> anyway, since the walk climbs from the nonexistent child back up to the file itself (which equals the boundary). Not exploitable today (a real file has no children; the shell read fails ENOTDIR) but the code does not hold the invariant the comment asserts, and no test covers this shape."
     },
     {
       "id": "pipeline.triage-verdict-text-can-contaminate-a-backlog-item-as-a-later-spec-reference",

@@ -579,6 +579,7 @@
 | pipeline.tp-ceremony-denials-inline-a-150-line-multi-shell-block-by-default | closed | workflow-improvement | pipeline | 2026-08-30 | NOW / Nova A -- PO decision 2026-08-30, item #12 of a 12-point instruction list: implement the Elephant's own guard-verbosity-slimming proposal. |
 | pipeline.tp-guard-rules-lifted-on-the-merging-machine-must-be-restored | closed | defect | pipeline | 2026-08-27 | — |
 | pipeline.transactional-readbacks-not-status-cascades | closed | workflow-improvement | pipeline | 2026-08-18 | — |
+| pipeline.transcript-root-child-path-admission | open | defect | pipeline | 2026-09-06 | Nova B — T1 Critic review of NVA-B-READCONTAIN-2 (PASS, 2 minor findings). F1: the transcript-file exception root's own doc comment claims 'admitted as an EXACT single-file match only -- never a directory-prefix admission', but isRealpathedWithinBoundary's ancestor-walk admits a candidate shaped <transcriptFile>/<child> anyway, since the walk climbs from the nonexistent child back up to the file itself (which equals the boundary). Not exploitable today (a real file has no children; the shell read fails ENOTDIR) but the code does not hold the invariant the comment asserts, and no test covers this shape. |
 | pipeline.triage-verdict-text-can-contaminate-a-backlog-item-as-a-later-spec-reference | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.trust-anchor-bootstrap-confirmed-still-circular-live | closed | defect | pipeline | 2026-08-29 | NOW / Nova A -- happy-path blocker, confirmed live by 2 of 3 independent runners against the exact candidate the PO tested with. |
 | pipeline.trust-anchor-bootstrap-test-never-registered-in-verify | closed | defect | pipeline | 2026-08-30 | Nova B — pre-existing gap found while registering an unrelated verify.mjs suite; not introduced by this session's own work. |
@@ -636,7 +637,7 @@
 
 ## Counts
 
-- open: 101
+- open: 102
 - in_progress: 0
 - closed: 513
 - rejected: 3
