@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "9f16f6027b327244e8c2d6a5c16ec6fb939e849d4d2e154e1189d5dae887543e"
+    "transitionHead": "a4205c6291c4585fd26859940cbdb064148d78f7972a91aa7d5ad391421962d2"
   },
   "counts": {
-    "open": 111,
+    "open": 113,
     "in_progress": 0,
     "closed": 524,
     "rejected": 3,
@@ -1685,6 +1685,15 @@
       "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-12-medium-low-triage-grouping.md"
     },
     {
+      "id": "pipeline.complete-adr-governs-coverage-before-reader-review-binding",
+      "status": "open",
+      "type": "requirement",
+      "owner": "pipeline",
+      "created": "2026-09-07",
+      "source": "PO decision 2026-09-07, decision queue items 10 and 12: follow the recommended separate ADR coverage package before depending on reconciliation for the reader-review binding.",
+      "deferred": false
+    },
+    {
       "id": "pipeline.concurrent-dispatches-in-one-shared-checkout-collide-in-ways-no-guard-catches",
       "status": "open",
       "type": "defect",
@@ -3237,6 +3246,15 @@
       "closureRepository": "self",
       "closureCommit": "d96e14c5efa51d4f4a0b1e9060a158077cfdd007",
       "closureEvidence": "plugins/pipeline-core/lib/guard-maintenance-window.test.mjs"
+    },
+    {
+      "id": "pipeline.guard-override-message-misassigns-roles-and-omits-signing",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-07",
+      "source": "PO takeover report and source inspection of the signature-mode guard recovery messages on 2026-09-07.",
+      "deferred": false
     },
     {
       "id": "pipeline.guard-reclassification-changed-what-a-signature-can-lift",
