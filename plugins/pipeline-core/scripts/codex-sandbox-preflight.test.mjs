@@ -20,7 +20,7 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
   PREFLIGHT_BUDGETS,
@@ -380,11 +380,10 @@ test("public payload is inert and contains no Critic or network invocation", () 
 test("payload keeps app-server stdin open until initialize can respond", { timeout: 20_000 }, async (t) => {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "codex-preflight-eof-race-")));
   t.after(() => rmSync(root, { recursive: true, force: true }));
-  const fakeCodex = join(root, "fake-codex");
   const codexHome = join(root, "codex-home");
   mkdirSync(codexHome);
   writeFileSync(join(root, "readable.txt"), "fixture\n");
-  writeFileSync(fakeCodex, `#!/usr/bin/env node
+  writeFileSync(join(root, "app-server"), `
 let ended = false;
 let scheduled = false;
 process.stdin.setEncoding("utf8");
@@ -396,8 +395,7 @@ process.stdin.on("data", (chunk) => {
   }, 25);
 });
 process.stdin.on("end", () => { ended = true; process.exit(0); });
-`, { mode: 0o700 });
-  chmodSync(fakeCodex, 0o700);
+`);
   const server = createServer((socket) => socket.end());
   const address = await new Promise((resolvePromise, reject) => {
     server.once("error", reject);
@@ -405,7 +403,7 @@ process.stdin.on("end", () => { ended = true; process.exit(0); });
   });
   t.after(() => { try { server.closeAllConnections(); } catch { /* Node < 18.2 */ } server.close(); });
   const request = {
-    codexPath: fakeCodex,
+    codexPath: realpathSync(process.execPath),
     codexHomePath: codexHome,
     allowedReadPath: join(root, "readable.txt"),
     externalReadPath: join(root, "readable.txt"),
@@ -415,7 +413,7 @@ process.stdin.on("end", () => { ended = true; process.exit(0); });
     networkHost: "127.0.0.1",
     networkPort: address.port,
   };
-  const payloadPath = new URL("./fixtures/codex-sandbox-preflight-payload.mjs", import.meta.url).pathname;
+  const payloadPath = fileURLToPath(new URL("./fixtures/codex-sandbox-preflight-payload.mjs", import.meta.url));
   const run = await runBoundedProbe({
     command: realpathSync(process.execPath),
     argv: [payloadPath, Buffer.from(JSON.stringify(request), "utf8").toString("base64url")],

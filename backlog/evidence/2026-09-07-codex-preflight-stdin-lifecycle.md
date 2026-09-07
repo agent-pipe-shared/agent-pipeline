@@ -41,3 +41,35 @@ receipts. A follow-up attempt targeting receipts 7–10 therefore reported
 `EEXIST`; it did not replace or alter the original receipts. The aggregate was
 computed from the ten original sanitized receipt files. This is a host capture
 transport limitation, not a preflight terminal-code result.
+
+## Portability follow-up (2026-09-07)
+
+Date: 2026-09-07  
+Dispatch: `NVA-B-EOF-PORTABILITY-1`
+
+The EOF-race regression now starts the platform Node runtime with an
+`app-server` JavaScript fixture in the test working directory. It no longer
+depends on a POSIX shebang, executable permission bits, or a URL pathname for
+the payload; the test converts the payload file URL with `fileURLToPath`.
+
+Regression sensitivity was demonstrated against a contained pre-fix copy of
+the payload that ends app-server stdin before waiting for initialization:
+
+- `node --test scratch/NVA-B-EOF-PORTABILITY-1/pre-fix-eof-red.test.mjs`
+  exited 1 because `appServer.initialized` was `false` rather than the required
+  `true`; machine-written evidence:
+  `scratch/NVA-B-EOF-PORTABILITY-1/pre-fix-eof-red.json`.
+
+The source regression retained both the initialization and bounded-stop
+assertions:
+
+- `node --test plugins/pipeline-core/scripts/codex-sandbox-preflight.test.mjs`
+  exited 0; machine-written evidence:
+  `scratch/NVA-B-EOF-PORTABILITY-1/codex-sandbox-preflight-green.json`.
+- `node --test harness/scripts/check-consumer-safe-paths.test.mjs` exited 0;
+  machine-written evidence:
+  `scratch/NVA-B-EOF-PORTABILITY-1/consumer-safe-paths.json`.
+
+The checks ran on the current Linux host. No Windows runtime was executed, and
+this evidence does not infer a Windows pass; the updated EOF regression has no
+Windows skip condition.
