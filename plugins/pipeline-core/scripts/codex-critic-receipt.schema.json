@@ -43,6 +43,8 @@
         "alias": { "type": "string" },
         "requestedModel": { "type": "string" },
         "requestedEffort": { "type": "string" },
+        "sourceSha256": { "type": "string" },
+        "candidateCommit": { "type": "string" },
         "mayDelegate": { "type": "boolean", "enum": [false] },
         "coordinatorConfirmed": { "type": "boolean" },
         "providerAttested": { "type": "boolean", "enum": [false] }

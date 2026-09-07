@@ -47,7 +47,8 @@ import {
   ProjectOnboardingReadyError,
   requireProjectOnboardingReady,
 } from "../lib/project-onboarding-ready-gate.mjs";
-import { projectHostDuty, routingProvenance } from "../lib/routing-projection.mjs";
+import { routingProvenance } from "../lib/routing-projection.mjs";
+import { resolveV3DutyRoute } from "../lib/critic-route-v3.mjs";
 import { PROGRESS_COMPONENTS, admitReviewAttempt, evaluateProgress } from "../lib/review-economy.mjs";
 import { executeSandboxedReadonlyDuty, runSandboxedReadonlyHostBridge } from "./sandboxed-readonly-host-bridge.mjs";
 import { createCodexSandboxRuntimeTransport } from "./codex-sandbox-runtime.mjs";
@@ -63,13 +64,18 @@ const VERDICT_SCHEMA_REPO_PATH = "plugins/pipeline-core/scripts/critic-verdict.s
 const EXECUTION_BINDING_PATHS = Object.freeze([
   "plugins/pipeline-core/config/routing-authority.json",
   "plugins/pipeline-core/config/runner-mappings.json",
+  "plugins/pipeline-core/config/runner-profiles-v3.json",
   "plugins/pipeline-core/lib/routing-projection.mjs",
+  "plugins/pipeline-core/lib/critic-route-v3.mjs",
+  "plugins/pipeline-core/lib/runner-profiles-v3.mjs",
+  "plugins/pipeline-core/lib/human-role-labels.mjs",
   "plugins/pipeline-core/lib/review-economy.mjs",
   "plugins/pipeline-core/lib/schema-lite.mjs",
   "plugins/pipeline-core/lib/yaml-lite.mjs",
   "plugins/pipeline-core/lib/manifest.mjs",
   "plugins/pipeline-core/lib/critic-packet-governance.mjs",
   "plugins/pipeline-core/scripts/codex-critic-dispatch.schema.json",
+  "plugins/pipeline-core/scripts/pipeline-user-v3.schema.json",
   "plugins/pipeline-core/scripts/codex-critic-host-return.schema.json",
   "plugins/pipeline-core/scripts/codex-critic-host.mjs",
   "plugins/pipeline-core/scripts/codex-critic-receipt.schema.json",
@@ -1012,12 +1018,25 @@ function assertFingerprintMapEqual(before, after, label) {
   if (JSON.stringify(before) !== JSON.stringify(after)) fail(`${label} repository mutation observed`);
 }
 
-function routeForNormalCritic() {
-  const route = projectHostDuty("criticNormal", "codex");
-  if (route.model !== "gpt-5.6-sol" || route.effort !== "xhigh" || route.dispatch !== "host-native") {
-    fail("normal Critic routing authority is not gpt-5.6-sol/xhigh host-native");
-  }
-  return { duty: route.duty, runner: route.runner, alias: "fable", model: route.model, effort: route.effort };
+function routeForNormalCritic(repoRoot, candidateCommit) {
+  const route = resolveV3DutyRoute({
+    rootDir: repoRoot,
+    dutyId: "critic_normal",
+    runner: "codex",
+    candidateCommit,
+  });
+  if (route.state !== "default") fail("normal Critic V3 duty is unavailable");
+  return {
+    duty: route.dutyId,
+    runner: route.runner,
+    // This is the native-host protocol label. It is the canonical resolved
+    // Codex model, never a Claude alias or a caller-selected model.
+    alias: route.model,
+    model: route.model,
+    effort: route.effort,
+    sourceSha256: route.sourceSha256,
+    candidateCommit: route.candidateCommit,
+  };
 }
 
 function atomicWriteExclusive(path, value) {
@@ -1114,7 +1133,7 @@ export function prepareNativeCritic(options, deps = {}) {
   if (request.ruleset_sha !== request.candidate_commit) fail("self-application requires ruleset_sha and candidate_commit to match");
   const execution = executionBindings(pipelineRoot);
   assertFingerprintMapEqual(protectedBefore, protectedFingerprintMap(repoRoot, pipelineRoot, observers), "ruleset identity");
-  const route = routeForNormalCritic();
+  const route = routeForNormalCritic(repoRoot, request.candidate_commit);
   const nonce = (deps.randomBytes ?? nodeRandomBytes)(32).toString("hex");
   const cleanupCapability = (deps.randomBytes ?? nodeRandomBytes)(32).toString("hex");
   const dispatchId = sha256(`${request.task_id}\0${request.candidate_commit}\0${nonce}`).slice(0, 32);
@@ -1351,9 +1370,9 @@ export function validateHostReturn(prepared, preparedSha256, hostReturn, verdict
   ], "host_execution");
   if (execution.dispatch_id !== prepared.dispatchId) fail("host dispatch_id mismatch");
   if (execution.task_name !== prepared.expectedTaskName || typeof execution.agent_id !== "string" || execution.agent_id.length < 3) fail("invalid host task/agent identity");
-  if (execution.requested_alias !== "fable" || execution.requested_effort !== "xhigh") fail("host requested route mismatch");
-  if (execution.resolved_model !== "gpt-5.6-sol" || execution.resolved_effort !== "xhigh") fail("host confirmed route mismatch");
-  if (execution.route_source !== "project-duty+coordinator") fail("host route source mismatch");
+  if (execution.requested_alias !== prepared.route.alias || execution.requested_effort !== prepared.route.effort) fail("host requested route mismatch");
+  if (execution.resolved_model !== prepared.route.model || execution.resolved_effort !== prepared.route.effort) fail("host confirmed route mismatch");
+  if (execution.route_source !== "v3-candidate-duty+coordinator") fail("host route source mismatch");
   if (execution.may_delegate !== false) fail("host delegation contract mismatch");
   if (execution.terminal_status !== "completed") fail("host task did not complete");
   if (!Number.isInteger(execution.completed_elapsed_ms) || execution.completed_elapsed_ms < 0 || execution.completed_elapsed_ms > HOST_LIMITS.maxElapsedMs) {
@@ -1448,7 +1467,7 @@ export function validateHostReturn(prepared, preparedSha256, hostReturn, verdict
   return { execution, result, reviewPass };
 }
 
-function validatePrepared(prepared) {
+function validatePrepared(prepared, repoRoot) {
   exactKeys(prepared, [
     "schema", "createdAt", "dispatchId", "nonce", "expectedTaskName", "request", "reviewPlan", "route", "hostContract", "sources", "review",
     "governance", "references", "verify", "assurance", "residualRisks", "bindings",
@@ -1461,14 +1480,14 @@ function validatePrepared(prepared) {
   if (!SHA256.test(prepared.nonce) || !/^[0-9a-f]{32}$/.test(prepared.dispatchId)) fail("prepared nonce/dispatch ID invalid");
   if (prepared.assurance !== assuranceForRequest(prepared.request)
     || JSON.stringify(prepared.residualRisks) !== JSON.stringify(RESIDUAL_RISKS)) fail("prepared assurance boundary drift");
-  exactKeys(prepared.route, ["duty", "runner", "alias", "model", "effort"], "prepared route");
+  exactKeys(prepared.route, ["duty", "runner", "alias", "model", "effort", "sourceSha256", "candidateCommit"], "prepared route");
   exactKeys(prepared.sources, ["reviewRoot", "rulesetRoot"], "prepared sources");
   exactKeys(prepared.review, ["root", "base", "commits", "commit", "tree", "diffReferencePath"], "prepared review");
   exactKeys(prepared.bindings, [
     "requestSha256", "referenceSetSha256", "reviewFingerprintSha256", "protectedBefore",
     "roleContractSha256", "promptContractSha256", "verdictSchemaSha256", "hostReturnSchemaSha256", "routingProvenance", "rulesetCheckoutSha", "executionSetSha256",
   ], "prepared bindings");
-  const route = routeForNormalCritic();
+  const route = routeForNormalCritic(repoRoot, prepared.request.candidate_commit);
   if (JSON.stringify(prepared.route) !== JSON.stringify(route)) fail("prepared route drift");
   if (!isAbsolute(prepared.review.root) || prepared.sources.reviewRoot !== prepared.review.root || !isAbsolute(prepared.sources.rulesetRoot)
     || prepared.review.base !== prepared.request.review_base
@@ -1512,6 +1531,7 @@ function validatePrepared(prepared) {
   if (prepared.request.ruleset_sha !== prepared.request.candidate_commit) fail("prepared self-application commit binding drift");
   if (!SHA256.test(prepared.bindings.referenceSetSha256) || !SHA256.test(prepared.bindings.reviewFingerprintSha256)) fail("prepared binding hash invalid");
   if (prepared.bindings.routingProvenance !== routingProvenance("codex")) fail("prepared routing provenance drift");
+  if (!SHA256.test(prepared.route.sourceSha256) || prepared.route.candidateCommit !== prepared.request.candidate_commit) fail("prepared V3 route binding invalid");
   if (!SHA256.test(prepared.bindings.executionSetSha256)) fail("prepared execution binding invalid");
   if (!Array.isArray(prepared.references) || prepared.references.length === 0) fail("prepared references missing");
   for (const [index, reference] of prepared.references.entries()) {
@@ -1622,8 +1642,9 @@ function validateReceiptSemantics(receipt, prepared, sanitizedVerdict, execution
   if (receipt.assurance !== prepared.assurance || JSON.stringify(receipt.residualRisks) !== JSON.stringify(RESIDUAL_RISKS)) fail("receipt assurance boundary drift");
   if ("normalLaneAuthorization" in receipt) fail("current receipt must not carry legacy normal lane authorization");
   if (receipt.route.providerAttested !== false || receipt.route.coordinatorConfirmed !== true) fail("receipt route claim drift");
-  if (receipt.route.duty !== "criticNormal" || receipt.route.runner !== "codex" || receipt.route.alias !== "fable"
-    || receipt.route.requestedModel !== "gpt-5.6-sol" || receipt.route.requestedEffort !== "xhigh"
+  if (receipt.route.duty !== prepared.route.duty || receipt.route.runner !== prepared.route.runner || receipt.route.alias !== prepared.route.alias
+    || receipt.route.requestedModel !== prepared.route.model || receipt.route.requestedEffort !== prepared.route.effort
+    || receipt.route.sourceSha256 !== prepared.route.sourceSha256 || receipt.route.candidateCommit !== prepared.route.candidateCommit
     || receipt.route.mayDelegate !== false) fail("receipt route binding drift");
   if (receipt.review.mode !== prepared.reviewPlan.mode
     || receipt.review.admissionCode !== prepared.reviewPlan.admissionCode
@@ -1682,7 +1703,7 @@ export function finalizeNativeCritic(options) {
   if (new Set(controlPaths).size !== controlPaths.length) fail("finalize control paths must be pairwise distinct");
   const preparedRecord = readJsonBounded(preparedPath);
   const prepared = preparedRecord.value;
-  validatePrepared(prepared);
+  validatePrepared(prepared, repoRoot);
   if (realpathSync(pipelineRoot) !== realpathSync(prepared.sources.rulesetRoot)) fail("finalize pipeline root differs from prepare");
   if (gitText(pipelineRoot, ["rev-parse", "HEAD"]) !== prepared.bindings.rulesetCheckoutSha) fail("ruleset checkout changed after prepare");
   assertRepositoryClean(pipelineRoot, "ruleset");
@@ -1721,6 +1742,8 @@ export function finalizeNativeCritic(options) {
       alias: prepared.route.alias,
       requestedModel: prepared.route.model,
       requestedEffort: prepared.route.effort,
+      sourceSha256: prepared.route.sourceSha256,
+      candidateCommit: prepared.route.candidateCommit,
       mayDelegate: false,
       coordinatorConfirmed: true,
       providerAttested: false,

@@ -60,13 +60,18 @@ const RULESET_PATHS = [
   "templates/prompts/critic-review.md",
   "plugins/pipeline-core/config/routing-authority.json",
   "plugins/pipeline-core/config/runner-mappings.json",
+  "plugins/pipeline-core/config/runner-profiles-v3.json",
   "plugins/pipeline-core/lib/routing-projection.mjs",
+  "plugins/pipeline-core/lib/critic-route-v3.mjs",
+  "plugins/pipeline-core/lib/runner-profiles-v3.mjs",
+  "plugins/pipeline-core/lib/human-role-labels.mjs",
   "plugins/pipeline-core/lib/review-economy.mjs",
   "plugins/pipeline-core/lib/schema-lite.mjs",
   "plugins/pipeline-core/lib/yaml-lite.mjs",
   "plugins/pipeline-core/lib/manifest.mjs",
   "plugins/pipeline-core/lib/critic-packet-governance.mjs",
   "plugins/pipeline-core/scripts/codex-critic-dispatch.schema.json",
+  "plugins/pipeline-core/scripts/pipeline-user-v3.schema.json",
   "plugins/pipeline-core/scripts/codex-critic-host-return.schema.json",
   "plugins/pipeline-core/scripts/codex-critic-host.mjs",
   "plugins/pipeline-core/scripts/codex-critic-receipt.schema.json",
@@ -162,6 +167,7 @@ function createCandidate(root) {
   mkdirSync(join(root, "specs"), { recursive: true });
   mkdirSync(join(root, "policies"), { recursive: true });
   writeJson(join(root, ".claude", "pipeline.json"), { project: "fixture", verify: "node verify.mjs" });
+  writeFileSync(join(root, "pipeline.user.yaml"), readFileSync(join(DEFAULT_PIPELINE_ROOT, "pipeline.user.yaml")));
   writeFileSync(join(root, "verify.mjs"), "process.exit(0);\n");
   writeFileSync(join(root, ".gitignore"), "evidence/\n");
   writeFileSync(join(root, "specs", "review.md"), "# Review spec\n");
@@ -179,7 +185,7 @@ function createCandidate(root) {
   run("git", ["config", "core.autocrlf", "false"], root);
   run("git", ["config", "user.name", "Fixture"], root);
   run("git", ["config", "user.email", "fixture@example.invalid"], root);
-  run("git", ["add", ".gitignore", ".claude/pipeline.json", "verify.mjs", "specs/review.md", "policies/guard.md", ...RULESET_PATHS], root);
+  run("git", ["add", ".gitignore", ".claude/pipeline.json", "pipeline.user.yaml", "verify.mjs", "specs/review.md", "policies/guard.md", ...RULESET_PATHS], root);
   run("git", ["commit", "-qm", "base"], root);
   const base = run("git", ["rev-parse", "HEAD"], root);
   writeFileSync(join(root, "specs", "review.md"), "# Review spec\n\nCandidate.\n");
@@ -295,11 +301,11 @@ function successfulReturn(prepared, preparedSha256, overrides = {}) {
       agent_id: "native-agent-fixture",
       task_name: prepared.expectedTaskName,
       dispatch_id: prepared.dispatchId,
-      requested_alias: "fable",
-      requested_effort: "xhigh",
-      resolved_model: "gpt-5.6-sol",
-      resolved_effort: "xhigh",
-      route_source: "project-duty+coordinator",
+      requested_alias: prepared.route.alias,
+      requested_effort: prepared.route.effort,
+      resolved_model: prepared.route.model,
+      resolved_effort: prepared.route.effort,
+      route_source: "v3-candidate-duty+coordinator",
       may_delegate: false,
       terminal_status: "completed",
       completed_elapsed_ms: 2_000,
@@ -631,11 +637,14 @@ const preparedResult = prepareNativeCritic({
 const preparedRecord = readJsonBounded(preparedPath);
 const prepared = preparedRecord.value;
 
-check("prepare emits fixed native Sol/xhigh route", () => {
+check("prepare emits the candidate-bound V3 normal Critic route", () => {
   assert.deepEqual(criticGateCalls, [{ rootDir: repo, intent: "dispatch", runner: "codex" }]);
-  assert.equal(preparedResult.model, "gpt-5.6-sol");
-  assert.equal(preparedResult.effort, "xhigh");
-  assert.equal(prepared.route.duty, "criticNormal");
+  assert.equal(preparedResult.model, "gpt-5.6-terra");
+  assert.equal(preparedResult.effort, "high");
+  assert.equal(prepared.route.duty, "critic_normal");
+  assert.equal(prepared.route.alias, prepared.route.model);
+  assert.equal(prepared.route.candidateCommit, candidate.commit);
+  assert.match(prepared.route.sourceSha256, /^[a-f0-9]{64}$/);
   assert.equal(prepared.hostContract.forkTurns, "none");
   assert.equal(prepared.assurance, T1_ASSURANCE);
   assert.deepEqual(prepared.request.normal_lane_authorization, legacyRequest.normal_lane_authorization);
@@ -908,6 +917,9 @@ check("non-T1 preparation retains the normal assurance", () => {
 });
 for (const [name, mutate, pattern] of [
   ["wrong model", (value) => { value.host_execution.resolved_model = "other"; }, /schema invalid|route mismatch/],
+  ["wrong requested model label", (value) => { value.host_execution.requested_alias = "other"; }, /route mismatch/],
+  ["wrong requested effort", (value) => { value.host_execution.requested_effort = "other"; }, /route mismatch/],
+  ["wrong V3 route source", (value) => { value.host_execution.route_source = "project-duty+coordinator"; }, /route source mismatch/],
   ["delegating host", (value) => { value.host_execution.may_delegate = true; }, /schema invalid|delegation/],
   ["wrong task name", (value) => { value.host_execution.task_name = "critic_other_task"; }, /task\/agent identity/],
   ["late first evidence", (value) => { value.host_execution.evidence_events[0].elapsed_ms = 60_001; }, /too late/],
@@ -1191,6 +1203,11 @@ check("current finalization strips legacy authorization while historical receipt
   assert.equal(receipt.assurance, T1_ASSURANCE);
   assert.equal(receipt.route.providerAttested, false);
   assert.equal(receipt.route.mayDelegate, false);
+  assert.equal(receipt.route.alias, prepared.route.model);
+  assert.equal(receipt.route.requestedModel, prepared.route.model);
+  assert.equal(receipt.route.requestedEffort, prepared.route.effort);
+  assert.equal(receipt.route.sourceSha256, prepared.route.sourceSha256);
+  assert.equal(receipt.route.candidateCommit, prepared.route.candidateCommit);
   assert.equal("normalLaneAuthorization" in receipt, false);
   const receiptSchema = JSON.parse(readFileSync(join(DEFAULT_PIPELINE_ROOT, "plugins/pipeline-core/scripts/codex-critic-receipt.schema.json"), "utf8"));
   const historicalReceipt = structuredClone(receipt);
