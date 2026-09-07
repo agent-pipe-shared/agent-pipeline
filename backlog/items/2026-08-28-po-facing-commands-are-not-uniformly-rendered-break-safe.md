@@ -7,7 +7,7 @@ status: closed
 created: 2026-08-28
 closed_at: 2026-09-07
 closure_repository: self
-closure_commit: da6b381c
+closure_commit: da6b381c4134e18c85df400ccd0fa98def67e87e
 closure_evidence: plugins/pipeline-core/lib/human-guard-override.mjs
 sprint: nova-b
 source: "Codex/WSL greenfield run, 2026-08-28 (docs/pipeline-session-analysis-2026-08-28.md), plus the PO's own observation that this runner needed three sessions and the most detours."

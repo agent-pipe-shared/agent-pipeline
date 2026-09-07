@@ -7,7 +7,7 @@ status: closed
 created: 2026-08-28
 closed_at: 2026-09-07
 closure_repository: self
-closure_commit: eca3e170
+closure_commit: eca3e170e0cf19660c1e0455c8daf656cb638863
 closure_evidence: plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
 sprint: nightwing
 done_when: contains plugins/pipeline-core/scripts/pipeline-start-preflight.mjs retireRegisteredWorktrees

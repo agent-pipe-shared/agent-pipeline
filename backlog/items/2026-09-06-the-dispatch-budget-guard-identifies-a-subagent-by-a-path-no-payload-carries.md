@@ -7,7 +7,7 @@ status: closed
 created: 2026-09-06
 closed_at: 2026-09-07
 closure_repository: self
-closure_commit: 6372b984
+closure_commit: 6372b98479384b6abb86b321d96159d712a2e928
 closure_evidence: backlog/evidence/2026-09-06-nva-b-guardfix-critic-round1.md
 source: "measured 2026-09-06 with a temporary user-level PreToolUse capture hook against two live goldfish dispatches; full record backlog/evidence/2026-09-06-dispatch-budget-guard-discriminator-measured.md, PO decision queue item 3"
 sprint: nova-b

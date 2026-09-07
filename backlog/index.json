@@ -203,7 +203,7 @@
       "deferred": false,
       "closedAt": "2026-09-07",
       "closureRepository": "self",
-      "closureCommit": "eca3e170",
+      "closureCommit": "eca3e170e0cf19660c1e0455c8daf656cb638863",
       "closureEvidence": "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs"
     },
     {
@@ -5208,7 +5208,7 @@
       "deferred": false,
       "closedAt": "2026-09-07",
       "closureRepository": "self",
-      "closureCommit": "da6b381c",
+      "closureCommit": "da6b381c4134e18c85df400ccd0fa98def67e87e",
       "closureEvidence": "plugins/pipeline-core/lib/human-guard-override.mjs"
     },
     {
@@ -7072,7 +7072,7 @@
       "deferred": false,
       "closedAt": "2026-09-07",
       "closureRepository": "self",
-      "closureCommit": "6372b984",
+      "closureCommit": "6372b98479384b6abb86b321d96159d712a2e928",
       "closureEvidence": "backlog/evidence/2026-09-06-nva-b-guardfix-critic-round1.md"
     },
     {
