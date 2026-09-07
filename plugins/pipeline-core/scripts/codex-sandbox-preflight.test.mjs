@@ -377,6 +377,56 @@ test("public payload is inert and contains no Critic or network invocation", () 
   assert.match(bytes, /shell: false/);
 });
 
+test("payload keeps app-server stdin open until initialize can respond", { timeout: 20_000 }, async (t) => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "codex-preflight-eof-race-")));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const fakeCodex = join(root, "fake-codex");
+  const codexHome = join(root, "codex-home");
+  mkdirSync(codexHome);
+  writeFileSync(join(root, "readable.txt"), "fixture\n");
+  writeFileSync(fakeCodex, `#!/usr/bin/env node
+let ended = false;
+let scheduled = false;
+process.stdin.setEncoding("utf8");
+process.stdin.on("data", (chunk) => {
+  if (scheduled || !chunk.includes("\\\"id\\\":1")) return;
+  scheduled = true;
+  setTimeout(() => {
+    if (!ended) process.stdout.write(JSON.stringify({ id: 1, result: { codexHome: process.env.CODEX_HOME, userAgent: "fixture", platformFamily: "fixture" } }) + "\\n");
+  }, 25);
+});
+process.stdin.on("end", () => { ended = true; process.exit(0); });
+`, { mode: 0o700 });
+  chmodSync(fakeCodex, 0o700);
+  const server = createServer((socket) => socket.end());
+  const address = await new Promise((resolvePromise, reject) => {
+    server.once("error", reject);
+    server.listen({ host: "127.0.0.1", port: 0 }, () => resolvePromise(server.address()));
+  });
+  t.after(() => { try { server.closeAllConnections(); } catch { /* Node < 18.2 */ } server.close(); });
+  const request = {
+    codexPath: fakeCodex,
+    codexHomePath: codexHome,
+    allowedReadPath: join(root, "readable.txt"),
+    externalReadPath: join(root, "readable.txt"),
+    sensitiveReadPath: join(root, "readable.txt"),
+    deniedWritePath: join(root, "denied-write.txt"),
+    scratchWritePath: join(root, "scratch-write.txt"),
+    networkHost: "127.0.0.1",
+    networkPort: address.port,
+  };
+  const payloadPath = new URL("./fixtures/codex-sandbox-preflight-payload.mjs", import.meta.url).pathname;
+  const run = await runBoundedProbe({
+    command: realpathSync(process.execPath),
+    argv: [payloadPath, Buffer.from(JSON.stringify(request), "utf8").toString("base64url")],
+    cwd: root,
+    env: { PATH: process.env.PATH || "/usr/bin:/bin" },
+  });
+  assert.equal(run.terminalCode, "ok");
+  assert.equal(run.payloadResult.appServer.initialized, true);
+  assert.equal(run.payloadResult.appServer.boundedStopObserved, true);
+});
+
 test("the fixture-driven payload actually runs and drives an eligible intermediate receipt", { timeout: 20_000 }, async (t) => {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "codex-preflight-fixture-")));
   const isRoot = typeof process.getuid === "function" && process.getuid() === 0;

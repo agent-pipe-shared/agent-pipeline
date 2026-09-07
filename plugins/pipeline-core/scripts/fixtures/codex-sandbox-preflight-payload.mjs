@@ -65,11 +65,12 @@ async function appServerInitProbe(codexPath, codexHomePath) {
       } catch { /* wait for a complete line */ }
     }
   });
-  child.stdin.end(`${JSON.stringify({ method: "initialize", id: 1, params: { clientInfo: { name: "pipeline-preflight", title: null, version: "1" }, capabilities: { experimentalApi: false, requestAttestation: false } } })}\n${JSON.stringify({ method: "initialized" })}\n`);
+  child.stdin.write(`${JSON.stringify({ method: "initialize", id: 1, params: { clientInfo: { name: "pipeline-preflight", title: null, version: "1" }, capabilities: { experimentalApi: false, requestAttestation: false } } })}\n${JSON.stringify({ method: "initialized" })}\n`);
   const handshake = await Promise.race([close.then(() => "closed"), (async () => {
     for (let attempt = 0; attempt < 200; attempt += 1) { if (initialized || overflow || spawnError) break; await wait(10); }
     return initialized ? "initialized" : "timeout";
   })()]);
+  child.stdin.end();
   if (handshake !== "closed") child.kill("SIGTERM");
   let stopped = await Promise.race([close.then(() => true), wait(2_000).then(() => false)]);
   if (!stopped) { child.kill("SIGKILL"); stopped = await Promise.race([close.then(() => true), wait(2_000).then(() => false)]); }
