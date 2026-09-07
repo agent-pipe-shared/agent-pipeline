@@ -13,6 +13,7 @@ import { invokeCodexCriticAppServer } from "./codex-critic-app-server.mjs";
 import { runSelectedCriticHost, selectedCriticInProcessBridge } from "./codex-critic-selected-host.mjs";
 import { buildSandboxRequest, sandboxSelectionDigest } from "./codex-sandbox-select.mjs";
 import { runSandboxedReadonlyHostBridge } from "./sandboxed-readonly-host-bridge.mjs";
+import { resolveCriticHighRiskRoute } from "../lib/critic-route-v3.mjs";
 
 import {
   ASSURANCE,
@@ -1332,12 +1333,31 @@ function validCriticVerdict() {
   };
 }
 
+const SELECTED_CRITIC_ROUTE = Object.freeze({ dutyId: "critic_high_risk", runner: "codex", model: "gpt-6-astra", effort: "max", sourceSha256: "a".repeat(64), candidateCommit: null });
+function selectedRouteFor(input) { return { ...SELECTED_CRITIC_ROUTE, candidateCommit: input.dispatch.candidateCommit }; }
+
+check("the selected Critic route resolves model and effort from validated V3 project authority", () => {
+  const candidateCommit = "c".repeat(40);
+  const source = readFileSync(join(DEFAULT_PIPELINE_ROOT, "pipeline.user.yaml"), "utf8");
+  const route = resolveCriticHighRiskRoute({
+    rootDir: DEFAULT_PIPELINE_ROOT,
+    candidateCommit,
+    readCandidateSource: ({ candidateCommit: observed }) => { assert.equal(observed, candidateCommit); return source; },
+  });
+  assert.deepEqual({ dutyId: route.dutyId, runner: route.runner, model: route.model, effort: route.effort }, {
+    dutyId: SELECTED_CRITIC_ROUTE.dutyId, runner: SELECTED_CRITIC_ROUTE.runner, model: SELECTED_CRITIC_ROUTE.model, effort: SELECTED_CRITIC_ROUTE.effort,
+  });
+  assert.match(route.sourceSha256, /^[a-f0-9]{64}$/);
+  assert.equal(route.candidateCommit, candidateCommit);
+});
+
 function criticPayload(overrides = {}) {
   return {
     sandboxTransport: {
       selectionId: "css_test", selectionSha256: "a".repeat(64), repoFingerprint: "b".repeat(64), duty: "critic",
       dispatch: { queueRevision: 1, candidateCommit: "c".repeat(40), candidateTree: "d".repeat(40), referenceSetSha256: "e".repeat(64), requestSha256: "f".repeat(64) },
-      requested: { runner: "codex", model: "gpt-5.6-sol" },
+      requested: { runner: SELECTED_CRITIC_ROUTE.runner, model: SELECTED_CRITIC_ROUTE.model },
+      criticRoute: SELECTED_CRITIC_ROUTE,
       toolchain: { cliSha256: "1".repeat(64) },
       profile: { base: ":read-only", network: { enabled: true }, sha256: "2".repeat(64), scratchRootSha256: "3".repeat(64) },
       scratch: { path: "/tmp/critic-scratch", sha256: "3".repeat(64), sandboxStateJson: "{}", sandboxStateSha256: "4".repeat(64), repoRoot: DEFAULT_PIPELINE_ROOT, codexPath: "/codex" },
@@ -1380,7 +1400,7 @@ function criticAnswered(overrides = {}) {
   return {
     schema: "pipeline.codex-critic-app-server-child.v1", ok: true, code: "answered",
     answer: JSON.stringify(validCriticVerdict()),
-    observed: { provider: "openai", model: "gpt-5.6-sol", effort: "xhigh", initialized: true, threadStarted: true, turnStarted: true, turnCompleted: true, stdinEnded: true, exitCode: 0, signal: null, cleanup: "complete" },
+    observed: { provider: "openai", model: SELECTED_CRITIC_ROUTE.model, effort: SELECTED_CRITIC_ROUTE.effort, initialized: true, threadStarted: true, turnStarted: true, turnCompleted: true, stdinEnded: true, exitCode: 0, signal: null, cleanup: "complete" },
     ...overrides,
   };
 }
@@ -1392,7 +1412,7 @@ await checkAsync("codex-critic-app-server consumer accepts a complete, valid chi
     spawnFn: fakeCriticSpawn(criticAnswered(), { code: 0, signal: null }, (request) => { childRequest = request; }),
   });
   assert.equal(result.status, "reviewed");
-  assert.deepEqual(result.identity, { provider: "openai", modelId: "gpt-5.6-sol", effort: "xhigh" });
+  assert.deepEqual(result.identity, { provider: "openai", modelId: SELECTED_CRITIC_ROUTE.model, effort: SELECTED_CRITIC_ROUTE.effort });
   assert.deepEqual(result.verdict, validCriticVerdict());
   assert.equal(result.sandboxExecution.terminal.cleanupStatus, "complete");
   assert.deepEqual(childRequest.referencePaths, ["roles/critic.md"]);
@@ -1401,7 +1421,7 @@ await checkAsync("codex-critic-app-server consumer accepts a complete, valid chi
 
 await checkAsync("codex-critic-app-server consumer refuses before spawning on invalid selection, references or dispatch identity", async () => {
   const cases = [
-    criticPayload({ sandboxTransport: { ...criticPayload().sandboxTransport, requested: { runner: "codex", model: "gpt-5.6-terra" } } }),
+    criticPayload({ sandboxTransport: { ...criticPayload().sandboxTransport, requested: { runner: "codex", model: SELECTED_CRITIC_ROUTE.model } } }),
     criticPayload({ sandboxTransport: { ...criticPayload().sandboxTransport, profile: { ...criticPayload().sandboxTransport.profile, network: { enabled: false } } } }),
     criticPayload({ sandboxTransport: { ...criticPayload().sandboxTransport, profile: { ...criticPayload().sandboxTransport.profile, scratchRootSha256: "9".repeat(64) } } }),
     criticPayload({ referencePaths: ["../outside"] }),
@@ -1439,11 +1459,12 @@ await checkAsync("codex-critic-app-server consumer never collapses a completed-b
 });
 
 check("selectedCriticInProcessBridge exposes exactly {launch, finalize} to the sandbox runtime's hostBridge contract", () => {
-  const built = selectedCriticInProcessBridge({
+  const bridgeInput = {
     sandboxRuntime: { repoRoot: DEFAULT_PIPELINE_ROOT }, referencePaths: ["roles/critic.md"],
     dispatch: { candidateCommit: "c".repeat(40), candidateTree: "d".repeat(40), referenceSetSha256: "e".repeat(64) },
     reviewBase: "9".repeat(40),
-  });
+  };
+  const built = selectedCriticInProcessBridge(bridgeInput, { route: selectedRouteFor(bridgeInput) });
   assert.deepEqual(Object.keys(built.bridge).sort(), ["finalize", "launch"]);
   assert.equal(typeof built.take, "function");
   assert.equal(Object.hasOwn(built.bridge, "take"), false);
@@ -1458,7 +1479,7 @@ await checkAsync("selectedCriticInProcessBridge.launch refuses drifted reference
   const baseLaunchRequest = () => ({
     selectionId: "css_test", duty: "critic",
     selection: { dispatch: { ...input.dispatch }, repoFingerprint: "b".repeat(64), toolchain: { cliSha256: "1".repeat(64) } },
-    requested: { runner: "codex", model: "gpt-5.6-sol" },
+    requested: { runner: SELECTED_CRITIC_ROUTE.runner, model: SELECTED_CRITIC_ROUTE.model },
     references: [...input.referencePaths],
     profile: { base: ":read-only", network: { enabled: true }, sha256: "2".repeat(64), scratchRootSha256: "3".repeat(64) },
     scratch: { path: "/tmp/x", sha256: "3".repeat(64), sandboxStateJson: "{}", sandboxStateSha256: "4".repeat(64), repoRoot: input.sandboxRuntime.repoRoot, codexPath: "/codex" },
@@ -1470,16 +1491,39 @@ await checkAsync("selectedCriticInProcessBridge.launch refuses drifted reference
   ];
   for (const request of drifted) {
     let invoked = false;
-    const built = selectedCriticInProcessBridge(input, { invokeAppServer: async () => { invoked = true; return { status: "reviewed" }; } });
+    const built = selectedCriticInProcessBridge(input, { route: selectedRouteFor(input), invokeAppServer: async () => { invoked = true; return { status: "reviewed" }; } });
     await assert.rejects(built.bridge.launch(request), /drifted/);
     assert.equal(invoked, false);
   }
 });
 
+await checkAsync("selectedCriticInProcessBridge rejects a candidate-bound V3 source change before a model request while preserving the generic runner/model request shape", async () => {
+  const input = {
+    sandboxRuntime: { repoRoot: DEFAULT_PIPELINE_ROOT }, referencePaths: ["roles/critic.md"],
+    dispatch: { candidateCommit: "c".repeat(40), candidateTree: "d".repeat(40), referenceSetSha256: "e".repeat(64) },
+    reviewBase: "9".repeat(40),
+  };
+  const route = selectedRouteFor(input);
+  let invoked = false;
+  const built = selectedCriticInProcessBridge(input, {
+    route,
+    verifyRoute: () => ({ ...route, sourceSha256: "f".repeat(64) }),
+    invokeAppServer: async () => { invoked = true; return { status: "reviewed" }; },
+  });
+  await assert.rejects(built.bridge.launch({
+    selectionId: "css_test", duty: "critic",
+    selection: { dispatch: { ...input.dispatch }, repoFingerprint: "b".repeat(64), toolchain: { cliSha256: "1".repeat(64) } },
+    requested: { runner: route.runner, model: route.model }, references: [...input.referencePaths],
+    profile: { base: ":read-only", network: { enabled: true }, sha256: "2".repeat(64), scratchRootSha256: "3".repeat(64) },
+    scratch: { path: "/tmp/x", sha256: "3".repeat(64), sandboxStateJson: "{}", sandboxStateSha256: "4".repeat(64), repoRoot: input.sandboxRuntime.repoRoot, codexPath: "/codex" },
+  }), /authority drifted/);
+  assert.equal(invoked, false);
+});
+
 function criticSelectionFixture(input) {
   const requestSha256 = buildSandboxRequest({
     repoFingerprint: "b".repeat(64), duty: "critic", queueRevision: 1, candidateCommit: input.dispatch.candidateCommit, candidateTree: input.dispatch.candidateTree,
-    referenceSetSha256: input.dispatch.referenceSetSha256, runner: "codex", model: "gpt-5.6-sol",
+    referenceSetSha256: input.dispatch.referenceSetSha256, runner: SELECTED_CRITIC_ROUTE.runner, model: SELECTED_CRITIC_ROUTE.model,
   }).requestSha256;
   return {
     schema: "pipeline.codex-sandbox-selection.v1", selectionId: "css_aaaaaaaaaaaaaaaaaaaaaaaaae", repoFingerprint: "b".repeat(64), duty: "critic",
@@ -1502,9 +1546,12 @@ await checkAsync("runSelectedCriticHost composes the real in-process bridge and 
     sandboxRuntime: { repoRoot: DEFAULT_PIPELINE_ROOT },
   };
   const selection = criticSelectionFixture(input);
+  let childRequest;
   const transport = {
+    resolveCriticRoute: ({ candidateCommit }) => ({ ...SELECTED_CRITIC_ROUTE, candidateCommit }),
     dependencies: {
       async executeSandboxedReadonlyDuty(request, dependencies) {
+        assert.deepEqual(request.requested, { runner: SELECTED_CRITIC_ROUTE.runner, model: SELECTED_CRITIC_ROUTE.model });
         const launched = await dependencies.bridge.launch({
           selectionId: selection.selectionId, duty: "critic", selection, requested: request.requested, references: request.references, profile: selection.profile,
           scratch: { path: "/tmp/critic-scratch", sha256: selection.profile.scratchRootSha256, sandboxStateJson: "{}", sandboxStateSha256: "8".repeat(64), repoRoot: input.sandboxRuntime.repoRoot, codexPath: "/codex" },
@@ -1518,7 +1565,7 @@ await checkAsync("runSelectedCriticHost composes the real in-process bridge and 
     },
     invokeCodexCriticAppServer: (payload) => invokeCodexCriticAppServer(payload, {
       buildSandboxInvocationFn: () => ({ command: "/codex", argv: ["sandbox"], options: { shell: false } }),
-      spawnFn: fakeCriticSpawn(criticAnswered()),
+      spawnFn: fakeCriticSpawn(criticAnswered(), { code: 0, signal: null }, (request) => { childRequest = request; }),
     }),
   };
   const result = await runSelectedCriticHost(input, transport);
@@ -1528,6 +1575,8 @@ await checkAsync("runSelectedCriticHost composes the real in-process bridge and 
   assert.equal(result.receipt.status, "reviewed");
   assert.equal(result.execution.dutyReceipt.schema, "pipeline.critic-receipt.v1");
   assert.equal(result.sandboxBinding.selectionId, selection.selectionId);
+  assert.equal(childRequest.model, SELECTED_CRITIC_ROUTE.model);
+  assert.equal(childRequest.effort, SELECTED_CRITIC_ROUTE.effort);
 });
 
 await checkAsync("selectedCriticInProcessBridge.finalize refuses when the selection or requested route drifted after a successful launch", async () => {
@@ -1537,14 +1586,14 @@ await checkAsync("selectedCriticInProcessBridge.finalize refuses when the select
     reviewBase: "9".repeat(40),
   };
   const selection = criticSelectionFixture(input);
-  const built = selectedCriticInProcessBridge(input, {
+  const built = selectedCriticInProcessBridge(input, { route: selectedRouteFor(input),
     invokeAppServer: (payload) => invokeCodexCriticAppServer(payload, {
       buildSandboxInvocationFn: () => ({ command: "/codex", argv: ["sandbox"], options: { shell: false } }),
       spawnFn: fakeCriticSpawn(criticAnswered()),
     }),
   });
   const scratch = { path: "/tmp/critic-scratch", sha256: selection.profile.scratchRootSha256, sandboxStateJson: "{}", sandboxStateSha256: "8".repeat(64), repoRoot: input.sandboxRuntime.repoRoot, codexPath: "/codex" };
-  const requested = { runner: "codex", model: "gpt-5.6-sol" };
+  const requested = { runner: SELECTED_CRITIC_ROUTE.runner, model: SELECTED_CRITIC_ROUTE.model };
   const launched = await built.bridge.launch({
     selectionId: selection.selectionId, duty: "critic", selection, requested, references: input.referencePaths, profile: selection.profile, scratch,
   });
@@ -1565,6 +1614,7 @@ await checkAsync("runSelectedCriticHost reports selected-sandbox-required when n
     sandboxRuntime: { repoRoot: DEFAULT_PIPELINE_ROOT },
   };
   const result = await runSelectedCriticHost(input, {
+    resolveCriticRoute: ({ candidateCommit }) => ({ ...SELECTED_CRITIC_ROUTE, candidateCommit }),
     dependencies: { async executeSandboxedReadonlyDuty() { return { status: "unavailable", childStarted: false, selectionId: null }; } },
   });
   assert.deepEqual(result, { ok: false, code: "selected-sandbox-required", selectionId: null, sandboxBinding: null });
@@ -1580,6 +1630,7 @@ await checkAsync("runSelectedCriticHost reports selected-critic-transport-failed
   };
   const failedAssurance = { class: "sandbox-read-only-except-coordinator-scratch-network-open", literal: "sandbox-read-only-except-coordinator-scratch; input/network isolation not asserted" };
   const result = await runSelectedCriticHost(input, {
+    resolveCriticRoute: ({ candidateCommit }) => ({ ...SELECTED_CRITIC_ROUTE, candidateCommit }),
     dependencies: {
       async executeSandboxedReadonlyDuty() {
         return {
@@ -1624,12 +1675,12 @@ await checkAsync("selectedCriticInProcessBridge.launch reports a genuinely unsta
   // sandboxSelectionDigest(), so a minimal selection object never has to
   // survive validateSandboxSelection(). This case is not drifted, so it does.
   const selection = criticSelectionFixture(input);
-  const built = selectedCriticInProcessBridge(input, {
+  const built = selectedCriticInProcessBridge(input, { route: selectedRouteFor(input),
     invokeAppServer: async () => ({ status: "unavailable", childStarted: false }),
   });
   const launched = await built.bridge.launch({
     selectionId: selection.selectionId, duty: "critic", selection,
-    requested: { runner: "codex", model: "gpt-5.6-sol" },
+    requested: { runner: SELECTED_CRITIC_ROUTE.runner, model: SELECTED_CRITIC_ROUTE.model },
     references: [...input.referencePaths],
     profile: selection.profile,
     scratch: { path: "/tmp/x", sha256: selection.profile.scratchRootSha256, sandboxStateJson: "{}", sandboxStateSha256: "4".repeat(64), repoRoot: input.sandboxRuntime.repoRoot, codexPath: "/codex" },
@@ -1647,8 +1698,8 @@ await checkAsync("the real runSandboxedReadonlyHostBridge resolves a genuinely u
   };
   const selection = criticSelectionFixture(input);
   const scratch = { path: "/tmp/critic-scratch", sha256: selection.profile.scratchRootSha256, sandboxStateJson: "{}", sandboxStateSha256: "8".repeat(64), repoRoot: input.sandboxRuntime.repoRoot, codexPath: "/codex" };
-  const requested = { runner: "codex", model: "gpt-5.6-sol" };
-  const built = selectedCriticInProcessBridge(input, {
+  const requested = { runner: SELECTED_CRITIC_ROUTE.runner, model: SELECTED_CRITIC_ROUTE.model };
+  const built = selectedCriticInProcessBridge(input, { route: selectedRouteFor(input),
     invokeAppServer: (payload) => invokeCodexCriticAppServer(payload, {
       buildSandboxInvocationFn: () => ({ command: "/codex", argv: ["sandbox"], options: { shell: false } }),
       spawnFn: fakeCriticSpawnFailure("ENOENT"),
@@ -1668,6 +1719,7 @@ await checkAsync("the real runSandboxedReadonlyHostBridge resolves a genuinely u
   assert.equal(execution.terminal.childStarted, false);
   assert.equal(execution.terminal.stdioStatus, "not-started");
   assert.equal(execution.terminal.cleanupStatus, "not-started");
+  assert.deepEqual(execution.requested, requested);
   assert.deepEqual(execution.observed, { cliSha256: null, profileSha256: null, networkEnabled: null, scratchRootSha256: null });
   assert.equal(execution.dutyReceipt.status, "unavailable");
   // noChild() is returned directly on an observed childStarted:false launch
@@ -1687,6 +1739,7 @@ await checkAsync("runSelectedCriticHost returns selected-sandbox-required, not s
   const selection = criticSelectionFixture(input);
   const scratch = { path: "/tmp/critic-scratch", sha256: selection.profile.scratchRootSha256, sandboxStateJson: "{}", sandboxStateSha256: "8".repeat(64), repoRoot: input.sandboxRuntime.repoRoot, codexPath: "/codex" };
   const transport = {
+    resolveCriticRoute: ({ candidateCommit }) => ({ ...SELECTED_CRITIC_ROUTE, candidateCommit }),
     invokeCodexCriticAppServer: (payload) => invokeCodexCriticAppServer(payload, {
       buildSandboxInvocationFn: () => ({ command: "/codex", argv: ["sandbox"], options: { shell: false } }),
       spawnFn: fakeCriticSpawnFailure("ENOENT"),
@@ -1744,15 +1797,15 @@ await checkAsync("selectedCriticInProcessBridge carries the app server's own obs
   };
   const selection = criticSelectionFixture(input);
   const scratch = { path: "/tmp/critic-scratch", sha256: selection.profile.scratchRootSha256, sandboxStateJson: "{}", sandboxStateSha256: "8".repeat(64), repoRoot: input.sandboxRuntime.repoRoot, codexPath: "/codex" };
-  const requested = { runner: "codex", model: "gpt-5.6-sol" };
-  const built = selectedCriticInProcessBridge(input, {
+  const requested = { runner: SELECTED_CRITIC_ROUTE.runner, model: SELECTED_CRITIC_ROUTE.model };
+  const built = selectedCriticInProcessBridge(input, { route: selectedRouteFor(input),
     // The app server observed a genuine completion but reports the wrong
     // model effort -- a binding fact this bridge must still refuse to
     // accept as a reviewed verdict, even though the child plainly ran.
     invokeAppServer: async ({ sandboxTransport }) => ({
       status: "reviewed",
       verdict: { pass: true, findings: [], summary: "ok" },
-      identity: { provider: "openai", modelId: "gpt-5.6-sol", effort: "high" },
+      identity: { provider: "openai", modelId: SELECTED_CRITIC_ROUTE.model, effort: "high" },
       sandboxExecution: {
         schema: "pipeline.codex-sandbox-host-execution.v1",
         selectionId: sandboxTransport.selectionId,

@@ -12,9 +12,7 @@
 import { spawn } from "node:child_process";
 
 const MAX_BYTES = 8 * 1024 * 1024;
-const MODEL = "gpt-5.6-sol";
 const PROVIDER = "openai";
-const EFFORT = "xhigh";
 const COMMIT_SHA = /^[0-9a-f]{40}$/;
 const TREE_SHA = /^[0-9a-f]{40,64}$/;
 
@@ -47,13 +45,15 @@ try {
 
 if (!process.exitCode) {
   const closedShape = request && typeof request === "object" && !Array.isArray(request)
-    && JSON.stringify(Object.keys(request).sort()) === JSON.stringify(["candidateCommit", "candidateTree", "codexPath", "cwd", "promptContractPath", "referencePaths", "reviewBase", "roleContractPath", "scratchPath", "verdictSchemaPath"])
+    && JSON.stringify(Object.keys(request).sort()) === JSON.stringify(["candidateCommit", "candidateTree", "codexPath", "cwd", "effort", "model", "promptContractPath", "referencePaths", "reviewBase", "roleContractPath", "scratchPath", "verdictSchemaPath"])
     && typeof request.codexPath === "string" && request.codexPath.startsWith("/")
     && typeof request.cwd === "string" && request.cwd.startsWith("/")
     && typeof request.scratchPath === "string" && request.scratchPath.startsWith("/")
     && typeof request.roleContractPath === "string" && request.roleContractPath.startsWith("/")
     && typeof request.promptContractPath === "string" && request.promptContractPath.startsWith("/")
     && typeof request.verdictSchemaPath === "string" && request.verdictSchemaPath.startsWith("/")
+    && typeof request.model === "string" && request.model.length > 0
+    && typeof request.effort === "string" && request.effort.length > 0
     && Array.isArray(request.referencePaths) && request.referencePaths.length > 0
     && request.referencePaths.every((path) => typeof path === "string" && path.length > 0 && !path.startsWith("/"))
     && COMMIT_SHA.test(request.candidateCommit) && TREE_SHA.test(request.candidateTree) && COMMIT_SHA.test(request.reviewBase);
@@ -116,7 +116,7 @@ if (!process.exitCode) {
       send({ method: "initialized" });
       send({ id: 2, method: "thread/start", params: {
         cwd: request.cwd,
-        model: MODEL,
+        model: request.model,
         allowProviderModelFallback: false,
         ephemeral: true,
         approvalPolicy: "never",
@@ -127,7 +127,7 @@ if (!process.exitCode) {
     }
     if (value?.id === 2) {
       const result = value.result;
-      if (value.error || result?.model !== MODEL || result?.modelProvider !== PROVIDER
+      if (value.error || result?.model !== request.model || result?.modelProvider !== PROVIDER
         || result?.approvalPolicy !== "never" || typeof result?.thread?.id !== "string") {
         protocolError = true; finishProtocol(); return;
       }
@@ -135,8 +135,8 @@ if (!process.exitCode) {
       send({ id: 3, method: "turn/start", params: {
         threadId,
         input: [{ type: "text", text: modelInput }],
-        model: MODEL,
-        effort: EFFORT,
+        model: request.model,
+        effort: request.effort,
         approvalPolicy: "never",
         sandboxPolicy: { type: "externalSandbox", networkAccess: "enabled" },
         cwd: request.cwd,
@@ -188,7 +188,7 @@ if (!process.exitCode) {
     ok,
     code: ok ? "answered" : writeAttempt ? "write-attempt" : protocolError ? "protocol-error" : "child-exit-error",
     answer: ok ? answer : null,
-    observed: { provider: ok ? PROVIDER : null, model: ok ? MODEL : null, effort: ok ? EFFORT : null, initialized, threadStarted: threadId !== null, turnStarted: turnId !== null, turnCompleted, stdinEnded: child.stdin.writableEnded, exitCode: close.code, signal: close.signal, cleanup: close.spawnError === null && close.signal === null ? "complete" : "incomplete" },
+    observed: { provider: ok ? PROVIDER : null, model: ok ? request.model : null, effort: ok ? request.effort : null, initialized, threadStarted: threadId !== null, turnStarted: turnId !== null, turnCompleted, stdinEnded: child.stdin.writableEnded, exitCode: close.code, signal: close.signal, cleanup: close.spawnError === null && close.signal === null ? "complete" : "incomplete" },
   });
   process.exitCode = ok ? 0 : 2;
 }

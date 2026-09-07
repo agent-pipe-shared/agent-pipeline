@@ -16,9 +16,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 // shape either way).
 const PLUGIN_ROOT = resolve(HERE, "..");
 const CHILD = realpathSync(fileURLToPath(new URL("./codex-critic-app-server-child.mjs", import.meta.url)));
-const MODEL = "gpt-5.6-sol";
 const PROVIDER = "openai";
-const EFFORT = "xhigh";
 const ROLE_CONTRACT_PATH = "roles/critic.md";
 const PROMPT_CONTRACT_PATH = "templates/prompts/critic-review.md";
 const VERDICT_SCHEMA_PATH = "scripts/critic-verdict.schema.json";
@@ -54,7 +52,8 @@ function loadVerdictSchema(path) {
 
 export async function invokeCodexCriticAppServer(payload, dependencies = {}) {
   const selected = payload?.sandboxTransport;
-  if (!selected || selected.requested?.runner !== "codex" || selected.requested?.model !== MODEL
+  if (!selected || selected.requested?.runner !== "codex" || typeof selected.requested?.model !== "string" || selected.requested.model.length === 0
+    || !selected.criticRoute || selected.criticRoute.model !== selected.requested.model || typeof selected.criticRoute.effort !== "string" || selected.criticRoute.effort.length === 0
     || selected.profile?.base !== ":read-only" || selected.profile?.network?.enabled !== true
     || selected.profile?.scratchRootSha256 !== selected.scratch?.sha256
     || typeof selected.scratch?.sandboxStateJson !== "string" || typeof selected.scratch?.sandboxStateSha256 !== "string"
@@ -98,6 +97,8 @@ export async function invokeCodexCriticAppServer(payload, dependencies = {}) {
     codexPath: selected.scratch.codexPath,
     cwd: selected.scratch.repoRoot,
     scratchPath: selected.scratch.path,
+    model: selected.criticRoute.model,
+    effort: selected.criticRoute.effort,
     referencePaths,
     roleContractPath: rolePath,
     promptContractPath: promptPath,
@@ -114,7 +115,7 @@ export async function invokeCodexCriticAppServer(payload, dependencies = {}) {
   }
   const protocolOk = terminal.code === 0 && terminal.signal === null && terminal.error === null
     && result?.schema === "pipeline.codex-critic-app-server-child.v1" && result.ok === true
-    && result.code === "answered" && result.observed?.provider === PROVIDER && result.observed?.model === MODEL && result.observed?.effort === EFFORT
+    && result.code === "answered" && result.observed?.provider === PROVIDER && result.observed?.model === selected.criticRoute.model && result.observed?.effort === selected.criticRoute.effort
     && result.observed?.initialized === true && result.observed?.threadStarted === true
     && result.observed?.turnStarted === true && result.observed?.turnCompleted === true
     && result.observed?.stdinEnded === true && result.observed?.exitCode === 0
@@ -132,7 +133,7 @@ export async function invokeCodexCriticAppServer(payload, dependencies = {}) {
   return {
     status: "reviewed",
     verdict,
-    identity: { provider: PROVIDER, modelId: MODEL, effort: EFFORT },
+    identity: { provider: PROVIDER, modelId: selected.criticRoute.model, effort: selected.criticRoute.effort },
     sandboxExecution: {
       schema: "pipeline.codex-sandbox-host-execution.v1",
       selectionId: selected.selectionId,

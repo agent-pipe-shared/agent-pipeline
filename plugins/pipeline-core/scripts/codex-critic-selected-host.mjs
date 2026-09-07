@@ -30,6 +30,7 @@ import { createCodexSandboxRuntimeTransport } from "./codex-sandbox-runtime.mjs"
 import { executeSandboxedReadonlyDuty } from "./sandboxed-readonly-host-bridge.mjs";
 import { sandboxSelectionDigest } from "./codex-sandbox-select.mjs";
 import { invokeCodexCriticAppServer } from "./codex-critic-app-server.mjs";
+import { resolveCriticHighRiskRoute, validateCriticHighRiskRoute } from "../lib/critic-route-v3.mjs";
 
 const SHA256 = /^[a-f0-9]{64}$/;
 const OID = /^[a-f0-9]{40,64}$/;
@@ -58,6 +59,13 @@ function validateSelectedCriticInput(input) {
     fail("selected Critic reference paths are invalid");
   }
   return input;
+}
+
+function validateRequestedCriticRoute(value) {
+  exactKeys(value, ["runner", "model"], "selected Critic requested route");
+  if (value.runner !== "codex" || typeof value.model !== "string" || value.model.length === 0
+  ) fail("selected Critic requested route is invalid");
+  return value;
 }
 
 function receiptFor({ selection, requested, identity, verdict }) {
@@ -107,11 +115,15 @@ function matchesSelectedHostExecution(value, selected) {
  * directly as hostBridge. Treat it as unconfirmed either way -- not fixed
  * here since that file is out of scope for this task.)
  */
-export function selectedCriticInProcessBridge(input, { invokeAppServer = invokeCodexCriticAppServer } = {}) {
+export function selectedCriticInProcessBridge(input, { route, verifyRoute = null, invokeAppServer = invokeCodexCriticAppServer } = {}) {
+  const boundRoute = validateCriticHighRiskRoute(route);
   const completed = new Map();
   const launch = async (request) => {
     exactKeys(request, ["selectionId", "duty", "selection", "requested", "references", "profile", "scratch"], "selected Critic launch");
     if (request.duty !== "critic") fail("selected Critic launch duty is invalid");
+    validateRequestedCriticRoute(request.requested);
+    if (request.requested.runner !== boundRoute.runner || request.requested.model !== boundRoute.model) fail("selected Critic generic request drifted from bound route");
+    if (typeof verifyRoute === "function" && !equal(verifyRoute(), boundRoute)) fail("selected Critic authority drifted before launch");
     if (!equal(request.references, input.referencePaths)) fail("selected Critic references drifted");
     if (request.scratch?.repoRoot !== input.sandboxRuntime.repoRoot) fail("selected Critic scratch repository drifted");
     if (request.selection?.dispatch?.candidateCommit !== input.dispatch.candidateCommit
@@ -126,6 +138,7 @@ export function selectedCriticInProcessBridge(input, { invokeAppServer = invokeC
       duty: request.duty,
       dispatch: structuredClone(request.selection.dispatch),
       requested: structuredClone(request.requested),
+      criticRoute: structuredClone(boundRoute),
       toolchain: structuredClone(request.selection.toolchain),
       profile: structuredClone(request.profile),
       scratch: structuredClone(request.scratch),
@@ -138,8 +151,8 @@ export function selectedCriticInProcessBridge(input, { invokeAppServer = invokeC
       reviewBase: input.reviewBase,
     });
     if (result?.status !== "reviewed" || !result.verdict || typeof result.verdict !== "object" || Array.isArray(result.verdict)
-      || !result.sandboxExecution || result.identity?.provider !== "openai" || result.identity?.modelId !== "gpt-5.6-sol"
-      || result.identity?.effort !== "xhigh" || !matchesSelectedHostExecution(result.sandboxExecution, sandboxTransport)) {
+      || !result.sandboxExecution || result.identity?.provider !== "openai" || result.identity?.modelId !== boundRoute.model
+      || result.identity?.effort !== boundRoute.effort || !matchesSelectedHostExecution(result.sandboxExecution, sandboxTransport)) {
       // Two different failure shapes reach this branch, and only one of them
       // carries a real observation. When the consumer never reports a
       // terminal at all (result.sandboxExecution is absent -- its own
@@ -235,7 +248,22 @@ function unavailableResult(code, selected = null) {
  */
 export async function runSelectedCriticHost(rawInput, transport = {}) {
   const input = validateSelectedCriticInput(rawInput);
+  const resolveRoute = transport.resolveCriticRoute ?? resolveCriticHighRiskRoute;
+  const routeInput = {
+    rootDir: input.sandboxRuntime.repoRoot,
+    candidateCommit: input.dispatch.candidateCommit,
+    ...(transport.authorityDependencies ?? {}),
+  };
+  const resolveBoundRoute = () => validateCriticHighRiskRoute(resolveRoute(routeInput));
+  let route;
+  try {
+    route = resolveBoundRoute();
+  } catch {
+    return unavailableResult("selected-critic-route-invalid");
+  }
   const selectedHost = selectedCriticInProcessBridge(input, {
+    route,
+    verifyRoute: resolveBoundRoute,
     invokeAppServer: transport.invokeCodexCriticAppServer ?? invokeCodexCriticAppServer,
   });
   let dependencies = transport.dependencies;
@@ -259,7 +287,7 @@ export async function runSelectedCriticHost(rawInput, transport = {}) {
       duty: "critic",
       repoFingerprint: input.repoFingerprint,
       dispatch: structuredClone(input.dispatch),
-      requested: { runner: "codex", model: "gpt-5.6-sol" },
+      requested: { runner: route.runner, model: route.model },
       references: [...input.referencePaths],
     }, dependencies);
   } catch {
