@@ -900,3 +900,38 @@ most likely to be wrong, recorded for any reader:
 - **Is the acceptance-criterion amendment an honest correction or a lowered
   bar dressed as one?** This is the judgment call the PO should see argued
   against, not just argued for.
+
+## Implementation addendum — native Codex and Antigravity delivery (2026-09-07)
+
+Increment 1 now has separate runner-native advisory adapters. They share only
+bounded, private state under the existing git-common-dir helper; state paths
+hash the runner session identity and retain hashes, counters, lifecycle IDs,
+and invocation groups only. Prompts, transcript paths, and raw tool arguments
+are neither logged nor stored. Any parse, storage, or hook failure exits
+successfully without a decision, escalation, or child launch.
+
+- **Codex.** `spawn_agent` and `update_plan` are observed through a separate
+  `PreToolUse` registration. Three deduplicated serial `spawn_agent` call IDs
+  trigger an exit-0 `hookSpecificOutput.additionalContext` advisory. Native
+  `SubagentStart`/`SubagentStop` overlap resets that serial run, so a shared
+  `turn_id` is never treated as proof of fan-out. This leaves the command and
+  write safety adapter's supported-tool set unchanged. The documented channels
+  are [Codex hooks](https://learn.chatgpt.com/docs/hooks).
+- **Antigravity.** Native `invoke_subagent` arrays are observed before the
+  safety adapter normalizes their name. `PreToolUse` carries no `invocationNum`,
+  so the preceding `PreInvocation` establishes the active invocation group;
+  documented `stepIdx` deduplicates retries and distinguishes separate native
+  calls within it. Width >=2 is direct fan-out evidence, while separate calls
+  in one invocation are aggregated before serial work is classified. The following `PreInvocation` emits only a due
+  `injectSteps[].ephemeralMessage`, then begins the next group. The documented
+  channels are [Antigravity hooks](https://www.antigravity.google/docs/hooks/)
+  and [Antigravity subagents](https://www.antigravity.google/docs/subagents/).
+
+Fixture tests exercise manifest registration through each native entrypoint,
+its runner-native context output, retry deduplication, fan-out reset, malformed
+input, and storage failure. They are not live model-delivery evidence. A
+bounded live probe for the parent is: in a sanctioned disposable session,
+perform three serial native subagent calls, observe the next runner-native
+model-context hook payload, then repeat with a two-child fan-out and confirm
+that no serial nudge is due. Record only the resulting sanitized pass/fail
+receipt; do not capture prompts, transcripts, or session identifiers.

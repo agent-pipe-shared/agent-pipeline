@@ -17,6 +17,18 @@
     ],
     "PreToolUse": [
       {
+        "matcher": "spawn_agent|update_plan",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/hooks/codex-slicing-hint.mjs\" PreToolUse",
+            "commandWindows": "node \"${PLUGIN_ROOT}/hooks/codex-slicing-hint.mjs\" PreToolUse",
+            "timeout": 3,
+            "statusMessage": "Evaluating optional task slicing"
+          }
+        ]
+      },
+      {
         "matcher": "Bash",
         "hooks": [
           {
@@ -37,6 +49,32 @@
             "commandWindows": "node \"${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs\"",
             "timeout": 45,
             "statusMessage": "Checking Agent-Pipeline write policy"
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/hooks/codex-slicing-hint.mjs\" SubagentStart",
+            "commandWindows": "node \"${PLUGIN_ROOT}/hooks/codex-slicing-hint.mjs\" SubagentStart",
+            "timeout": 3,
+            "statusMessage": "Tracking native subagent lifecycle"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/hooks/codex-slicing-hint.mjs\" SubagentStop",
+            "commandWindows": "node \"${PLUGIN_ROOT}/hooks/codex-slicing-hint.mjs\" SubagentStop",
+            "timeout": 3,
+            "statusMessage": "Tracking native subagent lifecycle"
           }
         ]
       }

@@ -100,10 +100,10 @@
  *   copy of that parsing) is a fan-out, recognized unconditionally from THIS
  *   call's own shape alone, exactly like `Workflow` above -- never from
  *   transcript history. Codex has no dispatch/subagent tool at all in this
- *   repository (codex-pretool-guard.mjs's own `supportedTools` names only
- *   Bash/apply_patch/Edit/Write), so it needs no recognizer here: every Codex
- *   tool name already falls through the routing below to silence, pinned by
- *   this file's CODEX test cases rather than by new code.
+ *   Claude-compatible guard surface, so it needs no recognizer here. Codex
+ *   native dispatch/lifecycle observations are handled separately by
+ *   `codex-slicing-hint.mjs`; keeping that native channel out of this safety
+ *   adapter preserves the supported-tool set and every existing decision.
  *
  * IN-FLIGHT-TURN EXCLUSION (the correctness crux). The transcript's LATEST
  * `message.id` group may be the turn currently producing THIS hook's own
@@ -618,10 +618,8 @@ export function evaluateSlicingGuard(input, options = {}) {
     // deliberately NOT a member of `DISPATCH_TOOL_NAMES` (see that constant's own
     // comment) but is routed through the SAME trigger-A evaluator as Task/Agent/
     // Workflow -- evaluateTriggerA is what recognizes its Subagents-array fan-out.
-    // Codex's own PreToolUse adapter (codex-pretool-guard.mjs) admits only
-    // Bash/apply_patch/Edit/Write -- none of which match any branch here, so every
-    // Codex call already falls through to the silent no-opinion return below by
-    // construction (pinned by this file's CODEX test cases; no code was added for it).
+    // Codex native observations are evaluated by codex-slicing-hint.mjs, not by this
+    // Claude-compatible safety guard; this preserves the adapter's supported tool set.
     if (DISPATCH_TOOL_NAMES.has(toolName) || toolName === ANTIGRAVITY_TOOL_NAME) {
       return evaluateTriggerA({ input, toolName, toolInput, sessionId, commonDir, nowFn, options });
     }

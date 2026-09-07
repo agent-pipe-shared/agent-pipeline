@@ -7,6 +7,11 @@
         "hooks": [
           {
             "type": "command",
+            "command": "node hooks/antigravity-slicing-hint.mjs observe",
+            "timeout": 3
+          },
+          {
+            "type": "command",
             "command": "node hooks/antigravity-pretool-guard.mjs",
             "timeout": 30
           }
@@ -21,6 +26,11 @@
       }
     ],
     "PreInvocation": [
+      {
+        "type": "command",
+        "command": "node hooks/antigravity-slicing-hint.mjs deliver",
+        "timeout": 3
+      },
       {
         "type": "command",
         "command": "node hooks/antigravity-start-hint.mjs",

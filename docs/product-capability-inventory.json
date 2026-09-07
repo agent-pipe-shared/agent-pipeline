@@ -116,7 +116,10 @@
         "guard:plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs:guard-lifecycle-ready",
         "hook:plugins/pipeline-core/hooks/codex-hooks.json:PreToolUse:Bash:node \"${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs\"",
         "hook:plugins/pipeline-core/hooks/codex-hooks.json:PreToolUse:apply_patch|Edit|Write:node \"${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs\"",
+        "hook:plugins/pipeline-core/hooks/codex-hooks.json:PreToolUse:spawn_agent|update_plan:node \"${PLUGIN_ROOT}/hooks/codex-slicing-hint.mjs\" PreToolUse",
         "hook:plugins/pipeline-core/hooks/codex-hooks.json:SessionStart:startup|resume|clear|compact:node \"${PLUGIN_ROOT}/hooks/codex-session-start-hint.mjs\"",
+        "hook:plugins/pipeline-core/hooks/codex-hooks.json:SubagentStart::node \"${PLUGIN_ROOT}/hooks/codex-slicing-hint.mjs\" SubagentStart",
+        "hook:plugins/pipeline-core/hooks/codex-hooks.json:SubagentStop::node \"${PLUGIN_ROOT}/hooks/codex-slicing-hint.mjs\" SubagentStop",
         "publication:plugins/pipeline-core/.codex-plugin/plugin.json:codex-plugin-manifest"
       ],
       "runners": [
@@ -154,10 +157,13 @@
       ],
       "productionEvidence": [
         "plugins/pipeline-core/.codex-plugin/plugin.json",
-        "plugins/pipeline-core/hooks/codex-hooks.json"
+        "plugins/pipeline-core/hooks/codex-hooks.json",
+        "plugins/pipeline-core/hooks/codex-slicing-hint.mjs",
+        "plugins/pipeline-core/hooks/native-slicing.mjs"
       ],
       "testEvidence": [
-        "plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs"
+        "plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs",
+        "plugins/pipeline-core/hooks/guard-slicing.test.mjs"
       ],
       "targets": [
         {

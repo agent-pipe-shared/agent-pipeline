@@ -40,8 +40,11 @@ import {
   readTranscriptRows,
   sha256Hex,
 } from "./guard-slicing.mjs";
+import { deliverAntigravitySlicing, observeAntigravitySlicing, observeCodexSlicing } from "./native-slicing.mjs";
 
 const GUARD = fileURLToPath(new URL("./guard-slicing.mjs", import.meta.url));
+const CODEX_NATIVE = fileURLToPath(new URL("./codex-slicing-hint.mjs", import.meta.url));
+const ANTIGRAVITY_NATIVE = fileURLToPath(new URL("./antigravity-slicing-hint.mjs", import.meta.url));
 
 const ORCH_TRANSCRIPT = "/fake/session/top.jsonl";
 const SUBAGENT_TRANSCRIPT = "/fake/session/subagents/agent-abc.jsonl";
@@ -655,4 +658,157 @@ test("GS18 (subprocess): end-to-end real invocation -- exact stdout bytes and a 
   } finally {
     rmSync(repo, { recursive: true, force: true });
   }
+});
+
+// --- Native Codex / Antigravity delivery (NVA-B-NATIVE-SLICING-1) --------
+
+function initNativeRepo() {
+  const repo = mkdtempSync(join(tmpdir(), "native-slicing-"));
+  execFileSync("git", ["init", "-q"], { cwd: repo });
+  return repo;
+}
+
+function runNative(script, args, input, cwd) {
+  return spawnSync(process.execPath, [script, ...args], {
+    cwd,
+    encoding: "utf8",
+    input: JSON.stringify(input),
+  });
+}
+
+test("GS31: registered Codex spawn_agent matcher receives raw spawn_agent input and emits one PreToolUse additionalContext after three serial exact call IDs", () => {
+  const manifest = JSON.parse(readFileSync(fileURLToPath(new URL("./codex-hooks.json", import.meta.url)), "utf8"));
+  const observer = manifest.hooks.PreToolUse.find((entry) => entry.matcher === "spawn_agent|update_plan");
+  assert.match(observer.hooks[0].command, /codex-slicing-hint\.mjs.*PreToolUse/);
+  assert.match(manifest.hooks.SubagentStart[0].hooks[0].command, /codex-slicing-hint\.mjs" SubagentStart/);
+  const repo = initNativeRepo();
+  try {
+    const base = { cwd: repo, session_id: "codex-native-session", tool_name: "spawn_agent", tool_input: {} };
+    for (const id of ["one", "two"]) {
+      const result = runNative(CODEX_NATIVE, ["PreToolUse"], { ...base, tool_use_id: id }, repo);
+      assert.equal(result.status, 0);
+      assert.equal(result.stdout, "");
+    }
+    const result = runNative(CODEX_NATIVE, ["PreToolUse"], { ...base, tool_use_id: "three" }, repo);
+    assert.equal(result.status, 0);
+    const output = JSON.parse(result.stdout);
+    assert.equal(output.hookSpecificOutput.hookEventName, "PreToolUse");
+    assert.match(output.hookSpecificOutput.additionalContext, /disjoint declared write scopes/);
+    assert.deepEqual(Object.keys(output.hookSpecificOutput).sort(), ["additionalContext", "hookEventName"], "the advisory cannot deny or request permission");
+    assert.equal(runNative(CODEX_NATIVE, ["PreToolUse"], { ...base, tool_use_id: "three" }, repo).stdout, "", "a retry must not duplicate the nudge");
+  } finally { rmSync(repo, { recursive: true, force: true }); }
+});
+
+test("GS32: Codex native lifecycle overlap resets a serial run without widening the safety bridge", () => {
+  const repo = initNativeRepo();
+  try {
+    const base = { cwd: repo, session_id: "codex-fanout", tool_name: "spawn_agent", tool_input: {} };
+    runNative(CODEX_NATIVE, ["PreToolUse"], { ...base, tool_use_id: "one" }, repo);
+    runNative(CODEX_NATIVE, ["SubagentStart"], { cwd: repo, session_id: "codex-fanout", agent_id: "child-a" }, repo);
+    const reset = runNative(CODEX_NATIVE, ["PreToolUse"], { ...base, tool_use_id: "two" }, repo);
+    assert.equal(reset.status, 0);
+    assert.equal(reset.stdout, "");
+    const safety = JSON.parse(readFileSync(fileURLToPath(new URL("./codex-hooks.json", import.meta.url)), "utf8"));
+    assert.equal(safety.hooks.PreToolUse.some((entry) => entry.matcher.includes("spawn_agent") && entry.hooks[0].command.includes("codex-pretool-guard")), false);
+  } finally { rmSync(repo, { recursive: true, force: true }); }
+});
+
+test("GS33: registered Antigravity observer associates PreToolUse events with the preceding PreInvocation and injects one ephemeral nudge", () => {
+  const manifest = JSON.parse(readFileSync(fileURLToPath(new URL("../hooks.json", import.meta.url)), "utf8"));
+  const pretool = manifest["pipeline-core"].PreToolUse[0].hooks;
+  assert.equal(pretool.some((entry) => entry.command === "node hooks/antigravity-slicing-hint.mjs observe"), true);
+  assert.equal(manifest["pipeline-core"].PreInvocation.some((entry) => entry.command === "node hooks/antigravity-slicing-hint.mjs deliver"), true);
+  const repo = initNativeRepo();
+  try {
+    const preInvocation = (invocationNum) => ({ workspacePaths: [repo], conversationId: "agy-native-session", invocationNum });
+    const call = (stepIdx, prompt) => ({
+      workspacePaths: [repo], conversationId: "agy-native-session",
+      stepIdx,
+      toolCall: { name: "invoke_subagent", args: { Subagents: [{ TypeName: "goldfish-implementor", Prompt: prompt }] } },
+    });
+    assert.equal(runNative(ANTIGRAVITY_NATIVE, ["deliver"], preInvocation(1), repo).stdout, "");
+    for (const [number, stepIdx, prompt] of [[2, 1, "one"], [3, 2, "two"], [4, 3, "three"]]) {
+      const observed = runNative(ANTIGRAVITY_NATIVE, ["observe"], call(stepIdx, prompt), repo);
+      assert.equal(observed.status, 0);
+      assert.equal(observed.stdout, "");
+      if (number < 4) assert.equal(runNative(ANTIGRAVITY_NATIVE, ["deliver"], preInvocation(number), repo).stdout, "");
+    }
+    const delivery = runNative(ANTIGRAVITY_NATIVE, ["deliver"], preInvocation(4), repo);
+    assert.equal(delivery.status, 0);
+    const output = JSON.parse(delivery.stdout);
+    assert.match(output.injectSteps[0].ephemeralMessage, /native parallel subagent dispatch/);
+    assert.deepEqual(Object.keys(output), ["injectSteps"], "the delivery channel cannot deny, escalate, or launch a child");
+    assert.equal(runNative(ANTIGRAVITY_NATIVE, ["deliver"], preInvocation(4), repo).stdout, "", "delivery retry must be idempotent");
+  } finally { rmSync(repo, { recursive: true, force: true }); }
+});
+
+test("GS34: native fan-out, malformed envelopes, and storage failures are silent and never deny", () => {
+  const repo = initNativeRepo();
+  try {
+    const fanout = {
+      workspacePaths: [repo], conversationId: "agy-fanout", stepIdx: 1,
+      toolCall: { name: "invoke_subagent", args: { Subagents: [{ TypeName: "a", Prompt: "one" }, { TypeName: "b", Prompt: "two" }] } },
+    };
+    assert.equal(runNative(ANTIGRAVITY_NATIVE, ["deliver"], { workspacePaths: [repo], conversationId: "agy-fanout", invocationNum: 1 }, repo).stdout, "");
+    assert.equal(runNative(ANTIGRAVITY_NATIVE, ["observe"], fanout, repo).status, 0);
+    assert.equal(runNative(ANTIGRAVITY_NATIVE, ["deliver"], { workspacePaths: [repo], conversationId: "agy-fanout", invocationNum: 2 }, repo).stdout, "");
+    const sameInvocation = (stepIdx) => ({
+      workspacePaths: [repo], conversationId: "agy-grouped", stepIdx,
+      toolCall: { name: "invoke_subagent", args: { Subagents: [{ TypeName: "goldfish-implementor", Prompt: "same" }] } },
+    });
+    assert.equal(runNative(ANTIGRAVITY_NATIVE, ["deliver"], { workspacePaths: [repo], conversationId: "agy-grouped", invocationNum: 1 }, repo).stdout, "");
+    assert.equal(runNative(ANTIGRAVITY_NATIVE, ["observe"], sameInvocation(1), repo).status, 0);
+    assert.equal(runNative(ANTIGRAVITY_NATIVE, ["observe"], sameInvocation(1), repo).status, 0, "the same step is a retry");
+    assert.equal(runNative(ANTIGRAVITY_NATIVE, ["observe"], sameInvocation(2), repo).status, 0, "an identical call at a new step is a distinct dispatch");
+    assert.equal(runNative(ANTIGRAVITY_NATIVE, ["deliver"], { workspacePaths: [repo], conversationId: "agy-grouped", invocationNum: 2 }, repo).stdout, "", "two native dispatch calls in one invocation are fan-out, not serial work");
+    assert.equal(runNative(ANTIGRAVITY_NATIVE, ["observe"], { malformed: true }, repo).status, 0);
+    const noStorage = observeCodexSlicing(
+      { cwd: repo, session_id: "failed-storage", tool_name: "spawn_agent", tool_use_id: "one", tool_input: {} },
+      "PreToolUse",
+      { resolveGitCommonDirFn: () => "/unwritable", mkdirSyncFn: () => { throw new Error("EACCES"); } },
+    );
+    assert.equal(noStorage.due, false);
+    assert.doesNotThrow(() => deliverAntigravitySlicing({ conversationId: "no-invocation" }, { resolveGitCommonDirFn: () => null }));
+    assert.doesNotThrow(() => observeAntigravitySlicing({ conversationId: "no-invocation" }, { resolveGitCommonDirFn: () => null }));
+  } finally { rmSync(repo, { recursive: true, force: true }); }
+});
+
+test("GS35: oversized or unknown persisted state is discarded before it can alter a native nudge", () => {
+  const writes = [];
+  const oversized = JSON.stringify({
+    schema: "pipeline.native-slicing-state.v1", runner: "codex", serialRun: 2,
+    unknown: "must-not-survive", padding: "x".repeat(70_000), seen: [], activeChildren: [], planBatches: [], groups: [],
+  });
+  const result = observeCodexSlicing(
+    { cwd: "/fixture", session_id: "oversized-state", tool_name: "spawn_agent", tool_use_id: "one", tool_input: {} },
+    "PreToolUse",
+    {
+      resolveGitCommonDirFn: () => "/fixture/.git",
+      existsSyncFn: () => true,
+      readFileSyncFn: () => oversized,
+      mkdirSyncFn: () => {},
+      writeFileSyncFn: (_path, text) => writes.push(text),
+    },
+  );
+  assert.equal(result.due, false, "oversized persisted serialRun must not manufacture a threshold crossing");
+  const saved = JSON.parse(writes[0]);
+  assert.equal(Object.hasOwn(saved, "unknown"), false);
+  assert.equal(saved.seen.length <= 64, true);
+});
+
+test("GS36: corrupt persisted native state fails open as a fresh bounded session", () => {
+  const writes = [];
+  const result = observeCodexSlicing(
+    { cwd: "/fixture", session_id: "corrupt-state", tool_name: "spawn_agent", tool_use_id: "one", tool_input: {} },
+    "PreToolUse",
+    {
+      resolveGitCommonDirFn: () => "/fixture/.git",
+      existsSyncFn: () => true,
+      readFileSyncFn: () => "{corrupt",
+      mkdirSyncFn: () => {},
+      writeFileSyncFn: (_path, text) => writes.push(text),
+    },
+  );
+  assert.equal(result.due, false);
+  assert.equal(JSON.parse(writes[0]).serialRun, 1);
 });
