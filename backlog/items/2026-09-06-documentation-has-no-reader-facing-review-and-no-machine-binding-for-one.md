@@ -125,7 +125,7 @@ the usual honest status tag; it is a candidate, not a commitment.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted by the PO on 2026-09-07; use the proposed review/binding split and wire the work into the backlog.
+- **Rationale:** review inside the documentation block permits normal rework; release preflight checks only a record bound to the reviewed documentation state. Approval does not claim that the binding exists yet.
+- **Assignment (if accepted):** Nova B documentation block; prerequisite: `pipeline.complete-adr-governs-coverage-before-reader-review-binding`. Preserve the reader review's blind phase and invalidate its binding when covered documentation changes.
+- **Date:** 2026-09-07

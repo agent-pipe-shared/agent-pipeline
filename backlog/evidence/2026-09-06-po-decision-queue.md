@@ -1,5 +1,58 @@
 # PO decision queue — collected 2026-09-06
 
+## PO decisions — 2026-09-07, Codex takeover
+
+These decisions supersede the waiting/recommendation text below; numbering is unchanged.
+Approval of work is not evidence that it has been implemented or exercised.
+
+| Item | Decision and execution boundary |
+|---|---|
+| 14 | Follow the recommendation: measure missing bootstrap receipts before activation; establish a usable receipt path before enabling GL-09 if the measurement shows broad blocking. Activation is approved subject to that sequence. |
+| 2 | Proceed with slicing-hook wiring. The PO applied the attended helper and committed the Claude hook/inventory at `2dab5966ee827b390c99546738628a29adf49308`; no repeated ceremony is required. Native Codex/Antigravity advisory delivery is also in candidate scope under ADR-0080. |
+| 11 | Proceed; already implemented by `9c15d74d5a833678ad9b2f352953d03059cf73bc`, corrected closure OIDs at `f94882ba6e59cc093b4500af3ad50c3fb50f818c`. Verify: 517/517, exact binding at the latter commit. No repeat signature is needed. |
+| 10 | Accept the proposed split and wire it into the backlog: reader review within the documentation block; release preflight checks a record bound to the documentation state. |
+| 13 | Keep the change-request procedure in Nightwing. |
+| 12 | Follow the recommendation: prioritize the ADR reconciliation coverage after the item-10 decision, as its own bounded package; complete coverage before relying on that mechanism for the new review binding. |
+| 4 | Retain the anonymous `AI-Assisted: true` marker; no provider/model co-author or session trailers. Existing dispatch-evidence trailers remain governed by GIT-03 and the previously recorded PO decision. |
+| 8 | A real Codex Critic run is approved once the preflight defect is fixed. The current session is Codex; that alone is not proof that the isolated route works. |
+| 7 | Follow the recommendation: defer the supervisor live probe and revisit alongside the item-8 live-run window. |
+| 6 | The latest PO boundary is read-only. Working operator-local access and actual Desktop/WSL read evidence were supplied; import with provenance and keep B2 execution separate. No CI start, project configuration change or push is authorized. See `2026-09-07-gitlab-read-access-observation.md`. |
+
+The GitLab project coordinate is held in local operational context, not copied into
+the public core. No key, credential, or account identifier belongs in this record.
+The original prose below is historical context, including obsolete waiting states.
+
+**Additional PO scope, 2026-09-07:** finish the authorized potential 0.6.2 content,
+then stamp a new local test candidate; publication is not requested. Update this
+repository's V3 model routing sensibly for current Claude, Codex and Antigravity
+models, with provider/runner evidence and role-appropriate cost/effort. The PO
+committed protected model authority/projection at
+`f895abafb9d99da259b1d407143d82402f177db6`; no repeat model ceremony is needed.
+Actual model and effort choices must consume V3 authority rather than duplicate
+constants in call sites. No credential search or renewal is delegated to agents.
+
+**PO sequencing and model constraint:** produce the local candidate first;
+D.2–D.6 follow while the PO tests it and remain in the final 0.6.2 scope.
+Exclude Claude Fable 5.1 from all selected routes, including fallbacks, because
+the PO's subscription does not include it. Existing floating `fable` aliases
+must therefore not remain active routes.
+
+**Historical access attempt:** an earlier bounded read request returned HTTP
+403, recorded in `evidence/gitlab-access-observation-2026-09-07.json`. Its exact
+credential identity cannot be reconstructed. The later supplied successful
+read observation supersedes the access blocker, not that historical uncertainty.
+
+**AFK continuation:** complete the local candidate with the confirmed Greenfield
+repairs and the read-evidence report. Collect actual human-only decisions and
+signatures together; at technical blocks continue independent work. D.2–D.6
+follow the test candidate; eligible Nova B work follows where those are blocked.
+No release, push, global plugin refresh or daemon restart is implied.
+
+The original override-message finding is retained separately in
+`backlog/items/2026-09-07-guard-override-message-misassigns-roles-and-omits-signing.md`.
+Nonliftable lifecycle recovery and executable legitimate signing guidance are
+different contracts; evidence for one does not close the other.
+
 Everything that is blocked on the PO rather than on work. Collected because
 the PO is mobile and cannot sign today. Ordered by what unblocks the most.
 
