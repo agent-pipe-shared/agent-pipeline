@@ -32,7 +32,7 @@ import { commandIsGitPush } from "../lib/git-cmd.mjs";
 
 // Same pure, no-I/O reuse pattern as scripts/repair-map.mjs: the secret-eligibility
 // screen lives once in eligibility() and is never reimplemented here (GF-060, F2).
-const { eligibility } = humanGuardOverrideInternals;
+const { commandDisclosureFields } = humanGuardOverrideInternals;
 
 const DEBUG_PREFIX = "[pipeline.codex-pretool.v1]";
 const PLUGIN_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -243,18 +243,6 @@ try {
 // (GF-094) so a relaying agent can copy it verbatim instead of re-quoting it;
 // it is never an additional disclosure path -- gated by the exact same
 // `commandIsSafe` conjunct as `command`, never independently.
-function commandDisclosureFields(root, tool, toolInput, rawCommand) {
-  let secretBearing = true;
-  try {
-    const probe = eligibility(root, tool, toolInput ?? {});
-    secretBearing = probe.eligible === false && probe.code === "HGO-NONOVERRIDABLE-SECRET";
-  } catch { /* fail closed: secretBearing stays true, disclosure stays hash-only */ }
-  const commandIsSafe = tool === "Bash" && !secretBearing;
-  return {
-    command: commandIsSafe ? rawCommand : null,
-    copyCommand: commandIsSafe ? boundedOpaqueCopyCommand(rawCommand) : null,
-  };
-}
 const lifecycleGoverned = [
   ".agent-pipeline/core.lock.json",
   "pipeline.user.yaml",
@@ -495,6 +483,9 @@ if (denials.length > 0) {
     completed = true;
     process.exit(0);
   }
+  if (consumed.status === "non-liftable-recovery-required") {
+    deny([consumed.cause, consumed.coDenialSummary, consumed.nextAction.reason].filter(Boolean).join("\n"));
+  }
   let overrideGuidance = "";
   if (consumed.status === "absent" || consumed.status === "replan") {
     try {
@@ -555,7 +546,7 @@ if (denials.length > 0) {
               "emit-signature-digest", "--repo", forcedQuote(overrideRepo), "--request-sha256", planned.requestSha256,
               "--plan-sha256", placeholder("<plan-sha256>"),
             ]),
-            `Then, outside this session (gates.push_approval is "${approvalMode}"; only the signature itself needs the external Ed25519 key; presence of a valid, correctly-bound signature IS the authorization -- there is no in-session activate step for this mode):`,
+            `Then, outside this session (gates.human_approval is "${approvalMode}"; only the signature itself needs the external Ed25519 key; presence of a valid, correctly-bound signature IS the authorization -- there is no in-session activate step for this mode):`,
             renderOverrideCommand(script, [
               "authorize-by-signature", "--repo", forcedQuote(overrideRepo), "--request-sha256", planned.requestSha256,
               "--plan-sha256", placeholder("<plan-sha256>"), "--proof", placeholder("<external-proof.json>"),

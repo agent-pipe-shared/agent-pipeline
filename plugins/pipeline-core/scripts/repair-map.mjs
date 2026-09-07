@@ -37,10 +37,10 @@
 // here. A code added to that function and not handled by a fixture in this
 // file fails `repair-map.test.mjs`. Two further rows
 // (`GUARD-LIFECYCLE-NOT-READY`, the GS-6 `NEVER_LIFTABLE_KERNEL_PATHS` case)
-// bypass `eligibility()` entirely by construction -- their own guard's
-// source never routes them through human-guard-override.mjs -- so no single
-// source enumerates them; they are named from this task's own briefing and
-// verified live against their real predicates
+// bypass `eligibility()` entirely by construction. Lifecycle now has an
+// additional central HGO boundary, verified below with a non-writing direct
+// route; the kernel case remains its own guard predicate. Neither appears in
+// eligibility()'s source enumeration, so both need an explicit row.
 // (`isNeverLiftableKernelPath`, and a direct drive of
 // `evaluateLifecycleReadyGuard` in the contract test). The dispatch report
 // states exactly what this enumeration does and does not cover.
@@ -207,14 +207,21 @@ export function structuralRows({ rootDir, pluginRoot }) {
   } catch (error) {
     kernelHit = { error: String(error?.message ?? error) };
   }
+  const lifecycleRoute = recordHumanGuardDenial({
+    rootDir,
+    pluginRoot,
+    toolName: "Edit",
+    toolInput: { file_path: "repair-map-lifecycle-probe.md" },
+    denials: [{ guard: "guard-lifecycle-ready.mjs", reason: "GUARD-LIFECYCLE-NOT-READY" }],
+  });
   return [
     {
       code: "GUARD-LIFECYCLE-NOT-READY",
       liftable: "never",
       by: "nobody",
       command: null,
-      reason: "never liftable by construction: no armed capability and no signature route exist for this code; "
-        + "guard-lifecycle-ready.mjs never calls into human-guard-override.mjs for it.",
+      reason: `never liftable by central enforcement: observed ${lifecycleRoute.status}/${lifecycleRoute.code}; `
+        + "no plan or capability is created for this exact lifecycle code.",
     },
     {
       code: "GS-6-NEVER-LIFTABLE-KERNEL-PATH",
@@ -252,7 +259,7 @@ export function buildRepairMap({ rootDir, pluginRoot = PLUGIN_ROOT } = {}) {
     schema: SCHEMA,
     generatedAt: new Date().toISOString(),
     enumerationSource: "plugins/pipeline-core/lib/human-guard-override.mjs:eligibility() (live-extracted) "
-      + "+ two named structural rows (GUARD-LIFECYCLE-NOT-READY, GS-6 kernel-path) that bypass it by construction",
+      + "+ two named structural rows (GUARD-LIFECYCLE-NOT-READY central route, GS-6 kernel-path)",
     knownEligibilityCodes: codes,
     uncoveredEligibilityCodes: uncovered,
     rows,

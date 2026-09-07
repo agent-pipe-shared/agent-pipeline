@@ -70,6 +70,7 @@ const CAPABILITY_SCHEMA = "pipeline.human-guard-override-capability.v2";
 const AUDIT_SCHEMA = "pipeline.human-guard-override-audit.v1";
 const AUDIT_HEAD_SCHEMA = "pipeline.human-guard-override-audit-head.v1";
 const MAX_REASON_BYTES = 500;
+const LIFECYCLE_NOT_READY_CODE = "GUARD-LIFECYCLE-NOT-READY";
 // 30 minutes, not 5 (PO, 2026-08-08). The window is sized for a HUMAN, and the
 // human step in the middle of it is: read the plan, recompute or read back the
 // intent digest, switch to a second terminal, unlock a key, type a passphrase.
@@ -1298,6 +1299,52 @@ function denialRetryActions(denials) {
   return actions;
 }
 
+// This is a code-level boundary, rather than a guard-filename boundary: the
+// lifecycle guard has other denial classes with legitimate recovery routes.
+// A matching code in any aggregated denial set makes the whole exact action
+// non-liftable, so an unrelated co-denial cannot smuggle it into HGO.
+function lifecycleCoDenialSummary(denials, lifecycleDenial) {
+  const summaries = [];
+  for (const denial of denials) {
+    if (denial === lifecycleDenial || denial?.guard === "guard-lifecycle-ready.mjs") continue;
+    const guard = String(denial?.guard ?? "unknown-guard").match(/^[A-Za-z0-9_.-]{1,120}$/u)?.[0] ?? "unknown-guard";
+    const code = String(denial?.reason ?? "").match(/\b(?:GUARD|HGO)-[A-Z0-9-]+\b/u)?.[0]?.slice(0, 120) ?? null;
+    summaries.push(code === null ? guard : `${guard} (${code})`);
+    if (summaries.length === 3) break;
+  }
+  if (summaries.length === 0) return null;
+  const additional = Array.isArray(denials) && denials.filter((denial) => denial !== lifecycleDenial
+    && denial?.guard !== "guard-lifecycle-ready.mjs").length - summaries.length;
+  return `Additional active guard denials: ${summaries.join(", ")}${additional > 0 ? `; ${additional} more` : ""}.`;
+}
+
+function lifecycleNotReadyRecovery(denials) {
+  const lifecycleDenial = Array.isArray(denials)
+    ? denials.find(({ reason }) => new RegExp(`\\b${LIFECYCLE_NOT_READY_CODE}\\b`, "u").test(String(reason)))
+    : null;
+  if (lifecycleDenial === null || lifecycleDenial === undefined) return null;
+  return {
+    status: "non-liftable-recovery-required",
+    code: "HGO-NONOVERRIDABLE-LIFECYCLE-NOT-READY",
+    cause: String(lifecycleDenial.reason).split(/\r?\n/u, 1)[0].slice(0, 500),
+    coDenialSummary: lifecycleCoDenialSummary(denials, lifecycleDenial),
+    nextAction: {
+      kind: "repair-required",
+      reason: "Lifecycle readiness cannot be overridden. Technical repair is required before retrying; repeating the same inspection alone cannot change readiness.",
+    },
+  };
+}
+
+function commandDisclosureFields(root, tool, toolInput, rawCommand) {
+  let secretBearing = true;
+  try {
+    const probe = eligibility(root, tool, toolInput ?? {});
+    secretBearing = probe.eligible === false && probe.code === "HGO-NONOVERRIDABLE-SECRET";
+  } catch {}
+  const safe = tool === "Bash" && !secretBearing;
+  return { command: safe ? rawCommand : null, copyCommand: safe ? boundedOpaqueCopyCommand(rawCommand) : null };
+}
+
 function decisionPreview({ toolName, toolInput, paths, commandClass, denials }) {
   const effect = commandClass === "local-plugin-install"
     ? {
@@ -2414,6 +2461,8 @@ export function recordHumanGuardDenial({
   appendCommandOffer = appendCommandOfferJournal,
 } = {}) {
   if (!Array.isArray(denials) || denials.length === 0) fail("HGO-DENIAL", "denial set is empty");
+  const lifecycleRecovery = lifecycleNotReadyRecovery(denials);
+  if (lifecycleRecovery !== null) return lifecycleRecovery;
   const physicalRootDir = physicalRoot(rootDir);
   const eligible = eligibility(physicalRootDir, toolName, toolInput);
   const isLocalPluginInstall = eligible.eligible && eligible.mode === "global-plugin-install";
@@ -3380,6 +3429,8 @@ export function consumeHumanGuardOverride({
   spawn = spawnSync,
   codexSpawn = spawnSync,
 } = {}) {
+  const lifecycleRecovery = lifecycleNotReadyRecovery(denials);
+  if (lifecycleRecovery !== null) return lifecycleRecovery;
   // NVA-CROSSREPOLEDGER-1: this is the OTHER entry point codex-pretool-guard.mjs calls
   // automatically with `rootDir: projectRoot`, when the agent retries the exact same
   // guarded command after obtaining a capability -- see recordHumanGuardDenial()'s
@@ -3657,6 +3708,8 @@ export const humanGuardOverrideInternals = {
   canonical,
   sha,
   eligibility,
+  commandDisclosureFields,
+  lifecycleNotReadyRecovery,
   secureDirectory,
   safePrivateFile,
   // NVA-HGOFIX-2: exposed so the suite can drive the win32 platform seam directly, without

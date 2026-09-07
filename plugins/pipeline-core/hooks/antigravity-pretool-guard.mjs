@@ -35,7 +35,7 @@ import {
 import { parseGuardCommand } from "./guard-command-grammar.mjs";
 import { commandIsGitPush } from "../lib/git-cmd.mjs";
 
-const { eligibility } = humanGuardOverrideInternals;
+const { commandDisclosureFields } = humanGuardOverrideInternals;
 
 const DEBUG_PREFIX = "[pipeline.agy-pretool.v1]";
 const PLUGIN_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -263,18 +263,6 @@ export function normalizeAntigravityToolInput(rawEnvelope) {
   return { toolName, toolInput, filePath, command, isReadOnly };
 }
 
-function commandDisclosureFields(root, tool, toolInput, rawCommand) {
-  let secretBearing = true;
-  try {
-    const probe = eligibility(root, tool, toolInput ?? {});
-    secretBearing = probe.eligible === false && probe.code === "HGO-NONOVERRIDABLE-SECRET";
-  } catch { /* fail closed */ }
-  const commandIsSafe = tool === "Bash" && !secretBearing;
-  return {
-    command: commandIsSafe ? rawCommand : null,
-    copyCommand: commandIsSafe ? boundedOpaqueCopyCommand(rawCommand) : null,
-  };
-}
 
 export function isBootstrapReadCommand(value, {
   pipelineStartSkill = PIPELINE_START_SKILL,
@@ -644,6 +632,9 @@ export async function runAntigravityPreToolGuard(rawInput) {
       allow();
       return;
     }
+    if (consumed.status === "non-liftable-recovery-required") {
+      deny([consumed.cause, consumed.coDenialSummary, consumed.nextAction.reason].filter(Boolean).join("\n"));
+    }
 
     let overrideGuidance = "";
     if (consumed.status === "absent" || consumed.status === "replan") {
@@ -701,7 +692,7 @@ export async function runAntigravityPreToolGuard(rawInput) {
                 "prepare-authorization", "--plan-sha256", placeholder("<plan-sha256-from-plan>"), "--reason", placeholder('"<fixed HGO_SIGNATURE_REASON text>"'),
               ),
               ceremonyCommand("emit-signature-digest", "--plan-sha256", placeholder("<plan-sha256>")),
-              `Then, outside this session (gates.push_approval is "${approvalMode}"; only the signature itself needs the external Ed25519 key; presence of a valid, correctly-bound signature IS the authorization -- there is no in-session activate step for this mode):`,
+            `Then, outside this session (gates.human_approval is "${approvalMode}"; only the signature itself needs the external Ed25519 key; presence of a valid, correctly-bound signature IS the authorization -- there is no in-session activate step for this mode):`,
               ceremonyCommand(
                 "authorize-by-signature", "--plan-sha256", placeholder("<plan-sha256>"), "--proof", placeholder("<external-proof.json>"),
               ),

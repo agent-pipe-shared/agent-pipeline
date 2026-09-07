@@ -17,10 +17,12 @@ import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
 import { normalizeAntigravityToolInput } from "./antigravity-pretool-guard.mjs";
+import { consumeRuntimeReadback, issueLaunchTicket, readRestartBarrier, sha256 } from "../lib/codex-onboarding-runtime.mjs";
 
 const hookDir = dirname(fileURLToPath(import.meta.url));
 const pluginRoot = join(hookDir, "..");
 const adapter = join(hookDir, "antigravity-pretool-guard.mjs");
+const onboardingScript = join(pluginRoot, "scripts", "project-onboarding-v3.mjs");
 let passed = 0;
 
 function fixture() {
@@ -30,6 +32,42 @@ function fixture() {
   writeFileSync(join(root, ".claude", "pipeline.json"), JSON.stringify({
     project: "test", verify: "node verify.mjs",
   }));
+  return root;
+}
+
+function lifecycleCommand(root, ...args) {
+  const result = spawnSync(process.execPath, [onboardingScript, ...args], { cwd: root, encoding: "utf8", shell: false });
+  assert.equal(result.status, 0, `${result.stderr}\n${result.stdout}`);
+  return JSON.parse(result.stdout);
+}
+
+function followLifecycleAction(root, result, name) {
+  assert.equal(result.nextAction?.argv?.[1], name, JSON.stringify(result));
+  return lifecycleCommand(root, ...result.nextAction.argv.slice(1));
+}
+
+function readyLifecycleFixture() {
+  const root = mkdtempSync(join(tmpdir(), "agy-ready-hgo-"));
+  followLifecycleAction(root, lifecycleCommand(root, "plan", "--root", root, "--runner", "antigravity"), "apply-portable-seed");
+  const initialized = spawnSync(process.execPath, [join(pluginRoot, "scripts", "onboarding-init.mjs"), "--root", root, "--runner", "antigravity", "--git-author-name", "Test Fixture", "--git-author-email", "fixture@example.invalid", "--push-approval", "chat"], { cwd: root, encoding: "utf8", shell: false });
+  assert.equal(initialized.status, 0, `${initialized.stderr}\n${initialized.stdout}`);
+  for (const args of [["config", "user.name", "Test Fixture"], ["config", "user.email", "fixture@example.invalid"], ["add", "pipeline.user.yaml"], ["commit", "-m", "test fixture policy"]]) {
+    const git = spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });
+    assert.equal(git.status, 0, git.stderr);
+  }
+  const barrier = readRestartBarrier({ rootDir: root });
+  if (barrier.status === "present") {
+    const issued = issueLaunchTicket({ rootDir: root, barrierSha256: barrier.rawSha256 });
+    consumeRuntimeReadback({ rootDir: root, ticketId: issued.ticketId, token: issued.token, receipt: { schema: "pipeline.codex-project-runtime-readback.v1", barrierSha256: barrier.rawSha256, repositoryFingerprint: barrier.barrier.repositoryFingerprint, sourceSha256: barrier.barrier.sourceSha256, runtimeTargetsSha256: barrier.barrier.runtimeTargetsSha256, readerGenerationSha256: sha256("test-agy-readback"), effectiveConfigSha256: sha256("test-agy-config"), validatedAgentsSha256: sha256("test-agy-agents"), ticketId: issued.ticketId, observedAtEpochMs: Date.now() } });
+  }
+  const collect = (result, values, material = null) => { const argv = result.nextAction.applyAction.argv.map((value) => values[value] ?? value); const index = argv.indexOf("--text-file"); if (material !== null && index >= 0) { const path = join(root, argv[index + 1]); mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, material); } return lifecycleCommand(root, ...argv.slice(1)); };
+  collect(lifecycleCommand(root, "inspect", "--root", root, "--runner", "antigravity"), { "<PO_INTAKE_GIT_AUTHOR_NAME>": "Test Fixture", "<PO_INTAKE_GIT_AUTHOR_EMAIL>": "fixture@example.invalid", "<PO_INTAKE_LANGUAGE>": "en", "<PO_INTAKE_PROFILE>": "feature" }, "AGY test fixture material.\n");
+  collect(lifecycleCommand(root, "inspect", "--root", root, "--runner", "antigravity"), { "<PO_INTAKE_DESIGN_ANSWERS_JSON>": JSON.stringify([{ question: "Scope?", answer: "AGY fixture." }]) });
+  const generated = followLifecycleAction(root, lifecycleCommand(root, "inspect", "--root", root, "--runner", "antigravity"), "intake-generate-plan");
+  lifecycleCommand(root, "intake-generate-apply", "--root", root, "--plan-sha256", generated.planSha256, "--activate", "--runner", "antigravity");
+  const bind = followLifecycleAction(root, lifecycleCommand(root, "inspect", "--root", root, "--runner", "antigravity"), "bootstrap-bind-plan");
+  followLifecycleAction(root, bind, "bootstrap-bind-apply");
+  assert.equal(lifecycleCommand(root, "inspect", "--root", root, "--runner", "antigravity").status, "ready");
   return root;
 }
 
@@ -330,7 +368,25 @@ check("Antigravity pretool guard blocks replace_file_content to pipeline.user.ya
 
   assert.equal(res.decision, "deny");
   assert.match(res.reason, /guard-gate-strength|Rule ID: GS-1\b/);
+  assert.match(res.reason, /GUARD-LIFECYCLE-NOT-READY/u);
+  assert.doesNotMatch(res.reason, /Human override available|authorize-by-signature|verify-audit/u);
   rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity GS-1 is liftable through its ordinary HGO path only after real lifecycle readiness", () => {
+  const root = readyLifecycleFixture();
+  try {
+    const res = decision(run({
+      toolCall: {
+        name: "replace_file_content",
+        args: { TargetFile: join(root, "pipeline.user.yaml"), TargetContent: "chat", ReplacementContent: "signature" },
+      },
+    }, root));
+    assert.equal(res.decision, "deny");
+    assert.match(res.reason, /guard-gate-strength|Rule ID: GS-1\b/);
+    assert.match(res.reason, /Human override available for this exact action/u);
+    assert.doesNotMatch(res.reason, /GUARD-LIFECYCLE-NOT-READY/u);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 check("Antigravity pretool guard blocks agent self-approval for approve-push", () => {
@@ -866,6 +922,20 @@ check("Antigravity pretool guard blocks inline bash -o pipefail -c execution, an
   assert.equal(res.decision, "deny");
   assert.match(res.reason, /Inline code execution/);
   rmSync(root, { recursive: true, force: true });
+});
+
+check("lifecycle-not-ready denial does not advertise a human override ceremony", () => {
+  const root = fixture();
+  try {
+    for (const target of ["notes.md", join(root, "absolute-notes.md")]) {
+      const denied = decision(run({ toolCall: { name: "replace_file_content", args: { TargetFile: target, TargetContent: "", ReplacementContent: "x" } } }, root));
+      assert.equal(denied.decision, "deny");
+      assert.match(denied.reason, /GUARD-LIFECYCLE-NOT-READY/u);
+      assert.match(denied.reason, /Technical repair is required before retrying/u);
+      assert.doesNotMatch(denied.reason, /Re-run the typed project-onboarding-v3 inspection/u);
+      assert.doesNotMatch(denied.reason, /Human override available|authorize-by-signature|verify-audit/u);
+    }
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 console.log(`\nAll ${passed} antigravity-pretool-guard tests passed.`);

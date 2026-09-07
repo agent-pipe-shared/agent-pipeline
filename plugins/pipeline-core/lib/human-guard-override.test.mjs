@@ -92,6 +92,75 @@ function reasonDigest(reason) {
   return createHash("sha256").update(Buffer.from(reason, "utf8")).digest("hex");
 }
 
+test("shared command disclosure is Bash-only, secret-safe, and copy-bounded", () => {
+  const { commandDisclosureFields } = humanGuardOverrideInternals;
+  const root = fixture();
+  try {
+    const command = "node tool.mjs --goal HTML Minispiel gemäß Übergabe";
+    const safe = commandDisclosureFields(root, "Bash", { command }, command);
+    assert.equal(safe.command, command);
+    assert.deepEqual(Object.keys(safe.copyCommand).sort(), ["cmd", "maxColumns", "posix", "powershell"]);
+    assert.equal(safe.copyCommand.maxColumns, 72);
+    for (const [label, rendered, lineSep] of [
+      ["posix", safe.copyCommand.posix, "\n"],
+      ["powershell", safe.copyCommand.powershell, "\n"],
+      ["cmd", safe.copyCommand.cmd, "\r\n"],
+    ]) {
+      if (rendered === null) continue;
+      assert.equal(typeof rendered, "string", label);
+      assert.equal(rendered.split(lineSep).every((line) => line.length <= safe.copyCommand.maxColumns), true,
+        `${label} rendering exceeds ${safe.copyCommand.maxColumns} columns`);
+    }
+    if (process.platform !== "win32" && safe.copyCommand.posix) {
+      const lines = safe.copyCommand.posix.split("\n");
+      assert.equal(lines.at(-1), 'eval "$CMD"');
+      const assignments = lines.slice(0, -1).join("\n");
+      const probe = spawnSync("bash", ["-c", `${assignments}\nprintf '%s' "$CMD"`], { encoding: "utf8" });
+      assert.equal(probe.status, 0, probe.stderr);
+      assert.equal(probe.stdout, command);
+    }
+    const secret = "ghp_FAKEFAKEFAKEFAKE1234567890AB";
+    assert.deepEqual(commandDisclosureFields(root, "Bash", { command: `touch ${secret}` }, `touch ${secret}`), { command: null, copyCommand: null });
+    assert.deepEqual(commandDisclosureFields(root, "Write", { file_path: "notes.md", content: command }, command), { command: null, copyCommand: null });
+    const throwingInput = {};
+    Object.defineProperty(throwingInput, "command", { get() { throw new Error("test-only eligibility getter failure"); } });
+    assert.deepEqual(commandDisclosureFields(root, "Bash", throwingInput, command), { command: null, copyCommand: null });
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("lifecycle-not-ready denial sets never create or consume a human-override route", () => {
+  const root = fixture();
+  try {
+    const toolInput = { file_path: "notes.md", content: "blocked\n" };
+    const lifecycle = { guard: "guard-lifecycle-ready.mjs", reason: "GUARD-LIFECYCLE-NOT-READY" };
+    const ordinary = { guard: "guard-devplan.mjs", reason: "GUARD-DEVPLAN-NOT-READY" };
+    for (const denials of [[lifecycle], [ordinary, lifecycle]]) {
+      const recorded = recordHumanGuardDenial({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials });
+      const consumed = consumeHumanGuardOverride({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials });
+      assert.equal(recorded.status, "non-liftable-recovery-required");
+      assert.equal(consumed.status, "non-liftable-recovery-required");
+      assert.equal(recorded.code, "HGO-NONOVERRIDABLE-LIFECYCLE-NOT-READY");
+      assert.equal(recorded.nextAction.kind, "repair-required");
+      const expectedSummary = denials.length === 1
+        ? null
+        : "Additional active guard denials: guard-devplan.mjs (GUARD-DEVPLAN-NOT-READY).";
+      assert.equal(recorded.coDenialSummary, expectedSummary);
+      assert.equal(consumed.coDenialSummary, expectedSummary);
+    }
+    assert.equal(existsSync(join(root, ".git", "agent-pipeline", "human-guard-overrides")), false);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("lifecycle co-denial diagnostics remain bounded", () => {
+  const long = "X".repeat(2_000);
+  const recovery = humanGuardOverrideInternals.lifecycleNotReadyRecovery([
+    { guard: "guard-lifecycle-ready.mjs", reason: `GUARD-LIFECYCLE-NOT-READY: ${long}` },
+    { guard: "guard-testpath.mjs", reason: `HGO-${"A".repeat(2_000)}` },
+  ]);
+  assert.ok(recovery.cause.length <= 500);
+  assert.ok(recovery.coDenialSummary.length <= 200);
+});
+
 /**
  * Tamper one of pluginIdentity()'s six hashed files by changing its bytes. `.codex-plugin/
  * plugin.json` is the one file `pluginIdentity()` runs through `JSON.parse()`, so a raw `//`
@@ -107,7 +176,9 @@ function tamperPluginFile(plugin, relative, label) {
   writeFileSync(path, relative[1] === "plugin.json" ? `${original}\n` : `${original}\n// ${label}\n`);
 }
 
-const denial = [{ guard: "guard-lifecycle-ready.mjs", reason: "GUARD-LIFECYCLE-NOT-READY" }];
+// A lifecycle guard filename is not itself non-liftable. This representative
+// remains a normal HGO denial; the exact NOT-READY code is covered separately.
+const denial = [{ guard: "guard-lifecycle-ready.mjs", reason: "GUARD-DEVPLAN-SHELL" }];
 
 // NVA-HGOTEST-1: `prepareHumanGuardOverrideAuthorization()`, `authorizeHumanGuardOverride()`
 // and `authorizeHumanGuardOverrideBySignature()` re-derive the global-plugin-install plan
@@ -354,7 +425,7 @@ test("NVA-SIGENTRY-1: describeHumanGuardOverrideSelection() resolves the exact m
 
     // The recorded denial's rationale and expiry are disclosed too (ADR-0059's "eligible
     // paths / denying guard's rationale / expiry").
-    assert.ok(secondText.includes("GUARD-LIFECYCLE-NOT-READY"));
+    assert.ok(secondText.includes("GUARD-DEVPLAN-SHELL"));
     assert.match(secondText, /expires at/u);
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -729,6 +800,39 @@ test("one exact attended capability is audited, consumed once and cannot be repl
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("an armed capability remains armed when a later lifecycle-not-ready co-denial takes precedence", () => {
+  const root = fixture();
+  try {
+    const toolInput = { file_path: "notes.md", content: "lifecycle precedence\n" };
+    const request = recordHumanGuardDenial({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: denial, nowMs: 1000 });
+    const plan = planHumanGuardOverride({ rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, nowMs: 2000, scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs") });
+    const reason = "PO attended lifecycle precedence fixture";
+    const prepared = prepareHumanGuardOverrideAuthorization({ rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, planSha256: plan.planSha256, reason, nowMs: 2500, scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs") });
+    assert.equal(authorizeHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, planSha256: plan.planSha256,
+      selectionSha256: prepared.selectionSha256, reason, reasonSha256: reasonDigest(reason), activate: true,
+      dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}` },
+      nowMs: 3000, scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"),
+    }).status, "armed");
+    const common = git(root, "rev-parse", "--path-format=absolute", "--git-common-dir");
+    const base = join(common, "agent-pipeline", "human-guard-overrides");
+    const [capabilityFile] = readdirSync(join(base, "capabilities"));
+    const capabilityBefore = readFileSync(join(base, "capabilities", capabilityFile), "utf8");
+    const auditBefore = readFileSync(join(base, "audit.jsonl"), "utf8");
+    const lifecycle = { guard: "guard-lifecycle-ready.mjs", reason: "GUARD-LIFECYCLE-NOT-READY: fixture" };
+    const blocked = consumeHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: [...denial, lifecycle], nowMs: 4000,
+    });
+    assert.equal(blocked.status, "non-liftable-recovery-required");
+    assert.equal(blocked.code, "HGO-NONOVERRIDABLE-LIFECYCLE-NOT-READY");
+    assert.equal(readFileSync(join(base, "capabilities", capabilityFile), "utf8"), capabilityBefore);
+    assert.equal(readFileSync(join(base, "audit.jsonl"), "utf8"), auditBefore);
+    assert.equal(consumeHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: denial, nowMs: 4000,
+    }).status, "consumed");
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 test("committed global chat arms HGO without a terminal or signature material and marks its capability/audit", () => {

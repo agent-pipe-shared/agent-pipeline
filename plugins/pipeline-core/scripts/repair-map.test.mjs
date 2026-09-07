@@ -97,6 +97,15 @@ test("AC-7 (contract): the two structural rows match a fresh drive of their real
   const readyRow = map.rows.find((row) => row.code === "GUARD-LIFECYCLE-NOT-READY");
   assert.equal(readyRow.command, null);
   assert.equal(readyRow.liftable, "never");
+  const lifecycle = { guard: "guard-lifecycle-ready.mjs", reason: "GUARD-LIFECYCLE-NOT-READY" };
+  for (const denials of [[lifecycle], [{ guard: "guard-devplan.mjs", reason: "GUARD-DEVPLAN-NOT-READY" }, lifecycle]]) {
+    const routed = recordHumanGuardDenial({
+      rootDir: ROOT, pluginRoot: PLUGIN_ROOT, toolName: "Edit", toolInput: { file_path: "repair-map-lifecycle-probe.md" }, denials,
+    });
+    assert.equal(routed.status, "non-liftable-recovery-required");
+    assert.equal(routed.code, "HGO-NONOVERRIDABLE-LIFECYCLE-NOT-READY");
+  }
+  assert.match(readyRow.reason, /non-liftable-recovery-required\/HGO-NONOVERRIDABLE-LIFECYCLE-NOT-READY/u);
 });
 
 test("AC-2/AC-3: the three never-selectable reasons are distinct, and none offers a command", () => {

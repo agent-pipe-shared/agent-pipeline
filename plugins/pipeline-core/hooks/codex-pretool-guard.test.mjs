@@ -3,6 +3,7 @@
 
 import assert from "node:assert/strict";
 import {
+  chmodSync,
   closeSync,
   mkdtempSync,
   mkdirSync,
@@ -16,11 +17,13 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { main as guardHumanOverrideMain } from "../scripts/guard-human-override.mjs";
+import { consumeRuntimeReadback, issueLaunchTicket, readRestartBarrier, sha256 } from "../lib/codex-onboarding-runtime.mjs";
 
 const hookDir = dirname(fileURLToPath(import.meta.url));
 const pluginRoot = join(hookDir, "..");
 const adapter = join(hookDir, "codex-pretool-guard.mjs");
 const humanOverrideScript = join(pluginRoot, "scripts", "guard-human-override.mjs");
+const onboardingScript = join(pluginRoot, "scripts", "project-onboarding-v3.mjs");
 let passed = 0;
 
 /**
@@ -37,17 +40,73 @@ function activateAuthorization(authorizeAction, selectionSha256) {
   let stdout = "";
   let stderr = "";
   const status = guardHumanOverrideMain(authorizeAction.argv.slice(1), {
-    write: (text) => { stdout += text; },
-    writeError: (text) => { stderr += text; },
-  }, {
-    dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${selectionSha256.slice(0, 8).toUpperCase()}` },
-  });
+    write: (text) => { stdout += text; }, writeError: (text) => { stderr += text; },
+  }, { dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${selectionSha256.slice(0, 8).toUpperCase()}` } });
   return { status, stdout, stderr };
 }
 
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), "codex-pretool-"));
   mkdirSync(join(root, ".claude"), { recursive: true });
+  return root;
+}
+
+function validPipelineUser(mode = "signature") {
+  return readFileSync(join(pluginRoot, "..", "..", "pipeline.user.yaml"), "utf8")
+    .replace('push_approval: "signature"', `push_approval: "${mode}"`);
+}
+
+function writeCanonicalManifest(root) {
+  mkdirSync(join(root, "project"), { recursive: true });
+  writeFileSync(join(root, "project", "pipeline.yaml"),
+    readFileSync(join(pluginRoot, "..", "..", "project", "pipeline.yaml"), "utf8"));
+}
+
+function lifecycleCommand(root, ...args) {
+  const result = spawnSync(process.execPath, [onboardingScript, ...args], {
+    cwd: root,
+    encoding: "utf8",
+    shell: false,
+  });
+  assert.equal(result.status, 0, `${result.stderr}\n${result.stdout}`);
+  return JSON.parse(result.stdout);
+}
+
+function followLifecycleAction(root, result, name) {
+  assert.equal(result.nextAction?.argv?.[1], name, JSON.stringify(result));
+  return lifecycleCommand(root, ...result.nextAction.argv.slice(1));
+}
+
+function executeFixtureAction(root, action, replacements) {
+  const result = spawnSync(action.executable, action.argv.map((value) => replacements[value] ?? value), { cwd: root, encoding: "utf8", shell: false });
+  assert.equal(result.status, 0, `${result.stderr}\n${result.stdout}`);
+  return JSON.parse(result.stdout);
+}
+
+function readyLifecycleFixture(mode = "chat") {
+  // TEST-ONLY fixture inputs below are explicit synthetic PO answers. The
+  // real CLI creates authority/checkpoint state; the real readback consumer
+  // verifies its ticket and digests before the native adapter probes it.
+  const root = mkdtempSync(join(tmpdir(), "codex-ready-hgo-"));
+  const portable = followLifecycleAction(root, lifecycleCommand(root, "plan", "--root", root, "--runner", "codex"), "apply-portable-seed");
+  const initialized = spawnSync(process.execPath, [join(pluginRoot, "scripts", "onboarding-init.mjs"), "--root", root, "--runner", "codex", "--git-author-name", "Test Fixture", "--git-author-email", "fixture@example.invalid", "--push-approval", mode], { cwd: root, encoding: "utf8", shell: false });
+  assert.equal(initialized.status, 0, `${initialized.stderr}\n${initialized.stdout}`);
+  assert.match(readFileSync(join(root, "pipeline.user.yaml"), "utf8"), new RegExp(`push_approval: "${mode}"`, "u"));
+  assert.match(readFileSync(join(root, "pipeline.user.yaml"), "utf8"), new RegExp(`human_approval: "${mode}"`, "u"));
+  for (const args of [["config", "user.name", "Test Fixture"], ["config", "user.email", "fixture@example.invalid"], ["add", "pipeline.user.yaml"], ["commit", "-m", "test fixture policy"]]) {
+    const git = spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });
+    assert.equal(git.status, 0, git.stderr);
+  }
+  const barrier = readRestartBarrier({ rootDir: root }); const issued = issueLaunchTicket({ rootDir: root, barrierSha256: barrier.rawSha256 });
+  consumeRuntimeReadback({ rootDir: root, ticketId: issued.ticketId, token: issued.token, receipt: { schema: "pipeline.codex-project-runtime-readback.v1", barrierSha256: barrier.rawSha256, repositoryFingerprint: barrier.barrier.repositoryFingerprint, sourceSha256: barrier.barrier.sourceSha256, runtimeTargetsSha256: barrier.barrier.runtimeTargetsSha256, readerGenerationSha256: sha256("test-hgo-readback"), effectiveConfigSha256: sha256("test-hgo-config"), validatedAgentsSha256: sha256("test-hgo-agents"), ticketId: issued.ticketId, observedAtEpochMs: Date.now() } });
+  const collect = (result, values, material = null) => { const argv = result.nextAction.applyAction.argv.map((value) => values[value] ?? value); const index = argv.indexOf("--text-file"); if (material !== null && index >= 0) { const path = join(root, argv[index + 1]); mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, material); } return lifecycleCommand(root, ...argv.slice(1)); };
+  collect(lifecycleCommand(root, "inspect", "--root", root, "--runner", "codex"), { "<PO_INTAKE_GIT_AUTHOR_NAME>": "Test Fixture", "<PO_INTAKE_GIT_AUTHOR_EMAIL>": "fixture@example.invalid", "<PO_INTAKE_LANGUAGE>": "en", "<PO_INTAKE_PROFILE>": "feature" }, "HGO test fixture material.\n");
+  collect(lifecycleCommand(root, "inspect", "--root", root, "--runner", "codex"), { "<PO_INTAKE_DESIGN_ANSWERS_JSON>": JSON.stringify([{ question: "Scope?", answer: "HGO fixture." }]) });
+  const generated = followLifecycleAction(root, lifecycleCommand(root, "inspect", "--root", root, "--runner", "codex"), "intake-generate-plan");
+  lifecycleCommand(root, "intake-generate-apply", "--root", root, "--plan-sha256", generated.planSha256, "--activate", "--runner", "codex");
+  const bind = followLifecycleAction(root, lifecycleCommand(root, "inspect", "--root", root, "--runner", "codex"), "bootstrap-bind-plan");
+  followLifecycleAction(root, bind, "bootstrap-bind-apply");
+  assert.equal(lifecycleCommand(root, "inspect", "--root", root, "--runner", "codex").status, "ready");
   return root;
 }
 
@@ -155,8 +214,15 @@ check("descriptor uses quoted PLUGIN_ROOT with Windows parity for both routing f
   assert.equal(sessionStart[0].hooks[0].commandWindows, sessionStart[0].hooks[0].command);
   assert.equal(sessionStart[0].hooks[0].timeout, 3);
   const entries = descriptor.hooks.PreToolUse;
-  assert.deepEqual(entries.map((entry) => entry.matcher), ["Bash", "apply_patch|Edit|Write"]);
-  for (const entry of entries) {
+  assert.deepEqual(entries.map((entry) => entry.matcher), ["spawn_agent|update_plan", "Bash", "apply_patch|Edit|Write"]);
+  const [slicing, ...guardEntries] = entries;
+  assert.equal(slicing.hooks.length, 1);
+  const slicingHook = slicing.hooks[0];
+  assert.equal(slicingHook.command, "node \"${PLUGIN_ROOT}/hooks/codex-slicing-hint.mjs\" PreToolUse");
+  assert.equal(slicingHook.commandWindows, slicingHook.command);
+  assert.equal(slicingHook.timeout, 3);
+  assert.equal(slicingHook.statusMessage, "Evaluating optional task slicing");
+  for (const entry of guardEntries) {
     assert.equal(entry.hooks.length, 1);
     const hook = entry.hooks[0];
     assert.equal(hook.command, "node \"${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs\"");
@@ -241,7 +307,7 @@ check("F1: codex adapter recognizes every push shape guard-push.mjs itself recog
     // was actually spawned and evaluated the command, not merely that SOME guard
     // denied it (guard-git.mjs is also spawned for any `git` command, but is
     // documented not to block a plain push).
-    assert.match(output.permissionDecisionReason, /guard-push/, command);
+    assert.match(output.permissionDecisionReason, /guard-push/, `${command}\n${output.permissionDecisionReason}`);
   }
 });
 
@@ -297,7 +363,7 @@ check("F1 round 2: codex adapter recognizes the directPush and shellWrapperPush 
   ]) {
     const output = decision(run({ tool_name: "Bash", tool_input: { command } }, root));
     assert.equal(output.permissionDecision, "deny", command);
-    assert.match(output.permissionDecisionReason, /guard-push/, command);
+    assert.match(output.permissionDecisionReason, /guard-push/, `${command}\n${output.permissionDecisionReason}`);
   }
 });
 
@@ -329,7 +395,7 @@ check("F1 round 3: codex adapter recognizes the escaped-value and unrecognized-g
   ]) {
     const output = decision(run({ tool_name: "Bash", tool_input: { command } }, root));
     assert.equal(output.permissionDecision, "deny", command);
-    assert.match(output.permissionDecisionReason, /guard-push/, command);
+    assert.match(output.permissionDecisionReason, /guard-push/, `${command}\n${output.permissionDecisionReason}`);
   }
 });
 
@@ -355,15 +421,7 @@ check("bounded rg-to-rg search filtering remains read-only without an override l
 });
 
 check("attended Human override admits only the exact next tool call and is then consumed", () => {
-  const root = fixture();
-  const git = (...args) => spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });
-  git("init", "-q", "-b", "main");
-  git("config", "user.name", "Fixture");
-  git("config", "user.email", "fixture@example.invalid");
-  writeFileSync(join(root, "README.md"), "fixture\n");
-  writeFileSync(join(root, "pipeline.user.yaml"), 'schema: "pipeline.user.v3"\ngates:\n  push_approval: "chat"\n');
-  git("add", "README.md", "pipeline.user.yaml");
-  git("commit", "-q", "-m", "fixture");
+  const root = readyLifecycleFixture("chat");
   const input = { tool_name: "Write", tool_input: { file_path: "notes.md", content: "attended\n" } };
   const first = decision(run(input, root));
   assert.equal(first.permissionDecision, "deny");
@@ -408,20 +466,12 @@ check("ADR-0059 Decision 4: the continuation names the configured mode's own fin
   // modes are exercised here and each assertion is bound to the mode the fixture actually
   // committed, not to the loop variable that produced it.
   for (const mode of ["chat", "signature"]) {
-    const root = fixture();
-    const git = (...args) => spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });
-    git("init", "-q", "-b", "main");
-    git("config", "user.name", "Fixture");
-    git("config", "user.email", "fixture@example.invalid");
-    writeFileSync(join(root, "README.md"), "fixture\n");
-    writeFileSync(join(root, "pipeline.user.yaml"), `schema: "pipeline.user.v3"\ngates:\n  push_approval: "${mode}"\n`);
-    git("add", "README.md", "pipeline.user.yaml");
-    git("commit", "-q", "-m", "fixture");
+    const root = readyLifecycleFixture(mode);
     // Read back what the repository carries. readPushApprovalMode() honours the COMMITTED
     // bytes and nothing else, so this -- not the loop variable -- is the live configuration
     // the printed command has to agree with.
     const committed = readFileSync(join(root, "pipeline.user.yaml"), "utf8")
-      .match(/push_approval:\s*"([a-z]+)"/u)?.[1];
+      .match(/human_approval:\s*"([a-z]+)"/u)?.[1];
     assert.equal(committed, mode, "fixture did not commit the mode it claims");
 
     const denied = decision(run({
@@ -434,7 +484,9 @@ check("ADR-0059 Decision 4: the continuation names the configured mode's own fin
     assert.match(reason, /Human override available for this exact action/u, `mode=${committed}`);
     assert.match(reason, /\bplan --repo\b/u, `mode=${committed}`);
     assert.match(reason, /prepare-authorization --repo/u, `mode=${committed}`);
-    assert.match(reason, new RegExp(`gates\\.push_approval is "${committed}"`, "u"), `mode=${committed}`);
+    if (committed === "signature") {
+      assert.match(reason, new RegExp(`gates\\.human_approval is "${committed}"`, "u"), `mode=${committed}`);
+    }
     if (committed === "chat") {
       assert.match(reason, /\bauthorize --repo\b[^\n]*--selection-sha256[^\n]*--activate/u,
         "chat mode must offer the in-session activate step");
@@ -483,20 +535,15 @@ check("ADR-0059 Decision 4: the continuation names the configured mode's own fin
 });
 
 check("Pipeline Author Repair selects one exact source root and consumes one patch", () => {
-  const root = fixture();
+  const root = readyLifecycleFixture("chat");
   const git = (...args) => spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });
-  git("init", "-q", "-b", "main");
-  git("config", "user.name", "Fixture");
-  git("config", "user.email", "fixture@example.invalid");
-  writeFileSync(join(root, "README.md"), "fixture\n");
-  writeFileSync(join(root, "pipeline.user.yaml"), 'schema: "pipeline.user.v3"\ngates:\n  push_approval: "chat"\n');
   const sourceRoot = join(root, "plugins", "pipeline-core");
   mkdirSync(join(sourceRoot, ".codex-plugin"), { recursive: true });
   mkdirSync(join(sourceRoot, "lib"), { recursive: true });
   writeFileSync(join(sourceRoot, ".codex-plugin", "plugin.json"), '{"name":"pipeline-core","version":"0.4.7"}\n');
   writeFileSync(join(sourceRoot, "lib", "repair.mjs"), "export const repaired = false;\n");
-  git("add", "README.md", "pipeline.user.yaml", "plugins/pipeline-core");
-  git("commit", "-q", "-m", "fixture");
+  git("add", "plugins/pipeline-core");
+  git("commit", "-q", "-m", "author repair fixture");
   const input = {
     tool_name: "apply_patch",
     tool_input: {
@@ -602,12 +649,13 @@ check("a safe Bash cross-repository-boundary denial carries the literal command 
 });
 
 check("a secret-bearing Bash cross-repository-boundary denial never carries the secret verbatim", () => {
+  const root = readyLifecycleFixture("chat");
   const secret = "ghp_FAKEFAKEFAKEFAKE1234567890AB";
   const command = `codex plugin remove ${secret}`;
   const output = decision(run({
     tool_name: "Bash",
     tool_input: { command },
-  }, hostBoundaryFixture()));
+  }, root));
   assert.equal(output.permissionDecision, "deny");
   assert.doesNotMatch(output.permissionDecisionReason, /ghp_FAKEFAKEFAKEFAKE/u,
     "the secret-bearing Bash command leaked verbatim into the denial reason");
@@ -620,15 +668,7 @@ check("a secret-bearing Bash cross-repository-boundary denial never carries the 
 });
 
 check("override persistence failure remains a sanitized fail-closed denial", () => {
-  const root = fixture();
-  const git = (...args) => spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });
-  git("init", "-q", "-b", "main");
-  git("config", "user.name", "Fixture");
-  git("config", "user.email", "fixture@example.invalid");
-  writeFileSync(join(root, "README.md"), "fixture\n");
-  git("add", "README.md");
-  git("commit", "-q", "-m", "fixture");
-  writeFileSync(join(root, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+  const root = readyLifecycleFixture("chat");
   mkdirSync(join(root, ".git", "agent-pipeline"), { recursive: true, mode: 0o700 });
   writeFileSync(join(root, ".git", "agent-pipeline", "human-guard-overrides"), "not-a-directory\n", { mode: 0o600 });
   const denied = decision(run({
@@ -641,16 +681,7 @@ check("override persistence failure remains a sanitized fail-closed denial", () 
 });
 
 check("Codex routes a documented Git override prefix to the Push-Gate's actual command", () => {
-  const root = fixture();
-  writeFileSync(join(root, ".claude", "pipeline.yaml"), [
-    "schema: pipeline.manifest.v0",
-    "gates:",
-    "  push:",
-    "    mode: blocking",
-    "    type: human",
-    "    approval: standing-approved",
-    "",
-  ].join("\n"));
+  const root = readyLifecycleFixture("chat");
   const output = decision(run({
     tool_name: "Bash",
     tool_input: {
@@ -658,7 +689,8 @@ check("Codex routes a documented Git override prefix to the Push-Gate's actual c
     },
   }, root));
   assert.equal(output.permissionDecision, "deny");
-  assert.match(output.permissionDecisionReason, /push repository cannot be resolved to a non-bare worktree/u);
+  assert.match(output.permissionDecisionReason, /raw Bash\/Git cannot publish refs\/heads\/main/u);
+  assert.match(output.permissionDecisionReason, /PUSH-PROOF-COMMIT-UNRESOLVED/u);
   assert.doesNotMatch(output.permissionDecisionReason, /push command prefix is ambiguous/u);
 });
 
@@ -787,15 +819,15 @@ check("outer Codex routing admits the exact bounded diagnostic pipeline while no
 });
 
 check("lifecycle readiness is additive and aggregates with existing write guards", () => {
-  const root = fixture();
-  writeFileSync(join(root, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+  const root = guidanceFixture();
   writeFileSync(join(root, ".claude", "guard-config.json"), JSON.stringify({
-    protectedTestPaths: [{ id: "LIFECYCLE-AGGREGATE", pattern: "locked\\.test\\.mjs$", reason: "locked fixture" }],
+    protectedTestPaths: [{ id: "HGO-LIFECYCLE-AGGREGATE", pattern: "locked\\.test\\.mjs$", reason: "locked fixture" }],
   }));
   const output = decision(run({ tool_name: "Edit", tool_input: { file_path: "locked.test.mjs" } }, root));
   assert.equal(output.permissionDecision, "deny");
-  assert.match(output.permissionDecisionReason, /LIFECYCLE-AGGREGATE/);
+  assert.match(output.permissionDecisionReason, /HGO-LIFECYCLE-AGGREGATE/);
   assert.match(output.permissionDecisionReason, /guard-lifecycle-ready/);
+  assert.doesNotMatch(output.permissionDecisionReason, /Human override available|authorize-by-signature|verify-audit/u);
 });
 
 check("Codex adapter blocks consumer-to-source drift for Edit, apply_patch and plugin mutation", () => {
@@ -850,162 +882,42 @@ check("malformed, unsupported and incomplete tool inputs fail closed", () => {
   }
 });
 
-// GF-060 (F2/F5, Critic FAIL on GF-059): the hostBoundary catch (HGO-GIT/HGO-ROOT/
-// HGO-COMMON-DIR -> HGO-EXTERNAL-REPOSITORY-OBSERVATION) is reached whenever
-// human-guard-override.mjs's topology() cannot attest the repository -- forced here by
-// never running `git init` in the fixture, so `git rev-parse --show-toplevel` genuinely
-// fails with HGO-GIT. `pipeline.user.yaml` makes the repo lifecycle-governed so an
-// ordinary Write/Bash denial reaches the override planner at all.
-function hostBoundaryFixture() {
+// GF-060/GF-064/GF-094 used this no-Git fixture as a proxy for HGO's host-boundary
+// route. Lifecycle now correctly refuses it before HGO topology, so it proves the
+// nonliftable native behavior instead. Shared command/copy disclosure is exercised by
+// human-guard-override.test.mjs and the real cross-repository route above.
+function nonReadyLifecycleFixture() {
   const root = fixture();
   writeFileSync(join(root, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
   return root;
 }
 
-check("GF-060: a secret-bearing denial reaching the host-boundary route never carries the secret verbatim", () => {
-  const root = hostBoundaryFixture();
+check("GF-060/GF-064: an invalid lifecycle denial has no HGO route and never discloses a secret", () => {
+  const root = nonReadyLifecycleFixture();
   const secret = "ghp_FAKEFAKEFAKEFAKE1234567890AB";
   const output = decision(run({
-    tool_name: "Write",
-    tool_input: { file_path: "notes.md", content: `credential leak test: ${secret}\n` },
+    tool_name: "Bash",
+    tool_input: { command: `touch ${secret}` },
   }, root));
   assert.equal(output.permissionDecision, "deny");
+  assert.match(output.permissionDecisionReason, /GUARD-LIFECYCLE-NOT-READY/u);
+  assert.match(output.permissionDecisionReason, /Technical repair is required before retrying/u);
   assert.doesNotMatch(output.permissionDecisionReason, /ghp_FAKEFAKEFAKEFAKE/u,
     "the secret-bearing content leaked verbatim into the denial reason");
-  const route = guardRecoveryRoute(output.permissionDecisionReason);
-  assert.equal(route.code, "HGO-EXTERNAL-REPOSITORY-OBSERVATION");
-  assert.equal(route.nextAction.action.command, null);
+  assert.doesNotMatch(output.permissionDecisionReason, /Guard recovery route:|Human override available|copyCommand|authorize-by-signature/u);
 });
 
-check("GF-060: a confirmed non-secret Bash denial reaching the host-boundary route keeps the literal command actionable", () => {
-  const root = hostBoundaryFixture();
-  const command = "git reset --hard HEAD~3";
-  const output = decision(run({
-    tool_name: "Bash",
-    tool_input: { command },
-  }, root));
-  assert.equal(output.permissionDecision, "deny");
-  const route = guardRecoveryRoute(output.permissionDecisionReason);
-  assert.equal(route.code, "HGO-EXTERNAL-REPOSITORY-OBSERVATION");
-  assert.equal(route.nextAction.action.command, command);
-});
-
-check("GF-060: a non-Bash denial reaching the host-boundary route never carries a misleading empty-string command", () => {
-  const root = hostBoundaryFixture();
-  const output = decision(run({
-    tool_name: "Write",
-    tool_input: { file_path: "notes.md", content: "plain content, nothing sensitive\n" },
-  }, root));
-  assert.equal(output.permissionDecision, "deny");
-  const route = guardRecoveryRoute(output.permissionDecisionReason);
-  assert.equal(route.code, "HGO-EXTERNAL-REPOSITORY-OBSERVATION");
-  assert.notEqual(route.nextAction.action.command, "");
-  assert.equal(route.nextAction.action.command, null);
-});
-
-// GF-064 (Critic F1): the two "Write" tests above pass unconditionally --
-// codex-pretool-guard.mjs's `command` field is already null for any non-Bash
-// toolName regardless of secretBearing, so they prove nothing about the
-// `&& !secretBearing` conjunct. This is the missing Bash+secret pairing: a
-// secret-bearing Bash command reaching the exact same host-boundary route
-// must still come back with `command: null`, or the secret would be emitted
-// verbatim in an attended-host-terminal guidance blob (real disclosure risk,
-// not just a formatting concern).
-check("GF-064: a secret-bearing Bash denial reaching the host-boundary route never carries the secret verbatim", () => {
-  const root = hostBoundaryFixture();
-  const secret = "ghp_FAKEFAKEFAKEFAKE1234567890AB";
-  // A non-git mutating command: guard-git.mjs's own denial reasons always echo
-  // `Command: <cmd>` verbatim (guard-git.mjs formatBlockHeader) regardless of
-  // secret content -- an orthogonal, out-of-scope UX behavior of a different
-  // guard. Routing through guard-lifecycle-ready.mjs's own NOT-READY denial
-  // (which never echoes the raw command) isolates the exact mechanism F1 is
-  // about: the `command` field this adapter itself builds for the host-boundary
-  // guidance blob.
-  const command = `touch ${secret}`;
-  const output = decision(run({
-    tool_name: "Bash",
-    tool_input: { command },
-  }, root));
-  assert.equal(output.permissionDecision, "deny");
-  assert.doesNotMatch(output.permissionDecisionReason, /ghp_FAKEFAKEFAKEFAKE/u,
-    "the secret-bearing Bash command leaked verbatim into the denial reason");
-  const route = guardRecoveryRoute(output.permissionDecisionReason);
-  assert.equal(route.code, "HGO-EXTERNAL-REPOSITORY-OBSERVATION");
-  assert.equal(route.nextAction.action.command, null);
-});
-
-// GF-094: a Codex retry command relayed through the host-boundary route reached the
-// human as a raw, unrendered string; Codex itself failed to quote a multi-word,
-// non-ASCII `--goal` value and separately wrapped the long line when relaying it,
-// corrupting the human's real terminal. `copyCommand` is a bounded, pre-quoted
-// rendering of the exact same `command` value the route already carries -- present
-// under the identical `commandIsSafe` conjunct, never a second disclosure path.
-check("GF-094: a non-secret Bash host-boundary denial carries a bounded, pre-quoted copyCommand alongside the raw command", () => {
-  const root = hostBoundaryFixture();
+check("GF-060/GF-094: an invalid lifecycle denial suppresses raw command and copy guidance", () => {
+  const root = nonReadyLifecycleFixture();
   const command = "node lib/project-onboarding-v3.mjs kickoff plan --root /some/project --goal HTML Minispiel gemäß Übergabe --language de";
   const output = decision(run({
     tool_name: "Bash",
     tool_input: { command },
   }, root));
   assert.equal(output.permissionDecision, "deny");
-  const route = guardRecoveryRoute(output.permissionDecisionReason);
-  assert.equal(route.code, "HGO-EXTERNAL-REPOSITORY-OBSERVATION");
-  assert.equal(route.nextAction.action.command, command);
-  const copy = route.nextAction.action.copyCommand;
-  assert.ok(copy, "copyCommand field is missing");
-  assert.deepEqual(Object.keys(copy).sort(), ["cmd", "maxColumns", "posix", "powershell"]);
-  assert.equal(copy.maxColumns, 72);
-  for (const [label, rendered, lineSep] of [
-    ["posix", copy.posix, "\n"],
-    ["powershell", copy.powershell, "\n"],
-    ["cmd", copy.cmd, "\r\n"],
-  ]) {
-    // A per-shell rendering may legitimately be null (that shell cannot safely
-    // represent this value at all) rather than thrown -- never required to be
-    // non-null, but whichever renders must stay within the shared bound.
-    if (rendered === null) continue;
-    assert.equal(typeof rendered, "string", label);
-    assert.equal(rendered.split(lineSep).every((line) => line.length <= copy.maxColumns), true,
-      `${label} rendering exceeds ${copy.maxColumns} columns`);
-  }
-  if (process.platform !== "win32" && copy.posix) {
-    const lines = copy.posix.split("\n");
-    assert.equal(lines.at(-1), 'eval "$CMD"');
-    const assignments = lines.slice(0, -1).join("\n");
-    const probe = spawnSync("bash", ["-c", `${assignments}\nprintf '%s' "$CMD"`], { encoding: "utf8" });
-    assert.equal(probe.status, 0, probe.stderr);
-    assert.equal(probe.stdout, command,
-      "the posix copyCommand rendering does not reconstruct the exact original command");
-  }
-});
-
-check("GF-094: a secret-bearing Bash host-boundary denial never leaks the secret through copyCommand either", () => {
-  const root = hostBoundaryFixture();
-  const secret = "ghp_FAKEFAKEFAKEFAKE1234567890AB";
-  const command = `touch ${secret}`;
-  const output = decision(run({
-    tool_name: "Bash",
-    tool_input: { command },
-  }, root));
-  assert.equal(output.permissionDecision, "deny");
-  assert.doesNotMatch(output.permissionDecisionReason, /ghp_FAKEFAKEFAKEFAKE/u,
-    "the secret-bearing Bash command leaked verbatim into the denial reason via copyCommand");
-  const route = guardRecoveryRoute(output.permissionDecisionReason);
-  assert.equal(route.nextAction.action.command, null);
-  assert.equal(route.nextAction.action.copyCommand, null,
-    "copyCommand must be suppressed exactly like command, never a bypass around the secret screen");
-});
-
-check("GF-094: a non-Bash host-boundary denial never carries a copyCommand field either", () => {
-  const root = hostBoundaryFixture();
-  const output = decision(run({
-    tool_name: "Write",
-    tool_input: { file_path: "notes.md", content: "plain content, nothing sensitive\n" },
-  }, root));
-  assert.equal(output.permissionDecision, "deny");
-  const route = guardRecoveryRoute(output.permissionDecisionReason);
-  assert.equal(route.nextAction.action.command, null);
-  assert.equal(route.nextAction.action.copyCommand, null);
+  assert.match(output.permissionDecisionReason, /GUARD-LIFECYCLE-NOT-READY/u);
+  assert.doesNotMatch(output.permissionDecisionReason, new RegExp(command.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "u"));
+  assert.doesNotMatch(output.permissionDecisionReason, /copyCommand|Guard recovery route:/u);
 });
 
 // NVA-CROSSREPOGUIDANCE-1 (backlog/items/2026-08-18-codex-pretool-guard-cross-repository-
@@ -1098,7 +1010,7 @@ check("NVA-CROSSREPOGUIDANCE-1: a cross-repository denial prints the TARGET repo
 });
 
 check("NVA-CROSSREPOGUIDANCE-1: an ordinary in-root denial still prints the session's own root, unchanged", () => {
-  const root = guidanceFixture();
+  const root = readyLifecycleFixture("chat");
   try {
     const denied = decision(run({
       tool_name: "Write",
@@ -1116,6 +1028,21 @@ check("NVA-CROSSREPOGUIDANCE-1: an ordinary in-root denial still prints the sess
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+check("lifecycle-not-ready denial does not advertise a human override ceremony", () => {
+  const root = fixture();
+  try {
+    writeFileSync(join(root, ".claude", "pipeline.json"), JSON.stringify({ project: "test", verify: "node verify.mjs" }));
+    for (const filePath of ["notes.md", join(root, "absolute-notes.md")]) {
+      const denied = decision(run({ tool_name: "Edit", tool_input: { file_path: filePath, old_string: "", new_string: "x" } }, root));
+      assert.equal(denied.permissionDecision, "deny");
+      assert.match(denied.permissionDecisionReason, /GUARD-LIFECYCLE-NOT-READY/u);
+      assert.match(denied.permissionDecisionReason, /Technical repair is required before retrying/u);
+      assert.doesNotMatch(denied.permissionDecisionReason, /Re-run the typed project-onboarding-v3 inspection/u);
+      assert.doesNotMatch(denied.permissionDecisionReason, /Human override available|authorize-by-signature|verify-audit/u);
+    }
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 if (process.exitCode) process.exit(process.exitCode);
