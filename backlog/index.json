@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "9d695f530fb90ea53d94687961c458c4159989fde2bcff94eb2de60562c61970"
+    "transitionHead": "9f16f6027b327244e8c2d6a5c16ec6fb939e849d4d2e154e1189d5dae887543e"
   },
   "counts": {
-    "open": 114,
+    "open": 111,
     "in_progress": 0,
-    "closed": 521,
+    "closed": 524,
     "rejected": 3,
     "deferred": 11
   },
@@ -195,12 +195,16 @@
     },
     {
       "id": "pipeline.a-registered-but-abandoned-worktree-is-never-retired",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-28",
       "source": "NVA-VTPGATE-1 stopped on it live, 2026-08-28",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-09-07",
+      "closureRepository": "self",
+      "closureCommit": "eca3e170",
+      "closureEvidence": "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs"
     },
     {
       "id": "pipeline.a-runner-improvised-the-po-signature-instructions",
@@ -5196,12 +5200,16 @@
     },
     {
       "id": "pipeline.po-facing-commands-are-not-uniformly-rendered-break-safe",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-28",
       "source": "Codex/WSL greenfield run, 2026-08-28 (docs/pipeline-session-analysis-2026-08-28.md), plus the PO's own observation that this runner needed three sessions and the most detours.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-09-07",
+      "closureRepository": "self",
+      "closureCommit": "da6b381c",
+      "closureEvidence": "plugins/pipeline-core/lib/human-guard-override.mjs"
     },
     {
       "id": "pipeline.po-gate-authority-path-canonicalization",
@@ -7056,12 +7064,16 @@
     },
     {
       "id": "pipeline.the-dispatch-budget-guard-identifies-a-subagent-by-a-path-no-payload-carries",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-06",
       "source": "measured 2026-09-06 with a temporary user-level PreToolUse capture hook against two live goldfish dispatches; full record backlog/evidence/2026-09-06-dispatch-budget-guard-discriminator-measured.md, PO decision queue item 3",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-09-07",
+      "closureRepository": "self",
+      "closureCommit": "6372b984",
+      "closureEvidence": "backlog/evidence/2026-09-06-nva-b-guardfix-critic-round1.md"
     },
     {
       "id": "pipeline.the-dispatch-record-field-enumeration-omits-a-field-the-checker-requires",

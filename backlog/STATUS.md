@@ -22,7 +22,7 @@
 | pipeline.a-promoted-feature-can-never-pass-the-plan-gate | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.a-push-approval-occupies-a-single-slot-so-destinations-cannot-be-prepared-together | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.a-read-only-command-is-refused-for-naming-a-protected-path | open | defect | pipeline | 2026-08-27 | — |
-| pipeline.a-registered-but-abandoned-worktree-is-never-retired | open | defect | pipeline | 2026-08-28 | — |
+| pipeline.a-registered-but-abandoned-worktree-is-never-retired | closed | defect | pipeline | 2026-08-28 | — |
 | pipeline.a-runner-improvised-the-po-signature-instructions | open | defect | pipeline | 2026-08-27 | — |
 | pipeline.a-runner-proposed-abandoning-pipeline-setup-as-too-laborious | closed | workflow-improvement | pipeline | 2026-08-29 | — |
 | pipeline.a-schema-less-project-pipeline-yaml-has-no-known-repair-path | closed | defect | pipeline | 2026-08-17 | — |
@@ -423,7 +423,7 @@
 | pipeline.po-ceremony-resolves-the-wrong-runner | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — a gate that forces the PO into their own terminal must not land them on a different runner there; reported by a consumer project and confirmed in the code |
 | pipeline.po-decision-bs26-unsatisfiable-under-the-phoenix-ledger-split | closed | requirement | pipeline | 2026-08-27 | — |
 | pipeline.po-decision-claude-start-time-item-closed-on-a-rejected-approach | closed | requirement | pipeline | 2026-08-27 | — |
-| pipeline.po-facing-commands-are-not-uniformly-rendered-break-safe | open | defect | pipeline | 2026-08-28 | — |
+| pipeline.po-facing-commands-are-not-uniformly-rendered-break-safe | closed | defect | pipeline | 2026-08-28 | — |
 | pipeline.po-gate-authority-path-canonicalization | closed | defect | pipeline | 2026-07-25 | — |
 | pipeline.po-gate-authority-receipt-readback | closed | defect | pipeline | 2026-07-25 | — |
 | pipeline.po-gate-worktree-authority | closed | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
@@ -571,7 +571,7 @@
 | pipeline.the-ai-hardening-gate-has-no-home-in-any-approved-feature-package | open | defect | pipeline | 2026-08-28 | Scheduled for Nova B (PO decision 2026-08-28) |
 | pipeline.the-budget-guard-carries-a-dead-branch-and-an-unbounded-sink | open | defect | pipeline | 2026-09-07 | — |
 | pipeline.the-denial-trim-state-is-keyed-per-session-not-per-agent-as-its-comment-claims | closed | defect | pipeline | 2026-09-01 | — |
-| pipeline.the-dispatch-budget-guard-identifies-a-subagent-by-a-path-no-payload-carries | open | defect | pipeline | 2026-09-06 | — |
+| pipeline.the-dispatch-budget-guard-identifies-a-subagent-by-a-path-no-payload-carries | closed | defect | pipeline | 2026-09-06 | — |
 | pipeline.the-dispatch-record-field-enumeration-omits-a-field-the-checker-requires | closed | defect | pipeline | 2026-09-01 | — |
 | pipeline.the-handover-size-guard-only-sees-one-of-two-write-paths | closed | defect | pipeline | 2026-09-01 | — |
 | pipeline.the-handover-size-guards-header-comment-contradicts-its-own-registration | closed | defect | pipeline | 2026-09-01 | — |
@@ -657,8 +657,8 @@
 
 ## Counts
 
-- open: 114
+- open: 111
 - in_progress: 0
-- closed: 521
+- closed: 524
 - rejected: 3
 - deferred: 11
