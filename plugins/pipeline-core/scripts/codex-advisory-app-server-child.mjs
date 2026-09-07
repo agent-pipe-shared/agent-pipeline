@@ -6,9 +6,7 @@ import { spawn } from "node:child_process";
 import { renderAdvisoryEvidencePrompt } from "../lib/advisory-lifecycle-v2.mjs";
 
 const MAX_BYTES = 8 * 1024 * 1024;
-const MODEL = "gpt-5.6-sol";
 const PROVIDER = "openai";
-const EFFORT = "max";
 
 function write(value) { process.stdout.write(`${JSON.stringify(value)}\n`); }
 function fail(code) { write({ schema: "pipeline.codex-advisory-app-server-child.v1", ok: false, code }); process.exitCode = 2; }
@@ -22,12 +20,19 @@ try {
 
 if (!process.exitCode) {
   const closedShape = request && typeof request === "object" && !Array.isArray(request)
-    && JSON.stringify(Object.keys(request).sort()) === JSON.stringify(["codexPath", "cwd", "evidenceBundle", "evidenceSha256", "question", "scratchPath"])
+    && JSON.stringify(Object.keys(request).sort()) === JSON.stringify(["advisoryRoute", "codexPath", "cwd", "evidenceBundle", "evidenceSha256", "question", "scratchPath"])
     && typeof request.codexPath === "string" && request.codexPath.startsWith("/")
     && typeof request.cwd === "string" && request.cwd.startsWith("/")
     && typeof request.scratchPath === "string" && request.scratchPath.startsWith("/")
     && typeof request.question === "string" && request.question.length > 0 && Buffer.byteLength(request.question) <= 262_144
-    && typeof request.evidenceSha256 === "string";
+    && typeof request.evidenceSha256 === "string"
+    && request.advisoryRoute && typeof request.advisoryRoute === "object" && !Array.isArray(request.advisoryRoute)
+    && JSON.stringify(Object.keys(request.advisoryRoute).sort()) === JSON.stringify(["candidateCommit", "dutyId", "effort", "model", "runner", "sourceSha256", "state"])
+    && request.advisoryRoute.dutyId === "advisory" && request.advisoryRoute.runner === "codex" && request.advisoryRoute.state === "default"
+    && typeof request.advisoryRoute.model === "string" && request.advisoryRoute.model.length > 0
+    && typeof request.advisoryRoute.effort === "string" && request.advisoryRoute.effort.length > 0
+    && /^[a-f0-9]{64}$/.test(request.advisoryRoute.sourceSha256)
+    && /^[a-f0-9]{40}$/.test(request.advisoryRoute.candidateCommit);
   if (!closedShape) fail("request-invalid");
 }
 
@@ -87,7 +92,7 @@ if (!process.exitCode) {
       send({ method: "initialized" });
       send({ id: 2, method: "thread/start", params: {
         cwd: request.cwd,
-        model: MODEL,
+        model: request.advisoryRoute.model,
         allowProviderModelFallback: false,
         ephemeral: true,
         approvalPolicy: "never",
@@ -98,7 +103,7 @@ if (!process.exitCode) {
     }
     if (value?.id === 2) {
       const result = value.result;
-      if (value.error || result?.model !== MODEL || result?.modelProvider !== PROVIDER
+      if (value.error || result?.model !== request.advisoryRoute.model || result?.modelProvider !== PROVIDER
         || result?.approvalPolicy !== "never" || typeof result?.thread?.id !== "string") {
         protocolError = true; finishProtocol(); return;
       }
@@ -106,8 +111,8 @@ if (!process.exitCode) {
       send({ id: 3, method: "turn/start", params: {
         threadId,
         input: [{ type: "text", text: modelInput }],
-        model: MODEL,
-        effort: EFFORT,
+        model: request.advisoryRoute.model,
+        effort: request.advisoryRoute.effort,
         approvalPolicy: "never",
         sandboxPolicy: { type: "externalSandbox", networkAccess: "enabled" },
         cwd: request.cwd,
@@ -158,7 +163,7 @@ if (!process.exitCode) {
     ok,
     code: ok ? "answered" : writeAttempt ? "write-attempt" : protocolError ? "protocol-error" : "child-exit-error",
     answer: ok ? answer : null,
-    observed: { provider: ok ? PROVIDER : null, model: ok ? MODEL : null, effort: ok ? EFFORT : null, initialized, threadStarted: threadId !== null, turnStarted: turnId !== null, turnCompleted, stdinEnded: child.stdin.writableEnded, exitCode: close.code, signal: close.signal, cleanup: close.spawnError === null && close.signal === null ? "complete" : "incomplete" },
+    observed: { provider: ok ? PROVIDER : null, model: ok ? request.advisoryRoute.model : null, effort: ok ? request.advisoryRoute.effort : null, initialized, threadStarted: threadId !== null, turnStarted: turnId !== null, turnCompleted, stdinEnded: child.stdin.writableEnded, exitCode: close.code, signal: close.signal, cleanup: close.spawnError === null && close.signal === null ? "complete" : "incomplete" },
   });
   process.exitCode = ok ? 0 : 2;
 }

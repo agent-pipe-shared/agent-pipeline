@@ -31,6 +31,7 @@ import { canonicalSha256, parseStrictJson } from "../lib/governance-event.mjs";
 import { appendPortableGovernanceEvent, readLocalRepositoryFingerprint } from "../lib/governance-event-store.mjs";
 import { readPublicRepositoryFile } from "../lib/threat-model-approval-request.mjs";
 import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
+import { resolveV3DutyRoute } from "../lib/critic-route-v3.mjs";
 import { ROUTES, selectHostAdvisorRoute } from "./codex-host-advisor-route.mjs";
 import { invokeCodexAdvisoryAppServer } from "./codex-advisory-app-server.mjs";
 import { createCodexSandboxRuntimeTransport } from "./codex-sandbox-runtime.mjs";
@@ -57,14 +58,32 @@ function hostRouteInput(input) {
   return { runner: input?.runner, profile: input?.profile, consent: advisorExport?.consent ?? "default" };
 }
 
-function receiptFor(input, { status, identity = null, answer = null, fallbackReason = "none" }) {
+function resolvedAdvisoryRoute(input, rootDir, resolveRoute = resolveV3DutyRoute) {
+  try {
+    const route = resolveRoute({
+      rootDir,
+      dutyId: "advisory",
+      runner: "codex",
+      candidateCommit: input?.dispatch?.candidateCommit,
+    });
+    exactKeys(route, ["dutyId", "runner", "model", "effort", "state", "sourceSha256", "candidateCommit"], "resolved Codex advisory route");
+    if (route.dutyId !== "advisory" || route.runner !== "codex" || route.state !== "default"
+      || typeof route.model !== "string" || route.model.length === 0
+      || typeof route.effort !== "string" || route.effort.length === 0
+      || !/^[a-f0-9]{64}$/.test(route.sourceSha256)
+      || route.candidateCommit !== input?.dispatch?.candidateCommit) return null;
+    return Object.freeze({ ...route });
+  } catch { return null; }
+}
+
+function receiptFor(input, advisoryRoute, { status, identity = null, answer = null, fallbackReason = "none" }) {
   const receipt = {
     schema: "pipeline.advisory-receipt.v1",
     receiptId: `advisory-${randomUUID()}`,
     dispatch: structuredClone(input.dispatch),
     duty: "advisory",
     profile: input.profile,
-    configuredRoute: { runner: "codex", selector: { kind: "model-id", value: "gpt-5.6-sol" }, effort: "max" },
+    configuredRoute: { runner: "codex", selector: { kind: "model-id", value: advisoryRoute.model }, effort: advisoryRoute.effort },
     adapter: "consult",
     observed: { status, identity: identity === null ? null : structuredClone(identity) },
     questionSha256: sha256(input.question),
@@ -80,17 +99,17 @@ function receiptFor(input, { status, identity = null, answer = null, fallbackRea
   return receipt;
 }
 
-function unavailable(input, code, execution = null) {
+function unavailable(input, advisoryRoute, code, execution = null) {
   return {
-    advisoryResult: { ok: false, code, answer: null, receipt: receiptFor(input, { status: "unavailable", fallbackReason: "consult-unavailable" }), attempts: [] },
+    advisoryResult: { ok: false, code, answer: null, receipt: receiptFor(input, advisoryRoute, { status: "unavailable", fallbackReason: "consult-unavailable" }), attempts: [] },
     execution,
     sandboxBinding: null,
   };
 }
 
-function selectedAdvisoryHostBridge(input, { invokeAppServer = invokeCodexAdvisoryAppServer, repoRoot } = {}) {
+function selectedAdvisoryHostBridge(input, advisoryRoute, { invokeAppServer = invokeCodexAdvisoryAppServer, repoRoot } = {}) {
   const completed = new Map();
-  return {
+  const bridge = {
     async launch(request) {
       exactKeys(request, ["selectionId", "duty", "selection", "requested", "references", "profile", "scratch"], "selected advisory launch");
       const evidence = validateAdvisoryEvidenceBundleForRepository(
@@ -115,9 +134,9 @@ function selectedAdvisoryHostBridge(input, { invokeAppServer = invokeCodexAdviso
         profile: structuredClone(request.profile),
         scratch: structuredClone(request.scratch),
       };
-      const result = await invokeAppServer({ question: input.question, evidenceBundle: structuredClone(input.evidenceBundle), sandboxTransport });
+      const result = await invokeAppServer({ question: input.question, evidenceBundle: structuredClone(input.evidenceBundle), sandboxTransport, advisoryRoute });
       if (result?.status !== "answered" || typeof result.answer !== "string" || !result.sandboxExecution
-        || result.identity?.provider !== "openai" || result.identity?.modelId !== "gpt-5.6-sol" || result.identity?.effort !== "max"
+        || result.identity?.provider !== "openai" || result.identity?.modelId !== advisoryRoute.model || result.identity?.effort !== advisoryRoute.effort
         || !matchesSelectedHostExecution(result.sandboxExecution, sandboxTransport)) {
         return { childStarted: result?.childStarted === true ? true : undefined };
       }
@@ -132,7 +151,7 @@ function selectedAdvisoryHostBridge(input, { invokeAppServer = invokeCodexAdviso
         || sandboxTransport.repoFingerprint !== selection.repoFingerprint
         || JSON.stringify(sandboxTransport.dispatch) !== JSON.stringify(selection.dispatch)
         || JSON.stringify(sandboxTransport.requested) !== JSON.stringify(requested)) throw new Error("selected advisory binding drifted");
-      const receipt = receiptFor(input, { status: "answered", identity: result.identity, answer: result.answer });
+      const receipt = receiptFor(input, advisoryRoute, { status: "answered", identity: result.identity, answer: result.answer });
       const hostExecution = result.sandboxExecution;
       const execution = {
         schema: "pipeline.codex-sandbox-execution-receipt.v1",
@@ -157,6 +176,7 @@ function selectedAdvisoryHostBridge(input, { invokeAppServer = invokeCodexAdviso
       return { answer: result.result.answer, receipt: structuredClone(result.receipt), execution: structuredClone(result.execution) };
     },
   };
+  return { hostBridge: { launch: bridge.launch, finalize: bridge.finalize }, take: bridge.take };
 }
 
 function matchesSelectedHostExecution(value, selected) {
@@ -219,7 +239,13 @@ export async function runSelectedAdvisoryHost(input, transport = undefined) {
       sandboxBinding: null,
     };
   }
-  const selectedHost = selectedAdvisoryHostBridge(input, {
+  const advisoryRoute = resolvedAdvisoryRoute(
+    input,
+    evidenceRoot,
+    transport?.resolveAdvisoryRoute ?? resolveV3DutyRoute,
+  );
+  if (advisoryRoute === null) return demandRejected("advisory_route_unavailable");
+  const selectedHost = selectedAdvisoryHostBridge(input, advisoryRoute, {
     invokeAppServer: transport?.invokeCodexAdvisoryAppServer ?? invokeCodexAdvisoryAppServer,
     repoRoot: evidenceRoot,
   });
@@ -227,7 +253,7 @@ export async function runSelectedAdvisoryHost(input, transport = undefined) {
   if (dependencies !== undefined) {
     dependencies = {
       ...dependencies,
-      bridge: { ...dependencies.bridge, ...selectedHost },
+      bridge: { ...dependencies.bridge, ...selectedHost.hostBridge },
     };
   }
   if (dependencies === undefined) {
@@ -235,10 +261,10 @@ export async function runSelectedAdvisoryHost(input, transport = undefined) {
       dependencies = createCodexSandboxRuntimeTransport({
         sandboxContext: structuredClone(input.sandboxContext),
         sandboxRuntime: input.sandboxRuntime,
-        hostBridge: selectedHost,
+        hostBridge: selectedHost.hostBridge,
       });
     } catch {
-      return unavailable(input, "selected-sandbox-required");
+      return unavailable(input, advisoryRoute, "selected-sandbox-required");
     }
   }
   let selected;
@@ -252,19 +278,19 @@ export async function runSelectedAdvisoryHost(input, transport = undefined) {
         candidateTree: input.dispatch.candidateTree,
         referenceSetSha256: input.sandboxContext.referenceSetSha256,
       },
-      requested: { runner: "codex", model: "gpt-5.6-sol" },
+      requested: { runner: "codex", model: advisoryRoute.model },
       references: input.references ?? [],
     }, dependencies);
   } catch {
-    return unavailable(input, "selected-sandbox-required");
+    return unavailable(input, advisoryRoute, "selected-sandbox-required");
   }
   if (selected?.status !== "answered" || selected.childStarted !== true || typeof selected.selectionId !== "string") {
-    return unavailable(input, "selected-sandbox-required");
+    return unavailable(input, advisoryRoute, "selected-sandbox-required");
   }
   const completed = selectedHost.take(selected.selectionId);
   if (!completed || completed.execution.selectionId !== selected.selectionId
     || completed.execution.selectionSha256 !== selected.selectionSha256
-    || completed.execution.dutyReceipt.sha256 !== selected.dutyReceiptSha256) return unavailable(input, "selected-sandbox-required");
+    || completed.execution.dutyReceipt.sha256 !== selected.dutyReceiptSha256) return unavailable(input, advisoryRoute, "selected-sandbox-required");
   return {
     advisoryResult: { ok: true, code: "answered", answer: completed.answer, receipt: completed.receipt, attempts: [{ adapter: "host-consult", kind: "consult", runner: "codex", status: "answered" }] },
     execution: completed.execution,
@@ -343,17 +369,23 @@ export async function runCodexAdvisoryThroughSelectedSandbox(input, adapter, tra
     };
   }
   const root = transport.repoRoot ?? process.cwd();
+  const advisoryRoute = resolvedAdvisoryRoute(
+    input,
+    root,
+    transport.resolveAdvisoryRoute ?? resolveV3DutyRoute,
+  );
+  if (advisoryRoute === null) return demandRejected("advisory_route_unavailable");
   const observe = transport.observeWorkspace ?? observeHostAdvisorWorkspace;
   let before;
-  try { before = observe(root); } catch { return bindConsultationRecord(input, unavailable(input, "host-observation-unavailable")); }
+  try { before = observe(root); } catch { return bindConsultationRecord(input, unavailable(input, advisoryRoute, "host-observation-unavailable")); }
   // A JSON reply from a host adapter carries neither an exact sandbox selection
   // nor a child/identity attestation. It is intentionally ignored.
   void adapter;
   const outcome = await runSelectedAdvisoryHost(input, transport);
   let after;
-  try { after = observe(root); } catch { return bindConsultationRecord(input, unavailable(input, "host-observation-unavailable", outcome.execution)); }
+  try { after = observe(root); } catch { return bindConsultationRecord(input, unavailable(input, advisoryRoute, "host-observation-unavailable", outcome.execution)); }
   if (before.workspaceSha256 !== after.workspaceSha256) {
-    return bindConsultationRecord(input, unavailable(input, "workspace-drift-unavailable", outcome.execution));
+    return bindConsultationRecord(input, unavailable(input, advisoryRoute, "workspace-drift-unavailable", outcome.execution));
   }
   return bindConsultationRecord(input, outcome);
 }

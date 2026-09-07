@@ -25,7 +25,6 @@ import {
   loadRunnerProfilesV3Registry,
   validateRunnerProfilesV3Registry,
 } from "./runner-profiles-v3.mjs";
-import { HOST_ADVISOR_POLICY } from "../scripts/codex-host-advisor-route.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const POLICY_PATH = join(HERE, "..", "config", "advisory-lifecycle-v2.json");
@@ -259,19 +258,14 @@ function routeDisposition(registry, runner) {
     effort: route.effort,
     capability: "configured-unprobed",
   };
-  const fallbacks = runner === "claude"
+  const fallbacks = Array.isArray(route.fallbacks)
     ? route.fallbacks.map((entry) => ({
       adapter: entry.adapter,
       selector: structuredClone(entry.selector),
       effort: entry.effort,
       capability: "configured-unprobed",
     }))
-    : [{
-      adapter: HOST_ADVISOR_POLICY.fallback.agentName,
-      selector: { kind: "model-id", value: HOST_ADVISOR_POLICY.fallback.model },
-      effort: HOST_ADVISOR_POLICY.fallback.effort,
-      capability: "configured-unprobed",
-    }];
+    : [];
   return { primary, fallbacks };
 }
 
@@ -279,14 +273,13 @@ function routePolicyDigest(registry, runner) {
   return digest({
     registrySchema: registry.schema,
     advisoryRoute: registry.duties.advisory[runner],
-    hostPolicy: runner === "codex" ? HOST_ADVISOR_POLICY : null,
   });
 }
 
 function capabilityState(primary, fallbacks) {
   if (primary === "available") return "available";
   if (primary === "unavailable" && fallbacks.includes("available")) return "degraded";
-  if (primary === "unavailable" && fallbacks.length > 0 && fallbacks.every((entry) => entry === "unavailable")) return "unavailable";
+  if (primary === "unavailable" && fallbacks.every((entry) => entry === "unavailable")) return "unavailable";
   return "unknown";
 }
 

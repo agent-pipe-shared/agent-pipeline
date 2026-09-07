@@ -11,20 +11,8 @@ export const ROUTES = Object.freeze({
 });
 export const HOST_ADVISOR_POLICY = Object.freeze({
   schema: "pipeline.codex-host-advisor-policy.v1",
-  maxAttempts: 2,
-  primary: Object.freeze({
-    agentName: "consult-advisor",
-    model: "gpt-5.6-sol",
-    effort: "max",
-    timeoutMs: 180_000,
-  }),
-  fallback: Object.freeze({
-    agentName: "consult-advisor-fast",
-    model: "gpt-5.6-terra",
-    effort: "high",
-    timeoutMs: 90_000,
-    forkTurns: "none",
-  }),
+  maxAttempts: 1,
+  timeoutMs: 180_000,
   workspaceGuard: "sha256-before-between-after",
   exhausted: "continue-advisory-unavailable",
 });

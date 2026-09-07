@@ -28,14 +28,14 @@ test("lifecycle events are non-triggers and identical demand is not repeated", (
   assert.match(skill, /changed question, reason, evidence, candidate or route-policy\s+digest is material drift/u);
 });
 
-test("Codex consultations keep the bounded route but spend 180/90 only on demand", () => {
+test("Codex consultations bind the V3 route and never synthesize a fallback", () => {
   assert.match(skill, /codex-host-advisor-route\.mjs/u);
   assert.match(skill, /pipeline\.codex-host-advisor-policy\.v1/u);
-  assert.match(skill, /one monotonic 180-second deadline/u);
-  assert.match(skill, /one monotonic 90-second deadline/u);
+  assert.match(skill, /candidate-bound Codex advisory duty from validated V3 authority/u);
+  assert.match(skill, /policy's monotonic deadline/u);
   assert.match(skill, /Polling never resets/u);
-  assert.match(skill, /interrupt exactly once/u);
-  assert.match(skill, /Never start a third\s+attempt/u);
+  assert.match(skill, /current governed fallback chain is empty/u);
+  assert.match(skill, /never synthesize a model, switch\s+model, or start a second attempt/u);
   assert.match(skill, /before\/between\/after\s+workspace observations/u);
   assert.match(skill, /no attested selected-sandbox execution; OS isolation and model identity are not asserted/u);
   assert.equal(skill.includes("danger-full-access"), false);

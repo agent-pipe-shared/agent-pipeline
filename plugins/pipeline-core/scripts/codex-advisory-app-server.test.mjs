@@ -21,10 +21,14 @@ function payload() {
   return {
     question: "What is the smallest safe bootstrap fix?",
     evidenceBundle,
+    advisoryRoute: {
+      dutyId: "advisory", runner: "codex", model: "gpt-6-astra", effort: "max", state: "default",
+      sourceSha256: "e".repeat(64), candidateCommit: "c".repeat(40),
+    },
     sandboxTransport: {
       selectionId: "css_test", selectionSha256: "a".repeat(64), repoFingerprint: "b".repeat(64), duty: "advisory",
       dispatch: { queueRevision: 1, candidateCommit: "c".repeat(40), candidateTree: "d".repeat(40), referenceSetSha256, requestSha256: "f".repeat(64) },
-      requested: { runner: "codex", model: "gpt-5.6-sol" },
+      requested: { runner: "codex", model: "gpt-6-astra" },
       toolchain: { cliSha256: "1".repeat(64) },
       profile: { base: ":read-only", network: { enabled: true }, sha256: "2".repeat(64), scratchRootSha256: "3".repeat(64) },
       scratch: { path: "/tmp/advisory", sha256: "3".repeat(64), sandboxStateJson: "{}", sandboxStateSha256: "4".repeat(64), repoRoot: process.cwd(), codexPath: "/codex" },
@@ -50,22 +54,23 @@ function fakeSpawn(result, terminal = { code: 0, signal: null }, onRequest = () 
 function answered(overrides = {}) {
   return {
     schema: "pipeline.codex-advisory-app-server-child.v1", ok: true, code: "answered", answer: "Use the closed launcher.",
-    observed: { provider: "openai", model: "gpt-5.6-sol", effort: "max", initialized: true, threadStarted: true, turnStarted: true, turnCompleted: true, stdinEnded: true, exitCode: 0, signal: null, cleanup: "complete" },
+    observed: { provider: "openai", model: "gpt-6-astra", effort: "max", initialized: true, threadStarted: true, turnStarted: true, turnCompleted: true, stdinEnded: true, exitCode: 0, signal: null, cleanup: "complete" },
     ...overrides,
   };
 }
 
-test("native adapter accepts only a complete openai/gpt-5.6-sol App-Server turn bound to the selected profile", async () => {
+test("native adapter passes the V3-selected route to a complete matching App-Server turn", async () => {
   let childRequest;
   const result = await invokeCodexAdvisoryAppServer(payload(), {
     buildSandboxInvocationFn: () => ({ command: "/codex", argv: ["sandbox"], options: { shell: false } }),
     spawnFn: fakeSpawn(answered(), { code: 0, signal: null }, (request) => { childRequest = request; }),
   });
   assert.equal(result.status, "answered");
-  assert.deepEqual(result.identity, { provider: "openai", modelId: "gpt-5.6-sol", effort: "max" });
+  assert.deepEqual(result.identity, { provider: "openai", modelId: "gpt-6-astra", effort: "max" });
   assert.equal(result.sandboxExecution.terminal.cleanupStatus, "complete");
   assert.deepEqual(childRequest.evidenceBundle, payload().evidenceBundle);
   assert.equal(childRequest.evidenceSha256, payload().sandboxTransport.dispatch.referenceSetSha256);
+  assert.deepEqual(childRequest.advisoryRoute, payload().advisoryRoute);
 });
 
 test("missing, tampered or selection-drifted evidence never starts the App Server child", async () => {

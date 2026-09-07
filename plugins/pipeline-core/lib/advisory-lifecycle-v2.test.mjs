@@ -67,15 +67,11 @@ test("disabled states precede route use and observed capability maps to bounded 
   }
   assert.equal(preflightAdvisoryCapability({
     runner: "codex", profile: "epic", consent: "approved",
-    observed: { primary: "unavailable", fallbacks: ["available"] },
-  }).evidence.state, "degraded");
-  assert.equal(preflightAdvisoryCapability({
-    runner: "codex", profile: "epic", consent: "approved",
-    observed: { primary: "unavailable", fallbacks: ["unavailable"] },
+    observed: { primary: "unavailable", fallbacks: [] },
   }).evidence.state, "unavailable");
   assert.equal(preflightAdvisoryCapability({
     runner: "codex", profile: "epic", consent: "approved",
-    observed: { primary: "unavailable", fallbacks: ["available", "available"] },
+    observed: { primary: "unavailable", fallbacks: ["available"] },
   }).code, "invalid_capability_observation");
 });
 

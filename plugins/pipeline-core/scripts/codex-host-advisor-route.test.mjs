@@ -50,7 +50,7 @@ test("the productive CLI accepts exactly one explicit route tuple", () => {
     ["--runner", "codex", "--runner", "codex", "--consent", "default"],
   ]) assert.throws(() => parseHostAdvisorRouteArgs(argv), { message: USAGE });
 });
-test("host route carries one bounded primary and one smaller fail-open fallback", () => {
+test("host route carries model-free bounds with one attempt", () => {
   const resolved = resolveHostAdvisorRoute({
     runner: "codex",
     profile: "epic",
@@ -59,20 +59,9 @@ test("host route carries one bounded primary and one smaller fail-open fallback"
   assert.deepEqual(Object.keys(resolved).sort(), ["policy", "route"]);
   assert.equal(resolved.route, ROUTES.HOST);
   assert.equal(resolved.policy, HOST_ADVISOR_POLICY);
-  assert.equal(resolved.policy.maxAttempts, 2);
-  assert.deepEqual(resolved.policy.primary, {
-    agentName: "consult-advisor",
-    model: "gpt-5.6-sol",
-    effort: "max",
-    timeoutMs: 180_000,
-  });
-  assert.deepEqual(resolved.policy.fallback, {
-    agentName: "consult-advisor-fast",
-    model: "gpt-5.6-terra",
-    effort: "high",
-    timeoutMs: 90_000,
-    forkTurns: "none",
-  });
+  assert.deepEqual(Object.keys(resolved.policy).sort(), ["exhausted", "maxAttempts", "schema", "timeoutMs", "workspaceGuard"]);
+  assert.equal(resolved.policy.maxAttempts, 1);
+  assert.equal(resolved.policy.timeoutMs, 180_000);
   assert.equal(resolved.policy.workspaceGuard, "sha256-before-between-after");
   assert.equal(resolved.policy.exhausted, "continue-advisory-unavailable");
   for (const input of [

@@ -23,7 +23,8 @@ import {
 } from "./advisory-host-bridge.mjs";
 import { buildSandboxRequest, sandboxSelectionDigest } from "./codex-sandbox-select.mjs";
 
-const dispatch = { dispatchId: "bridge-test", queueRevision: 1, candidateCommit: "a".repeat(40), candidateTree: "b".repeat(40) };
+const candidateCommit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: process.cwd(), encoding: "utf8" }).trim();
+const dispatch = { dispatchId: "bridge-test", queueRevision: 1, candidateCommit, candidateTree: "b".repeat(40) };
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 const evidenceBundle = () => buildAdvisoryEvidenceBundle(process.cwd(), [
   "plugins/pipeline-core/scripts/advisory-host-bridge.mjs",
@@ -48,12 +49,12 @@ const base = () => {
 function selectedAdvisory() {
   const referenceSetSha256 = base().sandboxContext.referenceSetSha256;
   const requestSha256 = buildSandboxRequest({
-    repoFingerprint: "c".repeat(64), duty: "advisory", queueRevision: 1, candidateCommit: "a".repeat(40), candidateTree: "b".repeat(40),
-    referenceSetSha256, runner: "codex", model: "gpt-5.6-sol",
+    repoFingerprint: "c".repeat(64), duty: "advisory", queueRevision: 1, candidateCommit, candidateTree: "b".repeat(40),
+    referenceSetSha256, runner: "codex", model: "gpt-6-astra",
   }).requestSha256;
   return {
     schema: "pipeline.codex-sandbox-selection.v1", selectionId: "css_aaaaaaaaaaaaaaaaaaaaaaaaae", repoFingerprint: "c".repeat(64), duty: "advisory",
-    dispatch: { queueRevision: 1, candidateCommit: "a".repeat(40), candidateTree: "b".repeat(40), referenceSetSha256, requestSha256 },
+    dispatch: { queueRevision: 1, candidateCommit, candidateTree: "b".repeat(40), referenceSetSha256, requestSha256 },
     toolchain: { cliVersion: "0.144.6", cliSha256: "0".repeat(64), observedHelperSha256: "1".repeat(64), selectionSchemaSha256: "2".repeat(64) },
     host: { platformClass: "linux-wsl2", kernel: { sysname: "Linux", release: "6", machine: "x86_64" }, filesystemClass: "wsl2-native", bootIdSha256: "3".repeat(64) },
     profile: { id: "codex-critic-intermediate.v1", sha256: "4".repeat(64), base: ":read-only", network: { enabled: true }, writableRootClass: "coordinator-scratch-only", scratchRootSha256: "5".repeat(64) },
@@ -80,10 +81,15 @@ function selectedTransport() {
         };
       },
     },
-    async invokeCodexAdvisoryAppServer({ sandboxTransport, evidenceBundle: evidence }) {
+    async invokeCodexAdvisoryAppServer({ sandboxTransport, evidenceBundle: evidence, advisoryRoute }) {
       assert.equal(advisoryEvidenceBundleSha256(evidence), sandboxTransport.dispatch.referenceSetSha256);
+      assert.deepEqual(sandboxTransport.requested, { runner: "codex", model: "gpt-6-astra" });
+      assert.deepEqual(advisoryRoute, {
+        dutyId: "advisory", runner: "codex", model: "gpt-6-astra", effort: "max", state: "default",
+        sourceSha256: advisoryRoute.sourceSha256, candidateCommit,
+      });
       return {
-        status: "answered", answer: "Use the selected transport.", identity: { provider: "openai", modelId: "gpt-5.6-sol", effort: "max" },
+        status: "answered", answer: "Use the selected transport.", identity: { provider: "openai", modelId: "gpt-6-astra", effort: "max" },
         sandboxExecution: {
           schema: "pipeline.codex-sandbox-host-execution.v1", selectionId: sandboxTransport.selectionId, selectionSha256: sandboxTransport.selectionSha256,
           repoFingerprint: sandboxTransport.repoFingerprint, duty: "advisory", dispatch: sandboxTransport.dispatch,
@@ -221,7 +227,7 @@ test("only a selected child with matching selection, identity, and durable recei
   assert.equal(adapterCalls, 0);
   assert.equal(result.advisoryResult.ok, true, JSON.stringify(result));
   assert.equal(result.advisoryResult.answer, "Use the selected transport.");
-  assert.equal(result.advisoryResult.receipt.observed.identity.modelId, "gpt-5.6-sol");
+  assert.equal(result.advisoryResult.receipt.observed.identity.modelId, "gpt-6-astra");
   assert.equal(result.execution.dutyReceipt.status, "answered");
   assert.equal(result.sandboxBinding.selectionId, result.execution.selectionId);
   assert.equal(result.sandboxBinding.dutyReceiptSha256, result.execution.dutyReceipt.sha256);
@@ -339,7 +345,7 @@ test("A-AC-05: an answered coordinateAdvisory receipt is durably recorded on the
         repoRoot: root,
         makeHostAdapter: () => async () => ({
           status: "answered", answer: "Prefer the smaller batch.",
-          identity: { provider: "anthropic", modelId: "claude-fable", effort: "not-applicable" },
+          identity: { provider: "anthropic", modelId: "claude-opus", effort: "not-applicable" },
         }),
       },
     ));
@@ -390,7 +396,7 @@ test("A-AC-05: a governance-event append failure never withholds the advisory an
         repoRoot: root,
         makeHostAdapter: () => async () => ({
           status: "answered", answer: "Yes, it is reversible.",
-          identity: { provider: "anthropic", modelId: "claude-fable", effort: "not-applicable" },
+          identity: { provider: "anthropic", modelId: "claude-opus", effort: "not-applicable" },
         }),
       },
     ));

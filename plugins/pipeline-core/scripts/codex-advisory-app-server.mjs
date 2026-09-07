@@ -9,17 +9,29 @@ import { buildSandboxInvocation } from "./codex-sandbox-preflight.mjs";
 import { validateAdvisoryEvidenceBundleForRepository } from "../lib/advisory-lifecycle-v2.mjs";
 
 const CHILD = realpathSync(fileURLToPath(new URL("./codex-advisory-app-server-child.mjs", import.meta.url)));
-const MODEL = "gpt-5.6-sol";
 const PROVIDER = "openai";
+
+function validAdvisoryRoute(route) {
+  return route && typeof route === "object" && !Array.isArray(route)
+    && JSON.stringify(Object.keys(route).sort()) === JSON.stringify(["candidateCommit", "dutyId", "effort", "model", "runner", "sourceSha256", "state"])
+    && route.dutyId === "advisory" && route.runner === "codex" && route.state === "default"
+    && typeof route.model === "string" && route.model.length > 0
+    && typeof route.effort === "string" && route.effort.length > 0
+    && /^[a-f0-9]{64}$/.test(route.sourceSha256)
+    && /^[a-f0-9]{40}$/.test(route.candidateCommit);
+}
 
 export async function invokeCodexAdvisoryAppServer(payload, dependencies = {}) {
   const selected = payload?.sandboxTransport;
+  const advisoryRoute = payload?.advisoryRoute;
   const evidence = validateAdvisoryEvidenceBundleForRepository(
     selected?.scratch?.repoRoot,
     payload?.evidenceBundle,
     selected?.dispatch?.referenceSetSha256 ?? null,
   );
-  if (!selected || selected.requested?.runner !== "codex" || selected.requested?.model !== MODEL
+  if (!selected || !validAdvisoryRoute(advisoryRoute)
+    || selected.requested?.runner !== "codex" || selected.requested?.model !== advisoryRoute.model
+    || selected.dispatch?.candidateCommit !== advisoryRoute.candidateCommit
     || selected.profile?.base !== ":read-only" || selected.profile?.network?.enabled !== true
     || selected.profile?.scratchRootSha256 !== selected.scratch?.sha256
     || typeof selected.scratch?.sandboxStateJson !== "string" || typeof selected.scratch?.sandboxStateSha256 !== "string"
@@ -56,6 +68,7 @@ export async function invokeCodexAdvisoryAppServer(payload, dependencies = {}) {
     question: payload.question,
     evidenceBundle: payload.evidenceBundle,
     evidenceSha256: evidence.bundleSha256,
+    advisoryRoute,
   }));
   const terminal = await close;
   let result = null;
@@ -65,7 +78,7 @@ export async function invokeCodexAdvisoryAppServer(payload, dependencies = {}) {
   }
   const success = terminal.code === 0 && terminal.signal === null && terminal.error === null
     && result?.schema === "pipeline.codex-advisory-app-server-child.v1" && result.ok === true
-    && result.code === "answered" && result.observed?.provider === PROVIDER && result.observed?.model === MODEL && result.observed?.effort === "max"
+    && result.code === "answered" && result.observed?.provider === PROVIDER && result.observed?.model === advisoryRoute.model && result.observed?.effort === advisoryRoute.effort
     && result.observed?.initialized === true && result.observed?.threadStarted === true
     && result.observed?.turnStarted === true && result.observed?.turnCompleted === true
     && result.observed?.stdinEnded === true && result.observed?.exitCode === 0
@@ -77,7 +90,7 @@ export async function invokeCodexAdvisoryAppServer(payload, dependencies = {}) {
   return {
     status: "answered",
     answer: result.answer,
-    identity: { provider: PROVIDER, modelId: MODEL, effort: "max" },
+    identity: { provider: PROVIDER, modelId: advisoryRoute.model, effort: advisoryRoute.effort },
     sandboxExecution: {
       schema: "pipeline.codex-sandbox-host-execution.v1",
       selectionId: selected.selectionId,

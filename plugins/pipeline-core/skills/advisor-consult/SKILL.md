@@ -67,19 +67,17 @@ through:
 `node "${PIPELINE_PLUGIN_ROOT}/scripts/codex-host-advisor-route.mjs" --runner codex --profile "{{PROFILE}}" --consent "{{CONSENT}}"`
 
 Accept exactly one JSON line with exactly `route|policy`. For
-`host-bound-consult`, require `pipeline.codex-host-advisor-policy.v1`. Launch
-the primary once with one monotonic 180-second deadline. Polling never resets
-it. If needed, interrupt exactly once, recompute the same workspace SHA-256,
-then launch exactly one fresh `gpt-5.6-terra` / `high` fallback with
-`forkTurns:none` and one monotonic 90-second deadline. Never start a third
-attempt.
+`host-bound-consult`, require `pipeline.codex-host-advisor-policy.v1`. Resolve
+the candidate-bound Codex advisory duty from validated V3 authority and launch
+it once with the policy's monotonic deadline. Polling never resets it. The
+current governed fallback chain is empty: never synthesize a model, switch
+model, or start a second attempt. An exhausted route is advisory-unavailable.
 
-The primary and fallback are fresh project-scoped advisory agents. Each
-receives only the bound question and allowlisted evidence, has no inherited
+The advisory agent starts fresh and is project-scoped. It receives only the
+bound question and allowlisted evidence, has no inherited
 chat, handover or memory, and may not mutate, persist, auto-apply, decide a
 gate, use a separate network tool or export to a third party. Workspace drift
-is a hard integrity failure. An exhausted unchanged route is
-`advisory-unavailable`; the Elephant retains the decision duty.
+is a hard integrity failure. The Elephant retains the decision duty.
 
 The launcher, host bridge and selected App Server transport validate the same
 canonical evidence-bundle digest independently. Only then may the child render
