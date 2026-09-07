@@ -116,6 +116,17 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "$comment": "Dispatch slicing nudge (NVA-B-SLICING-WIRE-1). Claude-only attended wiring for the non-blocking orchestrator slicing advisory. Wired by harness/scripts/wire-slicing-hook.mjs.",
+        "matcher": "Task|Agent|Workflow|TodoWrite",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-slicing.mjs\"",
+            "timeout": 10
+          }
+        ]
       }
     ],
     "Stop": [
