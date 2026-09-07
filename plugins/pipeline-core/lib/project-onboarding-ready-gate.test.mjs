@@ -465,6 +465,32 @@ test("every controlling non-ready lifecycle status is preserved and denied witho
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
+test("session capability failure phase is preserved only for a valid matching non-ready observation", () => {
+  const path = root();
+  try {
+    const readyWithPhase = {
+      ...readyResult(path, "session", "codex"),
+      repository: { sessionCapabilityFailurePhase: "descriptor-retirement" },
+    };
+    assert.throws(() => requireProjectOnboardingReady({ rootDir: path, intent: "session", runner: "codex", inspect: () => readyWithPhase }), (error) => error instanceof ProjectOnboardingReadyError && error.code === "PORG-INVALID-OBSERVATION");
+    const phased = readyResult(path, "session", "codex");
+    phased.status = "session-capability-unavailable";
+    phased.repository = { sessionCapabilityFailurePhase: "descriptor-retirement" };
+    assert.throws(() => requireProjectOnboardingReady({ rootDir: path, intent: "session", runner: "codex", inspect: () => phased }), (error) => {
+      assert(error instanceof ProjectOnboardingReadyError);
+      assert.equal(error.code, "PORG-NOT-READY");
+      assert.equal(error.sessionCapabilityFailurePhase, "descriptor-retirement");
+      return true;
+    });
+    const invalid = { ...phased, repository: { sessionCapabilityFailurePhase: "raw-error-must-not-escape" } };
+    assert.throws(() => requireProjectOnboardingReady({ rootDir: path, intent: "session", runner: "codex", inspect: () => invalid }), (error) => error instanceof ProjectOnboardingReadyError && error.code === "PORG-INVALID-OBSERVATION");
+    const nonSession = { ...phased, status: "worktree-capability-unavailable" };
+    assert.throws(() => requireProjectOnboardingReady({ rootDir: path, intent: "session", runner: "codex", inspect: () => nonSession }), (error) => error instanceof ProjectOnboardingReadyError && error.code === "PORG-INVALID-OBSERVATION");
+    const absent = { ...phased, repository: {} };
+    assert.throws(() => requireProjectOnboardingReady({ rootDir: path, intent: "session", runner: "codex", inspect: () => absent }), (error) => error instanceof ProjectOnboardingReadyError && error.sessionCapabilityFailurePhase === null);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
 // NVA-BL-INTAKEBIND-1 (AC-2): the Wave 4 onboarding coordinator's three new
 // v4Inspection statuses (design.md SSa.4) must be recognized as controlling
 // non-ready statuses -- a repo observed at any of them must fail as

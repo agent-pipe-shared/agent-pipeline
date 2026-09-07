@@ -358,13 +358,42 @@ check("a genuinely empty V3 onboarding root reaches the native Codex apply-patch
     // Native Codex PreToolUse emits a JSON payload only for a denial. An empty
     // successful response is the adapter's actual allow contract.
     assert.equal(result.stdout, "", result.stdout);
+    // The native pre-tool guard intentionally observes a proposed patch; the
+    // harness therefore persists the exact admitted fixture bytes separately.
+    // This demonstrates the sanctioned staging-authoring window reaches the
+    // real generated checkpoint, without manufacturing a PO acknowledgement.
+    const prdPath = join(created.root, prd);
+    const specPath = join(created.root, spec);
+    const scratchPath = join(created.root, "scratch", "nested", "greenfield-boundary.md");
+    const prdBytes = `${readFileSync(prdPath, "utf8")}\nReviewed fixture wording.\n`;
+    const specBytes = `${readFileSync(specPath, "utf8")}\nReviewed fixture specification.\n`;
+    const scratchBytes = "bounded scratch evidence\n";
+    writeFileSync(prdPath, prdBytes, "utf8");
+    writeFileSync(specPath, specBytes, "utf8");
+    mkdirSync(dirname(scratchPath), { recursive: true });
+    writeFileSync(scratchPath, scratchBytes, "utf8");
+    assert.equal(readFileSync(prdPath, "utf8"), prdBytes);
+    assert.equal(readFileSync(specPath, "utf8"), specBytes);
+    assert.equal(readFileSync(scratchPath, "utf8"), scratchBytes);
     const postAuthoring = runOnboarding(created.root, ["inspect", "--root", created.root, "--runner", "codex"]);
     assert.equal(postAuthoring.status, "bootstrap-binding-required", JSON.stringify(postAuthoring));
-    assert.ok(postAuthoring.nextAction, JSON.stringify(postAuthoring));
+    assert.equal(postAuthoring.nextAction?.kind, "collect-input", JSON.stringify(postAuthoring));
+    assert.ok(postAuthoring.nextAction.guidance.includes(prd), JSON.stringify(postAuthoring));
+    assert.ok(postAuthoring.nextAction.guidance.includes(sha256(prdBytes)), JSON.stringify(postAuthoring));
+    assert.ok(postAuthoring.nextAction.guidance.includes(spec), JSON.stringify(postAuthoring));
+    assert.ok(postAuthoring.nextAction.guidance.includes(sha256(specBytes)), JSON.stringify(postAuthoring));
     // Bootstrap binding is deliberately earlier than plan approval. This test
-    // proves its bounded authoring window and reports the returned nextAction;
-    // it never fabricates the PO acknowledgement or a binding approval.
+    // proves its bounded authoring window and returns the real PO-only ask;
+    // it never fabricates the acknowledgement marker or a binding approval.
     assert.notEqual(postAuthoring.status, "ready");
+    nativeDenial(
+      runNativeCodexPatchGuard(
+        created.root,
+        "*** Begin Patch\n*** Add File: src/not-yet-authorized.mjs\n+export default \\\"product authoring\\\";\n*** End Patch",
+      ),
+      "generated checkpoint product authoring",
+      "GUARD-LIFECYCLE-NOT-READY",
+    );
   } finally {
     if (created) rmSync(created.root, { recursive: true, force: true });
   }

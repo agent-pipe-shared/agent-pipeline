@@ -556,6 +556,32 @@ test("repository capability failures map exactly and stop before source/runtime 
   } finally { dispose(path); }
 });
 
+test("session capability failure phase is optional, closed, and retained only for its matching failure", () => {
+  const path = spacedRoot();
+  try {
+    const phased = { ...repositoryCapability("session-capability-unavailable"), sessionCapabilityFailurePhase: "descriptor-retirement" };
+    const observed = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, intent: "session", deps: {
+      ...fakeDeps,
+      observeCodexOnboardingCapabilities: () => phased,
+    } });
+    assert.equal(observed.status, "session-capability-unavailable");
+    assert.deepEqual(observed.repository, phased);
+    const invalid = { ...phased, sessionCapabilityFailurePhase: "raw-error-must-not-escape" };
+    const invalidObserved = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, intent: "session", deps: {
+      ...fakeDeps,
+      observeCodexOnboardingCapabilities: () => invalid,
+    } });
+    assert.equal(invalidObserved.status, "repository-observation-unavailable");
+    assert.equal(Object.hasOwn(invalidObserved.repository, "sessionCapabilityFailurePhase"), false);
+    const nonSession = { ...repositoryCapability("worktree-capability-unavailable"), sessionCapabilityFailurePhase: "descriptor-retirement" };
+    const nonSessionObserved = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, intent: "session", deps: {
+      ...fakeDeps,
+      observeCodexOnboardingCapabilities: () => nonSession,
+    } });
+    assert.equal(nonSessionObserved.status, "repository-observation-unavailable");
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
 test("host-managed session and dispatch map to repository-mode-unsupported before later stages", () => {
   for (const intent of ["session", "dispatch"]) {
     const path = spacedRoot();

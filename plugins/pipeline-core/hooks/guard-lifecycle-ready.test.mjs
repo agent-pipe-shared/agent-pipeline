@@ -7987,6 +7987,28 @@ test("NVA-B-GREENFIELD-SCRATCH-1: bootstrap-binding-required admits only contain
   }
 });
 
+test("NVA-B-CAPABILITY-PHASE-1: native lifecycle denial includes only the closed failed session-probe phase", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const denied = (lifecycleStatus, sessionCapabilityFailurePhase) => evaluateLifecycleReadyGuard(write("src/blocked.mjs"), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn({ intent }) {
+        throw new ProjectOnboardingReadyError("PORG-NOT-READY", "fixture", { intent, lifecycleStatus, sessionCapabilityFailurePhase });
+      },
+    });
+    const phased = denied("session-capability-unavailable", "descriptor-retirement");
+    assert.equal(phased.exitCode, 2);
+    assert.match(phased.stderr, /Pipeline session readiness is session-capability-unavailable \(failed session probe phase: descriptor-retirement\)\./u);
+    const invalid = denied("session-capability-unavailable", "raw-error-must-not-escape");
+    assert.equal(invalid.exitCode, 2);
+    assert.doesNotMatch(invalid.stderr, /raw-error-must-not-escape|failed session probe phase/u);
+    const nonSession = denied("worktree-capability-unavailable", "descriptor-retirement");
+    assert.equal(nonSession.exitCode, 2);
+    assert.doesNotMatch(nonSession.stderr, /failed session probe phase/u);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
 test("NVA-B-GREENFIELD-SCRATCH-CONTAINMENT-1: intended pre-plan scratch lanes require physical scratch containment", () => {
   const statuses = ["intake-required", "intake-design-questions-required", "restart-required", "bootstrap-binding-required"];
   for (const status of statuses) {

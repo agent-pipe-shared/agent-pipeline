@@ -47,6 +47,14 @@ import {
 
 const INTENTS = new Set(["onboarding", "bootstrap", "session", "dispatch"]);
 const MODES = new Set(["auto", "local", "host-managed"]);
+export const SESSION_CAPABILITY_FAILURE_PHASES = Object.freeze([
+  "descriptor-publication",
+  "descriptor-retirement",
+  "descriptor-load",
+  "directory-rollback",
+  "descriptor-rollback",
+]);
+const SESSION_CAPABILITY_FAILURE_PHASE_SET = new Set(SESSION_CAPABILITY_FAILURE_PHASES);
 const GIT_VERSION = /^git version (\d+)\.(\d+)(?:\.(\d+))?((?:[.-][0-9A-Za-z]+)*)/u;
 // Content written by `disposableWriteProbe`'s single fixed probe body, bound
 // once at module load. `cleanupProbeFile` uses this to decide ownership by
@@ -57,6 +65,10 @@ const PROBE_SHA256 = sha256(PROBE_BODY);
 function isInside(root, target) {
   const rel = relative(root, target);
   return rel === "" || (!rel.startsWith(`..${sep}`) && rel !== ".." && !isAbsolute(rel));
+}
+
+export function isSessionCapabilityFailurePhase(value) {
+  return typeof value === "string" && SESSION_CAPABILITY_FAILURE_PHASE_SET.has(value);
 }
 
 function defaultCapabilities(intent) {
@@ -734,12 +746,16 @@ export function observeCodexOnboardingCapabilities({
     return component;
   }
 
+  const sessionStage = { stage: "descriptor-publication" };
   try {
-    sessionProbe(root, repository, spawn, faultInjector);
+    sessionProbe(root, repository, spawn, faultInjector, sessionStage);
     component.sessionCapability = "passed";
   } catch {
     component.status = "session-capability-unavailable";
     component.sessionCapability = "failed";
+    // This is a closed, redacted probe phase from the SAME invocation. Never attach an error
+    // message or a repository-private descriptor detail to the public component.
+    component.sessionCapabilityFailurePhase = sessionStage.stage;
     return component;
   }
 

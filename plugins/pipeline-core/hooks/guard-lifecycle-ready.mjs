@@ -32,6 +32,7 @@ import {
   inspectProjectOnboardingV3,
   PO_AUTHORITY_REBIND_UNAVAILABLE_DIAGNOSTICS,
 } from "../lib/project-onboarding-v3.mjs";
+import { isSessionCapabilityFailurePhase } from "../lib/codex-onboarding-capabilities.mjs";
 // NVA-GF-COPYSAFE/NVA-W12-COPYSAFE: the shared argv-native renderer builds
 // every human ceremony step below. The default denial is therefore bounded
 // and copy-safe without asking the human to run a second rendering command.
@@ -504,6 +505,7 @@ function rejectedGrammarElement(code, command, parsed, root) {
 function blocked(
   code = "GUARD-LIFECYCLE-NOT-READY", lifecycleStatus = null, retryActions = [], overrideGuidance = "", rejectedElement = null,
   remediation = null, nearMissHint = null, observationInvalid = false, firstOccurrenceThisSession = true,
+  sessionCapabilityFailurePhase = null,
 ) {
   const typedLifecycleStatus = code === "GUARD-LIFECYCLE-NOT-READY"
     && CONTROLLING_NON_READY_STATUSES.has(lifecycleStatus)
@@ -556,6 +558,11 @@ function blocked(
         "Pipeline-governed project writes require an exact V4 ready result for session intent.",
         "Re-run the typed project-onboarding-v3 session inspection and use only its returned nextAction.",
       ])
+    : typedLifecycleStatus === "session-capability-unavailable" && isSessionCapabilityFailurePhase(sessionCapabilityFailurePhase)
+      ? [
+        `Pipeline session readiness is ${typedLifecycleStatus} (failed session probe phase: ${sessionCapabilityFailurePhase}).`,
+        "Re-run the typed project-onboarding-v3 inspection and use only its returned nextAction.",
+      ]
     : typedLifecycleStatus === "partial"
       ? [
         `Pipeline session readiness is ${typedLifecycleStatus}.`,
@@ -4803,6 +4810,13 @@ function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
     const invalidObservation = error instanceof ProjectOnboardingReadyError
       && error.code === "PORG-INVALID-OBSERVATION"
       && error.intent === "session";
+    const sessionCapabilityFailurePhase = error instanceof ProjectOnboardingReadyError
+      && error.code === "PORG-NOT-READY"
+      && error.intent === "session"
+      && error.lifecycleStatus === "session-capability-unavailable"
+      && isSessionCapabilityFailurePhase(error.sessionCapabilityFailurePhase)
+      ? error.sessionCapabilityFailurePhase
+      : null;
     // NVA-R15-ROOTADMIT: same discoverability fix as restartResumeHintNearMissHint above,
     // for a different near miss -- a recognised sanctioned-script invocation refused only
     // because its --root token resolves to a different physical location than this guard's
@@ -4835,6 +4849,8 @@ function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
         null,
         restartResumeHintNearMissHint ?? rootIdentityMismatchHint,
         invalidObservation,
+        true,
+        sessionCapabilityFailurePhase,
       );
   }
   return exactReadyReceipt(receipt) ? verdict(0) : blocked();

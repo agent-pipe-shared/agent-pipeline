@@ -118,7 +118,7 @@ function synchronizedSessionProbe(root, barrier, id, mode = "parallel") {
 }
 
 function expected(fields) {
-  return {
+  const result = {
     status: fields.status,
     mode: fields.mode,
     gitVersion: fields.gitVersion ?? null,
@@ -127,11 +127,15 @@ function expected(fields) {
     sessionCapability: fields.sessionCapability,
     worktreeCapability: fields.worktreeCapability,
   };
+  if (Object.hasOwn(fields, "sessionCapabilityFailurePhase")) {
+    result.sessionCapabilityFailurePhase = fields.sessionCapabilityFailurePhase;
+  }
+  return result;
 }
 
 function assertExact(actual, fields) {
   assert.deepEqual(actual, expected(fields));
-  assert.deepEqual(Object.keys(actual).sort(), [
+  const expectedKeys = [
     "gitVersion",
     "initializesGit",
     "mode",
@@ -139,7 +143,11 @@ function assertExact(actual, fields) {
     "sessionCapability",
     "status",
     "worktreeCapability",
-  ]);
+  ];
+  if (Object.hasOwn(fields, "sessionCapabilityFailurePhase")) {
+    expectedKeys.push("sessionCapabilityFailurePhase");
+  }
+  assert.deepEqual(Object.keys(actual).sort(), expectedKeys.sort());
 }
 
 function sha256(bytes) {
@@ -849,6 +857,7 @@ test("a non-descriptor entry preventing cleanup still reports session capability
       gitVersion: observed.gitVersion,
       rootWritable: "passed",
       sessionCapability: "failed",
+      sessionCapabilityFailurePhase: "directory-rollback",
       worktreeCapability: "not-required",
     });
     assert.equal(existsSync(foreign), true, "cleanup must preserve foreign, invalid state for diagnosis");
@@ -893,6 +902,7 @@ test("fault injection after session creation rolls back the exact descriptor and
     gitVersion: observed.gitVersion,
     rootWritable: "passed",
     sessionCapability: "failed",
+    sessionCapabilityFailurePhase: "descriptor-retirement",
     worktreeCapability: "not-required",
   });
   assert.deepEqual(treeSnapshot(root), before);

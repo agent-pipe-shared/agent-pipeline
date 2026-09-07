@@ -29,7 +29,7 @@ import {
   observeOnboardingAppServer,
   RUNNERS_WITHOUT_APP_SERVER,
 } from "./codex-onboarding-app-server.mjs";
-import { observeCodexOnboardingCapabilities } from "./codex-onboarding-capabilities.mjs";
+import { isSessionCapabilityFailurePhase, observeCodexOnboardingCapabilities } from "./codex-onboarding-capabilities.mjs";
 import {
   applyOnboardingContinuityRepair,
   applyOnboardingKickoff,
@@ -1871,20 +1871,29 @@ function unavailableRepository(intent) {
 const REPOSITORY_KEYS = [
   "status", "mode", "gitVersion", "initializesGit", "rootWritable", "sessionCapability", "worktreeCapability",
 ];
+const SESSION_CAPABILITY_FAILURE_PHASE_KEY = "sessionCapabilityFailurePhase";
 const REPOSITORY_STATUSES = new Set([
   "local-valid-writable", "local-uninitialized", "host-managed", "control-path-read-only", "control-path-invalid",
   "git-unavailable", "root-read-only", "session-capability-unavailable", "worktree-capability-unavailable", "unavailable",
 ]);
 function validRepositoryComponent(value) {
+  const phasePresent = value && typeof value === "object" && !Array.isArray(value)
+    && Object.prototype.hasOwnProperty.call(value, SESSION_CAPABILITY_FAILURE_PHASE_KEY);
+  const expectedKeys = phasePresent
+    ? [...REPOSITORY_KEYS, SESSION_CAPABILITY_FAILURE_PHASE_KEY]
+    : REPOSITORY_KEYS;
   return value && typeof value === "object" && !Array.isArray(value)
-    && JSON.stringify(Object.keys(value).sort()) === JSON.stringify([...REPOSITORY_KEYS].sort())
+    && JSON.stringify(Object.keys(value).sort()) === JSON.stringify([...expectedKeys].sort())
     && REPOSITORY_STATUSES.has(value.status)
     && new Set(["local", "host-managed", "unknown"]).has(value.mode)
     && (value.gitVersion === null || (typeof value.gitVersion === "string" && value.gitVersion.length > 0))
     && typeof value.initializesGit === "boolean"
     && new Set(["passed", "failed", "not-observed"]).has(value.rootWritable)
     && new Set(["passed", "failed", "not-required", "not-observed"]).has(value.sessionCapability)
-    && new Set(["passed", "failed", "not-required", "not-observed"]).has(value.worktreeCapability);
+    && new Set(["passed", "failed", "not-required", "not-observed"]).has(value.worktreeCapability)
+    && (!phasePresent || (value.status === "session-capability-unavailable"
+      && value.sessionCapability === "failed"
+      && isSessionCapabilityFailurePhase(value[SESSION_CAPABILITY_FAILURE_PHASE_KEY])));
 }
 
 function observeRepositoryCapability(rootDir, fs, intent, willInitializeGit = false) {

@@ -10,6 +10,7 @@ import {
   PROJECT_ONBOARDING_READY_ONLY_RESULT_KEYS,
   PROJECT_ONBOARDING_VERIFY_COMMAND_PLACEHOLDER,
 } from "./project-onboarding-v3.mjs";
+import { isSessionCapabilityFailurePhase } from "./codex-onboarding-capabilities.mjs";
 
 export const PROJECT_ONBOARDING_READY_GATE_SCHEMA = "pipeline.project-onboarding-ready-gate.v1";
 // This list stays hand-maintained -- unlike BASE_RESULT_KEYS/READY_ONLY_RESULT_KEYS above,
@@ -94,12 +95,13 @@ const SAFE_STATUS = /^[a-z][a-z0-9-]{0,79}$/u;
 const PIPELINE_STATE_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url));
 
 export class ProjectOnboardingReadyError extends Error {
-  constructor(code, message, { intent = null, lifecycleStatus = null } = {}) {
+  constructor(code, message, { intent = null, lifecycleStatus = null, sessionCapabilityFailurePhase = null } = {}) {
     super(message);
     this.name = "ProjectOnboardingReadyError";
     this.code = code;
     this.intent = intent;
     this.lifecycleStatus = lifecycleStatus;
+    this.sessionCapabilityFailurePhase = sessionCapabilityFailurePhase;
   }
 }
 
@@ -256,6 +258,18 @@ export function requireProjectOnboardingReady({
     );
   }
 
+  const candidatePhase = observed?.repository?.sessionCapabilityFailurePhase;
+  const phasePresent = observed?.repository && typeof observed.repository === "object"
+    && Object.prototype.hasOwnProperty.call(observed.repository, "sessionCapabilityFailurePhase");
+  if (phasePresent && (observed.status !== "session-capability-unavailable"
+    || !isSessionCapabilityFailurePhase(candidatePhase))) {
+    fail(
+      "PORG-INVALID-OBSERVATION",
+      `Project onboarding readiness returned an invalid result for intent ${intent}.`,
+      { intent },
+    );
+  }
+
   if (observed.status !== "ready") {
     const lifecycleStatus = safeLifecycleStatus(observed.status);
     if (lifecycleStatus === null || !NON_READY_STATUSES.has(lifecycleStatus)) {
@@ -268,7 +282,7 @@ export function requireProjectOnboardingReady({
     fail(
       "PORG-NOT-READY",
       `Project onboarding lifecycle is not ready for intent ${intent} (status ${lifecycleStatus}).`,
-      { intent, lifecycleStatus },
+      { intent, lifecycleStatus, sessionCapabilityFailurePhase: phasePresent ? candidatePhase : null },
     );
   }
 
