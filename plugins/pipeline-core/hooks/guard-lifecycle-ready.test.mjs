@@ -7925,6 +7925,67 @@ test("NVA-INTAKESPECS-1: the bootstrap-binding authoring admission covers specs/
   }
 });
 
+test("NVA-B-GREENFIELD-SCRATCH-1: bootstrap-binding-required admits only contained scratch Edit/Write while preserving staging and lifecycle boundaries", () => {
+  const path = root();
+  const featureId = "onboarding-0123456789ab";
+  let outside = null;
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    outside = mkdtempSync(join(tmpdir(), "bootstrap-binding-scratch-outside-"));
+    mkdirSync(join(path, "scratch"));
+    symlinkSync(outside, join(path, "scratch", "outside-link"));
+    const bindingDeps = { projectDir: path, requireProjectOnboardingReadyFn() { deny("bootstrap-binding-required"); } };
+
+    for (const input of [
+      write("scratch/bootstrap-note.md"),
+      edit("scratch/bootstrap-note.md"),
+      write("scratch/nested/holding.md"),
+      edit(join(path, "scratch", "absolute-note.md")),
+    ]) {
+      assert.equal(evaluateLifecycleReadyGuard(input, bindingDeps).exitCode, 0, input.tool_input.file_path);
+    }
+
+    // The generated PRD/spec lane remains exact and independent of the new scratch lane.
+    for (const filePath of [`specs/${featureId}/prd_${featureId}.md`, `specs/${featureId}/spec.md`]) {
+      assert.equal(evaluateLifecycleReadyGuard(write(filePath), bindingDeps).exitCode, 0, filePath);
+    }
+
+    for (const input of [
+      write("scratch-evil/file.md"),
+      edit("scratch/../outside.md"),
+      write("scratch"),
+      write(join(tmpdir(), "outside-bootstrap-scratch.md")),
+      write("scratch/outside-link/escaped.md"),
+      write(".claude/pipeline-state.json"),
+      write("scratch/.resume-hint-input.json"),
+      notebookEdit("scratch/bootstrap.ipynb"),
+      write(`specs/${featureId}/design-input.md`),
+    ]) {
+      const result = evaluateLifecycleReadyGuard(input, bindingDeps);
+      assert.equal(result.exitCode, 2, `${input.tool_name}:${input.tool_input.file_path ?? input.tool_input.notebook_path}`);
+    }
+
+    // Existing intake/restart admissions remain, while capability failure does not inherit a
+    // bootstrap scratch escape hatch.
+    for (const status of ["intake-required", "intake-design-questions-required", "restart-required"]) {
+      const result = evaluateLifecycleReadyGuard(write("scratch/retained-behavior.md"), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny(status); },
+      });
+      assert.equal(result.exitCode, 0, status);
+    }
+    const unavailable = evaluateLifecycleReadyGuard(write("scratch/capability-unavailable.md"), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { deny("session-capability-unavailable"); },
+    });
+    assert.equal(unavailable.exitCode, 2);
+    assert.match(unavailable.stderr, /GUARD-LIFECYCLE-NOT-READY/u);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    if (outside !== null) rmSync(outside, { recursive: true, force: true });
+  }
+});
+
 // NVA-I-GRAMMAR DoD 1: the three live reproductions from backlog/items/2026-08-27-shell-
 // grammar-reads-quoted-content-as-shell-syntax.md, each paired with a genuinely-composed
 // control that must stay refused. The quote-aware tokenizer itself (guard-command-grammar.mjs,

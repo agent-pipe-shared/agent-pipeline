@@ -4199,6 +4199,19 @@ function isIntakeLifecycleScratchWrite(input, root) {
   return resolved !== scratchRoot && pathInside(scratchRoot, resolved);
 }
 
+// NVA-B-GREENFIELD-SCRATCH-1: bootstrap document binding already admits the
+// exact generated PRD/spec authoring targets below, but the same lifecycle
+// status previously denied temporary in-repository scratch authoring. Reuse
+// the intake predicate's resolved physical-containment test while narrowing
+// this sibling admission to the two text authoring tools named by the
+// bootstrap flow; NotebookEdit and every Bash command remain governed by the
+// ordinary not-ready lane.
+function isBootstrapBindingScratchWrite(input, root) {
+  const toolName = String(input?.tool_name ?? "");
+  return (toolName === "Edit" || toolName === "Write")
+    && isIntakeLifecycleScratchWrite(input, root);
+}
+
 /**
  * NVA-GF-SCRATCH: the Bash-side twin -- `mkdir scratch`, `mkdir -p scratch`, and (unlike the
  * `partial` lane's isPartialLifecycleScratchDirCreate(), which admits only the bare directory
@@ -4683,6 +4696,13 @@ function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
       && error.lifecycleStatus === "bootstrap-binding-required"
       && isBootstrapBindingStagingAuthoringWrite(input, root);
     if (bootstrapBindingStagingAuthoringWrite) return verdict(0);
+    const bootstrapBindingScratchWrite = error instanceof ProjectOnboardingReadyError
+      && error.code === "PORG-NOT-READY"
+      && error.intent === "session"
+      && error.lifecycleStatus === "bootstrap-binding-required"
+      && !restartResumeHintNearMissWrite(input, root)
+      && isBootstrapBindingScratchWrite(input, root);
+    if (bootstrapBindingScratchWrite) return verdict(0);
     const exactPoAuthorityRebindRecovery = error instanceof ProjectOnboardingReadyError
       && error.code === "PORG-NOT-READY"
       && error.intent === "session"
