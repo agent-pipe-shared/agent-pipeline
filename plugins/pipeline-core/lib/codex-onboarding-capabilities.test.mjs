@@ -3,7 +3,7 @@
 
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import {
   chmodSync,
   existsSync,
@@ -24,6 +24,7 @@ import test from "node:test";
 
 import { diagnoseCodexOnboardingSessionCapability, observeCodexOnboardingCapabilities } from "./codex-onboarding-capabilities.mjs";
 import { hasCodexExistingGitControlMount } from "./codex-host-layout.mjs";
+import { retireSessionDescriptor, startSessionDescriptor } from "./worktree-lifecycle.mjs";
 
 const roots = [];
 
@@ -54,6 +55,66 @@ function localRepository(label = "local") {
   git(root, ["add", "README.md"]);
   git(root, ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", "fixture"]);
   return root;
+}
+
+function waitFor(condition, timeoutMs = 10_000) {
+  const deadline = Date.now() + timeoutMs;
+  return new Promise((resolveWait, rejectWait) => {
+    const poll = () => {
+      if (condition()) return resolveWait();
+      if (Date.now() >= deadline) return rejectWait(new Error("concurrent session-probe barrier timed out"));
+      setTimeout(poll, 10);
+    };
+    poll();
+  });
+}
+
+function synchronizedSessionProbe(root, barrier, id, mode = "parallel") {
+  const capabilityModule = new URL("./codex-onboarding-capabilities.mjs", import.meta.url).href;
+  const script = `
+    import { existsSync, writeFileSync } from "node:fs";
+    import { join } from "node:path";
+    import { diagnoseCodexOnboardingSessionCapability } from ${JSON.stringify(capabilityModule)};
+    const [rootDir, barrierDir, probeId, probeMode] = process.argv.slice(1);
+    const wait = new Int32Array(new SharedArrayBuffer(4));
+    function waitForMarker(marker) {
+      const deadline = Date.now() + 10_000;
+      while (!existsSync(join(barrierDir, marker))) {
+        if (Date.now() >= deadline) throw new Error("release barrier timed out");
+        Atomics.wait(wait, 0, 0, 20);
+      }
+    }
+    const result = diagnoseCodexOnboardingSessionCapability({
+      rootDir,
+      deps: {
+        faultInjector(stage) {
+          if (stage === "session-probe-created") {
+            writeFileSync(join(barrierDir, "ready-" + probeId), "ready\\n", { mode: 0o600 });
+            waitForMarker(probeMode === "parallel" ? "release" : "release-" + probeId);
+          }
+          if (stage === "session-probe-directory-enotempty" && probeMode === "creator") {
+            writeFileSync(join(barrierDir, "enotempty-" + probeId), "seen\\n", { mode: 0o600 });
+            waitForMarker("continue-" + probeId);
+          }
+        },
+      },
+    });
+    process.stdout.write(JSON.stringify(result));
+  `;
+  return new Promise((resolveProbe, rejectProbe) => {
+    const child = spawn(process.execPath, ["--input-type=module", "--eval", script, root, barrier, id, mode], {
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (chunk) => { stdout += chunk; });
+    child.stderr.on("data", (chunk) => { stderr += chunk; });
+    child.on("error", rejectProbe);
+    child.on("close", (status) => {
+      if (status !== 0) return rejectProbe(new Error(`probe ${id} failed: ${stderr}`));
+      try { resolveProbe(JSON.parse(stdout)); } catch { rejectProbe(new Error(`probe ${id} emitted invalid JSON: ${stdout}`)); }
+    });
+  });
 }
 
 function expected(fields) {
@@ -689,6 +750,111 @@ test("session intent performs and fully rolls back one real cleanup-descriptor p
     sessionCapability: "passed",
     worktreeCapability: "not-required",
   });
+  assert.deepEqual(treeSnapshot(root), before);
+});
+
+test("two synchronized real session probes keep concurrent descriptor ownership and both finish ready", async () => {
+  const root = localRepository("two synchronized session probes");
+  const before = treeSnapshot(root);
+  const active = join(root, ".git", "agent-pipeline", "session-descriptors", "active");
+  const barrier = join(root, "session-probe-barrier");
+  assert.equal(existsSync(active), false, "the descriptor directory starts absent");
+  mkdirSync(barrier, { recursive: true, mode: 0o700 });
+  try {
+    const first = synchronizedSessionProbe(root, barrier, "first");
+    const second = synchronizedSessionProbe(root, barrier, "second");
+    await waitFor(() => existsSync(join(barrier, "ready-first")) && existsSync(join(barrier, "ready-second")));
+    assert.equal(readdirSync(active).filter((name) => name.endsWith(".json")).length, 2, "both probes publish a live descriptor before cleanup");
+    writeFileSync(join(barrier, "release"), "release\n", { mode: 0o600 });
+    const [firstResult, secondResult] = await Promise.all([first, second]);
+    assert.deepEqual(firstResult, { schema: "pipeline.session-capability-diagnosis.v1", status: "ready", stage: "complete" });
+    assert.deepEqual(secondResult, { schema: "pipeline.session-capability-diagnosis.v1", status: "ready", stage: "complete" });
+  } finally {
+    rmSync(barrier, { recursive: true, force: true });
+  }
+  assert.deepEqual(treeSnapshot(root), before, "both probes retire their own descriptors and remove only empty directories");
+});
+
+test("a probe that created descriptor directories removes them after a peer observed them as preexisting", async () => {
+  const root = localRepository("preexisting directory cleanup interleaving");
+  const before = treeSnapshot(root);
+  const barrier = join(root, "session-probe-preexisting-barrier");
+  mkdirSync(barrier, { recursive: true, mode: 0o700 });
+  try {
+    const creator = synchronizedSessionProbe(root, barrier, "creator", "creator");
+    await waitFor(() => existsSync(join(barrier, "ready-creator")));
+    const peer = synchronizedSessionProbe(root, barrier, "peer", "peer");
+    await waitFor(() => existsSync(join(barrier, "ready-peer")));
+    writeFileSync(join(barrier, "release-creator"), "release\\n", { mode: 0o600 });
+    await waitFor(() => existsSync(join(barrier, "enotempty-creator")));
+    writeFileSync(join(barrier, "release-peer"), "release\\n", { mode: 0o600 });
+    const peerResult = await peer;
+    writeFileSync(join(barrier, "continue-creator"), "continue\\n", { mode: 0o600 });
+    const creatorResult = await creator;
+    assert.deepEqual(peerResult, { schema: "pipeline.session-capability-diagnosis.v1", status: "ready", stage: "complete" });
+    assert.deepEqual(creatorResult, { schema: "pipeline.session-capability-diagnosis.v1", status: "ready", stage: "complete" });
+  } finally {
+    rmSync(barrier, { recursive: true, force: true });
+  }
+  assert.deepEqual(treeSnapshot(root), before, "the creator removes empty directories that its peer correctly treated as preexisting");
+});
+
+test("a live foreign descriptor concurrently occupying a newly-created probe directory does not downgrade session capability", () => {
+  const root = localRepository("concurrent session cleanup");
+  let foreign = null;
+  try {
+    const observed = observeCodexOnboardingCapabilities({
+      rootDir: root,
+      intent: "session",
+      faultInjector(stage) {
+        if (stage !== "session-probe-created" || foreign !== null) return;
+        foreign = startSessionDescriptor(root, {
+          sessionId: "foreign-concurrent-session",
+          ownerNonce: "foreign-concurrent-owner",
+        });
+      },
+    });
+    assertExact(observed, {
+      status: "local-valid-writable",
+      mode: "local",
+      gitVersion: observed.gitVersion,
+      rootWritable: "passed",
+      sessionCapability: "passed",
+      worktreeCapability: "not-required",
+    });
+    assert.notEqual(foreign, null);
+    assert.equal(existsSync(foreign.path), true, "the concurrent descriptor is preserved, never removed by this probe");
+  } finally {
+    if (foreign !== null && existsSync(foreign.path)) retireSessionDescriptor(root, foreign);
+  }
+  const active = join(root, ".git", "agent-pipeline", "session-descriptors", "active");
+  assert.equal(existsSync(active) ? readdirSync(active).filter((name) => name.endsWith(".json")).length : 0, 0);
+});
+
+test("a non-descriptor entry preventing cleanup still reports session capability unavailable", () => {
+  const root = localRepository("session cleanup directory failure");
+  const before = treeSnapshot(root);
+  const foreign = join(root, ".git", "agent-pipeline", "session-descriptors", "active", "foreign.json");
+  try {
+    const observed = observeCodexOnboardingCapabilities({
+      rootDir: root,
+      intent: "session",
+      faultInjector(stage) {
+        if (stage === "session-probe-created") writeFileSync(foreign, "not a session descriptor\n", { mode: 0o600 });
+      },
+    });
+    assertExact(observed, {
+      status: "session-capability-unavailable",
+      mode: "local",
+      gitVersion: observed.gitVersion,
+      rootWritable: "passed",
+      sessionCapability: "failed",
+      worktreeCapability: "not-required",
+    });
+    assert.equal(existsSync(foreign), true, "cleanup must preserve foreign, invalid state for diagnosis");
+  } finally {
+    rmSync(join(root, ".git", "agent-pipeline"), { recursive: true, force: true });
+  }
   assert.deepEqual(treeSnapshot(root), before);
 });
 

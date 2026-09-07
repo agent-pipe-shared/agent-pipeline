@@ -218,7 +218,55 @@ function validateLocalRepository(root, gitType, spawn) {
   return repository;
 }
 
-function removeNewEmptyDirectories(paths, existed) {
+function hasLiveDescriptor(root, directory, spawn) {
+  try {
+    physicalDirectory(directory, "disposable capability descriptor directory");
+    for (const name of readdirSync(directory)) {
+      if (!name.endsWith(".json")) continue;
+      const sessionId = name.slice(0, -".json".length);
+      try {
+        // A nonempty directory is only concurrent ownership when the entry is
+        // a valid descriptor bound to this repository.  A junk file, symlink,
+        // or malformed foreign state must keep the cleanup failure fail-closed.
+        loadSessionDescriptor(root, sessionId, { spawn });
+        return true;
+      } catch {
+        // Continue looking: one invalid entry must not hide a separate valid
+        // concurrently-published descriptor.
+      }
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+function retryConcurrentDirectoryRemoval(path, { root, spawn, descriptorDirectory } = {}) {
+  let lastError = null;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    if (!existsSync(path)) return "removed";
+    try {
+      physicalDirectory(path, "disposable capability directory");
+      rmdirSync(path);
+      fsyncDirectory(dirname(path));
+      return "removed";
+    } catch (error) {
+      if (error?.code === "ENOENT" && !existsSync(path)) return "removed";
+      if (error?.code !== "ENOTEMPTY") throw error;
+      lastError = error;
+      if (hasLiveDescriptor(root, descriptorDirectory, spawn)) {
+        // Give the concurrent probe a bounded chance to retire its descriptor.
+        // A still-live valid descriptor after the final retry remains foreign
+        // concurrent ownership, not a cleanup failure for this probe.
+        if (attempt === 3) return "live";
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5);
+      }
+    }
+  }
+  throw lastError;
+}
+
+function removeNewEmptyDirectories(paths, existed, { root, spawn, descriptorDirectory, faultInjector } = {}) {
   let failure = null;
   for (let index = paths.length - 1; index >= 0; index--) {
     const path = paths[index];
@@ -228,6 +276,19 @@ function removeNewEmptyDirectories(paths, existed) {
       rmdirSync(path);
       fsyncDirectory(dirname(path));
     } catch (error) {
+      if (error?.code === "ENOTEMPTY") {
+        faultInjector?.("session-probe-directory-enotempty");
+        try {
+          if (["removed", "live"].includes(retryConcurrentDirectoryRemoval(path, { root, spawn, descriptorDirectory }))) continue;
+        } catch (retryError) {
+          failure ??= retryError;
+          continue;
+        }
+      }
+      // A peer can finish deleting this path between our initial existence
+      // check and rmdir(2). This is limited to the postcondition already
+      // holding; every remaining cleanup error stays fail-closed.
+      if (["ENOTEMPTY", "ENOENT"].includes(error?.code) && !existsSync(path)) continue;
       failure ??= error;
     }
   }
@@ -266,7 +327,7 @@ function sessionProbe(root, repository, spawn, faultInjector, stageBox = null) {
       retireSessionDescriptor(root, loaded, { spawn });
     }
     if (stageBox && primaryError === null) stageBox.stage = "directory-rollback";
-    removeNewEmptyDirectories(directories, existed);
+    removeNewEmptyDirectories(directories, existed, { root, spawn, descriptorDirectory: directories.at(-1), faultInjector });
   } catch (error) {
     cleanupError = error;
   }
