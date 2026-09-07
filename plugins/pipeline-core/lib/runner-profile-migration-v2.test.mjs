@@ -385,6 +385,27 @@ record("v1: accepted Terra aliases become requested frozen selectors without an 
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+record("v1: current Astra and Luna selectors reconcile to frozen V2 cells", () => {
+  const current = v1Source();
+  current.routing.duties.codex_design = direct("codex", "gpt-6-astra", "xhigh");
+  for (const duty of ["codex_implementation", "codex_goldfish", "codex_mechanic"]) {
+    current.routing.duties[duty] = direct("codex", "gpt-5.6-luna", "xhigh");
+  }
+  const root = fixtureRoot(yaml(current));
+  try {
+    const plan = planRunnerProfileMigrationV2({ rootDir: root });
+    assert.equal(plan.status, "ready");
+    assert.ok(plan.compatibilityDeltas.some((delta) => delta.oldRequested?.selector?.value === "gpt-6-astra"));
+    assert.ok(plan.compatibilityDeltas.some((delta) => delta.oldRequested?.selector?.value === "gpt-5.6-luna"));
+    assert.equal(applyRunnerProfileMigrationV2(plan, { rootDir: root, activate: true }).status, "applied");
+    const intent = parseYaml(readFileSync(join(root, sourcePath), "utf8"));
+    assert.equal(validatePipelineUserV2(intent).ok, true);
+    assert.deepEqual(intent.routing.profiles.design.design_phase.codex, registry.profiles.design.design_phase.codex);
+    assert.deepEqual(intent.routing.duties.implement.codex, registry.duties.implement.codex);
+    assert.deepEqual(intent.routing.duties.mechanic.codex, registry.duties.mechanic.codex);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 record("source classification: malformed, unknown, wrong-runner, unsupported, and duplicate legacy routes fail before planning", () => {
   const cases = [];
   const ambiguous = v0Source(); ambiguous.schema = "pipeline.user.v1"; cases.push({ source: yaml(ambiguous), code: "invalid_v1_source" });

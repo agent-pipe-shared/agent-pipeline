@@ -148,9 +148,9 @@ prompt defaults to decline and atomically records either `approved` or
 `declined` in `pipeline.user.yaml`. Re-run the same command to change that
 public-safe repository decision.
 
-With approval, Claude keeps its registered Fable → Opus → same-runner consult
-order and Read/Grep/Glob consult tools. Codex uses only the exact selected
-`network-open/read-only` Sol transport, whose launch payload is
+With approval, Claude uses its registered native Opus advisor, then a
+same-runner Opus consult fallback with Read/Grep/Glob consult tools. Codex uses
+only the exact selected `network-open/read-only` Astra transport, whose launch payload is
 Read/Grep/Glob/Bash. The checkout remains read-only and coordinator scratch is
 the sole writable root. No selected transport, no child, profile drift, wrong
 identity, or incomplete stdio/cleanup is a non-success; an unbound host Bash

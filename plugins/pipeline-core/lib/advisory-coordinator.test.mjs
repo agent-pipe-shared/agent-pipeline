@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { createAdvisoryDemand } from "./advisory-lifecycle-v2.mjs";
-import { ADVISORY_FABLE_ATTEMPTS, coordinateAdvisory } from "./advisory-coordinator.mjs";
+import { ADVISORY_NATIVE_ATTEMPTS, coordinateAdvisory } from "./advisory-coordinator.mjs";
 import { validateAdvisoryReceipt } from "./advisory-receipt.mjs";
 
 const DISPATCH = Object.freeze({
@@ -45,7 +45,7 @@ function options(overrides = {}) {
     now: () => 1_784_355_600_000,
     makeReceiptId: () => "advisory-receipt-01",
     advisorExport: { consent: "approved" },
-    invokeNative: async () => ({ status: "answered", answer: "native answer", identity: identity("anthropic", "claude-fable") }),
+    invokeNative: async () => ({ status: "answered", answer: "native answer", identity: identity("anthropic", "claude-opus") }),
     invokeConsult: async () => ({ status: "answered", answer: "consult answer", identity: identity("openai", "gpt-5.6-sol", "max") }),
     ...overrides,
   };
@@ -81,23 +81,28 @@ test("only an explicit declined advisor export consent disables advisory before 
   }
 });
 
-test("Claude retries Fable, then uses explicit same-runner Opus and records the fallback", async () => {
-  const calls = [];
+test("Claude retries native Opus, then uses same-runner Opus consult and records the fallback", async () => {
+  const nativeCalls = [];
+  const consultCalls = [];
   const result = await coordinateAdvisory(request({ profile: "feature", runner: "claude", question: "Is option A coherent?" }), options({
     invokeNative: async (call) => {
-      calls.push(call);
-      if (call.adapter === "native-fable") return { status: "unavailable" };
-      return { status: "answered", answer: "yes", identity: identity("anthropic", "claude-opus") };
+      nativeCalls.push(call);
+      return { status: "unavailable" };
+    },
+    invokeConsult: async (call) => {
+      consultCalls.push(call);
+      return { status: "answered", answer: "yes", identity: identity("anthropic", "claude-opus", "max") };
     },
   }));
 
   assert.equal(result.ok, true);
-  assert.equal(calls.length, ADVISORY_FABLE_ATTEMPTS + 1);
-  assert.deepEqual(calls.map(({ adapter, runner, attempt }) => ({ adapter, runner, attempt })), [
-    { adapter: "native-fable", runner: "claude", attempt: 1 },
-    { adapter: "native-fable", runner: "claude", attempt: 2 },
+  assert.equal(nativeCalls.length, ADVISORY_NATIVE_ATTEMPTS);
+  assert.deepEqual(nativeCalls.map(({ adapter, runner, attempt }) => ({ adapter, runner, attempt })), [
     { adapter: "native-opus", runner: "claude", attempt: 1 },
+    { adapter: "native-opus", runner: "claude", attempt: 2 },
   ]);
+  assert.equal(consultCalls.length, 1);
+  assert.equal(consultCalls[0].model, "opus");
   assert.equal(result.receipt.configuredRoute.runner, "claude");
   assert.equal(result.receipt.configuredRoute.selector.value, "opus");
   assert.equal(result.receipt.fallback.reason, "native-unavailable");
@@ -110,14 +115,14 @@ test("Claude falls through failed native adapters only to a fresh read-only Clau
     invokeNative: async () => ({ status: "timed-out" }),
     invokeConsult: async (call) => {
       consultCalls.push(call);
-      return { status: "answered", answer: "shadow first", identity: identity("anthropic", "claude-fable", "max") };
+      return { status: "answered", answer: "shadow first", identity: identity("anthropic", "claude-opus", "max") };
     },
   }));
 
   assert.equal(result.ok, true);
   assert.equal(consultCalls.length, 1);
   assert.equal(consultCalls[0].runner, "claude");
-  assert.equal(consultCalls[0].model, "fable");
+  assert.equal(consultCalls[0].model, "opus");
   assert.equal(consultCalls[0].effort, "max");
   assert.equal(consultCalls[0].freshContext, true);
   assert.deepEqual(consultCalls[0].tools, ["Read", "Grep", "Glob"]);

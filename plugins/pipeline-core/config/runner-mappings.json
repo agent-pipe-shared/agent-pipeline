@@ -23,41 +23,45 @@
     },
     "codex": {
       "capabilities": {
-        "review": "gpt-5.6-sol"
+        "design": "gpt-6-astra",
+        "implement": "gpt-5.6-luna",
+        "mechanic": "gpt-5.6-luna",
+        "deep": "gpt-5.6-terra",
+        "review": "gpt-5.6-terra"
       },
       "aliases": {
         "fable": "gpt-5.6-sol"
       },
       "directSelectors": {
-        "design": { "kind": "model-id", "value": "gpt-5.6-sol", "resolutionStatus": "observed-model-id", "resolutionEvidence": "project-codex-binding" },
-        "review": { "kind": "model-id", "value": "gpt-5.6-sol", "resolutionStatus": "observed-model-id", "resolutionEvidence": "project-codex-binding" },
-        "implement": { "kind": "alias", "value": "terra", "resolutionStatus": "unresolved-alias", "resolutionEvidence": null },
-        "mechanic": { "kind": "alias", "value": "terra", "resolutionStatus": "unresolved-alias", "resolutionEvidence": null },
-        "deep": { "kind": "alias", "value": "terra", "resolutionStatus": "unresolved-alias", "resolutionEvidence": null }
+        "design": { "kind": "model-id", "value": "gpt-6-astra", "resolutionStatus": "observed-model-id", "resolutionEvidence": "official-model-docs" },
+        "review": { "kind": "model-id", "value": "gpt-5.6-terra", "resolutionStatus": "observed-model-id", "resolutionEvidence": "official-model-docs" },
+        "implement": { "kind": "model-id", "value": "gpt-5.6-luna", "resolutionStatus": "observed-model-id", "resolutionEvidence": "official-model-docs" },
+        "mechanic": { "kind": "model-id", "value": "gpt-5.6-luna", "resolutionStatus": "observed-model-id", "resolutionEvidence": "official-model-docs" },
+        "deep": { "kind": "model-id", "value": "gpt-5.6-terra", "resolutionStatus": "observed-model-id", "resolutionEvidence": "official-model-docs" }
       },
       "effortMode": "identity"
     },
     "antigravity": {
       "capabilities": {
         "design": "gemini-3.1-pro-high",
-        "implement": "gemini-3.7-flash-high",
-        "mechanic": "gemini-3.7-flash-low",
-        "deep": "gemini-3.7-flash-high",
+        "implement": "gemini-3.8-flash-high",
+        "mechanic": "gemini-3.8-flash-low",
+        "deep": "gemini-3.8-flash-high",
         "review": "gemini-3.1-pro-high"
       },
       "aliases": {
-        "flash-high": "gemini-3.7-flash-high",
-        "flash-medium": "gemini-3.7-flash-medium",
-        "flash-low": "gemini-3.7-flash-low",
+        "flash-high": "gemini-3.8-flash-high",
+        "flash-medium": "gemini-3.8-flash-medium",
+        "flash-low": "gemini-3.8-flash-low",
         "pro-high": "gemini-3.1-pro-high",
         "pro-low": "gemini-3.1-pro-low"
       },
       "directSelectors": {
         "design": { "kind": "model-id", "value": "gemini-3.1-pro-high", "resolutionStatus": "observed-model-id", "resolutionEvidence": "agy-models" },
         "review": { "kind": "model-id", "value": "gemini-3.1-pro-high", "resolutionStatus": "observed-model-id", "resolutionEvidence": "agy-models" },
-        "implement": { "kind": "model-id", "value": "gemini-3.7-flash-high", "resolutionStatus": "observed-model-id", "resolutionEvidence": "agy-models" },
-        "mechanic": { "kind": "model-id", "value": "gemini-3.7-flash-low", "resolutionStatus": "observed-model-id", "resolutionEvidence": "agy-models" },
-        "deep": { "kind": "model-id", "value": "gemini-3.7-flash-high", "resolutionStatus": "observed-model-id", "resolutionEvidence": "agy-models" }
+        "implement": { "kind": "model-id", "value": "gemini-3.8-flash-high", "resolutionStatus": "observed-model-id", "resolutionEvidence": "agy-models" },
+        "mechanic": { "kind": "model-id", "value": "gemini-3.8-flash-low", "resolutionStatus": "observed-model-id", "resolutionEvidence": "agy-models" },
+        "deep": { "kind": "model-id", "value": "gemini-3.8-flash-high", "resolutionStatus": "observed-model-id", "resolutionEvidence": "agy-models" }
       },
       "effortMode": "identity"
     }

@@ -26,7 +26,7 @@
           "state": "default",
           "selector": {
             "kind": "model-id",
-            "value": "gpt-5.6-sol"
+            "value": "gpt-6-astra"
           },
           "effort": "xhigh",
           "unavailable": "defer",
@@ -68,7 +68,7 @@
           "state": "unavailable",
           "selector": {
             "kind": "model-id",
-            "value": "gemini-3.7-flash-high"
+            "value": "gemini-3.8-flash-high"
           },
           "effort": "high",
           "unavailable": "defer",
@@ -92,7 +92,7 @@
           "state": "default",
           "selector": {
             "kind": "model-id",
-            "value": "gpt-5.6-sol"
+            "value": "gpt-6-astra"
           },
           "effort": "high",
           "unavailable": "defer",
@@ -134,7 +134,7 @@
           "state": "unavailable",
           "selector": {
             "kind": "model-id",
-            "value": "gemini-3.7-flash-high"
+            "value": "gemini-3.8-flash-high"
           },
           "effort": "high",
           "unavailable": "defer",
@@ -168,7 +168,7 @@
           "state": "unavailable",
           "selector": {
             "kind": "model-id",
-            "value": "gemini-3.7-flash-high"
+            "value": "gemini-3.8-flash-high"
           },
           "effort": "high",
           "unavailable": "defer",
@@ -200,7 +200,7 @@
           "state": "unavailable",
           "selector": {
             "kind": "model-id",
-            "value": "gemini-3.7-flash-high"
+            "value": "gemini-3.8-flash-high"
           },
           "effort": "high",
           "unavailable": "defer",
@@ -235,7 +235,7 @@
         "state": "unavailable",
         "selector": {
           "kind": "model-id",
-          "value": "gemini-3.7-flash-high"
+          "value": "gemini-3.8-flash-high"
         },
         "effort": "high",
         "unavailable": "defer",
@@ -267,7 +267,7 @@
         "state": "unavailable",
         "selector": {
           "kind": "model-id",
-          "value": "gemini-3.7-flash-low"
+          "value": "gemini-3.8-flash-low"
         },
         "effort": "low",
         "unavailable": "defer",
@@ -299,7 +299,7 @@
         "state": "unavailable",
         "selector": {
           "kind": "model-id",
-          "value": "gemini-3.7-flash-high"
+          "value": "gemini-3.8-flash-high"
         },
         "effort": "high",
         "unavailable": "defer",
@@ -331,7 +331,7 @@
         "state": "unavailable",
         "selector": {
           "kind": "model-id",
-          "value": "gemini-3.7-flash-high"
+          "value": "gemini-3.8-flash-high"
         },
         "effort": "high",
         "unavailable": "defer",
@@ -363,7 +363,7 @@
         "state": "unavailable",
         "selector": {
           "kind": "model-id",
-          "value": "gemini-3.7-flash-high"
+          "value": "gemini-3.8-flash-high"
         },
         "effort": "high",
         "unavailable": "defer",
@@ -385,7 +385,7 @@
         "state": "default",
         "selector": {
           "kind": "model-id",
-          "value": "gpt-5.6-sol"
+          "value": "gpt-6-astra"
         },
         "effort": "max",
         "unavailable": "defer",
@@ -427,7 +427,7 @@
         "state": "unavailable",
         "selector": {
           "kind": "model-id",
-          "value": "gemini-3.7-flash-high"
+          "value": "gemini-3.8-flash-high"
         },
         "effort": "high",
         "unavailable": "defer",
@@ -443,34 +443,24 @@
       "receipt": "pipeline.advisory-receipt.v1",
       "claude": {
         "state": "default",
-        "adapter": "native-fable",
+        "adapter": "native-opus",
         "selector": {
           "kind": "alias",
-          "value": "fable"
+          "value": "opus"
         },
         "effort": "not-applicable",
         "evidence": "advisory-receipt",
         "fallbacks": [
           {
-            "adapter": "native-opus",
+            "adapter": "consult",
             "runner": "claude",
             "selector": {
               "kind": "alias",
               "value": "opus"
             },
-            "effort": "not-applicable",
-            "when": "native-fable-repeated-failure"
-          },
-          {
-            "adapter": "consult",
-            "runner": "claude",
-            "selector": {
-              "kind": "alias",
-              "value": "fable"
-            },
             "effort": "max",
             "isolation": "fresh-read-only",
-            "when": "native-adapters-unavailable"
+            "when": "native-opus-repeated-failure"
           }
         ]
       },
@@ -480,7 +470,7 @@
         "runner": "codex",
         "selector": {
           "kind": "model-id",
-          "value": "gpt-5.6-sol"
+          "value": "gpt-6-astra"
         },
         "effort": "max",
         "isolation": "selected-sandbox-network-open-read-only",

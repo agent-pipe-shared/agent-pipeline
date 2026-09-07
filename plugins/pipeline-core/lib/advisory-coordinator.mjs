@@ -23,7 +23,7 @@ const PROVIDER = Object.freeze({ claude: "anthropic", codex: "openai", antigravi
 const CONSULT_TOOLS = Object.freeze(["Read", "Grep", "Glob"]);
 const SELECTED_CODEX_CONSULT_TOOLS = Object.freeze([...CONSULT_TOOLS, "Bash"]);
 
-export const ADVISORY_FABLE_ATTEMPTS = 2;
+export const ADVISORY_NATIVE_ATTEMPTS = 2;
 export const ADVISORY_CONSULT_AGENT = "consult-advisor";
 
 function digest(value) {
@@ -72,7 +72,6 @@ function identityMatchesRoute(identity, step) {
   const configured = step.selector?.value;
   if (step.selector?.kind === "model-id") return identity.modelId === configured;
   const acceptedAliases = {
-    fable: new Set(["fable", "claude-fable"]),
     opus: new Set(["opus", "claude-opus"]),
     sonnet: new Set(["sonnet", "claude-sonnet"]),
   };
@@ -183,11 +182,11 @@ function routeSteps(contract, runner) {
   if (runner === "codex" || runner === "antigravity") {
     return [{ kind: "consult", adapter: route.adapter, runner, selector: route.selector, effort: route.effort, attempts: 1 }];
   }
-  const nativeOpus = route.fallbacks?.find((entry) => entry.adapter === "native-opus");
+  const nativeFallback = route.fallbacks?.find((entry) => entry.adapter?.startsWith("native-"));
   const consult = route.fallbacks?.find((entry) => entry.adapter === "consult");
   return [
-    { kind: "native", adapter: route.adapter, runner, selector: route.selector, effort: route.effort, attempts: ADVISORY_FABLE_ATTEMPTS },
-    nativeOpus && { kind: "native", ...nativeOpus, effort: nativeOpus.effort ?? route.effort, attempts: 1 },
+    { kind: "native", adapter: route.adapter, runner, selector: route.selector, effort: route.effort, attempts: ADVISORY_NATIVE_ATTEMPTS },
+    nativeFallback && { kind: "native", ...nativeFallback, effort: nativeFallback.effort ?? route.effort, attempts: 1 },
     consult && { kind: "consult", ...consult, effort: consult.effort ?? route.effort, attempts: 1 },
   ].filter(Boolean);
 }

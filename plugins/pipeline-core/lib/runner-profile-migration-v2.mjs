@@ -287,7 +287,7 @@ function directRoute(value, path, expectedRunner, diagnostics, { advisory = fals
   }
   const allowedSelectors = expectedRunner === "claude"
     ? [["alias", "fable"], ["alias", "opus"], ["alias", "sonnet"]]
-    : [["model-id", "gpt-5.6-sol"], ["model-id", "gpt-5.6-terra"], ["alias", "terra"]];
+    : [["model-id", "gpt-5.6-sol"], ["model-id", "gpt-5.6-terra"], ["model-id", "gpt-6-astra"], ["model-id", "gpt-5.6-luna"], ["alias", "terra"]];
   if (!allowedSelectors.some(([kind, selector]) => value.selector.kind === kind && value.selector.value === selector)) {
     diagnostics.push(diagnostic(`${path}.selector`, "unknown_selector", "direct route selector is not registered", "use a supported requested selector"));
     return null;

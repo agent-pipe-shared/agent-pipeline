@@ -47,8 +47,7 @@ const cases = [
       "mini.execution.claude": route(registry.profiles.mini.execution_phase.claude),
       "advisory.codex": route(registry.duties.advisory.codex),
       "advisory.claude": route(registry.duties.advisory.claude),
-      "advisory.claude.native-opus": route(registry.duties.advisory.claude.fallbacks[0]),
-      "advisory.claude.consult": route(registry.duties.advisory.claude.fallbacks[1]),
+      "advisory.claude.consult": route(registry.duties.advisory.claude.fallbacks[0]),
       "critic-high-risk.codex": route(registry.duties.critic_high_risk.codex),
       "critic-high-risk.claude": route(registry.duties.critic_high_risk.claude),
       "critic-normal.codex": route(registry.duties.critic_normal.codex),
@@ -64,15 +63,15 @@ const cases = [
       "test-author.codex": route(registry.duties.test_author.codex),
       "test-author.claude": route(registry.duties.test_author.claude),
     }, {
-      "epic.design.codex": "gpt-5.6-sol / xhigh", "epic.design.claude": "opus / xhigh",
+      "epic.design.codex": "gpt-6-astra / xhigh", "epic.design.claude": "opus / xhigh",
       "epic.execution.codex": "gpt-5.6-terra / high", "epic.execution.claude": "sonnet / high",
-      "feature.design.codex": "gpt-5.6-sol / high", "feature.design.claude": "opus / high",
+      "feature.design.codex": "gpt-6-astra / high", "feature.design.claude": "opus / high",
       "feature.execution.codex": "gpt-5.6-terra / medium", "feature.execution.claude": "sonnet / medium",
       "mini.design.codex": "gpt-5.6-terra / high", "mini.design.claude": "sonnet / high",
       "mini.execution.codex": "gpt-5.6-terra / medium", "mini.execution.claude": "sonnet / medium",
-      "advisory.codex": "gpt-5.6-sol / max", "advisory.claude": "fable / not-applicable",
-      "advisory.claude.native-opus": "opus / not-applicable", "advisory.claude.consult": "fable / max",
-      "critic-high-risk.codex": "gpt-5.6-sol / max", "critic-high-risk.claude": "opus / max",
+      "advisory.codex": "gpt-6-astra / max", "advisory.claude": "opus / not-applicable",
+      "advisory.claude.consult": "opus / max",
+      "critic-high-risk.codex": "gpt-6-astra / max", "critic-high-risk.claude": "opus / max",
       "critic-normal.codex": "gpt-5.6-terra / high", "critic-normal.claude": "sonnet / high",
       "deep.codex": "gpt-5.6-terra / medium", "deep.claude": "sonnet / medium",
       "implement.codex": "gpt-5.6-luna / medium", "implement.claude": "sonnet / medium",
@@ -94,13 +93,13 @@ const cases = [
     const value = completeIntent(); value.routing.duties.advisory.eligibility.mini = "required";
     const checked = validatePipelineUserV3(value); assert.equal(checked.ok, false); assert.ok(has(checked, "$.routing.duties.advisory.eligibility.mini", "frozen_mapping"));
   }],
-  ["Claude fallback order is fixed", () => {
-    const value = completeIntent(); value.routing.duties.advisory.claude.fallbacks.reverse();
+  ["Claude fallback route is fixed", () => {
+    const value = completeIntent(); value.routing.duties.advisory.claude.fallbacks[0].selector.value = "sonnet";
     const checked = validatePipelineUserV3(value); assert.equal(checked.ok, false); assert.ok(checked.errors.some((entry) => entry.path.startsWith("$.routing.duties.advisory.claude.fallbacks")));
   }],
   ["Codex advisory selected-sandbox host-consult cell is frozen", () => {
     const cell = completeIntent().routing.duties.advisory.codex;
-    assert.deepEqual(cell, { adapter: "host-consult", effort: "max", evidence: "advisory-receipt", isolation: "selected-sandbox-network-open-read-only", runner: "codex", selector: { kind: "model-id", value: "gpt-5.6-sol" }, state: "default", status: "pipeline.codex-sandbox-execution-receipt.v1" });
+    assert.deepEqual(cell, { adapter: "host-consult", effort: "max", evidence: "advisory-receipt", isolation: "selected-sandbox-network-open-read-only", runner: "codex", selector: { kind: "model-id", value: "gpt-6-astra" }, state: "default", status: "pipeline.codex-sandbox-execution-receipt.v1" });
     const value = completeIntent(); value.routing.duties.advisory.codex.selector.value = "gpt-5.6-terra";
     const checked = validatePipelineUserV3(value); assert.equal(checked.ok, false); assert.ok(has(checked, "$.routing.duties.advisory.codex.selector.value", "frozen_mapping"));
   }],
@@ -140,7 +139,7 @@ const cases = [
     assert.equal(codexRoute.effort, "high");
 
     const agyRoute = registry.duties.critic_normal.antigravity;
-    assert.equal(agyRoute.selector.value, "gemini-3.7-flash-high");
+    assert.equal(agyRoute.selector.value, "gemini-3.8-flash-high");
     assert.equal(agyRoute.effort, "high");
 
     const agyHighRisk = registry.duties.critic_high_risk.antigravity;

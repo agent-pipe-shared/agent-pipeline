@@ -227,7 +227,7 @@ record("v2 -> v3 is one-way, digest-only, and old design.advisory cannot disable
     assert.equal(intent.routing.profiles.design, undefined);
     assert.equal(intent.routing.profiles.epic.design_phase.claude.selector.value, "opus");
     assert.equal(intent.routing.duties.advisory.eligibility.epic, "required");
-    assert.equal(intent.routing.duties.advisory.claude.adapter, "native-fable");
+    assert.equal(intent.routing.duties.advisory.claude.adapter, "native-opus");
     assert.equal(intent.routing.duties.advisory.codex.adapter, "host-consult");
     assert.deepEqual(intent.advisor_export, { consent: "approved" });
     assert.deepEqual(validatePipelineUserV3(intent).advisoryExport, { consent: "approved", enabled: true });
@@ -298,7 +298,9 @@ record("a V3 authority update refreshes every frozen routing mapping as one regi
     const refreshed = parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8"));
     const registry = loadRunnerProfilesV3Registry();
     assert.deepEqual(refreshed.routing, { profiles: registry.profiles, duties: registry.duties });
+    assert.doesNotMatch(JSON.stringify(refreshed.routing), /fable/u);
     assert.equal(validatePipelineUserV3(refreshed).ok, true);
+    assert.match(readFileSync(join(root, ".claude/pipeline.yaml"), "utf8"), /advisor_epic:\n    model: opus/u);
     assert.equal(planRunnerProfileMigrationV3({ rootDir: root }).status, "noop");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

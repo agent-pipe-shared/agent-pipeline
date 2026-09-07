@@ -120,8 +120,8 @@ test("V3 plan projects epic/feature advisory and excludes mini advisory", () => 
     assert.equal(plan.status, "ready");
     assert.equal(plan.schema, "pipeline.runtime-projection-plan.v3");
     const claude = target(plan, ".claude/pipeline.yaml");
-    assert.match(claude.after.bytes, /advisor_epic:\n    model: fable\n    effort: not-applicable/u);
-    assert.match(claude.after.bytes, /advisor_feature:\n    model: fable\n    effort: not-applicable/u);
+    assert.match(claude.after.bytes, /advisor_epic:\n    model: opus\n    effort: not-applicable/u);
+    assert.match(claude.after.bytes, /advisor_feature:\n    model: opus\n    effort: not-applicable/u);
     assert.doesNotMatch(claude.after.bytes, /advisor_mini/u);
     assert.doesNotMatch(claude.after.bytes, /runnerRoutes/u);
     assert.doesNotMatch(claude.after.bytes, /worktype_mini_advisor/u);
@@ -129,7 +129,7 @@ test("V3 plan projects epic/feature advisory and excludes mini advisory", () => 
     assert.match(claude.after.bytes, /hostGate: visible-not-bypassed/u);
     assert.match(claude.after.bytes, /providerGate: visible-not-bypassed/u);
     assert.match(claude.after.bytes, /elephant_epic_design/u);
-    assert.match(claude.after.bytes, /Adapter selector catalog — Claude aliases: fable, haiku, opus, sonnet; Codex\/OpenAI model IDs: gpt-5\.6-luna, gpt-5\.6-sol, gpt-5\.6-terra\./u);
+    assert.match(claude.after.bytes, /Adapter selector catalog — Claude aliases: haiku, opus, sonnet; Codex\/OpenAI model IDs: gpt-5\.6-luna, gpt-5\.6-terra, gpt-6-astra\./u);
     assert.match(claude.after.bytes, /language:\n  human_facing: de\n  unowned_language_sentinel: exact/u);
     assert.match(claude.after.bytes, /language:\n  human_facing: de\n  unowned_language_sentinel: exact\nsession:\n  keep_awake: true\ncustomBefore: exact\n/u);
     assert.ok(claude.after.bytes.endsWith(SUFFIX));
