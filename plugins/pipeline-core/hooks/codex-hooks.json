@@ -55,6 +55,7 @@
     ],
     "SubagentStart": [
       {
+        "matcher": "",
         "hooks": [
           {
             "type": "command",
@@ -68,6 +69,7 @@
     ],
     "SubagentStop": [
       {
+        "matcher": "",
         "hooks": [
           {
             "type": "command",
