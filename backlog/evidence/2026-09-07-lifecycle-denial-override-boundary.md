@@ -28,3 +28,25 @@ suites and the central override and repair-map tests. The separate
 `consumer-safe-paths.txt` capture in the same directory passed all 9 checks.
 Earlier red fixture-migration captures remain preserved. This is source-level
 fixture verification; no installed-plugin or live-user override is claimed.
+
+## Native plugin-cache fixture isolation (2026-09-08)
+
+The two remaining Codex plugin-cache boundary regressions use disposable
+readyLifecycleFixture("chat") repositories. They keep the actual lifecycle
+producer/readback path, then exercise the static plugin-cache cross-repository
+classification and its exact-only external-boundary adapter route. This removes
+an unintended dependency on this repository's live source root while preserving
+the one-boundary/no-retry and safe-command/copy-command assertions.
+
+The prior terminal red captures remain evidence that these tests, when rooted
+at the live source checkout, observed `guard-lifecycle-ready.mjs` `ETIMEDOUT`
+and then `HGO-DECISION-RECORD-UNAVAILABLE`. Fixture isolation does not identify
+the timeout's cause or repair any live source/host hook problem; it isolates the
+native regression contract from that observed live-root condition.
+
+Separate 2026-09-08 measurements found source-root V4 readiness/CAS ready in
+0.7 seconds, registry listing in 204 milliseconds, and an explicitly
+external-registry-excluding source-tree hash in 217 milliseconds. Those are
+bounded observations of individual operations at that time, not a diagnosis or
+repair of the earlier hook timeout; no HGO storage or installation call was
+made for them.
