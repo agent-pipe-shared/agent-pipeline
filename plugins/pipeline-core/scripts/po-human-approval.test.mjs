@@ -2200,7 +2200,7 @@ function hgoFixtureDirs() {
 
 /** denial -> plan -> prepare-authorization (fixed HGO_SIGNATURE_REASON) -> the independently-reconstructed intent digest sign-intent must resolve, mirroring lib/human-guard-override.test.mjs's prepareSignedArming() shape without calling into any of this module's own new exports. */
 function armHgoRequest(repoRoot, toolInput) {
-  const denials = [{ guard: "guard-lifecycle-ready.mjs", reason: "GUARD-LIFECYCLE-NOT-READY" }];
+  const denials = [{ guard: "guard-devplan.mjs", reason: "GUARD-DEVPLAN-NOT-READY" }];
   const recorded = recordHumanGuardDenial({ rootDir: repoRoot, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials });
   assert.equal(recorded.status, "planned", `HGO fixture denial not plannable: ${JSON.stringify(recorded)}`);
   const scriptPath = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
@@ -2237,7 +2237,7 @@ test("NVA-SIGENTRY-1: sign-intent resolves an HGO signature-mode intent digest a
     const [prompt] = prompts;
     assert.ok(prompt.includes(armed.intent.sha256), "the digest being signed must still be named");
     assert.ok(prompt.includes("notes.md"), "the eligible path must be shown");
-    assert.ok(prompt.includes("GUARD-LIFECYCLE-NOT-READY"), "the denying guard's rationale must be shown");
+    assert.ok(prompt.includes("GUARD-DEVPLAN-NOT-READY"), "the denying guard's rationale must be shown");
     assert.match(prompt, /expires at/iu, "the recorded expiry must be shown");
     assert.doesNotMatch(prompt, /no recorded request/iu, "must not fall into the cannot-describe fallback");
 

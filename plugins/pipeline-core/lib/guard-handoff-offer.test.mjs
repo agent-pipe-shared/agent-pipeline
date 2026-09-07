@@ -26,7 +26,8 @@ import { humanGuardOverrideInternals, recordHumanGuardDenial } from "./human-gua
 
 const PLUGIN_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const NOW = 1_734_000_000_000;
-const denial = [{ guard: "guard-lifecycle-ready.mjs", reason: "GUARD-LIFECYCLE-NOT-READY" }];
+const denial = [{ guard: "guard-devplan.mjs", reason: "GUARD-DEVPLAN-NOT-READY" }];
+const lifecycleDenial = [{ guard: "guard-lifecycle-ready.mjs", reason: "GUARD-LIFECYCLE-NOT-READY" }];
 
 function git(root, ...args) {
   const result = spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });
@@ -212,6 +213,30 @@ test("R-AC-10: an unverified append readback suppresses nextAction the same way"
       assert.equal(observed.journalRefusal, GUARD_HANDOFF_JOURNAL_REFUSAL, label);
       assert.equal(Object.hasOwn(observed, "nextAction"), false, label);
     }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("lifecycle-not-ready never creates a signature path or external hand-off offer", () => {
+  const root = fixture();
+  try {
+    const appended = [];
+    const observed = recordHumanGuardDenial({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      toolName: "Read",
+      toolInput: { file_path: CANARY },
+      denials: lifecycleDenial,
+      nowMs: NOW,
+      appendCommandOffer: verifiedAppend(appended),
+    });
+    assert.equal(observed.status, "non-liftable-recovery-required");
+    assert.equal(observed.code, "HGO-NONOVERRIDABLE-LIFECYCLE-NOT-READY");
+    assert.equal(observed.nextAction.kind, "repair-required");
+    assert.equal(Object.hasOwn(observed, "requestSha256"), false);
+    assert.equal(Object.hasOwn(observed, "candidateSourceRoot"), false);
+    assert.deepEqual(appended, []);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
