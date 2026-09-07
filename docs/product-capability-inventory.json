@@ -213,6 +213,7 @@
         "verify-phase:harness/scripts/verify.mjs:authority-tier-agreement-check",
         "verify-phase:harness/scripts/verify.mjs:authority-tier-agreement-tests",
         "verify-phase:harness/scripts/verify.mjs:backlog-dispatch-reference-tests",
+        "verify-phase:harness/scripts/verify.mjs:backlog-done-predicate-check",
         "verify-phase:harness/scripts/verify.mjs:backlog-done-predicate-tests",
         "verify-phase:harness/scripts/verify.mjs:backlog-item-strip-for-dispatch-tests",
         "verify-phase:harness/scripts/verify.mjs:backlog-ledger-reconciliation-tests",

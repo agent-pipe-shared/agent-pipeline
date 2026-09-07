@@ -717,6 +717,13 @@ const TEST_SUITES = [
   // script against the real backlog/items/ tree. Running the script here is what makes that
   // claim true; the suite alone is shape evidence, not result evidence.
   { name: "backlog-sprint-assignment-check", file: join(pluginScriptsDir, "check-backlog-sprint-assignment.mjs") },
+  // Same reasoning as the sprint-assignment check directly above, for the sibling predicate
+  // checker: its suite proves the shape, only running it here proves the result. Registered
+  // 2026-09-07 under a PO-signed TP-3 override, after the four contradictions it reported on
+  // first run were resolved -- three finished items still booked open, and one predicate that
+  // named a test anchor which already existed when it was written, so the item read satisfied
+  // from the moment it was declared while the defect stayed live.
+  { name: "backlog-done-predicate-check", file: join(pluginScriptsDir, "check-backlog-done-predicate.mjs") },
   { name: "copy-safe-command-tests", file: join(libDir, "copy-safe-command.test.mjs") },
   { name: "project-onboarding-v3-pre-push-hook-offer-tests", file: join(pluginScriptsDir, "project-onboarding-v3-pre-push-hook-offer.test.mjs") },
   { name: "onboarding-init-tests", file: join(pluginScriptsDir, "onboarding-init.test.mjs") },
