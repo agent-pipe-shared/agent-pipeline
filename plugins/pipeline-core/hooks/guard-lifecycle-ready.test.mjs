@@ -7486,6 +7486,72 @@ test("NVA-BOOTRECEIPT-1: a subagent's sanctioned preflight Bash call writes a re
   }
 });
 
+test("NVA-B-GL09-ACTIVATE-1: measured runtime agent keys produce and consume one same-agent receipt", () => {
+  const path = bootstrapGovernedRoot();
+  const commonDir = bootstrapCommonDirFixture();
+  const { sessionDir, transcriptPath } = claudeMemorySessionFixture();
+  const runtimeSubagent = (toolName, toolInput, agentId = "runtime-agent-a") => ({
+    tool_name: toolName,
+    tool_input: toolInput,
+    transcript_path: transcriptPath,
+    agent_id: agentId,
+    agent_type: "pipeline-core:goldfish-deep",
+  });
+  const deps = { projectDir: path, resolveGitCommonDirFn: () => commonDir, requireProjectOnboardingReadyFn: () => readyStub(), nowFn: () => "1970-01-01T00:00:00.000Z" };
+  try {
+    for (const [toolName, toolInput] of [
+      ["Edit", { file_path: "src/implementation.mjs" }],
+      ["Write", { file_path: join(path, "src", "implementation.mjs") }],
+      ["NotebookEdit", { notebook_path: "src/implementation.ipynb" }],
+    ]) {
+      const denied = evaluateLifecycleReadyGuard(runtimeSubagent(toolName, toolInput), deps);
+      assert.equal(denied.exitCode, 2, toolName);
+      assert.match(denied.stderr, /GUARD-BOOTSTRAP-RECEIPT-MISSING/u, toolName);
+    }
+    assert.equal(evaluateLifecycleReadyGuard(runtimeSubagent("Bash", { command: `node "${START_PREFLIGHT_SCRIPT}"` }), deps).exitCode, 0);
+    assert.ok(existsSync(bootstrapReceiptPathFixture(commonDir, "runtime-agent-a")));
+    assert.deepEqual(JSON.parse(readFileSync(bootstrapReceiptPathFixture(commonDir, "runtime-agent-a"), "utf8")), {
+      schema: "pipeline.bootstrap-receipt.v1",
+      agentId: "runtime-agent-a",
+      agentType: "pipeline-core:goldfish-deep",
+      observedAt: "1970-01-01T00:00:00.000Z",
+    });
+    assert.equal(evaluateLifecycleReadyGuard(runtimeSubagent("Edit", { file_path: "src/implementation.mjs" }), deps).exitCode, 0);
+    assert.equal(evaluateLifecycleReadyGuard(runtimeSubagent("Edit", { file_path: "src/implementation.mjs" }, "runtime-agent-b"), deps).exitCode, 2);
+    assert.equal(evaluateLifecycleReadyGuard({ tool_name: "Edit", tool_input: { file_path: "src/implementation.mjs" }, transcript_path: transcriptPath }, deps).exitCode, 0);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(commonDir, { recursive: true, force: true });
+    rmSync(sessionDir, { recursive: true, force: true });
+  }
+});
+
+test("NVA-B-GL09-ACTIVATE-1: invalid transcript paths stay fail-closed and unsafe runtime keys stay visible unresolved", () => {
+  const path = bootstrapGovernedRoot();
+  const commonDir = bootstrapCommonDirFixture();
+  const deps = { projectDir: path, resolveGitCommonDirFn: () => commonDir, requireProjectOnboardingReadyFn: () => readyStub(), nowFn: () => "1970-01-01T00:00:00.000Z" };
+  try {
+    const relative = evaluateLifecycleReadyGuard({
+      tool_name: "Edit", tool_input: { file_path: "src/implementation.mjs" }, transcript_path: "relative/session.jsonl",
+      agent_id: "runtime-agent-a", agent_type: "pipeline-core:goldfish-deep",
+    }, deps);
+    assert.equal(relative.exitCode, 2);
+    assert.match(relative.stderr, /GUARD-BOOTSTRAP-RECEIPT-MISSING/u);
+    for (const [agent_id, agent_type] of [["runtime-agent-a", undefined], ["../traversal", "pipeline-core:goldfish-deep"], ["runtime-agent-a", "../traversal"]]) {
+      const result = evaluateLifecycleReadyGuard({
+        tool_name: "Edit", tool_input: { file_path: "src/implementation.mjs" }, transcript_path: "/parent/session.jsonl", agent_id, agent_type,
+      }, deps);
+      assert.equal(result.exitCode, 0);
+    }
+    const records = readFileSync(bootstrapObservationsPathFixture(commonDir), "utf8").trim().split("\n").map((line) => JSON.parse(line));
+    assert.equal(records.filter((record) => record.decision === "fail-open-unresolved-identity" && record.reason === "runtime-agent-identity-invalid").length, 3);
+    assert.equal(existsSync(join(commonDir, "agent-pipeline", "bootstrap-receipt", "..", "traversal.json")), false);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(commonDir, { recursive: true, force: true });
+  }
+});
+
 test("NVA-BOOTRECEIPT-1: near-miss Bash commands do not write a receipt", () => {
   const path = bootstrapGovernedRoot();
   const commonDir = bootstrapCommonDirFixture();
@@ -8210,6 +8276,32 @@ test("NVA-B-TRIMKEY AC-4: a subagent's own first denial of a class renders full 
     rmSync(path, { recursive: true, force: true });
     rmSync(commonDir, { recursive: true, force: true });
     rmSync(dirname(dirname(subagentTranscriptPath)), { recursive: true, force: true });
+  }
+});
+
+test("NVA-B-GL09-ACTIVATE-1: runtime-keyed subagent denial trim is independent of its parent session", () => {
+  const path = root();
+  const commonDir = bootstrapCommonDirFixture();
+  const { sessionDir, transcriptPath } = claudeMemorySessionFixture();
+  writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+  const deps = { projectDir: path, resolveGitCommonDirFn: () => commonDir };
+  const command = "rg -n lifecycle . | tee output.txt";
+  const session_id = "runtime-trim-shared-session";
+  try {
+    const parentFirst = evaluateLifecycleReadyGuard(bashWithSession(command, session_id), deps);
+    assert.match(parentFirst.stderr, /The complete admitted grammar, with bounds and exact spellings:/u);
+    const parentSecond = evaluateLifecycleReadyGuard(bashWithSession(command, session_id), deps);
+    assert.doesNotMatch(parentSecond.stderr, /The complete admitted grammar, with bounds and exact spellings:/u);
+    const runtimeSubagent = { tool_name: "Bash", tool_input: { command }, transcript_path: transcriptPath, session_id, agent_id: "runtime-trim-agent", agent_type: "pipeline-core:goldfish-deep" };
+    const first = evaluateLifecycleReadyGuard(runtimeSubagent, deps);
+    assert.match(first.stderr, /The complete admitted grammar, with bounds and exact spellings:/u);
+    const second = evaluateLifecycleReadyGuard(runtimeSubagent, deps);
+    assert.ok(second.stderr.length < first.stderr.length);
+    assert.ok(existsSync(join(commonDir, "agent-pipeline", "guard-denial-classes", "agent-runtime-trim-agent.json")));
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(commonDir, { recursive: true, force: true });
+    rmSync(sessionDir, { recursive: true, force: true });
   }
 });
 

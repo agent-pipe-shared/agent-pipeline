@@ -188,6 +188,8 @@ export function governanceMarkers(dependencies = {}) {
   }
 }
 const READY_RECEIPT_KEYS = ["intent", "schema", "status"];
+const RUNTIME_AGENT_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/u;
+const RUNTIME_AGENT_TYPE = /^[A-Za-z0-9][A-Za-z0-9:._-]{0,159}$/u;
 const ONBOARDING_SCRIPT = fileURLToPath(new URL("../scripts/project-onboarding-v3.mjs", import.meta.url));
 // NVA-K-DRIVERREACH (backlog: 2026-08-28-the-guided-driver-is-neither-discoverable-nor-
 // runnable.md): onboarding-init.mjs walks the onboarding CLI's `nextAction` chain to
@@ -4270,6 +4272,29 @@ function bootstrapReceiptDir(commonDir) {
   return join(commonDir, "agent-pipeline", "bootstrap-receipt");
 }
 
+// The live PreToolUse payload identifies dispatched callers with agent_id and
+// agent_type while retaining the parent's transcript path. Keep the sibling
+// budget resolver untouched: this local adapter changes only lifecycle receipt
+// and denial-trim consumers, and delegates every legacy shape to it unchanged.
+function lifecycleSubagentIdentity(input, dependencies) {
+  const legacy = (dependencies.subagentIdentityFn ?? subagentIdentity)(input, dependencies);
+  // A present malformed transcript path remains fail-closed even when a
+  // runtime key pair is also present; runtime keys must not mask that legacy
+  // authority-bearing fault.
+  if (legacy.kind === "invalid-identity") return legacy;
+  const hasAgentId = Object.hasOwn(input ?? {}, "agent_id");
+  const hasAgentType = Object.hasOwn(input ?? {}, "agent_type");
+  if (!hasAgentId && !hasAgentType) return legacy;
+  if (typeof input?.agent_id !== "string" || !RUNTIME_AGENT_ID.test(input.agent_id)
+    || typeof input?.agent_type !== "string" || !RUNTIME_AGENT_TYPE.test(input.agent_type)) {
+    return {
+      kind: "unresolved",
+      reason: "runtime-agent-identity-invalid",
+    };
+  }
+  return { kind: "subagent", agentId: input.agent_id, agentType: input.agent_type };
+}
+
 function bootstrapReceiptPath(commonDir, agentId) {
   return join(bootstrapReceiptDir(commonDir), `${agentId}.json`);
 }
@@ -4311,7 +4336,7 @@ function recordBootstrapObservation(commonDir, record, dependencies) {
  * record); fails open WITH an observation line for every other unresolvable branch.
  */
 function recordBootstrapPreflightReceipt(input, root, dependencies) {
-  const identity = (dependencies.subagentIdentityFn ?? subagentIdentity)(input, dependencies);
+  const identity = lifecycleSubagentIdentity(input, dependencies);
   if (identity.kind !== "subagent") return;
   const commonDir = (dependencies.resolveGitCommonDirFn ?? resolveGitCommonDir)(root, dependencies);
   if (commonDir === null) return; // nowhere safe to persist or record -- fail open, silently
@@ -4363,7 +4388,7 @@ function bootstrapReceiptMissingBlocked(identity, toolName) {
  * repository.
  */
 function evaluateBootstrapReceiptGate(input, root, toolName, dependencies) {
-  const identity = (dependencies.subagentIdentityFn ?? subagentIdentity)(input, dependencies);
+  const identity = lifecycleSubagentIdentity(input, dependencies);
   if (identity.kind === "orchestrator") return null;
   const commonDir = (dependencies.resolveGitCommonDirFn ?? resolveGitCommonDir)(root, dependencies);
   if (commonDir === null) return null; // nowhere safe to persist or record -- fail open, silently
@@ -4471,7 +4496,7 @@ function guardDenialClassesPath(commonDir, scopeKey) {
  *    extra full-text output, never a wrongly-trimmed denial.
  */
 function denialClassesScopeKey(input, dependencies) {
-  const identity = (dependencies.subagentIdentityFn ?? subagentIdentity)(input, dependencies);
+  const identity = lifecycleSubagentIdentity(input, dependencies);
   if (identity.kind === "subagent" && typeof identity.agentId === "string" && identity.agentId !== "") {
     return `agent-${identity.agentId}`;
   }
