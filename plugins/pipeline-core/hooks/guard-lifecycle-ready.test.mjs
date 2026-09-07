@@ -6,6 +6,7 @@ import { spawnSync } from "node:child_process";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import {
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -7983,6 +7984,88 @@ test("NVA-B-GREENFIELD-SCRATCH-1: bootstrap-binding-required admits only contain
   } finally {
     rmSync(path, { recursive: true, force: true });
     if (outside !== null) rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("NVA-B-GREENFIELD-SCRATCH-CONTAINMENT-1: intended pre-plan scratch lanes require physical scratch containment", () => {
+  const statuses = ["intake-required", "intake-design-questions-required", "restart-required", "bootstrap-binding-required"];
+  for (const status of statuses) {
+    const path = root();
+    let external = null;
+    try {
+      writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+      const deps = { projectDir: path, requireProjectOnboardingReadyFn() { deny(status); } };
+
+      // First creation has no existing scratch ancestor to realpath. It remains bounded by the
+      // physical project root and must stay admitted for a legitimate nested scratch path.
+      const firstCreationInputs = [write("scratch/nested/first-note.md")];
+      // Bootstrap binding deliberately grants its bounded scratch lane only to document
+      // authoring tools; its Bash mkdir boundary stays denied by the ordinary lifecycle gate.
+      if (status !== "bootstrap-binding-required") firstCreationInputs.push(bash("mkdir -p scratch/nested"));
+      for (const input of firstCreationInputs) {
+        assert.equal(evaluateLifecycleReadyGuard(input, deps).exitCode, 0, `${status}/first creation/${input.tool_name}`);
+      }
+
+      mkdirSync(join(path, "scratch"));
+      mkdirSync(join(path, "src"));
+      mkdirSync(join(path, ".claude"), { recursive: true });
+      external = mkdtempSync(join(tmpdir(), "physical-scratch-external-"));
+      symlinkSync(join(path, "src"), join(path, "scratch", "to-product"), "dir");
+      symlinkSync(join(path, ".claude"), join(path, "scratch", "to-authority"), "dir");
+      symlinkSync(external, join(path, "scratch", "to-external"), "dir");
+      symlinkSync(join(path, "src", "not-yet-created.mjs"), join(path, "scratch", "dangling-product.mjs"), "file");
+
+      for (const input of [
+        write("scratch/to-product/escaped.mjs"),
+        edit(join(path, "scratch", "to-authority", "escaped.json")),
+        write("scratch/to-external/escaped.md"),
+        write("scratch/dangling-product.mjs"),
+        bash("mkdir -p scratch/to-product/nested"),
+      ]) {
+        const result = evaluateLifecycleReadyGuard(input, deps);
+        assert.equal(result.exitCode, 2, `${status}/${input.tool_name}`);
+        assert.match(result.stderr, /GUARD-(?:LIFECYCLE-NOT-READY|CROSS-REPO-MUTATION)/u, `${status}/${input.tool_name}`);
+      }
+
+      rmSync(join(path, "scratch"), { recursive: true, force: true });
+      symlinkSync(join(path, "src"), join(path, "scratch"), "dir");
+      for (const input of [write("scratch/root-escape.mjs"), bash("mkdir -p scratch/nested")]) {
+        const result = evaluateLifecycleReadyGuard(input, deps);
+        assert.equal(result.exitCode, 2, `${status}/symlinked scratch root/${input.tool_name}`);
+      }
+    } finally {
+      rmSync(path, { recursive: true, force: true });
+      if (external !== null) rmSync(external, { recursive: true, force: true });
+    }
+  }
+});
+
+test("NVA-B-GREENFIELD-SCRATCH-CONTAINMENT-1: only ENOENT permits first creation; scratch inspection faults fail closed", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    mkdirSync(join(path, "scratch"));
+    const scratchRoot = join(path, "scratch");
+    const nested = join(scratchRoot, "nested");
+    for (const code of ["EACCES", "EIO"]) {
+      const fault = () => Object.assign(new Error(`simulated ${code}`), { code });
+      const rootFault = evaluateLifecycleReadyGuard(write("scratch/nested/note.md"), {
+        projectDir: path,
+        lstatSyncFn(target) { if (target === scratchRoot) throw fault(); return lstatSync(target); },
+        requireProjectOnboardingReadyFn() { deny("intake-required"); },
+      });
+      assert.equal(rootFault.exitCode, 2, `${code}/scratch root`);
+      assert.match(rootFault.stderr, /GUARD-LIFECYCLE-NOT-READY/u, `${code}/scratch root`);
+      const ancestorFault = evaluateLifecycleReadyGuard(write("scratch/nested/note.md"), {
+        projectDir: path,
+        lstatSyncFn(target) { if (target === nested) throw fault(); return lstatSync(target); },
+        requireProjectOnboardingReadyFn() { deny("intake-required"); },
+      });
+      assert.equal(ancestorFault.exitCode, 2, `${code}/scratch ancestor`);
+      assert.match(ancestorFault.stderr, /GUARD-LIFECYCLE-NOT-READY/u, `${code}/scratch ancestor`);
+    }
+  } finally {
+    rmSync(path, { recursive: true, force: true });
   }
 });
 

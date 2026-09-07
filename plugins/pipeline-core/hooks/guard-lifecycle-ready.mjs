@@ -5,6 +5,7 @@
 import {
   appendFileSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   readFileSync,
   realpathSync,
@@ -4180,23 +4181,62 @@ function isPartialLifecycleIncidentReportWrite(input, root) {
  * two onboarding-readiness statuses named in INTAKE_LIFECYCLE_STATUSES rather than to one fixed
  * filename -- matching guard-devplan.mjs's own scratch/ prefix exemption
  * (lib/guard-devplan-policy.mjs DEFAULT_EXEMPT_PREFIXES), which already admits any path under
- * scratch/ in every dev-plan phase. Resolved and compared via pathInside(), never a substring or
- * prefix-string match: the target must resolve, relative to root, to a path strictly INSIDE
- * <root>/scratch -- `scratch` itself (the bare directory, a Write/Edit target can never
- * legitimately name anyway) does not qualify, nor does a sibling whose name merely starts with
- * "scratch" (e.g. `scratch-evil/file`, which pathInside's relative()-based check correctly
- * rejects because its own relative path does not start with `scratch${sep}`). The caller
- * (evaluateAfterGrammarAdmission() below) is the one that gates this on lifecycleStatus being a
- * member of INTAKE_LIFECYCLE_STATUSES.
+ * scratch/ in every dev-plan phase. The lexical path must be strictly inside <root>/scratch,
+ * then its nearest existing ancestor must realpath inside that physical scratch boundary. This
+ * rejects a scratch root or descendant alias into product or authority paths without widening
+ * the pre-plan lane. The caller (evaluateAfterGrammarAdmission() below) gates this on lifecycle
+ * status; it does not make scratch a general project-write exemption.
  */
-function isIntakeLifecycleScratchWrite(input, root) {
+function isPhysicalIntakeScratchPath(filePath, root, dependencies = {}, { allowScratchRoot = false } = {}) {
+  const scratchRoot = join(root, PARTIAL_LIFECYCLE_SCRATCH_DIR);
+  const resolved = resolve(root, filePath);
+  if (resolved === scratchRoot) {
+    if (!allowScratchRoot) return false;
+  } else if (!pathInside(scratchRoot, resolved)) {
+    return false;
+  }
+  if (!isPathWithinRealpathedRoot(resolved, root, dependencies)) return false;
+  const lstat = dependencies.lstatSyncFn ?? lstatSync;
+  const realpath = dependencies.realpathSyncFn ?? realpathSync;
+  let scratchStat;
+  try {
+    scratchStat = lstat(scratchRoot);
+  } catch (error) {
+    // Only an absent entry permits the bounded first creation. Permission, I/O, and malformed
+    // filesystem failures are not evidence that scratch is absent and must fail closed.
+    return error?.code === "ENOENT";
+  }
+  if (scratchStat.isSymbolicLink() || !scratchStat.isDirectory()) return false;
+  try {
+    if (realpath(scratchRoot) !== scratchRoot) return false;
+  } catch {
+    return false;
+  }
+  // existsSync follows links and skips a dangling leaf while searching for an ancestor. Use
+  // lstat instead so the first lexical entry is inspected even when its target is absent.
+  let ancestor = resolved;
+  while (ancestor !== scratchRoot) {
+    try {
+      lstat(ancestor);
+      break;
+    } catch (error) {
+      if (error?.code !== "ENOENT") return false;
+      ancestor = dirname(ancestor);
+    }
+  }
+  try {
+    return pathInside(scratchRoot, realpath(ancestor));
+  } catch {
+    return false;
+  }
+}
+
+function isIntakeLifecycleScratchWrite(input, root, dependencies = {}) {
   const toolName = String(input?.tool_name ?? "");
   if (!WRITE_TOOLS.includes(toolName)) return false;
   const filePath = writeTargetPath(input?.tool_input, toolName);
   if (filePath === "") return false;
-  const scratchRoot = join(root, PARTIAL_LIFECYCLE_SCRATCH_DIR);
-  const resolved = resolve(root, filePath);
-  return resolved !== scratchRoot && pathInside(scratchRoot, resolved);
+  return isPhysicalIntakeScratchPath(filePath, root, dependencies);
 }
 
 // NVA-B-GREENFIELD-SCRATCH-1: bootstrap document binding already admits the
@@ -4206,10 +4246,10 @@ function isIntakeLifecycleScratchWrite(input, root) {
 // this sibling admission to the two text authoring tools named by the
 // bootstrap flow; NotebookEdit and every Bash command remain governed by the
 // ordinary not-ready lane.
-function isBootstrapBindingScratchWrite(input, root) {
+function isBootstrapBindingScratchWrite(input, root, dependencies = {}) {
   const toolName = String(input?.tool_name ?? "");
   return (toolName === "Edit" || toolName === "Write")
-    && isIntakeLifecycleScratchWrite(input, root);
+    && isIntakeLifecycleScratchWrite(input, root, dependencies);
 }
 
 /**
@@ -4220,7 +4260,7 @@ function isBootstrapBindingScratchWrite(input, root) {
  * the write-side twin above; any other target, or any extra/reordered flag simpleWords() cannot
  * parse into this shape, still falls through to the ordinary GUARD-LIFECYCLE-NOT-READY refusal.
  */
-function isIntakeLifecycleScratchMkdir(command, root) {
+function isIntakeLifecycleScratchMkdir(command, root, dependencies = {}) {
   const words = simpleWords(command, root);
   if (!words || words.length === 0) return false;
   if (basename(words[0]).toLowerCase() !== "mkdir") return false;
@@ -4229,9 +4269,7 @@ function isIntakeLifecycleScratchMkdir(command, root) {
     : args.length === 2 && args[0] === "-p" ? args[1]
       : null;
   if (target === null) return false;
-  const scratchRoot = join(root, PARTIAL_LIFECYCLE_SCRATCH_DIR);
-  const resolved = resolve(root, target);
-  return resolved === scratchRoot || pathInside(scratchRoot, resolved);
+  return isPhysicalIntakeScratchPath(target, root, dependencies, { allowScratchRoot: true });
 }
 
 /**
@@ -4682,8 +4720,8 @@ function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
     // believe the write landed somewhere it is actually read from.
     const restartLifecycleScratchWrite = restartRequired
       && !restartResumeHintNearMissWrite(input, root)
-      && (isIntakeLifecycleScratchWrite(input, root)
-        || (toolName === "Bash" && isIntakeLifecycleScratchMkdir((input.tool_input.command ?? input.tool_input.CommandLine), root)));
+      && (isIntakeLifecycleScratchWrite(input, root, dependencies)
+        || (toolName === "Bash" && isIntakeLifecycleScratchMkdir((input.tool_input.command ?? input.tool_input.CommandLine), root, dependencies)));
     if (restartLifecycleScratchWrite) return verdict(0);
     // NVA-BL-INTAKEBIND-1: the one narrow Edit/Write admission that lets a real
     // session perform the design's own intended staging-PRD/spec review step
@@ -4701,7 +4739,7 @@ function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
       && error.intent === "session"
       && error.lifecycleStatus === "bootstrap-binding-required"
       && !restartResumeHintNearMissWrite(input, root)
-      && isBootstrapBindingScratchWrite(input, root);
+      && isBootstrapBindingScratchWrite(input, root, dependencies);
     if (bootstrapBindingScratchWrite) return verdict(0);
     const exactPoAuthorityRebindRecovery = error instanceof ProjectOnboardingReadyError
       && error.code === "PORG-NOT-READY"
@@ -4745,8 +4783,8 @@ function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
       && error.code === "PORG-NOT-READY"
       && error.intent === "session"
       && INTAKE_LIFECYCLE_STATUSES.has(error.lifecycleStatus)
-      && (isIntakeLifecycleScratchWrite(input, root)
-        || (toolName === "Bash" && isIntakeLifecycleScratchMkdir((input.tool_input.command ?? input.tool_input.CommandLine), root)));
+      && (isIntakeLifecycleScratchWrite(input, root, dependencies)
+        || (toolName === "Bash" && isIntakeLifecycleScratchMkdir((input.tool_input.command ?? input.tool_input.CommandLine), root, dependencies)));
     if (intakeLifecycleScratchWrite) return verdict(0);
     // NVA-MICRO-1 (backlog: 2026-08-09-restart-resume-hint-write-misses-the-project-
     // prefix.md): a restart-required write that already missed the exact admission above
