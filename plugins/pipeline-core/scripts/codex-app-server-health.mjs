@@ -11,6 +11,7 @@ import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { resolveCriticHighRiskRoute } from "../lib/critic-route-v3.mjs";
 
 export const CODEX_APP_SERVER_HEALTH_SCHEMA = "pipeline.codex-app-server-health.v1";
 export const CODEX_APP_SERVER_DOCTOR_SCHEMA = "pipeline.codex-app-server-doctor.v1";
@@ -48,8 +49,9 @@ function invoke(executable, args, spawn = spawnSync) {
   });
 }
 
-function observeModelReadiness(daemon, spawn = spawnSync) {
-  const result = spawn(process.execPath, [MODEL_PROBE, daemon.managedCodexPath], {
+function observeModelReadiness(daemon, model, spawn = spawnSync) {
+  if (typeof model !== "string" || model.length === 0) return false;
+  const result = spawn(process.execPath, [MODEL_PROBE, daemon.managedCodexPath, model], {
     encoding: "utf8",
     shell: false,
     timeout: 65_000,
@@ -89,7 +91,7 @@ function stale(code, phase, detail = null) {
 }
 
 /** The single read-only daemon version observation. */
-export function observeCodexAppServer({ executable = "codex", spawn = spawnSync, requireModelReady = false } = {}) {
+export function observeCodexAppServer({ executable = "codex", spawn = spawnSync, requireModelReady = false, criticModel = null } = {}) {
   const result = invoke(executable, ["app-server", "daemon", "version"], spawn);
   const failure = executionFailure(result);
   if (failure !== null) return unavailable(failure, "observe", result?.error?.code ?? null);
@@ -99,7 +101,7 @@ export function observeCodexAppServer({ executable = "codex", spawn = spawnSync,
   if (daemon.cliVersion !== daemon.appServerVersion || daemon.managedCodexVersion !== daemon.appServerVersion) {
     return stale("CAS-DAEMON-VERSION-DRIFT", "observe", daemon);
   }
-  if (requireModelReady && !observeModelReadiness(daemon, spawn)) {
+  if (requireModelReady && !observeModelReadiness(daemon, criticModel, spawn)) {
     return stale("CAS-MODEL-UNAVAILABLE", "observe", daemon);
   }
   return {
@@ -119,8 +121,8 @@ export function observeCodexAppServer({ executable = "codex", spawn = spawnSync,
  * observation. It never invokes a model, starts a pipeline worker, or claims
  * that the current host exposes background wakeups.
  */
-export function checkCodexAppServer({ recover = false, executable = "codex", spawn = spawnSync, requireModelReady = false, platform = process.platform } = {}) {
-  const first = observeCodexAppServer({ executable, spawn, requireModelReady });
+export function checkCodexAppServer({ recover = false, executable = "codex", spawn = spawnSync, requireModelReady = false, criticModel = null, platform = process.platform } = {}) {
+  const first = observeCodexAppServer({ executable, spawn, requireModelReady, criticModel });
   if (first.status === "ready" || recover !== true || first.code === "CAS-CODEX-UNAVAILABLE" || first.code === "CAS-EXECUTION-UNAVAILABLE") return first;
   if (platform === "win32") {
     return {
@@ -145,7 +147,7 @@ export function checkCodexAppServer({ recover = false, executable = "codex", spa
       detail: failure ?? (restart.stderr?.trim() || null),
     };
   }
-  const after = observeCodexAppServer({ executable, spawn, requireModelReady });
+  const after = observeCodexAppServer({ executable, spawn, requireModelReady, criticModel });
   if (after.status !== "ready") {
     return { ...after, code: "CAS-DAEMON-RECOVERY-FAILED", phase: "recover", recovery: "failed" };
   }
@@ -178,9 +180,18 @@ export function doctorCodexAppServer({ executable = "codex", spawn = spawnSync }
 function parseArgs(argv) {
   if (argv.length === 0) return { mode: "health", recover: false, requireModelReady: false };
   if (argv.length === 1 && argv[0] === "--recover") return { mode: "health", recover: true, requireModelReady: false };
-  if (argv.length === 1 && argv[0] === "--critic-ready") return { mode: "health", recover: false, requireModelReady: true };
+  if (argv[0] === "--critic-ready") {
+    const options = { mode: "health", recover: false, requireModelReady: true, rootDir: resolve(process.cwd()), candidateCommit: null };
+    for (let index = 1; index < argv.length; index += 2) {
+      const flag = argv[index]; const value = argv[index + 1];
+      if (flag === "--root" && typeof value === "string") options.rootDir = resolve(value);
+      else if (flag === "--candidate-commit" && /^[a-f0-9]{40}$/u.test(value ?? "")) options.candidateCommit = value;
+      else throw new Error("Usage: codex-app-server-health.mjs --critic-ready [--root <project-root>] [--candidate-commit <40-hex>]");
+    }
+    return options;
+  }
   if (argv.length === 1 && argv[0] === "--doctor") return { mode: "doctor", recover: false };
-  throw new Error("Usage: codex-app-server-health.mjs [--recover|--critic-ready|--doctor]");
+  throw new Error("Usage: codex-app-server-health.mjs [--recover|--critic-ready [--root <project-root>] [--candidate-commit <40-hex>]|--doctor]");
 }
 
 export function run(argv = process.argv.slice(2), deps = {}) {
@@ -189,9 +200,22 @@ export function run(argv = process.argv.slice(2), deps = {}) {
   const { write: _write, writeError: _writeError, ...operationDeps } = deps;
   try {
     const parsed = parseArgs(argv);
+    if (parsed.requireModelReady) {
+      try {
+        parsed.criticModel = (operationDeps.resolveCriticRoute ?? resolveCriticHighRiskRoute)({
+          rootDir: parsed.rootDir,
+          candidateCommit: parsed.candidateCommit,
+          ...(operationDeps.authorityDependencies ?? {}),
+        }).model;
+      } catch {
+        const unavailableRoute = stale("CAS-MODEL-ROUTE-UNAVAILABLE", "observe");
+        write(`${JSON.stringify(unavailableRoute)}\n`);
+        return 2;
+      }
+    }
     const result = parsed.mode === "doctor"
       ? doctorCodexAppServer(operationDeps)
-      : checkCodexAppServer({ recover: parsed.recover, requireModelReady: parsed.requireModelReady, ...operationDeps });
+      : checkCodexAppServer({ recover: parsed.recover, requireModelReady: parsed.requireModelReady, criticModel: parsed.criticModel ?? null, ...operationDeps });
     write(`${JSON.stringify(result)}\n`);
     return result.status === "ready" || result.status === "completed" ? 0 : 2;
   } catch (error) {

@@ -7,11 +7,12 @@
  * Daemon version health does not prove that Codex can resolve the requested
  * model.  This performs no turn and supplies no repository content: it only
  * initializes a disposable App Server process and starts one ephemeral,
- * read-only thread for the fixed review model.
+ * read-only thread for the configured review model.
  */
 import { spawn } from "node:child_process";
+import { tmpdir } from "node:os";
+import { isAbsolute } from "node:path";
 
-const MODEL = "gpt-5.6-sol";
 const PROVIDER = "openai";
 const MAX_BYTES = 1024 * 1024;
 const TIMEOUT_MS = 60_000;
@@ -26,7 +27,8 @@ function fail(code, detail = null) {
 }
 
 const codexPath = process.argv[2];
-if (typeof codexPath !== "string" || !codexPath.startsWith("/")) {
+const model = process.argv[3];
+if (typeof codexPath !== "string" || !isAbsolute(codexPath) || typeof model !== "string" || model.length === 0) {
   fail("CAS-MODEL-PROBE-INPUT");
 } else {
   const child = spawn(codexPath, ["app-server", "--stdio", "--strict-config"], {
@@ -69,13 +71,15 @@ if (typeof codexPath !== "string" || !codexPath.startsWith("/")) {
         initialized = true;
         send({ method: "initialized" });
         send({ id: 2, method: "thread/start", params: {
-          cwd: process.cwd(), model: MODEL, allowProviderModelFallback: false,
+          // A thread is created but never turned. Its cwd is deliberately outside
+          // the project so the readiness check supplies no repository content.
+          cwd: tmpdir(), model, allowProviderModelFallback: false,
           ephemeral: true, approvalPolicy: "never", sandbox: "read-only",
           developerInstructions: "Model readiness probe only. Do not start a turn or access repository content.",
         } });
       } else if (message?.id === 2) {
         const thread = message.result?.thread;
-        if (message.error || message.result?.model !== MODEL || message.result?.modelProvider !== PROVIDER || typeof thread?.id !== "string") {
+        if (message.error || message.result?.model !== model || message.result?.modelProvider !== PROVIDER || typeof thread?.id !== "string") {
           finish("CAS-MODEL-PROBE-UNAVAILABLE"); return;
         }
         completed = true;

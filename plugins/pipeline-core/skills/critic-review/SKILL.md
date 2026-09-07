@@ -16,10 +16,15 @@ any child. `host-mode-unavailable` is typed no-child evidence; it cannot be
 replaced by user prose or an alternate route. The bound execution receipt uses
 only `sandbox-read-only-except-coordinator-scratch; input/network isolation not asserted`.
 
-Before selection, run `scripts/codex-app-server-health.mjs --critic-ready` on
-the same host. A running daemon without a successful bounded model-start probe
-is `CAS-MODEL-UNAVAILABLE`, not a usable Critic lane. This health result proves
-only local model admission; it does not replace the selected transport receipt.
+Before selection, run `scripts/codex-app-server-health.mjs --critic-ready
+--root <physical-project-root> --candidate-commit <full-candidate-commit>` on
+the same host. The probe resolves the high-risk Critic model from that exact
+candidate's validated V3 authority; the plain form uses the physical cwd and
+committed HEAD only for compatibility. A missing route is
+`CAS-MODEL-ROUTE-UNAVAILABLE`; a running daemon without a successful bounded
+model-start probe is `CAS-MODEL-UNAVAILABLE`, not a usable Critic lane. This
+health result proves only local model admission; it does not replace the
+selected transport receipt.
 The generic `codex exec` CLI is not a selected transport and must never be used
 as a fallback for this governed dispatch.
 

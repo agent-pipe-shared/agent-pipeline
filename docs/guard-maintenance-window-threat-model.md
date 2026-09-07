@@ -70,6 +70,7 @@ below assumes it holds and is written to catch a change that would break it.
   `lib/codex-onboarding-capabilities.mjs`, `lib/codex-onboarding-runtime.mjs`,
   `lib/continuity-host-adapter.mjs`, `lib/continuity-state.mjs`,
   `lib/continuity-status.mjs`, `lib/critic-export-policy.mjs`,
+  `lib/critic-route-v3.mjs`,
   `lib/critical-action-approval-request.mjs`, `lib/document-hooks.mjs`,
   `lib/entrypoint.mjs`, `lib/feature-package-topology.mjs`,
   `lib/gate-estimate.mjs`, `lib/git-cmd.mjs`,

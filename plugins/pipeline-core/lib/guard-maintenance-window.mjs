@@ -164,6 +164,11 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/continuity-state.mjs",
   "plugins/pipeline-core/lib/continuity-status.mjs",
   "plugins/pipeline-core/lib/critic-export-policy.mjs",
+  // NVA-B-CRITIC-HEALTH-ROUTING-2: codex-app-server-health.mjs is already
+  // kernel-protected below and resolves its high-risk Critic model through this
+  // V3 authority. A GS-6 window must not be able to change the authority that
+  // determines which model the protected health route probes.
+  "plugins/pipeline-core/lib/critic-route-v3.mjs",
   "plugins/pipeline-core/lib/critical-action-approval-request.mjs",
   "plugins/pipeline-core/lib/document-hooks.mjs",
   "plugins/pipeline-core/lib/entrypoint.mjs",
