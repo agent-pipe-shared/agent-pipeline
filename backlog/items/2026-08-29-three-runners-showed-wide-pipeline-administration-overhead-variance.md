@@ -102,11 +102,15 @@ What this does and does not settle:
 - It **does not** compare runners, which the second criterion requires. This is
   Claude only.
 
-The session total is $2,497.65 over five calendar days, with 98 % of input
-tokens served from cache and wall clock at 2.4× the API duration. Those figures
-belong in the cost page (D.5) rather than here; what belongs here is that a
-metered baseline now exists to compare a second runner against, which is the
-cheapest remaining step toward closing this item.
+**Not publishable, by PO ruling the same day.** The session measured is the
+Pipeline governing work on its own repository at the highest rigor setting,
+including measurement dispatches that produced only backlog entries, two
+discarded hypotheses, a review round that rejected our own change, and two
+killed gate runs. It answers what developing the Pipeline costs while looking
+like an answer to what using it costs, so it is internal input only and
+explicitly not material for the cost page. What belongs here is narrower and
+still useful: a metered baseline now exists for a second runner to be compared
+against, which is the cheapest remaining step toward closing this item.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 

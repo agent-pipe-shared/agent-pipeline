@@ -1,19 +1,28 @@
 > **Captured 2026-09-07** from the Claude Code usage report of the session that
-> produced the 0.6.2 local candidate, supplied by the PO for documentation use.
-> Design input for the cost page (D.5) and the metering item (D.6), not canon.
-> Account-specific fields — remaining limits, reset times, promotional offers —
-> were deliberately not carried over; only the measured cost, volume and
-> distribution facts are here. The distribution lines are the tool's own
-> wording, and its own caveat applies: they are approximate, derived from local
-> sessions on one machine, and each line is an independent characteristic
-> rather than a share of one breakdown.
+> produced the 0.6.2 local candidate, supplied by the PO. Account-specific
+> fields — remaining limits, reset times, promotional offers — were
+> deliberately not carried over.
+>
+> **PO ruling, same day: this figure is NOT publishable and is not input for
+> the cost page.** It measures a self-application session on the Pipeline's own
+> repository, not a user running the Pipeline on their product, and it is
+> therefore not evidence for what adoption costs. Its only sanctioned use is
+> internal: the metering item (D.6), where it is a first metered attribution
+> and a baseline a second runner can be compared against.
+>
+> The distribution lines are the tool's own wording, and its own caveat
+> applies: approximate, derived from local sessions on one machine, and each
+> line an independent characteristic rather than a share of one breakdown.
 
-# Measured cost of one Pipeline session — 2026-09-07
+# Measured cost of one self-application session — 2026-09-07
 
-The first hard number this repository has for what its own operating model
-costs to run. Everything published about cost so far was either a paired
-per-task figure from 2026-08-09 or a self-estimate; this is a metered total for
-a complete piece of delivery work.
+The first metered total for a complete block of work done *on this repository
+under its own operating model*. Everything recorded about cost so far was
+either a paired per-task figure from 2026-08-09 or a runner self-estimate.
+
+Read the boundary in the header before using any figure below: this is an
+internal operating measurement, not a statement about what adopting the
+Pipeline costs, and it is not input for the user-facing cost page.
 
 ## What the session was
 
@@ -83,17 +92,39 @@ administrative overhead, which also includes dispatch bootstrap, review rounds
 and gate runs — but it is a floor derived from measurement rather than from
 recall.
 
-## What may and may not be claimed from this
+## Why this must not go into user-facing documentation
 
-May be published: the total, the model split, the cache ratio, and the
-distribution lines with the tool's own caveat attached.
+The PO ruled on this the same day it was captured, and the reason is not
+caution about a large number — it is that the number answers a different
+question than a reader would take it for.
 
-May **not** be published as-is: that this is representative. It is one session,
-on one machine, on one runner, at an unusually high rigor setting, including a
-review round that failed and had to be reworked. A second measurement on a
-different shape of work is what would turn this from an anecdote into a range.
+**It measures the wrong subject.** This is a self-application session: the
+Pipeline governing work on the Pipeline's own repository, at the highest rigor
+setting the model offers, on canon and guard code where every change carries an
+independent review. A user adopting the Pipeline for their own product runs a
+different shape of work entirely. Publishing this as "what it costs" would
+answer "what does it cost to develop the Pipeline" while appearing to answer
+"what does it cost to use the Pipeline".
 
-Also worth stating plainly wherever this appears: the figure includes work that
-a reader would not call product — measurement dispatches whose only output was
-a backlog entry, a review that rejected our own change, and two gate runs that
-a misfiring memory heuristic killed before they finished.
+**Most of what it paid for is not delivery.** Measurement dispatches whose only
+output was a backlog entry. Two hypotheses tested and both discarded without a
+line of production code changing. A review round that rejected our own change
+and forced a rework. Two gate runs killed by a misfiring memory heuristic
+before they finished. Those are real costs of this session and none of them is
+a feature a user would receive.
+
+**Its shape is atypical in every dimension the tool itself flags.** Five
+calendar days at 2.4× wall clock over API time, permanently above 150 K of
+context, entirely subagent-driven. The tool names all three as cost drivers;
+this session maximises each.
+
+What the reader-facing cost page needs instead is a per-task figure from a
+consumer project, paired with and without the Pipeline, on work a reader
+recognises. The 2026-08-09 paired measurement is closer to that shape and is
+already recorded. This document is not a substitute for it and must not be
+cited as one.
+
+**Sanctioned use, in full:** the metering item's need for a metered rather than
+self-estimated attribution, and a baseline for comparing a second runner. The
+reader's Critic found that a reader cannot answer "what would this cost me"
+from the front doors; that gap stays open, and this document does not close it.
