@@ -21,8 +21,9 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 
 import {
@@ -34,6 +35,17 @@ import {
   anchoredInsert,
   invokesGuard,
 } from "./wire-dispatch-budget-hook.mjs";
+import {
+  GUARD_COMMAND as SLICING_GUARD_COMMAND,
+  HOOKS_RELATIVE_PATH as SLICING_HOOKS_PATH,
+  INVENTORY_RELATIVE_PATH as SLICING_INVENTORY_PATH,
+  MATCHER as SLICING_MATCHER,
+  SURFACE_ID as SLICING_SURFACE_ID,
+  applyWiring as applySlicingWiring,
+  preflight as slicingPreflight,
+  slicingRegistrations,
+  transformDocuments as transformSlicingDocuments,
+} from "./wire-slicing-hook.mjs";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const HOOKS_PATH = join(REPO_ROOT, "plugins", "pipeline-core", "hooks", "hooks.json");
@@ -149,4 +161,103 @@ test("WDB08: the anchor occurs exactly once in the real manifest", () => {
   const first = original.indexOf(HOOKS_ANCHOR);
   assert.notEqual(first, -1, "anchor not found in the live manifest");
   assert.equal(original.indexOf(HOOKS_ANCHOR, first + HOOKS_ANCHOR.length), -1, "anchor is ambiguous in the live manifest");
+});
+
+// --- Attended slicing-hook wiring -----------------------------------------
+
+const INVENTORY_PATH = join(REPO_ROOT, "docs", "product-capability-inventory.json");
+
+function unwiredSlicingSource() {
+  const hooks = JSON.parse(readFileSync(HOOKS_PATH, "utf8"));
+  const inventory = JSON.parse(readFileSync(INVENTORY_PATH, "utf8"));
+  hooks.hooks.PreToolUse = hooks.hooks.PreToolUse.filter((entry) => !slicingRegistrations({ hooks: { PreToolUse: [entry] } }).length);
+  const capability = inventory.capabilities.find((item) => item.id === "claude-hook-safety");
+  capability.surfaceIds = capability.surfaceIds.filter((id) => id !== SLICING_SURFACE_ID);
+  return { hooks: `${JSON.stringify(hooks, null, 2)}\n`, inventory: `${JSON.stringify(inventory, null, 2)}\n` };
+}
+
+function freshSlicingFixture({ wired = false } = {}) {
+  const root = mkdtempSync(join(tmpdir(), "wire-slicing-hook-"));
+  const source = unwiredSlicingSource();
+  const transformed = wired ? transformSlicingDocuments(source.hooks, source.inventory) : null;
+  const hooks = transformed?.hooksText ?? source.hooks;
+  const inventory = transformed?.inventoryText ?? source.inventory;
+  const hooksPath = join(root, SLICING_HOOKS_PATH);
+  const inventoryPath = join(root, SLICING_INVENTORY_PATH);
+  mkdirSync(dirname(hooksPath), { recursive: true });
+  mkdirSync(dirname(inventoryPath), { recursive: true });
+  writeFileSync(hooksPath, hooks, "utf8");
+  writeFileSync(inventoryPath, inventory, "utf8");
+  return { root, hooks, inventory, hooksPath, inventoryPath };
+}
+
+test("WSH01: preview transformation adds exactly the Claude slicing matcher, command, and timeout while preserving every other registration", () => {
+  const source = unwiredSlicingSource();
+  const before = JSON.parse(source.hooks);
+  const transformed = transformSlicingDocuments(source.hooks, source.inventory);
+  const after = JSON.parse(transformed.hooksText);
+  const registrations = slicingRegistrations(after);
+  assert.equal(registrations.length, 1);
+  assert.equal(registrations[0].matcher, SLICING_MATCHER);
+  assert.deepEqual(registrations[0].hooks, [{ type: "command", command: SLICING_GUARD_COMMAND, timeout: 10 }]);
+  assert.deepEqual(
+    after.hooks.PreToolUse.filter((entry) => !slicingRegistrations({ hooks: { PreToolUse: [entry] } }).length),
+    before.hooks.PreToolUse.filter((entry) => !slicingRegistrations({ hooks: { PreToolUse: [entry] } }).length),
+    "the transformation must not change any existing registration",
+  );
+  const capability = JSON.parse(transformed.inventoryText).capabilities.find((item) => item.id === "claude-hook-safety");
+  assert.equal(capability.surfaceIds.filter((id) => id === SLICING_SURFACE_ID).length, 1);
+});
+
+test("WSH02: malformed duplicate registrations and an inventory disagreement fail closed", () => {
+  const source = unwiredSlicingSource();
+  const hooks = JSON.parse(source.hooks);
+  hooks.hooks.PreToolUse.push({ matcher: SLICING_MATCHER, hooks: [{ type: "command", command: SLICING_GUARD_COMMAND, timeout: 10 }] });
+  hooks.hooks.PreToolUse.push({ matcher: SLICING_MATCHER, hooks: [{ type: "command", command: SLICING_GUARD_COMMAND, timeout: 10 }] });
+  assert.throws(() => transformSlicingDocuments(`${JSON.stringify(hooks, null, 2)}\n`, source.inventory), /duplicate slicing registrations/);
+  hooks.hooks.PreToolUse.pop();
+  assert.throws(() => transformSlicingDocuments(`${JSON.stringify(hooks, null, 2)}\n`, source.inventory), /disagree/);
+});
+
+test("WSH03: an injected post-write failure restores both original files byte-for-byte", () => {
+  const fixture = freshSlicingFixture();
+  try {
+    assert.throws(
+      () => applySlicingWiring(fixture.root, { postCheckFn: () => ({ ok: false, detail: "fault injection" }) }),
+      /original hooks\.json and product-capability inventory bytes were restored/,
+    );
+    assert.equal(readFileSync(fixture.hooksPath, "utf8"), fixture.hooks);
+    assert.equal(readFileSync(fixture.inventoryPath, "utf8"), fixture.inventory);
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test("WSH04: contained apply is idempotent after a successful post-check", () => {
+  const fixture = freshSlicingFixture();
+  try {
+    assert.deepEqual(applySlicingWiring(fixture.root, { postCheckFn: () => ({ ok: true, detail: "fixture" }) }), { alreadyWired: false, restored: false });
+    assert.deepEqual(applySlicingWiring(fixture.root, { postCheckFn: () => ({ ok: true, detail: "fixture" }) }), { alreadyWired: true, restored: false });
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test("WSH05: an already-wired contained source pair is accepted and remains idempotent", () => {
+  const fixture = freshSlicingFixture({ wired: true });
+  try {
+    assert.equal(transformSlicingDocuments(fixture.hooks, fixture.inventory).alreadyWired, true);
+    assert.deepEqual(applySlicingWiring(fixture.root, { postCheckFn: () => ({ ok: true, detail: "fixture" }) }), { alreadyWired: true, restored: false });
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test("WSH06: a dirty target preimage refuses before an attended apply", () => {
+  const result = slicingPreflight(REPO_ROOT, {
+    runSuite: false,
+    gitStatusFn: (_root, path) => path === SLICING_HOOKS_PATH ? " M plugins/pipeline-core/hooks/hooks.json" : "",
+  });
+  assert.equal(result.ok, false);
+  assert.ok(result.failures.includes("both target files are unmodified in git"));
 });
