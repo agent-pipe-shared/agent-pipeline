@@ -249,6 +249,19 @@ recommendation.
    and the same never-a-gate rule: this stays a consumption duty, never a
    readiness precondition.
 
+   On resumed intake, checkpoint-origin material chunks are the original
+   product-material record: retain their bytes and capture order, do not
+   recapture an existing chunk merely to satisfy a tool ritual, and keep
+   answered onboarding values separate from product requirements. When only a
+   recovered summary is available while drafting, label it as a recovered
+   summary with its available source pointer; never manufacture a verbatim
+   `materialInput` chunk from that summary. If the requirements remain
+   uncertain, collect the specific missing confirmation together rather than
+   silently substituting settings as requirements. Follow the current returned
+   `nextAction` from onboarding inspection; do not add `pipeline-state inspect`
+   or an Operating Model hash as an unavailable pre-binding prerequisite.
+   State/authority orientation follows ready binding.
+
 7. **Normal restart is handover-only:** a same-topic restart, context cut, or
    request to save progress is not a block close. Update only the calibrated
    handover and, where needed, the sanitised Resume-Hint, then re-enter with

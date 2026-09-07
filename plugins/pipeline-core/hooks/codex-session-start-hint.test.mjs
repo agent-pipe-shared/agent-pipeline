@@ -124,6 +124,8 @@ try {
   assert.match(withHint.context, /Resume-hint constraints: No transcript reading/u);
   assert.match(withHint.context, /Resume-hint questions: Any remaining gap\?/u);
   assert.match(withHint.context, /Resume-hint progress: hit a lifecycle-not-ready denial; resolved via typed inspection/u);
+  assert.match(withHint.context, /distilled fields are a recovered summary, never verbatim material input/u);
+  assert.match(withHint.context, /never manufacture a verbatim materialInput chunk from it/u);
   // The rest of the governed message/context is unchanged, only extended.
   assert.match(withHint.context, /A guard denial is not by itself a human gate/u);
   assert.equal(withHint.message, governed.message);
@@ -346,6 +348,9 @@ try {
       withVerbatim.context,
       /Resume-hint material input chunk 2 of 2: A second, later chunk of user input -- unicode: café, 日本語\./u,
     );
+    assert.match(withVerbatim.context, /Retain these checkpoint-origin chunks byte-for-byte in capture order/u);
+    assert.match(withVerbatim.context, /do not recapture an existing chunk merely to satisfy a ritual/u);
+    assert.match(withVerbatim.context, /do not substitute answered onboarding settings for product requirements/u);
 
     // A read failure (malformed checkpoint bytes) must degrade to exactly the distilled-card
     // output -- never a throw, never a crash, never a partial/garbled new line.

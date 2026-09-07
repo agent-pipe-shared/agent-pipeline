@@ -73,6 +73,15 @@ assert.match(core, /input received\n   after a short kickoff goal has already in
 assert.match(core, /do not;? ?\n?\s*reduce it to a new short kickoff goal or merely promise to remember it/u);
 assert.match(core, /Read back `resume-hint\.mjs inspect` after a\n   successful capture/u);
 
+assert.match(core, /checkpoint-origin material chunks are the original\n   product-material record/u);
+assert.match(core, /retain their bytes and capture order, do not\n   recapture an existing chunk merely to satisfy a tool ritual/u);
+assert.match(core, /answered onboarding values separate from product requirements/u);
+assert.match(core, /label it as a recovered\n   summary with its available source pointer; never manufacture a verbatim\n   `materialInput` chunk from that summary/u);
+assert.match(core, /collect the specific missing confirmation together rather than\n   silently substituting settings as requirements/u);
+assert.match(core, /Follow the current returned\n   `nextAction` from onboarding inspection/u);
+assert.match(core, /do not add `pipeline-state inspect`\n   or an Operating Model hash as an unavailable pre-binding prerequisite/u);
+assert.match(core, /State\/authority orientation follows ready binding/u);
+
 // RHSHAPE-1. The skill's description of the card must be a shape the validator
 // actually accepts. It was not: it called all four keys "a short distilled
 // statement", a reader built four strings, and `buildResumeHint` rejected it with

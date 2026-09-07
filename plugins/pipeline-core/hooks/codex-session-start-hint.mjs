@@ -129,6 +129,7 @@ function intakeVerbatimContextLines(root) {
     chunks.forEach((chunk, index) => {
       lines.push(`Resume-hint material input chunk ${index + 1} of ${chunks.length}: ${chunk.text}`);
     });
+    lines.push("Retain these checkpoint-origin chunks byte-for-byte in capture order; do not recapture an existing chunk merely to satisfy a ritual, and do not substitute answered onboarding settings for product requirements.");
   }
   return lines;
 }
@@ -156,6 +157,7 @@ function resumeHintContextLines(root, sessionId) {
   const { intent, scope, constraints, questions, progress } = observed.hint.context;
   const lines = [
     "A resume-hint card from a prior session is available and MUST be read now: incorporate it into this session's understanding before continuing -- noting its availability without reading its content does not satisfy this step.",
+    "Its distilled fields are a recovered summary, never verbatim material input: when only that summary is available while drafting, label it as a recovered summary with its available source pointer; never manufacture a verbatim materialInput chunk from it.",
     `Resume-hint intent: ${intent}`,
   ];
   if (Array.isArray(scope) && scope.length > 0) lines.push(`Resume-hint scope: ${scope.join("; ")}`);
