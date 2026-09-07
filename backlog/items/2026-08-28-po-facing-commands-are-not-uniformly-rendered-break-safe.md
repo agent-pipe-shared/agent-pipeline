@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.po-facing-commands-are-not-uniformly-rendered-break-safe
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-28
+closed_at: 2026-09-07
+closure_repository: self
+closure_commit: da6b381c
+closure_evidence: plugins/pipeline-core/lib/human-guard-override.mjs
 sprint: nova-b
 source: "Codex/WSL greenfield run, 2026-08-28 (docs/pipeline-session-analysis-2026-08-28.md), plus the PO's own observation that this runner needed three sessions and the most detours."
 done_when: contains plugins/pipeline-core/lib/human-guard-override.mjs copy-safe-command.mjs

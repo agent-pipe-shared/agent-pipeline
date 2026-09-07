@@ -7,10 +7,22 @@ status: open
 created: 2026-09-02
 source: "GitHub Actions run 33595311782 (push to main, commit 6262d408), job verify, step Runner-free offline Core Verify, suite guard-lifecycle-ready-tests"
 sprint: nova-b
-done_when: contains plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs pipeline.rebwire-req5-2-supplies-its-own-true
+done_when: contains .github/workflows/verify.yml command -v true
 ---
 
 # The CI `PATH` allowlist omits `true`, so the guard's own published continuation cannot execute in CI
+
+> **Predicate corrected 2026-09-07.** The `done_when` previously named a test
+> anchor in `guard-lifecycle-ready.test.mjs` that already existed when the
+> predicate was written, so the item read as satisfied from the moment it was
+> declared while the defect itself was untouched. It now names the CI symlink
+> that would actually fix it — the `command -v true` lookup the symlink line
+> needs, chosen over the `${core_path}/true` target because a brace breaks the
+> frontmatter parser. Checked the same day:
+> `.github/workflows/verify.yml` still links only `node`, `git`, `bash`, `sh`
+> and `openssl` into the offline PATH — `true` is still missing and the defect
+> is still live. Surfaced by `check-backlog-done-predicate.mjs`, which is the
+> exact contradiction that checker exists to find.
 
 ## Description
 

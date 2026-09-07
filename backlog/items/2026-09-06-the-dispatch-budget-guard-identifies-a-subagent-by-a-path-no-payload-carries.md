@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.the-dispatch-budget-guard-identifies-a-subagent-by-a-path-no-payload-carries
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-06
+closed_at: 2026-09-07
+closure_repository: self
+closure_commit: 6372b984
+closure_evidence: backlog/evidence/2026-09-06-nva-b-guardfix-critic-round1.md
 source: "measured 2026-09-06 with a temporary user-level PreToolUse capture hook against two live goldfish dispatches; full record backlog/evidence/2026-09-06-dispatch-budget-guard-discriminator-measured.md, PO decision queue item 3"
 sprint: nova-b
 done_when: contains plugins/pipeline-core/hooks/guard-dispatch-budget.mjs agent_id

@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.a-registered-but-abandoned-worktree-is-never-retired
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-28
+closed_at: 2026-09-07
+closure_repository: self
+closure_commit: eca3e170
+closure_evidence: plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
 sprint: nightwing
 done_when: contains plugins/pipeline-core/scripts/pipeline-start-preflight.mjs retireRegisteredWorktrees
 source: "NVA-VTPGATE-1 stopped on it live, 2026-08-28"
