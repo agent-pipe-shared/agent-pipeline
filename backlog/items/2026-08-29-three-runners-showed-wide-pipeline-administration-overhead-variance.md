@@ -78,6 +78,36 @@ independently reported.
   artifact whose presence proves the measurement was done well; a human (the
   PO or an Elephant) judges the resulting report.
 
+## First metered figure, 2026-09-07 — a floor, not the answer
+
+The PO supplied the Claude Code usage report for the session that produced the
+0.6.2 local candidate. Persisted verbatim, minus account-specific fields, at
+`specs/sprint-nova-epic/design/2026-09-07-measured-session-cost.md`.
+
+One line in it is directly relevant here: **16 % of the usage is attributed to
+the `pipeline-core` plugin itself** — its agents, skills and tool surface. A
+further 13 % is attributed to the deep implementation tier's subagents. Those
+are metered attributions from the tool, not self-estimates, which is exactly
+the property this item says the 40–90 % spread lacks.
+
+What this does and does not settle:
+
+- It **does** give the first measured number for part of the administrative
+  share, on one runner. The item's first acceptance criterion asked for exactly
+  that shape of figure.
+- It **does not** settle the share itself. The plugin's own attribution is
+  narrower than administrative overhead: dispatch bootstrap payloads, review
+  rounds, gate runs and guard-denial retries are administration too and are not
+  inside that 16 %.
+- It **does not** compare runners, which the second criterion requires. This is
+  Claude only.
+
+The session total is $2,497.65 over five calendar days, with 98 % of input
+tokens served from cache and wall clock at 2.4× the API duration. Those figures
+belong in the cost page (D.5) rather than here; what belongs here is that a
+metered baseline now exists to compare a second runner against, which is the
+cheapest remaining step toward closing this item.
+
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
 - **Decision:**
