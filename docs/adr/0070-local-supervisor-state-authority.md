@@ -4,6 +4,8 @@
 
 **Status:** accepted · **Date:** 2026-07-25
 
+**Governs:** docs/local-supervisor-state-threat-model.md, docs/product-capability-inventory.json, governance/observation-doc-governance.json, harness/scripts/verify.mjs, plugins/pipeline-core/lib/local-supervisor-state.mjs, plugins/pipeline-core/lib/local-supervisor-state.test.mjs, plugins/pipeline-core/scripts/local-supervisor-setup.mjs, plugins/pipeline-core/scripts/local-supervisor-setup.test.mjs, plugins/pipeline-core/scripts/local-supervisor-state.schema.json, plugins/pipeline-core/skills/pipeline-start/SKILL.md, plugins/pipeline-core/skills/pipeline-start/pipeline-start-v3.test.mjs
+
 ## Context
 
 Nova B B1-I needs a feature-branch-only local supervisor without creating a
