@@ -75,7 +75,12 @@ The C1 aggregation implementation and focused tests are locally committed at
 `854b0da8d1732bf2f787a684f9ad79659a7c9186`; its final checks record receipt
 64/64, consumer checks 9/9, and diff-check exit 0. C1 emission/local-report
 refinement is the next autonomous preparation step; baseline collection has
-not started. Full Verify on the new candidate and T1 review remain pending.
+not started. Full Verify then ran on commit `888ffc1770dbc1d1b1e562fa111b79cc0d6178b9`,
+tree `078ec307bb6167e644b63119ffcc27b376a455ef`, with exact clean start and
+finish bindings. The machine receipt records 508 steps, 499 green, the same 9
+failures as the d88 historical run, and exit 1; security evidence is preserved
+separately and remains a finding. This new candidate is still unreviewed; T1
+remains blocked by red Verify.
 An optional next-package read-only agent bootstrap was auto-review-rejected
 because bare `pipeline-start-preflight` may perform cleanup beyond its
 read-only scope; there was no retry or bypass, and orientation was completed
@@ -110,8 +115,8 @@ The [C1 plan](../specs/sprint-alfred-epic/plans/c1-core.md) landed at
 records 39 passing tests, closed validation, deterministic classification,
 lineage joins and status-tagged metrics. The
 [C1 aggregation plan](../specs/sprint-alfred-epic/plans/c1-aggregation.md)
-is prepared; aggregation implementation, emission, source authenticity checks,
-local reports and actual baseline collection remain open.
+is prepared; emission, source authenticity checks, local reports and actual
+baseline collection remain open.
 
 Full Verify is historical exact-source-candidate evidence for
 `a87677726d7d451862585b8e4870ddebb1325c4d`, tree
