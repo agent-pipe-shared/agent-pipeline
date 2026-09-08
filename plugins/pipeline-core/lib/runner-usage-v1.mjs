@@ -20,8 +20,10 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const SCRIPTS = resolve(HERE, "..", "scripts");
 const USAGE_SCHEMA_PATH = resolve(SCRIPTS, "runner-usage.schema.json");
 const BINDING_SCHEMA_PATH = resolve(SCRIPTS, "usage-route-binding.schema.json");
+const ATTRIBUTION_SCHEMA_PATH = resolve(SCRIPTS, "usage-attribution.schema.json");
 const USAGE_SCHEMA = Object.freeze(JSON.parse(readFileSync(USAGE_SCHEMA_PATH, "utf8")));
 const BINDING_SCHEMA = Object.freeze(JSON.parse(readFileSync(BINDING_SCHEMA_PATH, "utf8")));
+const ATTRIBUTION_SCHEMA = Object.freeze(JSON.parse(readFileSync(ATTRIBUTION_SCHEMA_PATH, "utf8")));
 // `registeredRouting()` is a clone of the module's frozen I0 registry.  Keep
 // it private so a caller cannot substitute a route after the module loads.
 import { registeredRouting as registeredRoutingV3 } from "./runner-profiles-v3.mjs";
@@ -64,6 +66,7 @@ const CODEX_FIELDS = new Set([
 
 export const RUNNER_USAGE_SCHEMA_PATH = USAGE_SCHEMA_PATH;
 export const USAGE_ROUTE_BINDING_SCHEMA_PATH = BINDING_SCHEMA_PATH;
+export const USAGE_ATTRIBUTION_SCHEMA_PATH = ATTRIBUTION_SCHEMA_PATH;
 export const SUPPORTED_NATIVE_USAGE_SOURCES = Object.freeze({
   claude: Object.freeze([CLAUDE_TURN_VERSION, CLAUDE_SESSION_VERSION]),
   codex: Object.freeze([CODEX_VERSION]),
@@ -221,12 +224,68 @@ export function loadUsageRouteBindingSchema() {
   return JSON.parse(JSON.stringify(BINDING_SCHEMA));
 }
 
+export function loadUsageAttributionSchema() {
+  return JSON.parse(JSON.stringify(ATTRIBUTION_SCHEMA));
+}
+
 export function validateRunnerUsageEnvelope(value) {
   return validateSchemaResult(value, USAGE_SCHEMA, USAGE_SCHEMA);
 }
 
 export function validateUsageRouteBinding(value) {
   return validateSchemaResult(value, BINDING_SCHEMA, BINDING_SCHEMA);
+}
+
+export function validateUsageAttributionBundle(value) {
+  const schemaResult = validateSchemaResult(value, ATTRIBUTION_SCHEMA, ATTRIBUTION_SCHEMA);
+  if (!schemaResult.valid) return schemaResult;
+  const errors = [];
+  const identities = new Map();
+  for (const [index, entry] of value.events.entries()) {
+    const envelopeResult = validateRunnerUsageEnvelope(entry.envelope);
+    if (!envelopeResult.valid) {
+      errors.push(`$.events[${index}].envelope: invalid runner usage envelope`);
+      continue;
+    }
+    const envelope = entry.envelope;
+    if (envelope.runner !== value.runner) errors.push(`$.events[${index}].envelope.runner: bundle runner mismatch`);
+    if (envelope.scope?.kind !== value.scopeKind || !nonemptyString(envelope.scope?.dispatchId)) errors.push(`$.events[${index}].envelope.scope: task-attributable dispatch scope required`);
+    if (entry.attribution.eventSha256 !== envelope.source?.eventSha256) errors.push(`$.events[${index}].attribution.eventSha256: source event mismatch`);
+    const requiredKind = {
+      administration: "sanitized-control-evidence",
+      product: "sanitized-product-evidence",
+      mixed: "sanitized-mixed-evidence",
+      unknown: "insufficient-evidence",
+    }[entry.attribution.class];
+    if (entry.attribution.provenance?.kind !== requiredKind) errors.push(`$.events[${index}].attribution.provenance.kind: class provenance mismatch`);
+    const source = envelope.source ?? {};
+    const identity = attributionIdentity(entry, value.scopeKind);
+    if (![source.kind, source.threadId, ...(value.scopeKind === "turn" ? [source.turnId] : [])].every(nonemptyString)) {
+      errors.push(`$.events[${index}].envelope.source: complete event identity required`);
+      continue;
+    }
+    const prior = identities.get(identity);
+    if (prior && !same(prior, entry)) errors.push(`$.events[${index}]: conflicting duplicate event identity`);
+    else identities.set(identity, entry);
+    try {
+      const raw = envelope.runner === "claude"
+        ? numericUsage(envelope.raw, CLAUDE_FIELDS, new Map([["cache_creation", CLAUDE_CACHE_FIELDS]]))
+        : envelope.runner === "codex"
+          ? numericUsage(envelope.raw, CODEX_FIELDS)
+          : numericUsage(envelope.raw, ANTIGRAVITY_FIELDS);
+      if (!same(envelope.common, commonProjection(envelope.runner, raw, envelope.route))) {
+        errors.push(`$.events[${index}].envelope.common: does not match the native raw projection`);
+      }
+    } catch {
+      errors.push(`$.events[${index}].envelope.raw: invalid native runner usage`);
+    }
+    for (const metric of Object.values(envelope.common ?? {})) {
+      if (metric?.status === "observed" && (!Number.isSafeInteger(metric.value) || metric.value < 0)) {
+        errors.push(`$.events[${index}].envelope.common: observed metric must be a nonnegative safe integer`);
+      }
+    }
+  }
+  return { valid: errors.length === 0, errors };
 }
 
 function exactNativeBytes(value) {
@@ -594,4 +653,177 @@ export function ingestCodexUsage(options = {}) {
 
 export function ingestAntigravityUsage(options = {}) {
   return ingestRunnerUsage({ ...options, runner: "antigravity" });
+}
+
+const ATTRIBUTION_CLASSES = Object.freeze(["administration", "product", "mixed", "unknown"]);
+const ATTRIBUTION_METRICS = Object.freeze([
+  "inputTokens",
+  "outputTokens",
+  "cachedInputTokens",
+  "cacheCreationInputTokens",
+  "cacheReadInputTokens",
+  "reasoningOutputTokens",
+]);
+export const USAGE_ATTRIBUTION_LIMITS = Object.freeze({ maxBundles: 16, maxBundleBytes: 1_000_000 });
+
+function attributionFail(code, message) {
+  fail(code, message);
+}
+
+function bundleIdentity(entry, scopeKind) {
+  const source = entry.envelope.source;
+  return JSON.stringify(scopeKind === "turn"
+    ? [entry.envelope.runner, source.kind, source.threadId, source.turnId]
+    : [entry.envelope.runner, source.kind, source.threadId]);
+}
+
+function attributionIdentity(entry, scopeKind) {
+  return bundleIdentity(entry, scopeKind);
+}
+
+function emptyMetricSummary() {
+  return {
+    observed: { eventCount: 0, value: 0, sourceFieldSha256: [], comparison: "same-runner-only" },
+    nonObserved: { unknown: {}, unavailable: {}, inapplicable: {} },
+  };
+}
+
+function addReason(bucket, reasonCode) {
+  bucket[reasonCode] = (bucket[reasonCode] ?? 0) + 1;
+}
+
+function addMetric(summary, metric) {
+  if (metric?.status === "observed") {
+    if (!Number.isSafeInteger(metric.value) || metric.value < 0 || summary.observed.value > Number.MAX_SAFE_INTEGER - metric.value) {
+      attributionFail("usage-attribution-invalid", "observed attribution metric is unsafe");
+    }
+    summary.observed.eventCount += 1;
+    summary.observed.value += metric.value;
+    const sourceFieldSha256 = createHash("sha256").update(metric.sourceField, "utf8").digest("hex");
+    if (!summary.observed.sourceFieldSha256.includes(sourceFieldSha256)) summary.observed.sourceFieldSha256.push(sourceFieldSha256);
+    return;
+  }
+  const status = ["unknown", "unavailable", "inapplicable"].includes(metric?.status) ? metric.status : "unknown";
+  addReason(summary.nonObserved[status], metric?.reasonCode ?? "metric-status-invalid");
+}
+
+function routeDisposition(route) {
+  if (route?.status === "bound") return "bound";
+  return "unbound";
+}
+
+function shareForMetric(classes, metric) {
+  const administration = classes.administration.metrics[metric];
+  const product = classes.product.metrics[metric];
+  const excludedEvents = classes.mixed.eventCount + classes.unknown.eventCount;
+  const nonObserved = Object.values(classes).reduce((count, entry) => count + Object.values(entry.metrics[metric].nonObserved)
+    .reduce((inner, reasons) => inner + Object.values(reasons).reduce((sum, value) => sum + value, 0), 0), 0);
+  if (administration.observed.value > Number.MAX_SAFE_INTEGER - product.observed.value) {
+    attributionFail("usage-attribution-invalid", "attribution share denominator is unsafe");
+  }
+  const denominator = administration.observed.value + product.observed.value;
+  if (excludedEvents > 0 || nonObserved > 0 || denominator === 0) {
+    return {
+      status: "not-computable",
+      reasonCode: excludedEvents > 0 ? "mixed-or-unknown-events-present" : nonObserved > 0 ? "metric-not-observed-for-exact-class-coverage" : "zero-observed-denominator",
+      denominatorBoundary: { mixedOrUnknownEventCount: excludedEvents, nonObservedMetricCount: nonObserved },
+    };
+  }
+  return {
+    status: "observed",
+    denominator,
+    administration: administration.observed.value / denominator,
+    product: product.observed.value / denominator,
+    comparison: "same-runner-only",
+  };
+}
+
+/**
+ * Reduces sanitized, supplied-label attribution bundles. It deliberately
+ * returns only aggregate counts and input/evidence digests: it never returns
+ * the raw envelope, route binding, source identifiers, or provenance payload.
+ */
+export function summarizeUsageAttribution(bundles) {
+  if (!Array.isArray(bundles) || bundles.length === 0 || bundles.length > USAGE_ATTRIBUTION_LIMITS.maxBundles) {
+    attributionFail("usage-attribution-invalid", "one to sixteen attribution bundles are required");
+  }
+  const seenRunners = new Set();
+  const runners = [];
+  let taskId = null;
+  let taskEvidenceSha256 = null;
+  for (const bundle of bundles) {
+    let byteLength;
+    try {
+      byteLength = Buffer.byteLength(JSON.stringify(bundle), "utf8");
+    } catch {
+      attributionFail("usage-attribution-invalid", "attribution bundle must be JSON serializable");
+    }
+    if (byteLength > USAGE_ATTRIBUTION_LIMITS.maxBundleBytes) attributionFail("usage-attribution-invalid", "attribution bundle is oversized");
+    const validation = validateUsageAttributionBundle(bundle);
+    if (!validation.valid) attributionFail("usage-attribution-invalid", validation.errors[0]);
+    if (seenRunners.has(bundle.runner)) attributionFail("usage-attribution-duplicate-runner", "only one attribution bundle per runner is permitted");
+    seenRunners.add(bundle.runner);
+    if (taskId === null) {
+      taskId = bundle.taskId;
+      taskEvidenceSha256 = bundle.taskEvidenceSha256;
+    } else if (taskId !== bundle.taskId || taskEvidenceSha256 !== bundle.taskEvidenceSha256) {
+      attributionFail("comparison-task-mismatch", "all attribution bundles must carry the same supplied task digest");
+    }
+    const classes = Object.fromEntries(ATTRIBUTION_CLASSES.map((classification) => [classification, {
+      eventCount: 0,
+      metrics: Object.fromEntries(ATTRIBUTION_METRICS.map((metric) => [metric, emptyMetricSummary()])),
+    }]));
+    const identities = new Map();
+    const provenanceDigests = new Set();
+    const routes = { bound: 0, unbound: 0 };
+    let deduplicatedEventCount = 0;
+    for (const entry of bundle.events) {
+      const identity = bundleIdentity(entry, bundle.scopeKind);
+      const prior = identities.get(identity);
+      if (prior) {
+        if (!same(prior, entry)) attributionFail("usage-attribution-conflict", "conflicting duplicate event identity");
+        deduplicatedEventCount += 1;
+        continue;
+      }
+      identities.set(identity, entry);
+      const bucket = classes[entry.attribution.class];
+      bucket.eventCount += 1;
+      provenanceDigests.add(entry.attribution.provenance.evidenceSha256);
+      routes[routeDisposition(entry.envelope.route)] += 1;
+      for (const metric of ATTRIBUTION_METRICS) addMetric(bucket.metrics[metric], entry.envelope.common[metric]);
+    }
+    const fieldShares = Object.fromEntries(ATTRIBUTION_METRICS.map((metric) => [metric, shareForMetric(classes, metric)]));
+    runners.push({
+      runner: bundle.runner,
+      scopeKind: bundle.scopeKind,
+      eventCount: bundle.events.length - deduplicatedEventCount,
+      deduplicatedEventCount,
+      suppliedClassification: {
+        provenance: "supplied-sanitized-labels-only",
+        provenanceEvidenceSha256: [...provenanceDigests].sort(),
+        semantics: "labels-and-hashes-bind-supplied-metadata-only-not-event-meaning",
+      },
+      routeDisposition: routes,
+      classes,
+      fieldShares,
+      toolCalls: { status: "unavailable", reasonCode: "runner-usage-event-does-not-emit-tool-use" },
+      elapsed: { status: "unavailable", reasonCode: "no-exclusive-interval-source" },
+    });
+  }
+  const routeUnbound = runners.some((runner) => runner.routeDisposition.unbound > 0);
+  return {
+    schema: "pipeline.usage-attribution-summary.v1",
+    task: {
+      taskIdSha256: createHash("sha256").update(taskId, "utf8").digest("hex"),
+      taskEvidenceSha256,
+      matchSemantics: "supplied-task-digest-match-enables-side-by-side-display-only-not-equivalent-work-attestation",
+    },
+    comparison: {
+      status: runners.length < 2 ? "insufficient-runner-coverage" : routeUnbound ? "route-unbound" : "side-by-side-only",
+      runnerCoverage: runners.length,
+      executionEvidence: { status: "not-attested-by-reducer" },
+      semantics: "native-metrics-remain-same-runner-only-no-causal-or-cross-model-cost-equivalence",
+    },
+    runners,
+  };
 }

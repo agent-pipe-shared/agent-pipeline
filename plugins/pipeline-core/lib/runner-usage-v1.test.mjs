@@ -13,6 +13,8 @@ import {
   ingestClaudeUsage,
   ingestCodexUsage,
   ingestAntigravityUsage,
+  summarizeUsageAttribution,
+  validateUsageAttributionBundle,
   validateRunnerUsageEnvelope,
   validateUsageRouteBinding,
 } from "./runner-usage-v1.mjs";
@@ -536,6 +538,145 @@ rejects("U34 Antigravity rejects the Codex cached-input field", () => ingestAnti
     source: { threadId: "wrong-field-thread", turnId: "wrong-field-turn" },
   },
 }), "usage-subobject-invalid");
+
+function attributionEnvelope(runner, threadId, turnId, inputTokens = 10) {
+  const bytes = Buffer.from(JSON.stringify({ type: "turn.completed", usage: runner === "antigravity"
+    ? { input_tokens: inputTokens, output_tokens: 2, cached_tokens: 1 }
+    : { input_tokens: inputTokens, output_tokens: 2, cached_input_tokens: 1, reasoning_output_tokens: 1 } }));
+  const sourceContext = runner === "codex"
+    ? { schema: "pipeline.usage-source-context.v1", trust: "codex-app-server", runner, source: { threadId, turnId }, scope: { kind: "turn", dispatchId: "dispatch-attribution" } }
+    : { schema: "pipeline.usage-source-context.v1", trust: "runner-wrapper", runner, source: { threadId, turnId }, scope: { kind: "turn", dispatchId: "dispatch-attribution" } };
+  return runner === "codex"
+    ? ingestCodexUsage({ version: "codex-exec-json.v1", nativeEventBytes: bytes, sourceContext })
+    : ingestAntigravityUsage({ version: "antigravity-exec-json.v1", nativeEventBytes: bytes, sourceContext });
+}
+
+function attributionBundle(runner, envelope, classification = "administration", taskId = "same-task") {
+  const provenanceKind = {
+    administration: "sanitized-control-evidence",
+    product: "sanitized-product-evidence",
+    mixed: "sanitized-mixed-evidence",
+    unknown: "insufficient-evidence",
+  }[classification];
+  return {
+    schema: "pipeline.usage-attribution-bundle.v1",
+    runner,
+    taskId,
+    taskEvidenceSha256: "f".repeat(64),
+    scopeKind: "turn",
+    events: [{
+      envelope,
+      attribution: {
+        eventSha256: envelope.source.eventSha256,
+        class: classification,
+        provenance: { kind: provenanceKind, evidenceSha256: "e".repeat(64) },
+      },
+    }],
+  };
+}
+
+check("U35 attribution reducer preserves whole-event classes, metrics, and supplied-label boundaries", () => {
+  const admin = attributionBundle("codex", attributionEnvelope("codex", "attribution-thread", "admin", 10));
+  const product = attributionBundle("antigravity", attributionEnvelope("antigravity", "attribution-thread", "product", 20), "product");
+  admin.taskId = "/home/private-user/task-secret";
+  product.taskId = admin.taskId;
+  const result = summarizeUsageAttribution([admin, product]);
+  assert.equal(result.comparison.status, "route-unbound");
+  assert.equal(result.comparison.executionEvidence.status, "not-attested-by-reducer");
+  assert.match(result.task.matchSemantics, /side-by-side/u);
+  assert.equal(typeof result.task.taskIdSha256, "string");
+  assert.equal("taskId" in result.task, false);
+  assert.equal(result.runners[0].classes.administration.metrics.inputTokens.observed.value, 10);
+  assert.equal(result.runners[0].classes.administration.metrics.outputTokens.observed.value, 2);
+  assert.equal(result.runners[0].classes.product.eventCount, 0);
+  assert.equal(result.runners[0].fieldShares.inputTokens.status, "observed");
+  assert.equal(result.runners[0].fieldShares.inputTokens.administration, 1);
+  assert.equal(result.runners[0].toolCalls.reasonCode, "runner-usage-event-does-not-emit-tool-use");
+  assert.equal(result.runners[0].elapsed.reasonCode, "no-exclusive-interval-source");
+  assert.equal(JSON.stringify(result).includes("attribution-thread"), false);
+  assert.equal(JSON.stringify(result).includes("/home/private-user/task-secret"), false);
+  assert.equal(JSON.stringify(result).includes("input_tokens"), false);
+});
+
+check("U36 attribution validation deduplicates exact events and rejects conflicting cumulative identity", () => {
+  const envelope = attributionEnvelope("codex", "dedup-thread", "dedup-turn", 5);
+  const bundle = attributionBundle("codex", envelope);
+  bundle.events.push(JSON.parse(JSON.stringify(bundle.events[0])));
+  assert.equal(validateUsageAttributionBundle(bundle).valid, true);
+  const result = summarizeUsageAttribution([bundle]);
+  assert.equal(result.runners[0].eventCount, 1);
+  assert.equal(result.runners[0].deduplicatedEventCount, 1);
+  bundle.events[1].attribution.class = "product";
+  bundle.events[1].attribution.provenance.kind = "sanitized-product-evidence";
+  assert.equal(validateUsageAttributionBundle(bundle).valid, false);
+  rejects("U36a conflicting duplicate is rejected by reducer", () => summarizeUsageAttribution([bundle]), "usage-attribution-invalid");
+});
+
+check("U37 attribution rejects task mismatch, repeated runner bundles, and aggregate scope", () => {
+  const codex = attributionBundle("codex", attributionEnvelope("codex", "mismatch-thread", "one"));
+  const antigravity = attributionBundle("antigravity", attributionEnvelope("antigravity", "mismatch-thread", "two"), "product", "other-task");
+  assert.throws(() => summarizeUsageAttribution([codex, antigravity]), (error) => error instanceof UsageIngestionError && error.code === "comparison-task-mismatch");
+  assert.throws(() => summarizeUsageAttribution([codex, JSON.parse(JSON.stringify(codex))]), (error) => error instanceof UsageIngestionError && error.code === "usage-attribution-duplicate-runner");
+  const aggregate = JSON.parse(JSON.stringify(codex));
+  aggregate.events[0].envelope.scope = { kind: "workspace-account-aggregate" };
+  assert.equal(validateUsageAttributionBundle(aggregate).valid, false);
+  const forged = JSON.parse(JSON.stringify(codex));
+  forged.events[0].attribution.eventSha256 = "0".repeat(64);
+  assert.equal(validateUsageAttributionBundle(forged).valid, false);
+  const unsafe = JSON.parse(JSON.stringify(codex));
+  unsafe.events[0].envelope.common.inputTokens.value = Number.MAX_SAFE_INTEGER + 1;
+  assert.equal(validateUsageAttributionBundle(unsafe).valid, false);
+});
+
+check("U38 mixed and unknown classes never receive a token allocation or share", () => {
+  const mixed = attributionBundle("codex", attributionEnvelope("codex", "mixed-thread", "mixed", 7), "mixed");
+  const result = summarizeUsageAttribution([mixed]);
+  assert.equal(result.runners[0].classes.mixed.metrics.inputTokens.observed.value, 7);
+  assert.equal(result.runners[0].fieldShares.inputTokens.status, "not-computable");
+  assert.equal(result.runners[0].fieldShares.inputTokens.reasonCode, "mixed-or-unknown-events-present");
+});
+
+check("U39 attribution rejects an overflow that appears only when class totals are combined", () => {
+  const bundle = attributionBundle("codex", attributionEnvelope("codex", "overflow-thread", "administration", Number.MAX_SAFE_INTEGER));
+  const product = JSON.parse(JSON.stringify(bundle.events[0]));
+  product.envelope.source.turnId = "product";
+  product.envelope.source.eventSha256 = "1".repeat(64);
+  product.attribution.eventSha256 = "1".repeat(64);
+  product.attribution.class = "product";
+  product.attribution.provenance.kind = "sanitized-product-evidence";
+  bundle.events.push(product);
+  rejects("U39a cross-class share denominator overflow is rejected", () => summarizeUsageAttribution([bundle]), "usage-attribution-invalid");
+});
+
+check("U40 attribution rejects forged common projections and does not emit hostile projection text", () => {
+  const bundle = attributionBundle("codex", attributionEnvelope("codex", "projection-thread", "projection"));
+  bundle.events[0].envelope.common.inputTokens.value = 99;
+  assert.equal(validateUsageAttributionBundle(bundle).valid, false);
+  bundle.events[0].envelope.common.inputTokens.value = 10;
+  bundle.events[0].envelope.common.inputTokens.sourceField = "/home/private-user/hostile-source-field";
+  assert.equal(validateUsageAttributionBundle(bundle).valid, false);
+  assert.throws(() => summarizeUsageAttribution([bundle]), (error) => error instanceof UsageIngestionError && error.code === "usage-attribution-invalid");
+});
+
+check("U41 structured event identities do not alias embedded separator characters", () => {
+  const bundle = attributionBundle("codex", attributionEnvelope("codex", "a\u0000b", "c"));
+  const distinct = JSON.parse(JSON.stringify(bundle.events[0]));
+  distinct.envelope.source.threadId = "a";
+  distinct.envelope.source.turnId = "b\u0000c";
+  distinct.envelope.source.eventSha256 = "2".repeat(64);
+  distinct.attribution.eventSha256 = "2".repeat(64);
+  bundle.events.push(distinct);
+  assert.equal(validateUsageAttributionBundle(bundle).valid, true);
+  assert.equal(summarizeUsageAttribution([bundle]).runners[0].eventCount, 2);
+});
+
+check("U42 malformed embedded envelopes fail validation without identity dereference", () => {
+  const bundle = attributionBundle("codex", attributionEnvelope("codex", "invalid-envelope-thread", "invalid-envelope"));
+  bundle.events[0].envelope = {};
+  bundle.events[0].attribution.eventSha256 = "0".repeat(64);
+  assert.doesNotThrow(() => validateUsageAttributionBundle(bundle));
+  assert.equal(validateUsageAttributionBundle(bundle).valid, false);
+});
 
 console.log(`runner-usage-v1: ${passed} passed, ${failed} failed`);
 process.exitCode = failed === 0 ? 0 : 1;

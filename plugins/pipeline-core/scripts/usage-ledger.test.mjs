@@ -195,3 +195,90 @@ test("usage-ledger --row omits the activity section when the session filter matc
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+function meteringBundle(runner, taskId = "same-task") {
+  const source = runner === "codex"
+    ? { kind: "codex-turn-completed-usage", version: "codex-exec-json.v1", eventSha256: "a".repeat(64), threadId: "sanitized-thread", turnId: "sanitized-turn" }
+    : { kind: "antigravity-exec-json", version: "antigravity-exec-json.v1", eventSha256: "b".repeat(64), threadId: "sanitized-thread", turnId: "sanitized-turn" };
+  const raw = runner === "codex"
+    ? { input_tokens: 4, output_tokens: 2, cached_input_tokens: 1, reasoning_output_tokens: 1 }
+    : { input_tokens: 4, output_tokens: 2, cached_tokens: 1 };
+  const unavailable = { status: "unavailable", reasonCode: "runner-does-not-emit" };
+  const omitted = { status: "unknown", reasonCode: "source-omitted" };
+  const common = {
+    inputTokens: { status: "observed", value: 4, sourceField: "input_tokens", comparison: "same-runner-only" },
+    outputTokens: { status: "observed", value: 2, sourceField: "output_tokens", comparison: "same-runner-only" },
+    cachedInputTokens: { status: "observed", value: 1, sourceField: runner === "codex" ? "cached_input_tokens" : "cached_tokens", comparison: "same-runner-only" },
+    cacheCreationInputTokens: unavailable,
+    cacheReadInputTokens: unavailable,
+    reasoningOutputTokens: runner === "codex" ? { status: "observed", value: 1, sourceField: "reasoning_output_tokens", comparison: "same-runner-only" } : omitted,
+    billedCost: { status: "unknown", reasonCode: "scope-unbound" },
+    estimatedCost: { status: "unknown", reasonCode: "scope-unbound" },
+  };
+  const envelope = {
+    schema: "pipeline.runner-usage.v1", runner, source,
+    scope: { kind: "turn", dispatchId: "sanitized-dispatch" },
+    route: { status: "unbound", effective: { status: "unknown", reasonCode: "receipt-missing" } }, raw, common,
+  };
+  return {
+    schema: "pipeline.usage-attribution-bundle.v1", runner, taskId,
+    taskEvidenceSha256: "f".repeat(64), scopeKind: "turn",
+    events: [{ envelope, attribution: { eventSha256: source.eventSha256, class: "administration", provenance: { kind: "sanitized-control-evidence", evidenceSha256: "e".repeat(64) } } }],
+  };
+}
+
+test("usage-ledger --metering reads only selected sanitized bundles and reports insufficient one-runner coverage", () => {
+  const root = mkdtempSync(join(tmpdir(), "usage-ledger-metering-"));
+  const bundlePath = join(root, "bundle.json");
+  writeFileSync(bundlePath, JSON.stringify(meteringBundle("codex")));
+  try {
+    const result = run(["--metering", bundlePath]);
+    assert.equal(result.status, 0, result.stderr);
+    const output = JSON.parse(result.stdout);
+    assert.equal(output.comparison.status, "insufficient-runner-coverage");
+    assert.equal(output.comparison.runnerCoverage, 1);
+    assert.equal(output.runners[0].toolCalls.status, "unavailable");
+    assert.doesNotMatch(result.stdout, /sanitized-thread|sanitized-dispatch|SECRET_CONTENT_MARKER/);
+    assert.doesNotMatch(result.stdout, new RegExp(root.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("usage-ledger --metering accepts matching two-runner bundles and rejects a task mismatch", () => {
+  const root = mkdtempSync(join(tmpdir(), "usage-ledger-metering-"));
+  const codexPath = join(root, "codex.json");
+  const antigravityPath = join(root, "antigravity.json");
+  writeFileSync(codexPath, JSON.stringify(meteringBundle("codex")));
+  writeFileSync(antigravityPath, JSON.stringify(meteringBundle("antigravity")));
+  try {
+    const matching = run(["--metering", codexPath, antigravityPath]);
+    assert.equal(matching.status, 0, matching.stderr);
+    assert.equal(JSON.parse(matching.stdout).comparison.runnerCoverage, 2);
+    writeFileSync(antigravityPath, JSON.stringify(meteringBundle("antigravity", "different-task")));
+    const mismatched = run(["--metering", codexPath, antigravityPath]);
+    assert.notEqual(mismatched.status, 0);
+    assert.match(mismatched.stderr, /comparison-task-mismatch/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("usage-ledger --metering rejects nonregular, oversized, and excess selected inputs before parsing", () => {
+  const root = mkdtempSync(join(tmpdir(), "usage-ledger-metering-"));
+  const oversized = join(root, "oversized.json");
+  writeFileSync(oversized, "x".repeat(1_000_001));
+  try {
+    const directory = run(["--metering", root]);
+    assert.notEqual(directory.status, 0);
+    assert.match(directory.stderr, /usage-attribution-input-invalid/);
+    const tooLarge = run(["--metering", oversized]);
+    assert.notEqual(tooLarge.status, 0);
+    assert.match(tooLarge.stderr, /usage-attribution-input-invalid/);
+    const excess = run(["--metering", ...Array.from({ length: 17 }, (_, index) => join(root, `missing-${index}.json`))]);
+    assert.notEqual(excess.status, 0);
+    assert.match(excess.stderr, /bounded list of sanitized bundle files/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

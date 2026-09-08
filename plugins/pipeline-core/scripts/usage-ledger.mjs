@@ -109,10 +109,11 @@
  *     an `id` (none observed so far, defensive only) cannot be deduped and is
  *     counted individually, surfaced via a diagnostic in `--row` output.
  */
-import { readdirSync, statSync, createReadStream, readFileSync } from "node:fs";
+import { closeSync, createReadStream, fstatSync, lstatSync, openSync, readFileSync, readSync, readdirSync, statSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { USAGE_ATTRIBUTION_LIMITS, UsageIngestionError, summarizeUsageAttribution } from "../lib/runner-usage-v1.mjs";
 
 const SESSION_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // Composite map-key separator: project dir names and Windows paths can never
@@ -128,7 +129,7 @@ const DEFAULT_PRICES_PATH = path.join(SCRIPT_DIR, "model-prices.json");
 function usage(msg) {
   if (msg) console.error(msg);
   console.error(
-    "Usage: node plugins/pipeline-core/scripts/usage-ledger.mjs <transcripts-root> [--session <uuid>] [--latest [projectDirName]] [--row [label]] [--prices <path>]",
+    "Usage: node plugins/pipeline-core/scripts/usage-ledger.mjs <transcripts-root> [--session <uuid>] [--latest [projectDirName]] [--row [label]] [--prices <path>] | --metering <sanitized-bundle.json...>",
   );
   console.error('Example (full table):  node plugins/pipeline-core/scripts/usage-ledger.mjs "$HOME/.claude/projects"');
   console.error(
@@ -140,6 +141,39 @@ function usage(msg) {
 // --- 0. Parse CLI arguments: root stays the mandatory first positional (GL-03);
 //        everything else is an optional flag. ---
 const argv = process.argv.slice(2);
+
+function readMeteringBundle(file) {
+  let descriptor;
+  try {
+    if (!lstatSync(file).isFile()) throw new Error("not-regular-file");
+    descriptor = openSync(file, "r");
+    const before = fstatSync(descriptor);
+    if (!before.isFile() || before.size > USAGE_ATTRIBUTION_LIMITS.maxBundleBytes) throw new Error("oversized-or-nonregular");
+    const bytes = Buffer.alloc(before.size);
+    if (readSync(descriptor, bytes, 0, bytes.length, 0) !== bytes.length) throw new Error("short-read");
+    const after = fstatSync(descriptor);
+    if (after.size !== before.size) throw new Error("file-changed-during-read");
+    return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+  } finally {
+    if (descriptor !== undefined) closeSync(descriptor);
+  }
+}
+
+// Metering is intentionally an exclusive, selected-file mode. It never opens
+// a transcript root, price table, provider endpoint, or directory tree.
+if (argv[0] === "--metering") {
+  const bundleFiles = argv.slice(1);
+  if (bundleFiles.length === 0 || bundleFiles.length > USAGE_ATTRIBUTION_LIMITS.maxBundles || bundleFiles.some((entry) => entry.startsWith("--"))) usage("--metering requires a bounded list of sanitized bundle files and accepts no other flags.");
+  try {
+    const bundles = bundleFiles.map(readMeteringBundle);
+    console.log(JSON.stringify(summarizeUsageAttribution(bundles)));
+    process.exit(0);
+  } catch (error) {
+    const code = error instanceof UsageIngestionError ? error.code : "usage-attribution-input-invalid";
+    console.error(`usage-ledger --metering: ${code}`);
+    process.exit(1);
+  }
+}
 const root = argv[0];
 if (!root) usage("Missing required argument: transcripts root directory.");
 

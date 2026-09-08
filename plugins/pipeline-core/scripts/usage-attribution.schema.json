@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.usage-attribution-bundle.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "runner", "taskId", "taskEvidenceSha256", "scopeKind", "events"],
+  "properties": {
+    "schema": { "const": "pipeline.usage-attribution-bundle.v1" },
+    "runner": { "enum": ["claude", "codex", "antigravity"] },
+    "taskId": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "taskEvidenceSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "scopeKind": { "enum": ["turn", "session"] },
+    "events": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["envelope", "attribution"],
+        "properties": {
+          "envelope": { "type": "object" },
+          "attribution": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["eventSha256", "class", "provenance"],
+            "properties": {
+              "eventSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+              "class": { "enum": ["administration", "product", "mixed", "unknown"] },
+              "provenance": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["kind", "evidenceSha256"],
+                "properties": {
+                  "kind": { "enum": ["sanitized-control-evidence", "sanitized-product-evidence", "sanitized-mixed-evidence", "insufficient-evidence"] },
+                  "evidenceSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
