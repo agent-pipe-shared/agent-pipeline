@@ -45,13 +45,19 @@ concurrent suite processes. These focused results do not replace the failed
 full gate. The selected Critic has not started. Operational pointers:
 `scratch/candidate-checkpoint-37aa24fc-20260908.json`.
 
-D.4's native parallel-work guide and corrected lifecycle observation are
-integrated in `ad8087fe`; D.2's inventory increment in `b25c8696` declares
-34 capabilities with 616 discovered surfaces assigned exactly once. Their
-document/inventory checks and strict dispatch bindings pass. Generated-obligations
-discovery, the inventory's independent review and final documentation binding
-remain open. D.3's generated enforcement reference, audit/security/cost pages,
-and D.6's metering boundary are in progress under disjoint ownership.
+D.4 is integrated in `ad8087fe`. D.2 (`b25c8696`, `8f08381f`) declares
+35 capabilities and assigns 616 surfaces exactly once; the existing obligations
+suite resolved the alleged discovery gap without a schema change. D.3's
+generated enforcement reference (`48266bb6`) and audit/security/cost pages
+(`1e7bb527`) pass focused checks. Front-door rewriting, independent inventory
+review and reader-review binding remain open.
+
+D.6's selected-file metering (`b1255de9`) passes synthetic tests; supplied
+labels are not independent classification proof. Actual comparable two-runner
+bundles remain missing. File-boundary containment (`38ecc0a0`) passes all 250
+lifecycle cases and retains caller protection. Full Verify and Critic remain
+required. Permanent GG22 regressions need an attended protected-test edit;
+the operator step is being prepared, not yet applied.
 
 The PO completed model-authority commit `f895abaf` and attended Claude hook
 commit `2dab5966`; both were read back against the expected changes. Active
