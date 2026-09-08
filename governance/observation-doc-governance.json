@@ -69,12 +69,15 @@
         "paths": [
           "docs/README.md",
           "docs/agent-decision-journal.md",
+          "docs/audit-and-evidence.md",
           "docs/audit-bundles.md",
           "docs/change-control.md",
+          "docs/cost-and-measurement.md",
           "docs/deploy/README.md",
           "docs/design/README.md",
           "docs/design/design-facilitator-prompt.md",
           "docs/design/export-template.md",
+          "docs/enforcement.md",
           "docs/evidence-viewer.md",
           "docs/external-traceability.md",
           "docs/github-issue-operations.md",
@@ -88,6 +91,7 @@
           "docs/parallel-work.md",
           "docs/runner-support.md",
           "docs/runtime-boundary.md",
+          "docs/security-controls.md",
           "docs/v3-consumer-onboarding.md",
           "docs/whats-new-0.5.0.md",
           "docs/whats-new-0.6.0.md"

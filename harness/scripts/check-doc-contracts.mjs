@@ -15,6 +15,7 @@ import { fileURLToPath } from "node:url";
 import { AUTHORITY_ARTIFACTS, resolveAuthorityArtifactPath } from "../../plugins/pipeline-core/lib/project-authority.mjs";
 
 import { checkObservationGovernance } from "./check-observation-governance.mjs";
+import { MANIFEST_PATHS, checkEnforcementDocument } from "./generate-enforcement-doc.mjs";
 
 const decoder = new TextDecoder("utf-8", { fatal: true });
 const EXCLUDED_PATH = "AGENTS.md";
@@ -67,6 +68,8 @@ const STATEFUL_DESIGN_CONTRACTS = [
     phrases: ["Self-reference audit (what mutable material cannot authenticate itself).", "self-reference audit"],
   },
 ];
+const ENFORCEMENT_DOCUMENT_PATH = "docs/enforcement.md";
+const ENFORCEMENT_SOURCE_MANIFESTS = Object.values(MANIFEST_PATHS);
 function posixPath(value) {
   return value.split(sep).join("/");
 }
@@ -547,6 +550,7 @@ export function checkRepository(rootInput, options = {}) {
   let anchorsChecked = 0;
   let excludedLinks = 0;
   let vendoredExcludedLinks = 0;
+  let enforcementDocument = "not-applicable";
 
   const readRepoText = (repoPath) => {
     if (isExcludedRepoPath(repoPath)) return null;
@@ -688,6 +692,31 @@ export function checkRepository(rootInput, options = {}) {
   const observationGovernance = checkObservationGovernance(root, { optionalWhenAbsent: true });
   for (const item of observationGovernance.findings) findings.push(`observation-governance: ${item}`);
 
+  // A tracked generated page is always pinned. The complete manifest set also
+  // identifies this source checkout, so it remains required when a deletion
+  // removes the page from the tracked set. Generic consumers and minimal
+  // fixtures with neither boundary stay outside this repository-specific
+  // contract.
+  if (trackedPaths.has(ENFORCEMENT_DOCUMENT_PATH) || ENFORCEMENT_SOURCE_MANIFESTS.every((path) => trackedPaths.has(path))) {
+    enforcementDocument = "checked";
+    if (!trackedPaths.has(ENFORCEMENT_DOCUMENT_PATH)) {
+      findings.push(
+        `generated-enforcement: ${ENFORCEMENT_DOCUMENT_PATH}: required generated page is not tracked -- run: node harness/scripts/generate-enforcement-doc.mjs --write and add the page`,
+      );
+    } else {
+      try {
+        const result = checkEnforcementDocument({ rootDir: root });
+        if (!result.ok) {
+          findings.push(
+            `generated-enforcement: ${ENFORCEMENT_DOCUMENT_PATH}: ${result.reason} -- run: node harness/scripts/generate-enforcement-doc.mjs --write`,
+          );
+        }
+      } catch (error) {
+        findings.push(`generated-enforcement: ${ENFORCEMENT_DOCUMENT_PATH}: generation failed: ${error.message}`);
+      }
+    }
+  }
+
   findings.sort();
   return {
     findings,
@@ -699,6 +728,7 @@ export function checkRepository(rootInput, options = {}) {
       vendoredExcludedLinks,
       observationGovernance: observationGovernance.applicable ? "checked" : "not-applicable",
       statefulDesignContracts,
+      enforcementDocument,
     },
   };
 }
