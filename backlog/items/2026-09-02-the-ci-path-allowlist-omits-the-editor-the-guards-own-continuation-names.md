@@ -198,3 +198,20 @@ predicate while a stated acceptance criterion is unmet is the exact premature
 closure this repository paid for on 2026-09-03
 (`backlog/items/2026-09-01-the-denial-trim-state-is-keyed-per-session-not-per-agent-as-its-comment-claims.md`,
 correction section), and closure there proved terminal.
+
+### Triage correction, 2026-09-08
+
+The September 7 predicate correction above inferred too much from the missing
+workflow symlink. Route 2 is present in current code: rbTrueShimDir() supplies
+the editor only to the real continuation subprocess. Re-running the existing
+rebwire req5-2 test under exactly the workflow's five-tool PATH passed, after
+separately confirming bare true was unavailable. See
+`backlog/evidence/2026-09-08-ci-true-shim-reverification.md`.
+
+The remaining criterion is actual CI evidence, not a missing implementation
+of Route 1. The current done_when string names a route the accepted triage did
+not choose; it must not be used to infer an outstanding source-code defect or
+authorize expanding the CI allowlist. Its replacement needs the ordinary
+item-content/ledger rescope procedure, and is not silently changed here.
+Status stays open because this local probe does not satisfy actual CI evidence.
+No push, CI job, workflow mutation or item closure was performed.
