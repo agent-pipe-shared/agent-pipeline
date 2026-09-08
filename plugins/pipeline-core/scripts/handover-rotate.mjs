@@ -42,12 +42,12 @@
  * pinned by this script's own test suite).
  */
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
-import { HANDOVER_MEASUREMENT_SCHEMA, resolveHandoverConfig } from "../lib/handover-rotation.mjs";
+import { HANDOVER_MEASUREMENT_SCHEMA, measureHandoverBytes, resolveHandoverConfig } from "../lib/handover-rotation.mjs";
 
 export const ARCHIVE_DIR = "docs/state-archive";
 const ACK_MARKER_RELATIVE = join(".git", "agent-pipeline", "handover-rotation", "extraction-acknowledged.json");
@@ -424,6 +424,24 @@ function assertPathWithinRoot(root, candidatePath, label) {
   return resolvedCandidate;
 }
 
+/**
+ * Resolves the configured or explicit handover file for every CLI mode. The
+ * lexical check keeps `..` paths out; the realpath check additionally keeps a
+ * handover symlink from exposing a target outside the repository root.
+ */
+function resolveExistingHandoverFile(root, handoverPath) {
+  const config = resolveHandoverConfig({ rootDir: root });
+  const resolvedHandoverPath = handoverPath ?? config.path;
+  const requestedFullPath = join(root, resolvedHandoverPath);
+  assertPathWithinRoot(root, requestedFullPath, "The handover path (--handover-path/--file)");
+  if (!existsSync(requestedFullPath)) {
+    throw new HandoverRotationError("HANDOVER-ROTATION-FILE-NOT-FOUND", `${resolvedHandoverPath} not found under ${root}.`);
+  }
+  const fullHandoverPath = realpathSync(requestedFullPath);
+  assertPathWithinRoot(realpathSync(root), fullHandoverPath, "The resolved handover path (--handover-path/--file)");
+  return { config, resolvedHandoverPath, fullHandoverPath };
+}
+
 // -- Documentation-governance registration (Pipeline-repo self-hosting only) --
 
 const DOC_GOVERNANCE_RELATIVE_PATH = join("governance", "observation-doc-governance.json");
@@ -479,12 +497,7 @@ export function registerArchiveInDocGovernance(root, { handoverPath, archivePath
 export function rotateHandover({
   root, handoverPath, sectionHeadings, summary, dateRange, slug, rotationDate = new Date().toISOString().slice(0, 10),
 }) {
-  const resolvedHandoverPath = handoverPath ?? resolveHandoverConfig({ rootDir: root }).path;
-  const fullHandoverPath = join(root, resolvedHandoverPath);
-  assertPathWithinRoot(root, fullHandoverPath, "The handover path (--handover-path)");
-  if (!existsSync(fullHandoverPath)) {
-    throw new HandoverRotationError("HANDOVER-ROTATION-FILE-NOT-FOUND", `${resolvedHandoverPath} not found under ${root}.`);
-  }
+  const { resolvedHandoverPath, fullHandoverPath } = resolveExistingHandoverFile(root, handoverPath);
   const liveContent = readFileSync(fullHandoverPath, "utf8");
   assertSectionsExtractionAcknowledged(root, { sectionHeadings, liveContent });
   const plan = planRotation({
@@ -509,32 +522,91 @@ export function rotateHandover({
 
 // -- CLI --
 
+const CLI_USAGE_CODE = "HANDOVER-ROTATION-CLI-USAGE";
+
+function cliUsage(message) {
+  return new HandoverRotationError(CLI_USAGE_CODE, message);
+}
+
 function parseArgs(argv) {
   const args = { sectionHeadings: [] };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
-    if (a === "--root") args.root = argv[++i];
+    const next = () => {
+      const value = argv[++i];
+      if (value === undefined || value.startsWith("--")) throw cliUsage(`${a} requires a value.`);
+      return value;
+    };
+    const setSingle = (key, value) => {
+      if (args[key] !== undefined && args[key] !== value) {
+        throw cliUsage(`${a} conflicts with the earlier value for ${key}.`);
+      }
+      args[key] = value;
+    };
+    if (a === "--root") setSingle("root", next());
     else if (a === "--acknowledge-extraction-done") args.acknowledge = true;
     else if (a === "--status") args.status = true;
-    else if (a === "--section-heading") args.sectionHeadings.push(argv[++i]);
-    else if (a === "--summary") args.summary = argv[++i];
-    else if (a === "--date-range") args.dateRange = argv[++i];
-    else if (a === "--slug") args.slug = argv[++i];
-    else if (a === "--rotation-date") args.rotationDate = argv[++i];
-    else if (a === "--handover-path") args.handoverPath = argv[++i];
+    else if (a === "--check-size") args.checkSize = true;
+    else if (a === "--dry-run") args.dryRun = true;
+    else if (a === "--section-heading") args.sectionHeadings.push(next());
+    else if (a === "--summary") setSingle("summary", next());
+    else if (a === "--date-range") setSingle("dateRange", next());
+    else if (a === "--slug") setSingle("slug", next());
+    else if (a === "--rotation-date") setSingle("rotationDate", next());
+    else if (a === "--handover-path") setSingle("handoverPath", next());
+    else if (a === "--file") setSingle("file", next());
+    else throw cliUsage(`Unsupported option: ${a}.`);
+  }
+  if (args.file !== undefined) {
+    if (args.handoverPath !== undefined && args.handoverPath !== args.file) {
+      throw cliUsage("--file and --handover-path name different handover files.");
+    }
+    args.handoverPath = args.file;
+  }
+  const modes = [
+    args.acknowledge && "acknowledge",
+    args.status && "status",
+    args.checkSize && "check-size",
+    args.dryRun && "dry-run",
+  ].filter(Boolean);
+  if (modes.length > 1) throw cliUsage(`Incompatible modes: ${modes.join(", ")}.`);
+  args.mode = modes[0] ?? "rotate";
+
+  const hasRotationDetail = args.summary !== undefined
+    || args.dateRange !== undefined
+    || args.slug !== undefined
+    || args.rotationDate !== undefined;
+  if (args.mode === "check-size" && (args.sectionHeadings.length > 0 || hasRotationDetail)) {
+    throw cliUsage("--check-size accepts only --root and an optional --handover-path/--file.");
+  }
+  if ((args.mode === "status" || args.mode === "acknowledge") && hasRotationDetail) {
+    throw cliUsage(`--${args.mode} cannot be combined with rotation-writing arguments.`);
+  }
+  if ((args.mode === "rotate" || args.mode === "dry-run") && args.sectionHeadings.length === 0) {
+    throw cliUsage(`--${args.mode} requires at least one --section-heading.`);
+  }
+  if ((args.mode === "rotate" || args.mode === "dry-run") && !args.summary) {
+    throw cliUsage(`--${args.mode} requires --summary "<one-line summary>".`);
   }
   return args;
 }
 
 if (isDirectInvocation(import.meta.url)) {
-  const args = parseArgs(process.argv.slice(2));
-  if (!args.root) {
-    console.error("handover-rotate: --root <repository-root> is required");
-    process.exit(1);
-  }
-  const root = resolve(args.root);
   try {
-    if (args.status) {
+    const args = parseArgs(process.argv.slice(2));
+    if (!args.root) throw cliUsage("--root <repository-root> is required.");
+    const root = resolve(args.root);
+    if (args.mode === "check-size") {
+      const { config, resolvedHandoverPath, fullHandoverPath } = resolveExistingHandoverFile(root, args.handoverPath);
+      const measurement = measureHandoverBytes(readFileSync(fullHandoverPath).byteLength, { maxBytes: config.maxBytes });
+      console.log(`Handover size: ${measurement.bytes} bytes (${measurement.metric}; max ${measurement.maxUpperBoundUnits}) for ${resolvedHandoverPath}.`);
+      if (!measurement.withinBudget) {
+        console.error(`HANDOVER-ROTATION-SIZE-EXCEEDS-MAX: ${resolvedHandoverPath} exceeds configured maximum ${measurement.maxUpperBoundUnits} bytes.`);
+        process.exit(1);
+      }
+      process.exit(0);
+    }
+    if (args.mode === "status") {
       // Read-only: NVA-HANDOVER-ROT-2 F4 / NVA-W3-R3 (schema v2). Never records the marker,
       // only reports it -- the close-block ritual checks this first so
       // `--acknowledge-extraction-done` stays a deliberate human/Elephant judgment call, never
@@ -542,9 +614,7 @@ if (isDirectInvocation(import.meta.url)) {
       // section's acknowledged-or-not state (against the live file's current content); without
       // one, lists every CURRENTLY PERSISTED acknowledged section.
       if (args.sectionHeadings.length > 0) {
-        const resolvedHandoverPath = args.handoverPath ?? resolveHandoverConfig({ rootDir: root }).path;
-        const fullHandoverPath = join(root, resolvedHandoverPath);
-        assertPathWithinRoot(root, fullHandoverPath, "The handover path (--handover-path)");
+        const { fullHandoverPath } = resolveExistingHandoverFile(root, args.handoverPath);
         const liveContent = readFileSync(fullHandoverPath, "utf8");
         for (const title of args.sectionHeadings) {
           const section = locateSectionOrThrow(liveContent, title);
@@ -568,16 +638,14 @@ if (isDirectInvocation(import.meta.url)) {
       }
       process.exit(0);
     }
-    if (args.acknowledge) {
+    if (args.mode === "acknowledge") {
       if (args.sectionHeadings.length === 0) {
         console.error("handover-rotate: --acknowledge-extraction-done requires at least one --section-heading "
           + "\"<title>\" -- schema v2 (ADR-0066 Decision 6) acknowledges specific sections, never the whole "
           + "repository at once.");
         process.exit(1);
       }
-      const resolvedHandoverPath = args.handoverPath ?? resolveHandoverConfig({ rootDir: root }).path;
-      const fullHandoverPath = join(root, resolvedHandoverPath);
-      assertPathWithinRoot(root, fullHandoverPath, "The handover path (--handover-path)");
+      const { fullHandoverPath } = resolveExistingHandoverFile(root, args.handoverPath);
       const liveContent = readFileSync(fullHandoverPath, "utf8");
       const entries = recordExtractionAcknowledged(root, { sectionHeadings: args.sectionHeadings, liveContent });
       for (const entry of entries) {
@@ -586,9 +654,24 @@ if (isDirectInvocation(import.meta.url)) {
       }
       process.exit(0);
     }
+    if (args.mode === "dry-run") {
+      const { resolvedHandoverPath, fullHandoverPath } = resolveExistingHandoverFile(root, args.handoverPath);
+      const liveContent = readFileSync(fullHandoverPath, "utf8");
+      assertSectionsExtractionAcknowledged(root, { sectionHeadings: args.sectionHeadings, liveContent });
+      const plan = planRotation({
+        liveContent,
+        handoverPath: resolvedHandoverPath,
+        sectionHeadings: args.sectionHeadings,
+        summary: args.summary,
+        dateRange: args.dateRange,
+        slug: args.slug,
+        rotationDate: args.rotationDate ?? new Date().toISOString().slice(0, 10),
+      });
+      console.log(`Dry-run archive plan: ${plan.archivedTitles.length} section(s) -> ${plan.archivePath}.`);
+      process.exit(0);
+    }
     if (!args.summary) {
-      console.error("handover-rotate: --summary \"<one-line summary>\" is required for a rotation");
-      process.exit(1);
+      throw cliUsage("--summary \"<one-line summary>\" is required for a rotation.");
     }
     const plan = rotateHandover({
       root,

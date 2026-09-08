@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import { spawnSync } from "node:child_process";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -32,6 +32,24 @@ mkdirSync(SCRATCH_ROOT, { recursive: true });
 
 function fixtureRoot(label) {
   return mkdtempSync(join(SCRATCH_ROOT, `handover-rotate-test-${label}-`));
+}
+
+function snapshotFixture(root) {
+  const entries = [];
+  function visit(relativePath) {
+    const fullPath = join(root, relativePath);
+    const stat = lstatSync(fullPath);
+    if (stat.isDirectory()) {
+      entries.push({ path: relativePath, type: "directory" });
+      for (const child of readdirSync(fullPath).sort()) visit(join(relativePath, child));
+    } else if (stat.isSymbolicLink()) {
+      entries.push({ path: relativePath, type: "symlink", target: readlinkSync(fullPath) });
+    } else {
+      entries.push({ path: relativePath, type: "file", content: readFileSync(fullPath).toString("base64") });
+    }
+  }
+  visit(".");
+  return entries;
 }
 
 const SAMPLE = [
@@ -687,6 +705,154 @@ const GOVERNANCE_FIXTURE = [
     );
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// == NVA-B-HANDOVER-CLI-MODES-1: inspection modes are explicit, read-only child-CLI entrypoints ==
+{
+  const root = fixtureRoot("cli-read-only-modes");
+  try {
+    mkdirSync(join(root, "docs"), { recursive: true });
+    mkdirSync(join(root, "project"), { recursive: true });
+    mkdirSync(join(root, "governance"), { recursive: true });
+    writeFileSync(join(root, "docs", "custom.md"), SAMPLE, "utf8");
+    writeFileSync(join(root, "project", "pipeline.json"), JSON.stringify({ handover: { path: "docs/custom.md", maxBytes: 10_000 } }), "utf8");
+    writeFileSync(join(root, "governance", "observation-doc-governance.json"), GOVERNANCE_FIXTURE, "utf8");
+    const cleanState = snapshotFixture(root);
+
+    const checked = spawnSync(process.execPath, [SCRIPT_PATH, "--root", root, "--check-size", "--file", "docs/custom.md"], { encoding: "utf8" });
+    assert.equal(checked.status, 0, checked.stderr);
+    assert.match(checked.stdout, /utf8-byte-upper-bound/);
+    assert.match(checked.stdout, /10000/);
+    assert.deepEqual(snapshotFixture(root), cleanState, "--check-size must preserve every fixture entry, including absent marker/archive paths");
+    assert.equal(existsSync(join(root, ".git", "agent-pipeline", "handover-rotation", "extraction-acknowledged.json")), false);
+    assert.equal(existsSync(join(root, ARCHIVE_DIR)), false);
+
+    writeFileSync(join(root, "project", "pipeline.json"), JSON.stringify({ handover: { path: "docs/custom.md", maxBytes: 1 } }), "utf8");
+    const overBefore = snapshotFixture(root);
+    const over = spawnSync(process.execPath, [SCRIPT_PATH, "--root", root, "--check-size", "--handover-path", "docs/custom.md"], { encoding: "utf8" });
+    assert.equal(over.status, 1, "an over-cap read-only size check must fail");
+    assert.match(over.stderr, /exceeds configured maximum/i);
+    assert.deepEqual(snapshotFixture(root), overBefore, "an over-cap size check must still write nothing");
+
+    writeFileSync(join(root, "project", "pipeline.json"), JSON.stringify({ handover: { path: "docs/custom.md", maxBytes: 10_000 } }), "utf8");
+    const unacknowledgedBefore = snapshotFixture(root);
+    const unacknowledged = spawnSync(
+      process.execPath,
+      [SCRIPT_PATH, "--root", root, "--dry-run", "--section-heading", "Block A", "--summary", "planned archive"],
+      { encoding: "utf8" },
+    );
+    assert.equal(unacknowledged.status, 1, "an unacknowledged dry run must fail just as a real rotation does");
+    assert.match(unacknowledged.stderr, /HANDOVER-EXTRACTION-NOT-ACKNOWLEDGED/);
+    assert.deepEqual(snapshotFixture(root), unacknowledgedBefore, "an unacknowledged dry run must not create a marker, archive, or governance write");
+
+    const live = readFileSync(join(root, "docs", "custom.md"), "utf8");
+    recordExtractionAcknowledged(root, { sectionHeadings: ["Block A"], liveContent: live });
+    const acknowledgedBefore = snapshotFixture(root);
+    const acknowledged = spawnSync(
+      process.execPath,
+      [SCRIPT_PATH, "--root", root, "--dry-run", "--section-heading", "Block A", "--summary", "planned archive"],
+      { encoding: "utf8" },
+    );
+    assert.equal(acknowledged.status, 0, acknowledged.stderr);
+    assert.match(acknowledged.stdout, /Dry-run archive plan/);
+    assert.match(acknowledged.stdout, /docs\/state-archive\//);
+    assert.ok(!acknowledged.stdout.includes("Content A line 1."), "the dry-run summary must remain bounded and omit handover body text");
+    assert.deepEqual(snapshotFixture(root), acknowledgedBefore, "an acknowledged dry run must be fully read-only");
+
+    writeFileSync(join(root, "docs", "custom.md"), live.replace("Content A line 1.", "Content A line 1, edited after acknowledgment."), "utf8");
+    const staleBefore = snapshotFixture(root);
+    const stale = spawnSync(
+      process.execPath,
+      [SCRIPT_PATH, "--root", root, "--dry-run", "--section-heading", "Block A", "--summary", "planned archive"],
+      { encoding: "utf8" },
+    );
+    assert.equal(stale.status, 1, "a stale extraction acknowledgement must fail dry-run");
+    assert.match(stale.stderr, /HANDOVER-EXTRACTION-NOT-ACKNOWLEDGED/);
+    assert.deepEqual(snapshotFixture(root), staleBefore, "a stale dry run must remain read-only");
+
+    const rejectedBefore = snapshotFixture(root);
+    for (const argv of [
+      ["--root", root, "--unknown-option", "--section-heading", "Block A", "--summary", "s"],
+      ["--root", root, "--execute", "--section-heading", "Block A", "--summary", "s"],
+      ["--root", root, "--help"],
+      ["--root", root, "--check-size", "--file"],
+      ["--root"],
+      ["--root", root, "--check-size", "--summary", "must refuse"],
+      ["--root", root, "--dry-run", "--acknowledge-extraction-done", "--section-heading", "Block A", "--summary", "s"],
+      ["--root", root, "--file", "docs/custom.md", "--handover-path", "docs/other.md", "--check-size"],
+      ["--root", root, "--root", join(root, "other"), "--check-size"],
+    ]) {
+      const rejected = spawnSync(process.execPath, [SCRIPT_PATH, ...argv], { encoding: "utf8" });
+      assert.equal(rejected.status, 1, `invalid CLI input must refuse: ${argv.join(" ")}`);
+      assert.match(rejected.stderr, /HANDOVER-ROTATION-CLI-USAGE/);
+      assert.deepEqual(snapshotFixture(root), rejectedBefore, "invalid flags must be rejected before any possible mutation");
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// == NVA-B-HANDOVER-CLI-MODES-1: check-size measures on-disk bytes, not decoded UTF-8 text ==
+{
+  const root = fixtureRoot("cli-size-raw-bytes");
+  try {
+    const handoverBytes = Buffer.from([0x41, 0xf0, 0x9f, 0x98, 0x80, 0xff]); // A, 😀, invalid UTF-8 byte
+    mkdirSync(join(root, "docs"), { recursive: true });
+    writeFileSync(join(root, "docs", "state.md"), handoverBytes);
+    const before = snapshotFixture(root);
+    const checked = spawnSync(process.execPath, [SCRIPT_PATH, "--root", root, "--check-size"], { encoding: "utf8" });
+    assert.equal(checked.status, 0, checked.stderr);
+    assert.match(checked.stdout, new RegExp(`Handover size: ${handoverBytes.length} bytes`));
+    assert.deepEqual(snapshotFixture(root), before, "raw-byte size inspection must preserve the fixture byte-for-byte");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// == NVA-B-HANDOVER-CLI-MODES-1: check-size applies the default cap and fails cleanly for a missing handover ==
+{
+  const root = fixtureRoot("cli-default-size");
+  const missingRoot = fixtureRoot("cli-size-missing-file");
+  try {
+    mkdirSync(join(root, "docs"), { recursive: true });
+    writeFileSync(join(root, "docs", "state.md"), SAMPLE, "utf8");
+    const defaultBefore = snapshotFixture(root);
+    const defaultCap = spawnSync(process.execPath, [SCRIPT_PATH, "--root", root, "--check-size"], { encoding: "utf8" });
+    assert.equal(defaultCap.status, 0, defaultCap.stderr);
+    assert.match(defaultCap.stdout, /max 30000/);
+    assert.deepEqual(snapshotFixture(root), defaultBefore, "the default-cap size check must remain read-only");
+
+    const missingBefore = snapshotFixture(missingRoot);
+    const missing = spawnSync(process.execPath, [SCRIPT_PATH, "--root", missingRoot, "--check-size"], { encoding: "utf8" });
+    assert.equal(missing.status, 1, "a missing default handover must refuse");
+    assert.match(missing.stderr, /HANDOVER-ROTATION-FILE-NOT-FOUND/);
+    assert.deepEqual(snapshotFixture(missingRoot), missingBefore, "a missing-file size check must not create directories or markers");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(missingRoot, { recursive: true, force: true });
+  }
+}
+
+// == NVA-B-HANDOVER-CLI-MODES-1: read-only file resolution must reject an escaping symlink ==
+{
+  const root = fixtureRoot("cli-read-only-symlink");
+  const outsideRoot = fixtureRoot("cli-read-only-symlink-outside");
+  const outside = join(outsideRoot, "handover.md");
+  try {
+    mkdirSync(join(root, "docs"), { recursive: true });
+    writeFileSync(outside, SAMPLE, "utf8");
+    symlinkSync(outside, join(root, "docs", "state.md"));
+    const before = snapshotFixture(root);
+    const outsideBefore = readFileSync(outside, "utf8");
+    const spawned = spawnSync(process.execPath, [SCRIPT_PATH, "--root", root, "--check-size"], { encoding: "utf8" });
+    assert.equal(spawned.status, 1, "a read-only CLI mode must reject a handover symlink that escapes root");
+    assert.match(spawned.stderr, /HANDOVER-ROTATION-PATH-ESCAPES-ROOT/);
+    assert.deepEqual(snapshotFixture(root), before, "a rejected symlink must leave the complete fixture state unchanged");
+    assert.equal(readFileSync(outside, "utf8"), outsideBefore, "the outside target must remain unread for mutation and unchanged");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(outsideRoot, { recursive: true, force: true });
   }
 }
 
