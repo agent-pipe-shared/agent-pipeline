@@ -14,6 +14,8 @@ für alle Guards, was dann Approval sauber regelt und auch einen Audit
 ermöglicht."* **Refines** [ADR-0058](0058-guard-maintenance-window.md);
 **extends** `docs/human-guard-override-threat-model.md`.
 
+**Governs:** plugins/pipeline-core/lib/human-guard-override.mjs, plugins/pipeline-core/lib/human-guard-override.test.mjs, plugins/pipeline-core/scripts/guard-human-override.mjs, plugins/pipeline-core/scripts/guard-human-override.test.mjs, plugins/pipeline-core/lib/critical-human-proof-policy.mjs, plugins/pipeline-core/lib/critical-human-proof-policy.test.mjs, plugins/pipeline-core/lib/copy-safe-command.mjs, plugins/pipeline-core/lib/copy-safe-command.test.mjs, plugins/pipeline-core/lib/guard-authority-ledger-intake.mjs, plugins/pipeline-core/lib/guard-authority-ledger-intake.test.mjs, plugins/pipeline-core/hooks/guard-testpath.mjs, plugins/pipeline-core/hooks/guard-testpath.test.mjs, plugins/pipeline-core/hooks/guard-gate-strength.mjs, plugins/pipeline-core/hooks/guard-gate-strength.test.mjs, plugins/pipeline-core/hooks/guard-gate-strength-ledger.test.mjs, plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs, plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs, plugins/pipeline-core/hooks/codex-pretool-guard.mjs, plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs, plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs, plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs, plugins/pipeline-core/lib/po-approval-proof.mjs, plugins/pipeline-core/lib/po-approval-proof.test.mjs, pipeline.user.yaml, project/critical-human-proof.json, docs/human-guard-override-threat-model.md
+
 ## Context
 
 `lib/human-guard-override.mjs` ("HGO") already classifies almost every kind

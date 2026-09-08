@@ -17,6 +17,8 @@ constrains here: [ADR-0055](0055-critical-human-proof-waiver.md),
 [ADR-0058](0058-guard-maintenance-window.md),
 [ADR-0059](0059-signed-human-guard-override.md).
 
+**Governs:** plugins/pipeline-core/scripts/po-human-approval.mjs, plugins/pipeline-core/scripts/po-human-approval.test.mjs, plugins/pipeline-core/lib/critical-action-approval-request.mjs, plugins/pipeline-core/lib/critical-action-approval-request.test.mjs, plugins/pipeline-core/scripts/po-approval-gate.mjs, plugins/pipeline-core/scripts/po-approval-gate.test.mjs, plugins/pipeline-core/scripts/push-prepare.mjs, plugins/pipeline-core/scripts/push-prepare.test.mjs, docs/push-release-flow.md
+
 ## Context
 
 `backlog/items/2026-08-07-push-release-flow-unusable-for-third-party-adopters.md`'s
