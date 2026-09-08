@@ -6,6 +6,8 @@
 partially supersedes** [ADR-0051](0051-dual-runner-tri-platform-development-contract.md)'s
 "support" clause. Everything else in ADR-0051 stands unchanged.
 
+**Governs:** docs/runner-platform-conformance.md, plugins/pipeline-core/lib/project-onboarding-v3.mjs, plugins/pipeline-core/lib/project-onboarding-v3.test.mjs, plugins/pipeline-core/scripts/onboarding-runner-identity.test.mjs, plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs, plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs, plugins/pipeline-core/hooks/lifecycle-gate-satisfiability.test.mjs, plugins/pipeline-core/lib/copy-safe-command.mjs, plugins/pipeline-core/lib/copy-safe-command.test.mjs, plugins/pipeline-core/lib/windows-private-state.mjs, plugins/pipeline-core/lib/windows-private-state.test.mjs, plugins/pipeline-core/scripts/live-runner-certification.mjs, plugins/pipeline-core/scripts/live-runner-certification.test.mjs, harness/scripts/verify.mjs, .github/workflows/verify.yml
+
 ## Context
 
 ADR-0051 closes with a definition that reads, taken literally:

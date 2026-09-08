@@ -2,6 +2,8 @@
 
 **Status:** accepted · **Date:** 2026-07-22 · **Decision owner:** Product Owner
 
+**Governs:** docs/operating-model.md, plugins/pipeline-core/lib/scheduling-lifecycle.mjs, plugins/pipeline-core/lib/scheduling-lifecycle.test.mjs, plugins/pipeline-core/scripts/scheduling-lifecycle.schema.json, plugins/pipeline-core/scripts/check-backlog-sprint-assignment.mjs, plugins/pipeline-core/scripts/check-backlog-sprint-assignment.test.mjs, plugins/pipeline-core/scripts/check-backlog-done-predicate.mjs, plugins/pipeline-core/scripts/check-backlog-done-predicate.test.mjs, plugins/pipeline-core/lib/parallel-sprint-integration.mjs, plugins/pipeline-core/lib/parallel-sprint-integration.test.mjs, plugins/pipeline-core/scripts/close-coordinator.mjs, plugins/pipeline-core/scripts/close-coordinator.test.mjs, plugins/pipeline-core/scripts/pipeline-state.mjs, plugins/pipeline-core/scripts/pipeline-state.test.mjs, harness/scripts/verify.mjs, harness/scripts/check-verify-suite-registration.mjs, harness/scripts/check-verify-suite-registration.test.mjs, .github/workflows/verify.yml
+
 ## Context
 
 Sentinel is the shared delivery line for the current go-live. Follow-up work

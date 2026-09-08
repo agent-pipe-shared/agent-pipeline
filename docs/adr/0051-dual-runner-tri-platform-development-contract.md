@@ -4,6 +4,8 @@
 
 **Status:** accepted by PO directive (Sprint Nova session) · **Basis:** PO directive, 2026-08-04, given directly in response to the runner-routing defect fixed in commit `7f5ac97` (see Context)
 
+**Governs:** docs/runner-platform-conformance.md, docs/adr/0067-tri-runner-antigravity-integration.md, plugins/pipeline-core/lib/project-onboarding-v3.mjs, plugins/pipeline-core/lib/project-onboarding-v3.test.mjs, plugins/pipeline-core/scripts/project-onboarding-v3.mjs, plugins/pipeline-core/scripts/onboarding-runner-identity.test.mjs, plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs, plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs, plugins/pipeline-core/hooks/lifecycle-gate-satisfiability.test.mjs, plugins/pipeline-core/hooks/hooks.json, plugins/pipeline-core/hooks/codex-pretool-guard.mjs, plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs, plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs, plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs, plugins/pipeline-core/lib/runner-profiles-v3.mjs, plugins/pipeline-core/lib/runner-profiles-v3.test.mjs, plugins/pipeline-core/config/runner-profiles-v3.json, plugins/pipeline-core/scripts/pipeline-user-v3.schema.json, plugins/pipeline-core/scripts/live-runner-certification.mjs, plugins/pipeline-core/scripts/live-runner-certification.test.mjs, plugins/pipeline-core/lib/windows-private-state.mjs, plugins/pipeline-core/lib/windows-private-state.test.mjs, harness/scripts/verify.mjs, .github/workflows/verify.yml
+
 ## Context
 
 This session diagnosed and fixed a concrete defect: a Claude Code bootstrap
