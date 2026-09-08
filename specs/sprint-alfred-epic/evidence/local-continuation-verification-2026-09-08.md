@@ -61,11 +61,21 @@ security/Full Verify reruns, and independent review are prerequisites.
 
 ## Continuation status
 
+Full Verify then ran on the exact clean candidate
+`96238c3c1b811dc69e5d5631de67f223a6853046`, tree
+`50383e982f0e23ea44e79f11a80bbf39f55f25da`, from
+2026-09-08T20:02:02.951Z through 2026-09-08T20:12:58.131Z. It finished exit 1
+with 508 steps and 499 green, the same 9 named failures as the earlier 888
+and d88 runs. Evidence: `evidence/alfred-source-96238c3c-verify.json` and
+`evidence/alfred-source-96238c3c-security.json`; the latter records the same
+single event-16 gitleaks finding. This is the current red candidate; T1 remains
+gated and no approval or closure is claimed.
+
 C1 aggregation implementation and focused tests are locally committed at
 `854b0da8d1732bf2f787a684f9ad79659a7c9186`; final checks record receipt 64/64,
 consumer checks 9/9, and diff-check exit 0. C1 emission/local-report
 refinement is next autonomous preparation; baseline collection has not
-started. Full Verify then ran on commit `888ffc1770dbc1d1b1e562fa111b79cc0d6178b9`,
+started. Full Verify previously ran on commit `888ffc1770dbc1d1b1e562fa111b79cc0d6178b9`,
 tree `078ec307bb6167e644b63119ffcc27b376a455ef`, with exact clean start and
 finish bindings. It finished 2026-09-08T19:26:38.631Z after starting at
 2026-09-08T19:15:58.283Z: exit 1, 508 steps, 499 green, and the same 9 named
