@@ -109,10 +109,19 @@ and the open review gates. Alfred remains implementing; no final feature or
 review claim is made.
 
 The [C1 emission/local-report plan](../specs/sprint-alfred-epic/plans/c1-emission.md)
-is the next autonomous preparation package. It remains design-only and
-not-production-dispatch-ready until its observer, projection and collector
-schemas are frozen. No emission, live-hook qualification, baseline, approval or
-review claim follows from the plan.
+is the next autonomous preparation package. The first-source and store/controller
+contracts are now frozen as plans; later observer, usage and reporting schemas
+remain design-only and the package is not-production-dispatch-ready. No
+emission, live-hook qualification, baseline, approval or review claim follows
+from the plan.
+
+The current first-slice documentation also links the [preflight observation
+plan](../specs/sprint-alfred-epic/plans/c1-preflight-observation.md),
+[store/controller plan](../specs/sprint-alfred-epic/plans/c1-store-controller.md),
+[store primitive narrative](../specs/sprint-alfred-epic/evidence/c1-store-primitives-2026-09-08.md),
+and [primitive results](../specs/sprint-alfred-epic/evidence/c1-store-primitives-2026-09-08.json).
+The next step is producer capture; store/controller, usage read-only I/O, local
+report, real observer composition and baseline remain open.
 
 The PO approved plural `probeSurfaces[]` with correlated `observations[]`
 and deferred the combined suite/capability registration until A1-2 stabilizes
