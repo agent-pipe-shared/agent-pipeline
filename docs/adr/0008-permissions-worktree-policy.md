@@ -2,6 +2,8 @@
 
 > _A German version follows below · Eine deutsche Fassung folgt weiter unten._
 
+**Governs:** .claude/settings.json, .claude/pipeline.json, guardrails/git.md, roles/goldfish.md, templates/CLAUDE.project.md, templates/pipeline.json.example, plugins/pipeline-core/lib/worktree-lifecycle.mjs, plugins/pipeline-core/lib/worktree-lifecycle.test.mjs, plugins/pipeline-core/scripts/worktree-create.mjs, plugins/pipeline-core/scripts/worktree-create.test.mjs
+
 ## Context
 
 Permissions are evaluated deny → ask → allow; a deny cannot be overridden by any other level; Bash argument patterns are officially flagged as fragile. Worktrees are first-class (`claude --worktree`, `isolation: worktree`, `.worktreeinclude`; branch base defaults to `origin/HEAD`). The Checkpoint-1 review overturned the blanket worktree mandate (major finding L3-02): <PROJECT_C>'s editor-bound compile gate is fail-open inside a worktree, <PROJECT_A> pays `node_modules` cost per worktree, and Windows practice itself is ⚠ UNVERIFIED — hence a calibratable rule plus follow-up item A4 instead of an absolute mandate.

@@ -2,6 +2,8 @@
 
 > _A German version follows below · Eine deutsche Fassung folgt weiter unten._
 
+**Governs:** docs/operating-model.md, policies/model-policy.md, harness/session-bootstrap.md, roles/elephant.md, roles/goldfish.md, guardrails/token-budget.md, plugins/pipeline-core/skills/pipeline-start/SKILL.md, plugins/pipeline-core/skills/close-block/SKILL.md, plugins/pipeline-core/hooks/hooks.json, plugins/pipeline-core/hooks/post-compact-reground.mjs, plugins/pipeline-core/hooks/post-compact-reground.test.mjs, plugins/pipeline-core/hooks/stop-suggest.mjs, plugins/pipeline-core/hooks/stop-suggest.test.mjs, plugins/pipeline-core/hooks/antigravity-stop-hook.mjs
+
 ## Context
 
 Cache economics are measurable: model/effort switches and `/compact` invalidate the entire cache — the official rule of thumb is "pick your model and effort level at the top of a session." Abort criteria are mandatory — after more than two failed attempts at the same problem, fresh context is cheaper than further iteration. Marathon sessions mixing topics are a documented anti-pattern from prior experience. A PO follow-up question (2026-07-03) makes session-lifecycle policy a mandatory part of the operating model: every Elephant session must be able to explain how it handles a full context window.

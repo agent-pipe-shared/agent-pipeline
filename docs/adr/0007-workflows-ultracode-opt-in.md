@@ -4,6 +4,8 @@
 
 **Status:** accepted (2026-07-03, Checkpoint 1) · **Basis:** Register E7 + condition A2
 
+**Governs:** policies/model-policy.md, harness/checklists/session-start.md, harness/checklists/goldfish-dispatch.md, plugins/pipeline-core/lib/workflow-writer-preflight.mjs, plugins/pipeline-core/lib/workflow-writer-preflight.test.mjs, plugins/pipeline-core/lib/workflow-runner-boundary.mjs, plugins/pipeline-core/lib/workflow-runner-boundary.test.mjs
+
 ## Context
 
 Dynamic Workflows orchestrate up to 16 parallel / 1,000 agents; multi-agent costs roughly 15× the tokens, and per Anthropic "most coding tasks" are the worst fit for it. Safety-critical: workflow subagents ALWAYS run under `acceptEdits` and inherit the tool allowlist — permission modes (`plan`/`ask`) do not apply there, only PreToolUse hook denies hold. The PO revised the initially restrictive research proposal to a low-threshold opt-in (good experience in the indication domains); the cp1 review flagged the safety precondition lost in that revision as major (L2-02) → condition A2 = this ADR.
