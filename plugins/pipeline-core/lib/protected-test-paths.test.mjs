@@ -92,6 +92,29 @@ test("extractShellWriteTargets: an unparseable command with a named write execut
   assert.ok(targets.some((t) => t.candidate === TARGET && t.lane === "unparsed-command"));
 });
 
+test("NVA-B-UNPARSED-CAVEAT-1: an unparsed command may refuse a protected-path MENTION after a writer elsewhere", () => {
+  // This command is never executed. The semicolon makes it unparseable to the
+  // closed grammar; `rm` names a writer for an unprotected target and the protected
+  // path is only printf content. The conservative fallback must say that distinction.
+  const command = `rm scratch/note.txt; printf '%s' ${TARGET}`;
+  const targets = extractShellWriteTargets({ command, root: "/repo" });
+  assert.ok(
+    targets.some((t) => t.candidate === TARGET
+      && t.lane === "unparsed-command"
+      && t.classification === "conservative-possible-write"),
+    `missing conservative classification: ${command}`,
+  );
+});
+
+test("NVA-B-UNPARSED-CAVEAT-1: a resolved shell write stays a confirmed target", () => {
+  const targets = extractShellWriteTargets({ command: `rm ${TARGET}`, root: "/repo" });
+  assert.ok(
+    targets.some((t) => t.candidate === TARGET
+      && t.lane === "write-command"
+      && t.classification === undefined),
+  );
+});
+
 test("extractShellWriteTargets: an unparseable command naming no writer yields nothing", () => {
   const command = `cat ${TARGET}; echo done`;
   assert.deepEqual(candidates(command), []);
@@ -339,7 +362,29 @@ test("NVA-B-OPAQUELANE-1: a shape this lane cannot resolve into a call structure
   const command = `node -e "var p='${TARGET}'; require('fs').writeFileSync(p,'x')"`;
   const targets = extractShellWriteTargets({ command, root: "/repo" });
   assert.ok(
-    targets.some((t) => t.candidate === TARGET && t.lane === "opaque-interpreter-code"),
+    targets.some((t) => t.candidate === TARGET
+      && t.lane === "opaque-interpreter-code"
+      && t.classification === "conservative-possible-write"),
     `an unresolved shape was silently admitted: ${command}`,
+  );
+});
+
+test("NVA-B-UNPARSED-CAVEAT-1: a structured opaque known-write target remains resolved", () => {
+  const command = `node -e "require('fs').writeFileSync('${TARGET}','x')"`;
+  const targets = extractShellWriteTargets({ command, root: "/repo" });
+  assert.ok(
+    targets.some((t) => t.candidate === TARGET
+      && t.lane === "opaque-interpreter-code"
+      && t.classification === undefined),
+  );
+});
+
+test("NVA-B-UNPARSED-CAVEAT-1: a dynamic opaque known-write expression remains conservative", () => {
+  const command = `node -e "require('fs').writeFileSync(resolveDestination('${TARGET}'),'x')"`;
+  const targets = extractShellWriteTargets({ command, root: "/repo" });
+  assert.ok(
+    targets.some((t) => t.candidate === TARGET
+      && t.lane === "opaque-interpreter-code"
+      && t.classification === "conservative-possible-write"),
   );
 });

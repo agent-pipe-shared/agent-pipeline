@@ -413,8 +413,8 @@ function ruleForCandidate(rules, candidate) {
   return rules.find((rule) => rule.re.test(normalized)) ?? null;
 }
 
-function hit(rule, candidate, lane) {
-  return { rule, candidate, lane };
+function hit(rule, candidate, lane, classification = undefined) {
+  return classification === undefined ? { rule, candidate, lane } : { rule, candidate, lane, classification };
 }
 
 /** Non-flag operands of a segment, `--`-aware, with `dd`'s `of=` operand folded in. */
@@ -698,6 +698,12 @@ function isOpaqueWriteSinkCall(call) {
   return OPAQUE_LANGUAGE_WRITE_SINKS.has(call.name);
 }
 
+/** A known sink's first argument is a resolved target only when it is one literal path. */
+function opaqueLiteralPathArgument(argument) {
+  const match = String(argument).trim().match(/^(["'])(.*)\1$/su);
+  return match !== null && /^[A-Za-z0-9_.\-/\\~]+$/u.test(match[2]);
+}
+
 /**
  * The path-relevant TEXT REGIONS of a JS/Python-shaped opaque interpreter payload — used by
  * BOTH the candidate extraction below and the basename-needle fallback in
@@ -705,10 +711,11 @@ function isOpaqueWriteSinkCall(call) {
  * other too (fixing both halves of the same defect with one function rather than two).
  *
  * `parsed: false` (unresolved payload: no call found at all, or an unbalanced paren/unterminated
- * quote) leaves `regions` as `[payload]` verbatim — byte-identical to this lane's pre-fix blind
- * scan, the fail-closed default this item requires for shapes it cannot resolve.
+ * quote) leaves `regions` as one conservative region containing `payload` verbatim — byte-identical
+ * to this lane's pre-fix blind scan, while retaining why its candidate is not a resolved target.
  *
- * `parsed: true` narrows `regions` to: a known write sink's first-argument span (the target,
+ * `parsed: true` narrows `regions` to: a known write sink's first-argument span (a resolved target
+ * only when it is one literal path),
  * however it is itself expressed — see the nested-call note on `OPAQUE_LANGUAGE_WRITE_SINKS`
  * above); plus any text NOT attributable to any top-level call at all (glue between calls, and
  * text before/after every call) — still scanned, still fail-closed, because this function only
@@ -720,16 +727,27 @@ function isOpaqueWriteSinkCall(call) {
  */
 function opaqueLanguagePayloadRegions(payload) {
   const calls = parseTopLevelCalls(payload);
-  if (calls === null || calls.length === 0) return { parsed: false, regions: [payload] };
+  if (calls === null || calls.length === 0) {
+    return { parsed: false, regions: [{ text: payload, classification: "conservative-possible-write" }] };
+  }
   const regions = [];
   const sorted = [...calls].sort((a, b) => a.start - b.start);
   let cursor = 0;
   for (const call of sorted) {
-    if (call.start > cursor) regions.push(payload.slice(cursor, call.start));
-    if (isOpaqueWriteSinkCall(call) && call.argSpans.length > 0) regions.push(call.argSpans[0]);
+    if (call.start > cursor) {
+      regions.push({ text: payload.slice(cursor, call.start), classification: "conservative-possible-write" });
+    }
+    if (isOpaqueWriteSinkCall(call) && call.argSpans.length > 0) {
+      const firstArgument = call.argSpans[0];
+      regions.push(opaqueLiteralPathArgument(firstArgument)
+        ? { text: firstArgument }
+        : { text: firstArgument, classification: "conservative-possible-write" });
+    }
     cursor = call.end;
   }
-  if (cursor < payload.length) regions.push(payload.slice(cursor));
+  if (cursor < payload.length) {
+    regions.push({ text: payload.slice(cursor), classification: "conservative-possible-write" });
+  }
   return { parsed: true, regions };
 }
 
@@ -749,9 +767,10 @@ function opaqueLanguagePayloadRegions(payload) {
  * HGO grammar capability, and an authority gate built on this extraction must not evaporate
  * the moment the grammar objection is cleared.
  *
- * @returns {Array<{candidate: string, lane: string}>} every candidate this command's syntax
- *   shows writing to, in the order a caller would test them against a rule set — not
- *   filtered, not deduplicated.
+ * @returns {Array<{candidate: string, lane: string, classification?: "conservative-possible-write"}>}
+ *   every candidate this command's syntax shows writing to, in the order a caller would test them
+ *   against a rule set — not filtered, not deduplicated. `classification` appears only when a
+ *   fail-closed fallback could not positively resolve the candidate as its write target.
  */
 export function extractShellWriteTargets({ command, root, toolName = "Bash", platform = process.platform } = {}) {
   if (typeof command !== "string" || command.trim() === "") return [];
@@ -774,8 +793,10 @@ export function extractShellWriteTargets({ command, root, toolName = "Bash", pla
         const payload = argv.join(" ");
         const { regions } = opaqueLanguagePayloadRegions(payload);
         for (const region of regions) {
-          for (const token of region.match(PATH_TOKEN) ?? []) {
-            targets.push({ candidate: token, lane: "opaque-interpreter-code" });
+          for (const token of region.text.match(PATH_TOKEN) ?? []) {
+            targets.push(region.classification === undefined
+              ? { candidate: token, lane: "opaque-interpreter-code" }
+              : { candidate: token, lane: "opaque-interpreter-code", classification: region.classification });
           }
         }
         continue;
@@ -816,7 +837,9 @@ export function extractShellWriteTargets({ command, root, toolName = "Bash", pla
       // opaque interpreter payload, whatever write shape recursion found inside it.
       for (const payload of gitShellPayloads(verb, postVerbArgv)) {
         for (const nested of extractShellWriteTargets({ command: payload, root, toolName: "Bash", platform })) {
-          targets.push({ candidate: nested.candidate, lane: "opaque-interpreter-code" });
+          targets.push(nested.classification === undefined
+            ? { candidate: nested.candidate, lane: "opaque-interpreter-code" }
+            : { candidate: nested.candidate, lane: "opaque-interpreter-code", classification: nested.classification });
         }
       }
     }
@@ -833,7 +856,7 @@ export function extractShellWriteTargets({ command, root, toolName = "Bash", pla
     || [...OPAQUE_CODE_FLAGS.keys()].some((name) => containsWholeToken(lowered, name));
   if (!writerNamed) return [];
   for (const token of command.match(PATH_TOKEN) ?? []) {
-    targets.push({ candidate: token, lane: "unparsed-command" });
+    targets.push({ candidate: token, lane: "unparsed-command", classification: "conservative-possible-write" });
   }
   return targets;
 }
@@ -841,8 +864,9 @@ export function extractShellWriteTargets({ command, root, toolName = "Bash", pla
 /**
  * Classify one shell command against the protected-test-path rules.
  *
- * @returns {{rule: {id: string, reason: string}, candidate: string, lane: string}|null}
- *   the FIRST rule this command was shown to write to, or null when nothing matched.
+ * @returns {{rule: {id: string, reason: string}, candidate: string, lane: string, classification?: "conservative-possible-write"}|null}
+ *   the FIRST rule this command was shown to write to, or null when nothing matched. A
+ *   classification is additive evidence that the fallback did not resolve a positive write target.
  */
 export function protectedTestPathShellHit({ command, rules, root, toolName = "Bash", platform = process.platform } = {}) {
   if (typeof command !== "string" || command.trim() === "") return null;
@@ -850,7 +874,7 @@ export function protectedTestPathShellHit({ command, rules, root, toolName = "Ba
 
   for (const target of extractShellWriteTargets({ command, root, toolName, platform })) {
     const rule = ruleForCandidate(rules, target.candidate);
-    if (rule !== null) return hit(rule, target.candidate, target.lane);
+    if (rule !== null) return hit(rule, target.candidate, target.lane, target.classification);
   }
 
   // Opaque-interpreter-code basename-needle fallback: intrinsically RULE-derived (it searches
@@ -878,9 +902,16 @@ export function protectedTestPathShellHit({ command, rules, root, toolName = "Ba
         const argv = [...segment.argv];
         if (!argv.some((arg) => codeFlags.includes(arg.toLowerCase()))) continue;
         const { regions } = opaqueLanguagePayloadRegions(argv.join(" "));
-        const haystack = regions.join(" ").replace(/\\/gu, "/").toLowerCase();
+        // Preserve the original rule priority even though regions now retain their individual
+        // confidence. A later region matching an earlier rule must beat an earlier region
+        // matching a later rule, exactly as the former joined-haystack scan did.
         for (const { rule, needle } of protectedTestPathBasenameNeedles(rules)) {
-          if (containsWholeToken(haystack, needle)) return hit(rule, needle, "opaque-interpreter-code");
+          for (const region of regions) {
+            const haystack = region.text.replace(/\\/gu, "/").toLowerCase();
+            if (containsWholeToken(haystack, needle)) {
+              return hit(rule, needle, "opaque-interpreter-code", region.classification);
+            }
+          }
         }
       }
     }

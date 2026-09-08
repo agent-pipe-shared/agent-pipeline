@@ -1220,28 +1220,20 @@ function protectedTestPathShellRefusalHit(command, root, dependencies = {}, tool
 }
 
 /**
- * NVA-B-OPAQUELANE-1: "only a detected write is refused" is not true, unqualified, for the
- * `opaque-interpreter-code` lane -- it can only tell a write target from a mention for the
- * shapes it resolves into a known call structure (`lib/protected-test-paths.mjs`'s
- * `opaqueLanguagePayloadRegions()`/git-rebase-exec recursion); anything it cannot resolve into
- * that structure is refused whether or not it actually writes, because the lane cannot prove
- * otherwise. This caveat states that plainly and names the route forward (restructure the
- * payload so it resolves, or use a plain write tool instead of opaque interpreter code) rather
- * than leaving the unqualified claim false for this one lane, as it was found to be (backlog:
- * 2026-09-02-the-opaque-payload-lane-refuses-a-mention-not-a-write.md).
+ * NVA-B-UNPARSED-CAVEAT-1 / pipeline.unparsed-command-lane-caveat: this wording follows the
+ * classifier's explicit conservative-fallback classification, rather than a particular lane.
+ * An opaque payload or an unparsed command can name a protected path without positively resolving
+ * it as the write target; the guard still refuses that possible write. Resolved targets do not
+ * carry this classification and keep the ordinary detected-write wording.
  */
-function protectedTestPathShellOpaqueCaveat(lane) {
-  if (lane !== "opaque-interpreter-code") return "";
-  return "This lane cannot parse arbitrary interpreter code: for a node -e/python3 -c/git "
-    + "rebase --exec payload it tells a write TARGET from a mere mention only for the shapes it "
-    + "can resolve into a call structure (a known write-sink call's own first argument, or a "
-    + "git --exec payload treated as its own shell command). Anything it cannot resolve -- free "
-    + "text outside a recognised call, the protected path assembled via a variable rather than "
-    + "written as a literal, or a malformed payload -- is refused whether or not it actually "
-    + "writes, because the lane cannot prove otherwise. Route forward: restructure the payload "
-    + "into a directly-resolvable shape (the protected path as a literal argument to a "
-    + "recognised call, or plain shell syntax), or make the change through a plain Edit/Write/"
-    + "git command instead of opaque interpreter code.\n";
+function protectedTestPathShellConservativeCaveat(hit) {
+  if (hit.classification !== "conservative-possible-write") return "";
+  return "This conservative fallback cannot parse arbitrary interpreter code or command structure "
+    + "well enough to prove the protected path is the write target. It may therefore refuse a mere "
+    + "mention when a writer is also named; that does not claim a detected protected write. Route "
+    + "forward: split supported standalone read/run commands from the unparsed form. For an actual "
+    + "protected test change, use the sanctioned author-repair workflow named by the denial guidance; "
+    + "do not try another tool to bypass this protection.\n";
 }
 
 function protectedTestPathShellBlocked(hit, overrideGuidance) {
@@ -1249,16 +1241,22 @@ function protectedTestPathShellBlocked(hit, overrideGuidance) {
     2,
     "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
       + `${TESTPATH_SHELL_DENIAL_CODE}: ${hit.rule.id}: ${hit.rule.reason}\n`
-      + `Detected as a shell write to a protected test path (lane: ${hit.lane}).\n`
+      + (hit.classification === "conservative-possible-write"
+        ? `Conservatively refused as a possible shell write to a protected test path (lane: ${hit.lane}).\n`
+        : `Detected as a shell write to a protected test path (lane: ${hit.lane}).\n`)
       + "Why: an implementing Goldfish MUST NOT modify, weaken, skip or delete the tests/checks "
       + "that gate its own implementation (QG-04 / roles/goldfish.md GF-04). A genuine test "
       + "change is its own, explicitly briefed task, and this gate is authority-bearing "
       + "(guardrails/global.md GL-09) -- so which write tool you reach for cannot decide "
       + "whether it applies.\n"
-      + "Reading and RUNNING the suite are unaffected: node --test, node <suite>, cat, rg, "
-      + "git add/commit/diff/log/show on this path are all admitted. Only a detected write is "
-      + "refused.\n"
-      + protectedTestPathShellOpaqueCaveat(hit.lane)
+      + (hit.classification === "conservative-possible-write"
+        ? "Supported standalone read/run commands remain admitted: node --test, node <suite>, cat, rg, "
+          + "git add/commit/diff/log/show. Their admission does not make an unparsed compound command "
+          + "safe.\n"
+        : "Reading and RUNNING the suite are unaffected: node --test, node <suite>, cat, rg, "
+          + "git add/commit/diff/log/show on this path are all admitted. Only a detected write is "
+          + "refused.\n")
+      + protectedTestPathShellConservativeCaveat(hit)
       + (overrideGuidance ?? ""),
   );
 }

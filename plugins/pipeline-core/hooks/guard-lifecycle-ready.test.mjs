@@ -7059,6 +7059,42 @@ test("TPSHELL-OPAQUEMENTION: a mere mention is admitted, running a protected sui
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
+test("NVA-B-UNPARSED-CAVEAT-1: a protected-path mention in an unparsed command is conservatively refused without echoing the raw command", () => {
+  const path = tpShellFixture();
+  try {
+    // The command is input to the guard only, never executed: rm names a writer for
+    // scratch/note.txt while the protected path is merely printf content after `;`.
+    const mention = `rm scratch/note.txt; printf '%s' ${TPSHELL_TARGET}`;
+    const refused = tpShellRun(path, mention);
+    assert.equal(refused.exitCode, 2, "the conservative fallback was silently admitted");
+    assert.match(refused.stderr, new RegExp(TESTPATH_SHELL_DENIAL_CODE, "u"));
+    assert.match(refused.stderr, /possible shell write/u);
+    assert.match(refused.stderr, /cannot parse arbitrary interpreter code or command structure/u);
+    assert.doesNotMatch(refused.stderr, /rm scratch\/note\.txt/u, "denial echoed raw command text");
+
+    const resolved = tpShellRun(path, `rm ${TPSHELL_TARGET}`);
+    assert.equal(resolved.exitCode, 2, "resolved protected write was admitted");
+    assert.match(resolved.stderr, /Detected as a shell write/u);
+    assert.doesNotMatch(resolved.stderr, /possible shell write/u);
+
+    const opaqueKnownWrite = tpShellRun(
+      path, `node -e "require('fs').writeFileSync('${TPSHELL_TARGET}','x')"`,
+    );
+    assert.equal(opaqueKnownWrite.exitCode, 2, "structured opaque protected write was admitted");
+    assert.doesNotMatch(opaqueKnownWrite.stderr, /possible shell write/u);
+
+    // The old basename fallback searched all regions per rule. Retain that priority while
+    // carrying the new per-region classification: TP-1's later-region basename wins over
+    // TP-5's earlier dynamic write expression.
+    const priority = tpShellRun(
+      path, "node -e \"require('fs').writeFileSync(join(dir,'guard-push.test.mjs'),'x'); guard-git.test.mjs\"",
+    );
+    assert.equal(priority.exitCode, 2);
+    assert.match(priority.stderr, /TP-1/u);
+    assert.match(priority.stderr, /possible shell write/u);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
 /**
  * TPSHELL-2. The lane is config-driven exactly like the write lane: a project that
  * protects nothing gets nothing new refused. Without this, TPSHELL-1 could be green on a
