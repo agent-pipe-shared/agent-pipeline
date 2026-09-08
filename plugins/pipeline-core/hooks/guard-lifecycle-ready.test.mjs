@@ -6209,6 +6209,7 @@ test("NVA-B-READCONTAIN-1 correction round 2, F5: isRealpathedWithinBoundary fai
     isRealpathedWithinBoundary(resolved, boundary, {
       realpathSyncFn: identityBoundaryThenThrowOnAncestor,
       existsSyncFn: () => true,
+      statSyncFn: () => ({ isDirectory: () => true }),
     }),
     false,
   );
@@ -6220,9 +6221,35 @@ test("NVA-B-READCONTAIN-1 correction round 2, F5: isRealpathedWithinBoundary fai
     isRealpathedWithinBoundary(resolved, boundary, {
       realpathSyncFn: (value) => value,
       existsSyncFn: () => true,
+      statSyncFn: () => ({ isDirectory: () => true }),
     }),
     true,
   );
+});
+
+test("NVA-B-FILE-BOUNDARY-PRIMITIVE-1: isRealpathedWithinBoundary admits a nonidentity descendant only for a real directory boundary", () => {
+  const fixture = mkdtempSync(join(tmpdir(), "guard-lifecycle-file-boundary-"));
+  const fileBoundary = join(fixture, "transcript.jsonl");
+  const linkedFileBoundary = join(fixture, "linked-transcript.jsonl");
+  const directoryBoundary = join(fixture, "memory");
+  writeFileSync(fileBoundary, "fixture\n");
+  symlinkSync(fileBoundary, linkedFileBoundary);
+  mkdirSync(directoryBoundary);
+  try {
+    assert.equal(isRealpathedWithinBoundary(fileBoundary, fileBoundary), true,
+      "the deliberate literal identity classifier shortcut still admits the exact file");
+    assert.equal(isRealpathedWithinBoundary(`${fileBoundary}/nonexistent-child`, fileBoundary), false,
+      "a nonexistent child below a regular-file boundary is never inside it");
+    assert.equal(isRealpathedWithinBoundary(`${fileBoundary}/nonexistent-child`, linkedFileBoundary), false,
+      "a symlinked file boundary has the same exact-file discipline after realpath");
+    assert.equal(isRealpathedWithinBoundary(`${directoryBoundary}/nonexistent-child`, directoryBoundary), true,
+      "a missing descendant below a real directory preserves the ancestor-walk admission");
+    assert.equal(isRealpathedWithinBoundary(`${directoryBoundary}/nonexistent-child`, directoryBoundary, {
+      statSyncFn: () => { throw new Error("simulated boundary inspection error"); },
+    }), false, "a boundary inspection failure fails closed");
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
 });
 
 /**

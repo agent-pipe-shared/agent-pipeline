@@ -2039,6 +2039,14 @@ const CAT_PIPELINE_DISPLAY_FLAGS = new Set([
  * checked BEFORE boundary is realpathed below -- it is a caller-constructed identity on the
  * caller's own strings, not a filesystem fact.
  *
+ * For every non-identity candidate, the realpathed boundary must be a DIRECTORY. A regular
+ * file has no contained descendants: without this inspection, the missing-descendant ancestor
+ * walk below would climb `<file>/<nonexistent-child>` back to that file and report it inside.
+ * This belongs in the exported primitive so future file-boundary callers inherit the same
+ * exact-file discipline as the current transcript-file caller. The directory case deliberately
+ * keeps admitting a missing descendant, and the literal identity shortcut above deliberately
+ * remains before this filesystem inspection.
+ *
  * `dependencies` (round 2, F5): exported so guard-lifecycle-ready.test.mjs can call this
  * function directly with an injected `realpathSyncFn` that throws, proving the fail-closed
  * catch branches below are real rather than merely present -- no production caller supplies
@@ -2048,9 +2056,11 @@ export function isRealpathedWithinBoundary(resolved, boundary, dependencies = {}
   if (resolved === boundary) return true;
   const exists = dependencies.existsSyncFn ?? existsSync;
   const realpath = dependencies.realpathSyncFn ?? realpathSync;
+  const stat = dependencies.statSyncFn ?? statSync;
   let realBoundary;
   try {
     realBoundary = realpath(boundary);
+    if (!stat(realBoundary).isDirectory()) return false;
   } catch {
     return false;
   }
