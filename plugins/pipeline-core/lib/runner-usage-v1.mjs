@@ -13,7 +13,7 @@ import { readFileSync, realpathSync, statSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { P3B_DIRECT_TERRA_RECEIPT_ADAPTER, validateRouteReceipt } from "./route-receipt.mjs";
+import { P3B_DIRECT_TERRA_RECEIPT_ADAPTER, P3B_LEGACY_V2_SOL_RECEIPT_ADAPTER, validateRouteReceipt } from "./route-receipt.mjs";
 import { registeredRouting } from "./runner-profiles-v2.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -361,7 +361,7 @@ function commonProjection(runner, raw, route) {
   return {
     inputTokens: rawMetric(raw, "input_tokens"),
     outputTokens: rawMetric(raw, "output_tokens"),
-    cachedInputTokens: rawMetric(raw, "cached_input_tokens"),
+    cachedInputTokens: rawMetric(raw, runner === "antigravity" ? "cached_tokens" : "cached_input_tokens"),
     cacheCreationInputTokens: unavailable(),
     cacheReadInputTokens: unavailable(),
     reasoningOutputTokens: rawMetric(raw, "reasoning_output_tokens"),
@@ -530,6 +530,13 @@ function bindRoute({ runner, source, scope, eventSha256, routeContext, repoRoot 
       && requested.selector.value === "gpt-5.6-terra"
       && requested.effort === "xhigh"
       ? P3B_DIRECT_TERRA_RECEIPT_ADAPTER
+      : runner === "codex"
+        && requested.selector.kind === "model-id"
+        && requested.selector.value === "gpt-5.6-sol"
+        && ["xhigh", "max"].includes(requested.effort)
+        // This point is reachable only after requestedMatchesRegisteredCell()
+        // bound the exact caller-held request to its frozen V2 cell above.
+        ? P3B_LEGACY_V2_SOL_RECEIPT_ADAPTER
       : undefined,
   );
   if (!validated?.ok) {

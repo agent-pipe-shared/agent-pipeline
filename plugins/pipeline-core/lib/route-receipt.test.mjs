@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
-import { P3B_DIRECT_TERRA_RECEIPT_ADAPTER, validateRouteReceipt } from "./route-receipt.mjs";
+import { P3B_DIRECT_TERRA_RECEIPT_ADAPTER, P3B_LEGACY_V2_SOL_RECEIPT_ADAPTER, validateRouteReceipt } from "./route-receipt.mjs";
 import { projectDirectRoutingDefaults, projectRunnerAssignment, validateDirectRoute } from "./routing-projection.mjs";
 
 let passed = 0;
@@ -499,6 +499,33 @@ const directTerraCliReceipt = receiptFor(
 check("RR96 registered direct Terra request accepts matching host attestation", accepts(directTerraReceipt, directTerraRoute, DISPATCH_BINDING, LEGACY_TERRA_EVIDENCE));
 check("RR97 P3B direct Terra adapter accepts exact host-attested same-dispatch evidence", accepts(directTerraReceipt, directTerraRoute, DISPATCH_BINDING, LEGACY_TERRA_EVIDENCE, P3B_DIRECT_TERRA_RECEIPT_ADAPTER));
 check("RR98 P3B direct Terra adapter rejects matching CLI evidence at the host-only boundary", rejectionReason(directTerraCliReceipt, directTerraRoute, DISPATCH_BINDING, LEGACY_TERRA_CLI_EVIDENCE, P3B_DIRECT_TERRA_RECEIPT_ADAPTER) === "terra-requires-host-evidence");
+
+const legacySolRoute = Object.freeze({
+  ...terraRoute,
+  selector: { kind: "model-id", value: "gpt-5.6-sol" },
+  effort: "max",
+});
+const LEGACY_SOL_OBSERVED = Object.freeze({
+  ...TERRA_OBSERVED,
+  effectiveSelector: Object.freeze({ kind: "model-id", value: "gpt-5.6-sol" }),
+  effectiveModelId: "gpt-5.6-sol",
+  effectiveEffort: "max",
+});
+const LEGACY_SOL_EVIDENCE = Object.freeze(trustedEvidenceFor("host", FIXTURE.hostDigest, LEGACY_SOL_OBSERVED));
+const legacySolReceipt = receiptFor(
+  legacySolRoute,
+  REQUESTED_DUTY,
+  REQUESTED_WORKTYPE,
+  LEGACY_SOL_OBSERVED,
+  LEGACY_SOL_EVIDENCE,
+  {},
+);
+check("RR99 current direct validation still rejects historical concrete Sol", validateDirectRoute(legacySolRoute).ok === false && rejects(legacySolReceipt, legacySolRoute, DISPATCH_BINDING, LEGACY_SOL_EVIDENCE));
+check("RR100 legacy V2 Sol adapter accepts exact caller-held receipt evidence", accepts(legacySolReceipt, legacySolRoute, DISPATCH_BINDING, LEGACY_SOL_EVIDENCE, P3B_LEGACY_V2_SOL_RECEIPT_ADAPTER));
+check("RR101 legacy V2 Sol route rejects the Terra adapter and arbitrary adapter objects", rejects(legacySolReceipt, legacySolRoute, DISPATCH_BINDING, LEGACY_SOL_EVIDENCE, P3B_DIRECT_TERRA_RECEIPT_ADAPTER) && rejects(legacySolReceipt, legacySolRoute, DISPATCH_BINDING, LEGACY_SOL_EVIDENCE, { schema: "pipeline.route-receipt-adapter.unknown.v1" }));
+const unsupportedLegacySolRoute = Object.freeze({ ...legacySolRoute, effort: "high" });
+const unsupportedLegacySolReceipt = receiptFor(unsupportedLegacySolRoute, REQUESTED_DUTY, REQUESTED_WORKTYPE, { ...LEGACY_SOL_OBSERVED, effectiveEffort: "high" }, { ...LEGACY_SOL_EVIDENCE, effectiveEffort: "high" }, {});
+check("RR102 legacy V2 Sol adapter rejects unsupported effort and mismatched result evidence", rejects(unsupportedLegacySolReceipt, unsupportedLegacySolRoute, DISPATCH_BINDING, { ...LEGACY_SOL_EVIDENCE, effectiveEffort: "high" }, P3B_LEGACY_V2_SOL_RECEIPT_ADAPTER) && rejects({ ...legacySolReceipt, resultSha256: "d".repeat(64) }, legacySolRoute, DISPATCH_BINDING, LEGACY_SOL_EVIDENCE, P3B_LEGACY_V2_SOL_RECEIPT_ADAPTER));
 
 console.log(`\n${passed}/${passed + failed} checks passed.`);
 process.exit(failed === 0 ? 0 : 1);

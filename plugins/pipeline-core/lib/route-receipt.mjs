@@ -21,9 +21,13 @@ const EFFORTS = ["low", "medium", "high", "xhigh", "max", "not-applicable"];
 const PROVIDERS = ["anthropic", "openai", "google"];
 const RUNNERS = ["claude", "codex", "antigravity"];
 const P3B_DIRECT_TERRA_RECEIPT_ADAPTER_SCHEMA = "pipeline.route-receipt-adapter.p3b-direct-terra.v1";
+const P3B_LEGACY_V2_SOL_RECEIPT_ADAPTER_SCHEMA = "pipeline.route-receipt-adapter.p3b-legacy-v2-sol.v1";
 
 export const P3B_DIRECT_TERRA_RECEIPT_ADAPTER = Object.freeze({
   schema: P3B_DIRECT_TERRA_RECEIPT_ADAPTER_SCHEMA,
+});
+export const P3B_LEGACY_V2_SOL_RECEIPT_ADAPTER = Object.freeze({
+  schema: P3B_LEGACY_V2_SOL_RECEIPT_ADAPTER_SCHEMA,
 });
 
 export function loadRouteReceiptSchema(path = SCHEMA_PATH) {
@@ -128,11 +132,25 @@ function isP3bDirectTerraAdapter(adapter) {
     && adapter.schema === P3B_DIRECT_TERRA_RECEIPT_ADAPTER_SCHEMA;
 }
 
+function isP3bLegacyV2SolAdapter(adapter) {
+  return exactKeys(adapter, ["schema"])
+    && adapter.schema === P3B_LEGACY_V2_SOL_RECEIPT_ADAPTER_SCHEMA;
+}
+
 function isP3bDirectTerraRoute(route) {
   return exactKeys(route, ["runner", "selector", "effort", "unavailability", "evidenceRequirement"])
     && route.runner === "codex"
     && sameSelector(route.selector, { kind: "model-id", value: "gpt-5.6-terra" })
     && route.effort === "xhigh"
+    && route.unavailability === "defer"
+    && route.evidenceRequirement === "dispatch-receipt";
+}
+
+function isP3bLegacyV2SolRoute(route) {
+  return exactKeys(route, ["runner", "selector", "effort", "unavailability", "evidenceRequirement"])
+    && route.runner === "codex"
+    && sameSelector(route.selector, { kind: "model-id", value: "gpt-5.6-sol" })
+    && ["xhigh", "max"].includes(route.effort)
     && route.unavailability === "defer"
     && route.evidenceRequirement === "dispatch-receipt";
 }
@@ -167,10 +185,15 @@ export function validateRouteReceipt(receipt, projectedRoute, dispatchBinding, t
   let route;
   let structural;
   const p3bDirectTerra = isP3bDirectTerraAdapter(adapter) && isP3bDirectTerraRoute(projectedRoute);
+  // The usage caller grants this adapter only after the exact frozen V2 cell
+  // matched its caller-held request. This validator still treats it as an
+  // untrusted narrow bypass for the current direct-selector check, then runs
+  // every structural, receipt, dispatch, and evidence binding below.
+  const p3bLegacyV2Sol = isP3bLegacyV2SolAdapter(adapter) && isP3bLegacyV2SolRoute(projectedRoute);
   try {
     route = validateDirectRoute(projectedRoute);
     if (route?.ok !== true) {
-      if (!p3bDirectTerra) return { ok: false, reason: "route" };
+      if (!p3bDirectTerra && !p3bLegacyV2Sol) return { ok: false, reason: "route" };
       route = { ok: true, route: { ...projectedRoute } };
     }
     structural = validateAgainstSchema(receipt, receiptSchema(dispatchBinding, trustedEvidence, schema));

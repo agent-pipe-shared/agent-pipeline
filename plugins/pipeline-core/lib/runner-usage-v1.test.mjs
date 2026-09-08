@@ -458,9 +458,6 @@ check("U30 ingestion has no repository persistence side effect", () => {
   assert.deepEqual(readFileSync(join(FIXTURES, "codex-turn-completed.json")), before);
 });
 
-console.log(`runner-usage-v1: ${passed} passed, ${failed} failed`);
-process.exitCode = failed === 0 ? 0 : 1;
-
 const agyRawBytes = Buffer.from(JSON.stringify({
   type: "turn.completed",
   usage: {
@@ -487,4 +484,58 @@ check("U31 Antigravity turn.completed maps tokens correctly", () => {
   assert.equal(agyEnvelope.common.inputTokens.value, 150);
   assert.equal(agyEnvelope.common.outputTokens.value, 300);
   assert.equal(agyEnvelope.common.cachedInputTokens.value, 100);
+  assert.deepEqual(agyEnvelope.raw, JSON.parse(agyRawBytes).usage);
+  assert.equal(agyEnvelope.source.eventSha256, sha256(agyRawBytes));
+  assert.deepEqual(agyEnvelope.common.cachedInputTokens, { status: "observed", value: 100, sourceField: "cached_tokens", comparison: "same-runner-only" });
 });
+
+check("U32 Antigravity preserves an explicit zero cached-token counter", () => {
+  const bytes = Buffer.from('{"type":"turn.completed","usage":{"input_tokens":7,"output_tokens":0,"cached_tokens":0}}');
+  const result = ingestAntigravityUsage({
+    version: "antigravity-exec-json.v1",
+    nativeEventBytes: bytes,
+    sourceContext: {
+      schema: "pipeline.usage-source-context.v1",
+      trust: "runner-wrapper",
+      runner: "antigravity",
+      scope: { kind: "turn" },
+      source: { threadId: "zero-thread", turnId: "zero-turn" },
+    },
+  });
+  assert.deepEqual(result.raw, JSON.parse(bytes).usage);
+  assert.equal(result.source.eventSha256, sha256(bytes));
+  assert.deepEqual(result.common.cachedInputTokens, { status: "observed", value: 0, sourceField: "cached_tokens", comparison: "same-runner-only" });
+});
+
+check("U33 Antigravity preserves an omitted cached-token counter as omitted", () => {
+  const bytes = Buffer.from('{"type":"turn.completed","usage":{"input_tokens":7,"output_tokens":0}}');
+  const result = ingestAntigravityUsage({
+    version: "antigravity-exec-json.v1",
+    nativeEventBytes: bytes,
+    sourceContext: {
+      schema: "pipeline.usage-source-context.v1",
+      trust: "runner-wrapper",
+      runner: "antigravity",
+      scope: { kind: "turn" },
+      source: { threadId: "omitted-thread", turnId: "omitted-turn" },
+    },
+  });
+  assert.deepEqual(result.raw, JSON.parse(bytes).usage);
+  assert.equal(result.source.eventSha256, sha256(bytes));
+  assert.deepEqual(result.common.cachedInputTokens, { status: "unknown", reasonCode: "source-omitted" });
+});
+
+rejects("U34 Antigravity rejects the Codex cached-input field", () => ingestAntigravityUsage({
+  version: "antigravity-exec-json.v1",
+  nativeEventBytes: Buffer.from('{"type":"turn.completed","usage":{"input_tokens":1,"cached_input_tokens":1}}'),
+  sourceContext: {
+    schema: "pipeline.usage-source-context.v1",
+    trust: "runner-wrapper",
+    runner: "antigravity",
+    scope: { kind: "turn" },
+    source: { threadId: "wrong-field-thread", turnId: "wrong-field-turn" },
+  },
+}), "usage-subobject-invalid");
+
+console.log(`runner-usage-v1: ${passed} passed, ${failed} failed`);
+process.exitCode = failed === 0 ? 0 : 1;
