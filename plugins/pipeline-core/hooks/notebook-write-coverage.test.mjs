@@ -60,6 +60,17 @@ function check(name, callback) {
   catch (error) { console.error(`FAIL ${name}: ${error.message}`); failed += 1; }
 }
 
+function matcherTokens(matcher) {
+  return String(matcher).split("|");
+}
+
+function writeMatchersMissingNotebookEdit(entries) {
+  return entries
+    .map((entry) => matcherTokens(entry.matcher))
+    .filter((tokens) => tokens.includes("Edit") || tokens.includes("Write") || tokens.includes("NotebookEdit"))
+    .filter((tokens) => !tokens.includes("NotebookEdit"));
+}
+
 try {
   check("NB01 writeTargetPath prefers file_path, accepts notebook_path, else empty", () => {
     assert.equal(writeTargetPath({ file_path: "a.mjs" }), "a.mjs");
@@ -85,14 +96,18 @@ try {
   check("NB02 every write matcher in hooks.json names NotebookEdit", () => {
     // The half that did not exist: correct guards that the tool call never reached.
     const hooks = JSON.parse(readFileSync(join(HOOKS, "hooks.json"), "utf8"));
-    const writeMatchers = (hooks.hooks?.PreToolUse ?? [])
-      .map((entry) => String(entry.matcher))
-      .filter((matcher) => matcher.includes("Edit") || matcher.includes("Write"));
+    const entries = hooks.hooks?.PreToolUse ?? [];
+    const writeMatchers = entries
+      .map((entry) => matcherTokens(entry.matcher))
+      .filter((tokens) => tokens.includes("Edit") || tokens.includes("Write") || tokens.includes("NotebookEdit"));
     assert.ok(writeMatchers.length >= 3, `expected the write matchers, found ${writeMatchers.length}`);
-    for (const matcher of writeMatchers) {
-      assert.ok(matcher.split("|").includes("NotebookEdit"),
-        `matcher "${matcher}" does not name NotebookEdit`);
-    }
+    assert.deepEqual(writeMatchersMissingNotebookEdit(entries), [], "a declared file-write matcher omits NotebookEdit");
+    assert.deepEqual(writeMatchersMissingNotebookEdit([{ matcher: "Edit|Write" }]), [["Edit", "Write"]],
+      "an actual Edit/Write registration without NotebookEdit must fail coverage");
+    const slicingAdvisory = entries.find((entry) => entry.matcher === "Task|Agent|Workflow|TodoWrite");
+    assert.ok(slicingAdvisory, "expected the TodoWrite slicing advisory registration");
+    assert.deepEqual(writeMatchersMissingNotebookEdit([slicingAdvisory]), [],
+      "TodoWrite is an advisory dispatch token, not a file-write registration");
   });
 
   check("NB03 a NotebookEdit in a governed repo without a ready bootstrap is refused", () => {
