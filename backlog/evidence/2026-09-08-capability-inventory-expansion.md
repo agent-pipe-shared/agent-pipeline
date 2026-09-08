@@ -27,3 +27,19 @@ Canonical preimage SHA-256:
 Critic review remains `required-before-publication` with no receipt. This
 evidence records an inventory increment only; it does not attest Critic review,
 full Verify, publication, or D2 completion.
+
+## Correction — generated obligations discovery
+
+The preceding claim that generated obligations needed a checker or discovery
+decision was false. `verifyMembers()` in
+`harness/scripts/check-product-capability-inventory.mjs` discovers every
+`TEST_SUITES` name, and `discoverSurfaces()` turns those names into
+`verify-phase` surface IDs. `harness/scripts/verify.mjs:648` registers
+`obligations-contract-tests`, so
+`verify-phase:harness/scripts/verify.mjs:obligations-contract-tests` already
+has a unique discovered surface. The template walker also already discovers
+`template-extension:templates/prompts/agent-obligations.md:prompts/agent-obligations.md`.
+
+The generator itself remains an explicit local CLI, not an automatically active
+runner behavior. Its output and contract test can therefore be represented by
+the two existing discovered surfaces without changing discovery or schema.

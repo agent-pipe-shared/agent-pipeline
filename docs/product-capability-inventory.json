@@ -387,7 +387,6 @@
         "verify-phase:harness/scripts/verify.mjs:nova-sandbox-launch-tests",
         "verify-phase:harness/scripts/verify.mjs:nova-scheduling-lifecycle-tests",
         "verify-phase:harness/scripts/verify.mjs:nova-verify-journal-tests",
-        "verify-phase:harness/scripts/verify.mjs:obligations-contract-tests",
         "verify-phase:harness/scripts/verify.mjs:observation-governance-bootstrap-tests",
         "verify-phase:harness/scripts/verify.mjs:observation-governance-tests",
         "verify-phase:harness/scripts/verify.mjs:onboarding-consent-guard-tests",
@@ -1228,7 +1227,6 @@
         "template-extension:templates/pipeline.json.example:pipeline.json.example",
         "template-extension:templates/pipeline.yaml.example:pipeline.yaml.example",
         "template-extension:templates/prd.md:prd.md",
-        "template-extension:templates/prompts/agent-obligations.md:prompts/agent-obligations.md",
         "template-extension:templates/prompts/critic-review.md:prompts/critic-review.md",
         "template-extension:templates/prompts/elephant-kickoff.md:prompts/elephant-kickoff.md",
         "template-extension:templates/prompts/goldfish-task.md:prompts/goldfish-task.md",
@@ -1283,7 +1281,6 @@
         "templates/pipeline.json.example",
         "templates/pipeline.yaml.example",
         "templates/prd.md",
-        "templates/prompts/agent-obligations.md",
         "templates/prompts/critic-review.md",
         "templates/prompts/elephant-kickoff.md",
         "templates/prompts/goldfish-task.md",
@@ -1297,13 +1294,69 @@
         "templates/three-scope-fixtures.md"
       ],
       "testEvidence": [
-        "harness/scripts/generate-agent-obligations.test.mjs",
         "harness/scripts/validate-manifest.test.mjs"
       ],
       "targets": [
         {
           "document": "README",
           "anchorId": "capability-starter-templates",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "generated-agent-obligations",
+      "publicName": "Generated agent obligations",
+      "problem": "Dispatched agents need an obligations template that tracks the current guard contracts without a hand-maintained second copy.",
+      "benefit": "An operator can explicitly generate the obligations template from current guard sources; the registered contract suite rejects byte drift and source-to-output drift.",
+      "status": "optional",
+      "surfaceIds": [
+        "template-extension:templates/prompts/agent-obligations.md:prompts/agent-obligations.md",
+        "verify-phase:harness/scripts/verify.mjs:obligations-contract-tests"
+      ],
+      "runners": [
+        "runner-neutral"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "codex": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "antigravity": {
+          "status": "supported",
+          "reasonCode": null
+        }
+      },
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "prerequisites": [
+        "Node.js runtime",
+        "explicit generator invocation",
+        "local repository checkout"
+      ],
+      "productionEvidence": [
+        "harness/scripts/generate-agent-obligations.mjs",
+        "templates/prompts/agent-obligations.md"
+      ],
+      "testEvidence": [
+        "harness/scripts/generate-agent-obligations.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "README",
+          "anchorId": "capability-generated-agent-obligations",
           "status": "pending"
         }
       ],
