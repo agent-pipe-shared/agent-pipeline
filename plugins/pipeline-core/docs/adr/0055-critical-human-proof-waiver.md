@@ -7,6 +7,8 @@ konfigurieren können muss ist das human hard gate mit dem private key ausserhal
 repos. wir lassen es hier im default an aber das sollte man abschalten können wenn es
 einen nervt."*
 
+**Governs:** pipeline.user.yaml, project/critical-human-proof.json, plugins/pipeline-core/lib/critical-human-proof-policy.mjs, plugins/pipeline-core/lib/critical-human-proof-policy.test.mjs, plugins/pipeline-core/lib/critical-action-authorization.mjs, plugins/pipeline-core/lib/critical-action-authorization.test.mjs, plugins/pipeline-core/scripts/pipeline-state.mjs, plugins/pipeline-core/scripts/pipeline-state.test.mjs, plugins/pipeline-core/hooks/guard-push.mjs, plugins/pipeline-core/hooks/guard-push.test.mjs, plugins/pipeline-core/scripts/push-prepare.mjs, plugins/pipeline-core/scripts/push-prepare.test.mjs, plugins/pipeline-core/scripts/po-human-approval.mjs, plugins/pipeline-core/scripts/po-human-approval.test.mjs, plugins/pipeline-core/scripts/publication-executor.mjs, plugins/pipeline-core/scripts/publication-executor.test.mjs, plugins/pipeline-core/scripts/release-preflight-cli.mjs, plugins/pipeline-core/scripts/release-preflight-cli.test.mjs, docs/push-release-flow.md, docs/po-approval-proof-contract.md, guardrails/security.md, roles/elephant.md
+
 ## Context
 
 Two different controls sit on top of a push, and they were being conflated.
