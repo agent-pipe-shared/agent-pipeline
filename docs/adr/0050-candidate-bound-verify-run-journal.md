@@ -2,6 +2,8 @@
 
 **Status:** accepted by PO Nova design approval · **Date:** 2026-08-01
 
+**Governs:** harness/scripts/verify.mjs, plugins/pipeline-core/scripts/verify-journal.mjs, plugins/pipeline-core/lib/verify-resume.mjs, plugins/pipeline-core/scripts/verify-journal.test.mjs, plugins/pipeline-core/lib/verify-resume.test.mjs
+
 ## Context
 
 Full Verify currently buffers a synchronous suite until it terminates. An

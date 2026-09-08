@@ -4,6 +4,8 @@
 
 **Status:** accepted (2026-08-06; amendment 2026-08-17, see below) · **Basis:** Dispatch MARKETPLACE-ID-06, confirmed by git history and the repeated `claude plugin validate` probes documented below.
 
+**Governs:** .claude-plugin/marketplace.json, setup.mjs, plugins/pipeline-core/lib/human-guard-override.mjs, plugins/pipeline-core/lib/human-guard-override.test.mjs, docs/claude-local-plugin-development.md, docs/codex-local-plugin-development.md
+
 ## Context
 
 This repository's published marketplace manifest, root `.claude-plugin/marketplace.json`,

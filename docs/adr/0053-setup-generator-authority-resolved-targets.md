@@ -4,6 +4,8 @@
 
 **Status:** accepted (generator fix), partially deferred (stale-mirror removal) · **Basis:** Dispatch AUTHORITY-GEN-07.
 
+**Governs:** setup.mjs, setup.test.mjs, plugins/pipeline-core/lib/project-authority.mjs
+
 ## Context
 
 `plugins/pipeline-core/lib/project-authority.mjs` exports `resolveProjectAuthorityPaths()`
