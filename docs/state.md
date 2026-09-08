@@ -30,13 +30,19 @@
 
 The candidate contract is
 `specs/sprint-nova-epic/design/2026-09-07-local-candidate-delta.md`.
-The PO returned on 2026-09-08 and ended AFK mode. Finish the three already
-dispatched round10 ADR packages; do not start further automatic backlog work.
-The local candidate remains the active delivery objective. D.2–D.6 follow that
-candidate and remain in final 0.6.2 scope. After initially allowing a later
-feature-branch push, the PO explicitly deferred pushing again on 2026-09-08:
-finish these activities and deliver the local candidate first. No push or
-release now. Keep the local development stamp; local testing precedes release.
+The PO resumed autonomous work on 2026-09-08: finish the current checks, then
+continue D.2–D.6 for 0.6.2 and suitable approved Nova-B work. Collect concrete
+PO decisions/signatures and continue independent packages at blockers. The
+latest instruction is to stamp again only when the PO returns. No push,
+release or installed-plugin update is authorized; local testing precedes release.
+
+Current check: `37aa24fc327b910e6b74ba26bdcb8e1601605e7a`, local build
+`0.6.1+<runner>.20260908184831.408738b`, finished exact and clean at 514/517
+after 697.804 seconds. Registration exclusions are repaired; two reference
+checks expose one newly unused allowance, and the Antigravity execution suite
+fails its two model cases. Both repairs are separately dispatched. The selected
+Critic has not started because the full gate is not green. Operational pointers:
+`scratch/candidate-checkpoint-37aa24fc-20260908.json`.
 
 The PO completed model-authority commit `f895abaf` and attended Claude hook
 commit `2dab5966`; both were read back against the expected changes. Active
