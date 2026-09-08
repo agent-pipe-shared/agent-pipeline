@@ -868,6 +868,151 @@ function stepGuardGit22({ dryRun, preview }) {
   return { status: "applied", detail };
 }
 
+/* ------------------------------- F2. guard-git.test.mjs (TP-1) GG22 pathspec coverage */
+
+// This is deliberately a separate attended-operator step. The earlier guard-git-22 step
+// covers the remediation-order regression; this one covers the later commit-pathspec scoping
+// fixes without changing that already-reviewed insertion or its expected count.
+const GG22_PATHSPEC_ANCHOR = `// ---- Summary -------------------------------------------------------------------------------------`;
+const GG22_PATHSPEC_REPLACEMENT = `// GG22-9 through GG22-15: a pathspec'd commit is scoped to the paths it names only when
+// the invocation is provably pathspec-exclusive. Each fixture builds real history with status-flip
+// debt and a deliberately unrelated staged source file: a pass must come from the fixed commit
+// pathspec handling, never from an empty index or absent debt.
+function gg22PathspecDebtFixture(prefix) {
+  const root = gitRepoFixture(prefix);
+  commitFile(root, "seed.txt", "seed\\n");
+  gg22CommitItem(root, "demo.md", "open", "chore: add demo item (open)");
+  gg22CommitLedgerTouch(root);
+  gg22CommitItem(root, "demo.md", "in_progress", "chore: flip demo item to in_progress");
+  gg22StageFile(root, "backlog/transitions.ndjson", "{\\"seq\\":2}\\n");
+  gg22StageFile(root, "src/unrelated.mjs", "export const unrelated = true;\\n");
+  return root;
+}
+
+const GG22_PATHSPEC_ALLOWED_DIR = gg22PathspecDebtFixture("guard-test-gg22-pathspec-allowed-");
+check(
+  "GG22-9 allow  pathspec ledger commit ignores unrelated staged source file",
+  'git commit -m "chore: reconcile ledger" -- backlog/transitions.ndjson',
+  ALLOW,
+  { projectDir: GG22_PATHSPEC_ALLOWED_DIR },
+);
+
+const GG22_PATHSPEC_DISALLOWED_DIR = gg22PathspecDebtFixture("guard-test-gg22-pathspec-disallowed-");
+check(
+  "GG22-10 block  pathspec source commit remains blocked while GG22 debt exists",
+  'git commit -m "feat: source change" -- src/unrelated.mjs',
+  BLOCK,
+  { projectDir: GG22_PATHSPEC_DISALLOWED_DIR, stderrIncludes: ["GG-22", "backlog/items/demo.md"] },
+);
+
+const GG22_PATHSPEC_BARE_DIR = gg22PathspecDebtFixture("guard-test-gg22-pathspec-bare-");
+check(
+  "GG22-11 block  bare staged-index commit remains blocked with unrelated source staged",
+  'git commit -m "feat: source change"',
+  BLOCK,
+  { projectDir: GG22_PATHSPEC_BARE_DIR, stderrIncludes: ["GG-22", "backlog/items/demo.md"] },
+);
+
+const GG22_PATHSPEC_INCLUDE_SHORT_DIR = gg22PathspecDebtFixture("guard-test-gg22-pathspec-include-short-");
+check(
+  "GG22-12 block  -i widens a pathspec commit to the staged index",
+  'git commit -i -m "chore: reconcile ledger" -- backlog/transitions.ndjson',
+  BLOCK,
+  { projectDir: GG22_PATHSPEC_INCLUDE_SHORT_DIR, stderrIncludes: ["GG-22", "backlog/items/demo.md"] },
+);
+
+const GG22_PATHSPEC_INCLUDE_LONG_DIR = gg22PathspecDebtFixture("guard-test-gg22-pathspec-include-long-");
+check(
+  "GG22-13 block  --include widens a pathspec commit to the staged index",
+  'git commit --include -m "chore: reconcile ledger" -- backlog/transitions.ndjson',
+  BLOCK,
+  { projectDir: GG22_PATHSPEC_INCLUDE_LONG_DIR, stderrIncludes: ["GG-22", "backlog/items/demo.md"] },
+);
+
+const GG22_PATHSPEC_TRAVERSAL_DIR = gg22PathspecDebtFixture("guard-test-gg22-pathspec-traversal-");
+check(
+  "GG22-14 block  ../ traversal escaping backlog/items is disallowed",
+  'git commit -m "feat: source change" -- backlog/items/../../src/unrelated.mjs',
+  BLOCK,
+  { projectDir: GG22_PATHSPEC_TRAVERSAL_DIR, stderrIncludes: ["GG-22", "backlog/items/demo.md"] },
+);
+
+const GG22_PATHSPEC_TRAILING_DIR = gg22PathspecDebtFixture("guard-test-gg22-pathspec-trailing-");
+gg22StageFile(GG22_PATHSPEC_TRAILING_DIR, "backlog/items/repair.md", gg22ItemBody("closed"));
+check(
+  "GG22-15 allow  trailing-slash backlog/items directory pathspec is admitted",
+  'git commit -m "chore: close item" -- backlog/items/',
+  ALLOW,
+  { projectDir: GG22_PATHSPEC_TRAILING_DIR },
+);
+
+// ---- Summary -------------------------------------------------------------------------------------`;
+
+const GUARD_GIT_22_PATHSPEC_BASE_CASES = 232;
+const GUARD_GIT_22_PATHSPEC_ADDED_CASES = 7;
+const GUARD_GIT_22_PATHSPEC_EXPECTED = new RegExp(`^${GUARD_GIT_22_PATHSPEC_BASE_CASES + GUARD_GIT_22_PATHSPEC_ADDED_CASES}/${GUARD_GIT_22_PATHSPEC_BASE_CASES + GUARD_GIT_22_PATHSPEC_ADDED_CASES} cases passed\\.$`, "mu");
+const GUARD_GIT_22_PATHSPEC_PREVIEW_PATH = join(dirname(GUARD_GIT_TEST_PATH), "guard-git.gg22-pathspec.preview-check.mjs");
+const GUARD_GIT_22_PATHSPEC_MARKERS = Object.freeze([
+  "GG22-9 allow  pathspec ledger commit ignores unrelated staged source file",
+  "GG22-10 block  pathspec source commit remains blocked while GG22 debt exists",
+  "GG22-11 block  bare staged-index commit remains blocked with unrelated source staged",
+  "GG22-12 block  -i widens a pathspec commit to the staged index",
+  "GG22-13 block  --include widens a pathspec commit to the staged index",
+  "GG22-14 block  ../ traversal escaping backlog/items is disallowed",
+  "GG22-15 allow  trailing-slash backlog/items directory pathspec is admitted",
+]);
+
+function markerOccurrences(source, marker) {
+  return source.split(marker).length - 1;
+}
+
+function stepGuardGit22Pathspec({ dryRun, preview }) {
+  const original = readFileSync(GUARD_GIT_TEST_PATH, "utf8");
+  const markerCounts = GUARD_GIT_22_PATHSPEC_MARKERS.map((marker) => markerOccurrences(original, marker));
+  const present = markerCounts.filter((count) => count > 0).length;
+  const replacementOccurrences = markerOccurrences(original, GG22_PATHSPEC_REPLACEMENT);
+  if (replacementOccurrences === 1 && markerCounts.every((count) => count === 1)) {
+    return { status: "already-applied", detail: "GG22-9 through GG22-15 pathspec fixture tests are already present" };
+  }
+  if (present > 0 || replacementOccurrences > 0) {
+    throw new Error(`GG22 pathspec tests are partially applied, changed, or duplicated (replacement occurrences: ${replacementOccurrences}; marker counts: ${markerCounts.join(", ")}). Nothing was written.`);
+  }
+
+  const next = anchoredReplace(original, GG22_PATHSPEC_ANCHOR, GG22_PATHSPEC_REPLACEMENT, "GG22 pathspec tests before Summary marker");
+
+  if (preview) {
+    let createdPreviewSibling = false;
+    try {
+      writeFileSync(GUARD_GIT_22_PATHSPEC_PREVIEW_PATH, next, { encoding: "utf8", flag: "wx" });
+      createdPreviewSibling = true;
+      const suite = run([GUARD_GIT_22_PATHSPEC_PREVIEW_PATH]);
+      const summary = suite.output.split("\n").filter((line) => /^(FAIL|\d+\/\d+ cases passed\.)/u.test(line)).join("\n");
+      if (suite.code !== 0 || !GUARD_GIT_22_PATHSPEC_EXPECTED.test(suite.output)) {
+        throw new Error(`preview run did not reach ${GUARD_GIT_22_PATHSPEC_BASE_CASES + GUARD_GIT_22_PATHSPEC_ADDED_CASES}/${GUARD_GIT_22_PATHSPEC_BASE_CASES + GUARD_GIT_22_PATHSPEC_ADDED_CASES} cases passed. (exit ${suite.code}):\\n${summary || suite.output.slice(-2000)}`);
+      }
+
+      return { status: "preview-green", detail: `${summary}; ${GUARD_GIT_22_PATHSPEC_ADDED_CASES} new cases (${GUARD_GIT_22_PATHSPEC_BASE_CASES} -> ${GUARD_GIT_22_PATHSPEC_BASE_CASES + GUARD_GIT_22_PATHSPEC_ADDED_CASES}); this invocation's preview sibling was removed and ${rel(GUARD_GIT_TEST_PATH)} was not touched` };
+    } finally {
+      if (createdPreviewSibling) rmSync(GUARD_GIT_22_PATHSPEC_PREVIEW_PATH, { force: true });
+    }
+  }
+
+  if (dryRun) {
+    return { status: "would-apply", detail: `1 anchored edit: insert ${GUARD_GIT_22_PATHSPEC_ADDED_CASES} GG22 pathspec fixture tests before the Summary marker (${GUARD_GIT_22_PATHSPEC_BASE_CASES} -> ${GUARD_GIT_22_PATHSPEC_BASE_CASES + GUARD_GIT_22_PATHSPEC_ADDED_CASES} cases)` };
+  }
+
+  const detail = writeThenVerifyOrRevert(GUARD_GIT_TEST_PATH, original, next, () => {
+    const suite = run([GUARD_GIT_TEST_PATH]);
+    if (suite.code !== 0 || !GUARD_GIT_22_PATHSPEC_EXPECTED.test(suite.output)) {
+      const summary = suite.output.split("\n").filter((line) => /^(FAIL|\d+\/\d+ cases passed\.)/u.test(line)).join("\n");
+      return { ok: false, detail: `expected ${GUARD_GIT_22_PATHSPEC_BASE_CASES + GUARD_GIT_22_PATHSPEC_ADDED_CASES}/${GUARD_GIT_22_PATHSPEC_BASE_CASES + GUARD_GIT_22_PATHSPEC_ADDED_CASES} cases passed., got exit ${suite.code}:\\n${summary || suite.output.slice(-2000)}` };
+    }
+    return { ok: true, detail: `guard-git: ${GUARD_GIT_22_PATHSPEC_BASE_CASES + GUARD_GIT_22_PATHSPEC_ADDED_CASES}/${GUARD_GIT_22_PATHSPEC_BASE_CASES + GUARD_GIT_22_PATHSPEC_ADDED_CASES} cases passed.` };
+  });
+
+  return { status: "applied", detail };
+}
+
 /* ---------------------------------------- D. guard-git.test.mjs (TP-1) fixture cwd */
 
 // WHY. guard-git.mjs's GIT-03 message-file check now resolves a `-F <path>` against
@@ -1508,11 +1653,12 @@ const STEPS = [
   { key: "guard-git-cwd", label: `D. set runGuard()'s spawned guard cwd to its own fixture dir in ${rel(GUARD_GIT_TEST_PATH)} (TP-1)`, fn: stepGuardGitCwd },
   { key: "verify-nva-c-protected", label: `E. register ${VERIFY_REGISTRATIONS_NVA_C_PROTECTED.length} more pending suites (NVA-C-PROTECTED) in ${rel(VERIFY_PATH)} (TP-3)`, fn: stepVerifyNvaCProtected },
   { key: "guard-git-22", label: `F. add GG22-7/GG22-8 fixture tests to ${rel(GUARD_GIT_TEST_PATH)} (TP-1)`, fn: stepGuardGit22 },
+  { key: "guard-git-22-pathspec", label: `F2. add GG22-9 through GG22-15 pathspec fixture tests to ${rel(GUARD_GIT_TEST_PATH)} (TP-1)`, fn: stepGuardGit22Pathspec },
   { key: "verify-manual-check-extract", label: `G. extract the manual-check logic out of ${rel(VERIFY_PATH)} into a testable module (TP-3)`, fn: stepVerifyManualCheckExtract },
   { key: "pipeline-state-runner-fixture", label: `H. bind the PO-authority fixtures to their Codex runner in ${rel(PIPELINE_STATE_TEST_PATH)} and ${rel(PIPELINE_STATE_PLUGIN_TEST_PATH)} (TP-5)`, fn: stepPipelineStateRunnerFixture },
 ];
 
-const PREVIEWABLE = new Set(["gate-strength", "entrypoint", "guard-git-cwd", "verify-nva-c-protected", "guard-git-22", "verify-manual-check-extract", "pipeline-state-runner-fixture"]);
+const PREVIEWABLE = new Set(["gate-strength", "entrypoint", "guard-git-cwd", "verify-nva-c-protected", "guard-git-22", "guard-git-22-pathspec", "verify-manual-check-extract", "pipeline-state-runner-fixture"]);
 
 if (only !== null && !STEPS.some((step) => step.key === only)) {
   process.stderr.write(`unknown --only value: ${only}\nExpected one of: ${STEPS.map((step) => step.key).join(", ")}\n`);
