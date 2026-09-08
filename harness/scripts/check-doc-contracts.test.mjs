@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
@@ -26,11 +27,32 @@ import {
   parseEnforcementCliArgs,
   renderEnforcementDocument,
 } from "./generate-enforcement-doc.mjs";
+import {
+  READER_REVIEW_PATHS,
+  checkReaderBinding,
+  snapshotReaderDocumentation,
+} from "./check-doc-reader-binding.mjs";
 
 const SCRIPT = fileURLToPath(new URL("./check-doc-contracts.mjs", import.meta.url));
 const ENFORCEMENT_SCRIPT = fileURLToPath(new URL("./generate-enforcement-doc.mjs", import.meta.url));
+const READER_BINDING_SCRIPT = fileURLToPath(new URL("./check-doc-reader-binding.mjs", import.meta.url));
 const REPO = resolve(fileURLToPath(new URL("../..", import.meta.url)));
 const roots = [];
+const EXPECTED_READER_REVIEW_PATHS = [
+  "PIPELINE_FLOW.md",
+  "README.md",
+  "SETUP.md",
+  "docs/README.md",
+  "docs/audit-and-evidence.md",
+  "docs/cost-and-measurement.md",
+  "docs/enforcement.md",
+  "docs/overview.md",
+  "docs/parallel-work.md",
+  "docs/security-controls.md",
+  "docs/usage.md",
+];
+const READER_RECORD_PATH = "specs/reader-binding/evidence/reader-review/record.json";
+const READER_DISPOSITION_PATH = "specs/reader-binding/evidence/reader-review/disposition/round-1.json";
 
 function linkFixtureDirectory(target, path) {
   symlinkSync(target, path, process.platform === "win32" ? "junction" : "dir");
@@ -145,6 +167,77 @@ function enforcementFixture() {
 function runEnforcementCli(root, args) {
   return spawnSync(process.execPath, [ENFORCEMENT_SCRIPT, ...args, "--root", root], { encoding: "utf8" });
 }
+
+function sha256Bytes(path) {
+  return createHash("sha256").update(readFileSync(path)).digest("hex");
+}
+
+function gitFixture(root, args) {
+  return execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
+}
+
+function commitFixture(root, paths, message) {
+  gitFixture(root, ["add", "--", ...paths]);
+  gitFixture(root, ["commit", "-q", "-m", message]);
+  return gitFixture(root, ["rev-parse", "HEAD"]);
+}
+
+function readerBindingFixture({ malformedRecord = false, invalidUtf8Record = false, missingRecord = false, resolvedFindings = false } = {}) {
+  const root = mkdtempSync(join(tmpdir(), "reader-binding-"));
+  roots.push(root);
+  for (const path of READER_REVIEW_PATHS) write(root, path, `# ${path}\n\nReader fixture.\n`);
+  write(root, "docs/product-capability-inventory.json", "{}\n");
+  write(root, "governance/observation-doc-governance.json", "{}\n");
+  write(root, "harness/reader-review-protocol.md", "# Reader protocol\n");
+  gitFixture(root, ["init", "-q"]);
+  gitFixture(root, ["config", "user.email", "fixture@example.test"]);
+  gitFixture(root, ["config", "user.name", "Fixture"]);
+  let reviewedCommit = commitFixture(root, ["."], "reviewed state");
+  let resolutionCommit = null;
+  if (resolvedFindings) {
+    write(root, "README.md", "# README.md\n\nResolved reader finding.\n");
+    resolutionCommit = commitFixture(root, ["README.md"], "resolve reader finding");
+    reviewedCommit = resolutionCommit;
+  }
+  if (missingRecord) return { root, reviewedCommit, candidateCommit: reviewedCommit };
+  if (malformedRecord || invalidUtf8Record) {
+    write(root, "specs/reader-binding/evidence/reader-review/record.json", invalidUtf8Record ? Buffer.from([0xff]) : "{not json}\n");
+    const candidateCommit = commitFixture(root, ["specs/reader-binding/evidence/reader-review/record.json"], "malformed record");
+    return { root, reviewedCommit, candidateCommit };
+  }
+  const snapshot = snapshotReaderDocumentation({ root, candidate: reviewedCommit, featureId: "reader-binding" });
+  const phaseOnePath = "specs/reader-binding/evidence/reader-review/phase-one/round-1.md";
+  const phaseTwoPath = "specs/reader-binding/evidence/reader-review/phase-two/round-1.md";
+  const dispositionPath = "specs/reader-binding/evidence/reader-review/disposition/round-1.json";
+  write(root, phaseOnePath, "# Phase one\n\nNo findings.\n");
+  write(root, phaseTwoPath, "# Phase two\n\nNo findings.\n");
+  const findings = resolvedFindings
+    ? [
+      { id: "cut-1", class: "cut", status: "resolved", resolutionCommit },
+      { id: "reordering-1", class: "reordering", status: "no-change", resolutionCommit: null },
+    ]
+    : [];
+  write(root, dispositionPath, `${JSON.stringify({ schema: "pipeline.doc-reader-disposition.v1", round: "round-1", status: resolvedFindings ? "resolved" : "no-findings", findings })}\n`);
+  const record = {
+    schema: "pipeline.doc-reader-binding-record.v1",
+    reviewedCommit,
+    reviewedTree: gitFixture(root, ["rev-parse", `${reviewedCommit}^{tree}`]),
+    docsetSha256: snapshot.docsetSha256,
+    coverage: snapshot.coverage,
+    inputs: snapshot.inputs,
+    phaseOne: { path: phaseOnePath, sha256: sha256Bytes(join(root, phaseOnePath)) },
+    phaseTwo: { path: phaseTwoPath, sha256: sha256Bytes(join(root, phaseTwoPath)) },
+    disposition: { path: dispositionPath, sha256: sha256Bytes(join(root, dispositionPath)) },
+  };
+  write(root, READER_RECORD_PATH, `${JSON.stringify(record)}\n`);
+  const candidateCommit = commitFixture(root, ["specs/reader-binding/evidence/reader-review"], "reader closure");
+  return { root, reviewedCommit, candidateCommit };
+}
+
+function readReaderRecord(root) { return JSON.parse(readFileSync(join(root, READER_RECORD_PATH), "utf8")); }
+function writeReaderRecord(root, record) { write(root, READER_RECORD_PATH, `${JSON.stringify(record)}\n`); }
+function readReaderDisposition(root) { return JSON.parse(readFileSync(join(root, READER_DISPOSITION_PATH), "utf8")); }
+function writeReaderDisposition(root, disposition) { write(root, READER_DISPOSITION_PATH, `${JSON.stringify(disposition)}\n`); }
 
 test.after(() => {
   for (const root of roots) {
@@ -774,6 +867,212 @@ test("current repository integration passes and excludes the instruction path", 
   assert.deepEqual(result.findings, []);
   assert(result.stats.markdownFiles > 100);
   assert.equal(result.stats.observationGovernance, "checked");
+});
+
+test("reader binding scope is the approved lexical set of eleven public documents", () => {
+  assert.deepEqual(READER_REVIEW_PATHS, EXPECTED_READER_REVIEW_PATHS);
+  assert.equal(new Set(READER_REVIEW_PATHS).size, 11);
+});
+
+test("reader binding accepts a record-only candidate and ignores worktree edits", () => {
+  const { root, reviewedCommit, candidateCommit } = readerBindingFixture();
+  const result = checkReaderBinding({ root, candidate: candidateCommit, featureId: "reader-binding" });
+  assert.equal(result.status, "passed");
+  assert.equal(result.candidateCommit, candidateCommit);
+  assert.equal(result.reviewedCommit, reviewedCommit);
+  assert.equal(result.findings.length, 0);
+  write(root, "README.md", "uncommitted worktree change\n");
+  assert.equal(checkReaderBinding({ root, candidate: candidateCommit, featureId: "reader-binding" }).status, "passed");
+  const resolved = readerBindingFixture({ resolvedFindings: true });
+  assert.equal(checkReaderBinding({ root: resolved.root, candidate: resolved.candidateCommit, featureId: "reader-binding" }).status, "passed", "a real ancestor resolution commit and no-change/null finding close a nonempty disposition");
+});
+
+test("reader binding fails malformed records and stale covered documentation", () => {
+  const malformed = readerBindingFixture({ malformedRecord: true });
+  const malformedResult = checkReaderBinding({ root: malformed.root, candidate: malformed.candidateCommit, featureId: "reader-binding" });
+  assert.equal(malformedResult.status, "failed");
+  assert.match(malformedResult.findings.join("\n"), /not valid JSON/);
+  const invalidUtf8 = readerBindingFixture({ invalidUtf8Record: true });
+  const invalidUtf8Result = checkReaderBinding({ root: invalidUtf8.root, candidate: invalidUtf8.candidateCommit, featureId: "reader-binding" });
+  assert.equal(invalidUtf8Result.status, "failed");
+  assert.match(invalidUtf8Result.findings.join("\n"), /not valid UTF-8/);
+
+  const stale = readerBindingFixture();
+  write(stale.root, "README.md", "# README.md\n\nChanged after review.\n");
+  const staleCandidate = commitFixture(stale.root, ["README.md"], "stale public document");
+  const staleResult = checkReaderBinding({ root: stale.root, candidate: staleCandidate, featureId: "reader-binding" });
+  assert.equal(staleResult.status, "failed");
+  assert.match(staleResult.findings.join("\n"), /does not bind identical reviewed and candidate documentation inputs/);
+});
+
+test("reader binding fails each covered-input drift and a deleted covered document", () => {
+  for (const path of ["docs/product-capability-inventory.json", "governance/observation-doc-governance.json", "harness/reader-review-protocol.md"]) {
+    const fixture = readerBindingFixture();
+    write(fixture.root, path, `changed ${path}\n`);
+    const candidate = commitFixture(fixture.root, [path], `drift ${path}`);
+    assert.match(checkReaderBinding({ root: fixture.root, candidate, featureId: "reader-binding" }).findings.join("\n"), /does not bind identical reviewed and candidate documentation inputs/);
+  }
+  const deleted = readerBindingFixture();
+  gitFixture(deleted.root, ["rm", "-q", "--", "README.md"]);
+  gitFixture(deleted.root, ["commit", "-q", "-m", "delete covered document"]);
+  const candidate = gitFixture(deleted.root, ["rev-parse", "HEAD"]);
+  assert.match(checkReaderBinding({ root: deleted.root, candidate, featureId: "reader-binding" }).findings.join("\n"), /README\.md is missing/);
+});
+
+test("reader binding fails missing or tampered reports and disposition", () => {
+  const missing = readerBindingFixture();
+  gitFixture(missing.root, ["rm", "-q", "--", "specs/reader-binding/evidence/reader-review/phase-one/round-1.md"]);
+  gitFixture(missing.root, ["commit", "-q", "-m", "remove phase one"]);
+  const missingCandidate = gitFixture(missing.root, ["rev-parse", "HEAD"]);
+  assert.match(checkReaderBinding({ root: missing.root, candidate: missingCandidate, featureId: "reader-binding" }).findings.join("\n"), /phase-one\/round-1\.md is missing/);
+
+  const report = readerBindingFixture();
+  const phaseTwoPath = "specs/reader-binding/evidence/reader-review/phase-two/round-1.md";
+  write(report.root, phaseTwoPath, "# Tampered phase two\n");
+  const reportCandidate = commitFixture(report.root, [phaseTwoPath], "tamper phase two");
+  assert.match(checkReaderBinding({ root: report.root, candidate: reportCandidate, featureId: "reader-binding" }).findings.join("\n"), /phase report digest mismatch/);
+
+  const disposition = readerBindingFixture();
+  write(disposition.root, READER_DISPOSITION_PATH, `${JSON.stringify(readReaderDisposition(disposition.root))}\n\n`);
+  const dispositionCandidate = commitFixture(disposition.root, [READER_DISPOSITION_PATH], "tamper disposition bytes");
+  assert.match(checkReaderBinding({ root: disposition.root, candidate: dispositionCandidate, featureId: "reader-binding" }).findings.join("\n"), /disposition digest mismatch/);
+
+  const missingDisposition = readerBindingFixture();
+  gitFixture(missingDisposition.root, ["rm", "-q", "--", READER_DISPOSITION_PATH]);
+  gitFixture(missingDisposition.root, ["commit", "-q", "-m", "remove disposition"]);
+  const missingDispositionCandidate = gitFixture(missingDisposition.root, ["rev-parse", "HEAD"]);
+  assert.match(checkReaderBinding({ root: missingDisposition.root, candidate: missingDispositionCandidate, featureId: "reader-binding" }).findings.join("\n"), /disposition\/round-1\.json is missing/);
+});
+
+test("reader binding rejects corrupt record identity, coverage, and evidence paths", () => {
+  const wrongTree = readerBindingFixture();
+  const wrongTreeRecord = readReaderRecord(wrongTree.root);
+  wrongTreeRecord.reviewedTree = "f".repeat(40);
+  writeReaderRecord(wrongTree.root, wrongTreeRecord);
+  const wrongTreeCandidate = commitFixture(wrongTree.root, [READER_RECORD_PATH], "wrong reviewed tree");
+  assert.match(checkReaderBinding({ root: wrongTree.root, candidate: wrongTreeCandidate, featureId: "reader-binding" }).findings.join("\n"), /reviewedTree does not match/);
+
+  for (const mutate of [
+    (record) => record.coverage.pop(),
+    (record) => { record.coverage[1] = { ...record.coverage[0] }; },
+  ]) {
+    const fixture = readerBindingFixture();
+    const record = readReaderRecord(fixture.root);
+    mutate(record);
+    writeReaderRecord(fixture.root, record);
+    const candidate = commitFixture(fixture.root, [READER_RECORD_PATH], "corrupt coverage");
+    assert.match(checkReaderBinding({ root: fixture.root, candidate, featureId: "reader-binding" }).findings.join("\n"), /record\.coverage/);
+  }
+
+  const unsafePath = readerBindingFixture();
+  const unsafeRecord = readReaderRecord(unsafePath.root);
+  unsafeRecord.phaseOne.path = "specs/reader-binding/evidence/reader-review/phase-one/../outside.md";
+  writeReaderRecord(unsafePath.root, unsafeRecord);
+  const unsafeCandidate = commitFixture(unsafePath.root, [READER_RECORD_PATH], "unsafe report path");
+  assert.match(checkReaderBinding({ root: unsafePath.root, candidate: unsafeCandidate, featureId: "reader-binding" }).findings.join("\n"), /unsafe round identifier/);
+});
+
+test("reader binding rejects a reviewed commit outside candidate ancestry", () => {
+  const fixture = readerBindingFixture();
+  const branch = gitFixture(fixture.root, ["branch", "--show-current"]);
+  gitFixture(fixture.root, ["checkout", "-q", "--orphan", "unrelated"]);
+  gitFixture(fixture.root, ["rm", "-rf", "--", "."]);
+  write(fixture.root, "unrelated.md", "# unrelated\n");
+  const unrelatedCommit = commitFixture(fixture.root, ["unrelated.md"], "unrelated history");
+  gitFixture(fixture.root, ["checkout", "-q", branch]);
+  const record = readReaderRecord(fixture.root);
+  record.reviewedCommit = unrelatedCommit;
+  writeReaderRecord(fixture.root, record);
+  const candidate = commitFixture(fixture.root, [READER_RECORD_PATH], "nonancestor reviewed commit");
+  assert.match(checkReaderBinding({ root: fixture.root, candidate, featureId: "reader-binding" }).findings.join("\n"), /not an ancestor/);
+});
+
+test("reader binding requires explicit empty findings and reachable resolution commits", () => {
+  const empty = readerBindingFixture();
+  const dispositionPath = "specs/reader-binding/evidence/reader-review/disposition/round-1.json";
+  const recordPath = "specs/reader-binding/evidence/reader-review/record.json";
+  const emptyDisposition = JSON.parse(readFileSync(join(empty.root, dispositionPath), "utf8"));
+  emptyDisposition.status = "resolved";
+  write(empty.root, dispositionPath, `${JSON.stringify(emptyDisposition)}\n`);
+  const emptyRecord = JSON.parse(readFileSync(join(empty.root, recordPath), "utf8"));
+  emptyRecord.disposition.sha256 = sha256Bytes(join(empty.root, dispositionPath));
+  write(empty.root, recordPath, `${JSON.stringify(emptyRecord)}\n`);
+  const emptyCandidate = commitFixture(empty.root, [dispositionPath, recordPath], "invalid empty disposition");
+  assert.match(checkReaderBinding({ root: empty.root, candidate: emptyCandidate, featureId: "reader-binding" }).findings.join("\n"), /empty findings require explicit no-findings/);
+
+  const unresolved = readerBindingFixture();
+  const unresolvedDisposition = JSON.parse(readFileSync(join(unresolved.root, dispositionPath), "utf8"));
+  unresolvedDisposition.status = "resolved";
+  unresolvedDisposition.findings = [{ id: "cut-1", class: "cut", status: "resolved", resolutionCommit: "f".repeat(40) }];
+  write(unresolved.root, dispositionPath, `${JSON.stringify(unresolvedDisposition)}\n`);
+  const unresolvedRecord = JSON.parse(readFileSync(join(unresolved.root, recordPath), "utf8"));
+  unresolvedRecord.disposition.sha256 = sha256Bytes(join(unresolved.root, dispositionPath));
+  write(unresolved.root, recordPath, `${JSON.stringify(unresolvedRecord)}\n`);
+  const unresolvedCandidate = commitFixture(unresolved.root, [dispositionPath, recordPath], "unresolved disposition");
+  assert.match(checkReaderBinding({ root: unresolved.root, candidate: unresolvedCandidate, featureId: "reader-binding" }).findings.join("\n"), /does not resolve to a real commit/);
+
+  const open = readerBindingFixture();
+  const openDisposition = readReaderDisposition(open.root);
+  openDisposition.status = "open";
+  writeReaderDisposition(open.root, openDisposition);
+  const openRecord = readReaderRecord(open.root);
+  openRecord.disposition.sha256 = sha256Bytes(join(open.root, dispositionPath));
+  writeReaderRecord(open.root, openRecord);
+  const openCandidate = commitFixture(open.root, [dispositionPath, recordPath], "open disposition status");
+  assert.match(checkReaderBinding({ root: open.root, candidate: openCandidate, featureId: "reader-binding" }).findings.join("\n"), /invalid schema, round, status, or findings array/);
+});
+
+test("reader binding refuses non-regular covered blobs and malformed CLI arguments", (t) => {
+  const root = mkdtempSync(join(tmpdir(), "reader-binding-symlink-"));
+  roots.push(root);
+  for (const path of READER_REVIEW_PATHS) write(root, path, "# fixture\n");
+  rmSync(join(root, "README.md"));
+  if (!linkFixtureFileOrClassifyUnavailable(t, "PIPELINE_FLOW.md", join(root, "README.md"))) return;
+  write(root, "docs/product-capability-inventory.json", "{}\n");
+  write(root, "governance/observation-doc-governance.json", "{}\n");
+  write(root, "harness/reader-review-protocol.md", "# protocol\n");
+  gitFixture(root, ["init", "-q"]);
+  gitFixture(root, ["config", "user.email", "fixture@example.test"]);
+  gitFixture(root, ["config", "user.name", "Fixture"]);
+  const candidate = commitFixture(root, ["."], "symlink coverage");
+  assert.throws(() => snapshotReaderDocumentation({ root, candidate, featureId: "reader-binding" }), /mode 100644/);
+  const badCli = spawnSync(process.execPath, [READER_BINDING_SCRIPT, "--root", root, "--candidate", candidate, "--candidate", candidate, "--feature-id", "reader-binding"], { encoding: "utf8" });
+  assert.equal(badCli.status, 2);
+  assert.equal(badCli.stdout, "");
+  const malformedCandidate = spawnSync(process.execPath, [READER_BINDING_SCRIPT, "--root", root, "--candidate", "not-a-commit", "--feature-id", "reader-binding"], { encoding: "utf8" });
+  assert.equal(malformedCandidate.status, 2);
+  const malformedFeature = spawnSync(process.execPath, [READER_BINDING_SCRIPT, "--root", root, "--candidate", candidate, "--feature-id", "../reader-binding"], { encoding: "utf8" });
+  assert.equal(malformedFeature.status, 2);
+});
+
+test("reader snapshot rejects covered blobs above the fixed byte cap", () => {
+  const root = mkdtempSync(join(tmpdir(), "reader-binding-oversize-"));
+  roots.push(root);
+  for (const path of READER_REVIEW_PATHS) write(root, path, "# fixture\n");
+  write(root, "README.md", Buffer.alloc((512 * 1024) + 1, 0x61));
+  write(root, "docs/product-capability-inventory.json", "{}\n");
+  write(root, "governance/observation-doc-governance.json", "{}\n");
+  write(root, "harness/reader-review-protocol.md", "# protocol\n");
+  gitFixture(root, ["init", "-q"]);
+  gitFixture(root, ["config", "user.email", "fixture@example.test"]);
+  gitFixture(root, ["config", "user.name", "Fixture"]);
+  const candidate = commitFixture(root, ["."], "oversize coverage");
+  assert.throws(() => snapshotReaderDocumentation({ root, candidate, featureId: "reader-binding" }), /byte limit/);
+});
+
+test("reader binding CLI emits one snapshot or check JSON object and fails an isolated missing-record fixture", () => {
+  const { root, candidateCommit } = readerBindingFixture();
+  const snapshot = spawnSync(process.execPath, [READER_BINDING_SCRIPT, "--root", root, "--candidate", candidateCommit, "--feature-id", "reader-binding", "--snapshot"], { encoding: "utf8" });
+  assert.equal(snapshot.status, 0);
+  assert.equal(snapshot.stdout.trim().split("\n").length, 1);
+  assert.equal(JSON.parse(snapshot.stdout).schema, "pipeline.doc-reader-docset-snapshot.v1");
+  const checked = spawnSync(process.execPath, [READER_BINDING_SCRIPT, "--root", root, "--candidate", candidateCommit, "--feature-id", "reader-binding"], { encoding: "utf8" });
+  assert.equal(checked.status, 0);
+  assert.equal(JSON.parse(checked.stdout).status, "passed");
+  const missing = readerBindingFixture({ missingRecord: true });
+  const missingResult = checkReaderBinding({ root: missing.root, candidate: missing.candidateCommit, featureId: "reader-binding" });
+  assert.equal(missingResult.status, "failed");
+  assert.match(missingResult.findings.join("\n"), /reader-review\/record\.json/);
 });
 
 const VENDORING_BACKLOG_ITEM = "backlog/items/2026-08-10-plugin-package-should-vendor-canon-references-via-build-step.md";
