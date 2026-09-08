@@ -52,7 +52,7 @@ candidate rather than copied as a current result.
   implementing the reader-review release binding.
 - **Date:** 2026-09-07
 
-### Progress — 2026-09-08
+### Progress — 2026-09-08, initial checkpoint
 
 The corrected corpus inventory counts 75 accepted ADRs among 80 numbered
 documents; 19 now declare Governs paths after seven bounded additions.
@@ -66,3 +66,16 @@ governed change rejects missing/uncommitted/stale records and accepts only
 the exact candidate's committed descendant record. This is an acceptance
 fixture, not the final source-candidate reconciliation. The item stays open
 until remaining scope and residual exclusions are addressed.
+
+### Progress — 2026-09-08, source checkpoint 9d2cbc38
+
+The complete committed corpus remains 80 numbered ADRs, of which 75 are
+accepted. Forty-four now carry governing paths; 31 accepted decisions remain
+without declarations. The source-bound inventory and individual responsibility
+rationales are indexed in
+`backlog/evidence/2026-09-08-adr-coverage-progress.md`.
+All eight latest additions preserve their original non-header bytes. No status
+or acceptance criterion changes here, and no final reconciliation or reader-review
+binding is claimed. The four affected universal copies were integrated separately
+in `9f07a1e89dbf7f3dc8c49a199dd5968e31e7d68b`; their generator and consumer
+checks pass. This still does not close the remaining coverage work.

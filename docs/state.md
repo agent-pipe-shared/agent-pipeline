@@ -24,7 +24,9 @@
 | 2026-08-11 to 2026-08-19 | Checkpoints 1-60 (2026-08-11 through 2026-08-19 checkpoint 60): superseded session narrative; durable decisions already live in ADRs/backlog/guardrails per this repo's own standing convention, not uniquely in this prose. | [docs/state-archive/2026-08-19--checkpoints-1-through-60.md](state-archive/2026-08-19--checkpoints-1-through-60.md) |
 | 2026-08-26 | 2026-08-25 Antigravity chat-gate-ceremony standardization, verify-tuner stage 2 acceptance, sprint-agy-runner delta4 Critic fix and candidate status | [docs/state-archive/2026-08-26--agy-runner-2026-08-25-handover.md](state-archive/2026-08-26--agy-runner-2026-08-25-handover.md) |
 
-## Current handover — 2026-09-07: local candidate integration
+## Current handover — 2026-09-08: local candidate repairs and ADR coverage
+
+**Lifecycle phase:** feature `sprint-nova-epic` · phase `implementation`
 
 The candidate contract is
 `specs/sprint-nova-epic/design/2026-09-07-local-candidate-delta.md`.
@@ -50,19 +52,65 @@ The repaired model-free intermediate Codex sandbox preflight passed on this
 host: both handshakes and bounded stops, scratch write and other-write denial.
 Input/network isolation is not asserted. Receipt:
 `scratch/candidate-intermediate-preflight-20260907-late.json`.
-Actual Critic model-readiness routing, lifecycle/native fixture integration and
-the genuine generated-checkpoint Greenfield test remain in progress.
+The selected and normal Critic/advisory routes now use the committed V3 model
+authority. Generated-checkpoint Greenfield fixtures persist both documents
+and reach the real plan-acknowledgement request, with simulated host readback
+explicitly disclosed. This does not complete the user's live game session.
+Concurrent probe cleanup, bounded scratch containment and intake provenance
+are repaired; the historical intermittent capability failure and live-source
+timeout are not causally proved resolved. Do not turn successful fixture runs
+into a live-host stability claim.
 
 GitLab has imported successful Desktop/WSL read evidence, validated locally;
 see `backlog/evidence/2026-09-07-gitlab-read-access-observation.md`. This is neither
 a new Nova network execution nor B2 CI/worker proof. Reads only are authorized.
 
-Full Verify, real independent Critic and a new local stamp remain outstanding.
-The last full gate is the historical 517/517 baseline at
-`f94882ba6e59cc093b4500af3ad50c3fb50f818c` (2026-09-07 18:17:20Z); it cannot
-certify these later changes. The installed plugin still carries
-`0.6.1+codex.20260906172530.87af6b6`; source changes do not imply a new installed
-candidate. Current operational checkpoint: `scratch/candidate-continuation-20260907-late.md`.
+The most recent complete Verify run is **505/517, failed**, exactly bound to
+`94bbc6a6ac0e17c91af08e1370810d5b06e55af3`, tree
+`c2808190083ad81e98b527fc7a971698d81a72a6`, with clean start and finish.
+Read `evidence/verify-1788823644708-c3279dedde58cddd.json` for its twelve failed
+steps. Later focused repairs do not change that historical result. A new full
+green gate, genuine selected Codex Critic and final local stamp are still required.
+
+Three PO boundaries remain collected in
+`scratch/po-candidate-queue-20260908.md`: separate action authorization for four
+Critic integrity pins (QG-16), a fresh external Author-Repair signature for the
+NotebookEdit coverage test (TP-10), and the human commit of the generated
+`project/pipeline.yaml` model mirror (GS-3). Protected pins and the notebook
+test remain unchanged; the mirror matches the already approved projection.
+Do not repeat the completed source-model and Claude-hook ceremonies.
+
+Independent repairs include the truthful unparsed-command denial
+(`8f667a42`, operational closure `ab61e512`) and bounded budget observations
+(`40eda94b`, operational closure `dc121506`). The latter passes its combined
+296-test capture and bounds repeated observations per session/reason, without
+claiming global retention or crash durability. Full candidate review is pending.
+
+The ADR source inventory at `9d2cbc3870e7bbd29dfa00c506d0c5ae3131d4d6`
+contains 44 declarations among 75 accepted decisions; 31 remain. The separate
+historical/provisional/proposed exclusions are unchanged. Source counts and
+responsibility evidence are indexed in
+`backlog/evidence/2026-09-08-adr-coverage-progress.md`. The four universal copies
+are integrated in `9f07a1e8`; generator, document and consumer checks pass.
+Final source-candidate reconciliation is still outstanding. Reader-review
+release binding waits for the remaining coverage.
+
+The previous committed handover lacked its lifecycle marker. It now reflects
+the actual observed feature and phase; the phase check is consistent and the
+authoritative state file is unchanged. Readback:
+`scratch/state-phase-marker-repair-20260908.json`.
+
+A separate source-backed follow-up remains: the close-block skill publishes
+handover size/dry-run flags absent from the rotation CLI. The library size
+measurement works. Evidence and scope:
+`backlog/evidence/2026-09-08-handover-size-command-mismatch.md`.
+
+The installed plugin still carries `0.6.1+codex.20260906172530.87af6b6`.
+The source-only stamp from the failed candidate is
+`0.6.1+codex.20260907232112.3edcb06`; it is not a newly delivered test candidate.
+This checkpoint performed no installation, daemon restart, release or push. Detailed current
+handover: `scratch/local-candidate-test-handover-20260908.md`; next continuation:
+`scratch/candidate-continuation-20260907-late.md`.
 
 ## Durable rules carried forward — these have no other home
 
@@ -194,7 +242,7 @@ Full verify green at `7cc0b649`, 506 suites.
   `backlog/items/2026-09-01-hook-bypass-rules-are-overridable-against-the-stated-policy.md`
   (maintenance window).
 
-The gate result for this candidate is in the machine-written
+The most recent full-run result is in the machine-written
 `evidence/verify-latest.json`, which names its own candidate commit and tree —
 read that rather than trusting any prose claim about which HEAD was green.
 
