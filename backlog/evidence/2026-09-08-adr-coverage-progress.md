@@ -1,6 +1,37 @@
 # ADR coverage progress — 2026-09-08
 
-## Current source checkpoint — 63 of 75 accepted decisions
+## Current source checkpoint — 75 of 75 accepted decisions
+
+Source commit `7232b834d41c7441eadaa3d7057370f50bc5dfe0` contains all 80 numbered
+ADRs: 75 accepted with declarations, 3 historical, 1 provisional and 1 proposed.
+The immutable rows are `scratch/adr-source-inventory-round10-rows-20260908.json`,
+SHA-256 `fb9a200bbad274d17b492858d9673410bb476cf71632fd0dfc0197a70207ab87`.
+The separate round10 binding verifies every source hash and the tracked corpus.
+
+The twelve additions are committed in `e8b823d6f98091c8193b76beb7142d1c4d83a13d`
+(execution), `97fab3d48b1267bbc0599a65a8386543eb676b16` (assurance), and the source
+checkpoint above (native). All three pass strict dispatch authorship. Parent
+verification uses the real reconciliation parser/matcher for every glob and
+compares header-stripped bodies directly against their fixed baseline
+`cfd8804c417da105ab47e1b484664d6d4ec94827`; all twelve pass. This also closes the
+execution worker's narrower original proof, whose limitations are disclosed in
+its readable evidence. ADR0047's universal copy is synchronized in `9cafae6b`.
+The generator, consumer and documentation checks pass; no new consumer allowance
+was needed. The separate additional consumer-instruction negative check and
+nine existing consumer regressions pass. Read
+`backlog/evidence/2026-09-08-adr-advisor-round10-vendor-integration.md`.
+
+The actual reconciliation checker at the new source checkpoint, base
+`f94882ba6e59cc093b4500af3ad50c3fb50f818c`, reports 244 changed paths and 54
+implicated, unreconciled ADRs. Capture:
+`scratch/source-reconciliation-7232b834d41c7441eadaa3d7057370f50bc5dfe0/actual-checker-result.json`.
+Its result is false; packet creation is not successful reconciliation. No
+assessment or ledger entry was manufactured. Queue item 12 remains open for
+semantic source-candidate reconciliation. The PO has deferred pushing, so this
+push/documentation obligation does not delay the local candidate's full Verify
+and genuine independent Critic. Header completion alone proves no conformance.
+
+## Earlier source checkpoint — 63 of 75 accepted decisions
 
 Source commit `bd588219c8e6a81fda1345cc05a515aae7958dd9` contains the same 80
 numbered ADRs: 75 accepted, 3 historical, 1 provisional and 1 proposed.

@@ -30,9 +30,13 @@
 
 The candidate contract is
 `specs/sprint-nova-epic/design/2026-09-07-local-candidate-delta.md`.
-The PO is AFK: continue independent authorized work at technical blocks and
-collect human-only decisions/signatures. D.2–D.6 follow the local test candidate
-and remain in final 0.6.2 scope. No release or push is requested.
+The PO returned on 2026-09-08 and ended AFK mode. Finish the three already
+dispatched round10 ADR packages; do not start further automatic backlog work.
+The local candidate remains the active delivery objective. D.2–D.6 follow that
+candidate and remain in final 0.6.2 scope. After initially allowing a later
+feature-branch push, the PO explicitly deferred pushing again on 2026-09-08:
+finish these activities and deliver the local candidate first. No push or
+release now. Keep the local development stamp; local testing precedes release.
 
 The PO completed model-authority commit `f895abaf` and attended Claude hook
 commit `2dab5966`; both were read back against the expected changes. Active
@@ -72,13 +76,14 @@ Read `evidence/verify-1788823644708-c3279dedde58cddd.json` for its twelve failed
 steps. Later focused repairs do not change that historical result. A new full
 green gate, genuine selected Codex Critic and final local stamp are still required.
 
-Three PO boundaries remain collected in
-`scratch/po-candidate-queue-20260908.md`: separate action authorization for four
-Critic integrity pins (QG-16), a fresh external Author-Repair signature for the
-NotebookEdit coverage test (TP-10), and the human commit of the generated
-`project/pipeline.yaml` model mirror (GS-3). Protected pins and the notebook
-test remain unchanged; the mirror matches the already approved projection.
-Do not repeat the completed source-model and Claude-hook ceremonies.
+All three collected PO steps are complete: the human project-model mirror
+commit `5971da14`, the four separately transcribed Critic integrity pins
+`4d1f0b9a`, and the exactly signed Notebook coverage repair `4ab11a53`.
+The external Author-Repair proof was verified, armed and actually consumed
+once (audit sequence 1401). Eight Notebook and nine consumer checks pass.
+Read `backlog/evidence/2026-09-08-po-authorized-critic-pin-transcription.md`
+and `backlog/evidence/2026-09-08-signed-notebook-matcher-repair.md`.
+Do not repeat these steps or the prior source-model and Claude-hook ceremonies.
 
 Independent repairs include the truthful unparsed-command denial
 (`8f667a42`, operational closure `ab61e512`) and bounded budget observations
@@ -86,14 +91,18 @@ Independent repairs include the truthful unparsed-command denial
 296-test capture and bounds repeated observations per session/reason, without
 claiming global retention or crash durability. Full candidate review is pending.
 
-The ADR source inventory at `bd588219c8e6a81fda1345cc05a515aae7958dd9`
-contains 63 declarations among 75 accepted decisions; 12 remain. The separate
-historical/provisional/proposed exclusions are unchanged. Source counts and
-responsibility evidence are indexed in
-`backlog/evidence/2026-09-08-adr-coverage-progress.md`. The latest three universal
-copies are integrated in `0db01ac9`; generator, document and consumer checks pass.
-Final source-candidate reconciliation is still outstanding. Reader-review
-release binding waits for the remaining coverage.
+The ADR source inventory at `7232b834d41c7441eadaa3d7057370f50bc5dfe0`
+contains declarations for all 75 accepted decisions. The separate three
+historical, one provisional and one proposed exclusions are unchanged.
+All twelve latest header additions preserve their bodies against the actual
+baseline and every glob matches tracked nonempty files using the real matcher.
+Source counts and responsibility evidence are indexed in
+`backlog/evidence/2026-09-08-adr-coverage-progress.md`. ADR0047's final universal
+copy is synchronized in `9cafae6b`; generator, consumer and document checks
+pass without a new consumer allowance. The actual reconciliation checker at this source
+commit, base `f94882ba`, reports 244 changed paths and 54 implicated, unreconciled
+ADRs. This is an open push/documentation obligation, not a local-candidate gate;
+no blanket ledger entries were created. Reader-review binding remains later.
 
 The previous committed handover lacked its lifecycle marker. It now reflects
 the actual observed feature and phase; the phase check is consistent and the
