@@ -18,6 +18,8 @@ Follow-up). **Cross-references** the sibling Nova checkout's
 read-only, as the origin of the mechanism this ADR adapts — this repository
 never writes to that checkout.
 
+**Governs:** docs/state.md, docs/state-archive/**, governance/observation-doc-governance.json, plugins/pipeline-core/lib/handover-rotation.mjs, plugins/pipeline-core/lib/handover-rotation.test.mjs, plugins/pipeline-core/scripts/handover-rotate.mjs, plugins/pipeline-core/scripts/handover-rotate.test.mjs, plugins/pipeline-core/hooks/guard-handover-size.mjs, plugins/pipeline-core/hooks/guard-handover-size.test.mjs, plugins/pipeline-core/scripts/rotate-handover-sections.mjs, plugins/pipeline-core/scripts/rotate-handover-sections.test.mjs, plugins/pipeline-core/skills/close-block/SKILL.md
+
 ## Context
 
 [ADR-0060](0060-handover-placement-and-rotation.md) established the

@@ -15,6 +15,8 @@ Decision 5, left explicitly open there. **Extends** [ADR-0012](0012-handover-can
 close-gate precedent (the existing CLAUDE.md length check) to the handover
 file itself.
 
+**Governs:** plugins/pipeline-core/lib/handover-rotation.mjs, plugins/pipeline-core/lib/handover-rotation.test.mjs, plugins/pipeline-core/scripts/handover-rotate.mjs, plugins/pipeline-core/scripts/handover-rotate.test.mjs, plugins/pipeline-core/hooks/guard-handover-size.mjs, plugins/pipeline-core/hooks/guard-handover-size.test.mjs, plugins/pipeline-core/hooks/hooks.json, plugins/pipeline-core/hooks/codex-pretool-guard.mjs, plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs, plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs, plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs, plugins/pipeline-core/scripts/rotate-handover-sections.mjs, plugins/pipeline-core/scripts/rotate-handover-sections.test.mjs, plugins/pipeline-core/skills/close-block/SKILL.md, plugins/pipeline-core/skills/close-feature/SKILL.md, plugins/pipeline-core/scripts/pipeline-state.mjs, plugins/pipeline-core/scripts/pipeline-state.test.mjs
+
 ## Context
 
 [ADR-0060](0060-handover-placement-and-rotation.md) established that mid-task

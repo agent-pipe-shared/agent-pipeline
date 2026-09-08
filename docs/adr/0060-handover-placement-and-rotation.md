@@ -22,6 +22,8 @@ geschrieben wird, dann muss es in adrs"*. **Extends**
 [ADR-0012](0012-handover-canonicalization.md); **refines**
 [ADR-0023](0023-elephant-context-diet.md).
 
+**Governs:** docs/state.md, templates/handover.md, harness/session-bootstrap.md, roles/elephant.md, roles/goldfish.md, roles/critic.md, plugins/pipeline-core/skills/pipeline-start/SKILL.md, plugins/pipeline-core/skills/close-block/SKILL.md
+
 ## Context
 
 [ADR-0012](0012-handover-canonicalization.md) established one versioned handover

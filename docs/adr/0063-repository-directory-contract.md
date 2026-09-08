@@ -2,6 +2,8 @@
 
 **Status:** accepted (lean scope, deliberately incomplete) · **Date:** 2026-08-12
 
+**Governs:** .gitignore, harness/session-bootstrap.md, harness/scripts/check-directory-contract.mjs, harness/scripts/check-directory-contract.test.mjs, harness/scripts/check-session-bootstrap-directory-contract.test.mjs, harness/scripts/generate-agent-obligations.mjs, harness/scripts/generate-agent-obligations.test.mjs, templates/prompts/agent-obligations.md, templates/prompts/goldfish-task.md, templates/prompts/critic-review.md, plugins/pipeline-core/skills/pipeline-start/SKILL.md, plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs, plugins/pipeline-core/scripts/dispatch-authorship-verify.test.mjs
+
 ## Context
 
 Agents invent a directory layout each session because nothing in the ruleset
