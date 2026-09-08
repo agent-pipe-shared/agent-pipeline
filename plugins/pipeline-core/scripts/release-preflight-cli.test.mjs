@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -17,7 +17,7 @@ const CLI_PATH = fileURLToPath(new URL("./release-preflight-cli.mjs", import.met
 const roots = [];
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 
-function fixture({ version = "1.2.3", manifestVersion = null, consentStatus = "approved", dirty = false, waiveReleasePreflight = true, globalHumanApproval = null, commitGlobalHumanApproval = true } = {}) {
+function fixture({ version = "1.2.3", manifestVersion = null, consentStatus = "approved", dirty = false, dirtyDeleteMember = false, dirtyDeleteChecker = false, symlinkedCheckerParent = false, waiveReleasePreflight = true, globalHumanApproval = null, commitGlobalHumanApproval = true, source = false, omitSourceMember = false, candidateCalibration = "source", sourceCheckerResult = "passed" } = {}) {
   const base = mkdtempSync(join(tmpdir(), "release-preflight-cli-"));
   roots.push(base);
   const git = (...args) => {
@@ -51,6 +51,25 @@ function fixture({ version = "1.2.3", manifestVersion = null, consentStatus = "a
   if (globalHumanApproval !== null) {
     write("pipeline.user.yaml", `schema: "pipeline.user.v3"\ngates:\n  human_approval: "${globalHumanApproval}"\n`);
   }
+  if (source) {
+    // This committed typed stub exercises the producer boundary only. Domain
+    // validity belongs to the real checker suite, which owns its Git fixtures.
+    const checkerResult = sourceCheckerResult === "malformed"
+      ? "process.stdout.write('{}\\n');"
+      : sourceCheckerResult === "stale"
+        ? "process.stdout.write(JSON.stringify({ schema: 'pipeline.doc-reader-binding-check.v1', status: 'failed', candidateCommit: values.get('--candidate'), featureId: values.get('--feature-id'), reviewedCommit: null, docsetSha256: null, findings: ['stale binding'], assurance: 'committed-state-and-evidence-presence-only' })); process.exitCode = 1;"
+      : `const candidate = values.get('--candidate'); const featureId = values.get('--feature-id');\nconst result = { schema: 'pipeline.doc-reader-binding-check.v1', status: 'passed', candidateCommit: ${sourceCheckerResult === "mismatched" ? "'0'.repeat(40)" : "candidate"}, featureId: ${sourceCheckerResult === "feature-mismatch" ? "'other-feature'" : "featureId"}, reviewedCommit: candidate, docsetSha256: 'd'.repeat(64), findings: [], assurance: 'committed-state-and-evidence-presence-only' };\nprocess.stdout.write(JSON.stringify(result));`;
+    write(".claude/pipeline.json", { project: "agent-pipeline", verify: "node harness/scripts/verify.mjs" });
+    for (const path of [
+      "harness/scripts/verify.mjs",
+      "harness/scripts/check-doc-contracts.mjs",
+      "harness/scripts/check-doc-reconciliation.mjs",
+      "harness/reader-review-protocol.md",
+      "governance/observation-doc-governance.json",
+      "docs/product-capability-inventory.json",
+    ]) write(path, "fixture source member\\n");
+    write("harness/scripts/check-doc-reader-binding.mjs", `#!/usr/bin/env node\nconst values = new Map();\nfor (let index = 0; index < process.argv.length; index += 2) values.set(process.argv[index], process.argv[index + 1]);\n${checkerResult}\n`);
+  }
   // ADR-0064 Decision 6: a hand-supplied --consent claiming "approved" now requires an
   // explicit, committed release-preflight waiver. Every fixture that exercises that
   // scenario as a SEPARATE, still-valid path (as opposed to the new proof-verified
@@ -68,6 +87,8 @@ function fixture({ version = "1.2.3", manifestVersion = null, consentStatus = "a
   git("add", "-A");
   git("commit", "-qm", "base");
   const baseCommit = git("rev-parse", "HEAD");
+  if (source && omitSourceMember) rmSync(join(base, "harness/scripts/check-doc-contracts.mjs"));
+  if (source && candidateCalibration === "malformed") write(".claude/pipeline.json", "{");
   write("docs/result.md", "# result\n\nsecond revision\n");
   git("add", "-A");
   git("commit", "-qm", "candidate");
@@ -77,6 +98,16 @@ function fixture({ version = "1.2.3", manifestVersion = null, consentStatus = "a
     write("pipeline.user.yaml", `schema: "pipeline.user.v3"\ngates:\n  human_approval: "${globalHumanApproval}"\n# working tree only\n`);
   }
   if (dirty) write("docs/spec.md", "# spec\n\nuncommitted\n");
+  if (dirtyDeleteMember) rmSync(join(base, "harness/scripts/verify.mjs"));
+  if (dirtyDeleteChecker) rmSync(join(base, "harness/scripts/check-doc-reader-binding.mjs"));
+  if (symlinkedCheckerParent) {
+    const outside = mkdtempSync(join(tmpdir(), "release-preflight-reader-outside-"));
+    roots.push(outside);
+    mkdirSync(join(outside, "scripts"));
+    writeFileSync(join(outside, "scripts/check-doc-reader-binding.mjs"), "#!/usr/bin/env node\n");
+    rmSync(join(base, "harness"), { recursive: true, force: true });
+    symlinkSync(outside, join(base, "harness"), "dir");
+  }
   return { base, baseCommit, candidateCommit, candidateTree, git };
 }
 
@@ -84,6 +115,14 @@ const build = ({ base, baseCommit }, over = {}) => buildReleasePreflight({
   rootDir: base, preflightId: "fixture-preflight", baseCommit,
   consentPath: "consent.json", lifecyclePath: "lifecycle.json", retentionPolicySha256: POLICY, ...over,
 });
+
+function runCli(context, outPath) {
+  return spawnSync(process.execPath, [
+    CLI_PATH, "--preflight-id", "fixture-preflight", "--base", context.baseCommit,
+    "--consent", "consent.json", "--lifecycle", "lifecycle.json", "--retention-policy", POLICY,
+    "--out", outPath, "--root", context.base,
+  ], { encoding: "utf8" });
+}
 
 /** A fresh Ed25519 keypair, PEM-exported, exactly the shape `po-approval-proof.mjs`
  * demands -- the same convention `critical-action-approval-request.test.mjs` uses,
@@ -481,6 +520,66 @@ try {
       assert.equal(error.code, "RPC-CONSENT-UNWAIVED", error.message);
       return true;
     });
+  });
+
+  check("RPC-reader a generic consumer fixture does not activate the Pipeline-source reader policy", () => {
+    const { record } = build(fixture());
+    assert.equal(record.status, "ready");
+  });
+
+  check("RPC-reader a committed source candidate invokes the typed reader checker before producing the preflight", () => {
+    const { record } = build(fixture({ source: true }));
+    assert.equal(record.status, "ready");
+  });
+
+  check("RPC-reader a source base cannot disable reader binding by deleting a required candidate member, and no artifact is written", () => {
+    const context = fixture({ source: true, omitSourceMember: true });
+    assert.throws(() => build(context), (error) => error instanceof ReleasePreflightCliError && error.code === "RPC-DOC-READER-BINDING");
+    const outPath = "source-reader-failure.json";
+    const result = runCli(context, outPath);
+    assert.equal(result.status, 2, result.stderr);
+    assert.match(result.stderr, /RPC-DOC-READER-BINDING/u);
+    assert.equal(existsSync(join(context.base, outPath)), false);
+  });
+
+  check("RPC-reader a source checker result with a mismatched candidate is refused", () => {
+    assert.throws(() => build(fixture({ source: true, sourceCheckerResult: "mismatched" })), (error) => error instanceof ReleasePreflightCliError && error.code === "RPC-DOC-READER-BINDING");
+  });
+
+  check("RPC-reader a malformed source checker result is refused", () => {
+    assert.throws(() => build(fixture({ source: true, sourceCheckerResult: "malformed" })), (error) => error instanceof ReleasePreflightCliError && error.code === "RPC-DOC-READER-BINDING");
+  });
+
+  check("RPC-reader a stale source binding result is refused", () => {
+    assert.throws(() => build(fixture({ source: true, sourceCheckerResult: "stale" })), (error) => error instanceof ReleasePreflightCliError && error.code === "RPC-DOC-READER-BINDING");
+  });
+
+  check("RPC-reader a source base rejects a malformed candidate calibration", () => {
+    assert.throws(() => build(fixture({ source: true, candidateCalibration: "malformed" })), (error) => error instanceof ReleasePreflightCliError && error.code === "RPC-DOC-READER-BINDING");
+  });
+
+  check("RPC-reader a mismatched checker feature ID is refused", () => {
+    assert.throws(() => build(fixture({ source: true, sourceCheckerResult: "feature-mismatch" })), (error) => error instanceof ReleasePreflightCliError && error.code === "RPC-DOC-READER-BINDING");
+  });
+
+  check("RPC-reader a missing local checker is normalized to the reader-binding failure", () => {
+    assert.throws(() => build(fixture({ source: true, dirtyDeleteChecker: true })), (error) => error instanceof ReleasePreflightCliError && error.code === "RPC-DOC-READER-BINDING");
+  });
+
+  check("RPC-reader a checker resolved through an escaping parent symlink is refused", () => {
+    assert.throws(() => build(fixture({ source: true, symlinkedCheckerParent: true })), (error) => error instanceof ReleasePreflightCliError && error.code === "RPC-DOC-READER-BINDING");
+  });
+
+  check("RPC-reader a dirty public document is still checked from committed source state and remains unclean", () => {
+    const { record } = build(fixture({ source: true, dirty: true }));
+    assert.equal(record.status, "blocked");
+    assert.deepEqual(record.reasons, ["repository-not-clean"]);
+  });
+
+  check("RPC-reader a dirty deletion of a committed source member does not turn the source policy off", () => {
+    const { record } = build(fixture({ source: true, dirtyDeleteMember: true }));
+    assert.equal(record.status, "blocked");
+    assert.deepEqual(record.reasons, ["repository-not-clean"]);
   });
 
   console.log(`\nrelease-preflight-cli: ${passed} passed, ${failed} failed`);

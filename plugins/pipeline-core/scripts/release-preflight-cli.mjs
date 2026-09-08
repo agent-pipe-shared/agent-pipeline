@@ -50,7 +50,7 @@
  */
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { lstatSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { closeSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { canonicalJson, createReleasePreflight, validateReleasePreflight } from "./release-preflight.mjs";
@@ -76,6 +76,26 @@ const RELEASE_PREFLIGHT_CONSENT_SUBJECT_SCHEMA = "pipeline.release-preflight-con
 // this plugin already applies (pipeline-state.mjs's EXTERNAL_PUBLIC_ARTIFACT_MAX_BYTES).
 const EXTERNAL_PROOF_ARTIFACT_MAX_BYTES = 65_536;
 const GLOBAL_CHAT_CONSENT_SCHEMA = "pipeline.release-preflight-chat-attribution.v1";
+const SOURCE_CALIBRATION_PATH = ".claude/pipeline.json";
+const SOURCE_READER_CHECKER_PATH = "harness/scripts/check-doc-reader-binding.mjs";
+const SOURCE_READER_REQUIRED_PATHS = Object.freeze([
+  "harness/scripts/verify.mjs",
+  "harness/scripts/check-doc-contracts.mjs",
+  "harness/scripts/check-doc-reconciliation.mjs",
+  SOURCE_READER_CHECKER_PATH,
+  "harness/reader-review-protocol.md",
+  "governance/observation-doc-governance.json",
+  "docs/product-capability-inventory.json",
+]);
+const SOURCE_READER_CHECK_SCHEMA = "pipeline.doc-reader-binding-check.v1";
+const SOURCE_READER_ASSURANCE = "committed-state-and-evidence-presence-only";
+const SOURCE_READER_FEATURE_ID = /^[a-z0-9][a-z0-9-]{0,62}$/u;
+const SOURCE_READER_COMMIT = /^[a-f0-9]{40}$/u;
+const SOURCE_READER_DIGEST = /^[a-f0-9]{64}$/u;
+const SOURCE_READER_CALIBRATION_MAX_BYTES = 65_536;
+const SOURCE_READER_MEMBER_MAX_BYTES = 4 * 1024 * 1024;
+const SOURCE_READER_CHILD_MAX_BUFFER = 256 * 1024;
+const SOURCE_READER_UTF8 = new TextDecoder("utf-8", { fatal: true });
 
 export class ReleasePreflightCliError extends Error {
   constructor(code, message) { super(message); this.name = "ReleasePreflightCliError"; this.code = code; }
@@ -101,6 +121,120 @@ function git(root, args) {
   const result = spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false, timeout: 10_000 });
   if (result.status !== 0 || result.error) fail("RPC-GIT", `git ${args.join(" ")} failed`);
   return String(result.stdout).trim();
+}
+
+/** Read a bounded regular blob without ever consulting its worktree path. */
+function committedRegularBlob(root, commit, path, maxBytes) {
+  const entry = spawnSync("git", ["ls-tree", "-l", commit, "--", path], {
+    cwd: root, encoding: "utf8", shell: false, timeout: 10_000, maxBuffer: 65_536,
+  });
+  if (entry.error || entry.status !== 0) fail("RPC-DOC-READER-BINDING", "could not inspect committed source reader inputs");
+  if (entry.stdout === "") return null;
+  const match = /^(\d+)\s+blob\s+([a-f0-9]{40}|[a-f0-9]{64})\s+(\d+)\t(.+)\n?$/u.exec(entry.stdout);
+  if (!match || match[4] !== path || match[1] !== "100644") return null;
+  const size = Number(match[3]);
+  if (!Number.isSafeInteger(size) || size < 0 || size > maxBytes) return null;
+  const blob = spawnSync("git", ["cat-file", "blob", match[2]], {
+    cwd: root, encoding: "buffer", shell: false, timeout: 10_000, maxBuffer: maxBytes,
+  });
+  if (blob.error || blob.status !== 0 || !Buffer.isBuffer(blob.stdout) || blob.stdout.length !== size) {
+    fail("RPC-DOC-READER-BINDING", "could not read committed source reader inputs");
+  }
+  return blob.stdout;
+}
+
+function sourceCalibration(root, commit) {
+  const blob = committedRegularBlob(root, commit, SOURCE_CALIBRATION_PATH, SOURCE_READER_CALIBRATION_MAX_BYTES);
+  if (blob === null) return { source: false, valid: false };
+  try {
+    const value = JSON.parse(SOURCE_READER_UTF8.decode(blob));
+    return {
+      source: value !== null && typeof value === "object" && !Array.isArray(value)
+        && value.project === "agent-pipeline" && value.verify === "node harness/scripts/verify.mjs",
+      valid: true,
+    };
+  } catch {
+    return { source: false, valid: false };
+  }
+}
+
+function localSourceReaderChecker(root, candidateBytes) {
+  let checkerPath;
+  let rootRealPath;
+  let checkerRealPath;
+  try {
+    checkerPath = repoFile(root, SOURCE_READER_CHECKER_PATH, "source reader checker");
+    rootRealPath = realpathSync(root);
+    checkerRealPath = realpathSync(checkerPath);
+  } catch {
+    fail("RPC-DOC-READER-BINDING", "the local source reader checker is unavailable or unsafe");
+  }
+  const checkerRelative = relative(rootRealPath, checkerRealPath);
+  if (checkerRelative === "" || checkerRelative === ".." || checkerRelative.startsWith(`..${sep}`) || isAbsolute(checkerRelative)) {
+    fail("RPC-DOC-READER-BINDING", "the local source reader checker escapes the source checkout");
+  }
+  let descriptor;
+  try {
+    descriptor = openSync(checkerRealPath, "r");
+    const info = fstatSync(descriptor);
+    if (!info.isFile() || info.size < 0 || info.size > SOURCE_READER_MEMBER_MAX_BYTES || info.size !== candidateBytes.length) {
+      fail("RPC-DOC-READER-BINDING", "the local source reader checker is not a bounded candidate match");
+    }
+    const bytes = readFileSync(descriptor);
+    if (!bytes.equals(candidateBytes)) fail("RPC-DOC-READER-BINDING", "the local source reader checker does not match the committed candidate");
+  } catch (error) {
+    if (error instanceof ReleasePreflightCliError) throw error;
+    fail("RPC-DOC-READER-BINDING", "the local source reader checker is unavailable or unsafe");
+  } finally {
+    if (descriptor !== undefined) closeSync(descriptor);
+  }
+  return checkerRealPath;
+}
+
+function validateSourceReaderResult(value, candidateCommit, featureId) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const expected = ["assurance", "candidateCommit", "docsetSha256", "featureId", "findings", "reviewedCommit", "schema", "status"];
+  const keys = Object.keys(value).sort();
+  if (keys.length !== expected.length || keys.some((key, index) => key !== expected[index])) return false;
+  return value.schema === SOURCE_READER_CHECK_SCHEMA
+    && value.status === "passed"
+    && value.candidateCommit === candidateCommit
+    && value.featureId === featureId
+    && typeof value.reviewedCommit === "string" && SOURCE_READER_COMMIT.test(value.reviewedCommit)
+    && typeof value.docsetSha256 === "string" && SOURCE_READER_DIGEST.test(value.docsetSha256)
+    && Array.isArray(value.findings) && value.findings.length === 0
+    && value.assurance === SOURCE_READER_ASSURANCE;
+}
+
+/**
+ * Pipeline-source policy only. This establishes committed-tree membership and
+ * delegates record validation to the source checkout's dedicated checker.
+ * It proves committed state and evidence presence, not reader provenance or
+ * judgment quality, and is not a defense against rewriting trusted source policy.
+ */
+function requireSourceReaderBinding(root, { base, candidate, featureId }) {
+  const baseCalibration = sourceCalibration(root, base.commit);
+  const candidateCalibration = sourceCalibration(root, candidate.commit);
+  if (!baseCalibration.source && !candidateCalibration.source) return;
+  if (!candidateCalibration.valid || !candidateCalibration.source || !SOURCE_READER_COMMIT.test(candidate.commit) || typeof featureId !== "string" || !SOURCE_READER_FEATURE_ID.test(featureId)) {
+    fail("RPC-DOC-READER-BINDING", "source reader binding requires a committed source calibration and safe candidate inputs");
+  }
+  const members = new Map();
+  for (const path of SOURCE_READER_REQUIRED_PATHS) {
+    const blob = committedRegularBlob(root, candidate.commit, path, SOURCE_READER_MEMBER_MAX_BYTES);
+    if (blob === null) fail("RPC-DOC-READER-BINDING", "a required committed source reader member is missing or invalid");
+    members.set(path, blob);
+  }
+  const checkerPath = localSourceReaderChecker(root, members.get(SOURCE_READER_CHECKER_PATH));
+  const child = spawnSync(process.execPath, [checkerPath, "--root", root, "--candidate", candidate.commit, "--feature-id", featureId], {
+    cwd: root, encoding: "utf8", shell: false, timeout: 10_000, maxBuffer: SOURCE_READER_CHILD_MAX_BUFFER,
+  });
+  if (child.error || child.status !== 0) fail("RPC-DOC-READER-BINDING", "the source reader binding checker did not pass");
+  let result;
+  try { result = JSON.parse(child.stdout); } catch { fail("RPC-DOC-READER-BINDING", "the source reader binding checker returned malformed output"); }
+  if (!validateSourceReaderResult(result, candidate.commit, featureId)) {
+    fail("RPC-DOC-READER-BINDING", "the source reader binding checker returned an invalid result");
+  }
 }
 
 /** Observed, never asserted: HEAD, its tree, and whether anything is uncommitted. */
@@ -374,6 +508,7 @@ export function buildReleasePreflight({
   const candidate = { commit: repository.headCommit, tree: repository.headTree };
   const baseTree = git(root, ["rev-parse", `${baseCommit}^{tree}`]);
   const base = { commit: git(root, ["rev-parse", `${baseCommit}^{commit}`]), tree: baseTree };
+  requireSourceReaderBinding(root, { base, candidate, featureId: lifecycleInput.featureId });
   const manifestAbsolute = repoFile(root, lifecyclePath, "lifecycle manifest");
   const manifestSha256 = sha256(readFileSync(manifestAbsolute));
   const candidateVersion = readFileSync(repoFile(root, "VERSION", "VERSION"), "utf8").trim();

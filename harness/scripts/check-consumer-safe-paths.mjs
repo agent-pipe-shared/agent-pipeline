@@ -80,6 +80,15 @@ function vendoredCanonAllowlistReason(origin) {
   );
 }
 
+function sourceReaderReleaseGateAllowlistReason() {
+  return (
+    "Class B: committed-base/candidate source-release gate data for this repository's own " +
+    "self-application (ADR-0015). These exact harness paths identify and invoke the " +
+    "reader-binding checker only after committed calibration identifies the Agent Pipeline " +
+    "source checkout; they are inert for consumer projects and are not consumer instructions."
+  );
+}
+
 export const VENDORED_CANON_ALLOWLIST = Object.freeze([
   // guardrails/deploy.md (lines 25, 28, 36, 67, 75)
   { file: "plugins/pipeline-core/guardrails/deploy.md", match: "ent}` (`harness/scripts/", reason: vendoredCanonAllowlistReason("guardrails/deploy.md") }, // L25
@@ -598,6 +607,13 @@ export const ALLOWLIST = Object.freeze([
   // from the source, same class as the pre-existing VENDORED_CANON_ALLOWLIST entries above.
   { file: "plugins/pipeline-core/docs/operating-model.md", match: "harness/scripts/check-po-gate-authority.mjs`; user-facing", reason: vendoredCanonAllowlistReason("docs/operating-model.md") }, // L350 (EN)
   { file: "plugins/pipeline-core/docs/operating-model.md", match: "harness/scripts/check-po-gate-authority.mjs`; Nutzertexte", reason: vendoredCanonAllowlistReason("docs/operating-model.md") }, // L696 (DE reference translation)
+  { file: "plugins/pipeline-core/docs/push-release-flow.md", match: "verify: \"node harness/scripts/verify.mjs\"", reason: vendoredCanonAllowlistReason("docs/push-release-flow.md") },
+  { file: "plugins/pipeline-core/scripts/release-preflight-cli.mjs", match: "SOURCE_READER_CHECKER_PATH = \"harness/scripts/check-doc-reader-binding.mjs\"", reason: sourceReaderReleaseGateAllowlistReason() },
+  { file: "plugins/pipeline-core/scripts/release-preflight-cli.mjs", match: "\"harness/scripts/verify.mjs\"", reason: sourceReaderReleaseGateAllowlistReason() },
+  { file: "plugins/pipeline-core/scripts/release-preflight-cli.mjs", match: "\"harness/scripts/check-doc-contracts.mjs\"", reason: sourceReaderReleaseGateAllowlistReason() },
+  { file: "plugins/pipeline-core/scripts/release-preflight-cli.mjs", match: "\"harness/scripts/check-doc-reconciliation.mjs\"", reason: sourceReaderReleaseGateAllowlistReason() },
+  { file: "plugins/pipeline-core/scripts/release-preflight-cli.mjs", match: "\"harness/reader-review-protocol.md\"", reason: sourceReaderReleaseGateAllowlistReason() },
+  { file: "plugins/pipeline-core/scripts/release-preflight-cli.mjs", match: "value.verify === \"node harness/scripts/verify.mjs\"", reason: sourceReaderReleaseGateAllowlistReason() },
 ]);
 
 function posixPath(value) {

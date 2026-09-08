@@ -188,15 +188,9 @@ and CLAUDE.md forbids machine-specific absolute paths in commits, docs, or
 prompts), so it belongs in shell configuration, never in this repository.
 
 **`--repo-root` must be a checkout that is clean including untracked files**
-(`observeCleanCandidate`). In this repository the main checkout can never
-satisfy that: `.claude/settings.json` and `project/pipeline-state.json` are
-tracked and permanently modified. `project/resume-hint.json` is NOT tracked —
-`.gitignore` excludes it as a "bounded non-authoritative restart aid" that must
-never enter history — so it never dirties this check; but because a fresh
-clone therefore carries no live card, a resume-hint check can be red in the
-working checkout and green in a fresh clone of the same commit. Point
-`--repo-root` at the detached verify worktree instead, after moving it to the
-candidate — that is what it exists for.
+(`observeCleanCandidate`). A clean main checkout can satisfy this requirement;
+use the candidate checkout that is actually clean, including untracked files.
+`project/resume-hint.json` remains ignored and is not part of this observation.
 
 **`--expires-at` is normalized, not rejected**, as long as `Date.parse` accepts
 it — pass any parseable ISO-8601 timestamp; the command canonicalizes it to the
@@ -255,6 +249,36 @@ retentionPolicySha256}`) must not dirty the tree before the human signs, so
 it belongs under `/evidence/` (`.gitignore:39`), the same ignored-but-present
 location every other pre-signature scratch artifact in this flow already
 uses.
+
+### Source reader binding (Agent Pipeline source checkout only)
+
+The Agent Pipeline source release preflight also requires a current reader
+binding. This source-only rule is selected from committed calibration at the
+resolved base and candidate (`project: "agent-pipeline"` and
+`verify: "node harness/scripts/verify.mjs"`); an installed plugin or an
+ordinary consumer with a documentation inventory does not acquire the rule.
+The candidate must retain the committed checker, its protocol, the required
+harness members, governance input, and capability inventory. The local checker
+must be the exact candidate bytes before it runs, so a dirty deletion cannot
+turn the rule off.
+
+Close the reader work inside one final public-document block. At final
+documentation state **Y**, phase one reads only the fixed public document set
+and records cuts, file/line issues, or ordering concerns. Phase two receives
+that same frozen document set, the immutable phase-one report, and the
+inventory, governance input, and dedicated reader protocol, then records its
+assessment. If either phase requires a
+public-document change, make the change and start a fresh two-phase round for
+the new final state. Commit the final phase reports and disposition, then add
+the binding record as a record-only descendant **C**. Do not change a covered
+document, the inventory, governance input, or reader protocol between Y and C.
+
+The release producer invokes the committed candidate checker for C before it
+writes any preflight record. A pass proves only that committed evidence is
+present and that its bound document/input hashes still equal Y. It does not
+prove who read the documents, reader freshness, truthful provenance, or the
+quality of the readers' judgment; it also does not defend against rewriting
+the trusted source policy itself.
 
 **Finding the right external directory:** more than one candidate directory
 may exist on a machine (e.g. one per repo this Pipeline governs). Verify by
