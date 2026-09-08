@@ -4,6 +4,8 @@
 
 **Status:** accepted (2026-07-03, Checkpoint 2, Q8) · **Basis:** Register E14
 
+**Governs:** .claude-plugin/marketplace.json, docs/adr/README.md, docs/adr/0049-gitlab-ci-constrained-remote-executor-pilot.md, docs/design-decisions.md, plugins/pipeline-core/lib/public-core-observation.mjs, plugins/pipeline-core/lib/public-core-origin-allowlist.mjs, plugins/pipeline-core/lib/forge-capability.mjs, plugins/pipeline-core/lib/forge-capability.test.mjs, plugins/pipeline-core/scripts/forge-capability.schema.json, plugins/pipeline-core/scripts/github-forge-adapter.mjs, plugins/pipeline-core/scripts/github-forge-adapter.test.mjs, plugins/pipeline-core/scripts/github-issue-operations.mjs, plugins/pipeline-core/scripts/github-issue-operations.test.mjs
+
 ## Context
 
 Checkpoint 2 raised the fundamental question of which git-hosting provider to use across all projects (CP2 Q8). The PO decided to stay with GitHub rather than switch — paired with documented mitigations and an ongoing-observation duty via tipping-point triggers in the tooling radar.

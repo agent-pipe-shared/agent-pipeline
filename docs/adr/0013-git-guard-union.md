@@ -4,6 +4,8 @@
 
 **Status:** accepted (2026-07-03, Checkpoint 1) · **Basis:** Register E11
 
+**Governs:** guardrails/git.md, project/guard-config.json, plugins/pipeline-core/hooks/guard-git.mjs, plugins/pipeline-core/hooks/guard-git.test.mjs, plugins/pipeline-core/hooks/hooks.json, plugins/pipeline-core/hooks/codex-pretool-guard.mjs, plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs, plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs, plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs, plugins/pipeline-core/lib/project-authority.mjs, plugins/pipeline-core/lib/project-authority.test.mjs
+
 ## Context
 
 All three source projects ran a PreToolUse git-guard as diverged copies: no single incarnation was a superset of the others — each copy carried protection rules the siblings lacked. This was the clearest measurable copy-paste damage in the existing estate. Shared core: a deny-guard against force-push, `reset --hard`, `clean -f`, main-branch deletion, secret staging; the pattern of "broad allows + targeted deny-guard"; exit code 2 with a plain-text reason; fail-open behavior; a human manual escape hatch. Hook denies also apply under `acceptEdits`/`bypassPermissions`.

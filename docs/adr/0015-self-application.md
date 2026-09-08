@@ -6,6 +6,8 @@
 
 **Status:** accepted (2026-07-03, Checkpoint 1) · **Basis:** Register E13, PO decision
 
+**Governs:** CLAUDE.md, .claude/pipeline.json, docs/operating-model.md, docs/state.md, policies/language-policy.md, roles/elephant.md, roles/critic.md, harness/review-protocol.md, templates/prompts/goldfish-task.md, templates/prompts/critic-review.md, plugins/pipeline-core/lib/self-application-attestation-gate.mjs, plugins/pipeline-core/lib/self-application-attestation-gate.test.mjs, plugins/pipeline-core/lib/public-core-observation.mjs, plugins/pipeline-core/lib/public-core-origin-allowlist.mjs, plugins/pipeline-core/lib/ruleset-source.mjs, plugins/pipeline-core/scripts/pipeline-start-preflight.mjs, plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs
+
 ## Context
 
 The Pipeline requires independent review, evidence, and versioned handovers from the projects it governs — that is only credible and tested if the Pipeline repo itself works the same way. Already practiced at Checkpoint 1: three independent Critics (fresh context, Fable 5/max) found 5 major findings and 0 blockers; immediate fixes and conditions A1–A13 were produced BEFORE the PO gate.
