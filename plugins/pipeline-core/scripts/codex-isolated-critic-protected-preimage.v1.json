@@ -16,15 +16,15 @@
     },
     {
       "path": "plugins/pipeline-core/scripts/codex-critic-host-return.schema.json",
-      "rawSha256": "e8ef765127f77954dfcb104b2f3349dd9bb98d991ef4f3c63fe6640eb7f1989d"
+      "rawSha256": "737105cde76fb612bd68a7c1f4e0d42fb5397f4c7a099d21167113dcfe8bfb15"
     },
     {
       "path": "plugins/pipeline-core/scripts/codex-critic-host.mjs",
-      "rawSha256": "387563e93e08b6b503a4c751faa44c38cf6046ecfd7542ee10968083f85e4f26"
+      "rawSha256": "4bdd5487ec60115232cacda2ac53235200c74a2733db10176bf12081500dfcdf"
     },
     {
       "path": "plugins/pipeline-core/scripts/codex-critic-receipt.schema.json",
-      "rawSha256": "912d6c1c743ed646dd5ab2b594f8840c18a24e00c2c30a17a0e51aabd9b3c4a2"
+      "rawSha256": "2194af00a47298d83bdcda8f0ac3f0069346bfd3d25a59cf567b773cccf52777"
     },
     {
       "path": "plugins/pipeline-core/scripts/critic-verdict.schema.json",
@@ -32,7 +32,7 @@
     },
     {
       "path": "plugins/pipeline-core/skills/critic-review/SKILL.md",
-      "rawSha256": "1123f114b1217488fa756378084f75deec8ff8a4583c8b29b9af5c5c7e8efd02"
+      "rawSha256": "58b786922780f1d2bb57a87b8578beaf9fe5321bad59567d530774bee830d383"
     },
     {
       "path": "roles/critic.md",
