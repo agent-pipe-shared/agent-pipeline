@@ -22,14 +22,35 @@ mechanism, a substitute for signed gates, or a record of feature acceptance.
 
 ## Decisions awaiting the PO
 
-None newly identified at this checkpoint. Do not turn routine implementation,
-tests, local commits, or review preparation into a PO checkpoint.
+### Event 16 deterministic scanner collision — new decision required
+
+The exact clean candidate is `d88b543486ddc8e6215d3944fafc1e38aa6790da`
+(tree `f803aa1a4b353ee6093676b3f33961359d193fe1`). Full Verify is red (exit 1,
+499/508 green); the security finding is one high `gitleaks` `generic-api-key`
+finding at line 1, column 987 in the immutable public-safe event
+`governance/events/human/16-evt-hgo-deny-cc612114562e4c5069cb6c66c06dda55-0.json`.
+The focused diagnostic exits 0 and confirms the raw match equals the producer
+`denyDecisionId`, `payload.decisionId`, and `idempotencyKey`. Evidence:
+`evidence/alfred-recovery-d88b5434-verify.json` and
+`evidence/alfred-event16-scanner-proposal.json`.
+
+Recommendation: defer applying an exception while C1 implementation and test
+preparation continue. Independent Critic launch remains blocked by red
+deterministic Verify. Alternative: the PO may approve one narrow
+content-v1 exception bound exactly to the event path, `generic-api-key`, line
+1, column 987, and the machine-confirmed content fingerprint in the scanner
+proposal. The proposed owner is the PO and the proposed review date is
+2026-09-26; this date is not automatic expiry. No new exception is authorized
+by the earlier GMW approval, and no standalone new-exception writer command was
+identified. Any eventual exact diff must use the repository's permitted
+mutation route and actual guard requirements. The event and scanner ignore
+remain unchanged.
 
 ## Open agent work and later gates
 
 | Topic | Current status | Next owner/action |
 |---|---|---|
-| C1 pure aggregation | Prepared plan; implementation and review pending | Goldfish implements the bounded contract, then deterministic checks and independent T1 review |
+| C1 pure aggregation | Implementation and focused tests committed at `854b0da8`; receipt 64/64 and consumer checks 9/9 pass | Prepare emission/local-report refinement, then candidate Verify and independent T1 review |
 | Slice/parallel hooks | Exact hook identity, native tool coverage and live invocation evidence unmeasured | Read-only investigation, then bounded tests where admitted |
 | Existing first-core and scanner-exception review | Prior installed transport blocker recorded; new version must be rechecked | Elephant prepares the current selected transport and candidate-bound review |
 | Real collection baseline | Native evidence and measured 14-day window remain open | Implement/validate collection before recording a real start; never backdate |
