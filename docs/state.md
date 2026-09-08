@@ -36,13 +36,22 @@ PO decisions/signatures and continue independent packages at blockers. The
 latest instruction is to stamp again only when the PO returns. No push,
 release or installed-plugin update is authorized; local testing precedes release.
 
-Current check: `37aa24fc327b910e6b74ba26bdcb8e1601605e7a`, local build
+Latest completed full check: `37aa24fc327b910e6b74ba26bdcb8e1601605e7a`, local build
 `0.6.1+<runner>.20260908184831.408738b`, finished exact and clean at 514/517
-after 697.804 seconds. Registration exclusions are repaired; two reference
-checks expose one newly unused allowance, and the Antigravity execution suite
-fails its two model cases. Both repairs are separately dispatched. The selected
-Critic has not started because the full gate is not green. Operational pointers:
+after 697.804 seconds. The reference allowance is repaired in `29c286a4`;
+the Antigravity test fixture now survives asynchronous cases in `98c63449`.
+The unchanged reference checks and 15 Antigravity cases pass, including two
+concurrent suite processes. These focused results do not replace the failed
+full gate. The selected Critic has not started. Operational pointers:
 `scratch/candidate-checkpoint-37aa24fc-20260908.json`.
+
+D.4's native parallel-work guide and corrected lifecycle observation are
+integrated in `ad8087fe`; D.2's inventory increment in `b25c8696` declares
+34 capabilities with 616 discovered surfaces assigned exactly once. Their
+document/inventory checks and strict dispatch bindings pass. Generated-obligations
+discovery, the inventory's independent review and final documentation binding
+remain open. D.3's generated enforcement reference, audit/security/cost pages,
+and D.6's metering boundary are in progress under disjoint ownership.
 
 The PO completed model-authority commit `f895abaf` and attended Claude hook
 commit `2dab5966`; both were read back against the expected changes. Active
@@ -75,12 +84,13 @@ GitLab has imported successful Desktop/WSL read evidence, validated locally;
 see `backlog/evidence/2026-09-07-gitlab-read-access-observation.md`. This is neither
 a new Nova network execution nor B2 CI/worker proof. Reads only are authorized.
 
-The most recent complete Verify run is **505/517, failed**, exactly bound to
+An earlier complete Verify run was **505/517, failed**, exactly bound to
 `94bbc6a6ac0e17c91af08e1370810d5b06e55af3`, tree
 `c2808190083ad81e98b527fc7a971698d81a72a6`, with clean start and finish.
 Read `evidence/verify-1788823644708-c3279dedde58cddd.json` for its twelve failed
-steps. Later focused repairs do not change that historical result. A new full
-green gate, genuine selected Codex Critic and final local stamp are still required.
+steps. Later focused repairs do not change that historical result. The newer
+514/517 run is recorded above. A new full green gate and genuine selected Codex
+Critic remain required; another local stamp waits for the PO's return.
 
 All three collected PO steps are complete: the human project-model mirror
 commit `5971da14`, the four separately transcribed Critic integrity pins
@@ -121,12 +131,13 @@ Actual child-CLI regressions preserve complete fixture state and all existing
 test assertions. Candidate-wide independent review remains pending. Evidence:
 `backlog/evidence/2026-09-08-handover-size-command-mismatch.md`.
 
-The installed plugin still carries `0.6.1+codex.20260906172530.87af6b6`.
-The source-only stamp from the failed candidate is
-`0.6.1+codex.20260907232112.3edcb06`; it is not a newly delivered test candidate.
-This checkpoint performed no installation, daemon restart, release or push. Detailed current
-handover: `scratch/local-candidate-test-handover-20260908.md`; next continuation:
-`scratch/candidate-continuation-20260907-late.md`.
+The installed plugin read back at this session's re-entry is
+`0.6.1+codex.20260908050949.b281527`; bootstrap and session readiness passed.
+The later source-only stamp is `0.6.1+codex.20260908184831.408738b` and was
+not installed. Subsequent source commits deliberately have no new stamp under
+the PO's latest instruction. This continuation performs no installation,
+daemon restart, release or push. Current operational notes:
+`scratch/candidate-autonomous-continuation-20260908.md`.
 
 ## Durable rules carried forward — these have no other home
 
