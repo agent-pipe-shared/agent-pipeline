@@ -4,6 +4,8 @@
 
 **Status:** accepted (PO decisions of 2026-07-16; routing amendment of 2026-07-17)
 
+**Governs:** plugins/pipeline-core/config/runner-profiles-v2.json, plugins/pipeline-core/lib/runner-profiles-v2.mjs, plugins/pipeline-core/lib/runner-profiles-v2.test.mjs, plugins/pipeline-core/scripts/pipeline-user-v2.schema.json, plugins/pipeline-core/lib/runner-usage-v1.mjs, plugins/pipeline-core/lib/runner-usage-v1.test.mjs, plugins/pipeline-core/scripts/runner-usage.schema.json, plugins/pipeline-core/scripts/usage-route-binding.schema.json
+
 ## Context
 
 Existing configuration and runtime surfaces describe Claude and Codex routes

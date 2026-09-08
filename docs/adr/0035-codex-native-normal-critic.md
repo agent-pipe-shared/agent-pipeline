@@ -6,6 +6,8 @@
 
 **Status:** accepted (PO-approved Phase-2 close design, 2026-07-15)
 
+**Governs:** plugins/pipeline-core/config/routing-authority.json, plugins/pipeline-core/config/runner-profiles-v3.json, plugins/pipeline-core/config/codex-sandbox-compatibility.v2.json, plugins/pipeline-core/config/codex-sandbox-compatibility.v2.schema.json, plugins/pipeline-core/lib/critic-route-v3.mjs, plugins/pipeline-core/lib/codex-sandbox-compatibility.mjs, plugins/pipeline-core/lib/codex-sandbox-compatibility.test.mjs, plugins/pipeline-core/scripts/codex-critic-host.mjs, plugins/pipeline-core/scripts/codex-critic-host.test.mjs, plugins/pipeline-core/scripts/codex-critic-host-return.schema.json, plugins/pipeline-core/scripts/codex-critic-receipt.schema.json, roles/critic.md, templates/prompts/critic-review.md
+
 ## Context
 
 The existing Critic contract assumes a fresh read-only reviewer and requires a

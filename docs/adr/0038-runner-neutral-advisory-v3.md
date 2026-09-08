@@ -3,6 +3,8 @@
 **Status:** accepted route registry; session-trigger and mandatory-receipt
 semantics superseded by ADR-0047 · **Date:** 2026-07-19
 
+**Governs:** plugins/pipeline-core/config/runner-profiles-v3.json, plugins/pipeline-core/lib/runner-profiles-v3.mjs, plugins/pipeline-core/lib/runner-profiles-v3.test.mjs, plugins/pipeline-core/lib/advisory-receipt.mjs, plugins/pipeline-core/lib/advisory-receipt.test.mjs, plugins/pipeline-core/scripts/advisory-receipt.schema.json, plugins/pipeline-core/lib/advisory-coordinator.mjs, plugins/pipeline-core/lib/advisory-coordinator.test.mjs, plugins/pipeline-core/scripts/advisory-host-bridge.mjs, plugins/pipeline-core/scripts/advisory-host-bridge.test.mjs, plugins/pipeline-core/agents/consult-advisor.md, plugins/pipeline-core/scripts/pipeline-user-v3.schema.json, plugins/pipeline-core/config/runtime-projection-v3-owned-keys.json, plugins/pipeline-core/lib/runtime-projection-v3.mjs, plugins/pipeline-core/lib/runtime-projection-v3.test.mjs, plugins/pipeline-core/lib/runner-profile-migration-v3.mjs, plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs, plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs, plugins/pipeline-core/lib/critic-export-policy.mjs, plugins/pipeline-core/lib/critic-export-policy.test.mjs, plugins/pipeline-core/scripts/critic-export-receipt.schema.json
+
 ## Context
 
 The unactivated V2 bridge preserved the legacy profile cell
