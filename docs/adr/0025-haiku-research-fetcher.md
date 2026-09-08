@@ -6,6 +6,8 @@
 
 **Status:** accepted (Wave 2, M12) · **Basis:** Register E25
 
+**Governs:** policies/model-policy.md, roles/elephant.md, roles/goldfish.md, templates/prompts/goldfish-task.md, plugins/pipeline-core/agents/goldfish-mechanic.md, plugins/pipeline-core/agents/goldfish-implementor.md, plugins/pipeline-core/agents/goldfish-deep.md
+
 ## Context
 
 The pipeline's general Haiku ban ([ADR-0006](0006-model-effort-policy.md), E6/MP-03: "NO Haiku in the pipeline") arose from concern over judgment quality. Wave 2 measured a clear efficiency gap for pure read-only web search/extraction with no artifacts/judgment: a research-fetch run (R1) completed in 77s/38k usable tokens on Haiku, versus roughly 12min/~200k tokens for Sonnet-class models on the same task class.

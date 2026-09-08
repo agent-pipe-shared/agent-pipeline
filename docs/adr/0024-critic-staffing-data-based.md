@@ -4,6 +4,8 @@
 
 Accepted during the 2026-07-05 measure wave. Revised for provider-neutral Phase 2 architecture on 2026-07-13.
 
+**Governs:** docs/operating-model.md, harness/review-protocol.md, roles/elephant.md, roles/critic.md, policies/model-policy.md, templates/prompts/critic-review.md, plugins/pipeline-core/config/runner-profiles-v3.json, plugins/pipeline-core/lib/runner-profiles-v3.mjs, plugins/pipeline-core/lib/runner-profiles-v3.test.mjs, plugins/pipeline-core/lib/runtime-projection-v3.mjs, plugins/pipeline-core/lib/runtime-projection-v3.test.mjs, plugins/pipeline-core/lib/critic-route-v3.mjs, plugins/pipeline-core/scripts/codex-critic-selected-host.mjs, plugins/pipeline-core/lib/critic-skip-decision.mjs, plugins/pipeline-core/lib/critic-skip-decision.test.mjs, plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs, plugins/pipeline-core/scripts/check-critic-skip-coverage.test.mjs
+
 ## Context
 
 Critic staffing should follow risk and evidence rather than use the most expensive review path for every change. Historical observations supported a cascade for routine work, but they did not weaken blocking review for high-risk architecture, guardrail, or security changes.

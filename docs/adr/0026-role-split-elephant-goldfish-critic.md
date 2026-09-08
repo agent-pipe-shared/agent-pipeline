@@ -4,6 +4,8 @@
 
 Accepted on 2026-07-07. Clarified for Phase 2 on 2026-07-13.
 
+**Governs:** docs/operating-model.md, roles/elephant.md, roles/goldfish.md, roles/critic.md, templates/prompts/goldfish-task.md, templates/prompts/critic-review.md, plugins/pipeline-core/agents/plan-verifier.md, plugins/pipeline-core/config/routing-authority.json, plugins/pipeline-core/lib/dispatch-policy.mjs, plugins/pipeline-core/lib/dispatch-policy.test.mjs
+
 ## Context
 
 The pipeline needs a stable separation between orchestration, execution, and independent review. It also needs a narrow check that an implementation diff maps to every approved plan item. That check is a verification capability, not a new authority or a fourth role.
