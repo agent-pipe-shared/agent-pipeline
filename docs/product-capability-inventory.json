@@ -190,20 +190,9 @@
         "verify-phase:harness/scripts/verify.mjs:advisory-host-bridge-tests",
         "verify-phase:harness/scripts/verify.mjs:advisory-lifecycle-v2-tests",
         "verify-phase:harness/scripts/verify.mjs:advisory-receipt-tests",
-        "verify-phase:harness/scripts/verify.mjs:afk-activation-tests",
-        "verify-phase:harness/scripts/verify.mjs:afk-assumption-mode-tests",
-        "verify-phase:harness/scripts/verify.mjs:afk-capability-worker-tests",
-        "verify-phase:harness/scripts/verify.mjs:afk-claude-host-tests",
-        "verify-phase:harness/scripts/verify.mjs:afk-git-adapter-tests",
-        "verify-phase:harness/scripts/verify.mjs:afk-ledger-tests",
-        "verify-phase:harness/scripts/verify.mjs:afk-review-tests",
-        "verify-phase:harness/scripts/verify.mjs:afk-transaction-host-tests",
-        "verify-phase:harness/scripts/verify.mjs:agent-decision-journal-tests",
         "verify-phase:harness/scripts/verify.mjs:agent-model-registry-tests",
         "verify-phase:harness/scripts/verify.mjs:agents-adapter-migration-check",
         "verify-phase:harness/scripts/verify.mjs:agents-adapter-migration-tests",
-        "verify-phase:harness/scripts/verify.mjs:ai-assisted-hardening-gate-tests",
-        "verify-phase:harness/scripts/verify.mjs:ai-assisted-hardening-tests",
         "verify-phase:harness/scripts/verify.mjs:antigravity-alpha-adapter-tests",
         "verify-phase:harness/scripts/verify.mjs:antigravity-execution-host-tests",
         "verify-phase:harness/scripts/verify.mjs:antigravity-pretool-guard-tests",
@@ -212,8 +201,6 @@
         "verify-phase:harness/scripts/verify.mjs:artifact-topology-check",
         "verify-phase:harness/scripts/verify.mjs:artifact-topology-tests",
         "verify-phase:harness/scripts/verify.mjs:async-execution-tests",
-        "verify-phase:harness/scripts/verify.mjs:audit-bundle-cli-tests",
-        "verify-phase:harness/scripts/verify.mjs:audit-bundle-core-tests",
         "verify-phase:harness/scripts/verify.mjs:auth-gate-inventory-drift-check",
         "verify-phase:harness/scripts/verify.mjs:auth-gate-inventory-drift-tests",
         "verify-phase:harness/scripts/verify.mjs:authority-revision-proof-tests",
@@ -231,11 +218,7 @@
         "verify-phase:harness/scripts/verify.mjs:bootstrap-payload-budget-tests",
         "verify-phase:harness/scripts/verify.mjs:bootstrap-payload-measure-cli-tests",
         "verify-phase:harness/scripts/verify.mjs:bootstrap-source-attestation-acceptance-tests",
-        "verify-phase:harness/scripts/verify.mjs:capture-evidence-tests",
         "verify-phase:harness/scripts/verify.mjs:capture-observation-intake-tests",
-        "verify-phase:harness/scripts/verify.mjs:change-control-cli-tests",
-        "verify-phase:harness/scripts/verify.mjs:change-control-core-tests",
-        "verify-phase:harness/scripts/verify.mjs:chat-gate-ceremony-tests",
         "verify-phase:harness/scripts/verify.mjs:check-adr-consistency-tests",
         "verify-phase:harness/scripts/verify.mjs:check-backlog-sprint-assignment-tests",
         "verify-phase:harness/scripts/verify.mjs:check-backlog-state-tests",
@@ -244,12 +227,10 @@
         "verify-phase:harness/scripts/verify.mjs:check-critic-contract-citations-tests",
         "verify-phase:harness/scripts/verify.mjs:check-critic-skip-coverage-tests",
         "verify-phase:harness/scripts/verify.mjs:check-directory-contract-tests",
-        "verify-phase:harness/scripts/verify.mjs:check-doc-reconciliation-tests",
         "verify-phase:harness/scripts/verify.mjs:check-gitignore-anchoring-tests",
         "verify-phase:harness/scripts/verify.mjs:check-ownership-tests",
         "verify-phase:harness/scripts/verify.mjs:check-protected-path-integrity-tests",
         "verify-phase:harness/scripts/verify.mjs:check-release-state-consistency-tests",
-        "verify-phase:harness/scripts/verify.mjs:check-resume-consumption-tests",
         "verify-phase:harness/scripts/verify.mjs:check-review-retry-plan-tests",
         "verify-phase:harness/scripts/verify.mjs:check-session-bootstrap-directory-contract-tests",
         "verify-phase:harness/scripts/verify.mjs:check-state-phase-consistency-tests",
@@ -289,21 +270,6 @@
         "verify-phase:harness/scripts/verify.mjs:codex-session-start-hint-tests",
         "verify-phase:harness/scripts/verify.mjs:commit-message-policy-tests",
         "verify-phase:harness/scripts/verify.mjs:consumer-safe-paths-tests",
-        "verify-phase:harness/scripts/verify.mjs:continuity-host-adapter-tests",
-        "verify-phase:harness/scripts/verify.mjs:continuity-result-bootstrap-tests",
-        "verify-phase:harness/scripts/verify.mjs:continuity-result-case-migration-tests",
-        "verify-phase:harness/scripts/verify.mjs:continuity-result-close-tests",
-        "verify-phase:harness/scripts/verify.mjs:continuity-result-rebind-tests",
-        "verify-phase:harness/scripts/verify.mjs:continuity-state-tests",
-        "verify-phase:harness/scripts/verify.mjs:continuity-status-cli-tests",
-        "verify-phase:harness/scripts/verify.mjs:continuity-status-tests",
-        "verify-phase:harness/scripts/verify.mjs:control-catalog-drift-tests",
-        "verify-phase:harness/scripts/verify.mjs:control-catalog-migration-tests",
-        "verify-phase:harness/scripts/verify.mjs:control-catalog-schema-tests",
-        "verify-phase:harness/scripts/verify.mjs:control-evaluation-receipt-tests",
-        "verify-phase:harness/scripts/verify.mjs:control-execution-exchange-tests",
-        "verify-phase:harness/scripts/verify.mjs:control-execution-lifecycle-event-tests",
-        "verify-phase:harness/scripts/verify.mjs:control-waiver-lifecycle-tests",
         "verify-phase:harness/scripts/verify.mjs:copy-safe-command-tests",
         "verify-phase:harness/scripts/verify.mjs:credential-lease-tests",
         "verify-phase:harness/scripts/verify.mjs:critic-bare-tests",
@@ -316,37 +282,19 @@
         "verify-phase:harness/scripts/verify.mjs:critic-route-activation-tests",
         "verify-phase:harness/scripts/verify.mjs:critic-skip-decision-tests",
         "verify-phase:harness/scripts/verify.mjs:critic-t1-po-override-tests",
-        "verify-phase:harness/scripts/verify.mjs:critical-action-approval-request-tests",
-        "verify-phase:harness/scripts/verify.mjs:critical-action-authorization-tests",
-        "verify-phase:harness/scripts/verify.mjs:critical-human-proof-gate-tests",
-        "verify-phase:harness/scripts/verify.mjs:critical-human-proof-policy-tests",
         "verify-phase:harness/scripts/verify.mjs:decision-reference-dual-evaluation-tests",
         "verify-phase:harness/scripts/verify.mjs:delivery-course-tests",
         "verify-phase:harness/scripts/verify.mjs:dispatch-authorship-verify-tests",
         "verify-phase:harness/scripts/verify.mjs:dispatch-policy-tests",
-        "verify-phase:harness/scripts/verify.mjs:dispatch-provenance-tests",
         "verify-phase:harness/scripts/verify.mjs:dispatch-record-strip-for-critic-tests",
-        "verify-phase:harness/scripts/verify.mjs:doc-contract-check",
-        "verify-phase:harness/scripts/verify.mjs:doc-contract-tests",
-        "verify-phase:harness/scripts/verify.mjs:document-hooks-manifest-tests",
-        "verify-phase:harness/scripts/verify.mjs:document-hooks-tests",
-        "verify-phase:harness/scripts/verify.mjs:document-identifier-tests",
-        "verify-phase:harness/scripts/verify.mjs:document-lifecycle-tests",
         "verify-phase:harness/scripts/verify.mjs:entrypoint-reachability-tests",
         "verify-phase:harness/scripts/verify.mjs:epic-file-contract-tests",
-        "verify-phase:harness/scripts/verify.mjs:error-register-check",
-        "verify-phase:harness/scripts/verify.mjs:error-register-tests",
         "verify-phase:harness/scripts/verify.mjs:evidence-view-model-tests",
         "verify-phase:harness/scripts/verify.mjs:evidence-view-renderer-tests",
-        "verify-phase:harness/scripts/verify.mjs:evidence-viewer-tests",
         "verify-phase:harness/scripts/verify.mjs:execution-plane-launch-tests",
         "verify-phase:harness/scripts/verify.mjs:external-command-offer-tests",
         "verify-phase:harness/scripts/verify.mjs:external-push-ledger-tests",
-        "verify-phase:harness/scripts/verify.mjs:external-reference-adapter-tests",
-        "verify-phase:harness/scripts/verify.mjs:external-reference-tests",
         "verify-phase:harness/scripts/verify.mjs:feature-package-topology-tests",
-        "verify-phase:harness/scripts/verify.mjs:finding-lifecycle-tests",
-        "verify-phase:harness/scripts/verify.mjs:forge-capability-tests",
         "verify-phase:harness/scripts/verify.mjs:gate-estimate-tests",
         "verify-phase:harness/scripts/verify.mjs:gate-strength-guard-tests",
         "verify-phase:harness/scripts/verify.mjs:generate-elephant-role-prohibitions-tests",
@@ -358,20 +306,6 @@
         "verify-phase:harness/scripts/verify.mjs:gitleaks-tests",
         "verify-phase:harness/scripts/verify.mjs:governance-authority-resolver-tests",
         "verify-phase:harness/scripts/verify.mjs:governance-authority-tests",
-        "verify-phase:harness/scripts/verify.mjs:governance-event-cli-tests",
-        "verify-phase:harness/scripts/verify.mjs:governance-event-core-tests",
-        "verify-phase:harness/scripts/verify.mjs:governance-event-projection-tests",
-        "verify-phase:harness/scripts/verify.mjs:governance-event-store-tests",
-        "verify-phase:harness/scripts/verify.mjs:governance-export-adapter-tests",
-        "verify-phase:harness/scripts/verify.mjs:governance-export-delivery-tests",
-        "verify-phase:harness/scripts/verify.mjs:governance-export-outbox-store-tests",
-        "verify-phase:harness/scripts/verify.mjs:governance-export-outbox-tests",
-        "verify-phase:harness/scripts/verify.mjs:governance-export-tests",
-        "verify-phase:harness/scripts/verify.mjs:governance-export-view-status-tests",
-        "verify-phase:harness/scripts/verify.mjs:governance-replay-cli-tests",
-        "verify-phase:harness/scripts/verify.mjs:governance-replay-core-tests",
-        "verify-phase:harness/scripts/verify.mjs:governance-replay-view-tests",
-        "verify-phase:harness/scripts/verify.mjs:governance-replay-viewer-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-apply-patch-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-authority-ledger-intake-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-devplan-tests",
@@ -385,12 +319,8 @@
         "verify-phase:harness/scripts/verify.mjs:guard-git-phoenix-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-git-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-handoff-offer-tests",
-        "verify-phase:harness/scripts/verify.mjs:guard-handover-size-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-human-override-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-lifecycle-ready-tests",
-        "verify-phase:harness/scripts/verify.mjs:guard-maintenance-window-cli-tests",
-        "verify-phase:harness/scripts/verify.mjs:guard-maintenance-window-kernel-closure-tests",
-        "verify-phase:harness/scripts/verify.mjs:guard-maintenance-window-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-onboarding-consent-lock-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-push-attestation-diagnostics-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-push-decision-reference-tests",
@@ -403,7 +333,6 @@
         "verify-phase:harness/scripts/verify.mjs:guard-testpath-gmw-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-testpath-override-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-testpath-tests",
-        "verify-phase:harness/scripts/verify.mjs:handover-rotate-tests",
         "verify-phase:harness/scripts/verify.mjs:handover-rotation-tests",
         "verify-phase:harness/scripts/verify.mjs:harness-lib-plan-spec-state-v2-tests",
         "verify-phase:harness/scripts/verify.mjs:hooks-manifest-shape-tests",
@@ -412,7 +341,6 @@
         "verify-phase:harness/scripts/verify.mjs:human-authority-grant-tests",
         "verify-phase:harness/scripts/verify.mjs:human-decision-attribution-tests",
         "verify-phase:harness/scripts/verify.mjs:human-governance-ledger-tests",
-        "verify-phase:harness/scripts/verify.mjs:human-guard-override-tests",
         "verify-phase:harness/scripts/verify.mjs:human-role-label-tests",
         "verify-phase:harness/scripts/verify.mjs:human-role-rendering-tests",
         "verify-phase:harness/scripts/verify.mjs:language-canon-check",
@@ -422,15 +350,12 @@
         "verify-phase:harness/scripts/verify.mjs:license-contract-check",
         "verify-phase:harness/scripts/verify.mjs:license-contract-tests",
         "verify-phase:harness/scripts/verify.mjs:lifecycle-gate-satisfiability-tests",
-        "verify-phase:harness/scripts/verify.mjs:lifecycle-governance-events-tests",
         "verify-phase:harness/scripts/verify.mjs:lifecycle-ready-enforcement-tests",
         "verify-phase:harness/scripts/verify.mjs:lifecycle-recovery-contract-tests",
         "verify-phase:harness/scripts/verify.mjs:live-runner-certification-tests",
         "verify-phase:harness/scripts/verify.mjs:local-supervisor-setup-tests",
         "verify-phase:harness/scripts/verify.mjs:local-supervisor-state-tests",
         "verify-phase:harness/scripts/verify.mjs:local-worker-pool-tests",
-        "verify-phase:harness/scripts/verify.mjs:local-worker-supervisor-cli-tests",
-        "verify-phase:harness/scripts/verify.mjs:local-worker-supervisor-core-tests",
         "verify-phase:harness/scripts/verify.mjs:machine-plane-tests",
         "verify-phase:harness/scripts/verify.mjs:main-session-route-tests",
         "verify-phase:harness/scripts/verify.mjs:manual-check-logic-tests",
@@ -441,12 +366,9 @@
         "verify-phase:harness/scripts/verify.mjs:neutral-range-plan-tests",
         "verify-phase:harness/scripts/verify.mjs:no-autoupdate-key-tests",
         "verify-phase:harness/scripts/verify.mjs:notebook-write-coverage-tests",
-        "verify-phase:harness/scripts/verify.mjs:nova-a8-benchmark-runner-tests",
         "verify-phase:harness/scripts/verify.mjs:nova-b2-gitlab-ci-broker-cli-tests",
         "verify-phase:harness/scripts/verify.mjs:nova-b2-gitlab-ci-broker-core-tests",
         "verify-phase:harness/scripts/verify.mjs:nova-b4-git-transport-contract-tests",
-        "verify-phase:harness/scripts/verify.mjs:nova-b4-github-forge-adapter-tests",
-        "verify-phase:harness/scripts/verify.mjs:nova-b4-gitlab-forge-adapter-tests",
         "verify-phase:harness/scripts/verify.mjs:nova-backlog-reconciler-cli-tests",
         "verify-phase:harness/scripts/verify.mjs:nova-backlog-reconciliation-tests",
         "verify-phase:harness/scripts/verify.mjs:nova-benchmark-tests",
@@ -465,19 +387,14 @@
         "verify-phase:harness/scripts/verify.mjs:nova-sandbox-launch-tests",
         "verify-phase:harness/scripts/verify.mjs:nova-scheduling-lifecycle-tests",
         "verify-phase:harness/scripts/verify.mjs:nova-verify-journal-tests",
-        "verify-phase:harness/scripts/verify.mjs:nova-verify-resume-tests",
         "verify-phase:harness/scripts/verify.mjs:obligations-contract-tests",
         "verify-phase:harness/scripts/verify.mjs:observation-governance-bootstrap-tests",
         "verify-phase:harness/scripts/verify.mjs:observation-governance-tests",
         "verify-phase:harness/scripts/verify.mjs:onboarding-consent-guard-tests",
         "verify-phase:harness/scripts/verify.mjs:onboarding-consent-mark-tests",
         "verify-phase:harness/scripts/verify.mjs:onboarding-consent-marker-tests",
-        "verify-phase:harness/scripts/verify.mjs:onboarding-continuity-tests",
         "verify-phase:harness/scripts/verify.mjs:onboarding-init-tests",
         "verify-phase:harness/scripts/verify.mjs:onboarding-runner-identity-tests",
-        "verify-phase:harness/scripts/verify.mjs:organization-policy-activation-tests",
-        "verify-phase:harness/scripts/verify.mjs:organization-policy-cli-tests",
-        "verify-phase:harness/scripts/verify.mjs:organization-policy-core-tests",
         "verify-phase:harness/scripts/verify.mjs:osv-scanner-tests",
         "verify-phase:harness/scripts/verify.mjs:p3b-runner-conformance-tests",
         "verify-phase:harness/scripts/verify.mjs:parallel-dispatch-planner-tests",
@@ -540,11 +457,6 @@
         "verify-phase:harness/scripts/verify.mjs:project-onboarding-v3-unborn-head-tests",
         "verify-phase:harness/scripts/verify.mjs:project-reset-tests",
         "verify-phase:harness/scripts/verify.mjs:protected-test-paths-tests",
-        "verify-phase:harness/scripts/verify.mjs:provenance-attestation-tests",
-        "verify-phase:harness/scripts/verify.mjs:provenance-envelope-tests",
-        "verify-phase:harness/scripts/verify.mjs:provenance-fixture-matrix-tests",
-        "verify-phase:harness/scripts/verify.mjs:provenance-local-builder-tests",
-        "verify-phase:harness/scripts/verify.mjs:provenance-release-binding-tests",
         "verify-phase:harness/scripts/verify.mjs:public-baseline-diagnose-tests",
         "verify-phase:harness/scripts/verify.mjs:public-core-observation-tests",
         "verify-phase:harness/scripts/verify.mjs:public-core-origin-allowlist-tests",
@@ -572,12 +484,8 @@
         "verify-phase:harness/scripts/verify.mjs:release-preflight-cli-tests",
         "verify-phase:harness/scripts/verify.mjs:release-version-plan-tests",
         "verify-phase:harness/scripts/verify.mjs:remote-provisional-receipt-tests",
-        "verify-phase:harness/scripts/verify.mjs:repair-map-tests",
         "verify-phase:harness/scripts/verify.mjs:repository-freshness-tests",
         "verify-phase:harness/scripts/verify.mjs:repository-path-identity-tests",
-        "verify-phase:harness/scripts/verify.mjs:resume-consumption-check",
-        "verify-phase:harness/scripts/verify.mjs:resume-hint-scripts-tests",
-        "verify-phase:harness/scripts/verify.mjs:resume-hint-tests",
         "verify-phase:harness/scripts/verify.mjs:review-economy-tests",
         "verify-phase:harness/scripts/verify.mjs:review-retry-plan-check",
         "verify-phase:harness/scripts/verify.mjs:review-retry-planner-tests",
@@ -602,13 +510,6 @@
         "verify-phase:harness/scripts/verify.mjs:runtime-projection-v3-tests",
         "verify-phase:harness/scripts/verify.mjs:sandboxed-readonly-duty-tests",
         "verify-phase:harness/scripts/verify.mjs:sandboxed-readonly-host-bridge-tests",
-        "verify-phase:harness/scripts/verify.mjs:sbom-discovery-cli-tests",
-        "verify-phase:harness/scripts/verify.mjs:sbom-discovery-tests",
-        "verify-phase:harness/scripts/verify.mjs:sbom-fixture-matrix-tests",
-        "verify-phase:harness/scripts/verify.mjs:sbom-lifecycle-tests",
-        "verify-phase:harness/scripts/verify.mjs:sbom-manifest-tests",
-        "verify-phase:harness/scripts/verify.mjs:sbom-node-adapter-tests",
-        "verify-phase:harness/scripts/verify.mjs:sbom-release-binding-tests",
         "verify-phase:harness/scripts/verify.mjs:schema-lite-tests",
         "verify-phase:harness/scripts/verify.mjs:scripts-pipeline-state-tests",
         "verify-phase:harness/scripts/verify.mjs:sdlc-efficiency-metrics-tests",
@@ -669,7 +570,6 @@
         "verify-phase:harness/scripts/verify.mjs:tmp-leak-guard-tests",
         "verify-phase:harness/scripts/verify.mjs:transfer-classification-tests",
         "verify-phase:harness/scripts/verify.mjs:trust-anchor-bootstrap-circularity-repro-tests",
-        "verify-phase:harness/scripts/verify.mjs:usage-ledger-tests",
         "verify-phase:harness/scripts/verify.mjs:v3-bootstrap-authority-tests",
         "verify-phase:harness/scripts/verify.mjs:validate-manifest",
         "verify-phase:harness/scripts/verify.mjs:validate-manifest-tests",
@@ -810,61 +710,6 @@
         }
       ],
       "configurationPath": ".claude/pipeline.yaml",
-      "specializedOnlyReason": null
-    },
-    {
-      "id": "handover-hard-size-gate",
-      "publicName": "Handover hard size gate",
-      "problem": "A long-running block can grow the canonical handover file without bound between close-time rotations.",
-      "benefit": "A PreToolUse guard refuses a growing write at or over a configured byte cap, while always admitting a shrinking (rotation) write, once activated.",
-      "status": "planned",
-      "surfaceIds": [
-        "guard:plugins/pipeline-core/hooks/guard-handover-size.mjs:guard-handover-size",
-        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-handover-size.mjs\""
-      ],
-      "runners": [
-        "antigravity",
-        "claude"
-      ],
-      "runnerDispositions": {
-        "claude": {
-          "status": "supported",
-          "reasonCode": null
-        },
-        "codex": {
-          "status": "unavailable",
-          "reasonCode": "claude-host-hook-contract"
-        },
-        "antigravity": {
-          "status": "supported",
-          "reasonCode": null
-        }
-      },
-      "platforms": [
-        "all"
-      ],
-      "operatingShapes": [
-        "multi-team",
-        "small-team",
-        "solo"
-      ],
-      "prerequisites": [
-        "pipeline-core plugin"
-      ],
-      "productionEvidence": [
-        "plugins/pipeline-core/hooks/guard-handover-size.mjs"
-      ],
-      "testEvidence": [
-        "plugins/pipeline-core/hooks/guard-handover-size.test.mjs"
-      ],
-      "targets": [
-        {
-          "document": "FLOW",
-          "anchorId": "capability-handover-hard-size-gate",
-          "status": "pending"
-        }
-      ],
-      "configurationPath": "none",
       "specializedOnlyReason": null
     },
     {
@@ -1302,7 +1147,6 @@
       "benefit": "The plugin supplies named specialist roles with explicit task boundaries.",
       "status": "shipped",
       "surfaceIds": [
-        "agent-role:plugins/pipeline-core/agents/afk-claude-worker.md:afk-claude-worker",
         "agent-role:plugins/pipeline-core/agents/consult-advisor.md:consult-advisor",
         "agent-role:plugins/pipeline-core/agents/critic.md:critic",
         "agent-role:plugins/pipeline-core/agents/goldfish-deep.md:goldfish-deep",
@@ -1585,6 +1429,1184 @@
         }
       ],
       "configurationPath": "pipeline.user.yaml",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "handover-hard-size-gate",
+      "publicName": "Handover hard size gate",
+      "problem": "A handover that grows beyond its configured cap can make the next session unusable.",
+      "benefit": "The registered guard evaluates proposed handover writes and refuses growth at or above the configured cap while allowing decreases.",
+      "status": "shipped",
+      "surfaceIds": [
+        "guard:plugins/pipeline-core/hooks/guard-handover-size.mjs:guard-handover-size",
+        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-handover-size.mjs\"",
+        "verify-phase:harness/scripts/verify.mjs:guard-handover-size-tests"
+      ],
+      "runners": [
+        "antigravity",
+        "claude"
+      ],
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "codex": {
+          "status": "unavailable",
+          "reasonCode": "claude-host-hook-contract"
+        },
+        "antigravity": {
+          "status": "supported",
+          "reasonCode": null
+        }
+      },
+      "prerequisites": [
+        "pipeline-core plugin"
+      ],
+      "productionEvidence": [
+        "plugins/pipeline-core/hooks/guard-handover-size.mjs",
+        "plugins/pipeline-core/hooks/hooks.json"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/hooks/guard-handover-size.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "README",
+          "anchorId": "capability-handover-hard-size-gate",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "plugins/pipeline-core/hooks/hooks.json",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "governance-event-ledger",
+      "publicName": "Governance event ledger",
+      "problem": "Governance decisions need tamper-evident event structure and candidate-bound validation.",
+      "benefit": "A caller can seal and validate RFC 8785 governance-event envelopes with SHA-256 binding; the library is not itself an automatically active runner integration.",
+      "status": "optional",
+      "surfaceIds": [
+        "verify-phase:harness/scripts/verify.mjs:governance-event-cli-tests",
+        "verify-phase:harness/scripts/verify.mjs:governance-event-core-tests",
+        "verify-phase:harness/scripts/verify.mjs:governance-event-projection-tests",
+        "verify-phase:harness/scripts/verify.mjs:governance-event-store-tests",
+        "verify-phase:harness/scripts/verify.mjs:lifecycle-governance-events-tests"
+      ],
+      "runners": [
+        "host-only"
+      ],
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "unavailable",
+          "reasonCode": "contract-only-api"
+        },
+        "codex": {
+          "status": "unavailable",
+          "reasonCode": "contract-only-api"
+        },
+        "antigravity": {
+          "status": "unavailable",
+          "reasonCode": "contract-only-api"
+        }
+      },
+      "prerequisites": [
+        "a caller that seals governance events",
+        "pipeline-core plugin"
+      ],
+      "productionEvidence": [
+        "plugins/pipeline-core/lib/governance-event.mjs"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/lib/governance-event.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "README",
+          "anchorId": "capability-governance-event-ledger",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "agent-decision-journal",
+      "publicName": "Agent decision journal",
+      "problem": "High-consequence agent decisions need a constrained record without retaining free-form reasoning.",
+      "benefit": "A caller can validate bounded decision-event classes and unavailable-journaling dispositions; this library alone does not activate a journal for every runner.",
+      "status": "optional",
+      "surfaceIds": [
+        "verify-phase:harness/scripts/verify.mjs:agent-decision-journal-tests"
+      ],
+      "runners": [
+        "host-only"
+      ],
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "unavailable",
+          "reasonCode": "contract-only-api"
+        },
+        "codex": {
+          "status": "unavailable",
+          "reasonCode": "contract-only-api"
+        },
+        "antigravity": {
+          "status": "unavailable",
+          "reasonCode": "contract-only-api"
+        }
+      },
+      "prerequisites": [
+        "a caller that records decision events",
+        "pipeline-core plugin"
+      ],
+      "productionEvidence": [
+        "plugins/pipeline-core/lib/agent-decision-journal.mjs"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/lib/agent-decision-journal.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "README",
+          "anchorId": "capability-agent-decision-journal",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "audit-and-evidence-cli",
+      "publicName": "Audit and evidence command-line tools",
+      "problem": "Evidence needs portable capture, inspection, replay, and bundle tooling with explicit command contracts.",
+      "benefit": "An operator can explicitly run audit-bundle, capture-evidence, evidence-viewer, governance-export, and governance-replay commands against local inputs; none starts automatically or proves publication.",
+      "status": "optional",
+      "surfaceIds": [
+        "verify-phase:harness/scripts/verify.mjs:audit-bundle-cli-tests",
+        "verify-phase:harness/scripts/verify.mjs:audit-bundle-core-tests",
+        "verify-phase:harness/scripts/verify.mjs:capture-evidence-tests",
+        "verify-phase:harness/scripts/verify.mjs:evidence-viewer-tests",
+        "verify-phase:harness/scripts/verify.mjs:governance-export-adapter-tests",
+        "verify-phase:harness/scripts/verify.mjs:governance-export-delivery-tests",
+        "verify-phase:harness/scripts/verify.mjs:governance-export-outbox-store-tests",
+        "verify-phase:harness/scripts/verify.mjs:governance-export-outbox-tests",
+        "verify-phase:harness/scripts/verify.mjs:governance-export-tests",
+        "verify-phase:harness/scripts/verify.mjs:governance-export-view-status-tests",
+        "verify-phase:harness/scripts/verify.mjs:governance-replay-cli-tests",
+        "verify-phase:harness/scripts/verify.mjs:governance-replay-core-tests",
+        "verify-phase:harness/scripts/verify.mjs:governance-replay-view-tests",
+        "verify-phase:harness/scripts/verify.mjs:governance-replay-viewer-tests"
+      ],
+      "runners": [
+        "host-only"
+      ],
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-cli"
+        },
+        "codex": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-cli"
+        },
+        "antigravity": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-cli"
+        }
+      },
+      "prerequisites": [
+        "Node.js runtime",
+        "explicit CLI invocation",
+        "local repository checkout"
+      ],
+      "productionEvidence": [
+        "plugins/pipeline-core/scripts/audit-bundle.mjs",
+        "plugins/pipeline-core/scripts/capture-evidence.mjs",
+        "plugins/pipeline-core/scripts/evidence-viewer.mjs",
+        "plugins/pipeline-core/scripts/governance-export.mjs",
+        "plugins/pipeline-core/scripts/governance-replay.mjs"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/scripts/audit-bundle.test.mjs",
+        "plugins/pipeline-core/scripts/capture-evidence.test.mjs",
+        "plugins/pipeline-core/scripts/evidence-viewer.test.mjs",
+        "plugins/pipeline-core/scripts/governance-export.test.mjs",
+        "plugins/pipeline-core/scripts/governance-replay.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "README",
+          "anchorId": "capability-audit-and-evidence-cli",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "change-control-cli",
+      "publicName": "Change-control command-line tooling",
+      "problem": "A change-control workflow needs candidate-bound local validation before any external process is considered.",
+      "benefit": "An operator can explicitly evaluate a local, provider-neutral change-control request; any external authorization remains a separate prerequisite.",
+      "status": "optional",
+      "surfaceIds": [
+        "verify-phase:harness/scripts/verify.mjs:change-control-cli-tests",
+        "verify-phase:harness/scripts/verify.mjs:change-control-core-tests"
+      ],
+      "runners": [
+        "host-only"
+      ],
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-cli"
+        },
+        "codex": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-cli"
+        },
+        "antigravity": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-cli"
+        }
+      },
+      "prerequisites": [
+        "Node.js runtime",
+        "explicit CLI invocation",
+        "local repository checkout"
+      ],
+      "productionEvidence": [
+        "plugins/pipeline-core/lib/change-control.mjs",
+        "plugins/pipeline-core/scripts/change-control.mjs"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/lib/change-control.test.mjs",
+        "plugins/pipeline-core/scripts/change-control.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "README",
+          "anchorId": "capability-change-control-cli",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "security-control-catalog",
+      "publicName": "Security control catalog and waivers",
+      "problem": "Security controls and waivers need structured applicability, evaluation, and expiry rules.",
+      "benefit": "A caller can resolve the checked catalog, evaluation receipts, and waiver lifecycle; the catalog is not an automatically active security scanner or runner control.",
+      "status": "optional",
+      "surfaceIds": [
+        "verify-phase:harness/scripts/verify.mjs:control-catalog-drift-tests",
+        "verify-phase:harness/scripts/verify.mjs:control-catalog-migration-tests",
+        "verify-phase:harness/scripts/verify.mjs:control-catalog-schema-tests",
+        "verify-phase:harness/scripts/verify.mjs:control-evaluation-receipt-tests",
+        "verify-phase:harness/scripts/verify.mjs:control-execution-exchange-tests",
+        "verify-phase:harness/scripts/verify.mjs:control-execution-lifecycle-event-tests",
+        "verify-phase:harness/scripts/verify.mjs:control-waiver-lifecycle-tests",
+        "verify-phase:harness/scripts/verify.mjs:finding-lifecycle-tests"
+      ],
+      "runners": [
+        "host-only"
+      ],
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "unavailable",
+          "reasonCode": "catalog-contract-only"
+        },
+        "codex": {
+          "status": "unavailable",
+          "reasonCode": "catalog-contract-only"
+        },
+        "antigravity": {
+          "status": "unavailable",
+          "reasonCode": "catalog-contract-only"
+        }
+      },
+      "prerequisites": [
+        "a caller that evaluates the catalog",
+        "pipeline-core plugin"
+      ],
+      "productionEvidence": [
+        "governance/security-controls/catalog.json",
+        "plugins/pipeline-core/lib/control-waiver-lifecycle.mjs",
+        "plugins/pipeline-core/lib/finding-lifecycle.mjs",
+        "plugins/pipeline-core/lib/security-policy-resolver.mjs"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/lib/control-waiver-lifecycle.test.mjs",
+        "plugins/pipeline-core/lib/finding-lifecycle.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "README",
+          "anchorId": "capability-security-control-catalog",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "supply-chain-provenance",
+      "publicName": "SBOM and provenance contracts",
+      "problem": "Release artifacts need machine-checked component and provenance contracts before a supply-chain claim is made.",
+      "benefit": "An operator can explicitly discover SBOM inputs and validate provenance contracts; it neither installs scanners nor creates an external attestation.",
+      "status": "optional",
+      "surfaceIds": [
+        "verify-phase:harness/scripts/verify.mjs:dispatch-provenance-tests",
+        "verify-phase:harness/scripts/verify.mjs:provenance-attestation-tests",
+        "verify-phase:harness/scripts/verify.mjs:provenance-envelope-tests",
+        "verify-phase:harness/scripts/verify.mjs:provenance-fixture-matrix-tests",
+        "verify-phase:harness/scripts/verify.mjs:provenance-local-builder-tests",
+        "verify-phase:harness/scripts/verify.mjs:provenance-release-binding-tests",
+        "verify-phase:harness/scripts/verify.mjs:sbom-discovery-cli-tests",
+        "verify-phase:harness/scripts/verify.mjs:sbom-discovery-tests",
+        "verify-phase:harness/scripts/verify.mjs:sbom-fixture-matrix-tests",
+        "verify-phase:harness/scripts/verify.mjs:sbom-lifecycle-tests",
+        "verify-phase:harness/scripts/verify.mjs:sbom-manifest-tests",
+        "verify-phase:harness/scripts/verify.mjs:sbom-node-adapter-tests",
+        "verify-phase:harness/scripts/verify.mjs:sbom-release-binding-tests"
+      ],
+      "runners": [
+        "host-only"
+      ],
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-cli"
+        },
+        "codex": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-cli"
+        },
+        "antigravity": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-cli"
+        }
+      },
+      "prerequisites": [
+        "Node.js runtime",
+        "SBOM or provenance input",
+        "explicit CLI invocation",
+        "local repository checkout"
+      ],
+      "productionEvidence": [
+        "plugins/pipeline-core/lib/provenance-attestation.mjs",
+        "plugins/pipeline-core/lib/sbom-manifest.mjs",
+        "plugins/pipeline-core/scripts/sbom-discovery.mjs"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/lib/provenance-attestation.test.mjs",
+        "plugins/pipeline-core/lib/sbom-manifest.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "README",
+          "anchorId": "capability-supply-chain-provenance",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "ai-assisted-hardening",
+      "publicName": "AI-assisted change hardening",
+      "problem": "Untrusted inputs need explicit handling rules when they influence a guarded change.",
+      "benefit": "An operator can explicitly evaluate AI-assisted change inputs through the hardening gate; library and test presence does not make a runner hook active.",
+      "status": "optional",
+      "surfaceIds": [
+        "verify-phase:harness/scripts/verify.mjs:ai-assisted-hardening-gate-tests",
+        "verify-phase:harness/scripts/verify.mjs:ai-assisted-hardening-tests"
+      ],
+      "runners": [
+        "host-only"
+      ],
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-cli"
+        },
+        "codex": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-cli"
+        },
+        "antigravity": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-cli"
+        }
+      },
+      "prerequisites": [
+        "Node.js runtime",
+        "declared change inputs",
+        "explicit gate invocation"
+      ],
+      "productionEvidence": [
+        "plugins/pipeline-core/lib/ai-assisted-hardening.mjs",
+        "plugins/pipeline-core/scripts/ai-assisted-hardening-gate.mjs"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/lib/ai-assisted-hardening.test.mjs",
+        "plugins/pipeline-core/scripts/ai-assisted-hardening-gate.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "README",
+          "anchorId": "capability-ai-assisted-hardening",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "critical-human-authorization",
+      "publicName": "Critical human authorization ceremonies",
+      "problem": "Critical actions need explicit human proof rather than an agent inference.",
+      "benefit": "An attended human can explicitly run the critical-authorization ceremony with a configured local key; an agent or local test cannot mint that proof.",
+      "status": "shipped",
+      "surfaceIds": [
+        "verify-phase:harness/scripts/verify.mjs:chat-gate-ceremony-tests",
+        "verify-phase:harness/scripts/verify.mjs:critical-action-approval-request-tests",
+        "verify-phase:harness/scripts/verify.mjs:critical-action-authorization-tests",
+        "verify-phase:harness/scripts/verify.mjs:critical-human-proof-gate-tests",
+        "verify-phase:harness/scripts/verify.mjs:critical-human-proof-policy-tests"
+      ],
+      "runners": [
+        "host-only"
+      ],
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "unavailable",
+          "reasonCode": "human-terminal-required"
+        },
+        "codex": {
+          "status": "unavailable",
+          "reasonCode": "human-terminal-required"
+        },
+        "antigravity": {
+          "status": "unavailable",
+          "reasonCode": "human-terminal-required"
+        }
+      },
+      "prerequisites": [
+        "OpenSSL",
+        "attended human terminal",
+        "configured local approval key",
+        "explicit authorization command"
+      ],
+      "productionEvidence": [
+        "plugins/pipeline-core/scripts/po-human-approval.mjs"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/scripts/po-human-approval.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "README",
+          "anchorId": "capability-critical-human-authorization",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "repair-guidance-cli",
+      "publicName": "Refusal repair guidance",
+      "problem": "A denied tool call needs a precise recovery route instead of an improvised bypass.",
+      "benefit": "An operator can explicitly ask the live repair planner which declared refusal route, if any, applies; the command itself grants no override.",
+      "status": "optional",
+      "surfaceIds": [
+        "verify-phase:harness/scripts/verify.mjs:repair-map-tests"
+      ],
+      "runners": [
+        "host-only"
+      ],
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-cli"
+        },
+        "codex": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-cli"
+        },
+        "antigravity": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-cli"
+        }
+      },
+      "prerequisites": [
+        "explicit repair-map invocation",
+        "local repository checkout",
+        "pipeline-core plugin"
+      ],
+      "productionEvidence": [
+        "plugins/pipeline-core/scripts/repair-map.mjs"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/scripts/repair-map.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "README",
+          "anchorId": "capability-repair-guidance-cli",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "continuity-and-handover",
+      "publicName": "Continuity and handover tools",
+      "problem": "A session transition needs durable, bounded context without treating stale or missing state as success.",
+      "benefit": "Installed runner integrations can inspect continuity state and an operator can explicitly inspect or rotate a configured handover; rotation is never automatic.",
+      "status": "shipped",
+      "surfaceIds": [
+        "verify-phase:harness/scripts/verify.mjs:check-resume-consumption-tests",
+        "verify-phase:harness/scripts/verify.mjs:continuity-host-adapter-tests",
+        "verify-phase:harness/scripts/verify.mjs:continuity-result-bootstrap-tests",
+        "verify-phase:harness/scripts/verify.mjs:continuity-result-case-migration-tests",
+        "verify-phase:harness/scripts/verify.mjs:continuity-result-close-tests",
+        "verify-phase:harness/scripts/verify.mjs:continuity-result-rebind-tests",
+        "verify-phase:harness/scripts/verify.mjs:continuity-state-tests",
+        "verify-phase:harness/scripts/verify.mjs:continuity-status-cli-tests",
+        "verify-phase:harness/scripts/verify.mjs:continuity-status-tests",
+        "verify-phase:harness/scripts/verify.mjs:handover-rotate-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-verify-resume-tests",
+        "verify-phase:harness/scripts/verify.mjs:onboarding-continuity-tests",
+        "verify-phase:harness/scripts/verify.mjs:resume-consumption-check",
+        "verify-phase:harness/scripts/verify.mjs:resume-hint-scripts-tests",
+        "verify-phase:harness/scripts/verify.mjs:resume-hint-tests"
+      ],
+      "runners": [
+        "runner-neutral"
+      ],
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "codex": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "antigravity": {
+          "status": "supported",
+          "reasonCode": null
+        }
+      },
+      "prerequisites": [
+        "configured project handover path",
+        "pipeline-core plugin",
+        "runner-specific runtime integration"
+      ],
+      "productionEvidence": [
+        "plugins/pipeline-core/lib/continuity-state.mjs",
+        "plugins/pipeline-core/scripts/continuity-status.mjs",
+        "plugins/pipeline-core/scripts/handover-rotate.mjs",
+        "plugins/pipeline-core/skills/pipeline-start/SKILL.md"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/lib/continuity-state.test.mjs",
+        "plugins/pipeline-core/scripts/handover-rotate.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "README",
+          "anchorId": "capability-continuity-and-handover",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "afk-capability-workers",
+      "publicName": "Capability-bounded AFK workers",
+      "problem": "Background work needs a bounded worker and reviewable lifecycle rather than unrestricted delegation.",
+      "benefit": "The Claude-only AFK worker returns one bounded analysis proposal from allowlisted repository inputs; it cannot execute commands, apply changes, approve, commit, or dispatch.",
+      "status": "shipped",
+      "surfaceIds": [
+        "agent-role:plugins/pipeline-core/agents/afk-claude-worker.md:afk-claude-worker",
+        "verify-phase:harness/scripts/verify.mjs:afk-activation-tests",
+        "verify-phase:harness/scripts/verify.mjs:afk-assumption-mode-tests",
+        "verify-phase:harness/scripts/verify.mjs:afk-capability-worker-tests",
+        "verify-phase:harness/scripts/verify.mjs:afk-claude-host-tests",
+        "verify-phase:harness/scripts/verify.mjs:afk-git-adapter-tests",
+        "verify-phase:harness/scripts/verify.mjs:afk-ledger-tests",
+        "verify-phase:harness/scripts/verify.mjs:afk-review-tests",
+        "verify-phase:harness/scripts/verify.mjs:afk-transaction-host-tests"
+      ],
+      "runners": [
+        "claude"
+      ],
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "codex": {
+          "status": "unavailable",
+          "reasonCode": "provider-claude-only"
+        },
+        "antigravity": {
+          "status": "unavailable",
+          "reasonCode": "provider-claude-only"
+        }
+      },
+      "prerequisites": [
+        "AFK activation receipt",
+        "Claude provider",
+        "allowlisted repository inputs"
+      ],
+      "productionEvidence": [
+        "plugins/pipeline-core/agents/afk-claude-worker.md"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/lib/afk-ledger.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "README",
+          "anchorId": "capability-afk-capability-workers",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "local-worker-supervision",
+      "publicName": "Local worker supervision",
+      "problem": "Local worker orchestration needs explicit leases, identities, cancellation, and cleanup rules.",
+      "benefit": "An operator can explicitly plan, inspect, cancel, clean up, or activate local-worker supervision; provider execution needs the separate allow-provider-execution flag and no OS isolation is claimed.",
+      "status": "optional",
+      "surfaceIds": [
+        "verify-phase:harness/scripts/verify.mjs:local-worker-supervisor-cli-tests",
+        "verify-phase:harness/scripts/verify.mjs:local-worker-supervisor-core-tests"
+      ],
+      "runners": [
+        "host-only"
+      ],
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "unavailable",
+          "reasonCode": "local-host-activation-required"
+        },
+        "codex": {
+          "status": "unavailable",
+          "reasonCode": "local-host-activation-required"
+        },
+        "antigravity": {
+          "status": "unavailable",
+          "reasonCode": "local-host-activation-required"
+        }
+      },
+      "prerequisites": [
+        "Node.js runtime",
+        "explicit --activate",
+        "explicit --allow-provider-execution for run",
+        "local worker workspace"
+      ],
+      "productionEvidence": [
+        "plugins/pipeline-core/lib/local-worker-supervisor.mjs",
+        "plugins/pipeline-core/scripts/local-worker-supervisor.mjs"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/lib/local-worker-supervisor.test.mjs",
+        "plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "README",
+          "anchorId": "capability-local-worker-supervision",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "cost-and-benchmark-cli",
+      "publicName": "Cost and benchmark command-line tools",
+      "problem": "Usage and benchmark claims need an explicit local measurement command and declared inputs.",
+      "benefit": "An operator can explicitly inspect local usage-ledger inputs or run the fixed benchmark harness; results require admitted inputs and do not establish cross-runner consumer overhead by themselves.",
+      "status": "optional",
+      "surfaceIds": [
+        "verify-phase:harness/scripts/verify.mjs:nova-a8-benchmark-runner-tests",
+        "verify-phase:harness/scripts/verify.mjs:usage-ledger-tests"
+      ],
+      "runners": [
+        "host-only"
+      ],
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-cli"
+        },
+        "codex": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-cli"
+        },
+        "antigravity": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-cli"
+        }
+      },
+      "prerequisites": [
+        "Claude CLI for native benchmark route",
+        "Node.js runtime",
+        "explicit local inputs",
+        "local transcripts for usage-ledger"
+      ],
+      "productionEvidence": [
+        "plugins/pipeline-core/lib/multi-cli-benchmark.mjs",
+        "plugins/pipeline-core/scripts/nova-a8-benchmark-runner.mjs",
+        "plugins/pipeline-core/scripts/usage-ledger.mjs"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/lib/multi-cli-benchmark.test.mjs",
+        "plugins/pipeline-core/scripts/nova-a8-benchmark-runner.test.mjs",
+        "plugins/pipeline-core/scripts/usage-ledger.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "README",
+          "anchorId": "capability-cost-and-benchmark-cli",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "error-register-quality-gate",
+      "publicName": "Error-register quality gate",
+      "problem": "Recurring delivery failures need a checked mechanism, lesson, or deferral rather than unstructured chronology.",
+      "benefit": "An operator can explicitly check that the repository error register uses the required recurring-resolution vocabulary; it is a repository quality check, not a runner hook.",
+      "status": "shipped",
+      "surfaceIds": [
+        "verify-phase:harness/scripts/verify.mjs:error-register-check",
+        "verify-phase:harness/scripts/verify.mjs:error-register-tests"
+      ],
+      "runners": [
+        "host-only"
+      ],
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-checker"
+        },
+        "codex": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-checker"
+        },
+        "antigravity": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-checker"
+        }
+      },
+      "prerequisites": [
+        "Node.js runtime",
+        "backlog error register",
+        "explicit checker invocation"
+      ],
+      "productionEvidence": [
+        "backlog/error-register.md",
+        "harness/scripts/check-error-register.mjs"
+      ],
+      "testEvidence": [
+        "harness/scripts/check-error-register.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "README",
+          "anchorId": "capability-error-register-quality-gate",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "organization-policy-packs",
+      "publicName": "Organization policy packs",
+      "problem": "Organization policy selection and activation need a declared local contract before an organization-level control is claimed.",
+      "benefit": "An operator can explicitly evaluate or activate a policy pack through the local CLI; a pack does not activate itself for every runner.",
+      "status": "optional",
+      "surfaceIds": [
+        "verify-phase:harness/scripts/verify.mjs:organization-policy-activation-tests",
+        "verify-phase:harness/scripts/verify.mjs:organization-policy-cli-tests",
+        "verify-phase:harness/scripts/verify.mjs:organization-policy-core-tests"
+      ],
+      "runners": [
+        "host-only"
+      ],
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-cli"
+        },
+        "codex": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-cli"
+        },
+        "antigravity": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-cli"
+        }
+      },
+      "prerequisites": [
+        "Node.js runtime",
+        "explicit policy-pack invocation",
+        "local repository checkout"
+      ],
+      "productionEvidence": [
+        "plugins/pipeline-core/lib/organization-policy.mjs",
+        "plugins/pipeline-core/scripts/organization-policy.mjs"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/lib/organization-policy.test.mjs",
+        "plugins/pipeline-core/scripts/organization-policy.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "README",
+          "anchorId": "capability-organization-policy-packs",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "external-traceability-adapters",
+      "publicName": "External traceability adapters",
+      "problem": "External references need a provider-neutral local representation before any provider action is considered.",
+      "benefit": "An operator can explicitly use local external-reference and forge-adapter commands; configured provider credentials and external writes remain separate concerns.",
+      "status": "optional",
+      "surfaceIds": [
+        "verify-phase:harness/scripts/verify.mjs:external-reference-adapter-tests",
+        "verify-phase:harness/scripts/verify.mjs:external-reference-tests",
+        "verify-phase:harness/scripts/verify.mjs:forge-capability-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-b4-github-forge-adapter-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-b4-gitlab-forge-adapter-tests"
+      ],
+      "runners": [
+        "host-only"
+      ],
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-cli"
+        },
+        "codex": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-cli"
+        },
+        "antigravity": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-cli"
+        }
+      },
+      "prerequisites": [
+        "Node.js runtime",
+        "explicit adapter invocation",
+        "local repository checkout"
+      ],
+      "productionEvidence": [
+        "plugins/pipeline-core/lib/external-reference-adapter.mjs",
+        "plugins/pipeline-core/scripts/external-reference.mjs",
+        "plugins/pipeline-core/scripts/github-forge-adapter.mjs",
+        "plugins/pipeline-core/scripts/gitlab-forge-adapter.mjs"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/lib/external-reference-adapter.test.mjs",
+        "plugins/pipeline-core/scripts/external-reference.test.mjs",
+        "plugins/pipeline-core/scripts/github-forge-adapter.test.mjs",
+        "plugins/pipeline-core/scripts/gitlab-forge-adapter.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "README",
+          "anchorId": "capability-external-traceability-adapters",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "human-override-and-maintenance-window",
+      "publicName": "Human guard override and maintenance window",
+      "problem": "A guard exception needs a bounded human-controlled route rather than an agent bypass.",
+      "benefit": "An attended operator can explicitly prepare or evaluate the documented override and maintenance-window ceremonies; neither is an automatically available agent override.",
+      "status": "optional",
+      "surfaceIds": [
+        "verify-phase:harness/scripts/verify.mjs:guard-maintenance-window-cli-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-maintenance-window-kernel-closure-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-maintenance-window-tests",
+        "verify-phase:harness/scripts/verify.mjs:human-guard-override-tests"
+      ],
+      "runners": [
+        "host-only"
+      ],
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "unavailable",
+          "reasonCode": "human-authorization-required"
+        },
+        "codex": {
+          "status": "unavailable",
+          "reasonCode": "human-authorization-required"
+        },
+        "antigravity": {
+          "status": "unavailable",
+          "reasonCode": "human-authorization-required"
+        }
+      },
+      "prerequisites": [
+        "attended human authorization",
+        "configured approval route",
+        "explicit ceremony invocation"
+      ],
+      "productionEvidence": [
+        "plugins/pipeline-core/lib/guard-maintenance-window.mjs",
+        "plugins/pipeline-core/lib/human-guard-override.mjs",
+        "plugins/pipeline-core/scripts/guard-maintenance-window.mjs"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/lib/guard-maintenance-window.test.mjs",
+        "plugins/pipeline-core/lib/human-guard-override.test.mjs",
+        "plugins/pipeline-core/scripts/guard-maintenance-window.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "README",
+          "anchorId": "capability-human-override-and-maintenance-window",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "documentation-quality-gates",
+      "publicName": "Documentation quality gates",
+      "problem": "Documentation contracts and lifecycle metadata need repeatable repository checks rather than a prose-only assertion.",
+      "benefit": "An operator can explicitly run the registered documentation contract, reconciliation, hook-manifest, identifier, and lifecycle checks; these checks do not publish documentation by themselves.",
+      "status": "optional",
+      "surfaceIds": [
+        "verify-phase:harness/scripts/verify.mjs:check-doc-reconciliation-tests",
+        "verify-phase:harness/scripts/verify.mjs:doc-contract-check",
+        "verify-phase:harness/scripts/verify.mjs:doc-contract-tests",
+        "verify-phase:harness/scripts/verify.mjs:document-hooks-manifest-tests",
+        "verify-phase:harness/scripts/verify.mjs:document-hooks-tests",
+        "verify-phase:harness/scripts/verify.mjs:document-identifier-tests",
+        "verify-phase:harness/scripts/verify.mjs:document-lifecycle-tests"
+      ],
+      "runners": [
+        "host-only"
+      ],
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-checker"
+        },
+        "codex": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-checker"
+        },
+        "antigravity": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-checker"
+        }
+      },
+      "prerequisites": [
+        "Node.js runtime",
+        "explicit checker invocation",
+        "local repository checkout"
+      ],
+      "productionEvidence": [
+        "harness/scripts/check-doc-contracts.mjs",
+        "plugins/pipeline-core/lib/document-hooks.mjs",
+        "plugins/pipeline-core/lib/document-identifiers.mjs",
+        "plugins/pipeline-core/lib/document-lifecycle.mjs"
+      ],
+      "testEvidence": [
+        "harness/scripts/check-doc-contracts.test.mjs",
+        "plugins/pipeline-core/lib/document-hooks.test.mjs",
+        "plugins/pipeline-core/lib/document-identifiers.test.mjs",
+        "plugins/pipeline-core/lib/document-lifecycle.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "README",
+          "anchorId": "capability-documentation-quality-gates",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
       "specializedOnlyReason": null
     }
   ]
