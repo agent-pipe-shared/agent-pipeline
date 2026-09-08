@@ -1,3 +1,5 @@
+**Governs:** docs/operating-model.md, roles/elephant.md, roles/goldfish.md, guardrails/token-budget.md, templates/prompts/goldfish-task.md, templates/prompts/session-bootstrap-check.md, plugins/pipeline-core/skills/pipeline-start/SKILL.md, plugins/pipeline-core/scripts/ruleset-freshness.mjs, plugins/pipeline-core/scripts/ruleset-freshness.test.mjs, plugins/pipeline-core/config/runner-profiles-v3.json, plugins/pipeline-core/lib/runner-profiles-v3.mjs, plugins/pipeline-core/lib/runner-profiles-v3.test.mjs, plugins/pipeline-core/lib/runtime-projection-v3.mjs, plugins/pipeline-core/lib/runtime-projection-v3.test.mjs, plugins/pipeline-core/agents/readiness-reviewer.md, plugins/pipeline-core/scripts/spec-readiness-host.mjs, plugins/pipeline-core/scripts/spec-readiness-host.test.mjs
+
 # ADR-0023: Orchestrator Context Diet and Latency Measure Bundle
 
 ## Status

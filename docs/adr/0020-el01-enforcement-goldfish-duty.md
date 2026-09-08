@@ -1,3 +1,5 @@
+**Governs:** docs/operating-model.md, roles/elephant.md, roles/goldfish.md, templates/prompts/goldfish-task.md, harness/checklists/session-close.md, plugins/pipeline-core/skills/close-block/SKILL.md, plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs, plugins/pipeline-core/scripts/dispatch-authorship-verify.test.mjs
+
 # ADR-0020: Every Implementation Runs as a Bounded Executor Dispatch
 
 ## Status

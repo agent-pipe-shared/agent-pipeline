@@ -1,3 +1,5 @@
+**Governs:** docs/operating-model.md, roles/elephant.md, harness/checklists/session-close.md, plugins/pipeline-core/skills/close-block/SKILL.md
+
 # ADR-0018: Elephant-Authored Close Retro
 
 ## Status

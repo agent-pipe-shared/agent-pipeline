@@ -1,3 +1,5 @@
+**Governs:** roles/elephant.md
+
 # ADR-0019: One Active Write Target per Orchestrator
 
 ## Status
