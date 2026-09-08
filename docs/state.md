@@ -81,10 +81,24 @@ finish bindings. The machine receipt records 508 steps, 499 green, the same 9
 failures as the d88 historical run, and exit 1; security evidence is preserved
 separately and remains a finding. This new candidate is still unreviewed; T1
 remains blocked by red Verify.
+
+The source adapter implementation is committed at
+`125a2d160ac7b3c4d16979ed4cfbe305a98f8ed5`, tree
+`173ccbd8f7b0e6e5438742c6a79be6692d01e9c6`. The C1 receipt suite passes
+80/80 (64 preserved plus 16 source-projection tests), consumer-safe-path checks pass 9/9, and diff-check exits 0, as
+recorded in `scratch/alfred-c1-source-projection-checks-final.json`. This is
+focused evidence, not a new Full Verify or T1 review. Usage/read-only I/O,
+local store/report, real observer composition and the 14-day baseline remain
+open.
 An optional next-package read-only agent bootstrap was auto-review-rejected
 because bare `pipeline-start-preflight` may perform cleanup beyond its
 read-only scope; there was no retry or bypass, and orientation was completed
 directly by the parent.
+
+The next candidate Full Verify is pending after this documentation integration;
+the 888 red result remains historical evidence and does not cover the landed
+source projection. Selected transport execution and independent T1 review also
+remain pending behind that gate.
 
 The [local continuation verification note](../specs/sprint-alfred-epic/evidence/local-continuation-verification-2026-09-08.md)
 records these candidate-bound facts, the hook-test status (failed/not measured),
