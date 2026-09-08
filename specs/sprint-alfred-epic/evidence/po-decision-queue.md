@@ -50,6 +50,7 @@ remain unchanged.
 
 | Topic | Current status | Next owner/action |
 |---|---|---|
+| C1 observer/store suite registration | Preparation is documented in [the registration route](c1-suite-registration-route-2026-09-08.md); implementation and focused tests are not yet complete | Implement the observer/store suites, run focused tests, prepare the exact registration patch, then evaluate the actual current TP-3 authorization; apply only through the valid active TP-3 route; no signature is presumed and no new approval is requested prematurely |
 | C1 pure aggregation | Implementation and focused tests committed at `854b0da8`; receipt 64/64 and consumer checks 9/9 pass | With source projection now landed, prepare emission/local-report refinement, then run the next candidate Verify and independent T1 review |
 | C1 source projection | Committed at `125a2d160ac7b3c4d16979ed4cfbe305a98f8ed5`, tree `173ccbd8f7b0e6e5438742c6a79be6692d01e9c6`; C1 receipt suite 80/80 (64 preserved plus 16 source-projection tests), consumer 9/9, diff-check 0; candidate `96238c3c` Verify is now recorded red at 499/508 | Prepare store/controller contract and later usage/observer work; T1 remains gated by red Verify and baseline is not started |
 | Slice/parallel hooks | Exact hook identity, native tool coverage and live invocation evidence unmeasured | Read-only investigation, then bounded tests where admitted |
