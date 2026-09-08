@@ -35,7 +35,38 @@ export class CriticDispatchPreflightError extends Error {
   }
 }
 
-function fail(code, message) { throw new CriticDispatchPreflightError(code, message); }
+// Only failures created at this producer's own branches supply typed source codes.
+// A foreign thrown value is rethrown unchanged and observed as CDP-UNEXPECTED;
+// observing it must never inspect its properties or invoke a proxy/getter.
+const sourceFailureCodes = new WeakMap();
+function fail(code, message) {
+  const error = new CriticDispatchPreflightError(code, message);
+  sourceFailureCodes.set(error, code);
+  throw error;
+}
+
+/**
+ * Trusted synchronous callbacks only. Return values are ignored without reading
+ * then/getters or assimilating Promises. Independently scheduled rejections or
+ * arbitrary callback side effects are outside this contract; there is no sandbox.
+ */
+function observeSource(observer, stage, outcome, code, candidate, specSha256) {
+  if (typeof observer !== "function") return;
+  try {
+    observer({
+      schema: "pipeline.critic-preflight-observation.v1",
+      producer: "critic-dispatch-preflight",
+      observationRevision: 1,
+      stage,
+      outcome,
+      code,
+      candidate: candidate === null ? null : { commit: candidate.commit, tree: candidate.tree },
+      specSha256,
+    });
+  } catch {
+    // Observation cannot replace the already chosen producer result/exception.
+  }
+}
 function sha256(bytes) { return createHash("sha256").update(bytes).digest("hex"); }
 function compare(left, right) { return left < right ? -1 : left > right ? 1 : 0; }
 function isObject(value) { return value !== null && typeof value === "object" && !Array.isArray(value); }
@@ -172,69 +203,87 @@ function requiredCandidateReadback(root, candidate, byPath, paths, label) {
  * state. Evidence is a local, bounded JSON observation that binds the frozen
  * candidate; Spec and guardrails are always read from that candidate tree.
  */
-export function preflightCriticDispatch({ root, base, candidate, specPath, guardrailPaths, evidencePaths, priorCriticEvidencePath = null }) {
-  if (typeof root !== "string" || root.length === 0 || typeof base !== "string" || typeof candidate !== "string") {
-    fail("CDP-INPUT", "root, base, and candidate are required.");
+export function preflightCriticDispatch({ root, base, candidate, specPath, guardrailPaths, evidencePaths, priorCriticEvidencePath = null }, observer = null) {
+  let stage = "request", sourceCandidate = null, sourceSpecSha256 = null;
+  try {
+    if (typeof root !== "string" || root.length === 0 || typeof base !== "string" || typeof candidate !== "string") {
+      fail("CDP-INPUT", "root, base, and candidate are required.");
+    }
+    const realRoot = realpathSync(root);
+    stage = "candidate";
+    const { commit: baseCommit, tree: baseTree } = resolveBase(realRoot, base);
+    const candidateCommit = git(realRoot, ["rev-parse", "--verify", `${candidate}^{commit}`]);
+    const candidateTree = git(realRoot, ["rev-parse", `${candidateCommit}^{tree}`]);
+    if (![baseTree, candidateCommit, candidateTree].every((value) => OID.test(value))) fail("CDP-REF", "Git returned an invalid candidate binding.");
+    if (baseCommit !== null && !OID.test(baseCommit)) fail("CDP-REF", "Git returned an invalid candidate binding.");
+    sourceCandidate = { commit: candidateCommit, tree: candidateTree };
+    if (baseCommit === candidateCommit) fail("CDP-RANGE", "Critic base and candidate must be different commits.");
+
+    stage = "paths";
+    const spec = normalizePath(specPath, "spec path");
+    const guardrails = uniquePaths(guardrailPaths, "guardrail path");
+    const evidence = uniquePaths(evidencePaths, "evidence path");
+    if (evidence.length === 0) fail("CDP-EVIDENCE-REQUIRED", "At least one fresh candidate-evidence artifact is required.");
+    const prior = priorCriticEvidencePath === null ? null : normalizePath(priorCriticEvidencePath, "prior Critic evidence path");
+    if (prior !== null && evidence.includes(prior)) fail("CDP-PRIOR-ALIASED", "Prior Critic evidence cannot satisfy fresh candidate evidence.");
+
+    stage = "inventory";
+    const files = candidateInventory(realRoot, candidateCommit);
+    const byPath = new Map(files.map((file) => [file.path, file]));
+    stage = "manifest";
+    const manifestFile = byPath.get(".claude/pipeline.yaml");
+    if (!manifestFile?.readable) fail("CDP-MANIFEST", "Candidate manifest is absent or unreadable.");
+    let manifest;
+    try { manifest = parseYaml(candidateText(realRoot, candidateCommit, ".claude/pipeline.yaml")); }
+    catch { fail("CDP-MANIFEST", "Candidate manifest cannot be parsed."); }
+    stage = "governance";
+    const changedPaths = git(realRoot, ["diff", "--name-only", "-z", baseCommit ?? baseTree, candidateCommit, "--"])
+      .split("\0").filter(Boolean).map((path) => normalizePath(path, "changed path")).sort(compare);
+    const governance = deriveCriticPacketGovernance({
+      schema: CRITIC_PACKET_GOVERNANCE_INPUT_SCHEMA,
+      manifest,
+      candidateFiles: files,
+      changedPaths,
+    });
+    const governancePaths = governance.required.map(({ path }) => path);
+    const allGuardrails = [...new Set([...guardrails, ...governancePaths])].sort(compare);
+    stage = "candidate-files";
+    const specReadback = requiredCandidateReadback(realRoot, candidateCommit, byPath, [spec], "Spec")[0];
+    sourceSpecSha256 = specReadback.sha256;
+    const guardrailReadback = requiredCandidateReadback(realRoot, candidateCommit, byPath, allGuardrails, "guardrail");
+    stage = "evidence";
+    const evidenceReadback = evidence.map((path) => matchingCandidateEvidence(localEvidence(realRoot, path), candidateCommit, candidateTree, path));
+    stage = "prior-evidence";
+    const priorReadback = prior === null ? null : { path: prior, sha256: sha256(localEvidence(realRoot, prior)) };
+
+    const result = {
+      schema: CRITIC_DISPATCH_PREFLIGHT_SCHEMA,
+      // The selected Codex transport is a separate, mandatory no-child
+      // preflight.  Calling this result "ready" caused coordinators to mistake
+      // packet integrity for a runnable Critic lane and to start an unbounded
+      // generic child when that lane was unavailable.
+      status: "packet-ready",
+      base: { commit: baseCommit, tree: baseTree },
+      candidate: { commit: candidateCommit, tree: candidateTree },
+      spec: specReadback,
+      guardrails: guardrailReadback,
+      governance,
+      evidence: evidenceReadback,
+      priorCriticEvidence: priorReadback,
+      dispatch: {
+        mode: "path-only", childCreated: false, packetCreated: false, stateMutated: false,
+        spawnAuthorized: false, requiredNextGate: "selected-runner-transport",
+      },
+    };
+    observeSource(observer, "complete", "packet-ready", null, sourceCandidate, sourceSpecSha256);
+    return result;
+  } catch (error) {
+    observeSource(observer, stage, "rejected", sourceFailureCodes.get(error) ?? "CDP-UNEXPECTED", sourceCandidate, sourceSpecSha256);
+    throw error;
   }
-  const realRoot = realpathSync(root);
-  const { commit: baseCommit, tree: baseTree } = resolveBase(realRoot, base);
-  const candidateCommit = git(realRoot, ["rev-parse", "--verify", `${candidate}^{commit}`]);
-  const candidateTree = git(realRoot, ["rev-parse", `${candidateCommit}^{tree}`]);
-  if (![baseTree, candidateCommit, candidateTree].every((value) => OID.test(value))) fail("CDP-REF", "Git returned an invalid candidate binding.");
-  if (baseCommit !== null && !OID.test(baseCommit)) fail("CDP-REF", "Git returned an invalid candidate binding.");
-  if (baseCommit === candidateCommit) fail("CDP-RANGE", "Critic base and candidate must be different commits.");
-
-  const spec = normalizePath(specPath, "spec path");
-  const guardrails = uniquePaths(guardrailPaths, "guardrail path");
-  const evidence = uniquePaths(evidencePaths, "evidence path");
-  if (evidence.length === 0) fail("CDP-EVIDENCE-REQUIRED", "At least one fresh candidate-evidence artifact is required.");
-  const prior = priorCriticEvidencePath === null ? null : normalizePath(priorCriticEvidencePath, "prior Critic evidence path");
-  if (prior !== null && evidence.includes(prior)) fail("CDP-PRIOR-ALIASED", "Prior Critic evidence cannot satisfy fresh candidate evidence.");
-
-  const files = candidateInventory(realRoot, candidateCommit);
-  const byPath = new Map(files.map((file) => [file.path, file]));
-  const manifestFile = byPath.get(".claude/pipeline.yaml");
-  if (!manifestFile?.readable) fail("CDP-MANIFEST", "Candidate manifest is absent or unreadable.");
-  let manifest;
-  try { manifest = parseYaml(candidateText(realRoot, candidateCommit, ".claude/pipeline.yaml")); }
-  catch { fail("CDP-MANIFEST", "Candidate manifest cannot be parsed."); }
-  const changedPaths = git(realRoot, ["diff", "--name-only", "-z", baseCommit ?? baseTree, candidateCommit, "--"])
-    .split("\0").filter(Boolean).map((path) => normalizePath(path, "changed path")).sort(compare);
-  const governance = deriveCriticPacketGovernance({
-    schema: CRITIC_PACKET_GOVERNANCE_INPUT_SCHEMA,
-    manifest,
-    candidateFiles: files,
-    changedPaths,
-  });
-  const governancePaths = governance.required.map(({ path }) => path);
-  const allGuardrails = [...new Set([...guardrails, ...governancePaths])].sort(compare);
-  const specReadback = requiredCandidateReadback(realRoot, candidateCommit, byPath, [spec], "Spec")[0];
-  const guardrailReadback = requiredCandidateReadback(realRoot, candidateCommit, byPath, allGuardrails, "guardrail");
-  const evidenceReadback = evidence.map((path) => matchingCandidateEvidence(localEvidence(realRoot, path), candidateCommit, candidateTree, path));
-  const priorReadback = prior === null ? null : { path: prior, sha256: sha256(localEvidence(realRoot, prior)) };
-
-  return {
-    schema: CRITIC_DISPATCH_PREFLIGHT_SCHEMA,
-    // The selected Codex transport is a separate, mandatory no-child
-    // preflight.  Calling this result "ready" caused coordinators to mistake
-    // packet integrity for a runnable Critic lane and to start an unbounded
-    // generic child when that lane was unavailable.
-    status: "packet-ready",
-    base: { commit: baseCommit, tree: baseTree },
-    candidate: { commit: candidateCommit, tree: candidateTree },
-    spec: specReadback,
-    guardrails: guardrailReadback,
-    governance,
-    evidence: evidenceReadback,
-    priorCriticEvidence: priorReadback,
-    dispatch: {
-      mode: "path-only", childCreated: false, packetCreated: false, stateMutated: false,
-      spawnAuthorized: false, requiredNextGate: "selected-runner-transport",
-    },
-  };
 }
 
-function parseArgs(argv) {
+export function parseCriticDispatchPreflightArgs(argv) {
   const values = { guardrailPaths: [], evidencePaths: [], priorCriticEvidencePath: null };
   for (let index = 0; index < argv.length; index += 1) {
     const flag = argv[index];
@@ -255,7 +304,7 @@ function parseArgs(argv) {
 
 if (isDirectInvocation(import.meta.url)) {
   try {
-    const result = preflightCriticDispatch(parseArgs(process.argv.slice(2)));
+    const result = preflightCriticDispatch(parseCriticDispatchPreflightArgs(process.argv.slice(2)));
     process.stdout.write(`${JSON.stringify(result)}\n`);
   } catch (error) {
     const code = error instanceof CriticDispatchPreflightError ? error.code : "CDP-UNEXPECTED";
