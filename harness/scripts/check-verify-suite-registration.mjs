@@ -127,106 +127,15 @@ export const REGISTERED_ROOTS = Object.freeze(["harness", join("plugins", "pipel
 export const REQUIRED_EXCLUSION_FIELDS = Object.freeze(["reason", "owner", "expires"]);
 
 /**
- * Declared exclusions -- files that legitimately carry no registration
- * entry today. Seeded 2026-08-08 from the 7 then-red suites in
- * specs/sprint-phoenix-epic/evidence/unregistered-suite-classification.md
- * (R1.2: filed, not fixed -- each is a debt with an owner, not a permanent
- * state). Do not add this checker's own two files here; see header.
- *
- * Eight remain, and the two departures left by different routes.
- * plugins/pipeline-core/lib/codex-host-plugin-list.test.mjs left on 2026-08-08 by
- * deletion, not by repair -- its whole subject was `observeCodexRulesetSource`,
- * retired by PO decision and superseded (see
- * specs/sprint-phoenix-epic/design/bootstrap-origin-allowlist-and-codex-wsl-freshness.md
- * A.3), so the suite followed the export out of the tree.
- * plugins/pipeline-core/lib/windows-assurance-verify-registration.test.mjs left on
- * 2026-08-09 by repair (PHX-RED6, commit afa00fd, WAVR19 green) and is now a
- * registered entry of verify.mjs's TEST_SUITES -- the outcome this list exists to
- * reach.
- *
- * SEVEN OF THE EIGHT ENTRIES BELOW ARE NOT OF THAT CLASS, and the difference matters more
- * than the count. harness/lib/plan-spec-state-v2.test.mjs,
- * harness/scripts/check-adr-consistency.test.mjs,
- * harness/scripts/check-critic-contract-citations.test.mjs,
- * harness/scripts/check-doc-reconciliation.test.mjs,
- * harness/scripts/recovery-bridge-approval.test.mjs,
- * plugins/pipeline-core/hooks/guard-git-phoenix.test.mjs and
- * plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.test.mjs are
- * GREEN. They are parked for one reason only: registering a suite means editing
- * verify.mjs, a protected test path whose maintenance window is closed, and opening
- * one needs a human signature. The remaining entry here is parked because it is RED
- * and must not be registered until repaired -- the opposite situation. Reading this
- * list as eight of a kind would misstate what it records: a passing suite waiting on a
- * signature is a scheduling fact, a failing suite is a defect. Their expiry is shared
- * with the rest deliberately, so that nothing here outlives a single review date, not
- * because they share the others' justification.
- *
- * ADDED 2026-09-06 (NVA-B-SLICINGBUILD-2): `plugins/pipeline-core/hooks/guard-slicing.test.mjs`
- * joined the green group below by the identical route -- 33/33 passing, parked solely because
- * registering it edits verify.mjs while the window is closed. The paragraph above this one
- * predates that addition and is not restated here; see the entry itself, and the test below
- * that pins the current membership, for the up-to-date set.
- *
- * The green group is growing, by two different routes. Three of its seven suites were
- * orphaned by the 0.5.2 integration and have since been repaired rather than deleted;
- * the other four are new checks written against a protected registration surface,
- * which is the only way a new check can enter this repository while the window is
- * closed. That direction of travel is the point: this list shrinks by registration or
- * deletion, never by an entry quietly going stale.
- *
- * A GREEN entry here is the one shape that rots quietly: the suite passes, so nothing
- * fails, and the stale `reason` keeps asserting a defect that no longer exists. That
- * is why the reason text is asserted rather than trusted -- see the suite's
- * `greenAwaitingRegistration` list.
- *
- * The remaining entry is owned by one filed backlog item --
- * backlog/items/2026-08-08-seven-unregistered-suites-are-red-and-must-not-be-registered.md
- * (`id: pipeline.seven-unregistered-suites-are-red`, owner: PO for
- * assignment) -- and its `expires` below is that item's own `due: 2026-09-07`.
- * It is deliberately identical: the exclusion does not get to outlive the item
- * that justifies it. The seven green entries carry the same date without being
- * owned by that item, so closing it no longer empties this list -- they leave by
- * registration on the next maintenance window. The shared date buys one property
- * only, and it is still the one that matters: nothing here outlives a single
- * review date.
+ * Declared exclusions -- files that legitimately carry no registration entry
+ * today. The table is empty: every suite under the registered roots has an
+ * actual Verify registration. Temporary exclusions remain supported and are
+ * still validated as expiry-bound debt; tests exercise that policy with a
+ * nonempty controlled fixture. The retired 2026-09-07 scheduling entries and
+ * their verification evidence are recorded in
+ * backlog/evidence/2026-09-08-retired-registered-suite-exclusions.md.
  */
-export const EXCLUSIONS = Object.freeze({
-  "harness/scripts/check-adr-consistency.test.mjs": Object.freeze({
-    reason: "GREEN, not red: 12/12 passing, written 2026-08-09 (PHX-ADRCHK) after two accepted ADRs were found contradicting the implementation and a three-way numbering collision had survived weeks unnoticed. Each of its five classes is pinned by a fixture that fires it and a fixture that clears it, and both motivating defects are reconstructed as a regression case. Parked solely because registering it edits verify.mjs, a protected test path whose maintenance window is closed and whose reopening needs a human signature. Register on the next window; this entry is a scheduling record, not a defect record.",
-    owner: "PO",
-    expires: "2026-09-07",
-  }),
-  "harness/scripts/check-doc-reconciliation.test.mjs": Object.freeze({
-    reason: "GREEN, not red: 19/19 passing, written 2026-08-09 (PHX-DOCREC) as layer two of the two-layer check the PO asked for after check-adr-consistency.mjs (layer one, PHX-ADRCHK) -- this layer asks whether a code change was reconciled against the ADRs that govern it, via a commit-range-bound record (docs/doc-reconciliation.md) that a stale entry cannot satisfy. Each of the five DoD-4 behaviours (fires on an unreconciled implicated ADR; clears on a correct entry; a record for a DIFFERENT candidate does not satisfy the range; an ADR with no Governs: line never fires; a Governs glob matching no tracked file is reported) is pinned by a fixture that fires it and a fixture that clears it, against a real temporary git repository. Parked solely because registering it edits verify.mjs, a protected test path whose maintenance window is closed and whose reopening needs a human signature. Register on the next window; this entry is a scheduling record, not a defect record.",
-    owner: "PO",
-    expires: "2026-09-07",
-  }),
-  "harness/scripts/check-critic-contract-citations.test.mjs": Object.freeze({
-    reason: "GREEN, not red: 21/21 passing. Parked solely because registering it edits verify.mjs, a protected test path whose maintenance window is closed and whose reopening needs a human signature. Register on the next window; this entry is a scheduling record, not a defect record.",
-    owner: "PO",
-    expires: "2026-09-07",
-  }),
-  "plugins/pipeline-core/scripts/check-critic-skip-coverage.test.mjs": Object.freeze({
-    reason: "GREEN, not red: 9/9 passing (NVA-CF-BL22-CRITICSKIPWIRE, 2026-08-29), distinguishing 'zero Critic artifacts because none were required' from 'zero despite N required' against fixture dispatch records. Parked solely because registering it edits verify.mjs, a protected test path whose maintenance window is closed and whose reopening needs a human signature. Register on the next window; this entry is a scheduling record, not a defect record.",
-    owner: "PO",
-    expires: "2026-09-07",
-  }),
-  "plugins/pipeline-core/scripts/measure-tofu-push-e2e.test.mjs": Object.freeze({
-    reason: "GREEN, not red: 8/8 passing (NVA-CF-CRITICFIX-F2F5F7, 2026-08-29), covering parseJsonStdout (including a Critic-round-2 regression case) and fakeSetupSpawn's genpkey/pkey interception for the BL16 TOFU e2e measurement script. Parked solely because registering it edits verify.mjs, a protected test path whose maintenance window is closed and whose reopening needs a human signature. Register on the next window; this entry is a scheduling record, not a defect record.",
-    owner: "PO",
-    expires: "2026-09-07",
-  }),
-  "harness/scripts/print-verify-failures.test.mjs": Object.freeze({
-    reason: "GREEN, not red: 17/17 passing (NVA-B-CIDIAG/NVA-B-CIDIAG2, 2026-09-01), covering the per-suite and global byte/line bounds with their explicit truncation notices, redaction of ghp_/github_pat_/AKIA/PEM-private-key-block credential shapes (including a regression check that the -{5}-quantifier rewrite of PRIVATE_KEY_BEGIN_RE/PRIVATE_KEY_END_RE in 58fe2d4b still matches a realistic BEGIN/END marker), and all evidence-degrade branches (missing evidence artifact, corrupt evidence JSON, evidence present but verifyRun null, missing run directory, missing per-suite receipt, missing per-suite log file). Parked solely because registering it edits verify.mjs, a protected test path whose maintenance window is closed and whose reopening needs a human signature -- confirmed unavailable in-session (guard-testpath override planning returned HGO-AUDIT with no route offered; no PO present in this dispatch to complete a signature ceremony). Register on the next window; this entry is a scheduling record, not a defect record.",
-    owner: "PO",
-    expires: "2026-09-07",
-  }),
-  "plugins/pipeline-core/hooks/guard-push-release-tag-ancestry.test.mjs": Object.freeze({
-    reason: "GREEN, not red: 10/10 passing (NVA-B-TAGFIX, 2026-09-01), covering checkReleaseTagAncestry (ADR-0078 D5): a release tag reachable from origin/main is allowed; an unreachable one is refused naming the tag, the commit, ADR-0078 D5 and a next step; refs/remotes/origin/main absent locally is no longer refused (the AC-2 correction this dispatch added, replacing the earlier permanent fail-closed refusal); non-release tags, branch pushes, tag deletes, and an explicit refs/tags/<name> destination are all unaffected; and an annotated tag is peeled to its target commit before the ancestry test, never the tag object's own sha. Parked solely because registering it edits verify.mjs, a protected test path (TP-3) whose maintenance window is closed and whose reopening needs a human signature. Register on the next window; this entry is a scheduling record, not a defect record.",
-    owner: "PO",
-    expires: "2026-09-07",
-  }),
-});
+export const EXCLUSIONS = Object.freeze({});
 
 function toPosix(rawPath) { return rawPath.split(sep).join("/"); }
 

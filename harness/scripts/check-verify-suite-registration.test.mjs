@@ -202,19 +202,9 @@ check("the checker's own two files are not declared exclusions", () => {
   assert.equal(Object.prototype.hasOwnProperty.call(EXCLUSIONS, "harness/scripts/check-verify-suite-registration.test.mjs"), false);
 });
 
-check("EXCLUSIONS is exactly the green suites parked on a closed maintenance window, each with reason, owner and expiry", () => {
-  // Two classes, kept apart on purpose. A red suite is a defect that must not be
-  // registered; a green suite waiting on a human signature is a scheduling fact.
-  // Asserting them separately means the green one cannot quietly become the cover
-  // for an eighth red one, which a flat seven-entry list would have allowed.
-  //
-  // afk-activation.test.mjs (formerly the sole red entry) and
-  // harness/lib/plan-spec-state-v2.test.mjs, recovery-bridge-approval.test.mjs,
-  // guard-git-phoenix.test.mjs, codex-isolated-critic-protected-preimage.test.mjs
-  // (formerly green) are now registered in verify.mjs's TEST_SUITES and so are
-  // no longer declared exclusions.
-  const red = [];
-  const greenAwaitingRegistration = [
+check("EXCLUSIONS is empty and every retired scheduling exclusion is registered exactly once", () => {
+  assert.deepEqual(Object.keys(EXCLUSIONS), []);
+  const retiredRegisteredSuites = [
     "harness/scripts/check-adr-consistency.test.mjs",
     "harness/scripts/check-critic-contract-citations.test.mjs",
     "harness/scripts/check-doc-reconciliation.test.mjs",
@@ -223,22 +213,12 @@ check("EXCLUSIONS is exactly the green suites parked on a closed maintenance win
     "plugins/pipeline-core/scripts/check-critic-skip-coverage.test.mjs",
     "plugins/pipeline-core/scripts/measure-tofu-push-e2e.test.mjs",
   ];
-  const expected = [...red, ...greenAwaitingRegistration].sort();
-  assert.deepEqual(Object.keys(EXCLUSIONS).sort(), expected);
-  for (const path of greenAwaitingRegistration) {
-    assert.match(EXCLUSIONS[path].reason, /^GREEN, not red:/u);
-  }
-  // QG-06 shape, checked per field so a failure names which field is missing where.
-  // (Supersedes the original bare-`reason`-string assertion, which this strictly
-  // subsumes: `reason` is still required to be a non-empty string.)
-  for (const [path, entry] of Object.entries(EXCLUSIONS)) {
-    for (const field of REQUIRED_EXCLUSION_FIELDS) {
-      assert.equal(
-        typeof entry[field] === "string" && entry[field].length > 0, true,
-        `EXCLUSIONS["${path}"] is missing the required QG-06 field "${field}"`,
-      );
-    }
-    assert.notEqual(parseExclusionDay(entry.expires), null, `EXCLUSIONS["${path}"].expires is not a YYYY-MM-DD day`);
+  const result = checkVerifySuiteRegistration();
+  assert.equal(result.ok, true, result.findings.join(" | "));
+  const repoRoot = resolve(here, "..", "..");
+  for (const path of retiredRegisteredSuites) {
+    const registrations = result.entries.filter((entry) => entry.resolvedPath === join(repoRoot, path));
+    assert.equal(registrations.length, 1, `${path} must have exactly one actual Verify registration`);
   }
 });
 
@@ -383,18 +363,19 @@ check("QG-06: exclusion validation runs even when verify.mjs cannot be read at a
   assert.ok(result.findings.some((line) => line.startsWith("READ-ERROR")));
 });
 
-check("QG-06: the real EXCLUSIONS table is self-clearing -- every entry expires on a stated day", () => {
-  const days = Object.values(EXCLUSIONS).map((entry) => parseExclusionDay(entry.expires));
+check("QG-06: a nonempty controlled exclusion table is self-clearing", () => {
+  const controlledExclusions = Object.freeze({ [EXCLUDED_PATH]: WELL_FORMED });
+  const days = Object.values(controlledExclusions).map((entry) => parseExclusionDay(entry.expires));
   assert.equal(days.every((day) => day !== null), true);
   const lastValidDay = new Date(Math.max(...days));
   const dayAfterLast = new Date(Math.max(...days) + 86_400_000);
-  // Deterministic, wall-clock-independent proof of both directions on the REAL table:
+  // Deterministic, wall-clock-independent proof of both directions on a nonempty table:
   // honoured on the last declared day, every entry expired the day after it.
-  const before = checkVerifySuiteRegistration({ exclusions: EXCLUSIONS, now: lastValidDay });
+  const before = checkVerifySuiteRegistration({ exclusions: controlledExclusions, now: lastValidDay });
   assert.deepEqual(before.expiredExclusions, []);
   assert.deepEqual(before.malformedExclusions, []);
-  const after = checkVerifySuiteRegistration({ exclusions: EXCLUSIONS, now: dayAfterLast });
-  assert.deepEqual(after.expiredExclusions.sort(), Object.keys(EXCLUSIONS).sort());
+  const after = checkVerifySuiteRegistration({ exclusions: controlledExclusions, now: dayAfterLast });
+  assert.deepEqual(after.expiredExclusions.sort(), Object.keys(controlledExclusions).sort());
 });
 
 // -- duplicateSuiteIds: the RUNTIME counterpart of Class 3. ------------------
