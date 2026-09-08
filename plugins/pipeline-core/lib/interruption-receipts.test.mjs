@@ -9,6 +9,10 @@ import { syncBuiltinESMExports } from "node:module";
 import { createHash } from "node:crypto";
 import { buildInterruptionReceipt as build, classifyInterruption as classify, validateInterruptionReceipt as validate, validateInterruptionRegistry, aggregateInterruptionReceipts } from "./interruption-receipts.mjs";
 import { canonicalInvocationJson, createInvocationRequest, createInvocationAttempt, invocationResolutionKey, validateInvocationChain } from "./invocation-reliability.mjs";
+import { projectC1SourceJoins } from "./interruption-source-adapter.mjs";
+import { createSelectedSandboxDisposition, reduceSelectedSandboxDisposition, validateSelectedSandboxDisposition } from "./selected-sandbox-disposition.mjs";
+import { compileCriticReviewLineage, validateCriticReviewHistory } from "./critic-review-lineage.mjs";
+import { REVIEW_LIMITS, sha256Canonical } from "./review-economy.mjs";
 
 const registry = JSON.parse(readFileSync(new URL("../../../policies/interruption-registry.v1.json", import.meta.url), "utf8"));
 const A = "a".repeat(64), B = "b".repeat(64), C = "c".repeat(64), D = "d".repeat(64);
@@ -558,4 +562,320 @@ test("aggregate runs only on supplied data under time, filesystem, process and n
     assert.deepEqual(aggregateInterruptionReceipts(supplied, registry), expected);
     assert.equal(touched, 0);
   } finally { globalThis.Date = OriginalDate; t.mock.restoreAll(); syncBuiltinESMExports(); }
+});
+
+
+// Full-source adapter fixtures use the owning Nova constructors. They are
+// synthetic records, not evidence of a live dispatch or interruption.
+function sourceDisposition(duty = "fixture-duty", terminal = false) {
+  let disposition = createSelectedSandboxDisposition({
+    dispositionId: "fixture-disposition", duty, transport: "fixture-transport",
+    fingerprint: { runnerSha256: A, hostBootSha256: B, platformClass: "fixture-platform", architectureClass: "fixture-arch",
+      sandboxSha256: C, profileSha256: D, policySha256: A, duty, contractVersion: "fixture-v1" },
+    assurance: { requested: "selected-sandbox", observed: "not-observed", evidenceSha256: null }, nowMonotonicMs: 0,
+  });
+  if (terminal) {
+    const probing = reduceSelectedSandboxDisposition(disposition, { kind: "probe-start",
+      attempt: { attemptId: "fixture-probe", index: 0, startedMonotonicMs: 0 }, challenge: { nonceSha256: A, bits: 256 } });
+    assert.equal(probing.ok, true);
+    const failed = reduceSelectedSandboxDisposition(probing.disposition,
+      { kind: "probe-failure", failure: "terminal-unavailable", observationReceiptSha256: B, nowMonotonicMs: 1 });
+    assert.equal(failed.ok, true); disposition = failed.disposition;
+  }
+  assert.equal(validateSelectedSandboxDisposition(disposition).ok, true);
+  return disposition;
+}
+function invocationSource({ count = 2, disposition = sourceDisposition(), invocationId = "source-invocation", attemptIds = ["z-attempt", "A-attempt"], commandText = "/synthetic/private/command" } = {}) {
+  const request = createInvocationRequest({ invocationId, subject: { kind: "dispatch", sha256: A },
+    route: { runner: "private-runner", adapterId: "private-adapter", adapterVersion: "v1", requestedModel: "private-model" },
+    duty: "fixture-duty", sandboxDispositionSha256: disposition?.recordSha256 ?? B,
+    command: { contractId: "private-command", executableSha256: C, arguments: [{ type: "literal", value: commandText }] },
+    inputDigests: [], timeoutMs: 1000, allowedOutputs: ["result"], privacyClass: "private" });
+  const attempts = [];
+  for (let index = 0; index < count; index++) attempts.push(createInvocationAttempt({
+    attemptId: attemptIds[index] ?? `attempt-${index}`, invocationId, index, requestSha256: request.requestSha256,
+    launchDecision: "suppressed", failureClass: "selected-sandbox-terminal",
+    started: null, ended: null, resultSha256: null, previousSha256: attempts.at(-1)?.recordSha256 ?? null,
+  }));
+  assert.equal(validateInvocationChain(request, attempts).ok, true);
+  return { request, attempts, sandboxDisposition: disposition };
+}
+function reviewSource(firstId = "z-review", count = 2) {
+  const history = [];
+  for (let index = 0; index < count; index++) {
+    const parent = history.at(-1) ?? null;
+    const candidate = { base: parent?.candidate.commit ?? "1".repeat(40),
+      commit: (index ? "4" : "2").repeat(40), tree: (index ? "5" : "3").repeat(40) };
+    const packet = { packetId: (index ? "2" : "1").repeat(32), request: { taskId: "synthetic-private-task" },
+      candidate, diff: { base: candidate.base, commit: candidate.commit, path: "synthetic/private.diff", bytes: 1, sha256: A },
+      diffPaths: ["synthetic/private-source.mjs"], bindings: { requestSha256: B, diffPathsSha256: C, governanceSha256: D } };
+    history.push(compileCriticReviewLineage({
+      packet, reviewId: parent ? "A-review" : firstId, parent,
+      packages: [{ id: "private-package", subjectSha256: A, changedPaths: packet.diffPaths, integrationEdges: ["fixture-edge"] }],
+      coverage: { changedPaths: packet.diffPaths, acceptanceIds: ["C1-source-fixture"], integrationEdges: ["fixture-edge"], complete: false, receiptSha256: null },
+      lane: { laneId: `private-lane-${index}`, contextSha256: index ? B : A, evidenceSha256: C },
+      verdict: { status: "pending", schemaValid: false, resultSha256: null, failure: null }, findings: [],
+      correction: parent ? { commit: candidate.commit, deltaSha256: A, impactSha256: sha256Canonical(["fixture-edge"]) } : null,
+      invalidation: parent ? { kind: "full-review-required", reason: "explicit-broad-review", evidenceSha256: D }
+        : { kind: "none", reason: null, evidenceSha256: null },
+      reviewAttempt: { round: index + 1, correctionCommits: index, requestedMode: "full" },
+    }));
+  }
+  assert.equal(validateCriticReviewHistory(history).ok, true);
+  return history;
+}
+function sourceInput(invocation = invocationSource(), review = reviewSource()) {
+  return { invocationBytes: invocation === null ? null : JSON.stringify(invocation),
+    reviewBytes: review === null ? null : JSON.stringify(review), currentCandidate: review?.at(-1).candidate ?? null,
+    coverage: { invocations: invocation === null ? "unknown" : "measured", reviews: review === null ? "unknown" : "measured" } };
+}
+function projected(value = sourceInput()) {
+  const result = projectC1SourceJoins(value);
+  assert.equal(result.ok, true, result.code);
+  assert.deepEqual(Object.keys(result).sort(), ["code", "ok", "projection"]);
+  return result.projection;
+}
+function projectionRejected(value, code) {
+  assert.deepEqual(projectC1SourceJoins(value), { ok: false, code, projection: null });
+}
+const rawSourceHash = (bytes) => createHash("sha256").update(bytes).digest("hex");
+function resealAttempt(row, patch) {
+  const { schema: _schema, recordSha256: _digest, ...semantic } = row;
+  return createInvocationAttempt({ ...semantic, ...patch });
+}
+function resealReview(row, patch) {
+  const { recordSha256: _digest, ...semantic } = { ...row, ...patch };
+  return { ...semantic, recordSha256: sha256Canonical(semantic) };
+}
+
+test("source projection validates real histories then sorts exact closed public rows", () => {
+  const invocation = invocationSource(), review = reviewSource(), value = sourceInput(invocation, review);
+  const projection = projected(value);
+  assert.deepEqual(projection, {
+    joins: {
+      invocations: invocation.attempts.map(({ invocationId, attemptId, requestSha256, previousSha256, recordSha256 }) =>
+        ({ invocationId, attemptId, requestSha256, previousSha256, recordSha256,
+          invocationResolutionKey: invocationResolutionKey(invocation.request, invocation.sandboxDisposition.fingerprint) })).reverse(),
+      reviews: review.map(({ reviewId, parentReviewId, previousSha256, recordSha256 }) =>
+        ({ reviewId, parentReviewId, previousSha256, recordSha256 })).reverse(),
+    },
+    coverage: { invocations: "measured", reviews: "measured" }, binding: { candidate: clone(review.at(-1).candidate) },
+    sourceSha256: { invocation: rawSourceHash(value.invocationBytes), review: rawSourceHash(value.reviewBytes) },
+  });
+  assert.notDeepEqual(review[0].candidate, review[1].candidate);
+  for (const privateText of ["private-command", "/synthetic/private", "private-lane", "private-package", "fingerprint", "findings", "requestedModel", "privacyClass"])
+    assert.equal(JSON.stringify(projection).includes(privateText), false, privateText);
+});
+test("source projection permits null disposition and terminal-unavailable observations without admission", () => {
+  for (const disposition of [null, sourceDisposition(), sourceDisposition("fixture-duty", true)]) {
+    const source = invocationSource({ disposition }), result = projected(sourceInput(source, null));
+    assert.equal(result.joins.invocations[0].invocationResolutionKey, disposition === null ? null : invocationResolutionKey(source.request, disposition.fingerprint));
+  }
+});
+test("source projection rejects original invalid invocation order, identities, digest and predecessor", () => {
+  for (const mutate of [
+    (v) => { v.request.requestSha256 = D; },
+    (v) => { v.attempts[0].recordSha256 = D; },
+    (v) => { v.attempts.reverse(); },
+    (v) => { v.attempts.push(clone(v.attempts[0])); },
+    (v) => { v.attempts[1] = resealAttempt(v.attempts[1], { previousSha256: D }); },
+    (v) => { v.attempts[1] = resealAttempt(v.attempts[1], { attemptId: v.attempts[0].attemptId }); },
+    (v) => { v.attempts = v.attempts.slice(1); },
+    (v) => { v.extra = null; },
+    (v) => { v.sandboxDisposition = { fingerprint: v.sandboxDisposition.fingerprint }; },
+    (v) => { v.sandboxDisposition.recordSha256 = D; },
+  ]) { const source = clone(invocationSource()); mutate(source); projectionRejected(sourceInput(source, null), "C1J-INVOCATION"); }
+});
+test("source projection binds the full disposition digest and duty", () => {
+  const source = clone(invocationSource());
+  source.sandboxDisposition = sourceDisposition("fixture-duty", true);
+  projectionRejected(sourceInput(source, null), "C1J-BINDING");
+  const otherDuty = sourceDisposition("other-duty"), mismatch = invocationSource({ disposition: otherDuty });
+  projectionRejected(sourceInput(mismatch, null), "C1J-BINDING");
+});
+test("source projection rejects invalid review history before projection and binds final candidate", () => {
+  for (const mutate of [
+    (rows) => { rows.reverse(); }, (rows) => { rows.push(clone(rows[0])); },
+    (rows) => { rows[0].recordSha256 = D; },
+    (rows) => { rows[1] = resealReview(rows[1], { previousSha256: D }); },
+    (rows) => { rows.splice(0, 1); },
+    (rows) => { rows[0].extra = null; },
+  ]) {
+    const history = clone(reviewSource()); mutate(history);
+    projectionRejected(sourceInput(null, history), "C1J-REVIEW");
+  }
+  const value = sourceInput(null, reviewSource());
+  for (const candidate of [null, reviewSource()[0].candidate, { commit: "f".repeat(40), tree: value.currentCandidate.tree }])
+    projectionRejected({ ...value, currentCandidate: candidate }, "C1J-BINDING");
+  assert.equal(projected(sourceInput(null, reviewSource("only-review", 1))).joins.reviews.length, 1);
+});
+test("source projection preserves explicit coverage and distinguishes absent from measured empty", () => {
+  for (const status of ["measured", "estimated", "unavailable", "unknown"]) {
+    const value = sourceInput(); value.coverage = { invocations: status, reviews: status };
+    assert.deepEqual(projected(value).coverage, value.coverage);
+  }
+  for (const status of ["unknown", "unavailable"]) {
+    const value = sourceInput(null, null); value.coverage = { invocations: status, reviews: status };
+    assert.deepEqual(projected(value), { joins: { invocations: [], reviews: [] }, coverage: value.coverage,
+      binding: { candidate: null }, sourceSha256: { invocation: null, review: null } });
+  }
+  for (const field of ["invocations", "reviews"]) for (const status of ["measured", "estimated"]) {
+    const value = sourceInput(null, null); value.coverage[field] = status; projectionRejected(value, "C1J-BINDING");
+  }
+  const empty = projected(sourceInput(invocationSource({ count: 0 }), null));
+  assert.deepEqual(empty.joins.invocations, []); assert.equal(empty.coverage.invocations, "measured");
+  projectionRejected({ ...sourceInput(null, null), reviewBytes: "[]" }, "C1J-REVIEW");
+});
+test("source projection rejects missing context and invalid closed coverage or document roots", () => {
+  for (const value of [null, undefined, [], "source", {}, { ...sourceInput(), coverage: null },
+    { ...sourceInput(), coverage: { invocations: "complete", reviews: "measured" } },
+    { ...sourceInput(), coverage: { invocations: "measured" } },
+    { ...sourceInput(), currentCandidate: { commit: A } }]) projectionRejected(value, "C1J-SHAPE");
+  for (const document of ["null", "true", "42", '"source"', "{}", "[]"]) {
+    projectionRejected({ ...sourceInput(), invocationBytes: document }, "C1J-INVOCATION");
+    projectionRejected({ ...sourceInput(), reviewBytes: document }, "C1J-REVIEW");
+  }
+});
+test("source projection accepts exactly string Buffer Uint8Array bytes and snapshots without iterators", () => {
+  const original = sourceInput(), expected = projected(original);
+  for (const encode of [(v) => v, (v) => Buffer.from(v), (v) => new Uint8Array(Buffer.from(v)),
+    (v) => { const backing = Buffer.from("xx" + v + "yy"); return new Uint8Array(backing.buffer, backing.byteOffset + 2, Buffer.byteLength(v)); }])
+    assert.deepEqual(projected({ ...original, invocationBytes: encode(original.invocationBytes), reviewBytes: encode(original.reviewBytes) }), expected);
+  let touched = 0;
+  const bytes = Buffer.from(original.invocationBytes);
+  Object.defineProperty(bytes, Symbol.iterator, { get() { touched++; throw null; } });
+  Object.defineProperty(bytes, "byteLength", { get() { touched++; throw null; } });
+  assert.deepEqual(projected({ ...original, invocationBytes: bytes }), expected); assert.equal(touched, 0);
+  for (const unsupported of [{}, [], new ArrayBuffer(1), new Uint16Array(1), new DataView(new ArrayBuffer(1)), 2, undefined,
+    Object.defineProperty({}, "toString", { get() { touched++; throw null; } }), new Proxy(new Uint8Array(1), {})])
+    projectionRejected({ ...original, invocationBytes: unsupported }, "C1J-SHAPE");
+  assert.equal(touched, 0);
+});
+test("source projection rejects hostile context without getters, iterators, coercion or exception disclosure", () => {
+  let touched = 0;
+  for (const locate of [(v) => v, (v) => v.coverage, (v) => v.currentCandidate]) for (const mutate of [
+    (v) => { v.extra = null; }, (v) => { v[Symbol("extra")] = null; },
+    (v) => { Object.setPrototypeOf(v, { privateField: "synthetic" }); },
+    (v) => { Object.defineProperty(v, Object.keys(v)[0], { get() { touched++; throw null; } }); },
+  ]) { const value = sourceInput(); mutate(locate(value)); projectionRejected(value, "C1J-SHAPE"); }
+  for (const thrown of [null, "C1J-PRIVACY", Object.defineProperty({}, "message", { get() { touched++; return "private"; } })])
+    projectionRejected(new Proxy({}, { getPrototypeOf() { throw thrown; } }), "C1J-SHAPE");
+  const value = sourceInput(); Object.setPrototypeOf(value, null); Object.setPrototypeOf(value.coverage, null); Object.setPrototypeOf(value.currentCandidate, null);
+  projected(value); assert.equal(touched, 0);
+  for (const candidate of [{ commit: "A".repeat(40), tree: "b".repeat(40) }, { commit: A, tree: "b".repeat(40) }, { commit: "abc", tree: "abc" }])
+    projectionRejected({ ...sourceInput(null, null), currentCandidate: candidate }, "C1J-SHAPE");
+  projected({ ...sourceInput(null, null), currentCandidate: { commit: A, tree: B } });
+});
+test("source projection rejects duplicate keys, trailing JSON, BOM and malformed Unicode at every byte boundary", () => {
+  const documents = ['{"request":{},"request":{}}', '{"request":{"nested":{"x":1,"x":2}}}',
+    '{"request":{"__proto__":1,"__proto__":2}}', '{"request":{"x":1,"\\u0078":2}}',
+    '{} null', '\ufeff{}', '{"x":1e999}', '{"x":"\\ud800"}', '{"x":"\\udfff"}',
+    '{"\\ud800":0}', '{"x":"\ud800"}', '{"x":"\udfff"}', '{"x":"\\uZZZZ"}', '{"x":NaN}' ];
+  for (const document of documents) for (const field of ["invocationBytes", "reviewBytes"])
+    projectionRejected({ ...sourceInput(), [field]: document }, "C1J-JSON");
+  for (const bytes of [Buffer.from([0xef, 0xbb, 0xbf, 0x7b, 0x7d]), Buffer.from([0xc0, 0xaf]),
+    Buffer.from([0xed, 0xa0, 0x80]), Buffer.from([0xf0, 0x9f]), Buffer.from([0xff])])
+    projectionRejected({ ...sourceInput(), invocationBytes: bytes }, "C1J-JSON");
+  // A scalar surrogate pair remains valid in private command data.
+  projected(sourceInput(invocationSource({ commandText: "fixture-😀" }), null));
+});
+test("source projection enforces full-source depth64 independently of receipt depth16 and quoted brackets", () => {
+  for (const depth of [16, 17, 64])
+    projectionRejected({ ...sourceInput(null, null), invocationBytes: "[".repeat(depth) + "0" + "]".repeat(depth) }, "C1J-INVOCATION");
+  for (const field of ["invocationBytes", "reviewBytes"])
+    projectionRejected({ ...sourceInput(), [field]: "[".repeat(65) + "0" + "]".repeat(65) }, "C1J-LIMIT");
+  projected(sourceInput(invocationSource({ commandText: '[{"escaped":"\\\""}]'.repeat(10) }), null));
+});
+test("source projection enforces exact UTF8 byte and owning history cardinality bounds", () => {
+  const value = sourceInput(invocationSource({ count: 0 }), null);
+  value.invocationBytes += " ".repeat(1_048_576 - Buffer.byteLength(value.invocationBytes));
+  projected(value);
+  for (const bytes of [value.invocationBytes + " ", Buffer.alloc(1_048_577), "é".repeat(524289)])
+    projectionRejected({ ...value, invocationBytes: bytes }, "C1J-LIMIT");
+  const full = invocationSource({ count: 256 });
+  assert.equal(projected(sourceInput(full, null)).joins.invocations.length, 256);
+  full.attempts.push(full.attempts[0]); projectionRejected(sourceInput(full, null), "C1J-INVOCATION");
+  const review = reviewSource("only-review", 1);
+  projectionRejected(sourceInput(null, Array(REVIEW_LIMITS.criticRounds + 2).fill(review[0])), "C1J-REVIEW");
+});
+test("source projection hashes exact original bytes while semantic rows remain deterministic and detached", () => {
+  const value = sourceInput(), before = clone(value), first = projected(value), next = projected(value);
+  const whitespace = projected({ ...value, invocationBytes: " \n" + value.invocationBytes + "\t", reviewBytes: "\n" + value.reviewBytes });
+  assert.deepEqual(first.joins, whitespace.joins); assert.notDeepEqual(first.sourceSha256, whitespace.sourceSha256);
+  assert.equal(whitespace.sourceSha256.invocation, rawSourceHash(" \n" + value.invocationBytes + "\t"));
+  const reordered = JSON.stringify(Object.fromEntries(Object.entries(JSON.parse(value.invocationBytes)).reverse()));
+  assert.deepEqual(projected({ ...value, invocationBytes: reordered }).joins, first.joins);
+  first.joins.invocations[0].attemptId = "changed"; first.coverage.reviews = "unknown"; first.binding.candidate.commit = A;
+  assert.deepEqual(projected(value), next); assert.deepEqual(value, before);
+  const bytes = Buffer.from(value.invocationBytes), retained = projected({ ...value, invocationBytes: bytes });
+  bytes.fill(0); assert.deepEqual(retained, next);
+});
+test("source projection screens exposed IDs without leaking or rejecting omitted private fields", () => {
+  for (const unsafe of ["sk-syntheticFixture", "ghp_syntheticFixture", "prefix:github_pat_synthetic", "AKIA" + "0".repeat(16)]) {
+    projectionRejected(sourceInput(invocationSource({ invocationId: unsafe }), null), "C1J-PRIVACY");
+    projectionRejected(sourceInput(invocationSource({ attemptIds: [unsafe, "safe-attempt"] }), null), "C1J-PRIVACY");
+    projectionRejected(sourceInput(null, reviewSource(unsafe, 1)), "C1J-PRIVACY");
+  }
+  projected(sourceInput(invocationSource({ commandText: "sk-privateSyntheticCommand" }), null));
+});
+test("source projection composes existing joins into an explicitly synthetic C1 receipt", () => {
+  const projection = projected(), value = input();
+  value.joins.invocations = projection.joins.invocations; value.joins.reviews = projection.joins.reviews;
+  value.binding.candidate = projection.binding.candidate;
+  const result = receipt(value); assert.equal(result.attemptCount.value, 2);
+  assert.deepEqual(result.joins.invocations, projection.joins.invocations);
+  assert.deepEqual(result.joins.reviews, projection.joins.reviews);
+});
+test("source adapter and its entire fresh import graph evaluate and run under ambient I/O tripwires", () => {
+  // Preload source text, then evaluate a fresh VM graph with no ambient facilities.
+  // Builtin module namespaces are prepared before installing the tripwires.
+  const script = `
+    import fs from "node:fs"; import vm from "node:vm"; import childProcess from "node:child_process";
+    import net from "node:net"; import { syncBuiltinESMExports } from "node:module";
+    const modules = new Map(), builtins = new Map();
+    function preload(url) {
+      if (modules.has(url)) return;
+      const source = fs.readFileSync(new URL(url), "utf8");
+      const mod = new vm.SourceTextModule(source, { identifier: url }); modules.set(url, mod);
+      for (const match of source.matchAll(/from\\s+["']([^"']+)["']/gu)) {
+        if (match[1].startsWith(".")) preload(new URL(match[1], url).href);
+        else builtins.set(match[1], null);
+      }
+    }
+    const root = process.argv[1]; preload(root);
+    for (const name of builtins.keys()) {
+      const namespace = await import(name), keys = Object.keys(namespace);
+      builtins.set(name, new vm.SyntheticModule(keys, function() { for (const key of keys) this.setExport(key, namespace[key]); }));
+    }
+    const entry = modules.get(root);
+    await entry.link((name, mod) => builtins.get(name) ?? modules.get(new URL(name, mod.identifier).href));
+    const fixture = JSON.parse(process.argv[2]);
+    let touched = 0; const denied = () => { touched++; throw new Error("ambient access"); };
+    const OriginalDate = Date, environment = process.env, originalCwd = process.cwd, originalHrtime = process.hrtime;
+    const restore = [];
+    try {
+      for (const object of [fs, fs.promises, childProcess, net]) {
+        for (const key of Object.keys(object)) if (typeof object[key] === "function") {
+          const descriptor = Object.getOwnPropertyDescriptor(object, key);
+          restore.push([object, key, descriptor]);
+          Object.defineProperty(object, key, { value: denied, configurable: descriptor.configurable, enumerable: descriptor.enumerable, writable: true });
+        }
+      }
+      globalThis.fetch = denied; process.cwd = denied; process.hrtime = denied;
+      process.env = new Proxy({}, { get: denied, ownKeys: denied, getOwnPropertyDescriptor: denied });
+      globalThis.Date = class extends OriginalDate { constructor(...args) { if (!args.length) denied(); super(...args); } static now() { return denied(); } };
+      syncBuiltinESMExports();
+      await entry.evaluate();
+      const result = entry.namespace.projectC1SourceJoins(fixture);
+      if (!result.ok || touched !== 0) throw new Error("pure projection failed");
+      if (Object.keys(entry.namespace).join(",") !== "projectC1SourceJoins") throw new Error("unexpected public API");
+    } finally {
+      process.env = environment; process.cwd = originalCwd; process.hrtime = originalHrtime; globalThis.Date = OriginalDate;
+      for (const [object, key, descriptor] of restore) Object.defineProperty(object, key, descriptor);
+      syncBuiltinESMExports();
+    }
+  `;
+  const result = childProcess.spawnSync(process.execPath, ["--no-warnings", "--experimental-vm-modules", "--input-type=module", "-e", script,
+    new URL("./interruption-source-adapter.mjs", import.meta.url).href, JSON.stringify(sourceInput())], { encoding: "utf8", timeout: 15000 });
+  assert.equal(result.error, undefined); assert.equal(result.status, 0, result.stderr); assert.equal(result.stdout, "");
 });
