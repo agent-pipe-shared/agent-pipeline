@@ -161,7 +161,8 @@ export const VENDORED_CANON_ALLOWLIST = Object.freeze([
   // docs/adr/0027-gate-philosophy.md (lines 9, 45)
   { file: "plugins/pipeline-core/docs/adr/0027-gate-philosophy.md", match: "cally via `node harness/scripts/pipeline", reason: vendoredCanonAllowlistReason("docs/adr/0027-gate-philosophy.md") }, // L9
   { file: "plugins/pipeline-core/docs/adr/0027-gate-philosophy.md", match: "bucht via `node harness/scripts/pipeline", reason: vendoredCanonAllowlistReason("docs/adr/0027-gate-philosophy.md") }, // L45
-  // docs/adr/0028-manifest-approach.md (lines 41, 49)
+  // docs/adr/0028-manifest-approach.md (lines 7, 41, 49)
+  { file: "plugins/pipeline-core/docs/adr/0028-manifest-approach.md", match: "**Governs:** setup.mjs, plugins/pipeline-core/lib/manifest.mjs, plugins/pipeline-core/lib/yaml-lite.mjs, plugins/pipeline-core/lib/schema-lite.mjs, plugins/pipeline-core/scripts/pipeline-manifest.schema.json, plugins/pipeline-core/lib/project-authority.mjs, plugins/pipeline-core/agents/**, setup.test.mjs, plugins/pipeline-core/lib/yaml-lite.test.mjs, plugins/pipeline-core/lib/schema-lite.test.mjs, plugins/pipeline-core/lib/project-authority.test.mjs", reason: vendoredCanonAllowlistReason("docs/adr/0028-manifest-approach.md") }, // L7, inherited canonical reconciliation metadata
   { file: "plugins/pipeline-core/docs/adr/0028-manifest-approach.md", match: "setup.mjs` produc", reason: vendoredCanonAllowlistReason("docs/adr/0028-manifest-approach.md") }, // L41
   { file: "plugins/pipeline-core/docs/adr/0028-manifest-approach.md", match: "setup.mjs` valida", reason: vendoredCanonAllowlistReason("docs/adr/0028-manifest-approach.md") }, // L49
   // docs/adr/0029-file-handoffs-status.md (lines 11, 50)

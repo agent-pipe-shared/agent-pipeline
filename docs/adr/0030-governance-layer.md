@@ -6,6 +6,8 @@
 
 **Status:** accepted (2026-07-07, PO plan approval "AP1 TUNING") · **Basis:** `.claude/plans/2026-07-07-ap1-pipeline-tuning.md` package P6, `governance/examples/README.md`
 
+**Governs:** governance/examples/**, plugins/pipeline-core/skills/critic-review/SKILL.md, plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs, plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs, plugins/pipeline-core/scripts/security-scan.mjs, plugins/pipeline-core/scripts/security-scan.test.mjs
+
 ## Context
 
 The pipeline is increasingly oriented toward being handed off to third parties (AP1 context). An adopting project/organization needs a place for its own conventions (style guides, naming conventions) AND for binding, partly machine-checkable rules (license allowlists, security policies) — both clearly separated from the pipeline's own infrastructure (`guardrails/*`, `harness/checklists/*`), which continues to govern exclusively HOW the pipeline itself works, not what a hosted project must fulfill.

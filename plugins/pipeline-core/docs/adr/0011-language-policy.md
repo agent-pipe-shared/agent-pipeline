@@ -4,6 +4,8 @@
 
 Accepted on 2026-07-03; revised for the public-core/private-overlay split during Phase 2.
 
+**Governs:** README.md, SETUP.md, docs/overview.md, docs/usage.md, plugins/pipeline-core/lib/po-gate-authority.mjs, plugins/pipeline-core/scripts/po-gate-profile-repair.mjs
+
 ## Context
 
 Runtime artifacts benefit from a single portable language, while a private project may configure a different language for its operator-facing material. Treating those needs as one repository-wide bilingual rule created duplicate documents, unnecessary context, and a risk of publishing private identity or project details.

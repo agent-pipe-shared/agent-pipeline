@@ -2,6 +2,8 @@
 
 > _A German version follows below · Eine deutsche Fassung folgt weiter unten._
 
+**Governs:** plugins/pipeline-core/scripts/pipeline-state.mjs, plugins/pipeline-core/lib/project-authority.mjs, plugins/pipeline-core/hooks/guard-devplan.mjs, plugins/pipeline-core/hooks/guard-push.mjs, plugins/pipeline-core/hooks/stop-suggest.mjs, templates/dev-plan.md, plugins/pipeline-core/scripts/pipeline-state.test.mjs, plugins/pipeline-core/hooks/guard-devplan.test.mjs, plugins/pipeline-core/hooks/guard-push.test.mjs, plugins/pipeline-core/hooks/stop-suggest.test.mjs
+
 ## Context
 
 The two new gates ([ADR-0027](0027-gate-philosophy.md)) need deterministic, git-committed state — "has plan approval already been recorded?", "has this push already been approved?" — that can be neither chat memory nor a hand-edited file (exactly the kind of silent, unauditable state change the gates exist to prevent). At the same time, plan artifacts themselves lacked a uniform home.

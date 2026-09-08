@@ -4,6 +4,8 @@
 
 **Status:** accepted (2026-07-07, PO plan approval "AP1 TUNING") · **Basis:** `.claude/plans/2026-07-07-ap1-pipeline-tuning.md` guiding decisions 1/2/4/7, `docs/operating-model.md` §8, `guardrails/security.md` SEC-04
 
+**Governs:** setup.mjs, plugins/pipeline-core/lib/manifest.mjs, plugins/pipeline-core/lib/yaml-lite.mjs, plugins/pipeline-core/lib/schema-lite.mjs, plugins/pipeline-core/scripts/pipeline-manifest.schema.json, plugins/pipeline-core/lib/project-authority.mjs, plugins/pipeline-core/agents/**, setup.test.mjs, plugins/pipeline-core/lib/yaml-lite.test.mjs, plugins/pipeline-core/lib/schema-lite.test.mjs, plugins/pipeline-core/lib/project-authority.test.mjs
+
 ## Context
 
 The Pipeline has so far configured projects exclusively via `.claude/pipeline.json` (calibration layer, `docs/operating-model.md` §8: project, verify command, autonomy, WIP limit, worktree mode, etc.). The AP1 mandate calls for additional, declarative control over phases, gates, security thresholds, model routing, profiles, and governance paths — without touching any of the three already-live project calibrations (`pipeline.json`) and without introducing an npm dependency for YAML parsing (zero-dependency invariant, [SEC-04](../../guardrails/security.md)).

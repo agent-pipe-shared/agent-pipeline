@@ -6,6 +6,8 @@
 
 **Status:** accepted (2026-07-11, sub-spec `specs/2026-07-11-sdlc-release-deploy/spec_s1-canon.md`, umbrella `specs/2026-07-11-sdlc-release-deploy/spec.md` §2.2/§2.4) · **Basis:** [ADR-0030](0030-governance-layer.md) (governance layer), [ADR-0033](0033-release-promotion-phase.md) (release/promotion phase), PO decisions (2026-07-11)
 
+**Governs:** plugins/pipeline-core/lib/manifest.mjs, plugins/pipeline-core/scripts/deploy-policy.schema.json, plugins/pipeline-core/scripts/policy-lock.schema.json, plugins/pipeline-core/hooks/guard-push.mjs, plugins/pipeline-core/hooks/guard-push.test.mjs, governance/examples/policies/deploy-policy.yaml, governance/examples/policies/deploy-risks.example.md, governance/examples/policies/policy-lock.example.yaml, templates/risks.md, guardrails/deploy.md
+
 ## Context
 
 Hosted/enterprise setups need a central deploy policy that can override a project manifest. [ADR-0030](0030-governance-layer.md) already distinguishes advisory guidelines from enforcing policies AND delivers a repo>user<managed hierarchy — but NO central-beats-project precedence between two repo-level artifacts (a central deploy policy vs. a project manifest). That's a new axis, which this decision explicitly draws.
