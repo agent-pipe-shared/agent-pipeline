@@ -50,6 +50,8 @@ Running this operating model across two machines surfaced a double registration:
 
 Accepted (2026-07-03, Checkpoint 1) · **Addendum** 2026-07-11 (install-scope canonicalization, see above) · Basis: Register E1. No standalone follow-up. Versioning phases: [ADR-0002](0002-versioning-sha-then-semver.md); staleness operation: [ADR-0010](0010-session-bootstrap.md).
 
+**Governs:** .claude-plugin/marketplace.json, plugins/pipeline-core/.claude-plugin/plugin.json, setup.mjs, plugins/pipeline-core/hooks/staleness-check.mjs, harness/session-bootstrap.md
+
 <!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
 
 # ADR-0001: Verteilung des Operating Model als Plugin/Marketplace

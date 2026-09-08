@@ -37,6 +37,8 @@ Clarification: in the SHA phase, the latest commit on `main` is the distributed 
 
 Switch to SemVer once stable. OPEN (Phase 5): the concrete switchover criterion — candidates: with the v0.1.0 release after Checkpoint 3, or once all three projects consume in production (Sprint 1 migration complete).
 
+**Governs:** .claude-plugin/marketplace.json, plugins/pipeline-core/.claude-plugin/plugin.json, plugins/pipeline-core/scripts/ruleset-freshness.mjs
+
 <!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
 
 # ADR-0002: Versionierungsstrategie — SHA-Phase, dann SemVer
