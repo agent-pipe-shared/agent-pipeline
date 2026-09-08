@@ -937,3 +937,28 @@ perform three serial native subagent calls, observe the next runner-native
 model-context hook payload, then repeat with a two-child fan-out and confirm
 that no serial nudge is due. Record only the resulting sanitized pass/fail
 receipt; do not capture prompts, transcripts, or session identifiers.
+
+## Implementation/status addendum — native delivery observation correction (2026-09-08)
+
+The Claude advisory wiring is complete: the attended wiring commit
+`2dab5966ee827b390c99546738628a29adf49308` registers the existing
+`guard-slicing.mjs` advisory for the Claude native dispatch and plan surfaces.
+The Codex and Antigravity adapter registrations remain present in their
+runner-native configuration. This is an implementation and registration fact,
+not a new enforcement decision: ADR-0080 remains advisory and does not require
+parallel execution.
+
+A sanitized native observation also found installed/source parity for the
+Codex hook configuration and slicing modules. Its initial conclusion that the
+bounded Codex state record was not parent-bound was corrected by deriving the
+stored key from the supplied parent session value before hashing. The corrected
+derivation establishes that a parent `SubagentStart` lifecycle observation was
+persisted. It does **not** establish a parent `PreToolUse` `spawn_agent`
+observation, an emitted due nudge, or model-visible `additionalContext`
+delivery. No equivalent live Antigravity delivery proof is claimed here.
+
+The source adapters and their fixture coverage prove configuration and
+source-level behavior only. They do not prove live event arrival or model
+delivery for every runner. The sanitized receipt, corrected conclusion, and
+source references are recorded in
+[`backlog/evidence/2026-09-08-native-slicing-delivery-observation.md`](../../backlog/evidence/2026-09-08-native-slicing-delivery-observation.md).
