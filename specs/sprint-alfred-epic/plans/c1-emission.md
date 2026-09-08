@@ -11,6 +11,11 @@ and reporting work together.
 
 ## Authority and contract boundaries
 
+The first-slice contracts are [C1 preflight observation](c1-preflight-observation.md)
+and [C1 store/controller](c1-store-controller.md). The store plan refines the
+older flat-filename proposal with a digest-directory layout, synchronous
+controller, and expanded bounded metadata.
+
 Authority: `specs/sprint-alfred-epic/spec.md` §§2, 6.1, 9, 10, 12 and 13,
 the #103 snapshot at lines 377–466, `plans/c1-core.md` step 3, and
 `plans/c1-aggregation.md`. Preserve the Interruption receipt + registry family

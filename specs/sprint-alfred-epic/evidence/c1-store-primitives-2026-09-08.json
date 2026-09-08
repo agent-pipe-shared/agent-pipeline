@@ -1,0 +1,42 @@
+{
+  "schema": "pipeline.alfred-store-primitive-probe.v1",
+  "candidate": {
+    "start": {
+      "commit": "ecc15e54bf2b3bc0a7e156c922e6879cbca5b786",
+      "tree": "5d24f2632b3036bfde3977f744a195c7fe3524c6"
+    },
+    "finish": {
+      "commit": "ecc15e54bf2b3bc0a7e156c922e6879cbca5b786",
+      "tree": "5d24f2632b3036bfde3977f744a195c7fe3524c6"
+    },
+    "binding": "exact"
+  },
+  "platform": "linux",
+  "nodeVersion": "v24.15.0",
+  "filesystemType": "0xef53",
+  "scope": "disposable-local-fixture",
+  "checks": [
+    {
+      "name": "exclusive-create-write-fsync-readback",
+      "status": "passed"
+    },
+    {
+      "name": "directory-fsync-before-and-after-create-only-link",
+      "status": "passed"
+    },
+    {
+      "name": "no-follow-refuses-symlink-leaf",
+      "status": "passed"
+    },
+    {
+      "name": "separate-process-mkdir-lock-contention",
+      "status": "passed"
+    }
+  ],
+  "limitations": [
+    "No C1 store implementation tested",
+    "No power-loss durability or crash recovery established",
+    "No hostile ancestor replacement, distributed filesystem or Windows qualification",
+    "No live interruption collection or baseline"
+  ]
+}
