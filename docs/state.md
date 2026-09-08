@@ -86,12 +86,12 @@ Independent repairs include the truthful unparsed-command denial
 296-test capture and bounds repeated observations per session/reason, without
 claiming global retention or crash durability. Full candidate review is pending.
 
-The ADR source inventory at `9d2cbc3870e7bbd29dfa00c506d0c5ae3131d4d6`
-contains 44 declarations among 75 accepted decisions; 31 remain. The separate
+The ADR source inventory at `9742b1aaa8b2f2502bd9d4a42285ede411034967`
+contains 52 declarations among 75 accepted decisions; 23 remain. The separate
 historical/provisional/proposed exclusions are unchanged. Source counts and
 responsibility evidence are indexed in
-`backlog/evidence/2026-09-08-adr-coverage-progress.md`. The four universal copies
-are integrated in `9f07a1e8`; generator, document and consumer checks pass.
+`backlog/evidence/2026-09-08-adr-coverage-progress.md`. The latest two universal
+copies are integrated in `2e94c12d`; generator, document and consumer checks pass.
 Final source-candidate reconciliation is still outstanding. Reader-review
 release binding waits for the remaining coverage.
 
@@ -100,9 +100,10 @@ the actual observed feature and phase; the phase check is consistent and the
 authoritative state file is unchanged. Readback:
 `scratch/state-phase-marker-repair-20260908.json`.
 
-A separate source-backed follow-up remains: the close-block skill publishes
-handover size/dry-run flags absent from the rotation CLI. The library size
-measurement works. Evidence and scope:
+The handover CLI repair is committed in `d50a4fbc`: explicit size and dry-run
+modes are read-only; malformed and unsupported flags refuse before mutation.
+Actual child-CLI regressions preserve complete fixture state and all existing
+test assertions. Candidate-wide independent review remains pending. Evidence:
 `backlog/evidence/2026-09-08-handover-size-command-mismatch.md`.
 
 The installed plugin still carries `0.6.1+codex.20260906172530.87af6b6`.

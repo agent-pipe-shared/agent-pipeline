@@ -96,3 +96,26 @@ and receipt enforcement, session probes and lifecycle/override guards, resume
 entry guidance, Codex preflight and Critic/advisory transports, and the associated
 tests, capability inventory, backlog decisions and evidence. Historical isolated
 experiments do not become active model-routing authority through this delta.
+
+## Additional confirmed handover CLI repair — 8 September
+
+The AFK continuation exposed a concrete defect in the existing handover tool:
+with valid section selection and extraction acknowledgement, `--dry-run`,
+`--check-size` and unknown options were ignored and the command performed a
+real rotation. The reproduction used disposable fixtures only; evidence is
+`backlog/evidence/2026-09-08-handover-size-command-mismatch.md` and
+`scratch/handover-cli-ignored-mode-reproduction-20260908.json`.
+
+The candidate repair must give the published inspection modes explicit,
+read-only behavior using the existing configuration, measurement and rotation
+primitives. A size check measures the configured file against its configured
+byte limit. A dry run validates current section-bound extraction acknowledgements
+and describes the proposed archive without writing any file or directory.
+Unknown options, missing values and conflicting modes must refuse before
+mutation. Preserve existing deliberate rotation and acknowledgement syntax,
+path containment and the distinction between the two archive mechanisms.
+Regression evidence must exercise the actual CLI and compare complete fixture
+state before and after each inspection/refusal, including private markers and
+governance registration. Update the close instructions to match the executable
+contract. This adds the CLI, its direct tests and the bounded close-instruction
+change to the final candidate review; it authorizes no rotation of this session.

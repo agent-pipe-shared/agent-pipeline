@@ -1,6 +1,35 @@
 # ADR coverage progress — 2026-09-08
 
-## Current source checkpoint — 44 of 75 accepted decisions
+## Current source checkpoint — 52 of 75 accepted decisions
+
+Source commit `9742b1aaa8b2f2502bd9d4a42285ede411034967` contains the same
+80 numbered ADRs: 75 accepted, 3 historical, 1 provisional and 1 proposed.
+Fifty-two accepted decisions now declare governing paths; 23 still lack them.
+The immutable complete rows are
+`scratch/adr-source-inventory-round8-rows-20260908.json`, SHA-256
+`fccdb5049e54dfcc9c3b0f962443d2ac1119e6ad6ca875ed5ab47ded26f88c60`;
+`scratch/adr-source-inventory-round8-20260908.json` binds their source bytes
+and exact tracked corpus to that commit.
+
+The latest additions are ADR-0013–0016 in
+`1d191a56941cfe2c767edab867fe60a37c0dd05f` and ADR-0018/0019/0020/0023 in
+the source checkpoint above. Both pass strict dispatch authorship. Readable
+obligation mappings and unchanged-body proof references are
+`backlog/evidence/2026-09-08-adr-contracts-governs-coverage.md` and
+`backlog/evidence/2026-09-08-adr-practice-governs-coverage.md`. They distinguish
+actual native guard and V3 effort owners from missing monitoring and explicitly
+process-only repository scoping. This declaration count does not establish
+implementation conformance or final source-candidate reconciliation.
+Queue item 12 remains open until the 23 remaining accepted decisions and
+legitimate exclusions are addressed and the final source candidate is reconciled.
+The two latest universal copies were integrated separately in
+`2e94c12d96d9af574d9ec8c89722ed6f5654e756`. Generator, consumer and document
+checks pass, including the nine existing consumer regressions. Exactly one
+inherited ADR-0014 header needed classification; a separate consumer instruction
+remains rejected. See
+`backlog/evidence/2026-09-08-adr-contracts-vendor-integration.md`.
+
+## Earlier source checkpoint — 44 of 75 accepted decisions
 
 Source commit `9d2cbc3870e7bbd29dfa00c506d0c5ae3131d4d6` contains 80
 numbered ADRs: 75 accepted, 3 historical, 1 provisional and 1 proposed.
@@ -31,8 +60,9 @@ The earlier continuity and approval packages are recorded in
 These mappings explicitly retain unimplemented or deferred obligations,
 including feature-close rotation and universal ceremony conformance.
 
-Queue item 12 remains open. Finish the 31 remaining accepted decisions and
-their legitimate exclusions, then reconcile the final source candidate.
+At this earlier checkpoint, 31 accepted decisions still lacked declarations;
+their legitimate exclusions and final source-candidate reconciliation also
+remained outstanding.
 Declaration counts alone prove neither complete semantic path coverage nor
 implementation conformance. The real-Git acceptance proof described below
 remains valid for its isolated fixture; it does not reconcile this new source

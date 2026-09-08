@@ -79,3 +79,15 @@ or acceptance criterion changes here, and no final reconciliation or reader-revi
 binding is claimed. The four affected universal copies were integrated separately
 in `9f07a1e89dbf7f3dc8c49a199dd5968e31e7d68b`; their generator and consumer
 checks pass. This still does not close the remaining coverage work.
+
+### Progress — 2026-09-08, source checkpoint 9742b1aa
+
+Fifty-two of the 75 accepted decisions now declare governing paths; 23 remain.
+The complete 80-row corpus is source-bound at
+`9742b1aaa8b2f2502bd9d4a42285ede411034967`. The eight new declarations preserve
+all original non-header bytes and are described in the current coverage evidence
+index above. Counts do not establish semantic completeness, implementation
+conformance or final reconciliation. This item remains open.
+The two corresponding universal copies are integrated in
+`2e94c12d96d9af574d9ec8c89722ed6f5654e756`, with the bounded consumer-check
+classification and its negative proof recorded in the coverage evidence index.
