@@ -2,6 +2,8 @@
 
 **Status:** accepted · **Date:** 2026-07-23
 
+**Governs:** plugins/pipeline-core/lib/control-execution-exchange.mjs, plugins/pipeline-core/lib/control-execution-exchange.test.mjs, plugins/pipeline-core/lib/continuity-state.mjs, plugins/pipeline-core/lib/continuity-state.test.mjs, plugins/pipeline-core/lib/control-execution-lifecycle-event.mjs, plugins/pipeline-core/lib/control-execution-lifecycle-event.test.mjs, plugins/pipeline-core/lib/lifecycle-governance-events.mjs, plugins/pipeline-core/lib/lifecycle-governance-events.test.mjs, plugins/pipeline-core/scripts/control-execution-exchange.schema.json, plugins/pipeline-core/scripts/fixtures/control-execution-exchange-*.json, plugins/pipeline-core/config/control-execution-extension-namespaces.json, plugins/pipeline-core/scripts/pipeline-state.mjs, plugins/pipeline-core/scripts/pipeline-state.test.mjs
+
 ## Context
 
 Issue #10 needs a smallest reversible boundary for future execution options without creating an executor or a second authority store. The Elephant remains the sole orchestrator. PO gates, admission, mutation authority, deterministic Verify, independent Critic, candidate binding, cancellation, merge/release/final acceptance remain control-plane decisions; workers cannot delegate. The workflow-runner boundary owns observed outcomes, and telemetry is observation only.

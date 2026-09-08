@@ -4,6 +4,8 @@
 
 **Status:** accepted (2026-08-11, PO instruction, chat, "Annehmen wie entworfen" — accept as drafted) · **Basis:** `specs/sprint-nova-epic/implementation/issue-acceptance-matrix.md` rows `#12`/`#14` and `#29`; `specs/sprint-nova-epic/plans/nova-a.md` Slices A2/A4; drafted at the PO's request ("ja bitte ADR entwerfen", 2026-08-11), accepted as drafted the same day.
 
+**Governs:** docs/nova-execution-plane-threat-model.md, harness/scripts/verify.mjs, plugins/pipeline-core/lib/execution-plane-contract.mjs, plugins/pipeline-core/lib/execution-plane-contract.test.mjs, plugins/pipeline-core/lib/execution-plane-contract-real.test.mjs, plugins/pipeline-core/scripts/execution-plane-launch.mjs, plugins/pipeline-core/scripts/execution-plane-launch.test.mjs, plugins/pipeline-core/scripts/selected-sandbox-launch.mjs, plugins/pipeline-core/scripts/selected-sandbox-launch.test.mjs, plugins/pipeline-core/scripts/selected-sandbox-disposition.schema.json, specs/sprint-nova-epic/implementation/issue-acceptance-matrix.md
+
 ## Context
 
 Nova A's Slice A4 (`#12`/`#14`, execution contract and scheduling lifecycle)

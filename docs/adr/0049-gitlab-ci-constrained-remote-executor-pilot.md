@@ -2,6 +2,8 @@
 
 **Status:** accepted by PO design approval · **Date:** 2026-07-27
 
+**Governs:** docs/gitlab-ci-pilot-threat-model.md, harness/scripts/verify.mjs, plugins/pipeline-core/lib/gitlab-ci-execution-broker.mjs, plugins/pipeline-core/lib/gitlab-ci-execution-broker.test.mjs, plugins/pipeline-core/scripts/gitlab-ci-execution-broker.mjs, plugins/pipeline-core/scripts/gitlab-ci-execution-broker.test.mjs, plugins/pipeline-core/scripts/gitlab-ci-execution-broker.schema.json, plugins/pipeline-core/scripts/gitlab-ci-execution-broker-observation.schema.json, plugins/pipeline-core/scripts/fixtures/nova-b2-gitlab/success-observation.json, specs/sprint-nova-epic/spec.md, specs/sprint-nova-epic/acceptance.md, specs/sprint-nova-epic/plans/nova-b.md, specs/sprint-nova-epic/result.md, specs/sprint-nova-epic/lifecycle.json
+
 ## Context
 
 Nova must support consumer-selected GitHub and GitLab targets without making a

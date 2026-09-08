@@ -2,6 +2,8 @@
 
 **Status:** accepted by PO instruction · **Date:** 2026-07-26
 
+**Governs:** docs/adr/README.md, docs/local-supervisor-state-threat-model.md, docs/product-capability-inventory.json, docs/state.md, governance/observation-doc-governance.json, harness/scripts/verify.mjs, plugins/pipeline-core/lib/local-worker-supervisor.mjs, plugins/pipeline-core/lib/local-worker-supervisor.test.mjs, plugins/pipeline-core/scripts/local-worker-supervisor.mjs, plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs, plugins/pipeline-core/scripts/local-worker-supervisor.schema.json, plugins/pipeline-core/scripts/fixtures/local-worker-supervisor-worker.mjs, specs/sprint-nova-epic/spec.md, specs/sprint-nova-epic/acceptance.md, specs/sprint-nova-epic/plans/nova-b.md, specs/sprint-nova-epic/prd_sprint-nova-epic.md, specs/sprint-nova-epic/result.md, specs/sprint-nova-epic/lifecycle.json
+
 ## Context
 
 ADR-0070 established the machine-local state root and repair authority but
