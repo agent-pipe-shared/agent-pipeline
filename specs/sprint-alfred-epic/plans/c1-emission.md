@@ -11,11 +11,6 @@ and reporting work together.
 
 ## Authority and contract boundaries
 
-The first-slice contracts are [C1 preflight observation](c1-preflight-observation.md)
-and [C1 store/controller](c1-store-controller.md). The store plan refines the
-older flat-filename proposal with a digest-directory layout, synchronous
-controller, and expanded bounded metadata.
-
 Authority: `specs/sprint-alfred-epic/spec.md` §§2, 6.1, 9, 10, 12 and 13,
 the #103 snapshot at lines 377–466, `plans/c1-core.md` step 3, and
 `plans/c1-aggregation.md`. Preserve the Interruption receipt + registry family
@@ -38,14 +33,11 @@ not accept arbitrary `--facts` or a model-selected classification.
 
 ## Source ingestion and privacy projection
 
-The first exact contract is the [C1 source-projection plan](c1-source-projection.md).
-Pure invocation/review source projection belongs in
+New pure source projection belongs in
 `plugins/pipeline-core/lib/interruption-source-adapter.mjs`. It accepts bytes
 plus closed repository-local routing/binding context, validates full owning
 source records, and builds only existing C1 observations and join rows. It
-does not launch a tool, inspect a session or write a file. Usage ingestion is a
-later separate read-only I/O adapter because owning `ingestRunnerUsage` reads
-shipped schemas and an exact route receipt during binding.
+does not launch a tool, inspect a session or write a file.
 
 Reject duplicate JSON keys before source validators see parsed data. Reuse
 `parseStrictJson` from `lib/governance-event.mjs`, preceded by a byte/nesting
@@ -62,7 +54,7 @@ their owning definitions. Do not substitute one kind of digest for the other.
 |---|---|
 | Invocation | Validate request and ordered complete attempts with `validateInvocationChain`; project the six existing C1 invocation-row fields. Derive `invocationResolutionKey` only with its owning function and actually available fingerprint. |
 | Review | Validate complete oldest-to-newest history with `validateCriticReviewHistory`; project existing review identity/predecessor/digest fields. Current receipt candidate remains distinct from predecessor candidates allowed by correction history. |
-| Usage | Later separate read-only I/O adapter: strictly inspect exact native bytes, then pass those same bytes and authentic source/route context to `ingestRunnerUsage`. Admit only a bound dispatch matching receipt scope and its native event digest. Never export native thread/turn/provider IDs. |
+| Usage | Strictly inspect exact native bytes, then pass those same bytes and authentic source/route context to `ingestRunnerUsage`. Admit only a bound dispatch matching receipt scope and its native event digest. Never export native thread/turn/provider IDs. |
 | Recovery | Accept only a validated sanctioned recovery artifact with existing public artifact identity and exact digest; a free-form claim or newly minted repair ID is insufficient. |
 
 The first adapter supports complete invocation/review histories only. A caller
@@ -224,13 +216,10 @@ guarantees. Document only commands that actually ship and are exercised.
 
 ## Delivery slices, ownership and verification
 
-1. Source projection: follow the [C1 source-projection plan](c1-source-projection.md)
-   for the new source-adapter module and its focused behavior in the existing
-   registered C1 receipt suite. Freeze exact callable/output shapes and
-   diagnostic vocabulary before dispatch. Source-validation, duplicate-key,
-   privacy, candidate and incomplete-history tests must prove behavior using
-   owning constructors. Usage ingestion remains a later separate read-only
-   I/O adapter.
+1. Source projection: new source-adapter module and its focused fixture suite.
+   Freeze exact callable/output shapes and diagnostic vocabulary in this plan
+   before dispatch. Source-validation, duplicate-key, privacy, candidate and
+   incomplete-history tests must prove behavior using owning constructors.
 2. Local store/report: store module, report CLI, focused suites, exact ignore
    entry and user/reference docs. Freeze collector envelope/coverage schema
    before dispatch. Exercise actual filesystem replay/conflict, crash remnants,
