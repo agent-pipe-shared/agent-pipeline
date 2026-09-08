@@ -48,11 +48,43 @@ authority reports `ready`, projection `noop`, and readback `current`; onboarding
 reports `ready` and `CAS-READY`. This replaces the prior blocked bootstrap,
 whose refresh omitted the project-tier manifest. The prior session's rollback
 request and denial remain in human-stream audit events 15/16 and their heads
-update. Access to prior runner transcripts remains guard-blocked. Existing
-Verify/security evidence predates this continuation and is not evidence for
-these changes. C1 aggregation is the next bounded package to inspect; its
-implementation, integration Verify and independent T1 review remain pending.
-Alfred remains implementing, with the baseline and acceptance limits below.
+update. Access to prior runner transcripts remains guard-blocked.
+
+The exact clean candidate `d88b543486ddc8e6215d3944fafc1e38aa6790da`, tree
+`f803aa1a4b353ee6093676b3f33961359d193fe1`, has now had Full Verify run. The
+machine receipt records exit 1 across 508 steps: 499 green and 9 failures —
+`setup-tests`, `routing-projection-tests`, `routing-projection-check`,
+`codex-advisory-bootstrap-tests`, `po-language-projection-check`,
+`verify-suite-registration-tests`, `verify-suite-registration-check`,
+`pipeline-user-v3-drift-tests`, and `security-scan`. Eight non-security
+failures are tracked under a separate diagnostic task. This Verify is red and
+does not authorize an independent Critic launch.
+
+The focused event-16 scanner diagnostic exits 0 and confirms that the raw match
+equals the producer `denyDecisionId({intentSha256: event.correlation.requestId,
+generation: 0, producer: hgo})`, `payload.decisionId`, and `idempotencyKey`.
+The scanner proposal remains `proposal-not-applied` and pending a new PO
+decision; the prior narrow approval does not cover event 16. No standalone
+new-exception writer command was identified; `repairStaleIgnoreEntry` is for an
+existing stale entry and is not applicable. Any eventual exact diff must use
+the repository's permitted mutation route and actual guard requirements. The
+proposed review date of
+2026-09-26 is a PO proposal, not an automatically enforced expiry.
+
+The C1 aggregation implementation and focused tests are locally committed at
+`854b0da8d1732bf2f787a684f9ad79659a7c9186`; its final checks record receipt
+64/64, consumer checks 9/9, and diff-check exit 0. C1 emission/local-report
+refinement is the next autonomous preparation step; baseline collection has
+not started. Full Verify on the new candidate and T1 review remain pending.
+An optional next-package read-only agent bootstrap was auto-review-rejected
+because bare `pipeline-start-preflight` may perform cleanup beyond its
+read-only scope; there was no retry or bypass, and orientation was completed
+directly by the parent.
+
+The [local continuation verification note](../specs/sprint-alfred-epic/evidence/local-continuation-verification-2026-09-08.md)
+records these candidate-bound facts, the hook-test status (failed/not measured),
+and the open review gates. Alfred remains implementing; no final feature or
+review claim is made.
 
 The PO approved plural `probeSurfaces[]` with correlated `observations[]`
 and deferred the combined suite/capability registration until A1-2 stabilizes
