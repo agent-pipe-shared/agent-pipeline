@@ -281,6 +281,228 @@ export function validateInterruptionReceipt(record, registry) {
   }
 }
 
+// Aggregate ingestion snapshots data descriptors, never caller property reads.
+// Receipt depth starts at zero independently of the new wrapper/array layers.
+function dataDescriptors(value) {
+  requireValue(value !== null && typeof value === "object");
+  const array = Array.isArray(value), prototype = Object.getPrototypeOf(value);
+  requireValue(array ? prototype === Array.prototype : prototype === null || prototype === Object.prototype);
+  const descriptors = Object.getOwnPropertyDescriptors(value), keys = Reflect.ownKeys(descriptors);
+  requireValue(keys.every((key) => typeof key === "string"));
+  requireValue(keys.every((key) => Object.hasOwn(descriptors[key], "value")
+    && (array && key === "length" || descriptors[key].enumerable)));
+  if (array) {
+    const length = descriptors.length?.value;
+    requireValue(Number.isSafeInteger(length) && length >= 0 && length <= 4096 && keys.length === length + 1
+      && keys.every((key) => key === "length" || /^(?:0|[1-9][0-9]*)$/u.test(key) && Number(key) < length));
+  } else requireValue(keys.length <= 64);
+  return descriptors;
+}
+function snapshotJson(value, depth = 0, ancestors = new Set()) {
+  requireValue(depth <= 16);
+  if (value === null || typeof value !== "object") { safeJson(value, depth); return value; }
+  requireValue(!ancestors.has(value));
+  const descriptors = dataDescriptors(value), result = Array.isArray(value) ? [] : Object.create(null);
+  ancestors.add(value);
+  for (const key of Object.keys(descriptors)) {
+    if (Array.isArray(value) && key === "length") continue;
+    result[key] = snapshotJson(descriptors[key].value, depth + 1, ancestors);
+  }
+  ancestors.delete(value);
+  return result;
+}
+const ordinal = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+const count = (value) => {
+  requireValue(Number.isSafeInteger(value) && value >= 0);
+  return metric(value, "measured", "count");
+};
+const bounded = (rows) => { requireValue(rows.length <= 4096); return rows; };
+const joinIdentity = {
+  invocations: (row) => canonical([row.invocationId, row.attemptId]),
+  reviews: (row) => row.reviewId,
+  usages: (row) => canonical([row.scope.dispatchId, row.source.eventSha256]),
+  recoveries: (row) => row.id,
+};
+const joinStatus = (row, kind) => kind === "recoveries" ? row.recoveryCount.status
+  : kind === "usages" ? row.collectionStatus : row.attemptCount.status;
+const measuredTime = (time) => time.status === "measured" ? time.value : null;
+const signature = (row) => ({ phase: row.scope.phase, codeFamily: row.category,
+  runner: row.actor.runner, role: row.actor.role, typedCode: row.typedCode, classification: row.classification });
+const missingSignatureField = (key, value) => value === null
+  || ["codeFamily", "classification"].includes(key) && value === "unknown";
+const knownSignature = (key) => Object.entries(key).every(([field, value]) => !missingSignatureField(field, value));
+
+function lineageHistory(rows) {
+  for (const key of ["featureId", "packageId", "dispatchId"])
+    requireValue(new Set(rows.map((row) => row.scope[key]).filter((value) => value !== null)).size <= 1, "C1-LINEAGE");
+  // Maps keep large update histories bounded without flattening every replay.
+  const observations = new Map(), artifacts = new Map();
+  const joins = Object.fromEntries(Object.keys(joinIdentity).map((key) => [key, new Map()]));
+  const retain = (map, key, row) => {
+    requireValue(!map.has(key) || same(map.get(key), row), "C1-CONFLICT");
+    map.set(key, row); requireValue(map.size <= 4096);
+  };
+  for (const row of rows) {
+    for (const observation of row.observations) retain(observations, observation.artifact.id, observation);
+    for (const artifact of row.binding.artifacts) retain(artifacts, artifact.id, artifact);
+    for (const kind of Object.keys(joins)) for (const link of row.joins[kind]) retain(joins[kind], joinIdentity[kind](link), link);
+  }
+  chainCheck([...joins.invocations.values()], false);
+  chainCheck([...joins.reviews.values()], false, true);
+  const measuredStarts = [...new Set(rows.map((row) => measuredTime(row.firstObservedAt)).filter((value) => value !== null))];
+  requireValue(measuredStarts.length <= 1, "C1-TIME");
+  const finalRows = rows.filter((row) => ["resolved", "terminal"].includes(row.state));
+  requireValue(new Set(finalRows.map((row) => row.state)).size <= 1, "C1-CONFLICT");
+  for (const row of finalRows) requireValue(same(row.resolution, finalRows[0].resolution), "C1-CONFLICT");
+  const endpointKey = finalRows[0]?.state === "terminal" ? "terminalAt" : "resolvedAt";
+  const measuredEnds = [...new Set(finalRows.map((row) => measuredTime(row[endpointKey])).filter((value) => value !== null))];
+  requireValue(measuredEnds.length <= 1, "C1-TIME");
+  const chronological = rows.filter((row) => row.observedThroughAt.status === "measured")
+    .sort((a, b) => ordinal(a.observedThroughAt.value, b.observedThroughAt.value) || ordinal(a.eventId, b.eventId));
+  const seen = Object.fromEntries(Object.keys(joins).map((key) => [key, new Set()]));
+  let prior = null, closedState = null, unresolvedCutoff = null;
+  for (const row of chronological) {
+    if (measuredStarts.length) requireValue(measuredStarts[0] <= row.observedThroughAt.value, "C1-TIME");
+    if (prior?.observedThroughAt.value === row.observedThroughAt.value) {
+      const withoutIdentity = ({ eventId, recordSha256, ...rest }) => rest;
+      requireValue(same(withoutIdentity(prior), withoutIdentity(row)), "C1-CONFLICT");
+    }
+    requireValue(closedState === null || row.state === closedState, "C1-CONFLICT");
+    if (["resolved", "terminal"].includes(row.state)) {
+      closedState = row.state;
+      if (unresolvedCutoff !== null && row[endpointKey].status === "measured")
+        requireValue(unresolvedCutoff <= row[endpointKey].value, "C1-TIME");
+    }
+    if (row.state === "unresolved") unresolvedCutoff = row.observedThroughAt.value;
+    for (const kind of Object.keys(joins)) {
+      const current = new Set(row.joins[kind].map(joinIdentity[kind]));
+      if (joinStatus(row, kind) === "measured")
+        requireValue([...seen[kind]].every((key) => current.has(key)), "C1-LINEAGE");
+      for (const key of current) seen[kind].add(key);
+    }
+    prior = row;
+  }
+  if (measuredStarts.length && measuredEnds.length) requireValue(measuredStarts[0] <= measuredEnds[0], "C1-TIME");
+  const orderingStatus = fold(rows.map((row) => row.observedThroughAt.status));
+  const latest = rows.length === 1 ? rows[0] : orderingStatus === "measured"
+    ? chronological.find((row) => row.observedThroughAt.value === chronological.at(-1).observedThroughAt.value) : null;
+  const missingStatus = orderingStatus === "unavailable" ? "unavailable" : "unknown";
+  const signatures = uniqueRows(rows.map(signature), canonical);
+  return {
+    rows, latest, signatures, stableSignature: signatures.length === 1 && knownSignature(signatures[0]) ? signatures[0] : null,
+    measuredStart: measuredStarts[0] ?? null, measuredEnd: measuredEnds[0] ?? null,
+    completeClocks: rows.every((row) => row.firstObservedAt.status === "measured" && row.observedThroughAt.status === "measured"
+      && (!["resolved", "terminal"].includes(row.state) || row[endpointKey].status === "measured")),
+    episode: { lineageId: rows[0].lineageId, eventIds: rows.map((row) => row.eventId).sort(), latestEventId: latest?.eventId ?? null,
+      orderingStatus, classifications: [...new Set(rows.map((row) => row.classification))].sort(), states: [...new Set(rows.map((row) => row.state))].sort(),
+      blockedWallTime: latest ? copy(latest.blockedWallTime) : metric(null, missingStatus, "ms"),
+      attemptCount: latest ? copy(latest.attemptCount) : metric(null, missingStatus, "count"),
+      recoveryCount: latest ? copy(latest.recoveryCount) : metric(null, missingStatus, "count") },
+  };
+}
+function ratio(numerator, denominator, status) {
+  requireValue(numerator <= denominator);
+  const effectiveStatus = denominator === 0 ? "unknown" : status;
+  return { numerator: count(numerator), denominator: count(denominator),
+    value: ["measured", "estimated"].includes(effectiveStatus) ? numerator / denominator : null, status: effectiveStatus, unit: "ratio" };
+}
+function followupOutcome(member, histories, window, coverage) {
+  const key = member.stableSignature, endpoint = member.measuredEnd;
+  if (!key || endpoint === null || window.end.status !== "measured" || endpoint >= window.end.value) return "unknown";
+  let complete = member.completeClocks && coverage.receipts === "measured" && coverage.followup === "measured";
+  for (const peer of histories) {
+    if (peer === member) continue;
+    // A measured start outside this exposure cannot hide a later new episode,
+    // even when some of that peer's other observations are unavailable.
+    if (peer.measuredStart !== null && (peer.measuredStart <= endpoint || peer.measuredStart > window.end.value)) continue;
+    const potential = peer.signatures.some((observed) => Object.keys(key).every((field) =>
+      missingSignatureField(field, observed[field]) || observed[field] === key[field]));
+    if (!potential) continue;
+    if (peer.stableSignature && same(peer.stableSignature, key) && peer.measuredStart !== null
+      && peer.measuredStart > endpoint && peer.measuredStart <= window.end.value) return "recurred";
+    // Unknown or changing signatures/clocks cannot support a negative claim.
+    if (!peer.stableSignature || !peer.completeClocks) complete = false;
+  }
+  return complete ? "noRecurrenceObserved" : "unknown";
+}
+function effectiveness(members, histories, window, coverage) {
+  const assessed = members.filter(({ latest }) => latest && latest.classification !== "unknown"
+    && ["unresolved", "resolved", "terminal"].includes(latest.state)
+    && !(latest.state === "resolved" && latest.classification === "terminal-blocker"));
+  const resolved = assessed.filter(({ latest }) => latest.state === "resolved");
+  const outcomes = { recurred: 0, noRecurrenceObserved: 0, unknown: 0 };
+  for (const member of resolved) outcomes[followupOutcome(member, histories, window, coverage)]++;
+  const followupAssessed = outcomes.recurred + outcomes.noRecurrenceObserved;
+  return { assessedCount: count(assessed.length), resolvedCount: count(resolved.length), unassessedCount: count(members.length - assessed.length),
+    resolvedShare: ratio(resolved.length, assessed.length, fold([coverage.receipts, ...assessed.map(({ latest }) => latest.collectionStatus)])),
+    followup: { resolvedCohortCount: count(resolved.length), assessedCount: count(followupAssessed),
+      recurredCount: count(outcomes.recurred), noRecurrenceObservedCount: count(outcomes.noRecurrenceObserved), unknownCount: count(outcomes.unknown),
+      recurrenceShare: ratio(outcomes.recurred, followupAssessed,
+        fold([coverage.receipts, coverage.followup, outcomes.unknown ? "estimated" : "measured"])) } };
+}
+
+/** Derive a local observed-population view; no collection or success authority. */
+export function aggregateInterruptionReceipts(input, registry) {
+  try {
+    let rules;
+    try { rules = snapshotJson(registry); registryCheck(rules); } catch { fail("C1-REGISTRY"); }
+    const fields = dataDescriptors(input);
+    requireValue(!Array.isArray(input) && exact(fields, ["receipts", "window", "coverage"]));
+    const window = snapshotJson(fields.window.value), coverage = snapshotJson(fields.coverage.value);
+    requireValue(exact(window, ["start", "end"]));
+    timeCheck(window.start); timeCheck(window.end);
+    requireValue(exact(coverage, ["receipts", "followup"]) && Object.values(coverage).every((status) => STATUSES.includes(status)));
+    requireValue(window.start.value === null || window.end.value === null || window.start.value <= window.end.value, "C1-TIME");
+    if (Object.values(coverage).includes("measured"))
+      requireValue(window.start.status === "measured" && window.end.status === "measured", "C1-TIME");
+    const source = fields.receipts.value, rows = dataDescriptors(source);
+    requireValue(Array.isArray(source));
+    const events = new Map();
+    for (let index = 0; index < rows.length.value; index++) {
+      const row = snapshotJson(rows[index].value), validation = validateInterruptionReceipt(row, rules);
+      requireValue(validation.ok, validation.code);
+      if (row.observedThroughAt.value !== null) {
+        requireValue(window.start.value === null || row.observedThroughAt.value >= window.start.value, "C1-TIME");
+        requireValue(window.end.value === null || row.observedThroughAt.value <= window.end.value, "C1-TIME");
+      }
+      requireValue(!events.has(row.eventId) || same(events.get(row.eventId), row), "C1-CONFLICT");
+      events.set(row.eventId, row);
+    }
+    const receipts = [...events.values()].sort((a, b) => ordinal(a.eventId, b.eventId)), lineages = new Map();
+    for (const row of receipts) {
+      if (!lineages.has(row.lineageId)) lineages.set(row.lineageId, []);
+      lineages.get(row.lineageId).push(row);
+    }
+    const histories = [...lineages.entries()].sort(([a], [b]) => ordinal(a, b)).map(([, rows]) => lineageHistory(rows));
+    const byLineage = new Map(histories.map((history) => [history.episode.lineageId, history]));
+    const totals = { eventCount: count(receipts.length), episodeCount: count(histories.length) };
+    for (const state of STATES) totals[`${state}Count`] = count(histories.filter(({ latest }) => latest?.state === state).length);
+    totals.unassessedCount = count(histories.filter(({ latest }) => latest === null).length);
+    const dimensions = { phase: (row) => row.scope.phase, codeFamily: (row) => row.category,
+      runner: (row) => row.actor.runner, role: (row) => row.actor.role, recurrenceSignature: signature, resolutionClass: (row) => row.resolution?.class ?? null };
+    const groups = {};
+    for (const [dimension, keyFor] of Object.entries(dimensions)) {
+      const buckets = new Map();
+      for (const row of receipts) {
+        const key = keyFor(row), bytes = canonical(key);
+        if (!buckets.has(bytes)) buckets.set(bytes, { key, lineageIds: new Set() });
+        buckets.get(bytes).lineageIds.add(row.lineageId);
+      }
+      groups[dimension] = bounded([...buckets.entries()]).sort(([a], [b]) => ordinal(a, b)).map(([, bucket]) => {
+        const lineageIds = [...bucket.lineageIds].sort();
+        return { key: bucket.key, lineageIds, episodeCount: count(lineageIds.length),
+          effectiveness: effectiveness(lineageIds.map((id) => byLineage.get(id)), histories, window, coverage) };
+      });
+    }
+    const categoryRanking = groups.codeFamily.map((group) => ({ category: group.key, lineageIds: group.lineageIds,
+      episodeCount: count(group.lineageIds.length), repeatCount: count(Math.max(group.lineageIds.length - 1, 0)) }))
+      .sort((a, b) => b.episodeCount.value - a.episodeCount.value || ordinal(a.category, b.category));
+    const core = { schema: "pipeline.interruption-aggregate.v1", contractPin: PIN, derivationRevision: REVISION,
+      registrySha256: hash(rules), window, coverage, receipts, episodes: histories.map(({ episode }) => episode), totals, groups, categoryRanking };
+    return { ok: true, code: null, aggregate: copy({ ...core, recordSha256: hash(core) }) };
+  } catch (error) { return { ok: false, code: diagnostic(error), aggregate: null }; }
+}
+
 function diagnostic(error) {
   try {
     const descriptor = error !== null && typeof error === "object" ? Object.getOwnPropertyDescriptor(error, "message") : null;
