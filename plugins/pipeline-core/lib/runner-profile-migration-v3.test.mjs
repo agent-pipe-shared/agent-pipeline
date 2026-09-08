@@ -3,7 +3,7 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, linkSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, linkSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -1117,6 +1117,97 @@ record("authenticated noop apply remains bound to source, runtime digests, and r
     rmSync(root, { recursive: true, force: true });
     rmSync(otherRoot, { recursive: true, force: true });
   }
+});
+
+record("existing neutral authority mirrors join the authenticated migration transaction without creating absent mirrors", () => {
+  const root = fixture(yaml(v3Intent()));
+  const absentRoot = fixture(yaml(v3Intent()));
+  try {
+    const bootstrap = planRunnerProfileMigrationV3({ rootDir: root });
+    assert.ok(["ready", "noop"].includes(bootstrap.status));
+    assert.ok(["applied", "noop"].includes(applyRunnerProfileMigrationV3(bootstrap, { rootDir: root, activate: true }).status));
+
+    const sourceBefore = readFileSync(join(root, "pipeline.user.yaml"), "utf8");
+    const staleManifest = `${readFileSync(join(root, ".claude/pipeline.yaml"), "utf8")}`
+      .replace(/human_facing: [^\n]+/u, "human_facing: en")
+      + 'unownedMirrorSentinel: "preserve"\n';
+    write(root, "project/pipeline.yaml", staleManifest);
+    const staleCalibration = JSON.parse(readFileSync(join(root, ".claude/pipeline.json"), "utf8"));
+    staleCalibration.humanRoles.po.displayLabel = "Stale";
+    staleCalibration.unownedMirrorSentinel = true;
+    write(root, "project/pipeline.json", `${JSON.stringify(staleCalibration, null, 2)}\n`);
+
+    const plan = planRunnerProfileMigrationV3({ rootDir: root });
+    assert.equal(plan.status, "ready", JSON.stringify(plan.diagnostics));
+    assert.deepEqual(plan.changes.map((entry) => entry.path), ["project/pipeline.json", "project/pipeline.yaml"]);
+    assert.equal(applyRunnerProfileMigrationV3(plan, { rootDir: root, activate: true }).status, "applied");
+    assert.equal(readFileSync(join(root, "pipeline.user.yaml"), "utf8"), sourceBefore, "source stays unchanged when only mirrors drift");
+    const legacyManifest = parseYaml(readFileSync(join(root, ".claude/pipeline.yaml"), "utf8"));
+    const updatedManifest = parseYaml(readFileSync(join(root, "project/pipeline.yaml"), "utf8"));
+    assert.deepEqual(updatedManifest.language, legacyManifest.language);
+    assert.deepEqual(updatedManifest.modelRouting, legacyManifest.modelRouting);
+    assert.deepEqual(updatedManifest.runnerRoutes, legacyManifest.runnerRoutes);
+    assert.equal(updatedManifest.unownedMirrorSentinel, "preserve");
+    const legacyCalibration = JSON.parse(readFileSync(join(root, ".claude/pipeline.json"), "utf8"));
+    const updatedCalibration = JSON.parse(readFileSync(join(root, "project/pipeline.json"), "utf8"));
+    assert.deepEqual(updatedCalibration.humanRoles, legacyCalibration.humanRoles);
+    assert.equal(updatedCalibration.unownedMirrorSentinel, true);
+    assert.equal(planRunnerProfileMigrationV3({ rootDir: root }).status, "noop");
+
+    write(root, "project/pipeline.yaml", readFileSync(join(root, "project/pipeline.yaml"), "utf8").replace(/human_facing: [^\n]+/u, "human_facing: en"));
+    const rollbackBefore = {
+      runtime: snapshot(root),
+      mirrors: Object.fromEntries(["project/pipeline.yaml", "project/pipeline.json"].map((path) => [path, readFileSync(join(root, path), "utf8")])),
+    };
+    const interruptedPlan = planRunnerProfileMigrationV3({ rootDir: root });
+    assert.equal(interruptedPlan.status, "ready");
+    assert.equal(applyRunnerProfileMigrationV3(interruptedPlan, {
+      rootDir: root,
+      activate: true,
+      interruptAfterRename: ({ target }) => target === "project/pipeline.yaml",
+    }).status, "interrupted");
+    const recoveryPlan = planPendingTransactionRecoveryV3({ rootDir: root });
+    assert.equal(recoveryPlan.status, "ready");
+    const recoveryAuthorization = authorizePendingTransactionRecoveryV3(recoveryPlan, {
+      deliverPreview: (_preview, invocation) => previewAck(invocation, "ack-neutral-mirror-rollback"),
+    });
+    assert.equal(applyPendingTransactionRecoveryV3(recoveryPlan, {
+      rootDir: root,
+      authorization: recoveryAuthorization,
+    }).status, "recovered");
+    assert.deepEqual({
+      runtime: snapshot(root),
+      mirrors: Object.fromEntries(["project/pipeline.yaml", "project/pipeline.json"].map((path) => [path, readFileSync(join(root, path), "utf8")])),
+    }, rollbackBefore, "recovery restores the drifted existing mirror preimage");
+
+    write(root, "project/pipeline.yaml", `${readFileSync(join(root, "project/pipeline.yaml"), "utf8")}# changed since plan\n`);
+    const stalePlan = planRunnerProfileMigrationV3({ rootDir: root });
+    write(root, "project/pipeline.yaml", `${readFileSync(join(root, "project/pipeline.yaml"), "utf8")}# external change after plan\n`);
+    const staleBytes = readFileSync(join(root, "project/pipeline.yaml"), "utf8");
+    assert.equal(applyRunnerProfileMigrationV3(stalePlan, { rootDir: root, activate: true }).status, "apply-failed");
+    assert.equal(readFileSync(join(root, "project/pipeline.yaml"), "utf8"), staleBytes, "changed mirror bytes survive refusal");
+
+    const absentBootstrap = planRunnerProfileMigrationV3({ rootDir: absentRoot });
+    assert.ok(["ready", "noop"].includes(absentBootstrap.status));
+    assert.ok(["applied", "noop"].includes(applyRunnerProfileMigrationV3(absentBootstrap, { rootDir: absentRoot, activate: true }).status));
+    assert.equal(existsSync(join(absentRoot, "project/pipeline.yaml")), false);
+    assert.equal(existsSync(join(absentRoot, "project/pipeline.json")), false);
+    assert.equal(planRunnerProfileMigrationV3({ rootDir: absentRoot }).status, "noop");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(absentRoot, { recursive: true, force: true });
+  }
+});
+
+record("an unsafe existing neutral authority mirror fails planning without a transaction", () => {
+  const root = fixture(yaml(v3Intent()));
+  try {
+    mkdirSync(join(root, "project"));
+    symlinkSync(join(root, "pipeline.user.yaml"), join(root, "project", "pipeline.yaml"));
+    const plan = planRunnerProfileMigrationV3({ rootDir: root });
+    assert.equal(plan.status, "invalid-baseline");
+    assert.equal(existsSync(join(root, ".pipeline-runner-profile-migration-v3")), false);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 record("legacy V3 Critic route and runnerRoutes refresh through sanctioned re-apply", () => {

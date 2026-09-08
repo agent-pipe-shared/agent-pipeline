@@ -318,6 +318,14 @@ function runtimePaths() {
   if (paths.some((path) => typeof path !== "string" || !SAFE_RELATIVE.test(path)) || new Set(paths).size !== paths.length) throw new Error("V3 runtime ownership manifest has unsafe or duplicate targets");
   return paths;
 }
+function neutralAuthorityMirrorPaths() {
+  const mirrors = loadRuntimeProjectionV3OwnedKeys().neutralAuthorityMirrors;
+  if (mirrors !== undefined && !Array.isArray(mirrors)) throw new Error("V3 neutral authority mirror manifest is invalid");
+  const paths = (mirrors ?? []).map((mirror) => mirror?.path);
+  if (paths.some((path) => typeof path !== "string" || !SAFE_RELATIVE.test(path)) || new Set(paths).size !== paths.length) throw new Error("V3 neutral authority mirror manifest has unsafe or duplicate paths");
+  if (paths.some((path) => runtimePaths().includes(path))) throw new Error("V3 neutral authority mirror manifest overlaps runtime ownership");
+  return paths;
+}
 function hasDurableHostInitAdmission(root, deps) {
   try {
     try {
@@ -370,6 +378,20 @@ function runtimeBaselines(root, deps, sourceKind, { initializeMissingRuntimeForS
     }
     const info = deps.lstatSync(target);
     if (!info.isFile() || info.isSymbolicLink()) throw new Error(`declared runtime baseline is not a regular file: ${relative}`);
+    baselines[relative] = { status: "present", bytes: deps.readFileSync(target, "utf8") };
+  }
+  // `project/*` is not a runtime target creator: it is an existing-only
+  // neutral authority mirror.  Still supply a present mirror to the same
+  // authenticated plan that updates its legacy runtime source, so its owned
+  // keys receive the transaction's preimage, changed-since-plan and rollback
+  // protections.  An absent mirror intentionally contributes no baseline --
+  // runtime-projection-v3 then emits no target and no project authority is
+  // created by this migration.
+  for (const relative of neutralAuthorityMirrorPaths()) {
+    const target = assertNoSymlink(root, relative, deps);
+    if (!deps.existsSync(target)) continue;
+    const info = deps.lstatSync(target);
+    if (!info.isFile() || info.isSymbolicLink()) throw new Error(`declared neutral authority mirror is not a regular file: ${relative}`);
     baselines[relative] = { status: "present", bytes: deps.readFileSync(target, "utf8") };
   }
   return { baselines, seeded, hostManagedCodex };
@@ -778,21 +800,33 @@ function validateTargetBoundary(entries) {
   // migration-owned, on that branch. This validator is the untrusted-input
   // boundary for both `prepare()` and journal recovery, so it does not trust
   // an externally supplied mode flag: it accepts only an exact match against
-  // one of the two canonical, freshly recomputed target lists -- the full
-  // runtime-ownership set, or that same set with every `.claude/` path
-  // removed. No other shape validates.
+  // one of the two canonical, freshly recomputed runtime target lists -- the
+  // full runtime-ownership set, or that same set with every `.claude/` path
+  // removed. Present declared neutral mirrors are an existing-only extension
+  // of either list: they are admitted only by their frozen manifest path and
+  // only with a present preimage, so this boundary cannot create authority.
   const full = runtimePaths().sort((a, b) => a.localeCompare(b));
   const hostManagedCodex = full.filter((path) => !path.startsWith(".claude/"));
+  const mirrorPaths = new Set(neutralAuthorityMirrorPaths());
   const hasAuthorityLock = entries?.at(-2)?.path === AUTHORITY_LOCK_FILE && entries?.at(-2)?.kind === "authority-lock";
   if (!Array.isArray(entries)) throw new Error("V3 transaction has an incomplete target boundary");
-  const runtimeCount = entries.length - 1 - (hasAuthorityLock ? 1 : 0);
-  const expected = runtimeCount === full.length ? full
-    : runtimeCount === hostManagedCodex.length ? hostManagedCodex
-      : null;
-  if (!expected) throw new Error("V3 transaction has an incomplete target boundary");
   if (entries.at(-1)?.path !== SOURCE_FILE || entries.at(-1)?.kind !== "source") throw new Error("V3 transaction does not commit source last");
   const runtime = entries.slice(0, hasAuthorityLock ? -2 : -1);
-  if (runtime.some((entry, index) => entry.kind !== "runtime" || entry.path !== expected[index])) throw new Error("V3 transaction differs from the owned runtime boundary");
+  if (runtime.some((entry) => entry.kind !== "runtime")) throw new Error("V3 transaction differs from the owned runtime boundary");
+  const paths = runtime.map((entry) => entry.path);
+  if (new Set(paths).size !== paths.length) throw new Error("V3 transaction differs from the owned runtime boundary");
+  const corePaths = paths.filter((path) => full.includes(path));
+  const expectedCore = corePaths.length === full.length && full.every((path) => corePaths.includes(path)) ? full
+    : corePaths.length === hostManagedCodex.length && hostManagedCodex.every((path) => corePaths.includes(path)) ? hostManagedCodex
+      : null;
+  if (!expectedCore) throw new Error("V3 transaction has an incomplete target boundary");
+  const mirrors = runtime.filter((entry) => mirrorPaths.has(entry.path));
+  if (paths.length !== corePaths.length + mirrors.length
+    || mirrors.some((entry) => entry.before?.status !== "present")) {
+    throw new Error("V3 transaction differs from the owned runtime boundary");
+  }
+  const expected = [...expectedCore, ...mirrors.map((entry) => entry.path)].sort((left, right) => left.localeCompare(right));
+  if (paths.length !== expected.length || paths.some((path, index) => path !== expected[index])) throw new Error("V3 transaction differs from the owned runtime boundary");
 }
 function imageMatches(actual, expected) {
   return isObject(expected) && actual.status === expected.status && actual.sha256 === expected.sha256 && actual.byteLength === expected.byteLength;
