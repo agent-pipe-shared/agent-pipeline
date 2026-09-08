@@ -150,16 +150,6 @@ export const ALLOWLIST = Object.freeze([
       "entry for the identical string.",
   },
   {
-    file: "harness/scripts/check-verify-suite-registration.mjs",
-    match: "plugins/pipeline-core/lib/codex-host-plugin-list" +
-      ".test.mjs",
-    reason:
-      "VFX2-REFPATH (2026-08-26): comment naming a suite deliberately " +
-      "deleted by PO decision (see the sibling dispatch record for that " +
-      "task id), listed here as a declared exclusion from a different " +
-      "registration check, not a live pointer.",
-  },
-  {
     file: "plugins/pipeline-core/scripts/security-adapters/gitleaks.mjs",
     match: "harness/scripts/security-adapters/gitleaks" +
       ".mjs",
