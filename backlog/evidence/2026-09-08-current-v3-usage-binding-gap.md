@@ -27,3 +27,25 @@ its Scratch fixtures on exit; earlier diagnostic captures remain historical.
 The fixtures supply synthetic effective evidence and prove no live host
 metering or billed cost. Antigravity unavailable-cell findings are registry
 inspection only. Current routing registration is not observed execution.
+
+## Structural follow-up and candidate disposition
+
+The subsequent actual-validator probe also finds frozen V1 exclusions for
+the V3 `epic` profile and `advisory` duty. A genuine bound V1 envelope rejects
+a changed V2 binding identifier: the full envelope schema hard-references
+the frozen binding schema for all three runners. Adding current model names
+alone cannot solve this boundary. The initially proposed new binding inside
+the old full envelope was withdrawn. Probe:
+`scratch/NVA-B-USAGE-V3-EVOLUTION-1/v3-envelope-boundary-probe-rerun.txt`,
+exit 0. Its full registry matrix identifies all 14 current Antigravity cells
+as unavailable, requiring negative cases rather than fabricated eligible runs.
+
+The repository search for the usage module and all four ingestion entry
+points found no runtime producer outside the adapter itself; tests call it.
+This does not establish external consumers or live usage support. It also
+does not establish an additional blocker in the selected-Critic, advisory,
+or Greenfield candidate flows. Track the successor envelope, binding/context,
+source declaration and explicit activation together as a D.5/D.6 follow-up
+concern. Until there is applicable evidence, preserve unknown usage as unknown.
+The Nova PRD forbids in-place frozen-contract changes and allows a versioned
+companion or an explicit ADR; this finding alone requires no new PO signature.
