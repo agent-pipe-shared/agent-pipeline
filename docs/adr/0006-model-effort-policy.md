@@ -4,6 +4,8 @@
 
 Accepted on 2026-07-03; effort defaults revised on 2026-07-04.
 
+**Governs:** docs/operating-model.md, policies/model-policy.md, pipeline.user.yaml, roles/elephant.md, roles/goldfish.md, roles/critic.md, harness/review-protocol.md, templates/prompts/goldfish-task.md, templates/prompts/critic-review.md, plugins/pipeline-core/agents/goldfish-*.md, plugins/pipeline-core/agents/critic.md, plugins/pipeline-core/config/routing-authority.json, plugins/pipeline-core/config/runner-profiles-v3.json, plugins/pipeline-core/lib/agent-model-registry.mjs, plugins/pipeline-core/lib/agent-model-registry.test.mjs, plugins/pipeline-core/lib/dispatch-policy.mjs, plugins/pipeline-core/lib/dispatch-policy.test.mjs, plugins/pipeline-core/lib/runner-profiles-v3.mjs, plugins/pipeline-core/lib/runner-profiles-v3.test.mjs, plugins/pipeline-core/lib/runtime-projection-v3.mjs, plugins/pipeline-core/lib/runtime-projection-v3.test.mjs, plugins/pipeline-core/lib/pipeline-user-v3-drift.mjs, plugins/pipeline-core/lib/pipeline-user-v3-drift.test.mjs, plugins/pipeline-core/lib/runner-usage-v1.mjs, plugins/pipeline-core/lib/runner-usage-v1.test.mjs, plugins/pipeline-core/scripts/check-routing-projections.mjs, plugins/pipeline-core/scripts/check-routing-projections.test.mjs, plugins/pipeline-core/scripts/pipeline-user-v3.schema.json, plugins/pipeline-core/scripts/runner-usage.schema.json
+
 ## Context
 
 Model names, prices, and runner controls change faster than the pipeline's safety requirements. The durable policy therefore describes capabilities and effort tiers in the provider-neutral kernel. Each runner owns the concrete model mapping.

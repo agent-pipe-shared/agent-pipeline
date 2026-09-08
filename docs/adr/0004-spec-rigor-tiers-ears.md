@@ -4,6 +4,8 @@
 
 **Status:** accepted (2026-07-03, Checkpoint 1) · **Basis:** Register E4
 
+**Governs:** docs/operating-model.md, roles/elephant.md, harness/definition-of-done.md, harness/checklists/goldfish-dispatch.md, templates/spec.md, templates/prompts/goldfish-task.md, templates/prompts/critic-review.md, plugins/pipeline-core/agents/readiness-reviewer.md, plugins/pipeline-core/scripts/spec-readiness-host.mjs, plugins/pipeline-core/scripts/spec-readiness-host.test.mjs, plugins/pipeline-core/scripts/sandboxed-readonly-host-bridge.mjs, plugins/pipeline-core/scripts/sandboxed-readonly-host-bridge.test.mjs
+
 ## Context
 
 All SDD frameworks converge on the same Markdown artifacts (Constitution/Spec/Plan/Tasks); Agent OS v3 dropped its own orchestration phases; in the one head-to-head comparison found, the lightest tool won and Spec Kit scored worst. The SDD critique is well documented: overhead ∝ 1/task-size, spec drift, the waterfall trap. EARS ("WHEN … THE SYSTEM SHALL …") turns every acceptance criterion 1:1 into a test case — the spec → tests → Critic bridge.

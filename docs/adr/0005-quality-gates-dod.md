@@ -2,6 +2,8 @@
 
 > _A German version follows below · Eine deutsche Fassung folgt weiter unten._
 
+**Governs:** .claude/pipeline.json, .github/workflows/verify.yml, docs/operating-model.md, guardrails/quality-gates.md, harness/definition-of-done.md, harness/review-protocol.md, roles/goldfish.md, roles/critic.md, templates/prompts/goldfish-task.md, templates/prompts/critic-review.md, harness/scripts/verify.mjs, harness/scripts/verify-evidence-writer.mjs, harness/scripts/verify-evidence-writer.test.mjs, plugins/pipeline-core/hooks/hooks.json, plugins/pipeline-core/hooks/stop-suggest.mjs, plugins/pipeline-core/hooks/guard-push.mjs, plugins/pipeline-core/hooks/guard-push.test.mjs, plugins/pipeline-core/hooks/guard-testpath.mjs, plugins/pipeline-core/hooks/guard-testpath.test.mjs, plugins/pipeline-core/scripts/verify-evidence-producer.mjs, plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs, plugins/pipeline-core/skills/critic-review/SKILL.md
+
 ## Context
 
 The documented main failure mode of agentic development is "reported done but not tested"; the countermeasure is evidence instead of claim. Verification is an escalation staircase: deterministic before probabilistic — stop-hooks block the end of the turn until the check is green; LLM review comes after and flags nothing that CI already enforces.
