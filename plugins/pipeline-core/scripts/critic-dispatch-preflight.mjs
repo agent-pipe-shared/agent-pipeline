@@ -54,7 +54,31 @@ export class CriticDispatchPreflightError extends Error {
   }
 }
 
-function fail(code, message, details = null) { throw new CriticDispatchPreflightError(code, message, details); }
+// Only failures created at this producer's own branches supply typed source codes.
+// A foreign thrown value is rethrown unchanged and observed as CDP-UNEXPECTED.
+const sourceFailureCodes = new WeakMap();
+function fail(code, message, details = null) {
+  const error = new CriticDispatchPreflightError(code, message, details);
+  sourceFailureCodes.set(error, code);
+  throw error;
+}
+
+/** Trusted synchronous callback; its return and failures cannot affect admission. */
+function observeSource(observer, stage, outcome, code, candidate, specSha256) {
+  if (typeof observer !== "function") return;
+  try {
+    observer({
+      schema: "pipeline.critic-preflight-observation.v1",
+      producer: "critic-dispatch-preflight",
+      observationRevision: 1,
+      stage, outcome, code,
+      candidate: candidate === null ? null : { commit: candidate.commit, tree: candidate.tree },
+      specSha256,
+    });
+  } catch {
+    // Observation cannot replace the already chosen producer result/exception.
+  }
+}
 function sha256(bytes) { return createHash("sha256").update(bytes).digest("hex"); }
 function compare(left, right) { return left < right ? -1 : left > right ? 1 : 0; }
 function isObject(value) { return value !== null && typeof value === "object" && !Array.isArray(value); }
@@ -232,14 +256,18 @@ function requiredCandidateReadback(root, candidate, byPath, paths, label) {
  * state. Evidence is a local, bounded JSON observation that binds the frozen
  * candidate; Spec and guardrails are always read from that candidate tree.
  */
-export function preflightCriticDispatch({ root, base = null, candidate, specPath, guardrailPaths, evidencePaths, priorCriticEvidencePath = null, reviewScope = null }) {
+export function preflightCriticDispatch({ root, base = null, candidate, specPath, guardrailPaths, evidencePaths, priorCriticEvidencePath = null, reviewScope = null }, observer = null) {
+  let stage = "request", sourceCandidate = null, sourceSpecSha256 = null;
+  try {
   if (typeof root !== "string" || root.length === 0 || typeof candidate !== "string") {
     fail("CDP-INPUT", "root and candidate are required.");
   }
   const realRoot = realpathSync(root);
+  stage = "paths";
   const scope = reviewScope === null ? null : currentArtifactScope(reviewScope);
   if (scope === null && typeof base !== "string") fail("CDP-INPUT", "base is required for an exact-range review.");
   if (scope !== null && base !== null) fail("CDP-SCOPE-MIXED", "Current-artifact scope cannot include a review base.");
+  stage = "candidate";
   const rangeBase = scope === null ? resolveBase(realRoot, base) : null;
   const baseCommit = rangeBase?.commit ?? null;
   const baseTree = rangeBase?.tree ?? null;
@@ -247,8 +275,10 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
   const candidateTree = git(realRoot, ["rev-parse", `${candidateCommit}^{tree}`]);
   if (![candidateCommit, candidateTree, ...(scope === null ? [baseTree] : [])].every((value) => OID.test(value))) fail("CDP-REF", "Git returned an invalid candidate binding.");
   if (baseCommit !== null && !OID.test(baseCommit)) fail("CDP-REF", "Git returned an invalid candidate binding.");
+  sourceCandidate = { commit: candidateCommit, tree: candidateTree };
   if (scope === null && baseCommit === candidateCommit) fail("CDP-RANGE", "Critic base and candidate must be different commits.");
 
+  stage = "paths";
   const spec = normalizePath(specPath, "spec path");
   const guardrails = uniquePaths(guardrailPaths, "guardrail path");
   const evidence = uniquePaths(evidencePaths, "evidence path");
@@ -256,13 +286,16 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
   const prior = priorCriticEvidencePath === null ? null : normalizePath(priorCriticEvidencePath, "prior Critic evidence path");
   if (prior !== null && evidence.includes(prior)) fail("CDP-PRIOR-ALIASED", "Prior Critic evidence cannot satisfy fresh candidate evidence.");
 
+  stage = "inventory";
   const files = candidateInventory(realRoot, candidateCommit);
   const byPath = new Map(files.map((file) => [file.path, file]));
+  stage = "manifest";
   const manifestFile = byPath.get(".claude/pipeline.yaml");
   if (!manifestFile?.readable) fail("CDP-MANIFEST", "Candidate manifest is absent or unreadable.");
   let manifest;
   try { manifest = parseYaml(candidateText(realRoot, candidateCommit, ".claude/pipeline.yaml")); }
   catch { fail("CDP-MANIFEST", "Candidate manifest cannot be parsed."); }
+  stage = "governance";
   const changedPaths = scope === null
     ? git(realRoot, ["diff", "--name-only", "-z", baseCommit ?? baseTree, candidateCommit, "--"])
       .split("\0").filter(Boolean).map((path) => normalizePath(path, "changed path")).sort(compare)
@@ -296,13 +329,17 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
   }
   const requirementPaths = requirementTraceability.mode === "declared" ? [requirementTraceability.map.path] : [];
   const allGuardrails = [...new Set([...guardrails, ...governancePaths, ...requirementPaths])].sort(compare);
+  stage = "candidate-files";
   const specReadback = requiredCandidateReadback(realRoot, candidateCommit, byPath, [spec], "Spec")[0];
+  sourceSpecSha256 = specReadback.sha256;
   const guardrailReadback = requiredCandidateReadback(realRoot, candidateCommit, byPath, allGuardrails, "guardrail");
+  stage = "evidence";
   const evidenceReadback = evidence.map((path) => matchingCandidateEvidence(localEvidence(realRoot, path), candidateCommit, candidateTree, path));
+  stage = "prior-evidence";
   const priorReadback = prior === null ? null : { path: prior, sha256: sha256(localEvidence(realRoot, prior)) };
   const sourceCoverage = scope === null ? null : currentArtifactCoverage(realRoot, candidateCommit, byPath, scope);
 
-  return {
+  const result = {
     schema: CRITIC_DISPATCH_PREFLIGHT_SCHEMA,
     // This remains read-only. The ordinary session orchestrator is the next
     // authority: it launches one fresh Critic and then hands the closed result
@@ -333,6 +370,12 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
       },
     },
   };
+  observeSource(observer, "complete", "packet-ready", null, sourceCandidate, sourceSpecSha256);
+  return result;
+  } catch (error) {
+    observeSource(observer, stage, "rejected", sourceFailureCodes.get(error) ?? "CDP-UNEXPECTED", sourceCandidate, sourceSpecSha256);
+    throw error;
+  }
 }
 
 /**
@@ -383,7 +426,7 @@ export function enumerateEvidenceArtifacts({ root, taskId }) {
   return { schema: EVIDENCE_SWEEP_SCHEMA, taskId, matches };
 }
 
-function parseArgs(argv) {
+export function parseCriticDispatchPreflightArgs(argv) {
   const values = { guardrailPaths: [], evidencePaths: [], priorCriticEvidencePath: null, sweepEvidenceTaskId: null };
   for (let index = 0; index < argv.length; index += 1) {
     const flag = argv[index];
@@ -404,7 +447,7 @@ function parseArgs(argv) {
 }
 
 if (isDirectInvocation(import.meta.url)) {
-  const args = parseArgs(process.argv.slice(2));
+  const args = parseCriticDispatchPreflightArgs(process.argv.slice(2));
   if (args.sweepEvidenceTaskId !== null) {
     try {
       const result = enumerateEvidenceArtifacts({ root: args.root, taskId: args.sweepEvidenceTaskId });
