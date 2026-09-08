@@ -1,5 +1,7 @@
 # ADR-0047: Model-free Advisor preflight and on-demand consultation v2
 
+**Governs:** plugins/pipeline-core/config/advisory-lifecycle-v2.json, plugins/pipeline-core/config/runner-profiles-v3.json, plugins/pipeline-core/lib/advisory-lifecycle-v2.mjs, plugins/pipeline-core/lib/advisory-lifecycle-v2.test.mjs, plugins/pipeline-core/lib/advisory-coordinator.mjs, plugins/pipeline-core/lib/advisory-coordinator.test.mjs, plugins/pipeline-core/scripts/advisor-capability-preflight.mjs, plugins/pipeline-core/scripts/advisor-capability-preflight.test.mjs, plugins/pipeline-core/scripts/codex-advisory-bootstrap.mjs, plugins/pipeline-core/scripts/codex-advisory-bootstrap.test.mjs, plugins/pipeline-core/scripts/codex-host-advisor-route.mjs, plugins/pipeline-core/scripts/codex-host-advisor-route.test.mjs, plugins/pipeline-core/scripts/advisory-host-bridge.mjs, plugins/pipeline-core/scripts/advisory-host-bridge.test.mjs, plugins/pipeline-core/skills/advisor-consult/SKILL.md, plugins/pipeline-core/agents/consult-advisor.md
+
 **Status:** accepted · **Date:** 2026-07-29
 
 ## Context

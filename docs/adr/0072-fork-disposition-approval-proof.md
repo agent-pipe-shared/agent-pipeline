@@ -1,5 +1,7 @@
 # ADR-0072: fork disposition requires a PO approval proof, using the same signature/chat mode this repository already applies to push
 
+**Governs:** pipeline.user.yaml, plugins/pipeline-core/lib/critical-action-approval-request.mjs, plugins/pipeline-core/lib/critical-action-approval-request.test.mjs, plugins/pipeline-core/lib/critical-human-proof-policy.mjs, plugins/pipeline-core/lib/governance-event-store.mjs, plugins/pipeline-core/lib/governance-event-store.test.mjs, plugins/pipeline-core/scripts/governance-event.mjs, plugins/pipeline-core/scripts/governance-event.test.mjs, plugins/pipeline-core/scripts/po-human-approval.mjs, plugins/pipeline-core/scripts/po-human-approval.test.mjs, plugins/pipeline-core/scripts/po-approval-gate.mjs, plugins/pipeline-core/scripts/po-approval-gate.test.mjs, plugins/pipeline-core/scripts/pipeline-state.mjs
+
 > Previously numbered ADR-0063 (until 2026-08-27).
 
 > Agent-Pipeline · Sprint Phoenix · as of 2026-08-10

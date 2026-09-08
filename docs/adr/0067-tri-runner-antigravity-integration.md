@@ -1,5 +1,7 @@
 # ADR-0067: Tri-runner (Claude Code + Codex + Antigravity CLI) development contract
 
+**Governs:** setup.mjs, plugins/pipeline-core/install-agy.mjs, plugins/pipeline-core/hooks.json, plugins/pipeline-core/config/runner-mappings.json, plugins/pipeline-core/config/runner-profiles-v3.json, plugins/pipeline-core/lib/runner-profiles-v3.mjs, plugins/pipeline-core/lib/runner-profiles-v3.test.mjs, plugins/pipeline-core/lib/project-onboarding-v3.mjs, plugins/pipeline-core/lib/project-onboarding-v3.test.mjs, plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs, plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs, plugins/pipeline-core/lib/antigravity-execution-host.mjs, plugins/pipeline-core/lib/antigravity-execution-host.test.mjs, plugins/pipeline-core/lib/runner-usage-v1.mjs, plugins/pipeline-core/lib/runner-usage-v1.test.mjs, plugins/pipeline-core/scripts/pipeline-start-preflight.mjs, plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs, plugins/pipeline-core/scripts/pipeline-user-v3.schema.json
+
 > Agent-Pipeline · Sprint Nova / Agy · as of 2026-08-22
 
 **Status:** accepted · **Basis:** PO directive (Sprint Nova/Agy), #69, #92, #15 · **Extends and updates** [ADR-0051](0051-dual-runner-tri-platform-development-contract.md) and [ADR-0057](0057-runner-platform-support-is-an-implementation-obligation.md).

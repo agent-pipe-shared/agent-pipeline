@@ -1,5 +1,7 @@
 # ADR-0080: Machine-delivered default task-slicing into parallel dispatch
 
+**Governs:** plugins/pipeline-core/hooks/guard-slicing.mjs, plugins/pipeline-core/hooks/guard-slicing.test.mjs, plugins/pipeline-core/hooks/native-slicing.mjs, plugins/pipeline-core/hooks/codex-slicing-hint.mjs, plugins/pipeline-core/hooks/antigravity-slicing-hint.mjs, plugins/pipeline-core/hooks/codex-hooks.json, plugins/pipeline-core/hooks.json
+
 > Agent-Pipeline · Sprint Nova-B · as of 2026-09-06
 
 > **Accepted as ADR-0080 on 2026-09-06.** Numbered in the act of acceptance per
