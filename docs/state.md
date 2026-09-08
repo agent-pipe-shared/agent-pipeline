@@ -91,6 +91,12 @@ records these candidate-bound facts, the hook-test status (failed/not measured),
 and the open review gates. Alfred remains implementing; no final feature or
 review claim is made.
 
+The [C1 emission/local-report plan](../specs/sprint-alfred-epic/plans/c1-emission.md)
+is the next autonomous preparation package. It remains design-only and
+not-production-dispatch-ready until its observer, projection and collector
+schemas are frozen. No emission, live-hook qualification, baseline, approval or
+review claim follows from the plan.
+
 The PO approved plural `probeSurfaces[]` with correlated `observations[]`
 and deferred the combined suite/capability registration until A1-2 stabilizes
 (`specs/sprint-alfred-epic/evidence/a1-po-decision-queue.md`). The PO applied
