@@ -60,18 +60,10 @@ routing:
         state: "unavailable"
         status: "pipeline.antigravity-sandbox-execution-receipt.v1"
       claude:
-        adapter: "native-fable"
+        adapter: "native-opus"
         effort: "not-applicable"
         evidence: "advisory-receipt"
         fallbacks:
-          -
-            adapter: "native-opus"
-            effort: "not-applicable"
-            runner: "claude"
-            selector:
-              kind: "alias"
-              value: "opus"
-            when: "native-fable-repeated-failure"
           -
             adapter: "consult"
             effort: "max"
@@ -79,11 +71,11 @@ routing:
             runner: "claude"
             selector:
               kind: "alias"
-              value: "fable"
-            when: "native-adapters-unavailable"
+              value: "opus"
+            when: "native-opus-repeated-failure"
         selector:
           kind: "alias"
-          value: "fable"
+          value: "opus"
         state: "default"
       codex:
         adapter: "host-consult"
@@ -93,7 +85,7 @@ routing:
         runner: "codex"
         selector:
           kind: "model-id"
-          value: "gpt-5.6-sol"
+          value: "gpt-6-astra"
         state: "default"
         status: "pipeline.codex-sandbox-execution-receipt.v1"
       eligibility:
@@ -123,7 +115,7 @@ routing:
         evidence: "dispatch-receipt"
         selector:
           kind: "model-id"
-          value: "gpt-5.6-sol"
+          value: "gpt-6-astra"
         state: "default"
         unavailable: "defer"
     critic_normal:
@@ -132,7 +124,7 @@ routing:
         evidence: "dispatch-receipt"
         selector:
           kind: "model-id"
-          value: "gemini-3.7-flash-high"
+          value: "gemini-3.8-flash-high"
         state: "unavailable"
         unavailable: "defer"
       claude:
@@ -157,7 +149,7 @@ routing:
         evidence: "dispatch-receipt"
         selector:
           kind: "model-id"
-          value: "gemini-3.7-flash-high"
+          value: "gemini-3.8-flash-high"
         state: "unavailable"
         unavailable: "defer"
       claude:
@@ -182,7 +174,7 @@ routing:
         evidence: "dispatch-receipt"
         selector:
           kind: "model-id"
-          value: "gemini-3.7-flash-high"
+          value: "gemini-3.8-flash-high"
         state: "unavailable"
         unavailable: "defer"
       claude:
@@ -207,7 +199,7 @@ routing:
         evidence: "dispatch-receipt"
         selector:
           kind: "model-id"
-          value: "gemini-3.7-flash-low"
+          value: "gemini-3.8-flash-low"
         state: "unavailable"
         unavailable: "defer"
       claude:
@@ -232,7 +224,7 @@ routing:
         evidence: "dispatch-receipt"
         selector:
           kind: "model-id"
-          value: "gemini-3.7-flash-high"
+          value: "gemini-3.8-flash-high"
         state: "unavailable"
         unavailable: "defer"
       claude:
@@ -257,7 +249,7 @@ routing:
         evidence: "dispatch-receipt"
         selector:
           kind: "model-id"
-          value: "gemini-3.7-flash-high"
+          value: "gemini-3.8-flash-high"
         state: "unavailable"
         unavailable: "defer"
       claude:
@@ -300,7 +292,7 @@ routing:
           evidence: "dispatch-receipt"
           selector:
             kind: "model-id"
-            value: "gpt-5.6-sol"
+            value: "gpt-6-astra"
           state: "default"
           unavailable: "defer"
       execution_phase:
@@ -309,7 +301,7 @@ routing:
           evidence: "dispatch-receipt"
           selector:
             kind: "model-id"
-            value: "gemini-3.7-flash-high"
+            value: "gemini-3.8-flash-high"
           state: "unavailable"
           unavailable: "defer"
         claude:
@@ -351,7 +343,7 @@ routing:
           evidence: "dispatch-receipt"
           selector:
             kind: "model-id"
-            value: "gpt-5.6-sol"
+            value: "gpt-6-astra"
           state: "default"
           unavailable: "defer"
       execution_phase:
@@ -360,7 +352,7 @@ routing:
           evidence: "dispatch-receipt"
           selector:
             kind: "model-id"
-            value: "gemini-3.7-flash-high"
+            value: "gemini-3.8-flash-high"
           state: "unavailable"
           unavailable: "defer"
         claude:
@@ -386,7 +378,7 @@ routing:
           evidence: "dispatch-receipt"
           selector:
             kind: "model-id"
-            value: "gemini-3.7-flash-high"
+            value: "gemini-3.8-flash-high"
           state: "unavailable"
           unavailable: "defer"
         claude:
@@ -411,7 +403,7 @@ routing:
           evidence: "dispatch-receipt"
           selector:
             kind: "model-id"
-            value: "gemini-3.7-flash-high"
+            value: "gemini-3.8-flash-high"
           state: "unavailable"
           unavailable: "defer"
         claude:

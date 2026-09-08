@@ -24,7 +24,35 @@
 | 2026-08-11 to 2026-08-19 | Checkpoints 1-60 (2026-08-11 through 2026-08-19 checkpoint 60): superseded session narrative; durable decisions already live in ADRs/backlog/guardrails per this repo's own standing convention, not uniquely in this prose. | [docs/state-archive/2026-08-19--checkpoints-1-through-60.md](state-archive/2026-08-19--checkpoints-1-through-60.md) |
 | 2026-08-26 | 2026-08-25 Antigravity chat-gate-ceremony standardization, verify-tuner stage 2 acceptance, sprint-agy-runner delta4 Critic fix and candidate status | [docs/state-archive/2026-08-26--agy-runner-2026-08-25-handover.md](state-archive/2026-08-26--agy-runner-2026-08-25-handover.md) |
 
-## Current handover — sprint-alfred-epic: A1/C1 registered, maintenance closed (2026-09-06)
+## Current handover — sprint-alfred-epic: local continuation, push deferred (2026-09-08)
+
+The PO confirmed `origin/feat/sprint-alfred` as the only valid upstream;
+the existing tracking configuration matches it. Do not create `sprint_alfred`.
+The PC transfer is postponed. Continue the approved Alfred implementation
+locally through the next morning (2026-09-09); push only after a new explicit PO
+instruction. Collect decision topics in the [PO queue](../specs/sprint-alfred-epic/evidence/po-decision-queue.md)
+and measure the requested slice/parallel hook behavior without inferring
+enforcement from concurrent agent activity alone. The earlier statement
+accepting replacement of remote state is not a request to push now and does not
+lift the repository's force-push prohibition or signed push gate.
+
+Before this continuation, HEAD was `db409445a97bbb1580d3b094f069af24f761d104`;
+local tracking reported 907 commits ahead and 53 behind. The last successful
+remote observation found `feat/sprint-alfred` at `d418ee953ecf5581abbeca7bb06d261b49c6ac35`.
+No push or new remote branch was performed. Refresh the remote observation
+before selecting a future publication candidate.
+
+Installed Pipeline `0.6.1+codex.20260908050949.b281527` now refreshes both
+existing manifest projections. After the sanctioned migration, installed V3
+authority reports `ready`, projection `noop`, and readback `current`; onboarding
+reports `ready` and `CAS-READY`. This replaces the prior blocked bootstrap,
+whose refresh omitted the project-tier manifest. The prior session's rollback
+request and denial remain in human-stream audit events 15/16 and their heads
+update. Access to prior runner transcripts remains guard-blocked. Existing
+Verify/security evidence predates this continuation and is not evidence for
+these changes. C1 aggregation is the next bounded package to inspect; its
+implementation, integration Verify and independent T1 review remain pending.
+Alfred remains implementing, with the baseline and acceptance limits below.
 
 The PO approved plural `probeSurfaces[]` with correlated `observations[]`
 and deferred the combined suite/capability registration until A1-2 stabilizes
@@ -125,8 +153,8 @@ A1/A2's measured enforcement; accepted cost is calendar visibility).
 1. **Rebase precondition first.** Nova lands on `origin/main`; this branch
    rebases onto that state. **No Alfred implementation dispatch before it** —
    design-time file inheritance from the Nova clone base ends at that rebase
-   (PRD §8 A-1). Push target afterwards:
-   `git push -u origin feat/sprint-alfred:sprint_alfred`, never to a Nova ref.
+   (PRD §8 A-1). Push target, corrected by the PO on 2026-09-08:
+   `origin`, destination `refs/heads/feat/sprint-alfred`; retain this upstream.
 2. **E1 contract freeze** as the first implementation act, then the **A1
    probe** and **C1 receipts** — the C1 dogfood clock is the calendar-critical
    path, since it calibrates B1 and D2 thresholds.
