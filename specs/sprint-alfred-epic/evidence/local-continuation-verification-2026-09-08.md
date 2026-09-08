@@ -65,8 +65,15 @@ C1 aggregation implementation and focused tests are locally committed at
 `854b0da8d1732bf2f787a684f9ad79659a7c9186`; final checks record receipt 64/64,
 consumer checks 9/9, and diff-check exit 0. C1 emission/local-report
 refinement is next autonomous preparation; baseline collection has not
-started. Full Verify on the new candidate and independent T1 review remain
-pending.
+started. Full Verify then ran on commit `888ffc1770dbc1d1b1e562fa111b79cc0d6178b9`,
+tree `078ec307bb6167e644b63119ffcc27b376a455ef`, with exact clean start and
+finish bindings. It finished 2026-09-08T19:26:38.631Z after starting at
+2026-09-08T19:15:58.283Z: exit 1, 508 steps, 499 green, and the same 9 named
+failures listed above. Machine evidence is
+`evidence/alfred-aggregation-888ffc17-verify.json`; security evidence is
+`evidence/alfred-aggregation-888ffc17-security.json` and records one gitleaks
+finding. This new candidate remains unreviewed and T1 remains blocked by red
+Verify.
 
 An optional next-package read-only agent bootstrap was auto-review-rejected
 because bare `pipeline-start-preflight` may perform cleanup beyond its
@@ -75,6 +82,5 @@ directly. This is a runtime limitation, not live-hook evidence.
 
 ## Open work
 
-C1 emission, authentic collection, measured baseline, Full Verify on the new
-candidate, and independent T1 review remain open. No feature acceptance or
-review completion is claimed.
+C1 emission, authentic collection, measured baseline, and independent T1 review
+remain open. No feature acceptance or review completion is claimed.
