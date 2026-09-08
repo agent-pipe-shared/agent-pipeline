@@ -86,12 +86,12 @@ Independent repairs include the truthful unparsed-command denial
 296-test capture and bounds repeated observations per session/reason, without
 claiming global retention or crash durability. Full candidate review is pending.
 
-The ADR source inventory at `9742b1aaa8b2f2502bd9d4a42285ede411034967`
-contains 52 declarations among 75 accepted decisions; 23 remain. The separate
+The ADR source inventory at `bd588219c8e6a81fda1345cc05a515aae7958dd9`
+contains 63 declarations among 75 accepted decisions; 12 remain. The separate
 historical/provisional/proposed exclusions are unchanged. Source counts and
 responsibility evidence are indexed in
-`backlog/evidence/2026-09-08-adr-coverage-progress.md`. The latest two universal
-copies are integrated in `2e94c12d`; generator, document and consumer checks pass.
+`backlog/evidence/2026-09-08-adr-coverage-progress.md`. The latest three universal
+copies are integrated in `0db01ac9`; generator, document and consumer checks pass.
 Final source-candidate reconciliation is still outstanding. Reader-review
 release binding waits for the remaining coverage.
 

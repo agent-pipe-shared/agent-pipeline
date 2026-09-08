@@ -91,3 +91,13 @@ conformance or final reconciliation. This item remains open.
 The two corresponding universal copies are integrated in
 `2e94c12d96d9af574d9ec8c89722ed6f5654e756`, with the bounded consumer-check
 classification and its negative proof recorded in the coverage evidence index.
+
+### Progress — 2026-09-08, source checkpoint bd588219
+
+Sixty-three of the 75 accepted decisions now declare governing paths; 12 remain.
+The eleven new source headers preserve normative bodies and status categories.
+The complete source inventory is hash-bound to `bd588219c8e6a81fda1345cc05a515aae7958dd9`;
+three universal copies are integrated in `0db01ac985ad89161c93f545701eaf911385080b`.
+See `backlog/evidence/2026-09-08-adr-coverage-progress.md` for current proof
+and the actual earlier-source reconciliation diagnostic. No final reconciliation
+or independent candidate review is claimed; this item remains open.

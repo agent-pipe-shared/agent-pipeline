@@ -1,6 +1,41 @@
 # ADR coverage progress — 2026-09-08
 
-## Current source checkpoint — 52 of 75 accepted decisions
+## Current source checkpoint — 63 of 75 accepted decisions
+
+Source commit `bd588219c8e6a81fda1345cc05a515aae7958dd9` contains the same 80
+numbered ADRs: 75 accepted, 3 historical, 1 provisional and 1 proposed.
+Sixty-three accepted decisions declare governing paths; 12 still lack them.
+The complete immutable rows are
+`scratch/adr-source-inventory-round9-rows-20260908.json`, SHA-256
+`221df707db4bd7e396c2cf98dcaa6a83207c5573b05e8e8d4583f384a4dafcc2`.
+The separate round9 binding verifies every source hash and the tracked corpus.
+
+The eleven additions are locally committed in
+`6289fb86d6d5f8bb112a57b55886dd8da11b5b6a` (roles),
+`8e058b3bd1581b1edd566ae82d2849afc8e6b75e` (delivery), and the
+source checkpoint above (authority). All three pass strict dispatch authorship.
+Readable mappings are in the 2026-09-08 adr-roles, adr-delivery and
+adr-authority Governs coverage evidence records. They retain missing runtime
+obligations and distinguish historical runner labels from current routing.
+The authority mapping includes Antigravity's actual tier-union classifier.
+
+The three universal copies are synchronized in `0db01ac985ad89161c93f545701eaf911385080b`.
+The generator, consumer-path and document checks and the nine existing consumer
+regressions pass. Actual inherited-header classification and negative evidence
+are recorded in
+`backlog/evidence/2026-09-08-adr-delivery-authority-vendor-integration.md`.
+
+This count does not prove implementation conformance, independent review or
+source-candidate reconciliation. A read-only run of the actual reconciliation
+checker against the earlier round8 source commit `2deb86e5`, base `f94882ba`,
+found 39 implicated and unreconciled ADRs among 52 declarations and 207 changed
+paths. Its checker result is false; the diagnostic wrapper's exit zero only
+means it captured that result. See
+`scratch/adr-reconciliation-baseline-round9-20260908.json`.
+No blanket reconciliation entries were created. Queue item 12 remains open
+for the 12 remaining accepted decisions and final source-candidate reconciliation.
+
+## Earlier source checkpoint — 52 of 75 accepted decisions
 
 Source commit `9742b1aaa8b2f2502bd9d4a42285ede411034967` contains the same
 80 numbered ADRs: 75 accepted, 3 historical, 1 provisional and 1 proposed.
