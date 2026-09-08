@@ -2,6 +2,8 @@
 
 > _A German version follows below · Eine deutsche Fassung folgt weiter unten._
 
+**Governs:** plugins/pipeline-core/hooks/guard-devplan.mjs, plugins/pipeline-core/hooks/guard-push.mjs, plugins/pipeline-core/hooks/hooks.json, plugins/pipeline-core/lib/manifest.mjs, plugins/pipeline-core/lib/guard-devplan-policy.mjs, plugins/pipeline-core/hooks/guard-devplan.test.mjs, plugins/pipeline-core/hooks/guard-push.test.mjs
+
 **Context:** The pipeline already had two human-gate precursors: the PRD-PO gate ([ADR-0021](0021-prd-po-gate.md), step 3b) and push approval ([ADR-0017](0017-push-policy-standing-approval.md), standing-approved in this repo). Both ran purely procedurally (prose/review discipline), never technically enforced. At the same time, the new manifest (`.claude/pipeline.yaml`, [ADR-0028](0028-manifest-approach.md)) introduces a per-gate `mode` (`blocking|warn|off`) — which at first glance conflicts with `guardrails/quality-gates.md` QG-06 ("gates are binary; warn-only needs an expiry date"). This conflict is deliberately named in the AP1 plan (guiding decision 5) and resolved here.
 
 **Decision:** **Exactly two blocking human gates** in the pipeline, enforced deterministically by hooks instead of prose instruction:
