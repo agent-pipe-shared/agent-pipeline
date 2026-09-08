@@ -10,7 +10,7 @@ closure_repository: self
 closure_commit: 865d8d9d32e732d4576c0177b64aca25c2cf39db
 closure_evidence: plugins/pipeline-core/hooks/guard-dispatch-budget.test.mjs
 sprint: nova
-done_when: contains plugins/pipeline-core/hooks/guard-dispatch-budget.mjs pipeline.dispatch-budget-invalid-identity-fails-closed
+done_when: "contains plugins/pipeline-core/hooks/guard-dispatch-budget.test.mjs assert.equal(record.reason, \"agent-id-present-but-not-a-string\");"
 source: "NVA-R6-GUARDSWEEP guard-layer sweep (backlog/items/2026-08-29-sweep-remaining-guards-for-fail-open-identity-and-pipe-unpiped-scope-asymmetry.md), auditing guard-dispatch-budget.mjs for its OWN direct callers/uses of subagentIdentity()'s unresolved result beyond the guard-lifecycle-ready.mjs caller already covered by F02 (pipeline.identity-attestation-fail-closed-fallback, fixed 2026-08-29)."
 ---
 
@@ -95,3 +95,24 @@ follow-up implementation task with its own tests.
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:**
+
+## Historical invariant retirement — 2026-09-08
+
+The closure fields above remain the historical implementation binding. The
+budget-specific discriminator subsequently moved from transcript topology to
+the measured agent-ID key contract; the shared `subagentIdentity()` resolver
+remains a separate lifecycle dependency. Consequently the old budget
+`invalid-identity` branch has no producer and its named invariant is retired
+explicitly in NVA-B-BUDGET-RESIDUE-1, not preserved as a misleading code marker.
+
+The current observability obligation is to record malformed agent identity
+with its actual reason, separately from a resolved identity whose turn cap
+cannot be found. The metadata predicate now names the retained direct test
+assertion for the non-string agent-ID reason. It is a structural regression
+tripwire; its presence alone does not prove a test ran. The package's actual
+behavioral results and limitations belong in
+`backlog/evidence/2026-09-08-budget-observation-bound.md`.
+
+This maintenance changes neither status nor any historical closure field.
+The item's three ledger events are status/closure reconciliation records,
+without an item-content hash pin, so no new transition or amendment is asserted.

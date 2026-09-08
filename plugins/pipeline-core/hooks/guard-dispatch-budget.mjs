@@ -99,13 +99,15 @@
  * `spawnDepth` not a number >=1, `agentType` not resolving to a known
  * agent definition file, that file missing/malformed `maxTurns`, or the
  * git common dir itself unresolvable) allows the call (verdict 0). Where a
- * common dir COULD be resolved, one line is appended to
- * `<git-common-dir>/agent-pipeline/dispatch-budget/unresolved.jsonl`
- * recording the branch taken, the reason, the resolved root and common dir,
- * the raw `transcript_path`, an instant, and whatever identity fields were
- * available, so the gap is measurable, never silent. This guard never fails
- * closed on its own confusion -- that would halt every dispatch in the
- * repository.
+ * common dir COULD be resolved, one complete JSON observation is atomically
+ * claimed per session/reason below `unresolved-observations/`; the historical
+ * readable `unresolved.jsonl` is retained and never truncated. Session and
+ * reason path components are digest-derived, while the diagnostic JSON records
+ * the branch, reason, root/common dir, transcript path and instant. This guard
+ * never fails closed on its own confusion -- that would halt every dispatch.
+ * The bound is per session/reason only, never a finite global-retention claim
+ * across unlimited sessions; absent, null, blank, or malformed session IDs all
+ * share the explicit fallback-session bucket for each reason.
  *
  * Two further branches used to return an allow verdict with nothing recorded
  * at all -- NVA-BUDGETROOT-1 closes both:
@@ -125,8 +127,9 @@
  *   own stderr -- the one channel guaranteed to exist for a PreToolUse hook
  *   regardless of git state -- without changing the exit code.
  */
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, linkSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
+import { createHash, randomUUID } from "node:crypto";
 import { basename, dirname, isAbsolute, join, relative } from "node:path";
 
 import { writeTargetPath } from "../lib/tool-write-target.mjs";
@@ -360,15 +363,53 @@ function saveCounter(path, counter, dependencies) {
   writeFileSyncFn(path, `${JSON.stringify(counter, null, 2)}\n`, "utf8");
 }
 
+function digest(value) {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function unresolvedObservationPath(commonDir, record) {
+  const sessionId = record.sessionId;
+  const sessionBucket = typeof sessionId === "string" && sessionId.trim() !== ""
+    ? `session-${digest(sessionId).slice(0, 32)}`
+    : "fallback-session";
+  const reasonBucket = `reason-${digest(String(record.reason ?? "unknown")).slice(0, 32)}`;
+  return join(commonDir, "agent-pipeline", "dispatch-budget", "unresolved-observations", sessionBucket, `${reasonBucket}.json`);
+}
+
 function recordUnresolved(commonDir, record, dependencies) {
+  const existsSyncFn = dependencies.existsSyncFn ?? existsSync;
   const mkdirSyncFn = dependencies.mkdirSyncFn ?? mkdirSync;
-  const appendFileSyncFn = dependencies.appendFileSyncFn ?? appendFileSync;
+  const writeFileSyncFn = dependencies.writeFileSyncFn ?? writeFileSync;
+  const linkSyncFn = dependencies.linkSyncFn ?? linkSync;
+  const unlinkSyncFn = dependencies.unlinkSyncFn ?? unlinkSync;
+  let temporary = null;
   try {
-    const dir = join(commonDir, "agent-pipeline", "dispatch-budget");
+    const path = unresolvedObservationPath(commonDir, record);
+    const dir = dirname(path);
+    if (existsSyncFn(path)) return; // cheap repeat path; link below still closes races
     mkdirSyncFn(dir, { recursive: true, mode: 0o700 });
-    appendFileSyncFn(join(dir, "unresolved.jsonl"), `${JSON.stringify(record)}\n`, "utf8");
+    temporary = join(dir, `.observation-${process.pid}-${randomUUID()}.json`);
+    const { sessionId, ...diagnostic } = record;
+    const observation = {
+      schema: "pipeline.dispatch-budget-unresolved-observation.v1",
+      ...diagnostic,
+      sessionBucket: basename(dirname(path)),
+    };
+    // The hard-link claim publishes a complete JSON diagnostic atomically. A
+    // concurrent claimant gets EEXIST; a crash before the link leaves only a
+    // disposable temporary file, never an empty suppressor.
+    writeFileSyncFn(temporary, `${JSON.stringify(observation)}\n`, "utf8");
+    try {
+      linkSyncFn(temporary, path);
+    } catch (error) {
+      if (error?.code !== "EEXIST") throw error;
+    }
   } catch {
     // best-effort observability only -- never let a logging failure change the fail-open verdict
+  } finally {
+    if (temporary !== null) {
+      try { unlinkSyncFn(temporary); } catch { /* best-effort cleanup */ }
+    }
   }
 }
 
@@ -452,14 +493,16 @@ function recordOrchestratorObservation(commonDir, record, dependencies) {
  * once-per-session marker with no way to tell it apart from a genuine orchestrator call
  * afterward. It now returns `kind: "unresolved"` instead, which routes through
  * `evaluateDispatchBudgetGuard`'s EXISTING `identity.kind === "unresolved"` branch into
- * `recordUnresolved()` (`unresolved.jsonl`) -- no new sink, no change to the allow verdict (still
- * exit 0), and no restoration of the transcript-path-keyed reasons that branch used to carry
+ * `recordUnresolved()`'s bounded per-session/reason observation -- no change to the allow verdict
+ * (still exit 0), and no restoration of the transcript-path-keyed reasons that branch used to carry
  * before `6372b984` (those tested a discriminator the 2026-09-06 measurement disproved; this is a
  * new reason keyed on the payload's actual key set, not a revival of the old one). The two
  * measured shapes are untouched: a payload with a usable `agent_id` is still `subagent`; a payload
  * with neither an `agent_id` key nor an `agent_type` key is still `orchestrator`, exactly as
  * before, including every legacy fixture already pinned in the test suite that never carries
- * either key.
+ * either key. `agent_id: null` remains malformed because the measured orchestrator shape omits
+ * that key; this differs from `transcript_path: null`, which the shared lifecycle resolver treats
+ * as absent. The budget-local classifier does not consume transcript-path identity.
  */
 function dispatchBudgetCallerIdentity(input) {
   const agentId = input?.agent_id;
@@ -509,57 +552,7 @@ export function evaluateDispatchBudgetGuard(input, options = {}) {
 
   if (identity.kind === "unresolved") {
     recordUnresolved(commonDir, {
-      ...identity, branch: "unresolved-identity", root: rootDir, commonDir, transcriptPath: rawTranscriptPath, at: nowFn(),
-    }, options);
-    return verdict(0);
-  }
-
-  if (identity.kind === "invalid-identity") {
-    // pipeline.dispatch-budget-invalid-identity-fails-closed (2026-08-29,
-    // NVA-R7-INVALIDIDENTITY): before this branch existed, a present-but-
-    // unusable transcript_path fell through to resolveMaxTurns() with the
-    // FIXED sentinel agentType (INVALID_TRANSCRIPT_PATH_SENTINEL_AGENT_TYPE),
-    // which never resolves (no agent definition file is ever named
-    // "unattested-invalid-transcript-path"), routing into the SAME
-    // recordUnresolved(...) call as a genuinely ambiguous identity -- kind
-    // "unresolved", branch "max-turns-unresolved", reason
-    // "max-turns-unresolvable". That reason is actively misleading: it reads
-    // exactly like "we resolved a real subagent identity but its agentType
-    // has no definition file", when what actually happened is the identity
-    // itself was never resolved at all. This is the concrete shape of
-    // "discards information" from the backlog finding -- not merely that the
-    // call was admitted, but that the record of it actively obscured what
-    // was detected.
-    //
-    // Chosen behaviour: keep admitting the call (exitCode 0, unchanged) but
-    // record it under its OWN branch and the identity's TRUE reason, never
-    // silently merged into -- or made to look like -- a resolved-but-
-    // undefined agent type. "Fails closed" here closes the OBSERVABILITY
-    // gap, not the gate: a budget/turn-counting guard blocking every tool
-    // call outright (Read included) on an unreadable identity is a much
-    // heavier, disproportionate act for a mechanism whose entire job is
-    // counting turns, not gating authority -- and it would directly
-    // contradict this file's own "Fail-open-but-visible" design (a guard
-    // that fails closed on its own confusion halts every dispatch in the
-    // repository), a design this specific identity shape does not
-    // invalidate: a present-but-not-absolute transcript_path is still, from
-    // THIS guard's narrow budget-counting purpose, an identity it cannot
-    // attribute a working cap to, however positively detected the
-    // malformation is. Unconditional denial was rejected for a second,
-    // independent reason: it would strand a flagged dispatch with no route
-    // left to even write its own evidence/dispatch-record-*.json, unlike the
-    // sibling guard-lifecycle-ready.mjs receipt gate's unconditional
-    // "deny-no-receipt" (which this guard deliberately does NOT copy) --
-    // that gate's job is a binary readiness attestation with no notion of a
-    // "closing act" to protect, so full denial costs it nothing equivalent.
-    // Never touches the real per-agentId counter file for this identity: the
-    // sentinel agentId is FIXED and shared across every invalid-identity
-    // occurrence session-wide, so loading/saving a counter keyed on it would
-    // create one shared, racy file across unrelated dispatches instead of
-    // the one-counter-file-per-real-dispatch invariant the rest of this
-    // guard relies on.
-    recordUnresolved(commonDir, {
-      ...identity, branch: "invalid-identity", root: rootDir, commonDir, transcriptPath: rawTranscriptPath, at: nowFn(),
+      ...identity, branch: "unresolved-identity", root: rootDir, commonDir, transcriptPath: rawTranscriptPath, sessionId: input?.session_id, at: nowFn(),
     }, options);
     return verdict(0);
   }
@@ -568,7 +561,7 @@ export function evaluateDispatchBudgetGuard(input, options = {}) {
   if (maxTurns === null) {
     recordUnresolved(commonDir, {
       kind: "unresolved", reason: "max-turns-unresolvable", agentId: identity.agentId, agentType: identity.agentType,
-      branch: "max-turns-unresolved", root: rootDir, commonDir, transcriptPath: rawTranscriptPath, at: nowFn(),
+      branch: "max-turns-unresolved", root: rootDir, commonDir, transcriptPath: rawTranscriptPath, sessionId: input?.session_id, at: nowFn(),
     }, options);
     return verdict(0);
   }

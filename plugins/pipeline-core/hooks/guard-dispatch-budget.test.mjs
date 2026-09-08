@@ -34,9 +34,8 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { spawn, spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -67,11 +66,14 @@ const RUNNER_SOURCE = [
   "let writeMode = 'normal';",
   "const writeFileSyncFn = (p, c) => {",
   "  if (writeMode === 'throw') throw new Error('disk full');",
+  "  if (writeMode === 'partial-throw') { files.set(p, 'partial'); throw new Error('ENOSPC'); }",
   "  if (writeMode === 'count') writeCount += 1;",
   "  files.set(p, c);",
   "};",
   "const mkdirSyncFn = () => {};",
   "const appendFileSyncFn = (p, c) => { files.set(p, (files.get(p) || '') + c); };",
+  "const linkSyncFn = (from, to) => { if (files.has(to)) { const e = new Error('EEXIST ' + to); e.code = 'EEXIST'; throw e; } if (!files.has(from)) { const e = new Error('ENOENT ' + from); e.code = 'ENOENT'; throw e; } files.set(to, files.get(from)); };",
+  "const unlinkSyncFn = (p) => { files.delete(p); };",
   "",
   "const mod = await import(guardPath);",
   "",
@@ -83,7 +85,7 @@ const RUNNER_SOURCE = [
   "const nowFn = () => scenario.nowIso || '2026-08-27T00:00:00.000Z';",
   "",
   "function baseOpts() {",
-  "  const o = { resolveGitCommonDirFn, nowFn, existsSyncFn, readFileSyncFn, writeFileSyncFn, mkdirSyncFn, appendFileSyncFn };",
+  "  const o = { resolveGitCommonDirFn, nowFn, existsSyncFn, readFileSyncFn, writeFileSyncFn, mkdirSyncFn, appendFileSyncFn, linkSyncFn, unlinkSyncFn };",
   "  if (!scenario.rootDirAbsent) o.rootDir = scenario.rootDir;",
   "  return o;",
   "}",
@@ -106,6 +108,8 @@ const RUNNER_SOURCE = [
   "    results.push(writeCount);",
   "  } else if (step.op === 'getFile') {",
   "    results.push(files.has(step.path) ? files.get(step.path) : null);",
+  "  } else if (step.op === 'getFilesByPrefix') {",
+  "    results.push(Array.from(files.entries()).filter(([p]) => p.startsWith(step.prefix)));",
   "  } else if (step.op === 'listFiles') {",
   "    results.push(Array.from(files.keys()));",
   "  } else if (step.op === 'filesSize') {",
@@ -121,7 +125,9 @@ const RUNNER_SOURCE = [
   "console.log('RESULT: ' + JSON.stringify({ results, commonDirCalls }));",
 ].join("\n");
 
-const runnerDir = mkdtempSync(join(tmpdir(), "guard-dispatch-budget-runner-"));
+const SCRATCH_ROOT = join(REPO_ROOT, "scratch");
+mkdirSync(SCRATCH_ROOT, { recursive: true });
+const runnerDir = mkdtempSync(join(SCRATCH_ROOT, "guard-dispatch-budget-runner-"));
 const RUNNER_PATH = join(runnerDir, "runner.mjs");
 writeFileSync(RUNNER_PATH, RUNNER_SOURCE);
 process.on("exit", () => { try { rmSync(runnerDir, { recursive: true, force: true }); } catch { /* best effort */ } });
@@ -213,13 +219,13 @@ test("evaluateDispatchBudgetGuard (NVA-B-BUDGETGUARD-2): a payload without agent
     rootDir: FAKE_ROOT,
     steps: [
       { op: "guard", input: { transcript_path: "relative/session/subagents/agent-x.jsonl", tool_name: "Read", tool_input: { file_path: "/x" } } },
-      { op: "getFile", path: `${COMMON_DIR}/agent-pipeline/dispatch-budget/unresolved.jsonl` },
+      { op: "getFilesByPrefix", prefix: `${COMMON_DIR}/agent-pipeline/dispatch-budget/unresolved-observations/` },
       { op: "listFiles" },
     ],
   });
   assert.equal(results[0].exitCode, 0);
-  assert.equal(results[1], null, "no agent_id means this guard's own identity step never inspects transcript_path at all, so no unresolved.jsonl entry is ever written for this call");
-  const counterFiles = results[2].filter((p) => p.includes("/dispatch-budget/") && !p.includes("orchestrator-seen") && !p.endsWith("unresolved.jsonl"));
+  assert.deepEqual(results[1], [], "no agent_id means this guard's own identity step never inspects transcript_path at all, so no unresolved observation is written for this call");
+  const counterFiles = results[2].filter((p) => p.includes("/dispatch-budget/") && !p.includes("orchestrator-seen") && !p.includes("unresolved-observations"));
   assert.deepEqual(counterFiles, [], "no per-agent counter file is written for a payload with no agent_id");
 });
 
@@ -371,11 +377,11 @@ test("evaluateDispatchBudgetGuard (NVA-B-BUDGETGUARD-2): a subagents/-shaped tra
     rootDir: FAKE_ROOT, // subagents/-shaped transcript_path, deliberately no agent_id, no meta.json seeded
     steps: [
       { op: "guard", input: { transcript_path: SUBAGENT_TRANSCRIPT, tool_name: "Read", tool_input: { file_path: "/x" } } },
-      { op: "getFile", path: `${COMMON_DIR}/agent-pipeline/dispatch-budget/unresolved.jsonl` },
+      { op: "getFilesByPrefix", prefix: `${COMMON_DIR}/agent-pipeline/dispatch-budget/unresolved-observations/` },
     ],
   });
   assert.equal(results[0].exitCode, 0);
-  assert.equal(results[1], null, "no unresolved.jsonl entry is written -- a payload with no agent_id is simply the orchestrator now, regardless of transcript_path shape");
+  assert.deepEqual(results[1], [], "no unresolved observation is written -- a payload with no agent_id is simply the orchestrator now, regardless of transcript_path shape");
 });
 
 test("evaluateDispatchBudgetGuard (NVA-B-BUDGETGUARD-2): an unresolvable maxTurns (unknown agent_type carried directly on the payload) still allows and records", () => {
@@ -383,11 +389,12 @@ test("evaluateDispatchBudgetGuard (NVA-B-BUDGETGUARD-2): an unresolvable maxTurn
     rootDir: FAKE_ROOT,
     steps: [
       { op: "guard", input: { agent_id: "abc123", agent_type: "pipeline-core:not-a-real-agent", tool_name: "Read", tool_input: { file_path: "/x" } } },
-      { op: "getFile", path: `${COMMON_DIR}/agent-pipeline/dispatch-budget/unresolved.jsonl` },
+      { op: "getFilesByPrefix", prefix: `${COMMON_DIR}/agent-pipeline/dispatch-budget/unresolved-observations/` },
     ],
   });
   assert.equal(results[0].exitCode, 0);
-  const record = JSON.parse(results[1].trim());
+  assert.equal(results[1].length, 1);
+  const record = JSON.parse(results[1][0][1]);
   assert.equal(record.reason, "max-turns-unresolvable");
   assert.equal(record.agentId, "abc123");
   assert.equal(record.agentType, "pipeline-core:not-a-real-agent");
@@ -454,27 +461,27 @@ test("evaluateDispatchBudgetGuard (NVA-B-BUDGETGUARD-2): the measured orchestrat
 // absence of `session_id`/`cwd`/etc. is not what this dispatch is testing). EXPECTED TO FAIL against
 // the guard as it stands after `6372b984`: `dispatchBudgetCallerIdentity()` there returns only
 // `subagent`/`orchestrator`, so every case below currently lands in the orchestrator branch.
-const UNRESOLVED_PATH = `${COMMON_DIR}/agent-pipeline/dispatch-budget/unresolved.jsonl`;
+const UNRESOLVED_PREFIX = `${COMMON_DIR}/agent-pipeline/dispatch-budget/unresolved-observations/`;
 
 test("evaluateDispatchBudgetGuard (NVA-B-BUDGETVIS-1): a payload carrying agent_type without agent_id is recorded as unattributable, not silently absorbed into the orchestrator marker", () => {
   const { results } = run({
     rootDir: FAKE_ROOT,
     steps: [
       { op: "guard", input: measuredOrchestratorPayload({ agent_type: "pipeline-core:goldfish-deep" }) },
-      { op: "getFile", path: UNRESOLVED_PATH },
+      { op: "getFilesByPrefix", prefix: UNRESOLVED_PREFIX },
       { op: "getFile", path: `${COMMON_DIR}/agent-pipeline/dispatch-budget/orchestrator-seen/parent.json` },
       { op: "listFiles" },
     ],
   });
   assert.equal(results[0].exitCode, 0, "an unattributable call is still allowed, exactly as today");
-  assert.ok(results[1] !== null, "an unattributable call must leave a record in unresolved.jsonl");
-  const record = JSON.parse(results[1].trim().split("\n")[0]);
+  assert.equal(results[1].length, 1, "an unattributable call must leave one bounded observation");
+  const record = JSON.parse(results[1][0][1]);
   assert.equal(record.kind, "unresolved");
   assert.equal(record.branch, "unresolved-identity");
   assert.equal(record.reason, "agent-type-without-agent-id");
   assert.equal(record.agentTypeRaw, "pipeline-core:goldfish-deep");
   assert.equal(results[2], null, "no orchestrator marker is written for this call -- it is not classified as the orchestrator");
-  const counterFiles = results[3].filter((p) => p.includes("/dispatch-budget/") && !p.includes("orchestrator-seen") && !p.endsWith("unresolved.jsonl"));
+  const counterFiles = results[3].filter((p) => p.includes("/dispatch-budget/") && !p.includes("orchestrator-seen") && !p.includes("unresolved-observations"));
   assert.deepEqual(counterFiles, [], "an unattributable call is never counted as a per-agent dispatch");
 });
 
@@ -483,12 +490,12 @@ test("evaluateDispatchBudgetGuard (NVA-B-BUDGETVIS-1): a payload carrying a blan
     rootDir: FAKE_ROOT,
     steps: [
       { op: "guard", input: measuredOrchestratorPayload({ agent_id: "   " }) },
-      { op: "getFile", path: UNRESOLVED_PATH },
+      { op: "getFilesByPrefix", prefix: UNRESOLVED_PREFIX },
     ],
   });
   assert.equal(results[0].exitCode, 0);
-  assert.ok(results[1] !== null, "an unattributable call must leave a record in unresolved.jsonl");
-  const record = JSON.parse(results[1].trim().split("\n")[0]);
+  assert.equal(results[1].length, 1, "an unattributable call must leave one bounded observation");
+  const record = JSON.parse(results[1][0][1]);
   assert.equal(record.reason, "agent-id-present-but-blank");
   assert.equal(record.agentIdRaw, "   ");
 });
@@ -498,12 +505,12 @@ test("evaluateDispatchBudgetGuard (NVA-B-BUDGETVIS-1): a payload carrying a non-
     rootDir: FAKE_ROOT,
     steps: [
       { op: "guard", input: measuredOrchestratorPayload({ agent_id: 12345 }) },
-      { op: "getFile", path: UNRESOLVED_PATH },
+      { op: "getFilesByPrefix", prefix: UNRESOLVED_PREFIX },
     ],
   });
   assert.equal(results[0].exitCode, 0);
-  assert.ok(results[1] !== null, "an unattributable call must leave a record in unresolved.jsonl");
-  const record = JSON.parse(results[1].trim().split("\n")[0]);
+  assert.equal(results[1].length, 1, "an unattributable call must leave one bounded observation");
+  const record = JSON.parse(results[1][0][1]);
   assert.equal(record.reason, "agent-id-present-but-not-a-string");
   assert.equal(record.agentIdRaw, 12345);
 });
@@ -521,12 +528,12 @@ test("evaluateDispatchBudgetGuard (NVA-B-BUDGETVIS-1): the three identity shapes
   });
   for (const r of results.slice(0, 3)) assert.equal(r.exitCode, 0);
   const allFiles = results[3];
-  const counterFiles = allFiles.filter((p) => p.includes("/dispatch-budget/") && !p.includes("orchestrator-seen") && !p.endsWith("unresolved.jsonl"));
+  const counterFiles = allFiles.filter((p) => p.includes("/dispatch-budget/") && !p.includes("orchestrator-seen") && !p.includes("unresolved-observations"));
   const markerFiles = allFiles.filter((p) => p.includes("/orchestrator-seen/"));
-  const unresolvedFiles = allFiles.filter((p) => p.endsWith("unresolved.jsonl"));
+  const unresolvedFiles = unresolvedObservationFiles(allFiles);
   assert.equal(counterFiles.length, 1, "exactly one per-agent counter file, for the genuine subagent call");
   assert.equal(markerFiles.length, 1, "exactly one orchestrator marker, for the genuine orchestrator call");
-  assert.equal(unresolvedFiles.length, 1, "exactly one unresolved.jsonl, holding the unattributable call's record");
+  assert.equal(unresolvedFiles.length, 1, "exactly one bounded unresolved observation, holding the unattributable call's record");
 });
 
 test("evaluateDispatchBudgetGuard: workingCap always equals each agent's own maxTurns minus the documented reserve", () => {
@@ -571,5 +578,104 @@ test("evaluateDispatchBudgetGuard: workingCap always equals each agent's own max
       expectedWorkingCap,
       `${agentName}: guard-derived workingCap must equal maxTurns - (CLOSING_ALLOWANCE + SAFETY_MARGIN)`,
     );
+  }
+});
+
+function unresolvedObservationFiles(paths) {
+  return paths.filter((path) => path.includes("/dispatch-budget/unresolved-observations/") && path.endsWith(".json"));
+}
+
+test("evaluateDispatchBudgetGuard (NVA-B-BUDGET-RESIDUE-1): repeated unresolved identity observations are bounded once per session and reason", () => {
+  const input = measuredOrchestratorPayload({ agent_id: null, agent_type: "pipeline-core:goldfish-deep", session_id: "bounded-session" });
+  const { results } = run({
+    rootDir: FAKE_ROOT,
+    steps: [
+      { op: "guard", input }, { op: "guard", input }, { op: "guard", input },
+      { op: "listFiles" },
+    ],
+  });
+  for (const result of results.slice(0, 3)) assert.equal(result.exitCode, 0);
+  const paths = unresolvedObservationFiles(results[3]);
+  assert.equal(paths.length, 1, "one complete observation is retained for repeated same-key calls");
+});
+
+test("evaluateDispatchBudgetGuard (NVA-B-BUDGET-RESIDUE-1): unresolved observation keys separate session, reason, and fallback session buckets", () => {
+  const { results } = run({
+    rootDir: FAKE_ROOT,
+    steps: [
+      { op: "guard", input: measuredOrchestratorPayload({ agent_id: null, session_id: "session-a" }) },
+      { op: "guard", input: measuredOrchestratorPayload({ agent_id: null, session_id: "session-b" }) },
+      { op: "guard", input: measuredOrchestratorPayload({ agent_type: "pipeline-core:goldfish-deep", session_id: "session-a" }) },
+      { op: "guard", input: measuredOrchestratorPayload({ agent_id: null, session_id: null }) },
+      { op: "listFiles" },
+    ],
+  });
+  for (const result of results.slice(0, 4)) assert.equal(result.exitCode, 0);
+  assert.equal(unresolvedObservationFiles(results[4]).length, 4);
+});
+
+test("evaluateDispatchBudgetGuard (NVA-B-BUDGET-RESIDUE-1): max-turns-unresolvable is deduplicated and sink failures remain fail-open", () => {
+  const unresolved = measuredSubagentPayload({ agent_type: "pipeline-core:not-a-real-agent", session_id: "unknown-turns" });
+  const { results } = run({
+    rootDir: FAKE_ROOT,
+    steps: [
+      { op: "guard", input: unresolved }, { op: "guard", input: unresolved },
+      { op: "setWriteMode", mode: "throw" },
+      { op: "guard", input: measuredOrchestratorPayload({ agent_id: null, session_id: "sink-failure" }) },
+      { op: "listFiles" },
+    ],
+  });
+  for (const result of [results[0], results[1], results[3]]) assert.equal(result.exitCode, 0);
+  assert.equal(unresolvedObservationFiles(results[4]).length, 1, "write failure does not create a suppressor or change the allow verdict");
+});
+
+test("evaluateDispatchBudgetGuard (NVA-B-BUDGET-RESIDUE-1): malformed and absent session identities share the explicit fallback bucket, retain legacy JSONL, and clean partial writes", () => {
+  const legacy = `${COMMON_DIR}/agent-pipeline/dispatch-budget/unresolved.jsonl`;
+  const { session_id: _sessionId, ...absentSession } = measuredOrchestratorPayload({ agent_id: null });
+  const { results } = run({
+    rootDir: FAKE_ROOT,
+    files: { [legacy]: "legacy-jsonl\n" },
+    steps: [
+      { op: "guard", input: absentSession },
+      { op: "guard", input: measuredOrchestratorPayload({ agent_id: null, session_id: null }) },
+      { op: "guard", input: measuredOrchestratorPayload({ agent_id: null, session_id: "   " }) },
+      { op: "guard", input: measuredOrchestratorPayload({ agent_id: null, session_id: 17 }) },
+      { op: "setWriteMode", mode: "partial-throw" },
+      { op: "guard", input: measuredOrchestratorPayload({ agent_type: "pipeline-core:goldfish-deep", session_id: "write-failure" }) },
+      { op: "getFile", path: legacy }, { op: "listFiles" },
+    ],
+  });
+  for (const result of [results[0], results[1], results[2], results[3], results[5]]) assert.equal(result.exitCode, 0);
+  assert.equal(results[6], "legacy-jsonl\n");
+  const observations = unresolvedObservationFiles(results[7]);
+  assert.equal(observations.length, 1, "absent and malformed session identities share fallback-session for one reason");
+  assert.equal(results[7].filter((path) => path.includes(".observation-")).length, 0, "partial write leaves no suppressor or temporary file");
+});
+
+test("evaluateDispatchBudgetGuard (NVA-B-BUDGET-RESIDUE-1): concurrent real-filesystem callers claim one complete same-key observation", async () => {
+  const fixture = mkdtempSync(join(REPO_ROOT, "scratch", "guard-dispatch-budget-observation-"));
+  const commonDir = join(fixture, "common");
+  const runner = join(fixture, "concurrent-runner.mjs");
+  const input = measuredOrchestratorPayload({ agent_id: null, agent_type: "pipeline-core:goldfish-deep", session_id: "same-session" });
+  writeFileSync(runner, [
+    "const [guardPath, commonDir, inputB64] = process.argv.slice(2);",
+    "const mod = await import(guardPath);",
+    "const result = mod.evaluateDispatchBudgetGuard(JSON.parse(Buffer.from(inputB64, 'base64url').toString('utf8')), { rootDir: '/', resolveGitCommonDirFn: () => commonDir });",
+    "process.exit(result.exitCode);",
+  ].join("\n"));
+  try {
+    await Promise.all(Array.from({ length: 8 }, () => new Promise((resolve, reject) => {
+      const child = spawn(process.execPath, [runner, GUARD, commonDir, Buffer.from(JSON.stringify(input)).toString("base64url")]);
+      child.on("error", reject);
+      child.on("exit", (code) => code === 0 ? resolve() : reject(new Error(`child exited ${code}`)));
+    })));
+    const observationRoot = join(commonDir, "agent-pipeline", "dispatch-budget", "unresolved-observations");
+    const directories = readdirSync(observationRoot, { recursive: true }).filter((entry) => String(entry).endsWith(".json"));
+    assert.equal(directories.length, 1);
+    const observation = JSON.parse(readFileSync(join(observationRoot, directories[0]), "utf8"));
+    assert.equal(observation.reason, "agent-id-present-but-not-a-string");
+    assert.equal(observation.branch, "unresolved-identity");
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
   }
 });
