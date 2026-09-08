@@ -15,6 +15,8 @@ A6/A6R. **Constrained by** [ADR-0061](0061-uniform-human-approval-ceremony.md);
 [ADR-0056](0056-push-approval-mode.md) by adding a kind to their existing
 machinery, changing neither.
 
+**Governs:** project/critical-human-proof.json, plugins/pipeline-core/lib/critical-action-approval-request.mjs, plugins/pipeline-core/lib/critical-action-approval-request.test.mjs, plugins/pipeline-core/lib/critical-human-proof-policy.mjs, plugins/pipeline-core/lib/critical-human-proof-policy.test.mjs, plugins/pipeline-core/scripts/po-human-approval.mjs, plugins/pipeline-core/scripts/po-human-approval.test.mjs, plugins/pipeline-core/scripts/release-preflight.mjs, plugins/pipeline-core/scripts/release-preflight.test.mjs, plugins/pipeline-core/scripts/release-preflight-cli.mjs, plugins/pipeline-core/scripts/release-preflight-cli.test.mjs, plugins/pipeline-core/scripts/publication-executor.mjs, plugins/pipeline-core/scripts/publication-executor.test.mjs, plugins/pipeline-core/scripts/publication-gate-evidence.mjs, plugins/pipeline-core/scripts/publication-gate-evidence.test.mjs, plugins/pipeline-core/scripts/push-release-flow-docs-contract.test.mjs, docs/push-release-flow.md
+
 ## Context
 
 `release-preflight.mjs` has validated a `consent` object since it shipped:
