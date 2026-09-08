@@ -38,9 +38,9 @@ const TERRA_OBSERVED = Object.freeze({
   effectiveDuty: "codex_implementation",
   effectiveWorktype: null,
   effectiveRunner: "codex",
-  effectiveSelector: Object.freeze({ kind: "model-id", value: "gpt-5.6-terra" }),
+  effectiveSelector: Object.freeze({ kind: "model-id", value: "gpt-5.6-luna" }),
   effectiveProvider: "openai",
-  effectiveModelId: "gpt-5.6-terra",
+  effectiveModelId: "gpt-5.6-luna",
   effectiveEffort: "xhigh",
 });
 const FABLE_OBSERVED = Object.freeze({
@@ -70,6 +70,10 @@ const FABLE_EVIDENCE = Object.freeze(trustedEvidenceFor("cli", FIXTURE.hostDiges
 
 const routing = projectDirectRoutingDefaults();
 const terraRoute = routing.duties.codex_implementation;
+const terraAliasRoute = Object.freeze({
+  ...terraRoute,
+  selector: { kind: "alias", value: "terra" },
+});
 const fableRoute = Object.freeze({
   ...terraRoute,
   selector: { kind: "alias", value: "fable" },
@@ -124,6 +128,11 @@ function rejects(receipt, route, dispatchBinding, trustedEvidence, adapter) {
   return outcome.threw === false && outcome.result.ok === false;
 }
 
+function rejectionReason(receipt, route, dispatchBinding, trustedEvidence, adapter) {
+  const outcome = outcomeOf(receipt, route, dispatchBinding, trustedEvidence, adapter);
+  return outcome.threw === false && outcome.result.ok === false ? outcome.result.reason : null;
+}
+
 const terraReceipt = receiptFor(
   terraRoute,
   REQUESTED_DUTY,
@@ -132,9 +141,32 @@ const terraReceipt = receiptFor(
   HOST_EVIDENCE,
   {},
 );
-check("RR01 Terra/xhigh route itself is valid", validateDirectRoute(terraRoute).ok);
-check("RR02 Terra attestation requires the exact caller-held dispatch binding", accepts(terraReceipt, terraRoute, DISPATCH_BINDING, HOST_EVIDENCE));
-check("RR03 Terra keeps requested alias separate from observed effective model", terraReceipt.requestedSelector.value === "terra" && terraReceipt.effectiveModelId === "gpt-5.6-terra");
+const TERRA_ALIAS_OBSERVED = Object.freeze({
+  ...TERRA_OBSERVED,
+  effectiveSelector: Object.freeze({ kind: "model-id", value: "gpt-5.6-terra" }),
+  effectiveModelId: "gpt-5.6-terra",
+});
+const TERRA_ALIAS_EVIDENCE = Object.freeze(trustedEvidenceFor("host", FIXTURE.hostDigest, TERRA_ALIAS_OBSERVED));
+const TERRA_ALIAS_CLI_EVIDENCE = Object.freeze(trustedEvidenceFor("cli", FIXTURE.hostDigest, TERRA_ALIAS_OBSERVED));
+const terraAliasReceipt = receiptFor(
+  terraAliasRoute,
+  REQUESTED_DUTY,
+  REQUESTED_WORKTYPE,
+  TERRA_ALIAS_OBSERVED,
+  TERRA_ALIAS_EVIDENCE,
+  {},
+);
+const terraAliasCliReceipt = receiptFor(
+  terraAliasRoute,
+  REQUESTED_DUTY,
+  REQUESTED_WORKTYPE,
+  TERRA_ALIAS_OBSERVED,
+  TERRA_ALIAS_CLI_EVIDENCE,
+  {},
+);
+check("RR01 current Luna/xhigh implementation route itself is valid", validateDirectRoute(terraRoute).ok);
+check("RR02 current Luna implementation attestation requires the exact caller-held dispatch binding", accepts(terraReceipt, terraRoute, DISPATCH_BINDING, HOST_EVIDENCE));
+check("RR03 implementation keeps the canonical direct request separate from observed receipt evidence", terraReceipt.requestedSelector.value === terraRoute.selector.value && terraReceipt.effectiveModelId === "gpt-5.6-luna");
 
 for (const field of ["schema", "dispatchId", "queueRevision", "candidateCommit", "candidateTree", "resultSha256", "requestedDuty", "requestedWorktype", "requestedRunner", "requestedProvider", "requestedSelector", "requestedEffort", "effectiveDuty", "effectiveWorktype", "effectiveRunner", "effectiveSelector", "effectiveProvider", "effectiveModelId", "effectiveEffort", "resolutionEvidence", "attestationAvailable", "effectiveRouteStatus"]) {
   const { [field]: omitted, ...withoutField } = terraReceipt;
@@ -156,7 +188,7 @@ check("RR16 candidate tree drift fails closed", rejects({ ...terraReceipt, candi
 check("RR17 queue revision drift fails closed", rejects({ ...terraReceipt, queueRevision: 1 }, terraRoute, DISPATCH_BINDING, HOST_EVIDENCE));
 check("RR18 dispatch identifier drift fails closed", rejects({ ...terraReceipt, dispatchId: "different-dispatch" }, terraRoute, DISPATCH_BINDING, HOST_EVIDENCE));
 check("RR19 trusted evidence digest drift fails closed", rejects({ ...terraReceipt, resolutionEvidence: { source: "host", sha256: "d".repeat(64) } }, terraRoute, DISPATCH_BINDING, HOST_EVIDENCE));
-check("RR20 Terra requires trusted host evidence rather than trusted CLI evidence", rejects(terraReceipt, terraRoute, DISPATCH_BINDING, CLI_EVIDENCE));
+check("RR20 Terra alias requires trusted host evidence rather than trusted CLI evidence", rejectionReason(terraAliasCliReceipt, terraAliasRoute, DISPATCH_BINDING, TERRA_ALIAS_CLI_EVIDENCE) === "terra-requires-host-evidence");
 check("RR21 raw output is rejected at the receipt schema boundary", rejects({ ...terraReceipt, rawOutput: "untrusted output" }, terraRoute, DISPATCH_BINDING, HOST_EVIDENCE));
 check("RR22 unresolved status fails closed", rejects({ ...terraReceipt, effectiveRouteStatus: "unresolved-alias", attestationAvailable: false }, terraRoute, DISPATCH_BINDING, HOST_EVIDENCE));
 check("RR23 unavailable status fails closed", rejects({ ...terraReceipt, effectiveRouteStatus: "unavailable", attestationAvailable: false }, terraRoute, DISPATCH_BINDING, HOST_EVIDENCE));
@@ -256,15 +288,15 @@ const ALTERNATE_TERRA_OBSERVED = Object.freeze({
 });
 const ALTERNATE_TERRA_EVIDENCE = Object.freeze(trustedEvidenceFor("host", FIXTURE.hostDigest, ALTERNATE_TERRA_OBSERVED));
 const alternateTerraReceipt = receiptFor(
-  terraRoute,
+  terraAliasRoute,
   REQUESTED_DUTY,
   REQUESTED_WORKTYPE,
   ALTERNATE_TERRA_OBSERVED,
   ALTERNATE_TERRA_EVIDENCE,
   {},
 );
-check("RR75 Terra accepts an alternate syntactically valid host-observed model when evidence agrees", accepts(alternateTerraReceipt, terraRoute, DISPATCH_BINDING, ALTERNATE_TERRA_EVIDENCE));
-check("RR76 Terra receipt matching gpt-5.6-terra still fails when trusted evidence observes another model", rejects(terraReceipt, terraRoute, DISPATCH_BINDING, ALTERNATE_TERRA_EVIDENCE));
+check("RR75 Terra alias accepts an alternate syntactically valid host-observed model when evidence agrees", accepts(alternateTerraReceipt, terraAliasRoute, DISPATCH_BINDING, ALTERNATE_TERRA_EVIDENCE));
+check("RR76 Terra alias receipt matching gpt-5.6-terra still fails when trusted evidence observes another model", rejects(terraAliasReceipt, terraAliasRoute, DISPATCH_BINDING, ALTERNATE_TERRA_EVIDENCE));
 
 const FABLE_NON_SOL_OBSERVED = Object.freeze({
   ...FABLE_OBSERVED,
@@ -427,39 +459,46 @@ check("RR93 Codex Fable quality alias rejects an unsupported effort even when at
 
 const ALTERNATE_TERRA_CLI_EVIDENCE = Object.freeze(trustedEvidenceFor("cli", FIXTURE.hostDigest, ALTERNATE_TERRA_OBSERVED));
 const alternateTerraCliReceipt = receiptFor(
-  terraRoute,
+  terraAliasRoute,
   REQUESTED_DUTY,
   REQUESTED_WORKTYPE,
   ALTERNATE_TERRA_OBSERVED,
   ALTERNATE_TERRA_CLI_EVIDENCE,
   {},
 );
-check("RR94 Terra accepts an alternate concrete model ID with matching host attestation", accepts(alternateTerraReceipt, terraRoute, DISPATCH_BINDING, ALTERNATE_TERRA_EVIDENCE));
-check("RR95 Terra still rejects matching CLI attestation for an alternate concrete model ID", rejects(alternateTerraCliReceipt, terraRoute, DISPATCH_BINDING, ALTERNATE_TERRA_CLI_EVIDENCE));
+check("RR94 Terra alias accepts an alternate concrete model ID with matching host attestation", accepts(alternateTerraReceipt, terraAliasRoute, DISPATCH_BINDING, ALTERNATE_TERRA_EVIDENCE));
+check("RR95 Terra alias still rejects matching CLI attestation for an alternate concrete model ID", rejectionReason(alternateTerraCliReceipt, terraAliasRoute, DISPATCH_BINDING, ALTERNATE_TERRA_CLI_EVIDENCE) === "terra-requires-host-evidence");
 
 const directTerraRoute = Object.freeze({
   ...terraRoute,
   selector: { kind: "model-id", value: "gpt-5.6-terra" },
 });
+const LEGACY_TERRA_OBSERVED = Object.freeze({
+  ...TERRA_OBSERVED,
+  effectiveSelector: Object.freeze({ kind: "model-id", value: "gpt-5.6-terra" }),
+  effectiveModelId: "gpt-5.6-terra",
+});
+const LEGACY_TERRA_EVIDENCE = Object.freeze(trustedEvidenceFor("host", FIXTURE.hostDigest, LEGACY_TERRA_OBSERVED));
+const LEGACY_TERRA_CLI_EVIDENCE = Object.freeze(trustedEvidenceFor("cli", FIXTURE.hostDigest, LEGACY_TERRA_OBSERVED));
 const directTerraReceipt = receiptFor(
   directTerraRoute,
   REQUESTED_DUTY,
   REQUESTED_WORKTYPE,
-  TERRA_OBSERVED,
-  HOST_EVIDENCE,
+  LEGACY_TERRA_OBSERVED,
+  LEGACY_TERRA_EVIDENCE,
   {},
 );
 const directTerraCliReceipt = receiptFor(
   directTerraRoute,
   REQUESTED_DUTY,
   REQUESTED_WORKTYPE,
-  TERRA_OBSERVED,
-  CLI_EVIDENCE,
+  LEGACY_TERRA_OBSERVED,
+  LEGACY_TERRA_CLI_EVIDENCE,
   {},
 );
-check("RR96 legacy validation keeps an unobserved direct Terra request closed", rejects(directTerraReceipt, directTerraRoute, DISPATCH_BINDING, HOST_EVIDENCE));
-check("RR97 P3B direct Terra adapter accepts exact host-attested same-dispatch evidence", accepts(directTerraReceipt, directTerraRoute, DISPATCH_BINDING, HOST_EVIDENCE, P3B_DIRECT_TERRA_RECEIPT_ADAPTER));
-check("RR98 P3B direct Terra adapter rejects CLI evidence", rejects(directTerraCliReceipt, directTerraRoute, DISPATCH_BINDING, CLI_EVIDENCE, P3B_DIRECT_TERRA_RECEIPT_ADAPTER));
+check("RR96 registered direct Terra request accepts matching host attestation", accepts(directTerraReceipt, directTerraRoute, DISPATCH_BINDING, LEGACY_TERRA_EVIDENCE));
+check("RR97 P3B direct Terra adapter accepts exact host-attested same-dispatch evidence", accepts(directTerraReceipt, directTerraRoute, DISPATCH_BINDING, LEGACY_TERRA_EVIDENCE, P3B_DIRECT_TERRA_RECEIPT_ADAPTER));
+check("RR98 P3B direct Terra adapter rejects matching CLI evidence at the host-only boundary", rejectionReason(directTerraCliReceipt, directTerraRoute, DISPATCH_BINDING, LEGACY_TERRA_CLI_EVIDENCE, P3B_DIRECT_TERRA_RECEIPT_ADAPTER) === "terra-requires-host-evidence");
 
 console.log(`\n${passed}/${passed + failed} checks passed.`);
 process.exit(failed === 0 ? 0 : 1);

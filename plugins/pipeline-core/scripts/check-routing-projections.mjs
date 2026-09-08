@@ -123,11 +123,15 @@ export function checkV3RuntimeProjection(root, user) {
     findings.push("V3 Claude advisory compatibility projection drift");
   }
   const advisor = plan.targets.find((target) => target.path === ".codex/agents/consult-advisor.toml");
+  // V3 validation above pins this requested duty cell to the frozen registry.
+  // Keep the byte-level template check while taking its selector and effort
+  // from that validated authority rather than retaining a second model table.
+  const advisorCell = user.routing.duties.advisory.codex;
   const expectedAdvisor = [
     'name = "consult-advisor"',
     'description = "Fresh independent read-only advisor; answer one supplied question with repository evidence only."',
-    'model = "gpt-5.6-sol"',
-    'model_reasoning_effort = "max"',
+    `model = ${JSON.stringify(advisorCell.selector.value)}`,
+    `model_reasoning_effort = ${JSON.stringify(advisorCell.effort)}`,
     'developer_instructions = "Use fresh context and answer exactly one supplied question. Read-only sandbox only: no chat, handover, memory, mutation, persistence, auto-apply, or gate decisions; no separate network tool or third-party export. Report evidence and insufficiency without claiming unobserved model identity or OS isolation."',
     'sandbox_mode = "read-only"',
     "",
@@ -206,9 +210,12 @@ export function checkCodexPartialMappingContract() {
 export function checkCodexNormalCriticDuty() {
   const findings = [];
   try {
+    const source = ROUTING_AUTHORITY.hostDuties?.criticNormal;
+    if (!source) throw new Error("canonical host duty missing");
+    const expected = projectRunnerAssignment("codex", source);
     const route = projectHostDuty("criticNormal", "codex");
-    if (route.model !== "gpt-5.6-sol") findings.push("Codex normal Critic model drift");
-    if (route.effort !== "xhigh") findings.push("Codex normal Critic effort drift");
+    if (route.model !== expected.model) findings.push("Codex normal Critic requested model drift");
+    if (route.effort !== expected.effort) findings.push("Codex normal Critic requested effort drift");
     if (route.dispatch !== "host-native") findings.push("Codex normal Critic must remain host-native");
   } catch (error) {
     findings.push(`Codex normal Critic duty unavailable: ${error.message}`);

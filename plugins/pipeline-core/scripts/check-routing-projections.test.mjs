@@ -82,7 +82,8 @@ try {
 check("RP12b unsupported effort fails closed", unsupportedEffort);
 check("RP13 partial Codex alias mapping remains narrow", checkCodexPartialMappingContract().ok);
 const codexNormalCritic = projectHostDuty("criticNormal", "codex");
-check("RP13a Codex normal Critic duty is host-native Sol/xhigh", codexNormalCritic.model === "gpt-5.6-sol" && codexNormalCritic.effort === "xhigh" && codexNormalCritic.dispatch === "host-native");
+const canonicalNormalCritic = projectRunnerAssignment("codex", ROUTING_AUTHORITY.hostDuties.criticNormal);
+check("RP13a Codex normal Critic duty preserves the canonical requested route and host-native dispatch", codexNormalCritic.model === canonicalNormalCritic.model && codexNormalCritic.effort === canonicalNormalCritic.effort && codexNormalCritic.dispatch === "host-native");
 check("RP13b Codex normal Critic duty contract passes", checkCodexNormalCriticDuty().ok);
 let unknownHostDuty = false;
 try {
@@ -119,8 +120,8 @@ check("RP23 direct v1 defaults validate as the sole source", validateDirectRouti
 check("RP24 direct Claude projection preserves the legacy modelRouting shape", directManifestProjectionMatches(projectClaudeManifestRouting(direct), direct));
 const runnerRoutes = projectRunnerRoutes(direct);
 check("RP25 all direct routes project deterministically", runnerRouteProjectionMatches(runnerRoutes, direct));
-check("RP26 Codex design and Critic request observed Sol/xhigh", runnerRoutes.duty_codex_design.selector.value === "gpt-5.6-sol" && runnerRoutes.duty_codex_design.effort === "xhigh" && runnerRoutes.duty_codex_independent_critic.selector.value === "gpt-5.6-sol");
-check("RP27 Codex implementation remains unresolved Terra alias", runnerRoutes.duty_codex_implementation.selector.kind === "alias" && runnerRoutes.duty_codex_implementation.selector.value === "terra" && runnerRoutes.duty_codex_implementation.resolutionStatus === "unresolved-alias");
+check("RP26 Codex design and Critic preserve the validator-approved canonical requests", JSON.stringify(runnerRoutes.duty_codex_design) === JSON.stringify(validateDirectRoute(direct.duties.codex_design).route) && JSON.stringify(runnerRoutes.duty_codex_independent_critic) === JSON.stringify(validateDirectRoute(direct.duties.codex_independent_critic).route));
+check("RP27 Codex implementation preserves the validator-approved canonical request", JSON.stringify(runnerRoutes.duty_codex_implementation) === JSON.stringify(validateDirectRoute(direct.duties.codex_implementation).route));
 check("RP28 unobserved concrete Codex IDs fail closed", !validateDirectRoute({ ...direct.duties.codex_implementation, selector: { kind: "model-id", value: "invented-id" } }).ok);
 const directWithAdvisorOff = structuredClone(direct);
 directWithAdvisorOff.worktypes.feature.advisor = "off";
@@ -148,8 +149,8 @@ const CLAUDE_654EBAF_MODEL_ROUTING = Object.freeze({
 });
 check("RP31 direct v1 Claude projection is semantically identical to Shared 654ebaf", JSON.stringify(projectClaudeManifestRouting(direct)) === JSON.stringify(CLAUDE_654EBAF_MODEL_ROUTING));
 
-const terraImplementation = direct.duties.codex_implementation;
-check("RP32 P1 Codex implementation requests Terra at xhigh", terraImplementation.runner === "codex" && terraImplementation.selector.kind === "alias" && terraImplementation.selector.value === "terra" && terraImplementation.effort === "xhigh");
+const canonicalImplementation = direct.duties.codex_implementation;
+check("RP32 P1 Codex implementation retains its validated direct request", canonicalImplementation.runner === "codex" && validateDirectRoute(canonicalImplementation).ok && JSON.stringify(runnerRoutes.duty_codex_implementation) === JSON.stringify(validateDirectRoute(canonicalImplementation).route));
 check("RP33 P1 runner providers stay explicitly mapped", expectedProviderForRunner("codex") === "openai" && expectedProviderForRunner("claude") === "anthropic");
 for (const effort of ["low", "medium", "high", "xhigh", "max"]) {
   const assignment = projectRunnerAssignment("codex", { model: "fable", effort });
@@ -186,7 +187,16 @@ try {
   }
   const projection = planRuntimeProjectionV3(v3Intent, { baselines: readRuntimeProjectionV3Baselines(v3Root) });
   for (const target of projection.targets) writeFileSync(join(v3Root, target.path), target.after.bytes);
-  check("RP35 V3 checker accepts exact epic/feature advisory projection", checkV3RuntimeProjection(v3Root, v3Intent).length === 0);
+  const advisorTarget = projection.targets.find((target) => target.path === ".codex/agents/consult-advisor.toml");
+  const configuredAdvisor = v3Intent.routing.duties.advisory.codex;
+  check("RP35 V3 checker accepts the configured advisory selector and effort projection", checkV3RuntimeProjection(v3Root, v3Intent).length === 0 && advisorTarget?.after.bytes.includes(`model = ${JSON.stringify(configuredAdvisor.selector.value)}`) && advisorTarget.after.bytes.includes(`model_reasoning_effort = ${JSON.stringify(configuredAdvisor.effort)}`));
+  const corruptedAdvisor = structuredClone(v3Intent);
+  corruptedAdvisor.routing.duties.advisory.codex.selector.value = "gpt-5.6-terra";
+  corruptedAdvisor.routing.duties.advisory.codex.effort = "high";
+  check("RP35a V3 checker rejects advisory selector and effort corruption before projection", checkV3RuntimeProjection(v3Root, corruptedAdvisor).includes("pipeline.user.yaml V3 schema or registry validation failed"));
+  writeFileSync(join(v3Root, ".codex", "agents", "consult-advisor.toml"), advisorTarget.after.bytes.replace(`model = ${JSON.stringify(configuredAdvisor.selector.value)}`, 'model = "tampered-model"'));
+  check("RP35b V3 checker detects advisory bytes tampered on disk", checkV3RuntimeProjection(v3Root, v3Intent).includes(".codex/agents/consult-advisor.toml V3 owned projection drift"));
+  writeFileSync(join(v3Root, ".codex", "agents", "consult-advisor.toml"), advisorTarget.after.bytes);
   writeFileSync(join(v3Root, ".claude", "pipeline.yaml"), baselines[".claude/pipeline.yaml"]);
   check("RP36 V3 checker detects advisory runtime drift", checkV3RuntimeProjection(v3Root, v3Intent).some((finding) => finding.includes("V3 owned projection drift")));
 } finally {
@@ -195,13 +205,13 @@ try {
 
 check("RP37 Antigravity runner provider is google", expectedProviderForRunner("antigravity") === "google");
 check("RP38 Antigravity design and implement capabilities match Gemini models",
-  projectRunnerAssignment("antigravity", { capability: "design", effort: "high" }).model === "gemini-3.1-pro-high"
-  && projectRunnerAssignment("antigravity", { capability: "implement", effort: "high" }).model === "gemini-3.7-flash-high"
-  && projectRunnerAssignment("antigravity", { capability: "mechanic", effort: "low" }).model === "gemini-3.7-flash-low"
+  projectRunnerAssignment("antigravity", { capability: "design", effort: "high" }).model === v3Registry.profiles.epic.design_phase.antigravity.selector.value
+  && projectRunnerAssignment("antigravity", { capability: "implement", effort: "high" }).model === v3Registry.duties.implement.antigravity.selector.value
+  && projectRunnerAssignment("antigravity", { capability: "mechanic", effort: "low" }).model === v3Registry.duties.mechanic.antigravity.selector.value
 );
 check("RP39 Antigravity aliases resolve accurately",
-  projectRunnerAssignment("antigravity", { model: "flash-high", effort: "high" }).model === "gemini-3.7-flash-high"
-  && projectRunnerAssignment("antigravity", { model: "pro-high", effort: "high" }).model === "gemini-3.1-pro-high"
+  projectRunnerAssignment("antigravity", { model: "flash-high", effort: "high" }).model === projectRunnerAssignment("antigravity", { capability: "implement", effort: "high" }).model
+  && projectRunnerAssignment("antigravity", { model: "pro-high", effort: "high" }).model === projectRunnerAssignment("antigravity", { capability: "design", effort: "high" }).model
 );
 check("RP40 Antigravity direct routes validate against observed model-ids",
   validateDirectRoute({

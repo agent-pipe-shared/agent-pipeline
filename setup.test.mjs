@@ -893,7 +893,7 @@ ok("validateHumanFacingLanguage: rejects unsupported source value fail-closed", 
   ok("renderUserYaml: direct routing is the sole top-level source", text.includes("schema: pipeline.user.v1") && text.includes("\nrouting:\n") && !/^worktypes:|^models:/m.test(text));
   ok("renderUserYaml: disabled design advisor stays an explicit off sentinel", text.includes('advisor: "off"'));
   ok("renderUserYaml: feature advisor carries a nested direct selector", /advisor:\s*\n\s*runner: claude\s*\n\s*selector:\s*\n\s*kind: alias\s*\n\s*value: opus/.test(text));
-  ok("renderUserYaml: Codex Terra duty carries xhigh without a fabricated ID", /codex_implementation:\s*\n\s*runner: codex\s*\n\s*selector:\s*\n\s*kind: alias\s*\n\s*value: terra\s*\n\s*effort: xhigh/.test(text));
+  ok("renderUserYaml: Codex implementation carries the canonical model ID without a fabricated ID", /codex_implementation:\s*\n\s*runner: codex\s*\n\s*selector:\s*\n\s*kind: model-id\s*\n\s*value: gpt-5\.6-luna\s*\n\s*effort: xhigh/.test(text));
 }
 {
   // release: static commented starter example (ADR-0033/0034) -- always present, entirely
