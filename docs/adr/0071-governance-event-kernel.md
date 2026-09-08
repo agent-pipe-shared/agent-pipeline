@@ -4,6 +4,8 @@
 
 **Status:** accepted · **Date:** 2026-08-02
 
+**Governs:** governance/schemas/governance-event-envelope.schema.json, governance/schemas/governance-event-receipt.schema.json, governance/schemas/lifecycle-governance-event.schema.json, plugins/pipeline-core/lib/governance-event.mjs, plugins/pipeline-core/lib/governance-event.test.mjs, plugins/pipeline-core/lib/governance-event-store.mjs, plugins/pipeline-core/lib/governance-event-store.test.mjs, plugins/pipeline-core/lib/governance-event-projection.mjs, plugins/pipeline-core/lib/governance-event-projection.test.mjs, plugins/pipeline-core/lib/lifecycle-governance-events.mjs, plugins/pipeline-core/lib/lifecycle-governance-events.test.mjs, plugins/pipeline-core/lib/control-execution-lifecycle-event.mjs, plugins/pipeline-core/lib/control-execution-lifecycle-event.test.mjs, plugins/pipeline-core/scripts/governance-event.mjs, plugins/pipeline-core/scripts/governance-event.test.mjs, plugins/pipeline-core/scripts/governance-replay.mjs, plugins/pipeline-core/scripts/governance-authority.mjs
+
 ## Status
 
 Accepted for Phoenix PHX-1.

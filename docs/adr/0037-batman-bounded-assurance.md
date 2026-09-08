@@ -4,6 +4,8 @@
 
 **Status:** accepted (PO decision of 2026-07-18)
 
+**Governs:** plugins/pipeline-core/lib/afk-capability-worker.mjs, plugins/pipeline-core/lib/afk-capability-worker.test.mjs, plugins/pipeline-core/lib/afk-ledger.mjs, plugins/pipeline-core/lib/afk-ledger.test.mjs, plugins/pipeline-core/lib/afk-git-adapter.mjs, plugins/pipeline-core/lib/afk-git-adapter.test.mjs, plugins/pipeline-core/lib/afk-transaction-host.mjs, plugins/pipeline-core/lib/afk-transaction-host.test.mjs, plugins/pipeline-core/lib/afk-review.mjs, plugins/pipeline-core/lib/afk-review.test.mjs, plugins/pipeline-core/scripts/afk-activation.mjs, plugins/pipeline-core/scripts/afk-activation.test.mjs, plugins/pipeline-core/scripts/afk-claude-host.mjs, plugins/pipeline-core/scripts/afk-claude-host.test.mjs, plugins/pipeline-core/scripts/afk-worker.schema.json, plugins/pipeline-core/scripts/afk-ledger.schema.json, plugins/pipeline-core/scripts/afk-review.schema.json, plugins/pipeline-core/scripts/afk-activation.schema.json, harness/scripts/verify.mjs, harness/scripts/check-verify-suite-registration.mjs, harness/scripts/check-verify-suite-registration.test.mjs, plugins/pipeline-core/lib/onboarding-continuity.mjs, plugins/pipeline-core/lib/interaction-continuity.test.mjs, plugins/pipeline-core/scripts/worktree-create.mjs, plugins/pipeline-core/scripts/worktree-target-binding.test.mjs, plugins/pipeline-core/scripts/publication-close-journal.mjs, plugins/pipeline-core/scripts/publication-close-journal.test.mjs, plugins/pipeline-core/scripts/critic-t1-po-override.mjs, plugins/pipeline-core/scripts/critic-t1-po-override.test.mjs, plugins/pipeline-core/scripts/critic-t1-po-override.schema.json
+
 ## Context
 
 Fresh second readiness passes rejected all five initial Batman slice Specs. The

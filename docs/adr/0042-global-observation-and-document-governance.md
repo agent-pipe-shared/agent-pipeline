@@ -2,6 +2,8 @@
 
 **Status:** accepted · **Date:** 2026-07-20 · **Decision owner:** Product Owner
 
+**Governs:** .github/ISSUE_TEMPLATE/observation.yml, governance/observation-doc-governance.json, docs/observation-intake.md, harness/scripts/check-observation-governance.mjs, harness/scripts/check-observation-governance.test.mjs, harness/scripts/check-doc-contracts.mjs, harness/scripts/check-doc-contracts.test.mjs, harness/scripts/verify.mjs, plugins/pipeline-core/lib/observation-governance-bootstrap.mjs, plugins/pipeline-core/lib/observation-governance-bootstrap.test.mjs, plugins/pipeline-core/scripts/observation-governance-bootstrap.mjs, plugins/pipeline-core/lib/public-core-observation.mjs, plugins/pipeline-core/lib/public-core-observation.test.mjs, plugins/pipeline-core/skills/capture-observation/SKILL.md, plugins/pipeline-core/skills/capture-observation/scripts/observation-intake.mjs, plugins/pipeline-core/skills/capture-observation/scripts/observation-intake.test.mjs
+
 ## Context
 
 Public observations were previously split between chat, repository backlog,

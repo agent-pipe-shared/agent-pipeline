@@ -21,6 +21,8 @@ receipt and drift model this ADR reuses without amending its schema.
 **Does not touch** [ADR-0055](0055-critical-human-proof-waiver.md)/[ADR-0056](0056-push-approval-mode.md)/[ADR-0061](0061-uniform-human-approval-ceremony.md);
 see Decision 5.
 
+**Governs:** harness/scripts/verify.mjs, plugins/pipeline-core/scripts/verify-journal.mjs, plugins/pipeline-core/scripts/verify-journal.test.mjs, plugins/pipeline-core/lib/verify-resume.mjs, plugins/pipeline-core/lib/verify-resume.test.mjs, plugins/pipeline-core/scripts/verify-resume-plan.schema.json, harness/scripts/check-verify-suite-registration.mjs, harness/scripts/check-verify-suite-registration.test.mjs, plugins/pipeline-core/scripts/push-prepare.mjs, plugins/pipeline-core/scripts/push-prepare.test.mjs, plugins/pipeline-core/hooks/guard-push.mjs, plugins/pipeline-core/hooks/guard-push.test.mjs, plugins/pipeline-core/scripts/security-scan.mjs, plugins/pipeline-core/scripts/security-scan.test.mjs
+
 ## Context
 
 Three gate results bind to one exact commit as a whole.
