@@ -1,11 +1,9 @@
 # Agent-Pipeline
 
-A versioned operating model for agentic software development — clone it, run one
-setup script, and adopt a battle-tested set of roles, review gates, and guardrails
-for your own projects.
-
-*Where this stands: an actively developed public core, shaped through public
-feature branches and dogfooding rounds. Feedback welcome.*
+A versioned operating model for teams that need agent-assisted delivery to be
+reviewable, traceable, and measurable. It turns a change into a bounded task,
+machine evidence, independent review, and a durable record that a team can
+inspect later.
 
 > **A note on language.** This operating model was first built in German and then
 > made English-first for release. The docs are English-primary — bilingual files
@@ -17,63 +15,39 @@ feature branches and dogfooding rounds. Feedback welcome.*
 
 > _A German version follows below · Eine deutsche Fassung folgt weiter unten._
 
-> **Newcomer path:** This README is the single entry point. For adoption, the only
-> required next document is `SETUP.md`; deeper and conceptual documentation
-> is optional reference.
+> **Newcomer path:** Read this page, then follow [SETUP](SETUP.md) for the
+> normal consumer adoption flow. [PIPELINE_FLOW](PIPELINE_FLOW.md) explains the
+> lifecycle; the links below are optional reference.
 
-> **Current release: `0.6.2`.** A tagged release is still not an
-> installation recommendation or production release. **Phoenix is the completed,
-> integrated product foundation:** durable delivery governance, explicit
-> candidate-bound evidence and approvals, independent review, and safe
-> boundaries for external actions. Missing, stale, malformed, or mismatched
-> proof remains a typed non-success.
->
-> **Nova remains active.** This release carries its usable, runner-aware
-> increment: a public Driver takes an empty directory through guided onboarding,
-> an existing or new first trust anchor, resumable intake, plan approval, real
-> verify setup, and the first implementation step. Claude, Codex, and
-> Antigravity exercise the same structured-action contract; a runner fills only
-> the declared human placeholders instead of reconstructing internal commands.
-> Nova B and runner-specific evidence remain future work, not a hidden claim
-> that Nova is complete.
->
-> Publication remains deliberately separate. The final candidate needs its own
-> complete Verify, security, independent-review, approval, and remote-readback
-> evidence; no earlier result is silently carried over to a changed tree. See
-> [What's new in 0.6.0](docs/whats-new-0.6.0.md) for scope and non-claims, and
-> the [consumer onboarding guide](docs/v3-consumer-onboarding.md) for the full
-> lifecycle.
+> **Documentation line: `0.6.2`.** This is the next release's documented scope,
+> not a tag, installation recommendation, production-availability claim, or
+> evidence that a local candidate has passed its release gates.
 
-> **What this costs you.** Enforcement is not free: gates, evidence discipline,
-> and independent review trade tokens and speed for correctness. That trade is
-> wrong for fast, exploratory work — a throwaway script or a same-day spike
-> does not need a Critic review or a signed push. Dial rigor down (or off) for
-> that kind of work via the three dials below; save full enforcement for
-> changes where a mistake is expensive.
+> **What you can inspect:** a candidate-bound Verify receipt, security-scan
+> status, review and approval records where the project requires them, and a
+> validated Feature Package or offline Audit Bundle. These artifacts support an
+> audit trail; they do not certify compliance or replace an auditor. Start with
+> [audit and evidence](docs/audit-and-evidence.md).
 
-> **Choose approval strength honestly.** `gates.human_approval: "chat"` is for
-> a PO-classified low-consequence repository only. It lets the agent record an
-> explicit chat answer without a key, trust anchor, terminal command, or
-> UI/host/TTY attestation. Its durable basis is
-> `chat-attributed-unattested`: attribution, not proof that a human/account/device
-> approved. `signature` remains the default and the only strong attested option.
-> Existing installations may still use ADR-0056's action-local approval keys;
-> do not assume a global selector works until the installed runtime recognizes
-> it. See [ADR-0076](docs/adr/0076-global-chat-attributed-unattested-approval-mode.md).
+> **What it costs:** the [cost page](docs/cost-and-measurement.md) gives four
+> historical full-Verify examples, including two red receipts. They are
+> observations, not an onboarding estimate or a promise for your project.
+> Consumer administration overhead has not yet been measured across runners.
 
 ## The problem
 
-Teams building with coding agents tend to reinvent the same conventions per repo —
-review rituals, git guardrails, handover files — copied by hand and drifting
-project to project. There's no independent reviewer separate from whoever wrote
-the code, and no shared discipline over which model does which kind of work at
-what cost. This repo is that missing shared layer: one versioned source, adopted
-by reference instead of copy-pasted.
+Teams with audit obligations often need more than a chat transcript or a claim
+that a test passed. They need a repeatable delivery record: who made a decision,
+what was checked against which candidate, what was refused, and what remained
+outside the evidence. Agent-Pipeline supplies that shared method without making
+it a compliance certification or a claim about every host's enforcement.
 
 ## What you get
 
 Four deliberately separated roles carry the model:
 
+<!-- capability:human-accountability-roles -->
+<a id="capability-human-accountability-roles"></a>
 - **Product Owner (you)** — the human gate. Sets direction, reviews outcomes, holds
   final sign-off.
 - **Elephant** — the long-lived orchestrator session. Turns your intent into a spec,
@@ -89,20 +63,28 @@ Around those roles:
   *before* any LLM judgment; only what survives the gates reaches a Critic.
 - **Specs with checkable acceptance criteria** — every task has a Definition of
   Done something or someone can actually check, not a "done"-on-a-feeling.
-- **Git guardrails** — a hook layer that blocks force-pushes, history rewrites,
-  deleted protected branches, and skipped hooks, regardless of what any agent asks
-  for.
+- **Git and write-path guardrails** — configured integrations can refuse unsafe
+  commands, protected-path writes, force-pushes, history rewrites, and skipped
+  hooks. The exact live controls depend on the installed runner and project
+  configuration; see [enforcement](docs/enforcement.md).
 - **A model/token policy** — role-tiered model routing (design / implement /
   mechanic / review / optional advisor) configured to your own subscription, so
   cost tracks task complexity instead of one model doing everything.
 - **Evidence discipline** — "done" means a machine-written log or output, the exact
   command, and its exit code — never a model-formulated claim that something
   "should work."
-- **Two human gates, not a stream of approvals** — plan sign-off up front and
-  completion sign-off at the end are the only two required stops for you.
-  Deliberately few and deliberately placed: your attention is the scarce
-  resource, and a long queue of small approvals trains reflexive clicking, not
-  actual review.
+- **Explicit human authority** — plan, acceptance, and remote-action decisions
+  remain with the human where the project calibration and action require them;
+  evidence never creates that authority.
+
+## Quick start
+
+For a project that will consume the pipeline, go to [SETUP](SETUP.md) and
+follow **Adopt a project**. It starts with prerequisites and the runner's
+public onboarding path; it does not ask a consumer to run this repository's
+source-maintainer setup. Then use [PIPELINE_FLOW](PIPELINE_FLOW.md) to choose
+the delivery route and [the documentation map](docs/README.md) for evidence,
+security, cost, and runtime-boundary reference.
 
 ## How it works
 
@@ -137,8 +119,8 @@ guards. Codex, Antigravity, and other CLIs can use the same roles, evidence,
 and review methodology, but this does not claim Claude hooks, plugin
 installation, automatic guards, or model identity — a requested route is not
 proof of observed model identity, and one runner's evidence does not prove
-another's behavior. For Codex, every duty assigned to Fable resolves to
-`gpt-5.6-sol` at the same effort tier; Claude assignments remain unchanged.
+another's behavior. Route selection comes from `pipeline.user.yaml`; consult
+the current source rather than treating a document label as a model promise.
 See [`docs/runtime-boundary.md`](docs/runtime-boundary.md) for the exact
 division of responsibility and [`docs/runner-support.md`](docs/runner-support.md)
 for the per-runner boundary table.
@@ -230,8 +212,9 @@ rule to enforced rule — lives in the
 
 ## Three dials, not one size fits all
 
-Same method, calibrated strictness — from a weekend hack to an enterprise
-codebase. Three independent dials set that:
+The method uses calibrated strictness: teams can match the written contract
+and review depth to the delivery's actual stakes. Three independent dials set
+that:
 
 - **Rigor per task** — issue-only / delta-spec / spec-anchored
 - **Governance mode per rule set** — advisory / enforcing / off
@@ -250,11 +233,11 @@ scarcest resource — so strictness gets invested where mistakes are expensive,
 and consciously spared elsewhere. The final judgment still always stays with the
 human.
 
-## Quick start
+## Source-maintainer command reference
 
-See [`SETUP.md`](SETUP.md) for the full walkthrough: maintain a pipeline source
-with `node setup.mjs`, then bind the plugin and start a consumer's first
-session. A fresh consumer root never needs a copied/root `setup.mjs`.
+Routine adopters should use [SETUP](SETUP.md) rather than these source-checkout
+commands. A fresh consumer root never copies or runs this repository's root
+`setup.mjs`.
 
 ### Command lifecycle
 
@@ -282,29 +265,101 @@ Before your first big feature, a quick look at
 guide for brainstorming a solid requirement before it enters the pipeline
 (optional, recommended).
 
+## Operational controls in context
+
+The adoption flow uses a small set of connected controls; their detailed local
+contracts live in the linked reference pages, rather than in a second catalog
+here.
+
+<!-- capability:plugin-distribution-and-publication -->
+<!-- anchor:capability-plugin-distribution-and-publication -->
+<!-- capability:session-and-delivery-skills -->
+<!-- anchor:capability-session-and-delivery-skills -->
+<!-- capability:specialist-agent-roles -->
+<!-- anchor:capability-specialist-agent-roles -->
+<!-- capability:starter-templates -->
+<!-- anchor:capability-starter-templates -->
+<!-- capability:generated-agent-obligations -->
+<!-- anchor:capability-generated-agent-obligations -->
+<!-- capability:v3-routed-duties -->
+<!-- anchor:capability-v3-routed-duties -->
+<!-- capability:v3-work-profiles -->
+<!-- anchor:capability-v3-work-profiles -->
+**Plan and delivery.** Distributed plugins, starter templates, V3 profiles and
+routed duties, named specialist roles, generated obligations, and bounded
+session skills make a task and its delivery record explicit. Publication is a
+separate evidence-bound action; a selected route is not an effective-model
+attestation.
+
+<!-- capability:handover-hard-size-gate -->
+<!-- anchor:capability-handover-hard-size-gate -->
+<!-- capability:governance-event-ledger -->
+<!-- anchor:capability-governance-event-ledger -->
+<!-- capability:agent-decision-journal -->
+<!-- anchor:capability-agent-decision-journal -->
+<!-- capability:continuity-and-handover -->
+<!-- anchor:capability-continuity-and-handover -->
+**Continuity.** Size-bounded handovers and explicit continuity, journal, and
+event-ledger tools preserve inspectable state. A library or record does not
+automatically activate a runner integration or create authority.
+
+<!-- capability:audit-and-evidence-cli -->
+<!-- anchor:capability-audit-and-evidence-cli -->
+<!-- capability:change-control-cli -->
+<!-- anchor:capability-change-control-cli -->
+<!-- capability:security-control-catalog -->
+<!-- anchor:capability-security-control-catalog -->
+<!-- capability:supply-chain-provenance -->
+<!-- anchor:capability-supply-chain-provenance -->
+<!-- capability:ai-assisted-hardening -->
+<!-- anchor:capability-ai-assisted-hardening -->
+**Assurance evidence.** Audit, change-control, security-catalog, provenance,
+and hardening tools are explicit local operations. Their receipts inform
+review; they do not publish externally, install a scanner, or certify security
+or compliance.
+
+<!-- capability:critical-human-authorization -->
+<!-- anchor:capability-critical-human-authorization -->
+<!-- capability:repair-guidance-cli -->
+<!-- anchor:capability-repair-guidance-cli -->
+<!-- capability:human-override-and-maintenance-window -->
+<!-- anchor:capability-human-override-and-maintenance-window -->
+**Human boundaries.** Critical authorization, refusal repair, override, and
+maintenance-window paths require an attended, declared procedure. Asking for
+guidance or preparing a request never grants an agent an override.
+
+<!-- capability:afk-capability-workers -->
+<!-- anchor:capability-afk-capability-workers -->
+<!-- capability:local-worker-supervision -->
+<!-- anchor:capability-local-worker-supervision -->
+<!-- capability:cost-and-benchmark-cli -->
+<!-- anchor:capability-cost-and-benchmark-cli -->
+<!-- capability:error-register-quality-gate -->
+<!-- anchor:capability-error-register-quality-gate -->
+<!-- capability:organization-policy-packs -->
+<!-- anchor:capability-organization-policy-packs -->
+<!-- capability:external-traceability-adapters -->
+<!-- anchor:capability-external-traceability-adapters -->
+**Operations.** Claude-only analysis workers, explicit local-worker
+supervision, cost/benchmark and quality checks, policy packs, and traceability
+adapters retain their stated boundaries: provider execution, external writes,
+and cross-runner cost comparisons need separate inputs and evidence.
+
 ## Runtime
 
-Built for [Claude Code](https://claude.com/claude-code) — the git-guard hooks, the
-session-bootstrap check, and gate enforcement all rely on its hook and plugin
-system. The underlying methodology (roles, SDLC, review contract) is portable to
-other agent runtimes without that enforcement layer; see
-[`docs/runtime-boundary.md`](docs/runtime-boundary.md) for the boundary between
-what's always portable and what's Claude-Code-specific.
+Claude Code is the documented full-enforcement environment for its hook and
+plugin layer. Codex has a host-dependent bridge, and Antigravity has native
+plugin/hook integration for the runner-specific controls their evidence
+documents. Those routes do not imply identical hooks, universal enforcement,
+OS isolation, or model identity. The methodology remains portable; see
+[`docs/runtime-boundary.md`](docs/runtime-boundary.md) and
+[`docs/runner-support.md`](docs/runner-support.md) for the current boundaries.
 
 ## Learn more
 
-- [`SETUP.md`](SETUP.md) — onboarding: prerequisites, setup steps, troubleshooting.
-- [`docs/overview.md`](docs/overview.md) — the model in one read: how the roles,
-  gates, and close ritual fit together end to end.
-- [`docs/usage.md`](docs/usage.md) — a day in the pipeline: what an ordinary
-  working session looks like from the inside.
-- [`docs/migration.md`](docs/migration.md) — bringing an existing repo under the
-  pipeline, one gate at a time.
-- [`docs/design-decisions.md`](docs/design-decisions.md) — the "why" behind the
-  model, in plain language.
-- [`docs/operating-model.md`](docs/operating-model.md) — the full normative
-  document: roles, SDLC, review system, session lifecycle, handover, project
-  calibration.
+Follow the canonical [documentation map](docs/README.md): it keeps adoption,
+enforcement, evidence, security, cost, and maintainer references in one order.
+For the normative contract, read [`docs/operating-model.md`](docs/operating-model.md).
 - [`LICENSE`](LICENSE) and [`LICENSE-DOCS`](LICENSE-DOCS) use the source-available Sustainable Use License 1.0 (SUL-1.0) with the Agent-Pipeline Additional Permission; see [`docs/licensing.md`](docs/licensing.md).
 
 ## Acknowledgments
@@ -328,13 +383,10 @@ Goldfish as an executor rather than a checker — it says so, and why, in
 
 # Agent-Pipeline (Deutsch)
 
-Ein versioniertes Operating Model für agentische Softwareentwicklung — klonen,
-ein Setup-Skript ausführen und ein erprobtes Set aus Rollen, Review-Gates und
-Guardrails für die eigenen Projekte übernehmen.
-
-*Wo das gerade steht: ein aktiv entwickelter Public Core, der über öffentliche
-Feature-Branches und Dogfooding-Runden weiterentwickelt wird. Feedback
-willkommen.*
+Ein versioniertes Operating Model für Teams, die agentische Lieferung
+prüfbar, nachvollziehbar und messbar machen müssen. Es formt eine Änderung zu
+einer begrenzten Aufgabe, Maschinenevidenz, unabhängiger Prüfung und einem
+dauerhaften, später einsehbaren Nachweis.
 
 > **Zur Sprache.** Dieses Operating Model entstand zuerst auf Deutsch und wurde für
 > die Veröffentlichung auf Englisch-first umgestellt. Die Doku ist englisch-primär —
@@ -345,55 +397,33 @@ willkommen.*
 > Sprache die Pipeline für dich verwendet (Commits, Reviews, PRDs), wählst du über
 > die Einstellung `language.human_facing`.
 
-> **Einstieg für Neue:** Diese README ist der einzige Einstieg. Für die Übernahme ist
-> als Nächstes nur `SETUP.md` erforderlich; weiterführende und
-> konzeptionelle Dokumentation ist optionales Nachschlagewerk.
+> **Einstieg für Neue:** Lies diese Seite und folge dann [SETUP](SETUP.md) für
+> den normalen Consumer-Ablauf. [PIPELINE_FLOW](PIPELINE_FLOW.md) erklärt den
+> Lifecycle; die weiteren Links sind Nachschlagewerk.
 
-> **Aktuelles Release: `0.6.2`.** Ein getaggtes Release ist weiterhin keine
-> Installationsempfehlung und kein Produktiv-Release.
-> **Phoenix ist die abgeschlossene, integrierte Produktgrundlage:** dauerhafte
-> Delivery-Governance, explizite kandidatengebundene Evidenz und Freigaben,
-> unabhängige Prüfung sowie sichere Grenzen für externe Aktionen. Fehlende,
-> veraltete, fehlerhafte oder nicht passende Nachweise bleiben typisierte
-> Nicht-Erfolge.
->
-> **Nova bleibt aktiv.** Dieses Release enthält dessen nutzbaren,
-> runner-bewussten Schritt: Ein öffentlicher Driver führt ein leeres Verzeichnis
-> über geführtes Onboarding, einen vorhandenen oder neuen ersten Trust Anchor,
-> wiederaufnehmbaren Intake, Planfreigabe, ein echtes Verify-Setup und den Start
-> der ersten Implementierung. Claude, Codex und Antigravity folgen dabei
-> demselben Vertrag strukturierter Aktionen; ein Runner füllt nur die
-> ausgewiesenen menschlichen Platzhalter statt interne Befehle zu erraten. Nova B
-> und runnerspezifische Evidenz bleiben Folgearbeit, nicht die Behauptung, Nova
-> sei abgeschlossen.
->
-> Die Veröffentlichung bleibt bewusst getrennt. Der finale Kandidat braucht seine
-> vollständige eigene Verify-, Security-, unabhängige Review-, Freigabe- und
-> Remote-Readback-Evidenz; kein älteres Ergebnis wird still auf einen veränderten
-> Tree übertragen. Umfang und bewusste Nicht-Claims stehen unter [Neu in
-> 0.6.0](docs/whats-new-0.6.0.md); den vollständigen Ablauf beschreibt der
-> [Consumer-Onboarding-Guide](docs/v3-consumer-onboarding.md).
+> **Dokumentationslinie: `0.6.2`.** Sie beschreibt den dokumentierten Umfang
+> des nächsten Releases, keinen Tag, keine Installationsempfehlung, keine
+> Produktivverfügbarkeit und keinen Nachweis bestandener lokaler Release-Gates.
 
-> **Freigabestärke ehrlich wählen.** `gates.human_approval: "chat"` ist nur
-> für ein vom PO ausdrücklich als folgenarm eingestuftes Repository gedacht.
-> Der Agent darf dann eine explizite Chat-Antwort ohne Schlüssel, Trust Anchor,
-> Terminalbefehl oder UI-/Host-/TTY-Attestierung festhalten. Die dauerhafte
-> Grundlage heißt `chat-attributed-unattested`: Zuschreibung, nicht der Beweis,
-> dass ein Mensch, Account oder Gerät freigegeben hat. `signature` bleibt Default
-> und die einzige starke attestierte Option. Bestehende Installationen können
-> noch ADR-0056s aktionslokale Schlüssel verwenden; einen globalen Selektor erst
-> nach Runtime-Readback als wirksam annehmen. Siehe
-> [ADR-0076](docs/adr/0076-global-chat-attributed-unattested-approval-mode.md).
+> **Was du prüfen kannst:** kandidatengebundene Verify-Receipts,
+> Security-Scan-Status sowie erforderliche Review- und Freigabe-Nachweise. Ein
+> validiertes Feature Package oder Offline-Audit-Bundle kann diese Artefakte
+> zusammenstellen. Das unterstützt eine Audit-Spur, ersetzt aber weder Auditor
+> noch Compliance-Zertifizierung. Siehe [Audit und Evidenz](docs/audit-and-evidence.md).
+
+> **Was es kostet:** Die [Kostenseite](docs/cost-and-measurement.md) zeigt vier
+> historische vollständige Verify-Beispiele, darunter zwei rote Receipts. Das
+> sind Beobachtungen, keine Onboarding-Schätzung oder Zusage für dein Projekt.
+> Consumer-Verwaltungsaufwand über Runner hinweg ist noch nicht gemessen.
 
 ## Das Problem
 
-Teams, die mit Coding-Agents arbeiten, erfinden dieselben Konventionen in jedem
-Repo neu — Review-Rituale, git-Guardrails, Handover-Dateien — und kopieren sie
-von Hand zwischen Projekten. Kopien driften auseinander. Es gibt keine
-unabhängige Prüfinstanz, die getrennt von den Autoren des Codes urteilt, und
-keine gemeinsame Linie dafür, welches Modell welche Art von Arbeit zu welchen
-Kosten übernimmt. Dieses Repo ist genau diese fehlende, gemeinsame Schicht:
-eine versionierte Quelle, per Referenz übernommen statt kopiert.
+Teams mit Audit-Pflichten brauchen oft mehr als einen Chat-Verlauf oder die
+Behauptung, ein Test sei grün. Sie brauchen einen wiederholbaren
+Delivery-Nachweis: Wer hat entschieden, was wurde gegen welchen Kandidaten
+geprüft, was wurde verweigert und was bleibt außerhalb der Evidenz.
+Agent-Pipeline liefert diese gemeinsame Methode, aber keine Compliance-
+Zertifizierung und keine Aussage über Enforcement auf jedem Host.
 
 ## Was du bekommst
 
@@ -419,9 +449,10 @@ Ergänzend dazu:
 - **Specs mit prüfbaren Akzeptanzkriterien** — keine Aufgabe ist „fertig" nach
   Gefühl; jede Aufgabe hat eine Definition of Done, die sich tatsächlich prüfen
   lässt.
-- **Git-Guardrails** — eine Hook-Schicht, die Force-Pushes, History-Rewrites,
-  gelöschte geschützte Branches und übersprungene Hooks blockiert, unabhängig
-  davon, worum ein Agent bittet.
+- **Git- und Write-Path-Guardrails** — konfigurierte Integrationen können
+  unsichere Befehle, geschützte Writes, Force-Pushes, History-Rewrites und
+  übersprungene Hooks verweigern. Die aktiven Kontrollen hängen von Runner und
+  Projektkonfiguration ab; siehe [Enforcement](docs/enforcement.md).
 - **Eine Modell-/Token-Policy** — rollenabgestuftes Modell-Routing (Design /
   Implementierung / Mechanik / Review / optionaler Advisor), die du auf dein
   eigenes Abo einstellst, sodass sich die Kosten nach der Aufgabenkomplexität
@@ -429,11 +460,18 @@ Ergänzend dazu:
 - **Nachweispflicht** — „fertig" heißt: ein maschinell geschriebenes Log oder
   Ergebnis, dazu der exakte Befehl und dessen Exit-Code — nie eine vom Modell
   formulierte Behauptung, etwas „sollte funktionieren".
-- **Zwei menschliche Gates statt eines Freigabe-Dauerstroms** — die Plan-Freigabe
-  vorn und die Abnahme am Ende sind die einzigen zwei Pflichthalte für dich.
-  Bewusst wenige, bewusst platziert: Deine Aufmerksamkeit ist die knappe
-  Ressource, und eine lange Schlange kleiner Freigaben trainiert reflexartiges
-  Wegklicken, kein echtes Prüfen.
+- **Explizite menschliche Autorität** — Plan-, Abnahme- und Remote-Aktionen
+  bleiben dort beim Menschen, wo Projektkalibrierung und Aktion dies verlangen;
+  Evidenz erzeugt diese Autorität nicht.
+
+## Schnellstart
+
+Für ein Consumer-Projekt gehe zu [SETUP](SETUP.md) und folge **Adopt a
+project**. Dieser Weg beginnt mit Voraussetzungen und dem öffentlichen
+Onboarding-Pfad des Runners; er verlangt nicht die source-maintainer-`setup.mjs`.
+Danach erklärt [PIPELINE_FLOW](PIPELINE_FLOW.md) die Lieferroute und die
+[Dokumentationskarte](docs/README.md) verweist auf Evidenz, Security, Kosten und
+Runner-Grenzen.
 
 ## Wie es funktioniert
 
@@ -467,9 +505,9 @@ Rollen-, Evidenz- und Review-Methodik nutzen, aber daraus folgt weder ein
 Anspruch auf Claude-Hooks, Plugin-Installation, automatische Guardrails noch
 Modellidentität — eine angefragte Route ist kein Beweis für beobachtete
 Modellidentität, und die Evidenz eines Runners belegt nicht das Verhalten
-eines anderen. In Codex wird jede Fable-Aufgabe bei gleichem Effort-Tier zu
-`gpt-5.6-sol` aufgelöst; Claude-Zuweisungen bleiben unverändert. Die genaue
-Zuständigkeitsgrenze steht in [`docs/runtime-boundary.md`](docs/runtime-boundary.md),
+eines anderen. Die Routenauswahl folgt `pipeline.user.yaml`; ein
+Dokumentlabel ist keine Modellzusage. Die genaue Zuständigkeitsgrenze steht in
+[`docs/runtime-boundary.md`](docs/runtime-boundary.md),
 die Boundary-Tabelle je Runner in [`docs/runner-support.md`](docs/runner-support.md).
 
 Die native Codex-Selected-Sandbox-Route bleibt der bevorzugte, attestierte Weg;
@@ -563,8 +601,9 @@ Hausregel bis zur erzwungenen Regel — steht im
 
 ## Drei Drehregler statt einer Einheitsgröße
 
-Gleiche Methode, kalibrierte Strenge — vom Wochenend-Hack bis zur
-Enterprise-Codebasis. Drei unabhängige Regler stellen das ein:
+Die Methode nutzt kalibrierte Strenge: Teams können schriftlichen Vertrag und
+Review-Tiefe an die tatsächlichen Stakes einer Lieferung anpassen. Drei
+unabhängige Regler stellen das ein:
 
 - **Rigor pro Aufgabe** — Issue-only / Delta-Spec / Spec-verankert
 - **Governance-Modus pro Regelwerk** — advisory / enforcing / off
@@ -583,12 +622,11 @@ Aufmerksamkeit ist die knappste Ressource — Strenge wird also dort
 investiert, wo Fehler teuer sind, und woanders bewusst gespart. Das letzte
 Urteil bleibt trotzdem immer beim Menschen.
 
-## Schnellstart
+## Source-Maintainer-Befehlsreferenz
 
-Der vollständige Ablauf steht in [`SETUP.md`](SETUP.md): eine Pipeline-Source
-mit `node setup.mjs` pflegen, dann das Plugin binden und die erste Consumer-
-Session starten. Ein frischer Consumer-Root benötigt keine kopierte/root
-`setup.mjs`.
+Normale Consumer-Übernahmen folgen [SETUP](SETUP.md), nicht diesen
+Source-Checkout-Befehlen. Ein frischer Consumer-Root kopiert oder startet die
+root-`setup.mjs` dieses Repositories nie.
 
 ### Befehls-Lebenszyklus
 
@@ -617,39 +655,52 @@ Vor dem ersten großen Feature lohnt ein kurzer Blick in
 zum Brainstorming einer soliden Anforderung, bevor sie in die Pipeline geht
 (optional, empfohlen).
 
+## Operative Kontrollen im Zusammenhang
+
+Der Übernahme-Ablauf verbindet wenige Kontrollen; ihre detaillierten lokalen
+Verträge stehen in den verlinkten Referenzen statt in einem zweiten Katalog.
+
+**Plan und Lieferung.** Verteilte Plugins, Starter-Templates, V3-Profile und
+geroutete Duties, benannte Spezialrollen, generierte Pflichten und begrenzte
+Session-Skills machen Aufgabe und Liefernachweis explizit. Veröffentlichung
+bleibt eine getrennte evidenzgebundene Aktion; eine gewählte Route attestiert
+kein effektives Modell.
+
+**Kontinuität.** Größenbegrenzte Handover sowie explizite Kontinuitäts-,
+Journal- und Event-Ledger-Werkzeuge erhalten prüfbaren State. Eine Bibliothek
+oder ein Record aktiviert weder automatisch eine Runner-Integration noch
+erzeugt sie Autorität.
+
+**Assurance-Evidenz.** Audit-, Change-Control-, Security-Katalog-,
+Provenance- und Hardening-Werkzeuge sind explizite lokale Operationen. Ihre
+Receipts informieren das Review; sie veröffentlichen nicht extern, installieren
+keinen Scanner und zertifizieren weder Security noch Compliance.
+
+**Menschliche Grenzen.** Critical Authorization, Refusal Repair, Override und
+Maintenance-Window-Pfade verlangen ein betreutes, deklariertes Verfahren. Eine
+Anleitung oder vorbereitete Anfrage verleiht einem Agenten keine Ausnahme.
+
+**Betrieb.** Claude-only Analyse-Worker, explizite Local-Worker-Supervision,
+Kosten-/Benchmark- und Qualitätschecks, Policy Packs und Traceability-Adapter
+behalten ihre genannten Grenzen: Provider-Ausführung, externe Writes und
+runnerübergreifende Kostenvergleiche benötigen getrennte Inputs und Evidenz.
+
 ## Laufzeitumgebung
 
-Gebaut für [Claude Code](https://claude.com/claude-code) — die git-Guard-Hooks, der
-Session-Bootstrap-Check und die Gate-Durchsetzung setzen auf dessen Hook- und
-Plugin-System auf. Die zugrunde liegende Methodik (Rollen, SDLC, Review-Vertrag)
-ist auf andere Agent-Laufzeitumgebungen übertragbar, allerdings ohne diese
-Durchsetzungsschicht; siehe [`docs/runtime-boundary.md`](docs/runtime-boundary.md)
-für die Grenze zwischen dem, was immer übertragbar ist, und dem, was
-Claude-Code-spezifisch ist.
+Claude Code ist die dokumentierte Full-Enforcement-Umgebung für seine Hook- und
+Plugin-Schicht. Codex hat eine hostabhängige Bridge, Antigravity eine native
+Plugin-/Hook-Integration für die runnerspezifischen Kontrollen, die ihre Evidenz
+belegt. Daraus folgen weder identische Hooks noch universelles Enforcement,
+OS-Isolation oder Modellidentität. Die Methodik bleibt übertragbar; die aktuellen
+Grenzen stehen in [`docs/runtime-boundary.md`](docs/runtime-boundary.md) und
+[`docs/runner-support.md`](docs/runner-support.md).
 
 ## Mehr erfahren
 
-- [`SETUP.md`](SETUP.md) — Onboarding: Voraussetzungen, Setup-Schritte,
-  Fehlerbehebung.
-- [`docs/overview.md`](docs/overview.md) — das Modell in einem Durchgang: wie
-  Rollen, Gates und Abschluss-Ritual von Anfang bis Ende zusammenspielen.
-- [`docs/usage.md`](docs/usage.md) — ein Tag in der Pipeline: wie eine gewöhnliche
-  Arbeitssitzung von innen aussieht.
-- [`docs/migration.md`](docs/migration.md) — ein bestehendes Repo Schritt für
-  Schritt unter die Pipeline bringen.
-- [`docs/design-decisions.md`](docs/design-decisions.md) — das „Warum" hinter dem
-  Modell, in einfacher Sprache.
-- [`docs/operating-model.md`](docs/operating-model.md) — das vollständige
-  normative Dokument: Rollen, SDLC, Review-System, Session-Lifecycle, Handover,
-  Projekt-Kalibrierung.
+Folge der kanonischen [Dokumentationskarte](docs/README.md): Sie ordnet
+Übernahme, Enforcement, Evidenz, Security, Kosten und Maintainer-Referenzen.
+Den normativen Vertrag beschreibt [`docs/operating-model.md`](docs/operating-model.md).
 - [`LICENSE`](LICENSE) und [`LICENSE-DOCS`](LICENSE-DOCS) verwenden die source-available Sustainable Use License 1.0 (SUL-1.0) mit der Agent-Pipeline Additional Permission; siehe [`docs/licensing.md`](docs/licensing.md).
-
-### Close lifecycle
-
-Feature completion is coordinated by the restart-safe H5 close coordinator.
-It supports checkpoint/resume, one frozen candidate with exact final Verify,
-local-only close without push, and separately authorized publication/readback.
-Release and promotion are optional later transitions.
 
 ## Danksagung
 

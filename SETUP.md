@@ -5,10 +5,9 @@ idea to a reviewable change: clarify intent, plan, implement in bounded tasks,
 run deterministic checks, review independently, and leave durable evidence.
 It is a project operating model, not an application framework.
 
-This guide has two jobs:
-
-1. prepare a copy of **this pipeline repository** as your shared source; and
-2. activate and calibrate the pipeline in each repository that will use it.
+This guide leads with the routine job: activate the pipeline in each repository
+that will use it. Maintaining a shared pipeline source is a separate,
+occasional job later in this guide.
 
 Start with the top-level [README](README.md) for the value proposition and
 terminology. Read [`PIPELINE_FLOW.md`](PIPELINE_FLOW.md) for the maintained
@@ -31,14 +30,39 @@ end-to-end flow; this page only explains installation and adoption.
   details as machine-local configuration. Do not commit them into the pipeline
   source, a generated projection, or a project calibration.
 
-- **What this costs you.** Enforcement is not free. Gates, evidence
-  discipline, and an independent review are deliberate friction that trades
-  tokens and speed for correctness — worth it where a mistake is expensive,
-  wrong for fast exploratory work like a same-day spike or a throwaway
-  script. The rigor/governance/profile dials in the top-level
-  [README](README.md#three-dials-not-one-size-fits-all) exist precisely so
-  you are not stuck paying full enforcement cost for work that does not need
-  it.
+- **Measured cost boundary.** The project publishes bounded historical Verify
+  envelopes, not a time or token promise for your project. Consumer overhead
+  across runners is still unmeasured; see [cost and
+  measurement](docs/cost-and-measurement.md) before estimating adoption work.
+
+## B. Activate the pipeline in one project repository
+
+Repeat this routine path for every application or service repository. It uses
+the public onboarding Driver: bind the supported runner integration, start a
+new session in the project root, invoke `/pipeline-core:pipeline-start`, and
+follow the returned structured action. Supply only its named human inputs; do
+not copy this source repository's `setup.mjs`, generated projections, or
+machine-local configuration into the consumer project.
+
+The Driver classifies fresh, existing, legacy, partial, and host-managed roots
+before it offers a write. An explicit request to initialize is required for a
+fresh seed; an existing project receives a reviewed, additive adoption plan;
+partial or malformed roots fail closed. After bootstrap readback, record the
+project's one Verify command, calibration, handover, and project-owned policy
+choices through the normal reviewed workflow.
+
+For Claude Code, bind the project-scoped `pipeline-core` plugin, then fully
+restart the host before the first bootstrap. For Codex, use its approved
+marketplace/add commands and begin a new thread after binding or refresh. For
+another runner, use only its supported integration and the manual controls
+stated in [runtime boundary](docs/runtime-boundary.md). Do not copy Claude
+commands or claim its hooks are installed elsewhere.
+
+The resulting Verify receipt and delivery records can be inspected with the
+candidate's other evidence. They do not certify compliance or replace a human
+decision. [Audit and evidence](docs/audit-and-evidence.md) gives the artifact
+boundary; [the detailed consumer procedures](#consumer-onboarding-details)
+retain exact commands and migration cases for operators who need them.
 
 ### Runner support, stated precisely
 
@@ -57,144 +81,9 @@ automatic guard enforcement exists there. See
 and manual responsibilities, and [`docs/runner-support.md`](docs/runner-support.md)
 for the per-runner boundary table.
 
-### Codex local agent activity troubleshooting
+## Consumer onboarding details {#consumer-onboarding-details}
 
-Codex local subagent activity depends on its persistent local app-server daemon.
-If agent threads no longer appear, or a session unexpectedly behaves as if no
-durable local execution were available, check the daemon before changing a
-pipeline plan or treating the incident as a repository failure:
-
-```sh
-node plugins/pipeline-core/scripts/codex-app-server-health.mjs
-```
-
-`CAS-READY` means the daemon returned a current closed version observation. It
-does not prove that a model child was launched or that a host provides a
-background wakeup. Any other `CAS-*` result is a local Codex-host incident,
-with an exact code and attended operator guidance. The bounded recovery makes
-one fixed daemon restart and then requires a new healthy observation:
-
-```sh
-node plugins/pipeline-core/scripts/codex-app-server-health.mjs --recover
-```
-
-The recovery never loops, launches no model, and does not change repository
-state. If it fails, run `codex doctor` in an attended local Codex session and
-retain the `CAS-*` result in the handover; do not claim an active worker.
-
-## A. Prepare your pipeline source
-
-Clone or fork this repository into the organisation that will maintain the
-shared pipeline. Keep that clone as a versioned product; projects should bind
-to it rather than copy its rules into every repository.
-
-### Activate or upgrade the V3 authority
-
-Run these commands **only in a pipeline source checkout that contains
-`pipeline.user.yaml`**. They are for an existing V0/V1/V2 authority or a V3
-projection that needs explicit reconciliation; they are not a setup command for
-an arbitrary application repository.
-
-```sh
-node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs inspect --root "$PWD"
-node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs plan --root "$PWD"
-node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs apply --root "$PWD" --activate
-```
-
-The sequence is intentional:
-
-1. `inspect` reads the present authority and any recoverable transaction state.
-2. `plan` shows the exact V3-owned runtime targets and byte changes. Review it
-   before writing anything.
-3. `apply --activate` is the only write step. Its CLI invocation creates and
-   authenticates a fresh plan, refuses source or target drift from that plan,
-   writes the declared runtime targets first, and commits `pipeline.user.yaml`
-   last.
-
-Stop unless `inspect` reports `ready` and `plan` reports `ready` or `noop`.
-Do not hand-edit generated runtime targets or use
-`setup.mjs --force` to bypass this boundary; `--force` cannot authorize a V3
-authority write.
-
-After activation, perform a read-only readback:
-
-```sh
-node setup.mjs
-```
-
-Success means the V3 source and its owned runtime projections agree, and the
-command performed no writes.
-
-### Choose advisor export consent explicitly
-
-Advisory is optional at the repository boundary. A missing
-`advisor_export` field and `consent: declined` are both valid Advisory-off
-states: bootstrap performs no advisor probe, child launch, repository export,
-or receipt creation. Existing V3 repositories are never silently opted in.
-The read-only `node setup.mjs` check prints the configuration command when
-consent is missing or declined but does not write it.
-
-To review the disclosure and record a repository-owner decision, run:
-
-```sh
-node setup.mjs --configure-advisor-export
-```
-
-The prompt explains that approval exports one advisory question plus the
-allowlisted repository candidate material needed by the configured
-same-runner advisor. It does not authorize secrets, credentials, unrelated
-paths, raw question/answer persistence, or a runner/model substitution. The
-prompt defaults to decline and atomically records either `approved` or
-`declined` in `pipeline.user.yaml`. Re-run the same command to change that
-public-safe repository decision.
-
-With approval, Claude uses its registered native Opus advisor, then a
-same-runner Opus consult fallback with Read/Grep/Glob consult tools. Codex uses
-only the exact selected `network-open/read-only` Astra transport, whose launch payload is
-Read/Grep/Glob/Bash. The checkout remains read-only and coordinator scratch is
-the sole writable root. No selected transport, no child, profile drift, wrong
-identity, or incomplete stdio/cleanup is a non-success; an unbound host Bash
-or consult is never a fallback.
-
-### Missing prerequisite guidance
-
-Normal `node setup.mjs` now runs the same read-only toolchain check after V3
-source/runtime validation. It prints every configured tool with its observed
-version and returns the manifest security-gate exit code. The standalone form
-remains available:
-
-```sh
-node plugins/pipeline-core/scripts/toolchain-preflight.mjs --root "$PWD"
-```
-
-Each missing configured prerequisite reports the claim that remains blocked,
-a copyable platform-appropriate `installCommand`, and
-`installAttempted: false`. Installer prerequisites are part of that command:
-on Ubuntu a missing `pipx` yields
-`sudo apt-get update && sudo apt-get install -y pipx && pipx install semgrep`,
-while an available `pipx` yields only `pipx install semgrep`. Go-backed commands
-likewise bootstrap Go only when it is absent. npm is never substituted for
-these non-npm scanners. System binaries plus the standard per-user
-`~/.local/bin` and `~/go/bin` locations are checked without trusting arbitrary
-PATH ordering. Semgrep receives bounded temporary settings/log/cache paths so
-its normal home-directory writes cannot be misreported as a missing install.
-Run a suggested command only after reviewing it under your own host/package-
-management policy, then repeat setup or the standalone preflight.
-
-### Transaction and rollback boundary
-
-The migration records preimages before activation. If an activation fails or is
-interrupted, the next `inspect`, `plan`, or `apply` attempts recovery from that
-record and restores the recorded preimages when safe. Do not delete a pending
-transaction directory or repair its files by hand.
-
-That recovery is deliberately narrow: it protects an incomplete transaction; it
-does **not** make a completed activation a reversible toggle. To change a
-completed authority, restore a reviewed version-controlled source in a separate
-working copy or make the corrected source change, then run a new
-inspect → plan → explicit activation cycle and read it back with `node setup.mjs`.
-
-## B. Activate the pipeline in one project repository
+<a id="consumer-onboarding-details"></a>
 
 Repeat this section for every application or service repository you want to
 govern. A governed project does not inherit your local account or credentials;
@@ -453,6 +342,84 @@ future adapter work, not 0.5.0 CLI features. A code pasted into the same agent
 chat is visible to that agent and cannot replace final local proof for an
 irreversible action. See [PO approval](docs/po-human-approval.md).
 
+## A. Maintain a shared pipeline source (occasional)
+
+<!-- capability:setup-and-runtime-projection -->
+<!-- anchor:capability-setup-and-runtime-projection -->
+
+Clone or fork this repository into the organisation that will maintain the
+shared pipeline. Keep that clone as a versioned product; projects should bind
+to it rather than copy its rules into every repository.
+
+### Activate or upgrade the V3 authority
+
+Run these commands **only in a pipeline source checkout that contains
+`pipeline.user.yaml`**. They are for an existing V0/V1/V2 authority or a V3
+projection that needs explicit reconciliation; they are not a setup command for
+an arbitrary application repository.
+
+```sh
+node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs inspect --root "$PWD"
+node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs plan --root "$PWD"
+node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs apply --root "$PWD" --activate
+```
+
+The sequence is intentional: `inspect` reads present authority and recoverable
+transaction state; `plan` shows V3-owned targets and byte changes for review;
+and `apply --activate` is the only write step. It authenticates a fresh plan,
+refuses source/target drift, writes runtime targets first, and commits
+`pipeline.user.yaml` last. Stop unless `inspect` is `ready` and `plan` is
+`ready` or `noop`. Do not hand-edit generated targets or use `setup.mjs --force`
+to bypass this boundary.
+
+After activation, run the read-only readback:
+
+```sh
+node setup.mjs
+```
+
+Success means the V3 source and its owned runtime projections agree without a
+write.
+
+### Choose advisor export consent explicitly
+
+Advisory is optional and off until a repository owner records consent. A
+missing field or `consent: declined` creates no advisor export, child launch,
+or receipt. To review that boundary, run:
+
+```sh
+node setup.mjs --configure-advisor-export
+```
+
+The prompt records `approved` or `declined` in `pipeline.user.yaml`; it does
+not authorize secrets, unrelated paths, raw-answer retention, model
+substitution, or a runner fallback. Source and runtime readback remain
+authoritative for the selected route; see [runtime boundary](docs/runtime-boundary.md).
+
+### Missing prerequisite guidance
+
+`node setup.mjs` runs the read-only toolchain check after V3 validation. It
+reports each configured tool, observed version, blocked claim, and a copyable
+platform command. The standalone form remains:
+
+```sh
+node plugins/pipeline-core/scripts/toolchain-preflight.mjs --root "$PWD"
+```
+
+Review an offered installer command under your host/package-management policy,
+then repeat setup or the preflight. npm is never substituted for non-npm
+scanners; bounded Semgrep settings prevent ordinary home-directory writes from
+being reported as a missing installation.
+
+### Transaction and rollback boundary
+
+The migration records preimages before activation. After an interrupted or
+failed activation, the next `inspect`, `plan`, or `apply` attempts safe
+recovery; do not delete a pending transaction directory or repair its files by
+hand. This is not a general revert: change completed authority in a reviewed
+working copy, then run a new inspect → plan → explicit activation cycle and
+read it back with `node setup.mjs`.
+
 ## C. Bring an existing repository under the pipeline
 
 Do this on a normal change branch and adopt one control at a time:
@@ -475,6 +442,27 @@ Migration changes your project’s process, so review those changes like any
 other architectural change. Do not paste a pipeline source’s
 `pipeline.user.yaml` into an application repository, and do not make a legacy
 authority look current by copying generated runtime files.
+
+## Troubleshooting: Codex local agent activity
+
+If Codex agent threads no longer appear after adoption, inspect its persistent
+local app-server daemon before changing a plan or treating the incident as a
+repository failure:
+
+```sh
+node plugins/pipeline-core/scripts/codex-app-server-health.mjs
+```
+
+`CAS-READY` is a current daemon-version observation. It does not prove a model
+child launched or a host background wakeup. For another `CAS-*` result, the
+bounded attended recovery is:
+
+```sh
+node plugins/pipeline-core/scripts/codex-app-server-health.mjs --recover
+```
+
+It never loops or changes repository state. If it fails, run `codex doctor` in
+an attended local Codex session and retain the result in the handover.
 
 ## Where to go next
 

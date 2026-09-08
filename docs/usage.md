@@ -1,9 +1,10 @@
 # Usage
 
-Use Agent-Pipeline when the result needs to be recoverable, reviewable, or
-safe to hand from one agent or session to another. Choose the work profile and
-rigor for the change; a throwaway experiment does not need the same ceremony as
-a security-sensitive delivery.
+Use Agent-Pipeline when the result needs to be recoverable, reviewable, and
+safe to hand between agents or sessions. It is particularly useful when a team
+must inspect which candidate was checked and which decision was made. The
+resulting evidence supports review and audit work; it is not compliance
+certification.
 
 ## Start or adopt a project
 
@@ -84,6 +85,9 @@ needs its own Verify, security, independent review, approval, and remote
 readback. Nova B remains open for further runner and workflow refinements.
 
 Use [SETUP](../SETUP.md) for installation, [PIPELINE_FLOW](../PIPELINE_FLOW.md)
-for the maintained lifecycle, and the [Operating Model](operating-model.md) for
-the normative role and gate rules. [What's new in
-0.6.0](whats-new-0.6.0.md) states what changed in that earlier release.
+for the maintained lifecycle, and the [documentation map](README.md) for the
+canonical next links. Consult [enforcement](enforcement.md), [audit and
+evidence](audit-and-evidence.md), [security controls](security-controls.md),
+[cost and measurement](cost-and-measurement.md), and [parallel work](parallel-work.md)
+when those boundaries apply. [Operating Model](operating-model.md) remains the
+normative role and gate contract.

@@ -123,6 +123,21 @@ a *new* reviewer checks it again. Neither an optional readiness decision nor a
 
 ## 3. Deliver in independently checkable packages
 
+<!-- capability:deterministic-verification -->
+<!-- anchor:capability-deterministic-verification -->
+
+For an audit-facing delivery, retain the candidate-bound Verify receipt with
+the package: it identifies the command, candidate, tree, suites, and result.
+A red, skipped, stale, or mismatched receipt is evidence of its limitation,
+not a green result. [Audit and evidence](docs/audit-and-evidence.md) explains
+what a review package can contain and what it cannot prove.
+
+<!-- capability:claude-hook-safety -->
+<!-- anchor:capability-claude-hook-safety -->
+
+<!-- capability:codex-host-hook-bridge -->
+<!-- anchor:capability-codex-host-hook-bridge -->
+
 ```mermaid
 flowchart LR
     SP[Approved current Spec] --> PF[Preflight: route, authority, capacity, scope]
@@ -142,6 +157,8 @@ flowchart LR
 
 | Step | Owner | Meaning | Evidence and boundary |
 |---|---|---|---|
+| Guardrails | Installed runner integration and project configuration. | Configured command and write-path safeguards may refuse unsafe actions before delivery proceeds. | Claude and Antigravity have the documented hook integration; this does not claim those hooks on Codex. |
+| Codex host bridge | Codex host and plugin integration. | The bridge applies only the command and write-path policy its host exposes. | Host lifecycle evidence remains required; no host-independent enforcement or model identity is implied. |
 | Preflight | Elephant and deterministic checks. | Current PRD/Spec, profile/phase route, capacity, scope, and authority bindings still match. | A mismatch defers or opens a course decision; it never becomes an informal dispatch. |
 | Test author — optional | A separately briefed test-author duty. | Use it when the test or gate contract itself must change. | The implementor does not weaken or rewrite the tests that judge its own implementation. Its output is separately reviewable. |
 | Implement | Goldfish. | One fresh-context, self-contained implementation package. Independent packages may run in parallel when files and data do not overlap. | A six-field briefing supplies goal, context, Definition of Done, prohibitions, stop conditions, and dispatch metadata. |
@@ -162,6 +179,23 @@ call it equivalent.
 | Governance | The project configures guidelines or policies under its governance paths. | Project/team owner supplies rules; Elephant applies them to the task. | Valid configured inputs, declared policy mode, and resulting review/gate evidence. | Advisory guidance informs design; enforcing requirements rejoin the relevant gate or block. This is not central IAM or a control plane. |
 | Release / promotion | The project declares a `release` section. | Release adapter and human promotion gate. | Per-environment evidence, rollback anchor, and deploy-log record. | Test promotion precedes production approval. Without a `release` section, this branch does not exist and adds no cost. |
 | Human acceptance | Calibration or stakes require final acceptance. | Human decision-maker. | Explicit acceptance of the delivered candidate. | Delivery and acceptance remain distinct; rejection starts a new candidate or course decision. |
+
+## Integration and update boundaries
+
+<!-- capability:parallel-sprint-promotion-gates -->
+<!-- anchor:capability-parallel-sprint-promotion-gates -->
+
+Independent packages can run in parallel only when their files and state do
+not overlap. Integration advances the explicitly selected merge-ready Sprint;
+protected or overlapping baseline changes require bounded impact review before
+promotion. See [parallel work](docs/parallel-work.md).
+
+<!-- capability:pipeline-update-channels -->
+<!-- anchor:capability-pipeline-update-channels -->
+
+Update channels provide a declared alpha, beta, or stable selection and a
+sanctioned repository-local override. Availability is read-only information;
+choosing an update does not itself install, activate, or verify it.
 
 ## 5. Close deliberately; recover with a bound
 
@@ -363,6 +397,12 @@ Freigabe.
 
 ## 3. In unabhängig prüfbaren Paketen liefern
 
+Für eine auditrelevante Lieferung wird der kandidatengebundene Verify-Receipt
+mit dem Paket aufbewahrt: Er benennt Befehl, Kandidat, Tree, Suites und
+Ergebnis. Ein roter, übersprungener, veralteter oder nicht passender Receipt
+ist Nachweis seiner Grenze, kein grünes Ergebnis. [Audit und
+Evidenz](docs/audit-and-evidence.md) erklärt Paketinhalt und Nicht-Claims.
+
 ```mermaid
 flowchart LR
     SP[Freigegebene aktuelle Spec] --> PF[Preflight: Route, Authority, Kapazität, Scope]
@@ -382,6 +422,8 @@ flowchart LR
 
 | Schritt | Owner | Bedeutung | Nachweis und Grenze |
 |---|---|---|---|
+| Guardrails | Installierte Runner-Integration und Projektkonfiguration. | Konfigurierte Command- und Write-Path-Schutzmaßnahmen können unsichere Aktionen verweigern. | Claude und Antigravity haben die dokumentierte Hook-Integration; daraus folgen keine solchen Hooks auf Codex. |
+| Codex-Host-Bridge | Codex-Host und Plugin-Integration. | Die Bridge wendet nur die Command- und Write-Path-Policy an, die ihr Host anbietet. | Host-Lifecycle-Evidenz bleibt erforderlich; weder hostunabhängiges Enforcement noch Modellidentität werden behauptet. |
 | Preflight | Elephant und deterministische Checks. | Aktuelles PRD/Spec, Profil-/Phasenroute, Kapazität, Scope und Authority-Bindungen passen weiterhin zusammen. | Ein Mismatch vertagt oder öffnet eine Kursentscheidung; er wird nie zum informellen Dispatch. |
 | Test-Autor — optional | Eine separat gebriefte Test-Autoren-Duty. | Nutze sie, wenn sich Test- oder Gate-Vertrag selbst ändern muss. | Der Implementierende schwächt oder schreibt die Tests nicht um, die seine Umsetzung bewerten. Sein Ergebnis ist separat prüfbar. |
 | Implementieren | Goldfish. | Ein frisches, eigenständiges Implementierungspaket. Unabhängige Pakete dürfen parallel laufen, wenn Dateien und Daten nicht überlappen. | Ein Sechs-Felder-Briefing liefert Ziel, Kontext, Definition of Done, Verbote, Stopp-Bedingungen und Dispatch-Metadaten. |
@@ -402,6 +444,17 @@ Teilbefehl und nenne ihn gleichwertig.
 | Governance | Das Projekt Guidelines oder Policies unter seinen Governance-Pfaden konfiguriert. | Projekt-/Team-Owner liefert Regeln; Elephant wendet sie auf die Aufgabe an. | Gültige konfigurierte Inputs, deklarierter Policy-Modus und daraus entstehender Review-/Gate-Nachweis. | Beratende Guidelines informieren Design; erzwingende Vorgaben münden im passenden Gate ein oder blocken. Das ist kein zentrales IAM und keine Control Plane. |
 | Release / Promotion | Das Projekt eine `release`-Sektion deklariert. | Release-Adapter und menschliches Promotion-Gate. | Nachweis je Umgebung, Rollback-Anker und Deploy-Log-Eintrag. | Test-Promotion geht Produktionsfreigabe voraus. Ohne `release`-Sektion existiert der Zweig nicht und kostet nichts. |
 | Menschliche Abnahme | Kalibrierung oder Stakes finale Abnahme verlangen. | Menschlicher Entscheider. | Ausdrückliche Abnahme des gelieferten Kandidaten. | Lieferung und Abnahme bleiben getrennt; Ablehnung startet einen neuen Kandidaten oder Kursentscheidung. |
+
+## Integrations- und Update-Grenzen
+
+Unabhängige Pakete dürfen nur parallel laufen, wenn Dateien und State nicht
+überlappen. Die Integration hebt den ausdrücklich ausgewählten merge-bereiten
+Sprint vor; geschützte oder überlappende Baseline-Änderungen brauchen zuvor eine
+begrenzte Auswirkungsprüfung. Siehe [parallele Arbeit](docs/parallel-work.md).
+
+Update-Kanäle wählen einen deklarierten Alpha-, Beta- oder Stable-Kanal und
+einen sanktionierten lokalen Override. Verfügbarkeit ist read-only Information;
+die Auswahl installiert, aktiviert oder verifiziert kein Update.
 
 ## 5. Bewusst abschließen; begrenzt recovern
 

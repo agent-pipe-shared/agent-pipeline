@@ -1,10 +1,10 @@
 # Overview
 
-Agent-Pipeline is a product for controlled, agent-assisted software delivery.
-It turns an intent into a bounded, reviewable change without making a chat
-history the source of truth. Its core loop is simple: record the work,
-dispatch it with a fresh context, collect deterministic evidence, review the
-result independently, and preserve the decision for the next session.
+Agent-Pipeline is for controlled, agent-assisted software delivery where a team
+needs a reviewable record beyond a chat history. It turns an intent into a
+bounded change, deterministic evidence, independent review, and a preserved
+decision. Candidate-bound receipts and validated packages can support an audit
+trail; they do not certify compliance or replace an auditor.
 
 ## The release line: 0.6.2
 
@@ -38,6 +38,9 @@ already integrated through Phoenix, and this overview does not present them as
 completed.
 
 For the product entry point, use the top-level [README](../README.md). For
-what changed in the earlier `0.6.0` release, see [What's new in
-0.6.0](whats-new-0.6.0.md). [Usage](usage.md) gives the normal user journey;
-[Operating Model](operating-model.md) is the normative process contract.
+the normal next documents, use the [documentation map](README.md):
+[Usage](usage.md) gives the routine journey, while [enforcement](enforcement.md),
+[audit and evidence](audit-and-evidence.md), [security controls](security-controls.md),
+[cost and measurement](cost-and-measurement.md), and [parallel work](parallel-work.md)
+provide the relevant reference boundaries. [Operating Model](operating-model.md)
+is the normative process contract.

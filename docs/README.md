@@ -1,29 +1,41 @@
 # Documentation map
 
-Start with the top-level [README](../README.md) for the product model and
-[SETUP](../SETUP.md) for installation or adoption.
+Start with the top-level [README](../README.md), then follow this map. It is
+the canonical order for the next documents; `overview.md` and `usage.md` are
+short companion references, not competing front doors.
 
-`0.6.2` is the current release. Phoenix is the integrated
-delivery-governance foundation; Nova is the active execution and adoption
-stream. The released scope includes a tested public Greenfield Driver for
-Claude, Codex, and Antigravity, but does not claim that every Nova B item or
-every host-specific assurance is complete. See [What's new in
-0.6.0](whats-new-0.6.0.md) for what changed in that earlier release.
+`0.6.2` names the next release's documented scope. It is not a tag,
+installation recommendation, production-availability claim, or proof that a
+local candidate has passed release gates.
 
-## User journey
+## Adoption
 
-- [`../SETUP.md`](../SETUP.md) — installation, V3 activation, and per-repository
-  adoption.
-- [`usage.md`](usage.md) — start, Greenfield Driver, delivery after readiness,
-  and normal human decision points.
-- [`../PIPELINE_FLOW.md`](../PIPELINE_FLOW.md) — end-to-end V3 flow, recovery
-  boundaries, and gates.
+- [`../SETUP.md`](../SETUP.md) — routine consumer adoption, prerequisites, and
+  later source-maintainer reference.
+- [`usage.md`](usage.md) — the normal user journey after a project is ready.
+- [`../PIPELINE_FLOW.md`](../PIPELINE_FLOW.md) — route selection, gates,
+  recovery, and close.
 - [`v3-consumer-onboarding.md`](v3-consumer-onboarding.md) — detailed
-  preview-first V3 migration and the Codex lifecycle V4.
-- [`runtime-boundary.md`](runtime-boundary.md) — methodology shared across
-  runners versus runner-specific enforcement and assurance.
+  preview-first migration and the Codex lifecycle V4.
+- [`runtime-boundary.md`](runtime-boundary.md) and
+  [`runner-support.md`](runner-support.md) — what is shared methodology and
+  what the installed runner can actually enforce.
 
-## Product and governance
+## Enforcement, evidence, security, and cost
+
+- [`enforcement.md`](enforcement.md) — configured guard and lifecycle
+  enforcement, including runner limits.
+- [`audit-and-evidence.md`](audit-and-evidence.md) — candidate-bound receipts,
+  Audit Bundles, and offline evidence viewing; artifacts are not compliance
+  certification or authority.
+- [`security-controls.md`](security-controls.md) — scanner/control boundaries,
+  framework mappings, waivers, and runtime limits.
+- [`cost-and-measurement.md`](cost-and-measurement.md) — historical Verify
+  envelopes and the explicit missing consumer-overhead comparison.
+- [`parallel-work.md`](parallel-work.md) — bounded parallel delivery and
+  integration boundaries.
+
+## Product and governance reference
 
 - [`overview.md`](overview.md) — the integrated Phoenix foundation and the
   active Nova product stream.
