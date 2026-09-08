@@ -95,10 +95,13 @@ because bare `pipeline-start-preflight` may perform cleanup beyond its
 read-only scope; there was no retry or bypass, and orientation was completed
 directly by the parent.
 
-The next candidate Full Verify is pending after this documentation integration;
-the 888 red result remains historical evidence and does not cover the landed
-source projection. Selected transport execution and independent T1 review also
-remain pending behind that gate.
+Full Verify then ran on the exact clean candidate `96238c3c1b811dc69e5d5631de67f223a6853046`,
+tree `50383e982f0e23ea44e79f11a80bbf39f55f25da`: exit 1, 508 steps, 499 green,
+and the same 9 failures as the 888 and d88 historical runs. Machine evidence
+is `evidence/alfred-source-96238c3c-verify.json`; security evidence records the
+same single event-16 gitleaks finding. The 888 and d88 bindings remain
+historical and do not cover this source-projection candidate. Selected
+transport execution and independent T1 review remain gated by red Verify.
 
 The [local continuation verification note](../specs/sprint-alfred-epic/evidence/local-continuation-verification-2026-09-08.md)
 records these candidate-bound facts, the hook-test status (failed/not measured),
