@@ -1,13 +1,17 @@
 ---
-schema: pipeline.backlog-item.v1
-id: pipeline.the-budget-guard-carries-a-dead-branch-and-an-unbounded-sink
-type: defect
-owner: pipeline
-status: open
-created: 2026-09-07
+schema: "pipeline.backlog-item.v1"
+id: "pipeline.the-budget-guard-carries-a-dead-branch-and-an-unbounded-sink"
+type: "defect"
+owner: "pipeline"
+status: "closed"
+created: "2026-09-07"
 source: "T1 Critic round 2 on NVA-B-BUDGETVIS-1 (PASS, two minor findings F-A and F-B), recorded in backlog/evidence/2026-09-06-nva-b-guardfix-critic-round1.md; plus one inconsistency the reworking dispatch disclosed about its own change"
-sprint: nova-b
-done_when: manual
+sprint: "nova-b"
+done_when: "manual"
+closed_at: "2026-09-08"
+closure_repository: "self"
+closure_commit: "40eda94b5341a18e1c539412a8cdcafd1f761712"
+closure_evidence: "backlog/evidence/2026-09-08-budget-observation-bound.md"
 ---
 
 # The budget guard carries a dead branch and an unbounded sink

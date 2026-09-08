@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "29773b8f00e0bd8a34e8d5408831c7a9df247979fdb94c2764dab8005db275c5"
+    "transitionHead": "40aa700bd97996ce4c77755f7f5c138972cc5ab044d5d691d7ad2a6b4f34e22f"
   },
   "counts": {
-    "open": 112,
+    "open": 111,
     "in_progress": 0,
-    "closed": 525,
+    "closed": 526,
     "rejected": 3,
     "deferred": 11
   },
@@ -7060,12 +7060,16 @@
     },
     {
       "id": "pipeline.the-budget-guard-carries-a-dead-branch-and-an-unbounded-sink",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-07",
       "source": "T1 Critic round 2 on NVA-B-BUDGETVIS-1 (PASS, two minor findings F-A and F-B), recorded in backlog/evidence/2026-09-06-nva-b-guardfix-critic-round1.md; plus one inconsistency the reworking dispatch disclosed about its own change",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-09-08",
+      "closureRepository": "self",
+      "closureCommit": "40eda94b5341a18e1c539412a8cdcafd1f761712",
+      "closureEvidence": "backlog/evidence/2026-09-08-budget-observation-bound.md"
     },
     {
       "id": "pipeline.the-denial-trim-state-is-keyed-per-session-not-per-agent-as-its-comment-claims",
