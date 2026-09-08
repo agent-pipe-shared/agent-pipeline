@@ -34,5 +34,14 @@ terminal green capture for:
 
 `node --test plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs plugins/pipeline-core/lib/runtime-projection-v3.test.mjs harness/scripts/check-consumer-safe-paths.test.mjs`
 
-It reports 51 migration tests, 31 projection tests, and 11 consumer-path tests
-passing (exit 0). No migration was applied to the source repository.
+It reports 51 migration checks and 31 projection checks; Node's 11 passing
+test entries comprise those two file wrappers plus 9 consumer-path tests
+(exit 0). The dispatch did not apply a source-repository migration.
+
+After commit `f0bb049bc54fcaf088b8a595c80c28f48f32802b`, the parent reviewed
+and applied the sanctioned local plan. Its only changed target was the
+existing project YAML mirror; source and other target hashes were unchanged.
+The resulting language and authority-tier checks pass in
+`scratch/candidate-authority-agreement-20260908.txt`. The generated manifest
+commit was refused by GS-3 and is reserved for the human operator; that
+uncommitted projection is not represented as part of a completed candidate.
