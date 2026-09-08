@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "a4205c6291c4585fd26859940cbdb064148d78f7972a91aa7d5ad391421962d2"
+    "transitionHead": "29773b8f00e0bd8a34e8d5408831c7a9df247979fdb94c2764dab8005db275c5"
   },
   "counts": {
-    "open": 113,
+    "open": 112,
     "in_progress": 0,
-    "closed": 524,
+    "closed": 525,
     "rejected": 3,
     "deferred": 11
   },
@@ -7253,13 +7253,17 @@
     },
     {
       "id": "pipeline.the-unparsed-command-lane-still-carries-the-false-denial-claim",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-03",
       "source": "Reported by dispatch NVA-B-OPAQUELANE-1, 2026-09-03, as a finding outside its own acceptance criteria, with a live reproduction: protectedTestPathShellHit() returns lane 'unparsed-command' for the reproducing command shape.",
       "deferred": false,
-      "tracking": "Nova B — the sibling of the opaque-interpreter-code lane. Same blind-scan fallback, same fail-closed refusal of a mere mention, and the guard still tells the reader that only a detected write is refused."
+      "tracking": "Nova B — the sibling of the opaque-interpreter-code lane. Same blind-scan fallback, same fail-closed refusal of a mere mention, and the guard still tells the reader that only a detected write is refused.",
+      "closedAt": "2026-09-08",
+      "closureRepository": "self",
+      "closureCommit": "8f667a4203ca6152c7f6542043ad65492aee7929",
+      "closureEvidence": "backlog/evidence/2026-09-08-unparsed-command-denial-caveat.md"
     },
     {
       "id": "pipeline.the-unregistered-suite-detector-is-not-itself-a-gate-step",

@@ -1,14 +1,18 @@
 ---
-schema: pipeline.backlog-item.v1
-id: pipeline.the-unparsed-command-lane-still-carries-the-false-denial-claim
-type: defect
-owner: pipeline
-status: open
-created: 2026-09-03
-sprint: nova-b
-done_when: "contains plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs pipeline.unparsed-command-lane-caveat"
-tracking: "Nova B — the sibling of the opaque-interpreter-code lane. Same blind-scan fallback, same fail-closed refusal of a mere mention, and the guard still tells the reader that only a detected write is refused."
+schema: "pipeline.backlog-item.v1"
+id: "pipeline.the-unparsed-command-lane-still-carries-the-false-denial-claim"
+type: "defect"
+owner: "pipeline"
+status: "closed"
+created: "2026-09-03"
 source: "Reported by dispatch NVA-B-OPAQUELANE-1, 2026-09-03, as a finding outside its own acceptance criteria, with a live reproduction: protectedTestPathShellHit() returns lane 'unparsed-command' for the reproducing command shape."
+tracking: "Nova B — the sibling of the opaque-interpreter-code lane. Same blind-scan fallback, same fail-closed refusal of a mere mention, and the guard still tells the reader that only a detected write is refused."
+sprint: "nova-b"
+done_when: "contains plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs pipeline.unparsed-command-lane-caveat"
+closed_at: "2026-09-08"
+closure_repository: "self"
+closure_commit: "8f667a4203ca6152c7f6542043ad65492aee7929"
+closure_evidence: "backlog/evidence/2026-09-08-unparsed-command-denial-caveat.md"
 ---
 
 # The `unparsed-command` lane still tells the reader that only a detected write is refused

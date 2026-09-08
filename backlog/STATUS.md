@@ -588,7 +588,7 @@
 | pipeline.the-sandbox-preflight-app-server-handshake-is-a-race | open | defect | pipeline | 2026-09-06 | — |
 | pipeline.the-t1-fallback-waits-for-failure-codes-the-route-collapses | open | defect | pipeline | 2026-09-06 | — |
 | pipeline.the-two-suite-registration-checkers-disagree | closed | defect | pipeline | 2026-08-27 | — |
-| pipeline.the-unparsed-command-lane-still-carries-the-false-denial-claim | open | defect | pipeline | 2026-09-03 | Nova B — the sibling of the opaque-interpreter-code lane. Same blind-scan fallback, same fail-closed refusal of a mere mention, and the guard still tells the reader that only a detected write is refused. |
+| pipeline.the-unparsed-command-lane-still-carries-the-false-denial-claim | closed | defect | pipeline | 2026-09-03 | Nova B — the sibling of the opaque-interpreter-code lane. Same blind-scan fallback, same fail-closed refusal of a mere mention, and the guard still tells the reader that only a detected write is refused. |
 | pipeline.the-unregistered-suite-detector-is-not-itself-a-gate-step | closed | defect | pipeline | 2026-09-01 | — |
 | pipeline.this-hosts-local-marketplace-copy-is-not-symlinked-to-source | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.three-doc-and-adr-checkers-never-run-in-verify | rejected | defect | pipeline | 2026-08-27 | — |
@@ -659,8 +659,8 @@
 
 ## Counts
 
-- open: 113
+- open: 112
 - in_progress: 0
-- closed: 524
+- closed: 525
 - rejected: 3
 - deferred: 11
