@@ -86,8 +86,9 @@ export function validateNativeCriticTuple(value) {
   validateNativeCriticPolicy(value.policy);
   exactKeys(value.toolSurface, ["configSha256", "observationSha256"], "native tool surface");
   digest(value.toolSurface.configSha256, "tool configuration digest");
-  // This is a sanitized fixed prohibited-feature/MCP-empty observation, not
-  // an asserted complete inventory of the native read tools Codex exposes.
+  // This binds sanitized fixed prohibited features and fully drained same-thread
+  // MCP pages that are empty, or all disabled with empty catalogs; it is not a
+  // complete native read-tool inventory.
   digest(value.toolSurface.observationSha256, "tool-surface observation digest");
   return clone(value);
 }
