@@ -62,7 +62,7 @@ function usableRunInput(value) {
     && Array.isArray(argv) && argv.every((part) => typeof part === "string") && !argv.includes("--root") ? { root, operationId, argv } : null;
 }
 function sameOperation(observation, operation) {
-  return observation.scope.featureId === operation.scope.featureId && observation.scope.phase === operation.scope.phase
+  return observation.scope.featureId === operation.scope.featureId
     && observation.ownerBinding.specSha256 === operation.specSha256;
 }
 

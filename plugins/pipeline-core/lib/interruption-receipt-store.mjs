@@ -506,7 +506,7 @@ function validReceiptBundle(io, path, rootStat, operationById, directoryName) {
     || !Array.isArray(marker.files) || marker.files.length !== 2) return null;
   const operation = operationById.get(marker.operationId);
   if (!operation || operation.storeId !== marker.storeId || operation.sha256 !== marker.operationSha256
-    || operation.metadata.scope.featureId !== observation.scope.featureId || operation.metadata.scope.phase !== observation.scope.phase
+    || operation.metadata.scope.featureId !== observation.scope.featureId
     || operation.metadata.specSha256 !== observation.ownerBinding.specSha256 || operation.metadata.specPathSha256 !== observation.ownerBinding.specPathSha256
     || observation.source.specSha256 !== null && observation.source.specSha256 !== operation.metadata.specSha256) return null;
   const observationFile = markerFile(marker, "observation.json"), receiptFile = markerFile(marker, "receipt.json");
@@ -656,7 +656,7 @@ function recordPreflight(factory, value, ports) {
     const operation = operations.get(input.handle.operationId);
     if (!operation) return incompleteWrite("C1S-NOT-FOUND");
     if (operation.sha256 !== input.handle.operationSha256) return incompleteWrite("C1S-BINDING");
-    if (operation.metadata.scope.featureId !== input.observation.scope.featureId || operation.metadata.scope.phase !== input.observation.scope.phase
+    if (operation.metadata.scope.featureId !== input.observation.scope.featureId
       || operation.metadata.specSha256 !== input.observation.ownerBinding.specSha256 || operation.metadata.specPathSha256 !== input.observation.ownerBinding.specPathSha256
       || input.observation.source.specSha256 !== null && input.observation.source.specSha256 !== operation.metadata.specSha256) return incompleteWrite("C1S-BINDING");
     const eventDirectory = sha256(Buffer.from(input.eventId, "utf8")), eventPath = join(topology.receiptsPath, eventDirectory);
