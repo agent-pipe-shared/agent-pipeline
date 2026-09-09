@@ -1130,6 +1130,10 @@ test("C1 recordPreflight rejects unbound candidate/owner observations and hostil
     assert.equal(store.recordPreflight({ handle, eventId: "wrong-spec", observation: wrongSpec }).code, "C1S-BINDING");
     const wrongOwner = c1PreflightObservation(); wrongOwner.ownerBinding.specSha256 = A;
     assert.equal(store.recordPreflight({ handle, eventId: "wrong-owner", observation: wrongOwner }).code, "C1S-BINDING");
+    const wrongFeature = c1PreflightObservation(); wrongFeature.scope.featureId = "different-feature";
+    assert.equal(store.recordPreflight({ handle, eventId: "wrong-feature", observation: wrongFeature }).code, "C1S-BINDING");
+    const wrongSpecPath = c1PreflightObservation(); wrongSpecPath.ownerBinding.specPathSha256 = A;
+    assert.equal(store.recordPreflight({ handle, eventId: "wrong-spec-path", observation: wrongSpecPath }).code, "C1S-BINDING");
     let touched = 0;
     const hostile = c1PreflightObservation(); Object.defineProperty(hostile, "source", { enumerable: true, get() { touched++; return c1Source(); } });
     assert.deepEqual(store.recordPreflight({ handle, eventId: "hostile", observation: hostile }),

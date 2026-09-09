@@ -114,5 +114,11 @@ test("owner phase changes retain the operation lineage while recording the curre
     const entries = receipts.map((entry) => JSON.parse(readFileSync(join(fx.root, "evidence/interruption-receipts", entry, "receipt.json"), "utf8")));
     assert.equal(new Set(entries.map((entry) => entry.lineageId)).size, 1);
     assert.deepEqual(new Set(entries.map((entry) => entry.scope.phase)), new Set(["implementation", "verification"]));
+    const status = run(observed, ["status", "--root", fx.root, "--operation", operationId]);
+    assert.equal(status.status, 0, status.stderr);
+    const operation = JSON.parse(status.stdout).operation;
+    assert.equal(operation.status, "observed");
+    assert.equal(operation.sequence, 2);
+    assert.equal(typeof operation.lineageId, "string");
   } finally { rmSync(fx.root, { recursive: true, force: true }); }
 });
