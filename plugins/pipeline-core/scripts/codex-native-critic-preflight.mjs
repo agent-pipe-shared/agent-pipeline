@@ -133,15 +133,17 @@ class RpcProcess {
     else pending.resolve(value.result);
   }
   request(method, params) {
+    if (this.failure !== null) return Promise.reject(this.failure);
     const id = this.nextId++; const payload = JSON.stringify({ id, method, params });
     return new Promise((resolveRequest, rejectRequest) => {
+      if (this.failure !== null) { rejectRequest(this.failure); return; }
       const timer = setTimeout(() => { this.pending.delete(id); rejectRequest(Object.assign(new Error(`${method} timed out`), { code: "timed-out" })); this.finish(new Error("protocol timed out")); }, this.timeoutMs); timer.unref();
       this.pending.set(id, { resolve: (value) => { clearTimeout(timer); resolveRequest(value); }, reject: (error) => { clearTimeout(timer); rejectRequest(error); } });
       try { this.child.stdin.write(`${payload}\n`); } catch (error) { this.finish(Object.assign(new Error("stdin write failed"), { code: "stdin-error", cause: error })); }
     });
   }
-  notify(method, params = undefined) { try { this.child.stdin.write(`${JSON.stringify(params === undefined ? { method } : { method, params })}\n`); } catch (error) { this.finish(Object.assign(new Error("stdin write failed"), { code: "stdin-error", cause: error })); } }
-  finish(error = new Error("protocol closed")) { if (this.failure !== null) return; this.failure = error; for (const pending of this.pending.values()) pending.reject(error); this.pending.clear(); try { this.child.stdin.end(); } catch {} try { this.child.kill("SIGTERM"); } catch {} }
+  notify(method, params = undefined) { if (this.failure !== null) return; try { this.child.stdin.write(`${JSON.stringify(params === undefined ? { method } : { method, params })}\n`); } catch (error) { this.finish(Object.assign(new Error("stdin write failed"), { code: "stdin-error", cause: error })); } }
+  finish(error = new Error("protocol closed")) { const first = this.failure ?? error; if (this.failure === null) this.failure = error; for (const pending of this.pending.values()) pending.reject(first); this.pending.clear(); try { this.child.stdin.end(); } catch {} try { this.child.kill("SIGTERM"); } catch {} }
   async close() { this.closing = true; try { this.child.stdin.end(); } catch (error) { this.finish(Object.assign(new Error("stdin close failed"), { code: "stdin-error", cause: error })); } const wait = (ms, value) => new Promise((resolveTimeout) => { const timer = setTimeout(() => resolveTimeout(value), ms); timer.unref(); }); const terminal = await Promise.race([this.closed, wait(this.timeoutMs, null)]); if (terminal) return terminal; try { this.child.kill("SIGTERM"); } catch {} const stopped = await Promise.race([this.closed, wait(2_000, null)]); if (stopped) return stopped; try { this.child.kill("SIGKILL"); } catch {} return await Promise.race([this.closed, wait(2_000, { code: null, signal: "SIGKILL" })]); }
 }
 
