@@ -6,12 +6,13 @@ mechanism, a substitute for signed gates, or a record of feature acceptance.
 
 ## Standing instructions
 
-- Continue the approved Alfred scope locally; the PC transfer is postponed.
+- Continue the approved Alfred scope locally; the user will perform the
+  terminal push after the local-priority rebase, and agents must not push.
 - Keep `origin/feat/sprint-alfred` as the only upstream. Do not create
   `sprint_alfred`; the prior handover target has been corrected.
-- Do not push until the PO gives a new explicit instruction. The earlier
-  willingness to replace remote state does not authorize a push now or remove
-  the repository's force-push and signed-approval controls.
+- The PO's 2026-09-09 instruction supersedes the prior no-push hold for the
+  terminal user action. Keep the repository's force-push and signed-approval
+  controls in force; agents do not execute the push.
 - Use bounded parallel tasks where dependencies and file ownership permit.
   Check the intended slice/parallel hooks with actual observations; a tool
   call, configured hook, or running child alone is not execution evidence.
@@ -65,7 +66,7 @@ push prerequisites before any execution; do not claim a push or signature.
 | Slice/parallel hooks | Exact hook identity, native tool coverage and live invocation evidence unmeasured | Read-only investigation, then bounded tests where admitted |
 | Existing first-core and scanner-exception review | Installed CAS-READY health and physical Critic adapter layout fix are observed; selected execution and T1 remain pending while Verify is red | Recheck the selected transport and candidate-bound review after the next green Verify |
 | Real collection baseline | Native evidence and measured 14-day window remain open | Implement/validate collection before recording a real start; never backdate |
-| Future publication | Explicitly deferred; old remote observation is insufficient | Await new PO instruction, then refresh refs and walk the configured gate |
+| Future publication | Local-priority rebase is complete and ready for the user terminal push; agents must not push | User performs the terminal push against `origin/feat/sprint-alfred` after independently checking the configured gates; refresh refs afterward |
 | Feature acceptance | Open | Present only after the required work and evidence exist |
 
 The two earlier A1 decisions remain resolved as recorded in
