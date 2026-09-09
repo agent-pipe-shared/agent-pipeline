@@ -234,7 +234,17 @@ if (!process.exitCode) {
         && item.commandActions[0]?.type === "unknown"
         && nativeCriticUnknownGitActionMatchesCommand(item.command, item.commandActions[0].command, request);
       if (!knownReadActions && !boundedNativeGitRead) {
-        writeAttempt = true; writeAttemptKind ??= "command-action";
+        // Keep the emitted evidence deliberately content-free: commands may contain
+        // paths or arguments that do not belong in a durable Critic receipt. The
+        // classification still tells the host whether the next repair belongs in
+        // the bounded Git reader or in a separate, explicit content-reader policy.
+        const unknownAction = native && Array.isArray(item.commandActions) && item.commandActions.length === 1
+          && item.commandActions[0]?.type === "unknown" && typeof item.commandActions[0]?.command === "string";
+        const unknownCommand = unknownAction ? item.commandActions[0].command.trim() : "";
+        writeAttempt = true;
+        writeAttemptKind ??= unknownAction
+          ? (unknownCommand === "git" || unknownCommand.startsWith("git ") ? "command-unknown-git" : "command-unknown-non-git")
+          : "command-action";
       }
     }
     if (item.type === "agentMessage") {

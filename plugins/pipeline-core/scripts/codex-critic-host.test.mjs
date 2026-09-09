@@ -1651,8 +1651,15 @@ check("the actual child admits native-tools only after native policy, complete f
       ], { requireNativeWire: true }), fixture, { native: true });
       assert.equal(result.status, 2, name);
       assert.equal(result.result.code, "write-attempt", name);
-      assert.equal(result.result.observed.writeAttemptKind, "command-action", name);
+      assert.equal(result.result.observed.writeAttemptKind, "command-unknown-git", name);
     }
+
+    const unknownNonGitRead = runActualCriticChild(childPath, writeFakeCriticAppServer(fixture, [
+      { type: "commandExecution", command: "cat roles/critic.md", commandActions: [{ type: "unknown", command: "cat roles/critic.md" }] }, finalItem,
+    ], { requireNativeWire: true }), fixture, { native: true });
+    assert.equal(unknownNonGitRead.status, 2);
+    assert.equal(unknownNonGitRead.result.code, "write-attempt");
+    assert.equal(unknownNonGitRead.result.observed.writeAttemptKind, "command-unknown-non-git");
 
     const emptyInventory = runActualCriticChild(childPath, writeFakeCriticAppServer(fixture, [finalItem], { requireNativeWire: true }), fixture, { native: true });
     assert.equal(emptyInventory.status, 0);
