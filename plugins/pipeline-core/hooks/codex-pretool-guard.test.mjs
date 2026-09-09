@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import {
   chmodSync,
   closeSync,
+  cpSync,
   mkdtempSync,
   mkdirSync,
   openSync,
@@ -83,7 +84,7 @@ function executeFixtureAction(root, action, replacements) {
   return JSON.parse(result.stdout);
 }
 
-function readyLifecycleFixture(mode = "chat") {
+function createReadyLifecycleFixture(mode = "chat") {
   // TEST-ONLY fixture inputs below are explicit synthetic PO answers. The
   // real CLI creates authority/checkpoint state; the real readback consumer
   // verifies its ticket and digests before the native adapter probes it.
@@ -107,6 +108,31 @@ function readyLifecycleFixture(mode = "chat") {
   const bind = followLifecycleAction(root, lifecycleCommand(root, "inspect", "--root", root, "--runner", "codex"), "bootstrap-bind-plan");
   followLifecycleAction(root, bind, "bootstrap-bind-apply");
   assert.equal(lifecycleCommand(root, "inspect", "--root", root, "--runner", "codex").status, "ready");
+  return root;
+}
+
+// The full Codex onboarding path is an integration fixture.  It is intentionally
+// exercised once per committed approval mode, then copied before each consumer:
+// every test still receives its own `.git` directory and may mutate its own runtime
+// receipts, but the repeated seven-process onboarding ceremony no longer dominates
+// this guard suite's wall-clock time.
+const readyLifecycleTemplates = new Map();
+const readyLifecycleCloneParents = new Set();
+process.once("exit", () => {
+  for (const parent of readyLifecycleCloneParents) rmSync(parent, { recursive: true, force: true });
+  for (const template of readyLifecycleTemplates.values()) rmSync(template, { recursive: true, force: true });
+});
+
+function readyLifecycleFixture(mode = "chat") {
+  let template = readyLifecycleTemplates.get(mode);
+  if (!template) {
+    template = createReadyLifecycleFixture(mode);
+    readyLifecycleTemplates.set(mode, template);
+  }
+  const parent = mkdtempSync(join(tmpdir(), "codex-ready-clone-"));
+  const root = join(parent, "project");
+  cpSync(template, root, { recursive: true, dereference: false });
+  readyLifecycleCloneParents.add(parent);
   return root;
 }
 
