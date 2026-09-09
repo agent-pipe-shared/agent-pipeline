@@ -354,7 +354,7 @@ test("selection.runPreflight() and selection.observeHost() make a real, unmocked
   assert.equal(receipt.terminalCode, result.terminalCode);
 });
 
-function writeNativePreflightFake(root, { malformedFeature = false, malformedSchema = false, hang = false, launchDenied = false, wrongSandbox = false, remoteControlNotification = false } = {}) {
+function writeNativePreflightFake(root, { malformedFeature = false, malformedSchema = false, hang = false, launchDenied = false, wrongSandbox = false, remoteControlNotification = false, lateServerRequest = false, nullFrame = false, closeStdin = false } = {}) {
   mkdirSync(root, { recursive: true });
   const path = join(root, "fake-native-preflight-codex.mjs");
   const protocol = JSON.stringify(malformedSchema ? {} : { definitions: { ClientRequest: { oneOf: ["initialize", "thread/start", "experimentalFeature/list", "mcpServerStatus/list", "command/exec"].map((method) => ({ properties: { method: { enum: [method] } } })) }, "v2/CommandExecParams": { required: ["command"], properties: { sandboxPolicy: { type: "object", readOnly: true } } }, "v2/ThreadStartParams": { properties: { sandbox: { type: "string" } } }, "v2/ExperimentalFeatureListParams": { properties: { threadId: { type: "string" } } }, "v2/ListMcpServerStatusParams": { properties: { threadId: { type: "string" } } } } });
@@ -367,14 +367,14 @@ function writeNativePreflightFake(root, { malformedFeature = false, malformedSch
     "if (argv[0] !== 'app-server') process.exit(2); let starts = 0; let stage = 0;",
     "const respond = (id, result) => process.stdout.write(JSON.stringify({ id, result }) + '\\n'); const reject = (id) => process.stdout.write(JSON.stringify({ id, error: { message: 'unexpected protocol order' } }) + '\\n');",
     "readline.createInterface({ input: process.stdin }).on('line', (line) => { const request = JSON.parse(line); if (!Object.hasOwn(request, 'id')) return;",
-    `if (request.method === 'initialize' && stage === 0) { ${hang ? "return;" : `${remoteControlNotification ? "process.stdout.write(JSON.stringify({ method: 'remoteControl/status/changed', params: { ignored: true } }) + '\\n');" : ""} stage = 1; return respond(request.id, {});`} }`,
+    `if (request.method === 'initialize' && stage === 0) { ${hang ? "return;" : `${nullFrame ? "process.stdout.write('null\\n');" : ""}${remoteControlNotification ? "process.stdout.write(JSON.stringify({ method: 'remoteControl/status/changed', params: { ignored: true } }) + '\\n');" : ""} stage = 1; respond(request.id, {}); ${closeStdin ? "process.stdin.destroy();" : ""} return;`} }`,
     "if (request.method === 'thread/start' && stage === 1) { stage = 2; starts += 1; return respond(request.id, { thread: { id: 'discovery' }, sandbox: { type: 'readOnly', networkAccess: false } }); }",
     "if (request.method === 'mcpServerStatus/list' && stage === 2 && request.params.threadId === 'discovery') { stage = 3; return respond(request.id, { data: [], nextCursor: null }); }",
     `if (request.method === 'thread/start' && stage === 3 && request.params.sandbox === 'read-only') { stage = 4; starts += 1; return respond(request.id, { thread: { id: 'reduced' }, sandbox: ${wrongSandbox ? "{ type: 'workspaceWrite', networkAccess: false }" : "{ type: 'readOnly', networkAccess: false }"} }); }`,
     `if (request.method === 'experimentalFeature/list' && stage === 4) { stage = 5; return respond(request.id, { data: ${malformedFeature ? "[{name:'plugins',enabled:false}]" : features}, nextCursor: null }); }`,
     "if (request.method === 'mcpServerStatus/list' && stage === 5 && request.params.threadId === 'reduced') { stage = 6; return respond(request.id, { data: [], nextCursor: null }); }",
     "if (request.method === 'command/exec' && stage === 6 && request.params.sandboxPolicy.type === 'readOnly' && request.params.sandboxPolicy.networkAccess === false && request.params.command[0] === '/bin/cat') { stage = 7; return respond(request.id, { exitCode: 0, stdout: 'native-critic-canary\\n', stderr: '' }); }",
-    `if (request.method === 'command/exec' && stage === 7 && request.params.command[1] === '-e') { stage = 8; return respond(request.id, { exitCode: 1, stdout: ${launchDenied ? "''" : "'attempted-write\\n'"}, stderr: 'EROFS' }); }`,
+    `if (request.method === 'command/exec' && stage === 7 && request.params.command[1] === '-e') { stage = 8; respond(request.id, { exitCode: 1, stdout: ${launchDenied ? "''" : "'attempted-write\\n'"}, stderr: 'EROFS' }); ${lateServerRequest ? "process.stdout.write(JSON.stringify({ id: 99, method: 'forbidden/request', params: {} }) + '\\n');" : ""} return; }`,
     "return reject(request.id); });",
   ].join("\n"), { mode: 0o755 });
   chmodSync(path, 0o755);
@@ -445,4 +445,24 @@ test("native Critic preflight distinguishes timeout, launch denial, wrong readba
   const outside = realpathSync(mkdirSync(join(root, "outside"), { recursive: true }));
   const escaped = await runNativeCriticPreflight({ scratchPath: outside, candidateRoot: repo, codexPath: writeNativePreflightFake(join(root, "fake-escape")) });
   assert.equal(escaped.status, "unavailable"); assert.equal(escaped.code, "input-invalid");
+});
+
+test("native Critic preflight retains late server requests and malformed frames as sticky terminal failures", async (t) => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "native-critic-preflight-sticky-")));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const { repo, scratch } = createNativePreflightRepo(root);
+  for (const [name, options] of [["late", { lateServerRequest: true }], ["null", { nullFrame: true }]]) {
+    const result = await runNativeCriticPreflight({ scratchPath: scratch, candidateRoot: repo, codexPath: writeNativePreflightFake(join(root, name), options) });
+    assert.equal(result.status, "unavailable", `${name}: ${JSON.stringify(result)}`);
+    assert.equal(result.code, "protocol-invalid", `${name}: ${JSON.stringify(result)}`);
+  }
+});
+
+test("native Critic preflight converts a closed stdin pipe into a bounded unavailable result", async (t) => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "native-critic-preflight-epipe-")));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const { repo, scratch } = createNativePreflightRepo(root);
+  const result = await runNativeCriticPreflight({ scratchPath: scratch, candidateRoot: repo, codexPath: writeNativePreflightFake(root, { closeStdin: true }) }, { timeoutMs: 100 });
+  assert.equal(result.status, "unavailable", JSON.stringify(result));
+  assert.notEqual(result.code, "smoke-failed", JSON.stringify(result));
 });

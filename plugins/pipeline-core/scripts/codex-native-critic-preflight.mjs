@@ -107,17 +107,19 @@ async function allPages(rpc, method, params, kind) {
 
 class RpcProcess {
   constructor(command, argv, options, dependencies = {}) {
-    this.spawn = dependencies.spawn ?? spawn; this.onNotification = dependencies.onNotification ?? null; this.timeoutMs = dependencies.timeoutMs ?? TIMEOUT_MS; this.nextId = 1; this.pending = new Map(); this.bytes = 0;
+    this.spawn = dependencies.spawn ?? spawn; this.onNotification = dependencies.onNotification ?? null; this.timeoutMs = dependencies.timeoutMs ?? TIMEOUT_MS; this.nextId = 1; this.pending = new Map(); this.bytes = 0; this.failure = null; this.closing = false;
     this.child = this.spawn(command, argv, { ...options, shell: false, stdio: ["pipe", "pipe", "pipe"] });
     this.closed = new Promise((resolveClose) => this.child.once("close", (code, signal) => resolveClose({ code, signal })));
-    this.child.once("error", (error) => this.finish(error)); this.child.once("close", () => this.finish(new Error("protocol closed")));
+    this.child.once("error", (error) => this.finish(error)); this.child.once("close", () => { if (!this.closing) this.finish(new Error("protocol closed")); });
     const lines = createInterface({ input: this.child.stdout });
     lines.on("line", (line) => this.receive(line));
     this.child.stderr.on("data", (chunk) => { this.bytes += chunk.length; if (this.bytes > MAX_BYTES) this.finish(new Error("stderr overflow")); });
+    this.child.stdin.on("error", (error) => this.finish(Object.assign(new Error("stdin write failed"), { code: "stdin-error", cause: error })));
   }
   receive(line) {
     this.bytes += Buffer.byteLength(line); if (this.bytes > MAX_BYTES) return this.finish(new Error("stdout overflow"));
-    let value; try { value = JSON.parse(line); } catch { return this.finish(new Error("protocol JSON is malformed")); }
+    let value; try { value = JSON.parse(line); } catch { return this.finish(Object.assign(new Error("protocol JSON is malformed"), { code: "protocol-invalid" })); }
+    if (!object(value)) return this.finish(Object.assign(new Error("protocol frame is not an object"), { code: "protocol-invalid" }));
     if (typeof value.method === "string") {
       if (typeof this.onNotification === "function") this.onNotification({ method: value.method, isRequest: Object.hasOwn(value, "id") });
       if (Object.hasOwn(value, "id")) return this.finish(new Error("server request is not admitted"));
@@ -134,12 +136,13 @@ class RpcProcess {
     const id = this.nextId++; const payload = JSON.stringify({ id, method, params });
     return new Promise((resolveRequest, rejectRequest) => {
       const timer = setTimeout(() => { this.pending.delete(id); rejectRequest(Object.assign(new Error(`${method} timed out`), { code: "timed-out" })); this.finish(new Error("protocol timed out")); }, this.timeoutMs); timer.unref();
-      this.pending.set(id, { resolve: (value) => { clearTimeout(timer); resolveRequest(value); }, reject: (error) => { clearTimeout(timer); rejectRequest(error); } }); this.child.stdin.write(`${payload}\n`);
+      this.pending.set(id, { resolve: (value) => { clearTimeout(timer); resolveRequest(value); }, reject: (error) => { clearTimeout(timer); rejectRequest(error); } });
+      try { this.child.stdin.write(`${payload}\n`); } catch (error) { this.finish(Object.assign(new Error("stdin write failed"), { code: "stdin-error", cause: error })); }
     });
   }
-  notify(method, params = undefined) { this.child.stdin.write(`${JSON.stringify(params === undefined ? { method } : { method, params })}\n`); }
-  finish(error = new Error("protocol closed")) { for (const pending of this.pending.values()) pending.reject(error); this.pending.clear(); try { this.child.kill("SIGTERM"); } catch {} }
-  async close() { this.child.stdin.end(); const wait = (ms, value) => new Promise((resolveTimeout) => { const timer = setTimeout(() => resolveTimeout(value), ms); timer.unref(); }); const terminal = await Promise.race([this.closed, wait(this.timeoutMs, null)]); if (terminal) return terminal; try { this.child.kill("SIGTERM"); } catch {} const stopped = await Promise.race([this.closed, wait(2_000, null)]); if (stopped) return stopped; try { this.child.kill("SIGKILL"); } catch {} return await Promise.race([this.closed, wait(2_000, { code: null, signal: "SIGKILL" })]); }
+  notify(method, params = undefined) { try { this.child.stdin.write(`${JSON.stringify(params === undefined ? { method } : { method, params })}\n`); } catch (error) { this.finish(Object.assign(new Error("stdin write failed"), { code: "stdin-error", cause: error })); } }
+  finish(error = new Error("protocol closed")) { if (this.failure !== null) return; this.failure = error; for (const pending of this.pending.values()) pending.reject(error); this.pending.clear(); try { this.child.stdin.end(); } catch {} try { this.child.kill("SIGTERM"); } catch {} }
+  async close() { this.closing = true; try { this.child.stdin.end(); } catch (error) { this.finish(Object.assign(new Error("stdin close failed"), { code: "stdin-error", cause: error })); } const wait = (ms, value) => new Promise((resolveTimeout) => { const timer = setTimeout(() => resolveTimeout(value), ms); timer.unref(); }); const terminal = await Promise.race([this.closed, wait(this.timeoutMs, null)]); if (terminal) return terminal; try { this.child.kill("SIGTERM"); } catch {} const stopped = await Promise.race([this.closed, wait(2_000, null)]); if (stopped) return stopped; try { this.child.kill("SIGKILL"); } catch {} return await Promise.race([this.closed, wait(2_000, { code: null, signal: "SIGKILL" })]); }
 }
 
 function startThreadResult(result, priorThread = null) {
@@ -203,7 +206,9 @@ async function runNativeCriticPreflightInternal(input, dependencies = {}) {
     writeObserved = attempted.stdout.includes("attempted-write") && attempted.exitCode === 1; nativeWriteDenied = writeObserved && OS_DENIAL.test(attempted.stderr.trim());
     const canaryUnchanged = sha256(readFileSync(canary)) === originalCanary;
     const afterSource = sourceIdentity(candidateRoot, dependencies); const sourceUnchanged = beforeSource.tree === afterSource.tree && beforeSource.dirty === afterSource.dirty && sha256(readFileSync(sourcePath)) === beforeScript;
-    terminal = await rpc.close(); rpc = null;
+    terminal = await rpc.close();
+    if (rpc.failure !== null) fail("protocol-invalid", "native protocol terminated with a sticky failure");
+    rpc = null;
     const observed = { initialized, readObserved, writeObserved, nativeWriteDenied, canaryUnchanged, hostWriteControl, sourceUnchanged, protocolError: false, guardDenial: false, sandboxLaunchDenied: false, timedOut: false, cleanupComplete: terminal.code === 0 && terminal.signal === null, terminal: { exitCode: terminal.code, signal: terminal.signal, spawnFailed: false } };
     if (!Object.values({ initialized, readObserved, writeObserved, nativeWriteDenied, canaryUnchanged, hostWriteControl, sourceUnchanged }).every(Boolean) || !observed.cleanupComplete) fail("smoke-failed", "native command smoke did not prove every required fact");
     const tuple = { cli: host.cli, protocolSchemaSha256, host: host.host, policy: NATIVE_CRITIC_POLICY, toolSurface: { configSha256: nativeCriticToolSurfaceConfigDigest(reduction), observationSha256: nativeCriticToolSurfaceObservationDigest(featureSnapshot, mcpSnapshot) } };
