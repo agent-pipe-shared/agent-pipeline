@@ -1037,6 +1037,7 @@ export function driveOnboardingInit({ rootDir, runner = null, stepCap = DEFAULT_
     }
 
     const isUnappliedMigrationPlan = output?.schema === "pipeline.runner-profile-migration-plan.v3"
+      && output?.status === "ready"
       && (output?.activation?.required === true || (Array.isArray(output?.changes) && output.changes.length > 0));
 
     if ((nextAction === null || nextAction === undefined) && isUnappliedMigrationPlan) {
