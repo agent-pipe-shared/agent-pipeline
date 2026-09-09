@@ -1637,21 +1637,21 @@ check("the actual child admits native-tools only after native policy, complete f
       assert.equal(result.result.code, "answered", name);
     }
 
-    for (const [name, command, commandActions] of [
+    for (const [name, command, commandActions, expectedWriteAttemptKind = "command-unknown-git"] of [
       ["external diff output", `${nativeGitPrefix} diff --no-ext-diff --no-textconv --output=/tmp/x ${base} ${candidate} -- roles/critic.md`, [{ type: "unknown", command: `${nativeGitPrefix} diff --no-ext-diff --no-textconv --output=/tmp/x ${base} ${candidate} -- roles/critic.md` }]],
       ["wrong base", `${nativeGitPrefix} diff --no-ext-diff --no-textconv ${candidate} ${base} -- roles/critic.md`, [{ type: "unknown", command: `${nativeGitPrefix} diff --no-ext-diff --no-textconv ${candidate} ${base} -- roles/critic.md` }]],
       ["unbound path", `${nativeGitPrefix} show --no-ext-diff --no-textconv ${candidate} -- README.md`, [{ type: "unknown", command: `${nativeGitPrefix} show --no-ext-diff --no-textconv ${candidate} -- README.md` }]],
       ["shell chain", `${nativeGitPrefix} status --porcelain=v1 --untracked-files=no && touch changed`, [{ type: "unknown", command: `${nativeGitPrefix} status --porcelain=v1 --untracked-files=no && touch changed` }]],
       ["wrapped shell chain", `bash -lc '${gitDiff}; touch changed'`, [{ type: "unknown", command: `${gitDiff}; touch changed` }]],
       ["action does not bind command", gitDiff, [{ type: "unknown", command: `${nativeGitPrefix} status --porcelain=v1 --untracked-files=no` }]],
-      ["duplicate unknown actions", gitDiff, [{ type: "unknown", command: gitDiff }, { type: "unknown", command: gitDiff }]],
+      ["duplicate unknown actions", gitDiff, [{ type: "unknown", command: gitDiff }, { type: "unknown", command: gitDiff }], "command-action"],
     ]) {
       const result = runActualCriticChild(childPath, writeFakeCriticAppServer(fixture, [
         { type: "commandExecution", command, commandActions }, finalItem,
       ], { requireNativeWire: true }), fixture, { native: true });
       assert.equal(result.status, 2, name);
       assert.equal(result.result.code, "write-attempt", name);
-      assert.equal(result.result.observed.writeAttemptKind, "command-unknown-git", name);
+      assert.equal(result.result.observed.writeAttemptKind, expectedWriteAttemptKind, name);
     }
 
     const unknownNonGitRead = runActualCriticChild(childPath, writeFakeCriticAppServer(fixture, [
