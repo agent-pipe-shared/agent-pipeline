@@ -3,14 +3,14 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { chmodSync, cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { arch, release, tmpdir, type } from "node:os";
 import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { PassThrough } from "node:stream";
 import { pathToFileURL } from "node:url";
 
 import { invokeCodexCriticAppServer } from "./codex-critic-app-server.mjs";
-import { nativeCriticEvidenceCandidate, nativeCriticHeartbeatSnapshot, nativeCriticReportedChildFailure } from "./codex-native-critic-host.mjs";
+import { invokeCodexNativeCriticHost, nativeCriticEvidenceCandidate, nativeCriticHeartbeatSnapshot, nativeCriticReportedChildFailure } from "./codex-native-critic-host.mjs";
 import { runSelectedCriticHost, selectedCriticInProcessBridge } from "./codex-critic-selected-host.mjs";
 import { buildSandboxRequest, sandboxSelectionDigest } from "./codex-sandbox-select.mjs";
 import { runSandboxedReadonlyHostBridge } from "./sandboxed-readonly-host-bridge.mjs";
@@ -19,7 +19,13 @@ import {
   NATIVE_CRITIC_PROHIBITED_FEATURES,
   NATIVE_CRITIC_REDUCING_CONFIG,
   nativeCriticReducingCliArgs,
+  nativeCriticToolSurfaceConfigDigest,
+  nativeCriticToolSurfaceObservationDigest,
+  reduceDiscoveredNativeMcpServers,
 } from "../lib/codex-native-critic-tools.mjs";
+import { buildNativeCriticSelection, nativeCriticArtifactRequestDigest, nativeCriticCanonicalDigest } from "../lib/codex-native-critic-policy.mjs";
+import { repositoryFingerprint } from "../lib/codex-onboarding-runtime.mjs";
+import { preflightCriticDispatch } from "./critic-dispatch-preflight.mjs";
 
 import {
   ASSURANCE,
@@ -1472,6 +1478,7 @@ function writeFakeCriticAppServer(directory, items, {
   const path = join(directory, "fake-codex-app-server.mjs");
   const source = [
     "#!/usr/bin/env node",
+    "if (process.argv.includes('--version')) { process.stdout.write('0.153.4\\n'); process.exit(0); }",
     `const items = ${JSON.stringify(items)};`,
     `const model = ${JSON.stringify(SELECTED_CRITIC_ROUTE.model)};`,
     `const itemThreadId = ${JSON.stringify(itemThreadId)};`,
@@ -1785,6 +1792,93 @@ check("the actual native child renders a current-artifact judgment without a cor
     assert.equal(result.result.code, "answered");
   } finally {
     rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+await checkAsync("a real Git current-artifact preflight flows through the actual native child to its receipt with a fake app-server backend and no model", async () => {
+  const root = mkdtempSync(join(tmpdir(), "codex-native-artifact-integration-"));
+  const nowMs = Date.parse("2026-09-10T12:00:00.000Z");
+  try {
+    for (const path of [".claude", "governance/guidelines", "governance/policies", "specs", "notes", "evidence"]) mkdirSync(join(root, path), { recursive: true });
+    writeFileSync(join(root, ".gitignore"), "evidence/\n");
+    writeFileSync(join(root, ".claude", "pipeline.yaml"), "governance:\n  guidelines_path: governance/guidelines\n  policies_path: governance/policies\n");
+    writeFileSync(join(root, "governance", "guidelines", "review.md"), "Review current artifacts.\n");
+    writeFileSync(join(root, "governance", "policies", "checklist.md"), "- inspect\n");
+    writeFileSync(join(root, "specs", "review.md"), "base\n");
+    run("git", ["init", "-q"], root); run("git", ["config", "user.name", "Fixture"], root); run("git", ["config", "user.email", "fixture@example.invalid"], root);
+    run("git", ["add", "."], root); run("git", ["commit", "-qm", "base"], root);
+    writeFileSync(join(root, "specs", "review.md"), "artifact under review\n"); run("git", ["add", "specs/review.md"], root); run("git", ["commit", "-qm", "artifact"], root);
+    writeFileSync(join(root, "notes", "later.md"), "unrelated later commit\n"); run("git", ["add", "notes/later.md"], root); run("git", ["commit", "-qm", "later unrelated correction"], root);
+    const candidateCommit = run("git", ["rev-parse", "HEAD"], root);
+    const candidateTree = run("git", ["rev-parse", "HEAD^{tree}"], root);
+    writeFileSync(join(root, "evidence", "verify.json"), `${JSON.stringify({ candidate: { commit: candidateCommit, tree: candidateTree } })}\n`);
+    const reviewScope = { kind: "current-artifacts", paths: ["specs/review.md"] };
+    const preflight = preflightCriticDispatch({
+      root, candidate: candidateCommit, reviewScope, specPath: "specs/review.md", guardrailPaths: [], evidencePaths: ["evidence/verify.json"],
+    });
+    const references = new Map();
+    for (const record of preflight.sourceCoverage) references.set(record.path, record);
+    for (const record of [preflight.spec, ...preflight.guardrails]) {
+      if (!references.has(record.path)) references.set(record.path, record);
+    }
+    for (const record of preflight.evidence) references.set(record.path, record);
+    const referenceRecords = [...references.values()].sort((left, right) => left.path.localeCompare(right.path));
+    const referencePaths = referenceRecords.map(({ path }) => path);
+    const fake = writeFakeCriticAppServer(root, [
+      { type: "agentMessage", phase: "final_answer", text: JSON.stringify(validCriticVerdict()) },
+    ], {
+      requireNativeWire: true,
+      expectedPromptIncludes: [
+        "Perform a full current-artifact judgment of the named current artifacts against the supplied spec and guardrails.",
+        "- specs/review.md",
+      ],
+      expectedPromptExcludes: ["Review base commit:", "exact correction range only"],
+    });
+    const reduction = reduceDiscoveredNativeMcpServers([{ data: [], nextCursor: null }]);
+    const featureSnapshot = {
+      pageCount: 1,
+      dataCount: NATIVE_CRITIC_PROHIBITED_FEATURES.length,
+      digest: nativeCriticCanonicalDigest(Object.fromEntries(NATIVE_CRITIC_PROHIBITED_FEATURES.map((name) => [name, false]))),
+    };
+    const mcpSnapshot = { pageCount: 1, dataCount: 0, digest: nativeCriticCanonicalDigest({ pageCount: 1, dataCount: 0, allDisabled: true, allEmpty: true, catalogFree: true }) };
+    const tuple = {
+      cli: { version: "0.153.4", sha256: createHash("sha256").update(readFileSync(fake)).digest("hex") },
+      protocolSchemaSha256: "2".repeat(64),
+      host: { platformClass: "linux-wsl2", kernel: { sysname: type(), release: release(), machine: arch() }, filesystemClass: "wsl2-native", bootIdSha256: createHash("sha256").update("boot").digest("hex") },
+      policy: { threadSandbox: "read-only", turn: { type: "readOnly", networkAccess: false } },
+      toolSurface: { configSha256: nativeCriticToolSurfaceConfigDigest(reduction), observationSha256: nativeCriticToolSurfaceObservationDigest(featureSnapshot, mcpSnapshot) },
+    };
+    const route = { dutyId: "critic_high_risk", runner: "codex", model: SELECTED_CRITIC_ROUTE.model, effort: SELECTED_CRITIC_ROUTE.effort, sourceSha256: "3".repeat(64), candidateCommit };
+    const smokeReceipt = {
+      schema: "pipeline.codex-native-critic-smoke.v1", status: "passed", tuple,
+      observed: { initialized: true, readObserved: true, writeObserved: true, nativeWriteDenied: true, canaryUnchanged: true, hostWriteControl: true, sourceUnchanged: true, protocolError: false, guardDenial: false, sandboxLaunchDenied: false, timedOut: false, cleanupComplete: true, terminal: { exitCode: 0, signal: null, spawnFailed: false } },
+      capturedAt: "2026-09-10T11:59:00.000Z",
+    };
+    const referenceSetSha256 = nativeCriticCanonicalDigest(referenceRecords);
+    const selection = buildNativeCriticSelection({
+      selectionId: "cncs_cccccccccccccccccccccccccc", repoFingerprint: repositoryFingerprint(root),
+      dispatch: { queueRevision: 1, candidateCommit, candidateTree, referenceSetSha256, requestSha256: nativeCriticArtifactRequestDigest({ candidateCommit, candidateTree, referenceSetSha256, reviewMode: "full", reviewScope }) },
+      route, poDecisionSha256: "4".repeat(64), smokeReceipt, smokeReceiptSha256: nativeCriticCanonicalDigest(smokeReceipt), createdAt: "2026-09-10T11:59:30.000Z",
+    }, { validateRoute: () => route, expectedTuple: tuple, nowMs, maxSmokeAgeMs: 300_000 });
+    const input = { selection, expectedTuple: tuple, repository: { root, cliPath: fake }, coordinatorScratch: { path: root }, referencePaths, referenceRecords, reviewScope, reviewMode: "full" };
+    const result = await invokeCodexNativeCriticHost(input, {
+      nowMs, resolveRoute: () => route,
+      readFileSync: (path) => path === "/proc/version" ? "Linux Microsoft" : path === "/proc/self/mountinfo" ? `1 0 0:1 / ${root} rw - ext4 /dev/root rw\n` : "boot",
+    });
+    assert.equal(result.status, "reviewed", JSON.stringify(result));
+    assert.deepEqual(result.receipt.reviewScope, preflight.reviewScope);
+    assert.deepEqual(result.receipt.sourceCoverage, preflight.sourceCoverage);
+    assert.equal(result.receipt.dispatch.candidateCommit, preflight.candidate.commit);
+    assert.equal(result.receipt.dispatch.candidateTree, preflight.candidate.tree);
+    assert.equal(referenceRecords.find(({ path }) => path === "specs/review.md").mode, "100644", "scope/spec overlap must retain the scoped mode binding");
+    const missingMode = structuredClone(input);
+    delete missingMode.referenceRecords.find(({ path }) => path === "specs/review.md").mode;
+    let childCreated = false;
+    const rejected = await invokeCodexNativeCriticHost(missingMode, { runChild: async () => { childCreated = true; throw new Error("must not run"); } });
+    assert.equal(rejected.code, "input-invalid");
+    assert.equal(childCreated, false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });
 
