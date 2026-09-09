@@ -1,13 +1,12 @@
 # Alfred autonomous continuation — PO decision queue
 
-Updated 2026-09-08. This is the collection point for decisions that genuinely
+Updated 2026-09-09. This is the collection point for decisions that genuinely
 need the PO during the approved Alfred continuation. It is not a new approval
 mechanism, a substitute for signed gates, or a record of feature acceptance.
 
 ## Standing instructions
 
-- Continue the approved Alfred scope locally through the next morning,
-  2026-09-09. The PC transfer is postponed.
+- Continue the approved Alfred scope locally; the PC transfer is postponed.
 - Keep `origin/feat/sprint-alfred` as the only upstream. Do not create
   `sprint_alfred`; the prior handover target has been corrected.
 - Do not push until the PO gives a new explicit instruction. The earlier
@@ -20,9 +19,9 @@ mechanism, a substitute for signed gates, or a record of feature acceptance.
   Stop dependent work at a configured human gate, a material scope decision,
   or a typed hard block without a safe recovery route.
 
-## Decisions awaiting the PO
+## PO decisions
 
-### Event 16 deterministic scanner collision — approved, not yet applied
+### Event 16 deterministic scanner collision — permanently approved and applied
 
 The exact clean candidate is `d88b543486ddc8e6215d3944fafc1e38aa6790da`
 (tree `f803aa1a4b353ee6093676b3f33961359d193fe1`). Full Verify is red (exit 1,
@@ -37,10 +36,12 @@ The focused diagnostic exits 0 and confirms the raw match equals the producer
 The PO explicitly approved on 2026-09-09 one permanent, narrow `content-v1`
 exception bound exactly to the event path, `generic-api-key`, line 1, column
 987, and the machine-confirmed content fingerprint in the scanner proposal.
-This approval is recorded as approved but not applied. Root owns preparing and
-applying the single scanner entry through the repository's permitted mutation
-route and actual guard requirements. The event and scanner ignore remain
-unchanged until that readback.
+The exact prepared entry has now been applied once through the permitted
+mutation route and read back. The event remains immutable; the ignore file
+pre-edit and post-edit hashes, event hash, and fixture result are recorded in
+[event16-permanent-scanner-exception-2026-09-09.md](event16-permanent-scanner-exception-2026-09-09.md)
+and [event16-permanent-scanner-exception-2026-09-09.json](event16-permanent-scanner-exception-2026-09-09.json).
+Candidate Security and Full Verify remain separate pending gates.
 
 ## Open agent work and later gates
 

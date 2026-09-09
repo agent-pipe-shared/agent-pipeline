@@ -13,9 +13,10 @@ diff-check was 0. Machine evidence is recorded in
 `scratch/alfred-c1-preflight-capture-checks.json` and the dispatch record
 `evidence/dispatch-record-ALFRED-C1-PREFLIGHT-CAPTURE-IMPLEMENT.json`.
 
-The checks include malformed End-marker rejection. A same-tool syntax-only
-correction repaired the malformed marker; no guard bypass or external approval
-was used. These are focused producer results and do not claim Full Verify,
+During evidence finalization, a malformed End marker caused a same-tool
+syntax-only correction; this operational evidence-save incident was separate
+from the 20 producer tests. No guard bypass or external approval was used.
+These are focused producer results and do not claim Full Verify,
 independent T1 review, emission, or a real 14-day baseline. The previous Full
 Verify candidate `96238c3c1b811dc69e5d5631de67f223a6853046` remains historical
 red at 499/508 with the same nine failures. A new candidate Full Verify remains
