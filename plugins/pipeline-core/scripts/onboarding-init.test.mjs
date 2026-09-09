@@ -1197,6 +1197,39 @@ test("driveOnboardingInit: walks migration plan -> apply --activate -> re-anchor
   }
 });
 
+test("driveOnboardingInit: a migration-ready V4 response keeps required asks while optional handover commands remain terminal", () => {
+  const migration = "/plugin/runner-profile-migration-v3.mjs";
+  for (const [label, nextAction, expectedOutcome] of [
+    ["verify command", { kind: "collect-input", input: { name: "verifyCommand" } }, "collect-input"],
+    ["optional handover", { kind: "command", executable: "node", argv: ["/plugin/pipeline-state.mjs", "set-phase", "--phase", "implementation"] }, "ready"],
+    ["handover pending ask", { kind: "command", executable: "node", argv: ["/plugin/pipeline-state.mjs", "set-phase", "--phase", "implementation"], pendingAsks: [{ kind: "collect-input", input: { name: "verifyCommand" } }] }, "pending-asks"],
+  ]) {
+    const root = freshRoot();
+    try {
+      let call = 0;
+      const run = (_executable, argv) => {
+        call += 1;
+        if (call === 1) return respond({ schema: "pipeline.project-onboarding.v4", status: "migration-required", nextAction: { kind: "command", executable: "node", argv: [migration, "plan", "--root", root] } });
+        if (call === 2) return respond({ schema: "pipeline.runner-profile-migration-plan.v3", status: "ready", changes: [{ path: "pipeline.user.yaml", changed: true }], activation: { required: true }, nextAction: { kind: "command", executable: "node", argv: [migration, "apply", "--root", root, "--activate"] } });
+        if (call === 3) return respond({ schema: "pipeline.runner-profile-migration-plan.v3", status: "applied", nextAction: null });
+        if (call === 4) {
+          assert.equal(argv.includes("inspect"), true, `${label}: migration must re-anchor before deciding readiness`);
+          return respond({ schema: "pipeline.project-onboarding.v4", status: "ready", nextAction });
+        }
+        throw new Error(`${label}: unexpected call ${call}`);
+      };
+      const result = driveOnboardingInit({ rootDir: root, runner: "codex", run });
+      assert.equal(result.outcome, expectedOutcome, `${label}: ${JSON.stringify(result)}`);
+      assert.equal(result.stepsExecuted, 4, `${label}: optional handover command must not execute during migration`);
+      assert.equal(call, 4);
+      if (expectedOutcome === "collect-input") assert.equal(result.collectInput.input.name, "verifyCommand");
+      if (expectedOutcome === "pending-asks") assert.equal(result.pendingAsks[0].input.name, "verifyCommand");
+    } finally {
+      dispose(root);
+    }
+  }
+});
+
 test("driveOnboardingInit: an unapplied migration plan missing its apply action fails closed instead of claiming ready", () => {
   const root = freshRoot();
   try {
