@@ -30,3 +30,30 @@ only. The configured upstream is `origin/feat/sprint-nova-codex-v046`.
 Preserve the local version stamp, satisfy the normal push prerequisites, and
 read back the remote commit. This grants no release, force push, or exchange
 of installed plugins.
+
+## Native Codex tool-sandbox integration
+
+After the concrete proposal separated trusted CLI authentication/runtime writes
+from native read-only model-tool execution, the PO approved implementation:
+
+> ja setze den umbau gerne um
+
+The PO subsequently requested parallel implementation and tests, while asking
+that the earlier WSL/EPERM problem and newer CLI versions be checked explicitly.
+This supplies ADR-0035's PO decision for the bounded integration work. It does
+not itself supply the same-surface efficacy evidence or activate a review lane.
+
+The new lane must keep a distinct assurance: native model-tool read-only,
+with trusted Codex runtime/authentication/cache outside that boundary. It must
+not relabel the existing intermediate whole-process profile or its receipts.
+Before a productive Critic turn, require actual same-host native write-denial
+evidence, candidate/route binding, and a bounded observation that external
+integrations cannot provide an unreviewed write path. Configuration reductions
+are local to the child process/thread; the installed plugin and global user
+configuration are not changed. Standing Critic consent above continues to
+cover the configured route and necessary review inputs.
+
+If this host cannot meet that contract, preserve the actual diagnostic and
+continue independent work. No fallback verdict or sandbox success may be
+inferred from a new CLI version, a model that simply never attempted a write,
+or the PO's consent.
