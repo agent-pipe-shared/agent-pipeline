@@ -20,6 +20,8 @@ import {
 } from "../lib/codex-native-critic-policy.mjs";
 import { coalesceInputCoveredRuntimeReads, createCodexSandboxRuntimeTransport } from "./codex-sandbox-runtime.mjs";
 import { compilePermissionProfile } from "./codex-sandbox-preflight.mjs";
+import { runNativeCriticPreflight } from "./codex-native-critic-preflight.mjs";
+import { NATIVE_CRITIC_PROHIBITED_FEATURES } from "../lib/codex-native-critic-tools.mjs";
 
 const SCRIPT = new URL("./codex-sandbox-runtime.mjs", import.meta.url);
 const CONTEXT = { repoFingerprint: "a".repeat(64), referenceSetSha256: "b".repeat(64) };
@@ -350,4 +352,88 @@ test("selection.runPreflight() and selection.observeHost() make a real, unmocked
   // (memoized within one transport instance) -- prove they observed the
   // identical real receipt, not two independent/divergent evaluations.
   assert.equal(receipt.terminalCode, result.terminalCode);
+});
+
+function writeNativePreflightFake(root, { malformedFeature = false, malformedSchema = false, hang = false, launchDenied = false, wrongSandbox = false } = {}) {
+  mkdirSync(root, { recursive: true });
+  const path = join(root, "fake-native-preflight-codex.mjs");
+  const protocol = JSON.stringify(malformedSchema ? {} : { definitions: { ClientRequest: { oneOf: ["initialize", "thread/start", "experimentalFeature/list", "mcpServerStatus/list", "command/exec"].map((method) => ({ properties: { method: { enum: [method] } } })) }, "v2/CommandExecParams": { required: ["command"], properties: { sandboxPolicy: { type: "object", readOnly: true } } }, "v2/ThreadStartParams": { properties: { sandbox: { type: "string" } } }, "v2/ExperimentalFeatureListParams": { properties: { threadId: { type: "string" } } }, "v2/ListMcpServerStatusParams": { properties: { threadId: { type: "string" } } } } });
+  const features = JSON.stringify(NATIVE_CRITIC_PROHIBITED_FEATURES.map((name) => ({ name, enabled: false })));
+  writeFileSync(path, [
+    "#!/usr/bin/env node",
+    "import fs from 'node:fs'; import readline from 'node:readline'; const argv = process.argv.slice(2);",
+    "if (argv[0] === '--version') { process.stdout.write('fake-native-codex 1.0\\n'); process.exit(0); }",
+    `if (argv[0] === 'app-server' && argv[1] === 'generate-json-schema') { const out = argv[argv.indexOf('--out') + 1]; fs.mkdirSync(out, { recursive: true }); fs.writeFileSync(out + '/codex_app_server_protocol.schemas.json', ${JSON.stringify(protocol)}); fs.writeFileSync(out + '/codex_app_server_protocol.v2.schemas.json', ${JSON.stringify(protocol)}); process.exit(0); }`,
+    "if (argv[0] !== 'app-server') process.exit(2); let starts = 0; let stage = 0;",
+    "const respond = (id, result) => process.stdout.write(JSON.stringify({ id, result }) + '\\n'); const reject = (id) => process.stdout.write(JSON.stringify({ id, error: { message: 'unexpected protocol order' } }) + '\\n');",
+    "readline.createInterface({ input: process.stdin }).on('line', (line) => { const request = JSON.parse(line); if (!Object.hasOwn(request, 'id')) return;",
+    `if (request.method === 'initialize' && stage === 0) { ${hang ? "return;" : "stage = 1; return respond(request.id, {});"} }`,
+    "if (request.method === 'thread/start' && stage === 1) { stage = 2; starts += 1; return respond(request.id, { thread: { id: 'discovery' }, sandbox: { type: 'readOnly', networkAccess: false } }); }",
+    "if (request.method === 'mcpServerStatus/list' && stage === 2 && request.params.threadId === 'discovery') { stage = 3; return respond(request.id, { data: [], nextCursor: null }); }",
+    `if (request.method === 'thread/start' && stage === 3 && request.params.sandbox === 'read-only') { stage = 4; starts += 1; return respond(request.id, { thread: { id: 'reduced' }, sandbox: ${wrongSandbox ? "{ type: 'workspaceWrite', networkAccess: false }" : "{ type: 'readOnly', networkAccess: false }"} }); }`,
+    `if (request.method === 'experimentalFeature/list' && stage === 4) { stage = 5; return respond(request.id, { data: ${malformedFeature ? "[{name:'plugins',enabled:false}]" : features}, nextCursor: null }); }`,
+    "if (request.method === 'mcpServerStatus/list' && stage === 5 && request.params.threadId === 'reduced') { stage = 6; return respond(request.id, { data: [], nextCursor: null }); }",
+    "if (request.method === 'command/exec' && stage === 6 && request.params.sandboxPolicy.type === 'readOnly' && request.params.sandboxPolicy.networkAccess === false && request.params.command[0] === '/bin/cat') { stage = 7; return respond(request.id, { exitCode: 0, stdout: 'native-critic-canary\\n', stderr: '' }); }",
+    `if (request.method === 'command/exec' && stage === 7 && request.params.command[1] === '-e') { stage = 8; return respond(request.id, { exitCode: 1, stdout: ${launchDenied ? "''" : "'attempted-write\\n'"}, stderr: 'EROFS' }); }`,
+    "return reject(request.id); });",
+  ].join("\n"), { mode: 0o755 });
+  chmodSync(path, 0o755);
+  return realpathSync(path);
+}
+
+function createNativePreflightRepo(root) {
+  const repo = realpathSync(mkdirSync(join(root, "repo"), { recursive: true }));
+  writeFileSync(join(repo, "tracked.txt"), "baseline\n");
+  const init = spawnSync("git", ["init", "-q"], { cwd: repo, encoding: "utf8" });
+  assert.equal(init.status, 0, init.stderr);
+  const commit = spawnSync("git", ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "add", "tracked.txt"], { cwd: repo, encoding: "utf8" });
+  assert.equal(commit.status, 0, commit.stderr);
+  const committed = spawnSync("git", ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "baseline"], { cwd: repo, encoding: "utf8" });
+  assert.equal(committed.status, 0, committed.stderr);
+  return { repo, scratch: realpathSync(mkdirSync(join(repo, "scratch"), { recursive: true })) };
+}
+
+test("native Critic preflight's default adapter generates a fake CLI schema, drains reduced metadata, and proves standalone native write denial without a turn", async (t) => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "native-critic-preflight-")));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const { repo, scratch } = createNativePreflightRepo(root);
+  writeFileSync(join(scratch, "preexisting.txt"), "preserve\n");
+  const cli = writeNativePreflightFake(root);
+  const result = await runNativeCriticPreflight({ scratchPath: scratch, candidateRoot: repo, codexPath: cli });
+  assert.equal(result.status, "passed", JSON.stringify(result));
+  assert.equal(result.metadata.turnsStarted, 0);
+  assert.equal(result.smokeReceipt.observed.nativeWriteDenied, true);
+  assert.equal(result.smokeReceipt.observed.canaryUnchanged, true);
+  assert.equal(result.tuple.policy.turn.networkAccess, false);
+  assert.equal(await readFile(join(scratch, "preexisting.txt"), "utf8"), "preserve\n");
+  assert.match(result.tuple.protocolSchemaSha256, /^[a-f0-9]{64}$/);
+});
+
+test("native Critic preflight fails closed for incomplete feature evidence and malformed generated schemas", async (t) => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "native-critic-preflight-invalid-")));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const { repo, scratch } = createNativePreflightRepo(root);
+  const cli = writeNativePreflightFake(root, { malformedFeature: true });
+  const result = await runNativeCriticPreflight({ scratchPath: scratch, candidateRoot: repo, codexPath: cli });
+  assert.equal(result.status, "unavailable");
+  assert.equal(result.code, "preflight-failed");
+  const invalidSchema = await runNativeCriticPreflight({ scratchPath: scratch, candidateRoot: repo, codexPath: writeNativePreflightFake(join(root, "schema"), { malformedSchema: true }) });
+  assert.equal(invalidSchema.status, "unavailable");
+  assert.equal(invalidSchema.code, "schema-invalid");
+});
+
+test("native Critic preflight distinguishes timeout, launch denial, wrong readback policy, and scratch escape from a witnessed write denial", async (t) => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "native-critic-preflight-boundaries-")));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const { repo, scratch } = createNativePreflightRepo(root);
+  const run = (options, dependencies = {}) => runNativeCriticPreflight({ scratchPath: scratch, candidateRoot: repo, codexPath: writeNativePreflightFake(join(root, `fake-${Object.keys(options).join("-") || "pass"}`), options) }, dependencies);
+  const timeout = await run({ hang: true }, { timeoutMs: 10 });
+  assert.equal(timeout.status, "unavailable"); assert.equal(timeout.code, "timed-out");
+  const launch = await run({ launchDenied: true });
+  assert.equal(launch.status, "unavailable"); assert.equal(launch.code, "smoke-failed");
+  const policy = await run({ wrongSandbox: true });
+  assert.equal(policy.status, "unavailable"); assert.equal(policy.code, "protocol-invalid");
+  const outside = realpathSync(mkdirSync(join(root, "outside"), { recursive: true }));
+  const escaped = await runNativeCriticPreflight({ scratchPath: outside, candidateRoot: repo, codexPath: writeNativePreflightFake(join(root, "fake-escape")) });
+  assert.equal(escaped.status, "unavailable"); assert.equal(escaped.code, "input-invalid");
 });
