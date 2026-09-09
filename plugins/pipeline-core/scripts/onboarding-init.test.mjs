@@ -1135,6 +1135,107 @@ test("driveOnboardingInit: malformed pendingAsks does not crash the driver and i
   }
 });
 
+test("driveOnboardingInit: walks migration plan -> apply --activate -> re-anchor inspect -> ready without premature termination", () => {
+  const root = freshRoot();
+  try {
+    let call = 0;
+    const run = (executable, argv) => {
+      call += 1;
+      if (call === 1) {
+        assert.equal(argv.includes("inspect"), true);
+        return respond({
+          schema: "pipeline.project-onboarding.v3",
+          status: "migration-required",
+          nextAction: {
+            kind: "command",
+            executable: "node",
+            argv: ["/migration.mjs", "plan", "--root", root],
+          },
+        });
+      }
+      if (call === 2) {
+        assert.deepEqual(argv, ["/migration.mjs", "plan", "--root", root]);
+        return respond({
+          schema: "pipeline.runner-profile-migration-plan.v3",
+          status: "ready",
+          changes: [{ path: "pipeline.user.yaml", changed: true }],
+          activation: { required: true, command: "apply --activate", sourceCommittedLast: true },
+          nextAction: {
+            kind: "command",
+            executable: "node",
+            argv: ["/migration.mjs", "apply", "--root", root, "--activate"],
+            mutation: true,
+          },
+        });
+      }
+      if (call === 3) {
+        assert.deepEqual(argv, ["/migration.mjs", "apply", "--root", root, "--activate"]);
+        return respond({
+          schema: "pipeline.runner-profile-migration-plan.v3",
+          status: "applied",
+          changes: [{ path: "pipeline.user.yaml", changed: true }],
+          nextAction: null,
+        });
+      }
+      if (call === 4) {
+        assert.equal(argv.includes("inspect"), true);
+        return respond({
+          schema: "pipeline.project-onboarding.v3",
+          status: "ready",
+          nextAction: null,
+        });
+      }
+      throw new Error(`Unexpected call ${call}`);
+    };
+
+    const result = driveOnboardingInit({ rootDir: root, runner: "codex", run });
+    assert.equal(result.outcome, "ready");
+    assert.equal(result.stepsExecuted, 4);
+    assert.equal(call, 4);
+  } finally {
+    dispose(root);
+  }
+});
+
+test("driveOnboardingInit: an unapplied migration plan missing its apply action fails closed instead of claiming ready", () => {
+  const root = freshRoot();
+  try {
+    let call = 0;
+    const run = (executable, argv) => {
+      call += 1;
+      if (call === 1) {
+        return respond({
+          schema: "pipeline.project-onboarding.v3",
+          status: "migration-required",
+          nextAction: {
+            kind: "command",
+            executable: "node",
+            argv: ["/migration.mjs", "plan", "--root", root],
+          },
+        });
+      }
+      if (call === 2) {
+        return respond({
+          schema: "pipeline.runner-profile-migration-plan.v3",
+          status: "ready",
+          changes: [{ path: "pipeline.user.yaml", changed: true }],
+          activation: { required: true, command: "apply --activate", sourceCommittedLast: true },
+          nextAction: null,
+        });
+      }
+      throw new Error(`Unexpected call ${call}`);
+    };
+
+    const result = driveOnboardingInit({ rootDir: root, runner: "codex", run });
+    assert.equal(result.outcome, "error");
+    assert.equal(result.error.faultCode, "migration-action-missing");
+    assert.equal(result.final.schema, "pipeline.runner-profile-migration-plan.v3");
+    assert.equal(call, 2);
+  } finally {
+    dispose(root);
+  }
+});
+
 test("DEFAULT_STEP_CAP is a small, positive constant", () => {
   assert.ok(Number.isInteger(DEFAULT_STEP_CAP));
   assert.ok(DEFAULT_STEP_CAP > 0);

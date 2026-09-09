@@ -1,0 +1,39 @@
+{
+  "schema": "pipeline.dispatch-record.v1",
+  "taskId": "NVA-V3-LIFECYCLE-RECOVERY",
+  "agentType": "goldfish-deep",
+  "model": "sonnet",
+  "effort": "xhigh",
+  "rulesetSha": "0.6.1+codex.20260909160547.a2ce12c",
+  "dispatcher": "/root",
+  "outcome": "committed-pending-verify",
+  "commits": [],
+  "log": [
+    {
+      "phase": "opening-readback",
+      "toolUseCount": 1,
+      "note": "Dispatch record created before substantive implementation; inherited candidate changes are being validated."
+    },
+    {
+      "phase": "focused-verification",
+      "toolUseCount": 15,
+      "note": "Focused migration, onboarding, capabilities, lifecycle-guard, and project-onboarding suites passed; consumer-safe-paths passed."
+    },
+    {
+      "phase": "verify-preflight",
+      "toolUseCount": 17,
+      "note": "Full Verify correctly refused the dirty candidate before running suites; final package is being committed before rerunning Verify."
+    }
+  ],
+  "report": {
+    "text": "V3 migration/onboarding lifecycle repair is focused-test green and awaiting the mandatory post-commit full Verify.",
+    "changedFiles": [
+      "plugins/pipeline-core/lib/codex-onboarding-capabilities.mjs",
+      "plugins/pipeline-core/lib/runner-profile-migration-v3.mjs",
+      "plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs",
+      "plugins/pipeline-core/scripts/onboarding-init.mjs",
+      "plugins/pipeline-core/scripts/onboarding-init.test.mjs",
+      "evidence/dispatch-record-NVA-V3-LIFECYCLE-RECOVERY.json"
+    ]
+  }
+}

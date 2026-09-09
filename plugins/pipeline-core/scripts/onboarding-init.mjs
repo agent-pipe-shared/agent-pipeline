@@ -1036,7 +1036,29 @@ export function driveOnboardingInit({ rootDir, runner = null, stepCap = DEFAULT_
       };
     }
 
-    if ((nextAction === null || nextAction === undefined) && output?.status === "ready") {
+    const isUnappliedMigrationPlan = output?.schema === "pipeline.runner-profile-migration-plan.v3"
+      && (output?.activation?.required === true || (Array.isArray(output?.changes) && output.changes.length > 0));
+
+    if ((nextAction === null || nextAction === undefined) && isUnappliedMigrationPlan) {
+      // A migration plan that still has mutations is not a readiness receipt.  In
+      // particular, do not re-anchor here: a later unrelated `inspect` could be
+      // ready while the published plan was never activated.  The plan contract
+      // requires its exact apply action, so a missing action is a terminal driver
+      // fault rather than permission to infer a recovery step.
+      return {
+        schema: SCHEMA,
+        runner,
+        root,
+        outcome: "error",
+        stepCap,
+        stepsExecuted: steps.length,
+        steps,
+        error: { faultCode: "migration-action-missing", exitCode: null, stderr: null, stdout: null },
+        final: output,
+      };
+    }
+
+    if ((nextAction === null || nextAction === undefined) && output?.status === "ready" && !isUnappliedMigrationPlan) {
       return { schema: SCHEMA, runner, root, outcome: "ready", stepCap, stepsExecuted: steps.length, steps, final: output };
     }
 

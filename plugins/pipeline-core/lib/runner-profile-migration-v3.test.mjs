@@ -235,7 +235,11 @@ record("v2 -> v3 is one-way, digest-only, and old design.advisory cannot disable
     assert.deepEqual(intent.session, { keep_awake: true });
     assert.deepEqual(JSON.parse(readFileSync(join(root, ".claude/pipeline.json"), "utf8")).humanRoles, { po: { displayLabel: "Human" } });
     assert.match(readFileSync(join(root, ".claude/pipeline.yaml"), "utf8"), /session:\n  keep_awake: true\n/u);
-    assert.equal(planRunnerProfileMigrationV3({ rootDir: root }).status, "noop");
+    const noopPlan = planRunnerProfileMigrationV3({ rootDir: root });
+    assert.equal(noopPlan.status, "noop");
+    assert.equal(noopPlan.changes.length, 0);
+    assert.equal(noopPlan.activation?.required, false);
+    assert.equal(noopPlan.nextAction, null);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -243,6 +247,11 @@ record("apply requires explicit activation and an unchanged in-process digest-on
   const root = fixture(yaml(v2Intent()));
   try {
     const plan = planRunnerProfileMigrationV3({ rootDir: root });
+    assert.equal(plan.status, "ready");
+    assert.equal(plan.activation?.required, true);
+    assert.equal(plan.nextAction?.kind, "command");
+    assert.equal(plan.nextAction?.mutation, true);
+    assert.deepEqual(plan.nextAction?.argv?.slice(1), ["apply", "--root", root, "--activate"]);
     assert.equal(applyRunnerProfileMigrationV3(plan, { rootDir: root }).status, "activation-required");
     plan.sourceKind = "forged";
     assert.equal(applyRunnerProfileMigrationV3(plan, { rootDir: root, activate: true }).status, "invalid-plan");

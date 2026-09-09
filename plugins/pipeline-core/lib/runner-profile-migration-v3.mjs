@@ -31,6 +31,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import {
   hasCodexRuntimeControlMount,
@@ -60,6 +61,7 @@ const LOCK_DIR = ".pipeline-runner-profile-migration-v3.lock";
 const JOURNAL_FILE = "journal.json";
 const JOURNAL_SCHEMA = "pipeline.runner-profile-migration-journal.v3";
 const PLAN_SCHEMA = "pipeline.runner-profile-migration-plan.v3";
+const MIGRATION_SCRIPT = fileURLToPath(new URL("../scripts/runner-profile-migration-v3.mjs", import.meta.url));
 const INSPECT_SCHEMA = "pipeline.runner-profile-migration-inspect.v3";
 const RECOVERY_PLAN_SCHEMA = "pipeline.runner-profile-migration-recovery-plan.v3";
 const RECOVERY_AUTHORIZATION_SCHEMA = "pipeline.runner-profile-migration-recovery-authorization.v3";
@@ -688,7 +690,18 @@ export function planRunnerProfileMigrationV3({
   const changes = targets.filter((target) => target.changed);
   return remember(result(changes.length === 0 ? "noop" : "ready", [], {
     root, sourceKind: classified.kind, sourceSha256: sha256(classified.source.bytes), intentSha256: sha256(JSON.stringify(stable(classified.intent))), compatibilityDeltas: classified.compatibilityDeltas, decisionConflicts: projection.decisionConflicts ?? [], runtimeMode: hostManagedCodex ? "host-managed-codex" : "standard", targets, changes,
-    activation: { required: true, command: "apply --activate", sourceCommittedLast: true },
+    activation: { required: changes.length > 0, command: "apply --activate", sourceCommittedLast: true },
+    nextAction: changes.length > 0 ? {
+      kind: "command",
+      executable: "node",
+      argv: [MIGRATION_SCRIPT, "apply", "--root", root, "--activate"],
+      mutation: true,
+      requiresConfirmation: false,
+      expected: {
+        schema: PLAN_SCHEMA,
+        statuses: ["applied", "noop"],
+      },
+    } : null,
   }), internal);
 }
 

@@ -213,7 +213,7 @@ function validateLocalRepository(root, gitType, spawn) {
   if (!registered) throw new Error("repository root is not a registered Git worktree");
 
   if (gitType === "directory") {
-    if (repository.primaryRoot !== root || realpathSync(join(root, ".git")) !== repository.commonDir) {
+    if (!samePhysicalPath(repository.primaryRoot, root) || !samePhysicalPath(join(root, ".git"), repository.commonDir)) {
       throw new Error("primary Git control directory escaped the project root");
     }
   } else {
