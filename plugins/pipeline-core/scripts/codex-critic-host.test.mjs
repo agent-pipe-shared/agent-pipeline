@@ -14,6 +14,11 @@ import { runSelectedCriticHost, selectedCriticInProcessBridge } from "./codex-cr
 import { buildSandboxRequest, sandboxSelectionDigest } from "./codex-sandbox-select.mjs";
 import { runSandboxedReadonlyHostBridge } from "./sandboxed-readonly-host-bridge.mjs";
 import { resolveCriticHighRiskRoute } from "../lib/critic-route-v3.mjs";
+import {
+  NATIVE_CRITIC_PROHIBITED_FEATURES,
+  NATIVE_CRITIC_REDUCING_CONFIG,
+  nativeCriticReducingCliArgs,
+} from "../lib/codex-native-critic-tools.mjs";
 
 import {
   ASSURANCE,
@@ -1422,7 +1427,18 @@ function criticAnswered(overrides = {}) {
   };
 }
 
-function writeFakeCriticAppServer(directory, items, { itemThreadId = "thread-1", itemTurnId = "turn-1", serverRequests = [] } = {}) {
+function writeFakeCriticAppServer(directory, items, {
+  itemThreadId = "review-thread", itemTurnId = "turn-1", serverRequests = [],
+  threadSandbox = { type: "readOnly", networkAccess: false },
+  featurePages = [{ data: NATIVE_CRITIC_PROHIBITED_FEATURES.map((name) => ({ name, enabled: false })), nextCursor: null }],
+  mcpPages = [{ data: [], nextCursor: null }],
+  discoveryMcpPages = [{ data: [], nextCursor: null }],
+  discoveryThreadId = "discovery-thread",
+  reviewThreadId = "review-thread",
+  threadReasoningEffort = SELECTED_CRITIC_ROUTE.effort,
+  requireNativeWire = false,
+  expectedEnvironment = null,
+} = {}) {
   const path = join(directory, "fake-codex-app-server.mjs");
   const source = [
     "#!/usr/bin/env node",
@@ -1431,16 +1447,33 @@ function writeFakeCriticAppServer(directory, items, { itemThreadId = "thread-1",
     `const itemThreadId = ${JSON.stringify(itemThreadId)};`,
     `const itemTurnId = ${JSON.stringify(itemTurnId)};`,
     `const serverRequests = ${JSON.stringify(serverRequests)};`,
+    `const threadSandbox = ${JSON.stringify(threadSandbox)};`,
+    `const featurePages = ${JSON.stringify(featurePages)};`,
+    `const mcpPages = ${JSON.stringify(mcpPages)};`,
+    `const discoveryMcpPages = ${JSON.stringify(discoveryMcpPages)};`,
+    `const discoveryThreadId = ${JSON.stringify(discoveryThreadId)};`,
+    `const reviewThreadId = ${JSON.stringify(reviewThreadId)};`,
+    `const threadReasoningEffort = ${JSON.stringify(threadReasoningEffort)};`,
+    `const requireNativeWire = ${JSON.stringify(requireNativeWire)};`,
+    `const expectedNativeArgs = ${JSON.stringify(nativeCriticReducingCliArgs())};`,
+    `const expectedEnvironment = ${JSON.stringify(expectedEnvironment)};`,
+    "const effectiveItemThreadId = requireNativeWire ? itemThreadId : 'thread-1';",
+    "let featureIndex = 0; let mcpIndex = 0; let discoveryMcpIndex = 0;",
     "let buffer = '';",
     "const send = (value) => process.stdout.write(JSON.stringify(value) + '\\n');",
     "const handle = (value) => {",
-    "  if (value.id === 1) return send({ id: 1, result: {} });",
-    "  if (value.id === 2) return send({ id: 2, result: { model, modelProvider: 'openai', approvalPolicy: 'never', thread: { id: 'thread-1' } } });",
-    "  if (value.id !== 3) return;",
-    "  send({ id: 3, result: { turn: { id: 'turn-1' } } });",
+    "  if (value.id === 1) { const configIndex = process.argv.indexOf('--strict-config'); if ((expectedEnvironment && Object.entries(expectedEnvironment).some(([key, value]) => process.env[key] !== value)) || (requireNativeWire && (value.params?.capabilities?.experimentalApi !== true || configIndex < 0 || !expectedNativeArgs.every((argument, index) => process.argv[configIndex + 1 + index] === argument)))) return send({ id: 1, error: { code: -1 } }); return send({ id: 1, result: {} }); }",
+    `  if (value.id === 2) { if (requireNativeWire && (value.params?.sandbox !== 'read-only' || value.params?.approvalPolicy !== 'never' || value.params?.ephemeral !== true || value.params?.model !== model || JSON.stringify(value.params?.config) !== JSON.stringify(${JSON.stringify(NATIVE_CRITIC_REDUCING_CONFIG)}))) return send({ id: 2, error: { code: -1 } }); return send({ id: 2, result: { model, modelProvider: 'openai', approvalPolicy: 'never', sandbox: threadSandbox, thread: { id: requireNativeWire ? discoveryThreadId : 'thread-1' } } }); }`,
+    "  if (value.id === 3 && value.method === 'mcpServerStatus/list') { if (requireNativeWire && (value.params?.threadId !== discoveryThreadId || value.params?.detail !== 'toolsAndAuthOnly')) return send({ id: 3, error: { code: -1 } }); return send({ id: 3, result: discoveryMcpPages[discoveryMcpIndex++] }); }",
+    `  if (value.id === 4 && value.method === 'thread/start') { const expected = { ...${JSON.stringify(NATIVE_CRITIC_REDUCING_CONFIG)}, model_reasoning_effort: ${JSON.stringify(SELECTED_CRITIC_ROUTE.effort)}, ...Object.fromEntries(discoveryMcpPages.flatMap((page) => page.data).map((row) => ['mcp_servers.' + row.name + '.enabled', false])) }; if (requireNativeWire && (value.params?.sandbox !== 'read-only' || value.params?.approvalPolicy !== 'never' || value.params?.ephemeral !== true || value.params?.model !== model || JSON.stringify(value.params?.config) !== JSON.stringify(expected))) return send({ id: 4, error: { code: -1 } }); return send({ id: 4, result: { model, modelProvider: 'openai', approvalPolicy: 'never', sandbox: threadSandbox, reasoningEffort: threadReasoningEffort, thread: { id: reviewThreadId } } }); }`,
+    "  if (value.id === 5 && value.method === 'experimentalFeature/list') { if (requireNativeWire && value.params?.threadId !== reviewThreadId) return send({ id: 5, error: { code: -1 } }); return send({ id: 5, result: featurePages[featureIndex++] }); }",
+    "  if (value.id === 6 && value.method === 'mcpServerStatus/list') { if (requireNativeWire && (value.params?.threadId !== reviewThreadId || value.params?.detail !== 'toolsAndAuthOnly')) return send({ id: 6, error: { code: -1 } }); return send({ id: 6, result: mcpPages[mcpIndex++] }); }",
+    "  if (value.method !== 'turn/start') return;",
+    "  if (requireNativeWire && (value.id !== 7 || value.params?.approvalPolicy !== 'never' || value.params?.model !== model || value.params?.effort == null || value.params?.sandboxPolicy?.type !== 'readOnly' || value.params?.sandboxPolicy?.networkAccess !== false)) return send({ id: value.id, error: { code: -1 } });",
+    "  send({ id: value.id, result: { turn: { id: 'turn-1' } } });",
     "  for (const request of serverRequests) send(request);",
-    "  for (const item of items) send({ method: 'item/completed', params: { threadId: itemThreadId, turnId: itemTurnId, item } });",
-    "  send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' } } });",
+    "  for (const item of items) send({ method: 'item/completed', params: { threadId: effectiveItemThreadId, turnId: itemTurnId, item } });",
+    "  send({ method: 'turn/completed', params: { threadId: requireNativeWire ? reviewThreadId : 'thread-1', turn: { id: 'turn-1', status: 'completed' } } });",
     "};",
     "process.stdin.on('data', (chunk) => {",
     "  buffer += chunk.toString('utf8'); let newline;",
@@ -1448,23 +1481,25 @@ function writeFakeCriticAppServer(directory, items, { itemThreadId = "thread-1",
     "});",
     "process.stdin.on('end', () => process.exit(0));",
   ].join("\n");
+  assert.doesNotThrow(() => new Function(source.replace(/^#![^\n]*\n/u, "")), "fake app-server source must parse before execution");
   writeFileSync(path, source, { mode: 0o700 });
   return path;
 }
 
-function runActualCriticChild(childPath, codexPath, scratchPath) {
+function runActualCriticChild(childPath, codexPath, scratchPath, { native = false, env } = {}) {
   const input = {
     codexPath, cwd: DEFAULT_PIPELINE_ROOT, scratchPath, model: SELECTED_CRITIC_ROUTE.model, effort: SELECTED_CRITIC_ROUTE.effort,
     referencePaths: ["roles/critic.md"], roleContractPath: join(DEFAULT_PIPELINE_ROOT, "plugins/pipeline-core/roles/critic.md"),
     promptContractPath: join(DEFAULT_PIPELINE_ROOT, "plugins/pipeline-core/templates/prompts/critic-review.md"),
     verdictSchemaPath: join(DEFAULT_PIPELINE_ROOT, "plugins/pipeline-core/scripts/critic-verdict.schema.json"),
     candidateCommit: "c".repeat(40), candidateTree: "d".repeat(40), reviewBase: "9".repeat(40),
+    ...(native ? { sandboxMode: "native-tools-read-only" } : {}),
   };
-  const run = spawnSync(process.execPath, [childPath], { cwd: DEFAULT_PIPELINE_ROOT, input: JSON.stringify(input), encoding: "utf8", shell: false, timeout: 5_000 });
+  const run = spawnSync(process.execPath, [childPath], { cwd: DEFAULT_PIPELINE_ROOT, input: JSON.stringify(input), encoding: "utf8", shell: false, timeout: 5_000, ...(env ? { env } : {}) });
   assert.equal(run.error, undefined);
   const lines = run.stdout.trim().split("\n").filter(Boolean);
   assert.equal(lines.length, 1, run.stdout);
-  return { status: run.status, result: JSON.parse(lines[0]) };
+  return { status: run.status, stderr: run.stderr, result: JSON.parse(lines[0]) };
 }
 
 check("the actual child accepts commentary before one final answer; invalid phases, duplicate finals, mismatched IDs, and writes remain rejected", () => {
@@ -1476,7 +1511,7 @@ check("the actual child accepts commentary before one final answer; invalid phas
     ];
     const fake = writeFakeCriticAppServer(fixture, commentaryThenFinal);
     const green = runActualCriticChild(join(DEFAULT_PIPELINE_ROOT, "plugins/pipeline-core/scripts/codex-critic-app-server-child.mjs"), fake, fixture);
-    assert.equal(green.status, 0);
+    assert.equal(green.status, 0, JSON.stringify(green));
     assert.equal(green.result.code, "answered");
     for (const legacyPhase of [undefined, null]) {
       const result = runActualCriticChild(join(DEFAULT_PIPELINE_ROOT, "plugins/pipeline-core/scripts/codex-critic-app-server-child.mjs"), writeFakeCriticAppServer(fixture, [
@@ -1498,6 +1533,137 @@ check("the actual child accepts commentary before one final answer; invalid phas
       assert.equal(result.status, 2, name);
       assert.equal(result.result.code, expected, name);
       if (expectedWriteAttemptKind) assert.equal(result.result.observed.writeAttemptKind, expectedWriteAttemptKind, name);
+    }
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+check("the actual child admits native-tools only after native policy, complete false feature readback, and an empty MCP inventory", () => {
+  const fixture = mkdtempSync(join(tmpdir(), "codex-critic-native-tools-"));
+  const childPath = join(DEFAULT_PIPELINE_ROOT, "plugins/pipeline-core/scripts/codex-critic-app-server-child.mjs");
+  const finalItem = { type: "agentMessage", phase: "final_answer", text: JSON.stringify(validCriticVerdict()) };
+  const completeFeatures = NATIVE_CRITIC_PROHIBITED_FEATURES.map((name) => ({ name, enabled: false }));
+  const nativeGitPrefix = "git --no-optional-locks -c core.pager=cat --no-pager";
+  const base = "9".repeat(40);
+  const candidate = "c".repeat(40);
+  const gitDiff = `${nativeGitPrefix} diff --no-ext-diff --no-textconv ${base} ${candidate} --`;
+  const wrappedGitDiff = `bash -lc '${gitDiff}'`;
+  try {
+    const inheritedNativeEnvironment = {
+      CODEX_SQLITE_HOME: join(fixture, "inherited-sqlite"),
+      TMPDIR: join(fixture, "inherited-tmpdir"),
+      TMP: join(fixture, "inherited-tmp"),
+      TEMP: join(fixture, "inherited-temp"),
+    };
+    const nativeEnvironment = runActualCriticChild(childPath, writeFakeCriticAppServer(fixture, [finalItem], {
+      requireNativeWire: true, expectedEnvironment: inheritedNativeEnvironment,
+    }), fixture, { native: true, env: { ...process.env, ...inheritedNativeEnvironment } });
+    assert.equal(nativeEnvironment.status, 0, "native child retains the parent runtime environment");
+    const legacyEnvironment = runActualCriticChild(childPath, writeFakeCriticAppServer(fixture, [finalItem], {
+      expectedEnvironment: {
+        CODEX_SQLITE_HOME: fixture, TMPDIR: fixture, TMP: fixture, TEMP: fixture,
+      },
+    }), fixture, { env: { ...process.env, ...inheritedNativeEnvironment } });
+    assert.equal(legacyEnvironment.status, 0, "legacy child isolates scratch runtime paths");
+
+    const green = runActualCriticChild(childPath, writeFakeCriticAppServer(fixture, [
+      { type: "agentMessage", phase: "commentary", text: "bounded commentary" },
+      { type: "commandExecution", command: wrappedGitDiff, commandActions: [{ type: "unknown", command: gitDiff }] },
+      finalItem,
+    ], {
+      requireNativeWire: true,
+      featurePages: [
+        { data: completeFeatures.slice(0, 7), nextCursor: "next" },
+        { data: completeFeatures.slice(7), nextCursor: null },
+      ],
+      discoveryMcpPages: [{ data: [{ name: "server-1" }], nextCursor: null }],
+      mcpPages: [{ data: [{ runtimeStatus: "disabled", pluginId: null, serverInfo: null, tools: {}, resources: [], resourceTemplates: [] }], nextCursor: null }],
+    }), fixture, { native: true });
+    assert.equal(green.status, 0, JSON.stringify(green));
+    assert.equal(green.result.schema, "pipeline.codex-native-critic-app-server-child.v1");
+    assert.equal(green.result.code, "answered");
+    assert.deepEqual(green.result.observed.requestedNativePolicy, { threadSandbox: "read-only", turn: { type: "readOnly", networkAccess: false } });
+    assert.deepEqual(green.result.observed.observedThreadSandbox, { type: "readOnly", networkAccess: false });
+    assert.equal(green.result.observed.observedThreadReasoningEffort, SELECTED_CRITIC_ROUTE.effort);
+    assert.match(green.result.observed.toolSurface.configSha256, /^[a-f0-9]{64}$/);
+    assert.equal(green.result.observed.toolSurface.mcpReductionCount, 1);
+    assert.deepEqual(green.result.observed.toolSurface.featureSnapshot.pageCount, 2);
+    assert.deepEqual(green.result.observed.mcpSnapshot, undefined);
+    assert.deepEqual(green.result.observed.toolSurface.mcpSnapshot, { pageCount: 1, dataCount: 1, digest: green.result.observed.toolSurface.mcpSnapshot.digest });
+    assert.match(green.result.observed.toolSurface.featureSnapshot.digest, /^[a-f0-9]{64}$/);
+    assert.match(green.result.observed.toolSurface.mcpSnapshot.digest, /^[a-f0-9]{64}$/);
+    assert.equal(JSON.stringify(green.result).includes("plugins"), false);
+    assert.equal(JSON.stringify(green.result).includes("server-1"), false);
+
+    for (const [name, command, actionCommand = command] of [
+      ["candidate show", `${nativeGitPrefix} show --no-ext-diff --no-textconv ${candidate} --`],
+      ["base rev-parse", `${nativeGitPrefix} rev-parse --verify ${base}^{commit}`],
+      ["candidate tree rev-parse", `${nativeGitPrefix} rev-parse --verify ${candidate}^{tree}`],
+      ["bounded status", `${nativeGitPrefix} status --porcelain=v1 --untracked-files=no`],
+    ]) {
+      const result = runActualCriticChild(childPath, writeFakeCriticAppServer(fixture, [
+        { type: "commandExecution", command, commandActions: [{ type: "unknown", command: actionCommand }] }, finalItem,
+      ], { requireNativeWire: true }), fixture, { native: true });
+      assert.equal(result.status, 0, name);
+      assert.equal(result.result.code, "answered", name);
+    }
+
+    for (const [name, command, commandActions] of [
+      ["external diff output", `${nativeGitPrefix} diff --no-ext-diff --no-textconv --output=/tmp/x ${base} ${candidate} -- roles/critic.md`, [{ type: "unknown", command: `${nativeGitPrefix} diff --no-ext-diff --no-textconv --output=/tmp/x ${base} ${candidate} -- roles/critic.md` }]],
+      ["wrong base", `${nativeGitPrefix} diff --no-ext-diff --no-textconv ${candidate} ${base} -- roles/critic.md`, [{ type: "unknown", command: `${nativeGitPrefix} diff --no-ext-diff --no-textconv ${candidate} ${base} -- roles/critic.md` }]],
+      ["unbound path", `${nativeGitPrefix} show --no-ext-diff --no-textconv ${candidate} -- README.md`, [{ type: "unknown", command: `${nativeGitPrefix} show --no-ext-diff --no-textconv ${candidate} -- README.md` }]],
+      ["shell chain", `${nativeGitPrefix} status --porcelain=v1 --untracked-files=no && touch changed`, [{ type: "unknown", command: `${nativeGitPrefix} status --porcelain=v1 --untracked-files=no && touch changed` }]],
+      ["wrapped shell chain", `bash -lc '${gitDiff}; touch changed'`, [{ type: "unknown", command: `${gitDiff}; touch changed` }]],
+      ["action does not bind command", gitDiff, [{ type: "unknown", command: `${nativeGitPrefix} status --porcelain=v1 --untracked-files=no` }]],
+      ["duplicate unknown actions", gitDiff, [{ type: "unknown", command: gitDiff }, { type: "unknown", command: gitDiff }]],
+    ]) {
+      const result = runActualCriticChild(childPath, writeFakeCriticAppServer(fixture, [
+        { type: "commandExecution", command, commandActions }, finalItem,
+      ], { requireNativeWire: true }), fixture, { native: true });
+      assert.equal(result.status, 2, name);
+      assert.equal(result.result.code, "write-attempt", name);
+      assert.equal(result.result.observed.writeAttemptKind, "command-action", name);
+    }
+
+    const emptyInventory = runActualCriticChild(childPath, writeFakeCriticAppServer(fixture, [finalItem], { requireNativeWire: true }), fixture, { native: true });
+    assert.equal(emptyInventory.status, 0);
+    assert.equal(emptyInventory.result.observed.toolSurface.mcpReductionCount, 0);
+    assert.equal(emptyInventory.result.observed.toolSurface.mcpSnapshot.dataCount, 0);
+
+    const onFeatures = completeFeatures.map((row) => ({ ...row })); onFeatures[0].enabled = true;
+    const goalsOn = completeFeatures.map((row) => ({ ...row, ...(row.name === "goals" ? { enabled: true } : {}) }));
+    const memoriesOn = completeFeatures.map((row) => ({ ...row, ...(row.name === "memories" ? { enabled: true } : {}) }));
+    const tokenBudgetOn = completeFeatures.map((row) => ({ ...row, ...(row.name === "token_budget" ? { enabled: true } : {}) }));
+    const duplicateFeatures = [...completeFeatures, { name: completeFeatures[0].name, enabled: false }];
+    const cases = [
+      ["wrong thread policy", { threadSandbox: { type: "externalSandbox", networkAccess: "enabled" } }, "protocol-error"],
+      ["enabled feature", { featurePages: [{ data: onFeatures, nextCursor: null }] }, "protocol-error"],
+      ["missing feature", { featurePages: [{ data: completeFeatures.slice(1), nextCursor: null }] }, "protocol-error"],
+      ["enabled goals feature", { featurePages: [{ data: goalsOn, nextCursor: null }] }, "protocol-error"],
+      ["enabled memories feature", { featurePages: [{ data: memoriesOn, nextCursor: null }] }, "protocol-error"],
+      ["enabled token budget feature", { featurePages: [{ data: tokenBudgetOn, nextCursor: null }] }, "protocol-error"],
+      ["missing goals feature", { featurePages: [{ data: completeFeatures.filter((row) => row.name !== "goals"), nextCursor: null }] }, "protocol-error"],
+      ["missing memories feature", { featurePages: [{ data: completeFeatures.filter((row) => row.name !== "memories"), nextCursor: null }] }, "protocol-error"],
+      ["missing token budget feature", { featurePages: [{ data: completeFeatures.filter((row) => row.name !== "token_budget"), nextCursor: null }] }, "protocol-error"],
+      ["wrong observed thread effort", { threadReasoningEffort: "high" }, "protocol-error"],
+      ["duplicate feature", { featurePages: [{ data: duplicateFeatures, nextCursor: null }] }, "protocol-error"],
+      ["malformed feature page", { featurePages: [{ data: "not-an-array", nextCursor: null }] }, "protocol-error"],
+      ["nonempty MCP with zero tools", { mcpPages: [{ data: [{ tools: {} }], nextCursor: null }] }, "protocol-error"],
+      ["nonempty MCP without disabled status", { mcpPages: [{ data: [{ runtimeStatus: null, pluginId: null, serverInfo: null, tools: {}, resources: [], resourceTemplates: [] }], nextCursor: null }] }, "protocol-error"],
+      ["enabled MCP after reduction", { mcpPages: [{ data: [{ runtimeStatus: "connected", pluginId: null, serverInfo: null, tools: {}, resources: [], resourceTemplates: [] }], nextCursor: null }] }, "protocol-error"],
+      ["catalog MCP after reduction", { mcpPages: [{ data: [{ runtimeStatus: "disabled", pluginId: "fixture-plugin", serverInfo: null, tools: {}, resources: [], resourceTemplates: [] }], nextCursor: null }] }, "protocol-error"],
+      ["malformed MCP page", { mcpPages: [{ data: "not-an-array", nextCursor: null }] }, "protocol-error"],
+      ["native tool item", { items: [{ type: "mcpToolCall" }, finalItem] }, "write-attempt"],
+      ["native server RPC", { serverRequests: [{ id: 77, method: "item/approval/request", params: {} }] }, "write-attempt"],
+      ["native wrong item IDs", { itemTurnId: "wrong-turn" }, "protocol-error"],
+    ];
+    for (const [name, options, code] of cases) {
+      const items = options.items ?? [finalItem];
+      const result = runActualCriticChild(childPath, writeFakeCriticAppServer(fixture, items, { requireNativeWire: true, ...options }), fixture, { native: true });
+      assert.equal(result.status, 2, name);
+      assert.equal(result.result.schema, "pipeline.codex-native-critic-app-server-child.v1", name);
+      assert.equal(result.result.code, code, name);
     }
   } finally {
     rmSync(fixture, { recursive: true, force: true });
