@@ -7,7 +7,7 @@
   "rulesetSha": "0.6.1+codex.20260909160547.a2ce12c",
   "dispatcher": "/root",
   "outcome": "committed-pending-verify",
-  "commits": [],
+  "commits": ["653703e9", "93423c67"],
   "log": [
     {
       "phase": "opening-readback",
@@ -23,10 +23,15 @@
       "phase": "verify-preflight",
       "toolUseCount": 17,
       "note": "Full Verify correctly refused the dirty candidate before running suites; final package is being committed before rerunning Verify."
+    },
+    {
+      "phase": "verify-regression-repair",
+      "toolUseCount": 28,
+      "note": "Full Verify exposed that an applied migration result retains its historical changes; the driver now identifies only ready, unapplied plans as pending activation. Focused suites passed again."
     }
   ],
   "report": {
-    "text": "V3 migration/onboarding lifecycle repair is focused-test green and awaiting the mandatory post-commit full Verify.",
+    "text": "V3 migration/onboarding lifecycle repair is focused-test green after the Verify-discovered applied-result correction and awaits the mandatory post-commit full Verify.",
     "changedFiles": [
       "plugins/pipeline-core/lib/codex-onboarding-capabilities.mjs",
       "plugins/pipeline-core/lib/runner-profile-migration-v3.mjs",
