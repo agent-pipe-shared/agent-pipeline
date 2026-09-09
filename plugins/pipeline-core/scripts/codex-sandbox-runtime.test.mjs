@@ -10,11 +10,124 @@ import { join } from "node:path";
 import test from "node:test";
 
 import { startSessionDescriptor } from "../lib/worktree-lifecycle.mjs";
+import {
+  NATIVE_CRITIC_ASSURANCE,
+  NATIVE_CRITIC_POLICY,
+  buildNativeCriticSelection,
+  nativeCriticCanonicalDigest,
+  validateNativeCriticPolicy,
+  validateNativeCriticSmokeReceipt,
+} from "../lib/codex-native-critic-policy.mjs";
 import { coalesceInputCoveredRuntimeReads, createCodexSandboxRuntimeTransport } from "./codex-sandbox-runtime.mjs";
 import { compilePermissionProfile } from "./codex-sandbox-preflight.mjs";
 
 const SCRIPT = new URL("./codex-sandbox-runtime.mjs", import.meta.url);
 const CONTEXT = { repoFingerprint: "a".repeat(64), referenceSetSha256: "b".repeat(64) };
+
+const NATIVE_NOW_MS = Date.parse("2026-09-09T08:00:00.000Z");
+const NATIVE_POLICY_OPTIONS = Object.freeze({ nowMs: NATIVE_NOW_MS, maxAgeMs: 60_000 });
+function nativeTuple() {
+  return {
+    cli: { version: "codex-cli 0.153.4", sha256: "1".repeat(64) },
+    protocolSchemaSha256: "2".repeat(64),
+    host: { platformClass: "linux-wsl2", kernel: { sysname: "Linux", release: "6.18.33.2-microsoft-standard-WSL2", machine: "x64" }, filesystemClass: "wsl2-native", bootIdSha256: "3".repeat(64) },
+    policy: structuredClone(NATIVE_CRITIC_POLICY),
+    toolSurface: { configSha256: "4".repeat(64), observationSha256: "5".repeat(64) },
+  };
+}
+function nativeSmoke(tuple = nativeTuple()) {
+  return {
+    schema: "pipeline.codex-native-critic-smoke.v1", status: "passed", tuple: structuredClone(tuple),
+    observed: {
+      initialized: true, readObserved: true, writeObserved: true, nativeWriteDenied: true,
+      canaryUnchanged: true, hostWriteControl: true, sourceUnchanged: true, protocolError: false,
+      guardDenial: false, sandboxLaunchDenied: false, timedOut: false, cleanupComplete: true,
+      terminal: { exitCode: 0, signal: null, spawnFailed: false },
+    },
+    capturedAt: "2026-09-09T07:59:30.000Z",
+  };
+}
+function nativeSelectionInput() {
+  const smokeReceipt = nativeSmoke();
+  return {
+    selectionId: `cncs_${"a".repeat(26)}`,
+    repoFingerprint: "6".repeat(64),
+    dispatch: { queueRevision: 7, candidateCommit: "7".repeat(40), candidateTree: "8".repeat(40), referenceSetSha256: "9".repeat(64), requestSha256: "a".repeat(64) },
+    route: { dutyId: "critic_high_risk", runner: "codex", model: "gpt-6-astra", effort: "max", sourceSha256: "b".repeat(64), candidateCommit: "7".repeat(40) },
+    poDecisionSha256: "c".repeat(64), smokeReceipt,
+    smokeReceiptSha256: nativeCriticCanonicalDigest(smokeReceipt),
+    createdAt: "2026-09-09T07:59:45.000Z",
+  };
+}
+function nativeSelectionOptions(validateRoute = (route) => structuredClone(route), expectedTuple = nativeTuple()) {
+  return { validateRoute, expectedTuple, nowMs: NATIVE_NOW_MS, maxSmokeAgeMs: 60_000 };
+}
+
+test("native Critic policy accepts only the approved per-tool read-only policy", () => {
+  assert.deepEqual(validateNativeCriticPolicy(structuredClone(NATIVE_CRITIC_POLICY)), NATIVE_CRITIC_POLICY);
+  for (const policy of [
+    { threadSandbox: "read-only", turn: { type: "externalSandbox", networkAccess: false } },
+    { threadSandbox: "read-only", turn: { type: "readOnly", networkAccess: true } },
+    { threadSandbox: "read-only", turn: { type: "readOnly", networkAccess: false, writableRoots: [] } },
+    { id: "codex-critic-intermediate.v1", base: ":read-only" },
+  ]) assert.throws(() => validateNativeCriticPolicy(policy));
+});
+
+test("native Critic smoke accepts the real-proof shape only when its tuple and terminal facts bind", () => {
+  const tuple = nativeTuple();
+  assert.deepEqual(validateNativeCriticSmokeReceipt(nativeSmoke(tuple), tuple, NATIVE_POLICY_OPTIONS).tuple, tuple);
+  const mutations = [
+    (receipt) => { receipt.observed.writeObserved = false; },
+    (receipt) => { receipt.observed.nativeWriteDenied = false; },
+    (receipt) => { receipt.observed.canaryUnchanged = false; },
+    (receipt) => { receipt.observed.sourceUnchanged = false; },
+    (receipt) => { receipt.observed.protocolError = true; },
+    (receipt) => { receipt.observed.guardDenial = true; },
+    (receipt) => { receipt.observed.sandboxLaunchDenied = true; },
+    (receipt) => { receipt.observed.timedOut = true; },
+    (receipt) => { receipt.observed.cleanupComplete = false; },
+    (receipt) => { receipt.observed.terminal.exitCode = 1; },
+    (receipt) => { receipt.capturedAt = "2026-09-09T08:00:01.000Z"; },
+    (receipt) => { receipt.capturedAt = "2026-09-09T07:58:00.000Z"; },
+    (receipt) => { receipt.capturedAt = "2026-02-30T07:59:30.000Z"; },
+    (receipt) => { receipt.tuple.cli.sha256 = "f".repeat(64); },
+    (receipt) => { receipt.tuple.host.bootIdSha256 = "e".repeat(64); },
+    (receipt) => { receipt.tuple.host.platformClass = "linux-native"; },
+    (receipt) => { receipt.tuple.toolSurface.observationSha256 = "d".repeat(64); },
+  ];
+  for (const mutate of mutations) {
+    const receipt = nativeSmoke(tuple); mutate(receipt);
+    assert.throws(() => validateNativeCriticSmokeReceipt(receipt, tuple, NATIVE_POLICY_OPTIONS));
+  }
+});
+
+test("native Critic selection binds V3 authority, candidate dispatch, PO decision and exact smoke digest without a fallback", () => {
+  const input = nativeSelectionInput();
+  const selected = buildNativeCriticSelection(input, nativeSelectionOptions());
+  assert.equal(selected.schema, "pipeline.codex-native-critic-selection.v1");
+  assert.equal(selected.status, "selected");
+  assert.deepEqual(selected.assurance, NATIVE_CRITIC_ASSURANCE);
+  for (const mutate of [
+    (value) => { value.selectionId = `css_${"a".repeat(25)}a`; },
+    (value) => { value.dispatch.candidateCommit = "d".repeat(40); },
+    (value) => { value.route.candidateCommit = "e".repeat(40); },
+    (value) => { value.smokeReceiptSha256 = "f".repeat(64); },
+    (value) => { value.smokeReceipt.tuple.policy.turn.networkAccess = true; },
+    (value) => { value.smokeReceipt.tuple.toolSurface.configSha256 = "d".repeat(64); },
+  ]) {
+    const value = nativeSelectionInput(); mutate(value);
+    assert.throws(() => buildNativeCriticSelection(value, nativeSelectionOptions()));
+  }
+  assert.throws(() => buildNativeCriticSelection(nativeSelectionInput(), nativeSelectionOptions((route) => ({ ...route, model: "fallback" }))));
+  for (const mutateExpected of [
+    (tuple) => { tuple.cli.sha256 = "d".repeat(64); },
+    (tuple) => { tuple.host.bootIdSha256 = "e".repeat(64); },
+    (tuple) => { tuple.toolSurface.configSha256 = "f".repeat(64); },
+  ]) {
+    const expectedTuple = nativeTuple(); mutateExpected(expectedTuple);
+    assert.throws(() => buildNativeCriticSelection(nativeSelectionInput(), nativeSelectionOptions(undefined, expectedTuple)));
+  }
+});
 
 test("covered production runtime reads are coalesced before the strict compiler while sibling reads remain explicit", (t) => {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "codex-covered-reads-")));
