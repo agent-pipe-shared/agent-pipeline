@@ -946,6 +946,11 @@ test("C1 observer closes primitive coercion, qualify input accessors, and hostil
   const throwingProxy = new Proxy({}, { getPrototypeOf() { throw new Error("proxy"); }, ownKeys() { throw new Error("proxy"); } });
   assert.deepEqual(captureCriticPreflightSource(throwingProxy), { ok: false, code: "C1O-SOURCE", source: null, observedAt: null });
   assert.deepEqual(qualifyCriticPreflightObservation(throwingProxy), { ok: false, code: "C1O-SCOPE-UNAVAILABLE", observation: null });
+
+  const hostileThrown = new Proxy({}, { getPrototypeOf() { throw new Error("error prototype"); }, getOwnPropertyDescriptor() { throw new Error("error descriptor"); } });
+  const sourceWithHostileThrow = new Proxy(c1Source(), { getPrototypeOf() { throw hostileThrown; } });
+  assert.doesNotThrow(() => captureCriticPreflightSource(sourceWithHostileThrow));
+  assert.deepEqual(captureCriticPreflightSource(sourceWithHostileThrow), { ok: false, code: "C1O-SOURCE", source: null, observedAt: null });
 });
 
 const c1StorePorts = (io) => ({ io, clock: () => ({ value: null, status: "unknown" }), randomId: () => "must-not-mint", platform: () => ({ status: "unsupported", backendId: null }) });
