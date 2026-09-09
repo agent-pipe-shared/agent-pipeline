@@ -26,6 +26,8 @@ const MAX_BYTES = 8 * 1024 * 1024;
 const PROVIDER = "openai";
 const COMMIT_SHA = /^[0-9a-f]{40}$/;
 const TREE_SHA = /^[0-9a-f]{40,64}$/;
+const MAX_TURN_WAIT_MS = 1_200_000;
+const TURN_LIVENESS_INTERVAL_MS = 45_000;
 
 function write(value) { process.stdout.write(`${JSON.stringify(value)}\n`); }
 function heartbeat(stage) {
@@ -133,10 +135,12 @@ if (!process.exitCode) {
   const discoveryMcpCursors = new Set();
   const featureCursors = new Set();
   const mcpCursors = new Set();
+  let turnLivenessTimer = null;
   const send = (value) => child.stdin.write(`${JSON.stringify(value)}\n`);
   const finishProtocol = () => {
     if (settled) return;
     settled = true;
+    if (turnLivenessTimer !== null) clearInterval(turnLivenessTimer);
     child.stdin.end();
   };
   const sendDiscoveryMcpPage = (cursor = null) => {
@@ -341,7 +345,11 @@ if (!process.exitCode) {
     if (value?.id === (native ? 7 : 3)) {
       if (value.error || typeof value.result?.turn?.id !== "string") { protocolError = true; finishProtocol(); return; }
       turnId = value.result.turn.id;
-      if (native) heartbeat("turn-started");
+      if (native) {
+        heartbeat("turn-started");
+        turnLivenessTimer = setInterval(() => heartbeat("turn-awaiting-response"), TURN_LIVENESS_INTERVAL_MS);
+        turnLivenessTimer.unref?.();
+      }
       return;
     }
     if (value?.method === "item/completed") {
@@ -371,9 +379,10 @@ if (!process.exitCode) {
   });
   child.stderr.on("data", (chunk) => { stderrBytes += chunk.length; if (stderrBytes > MAX_BYTES) { protocolError = true; finishProtocol(); } });
   send({ id: 1, method: "initialize", params: { clientInfo: { name: "agent-pipeline-critic", title: null, version: "1" }, capabilities: { experimentalApi: native, requestAttestation: false } } });
-  // One child turn, not a retry loop. Matches HOST_LIMITS.maxElapsedMs
-  // (codex-critic-host.mjs) rather than the shorter advisory budget.
-  const timeout = setTimeout(() => { protocolError = true; finishProtocol(); child.kill("SIGTERM"); }, 480_000);
+  // One child turn, not a retry loop. This is the same absolute 20-minute
+  // bound as the host. A turn-liveness heartbeat can prevent an earlier idle
+  // timeout, but never extends this cost cap.
+  const timeout = setTimeout(() => { protocolError = true; finishProtocol(); child.kill("SIGTERM"); }, MAX_TURN_WAIT_MS);
   const close = await new Promise((resolve) => {
     child.once("error", (error) => resolve({ code: null, signal: null, spawnError: error?.code ?? "spawn-error" }));
     child.once("close", (code, signal) => resolve({ code, signal, spawnError: null }));

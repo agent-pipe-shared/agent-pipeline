@@ -35,7 +35,8 @@ const VERDICT = "scripts/critic-verdict.schema.json";
 const PROVIDER = "openai";
 const MAX_BYTES = 8 * 1024 * 1024;
 // A large candidate may outlast the former eight-minute wall clock. Startup
-// remains short; only observed child heartbeats extend the review quiet window.
+// remains short. A child can retain an active turn to the absolute cap, while
+// item-completed heartbeats remain the only evidence of review progress.
 const MAX_ELAPSED_MS = 1_200_000;
 const STARTUP_IDLE_MS = 90_000;
 const REVIEW_IDLE_MS = 180_000;
@@ -98,7 +99,7 @@ function childTerminal(value) {
     cleanupStatus: value?.cleanup === "complete" ? "complete" : "incomplete",
   };
 }
-const HEARTBEAT_STAGES = new Set(["initialized", "discovery-thread-started", "review-thread-started", "turn-started", "review-progress", "turn-completed"]);
+const HEARTBEAT_STAGES = new Set(["initialized", "discovery-thread-started", "review-thread-started", "turn-started", "turn-awaiting-response", "review-progress", "turn-completed"]);
 export function nativeCriticHeartbeatSnapshot(previous, value) {
   if (!value || value.schema !== "pipeline.codex-native-critic-heartbeat.v1" || !HEARTBEAT_STAGES.has(value.stage)) return previous;
   const next = { ...previous };

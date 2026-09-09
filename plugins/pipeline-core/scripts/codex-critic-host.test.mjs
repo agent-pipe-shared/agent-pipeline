@@ -62,7 +62,10 @@ check("native Critic heartbeats advance only the bounded lifecycle and reject un
   const blank = { initialized: false, threadStarted: false, turnStarted: false, turnCompleted: false };
   const initialized = nativeCriticHeartbeatSnapshot(blank, { schema: "pipeline.codex-native-critic-heartbeat.v1", stage: "initialized" });
   const started = nativeCriticHeartbeatSnapshot(initialized, { schema: "pipeline.codex-native-critic-heartbeat.v1", stage: "turn-started" });
-  const completed = nativeCriticHeartbeatSnapshot(started, { schema: "pipeline.codex-native-critic-heartbeat.v1", stage: "turn-completed" });
+  const waiting = nativeCriticHeartbeatSnapshot(started, { schema: "pipeline.codex-native-critic-heartbeat.v1", stage: "turn-awaiting-response" });
+  assert.deepEqual(waiting, started);
+  assert.notStrictEqual(waiting, started);
+  const completed = nativeCriticHeartbeatSnapshot(waiting, { schema: "pipeline.codex-native-critic-heartbeat.v1", stage: "turn-completed" });
   assert.deepEqual(completed, { initialized: true, threadStarted: false, turnStarted: true, turnCompleted: true });
   assert.strictEqual(nativeCriticHeartbeatSnapshot(completed, { schema: "pipeline.codex-native-critic-heartbeat.v1", stage: "unbounded" }), completed);
 });
