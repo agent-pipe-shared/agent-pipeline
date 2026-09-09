@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.budget-guard-test-suite-silent-pass
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-06
+closed_at: 2026-09-07
+closure_repository: self
+closure_commit: b1ecbef2ee5cac36eb168641ca4f41ab9800eab7
+closure_evidence: backlog/evidence/2026-09-06-nva-b-guardfix-critic-round1.md
 sprint: nova-b
 done_when: manual
 tracking: "Nova B -- guard-dispatch-budget.test.mjs imports its module at the test file's own module scope. If that guard's entrypoint gate ever regresses to an unconditional top-level body, the import calls process.exit at module-evaluation time and node --test reports the whole file as ONE PASSING TEST with no assertion having run. The sibling suite guard-dispatch.test.mjs had the identical shape and it was removed in e4aeb8fe; this one was on that package's no-go list and was carried forward in a commit message body, which is not a tracked mitigation."

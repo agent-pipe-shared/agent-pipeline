@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.gg22-pathspec-fix-lacks-permanent-test
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-06
+closed_at: 2026-09-09
+closure_repository: self
+closure_commit: bdaa374b303dee04b1a6a3311c1b4a76c0c1d748
+closure_evidence: backlog/evidence/2026-09-09-local-candidate-po-decisions.md
 sprint: nova-b
 due: "2026-10-06"
 tracking: "Nova B — NVA-B-GG22FIX-1 (commit fe2d7afe) fixed the GG-22 shared-index deadlock, but plugins/pipeline-core/hooks/guard-git.test.mjs is TP-1 protected with no in-session override route, so the dispatch could not add a permanent regression test there. The fix was proven RED-then-GREEN via an ephemeral scratch/ reproduction script instead, which is not committed and does not guard against a future regression of this exact scoping logic."
