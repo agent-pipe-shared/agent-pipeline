@@ -91,6 +91,22 @@ recorded in `scratch/alfred-c1-source-projection-checks-final.json`. This is
 focused evidence, not a new Full Verify or T1 review. Usage/read-only I/O,
 local store/report, real observer composition and the 14-day baseline remain
 open.
+The Event16 candidate handover at
+`84eeb02fc4b7aec0f808d8549efb48993d0c5045` (tree
+`45c06156e5aaeda91bda4be17efb11df03a24560`) has now completed Full Verify:
+500/508, exit 1, with the same eight named failures recorded in
+`specs/sprint-alfred-epic/evidence/event16-candidate-verification-2026-09-09.json`.
+Security exited 0 with no findings; gitleaks, semgrep and license-check passed,
+while osv-scanner was skipped as not-applicable. Focused A1/C1/producer checks
+passed. The permanent scanner exception is implemented and read back.
+
+The PO explicitly requested on 2026-09-09 that this committed candidate be
+pushed for PC transfer once the remaining push prerequisites are handled.
+Standing no-push is superseded for this request, with `origin/feat/sprint-alfred`
+as the only upstream. Current push preflight is unsatisfied because Verify is
+red and an expired armed capability remains; histories are diverged, so no push
+or signed execution is claimed. The next action is push preparation followed by
+resuming Alfred after reconciliation.
 The producer-only capture increment is now committed at
 `3e11cdadfe8c0e6ab9bd864211fc6dc6e03270dc`, tree
 `ab433771e3711d999d75d04fbc3f71acbeb7a845`. Focused capture checks were 6/6,

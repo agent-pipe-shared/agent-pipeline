@@ -43,6 +43,17 @@ pre-edit and post-edit hashes, event hash, and fixture result are recorded in
 and [event16-permanent-scanner-exception-2026-09-09.json](event16-permanent-scanner-exception-2026-09-09.json).
 Candidate Security and Full Verify remain separate pending gates.
 
+The candidate `84eeb02fc4b7aec0f808d8549efb48993d0c5045` then recorded Full
+Verify exit 1 at 500/508 with the same eight failures; Security exited 0 with no
+findings. The exact machine summary is
+[event16-candidate-verification-2026-09-09.json](event16-candidate-verification-2026-09-09.json).
+The PO separately requested on 2026-09-09 that this committed candidate be
+pushed for PC transfer once prerequisites are handled. The prior no-push
+standing is superseded for that request; use only `origin/feat/sprint-alfred`.
+Push remains unexecuted because Verify failed and push preflight reports an
+expired armed capability and divergent histories. Prepare reconciliation and
+push prerequisites before any execution; do not claim a push or signature.
+
 ## Open agent work and later gates
 
 | Topic | Current status | Next owner/action |
