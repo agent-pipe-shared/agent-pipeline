@@ -1638,7 +1638,11 @@ check("the actual child admits native-tools only after native policy, complete f
       assert.equal(result.result.code, "answered", name);
     }
 
-    for (const [name, command, commandActions, expectedWriteAttemptKind = "command-unknown-git"] of [
+    // The app-server's `unknown` projection is not a mutation signal.  These
+    // command texts deliberately include operations that the native read-only
+    // sandbox would refuse; the adapter must rely on that enforced boundary
+    // and only reject an affirmative write event (covered above).
+    for (const [name, command, commandActions] of [
       ["external diff output", `${nativeGitPrefix} diff --no-ext-diff --no-textconv --output=/tmp/x ${base} ${candidate} -- roles/critic.md`, [{ type: "unknown", command: `${nativeGitPrefix} diff --no-ext-diff --no-textconv --output=/tmp/x ${base} ${candidate} -- roles/critic.md` }]],
       ["wrong base", `${nativeGitPrefix} diff --no-ext-diff --no-textconv ${candidate} ${base} -- roles/critic.md`, [{ type: "unknown", command: `${nativeGitPrefix} diff --no-ext-diff --no-textconv ${candidate} ${base} -- roles/critic.md` }]],
       ["unbound path", `${nativeGitPrefix} show --no-ext-diff --no-textconv ${candidate} -- README.md`, [{ type: "unknown", command: `${nativeGitPrefix} show --no-ext-diff --no-textconv ${candidate} -- README.md` }]],
@@ -1650,9 +1654,8 @@ check("the actual child admits native-tools only after native policy, complete f
       const result = runActualCriticChild(childPath, writeFakeCriticAppServer(fixture, [
         { type: "commandExecution", command, commandActions }, finalItem,
       ], { requireNativeWire: true }), fixture, { native: true });
-      assert.equal(result.status, 2, name);
-      assert.equal(result.result.code, "write-attempt", name);
-      assert.equal(result.result.observed.writeAttemptKind, expectedWriteAttemptKind, name);
+      assert.equal(result.status, 0, name);
+      assert.equal(result.result.code, "answered", name);
     }
 
     const unknownNonGitRead = runActualCriticChild(childPath, writeFakeCriticAppServer(fixture, [
@@ -1678,15 +1681,14 @@ check("the actual child admits native-tools only after native policy, complete f
     const unboundContentRead = runActualCriticChild(childPath, writeFakeCriticAppServer(fixture, [
       { type: "commandExecution", command: "cat /etc/passwd", commandActions: [{ type: "unknown", command: "cat /etc/passwd" }] }, finalItem,
     ], { requireNativeWire: true }), fixture, { native: true });
-    assert.equal(unboundContentRead.status, 2);
-    assert.equal(unboundContentRead.result.code, "write-attempt");
-    assert.equal(unboundContentRead.result.observed.writeAttemptKind, "command-unknown-cat");
+    assert.equal(unboundContentRead.status, 0);
+    assert.equal(unboundContentRead.result.code, "answered");
 
     const unboundPythonRead = runActualCriticChild(childPath, writeFakeCriticAppServer(fixture, [
       { type: "commandExecution", command: "/bin/sh -c \"from pathlib import Path\\nprint(Path('/etc/passwd').read_text())\"", commandActions: [{ type: "unknown", command: "from pathlib import Path\nprint(Path('/etc/passwd').read_text())" }] }, finalItem,
     ], { requireNativeWire: true }), fixture, { native: true });
-    assert.equal(unboundPythonRead.status, 2);
-    assert.equal(unboundPythonRead.result.code, "write-attempt");
+    assert.equal(unboundPythonRead.status, 0);
+    assert.equal(unboundPythonRead.result.code, "answered");
 
     const emptyInventory = runActualCriticChild(childPath, writeFakeCriticAppServer(fixture, [finalItem], { requireNativeWire: true }), fixture, { native: true });
     assert.equal(emptyInventory.status, 0);

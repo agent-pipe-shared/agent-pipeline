@@ -15,8 +15,6 @@ import { basename, dirname, resolve } from "node:path";
 import {
   NATIVE_CRITIC_REDUCING_CONFIG,
   NATIVE_CRITIC_REDUCING_CONFIG_SHA256,
-  nativeCriticUnknownContentReadMatchesCommand,
-  nativeCriticUnknownGitActionMatchesCommand,
   nativeCriticReducingCliArgs,
   nativeCriticToolSurfaceConfigDigest,
   nativeCriticToolSurfaceObservationDigest,
@@ -256,26 +254,16 @@ if (!process.exitCode) {
     if (item.type === "fileChange") { writeAttempt = true; writeAttemptKind ??= "file-change"; return; }
     if (item.type === "commandExecution") {
       debug({ event: "commandExecution", command: typeof item.command === "string" ? item.command : null, commandActions: Array.isArray(item.commandActions) ? item.commandActions : null });
-      const knownReadActions = Array.isArray(item.commandActions)
-        && item.commandActions.every((action) => ["read", "listFiles", "search"].includes(action?.type));
-      const boundedNativeGitRead = native && Array.isArray(item.commandActions) && item.commandActions.length === 1
-        && item.commandActions[0]?.type === "unknown"
-        && nativeCriticUnknownGitActionMatchesCommand(item.command, item.commandActions[0].command, request);
-      const boundedNativeContentRead = native && Array.isArray(item.commandActions) && item.commandActions.length === 1
-        && item.commandActions[0]?.type === "unknown"
-        && nativeCriticUnknownContentReadMatchesCommand(item.command, item.commandActions[0].command, request);
-      if (!knownReadActions && !boundedNativeGitRead && !boundedNativeContentRead) {
-        // Keep the emitted evidence deliberately content-free: commands may contain
-        // paths or arguments that do not belong in a durable Critic receipt. The
-        // classification still tells the host whether the next repair belongs in
-        // the bounded Git reader or in a separate, explicit content-reader policy.
-        const unknownAction = native && Array.isArray(item.commandActions) && item.commandActions.length === 1
-          && item.commandActions[0]?.type === "unknown" && typeof item.commandActions[0]?.command === "string";
-        const unknownCommand = unknownAction ? item.commandActions[0].command.trim() : "";
+      // CommandAction is descriptive app-server telemetry, not an authority
+      // boundary. A native Critic is enforced by the read-only sandbox,
+      // approvalPolicy=never, disabled network, and a fresh smoke proof; it
+      // therefore admits every command event and remains able to inspect a
+      // normal repository without a brittle command allowlist. Actual file
+      // changes, tool activation, and server RPC requests are handled above.
+      if (!native && (!Array.isArray(item.commandActions)
+        || !item.commandActions.every((action) => ["read", "listFiles", "search"].includes(action?.type)))) {
         writeAttempt = true;
-        writeAttemptKind ??= unknownAction
-          ? nativeUnknownCommandKind(unknownCommand)
-          : "command-action";
+        writeAttemptKind ??= "command-action";
       }
     }
     if (item.type === "agentMessage") {
