@@ -1659,7 +1659,7 @@ check("the actual child admits native-tools only after native policy, complete f
     ], { requireNativeWire: true }), fixture, { native: true });
     assert.equal(unknownNonGitRead.status, 2);
     assert.equal(unknownNonGitRead.result.code, "write-attempt");
-    assert.equal(unknownNonGitRead.result.observed.writeAttemptKind, "command-unknown-non-git");
+    assert.equal(unknownNonGitRead.result.observed.writeAttemptKind, "command-unknown-cat");
 
     for (const [name, command, actionCommand] of [
       ["bound role contract", `cat ${join(fixture, "role.md")}`, `cat ${join(fixture, "role.md")}`],
@@ -1677,7 +1677,7 @@ check("the actual child admits native-tools only after native policy, complete f
     ], { requireNativeWire: true }), fixture, { native: true });
     assert.equal(unboundContentRead.status, 2);
     assert.equal(unboundContentRead.result.code, "write-attempt");
-    assert.equal(unboundContentRead.result.observed.writeAttemptKind, "command-unknown-non-git");
+    assert.equal(unboundContentRead.result.observed.writeAttemptKind, "command-unknown-cat");
 
     const emptyInventory = runActualCriticChild(childPath, writeFakeCriticAppServer(fixture, [finalItem], { requireNativeWire: true }), fixture, { native: true });
     assert.equal(emptyInventory.status, 0);

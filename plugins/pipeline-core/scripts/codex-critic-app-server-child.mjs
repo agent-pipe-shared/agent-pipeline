@@ -29,10 +29,16 @@ const COMMIT_SHA = /^[0-9a-f]{40}$/;
 const TREE_SHA = /^[0-9a-f]{40,64}$/;
 const MAX_TURN_WAIT_MS = 1_200_000;
 const TURN_LIVENESS_INTERVAL_MS = 45_000;
+const SAFE_COMMAND_FAMILIES = new Set(["cat", "sed", "head", "tail", "rg", "ls", "find", "pwd"]);
 
 function write(value) { process.stdout.write(`${JSON.stringify(value)}\n`); }
 function heartbeat(stage) {
   if (typeof process.send === "function") process.send({ schema: "pipeline.codex-native-critic-heartbeat.v1", stage });
+}
+function nativeUnknownCommandKind(command) {
+  const first = typeof command === "string" ? command.trim().split(/\s+/, 1)[0] : "";
+  if (first === "git") return "command-unknown-git";
+  return SAFE_COMMAND_FAMILIES.has(first) ? `command-unknown-${first}` : "command-unknown-other";
 }
 const LEGACY_REQUEST_KEYS = Object.freeze(["candidateCommit", "candidateTree", "codexPath", "cwd", "effort", "model", "promptContractPath", "referencePaths", "reviewBase", "roleContractPath", "scratchPath", "verdictSchemaPath"]);
 const NATIVE_SANDBOX_MODE = "native-tools-read-only";
@@ -247,7 +253,7 @@ if (!process.exitCode) {
         const unknownCommand = unknownAction ? item.commandActions[0].command.trim() : "";
         writeAttempt = true;
         writeAttemptKind ??= unknownAction
-          ? (unknownCommand === "git" || unknownCommand.startsWith("git ") ? "command-unknown-git" : "command-unknown-non-git")
+          ? nativeUnknownCommandKind(unknownCommand)
           : "command-action";
       }
     }

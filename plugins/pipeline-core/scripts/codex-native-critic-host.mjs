@@ -136,7 +136,7 @@ function boundedFailure(code, selection = null, terminal = null, lifecycle = {})
       stdinEnded: lifecycle.stdinEnded === true,
       stdoutBytes: Number.isSafeInteger(lifecycle.stdoutBytes) && lifecycle.stdoutBytes >= 0 ? lifecycle.stdoutBytes : 0,
       stderrBytes: Number.isSafeInteger(lifecycle.stderrBytes) && lifecycle.stderrBytes >= 0 ? lifecycle.stderrBytes : 0,
-      writeAttemptKind: ["file-change", "command-action", "command-unknown-git", "command-unknown-non-git", "server-rpc-request", "tool-item"].includes(lifecycle.writeAttemptKind) ? lifecycle.writeAttemptKind : null,
+      writeAttemptKind: ["file-change", "command-action", "command-unknown-git", "command-unknown-cat", "command-unknown-sed", "command-unknown-head", "command-unknown-tail", "command-unknown-rg", "command-unknown-ls", "command-unknown-find", "command-unknown-pwd", "command-unknown-other", "server-rpc-request", "tool-item"].includes(lifecycle.writeAttemptKind) ? lifecycle.writeAttemptKind : null,
     },
   };
 }
