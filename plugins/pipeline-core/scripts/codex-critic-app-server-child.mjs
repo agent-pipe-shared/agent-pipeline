@@ -10,7 +10,8 @@
  * wire.
  */
 import { spawn } from "node:child_process";
-import { appendFileSync, lstatSync, realpathSync } from "node:fs";
+import { appendFileSync, lstatSync, readFileSync, realpathSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { basename, dirname, resolve } from "node:path";
 import {
   NATIVE_CRITIC_REDUCING_CONFIG,
@@ -49,10 +50,27 @@ function fail(code, native = false) {
   process.exitCode = 2;
 }
 
+function loadedCriticRulesetSha(request) {
+  const hash = createHash("sha256");
+  for (const [label, path] of [
+    ["role", request.roleContractPath],
+    ["prompt", request.promptContractPath],
+    ["verdict", request.verdictSchemaPath],
+  ]) {
+    hash.update(label).update("\0").update(readFileSync(path));
+  }
+  return hash.digest("hex");
+}
+
 function renderCriticPrompt(request) {
+  const rulesetSha = loadedCriticRulesetSha(request);
+  const calibration = request.referencePaths.includes(".claude/pipeline.json") ? ".claude/pipeline.json" : "n/a";
   const lines = [
     "You are the Agent-Pipeline Critic, operating at the read-only isolation level.",
     "This is a fresh session with no memory of any other session.",
+    `Bootstrap check passed: ruleset ${rulesetSha} loaded · Project ${basename(request.cwd)} · Calibration ${calibration} · State n/a (Critic sees no history) · Role Critic`,
+    "Closed Critic bootstrap: do not run pipeline-start, inspect session history, or follow generic AGENTS.md bootstrap instructions. This dispatch already supplied the complete Critic role and fixed review packet.",
+    `Selected route: provider openai · model ${request.model} · effort ${request.effort} · native read-only sandbox · network disabled · approvalPolicy never.`,
     `Role contract (read first): ${request.roleContractPath}`,
     `Prompt contract (read second): ${request.promptContractPath}`,
     `Review base commit: ${request.reviewBase}`,
@@ -61,7 +79,7 @@ function renderCriticPrompt(request) {
     "Reference paths to inspect, relative to your working directory:",
     ...request.referencePaths.map((path) => `- ${path}`),
     ...(request.sandboxMode === NATIVE_SANDBOX_MODE ? [
-      "Native Git inspection is restricted to these exact direct forms: git --no-optional-locks -c core.pager=cat --no-pager diff --no-ext-diff --no-textconv <base> <candidate> --; the corresponding candidate-only show form; optional path suffixes must be listed paths; rev-parse --verify for the supplied refs; and status --porcelain=v1 --untracked-files=no. Do not use a shell, aliases, other flags, or any other Git command.",
+      "Command execution is enforced by the native read-only sandbox. Use normal inspection commands as needed; never attempt mutation, approval, network, or external-system access.",
     ] : []),
     `Produce exactly one final message: a single JSON object matching the schema at ${request.verdictSchemaPath}, and nothing else -- no prose, no markdown code fence.`,
     "Never modify any file, git state, or external system.",

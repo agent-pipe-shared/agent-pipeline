@@ -1466,6 +1466,7 @@ function writeFakeCriticAppServer(directory, items, {
   threadReasoningEffort = SELECTED_CRITIC_ROUTE.effort,
   requireNativeWire = false,
   expectedEnvironment = null,
+  expectedPromptIncludes = [],
 } = {}) {
   const path = join(directory, "fake-codex-app-server.mjs");
   const source = [
@@ -1485,6 +1486,7 @@ function writeFakeCriticAppServer(directory, items, {
     `const requireNativeWire = ${JSON.stringify(requireNativeWire)};`,
     `const expectedNativeArgs = ${JSON.stringify(nativeCriticReducingCliArgs())};`,
     `const expectedEnvironment = ${JSON.stringify(expectedEnvironment)};`,
+    `const expectedPromptIncludes = ${JSON.stringify(expectedPromptIncludes)};`,
     "const effectiveItemThreadId = requireNativeWire ? itemThreadId : 'thread-1';",
     "let featureIndex = 0; let mcpIndex = 0; let discoveryMcpIndex = 0;",
     "let buffer = '';",
@@ -1498,6 +1500,8 @@ function writeFakeCriticAppServer(directory, items, {
     "  if (value.id === 6 && value.method === 'mcpServerStatus/list') { if (requireNativeWire && (value.params?.threadId !== reviewThreadId || value.params?.detail !== 'toolsAndAuthOnly')) return send({ id: 6, error: { code: -1 } }); return send({ id: 6, result: mcpPages[mcpIndex++] }); }",
     "  if (value.method !== 'turn/start') return;",
     "  if (requireNativeWire && (value.id !== 7 || value.params?.approvalPolicy !== 'never' || value.params?.model !== model || value.params?.effort == null || value.params?.sandboxPolicy?.type !== 'readOnly' || value.params?.sandboxPolicy?.networkAccess !== false)) return send({ id: value.id, error: { code: -1 } });",
+    "  const promptText = Array.isArray(value.params?.input) ? value.params.input.map((part) => part?.text ?? '').join('') : '';",
+    "  if (expectedPromptIncludes.some((text) => !promptText.includes(text))) return send({ id: value.id, error: { code: -1 } });",
     "  send({ id: value.id, result: { turn: { id: 'turn-1' } } });",
     "  for (const request of serverRequests) send(request);",
     "  for (const item of items) send({ method: 'item/completed', params: { threadId: effectiveItemThreadId, turnId: itemTurnId, item } });",
@@ -1601,6 +1605,12 @@ check("the actual child admits native-tools only after native policy, complete f
       finalItem,
     ], {
       requireNativeWire: true,
+      expectedPromptIncludes: [
+        "Bootstrap check passed: ruleset ",
+        "Closed Critic bootstrap: do not run pipeline-start",
+        "Selected route: provider openai",
+        "Command execution is enforced by the native read-only sandbox.",
+      ],
       featurePages: [
         { data: completeFeatures.slice(0, 7), nextCursor: "next" },
         { data: completeFeatures.slice(7), nextCursor: null },
