@@ -85,6 +85,26 @@ includes them in the next local candidate, before the 0.6.2 release.
 - Follow onboarding's current returned action. Do not insert later state or
   authority-orientation steps as unreachable pre-binding prerequisites.
 
+## V3 migration lifecycle repair: rollback and compatibility
+
+The V3 migration/onboarding lifecycle repair is the paired change in commits
+`653703e9` and `93423c67`. If it must be withdrawn from a deployed candidate,
+revert **both commits together**, then regenerate and read back the runtime
+projections and rerun full Verify before declaring the reverted candidate
+usable. This is the operational rollback path. Operators must not hand-edit
+`pipeline.user.yaml`, `.claude/pipeline.yaml`, or `.codex/agents/consult-advisor.toml`,
+and must not rerun the Alfred migration files by hand; use the corrected
+onboarding path and its returned action after the paired revert.
+
+The changed plan-output consumer is the generic onboarding driver. Its
+compatibility contract is deliberately narrow: every consumer treats
+`activation.required: false` together with `nextAction: null` as no activation;
+when a plan has non-empty `changes`, it must execute only that plan's exact
+sanctioned action, never infer or reconstruct an activation command. This keeps
+an already-applied migration idempotent while preserving activation for a plan
+that still has mutations. Existing normal local checkouts with a physical
+`.git` directory remain valid; a control-path escape remains fail-closed.
+
 ## Review, evidence and delivery
 
 - The repaired model-free Codex preflight preserves stdin until initialization
