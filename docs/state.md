@@ -24,17 +24,32 @@
 | 2026-08-11 to 2026-08-19 | Checkpoints 1-60 (2026-08-11 through 2026-08-19 checkpoint 60): superseded session narrative; durable decisions already live in ADRs/backlog/guardrails per this repo's own standing convention, not uniquely in this prose. | [docs/state-archive/2026-08-19--checkpoints-1-through-60.md](state-archive/2026-08-19--checkpoints-1-through-60.md) |
 | 2026-08-26 | 2026-08-25 Antigravity chat-gate-ceremony standardization, verify-tuner stage 2 acceptance, sprint-agy-runner delta4 Critic fix and candidate status | [docs/state-archive/2026-08-26--agy-runner-2026-08-25-handover.md](state-archive/2026-08-26--agy-runner-2026-08-25-handover.md) |
 
-## Current handover — sprint-alfred-epic: local continuation, push deferred (2026-09-08)
+## Current handover — sprint-alfred-epic: local-priority rebase ready for terminal push (2026-09-09)
 
 The PO confirmed `origin/feat/sprint-alfred` as the only valid upstream;
 the existing tracking configuration matches it. Do not create `sprint_alfred`.
-The PC transfer is postponed. Continue the approved Alfred implementation
-locally through the next morning (2026-09-09); push only after a new explicit PO
-instruction. Collect decision topics in the [PO queue](../specs/sprint-alfred-epic/evidence/po-decision-queue.md)
-and measure the requested slice/parallel hook behavior without inferring
-enforcement from concurrent agent activity alone. The earlier statement
-accepting replacement of remote state is not a request to push now and does not
-lift the repository's force-push prohibition or signed push gate.
+The PO's latest instruction authorizes the user to perform the terminal push
+after this local-priority rebase. Agents must not push. Collect decision topics
+in the [PO queue](../specs/sprint-alfred-epic/evidence/po-decision-queue.md) and
+measure the requested slice/parallel hook behavior without inferring
+enforcement from concurrent agent activity alone. The existing force-push
+prohibition and signed push gate remain in force.
+
+The local-priority rebase completed from `63a533a4a861b3453296c56d188edc5aecc253e3`
+through intermediate rebased HEAD `580368594f0029445fcf415ac5e264015d78a25b`
+and final restoration commit `21aaef4b313009a043d561bebc9eb0e9d3b1c536`.
+The final tree is `4fddd3d6ad85d902c4e2e0cf486458978f3246cc`, exactly the
+original local tree; `origin/feat/sprint-alfred` at
+`d418ee953ecf5581abbeca7bb06d261b49c6ac35` is an ancestor, and the branch is
+887 commits ahead with zero behind. Thirty-six patch-equivalent commits were
+skipped and 886 local commits replayed. One 47-line shortening of
+`specs/sprint-alfred-epic/evidence/design-authoring-record.json` was restored
+byte-exactly. Durable proof: [local-priority-rebase-2026-09-09.json](../specs/sprint-alfred-epic/evidence/local-priority-rebase-2026-09-09.json).
+
+Installed runtime state was already current before this integration; the
+rebase changed no YAML, model, gate, or installed state. Verify 500/508 and
+Security 0 for `84eeb02fc4b7aec0f808d8549efb48993d0c5045` remain historical
+evidence only; no fresh Verify, review, signature, or push is claimed here.
 
 Before this continuation, HEAD was `db409445a97bbb1580d3b094f069af24f761d104`;
 local tracking reported 907 commits ahead and 53 behind. The last successful

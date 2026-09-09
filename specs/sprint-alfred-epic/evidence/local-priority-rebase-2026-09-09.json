@@ -1,0 +1,80 @@
+{
+  "schema": "alfred.local-priority-rebase-parent-checks.v1",
+  "originalCommit": "63a533a4a861b3453296c56d188edc5aecc253e3",
+  "upstream": "d418ee953ecf5581abbeca7bb06d261b49c6ac35",
+  "rebaseChecks": [
+    {
+      "status": "fulfilled",
+      "value": {
+        "chunk_id": "4b6c68",
+        "wall_time_seconds": 0.000013366,
+        "exit_code": 0,
+        "original_token_count": 29,
+        "output": " .../evidence/design-authoring-record.json          | 47 ----------------------\n 1 file changed, 47 deletions(-)\n"
+      }
+    },
+    {
+      "status": "fulfilled",
+      "value": {
+        "chunk_id": "55940c",
+        "wall_time_seconds": 0.000028084,
+        "exit_code": 0,
+        "original_token_count": 21,
+        "output": "580368594f0029445fcf415ac5e264015d78a25b\ncff86d6fafbe1776204358cdd00c588bf4eba7a2\n"
+      }
+    },
+    {
+      "status": "fulfilled",
+      "value": {
+        "chunk_id": "06d7f1",
+        "wall_time_seconds": 0.000010099,
+        "exit_code": 0,
+        "original_token_count": 17,
+        "output": "M\tspecs/sprint-alfred-epic/evidence/design-authoring-record.json\n"
+      }
+    },
+    {
+      "status": "fulfilled",
+      "value": {
+        "chunk_id": "98bfa3",
+        "wall_time_seconds": 0.000016452,
+        "exit_code": 0,
+        "original_token_count": 0,
+        "output": ""
+      }
+    }
+  ],
+  "restoredTreeChecks": [
+    {
+      "status": "fulfilled",
+      "value": {
+        "chunk_id": "faf7c9",
+        "wall_time_seconds": 0.00001059,
+        "exit_code": 0,
+        "original_token_count": 21,
+        "output": "21aaef4b313009a043d561bebc9eb0e9d3b1c536\n4fddd3d6ad85d902c4e2e0cf486458978f3246cc\n"
+      }
+    },
+    {
+      "status": "fulfilled",
+      "value": {
+        "chunk_id": "c1f345",
+        "wall_time_seconds": 0.00000567,
+        "exit_code": 0,
+        "original_token_count": 0,
+        "output": ""
+      }
+    },
+    {
+      "status": "fulfilled",
+      "value": {
+        "chunk_id": "129aa3",
+        "wall_time_seconds": 0.000009789,
+        "exit_code": 0,
+        "original_token_count": 152,
+        "output": "commit 21aaef4b313009a043d561bebc9eb0e9d3b1c536\nAuthor:     The Agent-Pipeline Contributors <301875187+agent-pipe-shared@users.noreply.github.com>\nAuthorDate: Wed Sep 9 07:27:22 2026 +0200\nCommit:     The Agent-Pipeline Contributors <301875187+agent-pipe-shared@users.noreply.github.com>\nCommitDate: Wed Sep 9 07:27:22 2026 +0200\n\n    fix(alfred): restore local authoring record after rebase\n    \n    Preserve the exact local authoring record bytes that were shortened during\n    replay of patch-equivalent upstream history.\n    \n    AI-Assisted: true\n    Dispatch: ALFRED-LOCAL-PRIORITY-REBASE (goldfish)\n"
+      }
+    }
+  ],
+  "limitation": "Git ancestry and complete tree equality checked; historical Verify/Security receipts are not rebound."
+}
