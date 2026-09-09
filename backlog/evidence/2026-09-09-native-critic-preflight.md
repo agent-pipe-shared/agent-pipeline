@@ -23,9 +23,21 @@ order. It also covers timeout cleanup, launch denial without a witnessed canary
 write, wrong readback policy, scratch escape, malformed evidence, and preserved
 preexisting scratch content.
 `evidence/NVA-NATIVE-PREFLIGHT-1-consumer-safe-paths-test.txt` records the
-consumer-safe-path suite passing. The one bounded live action was unavailable:
-the installed server emitted a notification outside the producer's explicitly
-admitted safe notification set before metadata completed; capture is
-`evidence/NVA-NATIVE-PREFLIGHT-1-live-preflight-notification-recovery.txt`.
-Earlier input/schema recovery observations remain separately captured. No tuple
-or smoke receipt was emitted, and the native Critic lane remains inactive.
+consumer-safe-path suite passing. The NVA-NATIVE-PREFLIGHT-1 input and schema
+refusals were preparation failures; its notification refusal was the first
+actual app-server launch. They are separate captures and do not constitute one
+successful live action.
+
+NVA-NATIVE-PREFLIGHT-2 added a method-only diagnostic and identified the
+schema-declared, notification-only `remoteControl/status/changed` event. Its
+params are neither captured nor admitted as evidence. The producer now accepts
+only that necessary non-request event alongside its existing harmless status
+notifications; server requests with IDs and turn/tool events remain refused.
+The actual-wire regression stays model-free. Capture
+`evidence/NVA-NATIVE-PREFLIGHT-2-live-smoke.txt` records the resulting passed
+current tuple and smoke receipt: eighteen reduced false-feature observations
+over two pages, empty MCP status, standalone read, concrete native write
+denial, unchanged canary/source, host write control, clean teardown, and zero
+turns. The receipt was validated through `validateNativeCriticSmokeReceipt`
+against its actual tuple. This does not activate the native Critic lane or run
+a provider/model turn.

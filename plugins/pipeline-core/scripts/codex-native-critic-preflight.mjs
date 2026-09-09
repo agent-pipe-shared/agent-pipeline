@@ -107,7 +107,7 @@ async function allPages(rpc, method, params, kind) {
 
 class RpcProcess {
   constructor(command, argv, options, dependencies = {}) {
-    this.spawn = dependencies.spawn ?? spawn; this.timeoutMs = dependencies.timeoutMs ?? TIMEOUT_MS; this.nextId = 1; this.pending = new Map(); this.bytes = 0;
+    this.spawn = dependencies.spawn ?? spawn; this.onNotification = dependencies.onNotification ?? null; this.timeoutMs = dependencies.timeoutMs ?? TIMEOUT_MS; this.nextId = 1; this.pending = new Map(); this.bytes = 0;
     this.child = this.spawn(command, argv, { ...options, shell: false, stdio: ["pipe", "pipe", "pipe"] });
     this.closed = new Promise((resolveClose) => this.child.once("close", (code, signal) => resolveClose({ code, signal })));
     this.child.once("error", (error) => this.finish(error)); this.child.once("close", () => this.finish(new Error("protocol closed")));
@@ -119,8 +119,9 @@ class RpcProcess {
     this.bytes += Buffer.byteLength(line); if (this.bytes > MAX_BYTES) return this.finish(new Error("stdout overflow"));
     let value; try { value = JSON.parse(line); } catch { return this.finish(new Error("protocol JSON is malformed")); }
     if (typeof value.method === "string") {
+      if (typeof this.onNotification === "function") this.onNotification({ method: value.method, isRequest: Object.hasOwn(value, "id") });
       if (Object.hasOwn(value, "id")) return this.finish(new Error("server request is not admitted"));
-      if (!["thread/started", "thread/status/changed", "thread/closed", "mcpServer/startupStatus/updated", "configWarning", "deprecationNotice", "warning"].includes(value.method)) return this.finish(new Error("notification is not admitted"));
+      if (!["thread/started", "thread/status/changed", "thread/closed", "mcpServer/startupStatus/updated", "remoteControl/status/changed", "configWarning", "deprecationNotice", "warning"].includes(value.method)) return this.finish(new Error("notification is not admitted"));
       return;
     }
     if (!Object.hasOwn(value, "id")) return;
@@ -175,7 +176,7 @@ async function runNativeCriticPreflightInternal(input, dependencies = {}) {
   const sourcePath = physicalFile(input.sourcePath ?? fileURLToPath(import.meta.url), "preflight source");
   const beforeSource = sourceIdentity(candidateRoot, dependencies); const beforeScript = sha256(readFileSync(sourcePath));
   const canary = join(scratch, ".native-critic-canary"); const hostControl = join(scratch, ".native-critic-host-control");
-  let rpc = null; let terminal = { exitCode: null, signal: null, spawnFailed: false };
+  let rpc = null; let terminal = { exitCode: null, signal: null, spawnFailed: false }; const notificationMethods = [];
   let initialized = false; let readObserved = false; let writeObserved = false; let nativeWriteDenied = false; let hostWriteControl = false;
   try {
     mkdirSync(schemaDir, { recursive: true });
@@ -186,7 +187,7 @@ async function runNativeCriticPreflightInternal(input, dependencies = {}) {
     writeFileSync(canary, "native-critic-canary\n", "utf8"); const originalCanary = sha256(readFileSync(canary));
     writeFileSync(canary, "host-positive-control\n", "utf8"); writeFileSync(canary, "native-critic-canary\n", "utf8");
     hostWriteControl = sha256(readFileSync(canary)) === originalCanary;
-    rpc = new RpcProcess(cliPath, ["app-server", ...nativeCriticReducingCliArgs()], { cwd: scratch }, dependencies);
+    rpc = new RpcProcess(cliPath, ["app-server", ...nativeCriticReducingCliArgs()], { cwd: scratch }, { ...dependencies, onNotification: (event) => { if (dependencies.diagnosticNotifications === true && notificationMethods.length < 4) notificationMethods.push({ method: event.method, isRequest: event.isRequest }); } });
     const init = await rpc.request("initialize", { clientInfo: { name: "agent-pipeline-native-critic-preflight", version: "1" }, capabilities: { experimentalApi: true, requestAttestation: false } });
     if (!object(init)) fail("protocol-invalid", "initialize response is malformed"); initialized = true; rpc.notify("initialized");
     const discovery = startThreadResult(await rpc.request("thread/start", { cwd: scratch, sandbox: "read-only", approvalPolicy: "never", ephemeral: true }));
@@ -210,7 +211,7 @@ async function runNativeCriticPreflightInternal(input, dependencies = {}) {
     return { schema: "pipeline.codex-native-critic-preflight.v1", status: "passed", tuple, smokeReceipt, smokeReceiptSha256: nativeCriticCanonicalDigest(smokeReceipt), metadata: { featurePages: featureSnapshot.pageCount, mcpPages: mcpSnapshot.pageCount, discoveryMcpPages: discoveredPages.length, turnsStarted: 0 } };
   } catch (error) {
     if (rpc) terminal = await rpc.close();
-    return { schema: "pipeline.codex-native-critic-preflight.v1", status: "unavailable", code: error?.code ?? "preflight-failed", detail: cleanText(error?.message) ?? "preflight failed", terminal: { exitCode: terminal.code, signal: terminal.signal, spawnFailed: terminal.code === null && terminal.signal === null } };
+    return { schema: "pipeline.codex-native-critic-preflight.v1", status: "unavailable", code: error?.code ?? "preflight-failed", detail: cleanText(error?.message) ?? "preflight failed", ...(dependencies.diagnosticNotifications === true ? { notificationMethods } : {}), terminal: { exitCode: terminal.code, signal: terminal.signal, spawnFailed: terminal.code === null && terminal.signal === null } };
   } finally { try { rmSync(canary, { force: true }); rmSync(hostControl, { force: true }); } catch {} }
 }
 
@@ -220,10 +221,12 @@ export async function runNativeCriticPreflight(input, dependencies = {}) {
 }
 
 function cliArgs(argv) {
-  if (argv.length !== 6 || argv[0] !== "--scratch" || argv[2] !== "--candidate-root" || argv[4] !== "--codex") fail("input-invalid", "usage: --scratch <absolute-dir> --candidate-root <absolute-dir> --codex <absolute-path>");
-  return { scratchPath: argv[1], candidateRoot: argv[3], codexPath: argv[5] };
+  const diagnosticNotifications = argv.at(-1) === "--diagnostic-notifications";
+  const values = diagnosticNotifications ? argv.slice(0, -1) : argv;
+  if (values.length !== 6 || values[0] !== "--scratch" || values[2] !== "--candidate-root" || values[4] !== "--codex") fail("input-invalid", "usage: --scratch <absolute-dir> --candidate-root <absolute-dir> --codex <absolute-path> [--diagnostic-notifications]");
+  return { input: { scratchPath: values[1], candidateRoot: values[3], codexPath: values[5] }, dependencies: { diagnosticNotifications } };
 }
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const input = cliArgs(process.argv.slice(2));
-  runNativeCriticPreflight(input).then((result) => { process.stdout.write(`${JSON.stringify(result)}\n`); process.exitCode = result.status === "passed" ? 0 : 1; });
+  const { input, dependencies } = cliArgs(process.argv.slice(2));
+  runNativeCriticPreflight(input, dependencies).then((result) => { process.stdout.write(`${JSON.stringify(result)}\n`); process.exitCode = result.status === "passed" ? 0 : 1; });
 }
