@@ -10,6 +10,8 @@
  * wire.
  */
 import { spawn } from "node:child_process";
+import { appendFileSync, lstatSync, realpathSync } from "node:fs";
+import { basename, dirname, resolve } from "node:path";
 import {
   NATIVE_CRITIC_REDUCING_CONFIG,
   NATIVE_CRITIC_REDUCING_CONFIG_SHA256,
@@ -104,6 +106,24 @@ if (!process.exitCode) {
 
 if (!process.exitCode) {
   const native = request.sandboxMode === NATIVE_SANDBOX_MODE;
+  let debugTracePath = null;
+  if (native && typeof process.env.PIPELINE_CODEX_CRITIC_DEBUG_PATH === "string") {
+    // Debug stays opt-in and inside the caller-provided scratch root. It is
+    // operational telemetry only, never part of the child result or receipt.
+    try {
+      const scratchRoot = realpathSync(request.scratchPath);
+      const candidate = resolve(process.env.PIPELINE_CODEX_CRITIC_DEBUG_PATH);
+      if (!lstatSync(scratchRoot).isDirectory() || dirname(candidate) !== scratchRoot
+        || !basename(candidate).startsWith("native-critic-debug-")) throw new TypeError("debug path outside scratch");
+      appendFileSync(candidate, `${JSON.stringify({ schema: "pipeline.codex-native-critic-debug.v1", event: "started", at: new Date().toISOString() })}\n`, { mode: 0o600 });
+      debugTracePath = candidate;
+    } catch { /* Debug must never affect the normal fail-closed transport. */ }
+  }
+  const debug = (event) => {
+    if (debugTracePath === null) return;
+    try { appendFileSync(debugTracePath, `${JSON.stringify({ schema: "pipeline.codex-native-critic-debug.v1", at: new Date().toISOString(), ...event })}\n`, { mode: 0o600 }); }
+    catch { /* A diagnostic sink is never an authorization channel. */ }
+  };
   const child = spawn(request.codexPath, ["app-server", "--stdio", "--strict-config", ...(native ? nativeCriticReducingCliArgs() : [])], {
     cwd: request.cwd,
     env: {
@@ -235,6 +255,7 @@ if (!process.exitCode) {
     }
     if (item.type === "fileChange") { writeAttempt = true; writeAttemptKind ??= "file-change"; return; }
     if (item.type === "commandExecution") {
+      debug({ event: "commandExecution", command: typeof item.command === "string" ? item.command : null, commandActions: Array.isArray(item.commandActions) ? item.commandActions : null });
       const knownReadActions = Array.isArray(item.commandActions)
         && item.commandActions.every((action) => ["read", "listFiles", "search"].includes(action?.type));
       const boundedNativeGitRead = native && Array.isArray(item.commandActions) && item.commandActions.length === 1
@@ -272,6 +293,7 @@ if (!process.exitCode) {
     }
   };
   const onMessage = (value) => {
+    debug({ event: "protocol", id: Number.isSafeInteger(value?.id) ? value.id : null, method: typeof value?.method === "string" ? value.method : null, itemType: typeof value?.params?.item?.type === "string" ? value.params.item.type : null });
     if (value?.method && value?.id !== undefined) { writeAttempt = true; writeAttemptKind ??= "server-rpc-request"; finishProtocol(); return; }
     if (value?.id === 1) {
       if (value.error || !value.result || initialized) { protocolError = true; finishProtocol(); return; }
