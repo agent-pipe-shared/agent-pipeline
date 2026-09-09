@@ -3280,12 +3280,16 @@ test("the real legacy V0 frontdoor drives migration plan and exact activation be
     ]);
     assert.equal(result.final.status, "ready");
 
-    // The migrated authority is truly at rest: a second frontdoor walk runs
-    // only its anchor and cannot schedule a reverse migration.
-    const rerun = driveOnboardingInit({ rootDir: path, runner: "codex", run: runDriverStep });
-    assert.equal(rerun.outcome, "ready", JSON.stringify(rerun));
-    assert.equal(rerun.stepsExecuted, 1);
-    assert.deepEqual(rerun.steps[0].argv, [ONBOARDING_SCRIPT, "inspect", "--root", path, "--runner", "codex"]);
+    // The migrated authority is truly at rest: a fresh frontdoor inspection
+    // remains ready and the real migration planner itself has no reverse
+    // changes or activation action to offer.
+    const rerun = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
+    assert.equal(rerun.status, "ready", JSON.stringify(rerun));
+    assert.notDeepEqual(rerun.nextAction?.argv, [MIGRATION_SCRIPT, "plan", "--root", path]);
+    const noop = planRunnerProfileMigrationV3({ rootDir: path });
+    assert.equal(noop.status, "noop", JSON.stringify(noop));
+    assert.deepEqual(noop.changes, []);
+    assert.equal(noop.nextAction, null);
   } finally { dispose(path); }
 });
 

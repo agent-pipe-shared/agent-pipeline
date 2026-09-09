@@ -896,6 +896,7 @@ export function driveOnboardingInit({ rootDir, runner = null, stepCap = DEFAULT_
   let isAnchorStep = true;
   let lastAnchorOutput = null;
   let executedSinceAnchor = false;
+  let completedMigrationActivation = false;
 
   for (let stepIndex = 0; stepIndex < stepCap; stepIndex += 1) {
     const stepResult = runOnboardingStep({ executable, argv, run, env, projectRoot: root });
@@ -966,17 +967,21 @@ export function driveOnboardingInit({ rootDir, runner = null, stepCap = DEFAULT_
       }
     } else {
       executedSinceAnchor = true;
+      completedMigrationActivation ||= typeof argv[0] === "string"
+        && argv[0].endsWith("/runner-profile-migration-v3.mjs")
+        && argv[1] === "apply"
+        && argv.includes("--activate");
     }
 
-    // A V4 `ready` inspection is the onboarding terminal receipt.  It may
-    // additionally advertise a Pipeline-State handover action, but that action
-    // belongs to the project lifecycle after onboarding; following it here
-    // would make a completed legacy migration look non-terminal (or require
-    // this generic driver to interpret state-machine phases).  This branch is
-    // deliberately limited to the public V4 anchor, after the re-anchor
-    // progress check above, so a migration `inspect` classification can never
-    // claim readiness before its plan and exact activation action run.
+    // A V4 `ready` readback after the exact migration activation completes the
+    // migration route.  It may additionally advertise a Pipeline-State
+    // handover action, but that action belongs after this migration and must
+    // not obscure its terminal receipt.  Other ready V4 routes retain their
+    // existing generic nextAction handling.  The flag is set only from the
+    // actual migration apply response, so a classification `inspect` can
+    // never claim readiness before planning and activation.
     if (wasAnchorStep
+      && completedMigrationActivation
       && output?.schema === "pipeline.project-onboarding.v4"
       && output?.status === "ready") {
       return { schema: SCHEMA, runner, root, outcome: "ready", stepCap, stepsExecuted: steps.length, steps, final: output };
