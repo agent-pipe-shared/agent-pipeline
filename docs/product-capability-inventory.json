@@ -7,7 +7,7 @@
   "criticReview": {
     "status": "required-before-publication",
     "receiptSha256": null,
-    "reason": "The corrective Sentinel review has findings but no final sanctioned PASS receipt; publication remains blocked until a fresh candidate-bound Critic attestation is recorded."
+    "reason": "Independent candidate-bound review of the capability inventory, checker, and public targets is required before publication."
   },
   "capabilities": [
     {
