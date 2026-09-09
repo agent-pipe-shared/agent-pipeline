@@ -1664,6 +1664,7 @@ check("the actual child admits native-tools only after native policy, complete f
     for (const [name, command, actionCommand] of [
       ["bound role contract", `cat ${join(fixture, "role.md")}`, `cat ${join(fixture, "role.md")}`],
       ["wrapped bound prompt contract", `bash -lc 'cat ${join(fixture, "prompt.md")}'`, `cat ${join(fixture, "prompt.md")}`],
+      ["wrapped bound Python content read", `/bin/sh -c "from pathlib import Path\nprint(Path('${join(fixture, "role.md")}').read_text())"`, `from pathlib import Path\nprint(Path('${join(fixture, "role.md")}').read_text())`],
     ]) {
       const result = runActualCriticChild(childPath, writeFakeCriticAppServer(fixture, [
         { type: "commandExecution", command, commandActions: [{ type: "unknown", command: actionCommand }] }, finalItem,
@@ -1678,6 +1679,12 @@ check("the actual child admits native-tools only after native policy, complete f
     assert.equal(unboundContentRead.status, 2);
     assert.equal(unboundContentRead.result.code, "write-attempt");
     assert.equal(unboundContentRead.result.observed.writeAttemptKind, "command-unknown-cat");
+
+    const unboundPythonRead = runActualCriticChild(childPath, writeFakeCriticAppServer(fixture, [
+      { type: "commandExecution", command: "/bin/sh -c \"from pathlib import Path\\nprint(Path('/etc/passwd').read_text())\"", commandActions: [{ type: "unknown", command: "from pathlib import Path\nprint(Path('/etc/passwd').read_text())" }] }, finalItem,
+    ], { requireNativeWire: true }), fixture, { native: true });
+    assert.equal(unboundPythonRead.status, 2);
+    assert.equal(unboundPythonRead.result.code, "write-attempt");
 
     const emptyInventory = runActualCriticChild(childPath, writeFakeCriticAppServer(fixture, [finalItem], { requireNativeWire: true }), fixture, { native: true });
     assert.equal(emptyInventory.status, 0);

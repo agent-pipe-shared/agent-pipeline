@@ -122,11 +122,20 @@ function isBoundNativeCriticContentPath(path, request) {
   return [...contractPaths, ...referencePaths].includes(path);
 }
 
+function isBoundNativeCriticPythonReadCommand(command, request) {
+  // This is intentionally not a Python allowlist. It is one observed,
+  // content-only expression emitted by the native model before it falls back
+  // to cat: a Path construction followed directly by read_text().
+  const match = /^from pathlib import Path\nprint\(Path\((['"])([^'"\n]+)\1\)\.read_text\(\)\)$/.exec(command);
+  return match !== null && isBoundNativeCriticContentPath(match[2], request);
+}
+
 /**
- * The native model currently exposes simple file reads as
- * CommandAction::Unknown. Admit only a direct `cat` of a contract or the
- * already-bound reference set; no glob, option, shell syntax, directory, or
- * unbound filesystem path can enter this allowance.
+ * The native model currently exposes some simple file reads as
+ * CommandAction::Unknown. Admit only a direct `cat`, or the one observed
+ * Path(...).read_text() expression, for a contract or already-bound reference
+ * set; no generic interpreter, glob, option, directory, or unbound filesystem
+ * path can enter this allowance.
  */
 export function nativeCriticUnknownContentReadMatchesCommand(command, actionCommand, request) {
   if (typeof command !== "string" || typeof actionCommand !== "string") return false;
@@ -134,8 +143,10 @@ export function nativeCriticUnknownContentReadMatchesCommand(command, actionComm
   if (parsedAction.parseStatus !== "accepted" || parsedAction.operators.length !== 0
     || parsedAction.redirects.length !== 0 || parsedAction.segments.length !== 1) return false;
   const [{ executable, argv }] = parsedAction.segments;
-  if (!(["cat", "/bin/cat", "/usr/bin/cat"].includes(executable) && argv.length === 1
-    && isBoundNativeCriticContentPath(argv[0], request))) return false;
+  const boundedCat = ["cat", "/bin/cat", "/usr/bin/cat"].includes(executable) && argv.length === 1
+    && isBoundNativeCriticContentPath(argv[0], request);
+  const boundedPythonRead = isBoundNativeCriticPythonReadCommand(actionCommand, request);
+  if (!boundedCat && !boundedPythonRead) return false;
   if (command === actionCommand) return true;
   const parsedCommand = parseGuardCommand(command, request?.cwd);
   if (parsedCommand.parseStatus !== "accepted" || parsedCommand.operators.length !== 0
