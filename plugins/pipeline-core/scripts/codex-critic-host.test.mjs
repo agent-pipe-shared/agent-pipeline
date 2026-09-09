@@ -10,6 +10,7 @@ import { PassThrough } from "node:stream";
 import { pathToFileURL } from "node:url";
 
 import { invokeCodexCriticAppServer } from "./codex-critic-app-server.mjs";
+import { nativeCriticEvidenceCandidate } from "./codex-native-critic-host.mjs";
 import { runSelectedCriticHost, selectedCriticInProcessBridge } from "./codex-critic-selected-host.mjs";
 import { buildSandboxRequest, sandboxSelectionDigest } from "./codex-sandbox-select.mjs";
 import { runSandboxedReadonlyHostBridge } from "./sandboxed-readonly-host-bridge.mjs";
@@ -48,6 +49,14 @@ import { validateAgainstSchema } from "../lib/schema-lite.mjs";
 import { hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
 
 let passed = 0;
+
+check("native Critic evidence accepts a direct clean candidate and an exact clean Verify window only", () => {
+  const candidate = { commit: "a".repeat(40), tree: "b".repeat(40) };
+  assert.deepEqual(nativeCriticEvidenceCandidate({ candidate: { status: "clean", ...candidate } }), candidate);
+  assert.deepEqual(nativeCriticEvidenceCandidate({ candidate: { binding: "exact", start: { status: "clean", ...candidate }, finish: { status: "clean", ...candidate } } }), candidate);
+  assert.equal(nativeCriticEvidenceCandidate({ candidate: { binding: "exact", start: { status: "clean", ...candidate }, finish: { status: "dirty", ...candidate } } }), null);
+  assert.equal(nativeCriticEvidenceCandidate({ candidate: { binding: "exact", start: { status: "clean", ...candidate }, finish: { status: "clean", commit: "c".repeat(40), tree: candidate.tree } } }), null);
+});
 
 function prepareNativeCritic(options, dependencies = {}) {
   return prepareNativeCriticRaw(options, {

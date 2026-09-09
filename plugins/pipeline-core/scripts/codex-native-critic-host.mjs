@@ -73,6 +73,19 @@ function physicalPluginFile(path) {
   return actual;
 }
 function hashFile(path) { return createHash("sha256").update(readFileSync(path)).digest("hex"); }
+
+/** Extracts the candidate identity from the two canonical evidence shapes.
+ * Verify records bind their clean start and finish observations below
+ * `candidate`; security records bind one clean candidate directly. */
+export function nativeCriticEvidenceCandidate(evidence) {
+  const direct = evidence?.candidate && typeof evidence.candidate === "object" ? evidence.candidate : evidence;
+  if (COMMIT.test(direct?.commit) && TREE.test(direct?.tree)) return { commit: direct.commit, tree: direct.tree };
+  const window = evidence?.candidate;
+  if (window?.binding !== "exact" || window?.start?.status !== "clean" || window?.finish?.status !== "clean"
+    || !COMMIT.test(window.start.commit) || !TREE.test(window.start.tree)
+    || window.start.commit !== window.finish.commit || window.start.tree !== window.finish.tree) return null;
+  return { commit: window.start.commit, tree: window.start.tree };
+}
 function childTerminal(value) {
   return {
     childStarted: value?.started === true,
@@ -163,7 +176,7 @@ function observePhysical(input, dependencies) {
     } else {
       let evidence;
       try { evidence = JSON.parse(bytes); } catch { fail("candidate evidence is not JSON"); }
-      const candidate = evidence?.candidate && typeof evidence.candidate === "object" ? evidence.candidate : evidence;
+      const candidate = nativeCriticEvidenceCandidate(evidence);
       if (candidate?.commit !== input.selection.dispatch.candidateCommit || candidate?.tree !== input.selection.dispatch.candidateTree
         || record.candidate.commit !== candidate.commit || record.candidate.tree !== candidate.tree) fail("candidate evidence drifted");
     }
