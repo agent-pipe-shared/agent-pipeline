@@ -43,7 +43,7 @@ function nativeUnknownCommandKind(command) {
 }
 const LEGACY_REQUEST_KEYS = Object.freeze(["candidateCommit", "candidateTree", "codexPath", "cwd", "effort", "model", "promptContractPath", "referencePaths", "reviewBase", "roleContractPath", "scratchPath", "verdictSchemaPath"]);
 const NATIVE_SANDBOX_MODE = "native-tools-read-only";
-const NATIVE_REQUEST_KEYS = Object.freeze([...LEGACY_REQUEST_KEYS, "sandboxMode"].sort());
+const NATIVE_REQUEST_KEYS = Object.freeze([...LEGACY_REQUEST_KEYS, "reviewMode", "sandboxMode"].sort());
 
 function fail(code, native = false) {
   write({ schema: native ? "pipeline.codex-native-critic-app-server-child.v1" : "pipeline.codex-critic-app-server-child.v1", ok: false, code });
@@ -76,6 +76,10 @@ function renderCriticPrompt(request) {
     `Review base commit: ${request.reviewBase}`,
     `Candidate commit: ${request.candidateCommit}`,
     `Candidate tree: ${request.candidateTree}`,
+    ...(request.sandboxMode === NATIVE_SANDBOX_MODE ? [
+      "Selected review mode: full.",
+      `Perform a full review of the provided exact correction range only: ${request.reviewBase} through ${request.candidateCommit}. Do not broaden the review beyond that range.`,
+    ] : []),
     "Reference paths to inspect, relative to your working directory:",
     ...request.referencePaths.map((path) => `- ${path}`),
     ...(request.sandboxMode === NATIVE_SANDBOX_MODE ? [
@@ -110,7 +114,8 @@ if (!process.exitCode) {
     && typeof request.effort === "string" && request.effort.length > 0
     && Array.isArray(request.referencePaths) && request.referencePaths.length > 0
     && request.referencePaths.every((path) => typeof path === "string" && path.length > 0 && !path.startsWith("/"))
-    && COMMIT_SHA.test(request.candidateCommit) && TREE_SHA.test(request.candidateTree) && COMMIT_SHA.test(request.reviewBase);
+    && COMMIT_SHA.test(request.candidateCommit) && TREE_SHA.test(request.candidateTree) && COMMIT_SHA.test(request.reviewBase)
+    && (!native || request.reviewMode === "full");
   if (!closedShape) fail("request-invalid", native);
 }
 

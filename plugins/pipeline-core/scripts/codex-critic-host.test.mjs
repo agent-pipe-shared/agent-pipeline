@@ -1518,14 +1518,14 @@ function writeFakeCriticAppServer(directory, items, {
   return path;
 }
 
-function runActualCriticChild(childPath, codexPath, scratchPath, { native = false, env } = {}) {
+function runActualCriticChild(childPath, codexPath, scratchPath, { native = false, reviewMode = "full", env } = {}) {
   const input = {
     codexPath, cwd: DEFAULT_PIPELINE_ROOT, scratchPath, model: SELECTED_CRITIC_ROUTE.model, effort: SELECTED_CRITIC_ROUTE.effort,
     referencePaths: ["roles/critic.md"], roleContractPath: join(DEFAULT_PIPELINE_ROOT, "plugins/pipeline-core/roles/critic.md"),
     promptContractPath: join(DEFAULT_PIPELINE_ROOT, "plugins/pipeline-core/templates/prompts/critic-review.md"),
     verdictSchemaPath: join(DEFAULT_PIPELINE_ROOT, "plugins/pipeline-core/scripts/critic-verdict.schema.json"),
     candidateCommit: "c".repeat(40), candidateTree: "d".repeat(40), reviewBase: "9".repeat(40),
-    ...(native ? { sandboxMode: "native-tools-read-only" } : {}),
+    ...(native ? { sandboxMode: "native-tools-read-only", ...(reviewMode === null ? {} : { reviewMode }) } : {}),
   };
   const run = spawnSync(process.execPath, [childPath], { cwd: DEFAULT_PIPELINE_ROOT, input: JSON.stringify(input), encoding: "utf8", shell: false, timeout: 5_000, ...(env ? { env } : {}) });
   assert.equal(run.error, undefined);
@@ -1590,6 +1590,10 @@ check("the actual child admits native-tools only after native policy, complete f
     };
     const nativeEnvironment = runActualCriticChild(childPath, writeFakeCriticAppServer(fixture, [finalItem], {
       requireNativeWire: true, expectedEnvironment: inheritedNativeEnvironment,
+      expectedPromptIncludes: [
+        "Selected review mode: full.",
+        `Perform a full review of the provided exact correction range only: ${base} through ${candidate}. Do not broaden the review beyond that range.`,
+      ],
     }), fixture, { native: true, env: { ...process.env, ...inheritedNativeEnvironment } });
     assert.equal(nativeEnvironment.status, 0, "native child retains the parent runtime environment");
     const legacyEnvironment = runActualCriticChild(childPath, writeFakeCriticAppServer(fixture, [finalItem], {
@@ -1738,6 +1742,20 @@ check("the actual child admits native-tools only after native policy, complete f
       assert.equal(result.status, 2, name);
       assert.equal(result.result.schema, "pipeline.codex-native-critic-app-server-child.v1", name);
       assert.equal(result.result.code, code, name);
+    }
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+check("the native child rejects missing or unsupported review mode before starting Codex", () => {
+  const fixture = mkdtempSync(join(tmpdir(), "codex-critic-native-review-mode-"));
+  const childPath = join(DEFAULT_PIPELINE_ROOT, "plugins/pipeline-core/scripts/codex-critic-app-server-child.mjs");
+  try {
+    for (const reviewMode of [null, "delta"]) {
+      const result = runActualCriticChild(childPath, process.execPath, fixture, { native: true, reviewMode });
+      assert.equal(result.status, 2);
+      assert.equal(result.result.code, "request-invalid");
     }
   } finally {
     rmSync(fixture, { recursive: true, force: true });

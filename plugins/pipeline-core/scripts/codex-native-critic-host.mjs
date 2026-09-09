@@ -142,12 +142,13 @@ function boundedFailure(code, selection = null, terminal = null, lifecycle = {})
 }
 
 function validateInput(value) {
-  exactKeys(value, ["selection", "expectedTuple", "repository", "coordinatorScratch", "referencePaths", "referenceRecords", "reviewBase"], "native Critic host input");
+  exactKeys(value, ["selection", "expectedTuple", "repository", "coordinatorScratch", "referencePaths", "referenceRecords", "reviewBase", "reviewMode"], "native Critic host input");
   exactKeys(value.repository, ["root", "cliPath"], "native Critic repository");
   exactKeys(value.coordinatorScratch, ["path"], "native Critic coordinator scratch");
   if (!Array.isArray(value.referencePaths) || value.referencePaths.length === 0 || new Set(value.referencePaths).size !== value.referencePaths.length
     || value.referencePaths.some((path) => typeof path !== "string" || path.length === 0 || path.startsWith("/") || path.includes("\\") || path.split("/").some((part) => !part || part === "." || part === ".."))) fail("native Critic references are invalid");
   if (!COMMIT.test(value.reviewBase)) fail("native Critic review base is invalid");
+  if (value.reviewMode !== "full") fail("native Critic review mode is unsupported");
   if (!Array.isArray(value.referenceRecords) || value.referenceRecords.length !== value.referencePaths.length || value.referenceRecords.length > 128) fail("native Critic reference records are invalid");
   const recordPaths = value.referenceRecords.map((record) => record?.path);
   if (JSON.stringify(recordPaths) !== JSON.stringify(value.referencePaths)) fail("native Critic record paths drifted");
@@ -346,7 +347,7 @@ export async function invokeCodexNativeCriticHost(rawInput, dependencies = {}) {
     model: selection.route.model, effort: selection.route.effort, referencePaths: physical.referencePaths,
     roleContractPath: physical.rolePath, promptContractPath: physical.promptPath, verdictSchemaPath: physical.verdictPath,
     candidateCommit: selection.dispatch.candidateCommit, candidateTree: selection.dispatch.candidateTree, reviewBase: input.reviewBase,
-    sandboxMode: "native-tools-read-only",
+    reviewMode: input.reviewMode, sandboxMode: "native-tools-read-only",
   };
   let child;
   try { child = await runFixedChild(request, dependencies); }

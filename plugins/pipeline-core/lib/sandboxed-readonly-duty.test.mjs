@@ -187,15 +187,40 @@ function nativeDependencies(response = nativeChild()) {
     observePhysical: () => ({ repoRoot: process.cwd(), scratch: process.cwd(), cliPath: process.execPath, referencePaths: ["templates/prompts/critic-review.md"], rolePath: "roles/critic.md", promptPath: "templates/prompts/critic-review.md", verdictPath: "plugins/pipeline-core/scripts/critic-verdict.schema.json" }),
   };
 }
-function nativeInput() { return { selection: nativeSelection(), expectedTuple: NATIVE_TUPLE, repository: { root: process.cwd(), cliPath: process.execPath }, coordinatorScratch: { path: process.cwd() }, referencePaths: ["templates/prompts/critic-review.md"], referenceRecords: NATIVE_RECORDS, reviewBase: "a".repeat(40) }; }
+function nativeInput() { return { selection: nativeSelection(), expectedTuple: NATIVE_TUPLE, repository: { root: process.cwd(), cliPath: process.execPath }, coordinatorScratch: { path: process.cwd() }, referencePaths: ["templates/prompts/critic-review.md"], referenceRecords: NATIVE_RECORDS, reviewBase: "a".repeat(40), reviewMode: "full" }; }
 
-test("native Critic consumer accepts only a bound native child proof and never emits the legacy sandbox receipt", async () => {
-  const value = await invokeCodexNativeCriticHost(nativeInput(), nativeDependencies());
+test("native Critic consumer accepts and forwards only full exact-range review mode", async () => {
+  let childRequest = null;
+  const value = await invokeCodexNativeCriticHost(nativeInput(), {
+    ...nativeDependencies(),
+    runChild: async (request) => { childRequest = request; return nativeChild(); },
+  });
   assert.equal(value.schema, "pipeline.codex-native-critic-host-result.v1");
   assert.equal(value.status, "reviewed");
   assert.equal(value.receipt.schema, "pipeline.codex-native-critic-execution-receipt.v1");
   assert.equal(value.receipt.assurance.class, "native-model-tool-read-only");
   assert.equal(value.receipt.observed.toolSurface.observationSha256, NATIVE_TUPLE.toolSurface.observationSha256);
+  assert.equal(childRequest.reviewMode, "full");
+  assert.equal(childRequest.reviewBase, "a".repeat(40));
+  assert.equal(childRequest.candidateCommit, "b".repeat(40));
+  assert.equal(Object.hasOwn(childRequest, "priorReceipt"), false);
+});
+
+test("native Critic rejects missing or unsupported review mode before it can spawn a child", async () => {
+  for (const mutate of [
+    (input) => { delete input.reviewMode; },
+    (input) => { input.reviewMode = "delta"; },
+  ]) {
+    const input = nativeInput();
+    mutate(input);
+    let spawned = false;
+    const value = await invokeCodexNativeCriticHost(input, {
+      ...nativeDependencies(),
+      runChild: async () => { spawned = true; return nativeChild(); },
+    });
+    assert.equal(value.code, "input-invalid");
+    assert.equal(spawned, false);
+  }
 });
 
 test("native Critic re-observes the reference binding after the child returns", async () => {
@@ -310,7 +335,7 @@ test("native Critic default physical observer binds candidate sources and ignore
     const route = { ...NATIVE_ROUTE, candidateCommit: commit };
     const selected = buildNativeCriticSelection({ selectionId: "cncs_bbbbbbbbbbbbbbbbbbbbbbbbbb", repoFingerprint: repositoryFingerprint(root), dispatch: { queueRevision: 1, candidateCommit: commit, candidateTree: tree, referenceSetSha256: nativeCriticCanonicalDigest(records), requestSha256: "9".repeat(64) }, route, poDecisionSha256: "a".repeat(64), smokeReceipt: smoke, smokeReceiptSha256: nativeCriticCanonicalDigest(smoke), createdAt: "2026-09-09T11:59:30.000Z" }, { validateRoute: () => route, expectedTuple: tuple, nowMs: NATIVE_NOW, maxSmokeAgeMs: 300_000 });
     const response = nativeChild(); response.result.observed = { ...response.result.observed, toolSurface: { ...response.result.observed.toolSurface, configSha256: tuple.toolSurface.configSha256, observationSha256: tuple.toolSurface.observationSha256 } };
-    const input = { selection: selected, expectedTuple: tuple, repository: { root, cliPath: cli }, coordinatorScratch: { path: root }, referencePaths: records.map(({ path }) => path), referenceRecords: records, reviewBase: commit };
+    const input = { selection: selected, expectedTuple: tuple, repository: { root, cliPath: cli }, coordinatorScratch: { path: root }, referencePaths: records.map(({ path }) => path), referenceRecords: records, reviewBase: commit, reviewMode: "full" };
     const deps = { nowMs: NATIVE_NOW, resolveRoute: () => route, runChild: async () => response, readFileSync: (path) => path === "/proc/version" ? "Linux Microsoft" : path === "/proc/self/mountinfo" ? `1 0 0:1 / ${root} rw - ext4 /dev/root rw\n` : "boot" };
     assert.equal((await invokeCodexNativeCriticHost(input, deps)).status, "reviewed");
     const wrongFingerprint = { ...input, selection: { ...selected, repoFingerprint: "f".repeat(64) } }; assert.equal((await invokeCodexNativeCriticHost(wrongFingerprint, deps)).code, "physical-proof-unavailable");
