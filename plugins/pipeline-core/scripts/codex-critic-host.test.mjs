@@ -10,7 +10,7 @@ import { PassThrough } from "node:stream";
 import { pathToFileURL } from "node:url";
 
 import { invokeCodexCriticAppServer } from "./codex-critic-app-server.mjs";
-import { nativeCriticEvidenceCandidate, nativeCriticHeartbeatSnapshot } from "./codex-native-critic-host.mjs";
+import { nativeCriticEvidenceCandidate, nativeCriticHeartbeatSnapshot, nativeCriticReportedChildFailure } from "./codex-native-critic-host.mjs";
 import { runSelectedCriticHost, selectedCriticInProcessBridge } from "./codex-critic-selected-host.mjs";
 import { buildSandboxRequest, sandboxSelectionDigest } from "./codex-sandbox-select.mjs";
 import { runSandboxedReadonlyHostBridge } from "./sandboxed-readonly-host-bridge.mjs";
@@ -68,6 +68,13 @@ check("native Critic heartbeats advance only the bounded lifecycle and reject un
   const completed = nativeCriticHeartbeatSnapshot(waiting, { schema: "pipeline.codex-native-critic-heartbeat.v1", stage: "turn-completed" });
   assert.deepEqual(completed, { initialized: true, threadStarted: false, turnStarted: true, turnCompleted: true });
   assert.strictEqual(nativeCriticHeartbeatSnapshot(completed, { schema: "pipeline.codex-native-critic-heartbeat.v1", stage: "unbounded" }), completed);
+});
+
+check("native Critic preserves a structured child failure despite its nonzero terminal exit", () => {
+  assert.equal(nativeCriticReportedChildFailure({ schema: "pipeline.codex-native-critic-app-server-child.v1", ok: false, code: "write-attempt" }), "child-write-attempt");
+  assert.equal(nativeCriticReportedChildFailure({ schema: "pipeline.codex-native-critic-app-server-child.v1", ok: false, code: "protocol-error" }), "child-protocol-error");
+  assert.equal(nativeCriticReportedChildFailure({ schema: "pipeline.codex-native-critic-app-server-child.v1", ok: true, code: "answered" }), null);
+  assert.equal(nativeCriticReportedChildFailure({ schema: "untrusted", ok: false, code: "write-attempt" }), null);
 });
 
 function prepareNativeCritic(options, dependencies = {}) {

@@ -47,7 +47,15 @@ const SIGNALS = new Set(["SIGHUP", "SIGINT", "SIGTERM", "SIGKILL", "SIGABRT", "S
 const FAILURE_CODES = new Set([
   "input-invalid", "selection-invalid", "route-invalid", "physical-proof-unavailable", "physical-proof-drift",
   "child-spawn-failed", "child-timeout", "child-stream-overflow", "child-output-invalid", "child-policy-invalid",
-  "child-lifecycle-invalid", "child-verdict-invalid", "child-write-attempt", "child-terminal-invalid",
+  "child-lifecycle-invalid", "child-verdict-invalid", "child-write-attempt", "child-request-invalid",
+  "child-prompt-invalid", "child-protocol-error", "child-exit-error", "child-terminal-invalid",
+]);
+const CHILD_FAILURE_CODE_MAP = new Map([
+  ["request-invalid", "child-request-invalid"],
+  ["prompt-invalid", "child-prompt-invalid"],
+  ["protocol-error", "child-protocol-error"],
+  ["write-attempt", "child-write-attempt"],
+  ["child-exit-error", "child-exit-error"],
 ]);
 
 function fail(message) { throw new Error(`native Critic host: ${message}`); }
@@ -109,6 +117,10 @@ export function nativeCriticHeartbeatSnapshot(previous, value) {
   if (value.stage === "turn-completed") next.turnCompleted = true;
   return next;
 }
+export function nativeCriticReportedChildFailure(value) {
+  if (!value || value.schema !== "pipeline.codex-native-critic-app-server-child.v1" || value.ok !== false) return null;
+  return CHILD_FAILURE_CODE_MAP.get(value.code) ?? null;
+}
 function boundedFailure(code, selection = null, terminal = null, lifecycle = {}) {
   return {
     schema: "pipeline.codex-native-critic-host-failure.v1",
@@ -124,6 +136,7 @@ function boundedFailure(code, selection = null, terminal = null, lifecycle = {})
       stdinEnded: lifecycle.stdinEnded === true,
       stdoutBytes: Number.isSafeInteger(lifecycle.stdoutBytes) && lifecycle.stdoutBytes >= 0 ? lifecycle.stdoutBytes : 0,
       stderrBytes: Number.isSafeInteger(lifecycle.stderrBytes) && lifecycle.stderrBytes >= 0 ? lifecycle.stderrBytes : 0,
+      writeAttemptKind: ["file-change", "command-action", "server-rpc-request", "tool-item"].includes(lifecycle.writeAttemptKind) ? lifecycle.writeAttemptKind : null,
     },
   };
 }
@@ -331,7 +344,9 @@ export async function invokeCodexNativeCriticHost(rawInput, dependencies = {}) {
   const lifecycle = { ...child.heartbeat, ...(child.result?.observed ?? {}), stdoutBytes: child.stdoutBytes, stderrBytes: child.stderrBytes };
   if (child.timedOut) return boundedFailure("child-timeout", selection, terminal, lifecycle);
   if (child.overflow) return boundedFailure("child-stream-overflow", selection, terminal, lifecycle);
-  if (child.terminal.error !== null || child.terminal.code !== 0 || child.terminal.signal !== null) return boundedFailure("child-terminal-invalid", selection, terminal, lifecycle);
+  if (child.terminal.error !== null || child.terminal.code !== 0 || child.terminal.signal !== null) {
+    return boundedFailure(nativeCriticReportedChildFailure(child.result) ?? "child-terminal-invalid", selection, terminal, lifecycle);
+  }
   let verdictSchema;
   try { verdictSchema = JSON.parse(readFileSync(physical.verdictPath, "utf8")); }
   catch { return boundedFailure("physical-proof-unavailable", selection, terminal, lifecycle); }

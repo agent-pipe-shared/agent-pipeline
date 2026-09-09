@@ -220,6 +220,11 @@ test("native Critic consumer fails closed for old wire shapes, tool evidence dri
   const writeResult = await invokeCodexNativeCriticHost(nativeInput(), nativeDependencies(write));
   assert.equal(writeResult.code, "child-write-attempt");
   assert.equal(JSON.stringify(writeResult).includes(secret), false);
+  const terminalWrite = nativeChild({ result: { ...nativeChild().result, ok: false, code: "write-attempt", answer: secret }, terminal: { code: 2, signal: null, error: null, started: true, cleanup: "complete" } });
+  const terminalWriteResult = await invokeCodexNativeCriticHost(nativeInput(), nativeDependencies(terminalWrite));
+  assert.equal(terminalWriteResult.code, "child-write-attempt");
+  assert.equal(terminalWriteResult.lifecycle.writeAttemptKind, null);
+  assert.equal(JSON.stringify(terminalWriteResult).includes(secret), false);
   assert.equal((await invokeCodexNativeCriticHost(nativeInput(), nativeDependencies({ ...nativeChild(), timedOut: true }))).code, "child-timeout");
   assert.equal((await invokeCodexNativeCriticHost(nativeInput(), nativeDependencies({ ...nativeChild(), overflow: true, stdoutBytes: 8 * 1024 * 1024 + 1 }))).code, "child-stream-overflow");
   assert.equal((await invokeCodexNativeCriticHost(nativeInput(), nativeDependencies({ ...nativeChild(), terminal: { code: null, signal: "SIGTERM", error: null, started: true, cleanup: "incomplete" } }))).code, "child-terminal-invalid");
