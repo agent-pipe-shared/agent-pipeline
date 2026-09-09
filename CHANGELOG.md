@@ -20,6 +20,28 @@ once.
 
 ### Added
 
+- **Antigravity Ed25519 signature proof consumption**
+  (`plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs`, 50 tests): the
+  Antigravity `PreToolUse` guard admits `pipeline-state approve-push` when an
+  external `--proof` argument is supplied, allowing autonomous agent
+  consumption of human-authorized Ed25519 push signatures without triggering
+  anti-self-approval denials (ADR-0061).
+- **Sprint Nova Epic reader-review binding (Doku-Paket D)**
+  (`specs/sprint-nova-epic/evidence/reader-review/`): formal Phase 1, Phase 2,
+  and disposition records filed and machine-verified via
+  `check-doc-reader-binding.mjs` against the sprint documentation set.
+- **Orchestrator-added file disclosure support**
+  (`plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs`,
+  `templates/prompts/goldfish-task.md`): `dispatch-authorship-verify.mjs`
+  admits an optional `orchestratorAddedFiles` array in dispatch records,
+  permitting dispatches to disclose intentional orchestrator scaffolding
+  files without triggering authorship mismatch failures.
+- **Pipelined read lexical containment hardening**
+  (`plugins/pipeline-core/hooks/guard-command-grammar.mjs`,
+  `plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs`, 252 tests): closed
+  the lexical containment gap for `rg | rg` and `rg | head` pipelines by
+  resolving symlinks and checking realpath boundaries against project root and
+  session-derived extra roots.
 - **Parallel-dispatch slicing nudge** (`plugins/pipeline-core/hooks/guard-slicing.mjs`,
   42 tests): a `PreToolUse` advisory that, after three consecutive
   single-dispatch turns or a `TodoWrite` batch of three or more pending items,
