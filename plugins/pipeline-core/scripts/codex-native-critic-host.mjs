@@ -34,7 +34,11 @@ const PROMPT = "templates/prompts/critic-review.md";
 const VERDICT = "scripts/critic-verdict.schema.json";
 const PROVIDER = "openai";
 const MAX_BYTES = 8 * 1024 * 1024;
-const MAX_ELAPSED_MS = 480_000;
+// A large candidate may outlast the former eight-minute wall clock. Startup
+// remains short; only observed child heartbeats extend the review quiet window.
+const MAX_ELAPSED_MS = 1_200_000;
+const STARTUP_IDLE_MS = 90_000;
+const REVIEW_IDLE_MS = 180_000;
 const SHA256 = /^[a-f0-9]{64}$/;
 const COMMIT = /^[a-f0-9]{40}$/;
 const TREE = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
@@ -93,6 +97,16 @@ function childTerminal(value) {
     signal: SIGNALS.has(value?.signal) ? value.signal : null,
     cleanupStatus: value?.cleanup === "complete" ? "complete" : "incomplete",
   };
+}
+const HEARTBEAT_STAGES = new Set(["initialized", "discovery-thread-started", "review-thread-started", "turn-started", "review-progress", "turn-completed"]);
+export function nativeCriticHeartbeatSnapshot(previous, value) {
+  if (!value || value.schema !== "pipeline.codex-native-critic-heartbeat.v1" || !HEARTBEAT_STAGES.has(value.stage)) return previous;
+  const next = { ...previous };
+  if (value.stage === "initialized") next.initialized = true;
+  if (value.stage === "discovery-thread-started" || value.stage === "review-thread-started") next.threadStarted = true;
+  if (value.stage === "turn-started") next.turnStarted = true;
+  if (value.stage === "turn-completed") next.turnCompleted = true;
+  return next;
 }
 function boundedFailure(code, selection = null, terminal = null, lifecycle = {}) {
   return {
@@ -202,15 +216,26 @@ function observePhysical(input, dependencies) {
 async function runFixedChild(request, dependencies) {
   if (typeof dependencies.runChild === "function") return dependencies.runChild(structuredClone(request));
   const spawnFn = dependencies.spawnFn ?? spawn;
-  const child = spawnFn(process.execPath, [CHILD], { cwd: request.cwd, env: process.env, shell: false, detached: true, stdio: ["pipe", "pipe", "pipe"] });
+  const child = spawnFn(process.execPath, [CHILD], { cwd: request.cwd, env: process.env, shell: false, detached: true, stdio: ["pipe", "pipe", "pipe", "ipc"] });
   let stdoutBytes = 0; let stderrBytes = 0; const chunks = []; let overflow = false; let timedOut = false;
-  let killTimer = null; let stopped = false;
+  let killTimer = null; let idleTimer = null; let stopped = false;
+  let heartbeat = { initialized: false, threadStarted: false, turnStarted: false, turnCompleted: false };
+  const armIdle = () => {
+    if (idleTimer !== null) clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => { timedOut = true; stop(); }, heartbeat.turnStarted ? REVIEW_IDLE_MS : STARTUP_IDLE_MS);
+  };
   const stop = () => {
     if (stopped) return;
     stopped = true;
     try { process.kill(-child.pid, "SIGTERM"); } catch { try { child.kill("SIGTERM"); } catch {} }
     killTimer = setTimeout(() => { try { process.kill(-child.pid, "SIGKILL"); } catch { try { child.kill("SIGKILL"); } catch {} } }, 500);
   };
+  child.on("message", (value) => {
+    const next = nativeCriticHeartbeatSnapshot(heartbeat, value);
+    if (next === heartbeat) return;
+    heartbeat = next;
+    armIdle();
+  });
   child.stdout.on("data", (chunk) => { stdoutBytes += chunk.length; if (stdoutBytes <= MAX_BYTES) chunks.push(chunk); else { overflow = true; stop(); } });
   child.stderr.on("data", (chunk) => { stderrBytes += chunk.length; if (stderrBytes > MAX_BYTES) { overflow = true; stop(); } });
   const close = new Promise((resolveClose) => {
@@ -218,16 +243,18 @@ async function runFixedChild(request, dependencies) {
     child.once("close", (code, signal) => resolveClose({ code, signal, error: null }));
   });
   const timer = setTimeout(() => { timedOut = true; stop(); }, MAX_ELAPSED_MS);
+  armIdle();
   child.stdin.end(JSON.stringify(request));
   const terminal = await close;
   clearTimeout(timer);
+  if (idleTimer !== null) clearTimeout(idleTimer);
   if (killTimer !== null) clearTimeout(killTimer);
   let result = null;
   if (!overflow) {
     const lines = Buffer.concat(chunks).toString("utf8").trim().split("\n").filter(Boolean);
     try { if (lines.length === 1) result = JSON.parse(lines[0]); } catch { result = null; }
   }
-  return { result, terminal: { ...terminal, started: terminal.error === null, cleanup: terminal.error === null && terminal.signal === null ? "complete" : "incomplete" }, stdoutBytes, stderrBytes, overflow, timedOut };
+  return { result, heartbeat, terminal: { ...terminal, started: terminal.error === null, cleanup: terminal.error === null && terminal.signal === null ? "complete" : "incomplete" }, stdoutBytes, stderrBytes, overflow, timedOut };
 }
 
 function validateChild(result, selection, tuple, verdictSchema, terminal) {
@@ -300,7 +327,7 @@ export async function invokeCodexNativeCriticHost(rawInput, dependencies = {}) {
   try { child = await runFixedChild(request, dependencies); }
   catch { return boundedFailure("child-spawn-failed", selection); }
   const terminal = childTerminal(child.terminal);
-  const lifecycle = { ...(child.result?.observed ?? {}), stdoutBytes: child.stdoutBytes, stderrBytes: child.stderrBytes };
+  const lifecycle = { ...child.heartbeat, ...(child.result?.observed ?? {}), stdoutBytes: child.stdoutBytes, stderrBytes: child.stderrBytes };
   if (child.timedOut) return boundedFailure("child-timeout", selection, terminal, lifecycle);
   if (child.overflow) return boundedFailure("child-stream-overflow", selection, terminal, lifecycle);
   if (child.terminal.error !== null || child.terminal.code !== 0 || child.terminal.signal !== null) return boundedFailure("child-terminal-invalid", selection, terminal, lifecycle);

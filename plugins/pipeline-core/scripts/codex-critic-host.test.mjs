@@ -10,7 +10,7 @@ import { PassThrough } from "node:stream";
 import { pathToFileURL } from "node:url";
 
 import { invokeCodexCriticAppServer } from "./codex-critic-app-server.mjs";
-import { nativeCriticEvidenceCandidate } from "./codex-native-critic-host.mjs";
+import { nativeCriticEvidenceCandidate, nativeCriticHeartbeatSnapshot } from "./codex-native-critic-host.mjs";
 import { runSelectedCriticHost, selectedCriticInProcessBridge } from "./codex-critic-selected-host.mjs";
 import { buildSandboxRequest, sandboxSelectionDigest } from "./codex-sandbox-select.mjs";
 import { runSandboxedReadonlyHostBridge } from "./sandboxed-readonly-host-bridge.mjs";
@@ -56,6 +56,15 @@ check("native Critic evidence accepts a direct clean candidate and an exact clea
   assert.deepEqual(nativeCriticEvidenceCandidate({ candidate: { binding: "exact", start: { status: "clean", ...candidate }, finish: { status: "clean", ...candidate } } }), candidate);
   assert.equal(nativeCriticEvidenceCandidate({ candidate: { binding: "exact", start: { status: "clean", ...candidate }, finish: { status: "dirty", ...candidate } } }), null);
   assert.equal(nativeCriticEvidenceCandidate({ candidate: { binding: "exact", start: { status: "clean", ...candidate }, finish: { status: "clean", commit: "c".repeat(40), tree: candidate.tree } } }), null);
+});
+
+check("native Critic heartbeats advance only the bounded lifecycle and reject unknown stages", () => {
+  const blank = { initialized: false, threadStarted: false, turnStarted: false, turnCompleted: false };
+  const initialized = nativeCriticHeartbeatSnapshot(blank, { schema: "pipeline.codex-native-critic-heartbeat.v1", stage: "initialized" });
+  const started = nativeCriticHeartbeatSnapshot(initialized, { schema: "pipeline.codex-native-critic-heartbeat.v1", stage: "turn-started" });
+  const completed = nativeCriticHeartbeatSnapshot(started, { schema: "pipeline.codex-native-critic-heartbeat.v1", stage: "turn-completed" });
+  assert.deepEqual(completed, { initialized: true, threadStarted: false, turnStarted: true, turnCompleted: true });
+  assert.strictEqual(nativeCriticHeartbeatSnapshot(completed, { schema: "pipeline.codex-native-critic-heartbeat.v1", stage: "unbounded" }), completed);
 });
 
 function prepareNativeCritic(options, dependencies = {}) {

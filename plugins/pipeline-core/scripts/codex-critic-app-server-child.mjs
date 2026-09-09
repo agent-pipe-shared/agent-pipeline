@@ -28,6 +28,9 @@ const COMMIT_SHA = /^[0-9a-f]{40}$/;
 const TREE_SHA = /^[0-9a-f]{40,64}$/;
 
 function write(value) { process.stdout.write(`${JSON.stringify(value)}\n`); }
+function heartbeat(stage) {
+  if (typeof process.send === "function") process.send({ schema: "pipeline.codex-native-critic-heartbeat.v1", stage });
+}
 const LEGACY_REQUEST_KEYS = Object.freeze(["candidateCommit", "candidateTree", "codexPath", "cwd", "effort", "model", "promptContractPath", "referencePaths", "reviewBase", "roleContractPath", "scratchPath", "verdictSchemaPath"]);
 const NATIVE_SANDBOX_MODE = "native-tools-read-only";
 const NATIVE_REQUEST_KEYS = Object.freeze([...LEGACY_REQUEST_KEYS, "sandboxMode"].sort());
@@ -249,6 +252,7 @@ if (!process.exitCode) {
     if (value?.id === 1) {
       if (value.error || !value.result || initialized) { protocolError = true; finishProtocol(); return; }
       initialized = true;
+      if (native) heartbeat("initialized");
       send({ method: "initialized" });
       send({ id: 2, method: "thread/start", params: {
         cwd: request.cwd,
@@ -271,6 +275,7 @@ if (!process.exitCode) {
       }
       if (native) {
         discoveryThreadId = result.thread.id;
+        heartbeat("discovery-thread-started");
         sendDiscoveryMcpPage();
       } else {
         threadId = result.thread.id;
@@ -303,6 +308,7 @@ if (!process.exitCode) {
       threadId = result.thread.id;
       observedThreadSandbox = { type: result.sandbox.type, networkAccess: result.sandbox.networkAccess };
       observedThreadReasoningEffort = result.reasoningEffort;
+      heartbeat("review-thread-started");
       sendFeaturePage();
       return;
     }
@@ -335,17 +341,20 @@ if (!process.exitCode) {
     if (value?.id === (native ? 7 : 3)) {
       if (value.error || typeof value.result?.turn?.id !== "string") { protocolError = true; finishProtocol(); return; }
       turnId = value.result.turn.id;
+      if (native) heartbeat("turn-started");
       return;
     }
     if (value?.method === "item/completed") {
       if (value.params?.threadId !== threadId || value.params?.turnId !== turnId) protocolError = true;
       else inspectItem(value.params.item);
+      if (native && !protocolError && !writeAttempt) heartbeat("review-progress");
       return;
     }
     if (value?.method === "turn/completed") {
       if (value.params?.threadId !== threadId || value.params?.turn?.id !== turnId
         || value.params?.turn?.status !== "completed" || answer === null) protocolError = true;
       else turnCompleted = true;
+      if (native && turnCompleted) heartbeat("turn-completed");
       finishProtocol();
     }
   };
