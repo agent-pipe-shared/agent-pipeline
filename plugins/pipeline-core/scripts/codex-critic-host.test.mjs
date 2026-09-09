@@ -1422,6 +1422,88 @@ function criticAnswered(overrides = {}) {
   };
 }
 
+function writeFakeCriticAppServer(directory, items, { itemThreadId = "thread-1", itemTurnId = "turn-1", serverRequests = [] } = {}) {
+  const path = join(directory, "fake-codex-app-server.mjs");
+  const source = [
+    "#!/usr/bin/env node",
+    `const items = ${JSON.stringify(items)};`,
+    `const model = ${JSON.stringify(SELECTED_CRITIC_ROUTE.model)};`,
+    `const itemThreadId = ${JSON.stringify(itemThreadId)};`,
+    `const itemTurnId = ${JSON.stringify(itemTurnId)};`,
+    `const serverRequests = ${JSON.stringify(serverRequests)};`,
+    "let buffer = '';",
+    "const send = (value) => process.stdout.write(JSON.stringify(value) + '\\n');",
+    "const handle = (value) => {",
+    "  if (value.id === 1) return send({ id: 1, result: {} });",
+    "  if (value.id === 2) return send({ id: 2, result: { model, modelProvider: 'openai', approvalPolicy: 'never', thread: { id: 'thread-1' } } });",
+    "  if (value.id !== 3) return;",
+    "  send({ id: 3, result: { turn: { id: 'turn-1' } } });",
+    "  for (const request of serverRequests) send(request);",
+    "  for (const item of items) send({ method: 'item/completed', params: { threadId: itemThreadId, turnId: itemTurnId, item } });",
+    "  send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' } } });",
+    "};",
+    "process.stdin.on('data', (chunk) => {",
+    "  buffer += chunk.toString('utf8'); let newline;",
+    "  while ((newline = buffer.indexOf('\\n')) >= 0) { const line = buffer.slice(0, newline); buffer = buffer.slice(newline + 1); if (line) handle(JSON.parse(line)); }",
+    "});",
+    "process.stdin.on('end', () => process.exit(0));",
+  ].join("\n");
+  writeFileSync(path, source, { mode: 0o700 });
+  return path;
+}
+
+function runActualCriticChild(childPath, codexPath, scratchPath) {
+  const input = {
+    codexPath, cwd: DEFAULT_PIPELINE_ROOT, scratchPath, model: SELECTED_CRITIC_ROUTE.model, effort: SELECTED_CRITIC_ROUTE.effort,
+    referencePaths: ["roles/critic.md"], roleContractPath: join(DEFAULT_PIPELINE_ROOT, "plugins/pipeline-core/roles/critic.md"),
+    promptContractPath: join(DEFAULT_PIPELINE_ROOT, "plugins/pipeline-core/templates/prompts/critic-review.md"),
+    verdictSchemaPath: join(DEFAULT_PIPELINE_ROOT, "plugins/pipeline-core/scripts/critic-verdict.schema.json"),
+    candidateCommit: "c".repeat(40), candidateTree: "d".repeat(40), reviewBase: "9".repeat(40),
+  };
+  const run = spawnSync(process.execPath, [childPath], { cwd: DEFAULT_PIPELINE_ROOT, input: JSON.stringify(input), encoding: "utf8", shell: false, timeout: 5_000 });
+  assert.equal(run.error, undefined);
+  const lines = run.stdout.trim().split("\n").filter(Boolean);
+  assert.equal(lines.length, 1, run.stdout);
+  return { status: run.status, result: JSON.parse(lines[0]) };
+}
+
+check("the actual child accepts commentary before one final answer; invalid phases, duplicate finals, mismatched IDs, and writes remain rejected", () => {
+  const fixture = mkdtempSync(join(tmpdir(), "codex-critic-phase-protocol-"));
+  try {
+    const commentaryThenFinal = [
+      { type: "agentMessage", phase: "commentary", text: "documented intermediate commentary" },
+      { type: "agentMessage", phase: "final_answer", text: JSON.stringify(validCriticVerdict()) },
+    ];
+    const fake = writeFakeCriticAppServer(fixture, commentaryThenFinal);
+    const green = runActualCriticChild(join(DEFAULT_PIPELINE_ROOT, "plugins/pipeline-core/scripts/codex-critic-app-server-child.mjs"), fake, fixture);
+    assert.equal(green.status, 0);
+    assert.equal(green.result.code, "answered");
+    for (const legacyPhase of [undefined, null]) {
+      const result = runActualCriticChild(join(DEFAULT_PIPELINE_ROOT, "plugins/pipeline-core/scripts/codex-critic-app-server-child.mjs"), writeFakeCriticAppServer(fixture, [
+        { type: "agentMessage", ...(legacyPhase === undefined ? {} : { phase: legacyPhase }), text: JSON.stringify(validCriticVerdict()) },
+      ]), fixture);
+      assert.equal(result.status, 0, `legacy ${String(legacyPhase)} phase`);
+      assert.equal(result.result.code, "answered", `legacy ${String(legacyPhase)} phase`);
+    }
+    for (const [name, items, options, expected, expectedWriteAttemptKind] of [
+      ["duplicate final", [{ type: "agentMessage", phase: "final_answer", text: "{}" }, { type: "agentMessage", phase: "final_answer", text: "{}" }], {}, "protocol-error"],
+      ["duplicate legacy unknown", [{ type: "agentMessage", text: "{}" }, { type: "agentMessage", text: "{}" }], {}, "protocol-error"],
+      ["invalid phase", [{ type: "agentMessage", phase: "analysis", text: "{}" }], {}, "protocol-error"],
+      ["mismatched IDs", [{ type: "agentMessage", phase: "final_answer", text: "{}" }], { itemTurnId: "wrong-turn" }, "protocol-error"],
+      ["file change", [{ type: "fileChange", phase: "final_answer", text: "{}" }, { type: "agentMessage", phase: "final_answer", text: "{}" }], {}, "write-attempt", "file-change"],
+      ["non-read command action", [{ type: "commandExecution", commandActions: [{ type: "write" }] }, { type: "agentMessage", phase: "final_answer", text: "{}" }], {}, "write-attempt", "command-action"],
+      ["server RPC request", [{ type: "agentMessage", phase: "final_answer", text: "{}" }], { serverRequests: [{ id: 99, method: "item/approval/request", params: { opaque: "not-projected" } }] }, "write-attempt", "server-rpc-request"],
+    ]) {
+      const result = runActualCriticChild(join(DEFAULT_PIPELINE_ROOT, "plugins/pipeline-core/scripts/codex-critic-app-server-child.mjs"), writeFakeCriticAppServer(fixture, items, options), fixture);
+      assert.equal(result.status, 2, name);
+      assert.equal(result.result.code, expected, name);
+      if (expectedWriteAttemptKind) assert.equal(result.result.observed.writeAttemptKind, expectedWriteAttemptKind, name);
+    }
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
 await checkAsync("codex-critic-app-server consumer accepts a complete, valid child turn bound to the selected profile", async () => {
   let childRequest;
   const result = await invokeCodexCriticAppServer(criticPayload(), {
@@ -1454,24 +1536,29 @@ await checkAsync("codex-critic-app-server consumer refuses before spawning on in
 
 await checkAsync("codex-critic-app-server consumer never collapses a completed-but-invalid child into no-child evidence", async () => {
   const cases = [
-    criticAnswered({ observed: { ...criticAnswered().observed, model: "gpt-5.6-terra" } }),
-    criticAnswered({ observed: { ...criticAnswered().observed, effort: "high" } }),
-    { ...criticAnswered(), ok: false, code: "protocol-error", answer: null },
-    { ...criticAnswered(), ok: false, code: "write-attempt", answer: null },
-    criticAnswered({ observed: { ...criticAnswered().observed, stdinEnded: false } }),
-    criticAnswered({ observed: { ...criticAnswered().observed, cleanup: "incomplete" } }),
-    criticAnswered({ answer: "not json" }),
-    criticAnswered({ answer: JSON.stringify(["not", "an", "object"]) }),
-    criticAnswered({ answer: JSON.stringify({ ...validCriticVerdict(), pass: "yes" }) }),
-    (() => { const r = criticAnswered(); delete r.observed.exitCode; return r; })(),
-    (() => { const r = criticAnswered(); delete r.observed; return r; })(),
+    [criticAnswered({ observed: { ...criticAnswered().observed, model: "gpt-5.6-terra" } }), "route-mismatch"],
+    [criticAnswered({ observed: { ...criticAnswered().observed, effort: "high" } }), "route-mismatch"],
+    [{ ...criticAnswered(), ok: false, code: "protocol-error", answer: null }, "protocol-error"],
+    [{ ...criticAnswered(), ok: false, code: "write-attempt", answer: null }, "write-attempt"],
+    [criticAnswered({ observed: { ...criticAnswered().observed, stdinEnded: false } }), "lifecycle-invalid"],
+    [criticAnswered({ observed: { ...criticAnswered().observed, cleanup: "incomplete" } }), "lifecycle-invalid"],
+    [criticAnswered({ answer: "not json" }), "answer-json-invalid"],
+    [criticAnswered({ answer: JSON.stringify(["not", "an", "object"]) }), "verdict-schema-invalid"],
+    [criticAnswered({ answer: JSON.stringify({ ...validCriticVerdict(), pass: "yes" }) }), "verdict-schema-invalid"],
+    [(() => { const r = criticAnswered(); delete r.observed.exitCode; return r; })(), "lifecycle-invalid"],
+    [(() => { const r = criticAnswered(); delete r.observed; return r; })(), "route-mismatch"],
   ];
-  for (const result of cases) {
+  for (const [result, expectedCode] of cases) {
     const actual = await invokeCodexCriticAppServer(criticPayload(), {
       buildSandboxInvocationFn: () => ({ command: "/codex", argv: ["sandbox"], options: { shell: false } }),
       spawnFn: fakeCriticSpawn(result),
     });
-    assert.deepEqual(actual, { status: "unavailable", childStarted: true });
+    assert.equal(actual.status, "unavailable");
+    assert.equal(actual.childStarted, true);
+    assert.equal(actual.failureDiagnostic.child.code, expectedCode);
+    assert.deepEqual(Object.keys(actual.failureDiagnostic).sort(), ["binding", "child", "outer", "schema"]);
+    assert.equal(Object.hasOwn(actual.failureDiagnostic, "answer"), false);
+    assert.equal(Object.hasOwn(actual.failureDiagnostic.outer, "stderr"), false);
   }
 });
 
@@ -1663,6 +1750,44 @@ await checkAsync("runSelectedCriticHost reports selected-critic-transport-failed
   assert.equal(result.sandboxBinding.selectionId, "css_bbbbbbbbbbbbbbbbbbbbbbbbbi");
 });
 
+await checkAsync("runSelectedCriticHost carries the real app-server failure projection from the selected bridge to the selected transport error without accepting caller-supplied diagnostic data", async () => {
+  const input = {
+    repoFingerprint: "b".repeat(64),
+    dispatch: { queueRevision: 1, candidateCommit: "c".repeat(40), candidateTree: "d".repeat(40), referenceSetSha256: "e".repeat(64) },
+    referencePaths: ["roles/critic.md"], reviewBase: "9".repeat(40), sandboxRuntime: { repoRoot: DEFAULT_PIPELINE_ROOT },
+  };
+  const selection = criticSelectionFixture(input);
+  const result = await runSelectedCriticHost(input, {
+    resolveCriticRoute: ({ candidateCommit }) => ({ ...SELECTED_CRITIC_ROUTE, candidateCommit }),
+    invokeCodexCriticAppServer: (payload) => invokeCodexCriticAppServer(payload, {
+      buildSandboxInvocationFn: () => ({ command: "/codex", argv: ["sandbox"], options: { shell: false } }),
+      spawnFn: fakeCriticSpawn(criticAnswered({ answer: "not json" })),
+    }),
+    dependencies: {
+      async executeSandboxedReadonlyDuty(request, dependencies) {
+        const launched = await dependencies.bridge.launch({
+          selectionId: selection.selectionId, duty: "critic", selection, requested: request.requested, references: request.references, profile: selection.profile,
+          scratch: { path: "/tmp/critic-scratch", sha256: selection.profile.scratchRootSha256, sandboxStateJson: "{}", sandboxStateSha256: "8".repeat(64), repoRoot: input.sandboxRuntime.repoRoot, codexPath: "/codex" },
+        });
+        assert.equal(launched.childStarted, true);
+        return {
+          status: "error", childStarted: true, selectionId: selection.selectionId, selectionSha256: sandboxSelectionDigest(selection),
+          executionReceiptSha256: "2".repeat(64), dutyReceiptSha256: "3".repeat(64), assurance: selection.assurance,
+        };
+      },
+    },
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.code, "selected-critic-transport-failed");
+  assert.equal(result.failureDiagnostic.child.code, "answer-json-invalid");
+  assert.deepEqual(result.failureDiagnostic.binding, {
+    selectionId: selection.selectionId, selectionSha256: sandboxSelectionDigest(selection),
+    candidateCommit: input.dispatch.candidateCommit, candidateTree: input.dispatch.candidateTree,
+  });
+  assert.equal(JSON.stringify(result.failureDiagnostic).includes("not json"), false);
+  assert.deepEqual(Object.keys(result.failureDiagnostic.child).sort(), ["cleanup", "code", "exitCode", "initialized", "signal", "started", "stdinEnded", "threadStarted", "turnCompleted", "turnStarted", "writeAttemptKind"]);
+});
+
 // --- NVA-B-XPORTFIX-1: a spawn that never starts a child at all must reach
 // the generic bridge as an observed childStarted:false, not undefined. An
 // undefined observation is routed to postLaunchFailure() (a falsified
@@ -1676,7 +1801,10 @@ await checkAsync("codex-critic-app-server reports childStarted:false, not true, 
     buildSandboxInvocationFn: () => ({ command: "/codex", argv: ["sandbox"], options: { shell: false } }),
     spawnFn: fakeCriticSpawnFailure("ENOENT"),
   });
-  assert.deepEqual(result, { status: "unavailable", childStarted: false });
+  assert.equal(result.status, "unavailable");
+  assert.equal(result.childStarted, false);
+  assert.equal(result.failureDiagnostic.child.code, "outer-terminal");
+  assert.equal(result.failureDiagnostic.outer.spawnFailed, true);
 });
 
 await checkAsync("selectedCriticInProcessBridge.launch reports a genuinely unstarted child as childStarted:false, not undefined -- this is the exact expression the generic bridge uses to tell noChild() apart from postLaunchFailure()", async () => {

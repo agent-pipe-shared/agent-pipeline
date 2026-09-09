@@ -115,7 +115,7 @@ function matchesSelectedHostExecution(value, selected) {
  * directly as hostBridge. Treat it as unconfirmed either way -- not fixed
  * here since that file is out of scope for this task.)
  */
-export function selectedCriticInProcessBridge(input, { route, verifyRoute = null, invokeAppServer = invokeCodexCriticAppServer } = {}) {
+export function selectedCriticInProcessBridge(input, { route, verifyRoute = null, invokeAppServer = invokeCodexCriticAppServer, captureFailureDiagnostic = null } = {}) {
   const boundRoute = validateCriticHighRiskRoute(route);
   const completed = new Map();
   const launch = async (request) => {
@@ -153,6 +153,8 @@ export function selectedCriticInProcessBridge(input, { route, verifyRoute = null
     if (result?.status !== "reviewed" || !result.verdict || typeof result.verdict !== "object" || Array.isArray(result.verdict)
       || !result.sandboxExecution || result.identity?.provider !== "openai" || result.identity?.modelId !== boundRoute.model
       || result.identity?.effort !== boundRoute.effort || !matchesSelectedHostExecution(result.sandboxExecution, sandboxTransport)) {
+      const diagnostic = validateFailureDiagnostic(result?.failureDiagnostic, input, sandboxTransport);
+      if (diagnostic && typeof captureFailureDiagnostic === "function") captureFailureDiagnostic(diagnostic);
       // Two different failure shapes reach this branch, and only one of them
       // carries a real observation. When the consumer never reports a
       // terminal at all (result.sandboxExecution is absent -- its own
@@ -234,8 +236,36 @@ export function selectedCriticInProcessBridge(input, { route, verifyRoute = null
   };
 }
 
-function unavailableResult(code, selected = null) {
-  return { ok: false, code, selectionId: selected?.selectionId ?? null, sandboxBinding: null };
+const APP_SERVER_FAILURE_CODES = new Set([
+  "request-invalid", "prompt-invalid", "protocol-error", "write-attempt", "child-exit-error",
+  "outer-terminal", "outer-stdout-overflow", "child-output-invalid", "route-mismatch",
+  "lifecycle-invalid", "answer-json-invalid", "verdict-schema-invalid",
+]);
+const TERMINAL_SIGNALS = new Set(["SIGHUP", "SIGINT", "SIGTERM", "SIGKILL", "SIGABRT", "SIGSEGV", "SIGPIPE"]);
+
+function validateFailureDiagnostic(value, input, sandboxTransport) {
+  if (!value || typeof value !== "object" || Array.isArray(value)
+    || JSON.stringify(Object.keys(value).sort()) !== JSON.stringify(["binding", "child", "outer", "schema"])
+    || value.schema !== "pipeline.codex-critic-app-server-failure.v1"
+    || JSON.stringify(Object.keys(value.binding ?? {}).sort()) !== JSON.stringify(["candidateCommit", "candidateTree", "selectionId", "selectionSha256"])
+    || value.binding.candidateCommit !== input.dispatch.candidateCommit || value.binding.candidateTree !== input.dispatch.candidateTree
+    || typeof value.binding.selectionId !== "string" || typeof value.binding.selectionSha256 !== "string" || !/^[0-9a-f]{64}$/.test(value.binding.selectionSha256)
+    || value.binding.selectionId !== sandboxTransport.selectionId || value.binding.selectionSha256 !== sandboxTransport.selectionSha256
+    || JSON.stringify(Object.keys(value.child ?? {}).sort()) !== JSON.stringify(["cleanup", "code", "exitCode", "initialized", "signal", "started", "stdinEnded", "threadStarted", "turnCompleted", "turnStarted", "writeAttemptKind"])
+    || !APP_SERVER_FAILURE_CODES.has(value.child.code) || typeof value.child.started !== "boolean"
+    || typeof value.child.initialized !== "boolean" || typeof value.child.threadStarted !== "boolean" || typeof value.child.turnStarted !== "boolean" || typeof value.child.turnCompleted !== "boolean" || typeof value.child.stdinEnded !== "boolean"
+    || !(Number.isInteger(value.child.exitCode) || value.child.exitCode === null) || !(TERMINAL_SIGNALS.has(value.child.signal) || value.child.signal === null)
+    || !["complete", "incomplete", "unknown"].includes(value.child.cleanup) || !["file-change", "command-action", "server-rpc-request", null].includes(value.child.writeAttemptKind)
+    || JSON.stringify(Object.keys(value.outer ?? {}).sort()) !== JSON.stringify(["exitCode", "signal", "spawnFailed", "stderrBytes", "stdoutBytes"])
+    || !(Number.isInteger(value.outer.exitCode) || value.outer.exitCode === null) || !(TERMINAL_SIGNALS.has(value.outer.signal) || value.outer.signal === null)
+    || typeof value.outer.spawnFailed !== "boolean" || !Number.isInteger(value.outer.stdoutBytes) || value.outer.stdoutBytes < 0 || !Number.isInteger(value.outer.stderrBytes) || value.outer.stderrBytes < 0) return null;
+  return structuredClone(value);
+}
+
+function unavailableResult(code, selected = null, failureDiagnostic = null) {
+  const result = { ok: false, code, selectionId: selected?.selectionId ?? null, sandboxBinding: null };
+  if (failureDiagnostic) result.failureDiagnostic = structuredClone(failureDiagnostic);
+  return result;
 }
 
 /**
@@ -261,10 +291,12 @@ export async function runSelectedCriticHost(rawInput, transport = {}) {
   } catch {
     return unavailableResult("selected-critic-route-invalid");
   }
+  let capturedFailureDiagnostic = null;
   const selectedHost = selectedCriticInProcessBridge(input, {
     route,
     verifyRoute: resolveBoundRoute,
     invokeAppServer: transport.invokeCodexCriticAppServer ?? invokeCodexCriticAppServer,
+    captureFailureDiagnostic: (diagnostic) => { capturedFailureDiagnostic = diagnostic; },
   });
   let dependencies = transport.dependencies;
   if (dependencies !== undefined) {
@@ -278,7 +310,7 @@ export async function runSelectedCriticHost(rawInput, transport = {}) {
         hostBridge: selectedHost.bridge,
       });
     } catch {
-      return unavailableResult("selected-sandbox-required");
+      return unavailableResult("selected-sandbox-required", null, capturedFailureDiagnostic);
     }
   }
   let selected;
@@ -291,13 +323,13 @@ export async function runSelectedCriticHost(rawInput, transport = {}) {
       references: [...input.referencePaths],
     }, dependencies);
   } catch {
-    return unavailableResult("selected-sandbox-required");
+    return unavailableResult("selected-sandbox-required", null, capturedFailureDiagnostic);
   }
   if (!selected || selected.status === "unavailable" || selected.childStarted !== true) {
-    return unavailableResult("selected-sandbox-required", selected);
+    return unavailableResult("selected-sandbox-required", selected, capturedFailureDiagnostic);
   }
   if (selected.status === "error") {
-    return {
+    const result = {
       ok: false,
       code: "selected-critic-transport-failed",
       selectionId: selected.selectionId,
@@ -309,6 +341,8 @@ export async function runSelectedCriticHost(rawInput, transport = {}) {
         assurance: structuredClone(selected.assurance),
       },
     };
+    if (capturedFailureDiagnostic) result.failureDiagnostic = structuredClone(capturedFailureDiagnostic);
+    return result;
   }
   const completedResult = selectedHost.take(selected.selectionId);
   if (!completedResult || completedResult.execution.selectionId !== selected.selectionId

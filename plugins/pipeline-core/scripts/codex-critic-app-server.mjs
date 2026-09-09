@@ -22,6 +22,9 @@ const PROMPT_CONTRACT_PATH = "templates/prompts/critic-review.md";
 const VERDICT_SCHEMA_PATH = "scripts/critic-verdict.schema.json";
 const COMMIT_SHA = /^[0-9a-f]{40}$/;
 const TREE_SHA = /^[0-9a-f]{40,64}$/;
+const CHILD_FAILURE_CODES = new Set(["request-invalid", "prompt-invalid", "protocol-error", "write-attempt", "child-exit-error"]);
+const FAILURE_CODES = new Set([...CHILD_FAILURE_CODES, "outer-terminal", "outer-stdout-overflow", "child-output-invalid", "route-mismatch", "lifecycle-invalid", "answer-json-invalid", "verdict-schema-invalid"]);
+const SIGNALS = new Set(["SIGHUP", "SIGINT", "SIGTERM", "SIGKILL", "SIGABRT", "SIGSEGV", "SIGPIPE"]);
 
 function fail(message) { throw new Error(message); }
 
@@ -48,6 +51,26 @@ function normalizedCriticReference(repoRoot, value) {
 
 function loadVerdictSchema(path) {
   try { return JSON.parse(readFileSync(path, "utf8")); } catch { fail("critic verdict schema is unreadable"); }
+}
+
+function boundedFailureDiagnostic(result, terminal, stdoutBytes, stderrBytes, selected, payload, diagnosticCode) {
+  const observed = result?.observed && typeof result.observed === "object" ? result.observed : {};
+  const exitCode = Number.isInteger(observed.exitCode) ? observed.exitCode : null;
+  const signal = SIGNALS.has(observed.signal) ? observed.signal : null;
+  const outerExitCode = Number.isInteger(terminal.code) ? terminal.code : null;
+  const outerSignal = SIGNALS.has(terminal.signal) ? terminal.signal : null;
+  return {
+    schema: "pipeline.codex-critic-app-server-failure.v1",
+    binding: { selectionId: selected.selectionId, selectionSha256: selected.selectionSha256, candidateCommit: payload.candidateCommit, candidateTree: payload.candidateTree },
+    child: {
+      code: FAILURE_CODES.has(diagnosticCode) ? diagnosticCode : "child-output-invalid", started: terminal.error === null, initialized: observed.initialized === true,
+      threadStarted: observed.threadStarted === true, turnStarted: observed.turnStarted === true,
+      turnCompleted: observed.turnCompleted === true, stdinEnded: observed.stdinEnded === true,
+      exitCode, signal, cleanup: observed.cleanup === "complete" || observed.cleanup === "incomplete" ? observed.cleanup : "unknown",
+      writeAttemptKind: ["file-change", "command-action", "server-rpc-request"].includes(observed.writeAttemptKind) ? observed.writeAttemptKind : null,
+    },
+    outer: { exitCode: outerExitCode, signal: outerSignal, spawnFailed: terminal.error !== null, stdoutBytes, stderrBytes },
+  };
 }
 
 export async function invokeCodexCriticAppServer(payload, dependencies = {}) {
@@ -87,8 +110,9 @@ export async function invokeCodexCriticAppServer(payload, dependencies = {}) {
   });
   const chunks = [];
   let bytes = 0;
+  let stderrBytes = 0;
   child.stdout.on("data", (chunk) => { bytes += chunk.length; if (bytes <= 8 * 1024 * 1024) chunks.push(chunk); });
-  child.stderr.on("data", () => {});
+  child.stderr.on("data", (chunk) => { stderrBytes += chunk.length; });
   const close = new Promise((res) => {
     child.once("error", (error) => res({ code: null, signal: null, error: error?.code ?? "spawn-error" }));
     child.once("close", (code, signal) => res({ code, signal, error: null }));
@@ -113,23 +137,36 @@ export async function invokeCodexCriticAppServer(payload, dependencies = {}) {
     const lines = Buffer.concat(chunks).toString("utf8").trim().split("\n").filter(Boolean);
     try { if (lines.length === 1) result = JSON.parse(lines[0]); } catch { result = null; }
   }
-  const protocolOk = terminal.code === 0 && terminal.signal === null && terminal.error === null
-    && result?.schema === "pipeline.codex-critic-app-server-child.v1" && result.ok === true
-    && result.code === "answered" && result.observed?.provider === PROVIDER && result.observed?.model === selected.criticRoute.model && result.observed?.effort === selected.criticRoute.effort
-    && result.observed?.initialized === true && result.observed?.threadStarted === true
-    && result.observed?.turnStarted === true && result.observed?.turnCompleted === true
-    && result.observed?.stdinEnded === true && result.observed?.exitCode === 0
-    && result.observed?.signal === null && result.observed?.cleanup === "complete"
-    && typeof result.answer === "string";
+  const childAnswered = result?.schema === "pipeline.codex-critic-app-server-child.v1" && result.ok === true && result.code === "answered";
+  const routeOk = childAnswered && result.observed?.provider === PROVIDER && result.observed?.model === selected.criticRoute.model && result.observed?.effort === selected.criticRoute.effort;
+  const lifecycleOk = routeOk && result.observed?.initialized === true && result.observed?.threadStarted === true
+    && result.observed?.turnStarted === true && result.observed?.turnCompleted === true && result.observed?.stdinEnded === true
+    && result.observed?.exitCode === 0 && result.observed?.signal === null && result.observed?.cleanup === "complete";
+  const protocolOk = terminal.code === 0 && terminal.signal === null && terminal.error === null && lifecycleOk && typeof result.answer === "string";
   let verdict = null;
+  let answerJsonOk = false;
   if (protocolOk) {
-    try { verdict = JSON.parse(result.answer); } catch { verdict = null; }
+    try { verdict = JSON.parse(result.answer); answerJsonOk = true; } catch { verdict = null; }
   }
   const verdictOk = protocolOk && verdict !== null && typeof verdict === "object" && !Array.isArray(verdict)
     && validateAgainstSchema(verdict, loadVerdictSchema(verdictSchemaPath)).valid;
   // Do not collapse a completed but invalid child into no-child evidence. The
   // selected-duty bridge must retain it as a started transport incident.
-  if (!verdictOk) return { status: "unavailable", childStarted: terminal.error === null };
+  if (!verdictOk) {
+    const diagnosticCode = CHILD_FAILURE_CODES.has(result?.code) ? result.code
+      : bytes > 8 * 1024 * 1024 ? "outer-stdout-overflow"
+        : terminal.error !== null || terminal.code !== 0 || terminal.signal !== null ? "outer-terminal"
+          : !childAnswered ? "child-output-invalid"
+            : !routeOk ? "route-mismatch"
+              : !lifecycleOk ? "lifecycle-invalid"
+                : !answerJsonOk ? "answer-json-invalid"
+                  : "verdict-schema-invalid";
+    return {
+    status: "unavailable",
+    childStarted: terminal.error === null,
+    failureDiagnostic: boundedFailureDiagnostic(result, terminal, bytes, stderrBytes, selected, payload, diagnosticCode),
+    };
+  }
   return {
     status: "reviewed",
     verdict,

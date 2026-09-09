@@ -88,6 +88,7 @@ if (!process.exitCode) {
   let answer = null;
   let turnCompleted = false;
   let writeAttempt = false;
+  let writeAttemptKind = null;
   let protocolError = false;
   let settled = false;
   const send = (value) => child.stdin.write(`${JSON.stringify(value)}\n`);
@@ -98,18 +99,29 @@ if (!process.exitCode) {
   };
   const inspectItem = (item) => {
     if (!item || typeof item !== "object") { protocolError = true; return; }
-    if (item.type === "fileChange") { writeAttempt = true; return; }
+    if (item.type === "fileChange") { writeAttempt = true; writeAttemptKind ??= "file-change"; return; }
     if (item.type === "commandExecution") {
       if (!Array.isArray(item.commandActions)
-        || item.commandActions.some((action) => !["read", "listFiles", "search"].includes(action?.type))) writeAttempt = true;
+        || item.commandActions.some((action) => !["read", "listFiles", "search"].includes(action?.type))) {
+        writeAttempt = true; writeAttemptKind ??= "command-action";
+      }
     }
     if (item.type === "agentMessage") {
-      if (typeof item.text !== "string" || answer !== null) protocolError = true;
-      else answer = item.text;
+      if (typeof item.text !== "string") { protocolError = true; return; }
+      // Codex 0.153.4 emits commentary before final_answer. Missing phase is
+      // accepted only as the single legacy answer; multiple unknown replies
+      // never become a verdict by accident.
+      if (item.phase === "commentary") return;
+      if (item.phase === "final_answer" || item.phase === undefined || item.phase === null) {
+        if (answer !== null) protocolError = true;
+        else answer = item.text;
+        return;
+      }
+      protocolError = true;
     }
   };
   const onMessage = (value) => {
-    if (value?.method && value?.id !== undefined) { writeAttempt = true; finishProtocol(); return; }
+    if (value?.method && value?.id !== undefined) { writeAttempt = true; writeAttemptKind ??= "server-rpc-request"; finishProtocol(); return; }
     if (value?.id === 1) {
       if (value.error || !value.result || initialized) { protocolError = true; finishProtocol(); return; }
       initialized = true;
@@ -188,7 +200,7 @@ if (!process.exitCode) {
     ok,
     code: ok ? "answered" : writeAttempt ? "write-attempt" : protocolError ? "protocol-error" : "child-exit-error",
     answer: ok ? answer : null,
-    observed: { provider: ok ? PROVIDER : null, model: ok ? request.model : null, effort: ok ? request.effort : null, initialized, threadStarted: threadId !== null, turnStarted: turnId !== null, turnCompleted, stdinEnded: child.stdin.writableEnded, exitCode: close.code, signal: close.signal, cleanup: close.spawnError === null && close.signal === null ? "complete" : "incomplete" },
+    observed: { provider: ok ? PROVIDER : null, model: ok ? request.model : null, effort: ok ? request.effort : null, initialized, threadStarted: threadId !== null, turnStarted: turnId !== null, turnCompleted, stdinEnded: child.stdin.writableEnded, exitCode: close.code, signal: close.signal, cleanup: close.spawnError === null && close.signal === null ? "complete" : "incomplete", writeAttemptKind },
   });
   process.exitCode = ok ? 0 : 2;
 }
