@@ -5,14 +5,6 @@ reviewable, traceable, and measurable. It turns a change into a bounded task,
 machine evidence, independent review, and a durable record that a team can
 inspect later.
 
-> **A note on language.** This operating model was first built in German and then
-> made English-first for release. The docs are English-primary — bilingual files
-> keep a full German reference below a skip marker — but because of that origin,
-> stray German may still surface here and there (a comment, an example, an internal
-> label, or the odd directive). It's harmless, corrections/PRs are welcome, and you
-> pick the language the pipeline works in for you (commits, reviews, PRDs) via the
-> `language.human_facing` setting.
-
 > _A German version follows below · Eine deutsche Fassung folgt weiter unten._
 
 > **Newcomer path:** Read this page, then follow [SETUP](SETUP.md) for the
@@ -392,15 +384,6 @@ Ein versioniertes Operating Model für Teams, die agentische Lieferung
 prüfbar, nachvollziehbar und messbar machen müssen. Es formt eine Änderung zu
 einer begrenzten Aufgabe, Maschinenevidenz, unabhängiger Prüfung und einem
 dauerhaften, später einsehbaren Nachweis.
-
-> **Zur Sprache.** Dieses Operating Model entstand zuerst auf Deutsch und wurde für
-> die Veröffentlichung auf Englisch-first umgestellt. Die Doku ist englisch-primär —
-> zweisprachige Dateien führen unterhalb eines Skip-Markers eine vollständige
-> deutsche Referenz —, aber durch diese Herkunft können vereinzelt noch deutsche
-> Reste auftauchen (ein Kommentar, ein Beispiel, ein internes Label oder mal eine
-> Direktive). Das ist unkritisch, Korrekturen/PRs sind willkommen, und welche
-> Sprache die Pipeline für dich verwendet (Commits, Reviews, PRDs), wählst du über
-> die Einstellung `language.human_facing`.
 
 > **Einstieg für Neue:** Lies diese Seite und folge dann [SETUP](SETUP.md) für
 > den normalen Consumer-Ablauf. [PIPELINE_FLOW](PIPELINE_FLOW.md) erklärt den
