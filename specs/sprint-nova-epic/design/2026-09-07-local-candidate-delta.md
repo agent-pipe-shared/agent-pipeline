@@ -3,7 +3,25 @@
 This contract supplements the Sprint Nova PRD for the next local test candidate.
 The release target is 0.6.2; a local candidate retains the current release base
 and receives runner-specific build metadata. Publication and pushing are outside
-this delivery. D.2–D.6 follow the test candidate and remain required for 0.6.2.
+this delivery. D.2–D.6 followed the first test candidate; the current user goal
+includes them in the next local candidate, before the 0.6.2 release.
+
+## Current documentation completion scope — 9 September
+
+- Complete D.2 capability coverage and its actual public targets. Activate the
+  inventory only with a genuine passing Critic receipt; fixture digests are not
+  review evidence. Include the inventory and its checker in technical review.
+- Complete D.3 frontdoors, D.4 parallel-work guidance and D.5 cost documentation
+  with the delivered runner boundaries and evidence limits stated accurately.
+- D.6 attribution must preserve supplied labels and distinguish measured runs
+  from estimates. Missing comparable runner measurements remain an explicit
+  evidence dependency; do not manufacture a comparison to close the item.
+- Perform the fresh two-stage reader review prescribed by
+  `harness/reader-review-protocol.md` after inventory activation, resolve findings,
+  and bind its closure to the final committed documentation state. Include the
+  reader checker, release-preflight integration and regressions in Critic scope.
+- Complete the started Nova-B repairs, including GG22 pathspec regressions and
+  current preflight-schema compatibility binding, before the final local stamp.
 
 ## Routing authority
 
