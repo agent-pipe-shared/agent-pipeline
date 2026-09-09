@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.rg-pipe-lexical-containment-gap
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-06
+closed_at: 2026-09-09
+closure_repository: self
+closure_commit: 4950d24addeac9a93df61826d4a9f4a044753480
+closure_evidence: backlog/evidence/2026-09-09-local-candidate-po-decisions.md
 sprint: nova-b
 tracking: "Nova B — NVA-B-READCONTAIN-1 restored realpath-aware containment for the single-command read lane, the cat-pipeline lane, and the git-pipeline lane in guard-lifecycle-ready.mjs. It deliberately did not touch guard-command-grammar.mjs's approvedReadPath(), which backs the rg-to-rg/rg-to-head bounded pipeline (isBoundedReadOnlyPipeline) — that function stays purely lexical (resolve()+pathInside(), no existsSync/realpathSync at all), a strictly weaker check than even NVA-B-READCONTAIN-1's own round-1 (direct-symlink-only) fix. Traced and confirmed by the Elephant, 2026-09-06, while filing related gaps found during the same package's closure."
 done_when: manual

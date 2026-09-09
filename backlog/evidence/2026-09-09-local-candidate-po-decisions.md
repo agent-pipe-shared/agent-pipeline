@@ -57,3 +57,12 @@ If this host cannot meet that contract, preserve the actual diagnostic and
 continue independent work. No fallback verdict or sandbox success may be
 inferred from a new CLI version, a model that simply never attempted a write,
 or the PO's consent.
+
+## Closure of pipeline.rg-pipe-lexical-containment-gap and pipeline.orchestrator-added-file-undisclosed-in-dispatch-commit
+
+In commit `4950d24addeac9a93df61826d4a9f4a044753480`:
+- Bounded `rg`-pipeline (`isBoundedReadOnlyPipeline`) containment checks now resolve symlinks via `isRealpathedWithinBoundary`, refusing direct outside symlinks and symlink+.. escapes.
+- Bounded `cat`-pipeline (`isBoundedCatPipeline`) accepts and threads session-derived extra roots (session transcript file and session memory directory).
+- `dispatch-authorship-verify.mjs` and `goldfish-task.md` briefing template support `orchestratorAddedFiles`, resolving discrepancies where an orchestrator legitimately adds registry or evidence files to a dispatch commit.
+- Verified by unit tests in `guard-lifecycle-ready.test.mjs` and `dispatch-authorship-verify.test.mjs`.
+

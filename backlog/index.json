@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "ce6847971b847cbf501e46d4cb0d6294b666230b3ddaeff90fca8db42c18634f"
+    "transitionHead": "0e467a27cda99ffbf9c08480fe4017f9d580437d037fa70ad65aede55c7b6278"
   },
   "counts": {
-    "open": 110,
+    "open": 108,
     "in_progress": 0,
-    "closed": 528,
+    "closed": 530,
     "rejected": 3,
     "deferred": 11
   },
@@ -4803,13 +4803,17 @@
     },
     {
       "id": "pipeline.orchestrator-added-file-undisclosed-in-dispatch-commit",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-06",
       "source": "T1 Critic round-2 finding F-D on NVA-B-PARALLELSLICING-DESIGN-1, 2026-09-06: commit 9e40548b carries governance/observation-doc-governance.json (+1) alongside the draft; the stripped record lists only the draft and its own evidence file.",
       "deferred": false,
-      "tracking": "Nova B -- a commit carrying a Dispatch: trailer can legitimately contain files the dispatch did not write (an EL-01-permitted orchestrator append, e.g. a governance registry line added at commit time). The dispatch record's changedFiles then under-reports the commit's file set, and there is no field in which the orchestrator's own addition can be disclosed. A Critic comparing git show --stat against the record sees an unexplained discrepancy and must reason its way to the benign reading."
+      "tracking": "Nova B -- a commit carrying a Dispatch: trailer can legitimately contain files the dispatch did not write (an EL-01-permitted orchestrator append, e.g. a governance registry line added at commit time). The dispatch record's changedFiles then under-reports the commit's file set, and there is no field in which the orchestrator's own addition can be disclosed. A Critic comparing git show --stat against the record sees an unexplained discrepancy and must reason its way to the benign reading.",
+      "closedAt": "2026-09-09",
+      "closureRepository": "self",
+      "closureCommit": "4950d24addeac9a93df61826d4a9f4a044753480",
+      "closureEvidence": "backlog/evidence/2026-09-09-local-candidate-po-decisions.md"
     },
     {
       "id": "pipeline.orchestrator-authored-production-commits-have-no-deterministic-control",
@@ -6344,13 +6348,17 @@
     },
     {
       "id": "pipeline.rg-pipe-lexical-containment-gap",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-06",
       "source": "Elephant, 2026-09-06, code trace of guard-command-grammar.mjs's approvedReadPath()/validateRg()/isBoundedReadOnlyPipeline() against guard-lifecycle-ready.mjs's now-realpath-aware isApprovedSingleCommandReadArg()/isApprovedCatPipelineReadPath(), prompted by an advisor review of NVA-B-READCONTAIN-1's closure.",
       "deferred": false,
-      "tracking": "Nova B — NVA-B-READCONTAIN-1 restored realpath-aware containment for the single-command read lane, the cat-pipeline lane, and the git-pipeline lane in guard-lifecycle-ready.mjs. It deliberately did not touch guard-command-grammar.mjs's approvedReadPath(), which backs the rg-to-rg/rg-to-head bounded pipeline (isBoundedReadOnlyPipeline) — that function stays purely lexical (resolve()+pathInside(), no existsSync/realpathSync at all), a strictly weaker check than even NVA-B-READCONTAIN-1's own round-1 (direct-symlink-only) fix. Traced and confirmed by the Elephant, 2026-09-06, while filing related gaps found during the same package's closure."
+      "tracking": "Nova B — NVA-B-READCONTAIN-1 restored realpath-aware containment for the single-command read lane, the cat-pipeline lane, and the git-pipeline lane in guard-lifecycle-ready.mjs. It deliberately did not touch guard-command-grammar.mjs's approvedReadPath(), which backs the rg-to-rg/rg-to-head bounded pipeline (isBoundedReadOnlyPipeline) — that function stays purely lexical (resolve()+pathInside(), no existsSync/realpathSync at all), a strictly weaker check than even NVA-B-READCONTAIN-1's own round-1 (direct-symlink-only) fix. Traced and confirmed by the Elephant, 2026-09-06, while filing related gaps found during the same package's closure.",
+      "closedAt": "2026-09-09",
+      "closureRepository": "self",
+      "closureCommit": "4950d24addeac9a93df61826d4a9f4a044753480",
+      "closureEvidence": "backlog/evidence/2026-09-09-local-candidate-po-decisions.md"
     },
     {
       "id": "pipeline.ruleset-freshness-wsl-subsystem-absent",

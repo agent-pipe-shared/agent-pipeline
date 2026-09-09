@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.orchestrator-added-file-undisclosed-in-dispatch-commit
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-06
+closed_at: 2026-09-09
+closure_repository: self
+closure_commit: 4950d24addeac9a93df61826d4a9f4a044753480
+closure_evidence: backlog/evidence/2026-09-09-local-candidate-po-decisions.md
 sprint: nova-b
 done_when: manual
 tracking: "Nova B -- a commit carrying a Dispatch: trailer can legitimately contain files the dispatch did not write (an EL-01-permitted orchestrator append, e.g. a governance registry line added at commit time). The dispatch record's changedFiles then under-reports the commit's file set, and there is no field in which the orchestrator's own addition can be disclosed. A Critic comparing git show --stat against the record sees an unexplained discrepancy and must reason its way to the benign reading."
