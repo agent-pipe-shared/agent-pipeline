@@ -65,6 +65,32 @@ test("read-only dispatch preflight binds candidate, candidate-tree governance, a
   assert.equal(result.dispatch.requiredNextGate, "selected-runner-transport");
 });
 
+test("current-artifact preflight binds an unchanged artifact to the later candidate without inventing a range", () => {
+  const fx = fixture();
+  writeFileSync(join(fx.root, "governance", "policies", "checklist.md"), "- verify\n- later correction\n");
+  const candidate = commit(fx.root, "later unrelated correction");
+  const tree = git(fx.root, ["rev-parse", "HEAD^{tree}"]);
+  writeFileSync(join(fx.root, "evidence", "verify.json"), `${JSON.stringify({ candidate: { commit: candidate, tree } })}\n`);
+  const result = preflightCriticDispatch({
+    root: fx.root, candidate, reviewScope: { kind: "current-artifacts", paths: ["specs/spec.md"] },
+    specPath: "specs/spec.md", guardrailPaths: [], evidencePaths: ["evidence/verify.json"],
+  });
+  assert.equal(Object.hasOwn(result, "base"), false);
+  assert.deepEqual(result.reviewScope, { kind: "current-artifacts", paths: ["specs/spec.md"] });
+  assert.deepEqual(result.sourceCoverage.map(({ path, mode }) => ({ path, mode })), [{ path: "specs/spec.md", mode: "100644" }]);
+  assert.equal(result.candidate.commit, candidate);
+  assert.throws(() => preflightCriticDispatch({
+    root: fx.root, base: fx.base, candidate, reviewScope: { kind: "current-artifacts", paths: ["specs/spec.md"] },
+    specPath: "specs/spec.md", guardrailPaths: [], evidencePaths: ["evidence/verify.json"],
+  }), (error) => error instanceof CriticDispatchPreflightError && error.code === "CDP-SCOPE-MIXED");
+  for (const paths of [["specs\\spec.md"], ["specs/spec.md", "specs/spec.md"], ["specs/spec.md", "governance/policies/checklist.md"]]) {
+    assert.throws(() => preflightCriticDispatch({
+      root: fx.root, candidate, reviewScope: { kind: "current-artifacts", paths },
+      specPath: "specs/spec.md", guardrailPaths: [], evidencePaths: ["evidence/verify.json"],
+    }), (error) => error instanceof CriticDispatchPreflightError);
+  }
+});
+
 test("rejects missing candidate-bound evidence, missing governance, and prior-evidence aliasing", () => {
   const fx = fixture();
   assert.throws(() => preflightCriticDispatch(input(fx, { evidencePaths: [] })), (error) => error instanceof CriticDispatchPreflightError && error.code === "CDP-EVIDENCE-REQUIRED");

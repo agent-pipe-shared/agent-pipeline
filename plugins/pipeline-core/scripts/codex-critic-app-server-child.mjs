@@ -41,9 +41,11 @@ function nativeUnknownCommandKind(command) {
   if (first === "git") return "command-unknown-git";
   return SAFE_COMMAND_FAMILIES.has(first) ? `command-unknown-${first}` : "command-unknown-other";
 }
-const LEGACY_REQUEST_KEYS = Object.freeze(["candidateCommit", "candidateTree", "codexPath", "cwd", "effort", "model", "promptContractPath", "referencePaths", "reviewBase", "roleContractPath", "scratchPath", "verdictSchemaPath"]);
+const BASE_REQUEST_KEYS = Object.freeze(["candidateCommit", "candidateTree", "codexPath", "cwd", "effort", "model", "promptContractPath", "referencePaths", "roleContractPath", "scratchPath", "verdictSchemaPath"]);
+const LEGACY_REQUEST_KEYS = Object.freeze([...BASE_REQUEST_KEYS, "reviewBase"].sort());
 const NATIVE_SANDBOX_MODE = "native-tools-read-only";
-const NATIVE_REQUEST_KEYS = Object.freeze([...LEGACY_REQUEST_KEYS, "reviewMode", "sandboxMode"].sort());
+const NATIVE_RANGE_REQUEST_KEYS = Object.freeze([...LEGACY_REQUEST_KEYS, "reviewMode", "sandboxMode"].sort());
+const NATIVE_ARTIFACT_REQUEST_KEYS = Object.freeze([...BASE_REQUEST_KEYS, "reviewScope", "reviewMode", "sandboxMode"].sort());
 
 function fail(code, native = false) {
   write({ schema: native ? "pipeline.codex-native-critic-app-server-child.v1" : "pipeline.codex-critic-app-server-child.v1", ok: false, code });
@@ -65,6 +67,7 @@ function loadedCriticRulesetSha(request) {
 function renderCriticPrompt(request) {
   const rulesetSha = loadedCriticRulesetSha(request);
   const calibration = request.referencePaths.includes(".claude/pipeline.json") ? ".claude/pipeline.json" : "n/a";
+  const artifact = request.reviewScope !== undefined;
   const lines = [
     "You are the Agent-Pipeline Critic, operating at the read-only isolation level.",
     "This is a fresh session with no memory of any other session.",
@@ -73,13 +76,20 @@ function renderCriticPrompt(request) {
     `Selected route: provider openai · model ${request.model} · effort ${request.effort} · native read-only sandbox · network disabled · approvalPolicy never.`,
     `Role contract (read first): ${request.roleContractPath}`,
     `Prompt contract (read second): ${request.promptContractPath}`,
-    `Review base commit: ${request.reviewBase}`,
     `Candidate commit: ${request.candidateCommit}`,
     `Candidate tree: ${request.candidateTree}`,
-    ...(request.sandboxMode === NATIVE_SANDBOX_MODE ? [
+    ...(artifact ? [
+      "Selected review mode: full.",
+      "Perform a full current-artifact judgment of the named current artifacts against the supplied spec and guardrails. Review the complete supplied artifacts; do not treat this as a correction range or broaden beyond the named artifacts.",
+      "Named current artifacts:",
+      ...request.reviewScope.paths.map((path) => `- ${path}`),
+    ] : [
+      `Review base commit: ${request.reviewBase}`,
+      ...(request.sandboxMode === NATIVE_SANDBOX_MODE ? [
       "Selected review mode: full.",
       `Perform a full review of the provided exact correction range only: ${request.reviewBase} through ${request.candidateCommit}. Do not broaden the review beyond that range.`,
-    ] : []),
+      ] : []),
+    ]),
     "Reference paths to inspect, relative to your working directory:",
     ...request.referencePaths.map((path) => `- ${path}`),
     ...(request.sandboxMode === NATIVE_SANDBOX_MODE ? [
@@ -100,7 +110,8 @@ try {
 
 if (!process.exitCode) {
   const native = request?.sandboxMode === NATIVE_SANDBOX_MODE;
-  const expectedKeys = native ? NATIVE_REQUEST_KEYS : LEGACY_REQUEST_KEYS;
+  const artifact = native && Object.hasOwn(request ?? {}, "reviewScope");
+  const expectedKeys = native ? (artifact ? NATIVE_ARTIFACT_REQUEST_KEYS : NATIVE_RANGE_REQUEST_KEYS) : LEGACY_REQUEST_KEYS;
   const closedShape = request && typeof request === "object" && !Array.isArray(request)
     && JSON.stringify(Object.keys(request).sort()) === JSON.stringify(expectedKeys)
     && (!native || request.sandboxMode === NATIVE_SANDBOX_MODE)
@@ -114,7 +125,13 @@ if (!process.exitCode) {
     && typeof request.effort === "string" && request.effort.length > 0
     && Array.isArray(request.referencePaths) && request.referencePaths.length > 0
     && request.referencePaths.every((path) => typeof path === "string" && path.length > 0 && !path.startsWith("/"))
-    && COMMIT_SHA.test(request.candidateCommit) && TREE_SHA.test(request.candidateTree) && COMMIT_SHA.test(request.reviewBase)
+    && COMMIT_SHA.test(request.candidateCommit) && TREE_SHA.test(request.candidateTree)
+    && (artifact
+      ? request.reviewScope?.kind === "current-artifacts" && Array.isArray(request.reviewScope.paths) && request.reviewScope.paths.length > 0
+        && request.reviewScope.paths.every((path) => typeof path === "string" && path.length > 0 && !path.startsWith("/") && !path.includes("\\") && !path.includes("\0") && !path.startsWith("./") && !path.endsWith("/") && path.split("/").every((part) => part && part !== "." && part !== ".."))
+        && new Set(request.reviewScope.paths).size === request.reviewScope.paths.length
+        && JSON.stringify(request.reviewScope.paths) === JSON.stringify([...request.reviewScope.paths].sort())
+      : COMMIT_SHA.test(request.reviewBase))
     && (!native || request.reviewMode === "full");
   if (!closedShape) fail("request-invalid", native);
 }

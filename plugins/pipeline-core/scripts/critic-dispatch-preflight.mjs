@@ -70,6 +70,18 @@ function uniquePaths(values, label) {
   return paths;
 }
 
+function currentArtifactScope(value) {
+  if (!isObject(value) || JSON.stringify(Object.keys(value).sort()) !== JSON.stringify(["kind", "paths"])) {
+    fail("CDP-SCOPE", "Current-artifact review scope must be closed.");
+  }
+  if (value.kind !== "current-artifacts") fail("CDP-SCOPE", "Unsupported current-artifact review scope.");
+  const paths = uniquePaths(value.paths, "current-artifact path");
+  if (paths.length === 0 || paths.length > 128 || JSON.stringify(paths) !== JSON.stringify(value.paths)) {
+    fail("CDP-SCOPE", "Current-artifact paths must be nonempty lexical unique paths.");
+  }
+  return { kind: "current-artifacts", paths };
+}
+
 function gitOrNull(root, args) {
   const result = spawnSync("git", ["-C", root, ...args], {
     encoding: "utf8",
@@ -144,6 +156,32 @@ function candidateText(root, candidate, path) {
   return String(result.stdout);
 }
 
+function candidateBytes(root, candidate, path) {
+  const result = spawnSync("git", ["-C", root, "show", `${candidate}:${path}`], {
+    encoding: null,
+    env: { LANG: "C", LC_ALL: "C", PATH: process.env.PATH ?? "" },
+    shell: false,
+    timeout: 10_000,
+    maxBuffer: EVIDENCE_MAX_BYTES,
+  });
+  if (result.error || result.status !== 0) fail("CDP-CANDIDATE-READ", `Cannot read candidate path: ${path}`);
+  return result.stdout;
+}
+
+function currentArtifactCoverage(root, candidate, byPath, scope) {
+  return scope.paths.map((path) => {
+    const file = byPath.get(path);
+    if (!file || !file.readable) fail("CDP-SCOPE-PATH", `Current artifact is absent or unreadable in the candidate: ${path}`);
+    const row = git(root, ["ls-tree", "-z", candidate, "--", path]);
+    const match = row.match(/^(\d{6}) blob ([a-f0-9]+)\t/s);
+    if (!match || !OID.test(match[2]) || !["100644", "100755"].includes(match[1])) {
+      fail("CDP-SCOPE-MODE", `Current artifact is not a supported regular candidate file: ${path}`);
+    }
+    const bytes = candidateBytes(root, candidate, path);
+    return { path, blobOid: match[2], sha256: sha256(bytes), mode: match[1] };
+  });
+}
+
 function localEvidence(root, path) {
   const realRoot = realpathSync(root);
   const absolute = resolve(realRoot, path);
@@ -184,17 +222,22 @@ function requiredCandidateReadback(root, candidate, byPath, paths, label) {
  * state. Evidence is a local, bounded JSON observation that binds the frozen
  * candidate; Spec and guardrails are always read from that candidate tree.
  */
-export function preflightCriticDispatch({ root, base, candidate, specPath, guardrailPaths, evidencePaths, priorCriticEvidencePath = null }) {
-  if (typeof root !== "string" || root.length === 0 || typeof base !== "string" || typeof candidate !== "string") {
-    fail("CDP-INPUT", "root, base, and candidate are required.");
+export function preflightCriticDispatch({ root, base = null, candidate, specPath, guardrailPaths, evidencePaths, priorCriticEvidencePath = null, reviewScope = null }) {
+  if (typeof root !== "string" || root.length === 0 || typeof candidate !== "string") {
+    fail("CDP-INPUT", "root and candidate are required.");
   }
   const realRoot = realpathSync(root);
-  const { commit: baseCommit, tree: baseTree } = resolveBase(realRoot, base);
+  const scope = reviewScope === null ? null : currentArtifactScope(reviewScope);
+  if (scope === null && typeof base !== "string") fail("CDP-INPUT", "base is required for an exact-range review.");
+  if (scope !== null && base !== null) fail("CDP-SCOPE-MIXED", "Current-artifact scope cannot include a review base.");
+  const rangeBase = scope === null ? resolveBase(realRoot, base) : null;
+  const baseCommit = rangeBase?.commit ?? null;
+  const baseTree = rangeBase?.tree ?? null;
   const candidateCommit = git(realRoot, ["rev-parse", "--verify", `${candidate}^{commit}`]);
   const candidateTree = git(realRoot, ["rev-parse", `${candidateCommit}^{tree}`]);
-  if (![baseTree, candidateCommit, candidateTree].every((value) => OID.test(value))) fail("CDP-REF", "Git returned an invalid candidate binding.");
+  if (![candidateCommit, candidateTree, ...(scope === null ? [baseTree] : [])].every((value) => OID.test(value))) fail("CDP-REF", "Git returned an invalid candidate binding.");
   if (baseCommit !== null && !OID.test(baseCommit)) fail("CDP-REF", "Git returned an invalid candidate binding.");
-  if (baseCommit === candidateCommit) fail("CDP-RANGE", "Critic base and candidate must be different commits.");
+  if (scope === null && baseCommit === candidateCommit) fail("CDP-RANGE", "Critic base and candidate must be different commits.");
 
   const spec = normalizePath(specPath, "spec path");
   const guardrails = uniquePaths(guardrailPaths, "guardrail path");
@@ -210,8 +253,10 @@ export function preflightCriticDispatch({ root, base, candidate, specPath, guard
   let manifest;
   try { manifest = parseYaml(candidateText(realRoot, candidateCommit, ".claude/pipeline.yaml")); }
   catch { fail("CDP-MANIFEST", "Candidate manifest cannot be parsed."); }
-  const changedPaths = git(realRoot, ["diff", "--name-only", "-z", baseCommit ?? baseTree, candidateCommit, "--"])
-    .split("\0").filter(Boolean).map((path) => normalizePath(path, "changed path")).sort(compare);
+  const changedPaths = scope === null
+    ? git(realRoot, ["diff", "--name-only", "-z", baseCommit ?? baseTree, candidateCommit, "--"])
+      .split("\0").filter(Boolean).map((path) => normalizePath(path, "changed path")).sort(compare)
+    : scope.paths;
   const governance = deriveCriticPacketGovernance({
     schema: CRITIC_PACKET_GOVERNANCE_INPUT_SCHEMA,
     manifest,
@@ -224,6 +269,7 @@ export function preflightCriticDispatch({ root, base, candidate, specPath, guard
   const guardrailReadback = requiredCandidateReadback(realRoot, candidateCommit, byPath, allGuardrails, "guardrail");
   const evidenceReadback = evidence.map((path) => matchingCandidateEvidence(localEvidence(realRoot, path), candidateCommit, candidateTree, path));
   const priorReadback = prior === null ? null : { path: prior, sha256: sha256(localEvidence(realRoot, prior)) };
+  const sourceCoverage = scope === null ? null : currentArtifactCoverage(realRoot, candidateCommit, byPath, scope);
 
   return {
     schema: CRITIC_DISPATCH_PREFLIGHT_SCHEMA,
@@ -232,7 +278,7 @@ export function preflightCriticDispatch({ root, base, candidate, specPath, guard
     // packet integrity for a runnable Critic lane and to start an unbounded
     // generic child when that lane was unavailable.
     status: "packet-ready",
-    base: { commit: baseCommit, tree: baseTree },
+    ...(scope === null ? { base: { commit: baseCommit, tree: baseTree } } : { reviewScope: scope, sourceCoverage }),
     candidate: { commit: candidateCommit, tree: candidateTree },
     spec: specReadback,
     guardrails: guardrailReadback,

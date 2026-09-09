@@ -1467,6 +1467,7 @@ function writeFakeCriticAppServer(directory, items, {
   requireNativeWire = false,
   expectedEnvironment = null,
   expectedPromptIncludes = [],
+  expectedPromptExcludes = [],
 } = {}) {
   const path = join(directory, "fake-codex-app-server.mjs");
   const source = [
@@ -1487,6 +1488,7 @@ function writeFakeCriticAppServer(directory, items, {
     `const expectedNativeArgs = ${JSON.stringify(nativeCriticReducingCliArgs())};`,
     `const expectedEnvironment = ${JSON.stringify(expectedEnvironment)};`,
     `const expectedPromptIncludes = ${JSON.stringify(expectedPromptIncludes)};`,
+    `const expectedPromptExcludes = ${JSON.stringify(expectedPromptExcludes)};`,
     "const effectiveItemThreadId = requireNativeWire ? itemThreadId : 'thread-1';",
     "let featureIndex = 0; let mcpIndex = 0; let discoveryMcpIndex = 0;",
     "let buffer = '';",
@@ -1502,6 +1504,7 @@ function writeFakeCriticAppServer(directory, items, {
     "  if (requireNativeWire && (value.id !== 7 || value.params?.approvalPolicy !== 'never' || value.params?.model !== model || value.params?.effort == null || value.params?.sandboxPolicy?.type !== 'readOnly' || value.params?.sandboxPolicy?.networkAccess !== false)) return send({ id: value.id, error: { code: -1 } });",
     "  const promptText = Array.isArray(value.params?.input) ? value.params.input.map((part) => part?.text ?? '').join('') : '';",
     "  if (expectedPromptIncludes.some((text) => !promptText.includes(text))) return send({ id: value.id, error: { code: -1 } });",
+    "  if (expectedPromptExcludes.some((text) => promptText.includes(text))) return send({ id: value.id, error: { code: -1 } });",
     "  send({ id: value.id, result: { turn: { id: 'turn-1' } } });",
     "  for (const request of serverRequests) send(request);",
     "  for (const item of items) send({ method: 'item/completed', params: { threadId: effectiveItemThreadId, turnId: itemTurnId, item } });",
@@ -1518,13 +1521,14 @@ function writeFakeCriticAppServer(directory, items, {
   return path;
 }
 
-function runActualCriticChild(childPath, codexPath, scratchPath, { native = false, reviewMode = "full", env } = {}) {
+function runActualCriticChild(childPath, codexPath, scratchPath, { native = false, reviewMode = "full", reviewScope = null, env } = {}) {
   const input = {
     codexPath, cwd: DEFAULT_PIPELINE_ROOT, scratchPath, model: SELECTED_CRITIC_ROUTE.model, effort: SELECTED_CRITIC_ROUTE.effort,
     referencePaths: ["roles/critic.md"], roleContractPath: join(DEFAULT_PIPELINE_ROOT, "plugins/pipeline-core/roles/critic.md"),
     promptContractPath: join(DEFAULT_PIPELINE_ROOT, "plugins/pipeline-core/templates/prompts/critic-review.md"),
     verdictSchemaPath: join(DEFAULT_PIPELINE_ROOT, "plugins/pipeline-core/scripts/critic-verdict.schema.json"),
-    candidateCommit: "c".repeat(40), candidateTree: "d".repeat(40), reviewBase: "9".repeat(40),
+    candidateCommit: "c".repeat(40), candidateTree: "d".repeat(40),
+    ...(reviewScope === null ? { reviewBase: "9".repeat(40) } : { reviewScope }),
     ...(native ? { sandboxMode: "native-tools-read-only", ...(reviewMode === null ? {} : { reviewMode }) } : {}),
   };
   const run = spawnSync(process.execPath, [childPath], { cwd: DEFAULT_PIPELINE_ROOT, input: JSON.stringify(input), encoding: "utf8", shell: false, timeout: 5_000, ...(env ? { env } : {}) });
@@ -1757,6 +1761,28 @@ check("the native child rejects missing or unsupported review mode before starti
       assert.equal(result.status, 2);
       assert.equal(result.result.code, "request-invalid");
     }
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+check("the actual native child renders a current-artifact judgment without a correction range", () => {
+  const fixture = mkdtempSync(join(tmpdir(), "codex-critic-native-current-artifact-"));
+  const childPath = join(DEFAULT_PIPELINE_ROOT, "plugins/pipeline-core/scripts/codex-critic-app-server-child.mjs");
+  const scope = { kind: "current-artifacts", paths: ["plugins/pipeline-core/scripts/codex-native-critic-host.mjs"] };
+  try {
+    const result = runActualCriticChild(childPath, writeFakeCriticAppServer(fixture, [
+      { type: "agentMessage", phase: "final_answer", text: JSON.stringify(validCriticVerdict()) },
+    ], {
+      requireNativeWire: true,
+      expectedPromptIncludes: [
+        "Perform a full current-artifact judgment of the named current artifacts against the supplied spec and guardrails.",
+        "- plugins/pipeline-core/scripts/codex-native-critic-host.mjs",
+      ],
+      expectedPromptExcludes: ["Review base commit:", "exact correction range only"],
+    }), fixture, { native: true, reviewScope: scope });
+    assert.equal(result.status, 0, JSON.stringify(result));
+    assert.equal(result.result.code, "answered");
   } finally {
     rmSync(fixture, { recursive: true, force: true });
   }

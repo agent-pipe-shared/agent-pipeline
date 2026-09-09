@@ -18,7 +18,9 @@ import { validateAgainstSchema } from "../lib/schema-lite.mjs";
 import {
   NATIVE_CRITIC_ASSURANCE,
   NATIVE_CRITIC_POLICY,
+  nativeCriticArtifactRequestDigest,
   nativeCriticCanonicalDigest,
+  validateNativeCriticArtifactScope,
   validateNativeCriticSelection,
   validateNativeCriticTuple,
 } from "../lib/codex-native-critic-policy.mjs";
@@ -43,6 +45,7 @@ const REVIEW_IDLE_MS = 180_000;
 const SHA256 = /^[a-f0-9]{64}$/;
 const COMMIT = /^[a-f0-9]{40}$/;
 const TREE = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
+const REGULAR_MODE = new Set(["100644", "100755"]);
 const SIGNALS = new Set(["SIGHUP", "SIGINT", "SIGTERM", "SIGKILL", "SIGABRT", "SIGSEGV", "SIGPIPE"]);
 const FAILURE_CODES = new Set([
   "input-invalid", "selection-invalid", "route-invalid", "physical-proof-unavailable", "physical-proof-drift",
@@ -142,27 +145,42 @@ function boundedFailure(code, selection = null, terminal = null, lifecycle = {})
 }
 
 function validateInput(value) {
-  exactKeys(value, ["selection", "expectedTuple", "repository", "coordinatorScratch", "referencePaths", "referenceRecords", "reviewBase", "reviewMode"], "native Critic host input");
+  const artifact = Object.hasOwn(value ?? {}, "reviewScope");
+  exactKeys(value, artifact
+    ? ["selection", "expectedTuple", "repository", "coordinatorScratch", "referencePaths", "referenceRecords", "reviewScope", "reviewMode"]
+    : ["selection", "expectedTuple", "repository", "coordinatorScratch", "referencePaths", "referenceRecords", "reviewBase", "reviewMode"], "native Critic host input");
   exactKeys(value.repository, ["root", "cliPath"], "native Critic repository");
   exactKeys(value.coordinatorScratch, ["path"], "native Critic coordinator scratch");
   if (!Array.isArray(value.referencePaths) || value.referencePaths.length === 0 || new Set(value.referencePaths).size !== value.referencePaths.length
     || value.referencePaths.some((path) => typeof path !== "string" || path.length === 0 || path.startsWith("/") || path.includes("\\") || path.split("/").some((part) => !part || part === "." || part === ".."))) fail("native Critic references are invalid");
-  if (!COMMIT.test(value.reviewBase)) fail("native Critic review base is invalid");
+  const reviewScope = artifact ? validateNativeCriticArtifactScope(value.reviewScope) : null;
+  if (!artifact && !COMMIT.test(value.reviewBase)) fail("native Critic review base is invalid");
   if (value.reviewMode !== "full") fail("native Critic review mode is unsupported");
   if (!Array.isArray(value.referenceRecords) || value.referenceRecords.length !== value.referencePaths.length || value.referenceRecords.length > 128) fail("native Critic reference records are invalid");
   const recordPaths = value.referenceRecords.map((record) => record?.path);
   if (JSON.stringify(recordPaths) !== JSON.stringify(value.referencePaths)) fail("native Critic record paths drifted");
+  const scopedPaths = new Set(reviewScope?.paths ?? []);
   for (const record of value.referenceRecords) {
     if (record?.blobOid !== undefined) {
-      exactKeys(record, ["path", "blobOid", "sha256"], "native source reference");
-      if (!TREE.test(record.blobOid) || !SHA256.test(record.sha256)) fail("native source record is invalid");
+      exactKeys(record, scopedPaths.has(record.path) ? ["path", "blobOid", "sha256", "mode"] : ["path", "blobOid", "sha256"], "native source reference");
+      if (!TREE.test(record.blobOid) || !SHA256.test(record.sha256) || (scopedPaths.has(record.path) && !REGULAR_MODE.has(record.mode))) fail("native source record is invalid");
     } else {
       exactKeys(record, ["path", "sha256", "candidate"], "native evidence reference");
       exactKeys(record.candidate, ["commit", "tree"], "native evidence candidate");
       if (!SHA256.test(record.sha256) || !COMMIT.test(record.candidate.commit) || !TREE.test(record.candidate.tree)) fail("native evidence record is invalid");
     }
   }
+  if (reviewScope !== null && reviewScope.paths.some((path) => !value.referenceRecords.some((record) => record.path === path && record.blobOid !== undefined && REGULAR_MODE.has(record.mode)))) {
+    fail("native Critic current artifact is missing source coverage");
+  }
   if (value.selection?.dispatch?.referenceSetSha256 !== nativeCriticCanonicalDigest(value.referenceRecords)) fail("native Critic reference-set digest drifted");
+  if (reviewScope !== null && value.selection?.dispatch?.requestSha256 !== nativeCriticArtifactRequestDigest({
+    candidateCommit: value.selection?.dispatch?.candidateCommit,
+    candidateTree: value.selection?.dispatch?.candidateTree,
+    referenceSetSha256: value.selection?.dispatch?.referenceSetSha256,
+    reviewMode: value.reviewMode,
+    reviewScope,
+  })) fail("native Critic current-artifact request digest drifted");
   validateNativeCriticTuple(value.expectedTuple);
   return value;
 }
@@ -192,7 +210,7 @@ function observePhysical(input, dependencies) {
   const bootId = readText("/proc/sys/kernel/random/boot_id", "utf8").trim();
   if (!bootId) fail("boot identifier is unavailable");
   const candidateTree = exec("git", ["rev-parse", `${input.selection.dispatch.candidateCommit}^{tree}`], { cwd: repoRoot, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
-  exec("git", ["cat-file", "-e", `${input.reviewBase}^{commit}`], { cwd: repoRoot, stdio: "ignore" });
+  if (input.reviewScope === undefined) exec("git", ["cat-file", "-e", `${input.reviewBase}^{commit}`], { cwd: repoRoot, stdio: "ignore" });
   if (candidateTree !== input.selection.dispatch.candidateTree) fail("candidate tree drifted");
   for (const record of input.referenceRecords) {
     const absolute = resolve(repoRoot, record.path);
@@ -202,6 +220,12 @@ function observePhysical(input, dependencies) {
       const blobOid = exec("git", ["rev-parse", `${input.selection.dispatch.candidateCommit}:${record.path}`], { cwd: repoRoot, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
       const candidateBytes = exec("git", ["show", `${input.selection.dispatch.candidateCommit}:${record.path}`], { cwd: repoRoot, encoding: null, stdio: ["ignore", "pipe", "ignore"] });
       if (blobOid !== record.blobOid || createHash("sha256").update(candidateBytes).digest("hex") !== record.sha256) fail("candidate source reference drifted");
+      if (input.reviewScope?.paths.includes(record.path)) {
+        const row = exec("git", ["ls-tree", "-z", input.selection.dispatch.candidateCommit, "--", record.path], { cwd: repoRoot, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+        const match = row.match(/^(\d{6}) blob ([a-f0-9]+)\t/s);
+        const physicalMode = (lstatSync(absolute).mode & 0o100) !== 0 ? "100755" : "100644";
+        if (!match || !REGULAR_MODE.has(match[1]) || match[1] !== record.mode || match[2] !== record.blobOid || physicalMode !== record.mode) fail("candidate current-artifact source drifted");
+      }
     } else {
       let evidence;
       try { evidence = JSON.parse(bytes); } catch { fail("candidate evidence is not JSON"); }
@@ -331,7 +355,7 @@ function validateChild(result, selection, tuple, verdictSchema, terminal) {
  */
 export async function invokeCodexNativeCriticHost(rawInput, dependencies = {}) {
   let input; let selection;
-  try { input = validateInput(rawInput); selection = input.selection; }
+  try { input = structuredClone(validateInput(rawInput)); selection = input.selection; }
   catch { return boundedFailure("input-invalid"); }
   const nowMs = dependencies.nowMs ?? Date.now();
   const resolveRoute = dependencies.resolveRoute ?? resolveCriticHighRiskRoute;
@@ -346,7 +370,8 @@ export async function invokeCodexNativeCriticHost(rawInput, dependencies = {}) {
     codexPath: physical.cliPath, cwd: physical.repoRoot, scratchPath: physical.scratch,
     model: selection.route.model, effort: selection.route.effort, referencePaths: physical.referencePaths,
     roleContractPath: physical.rolePath, promptContractPath: physical.promptPath, verdictSchemaPath: physical.verdictPath,
-    candidateCommit: selection.dispatch.candidateCommit, candidateTree: selection.dispatch.candidateTree, reviewBase: input.reviewBase,
+    candidateCommit: selection.dispatch.candidateCommit, candidateTree: selection.dispatch.candidateTree,
+    ...(input.reviewScope === undefined ? { reviewBase: input.reviewBase } : { reviewScope: input.reviewScope }),
     reviewMode: input.reviewMode, sandboxMode: "native-tools-read-only",
   };
   let child;
@@ -386,6 +411,13 @@ export async function invokeCodexNativeCriticHost(rawInput, dependencies = {}) {
     terminal,
     verdictSha256: nativeCriticCanonicalDigest(checked.verdict),
     assurance: structuredClone(NATIVE_CRITIC_ASSURANCE),
+    ...(input.reviewScope === undefined ? {} : {
+      reviewScope: structuredClone(input.reviewScope),
+      sourceCoverage: input.reviewScope.paths.map((path) => {
+        const record = input.referenceRecords.find((entry) => entry.path === path);
+        return { path: record.path, blobOid: record.blobOid, sha256: record.sha256, mode: record.mode };
+      }),
+    }),
   };
   return { schema: "pipeline.codex-native-critic-host-result.v1", status: "reviewed", verdict: checked.verdict, receipt };
 }

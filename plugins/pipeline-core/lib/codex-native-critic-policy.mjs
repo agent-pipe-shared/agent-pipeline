@@ -58,6 +58,47 @@ export function nativeCriticCanonicalDigest(value) {
   return createHash("sha256").update(canonicalNativeCriticJson(value), "utf8").digest("hex");
 }
 
+function nativeArtifactPath(value) {
+  if (typeof value !== "string" || value.length === 0 || value.length > 240 || value.trim() !== value
+    || value.includes("\\") || value.includes("\0") || value.startsWith("/") || value.startsWith("./") || value.endsWith("/")) {
+    fail("current-artifact path is invalid");
+  }
+  if (value.split("/").some((part) => part === "" || part === "." || part === "..")) fail("current-artifact path is invalid");
+  return value;
+}
+
+/** Validates the closed current-artifact review scope shared by coordinator and host. */
+export function validateNativeCriticArtifactScope(value) {
+  exactKeys(value, ["kind", "paths"], "current-artifact review scope");
+  if (value.kind !== "current-artifacts" || !Array.isArray(value.paths) || value.paths.length === 0 || value.paths.length > 128) {
+    fail("current-artifact review scope is invalid");
+  }
+  const paths = value.paths.map(nativeArtifactPath);
+  const ordered = [...paths].sort();
+  if (new Set(paths).size !== paths.length || JSON.stringify(paths) !== JSON.stringify(ordered)) fail("current-artifact paths are not lexical unique");
+  return { kind: "current-artifacts", paths };
+}
+
+/**
+ * Canonical selection binding for the current-artifact alternative only.
+ * Range dispatches deliberately retain their established request convention.
+ */
+export function nativeCriticArtifactRequestDigest(value) {
+  exactKeys(value, ["candidateCommit", "candidateTree", "referenceSetSha256", "reviewMode", "reviewScope"], "current-artifact request");
+  if (!COMMIT_SHA.test(value.candidateCommit) || !OID.test(value.candidateTree)) fail("current-artifact candidate is invalid");
+  digest(value.referenceSetSha256, "current-artifact reference set digest");
+  if (value.reviewMode !== "full") fail("current-artifact review mode is unsupported");
+  const reviewScope = validateNativeCriticArtifactScope(value.reviewScope);
+  return nativeCriticCanonicalDigest({
+    schema: "pipeline.codex-native-critic-current-artifact-request.v1",
+    candidateCommit: value.candidateCommit,
+    candidateTree: value.candidateTree,
+    referenceSetSha256: value.referenceSetSha256,
+    reviewMode: value.reviewMode,
+    reviewScope,
+  });
+}
+
 export function validateNativeCriticPolicy(value) {
   exactKeys(value, ["threadSandbox", "turn"], "native policy");
   exactKeys(value.turn, ["type", "networkAccess"], "native turn policy");

@@ -14,7 +14,7 @@ import { bindSandboxedReadonlyDuty, buildSandboxedReadonlyRequest, validateSandb
 import { sandboxSelectionDigest } from "../scripts/codex-sandbox-select.mjs";
 import { invokeCodexNativeCriticHost, runFixedChild } from "../scripts/codex-native-critic-host.mjs";
 import { repositoryFingerprint } from "../lib/codex-onboarding-runtime.mjs";
-import { buildNativeCriticSelection, nativeCriticCanonicalDigest } from "./codex-native-critic-policy.mjs";
+import { buildNativeCriticSelection, nativeCriticArtifactRequestDigest, nativeCriticCanonicalDigest } from "./codex-native-critic-policy.mjs";
 import { NATIVE_CRITIC_PROHIBITED_FEATURES, NATIVE_CRITIC_REDUCING_CONFIG_SHA256, nativeCriticToolSurfaceConfigDigest, nativeCriticToolSurfaceObservationDigest, reduceDiscoveredNativeMcpServers } from "./codex-native-critic-tools.mjs";
 
 const D = "a".repeat(64);
@@ -188,6 +188,21 @@ function nativeDependencies(response = nativeChild()) {
   };
 }
 function nativeInput() { return { selection: nativeSelection(), expectedTuple: NATIVE_TUPLE, repository: { root: process.cwd(), cliPath: process.execPath }, coordinatorScratch: { path: process.cwd() }, referencePaths: ["templates/prompts/critic-review.md"], referenceRecords: NATIVE_RECORDS, reviewBase: "a".repeat(40), reviewMode: "full" }; }
+function nativeArtifactInput() {
+  const reviewScope = { kind: "current-artifacts", paths: ["templates/prompts/critic-review.md"] };
+  const referenceRecords = [{ ...NATIVE_RECORDS[0], mode: "100644" }];
+  const referenceSetSha256 = nativeCriticCanonicalDigest(referenceRecords);
+  const selection = nativeSelection();
+  selection.dispatch = {
+    ...selection.dispatch,
+    referenceSetSha256,
+    requestSha256: nativeCriticArtifactRequestDigest({
+      candidateCommit: selection.dispatch.candidateCommit, candidateTree: selection.dispatch.candidateTree,
+      referenceSetSha256, reviewMode: "full", reviewScope,
+    }),
+  };
+  return { selection, expectedTuple: NATIVE_TUPLE, repository: { root: process.cwd(), cliPath: process.execPath }, coordinatorScratch: { path: process.cwd() }, referencePaths: ["templates/prompts/critic-review.md"], referenceRecords, reviewScope, reviewMode: "full" };
+}
 
 test("native Critic consumer accepts and forwards only full exact-range review mode", async () => {
   let childRequest = null;
@@ -204,6 +219,67 @@ test("native Critic consumer accepts and forwards only full exact-range review m
   assert.equal(childRequest.reviewBase, "a".repeat(40));
   assert.equal(childRequest.candidateCommit, "b".repeat(40));
   assert.equal(Object.hasOwn(childRequest, "priorReceipt"), false);
+});
+
+test("native Critic binds a full current-artifact review to its source coverage and receipt", async () => {
+  let childRequest = null;
+  const value = await invokeCodexNativeCriticHost(nativeArtifactInput(), {
+    ...nativeDependencies(),
+    runChild: async (request) => { childRequest = request; return nativeChild(); },
+  });
+  assert.equal(value.status, "reviewed");
+  assert.equal(Object.hasOwn(childRequest, "reviewBase"), false);
+  assert.deepEqual(childRequest.reviewScope, { kind: "current-artifacts", paths: ["templates/prompts/critic-review.md"] });
+  assert.deepEqual(value.receipt.reviewScope, childRequest.reviewScope);
+  assert.deepEqual(value.receipt.sourceCoverage.map(({ path, mode }) => ({ path, mode })), [{ path: "templates/prompts/critic-review.md", mode: "100644" }]);
+});
+
+test("native Critic snapshots artifact scope and source coverage before awaiting the child", async () => {
+  const input = nativeArtifactInput();
+  const value = await invokeCodexNativeCriticHost(input, {
+    ...nativeDependencies(),
+    runChild: async () => {
+      input.reviewScope.paths[0] = "caller-mutated.md";
+      input.referenceRecords[0].mode = "100755";
+      return nativeChild();
+    },
+  });
+  assert.equal(value.status, "reviewed");
+  assert.deepEqual(value.receipt.reviewScope.paths, ["templates/prompts/critic-review.md"]);
+  assert.equal(value.receipt.sourceCoverage[0].mode, "100644");
+});
+
+test("native Critic rejects artifact scope omission, mixed input, and stale artifact request digests before child creation", async () => {
+  const cases = [
+    (input) => { input.referenceRecords[0] = { path: input.referenceRecords[0].path, blobOid: input.referenceRecords[0].blobOid, sha256: input.referenceRecords[0].sha256 }; },
+    (input) => { input.reviewBase = "a".repeat(40); },
+  ];
+  for (const mutate of cases) {
+    const input = nativeArtifactInput();
+    mutate(input);
+    let spawned = false;
+    const value = await invokeCodexNativeCriticHost(input, { ...nativeDependencies(), runChild: async () => { spawned = true; return nativeChild(); } });
+    assert.equal(value.code, "input-invalid");
+    assert.equal(spawned, false);
+  }
+  const input = nativeArtifactInput();
+  const additional = { path: "roles/critic.md", blobOid: "8".repeat(40), sha256: "9".repeat(64), mode: "100644" };
+  input.referencePaths.push(additional.path);
+  input.referenceRecords.push(additional);
+  const referenceSetSha256 = nativeCriticCanonicalDigest(input.referenceRecords);
+  input.selection.dispatch = {
+    ...input.selection.dispatch,
+    referenceSetSha256,
+    requestSha256: nativeCriticArtifactRequestDigest({
+      candidateCommit: input.selection.dispatch.candidateCommit, candidateTree: input.selection.dispatch.candidateTree,
+      referenceSetSha256, reviewMode: input.reviewMode, reviewScope: input.reviewScope,
+    }),
+  };
+  input.reviewScope = { kind: "current-artifacts", paths: [additional.path] };
+  let spawned = false;
+  const stale = await invokeCodexNativeCriticHost(input, { ...nativeDependencies(), runChild: async () => { spawned = true; return nativeChild(); } });
+  assert.equal(stale.code, "input-invalid");
+  assert.equal(spawned, false);
 });
 
 test("native Critic rejects missing or unsupported review mode before it can spawn a child", async () => {
@@ -338,6 +414,39 @@ test("native Critic default physical observer binds candidate sources and ignore
     const input = { selection: selected, expectedTuple: tuple, repository: { root, cliPath: cli }, coordinatorScratch: { path: root }, referencePaths: records.map(({ path }) => path), referenceRecords: records, reviewBase: commit, reviewMode: "full" };
     const deps = { nowMs: NATIVE_NOW, resolveRoute: () => route, runChild: async () => response, readFileSync: (path) => path === "/proc/version" ? "Linux Microsoft" : path === "/proc/self/mountinfo" ? `1 0 0:1 / ${root} rw - ext4 /dev/root rw\n` : "boot" };
     assert.equal((await invokeCodexNativeCriticHost(input, deps)).status, "reviewed");
+    const reviewScope = { kind: "current-artifacts", paths: ["specs/review.md"] };
+    const artifactRecords = [{ ...records[0], mode: "100644" }, records[1]];
+    const artifactReferenceSetSha256 = nativeCriticCanonicalDigest(artifactRecords);
+    const artifactSelection = {
+      ...selected,
+      dispatch: {
+        ...selected.dispatch,
+        referenceSetSha256: artifactReferenceSetSha256,
+        requestSha256: nativeCriticArtifactRequestDigest({ candidateCommit: commit, candidateTree: tree, referenceSetSha256: artifactReferenceSetSha256, reviewMode: "full", reviewScope }),
+      },
+    };
+    const artifactInput = { selection: artifactSelection, expectedTuple: tuple, repository: { root, cliPath: cli }, coordinatorScratch: { path: root }, referencePaths: artifactRecords.map(({ path }) => path), referenceRecords: artifactRecords, reviewScope, reviewMode: "full" };
+    const artifactResult = await invokeCodexNativeCriticHost(artifactInput, deps);
+    assert.equal(artifactResult.status, "reviewed");
+    assert.deepEqual(artifactResult.receipt.sourceCoverage.map(({ path, mode }) => ({ path, mode })), [{ path: "specs/review.md", mode: "100644" }]);
+    chmodSync(join(root, "specs", "review.md"), 0o755);
+    assert.equal((await invokeCodexNativeCriticHost(artifactInput, deps)).code, "physical-proof-unavailable");
+    chmodSync(join(root, "specs", "review.md"), 0o644);
+    writeFileSync(join(root, "specs", "review.md"), "mutated before artifact review\n");
+    assert.equal((await invokeCodexNativeCriticHost(artifactInput, deps)).code, "physical-proof-unavailable");
+    writeFileSync(join(root, "specs", "review.md"), sourceBytes);
+    const afterChildDrift = await invokeCodexNativeCriticHost(artifactInput, {
+      ...deps,
+      runChild: async () => { writeFileSync(join(root, "specs", "review.md"), "mutated during artifact review\n"); return response; },
+    });
+    assert.equal(afterChildDrift.code, "physical-proof-drift");
+    writeFileSync(join(root, "specs", "review.md"), sourceBytes);
+    const modeAfterChildDrift = await invokeCodexNativeCriticHost(artifactInput, {
+      ...deps,
+      runChild: async () => { chmodSync(join(root, "specs", "review.md"), 0o755); return response; },
+    });
+    assert.equal(modeAfterChildDrift.code, "physical-proof-drift");
+    chmodSync(join(root, "specs", "review.md"), 0o644);
     const wrongFingerprint = { ...input, selection: { ...selected, repoFingerprint: "f".repeat(64) } }; assert.equal((await invokeCodexNativeCriticHost(wrongFingerprint, deps)).code, "physical-proof-unavailable");
     writeFileSync(join(root, "specs", "review.md"), "mutated\n"); assert.equal((await invokeCodexNativeCriticHost(input, deps)).code, "physical-proof-unavailable");
     writeFileSync(join(root, "specs", "review.md"), sourceBytes); writeFileSync(join(root, "evidence", "verify-latest.json"), JSON.stringify({ candidate: { commit: "0".repeat(40), tree } })); assert.equal((await invokeCodexNativeCriticHost(input, deps)).code, "physical-proof-unavailable");
