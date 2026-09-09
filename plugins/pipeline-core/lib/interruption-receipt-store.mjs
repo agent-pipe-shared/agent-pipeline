@@ -9,6 +9,8 @@ import * as fs from "node:fs";
 import { createHash, randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { canonicalInvocationJson } from "./invocation-reliability.mjs";
+import { buildInterruptionReceipt, validateInterruptionReceipt } from "./interruption-receipts.mjs";
+import registry from "../../../policies/interruption-registry.v1.json" with { type: "json" };
 
 const CREATE_SCHEMA = "pipeline.interruption-store-create-result.v1";
 const OPERATION_SCHEMA = "pipeline.interruption-store-operation-result.v1";
@@ -18,11 +20,22 @@ const REPORT_SCHEMA = "pipeline.interruption-store-report-result.v1";
 const IO_KEYS = ["lstatSync", "realpathSync", "openSync", "fstatSync", "readSync", "writeSync", "fsyncSync", "closeSync", "mkdirSync", "linkSync", "unlinkSync", "rmdirSync", "opendirSync", "statfsSync"];
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:+-]{0,127}$/u;
 const DIGEST = /^[a-f0-9]{64}$/u;
+const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
+const PRIVATE_ID = /(?:^|[._:+-])(?:sk-|gh[pousr]_|github_pat_|AKIA[0-9A-Z]{16})/u;
 const BACKEND_ID = "linux-node24.15.0-ef53-v1";
 const EXT_TYPE = 0xef53n;
 const STORE_KEYS = ["schema", "storeId", "layoutRevision"];
 const OPERATION_KEYS = ["schema", "storeId", "operationId", "operationKind", "createdAt", "scope", "specSha256", "specPathSha256"];
 const MARKER_KEYS = ["schema", "kind", "id", "storeId", "operationId", "operationSha256", "sequence", "previousEntrySha256", "lineageId", "firstObservedAt", "files"];
+const RECEIPT_FILES = ["observation.json", "receipt.json"];
+const RECEIPT_LIMIT = 4096;
+const RECEIPT_BYTES_LIMIT = 64 * 1024 * 1024;
+const SOURCE_STAGE_CODES = Object.freeze({
+  arguments: ["CDP-ARGUMENT"], request: ["CDP-INPUT"], candidate: ["CDP-GIT", "CDP-REF", "CDP-RANGE"],
+  paths: ["CDP-PATH", "CDP-PATHS", "CDP-DUPLICATE-PATH", "CDP-EVIDENCE-REQUIRED", "CDP-PRIOR-ALIASED"], inventory: ["CDP-GIT", "CDP-TREE", "CDP-PATH"],
+  manifest: ["CDP-MANIFEST"], governance: ["CDP-GIT", "CDP-PATH"], "candidate-files": ["CDP-CANDIDATE-PATH", "CDP-CANDIDATE-READ"],
+  evidence: ["CDP-EVIDENCE-PATH", "CDP-EVIDENCE-FILE", "CDP-EVIDENCE-JSON", "CDP-EVIDENCE-BINDING"], "prior-evidence": ["CDP-EVIDENCE-PATH", "CDP-EVIDENCE-FILE"],
+});
 const FIXED_DIRECTORIES = [
   ["evidence"], ["evidence", "interruption-collection"], ["evidence", "interruption-collection", "store"],
   ["evidence", "interruption-collection", "entries"], ["evidence", "interruption-receipts"], ["telemetry"], ["telemetry", "interruptions"],
@@ -268,6 +281,56 @@ function safeContext(value) {
     ownerBinding: Object.freeze({ stateSha256: owner.stateSha256.value, continuityRevision: owner.continuityRevision.value, specSha256: owner.specSha256.value, specPathSha256: owner.specPathSha256.value }) });
 }
 
+function publicId(value) { return typeof value === "string" && ID.test(value) && !PRIVATE_ID.test(value); }
+
+function safeScope(value) {
+  const fields = shape(value, ["featureId", "packageId", "dispatchId", "phase"]);
+  if (!fields || !ID.test(fields.featureId.value) || fields.packageId.value !== null || fields.dispatchId.value !== null
+    || !(fields.phase.value === null || typeof fields.phase.value === "string" && ID.test(fields.phase.value))) return null;
+  return { featureId: fields.featureId.value, packageId: null, dispatchId: null, phase: fields.phase.value };
+}
+
+function safeOwnerBinding(value) {
+  const fields = shape(value, ["stateSha256", "continuityRevision", "specSha256", "specPathSha256"]);
+  if (!fields || ![fields.stateSha256.value, fields.specSha256.value, fields.specPathSha256.value].every((item) => typeof item === "string" && DIGEST.test(item))
+    || !Number.isSafeInteger(fields.continuityRevision.value) || fields.continuityRevision.value < 0) return null;
+  return { stateSha256: fields.stateSha256.value, continuityRevision: fields.continuityRevision.value,
+    specSha256: fields.specSha256.value, specPathSha256: fields.specPathSha256.value };
+}
+
+function safePreflightObservation(value) {
+  const fields = shape(value, ["schema", "source", "observedAt", "scope", "actor", "ownerBinding"]);
+  if (!fields || fields.schema.value !== "pipeline.critic-preflight-local-observation.v1") return null;
+  const sourceFields = shape(fields.source.value, ["schema", "producer", "observationRevision", "stage", "outcome", "code", "candidate", "specSha256"]);
+  const scope = safeScope(fields.scope.value), ownerBinding = safeOwnerBinding(fields.ownerBinding.value);
+  const actor = shape(fields.actor.value, ["runner", "role"]), observedAt = safeTime(fields.observedAt.value);
+  if (!sourceFields || !scope || !ownerBinding || !actor || !observedAt || actor.runner.value !== null || actor.role.value !== null
+    || sourceFields.schema.value !== "pipeline.critic-preflight-observation.v1" || sourceFields.producer.value !== "critic-dispatch-preflight"
+    || sourceFields.observationRevision.value !== 1 || !["rejected", "packet-ready"].includes(sourceFields.outcome.value)
+    || typeof sourceFields.stage.value !== "string" || (sourceFields.outcome.value === "rejected"
+      && sourceFields.code.value !== "CDP-UNEXPECTED" && !SOURCE_STAGE_CODES[sourceFields.stage.value]?.includes(sourceFields.code.value))
+    || (sourceFields.specSha256.value !== null && !DIGEST.test(sourceFields.specSha256.value))) return null;
+  const candidateFields = shape(sourceFields.candidate.value, ["commit", "tree"]);
+  if (!candidateFields || !OID.test(candidateFields.commit.value) || !OID.test(candidateFields.tree.value)
+    || candidateFields.commit.value.length !== candidateFields.tree.value.length) return null;
+  if (sourceFields.outcome.value === "packet-ready" && (sourceFields.stage.value !== "complete" || sourceFields.code.value !== null || sourceFields.specSha256.value === null)) return null;
+  if (sourceFields.outcome.value === "rejected" && (sourceFields.stage.value === "complete" || sourceFields.code.value === null || !Object.hasOwn(SOURCE_STAGE_CODES, sourceFields.stage.value))) return null;
+  return { schema: fields.schema.value, source: { schema: sourceFields.schema.value, producer: sourceFields.producer.value,
+    observationRevision: sourceFields.observationRevision.value, stage: sourceFields.stage.value, outcome: sourceFields.outcome.value,
+    code: sourceFields.code.value, candidate: { commit: candidateFields.commit.value, tree: candidateFields.tree.value }, specSha256: sourceFields.specSha256.value },
+  observedAt, scope, actor: { runner: null, role: null }, ownerBinding };
+}
+
+function preflightInput(value) {
+  const fields = shape(value, ["handle", "eventId", "observation"]);
+  const handle = fields ? shape(fields.handle.value, ["storeId", "operationId", "operationSha256"]) : null;
+  const observation = fields ? safePreflightObservation(fields.observation.value) : null;
+  if (!fields || !handle || !observation || !publicId(fields.eventId.value) || !ID.test(handle.storeId.value) || !ID.test(handle.operationId.value)
+    || !DIGEST.test(handle.operationSha256.value)) return null;
+  return { handle: { storeId: handle.storeId.value, operationId: handle.operationId.value, operationSha256: handle.operationSha256.value },
+    eventId: fields.eventId.value, observation };
+}
+
 function productionPlatform(root) {
   try {
     if (process.platform !== "linux" || process.versions.node !== "24.15.0" || !Number.isInteger(fs.constants.O_NOFOLLOW)
@@ -422,6 +485,101 @@ function validOperationInventory(io, entriesPath, storeId) {
     && validOperationBundle(io, join(entriesPath, name), storeId, name));
 }
 
+function sameTime(left, right) { return left.value === right.value && left.status === right.status; }
+function markerFile(marker, name) { return Array.isArray(marker.files) ? marker.files.find((file) => file?.name === name) ?? null : null; }
+
+function validReceiptBundle(io, path, rootStat, operationById, directoryName) {
+  if (!sameDirectory(io, path, rootStat)) return null;
+  const names = directoryNames(io, path, 4);
+  if (!Array.isArray(names) || names.length !== 4 || ![...names].sort().every((name, index) => name === [".commit.pending", "commit.json", ...RECEIPT_FILES][index])) return null;
+  const observationBytes = readRegular(io, join(path, "observation.json"), 1_048_576);
+  const receiptBytes = readRegular(io, join(path, "receipt.json"), 1_048_576);
+  const markerBytes = readRegular(io, join(path, "commit.json"), 4096, 2n);
+  const pendingBytes = readRegular(io, join(path, ".commit.pending"), 4096, 2n);
+  if (!observationBytes || !receiptBytes || !markerBytes || !pendingBytes || !markerBytes.equals(pendingBytes)) return null;
+  const observation = safePreflightObservation(parseCanonical(observationBytes)), receipt = parseCanonical(receiptBytes), marker = parseCanonical(markerBytes);
+  if (!observation || !receipt || !exactData(marker, MARKER_KEYS) || validateInterruptionReceipt(receipt, registry).ok !== true
+    || !markerBytes.equals(canonicalBytes(marker)) || !observationBytes.equals(canonicalBytes(observation)) || !receiptBytes.equals(canonicalBytes(receipt))
+    || marker.schema !== "pipeline.interruption-publication.v1" || marker.kind !== "receipt" || !publicId(marker.id) || sha256(Buffer.from(marker.id, "utf8")) !== directoryName || !ID.test(marker.storeId)
+    || !ID.test(marker.operationId) || !DIGEST.test(marker.operationSha256) || !Number.isSafeInteger(marker.sequence) || marker.sequence < 1
+    || !DIGEST.test(marker.previousEntrySha256) || !ID.test(marker.lineageId) || !timeInput(marker.firstObservedAt)
+    || !Array.isArray(marker.files) || marker.files.length !== 2) return null;
+  const operation = operationById.get(marker.operationId);
+  if (!operation || operation.storeId !== marker.storeId || operation.sha256 !== marker.operationSha256
+    || operation.metadata.scope.featureId !== observation.scope.featureId || operation.metadata.scope.phase !== observation.scope.phase
+    || operation.metadata.specSha256 !== observation.ownerBinding.specSha256 || operation.metadata.specPathSha256 !== observation.ownerBinding.specPathSha256
+    || observation.source.specSha256 !== null && observation.source.specSha256 !== operation.metadata.specSha256) return null;
+  const observationFile = markerFile(marker, "observation.json"), receiptFile = markerFile(marker, "receipt.json");
+  if (!observationFile || !receiptFile || !exactData(observationFile, ["name", "sha256", "byteLength", "recordSha256"])
+    || !exactData(receiptFile, ["name", "sha256", "byteLength", "recordSha256"])
+    || observationFile.sha256 !== sha256(observationBytes) || observationFile.byteLength !== observationBytes.length || observationFile.recordSha256 !== null
+    || receiptFile.sha256 !== sha256(receiptBytes) || receiptFile.byteLength !== receiptBytes.length || receiptFile.recordSha256 !== receipt.recordSha256) return null;
+  const artifact = receipt.observations.length === 1 ? receipt.observations[0].artifact : null;
+  if (receipt.eventId !== marker.id || receipt.lineageId !== marker.lineageId || !sameTime(receipt.firstObservedAt, marker.firstObservedAt)
+    || receipt.state !== "unknown" || receipt.typedCode !== observation.source.code || receipt.observedThroughAt.value !== observation.observedAt.value
+    || receipt.observedThroughAt.status !== observation.observedAt.status || receipt.scope.featureId !== observation.scope.featureId
+    || receipt.scope.packageId !== null || receipt.scope.dispatchId !== null || receipt.scope.phase !== observation.scope.phase
+    || receipt.actor.runner !== null || receipt.actor.role !== null || receipt.resolution !== null || receipt.resolvedAt.value !== null || receipt.terminalAt.value !== null
+    || receipt.attemptCount.status !== "unknown" || receipt.recoveryCount.status !== "unknown" || receipt.classification !== "unknown" || receipt.category !== "unknown"
+    || receipt.matchedRuleIds.length !== 0 || marker.files[0]?.name !== "observation.json" || marker.files[1]?.name !== "receipt.json" || receipt.observations.length !== 1 || receipt.observations[0].sourceKind !== "workflow-observer"
+    || receipt.observations[0].facts.length !== 0 || !artifact || artifact.id !== marker.id || artifact.sha256 !== sha256(observationBytes)
+    || receipt.binding.artifacts.length !== 1 || receipt.binding.artifacts[0].id !== marker.id || receipt.binding.artifacts[0].sha256 !== sha256(observationBytes)
+    || receipt.binding.candidate === null || receipt.binding.candidate.commit !== observation.source.candidate.commit || receipt.binding.candidate.tree !== observation.source.candidate.tree
+    || Object.values(receipt.joins).some((rows) => rows.length !== 0)) return null;
+  return { marker, markerSha256: sha256(markerBytes), observationBytes, receiptBytes, observation, receipt };
+}
+
+function operationInventory(io, entriesPath, storeId) {
+  if (!validOperationInventory(io, entriesPath, storeId)) return null;
+  const result = new Map();
+  for (const name of directoryNames(io, entriesPath)) {
+    const metadataBytes = readRegular(io, join(entriesPath, name, "metadata.json"));
+    const metadata = metadataBytes ? parseCanonical(metadataBytes) : null;
+    if (!metadata) return null;
+    result.set(metadata.operationId, { storeId, sha256: sha256(metadataBytes), metadata, commitSha256: sha256(readRegular(io, join(entriesPath, name, "commit.json"), 4096, 2n)) });
+  }
+  return result;
+}
+
+function receiptInventory(io, receiptsPath, rootStat, operationById) {
+  const names = directoryNames(io, receiptsPath, RECEIPT_LIMIT + 1);
+  if (!Array.isArray(names) || names.length > RECEIPT_LIMIT || !names.every((name) => /^[a-f0-9]{64}$/u.test(name))) return null;
+  const rows = [];
+  for (const name of names) {
+    const row = validReceiptBundle(io, join(receiptsPath, name), rootStat, operationById, name);
+    if (!row) return null;
+    rows.push({ name, ...row });
+  }
+  return rows;
+}
+
+function operationLineage(rows, operation) {
+  const own = rows.filter((row) => row.marker.operationId === operation.metadata.operationId).sort((left, right) => left.marker.sequence - right.marker.sequence);
+  let previous = operation.commitSha256, lineageId = null, firstObservedAt = null;
+  for (let index = 0; index < own.length; index++) {
+    const row = own[index];
+    if (row.marker.sequence !== index + 1 || row.marker.previousEntrySha256 !== previous
+      || lineageId !== null && row.marker.lineageId !== lineageId || firstObservedAt !== null && !sameTime(row.marker.firstObservedAt, firstObservedAt)) return null;
+    lineageId = row.marker.lineageId; firstObservedAt = row.marker.firstObservedAt; previous = row.markerSha256;
+  }
+  return { sequence: own.length + 1, previousEntrySha256: previous, lineageId, firstObservedAt };
+}
+
+function createReceiptBundle(io, directoryPath, observationBytes, receiptBytes, marker) {
+  const observationPath = join(directoryPath, "observation.json"), receiptPath = join(directoryPath, "receipt.json");
+  if (!exclusiveFile(io, observationPath, observationBytes) || !exclusiveFile(io, receiptPath, receiptBytes)) return false;
+  const finalMarker = { ...marker, files: [
+    { name: "observation.json", sha256: sha256(observationBytes), byteLength: observationBytes.length, recordSha256: null },
+    { name: "receipt.json", sha256: sha256(receiptBytes), byteLength: receiptBytes.length, recordSha256: parseCanonical(receiptBytes)?.recordSha256 ?? null },
+  ] };
+  const markerBytes = canonicalBytes(finalMarker), pendingPath = join(directoryPath, ".commit.pending"), commitPath = join(directoryPath, "commit.json");
+  if (!exclusiveFile(io, pendingPath, markerBytes)) return false;
+  try { io.linkSync(pendingPath, commitPath); } catch { return false; }
+  if (!fsyncDirectory(io, directoryPath)) return false;
+  const committed = readRegular(io, commitPath, 4096, 2n), pending = readRegular(io, pendingPath, 4096, 2n);
+  return committed && pending && committed.equals(markerBytes) && pending.equals(markerBytes) ? sha256(markerBytes) : false;
+}
+
 function lock(io, collectionPath, rootStat, nonce) {
   const path = join(collectionPath, ".writer-lock");
   try { io.mkdirSync(path); }
@@ -452,6 +610,105 @@ function snapshotInput(value) {
     || typeof scope[key].value === "string" && ID.test(scope[key].value));
 }
 
+function writeTopology(factory, root, lockHeld = false) {
+  const evidencePath = join(root.path, "evidence"), collectionPath = join(evidencePath, "interruption-collection");
+  for (const path of [evidencePath, collectionPath]) {
+    const found = lstat(factory.io, path);
+    if (found.state === "absent") return { code: "C1S-NOT-FOUND" };
+    if (found.state !== "present" || !sameDirectory(factory.io, path, root.stat)) return { code: "C1S-ROOT" };
+  }
+  const lockPath = join(collectionPath, ".writer-lock"), lockState = lstat(factory.io, lockPath);
+  if (lockState.state === "present" && !lockHeld) return { code: directory(lockState.stat) ? "C1S-LOCKED" : "C1S-ROOT" };
+  if (lockState.state === "present" && !directory(lockState.stat)) return { code: "C1S-ROOT" };
+  if (lockState.state === "error") return { code: "C1S-IO" };
+  const paths = { collectionPath, storePath: join(collectionPath, "store"), entriesPath: join(collectionPath, "entries"),
+    receiptsPath: join(evidencePath, "interruption-receipts"), telemetryPath: join(root.path, "telemetry"), reportsPath: join(root.path, "telemetry", "interruptions") };
+  for (const path of [paths.storePath, paths.entriesPath, paths.receiptsPath, paths.telemetryPath, paths.reportsPath]) {
+    const found = lstat(factory.io, path);
+    if (found.state === "absent") return { code: "C1S-CORRUPT" };
+    if (found.state !== "present" || !sameDirectory(factory.io, path, root.stat)) return { code: "C1S-ROOT" };
+  }
+  const storeId = validStoreBundle(factory.io, paths.storePath);
+  if (!storeId) return { code: contents(factory.io, paths.storePath) === "material" ? "C1S-INCOMPLETE" : "C1S-CORRUPT" };
+  return { code: null, storeId, ...paths };
+}
+
+function recordPreflight(factory, value, ports) {
+  const input = preflightInput(value);
+  if (!input) return incompleteWrite("C1S-SHAPE");
+  const root = safeRoot(factory.io, factory.root);
+  if (!root) return incompleteWrite("C1S-ROOT");
+  if (!platformEligible(ports.platform, root.path)) return incompleteWrite("C1S-PLATFORM");
+  const before = writeTopology(factory, root);
+  if (before.code) return incompleteWrite(before.code);
+  let nonce;
+  try { nonce = ports.randomId(); } catch { return incompleteWrite("C1S-IO"); }
+  if (!ID.test(nonce)) return incompleteWrite("C1S-IO");
+  const token = lock(factory.io, before.collectionPath, root.stat, nonce);
+  if (token === null) return incompleteWrite("C1S-LOCKED");
+  if (!token) return incompleteWrite("C1S-IO");
+  try {
+    const topology = writeTopology(factory, root, true);
+    if (topology.code) return incompleteWrite(topology.code);
+    if (topology.storeId !== input.handle.storeId) return incompleteWrite("C1S-BINDING");
+    const operations = operationInventory(factory.io, topology.entriesPath, topology.storeId);
+    if (!operations) return incompleteWrite("C1S-CORRUPT");
+    const operation = operations.get(input.handle.operationId);
+    if (!operation) return incompleteWrite("C1S-NOT-FOUND");
+    if (operation.sha256 !== input.handle.operationSha256) return incompleteWrite("C1S-BINDING");
+    if (operation.metadata.scope.featureId !== input.observation.scope.featureId || operation.metadata.scope.phase !== input.observation.scope.phase
+      || operation.metadata.specSha256 !== input.observation.ownerBinding.specSha256 || operation.metadata.specPathSha256 !== input.observation.ownerBinding.specPathSha256
+      || input.observation.source.specSha256 !== null && input.observation.source.specSha256 !== operation.metadata.specSha256) return incompleteWrite("C1S-BINDING");
+    const eventDirectory = sha256(Buffer.from(input.eventId, "utf8")), eventPath = join(topology.receiptsPath, eventDirectory);
+    const target = lstat(factory.io, eventPath);
+    if (target.state === "error") return incompleteWrite("C1S-IO");
+    const observationBytes = canonicalBytes(input.observation);
+    if (target.state === "present") {
+      if (!sameDirectory(factory.io, eventPath, root.stat)) return incompleteWrite("C1S-ROOT");
+      const committed = lstat(factory.io, join(eventPath, "commit.json"));
+      if (committed.state === "absent") return incompleteWrite("C1S-INCOMPLETE");
+      if (committed.state === "error") return incompleteWrite("C1S-IO");
+      if (!regular(committed.stat)) return incompleteWrite("C1S-ROOT");
+      const existing = validReceiptBundle(factory.io, eventPath, root.stat, operations, eventDirectory);
+      if (!existing) return incompleteWrite("C1S-CORRUPT");
+      if (existing.marker.id !== input.eventId || !existing.observationBytes.equals(observationBytes)) return incompleteWrite("C1S-CONFLICT");
+      return Object.freeze({ schema: WRITE_SCHEMA, status: "replayed", code: null, coreCode: null, eventId: input.eventId,
+        lineageId: existing.marker.lineageId, entrySha256: existing.markerSha256 });
+    }
+    const receipts = receiptInventory(factory.io, topology.receiptsPath, root.stat, operations);
+    if (!receipts) return incompleteWrite("C1S-INCOMPLETE");
+    const lineage = operationLineage(receipts, operation);
+    if (!lineage) return incompleteWrite("C1S-CORRUPT");
+    let lineageId = lineage.lineageId, firstObservedAt = lineage.firstObservedAt;
+    if (lineageId === null) {
+      try { lineageId = ports.randomId(); } catch { return incompleteWrite("C1S-IO"); }
+      if (!ID.test(lineageId)) return incompleteWrite("C1S-IO");
+      firstObservedAt = input.observation.observedAt;
+    }
+    const receiptInput = { eventId: input.eventId, lineageId, scope: input.observation.scope, actor: { runner: null, role: null }, typedCode: input.observation.source.code,
+      observations: [{ sourceKind: "workflow-observer", facts: [], artifact: { id: input.eventId, sha256: sha256(observationBytes) } }], state: "unknown",
+      firstObservedAt, observedThroughAt: input.observation.observedAt, resolvedAt: { value: null, status: "unknown" }, terminalAt: { value: null, status: "unknown" },
+      attemptCoverage: "unknown", recoveryCoverage: "unknown", joins: { invocations: [], reviews: [], usages: [], recoveries: [] }, resolution: null,
+      binding: { candidate: input.observation.source.candidate, artifacts: [{ id: input.eventId, sha256: sha256(observationBytes) }] } };
+    const built = buildInterruptionReceipt(receiptInput, registry);
+    if (!built.ok) return { ...incompleteWrite("C1S-RECEIPT"), coreCode: built.code };
+    const receiptBytes = canonicalBytes(built.receipt);
+    const retainedBytes = receipts.reduce((total, row) => total + row.observationBytes.length + row.receiptBytes.length, 0);
+    if (receipts.length >= RECEIPT_LIMIT || retainedBytes + observationBytes.length + receiptBytes.length > RECEIPT_BYTES_LIMIT) return incompleteWrite("C1S-LIMIT");
+    const made = mkdirChecked(factory.io, eventPath, root.stat);
+    if (made !== "created") return incompleteWrite(made === "root" ? "C1S-ROOT" : "C1S-IO");
+    if (!fsyncDirectory(factory.io, topology.receiptsPath)) return incompleteWrite("C1S-IO");
+    const marker = { schema: "pipeline.interruption-publication.v1", kind: "receipt", id: input.eventId, storeId: topology.storeId,
+      operationId: operation.metadata.operationId, operationSha256: operation.sha256, sequence: lineage.sequence, previousEntrySha256: lineage.previousEntrySha256,
+      lineageId, firstObservedAt, files: [] };
+    const entrySha256 = createReceiptBundle(factory.io, eventPath, observationBytes, receiptBytes, marker);
+    if (!entrySha256) return incompleteWrite("C1S-IO");
+    const readback = validReceiptBundle(factory.io, eventPath, root.stat, operations, eventDirectory);
+    if (!readback || readback.markerSha256 !== entrySha256) return incompleteWrite("C1S-IO");
+    return Object.freeze({ schema: WRITE_SCHEMA, status: "created", code: null, coreCode: null, eventId: input.eventId, lineageId, entrySha256 });
+  } finally { releaseLock(factory.io, token); }
+}
+
 /**
  * Construct a closed C1 store façade.  Construction is deliberately lazy.
  */
@@ -464,7 +721,7 @@ export function createInterruptionStore(input, ports = productionPorts) {
   };
   return Object.freeze({
     createOperation: (value) => createOperation(factory, value, ports),
-    recordPreflight: (value) => unavailableInput(value, ["handle", "eventId", "observation"]) ? incompleteWrite() : incompleteWrite("C1S-SHAPE"),
+    recordPreflight: (value) => recordPreflight(factory, value, ports),
     recordCompletion: (value) => unavailableInput(value, ["handle", "controlId", "source", "observedAt", "context"]) ? incompleteWrite() : incompleteWrite("C1S-SHAPE"),
     recordDiagnostic: (value) => unavailableInput(value, ["handle", "controlId", "code", "observedAt"]) ? incompleteWrite() : incompleteWrite("C1S-SHAPE"),
     readOperation: read(operationInput, operationResult),
