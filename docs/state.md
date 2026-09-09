@@ -24,40 +24,42 @@
 | 2026-08-11 to 2026-08-19 | Checkpoints 1-60 (2026-08-11 through 2026-08-19 checkpoint 60): superseded session narrative; durable decisions already live in ADRs/backlog/guardrails per this repo's own standing convention, not uniquely in this prose. | [docs/state-archive/2026-08-19--checkpoints-1-through-60.md](state-archive/2026-08-19--checkpoints-1-through-60.md) |
 | 2026-08-26 | 2026-08-25 Antigravity chat-gate-ceremony standardization, verify-tuner stage 2 acceptance, sprint-agy-runner delta4 Critic fix and candidate status | [docs/state-archive/2026-08-26--agy-runner-2026-08-25-handover.md](state-archive/2026-08-26--agy-runner-2026-08-25-handover.md) |
 
-## Current handover — 2026-09-08: local candidate repairs and ADR coverage
+## Current handover — 2026-09-09: candidate evidence and remaining closure
 
 **Lifecycle phase:** feature `sprint-nova-epic` · phase `implementation`
 
 The candidate contract is
 `specs/sprint-nova-epic/design/2026-09-07-local-candidate-delta.md`.
-The PO resumed autonomous work on 2026-09-08: finish the current checks, then
-continue D.2–D.6 for 0.6.2 and suitable approved Nova-B work. Collect concrete
-PO decisions/signatures and continue independent packages at blockers. The
-latest instruction is to stamp again only when the PO returns. No push,
-release or installed-plugin update is authorized; local testing precedes release.
+The PO returned on 2026-09-09 and separately authorized a feature-branch push
+once the candidate is final. Release and installed-plugin exchange remain
+unauthorized. The latest completed full Verify is exact and clean at
+`c597aa9d466e00fb02c6ff9a414a2ed08b4b1e8e`, tree
+`f046e6748a379c34bb6f66543a88e85b6a415943`: 517/517 terminal receipts,
+all fresh, exit 0 (`evidence/verify-latest.json`). This state correction is
+not covered by that preceding gate; a final stamp, fresh full gate and only
+then the authorized feature push remain future work.
 
-Latest completed full check: `37aa24fc327b910e6b74ba26bdcb8e1601605e7a`, local build
-`0.6.1+<runner>.20260908184831.408738b`, finished exact and clean at 514/517
-after 697.804 seconds. The reference allowance is repaired in `29c286a4`;
-the Antigravity test fixture now survives asynchronous cases in `98c63449`.
-The unchanged reference checks and 15 Antigravity cases pass, including two
-concurrent suite processes. These focused results do not replace the failed
-full gate. The selected Critic has not started. Operational pointers:
-`scratch/candidate-checkpoint-37aa24fc-20260908.json`.
+D.2 declares 35 capabilities and assigns 616 surfaces exactly once. Its actual
+public targets are complete in `bf376474`; inventory activation remains blocked
+on a genuine candidate-bound Critic PASS. D.3 frontdoor work is integrated in
+`c89d8848`; D.4 is integrated in `ad8087fe`; D.5 pages and generated reference
+have focused proof. D.6 retains its explicit missing comparable two-runner
+measurement dependency; supplied labels and the one-runner metering result do
+not establish that comparison. GG22's attended insertion is complete in
+`bdaa374b`, with seven committed pathspec regressions.
 
-D.4 is integrated in `ad8087fe`. D.2 (`b25c8696`, `8f08381f`) declares
-35 capabilities and assigns 616 surfaces exactly once; the existing obligations
-suite resolved the alleged discovery gap without a schema change. D.3's
-generated enforcement reference (`48266bb6`) and audit/security/cost pages
-(`1e7bb527`) pass focused checks. Front-door rewriting, independent inventory
-review and reader-review binding remain open.
+The authorized selected Critic attempt for `c597` failed before child
+initialization, thread, or model turn and produced no verdict; its bound,
+sanitized result is `scratch/local-candidate-critic-c597aa9d466e-1788936988168/result.json`.
+Do not infer a phase or command defect as its cause. The clean-home preflight
+does not prove inherited-home Critic startup. Separately observed EROFS and the
+version-matched installation-id startup source are a candidate cause, not a
+path-level proof. The inherited-home control is recorded at
+`scratch/codex-sandbox-inherited-init-1788938492051/result.json`.
 
-D.6's selected-file metering (`b1255de9`) passes synthetic tests; supplied
-labels are not independent classification proof. Actual comparable two-runner
-bundles remain missing. File-boundary containment (`38ecc0a0`) passes all 250
-lifecycle cases and retains caller protection. Full Verify and Critic remain
-required. Permanent GG22 regressions need an attended protected-test edit;
-the operator step is being prepared, not yet applied.
+A genuine Critic PASS remains required before inventory activation, then a
+fresh two-stage reader review and its committed binding. A final new stamp,
+fresh full gate, and the authorized feature push remain future work.
 
 The PO completed model-authority commit `f895abaf` and attended Claude hook
 commit `2dab5966`; both were read back against the expected changes. Active
@@ -90,13 +92,13 @@ GitLab has imported successful Desktop/WSL read evidence, validated locally;
 see `backlog/evidence/2026-09-07-gitlab-read-access-observation.md`. This is neither
 a new Nova network execution nor B2 CI/worker proof. Reads only are authorized.
 
-An earlier complete Verify run was **505/517, failed**, exactly bound to
+Historical Verify evidence: an earlier complete run was **505/517, failed**, exactly bound to
 `94bbc6a6ac0e17c91af08e1370810d5b06e55af3`, tree
 `c2808190083ad81e98b527fc7a971698d81a72a6`, with clean start and finish.
 Read `evidence/verify-1788823644708-c3279dedde58cddd.json` for its twelve failed
-steps. Later focused repairs do not change that historical result. The newer
-514/517 run is recorded above. A new full green gate and genuine selected Codex
-Critic remain required; another local stamp waits for the PO's return.
+steps. The 514/517 run at `37aa24fc` is also historical. Neither is the current
+gate; `evidence/verify-latest.json` is the current exact 517/517 proof for
+`c597`. A future full gate is nevertheless required after final candidate changes.
 
 All three collected PO steps are complete: the human project-model mirror
 commit `5971da14`, the four separately transcribed Critic integrity pins
