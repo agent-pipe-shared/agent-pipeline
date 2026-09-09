@@ -1628,6 +1628,7 @@ check("the actual child admits native-tools only after native policy, complete f
       ["candidate show", `${nativeGitPrefix} show --no-ext-diff --no-textconv ${candidate} --`],
       ["base rev-parse", `${nativeGitPrefix} rev-parse --verify ${base}^{commit}`],
       ["candidate tree rev-parse", `${nativeGitPrefix} rev-parse --verify ${candidate}^{tree}`],
+      ["bound candidate tree rev-parse", `${nativeGitPrefix} rev-parse --verify ${"d".repeat(40)}`],
       ["bounded status", `${nativeGitPrefix} status --porcelain=v1 --untracked-files=no`],
     ]) {
       const result = runActualCriticChild(childPath, writeFakeCriticAppServer(fixture, [
@@ -1664,6 +1665,7 @@ check("the actual child admits native-tools only after native policy, complete f
     for (const [name, command, actionCommand] of [
       ["bound role contract", `cat ${join(DEFAULT_PIPELINE_ROOT, "plugins/pipeline-core/roles/critic.md")}`, `cat ${join(DEFAULT_PIPELINE_ROOT, "plugins/pipeline-core/roles/critic.md")}`],
       ["wrapped bound prompt contract", `bash -lc 'cat ${join(DEFAULT_PIPELINE_ROOT, "plugins/pipeline-core/templates/prompts/critic-review.md")}'`, `cat ${join(DEFAULT_PIPELINE_ROOT, "plugins/pipeline-core/templates/prompts/critic-review.md")}`],
+      ["wrapped multiple candidate reads", "bash -lc 'cat plugins/pipeline-core/scripts/critic-verdict.schema.json plugins/pipeline-core/skills/pipeline-start/SKILL.md'", "cat plugins/pipeline-core/scripts/critic-verdict.schema.json plugins/pipeline-core/skills/pipeline-start/SKILL.md"],
       ["wrapped bound Python content read", `/bin/sh -c "from pathlib import Path\nprint(Path('${join(DEFAULT_PIPELINE_ROOT, "plugins/pipeline-core/roles/critic.md")}').read_text())"`, `from pathlib import Path\nprint(Path('${join(DEFAULT_PIPELINE_ROOT, "plugins/pipeline-core/roles/critic.md")}').read_text())`],
       ["semicolon-separated bound Python content read", `/bin/sh -c "from pathlib import Path; print(Path('${join(DEFAULT_PIPELINE_ROOT, "plugins/pipeline-core/roles/critic.md")}').read_text())"`, `from pathlib import Path; print(Path('${join(DEFAULT_PIPELINE_ROOT, "plugins/pipeline-core/roles/critic.md")}').read_text())`],
     ]) {

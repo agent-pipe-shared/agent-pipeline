@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import { nativeCriticCanonicalDigest } from "./codex-native-critic-policy.mjs";
+import { lstatSync, realpathSync } from "node:fs";
+import { isAbsolute, relative, resolve } from "node:path";
 import { parseGuardCommand } from "../hooks/guard-command-grammar.mjs";
 
 export const NATIVE_CRITIC_PROHIBITED_FEATURES = Object.freeze([
@@ -68,12 +70,14 @@ function isBoundPathSuffix(argv, offset, referencePaths) {
 export function isNativeCriticBoundedGitReadCommand(command, {
   cwd,
   candidateCommit,
+  candidateTree,
   reviewBase,
   referencePaths,
 } = {}) {
   if (typeof command !== "string" || command.length === 0 || command.length > 8192
     || typeof cwd !== "string" || !cwd.startsWith("/")
     || !/^[0-9a-f]{40}$/.test(candidateCommit ?? "")
+    || !/^[0-9a-f]{40}$/.test(candidateTree ?? "")
     || !/^[0-9a-f]{40}$/.test(reviewBase ?? "")
     || !Array.isArray(referencePaths) || referencePaths.length === 0
     || new Set(referencePaths).size !== referencePaths.length
@@ -94,7 +98,8 @@ export function isNativeCriticBoundedGitReadCommand(command, {
   }
   if (args[0] === "rev-parse") {
     return args.length === 3 && args[1] === "--verify"
-      && (args[2] === `${reviewBase}^{commit}` || args[2] === `${candidateCommit}^{commit}` || args[2] === `${candidateCommit}^{tree}`);
+      && (args[2] === `${reviewBase}^{commit}` || args[2] === `${candidateCommit}^{commit}`
+        || args[2] === `${candidateCommit}^{tree}` || args[2] === candidateTree);
   }
   return args.length === 3 && args[0] === "status" && args[1] === "--porcelain=v1" && args[2] === "--untracked-files=no";
 }
@@ -113,13 +118,25 @@ export function nativeCriticUnknownGitActionMatchesCommand(command, actionComman
     && argv.length === 2 && ["-c", "-lc"].includes(argv[0]) && argv[1] === actionCommand;
 }
 
-function isBoundNativeCriticContentPath(path, request) {
-  if (typeof path !== "string" || !path.startsWith("/") || !request || typeof request.cwd !== "string") return false;
-  const contractPaths = [request.roleContractPath, request.promptContractPath, request.verdictSchemaPath];
-  const referencePaths = Array.isArray(request.referencePaths)
-    ? request.referencePaths.map((referencePath) => `${request.cwd}/${referencePath}`)
-    : [];
-  return [...contractPaths, ...referencePaths].includes(path);
+function isNativeCriticCandidateReadPath(path, request) {
+  if (typeof path !== "string" || path.length === 0 || path.startsWith("-")
+    || !request || typeof request.cwd !== "string") return false;
+  const contracts = [request.roleContractPath, request.promptContractPath, request.verdictSchemaPath];
+  const absoluteContract = isAbsolute(path) && contracts.includes(path);
+  if (!absoluteContract && (isAbsolute(path) || path.includes("\\")
+    || path.split("/").some((part) => !part || part === "." || part === ".."))) return false;
+  try {
+    const supplied = absoluteContract ? path : resolve(request.cwd, path);
+    const suppliedStat = lstatSync(supplied);
+    if (!suppliedStat.isFile() || suppliedStat.isSymbolicLink()) return false;
+    const physical = realpathSync(supplied);
+    if (absoluteContract) return physical === realpathSync(path);
+    const root = realpathSync(request.cwd);
+    const rel = relative(root, physical);
+    return !isAbsolute(rel) && rel !== ".." && !rel.startsWith(`..${"/"}`);
+  } catch {
+    return false;
+  }
 }
 
 function isBoundNativeCriticPythonReadCommand(command, request) {
@@ -127,15 +144,15 @@ function isBoundNativeCriticPythonReadCommand(command, request) {
   // content-only expression emitted by the native model before it falls back
   // to cat: a Path construction followed directly by read_text().
   const match = /^from pathlib import Path(?:\n|;\s*)print\(Path\((['"])([^'"\n]+)\1\)\.read_text\(\)\)$/.exec(command);
-  return match !== null && isBoundNativeCriticContentPath(match[2], request);
+  return match !== null && isNativeCriticCandidateReadPath(match[2], request);
 }
 
 /**
  * The native model currently exposes some simple file reads as
- * CommandAction::Unknown. Admit only a direct `cat`, or the one observed
- * Path(...).read_text() expression, for a contract or already-bound reference
- * set; no generic interpreter, glob, option, directory, or unbound filesystem
- * path can enter this allowance.
+ * CommandAction::Unknown. Admit a direct `cat` over physical regular files in
+ * the bound candidate, or the one observed Path(...).read_text() expression.
+ * Absolute reads remain limited to the three bound contracts; paths escaping
+ * the candidate, options, directories and symlinks remain excluded.
  */
 export function nativeCriticUnknownContentReadMatchesCommand(command, actionCommand, request) {
   if (typeof command !== "string" || typeof actionCommand !== "string") return false;
@@ -145,8 +162,8 @@ export function nativeCriticUnknownContentReadMatchesCommand(command, actionComm
   if (parsedAction.parseStatus === "accepted" && parsedAction.operators.length === 0
     && parsedAction.redirects.length === 0 && parsedAction.segments.length === 1) {
     const [{ executable, argv }] = parsedAction.segments;
-    boundedCat = ["cat", "/bin/cat", "/usr/bin/cat"].includes(executable) && argv.length === 1
-      && isBoundNativeCriticContentPath(argv[0], request);
+    boundedCat = ["cat", "/bin/cat", "/usr/bin/cat"].includes(executable) && argv.length > 0
+      && argv.every((path) => isNativeCriticCandidateReadPath(path, request));
   }
   if (!boundedCat && !boundedPythonRead) return false;
   if (command === actionCommand) return true;
