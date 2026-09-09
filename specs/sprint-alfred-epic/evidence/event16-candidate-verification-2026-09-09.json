@@ -1,0 +1,129 @@
+{
+  "schema": "alfred.event16-candidate-verification.v1",
+  "candidate": {
+    "commit": "84eeb02fc4b7aec0f808d8549efb48993d0c5045",
+    "tree": "45c06156e5aaeda91bda4be17efb11df03a24560"
+  },
+  "runId": "verify-1788929871077-ee3ad285ad8f9661",
+  "startedAt": "2026-09-09T04:57:51.055Z",
+  "finishedAt": "2026-09-09T05:08:45.681Z",
+  "verify": {
+    "exitCode": 1,
+    "total": 508,
+    "passed": 500,
+    "failures": [
+      {
+        "name": "setup-tests",
+        "exitCode": 1,
+        "durationMs": 454,
+        "reused": false
+      },
+      {
+        "name": "routing-projection-tests",
+        "exitCode": 1,
+        "durationMs": 340,
+        "reused": false
+      },
+      {
+        "name": "routing-projection-check",
+        "exitCode": 2,
+        "durationMs": 180,
+        "reused": false
+      },
+      {
+        "name": "codex-advisory-bootstrap-tests",
+        "exitCode": 1,
+        "durationMs": 545,
+        "reused": false
+      },
+      {
+        "name": "po-language-projection-check",
+        "exitCode": 2,
+        "durationMs": 417,
+        "reused": false
+      },
+      {
+        "name": "verify-suite-registration-tests",
+        "exitCode": 1,
+        "durationMs": 220,
+        "reused": false
+      },
+      {
+        "name": "verify-suite-registration-check",
+        "exitCode": 2,
+        "durationMs": 145,
+        "reused": false
+      },
+      {
+        "name": "pipeline-user-v3-drift-tests",
+        "exitCode": 1,
+        "durationMs": 201,
+        "reused": false
+      }
+    ],
+    "removedFailures": [
+      "security-scan"
+    ],
+    "addedFailures": []
+  },
+  "security": {
+    "exitCode": 0,
+    "findingCount": 0,
+    "scanners": [
+      {
+        "tool": "gitleaks",
+        "status": "PASS",
+        "reportStatus": "passed",
+        "findingCount": 0
+      },
+      {
+        "tool": "osv-scanner",
+        "status": "SKIPPED",
+        "reportStatus": "not-applicable",
+        "findingCount": 0
+      },
+      {
+        "tool": "semgrep",
+        "status": "PASS",
+        "reportStatus": "passed",
+        "findingCount": 0
+      },
+      {
+        "tool": "license-check",
+        "status": "PASS",
+        "reportStatus": "passed",
+        "findingCount": 0
+      }
+    ]
+  },
+  "focused": [
+    {
+      "name": "enforcement-conformance-tests",
+      "exitCode": 0,
+      "durationMs": 13171,
+      "reused": false
+    },
+    {
+      "name": "interruption-receipts-tests",
+      "exitCode": 0,
+      "durationMs": 22413,
+      "reused": false
+    },
+    {
+      "name": "critic-dispatch-preflight-tests",
+      "exitCode": 0,
+      "durationMs": 6983,
+      "reused": false
+    }
+  ],
+  "artifacts": {
+    "verify": {
+      "path": "evidence/alfred-event16-84eeb02f-verify.json",
+      "sha256": "7811959ebbcb46811ccc480f22a79b1edd3712b31f16735db5e5141505be4c64"
+    },
+    "security": {
+      "path": "evidence/alfred-event16-84eeb02f-security.json",
+      "sha256": "8ce788fff7f86cf4ce38b0d0372a0d2b09a53bbbac8b5081874afed0bd5d18aa"
+    }
+  }
+}
