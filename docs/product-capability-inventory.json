@@ -995,7 +995,7 @@
       ],
       "targets": [
         {
-          "document": "OPERATING_MODEL",
+          "document": "FLOW",
           "anchorId": "capability-release-planning-controls",
           "status": "pending"
         }

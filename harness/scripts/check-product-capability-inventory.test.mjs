@@ -18,9 +18,30 @@ function check(name, fn) {
   process.stdout.write(`ok ${passed} - ${name}\n`);
 }
 
-function inventory() {
+const FIXTURE_RECEIPT_SHA256 = "a".repeat(64);
+const PENDING_REVIEW = {
+  status: "required-before-publication",
+  receiptSha256: null,
+  reason: "Fixture-only pending review; no Critic receipt is attested.",
+};
+
+function inventory({ review = "attested", targets = "pending" } = {}) {
   const document = JSON.parse(readFileSync(inventoryPath, "utf8"));
-  document.criticReview = { status: "attested", receiptSha256: "a".repeat(64), reason: null };
+  if (review === "attested") {
+    // Fixture-only digest: it is never written to the production inventory.
+    document.criticReview = { status: "attested", receiptSha256: FIXTURE_RECEIPT_SHA256, reason: null };
+  } else if (review === "pending") {
+    document.criticReview = structuredClone(PENDING_REVIEW);
+  } else {
+    throw new Error(`Unknown review fixture state: ${review}`);
+  }
+  const targetStatus = targets === "active" ? "active" : targets === "pending" ? "pending" : null;
+  if (targetStatus === null) {
+    throw new Error(`Unknown target fixture state: ${targets}`);
+  }
+  for (const capability of document.capabilities) {
+    for (const target of capability.targets) target.status = targetStatus;
+  }
   return document;
 }
 
@@ -123,7 +144,7 @@ check("HAW-A01 discovers the complete current direct product surface", () => {
 
 check("HAW-A02 accepts an attested receipt and an honest inventory-phase pending gate", () => {
   assert.equal(validated(inventory()).ok, true);
-  const pendingReview = JSON.parse(readFileSync(inventoryPath, "utf8"));
+  const pendingReview = inventory({ review: "pending" });
   assert.equal(validated(pendingReview).ok, true);
   const finalResult = validated(pendingReview, "final");
   assert.equal(finalResult.ok, false);
@@ -166,9 +187,14 @@ for (const [name, mutate, pattern] of [
 }
 
 check("HAW-A04 final phase rejects pending front-door claims before documentation authorship", () => {
-  const result = validated(inventory(), "final");
+  const result = validated(inventory({ targets: "pending" }), "final");
   assert.equal(result.ok, false);
   assert.match(result.findings.join("\n"), /must be active during final phase/);
+});
+
+check("HAW-A04a accepts active public-target fixtures against actual documentation anchors", () => {
+  const result = validated(inventory({ targets: "active" }), "final");
+  assert.equal(result.ok, true);
 });
 
 check("HAW-A05 accepts an ancestor baseline and still requires every discovered surface to be categorized", () => {

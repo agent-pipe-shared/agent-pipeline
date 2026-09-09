@@ -48,6 +48,7 @@ Four deliberately separated roles carry the model:
 
 <!-- capability:human-accountability-roles -->
 <a id="capability-human-accountability-roles"></a>
+<!-- anchor:capability-human-accountability-roles -->
 - **Product Owner (you)** — the human gate. Sets direction, reviews outcomes, holds
   final sign-off.
 - **Elephant** — the long-lived orchestrator session. Turns your intent into a spec,
@@ -340,10 +341,14 @@ guidance or preparing a request never grants an agent an override.
 <!-- anchor:capability-organization-policy-packs -->
 <!-- capability:external-traceability-adapters -->
 <!-- anchor:capability-external-traceability-adapters -->
+<!-- capability:documentation-quality-gates -->
+<!-- anchor:capability-documentation-quality-gates -->
 **Operations.** Claude-only analysis workers, explicit local-worker
 supervision, cost/benchmark and quality checks, policy packs, and traceability
 adapters retain their stated boundaries: provider execution, external writes,
-and cross-runner cost comparisons need separate inputs and evidence.
+and cross-runner cost comparisons need separate inputs and evidence. This source
+repository's documentation-contract check validates tracked Markdown links,
+anchors, and the calibrated handover authority locally.
 
 ## Runtime
 
@@ -684,6 +689,8 @@ Anleitung oder vorbereitete Anfrage verleiht einem Agenten keine Ausnahme.
 Kosten-/Benchmark- und Qualitätschecks, Policy Packs und Traceability-Adapter
 behalten ihre genannten Grenzen: Provider-Ausführung, externe Writes und
 runnerübergreifende Kostenvergleiche benötigen getrennte Inputs und Evidenz.
+Der Documentation-Contract-Check dieses Quell-Repositorys prüft getrackte
+Markdown-Links, -Anchors und die kalibrierte Handover-Autorität lokal.
 
 ## Laufzeitumgebung
 

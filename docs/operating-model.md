@@ -369,6 +369,8 @@ Typical repository dials are:
 - project-owned guidelines and machine-checkable policies;
 - protected test paths and approved ritual extensions.
 
+<!-- capability:governance-example-extensions -->
+<!-- anchor:capability-governance-example-extensions -->
 Extensions are optional and bounded: custom PRD/spec/ADR/handover templates,
 governance guidelines, policy checks, release/deploy adapters, UI/security
 phases and organization-private adapters. They must be configured through the

@@ -172,6 +172,8 @@ call it equivalent.
 
 ## 4. Optional branches are explicit, not implied
 
+<!-- capability:release-planning-controls -->
+<!-- anchor:capability-release-planning-controls -->
 | Branch | It exists only when | Owner | Evidence | Rejoin / terminal state |
 |---|---|---|---|---|
 | Security | The manifest declares the security phase or task risk requires its configured checks. | Deterministic security harness; Elephant owns disposition. | Scanner status and exact-candidate evidence. `SKIPPED` is not `PASS`; `ERROR` fails closed. | A policy-acceptable result rejoins Critic/close. Findings or unavailable required checks enter recovery or stop. |
