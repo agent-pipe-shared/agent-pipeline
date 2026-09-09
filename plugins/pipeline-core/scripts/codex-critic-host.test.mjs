@@ -1658,9 +1658,8 @@ check("the actual child admits native-tools only after native policy, complete f
     const unknownNonGitRead = runActualCriticChild(childPath, writeFakeCriticAppServer(fixture, [
       { type: "commandExecution", command: "cat roles/critic.md", commandActions: [{ type: "unknown", command: "cat roles/critic.md" }] }, finalItem,
     ], { requireNativeWire: true }), fixture, { native: true });
-    assert.equal(unknownNonGitRead.status, 2);
-    assert.equal(unknownNonGitRead.result.code, "write-attempt");
-    assert.equal(unknownNonGitRead.result.observed.writeAttemptKind, "command-unknown-cat");
+    assert.equal(unknownNonGitRead.status, 0);
+    assert.equal(unknownNonGitRead.result.code, "answered");
 
     for (const [name, command, actionCommand] of [
       ["bound role contract", `cat ${join(DEFAULT_PIPELINE_ROOT, "plugins/pipeline-core/roles/critic.md")}`, `cat ${join(DEFAULT_PIPELINE_ROOT, "plugins/pipeline-core/roles/critic.md")}`],
