@@ -79,7 +79,14 @@ the native host validated its execution receipt. The result is **FAIL**, with
 two major preflight defects: a late protocol failure can be lost, and stdin
 errors/null frames can escape bounded failure handling. Immutable result:
 `backlog/evidence/2026-09-09-native-preflight-critic-round-1.json`.
-Task `NVA-NATIVE-PREFLIGHT-FIX-1` repairs those findings with wire regressions.
+Task `NVA-NATIVE-PREFLIGHT-FIX-1` repaired those findings in `0e8732a0`;
+focused runtime tests pass 14/14 and consumer-safe tests pass 9/9. The single
+correction review remains pending. Its scratch coordinator is
+`scratch/NVA-NATIVE-REREVIEW-COORDINATOR-1/native-rereview-coordinator.mjs`:
+it binds the original native receipt to review base `04e5883b`, retains prior
+verdict material only at the coordinator boundary, and requests full inspection
+of the exact correction range. This is coordinator lineage validation, not
+native-host lineage enforcement or a review PASS.
 This new-package review does not close the migration correction review or
 inventory/reader-checker/Nova-B coverage. Do not repeat the old initialization
 probes or infer a PASS from a completed model turn. Subsequent edits require
