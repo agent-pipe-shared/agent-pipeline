@@ -930,6 +930,10 @@ const c1StoreIo = (onCall = () => {}) => Object.fromEntries(Object.keys(producti
 }]));
 const c1UnknownTime = () => ({ value: null, status: "unknown" });
 const c1SnapshotRequest = () => ({ window: { start: c1UnknownTime(), end: c1UnknownTime() }, scope: { featureId: null, packageId: null, dispatchId: null } });
+const c1Context = () => ({ scope: { featureId: "alfred", packageId: null, dispatchId: null, phase: "implementation" },
+  ownerBinding: { stateSha256: A, continuityRevision: 1, specSha256: B, specPathSha256: C } });
+const c1EligiblePorts = (ids) => ({ io: productionPorts.io, clock: () => time(1), randomId: () => ids.shift() ?? null,
+  platform: () => ({ status: "eligible", backendId: "linux-node24.15.0-ef53-v1" }) });
 
 test("C1 store factory is descriptor-safe and performs no I/O or identity allocation", () => {
   let calls = 0;
@@ -970,5 +974,72 @@ test("C1 absent reads distinguish a lock and prepared owned material without rem
     fs.unlinkSync(`${collection}/store/metadata.json`);
     fs.mkdirSync(`${collection}/.writer-lock`);
     assert.equal(store.readSnapshot(c1SnapshotRequest()).code, "C1S-LOCKED");
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test("C1 createOperation initializes only the fixed immutable store layout on the eligible production filesystem", () => {
+  const root = fs.mkdtempSync("scratch/c1-store-create-");
+  try {
+    const result = createInterruptionStore({ root }).createOperation({ context: c1Context() });
+    assert.equal(result.ok, true, result.code);
+    assert.deepEqual(Object.keys(result).sort(), ["code", "handle", "ok", "schema"]);
+    assert.deepEqual(Object.keys(result.handle).sort(), ["operationId", "operationSha256", "storeId"]);
+    const collection = `${root}/evidence/interruption-collection`;
+    const store = JSON.parse(fs.readFileSync(`${collection}/store/metadata.json`, "utf8"));
+    assert.deepEqual(store, { schema: "pipeline.interruption-store.v1", storeId: result.handle.storeId, layoutRevision: 1 });
+    const entry = `${collection}/entries/${createHash("sha256").update(result.handle.operationId).digest("hex")}`;
+    const operation = JSON.parse(fs.readFileSync(`${entry}/metadata.json`, "utf8"));
+    assert.deepEqual(operation, { schema: "pipeline.interruption-operation.v1", storeId: result.handle.storeId, operationId: result.handle.operationId,
+      operationKind: "critic-preflight", createdAt: operation.createdAt, scope: c1Context().scope, specSha256: B, specPathSha256: C });
+    assert.equal(result.handle.operationSha256, createHash("sha256").update(canonicalInvocationJson(operation)).digest("hex"));
+    for (const path of ["store/commit.json", "store/.commit.pending", `entries/${createHash("sha256").update(result.handle.operationId).digest("hex")}/commit.json`,
+      `entries/${createHash("sha256").update(result.handle.operationId).digest("hex")}/.commit.pending`, "../interruption-receipts", "../../telemetry/interruptions"]) {
+      assert.equal(fs.lstatSync(`${collection}/${path}`).isSymbolicLink(), false);
+    }
+    assert.equal(fs.existsSync(`${collection}/.writer-lock`), false);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test("C1 createOperation preserves duplicate definitions, locks, partial bytes and unsafe components", () => {
+  const root = fs.mkdtempSync("scratch/c1-store-create-guards-");
+  try {
+    const ids = ["nonce-1", "store-1", "operation-1", "nonce-2", "operation-1"];
+    const store = createInterruptionStore({ root }, c1EligiblePorts(ids));
+    assert.equal(store.createOperation({ context: c1Context() }).ok, true);
+    assert.deepEqual(store.createOperation({ context: c1Context() }), { schema: "pipeline.interruption-store-create-result.v1", ok: false, code: "C1S-CONFLICT", handle: null });
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+
+  const lockedRoot = fs.mkdtempSync("scratch/c1-store-create-locked-");
+  try {
+    fs.mkdirSync(`${lockedRoot}/evidence/interruption-collection/.writer-lock`, { recursive: true });
+    const result = createInterruptionStore({ root: lockedRoot }, c1EligiblePorts(["nonce-1"])).createOperation({ context: c1Context() });
+    assert.deepEqual(result, { schema: "pipeline.interruption-store-create-result.v1", ok: false, code: "C1S-LOCKED", handle: null });
+    assert.equal(fs.existsSync(`${lockedRoot}/evidence/interruption-collection/.writer-lock`), true);
+  } finally { fs.rmSync(lockedRoot, { recursive: true, force: true }); }
+
+  const partialRoot = fs.mkdtempSync("scratch/c1-store-create-partial-");
+  try {
+    const path = `${partialRoot}/evidence/interruption-collection/store/metadata.json`;
+    fs.mkdirSync(`${partialRoot}/evidence/interruption-collection/store`, { recursive: true }); fs.writeFileSync(path, "partial", "utf8");
+    const result = createInterruptionStore({ root: partialRoot }, c1EligiblePorts(["nonce-1"])).createOperation({ context: c1Context() });
+    assert.equal(result.code, "C1S-INCOMPLETE"); assert.equal(fs.readFileSync(path, "utf8"), "partial");
+  } finally { fs.rmSync(partialRoot, { recursive: true, force: true }); }
+
+  const unsafeRoot = fs.mkdtempSync("scratch/c1-store-create-unsafe-");
+  const target = fs.mkdtempSync("scratch/c1-store-create-target-");
+  try {
+    fs.symlinkSync(target, `${unsafeRoot}/evidence`);
+    const result = createInterruptionStore({ root: unsafeRoot }, c1EligiblePorts(["nonce-1"])).createOperation({ context: c1Context() });
+    assert.equal(result.code, "C1S-ROOT"); assert.equal(fs.lstatSync(`${unsafeRoot}/evidence`).isSymbolicLink(), true);
+  } finally { fs.rmSync(unsafeRoot, { recursive: true, force: true }); fs.rmSync(target, { recursive: true, force: true }); }
+});
+
+test("C1 createOperation rejects malformed observer context before filesystem mutation", () => {
+  const root = fs.mkdtempSync("scratch/c1-store-create-shape-");
+  try {
+    const invalid = c1Context(); invalid.scope.packageId = "caller-selected";
+    const result = createInterruptionStore({ root }, c1EligiblePorts(["unused"])).createOperation({ context: invalid });
+    assert.deepEqual(result, { schema: "pipeline.interruption-store-create-result.v1", ok: false, code: "C1S-SHAPE", handle: null });
+    assert.deepEqual(fs.readdirSync(root), []);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
