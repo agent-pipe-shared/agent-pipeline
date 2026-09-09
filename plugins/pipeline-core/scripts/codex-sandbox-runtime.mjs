@@ -79,12 +79,31 @@ function validateHostBridge(value) {
   if (typeof value.launch !== "function" || typeof value.finalize !== "function") fail("Codex selected host bridge is invalid");
   return value;
 }
+export function coalesceInputCoveredRuntimeReads(inputRoot, runtimeReadSet) {
+  inputRoot = physicalDirectory(inputRoot, "runtime input root");
+  if (!Array.isArray(runtimeReadSet)) fail("runtime read set is invalid");
+  const prefix = `${inputRoot}/`;
+  const physicalReadPath = (path) => {
+    if (typeof path !== "string" || !isAbsolute(path) || resolve(path) !== path) fail("runtime read path must be physical");
+    if (path === "/proc/self" || path === "/dev/null") { if (!existsSync(path)) fail("runtime read path must be physical"); return path; }
+    const stat = lstatSync(path);
+    if ((!stat.isFile() && !stat.isDirectory()) || realpathSync(path) !== path) fail("runtime read path must be physical");
+    return path;
+  };
+  return [...new Set(runtimeReadSet.map(physicalReadPath))]
+    .filter((path) => path !== inputRoot && !path.startsWith(prefix))
+    .sort();
+}
 function compiledIntermediateReadback(runtime, scratch, selectedProfile = null) {
   if (!scratch || typeof scratch.path !== "string" || !SHA256.test(scratch.sha256 ?? "")) fail("Codex sandbox scratch is unavailable");
   const compiled = compilePermissionProfile("intermediate", {
     inputRoot: runtime.repoRoot,
     outputRoot: scratch.path,
-    runtimeReadSet: [...new Set([...resolveNodeRuntimeReadSet(process.execPath), runtime.codexPath, CODEX_ADVISORY_CHILD_PATH])].sort(),
+    runtimeReadSet: coalesceInputCoveredRuntimeReads(runtime.repoRoot, [
+      ...resolveNodeRuntimeReadSet(process.execPath),
+      runtime.codexPath,
+      CODEX_ADVISORY_CHILD_PATH,
+    ]),
     // The intermediate compiled form does not include deny entries, but its
     // shared compiler requires two real, non-overlapping control roots. Both
     // must be real, existing directories (compilePermissionProfile's

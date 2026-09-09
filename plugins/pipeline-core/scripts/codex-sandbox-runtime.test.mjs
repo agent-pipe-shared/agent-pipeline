@@ -3,17 +3,54 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
 import { startSessionDescriptor } from "../lib/worktree-lifecycle.mjs";
-import { createCodexSandboxRuntimeTransport } from "./codex-sandbox-runtime.mjs";
+import { coalesceInputCoveredRuntimeReads, createCodexSandboxRuntimeTransport } from "./codex-sandbox-runtime.mjs";
+import { compilePermissionProfile } from "./codex-sandbox-preflight.mjs";
 
 const SCRIPT = new URL("./codex-sandbox-runtime.mjs", import.meta.url);
 const CONTEXT = { repoFingerprint: "a".repeat(64), referenceSetSha256: "b".repeat(64) };
+
+test("covered production runtime reads are coalesced before the strict compiler while sibling reads remain explicit", (t) => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "codex-covered-reads-")));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const inputRoot = realpathSync(mkdirSync(join(root, "input"), { recursive: true }));
+  const outputRoot = realpathSync(mkdirSync(join(root, "output"), { recursive: true }));
+  const deniedRoot = realpathSync(mkdirSync(join(root, "denied"), { recursive: true }));
+  const sensitiveRoot = realpathSync(mkdirSync(join(root, "sensitive"), { recursive: true }));
+  const siblingRoot = realpathSync(mkdirSync(join(root, "input-sibling"), { recursive: true }));
+  const child = join(inputRoot, "production-helper.mjs");
+  const sibling = join(siblingRoot, "runtime-helper.mjs");
+  const outputHelper = join(outputRoot, "runtime-helper.mjs");
+  const deniedHelper = join(deniedRoot, "runtime-helper.mjs");
+  const sensitiveHelper = join(sensitiveRoot, "runtime-helper.mjs");
+  writeFileSync(child, "export {};\n");
+  writeFileSync(sibling, "export {};\n");
+  writeFileSync(outputHelper, "export {};\n");
+  writeFileSync(deniedHelper, "export {};\n");
+  writeFileSync(sensitiveHelper, "export {};\n");
+  const reads = coalesceInputCoveredRuntimeReads(inputRoot, [inputRoot, realpathSync(child), realpathSync(sibling), siblingRoot, "/proc/self", "/dev/null"]);
+  assert.deepEqual(reads, ["/dev/null", "/proc/self", realpathSync(sibling), siblingRoot].sort());
+  assert.doesNotThrow(() => compilePermissionProfile("intermediate", {
+    inputRoot, outputRoot, runtimeReadSet: reads.filter((path) => path !== siblingRoot), deniedRoots: [deniedRoot], sensitiveRoots: [sensitiveRoot], sandboxCwd: inputRoot,
+  }));
+  assert.throws(() => compilePermissionProfile("intermediate", {
+    inputRoot, outputRoot, runtimeReadSet: [realpathSync(child)], deniedRoots: [deniedRoot], sensitiveRoots: [sensitiveRoot], sandboxCwd: inputRoot,
+  }), /overlap or alias/);
+  for (const overlap of [outputHelper, deniedHelper, sensitiveHelper]) {
+    assert.throws(() => compilePermissionProfile("intermediate", {
+      inputRoot, outputRoot, runtimeReadSet: [realpathSync(overlap)], deniedRoots: [deniedRoot], sensitiveRoots: [sensitiveRoot], sandboxCwd: inputRoot,
+    }), /overlap or alias/);
+  }
+  const alias = join(root, "runtime-helper-alias.mjs");
+  symlinkSync(sibling, alias);
+  assert.throws(() => coalesceInputCoveredRuntimeReads(inputRoot, [alias]), /must be physical/);
+});
 
 test("the standard runtime adapter rejects missing or caller-shaped host coordinates before preflight or a model launch", () => {
   assert.throws(() => createCodexSandboxRuntimeTransport({ sandboxContext: CONTEXT }));
