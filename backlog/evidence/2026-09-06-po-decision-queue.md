@@ -17,6 +17,12 @@ approval gate, and prior decisions below must not be asked again.
 No new approval, review PASS, live Alfred readiness or release is asserted
 by this queue entry.
 
+For each new human decision, record the concrete question, recommendation,
+alternatives and consequences, evidence, affected package, and blocking status.
+Continue independent approved work while that package waits. Technical repair,
+focused tests, local commits and review preparation need no repeated routine
+approval. Existing answered decisions remain effective within their scope.
+
 ## PO decisions — 2026-09-07, Codex takeover
 
 These decisions supersede the waiting/recommendation text below; numbering is unchanged.
